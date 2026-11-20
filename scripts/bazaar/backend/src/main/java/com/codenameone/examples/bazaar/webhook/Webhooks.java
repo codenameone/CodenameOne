@@ -154,9 +154,11 @@ public class Webhooks {
     }
 
     /// `sha256=` and the hex HMAC-SHA256 of `body` keyed with `secret`.
+    // tag::bazaar-webhook-signature[]
     public static String signature(String secret, byte[] body) throws IOException {
         return "sha256=" + Ids.hex(Crypto.hmacSha256(secret.getBytes("UTF-8"), body));
     }
+    // end::bazaar-webhook-signature[]
 
     /// Whether `header` is the signature of `body` under `secret`, compared
     /// in constant time: what a receiver does.

@@ -22,9 +22,6 @@ import com.codename1.components.SpanLabel;
 import com.codename1.io.FileSystemStorage;
 import com.codename1.io.oidc.OidcTokens;
 import com.codename1.io.oidc.TokenStore;
-import com.codename1.maps.LatLng;
-import com.codename1.maps.MapView;
-import com.codename1.maps.vector.TileCallback;
 import com.codename1.testing.AbstractTest;
 import com.codename1.ui.Button;
 import com.codename1.ui.CN;
@@ -32,7 +29,6 @@ import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Display;
 import com.codename1.ui.Form;
-import com.codename1.ui.Graphics;
 import com.codename1.ui.Image;
 import com.codename1.ui.Label;
 import com.codename1.ui.TextArea;
@@ -44,31 +40,22 @@ import com.codenameone.examples.bazaar.net.Session;
 import com.codenameone.examples.bazaar.ui.Lang;
 import com.codenameone.examples.bazaar.ui.Look;
 import com.codenameone.examples.bazaar.ui.Nav;
-import com.codenameone.examples.bazaar.ui.Photos;
 
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.util.ArrayList;
 import java.util.Calendar;
-import java.util.List;
 import java.util.Map;
 
-/// What the end-to-end tests share. Each of them drives the real app, through
-/// its real screens, against a real server -- the one `run-e2e.sh` starts on the
-/// `test` profile, which has the four demo accounts, a geocoder that knows ten
-/// places and a text-message sender that hands the code back.
-///
-/// Three things are pinned so that a run is the same wherever it happens: the
-/// map draws from tiles bundled with the tests, a route is the straight line,
-/// and the device stands at a fixed point. None of it touches the server.
+/// What the end-to-end tests share. Each of them drives the real app against a
+/// real server -- the one `run-e2e.sh` starts on the `test` profile, which has
+/// the demo accounts and the two demo stores -- and acts for the other people in
+/// the story (the store owner, the cashier, the platform admin) through the API.
 public abstract class E2e extends AbstractTest {
     public static final String PASSWORD = "bazaar-demo";
-    public static final String CUSTOMER = "customer@bazaar.example";
-    public static final String COURIER = "courier@bazaar.example";
+    public static final String CUSTOMER = "shopper@bazaar.example";
     public static final String ADMIN = "admin@bazaar.example";
-    public static final String MERCHANT = "merchant@bazaar.example";
-    /// Where the device stands: the middle of the bundled tiles.
-    public static final LatLng HERE = new LatLng(37.8080, -122.4120);
+    public static final String MERCHANT = "owner@bazaar.example";
+    public static final String CASHIER = "cashier@bazaar.example";
 
     protected interface Check {
         boolean ok();
@@ -138,21 +125,6 @@ public abstract class E2e extends AbstractTest {
             Nav.launch();
         });
         waitForForm("Welcome");
-        quiet();
-    }
-
-    /// Puts the server back where a test expects to find it: nobody onboarding,
-    /// and the customer with no delivery under way. The tests share one server, and
-    /// without this a test that failed half way would fail the ones after it
-    /// for a reason that has nothing to do with them.
-    private void quiet() {
-        Actor.signIn(COURIER).online(false, 0, 0);
-        Actor customer = Actor.signIn(CUSTOMER);
-        String id = Actor.text(customer.get("/api/deliveries/active"), "id");
-        if (id.length() > 0) {
-            customer.post("/api/deliveries/" + id + "/cancel", null);
-        }
-        Photos.useSource(null);
     }
 
     @Override
@@ -312,90 +284,28 @@ public abstract class E2e extends AbstractTest {
         });
     }
 
-    /// The restaurant the demo merchant runs, and where its kitchen is.
-    protected static final String KITCHEN = "r-ember";
-    protected static final LatLng KITCHEN_AT = new LatLng(37.7952, -122.3934);
+    /// The demo store the tests shop in and run.
+    protected static final String STORE = "northwind";
 
-    /// The first dish of the demo kitchen's menu that is on sale and has
-    /// nothing to choose, read from the server: dish ids are made at seeding.
-    protected static String dish(Actor customer) {
-        Map<String, Object> restaurant = customer.get("/api/restaurants/" + KITCHEN + "?lat="
-                + HERE.getLatitude() + "&lng=" + HERE.getLongitude());
-        Object menu = restaurant.get("menu");
-        for (Object section : menu instanceof List ? (List<?>) menu : new ArrayList<Object>()) {
-            Object dishes = section instanceof Map ? ((Map<?, ?>) section).get("dishes") : null;
-            for (Object dish : dishes instanceof List ? (List<?>) dishes : new ArrayList<Object>()) {
-                if (!(dish instanceof Map)) {
-                    continue;
-                }
-                Map<?, ?> found = (Map<?, ?>) dish;
-                Object options = found.get("options");
-                // The parser reads a JSON boolean as the string "true".
-                if ("true".equals(String.valueOf(found.get("available")))
-                        && (!(options instanceof List) || ((List<?>) options).isEmpty())) {
-                    return String.valueOf(found.get("id"));
+    /// The id of the demo store, as the server knows it: ids are made at seeding.
+    protected static String storeId() {
+        return Actor.text(Actor.guest().get("/api/shop/stores/" + STORE), "id");
+    }
+
+    /// The first variant of the demo store's catalog that has stock to sell.
+    protected static String variantInStock(Actor who) {
+        Map<String, Object> page = who.get("/api/shop/stores/" + STORE + "/products?size=24");
+        for (Object card : Actor.maps(page.get("items"))) {
+            Map<String, Object> product = who.get("/api/shop/products/"
+                    + Actor.text((Map<String, Object>) card, "id"));
+            for (Object v : Actor.maps(product.get("variants"))) {
+                Map<String, Object> variant = (Map<String, Object>) v;
+                if (Actor.num(variant, "available") > 2) {
+                    return Actor.text(variant, "id");
                 }
             }
         }
-        throw new IllegalStateException("the demo kitchen has no plain dish on sale");
-    }
-
-    /// Puts a dish from the demo kitchen in the cart and opens the checkout,
-    /// as far as the server's price for it, which is where a test chooses
-    /// what to do next.
-    protected void cart() {
-        String dish = dish(Actor.signIn(CUSTOMER));
-        reveal("restaurant-" + KITCHEN);
-        click("restaurant-" + KITCHEN);
-        waitForForm("restaurant");
-        reveal("dish-" + dish);
-        click("dish-" + dish);
-        waitForForm("dish");
-        click("add-to-order");
-        waitForForm("restaurant");
-        click("restaurant-cart");
-        waitForForm("checkout");
-        // Enabled, not just showing a total: the button keeps the last total
-        // while a new quote is on its way, and cannot be used until it is in.
-        until(() -> text("place").indexOf("$") >= 0 && findByName("place").isEnabled(), 20000,
-                "the order to be priced");
-    }
-
-    /// The id of the order the customer has on its way.
-    protected static String placed(Actor customer) {
-        List<Object> active = customer.list("/api/orders/active");
-        return active.isEmpty() || !(active.get(0) instanceof Map) ? null
-                : Actor.text((Map<String, Object>) active.get(0), "id");
-    }
-
-    /// Waits for a delivery to be offered to `courier` and returns its id.
-    protected String offered(final Actor courier) {
-        final String[] id = new String[1];
-        until(() -> {
-            Map<String, Object> delivery = courier.get("/api/courier/active");
-            if ("OFFERED".equals(Actor.text(delivery, "state"))) {
-                id[0] = Actor.text(delivery, "id");
-            }
-            return id[0] != null;
-        }, 30000, "the offer to reach the courier");
-        return id[0];
-    }
-
-    /// A picture for the app to take as a photograph: the tests have neither
-    /// a camera nor a gallery. It is drawn rather than read from a file so
-    /// that it is the same picture wherever the tests run.
-    protected static Image photograph() {
-        Image picture = Image.createImage(640, 400, 0xffe9edf2);
-        Graphics g = picture.getGraphics();
-        g.setColor(0x2f6fed);
-        g.fillRect(0, 0, 640, 70);
-        g.setColor(0xb8c2cf);
-        g.fillRect(40, 110, 150, 190);
-        g.setColor(0x8795a7);
-        for (int line = 0; line < 5; line++) {
-            g.fillRect(230, 120 + line * 38, line % 2 == 0 ? 340 : 250, 16);
-        }
-        return picture;
+        throw new IllegalStateException("the demo store has nothing in stock");
     }
 
     // -------------------------------------------------------- screenshots
@@ -486,23 +396,12 @@ public abstract class E2e extends AbstractTest {
                 || Math.abs((a & 0xff) - (b & 0xff)) > 60;
     }
 
-    /// Waits for the screen to stop moving: transitions over, the map drawn.
+    /// Waits for the screen to stop moving: transitions over.
     private void settle() {
-        waitFor(1500);
-        until(() -> {
-            Component map = findByName("map");
-            return !(map instanceof MapView) || ((MapView) map).isMapReady();
-        }, 20000, "the map");
-        waitFor(500);
+        waitFor(2000);
     }
 
-    /// The map of the neighbourhood the tests happen in, read from the test
-    /// resources, so that a run draws the same streets with no network.
-    ///
-    /// A tile outside the bundled area is answered with an empty one. A tile
-    /// that fails is asked for again and is never drawn, and the map then
-    /// never reports itself ready -- which a test waiting to take a capture
-    /// would read as a map that is still loading.
+    /// Keeps the session's tokens in memory, so a test starts signed out.
     static final class MemoryStore implements TokenStore {
         private OidcTokens kept;
 

@@ -92,6 +92,7 @@ public class Inventory {
     /// nothing, when fewer are available -- unless the variant allows
     /// backorders, when the units are promised anyway and available goes
     /// negative. Concurrent reservations never promise the same unit twice.
+    // tag::bazaar-reserve[]
     @Transactional(rollbackFor = IOException.class)
     public boolean reserve(String storeId, String variantId, String locationId, int qty,
             String reference, String username) throws IOException {
@@ -119,6 +120,7 @@ public class Inventory {
         }
         return false;
     }
+    // end::bazaar-reserve[]
 
     /// Takes back a promise [#reserve] made: an order cancelled or edited.
     @Transactional(rollbackFor = IOException.class)

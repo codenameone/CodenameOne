@@ -30,14 +30,17 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
-/// The other person in a test. The app on screen is one user; a delivery needs
-/// two, so the second one acts through the API directly, with their own token.
+/// The other people in a test. The app on screen is one user; a sale involves
+/// several (the shopper, the store owner, the cashier, the platform admin), so the
+/// others act through the API directly, with their own tokens.
 ///
 /// Their requests opt out of the app's authorizer, which would otherwise put
 /// the on-screen user's token on anything sent to `/api`.
 final class Actor {
     private final String token;
     int status;
+    private String extraHeader;
+    private String extraValue;
 
     /// One sign-in for each account for the whole run. The server limits how
     /// often an address may sign in, as it should, and a suite that signed in
@@ -61,6 +64,11 @@ final class Actor {
 
     /// Whether `email` can sign in at this moment, asked of the server and
     /// kept by nobody: this is how a test sees a blocked account refused.
+    /// Someone who has not signed in: a shopper browsing as a guest.
+    static Actor guest() {
+        return new Actor(null);
+    }
+
     static boolean canSignIn(String email) {
         try {
             authenticate(email);
@@ -90,6 +98,13 @@ final class Actor {
         return new Actor(token[0]);
     }
 
+    /// A header the next requests carry, such as a guest cart's token.
+    Actor with(String header, String value) {
+        extraHeader = header;
+        extraValue = value;
+        return this;
+    }
+
     Map<String, Object> get(String path) {
         return send("GET", path, null);
     }
@@ -111,7 +126,12 @@ final class Actor {
             request.setContentType("application/json");
             request.setRequestBody(json);
         }
-        request.addRequestHeader("Authorization", "Bearer " + token);
+        if (token != null) {
+            request.addRequestHeader("Authorization", "Bearer " + token);
+        }
+        if (extraHeader != null && extraValue != null) {
+            request.addRequestHeader(extraHeader, extraValue);
+        }
         request.setAuthorizer(RequestAuthorizer.NONE);
         request.setReadResponseForErrors(true);
         request.setFailSilently(true);
@@ -138,14 +158,28 @@ final class Actor {
                 : new java.util.ArrayList<Object>();
     }
 
-    /// A courier's position report.
-    Map<String, Object> online(boolean online, double lat, double lng) {
-        return post("/api/courier/status", "{\"online\":" + online + ",\"lat\":" + lat
-                + ",\"lng\":" + lng + ",\"heading\":0}");
-    }
-
+    /// A JSON string, "" when it is missing.
     static String text(Map<String, Object> json, String key) {
         Object value = json.get(key);
         return value instanceof String ? (String) value : "";
+    }
+
+    /// The maps in a JSON list, or none when `value` is not a list.
+    static java.util.List<Object> maps(Object value) {
+        java.util.List<Object> out = new java.util.ArrayList<Object>();
+        if (value instanceof java.util.List) {
+            for (Object o : (java.util.List<?>) value) {
+                if (o instanceof Map) {
+                    out.add(o);
+                }
+            }
+        }
+        return out;
+    }
+
+    /// A JSON number as a long, 0 when it is missing.
+    static long num(Map<String, Object> json, String key) {
+        Object value = json.get(key);
+        return value instanceof Number ? ((Number) value).longValue() : 0;
     }
 }

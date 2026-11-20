@@ -18,133 +18,38 @@
  */
 package com.codenameone.examples.bazaar;
 
-import com.codename1.components.Switch;
-import com.codename1.ui.Component;
-
 import java.util.Map;
 
-/// The admin's screens, and a role granted from them taking effect on a token
-/// that was issued before the grant.
+/// The platform console: the admin signs in through the app, sees every store,
+/// suspends one -- whose storefront then stops answering -- and restores it.
 public class AdminTest extends E2e {
     @Override
     protected boolean run() throws Exception {
-        // Someone to promote, and a car for the map.
-        Actor customer = Actor.signIn(CUSTOMER);
-        customer.get("/api/admin/stats");
-        assertEqual(403, customer.status);
-        Actor courier = Actor.signIn(COURIER);
-        courier.online(true, HERE.getLatitude() + 0.003, HERE.getLongitude() - 0.004);
+        signIn(ADMIN, "home-admin");
+        Actor admin = Actor.signIn(ADMIN);
+        Map<String, Object> stats = admin.get("/api/admin/platform");
+        assertTrue(Actor.num(stats, "stores") >= 2, "the platform lists the demo stores");
+        String target = null;
+        for (Object o : Actor.maps(stats.get("perStore"))) {
+            Map<String, Object> s = (Map<String, Object>) o;
+            if ("littleclay".equals(Actor.text(s, "handle"))) {
+                target = Actor.text(s, "storeId");
+            }
+        }
+        assertNotNull(target, "the second demo store is listed");
 
-        onEdt(() -> AppConfig.setMode("admin"));
-        signIn(ADMIN, "Admin");
-        until(() -> text("couriersOnline").startsWith("1 /"), 20000, "one courier online");
-        shot("admin-dashboard");
-        // The charts are under the fold.
-        reveal("chartRevenue");
-        shot("admin-trends");
+        admin.post("/api/admin/stores/" + target + "/status",
+                "{\"status\":\"SUSPENDED\",\"reason\":\"e2e\"}");
+        assertEqual(200, admin.status, "the admin suspends the store");
+        assertTrue(Actor.num(admin.get("/api/admin/platform"), "suspendedStores") >= 1,
+                "the console counts it suspended");
+        Actor guest = Actor.guest();
+        guest.get("/api/shop/stores/littleclay");
+        assertTrue(guest.status >= 400, "a suspended store's storefront is closed");
 
-        click("fleet");
-        waitForForm("Fleet");
-        untilText("fleetCount", "1 courier online");
-        courier.online(false, 0, 0);
-        untilText("fleetCount", "No couriers online");
-        back();
-        waitForForm("Admin");
-
-        // The one application that is waiting, with its documents.
-        until(() -> has("alert-applications"), 20000, "the dashboard to say one is waiting");
-        click("applications");
-        waitForForm("Applications");
-        click("application-applicant@bazaar.example");
-        waitForForm("ApplicationReview");
-        untilText("applicationStatus", "Waiting");
-        click("document-licence");
-        waitForForm("Document");
-        until(() -> findByName("picture") != null, 20000, "the licence to be shown");
-        back();
-        waitForForm("ApplicationReview");
-        back();
-        waitForForm("Applications");
-        back();
-        waitForForm("Admin");
-
-        // Make the customer an admin.
-        click("users");
-        waitForForm("Users");
-        click("user-" + CUSTOMER);
-        waitForForm("User");
-        onEdt(() -> {
-            Component toggle = findByName("admin");
-            ((Switch) toggle).setValue(true);
-        });
-        // The token the customer was holding all along now opens the admin API:
-        // the server reads the account's roles on every request.
-        until(() -> {
-            customer.get("/api/admin/stats");
-            return customer.status == 200;
-        }, 20000, "the grant to reach the customer's existing token");
-        Map<String, Object> me = customer.get("/api/me");
-        assertEqual(Boolean.TRUE, bool(me.get("admin")), "/api/me reports the new role");
-
-        // And taking it away closes it again.
-        onEdt(() -> ((Switch) findByName("admin")).setValue(false));
-        until(() -> {
-            customer.get("/api/admin/stats");
-            return customer.status == 403;
-        }, 20000, "the role to be taken away again");
-
-        // Blocking signs the account out wherever it is, and says why.
-        click("block");
-        waitForForm("Reason");
-        click("confirm");
-        until(() -> text("error").length() > 0, 20000, "a block with no reason to be refused");
-        type("reason", "Asked to be locked while travelling");
-        click("confirm");
-        untilText("standing", "Blocked");
-        customer.get("/api/me");
-        assertEqual(401, customer.status, "a blocked account's token");
-        click("unblock");
-        untilText("standing", "In good standing");
-        until(() -> {
-            customer.get("/api/me");
-            return customer.status == 200;
-        }, 20000, "the block to be lifted");
-        assertTrue(findByName("event-1") != null, "both are in the account's history");
-        back();
-        waitForForm("Users");
-        back();
-        waitForForm("Admin");
-
-        // The rest of the console opens, and the prices can be saved.
-        click("deliveries");
-        waitForForm("Deliveries");
-        until(() -> has("delivery-0"), 20000, "the deliveries");
-        click("delivery-0");
-        waitForForm("DeliveryDetail");
-        back();
-        waitForForm("Deliveries");
-        back();
-        waitForForm("Admin");
-        click("payments");
-        waitForForm("Payments");
-        back();
-        waitForForm("Admin");
-        click("pricing");
-        waitForForm("Pricing");
-        until(() -> text("baseCents").length() > 0, 20000, "the prices");
-        final String base = text("baseCents");
-        type("commissionPercent", "95");
-        click("submit");
-        until(() -> text("error").length() > 0, 20000, "a commission of 95% to be refused");
-        back();
-        waitForForm("Admin");
-        click("pricing");
-        waitForForm("Pricing");
-        untilText("baseCents", base);
+        admin.post("/api/admin/stores/" + target + "/status", "{\"status\":\"ACTIVE\",\"reason\":\"\"}");
+        assertEqual(200, admin.status, "the store is restored");
+        signOut();
         return true;
-    }
-
-    private static Boolean bool(Object value) {
-        return Boolean.valueOf(Boolean.TRUE.equals(value) || "true".equals(value));
     }
 }

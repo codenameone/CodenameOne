@@ -8,8 +8,9 @@
 #   --native     runs the tests against the compiled server
 #   --prebuilt   uses the server as it was last built, without building it again
 #
-# The tests drive the real screens: they sign in, request a delivery, drive it and
-# administer it, while a second user acts through the API. They capture a few
+# The tests drive the real screens: a shopper signs in and checks out, the owner
+# fulfils the order, a cashier syncs an offline sale and the admin suspends a store,
+# the people off screen acting through the API. They capture a few
 # screens into target/e2e-shots and hold them against screenshots/.
 #
 # Needs JAVA_HOME on JDK 17 or newer, and the Codename One artifacts this project

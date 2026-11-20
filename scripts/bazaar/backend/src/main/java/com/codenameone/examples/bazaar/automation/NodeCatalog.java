@@ -68,6 +68,7 @@ public final class NodeCatalog {
 
     static {
         List<NodeTypeDto> all = new ArrayList<NodeTypeDto>();
+        // tag::bazaar-node-catalog[]
         trigger(all, ORDER_CREATED, "Order placed", "An order is placed online or at a register.");
         trigger(all, ORDER_PAID, "Order paid", "An order's payment is taken.");
         trigger(all, ORDER_FULFILLED, "Order fulfilled", "The last item of an order ships.");
@@ -78,6 +79,7 @@ public final class NodeCatalog {
                 "A cart with items and a shopper to reach sat untouched for an hour.");
         condition(all, IF_TOTAL_OVER, "Total over", "The order's total is over an amount.",
                 param("amount", "Amount", "MONEY", "20000"));
+        // end::bazaar-node-catalog[]
         condition(all, IF_CUSTOMER_TAG, "Customer tagged", "The customer carries a tag.",
                 param("tag", "Tag", "TEXT", "VIP"));
         condition(all, IF_PRODUCT_TAG, "Product tagged",

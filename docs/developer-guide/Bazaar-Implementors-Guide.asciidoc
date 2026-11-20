@@ -98,13 +98,14 @@ without writing an `InventoryMove` in the same transaction, with a reason
 `TRANSFER_OUT`, `TRANSFER_IN`, `RECEIVE`, `CORRECTION` or `POS_SYNC`), so the
 history of every number is in the moves and the levels can be rebuilt from them.
 
-Checkout reserves stock through `Inventory.reserve`. The reservation is a
-conditional update: it names the version of the level it read and succeeds only
-if nobody changed the row since, and only if enough is still available. A lost
-race reads the row again and retries a few times. Two shoppers buying the last
-unit at the same moment therefore can't both succeed: one update matches and the
-other finds nothing left. A variant that allows backorders, or one whose stock
-isn't tracked, skips the check.
+Checkout reserves stock through `Inventory.reserve`, a conditional update that
+names the version of the level it read and retries a lost race. Two shoppers
+buying the last unit at the same moment therefore can't both succeed:
+
+[source,java]
+----
+include::../../scripts/bazaar/backend/src/main/java/com/codenameone/examples/bazaar/inventory/Inventory.java[tag=bazaar-reserve,indent=0]
+----
 
 Shipping a fulfilment takes the units off hand and off committed together;
 cancelling an order releases what it reserved. A return that's restocked writes
@@ -185,6 +186,14 @@ stale tax rate moves a total by cents. A larger gap, or a gift card that ran dry
 while the register was offline, is answered as an error that the outbox screen
 shows for a person to retry or settle.
 
+The tenders are held against the server's total like this; a stale tax rate
+moves a total by cents, so only a shortfall past `tolerance()` is refused:
+
+[source,java]
+----
+include::../../scripts/bazaar/backend/src/main/java/com/codenameone/examples/bazaar/pos/PosSales.java[tag=bazaar-pos-sync,indent=0]
+----
+
 === Fulfilment
 
 The merchant's fulfilment board shows every open order as a card in To pack,
@@ -216,10 +225,16 @@ them, and on a desktop lets the user drag the file out of the window.
 A store can register addresses to be told about `orders/create`, `orders/paid`,
 `orders/fulfilled`, `orders/cancelled`, `refunds/create`, `inventory/low`,
 `products/update` and `customers/create`. Every delivery is a `POST` of the event
-as JSON, signed with the webhook's secret: the `X-Bazaar-Signature` header holds
-`sha256=` and the hexadecimal HMAC-SHA256 of the body. A receiver computes the
-same value over the exact bytes it received and compares the two in constant
-time before trusting the body. A delivery not answered with a 2xx status
+as JSON, signed with the webhook's secret in the `X-Bazaar-Signature` header. A
+receiver computes the same value over the exact bytes it received and compares
+the two in constant time before trusting the body:
+
+[source,java]
+----
+include::../../scripts/bazaar/backend/src/main/java/com/codenameone/examples/bazaar/webhook/Webhooks.java[tag=bazaar-webhook-signature,indent=0]
+----
+
+ A delivery not answered with a 2xx status
 is retried after 1, 2, 4, 8 and 16 minutes, and is marked failed after six
 attempts. The merchant's webhooks page lists every delivery with its status and
 response, and can send one again.
@@ -239,7 +254,15 @@ include::../../scripts/bazaar/common/src/main/java/com/codenameone/examples/baza
 ----
 
 The server's `NodeCatalog` is the list of node types, which the editor reads to
-build its palette, so a new type needs no app release:
+build its palette, so a new type needs no app release. Each entry names its
+kind, title, description and parameters:
+
+[source,java]
+----
+include::../../scripts/bazaar/backend/src/main/java/com/codenameone/examples/bazaar/automation/NodeCatalog.java[tag=bazaar-node-catalog,indent=0]
+----
+
+The full set:
 
 [cols="1,3"]
 |===

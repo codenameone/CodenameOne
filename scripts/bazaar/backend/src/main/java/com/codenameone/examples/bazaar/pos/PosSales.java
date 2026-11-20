@@ -459,6 +459,7 @@ public class PosSales {
         // shortfall within tolerance() is recorded as a rounding difference.
         // Only a shortfall past the tolerance is refused -- that sale was
         // genuinely not paid for.
+        // tag::bazaar-pos-sync[]
         long other = plan.giftCents + plan.creditCents + plan.cardCents;
         long rest = Math.max(0, due - other);
         plan.overCents = Math.max(0, other - due);
@@ -470,6 +471,7 @@ public class PosSales {
                     + due + " cents");
         }
         plan.shortCents = shortCents;
+        // end::bazaar-pos-sync[]
         // Units sold that the location does not have: the sale stands.
         Map<String, Integer> sold = new HashMap<String, Integer>();
         for (int iter = 0; iter < quote.lines.size(); iter++) {
