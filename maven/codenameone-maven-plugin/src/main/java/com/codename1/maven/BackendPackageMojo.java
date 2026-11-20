@@ -163,7 +163,7 @@ public class BackendPackageMojo extends AbstractMojo {
     private boolean sqlite;
 
     /**
-     * The one database engine this backend is built for: sqlite, postgres or
+     * The one database engine this backend is built for: sqlite, postgres, sqlserver, oracle or
      * mysql. There is no default, because the build compiles only that engine's
      * client in; BackendEngines judges the value and fails the build without one.
      */

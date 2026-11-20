@@ -1,0 +1,7 @@
+// Generated from docs/developer-guide source blocks. Edit the guide snippets here, not inline.
+
+// tag::backend-data-xml-001[]
+<properties>
+    <cn1.backend.database>postgres</cn1.backend.database>
+</properties>
+// end::backend-data-xml-001[]

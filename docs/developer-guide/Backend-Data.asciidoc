@@ -88,7 +88,7 @@ the database user needs permission to call:
 
 [source,sql]
 ----
-GRANT EXECUTE ON SYS.DBMS_LOCK TO app_user;
+include::../demos/common/src/main/snippets/developer-guide/backend-data.sql[tag=backend-data-sql-001,indent=0]
 ----
 
 ==== One engine for each application
@@ -97,9 +97,7 @@ A server is built for one database engine, and the build names it:
 
 [source,xml]
 ----
-<properties>
-    <cn1.backend.database>postgres</cn1.backend.database>
-</properties>
+include::../demos/common/src/main/snippets/developer-guide/backend-data.xml[tag=backend-data-xml-001,indent=0]
 ----
 
 The value is `sqlite`, `postgres`, `mysql`, `sqlserver` or `oracle`, and

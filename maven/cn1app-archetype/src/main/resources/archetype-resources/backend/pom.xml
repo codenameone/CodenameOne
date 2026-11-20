@@ -48,7 +48,7 @@
       generates the app's client and this module's dispatcher.
     -->
     <properties>
-        <!-- The ONE database engine this server is built for: sqlite, postgres or
+        <!-- The ONE database engine this server is built for: sqlite, postgres, sqlserver, oracle or
              mysql (which covers MariaDB). Only that engine's client is compiled in,
              and a URL naming another is refused. sqlite means no database server.
              -Dcn1.backend.database=... overrides it for one build. -->
