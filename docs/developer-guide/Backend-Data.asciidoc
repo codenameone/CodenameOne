@@ -76,7 +76,7 @@ differences can't be hidden:
   Two things it can't cover:
 ** A nullable text field can't tell `""` from `null`, and reads back `null`.
    `<>` against a parameter leaves its NULL rows out, as every other engine
-   does, so a stored `""` there does not count as different from `"x"`.
+   does, so a stored `""` there doesn't count as different from `"x"`.
 ** A schema written by hand must declare required text columns nullable, as the
    Oracle migrations of the samples do.
 * Oracle commits around every DDL statement, as MySQL does, so a migration
