@@ -61,7 +61,9 @@ final class Words {
             {"PACKED", "Packed"}, {"SHIPPED", "Shipped"}, {"IN_TRANSIT", "In transit"},
             {"OUT_FOR_DELIVERY", "Out for delivery"}, {"DELIVERED", "Delivered"},
             {"PICKED_UP", "Picked up"}, {"SHIP", "Ship"}, {"REQUESTED", "Requested"},
-            {"APPROVED", "Approved"}, {"DECLINED", "Declined"}, {"TO_PACK", "To pack"}
+            {"APPROVED", "Approved"}, {"DECLINED", "Declined"}, {"TO_PACK", "To pack"},
+            {"PUBLISHED", "Published"}, {"REJECTED", "Rejected"}, {"SUSPENDED", "Suspended"},
+            {"FAILED", "Failed"}
         };
         for (int iter = 0; iter < words.length; iter++) {
             if (words[iter][0].equals(code)) {
@@ -79,11 +81,12 @@ final class Words {
     static String badge(String code) {
         if ("ACTIVE".equals(code) || "PAID".equals(code) || "FULFILLED".equals(code)
                 || "RECEIVED".equals(code) || "CLOSED".equals(code) || "DELIVERED".equals(code)
-                || "PICKED_UP".equals(code) || "APPROVED".equals(code)) {
+                || "PICKED_UP".equals(code) || "APPROVED".equals(code) || "PUBLISHED".equals(code)) {
             return "SvBadgeGood";
         }
         if ("CANCELLED".equals(code) || "VOIDED".equals(code) || "REFUNDED".equals(code)
-                || "ARCHIVED".equals(code) || "DECLINED".equals(code)) {
+                || "ARCHIVED".equals(code) || "DECLINED".equals(code) || "REJECTED".equals(code)
+                || "SUSPENDED".equals(code) || "FAILED".equals(code)) {
             return "SvBadgeBad";
         }
         if ("PENDING".equals(code) || "UNFULFILLED".equals(code) || "PARTIAL".equals(code)

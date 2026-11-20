@@ -64,6 +64,7 @@ final class Dashboard extends LiveChannel.Adapter {
     private final Container page;
     private final Container alerts = new Container(BoxLayout.y());
     private final StatRow numbers;
+    private final StatRow platform;
     private final Container series = new Container(BoxLayout.y());
     private int days = 14;
     private int columns;
@@ -74,6 +75,7 @@ final class Dashboard extends LiveChannel.Adapter {
         this.wide = wide;
         this.places = places;
         numbers = Ui.stats(wide ? 4 : 2);
+        platform = Ui.stats(wide ? 3 : 2);
         if (wide) {
             // Not Ui.page(): that keeps to a column, and this is the one page
             // that is meant to use the width.
@@ -91,6 +93,9 @@ final class Dashboard extends LiveChannel.Adapter {
         numbers.setName("stats");
         Ui.section(page, "Right now");
         page.add(numbers);
+        Ui.section(page, "Stores");
+        platform.setName("platform-stats");
+        page.add(platform);
         Ui.section(page, "Trends");
         Container range = Ui.choice("range", new String[] {"7 days", "14 days", "30 days"},
                 new String[] {"7", "14", "30"}, String.valueOf(days), value -> {
@@ -128,6 +133,7 @@ final class Dashboard extends LiveChannel.Adapter {
 
     void load() {
         Api.admin().stats(Net.to(this::fill, (status, message) -> { }));
+        Api.platform().stats(Net.to(this::fillPlatform, (status, message) -> { }));
     }
 
     private void loadSeries() {
@@ -243,6 +249,21 @@ final class Dashboard extends LiveChannel.Adapter {
         Ui.icon(alert, icon, 3.4f);
         alert.addActionListener(e -> go.run());
         return alert;
+    }
+
+    /// The marketplace as a whole: stores by status, orders and what was sold.
+    private void fillPlatform(com.codenameone.examples.bazaar.api.PlatformStatsDto stats) {
+        platform.clear();
+        platform.stat(String.valueOf(stats.stores()), "Stores", "platformStores");
+        platform.stat(String.valueOf(stats.activeStores()), "Active stores", "platformActive");
+        platform.stat(String.valueOf(stats.suspendedStores()), "Suspended stores",
+                "platformSuspended");
+        platform.stat(String.valueOf(stats.orders()), "Orders", "platformOrders");
+        platform.stat(String.valueOf(stats.ordersToday()), "Orders today", "platformOrdersToday");
+        String currency = stats.perStore() != null && !stats.perStore().isEmpty()
+                ? stats.perStore().get(0).currency() : "USD";
+        platform.stat(Ui.money(stats.gmvCents(), currency), "Gross sales", "platformGmv");
+        Ui.relayout(page);
     }
 
     private static Container box(String title) {

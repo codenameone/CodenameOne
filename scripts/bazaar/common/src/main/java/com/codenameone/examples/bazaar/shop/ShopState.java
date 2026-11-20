@@ -23,6 +23,7 @@ import com.codename1.io.Preferences;
 import com.codenameone.examples.bazaar.api.AddressDto;
 import com.codenameone.examples.bazaar.api.CartDto;
 import com.codenameone.examples.bazaar.api.CartLineChangeDto;
+import com.codenameone.examples.bazaar.api.SavedAddressDto;
 import com.codenameone.examples.bazaar.api.StoreDto;
 import com.codenameone.examples.bazaar.net.Api;
 import com.codenameone.examples.bazaar.net.Session;
@@ -213,15 +214,76 @@ public final class ShopState {
                 }, failed));
     }
 
-    // -------------------------------------------------------------- wishlist
+    // -------------------------------------------- wishlist and addresses
 
-    /// The products saved for later on this device, by the signed-in owner.
-    /// The server has no wishlist yet, so it is kept here.
-    public static List<String> wishlist() {
+    // The account's wishlist and address book live on the server; these are
+    // the copies the screens read synchronously, kept for the owner they
+    // were fetched for and changed optimistically.
+    private static String accountOwner;
+    private static boolean synced;
+    private static final List<String> WISHED = new ArrayList<String>();
+    private static final List<SavedAddressDto> SAVED = new ArrayList<SavedAddressDto>();
+
+    private static void ensureOwner() {
+        String owner = Session.owner();
+        if (owner == null ? accountOwner != null : !owner.equals(accountOwner)) {
+            accountOwner = owner;
+            synced = false;
+            WISHED.clear();
+            SAVED.clear();
+        }
+    }
+
+    /// Fetches the wishlist and address book from the server, after first
+    /// moving up anything an older version kept on this device. The device
+    /// copy is cleared only once the server has taken every entry.
+    public static void syncAccount(final Runnable done) {
+        ensureOwner();
+        if (Session.user() == null) {
+            run(done);
+            return;
+        }
+        final String owner = Session.owner();
+        migrateWishes(owner, () -> migrateAddresses(owner, () ->
+                Api.wishlist().list(Net.to(items -> {
+                    if (sameOwner(owner)) {
+                        WISHED.clear();
+                        for (int iter = 0; items != null && iter < items.size(); iter++) {
+                            WISHED.add(items.get(iter).productId());
+                        }
+                    }
+                    Api.addresses().list(Net.to(list -> {
+                        if (sameOwner(owner)) {
+                            SAVED.clear();
+                            if (list != null) {
+                                SAVED.addAll(list);
+                            }
+                        }
+                        run(done);
+                    }, (status, message) -> run(done)));
+                }, (status, message) -> run(done)))));
+    }
+
+    /// Syncs once per signed-in account; later calls do nothing.
+    public static void syncIfNeeded(Runnable done) {
+        ensureOwner();
+        if (synced || Session.user() == null) {
+            run(done);
+            return;
+        }
+        synced = true;
+        syncAccount(done);
+    }
+
+    private static boolean sameOwner(String owner) {
+        return owner != null && owner.equals(Session.owner());
+    }
+
+    /// Splits the comma separated ids an older version stored.
+    static List<String> splitIds(String saved) {
         List<String> ids = new ArrayList<String>();
-        String saved = Preferences.get(WISH_KEY + Session.owner(), "");
         int start = 0;
-        while (start < saved.length()) {
+        while (saved != null && start < saved.length()) {
             int end = saved.indexOf(',', start);
             if (end < 0) {
                 end = saved.length();
@@ -234,48 +296,138 @@ public final class ShopState {
         return ids;
     }
 
+    private static void migrateWishes(final String owner, final Runnable next) {
+        final List<String> local = splitIds(Preferences.get(WISH_KEY + owner, ""));
+        if (local.isEmpty()) {
+            next.run();
+            return;
+        }
+        final int[] left = {local.size()};
+        final boolean[] failed = {false};
+        for (int iter = 0; iter < local.size(); iter++) {
+            Api.wishlist().add(local.get(iter), Net.to(item -> {
+                if (--left[0] == 0) {
+                    if (!failed[0]) {
+                        Preferences.delete(WISH_KEY + owner);
+                    }
+                    next.run();
+                }
+            }, (status, message) -> {
+                // A product that is gone answers 404; that entry is done.
+                failed[0] |= status != 404;
+                if (--left[0] == 0) {
+                    if (!failed[0]) {
+                        Preferences.delete(WISH_KEY + owner);
+                    }
+                    next.run();
+                }
+            }));
+        }
+    }
+
+    private static void migrateAddresses(final String owner, final Runnable next) {
+        final List<AddressDto> local = Addresses.decode(Preferences.get(ADDRESS_KEY + owner, ""));
+        if (local.isEmpty()) {
+            next.run();
+            return;
+        }
+        final int[] left = {local.size()};
+        final boolean[] failed = {false};
+        for (int iter = 0; iter < local.size(); iter++) {
+            Api.addresses().add(new SavedAddressDto(null, local.get(iter), false), Net.to(saved -> {
+                if (--left[0] == 0) {
+                    if (!failed[0]) {
+                        Preferences.delete(ADDRESS_KEY + owner);
+                    }
+                    next.run();
+                }
+            }, (status, message) -> {
+                failed[0] = true;
+                if (--left[0] == 0) {
+                    next.run();
+                }
+            }));
+        }
+    }
+
+    /// The products this account saved for later, newest first.
+    public static List<String> wishlist() {
+        ensureOwner();
+        return new ArrayList<String>(WISHED);
+    }
+
     public static boolean wished(String productId) {
-        return wishlist().contains(productId);
+        ensureOwner();
+        return WISHED.contains(productId);
     }
 
     /// Saves `productId` for later, or takes it off the list; answers whether
-    /// it is on the list now.
-    public static boolean toggleWish(String productId) {
-        List<String> ids = wishlist();
-        boolean now = !ids.remove(productId);
+    /// it is on the list now. The list changes at once and goes back if the
+    /// server refuses.
+    public static boolean toggleWish(final String productId) {
+        ensureOwner();
+        final boolean now = !WISHED.remove(productId);
         if (now) {
-            ids.add(0, productId);
+            WISHED.add(0, productId);
+            Api.wishlist().add(productId, Net.to(item -> { }, (status, message) -> {
+                WISHED.remove(productId);
+            }));
+        } else {
+            Api.wishlist().remove(productId, Net.to(items -> { }, (status, message) -> {
+                if (!WISHED.contains(productId)) {
+                    WISHED.add(0, productId);
+                }
+            }));
         }
-        StringBuilder out = new StringBuilder();
-        for (int iter = 0; iter < ids.size() && iter < 100; iter++) {
-            if (out.length() > 0) {
-                out.append(',');
-            }
-            out.append(ids.get(iter));
-        }
-        Preferences.set(WISH_KEY + Session.owner(), out.toString());
         return now;
     }
 
-    // ------------------------------------------------------------- addresses
-
+    /// The address book, default first.
     public static List<AddressDto> addresses() {
-        return Addresses.decode(Preferences.get(ADDRESS_KEY + Session.owner(), ""));
+        ensureOwner();
+        List<AddressDto> out = new ArrayList<AddressDto>();
+        for (int iter = 0; iter < SAVED.size(); iter++) {
+            if (SAVED.get(iter).isDefault()) {
+                out.add(0, SAVED.get(iter).address());
+            } else {
+                out.add(SAVED.get(iter).address());
+            }
+        }
+        return out;
     }
 
+    /// Adds `address` to the book unless it is already there.
     public static void rememberAddress(AddressDto address) {
-        Preferences.set(ADDRESS_KEY + Session.owner(),
-                Addresses.encode(Addresses.remember(addresses(), address)));
+        ensureOwner();
+        for (int iter = 0; iter < SAVED.size(); iter++) {
+            if (Addresses.same(SAVED.get(iter).address(), address)) {
+                return;
+            }
+        }
+        final SavedAddressDto pending = new SavedAddressDto(null, address, SAVED.isEmpty());
+        SAVED.add(pending);
+        Api.addresses().add(pending, Net.to(saved -> {
+            int at = SAVED.indexOf(pending);
+            if (at >= 0) {
+                SAVED.set(at, saved);
+            }
+        }, (status, message) -> SAVED.remove(pending)));
     }
 
     public static void forgetAddress(AddressDto address) {
-        List<AddressDto> kept = new ArrayList<AddressDto>();
-        for (AddressDto a : addresses()) {
-            if (!Addresses.same(a, address)) {
-                kept.add(a);
+        ensureOwner();
+        for (int iter = SAVED.size() - 1; iter >= 0; iter--) {
+            SavedAddressDto s = SAVED.get(iter);
+            if (Addresses.same(s.address(), address)) {
+                SAVED.remove(iter);
+                if (s.id() != null) {
+                    Api.addresses().remove(s.id(), Net.to(list -> {
+                        SAVED.clear();
+                        SAVED.addAll(list);
+                    }, (status, message) -> { }));
+                }
             }
         }
-        Preferences.set(ADDRESS_KEY + Session.owner(), Addresses.encode(kept));
     }
 
     private static void fire(List<Runnable> listeners) {

@@ -2473,3 +2473,92 @@ PosDisplayTotal {
         color: var(--text-dark);
     }
 }
+
+/* Merchant automations, analytics, customers, reviews, webhooks and store
+   media; shop reviews. Chart colours are read from these styles' colours. */
+MeAutoRoot { background-color: var(--surface-alt); padding: 0; margin: 0; }
+MeAutoBar { background-color: var(--surface); border-bottom: 1px solid var(--line); padding: 1mm 2mm 1mm 2mm; margin: 0; }
+MeAutoSide { background-color: var(--surface); border-right: 1px solid var(--line); padding: 1.6mm; margin: 0; }
+MeAutoInspector { background-color: var(--surface); border-left: 1px solid var(--line); padding: 2.4mm; margin: 0; }
+MeAutoKind { color: var(--text-muted); font-family: "native:MainBold"; font-size: 2mm; padding: 1.6mm 0 0.6mm 0; margin: 0; }
+MeAutoProblems { background-color: var(--danger-tint); padding: 1.2mm 2.4mm 1.2mm 2.4mm; margin: 0; }
+MeAutoProblem { color: var(--danger); font-size: 2.2mm; padding: 0.4mm 0 0.4mm 0; margin: 0; }
+MeAnalyticsHead { padding: 0 0 1.6mm 0; margin: 0; }
+MeAnalyticsRange { color: var(--text); font-family: "native:MainBold"; font-size: 3.4mm; padding: 0; margin: 0; }
+MeCardTitle { color: var(--text); font-family: "native:MainBold"; font-size: 2.6mm; padding: 0 0 1.6mm 0; margin: 0; }
+MeDeltaUp { color: var(--success); font-family: "native:MainBold"; font-size: 2.1mm; padding: 0.6mm 0 0 0; margin: 0; }
+MeDeltaDown { color: var(--danger); font-family: "native:MainBold"; font-size: 2.1mm; padding: 0.6mm 0 0 0; margin: 0; }
+MeDeltaFlat { color: var(--text-muted); font-size: 2.1mm; padding: 0.6mm 0 0 0; margin: 0; }
+MeChartBox { background-color: var(--surface); padding: 0; margin: 0; }
+MeChart { color: var(--brand); background-color: var(--surface); padding: 0; margin: 0; }
+MeChartGrid { color: var(--line); }
+MeChartText { color: var(--text-muted); font-size: 1.9mm; }
+MeChartLine { color: var(--brand); }
+MeChartPrevious { color: var(--line-strong); }
+MeChartBar { color: var(--brand); }
+MeChartSlice { color: var(--brand); }
+MeChartSlice1 { color: var(--brand); }
+MeChartSlice2 { color: #0d9488; }
+MeChartSlice3 { color: #d97706; }
+MeChartSlice4 { color: #db2777; }
+MeLegend { color: var(--text); font-size: 2.1mm; padding: 0.4mm 1mm 0.4mm 0; margin: 0; }
+MeLegendValue { color: var(--text-muted); font-size: 2.1mm; padding: 0.4mm 0 0.4mm 1mm; margin: 0; }
+MeSwatchDot { padding: 0; margin: 0 1mm 0 0; }
+MeFunnel { color: var(--brand); background-color: var(--surface); font-size: 2.1mm; padding: 0; margin: 0; }
+MeFunnelBox { background-color: var(--brand-tint); color: var(--brand); padding: 0; margin: 0; }
+MeMeter { color: var(--brand); background-color: var(--surface-alt); border-radius: 0.6mm; padding: 0; margin: 0.6mm 0 0 0; }
+MeBreakRow { padding: 1mm 0 1mm 0; margin: 0; border-bottom: 1px solid var(--line); }
+MeChip { color: var(--text); background-color: var(--surface); border: 1px solid var(--line-strong); border-radius: 3mm; font-size: 2.2mm; padding: 1mm 2.6mm 1mm 2.6mm; margin: 0 1.2mm 1.2mm 0; }
+MeChipOn { color: var(--brand-contrast); background-color: var(--brand); border: 1px solid var(--brand); border-radius: 3mm; font-family: "native:MainBold"; font-size: 2.2mm; padding: 1mm 2.6mm 1mm 2.6mm; margin: 0 1.2mm 1.2mm 0; }
+MeCode { color: var(--text); background-color: var(--surface-alt); font-family: "native:MainLight"; font-size: 2mm; padding: 1.6mm; margin: 0; }
+MeMediaRow { padding: 1.2mm 0 1.2mm 0; margin: 0; border-bottom: 1px solid var(--line); }
+MeMediaThumb { color: var(--text-muted); background-color: var(--surface-alt); border-radius: var(--radius); padding: 1mm; margin: 0 2mm 0 0; }
+ShopStarPick { color: #f59e0b; background-color: transparent; padding: 0.6mm; margin: 0; }
+ShopReviewSummary { padding: 1.6mm 0 2mm 0; margin: 0; }
+ShopReviewAverage { color: var(--text); font-family: "native:MainBold"; font-size: 6mm; padding: 0; margin: 0 3mm 0 0; }
+ShopReviewTrack { background-color: var(--surface-alt); border-radius: 0.6mm; padding: 0; margin: 0.8mm 1.4mm 0.8mm 1.4mm; }
+ShopReviewFill { background-color: #f59e0b; border-radius: 0.6mm; padding: 0.6mm 0 0.6mm 0; margin: 0; }
+ShopReview { border-top: 1px solid var(--line); padding: 2mm 0 2mm 0; margin: 0; }
+
+@media (prefers-color-scheme: dark) {
+    MeAutoRoot { background-color: var(--surface-alt-dark); }
+    MeAutoBar { background-color: var(--surface-dark); border-bottom: 1px solid var(--line-dark); }
+    MeAutoSide { background-color: var(--surface-dark); border-right: 1px solid var(--line-dark); }
+    MeAutoInspector { background-color: var(--surface-dark); border-left: 1px solid var(--line-dark); }
+    MeAutoKind { color: var(--text-muted-dark); }
+    MeAutoProblems { background-color: var(--danger-tint-dark); }
+    MeAutoProblem { color: var(--danger-dark); }
+    MeAnalyticsRange { color: var(--text-dark); }
+    MeCardTitle { color: var(--text-dark); }
+    MeDeltaUp { color: var(--success-dark); }
+    MeDeltaDown { color: var(--danger-dark); }
+    MeDeltaFlat { color: var(--text-muted-dark); }
+    MeChartBox { background-color: var(--surface-dark); }
+    MeChart { color: var(--brand-dark); background-color: var(--surface-dark); }
+    MeChartGrid { color: var(--line-dark); }
+    MeChartText { color: var(--text-muted-dark); }
+    MeChartLine { color: var(--brand-dark); }
+    MeChartPrevious { color: var(--line-strong-dark); }
+    MeChartBar { color: var(--brand-dark); }
+    MeChartSlice { color: var(--brand-dark); }
+    MeChartSlice1 { color: var(--brand-dark); }
+    MeChartSlice2 { color: #2dd4bf; }
+    MeChartSlice3 { color: #fbbf24; }
+    MeChartSlice4 { color: #f472b6; }
+    MeLegend { color: var(--text-dark); }
+    MeLegendValue { color: var(--text-muted-dark); }
+    MeFunnel { color: var(--brand-dark); background-color: var(--surface-dark); }
+    MeFunnelBox { background-color: var(--brand-tint-dark); color: var(--brand-dark); }
+    MeMeter { color: var(--brand-dark); background-color: var(--surface-alt-dark); }
+    MeBreakRow { border-bottom: 1px solid var(--line-dark); }
+    MeChip { color: var(--text-dark); background-color: var(--surface-dark); border: 1px solid var(--line-strong-dark); }
+    MeChipOn { color: var(--brand-contrast-dark); background-color: var(--brand-dark); border: 1px solid var(--brand-dark); }
+    MeCode { color: var(--text-dark); background-color: var(--surface-alt-dark); }
+    MeMediaRow { border-bottom: 1px solid var(--line-dark); }
+    MeMediaThumb { color: var(--text-muted-dark); background-color: var(--surface-alt-dark); }
+    ShopStarPick { color: #fbbf24; }
+    ShopReviewAverage { color: var(--text-dark); }
+    ShopReviewTrack { background-color: var(--surface-alt-dark); }
+    ShopReviewFill { background-color: #fbbf24; }
+    ShopReview { border-top: 1px solid var(--line-dark); }
+}

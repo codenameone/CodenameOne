@@ -53,6 +53,13 @@ final class AccountPane extends ShopPane {
         setName("shop-account");
         add(BorderLayout.CENTER, page);
         reload();
+        // The address book and wishlist come from the server; show them once
+        // they arrive.
+        ShopState.syncAccount(() -> {
+            if (getComponentForm() != null || isInitialized()) {
+                reload();
+            }
+        });
     }
 
     @Override

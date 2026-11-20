@@ -188,6 +188,8 @@ final class ProductForm {
             Ui.section(page, "About this product");
             page.add(Ui.text(product.description(), "SvText"));
         }
+        Ui.section(page, "Reviews");
+        page.add(ProductReviews.create(product.id()));
         root.add(BorderLayout.CENTER, page);
         Ui.relayout(root);
     }

@@ -33,6 +33,8 @@ public final class MerchantSections {
     public static final String SHIPPING = "shipping";
     public static final String TAXES = "taxes";
     public static final String GIFT_CARDS = "giftcards";
+    /// Review moderation.
+    public static final String REVIEWS = "reviews";
 
     private static boolean installed;
 
@@ -60,6 +62,11 @@ public final class MerchantSections {
         Sections.register(Nav.MERCHANT, new Section(GIFT_CARDS, "Gift cards", grow,
                 FontImage.MATERIAL_CARD_GIFTCARD, GiftCardsPane::new));
         Sections.content(Nav.MERCHANT, Sections.SETTINGS, SettingsPane::new);
+        Sections.content(Nav.MERCHANT, Sections.AUTOMATIONS, AutomationsPane::new);
+        Sections.content(Nav.MERCHANT, Sections.ANALYTICS, AnalyticsPane::new);
+        Sections.content(Nav.MERCHANT, Sections.CUSTOMERS, CustomersPane::new);
+        Sections.register(Nav.MERCHANT, new Section(REVIEWS, "Reviews", store,
+                FontImage.MATERIAL_RATE_REVIEW, ReviewsPane::new));
         Sections.register(Nav.MERCHANT, new Section(SHIPPING, "Shipping", manage,
                 FontImage.MATERIAL_LOCAL_SHIPPING, ShippingPane::new));
         Sections.register(Nav.MERCHANT, new Section(TAXES, "Taxes", manage,

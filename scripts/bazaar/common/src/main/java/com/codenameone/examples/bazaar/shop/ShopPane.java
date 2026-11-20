@@ -46,6 +46,7 @@ abstract class ShopPane extends Container {
         if (ShopState.store() == null && !(this instanceof HomePane)) {
             ShopState.restoreStore();
         }
+        ShopState.syncIfNeeded(null);
     }
 
     @Override

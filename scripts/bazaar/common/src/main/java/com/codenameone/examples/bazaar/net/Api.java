@@ -35,6 +35,15 @@ import com.codenameone.examples.bazaar.api.TaxApi;
 import com.codenameone.examples.bazaar.api.OrderApi;
 import com.codenameone.examples.bazaar.api.PaymentApi;
 import com.codenameone.examples.bazaar.api.StoreApi;
+import com.codenameone.examples.bazaar.api.AutomationApi;
+import com.codenameone.examples.bazaar.api.AnalyticsApi;
+import com.codenameone.examples.bazaar.api.CustomerApi;
+import com.codenameone.examples.bazaar.api.WebhookApi;
+import com.codenameone.examples.bazaar.api.StoreMediaApi;
+import com.codenameone.examples.bazaar.api.PlatformApi;
+import com.codenameone.examples.bazaar.api.ReviewApi;
+import com.codenameone.examples.bazaar.api.WishlistApi;
+import com.codenameone.examples.bazaar.api.AddressApi;
 
 /// The server, as the app calls it.
 ///
@@ -59,6 +68,15 @@ public final class Api {
     private static FulfillmentApi fulfilment;
     private static ReturnApi returns;
     private static PosApi pos;
+    private static AutomationApi automations;
+    private static AnalyticsApi analytics;
+    private static CustomerApi customers;
+    private static WebhookApi webhooks;
+    private static StoreMediaApi storeMedia;
+    private static PlatformApi platform;
+    private static ReviewApi reviews;
+    private static WishlistApi wishlist;
+    private static AddressApi addresses;
 
     private Api() {
     }
@@ -80,6 +98,15 @@ public final class Api {
         fulfilment = RestClients.create(FulfillmentApi.class, baseUrl);
         returns = RestClients.create(ReturnApi.class, baseUrl);
         pos = RestClients.create(PosApi.class, baseUrl);
+        automations = RestClients.create(AutomationApi.class, baseUrl);
+        analytics = RestClients.create(AnalyticsApi.class, baseUrl);
+        customers = RestClients.create(CustomerApi.class, baseUrl);
+        webhooks = RestClients.create(WebhookApi.class, baseUrl);
+        storeMedia = RestClients.create(StoreMediaApi.class, baseUrl);
+        platform = RestClients.create(PlatformApi.class, baseUrl);
+        reviews = RestClients.create(ReviewApi.class, baseUrl);
+        wishlist = RestClients.create(WishlistApi.class, baseUrl);
+        addresses = RestClients.create(AddressApi.class, baseUrl);
     }
 
     public static AccountApi account() {
@@ -144,5 +171,41 @@ public final class Api {
 
     public static PosApi pos() {
         return pos;
+    }
+
+    public static AutomationApi automations() {
+        return automations;
+    }
+
+    public static AnalyticsApi analytics() {
+        return analytics;
+    }
+
+    public static CustomerApi customers() {
+        return customers;
+    }
+
+    public static WebhookApi webhooks() {
+        return webhooks;
+    }
+
+    public static StoreMediaApi storeMedia() {
+        return storeMedia;
+    }
+
+    public static PlatformApi platform() {
+        return platform;
+    }
+
+    public static ReviewApi reviews() {
+        return reviews;
+    }
+
+    public static WishlistApi wishlist() {
+        return wishlist;
+    }
+
+    public static AddressApi addresses() {
+        return addresses;
     }
 }

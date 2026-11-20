@@ -25,7 +25,7 @@ import com.codenameone.examples.bazaar.ui.Sections;
 import com.codenameone.examples.bazaar.ui.Shell;
 
 /// The platform console's sections: the overview, the accounts and the
-/// payments. Stores keeps its placeholder until the store contracts exist.
+/// stores and the payments.
 ///
 /// Everything here is behind `/api/admin`, which the server opens to the
 /// `admin` role and to nobody else. That is where the protection is.
@@ -39,6 +39,11 @@ public final class AdminSections {
         Sections.content(Nav.ADMIN, Sections.USERS, () -> {
             EmbeddedPanes panes = new EmbeddedPanes();
             UsersForm.show(panes, UsersForm.ALL);
+            return panes.host();
+        });
+        Sections.content(Nav.ADMIN, Sections.STORES, () -> {
+            EmbeddedPanes panes = new EmbeddedPanes();
+            StoresForm.show(panes);
             return panes.host();
         });
         Sections.content(Nav.ADMIN, Sections.PAYMENTS, () -> {

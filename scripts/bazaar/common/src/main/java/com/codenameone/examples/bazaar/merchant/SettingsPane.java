@@ -52,6 +52,7 @@ final class SettingsPane extends MerchantPane {
 
     private int accent;
     private String logoPhotoId;
+    private String heroPhotoId;
 
     SettingsPane() {
         super("Settings", "merchant-settings");
@@ -94,6 +95,7 @@ final class SettingsPane extends MerchantPane {
     private void show(final StoreDto s) {
         accent = s.accentColor() & 0xffffff;
         logoPhotoId = s.logoPhotoId();
+        heroPhotoId = s.heroPhotoId();
         Container page = MUi.page("settings-page");
 
         Ui.section(page, "Store");
@@ -156,11 +158,24 @@ final class SettingsPane extends MerchantPane {
         tagline.addDataChangedListener((t, i) -> paint.run());
         look.add(swatches);
         look.add(preview);
-        final Label logo = Ui.plain(logoPhotoId == null ? Lang.tr("No logo") : Lang.tr("Logo set"),
-                "SvMuted");
-        // The server has no endpoint for a store image upload yet (photos
-        // attach to products only), so the logo is shown, not changed, here.
-        look.add(logo);
+        final Container media = new Container(BoxLayout.y());
+        media.setName("settings-media");
+        final Runnable[] paintMedia = new Runnable[1];
+        StoreMedia.Changed changed = saved -> {
+            // Kept apart from the form: Save must not put back the old ids.
+            logoPhotoId = saved.logoPhotoId();
+            heroPhotoId = saved.heroPhotoId();
+            MerchantState.updated(saved);
+            paintMedia[0].run();
+        };
+        paintMedia[0] = () -> {
+            media.removeAll();
+            media.add(StoreMedia.editor(false, logoPhotoId, changed));
+            media.add(StoreMedia.editor(true, heroPhotoId, changed));
+            Ui.relayout(media);
+        };
+        paintMedia[0].run();
+        look.add(media);
         page.add(look);
         paint.run();
 
@@ -192,7 +207,7 @@ final class SettingsPane extends MerchantPane {
             }
             StoreDto wanted = new StoreDto(s.id(), s.handle(), name.getText().trim(),
                     tagline.getText().trim(), description.getText(), MUi.code(currency, CURRENCIES),
-                    accent, logoPhotoId, s.heroPhotoId(), s.ownerUsername(), s.status(),
+                    accent, logoPhotoId, heroPhotoId, s.ownerUsername(), s.status(),
                     inclusive.isSelected(), email.getText().trim(), phone.getText().trim(),
                     address.getText().trim(), policies.getText());
             Api.stores().saveSettings(MerchantState.storeId(), wanted, Net.to(saved -> {
@@ -200,6 +215,14 @@ final class SettingsPane extends MerchantPane {
                 MerchantState.updated(saved);
             }, Ui::fail));
         })));
+
+        Ui.section(page, "Webhooks");
+        Container hooks = new Container(BoxLayout.y());
+        hooks.setUIID("MeCard");
+        hooks.add(Ui.tap(Ui.row(FontImage.MATERIAL_WEBHOOK, "Webhooks",
+                "Send order, product and stock events to another system", null),
+                "settings-webhooks", e -> new WebhooksPage(this).show()));
+        page.add(hooks);
 
         Ui.section(page, "Locations");
         final Container locations = new Container(BoxLayout.y());
