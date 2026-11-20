@@ -68,6 +68,8 @@ jobs:
           persist-credentials: false
           fetch-depth: 2
           filter: blob:none
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
       - id: find
         run: |
           set -euo pipefail
@@ -124,6 +126,9 @@ jobs:
       - uses: actions/checkout@v6
         with:
           persist-credentials: false
+
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
 
       # The point of all this: a PR missing a golden is known to fail, so
       # none of its runs may spend runners. They stay cancelled; the push

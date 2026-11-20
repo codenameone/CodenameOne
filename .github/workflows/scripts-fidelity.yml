@@ -143,6 +143,8 @@ jobs:
       FIDELITY_UPDATE_GOLDENS: '1'
     steps:
       - uses: actions/checkout@v6
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
       - name: Set TMPDIR
         run: echo "TMPDIR=${{ runner.temp }}" >> "$GITHUB_ENV"
       - name: Cache codenameone-tools
@@ -239,6 +241,8 @@ jobs:
       # regenerated here, so no FIDELITY_UPDATE_GOLDENS.
     steps:
       - uses: actions/checkout@v6
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
       - name: Set TMPDIR
         run: echo "TMPDIR=${{ runner.temp }}" >> "$GITHUB_ENV"
       - name: Cache codenameone-tools
@@ -374,6 +378,8 @@ jobs:
       # regenerated here, so no FIDELITY_UPDATE_GOLDENS.
     steps:
       - uses: actions/checkout@v6
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
       - name: Set TMPDIR
         run: echo "TMPDIR=${{ runner.temp }}" >> "$GITHUB_ENV"
       - name: Cache codenameone-tools

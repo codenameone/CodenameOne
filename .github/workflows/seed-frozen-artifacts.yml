@@ -37,6 +37,9 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
+
       - name: Validate the coordinate override
         env:
           # Read as DATA, from the environment. Never `${{ inputs.coordinates }}`

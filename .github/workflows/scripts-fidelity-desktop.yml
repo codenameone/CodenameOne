@@ -155,6 +155,8 @@ jobs:
           # Match the Windows 11 font inventory used by native reference capture.
           # Java 8 and the simulator native libraries run through x64 emulation there.
           architecture: ${{ matrix.platform == 'windows' && 'x64' || '' }}
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
       - id: jdk21
         shell: bash
         run: echo "path=$JAVA_HOME" >> "$GITHUB_OUTPUT"
@@ -164,6 +166,9 @@ jobs:
           distribution: ${{ matrix.platform == 'macos' && 'zulu' || 'temurin' }}
           java-version: '8'
           architecture: ${{ matrix.platform == 'windows' && 'x64' || '' }}
+
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
 
       # Needed by the run only: run-desktop-fidelity-tests.sh starts the simulator under
       # xvfb-run to render the tiles. The build below needs no display -- the cn1 css goal

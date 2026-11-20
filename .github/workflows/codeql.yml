@@ -46,6 +46,9 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v6
 
+    - name: Use Google's copy of Maven Central first
+      uses: ./.github/actions/maven-central-mirror
+
     - name: Initialize CodeQL
       uses: github/codeql-action/init@v4
       with:

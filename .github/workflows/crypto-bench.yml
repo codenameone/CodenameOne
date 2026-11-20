@@ -68,6 +68,8 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
       - name: The prebuilt Android kernels match their sources
         shell: bash
         run: scripts/check-android-crypto-kernels.sh
@@ -78,6 +80,8 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
       - name: The generated shaders match the kernel source
         shell: bash
         run: scripts/crypto-gpu/gen.py --check
@@ -104,6 +108,8 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
       - name: Run the JVM benchmark
         shell: bash
         run: scripts/crypto-bench/jvm-run.sh "$RUNNER_TEMP/jvm" | tee "$RUNNER_TEMP/jvm.txt"
@@ -117,6 +123,8 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
       - name: Install the reference libraries
         shell: bash
         run: sudo apt-get update -q && sudo apt-get install -y -q clang cmake libssl-dev libsodium-dev pkg-config

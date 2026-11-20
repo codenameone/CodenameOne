@@ -59,6 +59,9 @@ jobs:
           # The pull request's base commit has to be present for the diff.
           fetch-depth: 0
 
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
+
       - name: The gate's own unit tests
         working-directory: vm/selfhost
         run: python3 -m unittest test_perf_gate

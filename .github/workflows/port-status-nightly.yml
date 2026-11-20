@@ -30,6 +30,8 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v6
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
       - name: Publish the newest master report for every port
         env:
           GH_TOKEN: ${{ github.token }}
@@ -46,6 +48,8 @@ jobs:
           distribution: temurin
           java-version: '8'
           cache: maven
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
       - name: Prepare Codename One binaries
         run: |
           mkdir -p ~/.codenameone
@@ -56,6 +60,8 @@ jobs:
           distribution: temurin
           java-version: '17'
           cache: maven
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
       - name: Set up workspace
         run: ./scripts/setup-workspace.sh -q -DskipTests
       # After everything that fills the local Maven repository and before the
@@ -81,6 +87,8 @@ jobs:
         browser: [chromium, firefox, webkit]
     steps:
       - uses: actions/checkout@v6
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
       - uses: actions/setup-node@v6
         with:
           node-version: '20'
@@ -126,6 +134,8 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
       - uses: actions/download-artifact@v4
         if: needs.build-javascript-app.result == 'success'
         with:

@@ -62,6 +62,9 @@ jobs:
           java-version: '8'
           distribution: 'temurin'
 
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
+
       - name: Set TMPDIR
         run: echo "TMPDIR=${{ runner.temp }}" >> "$GITHUB_ENV"
 

@@ -70,6 +70,9 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
+
       - name: Unit-test the gate
         # Run before anything is resolved, so a broken gate is reported as a
         # broken gate rather than as a clean dependency set.
@@ -81,6 +84,8 @@ jobs:
         with:
           java-version: '17'
           distribution: 'temurin'
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
       - run: echo "GRADLE_JAVA_HOME=$JAVA_HOME" >> "$GITHUB_ENV"
       - uses: gradle/actions/setup-gradle@v4
         with:
@@ -91,6 +96,9 @@ jobs:
           java-version: '8'
           distribution: 'temurin'
           cache: 'maven'
+
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
 
       - name: Build build-engine, run the floor test, list its Android dependencies
         env:

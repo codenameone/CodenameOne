@@ -141,6 +141,9 @@ jobs:
           java-version: '8'
           cache: 'maven'
 
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
+
       - name: Install core and the backend
         working-directory: maven
         run: |

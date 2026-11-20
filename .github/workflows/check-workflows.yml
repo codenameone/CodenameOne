@@ -48,11 +48,19 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
+
       # Deliberately NOT filtered by paths. A workflow file is only one of the ways this
       # check goes stale: actionlint's own rules move, and a run over an unchanged tree
       # that starts failing is information rather than noise.
       - name: Validate every workflow file
         run: scripts/check-workflows.sh
+
+      # Maven Central throttles the runners: every job with a full checkout has to
+      # install the mirror settings, and the CI wrappers must start Maven from R2.
+      - name: Check every job installs the Maven Central mirror
+        run: python3 scripts/check-maven-central-mirror.py
 
       - name: Check CI selection and obsolete-run cancellation
         run: |
@@ -83,6 +91,9 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
+
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
 
       - name: Check fidelity baseline coverage enforcement
         run: |

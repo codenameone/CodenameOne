@@ -63,6 +63,9 @@ jobs:
           java-version: '17'
           cache: maven
 
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
+
       # The Playground compiles against the in-repo 8.0-SNAPSHOT.
       - name: Bootstrap local Codename One snapshots
         run: SKIP_CN1_ARCHETYPES=1 ./scripts/setup-workspace.sh -q -DskipTests

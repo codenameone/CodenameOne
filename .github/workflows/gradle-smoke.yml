@@ -95,6 +95,8 @@ jobs:
         with:
           java-version: ${{ matrix.gradle-jdk }}
           distribution: 'temurin'
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
       - run: echo "GRADLE_JAVA_HOME=$JAVA_HOME" >> $GITHUB_ENV
       - name: Set up JDK 8
         uses: actions/setup-java@v5
@@ -102,6 +104,8 @@ jobs:
           java-version: '8'
           distribution: 'temurin'
           cache: 'maven'
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
       # The Gradle distributions the tests' wrappers download: a services.gradle.org
       # outage (a 504) otherwise fails a test that has nothing to do with it.
       - name: Cache Gradle distributions
@@ -207,6 +211,8 @@ jobs:
         with:
           java-version: '17'
           distribution: 'temurin'
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
       - run: echo "GRADLE_JAVA_HOME=$JAVA_HOME" >> $GITHUB_ENV
       # Temurin 8 is unavailable on macOS ARM64; Zulu supplies a native Java 8.
       - name: Set up JDK 8
@@ -215,6 +221,8 @@ jobs:
           java-version: '8'
           distribution: 'zulu'
           cache: 'maven'
+      - name: Use Google's copy of Maven Central first
+        uses: ./.github/actions/maven-central-mirror
       # The Gradle distributions the tests' wrappers download: a services.gradle.org
       # outage (a 504) otherwise fails a test that has nothing to do with it.
       - name: Cache Gradle distributions
