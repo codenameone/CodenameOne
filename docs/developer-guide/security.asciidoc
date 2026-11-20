@@ -537,11 +537,11 @@ NOTE: This family is Android-only. iOS gives no application a way to draw over a
 
 On Android the keyboard is an app the user installs and selects, and the system hands it every keystroke typed into every other app. A malicious keyboard is therefore a keylogger: a penetration test typically installs one, types a password into your app and reads it back out of the keyboard's own files. Native apps have the same exposure, and no flag can switch it off, but there are three layers of defense, from free to complete.
 
-*Password and sensitive fields ask for incognito input.* A field with the `TextArea.PASSWORD` or `TextArea.SENSITIVE` constraint asks the keyboard not to learn, store or sync what is typed (`IME_FLAG_NO_PERSONALIZED_LEARNING`). Gboard, Samsung's keyboard and SwiftKey honor it. A keylogger ignores it, so treat it as hygiene rather than protection.
+*Password and sensitive fields ask for incognito input.* A field with the `TextArea.PASSWORD` or `TextArea.SENSITIVE` constraint asks the keyboard not to learn, store or sync what's typed (`IME_FLAG_NO_PERSONALIZED_LEARNING`). Gboard, Samsung's keyboard and SwiftKey honor it. A keylogger ignores it, so treat it as hygiene rather than protection.
 
 *Detect a user-installed keyboard.* `DeviceIntegrity.isThirdPartyKeyboardActive()` returns `true` when the selected keyboard didn't ship with the device and isn't on the allow-list you pass, and `getActiveKeyboard()` names it. Check it before a credential screen to warn the user or to switch to the next layer.
 
-*Type with the app's own keyboard.* `SecureKeyboard` is an on-screen keyboard Codename One draws itself. A field it is installed on is made uneditable, so the platform editor never opens on it, and a tap shows the secure keyboard instead, which writes into the field directly. The layout follows the field's constraint (number pad, email, URL or letters), pressed keys aren't magnified for a screen recorder to catch, and `setScrambled(true)` moves the digits every time it opens so recorded touch positions don't map back to a PIN.
+*Type with the app's own keyboard.* `SecureKeyboard` is an on-screen keyboard Codename One draws itself. Installing it makes the field uneditable, so the platform editor never opens on it, and a tap shows the secure keyboard instead, which writes into the field directly. The layout follows the field's constraint (number pad, email, URL or letters), pressed keys aren't magnified for a screen recorder to catch, and `setScrambled(true)` moves the digits every time it opens so recorded touch positions don't map back to a PIN.
 
 [source,java]
 ----

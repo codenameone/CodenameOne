@@ -140,6 +140,7 @@ public final class SecureKeyboard extends Component {
     private int laidOutWidth = -1;
     private int laidOutHeight = -1;
     private InteractionDialog dialog;
+    private boolean landed;
     private Font textFont;
     private Font iconFont;
     private int fontForHeight = -1;
@@ -180,6 +181,11 @@ public final class SecureKeyboard extends Component {
         }
         SecureKeyboard kb = new SecureKeyboard(field);
         field.putClientProperty(CLIENT_PROPERTY, kb);
+        if (field.isEditing()) {
+            // Installed mid-edit: the platform editor would stay open on what is now a
+            // protected field, so end that edit first.
+            field.stopEditing();
+        }
         field.setEditable(false);
         field.addPointerReleasedListener(kb.tapListener);
         return kb;
@@ -195,7 +201,8 @@ public final class SecureKeyboard extends Component {
         if (kb == null) {
             return;
         }
-        kb.hide();
+        // Not an edit the user finished, so no action event: apps submit PINs on it.
+        kb.dismiss(false);
         field.removePointerReleasedListener(kb.tapListener);
         field.putClientProperty(CLIENT_PROPERTY, null);
         field.setEditable(kb.wasEditable);
@@ -300,7 +307,18 @@ public final class SecureKeyboard extends Component {
     public boolean isShowing() {
         // Our own state, not the dialog's: InteractionDialog.show defers when called from an
         // event, as a tap on the field is, so the dialog is briefly not showing yet.
-        return dialog != null;
+        InteractionDialog dlg = dialog;
+        if (dlg == null) {
+            return false;
+        }
+        if (landed && dlg.getParent() == null) {
+            // Removed behind our back (the form's layered pane cleared or replaced) while an
+            // animation defers the deinitialize below. Forget it, or the field could never open
+            // its keyboard again.
+            forget();
+            return false;
+        }
+        return true;
     }
 
     /// Shows the keyboard at the bottom of the field's form. Called by a tap on the field; call it
@@ -325,15 +343,21 @@ public final class SecureKeyboard extends Component {
         dlg.setUIID("Container");
         dlg.getContentPane().setUIID("Container");
         dlg.getTitleComponent().setHidden(true);
+        if (getParent() != null) {
+            // Still inside a dialog that was removed behind our back.
+            remove();
+        }
         dlg.add(BorderLayout.CENTER, this);
         dialog = dlg;
+        landed = false;
         int h = keyboardHeight(f.getWidth(), f.getHeight());
         try {
             f.setCurrentInputDevice(new VirtualInputDevice() { //NOPMD CloseResource - managed by Form#setCurrentInputDevice
                 @Override
                 public void close() {
                     if (dialog == dlg) { //NOPMD CompareObjectsWithEquals
-                        hide();
+                        // The form moved on; the user did not finish the edit.
+                        dismiss(false);
                     }
                 }
             });
@@ -348,16 +372,41 @@ public final class SecureKeyboard extends Component {
     /// Hides the keyboard and reports the edit as complete, as the platform editor does when it
     /// closes: the field's action listeners fire.
     public void hide() {
+        dismiss(true);
+    }
+
+    @Override
+    protected void initComponent() {
+        super.initComponent();
+        // On screen at last: from here a dialog with no parent was removed, not still pending.
+        landed = true;
+    }
+
+    @Override
+    protected void deinitialize() {
+        super.deinitialize();
+        // Removed behind our back. No action event: the user did not finish the edit.
+        forget();
+    }
+
+    private void forget() {
+        dialog = null;
+        landed = false;
+        pressed = null;
+    }
+
+    private void dismiss(boolean complete) {
         InteractionDialog dlg = dialog;
         if (dlg == null) {
             return;
         }
-        dialog = null;
-        pressed = null;
+        forget();
         // Unconditionally: a show deferred by an event may not have landed yet, and dispose()
         // on a dialog that is not up only marks it disposed.
         dlg.dispose();
-        Display.getInstance().onEditingComplete(field, field.getText());
+        if (complete) {
+            Display.getInstance().onEditingComplete(field, field.getText());
+        }
     }
 
     private static String shuffledDigits() {

@@ -23,6 +23,8 @@
 package com.codename1.security;
 
 import com.codename1.junit.UITestBase;
+import com.codename1.components.InteractionDialog;
+import com.codename1.ui.Container;
 import com.codename1.ui.Form;
 import com.codename1.ui.TextArea;
 import com.codename1.ui.TextField;
@@ -151,5 +153,41 @@ class SecureKeyboardTest extends UITestBase {
         assertEquals("4", tf.getText());
         assertEquals(1, actions[0]);
         assertNotEquals(0, kb.getPreferredH());
+    }
+
+    @Test
+    void uninstallAndRemovalDoNotFireOrStick() {
+        Form f = new Form("t", BoxLayout.y());
+        TextField tf = new TextField("", "", 6, TextArea.NUMERIC);
+        f.add(tf);
+        f.show();
+        flushSerialCalls();
+        final int[] actions = new int[1];
+        tf.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+                actions[0]++;
+            }
+        });
+        SecureKeyboard kb = SecureKeyboard.install(tf);
+        tapComponent(tf);
+        flushSerialCalls();
+        assertTrue(kb.isShowing());
+        // Removed behind the keyboard's back: it must notice rather than refuse to reopen.
+        Container c = kb.getParent();
+        while (!(c instanceof InteractionDialog)) {
+            c = c.getParent();
+        }
+        c.remove();
+        flushSerialCalls();
+        assertFalse(kb.isShowing(), "a keyboard removed from the form is not showing");
+        tapComponent(tf);
+        flushSerialCalls();
+        assertTrue(kb.isShowing(), "and the field can open it again");
+        SecureKeyboard.uninstall(tf);
+        flushSerialCalls();
+        assertFalse(kb.isShowing());
+        assertEquals(0, actions[0], "closing without the user finishing must not submit");
+        assertTrue(tf.isEditable());
     }
 }
