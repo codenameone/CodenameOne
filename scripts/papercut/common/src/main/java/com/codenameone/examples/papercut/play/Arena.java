@@ -1,7 +1,20 @@
 /*
- * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
- * Use of this source code is governed by the license in the LICENSE file beside
- * this project's pom.xml.
+ * Copyright (c) 2026, Codename One and/or its affiliates.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
  */
 package com.codenameone.examples.papercut.play;
 
@@ -101,6 +114,9 @@ public final class Arena {
     // ---- the run --------------------------------------------------------------
     public long score;
     public int multiplier = 1;
+    /// The highest the multiplier reached this run, which the server checks.
+    public int peakMultiplier = 1;
+    private boolean endRequested;
     public int lives;
     public int bombs;
     public float time;
@@ -112,6 +128,13 @@ public final class Arena {
     private float budget;
     private float eventTimer = 18;
     private float eraseFlash;
+
+    /// Adds erasers bought in the shop to this run's starting pile.
+    public void addErasers(int extra) {
+        if (mode != FOLD) {
+            bombs = Math.min(MAX_BOMBS, bombs + extra);
+        }
+    }
 
     public Arena(int mode, long seed) {
         this.mode = mode;
@@ -135,7 +158,19 @@ public final class Arena {
 
     /// Advances the game by `dt` seconds. Call it with [#STEP]; a larger step
     /// lets fast things pass through each other.
+    /// Ends the run on its next step, as losing the last quill would: what
+    /// the end-to-end tests use to reach the end-of-run card without playing
+    /// a whole run. Read on the step, so it is safe to call from any thread.
+    public void endNow() {
+        endRequested = true;
+    }
+
     public void step(float dt) {
+        if (endRequested && !over) {
+            lives = 1;
+            shipAlive = true;
+            loseQuill();
+        }
         if (over) {
             sheet.update(dt);
             return;
@@ -655,6 +690,8 @@ public final class Arena {
                 if (d2 < 26 * 26) {
                     p.dead = true;
                     multiplier = Math.min(MAX_MULTIPLIER, multiplier + 1);
+            peakMultiplier = Math.max(peakMultiplier, multiplier);
+                    peakMultiplier = Math.max(peakMultiplier, multiplier);
                     if (listener != null) {
                         listener.picked(p.x, p.y, multiplier);
                     }

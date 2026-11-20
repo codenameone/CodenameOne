@@ -1,0 +1,114 @@
+= Papercut
+
+A twin-stick arena shooter in cut paper and ink, and its server, in one Maven
+project and one language. A paper quill flies over a school notebook page and
+shoots ink at paper creatures: darts that rush you, pinwheels that spin across
+the page, cranes that split into cranelets, scissors that open and dash, and
+inkwells that pull everything toward them before they burst into darts. Ink
+drops raise the multiplier up to x20, the eraser clears the page, and the sheet
+ripples under every blast and keeps the stains.
+
+Three modes: Classic, Fold (no gun; fly through paper gates) and Daily (one seed
+for everyone, from the server). Around the game is what a live arcade game
+needs: accounts, leaderboards for all time, the week, today and your friends, a
+shop of quill papers, achievements and a console for running it.
+
+There is no `rules` module. The server never replays a run: it hands out a
+single-use ticket when a run starts and holds the score that comes back to the
+plausibility bounds in `ScoreBounds`, which the app and the server share. The
+arena runs in the app alone.
+
+It's a sample of what Codename One does for games, and the project the
+Initializr generates when you start from the arena shooter template.
+
+== Start here
+
+One chapter of the developer guide covers this project:
+
+* https://www.codenameone.com/developer-guide/#papercut-implementors-guide[The Papercut chapter]
+  (link:../../docs/developer-guide/Papercut-Implementors-Guide.asciidoc[source])
+  tours what the game does, with the demo accounts, then explains how it's
+  built and what to change to make it yours: creatures, modes, the look and
+  the server.
+
+== The modules
+
+[cols="1,3"]
+|===
+| Module | What it holds
+
+| `shared` | The data transfer objects, the `@RestClient` interfaces and
+  `ScoreBounds`.
+| `common` | The app: the arena simulation, its view over `com.codename1.gaming`,
+  the twin sticks, the paper sheet, the menus, the boards, the shop and the
+  admin console.
+| `backend` | The server: accounts, run tickets and scores, boards, the daily
+  seed, the shop, achievements and administration.
+| `ios` | The iOS build, for generating the Xcode project.
+|===
+
+== Running it
+
+Start the server on the development profile. It needs nothing installed: the
+database is in memory, purchases are simulated, and the demo accounts
+`player@`, `rival@`, `trouble@` and `admin@papercut.example` exist, each with
+the password `papercut-demo`.
+
+[source,bash]
+----
+CN1_PROFILE=dev backend/server.sh run
+----
+
+Then run the app in the simulator:
+
+[source,bash]
+----
+mvn verify -Psimulator -DskipTests -Dcodename1.platform=javase
+----
+
+On a touch screen the left thumb flies and the right one aims and fires; on a
+desktop it's WASD and the mouse, and a gamepad works too.
+
+For the native iOS app, generate the Xcode project on a Mac, open it and run it
+from Xcode:
+
+[source,bash]
+----
+mvn package -DskipTests -Dcodename1.platform=ios -Dcodename1.buildTarget=ios-source -Dopen=false
+----
+
+== Tests
+
+[source,bash]
+----
+mvn -pl shared,backend -Dcodename1.platform=backend test   # <1>
+./run-e2e.sh   # <2>
+./check-template.sh   # <3>
+----
+<1> The server's tests: accounts, run tickets and score bounds, boards, the
+    shop, progression and administration.
+<2> Starts the server on the `test` profile and runs the app's tests against it
+    in the simulator, the arena's own tests among them. Screenshots land in
+    `target/e2e-shots`.
+<3> Generates a project from the Initializr template, under another name and
+    package, and builds it.
+
+`.github/workflows/papercut.yml` runs them, and builds the app for Android and
+iOS.
+
+== The Initializr template
+
+`scripts/sync-initializr-template.py papercut --write` copies this project into
+the Initializr's resources; without `--write` it fails when they differ, which is
+what CI runs. Change the project here, never the copies.
+
+== Licence
+
+Papercut is released under MIT No Attribution (see `LICENSE`), not under the
+GPLv2 with Classpath Exception that covers Codename One itself. Take any of it
+into your own application, under any licence, with no notice to keep.
+
+The cut-outs are drawn by `tools/make-art.py`; the paper textures (ambientCG) and
+sounds (OpenGameArt) are CC0, and the type is Gochi Hand and Patrick Hand under
+the SIL Open Font License. `ART.md` lists every source and how to re-skin the
+game.

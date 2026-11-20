@@ -91,6 +91,17 @@ public enum Template {
             "The paintball template is an app, a server and the modules they share; "
                     + "an Initializr Gradle project is a single project.",
             new String[0], "/splat-modules.zip", "/splat-settings.properties"),
+    // A twin-stick arena shooter in cut paper and ink: no rules module (the server
+    // holds scores to plausibility bounds instead of re-simulating them), daily
+    // seeds, boards, a shop and achievements. It is the project in
+    // scripts/papercut; its resources come from
+    // `scripts/sync-initializr-template.py papercut`. Its look is drawn art, so it
+    // has no colour scheme to choose.
+    PAPERCUT(false, "/papercut-src.zip", "/papercut-css.zip", "/papercut-pom.xml",
+            "com.codenameone.examples.papercut", "Papercut", "/papercut-preview.jpg",
+            "The arena shooter template is an app, a server and the contract module they share; "
+                    + "an Initializr Gradle project is a single project.",
+            new String[0], "/papercut-modules.zip", "/papercut-settings.properties"),
     // The same kind of template as WAYLINE: an end-to-end encrypted messaging app
     // (chats, groups, media, calls) and its server. It is the project in
     // scripts/parley, and its resources come from
@@ -206,7 +217,7 @@ public enum Template {
     /// Whether the developer can choose a colour scheme for the template: false for
     /// one whose look is art and not a palette its stylesheet declares.
     public boolean hasColorScheme() {
-        return this != SKIRMISH && this != DASH && this != SPLAT;
+        return this != SKIRMISH && this != DASH && this != SPLAT && this != PAPERCUT;
     }
 
     public boolean supportsGradle() {
