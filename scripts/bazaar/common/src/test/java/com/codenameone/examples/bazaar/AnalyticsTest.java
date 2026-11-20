@@ -20,8 +20,8 @@ package com.codenameone.examples.bazaar;
 
 import java.util.Map;
 
-/// Analytics: once a sale has gone through (the shop and register tests run
-/// first and each makes one), the owner's dashboard has non-zero KPIs.
+/// Analytics: the demo stores are seeded with a month of past sales, so the
+/// owner's dashboard has non-zero KPIs whichever test runs first.
 public class AnalyticsTest extends E2e {
     @Override
     protected boolean run() throws Exception {

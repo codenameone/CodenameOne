@@ -40,6 +40,13 @@ import com.codenameone.examples.bazaar.domain.Variant;
 import com.codenameone.examples.bazaar.inventory.Inventory;
 import com.codenameone.examples.bazaar.inventory.Stock;
 import com.codenameone.examples.bazaar.repository.CollectionProductRepository;
+import com.codenameone.examples.bazaar.repository.OrderLineRepository;
+import com.codenameone.examples.bazaar.repository.RegisterRepository;
+import com.codenameone.examples.bazaar.repository.StoreOrderRepository;
+import com.codenameone.examples.bazaar.domain.OrderLine;
+import com.codenameone.examples.bazaar.domain.Register;
+import com.codenameone.examples.bazaar.domain.StoreOrder;
+import com.codenameone.examples.bazaar.order.Orders;
 import com.codenameone.examples.bazaar.repository.CollectionRepository;
 import com.codenameone.examples.bazaar.repository.InventoryLevelRepository;
 import com.codenameone.examples.bazaar.repository.InventoryMoveRepository;
@@ -224,6 +231,9 @@ public class DemoStores {
     private final PurchaseLineRepository orderLines;
     private final Accounts accounts;
     private final PasswordEncoder encoder;
+    private final RegisterRepository registers;
+    private final StoreOrderRepository sales;
+    private final OrderLineRepository saleLines;
     private final com.codenameone.examples.bazaar.pricing.DemoPricing pricing;
     private final com.codenameone.examples.bazaar.automation.Automations automations;
 
@@ -235,7 +245,12 @@ public class DemoStores {
             SupplierRepository suppliers, PurchaseOrderRepository orders,
             PurchaseLineRepository orderLines, Accounts accounts, PasswordEncoder encoder,
             com.codenameone.examples.bazaar.pricing.DemoPricing pricing,
-            com.codenameone.examples.bazaar.automation.Automations automations) {
+            com.codenameone.examples.bazaar.automation.Automations automations,
+            RegisterRepository registers, StoreOrderRepository sales,
+            OrderLineRepository saleLines) {
+        this.registers = registers;
+        this.sales = sales;
+        this.saleLines = saleLines;
         this.pricing = pricing;
         this.automations = automations;
         this.stores = stores;
@@ -267,6 +282,8 @@ public class DemoStores {
         }
         seedPricing(NORTHWIND);
         seedPricing(LITTLE_CLAY);
+        seedFloor(NORTHWIND, owner, cashier);
+        seedFloor(LITTLE_CLAY, owner, owner);
         accounts.setMerchant(owner, true);
         accounts.setMerchant(cashier, true);
     }
@@ -278,6 +295,104 @@ public class DemoStores {
         if (store != null) {
             pricing.seed(store.getId());
             automations.seedDemo(store.getId());
+        }
+    }
+
+    /// A register at every shop floor, and a month of past sales, once per
+    /// store, so the register opens and the dashboard and analytics have
+    /// something to show on a first run.
+    private void seedFloor(String handle, String owner, String cashier) throws IOException {
+        Store store = stores.findByHandle(handle);
+        if (store == null) {
+            return;
+        }
+        List<Register> tills = new ArrayList<Register>();
+        if (registers.findByStoreId(store.getId()).isEmpty()) {
+            for (Location place : locations.findByStoreIdOrderByPositionAsc(store.getId())) {
+                if ("WAREHOUSE".equals(place.getKind())) {
+                    continue;
+                }
+                Register r = new Register();
+                r.setId(Ids.next());
+                r.setStoreId(store.getId());
+                r.setLocationId(place.getId());
+                r.setName(place.getName() + " register");
+                r.setActive(place.isActive());
+                registers.insert(r);
+                tills.add(r);
+            }
+        } else {
+            tills.addAll(registers.findByStoreId(store.getId()));
+        }
+        if (sales.findFirstByStoreIdOrderByNumberDesc(store.getId()) == null) {
+            history(store, tills, owner, cashier);
+        }
+    }
+
+    @Transactional(rollbackFor = IOException.class)
+    void history(Store store, List<Register> tills, String owner, String cashier)
+            throws IOException {
+        List<Variant> stock = variants.findByStoreId(store.getId());
+        if (stock.isEmpty()) {
+            return;
+        }
+        java.util.Map<String, String> titles = new java.util.HashMap<String, String>();
+        for (Product p : products.findByStoreIdOrderByTitleAsc(store.getId())) {
+            titles.put(p.getId(), p.getTitle());
+        }
+        long day = 24L * 60 * 60 * 1000;
+        int number = 1001;
+        for (int iter = 0; iter < 14; iter++) {
+            boolean pos = iter % 3 == 2 && !tills.isEmpty();
+            Instant at = Instant.now().minusMillis((28 - iter * 2) * day + iter * 3600_000L);
+            StoreOrder o = new StoreOrder();
+            o.setId(Ids.next());
+            o.setStoreId(store.getId());
+            o.setNumber(number++);
+            // client_id is unique; the id itself never collides.
+            o.setClientId(o.getId());
+            o.setChannel(pos ? Orders.POS : Orders.ONLINE);
+            o.setStatus(Orders.CLOSED);
+            o.setFinancial(Orders.PAID);
+            o.setFulfilment(Orders.FULFILLED);
+            o.setCurrency(store.getCurrency());
+            o.setEmail("customer" + (iter % 5) + "@example.com");
+            if (pos) {
+                Register till = tills.get(0);
+                o.setLocationId(till.getLocationId());
+                o.setRegisterId(till.getId());
+                o.setStaffUsername(cashier);
+            } else {
+                o.setShipName("Demo customer " + (iter % 5 + 1));
+                o.setShipCountry("US");
+            }
+            List<OrderLine> lines = new ArrayList<OrderLine>();
+            long subtotal = 0;
+            for (int l = 0; l < 1 + iter % 3; l++) {
+                Variant v = stock.get((iter * 7 + l * 3) % stock.size());
+                OrderLine line = new OrderLine();
+                line.setId(Ids.next());
+                line.setOrderId(o.getId());
+                line.setProductId(v.getProductId());
+                line.setVariantId(v.getId());
+                String title = titles.get(v.getProductId());
+                line.setTitle(title == null ? v.getTitle() : title);
+                line.setVariantTitle(v.getTitle());
+                line.setSku(v.getSku());
+                line.setQuantity(1 + l % 2);
+                line.setFulfilledQty(line.getQuantity());
+                line.setPriceCents(v.getPriceCents());
+                line.setLocationId(o.getLocationId());
+                subtotal += v.getPriceCents() * line.getQuantity();
+                lines.add(line);
+            }
+            o.setSubtotalCents(subtotal);
+            o.setTotalCents(subtotal);
+            o.setCreatedAt(at);
+            o.setUpdatedAt(at);
+            o.setClosedAt(at);
+            sales.insert(o);
+            saleLines.saveAll(lines);
         }
     }
 

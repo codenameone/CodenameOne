@@ -121,7 +121,10 @@ public abstract class E2e extends AbstractTest {
             Look.apply();
             Lang.apply();
             Session.start(AppConfig.serverUrl());
-            AppConfig.setMode(Nav.SHOP);
+            // No remembered mode: each account opens where its role puts
+            // it (admin console, store, register or shop), as on a fresh
+            // install.
+            AppConfig.setMode("");
             Nav.launch();
         });
         waitForForm("Welcome");
@@ -264,10 +267,15 @@ public abstract class E2e extends AbstractTest {
         onEdt(() -> Display.getInstance().getCurrent().getBackCommand().actionPerformed(null));
     }
 
-    /// Signs out through the menu of a home screen.
+    /// Signs out the way a home screen offers: the side panel's entry on a
+    /// wide screen, the title bar's overflow command on a phone (a native
+    /// menu a test cannot open, so its command is run directly).
     protected void signOut() {
-        click("menu-open");
-        click("menu-signOut");
+        if (has("menu-signOut")) {
+            click("menu-signOut");
+        } else {
+            onEdt(Nav::signOut);
+        }
         waitForForm("Welcome");
     }
 
