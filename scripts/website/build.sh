@@ -911,6 +911,13 @@ else
   echo "Warning: python3 not found; skipping lunr index generation." >&2
 fi
 
+# A shortcode Hugo did not expand renders as visible text ("{{< guide-block >}}",
+# a post-link with its link spliced into it) while Hugo still exits 0; only the
+# generated HTML shows it.
+if command -v "${PYTHON_BIN}" >/dev/null 2>&1; then
+  "${PYTHON_BIN}" "${REPO_ROOT}/scripts/website/check_rendered_shortcodes.py" "${WEBSITE_DIR}/public"
+fi
+
 # The site and the downloadable zip are two renderings of one set of sources, and
 # the split only works while they agree on addresses. Compare them here rather
 # than trusting the generator: a fragment that drifts is a dead link from the
