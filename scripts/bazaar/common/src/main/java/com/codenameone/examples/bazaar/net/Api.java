@@ -21,12 +21,6 @@ package com.codenameone.examples.bazaar.net;
 import com.codename1.io.rest.RestClients;
 import com.codenameone.examples.bazaar.api.AccountApi;
 import com.codenameone.examples.bazaar.api.AdminApi;
-import com.codenameone.examples.bazaar.api.CatalogApi;
-import com.codenameone.examples.bazaar.api.CourierApi;
-import com.codenameone.examples.bazaar.api.OnboardingApi;
-import com.codenameone.examples.bazaar.api.GeoApi;
-import com.codenameone.examples.bazaar.api.MerchantApi;
-import com.codenameone.examples.bazaar.api.OrderApi;
 import com.codenameone.examples.bazaar.api.PaymentApi;
 
 /// The server, as the app calls it.
@@ -37,55 +31,20 @@ import com.codenameone.examples.bazaar.api.PaymentApi;
 /// from compiling.
 public final class Api {
     private static AccountApi account;
-    private static CatalogApi catalog;
-    private static OrderApi orders;
-    private static MerchantApi merchant;
-    private static CourierApi courier;
-    private static GeoApi geo;
     private static AdminApi admin;
     private static PaymentApi payments;
-    private static OnboardingApi onboarding;
 
     private Api() {
     }
 
     static void connect(String baseUrl) {
         account = RestClients.create(AccountApi.class, baseUrl);
-        catalog = RestClients.create(CatalogApi.class, baseUrl);
-        orders = RestClients.create(OrderApi.class, baseUrl);
-        merchant = RestClients.create(MerchantApi.class, baseUrl);
-        courier = RestClients.create(CourierApi.class, baseUrl);
-        geo = RestClients.create(GeoApi.class, baseUrl);
         admin = RestClients.create(AdminApi.class, baseUrl);
         payments = RestClients.create(PaymentApi.class, baseUrl);
-        onboarding = RestClients.create(OnboardingApi.class, baseUrl);
     }
 
     public static AccountApi account() {
         return account;
-    }
-
-    /// Restaurants and their menus, and applying to open one.
-    public static CatalogApi catalog() {
-        return catalog;
-    }
-
-    /// The customer's orders, favourites and addresses.
-    public static OrderApi orders() {
-        return orders;
-    }
-
-    /// The restaurant the caller is on the staff of.
-    public static MerchantApi merchant() {
-        return merchant;
-    }
-
-    public static CourierApi courier() {
-        return courier;
-    }
-
-    public static GeoApi geo() {
-        return geo;
     }
 
     public static AdminApi admin() {
@@ -96,9 +55,6 @@ public final class Api {
         return payments;
     }
 
-    /// Applying to deliver, which is open to everyone; [#courier] is for those
-    /// whose application was approved.
-    public static OnboardingApi onboarding() {
-        return onboarding;
-    }
+    // Store, catalog and order clients are added here as the shared module
+    // grows the contracts for them.
 }

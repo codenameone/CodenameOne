@@ -50,7 +50,6 @@ import com.codename1.ui.plaf.UIManager;
 import com.codename1.appkit.Net;
 import com.codenameone.examples.bazaar.Prefs;
 import com.codenameone.examples.bazaar.Telemetry;
-import com.codenameone.examples.bazaar.api.DeliveryState;
 
 import java.util.Date;
 
@@ -456,7 +455,7 @@ public final class Ui {
     }
 
     /// Something to read before acting on what follows -- a customer's note
-    /// for the kitchen: an icon, a bold title and the words, in a tinted box
+    /// for the merchant: an icon, a bold title and the words, in a tinted box
     /// in the flow of the page. [#banner] is for a screen with nothing else
     /// on it, and is far too loud between two sections.
     public static Container callout(char icon, String title, String text) {
@@ -527,7 +526,7 @@ public final class Ui {
     }
 
     /// Asks why, before something an admin does to someone else's account or
-    /// delivery. The reason is kept with what was done, so it is not optional.
+    /// order. The reason is kept with what was done, so it is not optional.
     ///
     /// @param action what the button says, which is what will be done
     public static void reason(final Form previous, String title, String text, String action,
@@ -732,48 +731,5 @@ public final class Ui {
 
     public static String minutes(double seconds) {
         return Lang.tr("{0} min", String.valueOf(Math.max(1L, Math.round(seconds / 60d))));
-    }
-
-    /// A delivery's state in words.
-    public static String state(DeliveryState state) {
-        if (DeliveryState.REQUESTED == state || DeliveryState.OFFERED == state) {
-            return "Finding a courier";
-        }
-        if (DeliveryState.ACCEPTED == state) {
-            return "Courier on the way";
-        }
-        if (DeliveryState.ARRIVED == state) {
-            return "Courier at pickup";
-        }
-        if (DeliveryState.IN_PROGRESS == state) {
-            return "On its way";
-        }
-        if (DeliveryState.COMPLETED == state) {
-            return "Completed";
-        }
-        if (DeliveryState.CANCELLED_BY_CUSTOMER == state) {
-            return "Cancelled by customer";
-        }
-        if (DeliveryState.CANCELLED_BY_COURIER == state) {
-            return "Cancelled by courier";
-        }
-        if (DeliveryState.CANCELLED_BY_ADMIN == state) {
-            return "Cancelled by Bazaar";
-        }
-        if (DeliveryState.NO_COURIERS == state) {
-            return "No courier found";
-        }
-        return "";
-    }
-
-    /// The style of the badge a state is shown in.
-    public static String stateBadge(DeliveryState state) {
-        if (DeliveryState.COMPLETED == state) {
-            return "SvBadgeGood";
-        }
-        if (state != null && state.isActive()) {
-            return "SvBadgeWarn";
-        }
-        return "SvBadgeBad";
     }
 }

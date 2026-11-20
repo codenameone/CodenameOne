@@ -32,10 +32,10 @@ import java.io.IOException;
 import java.util.Map;
 import java.util.Timer;
 
-/// The WebSocket the server pushes changes down: a delivery changed state, the
-/// courier moved, a car went on or offline.
+/// The WebSocket the server pushes changes down: an order changed state, stock
+/// moved, something a back-office screen shows was edited.
 ///
-/// It only ever says *that* something changed. What the delivery now is, the app
+/// It only ever says *that* something changed. What the order now is, the app
 /// asks for over the REST API, which stays the one source of truth -- so a
 /// frame that is lost, or a socket that is down, costs a few seconds and
 /// nothing else. Every screen that listens here also polls, slowly while the
@@ -47,35 +47,29 @@ import java.util.Timer;
 public final class LiveChannel {
     /// What a screen wants to hear about. All of it arrives on the EDT.
     public interface Listener {
-        /// An order the user is a party to changed: theirs as a customer, their
-        /// restaurant's, or the one they carry.
-        void orderChanged(String id, String state);
+        /// An order the user is a party to changed: theirs as a shopper, or
+        /// one of the store they work for.
+        void orderChanged(String id, String status);
 
-        void deliveryChanged(String id, String state);
+        /// Stock of a variant changed at some location of the user's store.
+        void stockChanged(String variantId, String locationId);
 
-        void courierMoved(String deliveryId, double lat, double lng, double heading);
-
-        void fleetChanged(String username, boolean online, double lat, double lng,
-                double heading);
+        /// Any other frame, by its `type`, for a screen that knows it.
+        void changed(String type, Map<String, Object> frame);
     }
 
     /// A listener that ignores everything, to override the part a screen wants.
     public static class Adapter implements Listener {
         @Override
-        public void orderChanged(String id, String state) {
+        public void orderChanged(String id, String status) {
         }
 
         @Override
-        public void deliveryChanged(String id, String state) {
+        public void stockChanged(String variantId, String locationId) {
         }
 
         @Override
-        public void courierMoved(String deliveryId, double lat, double lng, double heading) {
-        }
-
-        @Override
-        public void fleetChanged(String username, boolean online, double lat, double lng,
-                double heading) {
+        public void changed(String type, Map<String, Object> frame) {
         }
     }
 
@@ -224,28 +218,17 @@ public final class LiveChannel {
         }
         Object type = json.get("type");
         if ("order".equals(type)) {
-            listener.orderChanged(text(json, "id"), text(json, "state"));
-        } else if ("delivery".equals(type)) {
-            listener.deliveryChanged(text(json, "id"), text(json, "state"));
-        } else if ("courier".equals(type)) {
-            listener.courierMoved(text(json, "deliveryId"), number(json, "lat"), number(json, "lng"),
-                    number(json, "heading"));
-        } else if ("fleet".equals(type)) {
-            Object online = json.get("online");
-            listener.fleetChanged(text(json, "username"),
-                    Boolean.TRUE.equals(online) || "true".equals(online),
-                    number(json, "lat"), number(json, "lng"), number(json, "heading"));
+            listener.orderChanged(text(json, "id"), text(json, "status"));
+        } else if ("stock".equals(type)) {
+            listener.stockChanged(text(json, "variantId"), text(json, "locationId"));
+        } else if (type instanceof String) {
+            listener.changed((String) type, json);
         }
     }
 
-    // Tested, never cast and caught: a failed cast does not throw on iOS.
     private static String text(Map<String, Object> json, String key) {
         Object value = json.get(key);
         return value instanceof String ? (String) value : "";
     }
 
-    private static double number(Map<String, Object> json, String key) {
-        Object value = json.get(key);
-        return value instanceof Number ? ((Number) value).doubleValue() : 0;
-    }
 }

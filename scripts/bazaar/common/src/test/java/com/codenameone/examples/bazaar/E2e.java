@@ -24,9 +24,7 @@ import com.codename1.io.oidc.OidcTokens;
 import com.codename1.io.oidc.TokenStore;
 import com.codename1.maps.LatLng;
 import com.codename1.maps.MapView;
-import com.codename1.maps.vector.BundledTileSource;
 import com.codename1.maps.vector.TileCallback;
-import com.codename1.maps.vector.TileSource;
 import com.codename1.testing.AbstractTest;
 import com.codename1.ui.Button;
 import com.codename1.ui.CN;
@@ -42,9 +40,6 @@ import com.codename1.ui.spinner.Picker;
 import com.codename1.ui.util.ImageIO;
 import com.codename1.util.AsyncResource;
 import com.codenameone.examples.bazaar.live.LiveChannel;
-import com.codenameone.examples.bazaar.map.Locator;
-import com.codenameone.examples.bazaar.map.Maps;
-import com.codenameone.examples.bazaar.map.Routes;
 import com.codenameone.examples.bazaar.net.Session;
 import com.codenameone.examples.bazaar.ui.Lang;
 import com.codenameone.examples.bazaar.ui.Look;
@@ -126,9 +121,6 @@ public abstract class E2e extends AbstractTest {
             return;
         }
         Session.useStore(new MemoryStore());
-        Maps.useTiles(new Tiles());
-        Routes.useStraightLines(true);
-        Locator.pin(HERE);
         onEdt(() -> {
             LiveChannel.stop();
             // The tests read the screens in English, whatever the machine
@@ -142,7 +134,7 @@ public abstract class E2e extends AbstractTest {
             Look.apply();
             Lang.apply();
             Session.start(AppConfig.serverUrl());
-            AppConfig.setMode(Nav.CUSTOMER);
+            AppConfig.setMode(Nav.SHOP);
             Nav.launch();
         });
         waitForForm("Welcome");
@@ -511,55 +503,6 @@ public abstract class E2e extends AbstractTest {
     /// that fails is asked for again and is never drawn, and the map then
     /// never reports itself ready -- which a test waiting to take a capture
     /// would read as a map that is still loading.
-    static final class Tiles implements TileSource {
-        private static final byte[] EMPTY = new byte[0];
-        // At the root of the resources: a Codename One resource has no
-        // directory, and the simulator refuses a path that names one.
-        private final TileSource bundled =
-                new BundledTileSource("/mt_{z}_{x}_{y}.mvt", true, 13, 13);
-
-        @Override
-        public boolean isVector() {
-            return true;
-        }
-
-        @Override
-        public int getTileSize() {
-            return 256;
-        }
-
-        @Override
-        public int getMinZoom() {
-            return 13;
-        }
-
-        @Override
-        public int getMaxZoom() {
-            return 13;
-        }
-
-        @Override
-        public String getAttribution() {
-            return "(c) OpenStreetMap contributors";
-        }
-
-        @Override
-        public void fetchTile(int z, int x, int y, final TileCallback callback) {
-            bundled.fetchTile(z, x, y, new TileCallback() {
-                @Override
-                public void tileLoaded(int tz, int tx, int ty, byte[] data) {
-                    callback.tileLoaded(tz, tx, ty, data);
-                }
-
-                @Override
-                public void tileFailed(int tz, int tx, int ty) {
-                    callback.tileLoaded(tz, tx, ty, EMPTY);
-                }
-            });
-        }
-    }
-
-    /// Tokens kept for the length of the run and nowhere else.
     static final class MemoryStore implements TokenStore {
         private OidcTokens kept;
 

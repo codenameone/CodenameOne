@@ -19,8 +19,6 @@
 package com.codenameone.examples.bazaar;
 
 import com.codename1.system.Lifecycle;
-import com.codenameone.examples.bazaar.courier.Shift;
-import com.codenameone.examples.bazaar.map.Locator;
 import com.codenameone.examples.bazaar.net.Account;
 import com.codenameone.examples.bazaar.net.Session;
 import com.codenameone.examples.bazaar.notify.Notifications;
@@ -38,8 +36,8 @@ import com.codenameone.examples.bazaar.ui.Nav;
 ///   the `shared` module. Nothing else in the app builds a URL.
 /// - `live` -- the WebSocket the server pushes changes down.
 /// - `notify` -- push notifications, for a phone that is not looking.
-/// - `ui`, `customer`, `courier`, `admin` -- the screens.
-/// - `map` -- the map, its markers and the device's position.
+/// - `ui` -- the shell: navigation, sections, desktop menus and shared widgets.
+/// - `admin`, `pay` -- the platform console and the wallet.
 /// - `src/main/css/theme.css` -- every colour, font and margin.
 /// - `src/main/l10n` -- every word, in each language the app speaks.
 /// - `Prefs` -- what the user chose in Settings.
@@ -62,28 +60,19 @@ public class Bazaar extends Lifecycle {
     /// page is noticed: the browser it opened in tells the app nothing.
     ///
     /// It is also when the app asks for its push token, which the platform
-    /// answers at once when nothing has changed, and when the position is
-    /// looked for again if going to the background put the search down.
+    /// answers at once when nothing has changed.
     @Override
     public void start() {
         super.start();
         CardForm.resumed();
-        Shift.resumed();
-        Locator.resumed();
         Notifications.start();
     }
 
     /// The app is put away, which is the last sure moment to send the usage
     /// reports gathered since the last batch.
-    ///
-    /// A courier on line goes on reporting where the car is from the
-    /// background; anyone else's search for the position is put down until
-    /// the app is back.
     @Override
     public void stop() {
         super.stop();
         Telemetry.flush();
-        Shift.paused();
-        Locator.paused();
     }
 }

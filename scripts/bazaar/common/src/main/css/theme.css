@@ -44,66 +44,60 @@
     switchTrackOffOutlineWidthMM: "0";
     switchTrackOnOutlineWidthMM: "0";
     switchThumbWidthScale: "1.0";
-    --brand: #7ac943;
-    --brand-pressed: #9bdf6c;
-    /* Dark lettering on the green: white on it reads at barely 2:1. */
-    --brand-contrast: #10210a;
+    /* ONE ACCENT: change --brand (and its dark twin) to re-skin the app. */
+    --brand: #4f46e5;
+    --brand-pressed: #4338ca;
+    /* Lettering on the accent. */
+    --brand-contrast: #ffffff;
+    /* Neutral surfaces: the page, a recessed panel, a pressed row. */
     --surface: #ffffff;
-    --surface-alt: #eff0f0;
-    --surface-press: #e2e4e4;
-    --text: #1b1c1d;
-    /* Grub's grey, darkened from #989898 until it reads on white. */
-    --text-muted: #6b6e70;
-    --line: #dbdfdf;
-    --line-strong: #c4c9c9;
-    --success: #12805c;
-    --warning: #b25e09;
-    --danger: #c5292a;
-    /* The pale ground a selected card and a badge sit on. */
-    --brand-tint: #eef8e6;
-    --success-tint: #e4f4ed;
-    --warning-tint: #fcf0df;
-    --danger-tint: #fcebeb;
+    --surface-alt: #f6f7f9;
+    --surface-press: #eceef2;
+    --text: #111827;
+    --text-muted: #5b6472;
+    --line: #e5e7eb;
+    --line-strong: #d1d5db;
+    --success: #047857;
+    --warning: #b45309;
+    --danger: #c81e1e;
+    /* The pale ground a selected row and a badge sit on. */
+    --brand-tint: #eef2ff;
+    --success-tint: #e7f6ef;
+    --warning-tint: #fdf3e2;
+    --danger-tint: #fdecec;
 
-    --brand-dark: #8fd65c;
-    --brand-pressed-dark: #7ac943;
-    --brand-contrast-dark: #10210a;
-    --surface-dark: #18191a;
-    --surface-alt-dark: #242526;
-    --surface-press-dark: #3a3b3c;
-    --text-dark: #e4e6eb;
-    --text-muted-dark: #b0b3b8;
-    --line-dark: #3a3b3c;
-    --line-strong-dark: #4e4f50;
-    --success-dark: #47c79a;
-    --warning-dark: #f0a24b;
-    --danger-dark: #ff7a7a;
-    --brand-tint-dark: #23331a;
-    --success-tint-dark: #15302a;
-    --warning-tint-dark: #33270f;
-    --danger-tint-dark: #3a1f22;
+    --brand-dark: #818cf8;
+    --brand-pressed-dark: #a5b4fc;
+    --brand-contrast-dark: #0b1020;
+    --surface-dark: #0f1115;
+    --surface-alt-dark: #171a21;
+    --surface-press-dark: #232733;
+    --text-dark: #e8eaf0;
+    --text-muted-dark: #a3aab8;
+    --line-dark: #262a35;
+    --line-strong-dark: #343a48;
+    --success-dark: #34d399;
+    --warning-dark: #fbbf24;
+    --danger-dark: #f87171;
+    --brand-tint-dark: #1e1f3d;
+    --success-tint-dark: #0f2a22;
+    --warning-tint-dark: #2e2410;
+    --danger-tint-dark: #341a1d;
 
     /* ONE RADIUS for anything card- or button-shaped, a smaller one for what
        sits inside a card, and the sheet's. */
-    --radius: 2mm;
-    --radius-small: 1.5mm;
+    --radius: 2.4mm;
+    --radius-small: 1.6mm;
 
-    /* What floats over the map: the shadow under it, the dimming behind an
-       open menu, and the corners of the sheet. */
+    /* The shadow under a floating card, and the dimming behind a sheet. */
     --shadow: #101828;
     /* Under a card with square-ish corners. Black, and without a blur where it
        is used: that is the one shadow a rounded rectangle draws for itself.
        Any other is rendered to pictures of the card when the theme is
        compiled, and a build that cannot render them has no card at all. */
-    --shadow-card: rgba(0, 0, 0, 0.14);
+    --shadow-card: rgba(0, 0, 0, 0.08);
     --scrim: #000000;
     --radius-sheet: 4mm;
-    /* The map's own drawings. The edge is the outline that keeps a pin, the
-       courier and the route readable over any tile. */
-    --map-edge: #ffffff;
-    --map-edge-dark: #18191a;
-    --car: #1b1c1d;
-    --car-dark: #e4e6eb;
 }
 
 /* ---------------------------------------------------------------- surfaces */
@@ -152,7 +146,7 @@ SvHeroIcon {
     background-color: transparent;
 }
 
-/* The panel that rises over the map. */
+/* A sheet that rises from the bottom. */
 SvCard {
     background-color: var(--surface);
     border-radius: var(--radius-sheet) var(--radius-sheet) 0 0;
@@ -160,7 +154,7 @@ SvCard {
     margin: 0;
 }
 
-/* A panel that floats over the map with a gap around it. */
+/* A panel that floats with a gap around it. */
 SvFloat {
     background-color: var(--surface);
     border-radius: var(--radius);
@@ -240,15 +234,6 @@ SvPrice {
 
 /* The same, where it is the headline of a sheet: it starts where the
    sheet's words start. */
-SvFare {
-    color: var(--text);
-    font-family: "native:MainBold";
-    font-size: 5.2mm;
-    padding: 0;
-    margin: 0;
-    text-align: left;
-    background-color: transparent;
-}
 
 SvError {
     color: var(--danger);
@@ -341,7 +326,7 @@ SvLink.pressed {
     background-color: var(--brand-tint);
 }
 
-/* The round buttons that sit on the map. */
+/* Round icon buttons over content (a photo, a scanner view). */
 SvMapButton {
     color: var(--text);
     background: cn1-round-border;
@@ -373,20 +358,6 @@ SvBarButton.pressed {
 }
 
 /* "Where to?" -- looks like a field, behaves like a button. */
-SvSearchBar {
-    color: var(--text);
-    background-color: var(--surface-alt);
-    border-radius: var(--radius);
-    font-family: "native:MainBold";
-    font-size: 3.1mm;
-    text-align: left;
-    padding: 2.9mm 3.2mm 2.9mm 3.2mm;
-    margin: 0.8mm 0 0.8mm 0;
-}
-
-SvSearchBar.pressed {
-    background-color: var(--surface-press);
-}
 
 /* ------------------------------------------------------------------ fields */
 
@@ -556,41 +527,6 @@ BackCommand {
     background-color: transparent;
 }
 
-/* ---------------------------------------------------------------------------
- * MAP. A marker is an icon drawn in its style's colour, and the route is a
- * line in SvRoute's.
- */
-SvMarkerPickup {
-    color: var(--success);
-    background-color: var(--map-edge);
-}
-
-SvMarkerDropoff {
-    color: var(--danger);
-    background-color: var(--map-edge);
-}
-
-SvMarkerCar {
-    color: var(--car);
-    background-color: var(--map-edge);
-}
-
-SvRoute {
-    color: var(--brand);
-    background-color: var(--map-edge);
-}
-
-SvStar {
-    color: var(--warning);
-    background-color: transparent;
-    padding: 1.2mm;
-    margin: 0.6mm 0 0.6mm 0;
-}
-
-SvStar.pressed {
-    color: var(--text-muted);
-}
-
 /* The switch: the thumb is the colour, the track the background. */
 Switch {
     color: #ffffff;
@@ -612,90 +548,8 @@ Switch.disabled {
 }
 
 /* ---------------------------------------------------------------------------
- * OVER THE MAP. The clear strip the status bar is drawn in, which the map
- * runs under, the bar of floating controls,
- * the sheet at the bottom and what goes in each.
+ * SHEETS AND CHIPS.
  */
-SvStatusShade {
-    background-color: transparent;
-    padding: 0;
-    margin: 0;
-}
-
-SvMapBar {
-    background-color: transparent;
-    padding: 1.2mm 2.4mm 0 0;
-    margin: 0;
-}
-
-/* "Where to?" -- a card that floats over the map and behaves like a button. */
-SvSearchCard {
-    color: var(--text);
-    background-color: var(--surface);
-    border-radius: var(--radius);
-    cn1-box-shadow-spread: 0.5mm;
-    cn1-box-shadow-blur: 0;
-    cn1-box-shadow-h: 0.5;
-    cn1-box-shadow-v: 0.7;
-    cn1-box-shadow-color: var(--shadow-card);
-    font-family: "native:MainBold";
-    font-size: 3.1mm;
-    text-align: left;
-    padding: 3mm 3.2mm 3mm 3.2mm;
-    margin: 0.5mm 0 0.5mm 0;
-}
-
-SvSearchCard.pressed {
-    background-color: var(--surface-alt);
-}
-
-/* From where to where, once there is somewhere to go. */
-SvTripCard {
-    cn1-derive: SvSearchCard;
-    padding: 1.9mm 3.2mm 1.9mm 3.2mm;
-}
-
-SvTripStop {
-    color: var(--text);
-    background-color: transparent;
-    font-family: "native:MainRegular";
-    font-size: 2.6mm;
-    text-align: left;
-    padding: 0.7mm 0 0.7mm 0;
-    margin: 0;
-}
-
-/* The courier's card at the top: on line or off, and today's takings. */
-SvStatusCard {
-    cn1-derive: SvSearchCard;
-    padding: 1.7mm 3.2mm 1.7mm 2mm;
-}
-
-SvStatusValue {
-    color: var(--text);
-    background-color: transparent;
-    font-family: "native:MainBold";
-    font-size: 3.3mm;
-    text-align: right;
-    padding: 0;
-    margin: 0;
-}
-
-SvStatusDetail {
-    color: var(--text-muted);
-    background-color: transparent;
-    font-family: "native:MainRegular";
-    font-size: 2.15mm;
-    text-align: right;
-    padding: 0;
-    margin: 0;
-}
-
-SvMapTitle {
-    cn1-derive: SvSearchCard;
-    font-size: 3.05mm;
-    padding: 3mm 3.2mm 3mm 3.2mm;
-}
 
 /* One short fact, in a pill under the bar. */
 SvChip {
@@ -729,49 +583,8 @@ SvGrip {
 }
 
 /* The countdown: the colour is the time left, the background the time gone. */
-SvRingTrack {
-    color: var(--line);
-    background-color: transparent;
-}
-
-SvRing {
-    color: var(--brand);
-    background-color: transparent;
-    font-family: "native:MainBold";
-    font-size: 3.3mm;
-    padding: 0.8mm;
-    margin: 0 0 0 2.4mm;
-}
-
-SvPulse {
-    color: var(--brand);
-    background-color: transparent;
-    padding: 0.8mm;
-    margin: 0.8mm 0 0.8mm 0;
-}
 
 /* Home and Work, side by side on the idle sheet. */
-SvShortcut {
-    color: var(--text);
-    background-color: var(--surface-alt);
-    border-radius: var(--radius);
-    font-family: "native:MainBold";
-    font-size: 2.75mm;
-    text-align: left;
-    padding: 2.6mm 3mm 2.6mm 3mm;
-    margin: 2mm 0.8mm 0.8mm 0.8mm;
-}
-
-SvShortcut.pressed {
-    background-color: var(--surface-press);
-}
-
-SvCourierCard {
-    background-color: var(--surface-alt);
-    border-radius: var(--radius);
-    padding: 2.8mm 3mm 2.8mm 3mm;
-    margin: 2mm 0 1mm 0;
-}
 
 SvAvatar {
     color: var(--brand-contrast);
@@ -785,17 +598,6 @@ SvAvatar {
 }
 
 /* A number plate reads as one, so it is boxed like one. */
-SvPlate {
-    color: var(--text);
-    background-color: var(--surface);
-    border: 1px solid var(--line-strong);
-    border-radius: var(--radius-small);
-    font-family: "native:MainBold";
-    font-size: 2.5mm;
-    text-align: center;
-    padding: 0.9mm 2mm 0.9mm 2mm;
-    margin: 1mm 0 0 0;
-}
 
 SvActions {
     background-color: transparent;
@@ -828,27 +630,6 @@ SvActionDanger {
 SvActionDanger.pressed {
     color: var(--danger);
     background-color: var(--danger-tint);
-}
-
-/* The one large round control an off-line courier has. */
-SvGo {
-    color: var(--brand-contrast);
-    background: cn1-round-border;
-    background-color: var(--brand);
-    cn1-box-shadow-spread: 0.6mm;
-    cn1-box-shadow-blur: 2mm;
-    cn1-box-shadow-h: 0.5;
-    cn1-box-shadow-v: 0.7;
-    cn1-box-shadow-color: var(--shadow);
-    font-family: "native:MainBold";
-    font-size: 4.2mm;
-    text-align: center;
-    padding: 5.6mm;
-    margin: 1.6mm;
-}
-
-SvGo.pressed {
-    background-color: var(--brand-pressed);
 }
 
 /* ------------------------------------------------------ records and charts */
@@ -1158,39 +939,6 @@ SvScrim {
     margin: 0;
 }
 
-SvMenu {
-    background-color: var(--surface);
-    padding: 0;
-    margin: 0;
-}
-
-SvMenuTop {
-    background-color: var(--surface);
-    border-bottom: 1px solid var(--line);
-    padding: 5mm 4mm 3.6mm 4mm;
-    margin: 0;
-}
-
-SvMenuName {
-    color: var(--text);
-    background-color: transparent;
-    font-family: "native:MainBold";
-    font-size: 3.5mm;
-    text-align: left;
-    padding: 0;
-    margin: 0;
-}
-
-SvMenuDetail {
-    color: var(--text-muted);
-    background-color: transparent;
-    font-family: "native:MainRegular";
-    font-size: 2.4mm;
-    text-align: left;
-    padding: 0.2mm 0 0 0;
-    margin: 0;
-}
-
 /* Which of the three apps this is. */
 SvModeBadge {
     color: var(--brand);
@@ -1203,38 +951,7 @@ SvModeBadge {
     margin: 2.4mm 0 0 0;
 }
 
-SvMenuLabel {
-    color: var(--text-muted);
-    background-color: transparent;
-    font-family: "native:MainBold";
-    font-size: 2.1mm;
-    text-align: left;
-    padding: 3.6mm 4mm 1mm 4mm;
-    margin: 0;
-}
-
-SvMenuItem {
-    color: var(--text);
-    background-color: transparent;
-    font-family: "native:MainRegular";
-    font-size: 2.9mm;
-    text-align: left;
-    padding: 2.6mm 4mm 2.6mm 4mm;
-    margin: 0;
-}
-
-SvMenuItem.pressed {
-    background-color: var(--surface-alt);
-}
-
-SvMenuBottom {
-    background-color: transparent;
-    border-top: 1px solid var(--line);
-    padding: 0.8mm 0 1.6mm 0;
-    margin: 0;
-}
-
-/* The top of a home screen that has no map: the menu, and what this is. */
+/* A bar across the top of a pane. */
 SvHomeBar {
     background-color: var(--surface);
     border-bottom: 1px solid var(--line);
@@ -1286,7 +1003,6 @@ SvSegment.pressed {
     color: var(--text);
     background-color: var(--surface);
 }
-
 
 SvSegment.disabled {
     color: var(--line-strong);
@@ -1383,8 +1099,8 @@ SvSideItem.pressed {
 
 SvSidePicked {
     cn1-derive: SvSideItem;
-    color: var(--brand-contrast);
-    background-color: var(--brand);
+    color: var(--brand);
+    background-color: var(--brand-tint);
     font-family: "native:MainBold";
 }
 
@@ -1524,58 +1240,25 @@ SvDeskStatLabel { color: var(--text-secondary-color); background-color: transpar
 SvDeskChartValue { color: var(--text-color); background-color: transparent; font-family: "native:MainBold"; font-size: 4.3mm; padding: 0.6mm 0 0 0; margin: 0; }
 SvDeskChartAxis { color: var(--text-secondary-color); background-color: transparent; font-family: "native:MainRegular"; font-size: 2.1mm; padding: 0.6mm 0 0 0; margin: 0; }
 
-
-/*
- * DARK MODE. The same rules, with the second value of each colour. A rule added
- * above that names a colour needs its line here.
- */
-/* THE CUSTOMER'S SCREENS -- Grub's look: photos on cards, the green for what
-   can be tapped, grey for everything that is only read. */
-SvHomeHeader { background-color: var(--surface); padding: 1mm 3mm 1.5mm 1mm; margin: 0; }
-SvDeliverTo { color: var(--text); font-family: "native:MainBold"; font-size: 2.9mm; padding: 0; margin: 0; background-color: transparent; }
-SvGreeting { color: var(--text); font-family: "native:MainBold"; font-size: 4.4mm; padding: 1mm 0 0 0; margin: 0; background-color: transparent; }
+/* COMMERCE -- the storefront and the back office: product cards with a
+   photo on top, quantities, the tab bar of a phone. */
+SvProductCard { background-color: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 0 0 2mm 0; margin: 1mm; }
+SvProductCard.pressed { background-color: var(--surface-alt); }
+SvProductPhoto { background-color: var(--surface-alt); border-radius: var(--radius-small); padding: 0; margin: 0 0 1.6mm 0; }
+SvProductName { color: var(--text); font-family: "native:MainRegular"; font-size: 2.75mm; padding: 0 2mm 0 2mm; margin: 0; background-color: transparent; }
+SvProductPrice { color: var(--text); font-family: "native:MainBold"; font-size: 2.9mm; padding: 0.6mm 2mm 0 2mm; margin: 0; background-color: transparent; }
 SvMutedSmall { color: var(--text-muted); font-family: "native:MainRegular"; font-size: 2.1mm; padding: 0.3mm 0 0.3mm 0; margin: 0; background-color: transparent; }
 SvMetaLine { color: var(--text); font-family: "native:MainRegular"; font-size: 2.1mm; padding: 0.3mm 0 0 0; margin: 0; background-color: transparent; }
-SvCuisineRow { padding: 2mm 0 2mm 0; margin: 0; background-color: transparent; }
-SvCuisine { color: var(--text); background-color: var(--surface-alt); border-radius: var(--radius); font-family: "native:MainRegular"; font-size: 2.1mm; text-align: center; padding: 1.6mm 2.2mm 1.6mm 2.2mm; margin: 0 1.6mm 0 0; }
-SvCuisine.pressed { background-color: var(--surface-press); }
-SvCuisineSelected { color: var(--brand-contrast); background-color: var(--brand); border-radius: var(--radius); font-family: "native:MainBold"; font-size: 2.1mm; text-align: center; padding: 1.6mm 2.2mm 1.6mm 2.2mm; margin: 0 1.6mm 0 0; }
-SvRestaurantCard { background-color: var(--surface); border-radius: var(--radius); padding: 0; margin: 0 0 3mm 0; }
-SvRestaurantCard.pressed { background-color: var(--surface-alt); }
-SvRestaurantPhoto { color: #f3e7d3; background-color: transparent; border-radius: var(--radius); padding: 0; margin: 0; }
-SvRestaurantWords { padding: 1.4mm 0.5mm 0 0.5mm; margin: 0; background-color: transparent; }
-SvRestaurantName { color: var(--text); font-family: "native:MainBold"; font-size: 2.9mm; padding: 0; margin: 0; background-color: transparent; }
-SvRestaurantTitle { color: var(--text); font-family: "native:MainBold"; font-size: 4.4mm; padding: 2mm 0 0.5mm 0; margin: 0; background-color: transparent; }
-SvPhotoBadge { color: var(--brand); background: cn1-pill-border; background-color: var(--surface); padding: 1mm; margin: 0; }
-SvClosedBadge { color: var(--surface); background: cn1-pill-border; background-color: var(--text); font-family: "native:MainBold"; font-size: 2.05mm; padding: 0.7mm 2mm 0.7mm 2mm; margin: 0; }
-SvPopularBadge { color: var(--brand-contrast); background: cn1-pill-border; background-color: var(--brand-tint); font-family: "native:MainBold"; font-size: 2.05mm; padding: 0.5mm 1.6mm 0.5mm 1.6mm; margin: 0 0 0 1.6mm; }
-SvHeroPhoto { color: #f3e7d3; background-color: transparent; padding: 0; margin: 0; }
-SvSectionChips { padding: 2mm 0 1mm 0; margin: 0; background-color: transparent; }
-SvSectionChip { color: var(--text); background: cn1-pill-border; background-color: var(--surface-alt); font-family: "native:MainBold"; font-size: 2.5mm; padding: 1.2mm 3mm 1.2mm 3mm; margin: 0 1.6mm 0 0; }
-SvSectionChip.pressed { background-color: var(--surface-press); }
-SvMenuSection { color: var(--text); font-family: "native:MainBold"; font-size: 3.5mm; padding: 4mm 0 1mm 0; margin: 0; background-color: transparent; }
-SvDishRow { background-color: var(--surface); border-bottom: 1px solid var(--line); padding: 2.6mm 0 2.6mm 0; margin: 0; }
-SvDishRow.pressed { background-color: var(--surface-alt); }
-SvDishRowOff { background-color: var(--surface); border-bottom: 1px solid var(--line); padding: 2.6mm 0 2.6mm 0; margin: 0; opacity: 0.5; }
-SvDishName { color: var(--text); font-family: "native:MainBold"; font-size: 2.75mm; padding: 0; margin: 0; background-color: transparent; }
-SvDishPrice { color: var(--text); font-family: "native:MainRegular"; font-size: 2.5mm; padding: 0.6mm 0 0 0; margin: 0; background-color: transparent; }
-SvDishPhoto { color: #f3e7d3; background-color: transparent; border-radius: var(--radius); padding: 0; margin: 0 0 0 2mm; }
-SvOrderThumb { color: #f3e7d3; background-color: transparent; border-radius: var(--radius); padding: 0; margin: 0 2.4mm 0 0; }
 SvOrderRow { background-color: var(--surface); border-bottom: 1px solid var(--line); padding: 2.6mm 3mm 2.6mm 3mm; margin: 0; }
 SvOrderRow.pressed { background-color: var(--surface-alt); }
-SvActiveOrder { background-color: var(--brand-tint); border-radius: var(--radius); padding: 2mm 3mm 2mm 3mm; margin: 2mm 0 0 0; }
-SvActiveOrder.pressed { background-color: var(--surface-alt); }
-SvCartButton { color: var(--brand-contrast); background-color: var(--brand); border-radius: var(--radius); font-family: "native:MainBold"; font-size: 2.9mm; text-align: center; padding: 2.75mm 4mm 2.75mm 4mm; margin: 1.6mm 3mm 1.6mm 3mm; }
-SvCartButton.pressed { background-color: var(--brand-pressed); }
 SvCartLine { background-color: var(--surface); border-bottom: 1px solid var(--line); padding: 2mm 0 2mm 0; margin: 0; }
-SvAddBar { background-color: var(--surface); border-top: 1px solid var(--line); padding: 1mm 3mm 1mm 3mm; margin: 0; }
 SvStepper { background: cn1-pill-border; background-color: var(--surface-alt); padding: 0 1mm 0 1mm; margin: 1.6mm 2mm 0.8mm 0; }
 SvQuantity { color: var(--text); font-family: "native:MainBold"; font-size: 2.9mm; text-align: center; padding: 2mm 1.6mm 2mm 1.6mm; margin: 0; background-color: transparent; }
 SvSearchField { color: var(--text); background: cn1-pill-border; background-color: var(--surface-alt); font-family: "native:MainRegular"; font-size: 2.9mm; padding: 2mm 3mm 2mm 3mm; margin: 0; }
 SvTabBar { background-color: var(--surface); border-top: 1px solid var(--line); padding: 0.6mm 0 0.6mm 0; margin: 0; }
 SvTab { color: var(--text-muted); background-color: transparent; font-family: "native:MainRegular"; font-size: 2.05mm; text-align: center; padding: 1mm 0 1mm 0; margin: 0; }
 SvTab.pressed { color: var(--text); }
-SvTabSelected { color: var(--brand-pressed); background-color: transparent; font-family: "native:MainBold"; font-size: 2.05mm; text-align: center; padding: 1mm 0 1mm 0; margin: 0; }
+SvTabSelected { color: var(--brand); background-color: transparent; font-family: "native:MainBold"; font-size: 2.05mm; text-align: center; padding: 1mm 0 1mm 0; margin: 0; }
 SvSheetTitle { color: var(--text); font-family: "native:MainBold"; font-size: 3.5mm; padding: 0; margin: 0; background-color: transparent; }
 SvSteps { padding: 2mm 0 1mm 0; margin: 0; background-color: transparent; }
 SvStep { padding: 0 0.8mm 0 0.8mm; margin: 0; background-color: transparent; }
@@ -1587,14 +1270,16 @@ SvStepTextTodo { color: var(--text-muted); font-family: "native:MainRegular"; fo
 SvDiscount { color: var(--success); font-family: "native:MainRegular"; font-size: 2.75mm; padding: 0; margin: 0; background-color: transparent; }
 SvTotal { color: var(--text); font-family: "native:MainBold"; font-size: 3.5mm; padding: 0; margin: 0; background-color: transparent; }
 
-/* THE KITCHEN'S QUEUE -- down the left on a wide screen, the order beside it. */
-SvQueuePane { background-color: var(--surface); border-right: 1px solid var(--line); padding: 0; margin: 0; }
-SvDetailPane { background-color: var(--surface-alt); padding: 0; margin: 0; }
-SvQueueRow { background-color: var(--surface); border-bottom: 1px solid var(--line); padding: 2.6mm 3mm 2.6mm 3mm; margin: 0; }
-SvQueueRow.pressed { background-color: var(--surface-alt); }
-SvQueueRowPicked { background-color: var(--brand-tint); border-bottom: 1px solid var(--line); padding: 2.6mm 3mm 2.6mm 3mm; margin: 0; }
-
+/*
+ * DARK MODE. The same rules, with the second value of each colour. A rule added
+ * above that names a colour needs its line here.
+ */
 @media (prefers-color-scheme: dark) {
+    SvProductCard { background-color: var(--surface-dark); border: 1px solid var(--line-dark); }
+    SvProductCard.pressed { background-color: var(--surface-alt-dark); }
+    SvProductPhoto { background-color: var(--surface-alt-dark); }
+    SvProductName { color: var(--text-dark); }
+    SvProductPrice { color: var(--text-dark); }
     SvForm { background-color: var(--surface-dark); }
     SvPage { background-color: var(--surface-dark); }
     SvHero { background-color: var(--brand-dark); }
@@ -1611,7 +1296,6 @@ SvQueueRowPicked { background-color: var(--brand-tint); border-bottom: 1px solid
     SvMuted { color: var(--text-muted-dark); }
     SvLabel { color: var(--text-muted-dark); }
     SvPrice { color: var(--text-dark); }
-    SvFare { color: var(--text-dark); }
     SvError { color: var(--danger-dark); }
     SvNotice { color: var(--text-dark); background-color: var(--surface-alt-dark); }
     SvPrimary { color: var(--brand-contrast-dark); background-color: var(--brand-dark); }
@@ -1627,8 +1311,6 @@ SvQueueRowPicked { background-color: var(--brand-tint); border-bottom: 1px solid
     SvMapButton.pressed { background: cn1-round-border; background-color: var(--surface-alt-dark); }
     SvBarButton { background: cn1-round-border; color: var(--text-dark); background-color: var(--surface-dark); }
     SvBarButton.pressed { background: cn1-round-border; background-color: var(--surface-alt-dark); }
-    SvSearchBar { color: var(--text-dark); background-color: var(--surface-alt-dark); }
-    SvSearchBar.pressed { background-color: var(--surface-press-dark); }
     SvField { color: var(--text-dark); background-color: var(--surface-alt-dark); }
     SvFieldHint { color: var(--text-muted-dark); }
     SvRow { background-color: var(--surface-dark); border-bottom: 1px solid var(--line-dark); }
@@ -1649,44 +1331,15 @@ SvQueueRowPicked { background-color: var(--brand-tint); border-bottom: 1px solid
     Title { color: var(--text-dark); }
     TitleCommand { color: var(--text-dark); }
     BackCommand { color: var(--text-dark); }
-    SvMarkerPickup { color: var(--success-dark); background-color: var(--map-edge-dark); }
-    SvMarkerDropoff { color: var(--danger-dark); background-color: var(--map-edge-dark); }
-    SvMarkerCar { color: var(--car-dark); background-color: var(--map-edge-dark); }
-    SvRoute { color: var(--brand-dark); background-color: var(--map-edge-dark); }
-    SvSearchCard { color: var(--text-dark); background-color: var(--surface-alt-dark); }
-    SvSearchCard.pressed { background-color: var(--line-dark); }
-    SvTripCard { color: var(--text-dark); background-color: var(--surface-alt-dark); }
-    SvTripStop { color: var(--text-dark); }
-    SvStatusCard { color: var(--text-dark); background-color: var(--surface-alt-dark); }
-    SvStatusValue { color: var(--text-dark); }
-    SvStatusDetail { color: var(--text-muted-dark); }
-    SvMapTitle { color: var(--text-dark); background-color: var(--surface-alt-dark); }
     SvChip { background: cn1-pill-border; color: var(--text-dark); background-color: var(--surface-alt-dark); }
     SvSheet { background-color: var(--surface-dark); }
     SvGrip { color: var(--line-strong-dark); }
-    SvRing { color: var(--brand-dark); }
-    SvRingTrack { color: var(--line-dark); }
-    SvPulse { color: var(--brand-dark); }
-    SvShortcut { color: var(--text-dark); background-color: var(--surface-alt-dark); }
-    SvShortcut.pressed { background-color: var(--surface-press-dark); }
-    SvCourierCard { background-color: var(--surface-alt-dark); }
     SvAvatar { background: cn1-round-border; color: var(--brand-contrast-dark); background-color: var(--brand-dark); }
-    SvPlate { color: var(--text-dark); background-color: var(--surface-dark); border: 1px solid var(--line-strong-dark); }
     SvAction { color: var(--text-dark); }
     SvAction.pressed { color: var(--brand-dark); background-color: var(--surface-alt-dark); }
     SvActionDanger { color: var(--danger-dark); }
     SvActionDanger.pressed { color: var(--danger-dark); background-color: var(--danger-tint-dark); }
-    SvGo { background: cn1-round-border; color: var(--brand-contrast-dark); background-color: var(--brand-dark); }
-    SvGo.pressed { background: cn1-round-border; background-color: var(--brand-pressed-dark); }
-    SvMenu { background-color: var(--surface-dark); }
-    SvMenuTop { background-color: var(--surface-dark); border-bottom: 1px solid var(--line-dark); }
-    SvMenuName { color: var(--text-dark); }
-    SvMenuDetail { color: var(--text-muted-dark); }
     SvModeBadge { background: cn1-pill-border; color: var(--brand-dark); background-color: var(--brand-tint-dark); }
-    SvMenuLabel { color: var(--text-muted-dark); }
-    SvMenuItem { color: var(--text-dark); }
-    SvMenuItem.pressed { background-color: var(--surface-alt-dark); }
-    SvMenuBottom { border-top: 1px solid var(--line-dark); }
     SvHomeBar { background-color: var(--surface-dark); border-bottom: 1px solid var(--line-dark); }
     SvSection { color: var(--text-dark); }
     SvSegments { background-color: var(--surface-alt-dark); }
@@ -1728,14 +1381,13 @@ SvQueueRowPicked { background-color: var(--brand-tint); border-bottom: 1px solid
     SvThumb { color: var(--text-muted-dark); background-color: var(--surface-alt-dark); }
     SvStepLabel { color: var(--brand-dark); }
     SvFooter { background-color: var(--surface-dark); border-top: 1px solid var(--line-dark); }
-    SvStar { color: var(--warning-dark); }
     SvSide { background-color: var(--surface-alt-dark); border-right: 1px solid var(--line-dark); }
     SvSideName { color: var(--text-dark); }
     SvSideDetail { color: var(--text-muted-dark); }
     SvSideLabel { color: var(--text-muted-dark); }
     SvSideItem { color: var(--text-dark); }
     SvSideItem.pressed { background-color: var(--line-dark); }
-    SvSidePicked { color: var(--brand-contrast-dark); background-color: var(--brand-dark); }
+    SvSidePicked { color: var(--brand-dark); background-color: var(--brand-tint-dark); }
     SvMaster { background-color: var(--surface-dark); border-right: 1px solid var(--line-dark); }
     SvPaneBar { background-color: var(--surface-dark); border-bottom: 1px solid var(--line-dark); }
     SvPaneTitle { color: var(--text-dark); }
@@ -1743,7 +1395,6 @@ SvQueueRowPicked { background-color: var(--brand-tint); border-bottom: 1px solid
     SvSecondary.disabled, SvDanger.disabled, SvLink.disabled { color: var(--line-strong-dark); }
     SvField.selected { background-color: var(--brand-tint-dark); }
     SvField.disabled { color: var(--text-muted-dark); }
-    SvStar.pressed { color: var(--text-muted-dark); }
     Switch { color: #ffffff; background-color: var(--line-strong-dark); }
     Switch.selected { color: #ffffff; background-color: var(--brand-dark); }
     Switch.disabled { color: var(--text-muted-dark); background-color: var(--line-dark); }
@@ -1795,41 +1446,11 @@ SvQueueRowPicked { background-color: var(--brand-tint); border-bottom: 1px solid
     SvDeskStatLabel { color: var(--text-secondary-color-dark); }
     SvDeskChartValue { color: var(--text-color-dark); }
     SvDeskChartAxis { color: var(--text-secondary-color-dark); }
-    SvHomeHeader { background-color: var(--surface-dark); }
-    SvDeliverTo { color: var(--text-dark); }
-    SvGreeting { color: var(--text-dark); }
     SvMutedSmall { color: var(--text-muted-dark); }
     SvMetaLine { color: var(--text-dark); }
-    SvCuisine { color: var(--text-dark); background-color: var(--surface-alt-dark); }
-    SvCuisine.pressed { background-color: var(--surface-press-dark); }
-    SvCuisineSelected { color: var(--brand-contrast-dark); background-color: var(--brand-dark); }
-    SvRestaurantCard { background-color: var(--surface-dark); }
-    SvRestaurantCard.pressed { background-color: var(--surface-alt-dark); }
-    SvRestaurantPhoto { color: #f3e7d3; background-color: transparent; }
-    SvRestaurantName { color: var(--text-dark); }
-    SvRestaurantTitle { color: var(--text-dark); }
-    SvPhotoBadge { color: var(--brand-dark); background-color: var(--surface-dark); }
-    SvClosedBadge { color: var(--surface-dark); background-color: var(--text-dark); }
-    SvPopularBadge { color: var(--brand-dark); background-color: var(--brand-tint-dark); }
-    SvHeroPhoto { color: #f3e7d3; background-color: transparent; }
-    SvSectionChip { color: var(--text-dark); background-color: var(--surface-alt-dark); }
-    SvSectionChip.pressed { background-color: var(--surface-press-dark); }
-    SvMenuSection { color: var(--text-dark); }
-    SvDishRow { background-color: var(--surface-dark); border-bottom: 1px solid var(--line-dark); }
-    SvDishRow.pressed { background-color: var(--surface-alt-dark); }
-    SvDishRowOff { background-color: var(--surface-dark); border-bottom: 1px solid var(--line-dark); }
-    SvDishName { color: var(--text-dark); }
-    SvDishPrice { color: var(--text-dark); }
-    SvDishPhoto { color: #f3e7d3; background-color: transparent; }
-    SvOrderThumb { color: #f3e7d3; background-color: transparent; }
     SvOrderRow { background-color: var(--surface-dark); border-bottom: 1px solid var(--line-dark); }
     SvOrderRow.pressed { background-color: var(--surface-alt-dark); }
-    SvActiveOrder { background-color: var(--brand-tint-dark); }
-    SvActiveOrder.pressed { background-color: var(--surface-alt-dark); }
-    SvCartButton { color: var(--brand-contrast-dark); background-color: var(--brand-dark); }
-    SvCartButton.pressed { background-color: var(--brand-pressed-dark); }
     SvCartLine { background-color: var(--surface-dark); border-bottom: 1px solid var(--line-dark); }
-    SvAddBar { background-color: var(--surface-dark); border-top: 1px solid var(--line-dark); }
     SvStepper { background-color: var(--surface-alt-dark); }
     SvQuantity { color: var(--text-dark); }
     SvSearchField { color: var(--text-dark); background-color: var(--surface-alt-dark); }
@@ -1843,9 +1464,4 @@ SvQueueRowPicked { background-color: var(--brand-tint); border-bottom: 1px solid
     SvStepText { color: var(--text-dark); }
     SvDiscount { color: var(--success-dark); }
     SvTotal { color: var(--text-dark); }
-    SvQueuePane { background-color: var(--surface-dark); border-right: 1px solid var(--line-dark); }
-    SvDetailPane { background-color: var(--surface-alt-dark); }
-    SvQueueRow { background-color: var(--surface-dark); border-bottom: 1px solid var(--line-dark); }
-    SvQueueRow.pressed { background-color: var(--surface-alt-dark); }
-    SvQueueRowPicked { background-color: var(--brand-tint-dark); border-bottom: 1px solid var(--line-dark); }
 }

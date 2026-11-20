@@ -48,7 +48,7 @@ import java.util.List;
 /// is flagged for attention, and whether it may be used at all.
 ///
 /// All of it takes effect at once. The server reads an account's roles and its
-/// block on every request, not from the token the app is holding, so a courier
+/// block on every request, not from the token the app is holding, so a merchant
 /// made an admin has the admin screens the next time their app asks who they
 /// are, and a blocked account's next call is refused.
 ///
@@ -57,9 +57,9 @@ import java.util.List;
 public final class UsersForm {
     static final String ALL = "all";
     static final String FLAGGED = "flagged";
-    private static final String[] FILTERS = {ALL, "customers", "couriers", "admins", FLAGGED,
+    private static final String[] FILTERS = {ALL, "shoppers", "merchants", "admins", FLAGGED,
         "blocked"};
-    private static final String[] FILTER_NAMES = {"Everyone", "Customers", "Couriers", "Admins",
+    private static final String[] FILTER_NAMES = {"Everyone", "Shoppers", "Merchants", "Admins",
         "Flagged", "Blocked"};
 
     private final Panes panes;
@@ -143,11 +143,11 @@ public final class UsersForm {
         if ("admins".equals(filter)) {
             return user.admin();
         }
-        if ("couriers".equals(filter)) {
-            return user.courier();
+        if ("merchants".equals(filter)) {
+            return user.merchant();
         }
-        if ("customers".equals(filter)) {
-            return !user.courier() && !user.admin();
+        if ("shoppers".equals(filter)) {
+            return !user.merchant() && !user.admin();
         }
         return true;
     }
@@ -176,7 +176,7 @@ public final class UsersForm {
         if (user.suspended()) {
             return "Blocked";
         }
-        return user.admin() ? "Admin" : user.courier() ? "Courier" : "Customer";
+        return user.admin() ? "Admin" : user.merchant() ? "Merchant" : "Shopper";
     }
 
     /// One account in full, fetched each time it is shown.
@@ -199,55 +199,45 @@ public final class UsersForm {
             page.add(why);
         }
 
-        StatRow numbers = Ui.stats(3);
-        numbers.stat(String.valueOf(detail.deliveries()), "Deliveries", "userDeliveries");
-        numbers.stat(String.valueOf(detail.cancellations()), "Cancelled",
-                "userCancellations");
-        numbers.stat(detail.rating() > 0 ? Ui.tenths(detail.rating()) : "-", "Rating",
-                "userRating");
+        StatRow numbers = Ui.stats(2);
+        numbers.stat(String.valueOf(detail.payments()), "Payments", "userPayments");
+        numbers.stat(Ui.money(detail.spent(), null), "Spent", "userSpent");
         page.add(numbers);
-        StatRow money = Ui.stats(2);
-        money.stat(Ui.money(detail.spent(), null), "Spent on orders", "userSpent");
-        money.stat(Ui.money(detail.earned(), null), "Earned delivering", "userEarned");
-        page.add(money);
 
         Ui.section(page, "Contact");
         page.add(Ui.row(FontImage.MATERIAL_PHONE, user.phone(),
                 user.phoneVerified() ? "Verified" : "Not verified", null));
-        if (user.courier()) {
-            page.add(Ui.row(FontImage.MATERIAL_DIRECTIONS_CAR, user.vehicle(), user.plate(), null));
-        }
 
         Ui.section(page, "Access");
-        final Switch courier = toggle("courier", user.courier());
+        final Switch merchant = toggle("merchant", user.merchant());
         final Switch admin = toggle("admin", user.admin());
-        page.add(Ui.row(FontImage.MATERIAL_DIRECTIONS_CAR, "Courier",
-                "May go online and take deliveries", courier));
+        page.add(Ui.row(FontImage.MATERIAL_STORE, "Merchant",
+                "May run the stores they are staff of", merchant));
         page.add(Ui.row(FontImage.MATERIAL_INSIGHTS, "Admin",
                 "May see and change everything here", admin));
         // A change the server refuses -- an admin removing their own role, say
         // -- is put back, so the switches always show what is true. Putting
         // one back is itself a change, which `settling` keeps from being sent.
         final boolean[] settling = new boolean[1];
-        // The roles as the server last confirmed them: courier, admin.
-        final boolean[] held = {user.courier(), user.admin()};
+        // The roles as the server last confirmed them: merchant, admin.
+        final boolean[] held = {user.merchant(), user.admin()};
         final Runnable roles = () -> {
             if (settling[0]) {
                 return;
             }
-            RoleChangeDto change = new RoleChangeDto(courier.isValue(), admin.isValue());
+            RoleChangeDto change = new RoleChangeDto(merchant.isValue(), admin.isValue());
             Api.admin().setRoles(user.username(), change, Net.to(saved -> {
-                held[0] = saved.courier();
+                held[0] = saved.merchant();
                 held[1] = saved.admin();
             }, (status, message) -> {
                 Ui.fail(status, message);
                 settling[0] = true;
-                courier.setValue(held[0]);
+                merchant.setValue(held[0]);
                 admin.setValue(held[1]);
                 settling[0] = false;
             }));
         };
-        courier.addChangeListener(e -> roles.run());
+        merchant.addChangeListener(e -> roles.run());
         admin.addChangeListener(e -> roles.run());
 
         Ui.section(page, "Moderation");
@@ -315,19 +305,14 @@ public final class UsersForm {
                 : "unblock".equals(action) ? FontImage.MATERIAL_LOCK_OPEN
                 : "flag".equals(action) ? FontImage.MATERIAL_FLAG
                 : "unflag".equals(action) ? FontImage.MATERIAL_OUTLINED_FLAG
-                : "approve".equals(action) ? FontImage.MATERIAL_CHECK_CIRCLE
-                : "reject".equals(action) ? FontImage.MATERIAL_CANCEL
-                : "listed".equals(action) ? FontImage.MATERIAL_STOREFRONT
-                : "cancel_order".equals(action) ? FontImage.MATERIAL_REMOVE_SHOPPING_CART
+                : "store_approved".equals(action) ? FontImage.MATERIAL_STOREFRONT
                 : FontImage.MATERIAL_MANAGE_ACCOUNTS;
     }
 
     private static String action(String action) {
         return "block".equals(action) ? "Blocked" : "unblock".equals(action) ? "Unblocked"
                 : "flag".equals(action) ? "Flagged" : "unflag".equals(action) ? "Flag removed"
-                : "approve".equals(action) ? "Approved to deliver" : "reject".equals(action)
-                ? "Application sent back" : "listed".equals(action) ? "Restaurant listed"
-                : "cancel_order".equals(action) ? "Order cancelled" : "Roles changed";
+                : "store_approved".equals(action) ? "Store approved" : "Roles changed";
     }
 
     private static Switch toggle(String name, boolean value) {

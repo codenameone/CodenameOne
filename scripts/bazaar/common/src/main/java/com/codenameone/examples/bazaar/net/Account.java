@@ -200,12 +200,7 @@ public final class Account {
     }
 
     private static void changed(String name) {
-        if (applying || Session.user() == null || Prefs.RECENTS.equals(name)) {
-            return;
-        }
-        // Where to deliver is the device's: the server keeps saved addresses
-        // of its own, through their own calls.
-        if (Prefs.DELIVER_TO.equals(name)) {
+        if (applying || Session.user() == null) {
             return;
         }
         preferencesChanged = true;
@@ -333,11 +328,10 @@ public final class Account {
                         : language,
                 Prefs.theme(),
                 Prefs.units(),
-                Prefs.notifyDeliveryUpdates(),
+                Prefs.notifyOrderUpdates(),
                 Prefs.notifyReceipts(),
                 Prefs.notifyPromotions(),
-                Prefs.paymentMethod(),
-                Prefs.tipPercent());
+                Prefs.paymentMethod());
     }
 
     /// The profile to send: the one the server gave, or the name signed in
@@ -358,14 +352,13 @@ public final class Account {
             }
             Prefs.setTheme(from.theme());
             Prefs.setUnits(from.units());
-            Prefs.setNotifyDeliveryUpdates(from.notifyDeliveryUpdates());
+            Prefs.setNotifyOrderUpdates(from.notifyOrderUpdates());
             Prefs.setNotifyReceipts(from.notifyReceipts());
             Prefs.setNotifyPromotions(from.notifyPromotions());
             String method = from.defaultPaymentMethodId();
             if (method != null && method.length() > 0) {
                 Prefs.setPaymentMethod(method);
             }
-            Prefs.setTipPercent(from.defaultTipPercent());
         } finally {
             applying = false;
         }

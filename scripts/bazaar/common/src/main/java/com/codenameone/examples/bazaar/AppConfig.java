@@ -108,7 +108,7 @@ public final class AppConfig {
 
     /// The mode the account `owner` (see
     /// [com.codenameone.examples.bazaar.net.Session#owner(String)]) chose last
-    /// -- `customer`, `courier` or `admin` -- or
+    /// -- `shop`, `merchant`, `pos` or `admin` -- or
     /// empty when they have chosen none, or the choice on record is someone
     /// else's. A choice recorded with no name is anyone's: that is how a test
     /// puts the app in a mode before it signs in.

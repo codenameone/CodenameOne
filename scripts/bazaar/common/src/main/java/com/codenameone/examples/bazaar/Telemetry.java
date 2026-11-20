@@ -25,7 +25,6 @@ import com.codename1.analytics.AnalyticsProvider;
 import com.codename1.analytics.CodenameOneAnalyticsProvider;
 import com.codename1.analytics.LoggingAnalyticsProvider;
 import com.codename1.ui.CN;
-import com.codenameone.examples.bazaar.api.DeliveryState;
 import com.codenameone.examples.bazaar.ui.Lang;
 
 /// What the app reports about how it is used, and whether it may.
@@ -35,7 +34,7 @@ import com.codenameone.examples.bazaar.ui.Lang;
 /// vocabulary -- every event name and every parameter -- is in this file, and
 /// it is here that the one rule is kept: nothing that says who someone is or
 /// where they are ever goes into an event. No name, e-mail address, phone
-/// number, address, position, card number or delivery id; an amount of money goes
+/// number, address, position, card number or order id; an amount of money goes
 /// as the bracket it falls in. What is known about the user is two things: the
 /// mode they are in and the language they read.
 ///
@@ -53,9 +52,8 @@ import com.codenameone.examples.bazaar.ui.Lang;
 /// writes what it would have sent to the log.
 public final class Telemetry {
     private static final String ACCOUNT = "account";
-    private static final String DELIVERY = "delivery";
+    private static final String ORDER = "order";
     private static final String PAYMENT = "payment";
-    private static final String COURIER = "courier";
     private static final String ADMIN = "admin";
     private static final String SETTINGS = "settings";
 
@@ -173,7 +171,7 @@ public final class Telemetry {
         screen = name;
     }
 
-    /// The user is in `mode`: customer, courier or admin.
+    /// The user is in `mode`: shop, merchant, pos or admin.
     public static void role(String mode) {
         role = mode;
         describe();
@@ -208,53 +206,32 @@ public final class Telemetry {
         role = null;
     }
 
-    /// @param onboarding whether they came to drive
-    public static void registered(boolean onboarding) {
-        send(ACCOUNT, "sign_up", "method", "password", "intent", onboarding ? "courier" : "customer");
+    /// @param selling whether they came to sell rather than to shop
+    public static void registered(boolean selling) {
+        send(ACCOUNT, "sign_up", "method", "password", "intent", selling ? "merchant" : "shopper");
     }
 
     public static void phoneVerified() {
         send(ACCOUNT, "phone_verified");
     }
 
-    // ------------------------------------------------------------------ deliveries
+    // ------------------------------------------------------------------ orders
 
-    /// @param lines how many dishes the cart holds
-    public static void orderQuoted(int lines) {
-        send(DELIVERY, "order_quoted", "lines", Integer.valueOf(lines));
+    /// @param lines how many lines the cart holds
+    public static void checkoutStarted(int lines) {
+        send(ORDER, "checkout_started", "lines", Integer.valueOf(lines));
     }
 
-    public static void orderPlaced(boolean cash, boolean promo) {
-        send(DELIVERY, "order_placed", "payment", cash ? "cash" : "card", "promo",
-                promo ? "yes" : "no");
-    }
-
-    /// @param by `customer`, `courier` or `admin`
-    /// @param state the state the delivery was in
-    public static void deliveryCancelled(String by, DeliveryState state) {
-        send(DELIVERY, "delivery_cancelled", "by", by, "state", state == null ? "" : state.name());
-    }
-
-    /// @param side whose device saw it end: `customer` or `courier`. A delivery that
-    ///     both of them use the app for is reported by both, so a count of
-    ///     deliveries takes one side.
-    public static void deliveryCompleted(String side, long fareCents, boolean cash) {
-        send(DELIVERY, "delivery_completed", "side", side, "fare", fare(fareCents), "payment",
-                cash ? "cash" : "card");
+    /// @param channel `online` or `pos`
+    public static void orderPlaced(String channel, long totalCents) {
+        send(ORDER, "order_placed", "channel", channel, "total", fare(totalCents));
     }
 
     public static void rated(int stars) {
-        send(DELIVERY, "rating_given", "stars", Integer.valueOf(stars));
+        send(ORDER, "rating_given", "stars", Integer.valueOf(stars));
     }
 
     // --------------------------------------------------------------- payment
-
-    /// @param where `delivery` at the end of the delivery, `receipt` from the receipt
-    /// @param percent the share of the fare, or 0 for an amount typed in
-    public static void tipped(String where, int percent) {
-        send(PAYMENT, "tip_added", "where", where, "share",
-                percent > 0 ? percent + "_percent" : "custom");
-    }
 
     public static void cardAdded() {
         send(PAYMENT, "card_added");
@@ -264,34 +241,7 @@ public final class Telemetry {
         send(PAYMENT, "card_removed");
     }
 
-    // --------------------------------------------------------------- onboarding
-
-    /// @param again whether this is an application sent back, being put right
-    public static void applicationStarted(boolean again) {
-        send(COURIER, "courier_application_started", "resubmission", Boolean.valueOf(again));
-    }
-
-    public static void applicationSubmitted() {
-        send(COURIER, "courier_application_submitted");
-    }
-
-    public static void courierOnline(boolean online) {
-        send(COURIER, online ? "courier_online" : "courier_offline");
-    }
-
-    public static void offerAnswered(boolean accepted) {
-        send(COURIER, accepted ? "offer_accepted" : "offer_declined");
-    }
-
-    public static void payoutRequested(long cents) {
-        send(COURIER, "payout_requested", "amount", fare(cents));
-    }
-
     // ----------------------------------------------------------------- admin
-
-    public static void applicationReviewed(boolean approved) {
-        send(ADMIN, approved ? "admin_application_approved" : "admin_application_rejected");
-    }
 
     public static void userFlagged(boolean flagged) {
         send(ADMIN, flagged ? "admin_user_flagged" : "admin_user_unflagged");
@@ -302,12 +252,8 @@ public final class Telemetry {
     }
 
     /// @param from the screen it was done from
-    public static void deliveryRefunded(String from) {
-        send(ADMIN, "admin_delivery_refunded", "from", from);
-    }
-
-    public static void pricingChanged() {
-        send(ADMIN, "admin_pricing_changed");
+    public static void orderRefunded(String from) {
+        send(ADMIN, "admin_order_refunded", "from", from);
     }
 
     // -------------------------------------------------------------- settings
@@ -335,7 +281,7 @@ public final class Telemetry {
     // ------------------------------------------------------------- the store
 
     /// The bracket an amount of money falls in, in whole units of the
-    /// currency. The amount itself, beside a time, can be matched to a delivery.
+    /// currency. The amount itself, beside a time, can be matched to an order.
     static String fare(long cents) {
         long units = cents / 100;
         return units < 5 ? "under_5" : units < 10 ? "5_to_10" : units < 20 ? "10_to_20"

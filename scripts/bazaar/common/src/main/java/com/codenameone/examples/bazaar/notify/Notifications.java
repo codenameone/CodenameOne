@@ -31,13 +31,12 @@ import com.codename1.appkit.Net;
 import com.codenameone.examples.bazaar.net.Session;
 import com.codenameone.examples.bazaar.ui.Nav;
 
-/// Push notifications: the delivery news that reaches a phone in a pocket.
+/// Push notifications: the order news that reaches a phone in a pocket.
 ///
 /// The phone registers with the platform's push service once, and the token
 /// it gets is handed to the Bazaar server for whoever is signed in. Signing
 /// out takes it back, so the next person to use the phone is not told about
-/// the last one's deliveries. The server decides what to send and when; see the
-/// server's `DeliveryPushes`.
+/// the last one's orders. The server decides what to send and when.
 ///
 /// Only on a phone (Android and iOS) and only with [AppConfig#PUSH_APP_KEY]
 /// set. The simulator has no push service to register with, and a browser
@@ -127,8 +126,8 @@ public final class Notifications {
     }
 
     // tag::bazaar-push-listener[]
-    /// Called on the event thread. A message is about a delivery: the app opens
-    /// the screen that shows it, which reads the delivery from the server. The
+    /// Called on the event thread. A message is about an order: the app opens
+    /// the screen that shows it, which reads the order from the server. The
     /// message's own words are for the notification shade, not for the app.
     private static final class Listener implements PushListener {
         @Override
@@ -139,15 +138,13 @@ public final class Notifications {
 
         @Override
         public void onMessage(PushMessage message) {
-            // OrderPushes names the order; its delivery has the same id.
             Object order = message.getData().get("orderId");
             Object role = message.getData().get("role");
-            // A message with no title is a silent one: the Live Activity
-            // moving on, which the push client has already applied.
+            // A message with no title is a silent one, already applied.
             String title = message.getTitle();
             if (order != null && title != null && title.length() > 0
                     && Session.user() != null) {
-                Nav.showDelivery(role == null ? Nav.CUSTOMER : String.valueOf(role));
+                Nav.showOrder(role == null ? Nav.SHOP : String.valueOf(role));
             }
         }
 

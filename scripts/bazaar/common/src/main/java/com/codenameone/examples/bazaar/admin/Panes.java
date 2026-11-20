@@ -31,7 +31,7 @@ import java.util.List;
 /// Where a part of the admin console shows what it has.
 ///
 /// Every part is a list and what is opened from it: an application, an
-/// account, a delivery. On a phone each of those is a screen of its own, reached
+/// account, a payment. On a phone each of those is a screen of its own, reached
 /// from the one before and left with the back arrow. On a wide screen the list
 /// stays where it is and what is opened from it is shown beside it. The parts
 /// are written once, against this, and do not know which they are in:
@@ -41,7 +41,7 @@ import java.util.List;
 /// - [#over] shows something on top of that: a document, the question "why?".
 /// - [#back] leaves the last of those; [#home] leaves all of them.
 ///
-/// [#phone(Form)] is the phone's. The wide one is [Console]'s.
+/// [#phone(Form)] is a phone's screens; [EmbeddedPanes] puts them in a section of the shell.
 abstract class Panes {
     /// Shows a part's list.
     ///

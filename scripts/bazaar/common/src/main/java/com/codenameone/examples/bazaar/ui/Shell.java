@@ -1,0 +1,346 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
+ */
+package com.codenameone.examples.bazaar.ui;
+
+import com.codename1.ui.Button;
+import com.codename1.ui.CN;
+import com.codename1.ui.Command;
+import com.codename1.ui.Component;
+import com.codename1.ui.Container;
+import com.codename1.ui.FontImage;
+import com.codename1.ui.Form;
+import com.codename1.ui.geom.Dimension;
+import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.layouts.BoxLayout;
+import com.codename1.ui.layouts.GridLayout;
+import com.codenameone.examples.bazaar.api.UserDto;
+import com.codenameone.examples.bazaar.net.Session;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/// The home screen of a mode, laid out for the room there is.
+///
+/// - On a phone: a title bar, the open section, and a tab bar along the bottom
+///   with the first sections of the mode. A mode with more than five puts the
+///   rest under "More".
+/// - On a wide screen (a tablet on its side, a desktop window, a browser): a
+///   sidebar down the side with every section under its group heading, the
+///   switch to other modes, Settings and Sign out, and the open section beside
+///   it. On a desktop the window also gets a menu bar, see [DesktopMenus].
+///
+/// Which one is decided when the screen is built; a window resized across the
+/// line, or a device turned, builds it again on the section that was open.
+public final class Shell implements Nav.Home {
+    private static final float SIDE_MM = 56f;
+    private static final int PHONE_TABS = 5;
+    private static final String MORE = "more";
+
+    /// The section open in each mode, kept across rebuilds.
+    private static final Map<String, String> OPEN = new HashMap<String, String>();
+    private static Shell current;
+
+    private final String mode;
+    private final List<Section> sections;
+    private final boolean wide = Layouts.wide();
+    private final Form form;
+    private final Container body = new Container(new BorderLayout());
+    private final Container side;
+    private final Container tabs;
+    private final Map<String, Button> entries = new HashMap<String, Button>();
+    private String open;
+
+    /// @param mode one of `Nav.SHOP`, `Nav.MERCHANT`, `Nav.POS`, `Nav.ADMIN`
+    public Shell(String mode) {
+        this.mode = mode;
+        this.sections = Sections.of(mode);
+        form = Ui.form(Lang.tr(title(mode)), "home-" + mode);
+        form.setScrollable(false);
+        body.setName("section");
+        if (wide) {
+            side = side();
+            tabs = null;
+            Container screen = new Container(new BorderLayout());
+            screen.setSafeArea(true);
+            screen.add(BorderLayout.WEST, side);
+            screen.add(BorderLayout.CENTER, body);
+            form.add(BorderLayout.CENTER, screen);
+            if (!DesktopMenus.nativeBar(form)) {
+                form.getToolbar().addMaterialCommandToLeftBar("", FontImage.MATERIAL_MENU,
+                        e -> toggleSidebar()).putClientProperty("name", "sidebar-toggle");
+            }
+        } else {
+            side = null;
+            tabs = tabs();
+            form.add(BorderLayout.CENTER, body);
+            if (tabs != null) {
+                form.add(BorderLayout.SOUTH, tabs);
+            }
+            overflow();
+        }
+        DesktopMenus.install(form, this);
+        Layouts.dress(form);
+        Layouts.onChange(form, Nav::home);
+    }
+
+    /// The shell on screen, for a feature screen that wants to move to
+    /// another section; null before the first home screen.
+    public static Shell current() {
+        return current;
+    }
+
+    /// What the title bar says in `mode`.
+    public static String title(String mode) {
+        return Nav.ADMIN.equals(mode) ? "Bazaar Admin" : Nav.MERCHANT.equals(mode) ? "Bazaar Merchant"
+                : Nav.POS.equals(mode) ? "Bazaar POS" : "Bazaar";
+    }
+
+    public String mode() {
+        return mode;
+    }
+
+    public List<Section> sections() {
+        return sections;
+    }
+
+    /// The id of the section on screen.
+    public String openSection() {
+        return open;
+    }
+
+    @Override
+    public Form form() {
+        return form;
+    }
+
+    @Override
+    public void start() {
+        current = this;
+        String last = OPEN.get(mode);
+        show(last != null && find(last) != null ? last
+                : sections.isEmpty() ? null : sections.get(0).id());
+    }
+
+    /// Opens section `id` of this mode. Does nothing for an id it does not have.
+    public void show(String id) {
+        Section section = find(id);
+        if (section == null) {
+            return;
+        }
+        open = id;
+        OPEN.put(mode, id);
+        body.removeAll();
+        Component content = section.create();
+        body.add(BorderLayout.CENTER, content);
+        if (wide && !DesktopMenus.nativeBar(form)) {
+            form.setTitle(Lang.tr(title(mode)));
+        } else {
+            form.setTitle(Lang.tr(sections.size() == 1 ? title(mode) : section.title()));
+        }
+        mark();
+        Ui.viewed(mode + "-" + id);
+        Layouts.dress(body);
+        form.revalidateWithAnimationSafety();
+    }
+
+    /// Hides the sidebar of a wide screen, or shows it again.
+    public void toggleSidebar() {
+        if (side == null) {
+            return;
+        }
+        side.setHidden(!side.isHidden());
+        side.setVisible(!side.isHidden());
+        form.revalidateWithAnimationSafety();
+    }
+
+    /// Opens the section on screen in a window of its own, where there are
+    /// windows; elsewhere says that there are not.
+    public void openInWindow() {
+        Section section = find(open);
+        if (section == null) {
+            return;
+        }
+        if (Windows.open(section.title(), section.create(), 180f, 130f) == null) {
+            Ui.say("Windows are not supported here");
+        }
+    }
+
+    private Section find(String id) {
+        for (int iter = 0; id != null && iter < sections.size(); iter++) {
+            if (sections.get(iter).id().equals(id)) {
+                return sections.get(iter);
+            }
+        }
+        return null;
+    }
+
+    /// Shows which section is open in the sidebar or the tab bar.
+    private void mark() {
+        boolean inTabs = false;
+        for (Map.Entry<String, Button> entry : entries.entrySet()) {
+            boolean picked = entry.getKey().equals(open);
+            inTabs |= picked;
+            Button button = entry.getValue();
+            if (wide) {
+                button.setUIID(picked ? "SvSidePicked" : "SvSideItem");
+            } else {
+                button.setUIID(picked ? "SvTabSelected" : "SvTab");
+            }
+        }
+        Button more = entries.get(MORE);
+        if (more != null && !inTabs) {
+            more.setUIID("SvTabSelected");
+        }
+        for (Map.Entry<String, Button> entry : entries.entrySet()) {
+            Section section = find(entry.getKey());
+            char icon = section == null ? FontImage.MATERIAL_MORE_HORIZ : section.icon();
+            Ui.icon(entry.getValue(), icon, wide ? 3.4f : 3.6f);
+        }
+        if (side != null) {
+            Layouts.dress(side);
+        }
+    }
+
+    // ------------------------------------------------------------------ phone
+
+    private Container tabs() {
+        if (sections.size() < 2) {
+            return null;
+        }
+        int shown = sections.size() > PHONE_TABS ? PHONE_TABS - 1 : sections.size();
+        Container bar = new Container(new GridLayout(1, shown + (shown < sections.size() ? 1 : 0)));
+        bar.setUIID("SvTabBar");
+        bar.setSafeArea(true);
+        bar.setName("tabs");
+        for (int iter = 0; iter < shown; iter++) {
+            final Section section = sections.get(iter);
+            bar.add(tab(section.id(), section.title(), () -> show(section.id())));
+        }
+        if (shown < sections.size()) {
+            bar.add(tab(MORE, "More", this::more));
+        }
+        return bar;
+    }
+
+    private Button tab(String id, String text, final Runnable go) {
+        Button tab = new Button(text, "SvTab");
+        tab.setName("tab-" + id);
+        tab.setTextPosition(Component.BOTTOM);
+        tab.addActionListener(e -> go.run());
+        entries.put(id, tab);
+        return tab;
+    }
+
+    /// The sections that did not fit in the tab bar, as a list.
+    private void more() {
+        Container list = Ui.page();
+        list.setName("more");
+        for (int iter = PHONE_TABS - 1; iter < sections.size(); iter++) {
+            final Section section = sections.get(iter);
+            list.add(Ui.tap(Ui.row(section.icon(), section.title(), null, null),
+                    "more-" + section.id(), e -> show(section.id())));
+        }
+        open = MORE;
+        body.removeAll();
+        body.add(BorderLayout.CENTER, list);
+        form.setTitle(Lang.tr("More"));
+        mark();
+        form.revalidateWithAnimationSafety();
+    }
+
+    /// The phone's title bar menu: other modes, Settings and Sign out.
+    private void overflow() {
+        UserDto user = Session.user();
+        for (String other : Nav.modes(user)) {
+            if (!other.equals(mode)) {
+                final String to = other;
+                Command go = form.getToolbar().addCommandToOverflowMenu(
+                        Lang.tr(Nav.label(to)), null, e -> Nav.switchTo(to));
+                go.putClientProperty("name", "switch-" + to);
+            }
+        }
+        form.getToolbar().addCommandToOverflowMenu(Lang.tr("Settings"), null,
+                e -> SettingsForm.show(form));
+        form.getToolbar().addCommandToOverflowMenu(Lang.tr("Sign out"), null, e -> Nav.signOut());
+    }
+
+    // ------------------------------------------------------------------- wide
+
+    private Container side() {
+        Container panel = new Container(new BorderLayout()) {
+            @Override
+            protected Dimension calcPreferredSize() {
+                Dimension size = super.calcPreferredSize();
+                size.setWidth(CN.convertToPixels(SIDE_MM));
+                return size;
+            }
+        };
+        panel.setUIID("SvSide");
+        panel.setName("side");
+        UserDto user = Session.user();
+        Container who = new Container(BoxLayout.y());
+        who.add(Ui.plain(user == null ? "" : user.displayName(), "SvSideName"));
+        who.add(Ui.plain(user == null ? "" : user.username(), "SvSideDetail"));
+
+        Container list = new Container(BoxLayout.y());
+        list.setScrollableY(true);
+        list.setScrollVisible(false);
+        String group = "";
+        for (int iter = 0; iter < sections.size(); iter++) {
+            final Section section = sections.get(iter);
+            if (section.group().length() > 0 && !section.group().equals(group)) {
+                list.add(Ui.label(section.group(), "SvSideLabel"));
+            }
+            group = section.group();
+            Button entry = entry(section.icon(), section.title(), "nav-" + section.id(),
+                    () -> show(section.id()));
+            entries.put(section.id(), entry);
+            list.add(entry);
+        }
+        List<String> modes = Nav.modes(user);
+        if (modes.size() > 1) {
+            list.add(Ui.label("Switch to", "SvSideLabel"));
+            for (String other : modes) {
+                if (!other.equals(mode)) {
+                    final String to = other;
+                    list.add(entry(Nav.icon(to), Nav.label(to), "switch-" + to,
+                            () -> Nav.switchTo(to)));
+                }
+            }
+        }
+
+        Container bottom = new Container(BoxLayout.y());
+        bottom.add(entry(FontImage.MATERIAL_SETTINGS, "Settings", "menu-settings",
+                () -> SettingsForm.show(form)));
+        bottom.add(entry(FontImage.MATERIAL_LOGOUT, "Sign out", "menu-signOut", Nav::signOut));
+
+        panel.add(BorderLayout.NORTH, who);
+        panel.add(BorderLayout.CENTER, list);
+        panel.add(BorderLayout.SOUTH, bottom);
+        return panel;
+    }
+
+    private static Button entry(char icon, String text, String name, final Runnable go) {
+        Button entry = new Button(text, "SvSideItem");
+        entry.setName(name);
+        Ui.icon(entry, icon, 3.4f);
+        entry.addActionListener(e -> go.run());
+        return entry;
+    }
+}

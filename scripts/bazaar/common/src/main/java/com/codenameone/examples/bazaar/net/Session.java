@@ -37,7 +37,6 @@ import com.codename1.util.SuccessCallback;
 import com.codenameone.examples.bazaar.AppConfig;
 import com.codenameone.examples.bazaar.Prefs;
 import com.codenameone.examples.bazaar.api.UserDto;
-import com.codenameone.examples.bazaar.customer.Cart;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -69,6 +68,7 @@ public final class Session {
     private static TokenStore store;
     private static UserDto user;
     private static Runnable onSignedOut;
+    private static final java.util.List<Runnable> accountChanged = new java.util.ArrayList<Runnable>();
     /// Counts the sessions: moved on whenever the server changes, an account
     /// signs in, or the session ends. An answer to a request made in an
     /// earlier session describes somebody who is no longer signed in here --
@@ -161,6 +161,15 @@ public final class Session {
         onSignedOut = handler;
     }
 
+    /// Runs `handler` whenever the signed-in account changes (signed out,
+    /// another account, another server): for a cart or a draft that belonged
+    /// to whoever was here before.
+    public static void onAccountChanged(Runnable handler) {
+        if (!accountChanged.contains(handler)) {
+            accountChanged.add(handler);
+        }
+    }
+
     public static String serverUrl() {
         return base;
     }
@@ -175,9 +184,11 @@ public final class Session {
         user = described;
         String after = owner();
         if (before == null ? after != null : !before.equals(after)) {
-            // Signed out, expired, another account or another server: the
-            // cart was picked by whoever was here before.
-            Cart.clear();
+            // Signed out, expired, another account or another server: what
+            // the last person left behind (a cart, a draft) is not this one's.
+            for (int iter = 0; iter < accountChanged.size(); iter++) {
+                accountChanged.get(iter).run();
+            }
         }
         if (described != null && described.username() != null) {
             // What the device keeps about one person is not the next one's.
@@ -262,8 +273,8 @@ public final class Session {
     /// Signs in with an e-mail address and password.
     /// An e-mail address the way the server names its account: trimmed, with
     /// its ASCII letters in lower case (`Accounts.email` on the server). Signing
-    /// in as `Courier@Bazaar.example` must reach, and record its mode under, the
-    /// same account as `courier@bazaar.example`. Folded by hand: `toLowerCase()`
+    /// in as `Shopper@Bazaar.example` must reach, and record its mode under, the
+    /// same account as `shopper@bazaar.example`. Folded by hand: `toLowerCase()`
     /// follows the device locale, and under Turkish the `I` would not fold to `i`.
     public static String accountName(String email) {
         if (email == null) {

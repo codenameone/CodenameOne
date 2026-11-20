@@ -50,20 +50,9 @@ public final class PaymentsForm {
         panes.list("Payments", "Payments", Panes.listed(null, list), load[0]);
     }
 
-    /// A payment, opened: its receipt, and the way to return the money.
+    /// A payment, opened: its receipt. Refunds are made from the store's order.
     private static void open(final Panes panes, final ReceiptDto payment) {
         Container page = ReceiptForm.page(payment, true);
-        if ("paid".equals(payment.status())) {
-            page.add(Ui.danger("Refund this order", "refund", e -> panes.reason("Refund",
-                    Lang.tr("{0} goes back to the card it came from.",
-                            Ui.money(payment.total(), payment.currency())), "Refund", why -> {
-                        ReasonDto reason = new ReasonDto(why);
-                        Api.admin().refundOrder(payment.orderId(), reason, Net.to(refunded -> {
-                            Telemetry.deliveryRefunded("payments");
-                            open(panes, refunded);
-                        }, Ui::fail));
-                    })));
-        }
         panes.detail("Receipt", "Receipt", page);
     }
 
@@ -71,19 +60,19 @@ public final class PaymentsForm {
         list.removeAll();
         if (payments == null || payments.isEmpty()) {
             list.add(Ui.empty(FontImage.MATERIAL_PAYMENTS, "No payments yet",
-                    "A delivery shows up here when it is paid for."));
+                    "An order shows up here when it is paid for."));
         }
         for (int iter = 0; payments != null && iter < payments.size(); iter++) {
             final ReceiptDto payment = payments.get(iter);
             Container value = new Container(BoxLayout.y());
-            value.add(Ui.plain(Ui.money(payment.total(), payment.currency()), "SvRowValue"));
+            value.add(Ui.plain(Ui.money(payment.amount(), payment.currency()), "SvRowValue"));
             value.add(Ui.badge(ReceiptForm.status(payment.status()),
                     ReceiptForm.badge(payment.status())));
             String who = payment.customerUsername() == null ? "" : payment.customerUsername();
             String how = "cash".equals(payment.status()) ? Lang.tr("Cash") : payment.methodLabel();
             final Container picked = Ui.row("cash".equals(payment.status())
                     ? FontImage.MATERIAL_PAYMENTS : FontImage.MATERIAL_CREDIT_CARD,
-                    payment.dropoffName(),
+                    payment.orderId(),
                     who + (who.length() > 0 && how != null && how.length() > 0 ? Ui.DOT : "")
                             + (how == null ? "" : how), value);
             list.add(Ui.tap(picked, "payment-" + iter, e -> {

@@ -18,41 +18,44 @@
  */
 package com.codenameone.examples.bazaar.ui;
 
+import com.codename1.appkit.Net;
 import com.codename1.ui.CN;
 import com.codename1.ui.Container;
+import com.codename1.ui.FontImage;
 import com.codename1.ui.Form;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codenameone.examples.bazaar.AppConfig;
 import com.codenameone.examples.bazaar.Prefs;
 import com.codenameone.examples.bazaar.Telemetry;
-import com.codenameone.examples.bazaar.admin.AdminForm;
+import com.codenameone.examples.bazaar.admin.AdminSections;
 import com.codenameone.examples.bazaar.api.UserDto;
-import com.codenameone.examples.bazaar.courier.ApplyForm;
-import com.codenameone.examples.bazaar.courier.CourierForm;
-import com.codenameone.examples.bazaar.courier.Shift;
 import com.codenameone.examples.bazaar.live.LiveChannel;
-import com.codenameone.examples.bazaar.merchant.MerchantForm;
 import com.codenameone.examples.bazaar.net.Account;
 import com.codenameone.examples.bazaar.net.Api;
-import com.codename1.appkit.Net;
 import com.codenameone.examples.bazaar.net.Session;
 import com.codenameone.examples.bazaar.notify.Notifications;
-import com.codenameone.examples.bazaar.customer.CustomerForm;
+import java.util.ArrayList;
+import java.util.List;
 
 /// Decides which screen the app is on.
 ///
-/// The app is four apps in one -- for ordering, for delivering, for running a
-/// restaurant and for administering -- and which of them a user may enter is the server's
-/// decision: it is the roles on their account, as `/api/me` reports them. Each
-/// has a home screen of its own, with its own menu, and the user is in one of
-/// them at a time. Hiding a mode here is a courtesy and not the protection; the
-/// server refuses a courier's, a merchant's or an admin's call from anyone without the role,
+/// The app is four apps in one -- shopping, running a store, ringing up sales
+/// at the counter and administering the platform -- and which of them a user
+/// may enter is the server's decision: it is the roles on their account, as
+/// `/api/me` reports them (`merchant`, `admin`). Each mode has a home screen,
+/// a [Shell] over the mode's [Sections], and the user is in one of them at a
+/// time. Hiding a mode here is a courtesy and not the protection; the server
+/// refuses a merchant's or an admin's call from anyone without the role,
 /// whatever the app shows.
 public final class Nav {
-    public static final String CUSTOMER = "customer";
-    public static final String COURIER = "courier";
-    public static final String ADMIN = "admin";
+    /// Shopping: the storefront. Everyone may.
+    public static final String SHOP = "shop";
+    /// Running a store: staff of a store.
     public static final String MERCHANT = "merchant";
+    /// The register: quick sale entry for a cashier, inside the merchant's side.
+    public static final String POS = "pos";
+    /// The platform console.
+    public static final String ADMIN = "admin";
 
     /// The home screen of a mode.
     public interface Home {
@@ -79,8 +82,8 @@ public final class Nav {
 
     /// The first screen: wherever the stored session leads.
     public static void launch() {
+        AdminSections.install();
         Session.onSignedOut(() -> {
-            Shift.end();
             LiveChannel.stop();
             Telemetry.signedOut("expired");
             WelcomeForm.show();
@@ -95,11 +98,9 @@ public final class Nav {
     /// account's settings are fetched, applied, and then their home is shown in
     /// the language and the colours they chose.
     public static void enter() {
-        // Where this phone is to be sent notifications, now that there is
-        // someone to send them to.
         Notifications.signedIn();
-        // Menu prices are shown in the server's currency, which only the
-        // payment config says.
+        // Prices are shown in the server's currency, which only the payment
+        // config says.
         Api.payments().config(Net.to(config -> Ui.setCurrency(config.currency()), (status, message) -> { }));
         Account.load(() -> {
             Look.apply();
@@ -107,8 +108,6 @@ public final class Nav {
             if (Telemetry.asked()) {
                 home();
             } else {
-                // Once on a device, before the first screen that would be
-                // counted: whether it may be.
                 ConsentForm.show(Nav::home);
             }
         });
@@ -123,8 +122,7 @@ public final class Nav {
     }
 
     /// The account was asked about again: back to the home screen only if
-    /// the mode it opens in is no longer the one on screen, so somebody whose
-    /// roles did not change is not pulled out of what they were doing.
+    /// the mode it opens in is no longer the one on screen.
     public static void refreshed() {
         UserDto user = Session.user();
         if (user == null || !mode(user).equals(homeMode)) {
@@ -132,11 +130,9 @@ public final class Nav {
         }
     }
 
-    /// Builds the home screen of the mode the user is in, without showing it:
-    /// for a caller that is about to show something on top of it. Null, and
-    /// the welcome screen showing, when nobody is signed in.
+    /// Builds the home screen of the mode the user is in, without showing it.
+    /// Null, and the welcome screen showing, when nobody is signed in.
     public static Form build() {
-        CustomerForm.stopLocating();
         UserDto user = Session.user();
         if (user == null) {
             WelcomeForm.show();
@@ -145,119 +141,102 @@ public final class Nav {
         LiveChannel.start();
         String mode = mode(user);
         Telemetry.role(mode);
-        // Delivering is for the approved. Anyone else who chooses it gets the
-        // way there: the application, and what has become of it.
-        if (!COURIER.equals(mode)) {
-            // Out of the courier's side of the app is off line as far as the
-            // phone is concerned: nothing goes on reporting where it is.
-            Shift.leave();
-        }
-        Home home = ADMIN.equals(mode) ? new AdminForm()
-                : MERCHANT.equals(mode) ? new MerchantForm()
-                : !COURIER.equals(mode) ? new CustomerForm()
-                : user.courier() ? new CourierForm() : new ApplyForm();
+        Home home = new Shell(mode);
         home.start();
         homeForm = home.form();
         homeMode = mode;
         return homeForm;
     }
 
+    /// The modes `user` may enter, in the order they are offered.
+    public static List<String> modes(UserDto user) {
+        List<String> modes = new ArrayList<String>();
+        modes.add(SHOP);
+        if (user != null && user.merchant()) {
+            modes.add(MERCHANT);
+            modes.add(POS);
+        }
+        if (user != null && user.admin()) {
+            modes.add(ADMIN);
+        }
+        return modes;
+    }
+
+    /// What a mode is called where the user switches to it.
+    public static String label(String mode) {
+        return ADMIN.equals(mode) ? "Administration" : MERCHANT.equals(mode) ? "Your store"
+                : POS.equals(mode) ? "Point of sale" : "Shopping";
+    }
+
+    public static char icon(String mode) {
+        return ADMIN.equals(mode) ? FontImage.MATERIAL_ADMIN_PANEL_SETTINGS
+                : MERCHANT.equals(mode) ? FontImage.MATERIAL_STORE
+                : POS.equals(mode) ? FontImage.MATERIAL_POINT_OF_SALE
+                : FontImage.MATERIAL_SHOPPING_BAG;
+    }
+
     /// The mode to open for `user`.
     ///
     /// The one they chose last, while their account still allows it. With no
-    /// choice made, the one their account is for: an admin administers, a
-    /// merchant runs their restaurant, a courier delivers, and everyone else
-    /// orders. A choice is remembered for the
-    /// account that made it, so the next person to sign in on the same device
-    /// starts where their own account does.
+    /// choice made, the one their account is for: an admin administers, store
+    /// staff run their store, and everyone else shops. A choice is remembered
+    /// for the account that made it.
     public static String mode(UserDto user) {
         String saved = AppConfig.mode(Session.owner(user.username()));
-        if (ADMIN.equals(saved) && user.admin()) {
-            return ADMIN;
+        if (saved != null && modes(user).contains(saved)) {
+            return saved;
         }
-        if (MERCHANT.equals(saved) && user.merchant()) {
-            return MERCHANT;
-        }
-        // Not only for a courier: someone who is applying to be one is in the
-        // courier's side of the app too, on the screen that says how it stands.
-        if (COURIER.equals(saved)) {
-            return COURIER;
-        }
-        if (CUSTOMER.equals(saved)) {
-            return CUSTOMER;
-        }
-        return user.admin() ? ADMIN : user.merchant() ? MERCHANT
-                : user.courier() ? COURIER : CUSTOMER;
+        return user.admin() ? ADMIN : user.merchant() ? MERCHANT : SHOP;
     }
 
-    /// The user chose `mode` from the menu.
+    /// The user chose `mode`.
     public static void switchTo(String mode) {
-        if (Shift.taken()) {
-            Ui.say("Finish the delivery you took first");
-            return;
-        }
         UserDto user = Session.user();
         AppConfig.setMode(mode, user == null ? "" : Session.owner(user.username()));
         home();
     }
 
-    /// A notification about a delivery was opened: the home that shows that delivery,
-    /// as the customer, the courier or the kitchen the notification was for. Nothing
-    /// changes when that home is already on screen; it hears of the change
-    /// over the live channel too.
-    public static void showDelivery(String role) {
+    /// A notification about an order was opened: the home of the side it was
+    /// for (`shop` or `merchant`), on its Orders section. Nothing changes when
+    /// that home is already on screen; it hears of the change over the live
+    /// channel too.
+    public static void showOrder(String role) {
         UserDto user = Session.user();
         if (user == null) {
             return;
         }
-        String wanted = COURIER.equals(role) && user.courier() ? COURIER
-                : MERCHANT.equals(role) && user.merchant() ? MERCHANT : CUSTOMER;
-        if (wanted.equals(homeMode) && homeForm != null && CN.getCurrentForm() == homeForm) {
-            return;
+        String wanted = MERCHANT.equals(role) && user.merchant() ? MERCHANT : SHOP;
+        if (!(wanted.equals(homeMode) && homeForm != null && CN.getCurrentForm() == homeForm)) {
+            AppConfig.setMode(wanted, Session.owner(user.username()));
+            home();
         }
-        if (Shift.taken() && !COURIER.equals(wanted)) {
-            // A notification is no reason to leave a delivery half done.
-            return;
+        Shell shell = Shell.current();
+        if (shell != null && wanted.equals(shell.mode())) {
+            shell.show(Sections.ORDERS);
         }
-        AppConfig.setMode(wanted, Session.owner(user.username()));
-        home();
     }
 
     public static void signOut() {
-        if (Shift.taken()) {
-            Ui.say("Finish the delivery you took first");
-            return;
-        }
         leave("user", true);
     }
 
     /// The account was closed: signed out, and what the device kept for the
     /// usage reports forgotten with it.
     public static void deleted() {
-        // Closing the account already made the server forget its devices.
         leave("deleted", false);
         Telemetry.forget();
-        // Nobody is coming back for where that account went.
         Prefs.ownedBy("");
     }
 
     private static void leave(final String reason, boolean forgetDevice) {
         Account.flush();
-        Shift.leave();
-        CustomerForm.stopLocating();
         LiveChannel.stop();
         homeForm = null;
         homeMode = "";
-        // The server forgets this phone for the account first, while there is
-        // still a session to ask with.
         Runnable out = () -> {
             Telemetry.signedOut(reason);
             Session.signOut(WelcomeForm::show);
         };
-        // The delivery's Live Activity is left to the system. Signing out does not
-        // end the delivery, which goes on for the customer who signed out, and the
-        // system removes an activity on its own within hours. Ending it here
-        // would hide a delivery that is still happening.
         if (forgetDevice) {
             Notifications.signingOut(out);
         } else {
@@ -277,14 +256,10 @@ public final class Nav {
             switchOver.run();
             return;
         }
-        // Signed in: sign out the way the Sign out button does, against the
-        // server still in use, before pointing anywhere else. Session.start
-        // only forgets the tokens on this phone, so the old server would keep
-        // a live refresh token and this phone's push registration, and go on
-        // notifying it about that account's deliveries.
+        // Signed in: sign out against the server still in use first, so it
+        // does not keep a live refresh token and this device's push
+        // registration.
         Account.flush();
-        Shift.leave();
-        CustomerForm.stopLocating();
         LiveChannel.stop();
         homeForm = null;
         homeMode = "";

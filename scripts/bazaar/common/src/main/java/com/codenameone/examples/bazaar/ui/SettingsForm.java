@@ -64,17 +64,13 @@ public final class SettingsForm {
         Ui.section(page, "Account");
         Container account = group();
         account.add(Ui.tap(Ui.row(FontImage.MATERIAL_PERSON, "Profile",
-                "Your name and saved addresses", chevron()), "profile",
+                "Your name", chevron()), "profile",
                 e -> ProfileForm.show(form, () -> show(previous))));
         account.add(Ui.row(FontImage.MATERIAL_PHONE, user.phone(),
-                user.phoneVerified() ? null : "Needed before your first delivery",
+                user.phoneVerified() ? null : "Needed before your first order",
                 user.phoneVerified() ? Ui.badge("Verified", "SvBadgeGood")
                         : Ui.link("Verify", "verify",
                                 e -> VerifyPhoneForm.show(() -> show(previous)))));
-        if (user.courier()) {
-            account.add(Ui.row(FontImage.MATERIAL_TWO_WHEELER, user.vehicle(), user.plate(),
-                    null));
-        }
         account.add(Ui.tap(Ui.row(FontImage.MATERIAL_LOCK, "Password",
                 "Change the password you sign in with", chevron()), "password",
                 e -> password(form)));
@@ -85,19 +81,15 @@ public final class SettingsForm {
         pay.add(Ui.tap(Ui.row(FontImage.MATERIAL_ACCOUNT_BALANCE_WALLET, "Wallet",
                 "Your cards, and which of them pays by default", chevron()), "wallet",
                 e -> WalletForm.show(form)));
-        pay.add(Ui.label("Tip offered first", "SvLabel"));
-        pay.add(Ui.choice("tip", new String[] {"None", "10%", "15%", "20%"},
-                new String[] {"0", "10", "15", "20"}, String.valueOf(Prefs.tipPercent()),
-                value -> Prefs.setTipPercent(Integer.parseInt(value))));
         page.add(pay);
 
         Ui.section(page, "Notifications");
         Container notify = group();
-        notify.add(Ui.row(FontImage.MATERIAL_NOTIFICATIONS, "Delivery updates",
-                "Courier found, arriving, at the door",
-                Ui.toggle("notifyDeliveryUpdates", Prefs.notifyDeliveryUpdates(),
-                        Prefs::setNotifyDeliveryUpdates)));
-        notify.add(Ui.row(FontImage.MATERIAL_RECEIPT, "Receipts", "After every delivery",
+        notify.add(Ui.row(FontImage.MATERIAL_NOTIFICATIONS, "Order updates",
+                "Confirmed, shipped, out for delivery, ready for pickup",
+                Ui.toggle("notifyOrderUpdates", Prefs.notifyOrderUpdates(),
+                        Prefs::setNotifyOrderUpdates)));
+        notify.add(Ui.row(FontImage.MATERIAL_RECEIPT, "Receipts", "After every order",
                 Ui.toggle("notifyReceipts", Prefs.notifyReceipts(), Prefs::setNotifyReceipts)));
         notify.add(Ui.row(FontImage.MATERIAL_LOCAL_OFFER, "Offers", "Discounts and news",
                 Ui.toggle("notifyPromotions", Prefs.notifyPromotions(),
@@ -160,19 +152,16 @@ public final class SettingsForm {
         Ui.section(page, "About");
         Container about = group();
         about.add(Ui.row(FontImage.MATERIAL_INFO, "Bazaar",
-                "A sample delivery service built with Codename One", null));
+                "A sample commerce platform built with Codename One", null));
         about.add(Ui.tap(Ui.row(FontImage.MATERIAL_DESCRIPTION, "Terms of service", null,
                 chevron()), "terms", e -> legal(form, "Terms of service",
-                        "Bazaar is a sample. No real deliveries are booked, no real couriers are "
-                        + "sent and no money changes hands.", null)));
+                        "Bazaar is a sample. No real goods are sold, nothing is shipped "
+                        + "and no money changes hands.", null)));
         about.add(Ui.tap(Ui.row(FontImage.MATERIAL_POLICY, "Privacy policy", null, chevron()),
                 "privacy", e -> legal(form, "Privacy policy",
-                        "Your position is sent to the server you signed in to: to show "
-                        + "what delivers to you and, while you deliver, to offer you orders. "
-                        + "Two public map services see points too: the app asks OSRM for the "
-                        + "route between the two ends of a delivery, and the server asks Photon "
-                        + "to find the addresses you search for and to name the place you are at. "
-                        + "Your settings are kept with your account on that server.",
+                        "Your orders, addresses and settings are kept with your account on the "
+                        + "server you signed in to. The server may ask a public geocoding "
+                        + "service to complete a shipping address you type.",
                         "With usage statistics turned on, the app also counts which screens "
                         + "are opened and which features are used, and reports that to "
                         + "Codename One's analytics service under a made-up id for this "
@@ -262,7 +251,7 @@ public final class SettingsForm {
         Container page = Ui.page();
         page.add(Ui.banner(FontImage.MATERIAL_DELETE_FOREVER, "Delete your account?",
                 "Your sign-in, your profile, your saved cards and your settings are removed "
-                + "for good. Deliveries you took stay in the service's records, under the email "
+                + "for good. Orders you placed stay in the stores' records, under the email "
                 + "address you signed in with.",
                 "SvBannerIconBad"));
         // Asked for again, as changing the password asks: being signed in is

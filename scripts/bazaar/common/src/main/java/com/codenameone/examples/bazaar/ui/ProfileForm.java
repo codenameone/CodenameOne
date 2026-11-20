@@ -26,18 +26,13 @@ import com.codename1.ui.Form;
 import com.codename1.ui.TextField;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codenameone.examples.bazaar.api.ProfileDto;
-import com.codenameone.examples.bazaar.api.SavedAddressDto;
 import com.codenameone.examples.bazaar.api.UserDto;
-import com.codenameone.examples.bazaar.customer.PlaceSearchForm;
-import com.codenameone.examples.bazaar.map.Locator;
 import com.codenameone.examples.bazaar.net.Account;
 import com.codenameone.examples.bazaar.net.Api;
 import com.codename1.appkit.Net;
 import com.codenameone.examples.bazaar.net.Session;
-import java.util.List;
 
-/// Who the user is to the service: the name couriers and kitchens see, and the
-/// addresses orders go to.
+/// Who the user is to the service: the name stores see on their orders.
 public final class ProfileForm {
     private ProfileForm() {
     }
@@ -53,7 +48,7 @@ public final class ProfileForm {
 
         Ui.section(page, "About you");
         final TextField name = Ui.field(page, "Name", "name",
-                "What the kitchen and the courier will call you");
+                "How stores will address you");
         name.setText(profile == null ? user.displayName() : profile.name());
 
         final SpanLabel error = Ui.text("", "SvError");
@@ -70,39 +65,7 @@ public final class ProfileForm {
         });
         page.add(error).add(save);
 
-        // Saved with the account, so they follow it to the browser and to the
-        // next phone; each is saved or removed as it is changed.
-        Ui.section(page, "Saved addresses");
-        final Container addresses = SettingsForm.group();
-        addresses.setName("addresses");
-        page.add(addresses);
-        page.add(Ui.secondary("Add an address", "addAddress",
-                e -> PlaceSearchForm.show(form, Locator.here(), picked ->
-                        Api.orders().saveAddress(new SavedAddressDto(null, picked.name(),
-                                picked.address(), picked.lat(), picked.lng(), ""),
-                                Net.to(added -> load(form, addresses), Ui::fail)))));
         form.add(BorderLayout.CENTER, page);
         form.show();
-        load(form, addresses);
-    }
-
-    private static void load(final Form form, final Container addresses) {
-        Api.orders().addresses(Net.to(found -> {
-            addresses.removeAll();
-            List<SavedAddressDto> all = found;
-            if (all == null || all.isEmpty()) {
-                addresses.add(Ui.text("None yet. Addresses you deliver to can be saved here.",
-                        "SvMuted"));
-            }
-            for (int iter = 0; all != null && iter < all.size(); iter++) {
-                final SavedAddressDto address = all.get(iter);
-                addresses.add(Ui.row(FontImage.MATERIAL_PLACE, address.label(),
-                        address.address(), Ui.flat(FontImage.MATERIAL_DELETE_OUTLINE,
-                                "removeAddress-" + iter,
-                                e -> Api.orders().removeAddress(address.id(),
-                                        Net.to(gone -> load(form, addresses), Ui::fail)))));
-            }
-            Ui.refresh(form);
-        }, Ui::fail));
     }
 }

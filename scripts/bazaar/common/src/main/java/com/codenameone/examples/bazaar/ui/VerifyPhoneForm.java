@@ -33,7 +33,7 @@ import com.codename1.appkit.Net;
 import com.codenameone.examples.bazaar.net.Session;
 
 /// Proves the phone number is the user's, which the server asks for before the
-/// first delivery.
+/// first order.
 ///
 /// The code is the server's: it makes it up, texts it, and is the only one who
 /// checks it. The app never sees the code unless the server is a development

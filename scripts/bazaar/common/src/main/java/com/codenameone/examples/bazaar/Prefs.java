@@ -19,9 +19,6 @@
 package com.codenameone.examples.bazaar;
 
 import com.codename1.io.Preferences;
-import com.codenameone.examples.bazaar.api.PlaceDto;
-import java.util.ArrayList;
-import java.util.List;
 
 /// What the user has chosen in Settings, and the places they go back to.
 ///
@@ -41,16 +38,11 @@ public final class Prefs {
     public static final String LANGUAGE = "language";
     public static final String THEME = "theme";
     public static final String UNITS = "units";
-    public static final String NOTIFY_DELIVERY_UPDATES = "notifyDeliveryUpdates";
+    public static final String NOTIFY_ORDER_UPDATES = "notifyOrderUpdates";
     public static final String NOTIFY_RECEIPTS = "notifyReceipts";
     public static final String NOTIFY_PROMOTIONS = "notifyPromotions";
     public static final String PAYMENT_METHOD = "defaultPaymentMethodId";
-    public static final String TIP_PERCENT = "defaultTipPercent";
-    /// Where orders go unless the cart says otherwise. Kept on the device:
-    /// the addresses the account saved are the server's.
-    public static final String DELIVER_TO = "deliverTo";
-    public static final String RECENTS = "recents";
-    /// Whose the recent destinations are: see [#ownedBy].
+    /// Whose the values below are: see [#ownedBy].
     private static final String RECENTS_OWNER = "recentsOwner";
 
     public static final String THEME_SYSTEM = "system";
@@ -63,10 +55,8 @@ public final class Prefs {
 
     private static final String PREFIX = "bazaar.pref.";
     /// The plain values that are a copy of the account's; see [#ownedBy].
-    private static final String[] ACCOUNT_OWNED = {NOTIFY_DELIVERY_UPDATES, NOTIFY_RECEIPTS,
-        NOTIFY_PROMOTIONS, PAYMENT_METHOD, TIP_PERCENT};
-    /// How many delivery addresses are remembered.
-    private static final int RECENT_LIMIT = 4;
+    private static final String[] ACCOUNT_OWNED = {NOTIFY_ORDER_UPDATES, NOTIFY_RECEIPTS,
+        NOTIFY_PROMOTIONS, PAYMENT_METHOD};
 
     private static Listener listener;
 
@@ -112,12 +102,12 @@ public final class Prefs {
 
     // ----------------------------------------------------------- notifications
 
-    public static boolean notifyDeliveryUpdates() {
-        return flag(NOTIFY_DELIVERY_UPDATES, true);
+    public static boolean notifyOrderUpdates() {
+        return flag(NOTIFY_ORDER_UPDATES, true);
     }
 
-    public static void setNotifyDeliveryUpdates(boolean on) {
-        put(NOTIFY_DELIVERY_UPDATES, on);
+    public static void setNotifyOrderUpdates(boolean on) {
+        put(NOTIFY_ORDER_UPDATES, on);
     }
 
     public static boolean notifyReceipts() {
@@ -147,75 +137,20 @@ public final class Prefs {
         put(PAYMENT_METHOD, id);
     }
 
-    /// The tip offered first at checkout, as a percentage of the food.
-    public static int tipPercent() {
-        return Preferences.get(PREFIX + TIP_PERCENT, 0);
-    }
-
-    public static void setTipPercent(int percent) {
-        if (percent != tipPercent()) {
-            Preferences.set(PREFIX + TIP_PERCENT, percent);
-            changed(TIP_PERCENT);
-        }
-    }
-
-    // ---------------------------------------------------------------- places
-
-    /// Where orders are delivered, or null until the customer has said.
-    public static PlaceDto deliverTo() {
-        return place(DELIVER_TO);
-    }
-
-    public static void setDeliverTo(PlaceDto place) {
-        store(DELIVER_TO, place);
-        changed(DELIVER_TO);
-    }
-
-    /// The last few places delivered to, the newest first.
-    public static List<PlaceDto> recents() {
-        List<PlaceDto> all = new ArrayList<PlaceDto>();
-        for (int iter = 0; iter < RECENT_LIMIT; iter++) {
-            PlaceDto place = place(RECENTS + "." + iter);
-            if (place != null) {
-                all.add(place);
-            }
-        }
-        return all;
-    }
-
-    /// Remembers `place` as the destination chosen last.
-    public static void addRecent(PlaceDto place) {
-        if (place == null || place.name() == null || place.name().length() == 0) {
-            return;
-        }
-        List<PlaceDto> all = recents();
-        for (int iter = all.size() - 1; iter >= 0; iter--) {
-            if (place.name().equals(all.get(iter).name())) {
-                all.remove(iter);
-            }
-        }
-        all.add(0, place);
-        for (int iter = 0; iter < RECENT_LIMIT; iter++) {
-            store(RECENTS + "." + iter, iter < all.size() ? all.get(iter) : null);
-        }
-        changed(RECENTS);
-    }
 
     /// Says whose device this is now, by the name they signed in with; empty
     /// for nobody. When the account changes, what the device holds of the
-    /// last one is dropped and not shown to the next: the recent
-    /// destinations, which are kept here only and say where a person goes,
-    /// and the copy of everything the account keeps on the server -- home,
-    /// work, the card paid with, the delivery options.
+    /// last one is dropped and not shown to the next: the copy of everything
+    /// the account keeps on the server -- the card paid with, the
+    /// notification choices.
     /// That copy is replaced when the new account's values arrive, but they
     /// may not arrive, and then the last person's would be on screen and go
     /// out with the next save as the new person's own. How the app looks
     /// (language, theme, units) is the device's and stays. The same account
     /// signing in again finds its own still there.
     ///
-    /// The listener is told of the recent destinations alone. It sends what
-    /// it is told of to the server, and values dropped here were not changed
-    /// by anyone: reported, they would be saved over the new account's.
+    /// The listener is told nothing: values dropped here were not changed by
+    /// anyone, and reported they would be saved over the new account's.
     ///
     /// @param account the account, with its server, as
     ///     [com.codenameone.examples.bazaar.net.Session#owner(String)] names
@@ -225,15 +160,10 @@ public final class Prefs {
         if (owner.equals(text(RECENTS_OWNER, ""))) {
             return;
         }
-        for (int iter = 0; iter < RECENT_LIMIT; iter++) {
-            store(RECENTS + "." + iter, null);
-        }
-        store(DELIVER_TO, null);
         for (String name : ACCOUNT_OWNED) {
             Preferences.delete(PREFIX + name);
         }
         Preferences.set(PREFIX + RECENTS_OWNER, owner);
-        changed(RECENTS);
     }
 
     // ------------------------------------------------------------- the store
@@ -261,25 +191,6 @@ public final class Prefs {
             Preferences.set(PREFIX + name, value);
             changed(name);
         }
-    }
-
-    private static PlaceDto place(String name) {
-        String title = text(name + ".name", "");
-        if (title.length() == 0) {
-            return null;
-        }
-        PlaceDto place = new PlaceDto(title, text(name + ".address", ""),
-                Preferences.get(PREFIX + name + ".lat", 0d),
-                Preferences.get(PREFIX + name + ".lng", 0d));
-        return place;
-    }
-
-    private static void store(String name, PlaceDto place) {
-        Preferences.set(PREFIX + name + ".name", place == null ? "" : place.name());
-        Preferences.set(PREFIX + name + ".address",
-                place == null || place.address() == null ? "" : place.address());
-        Preferences.set(PREFIX + name + ".lat", place == null ? 0d : place.lat());
-        Preferences.set(PREFIX + name + ".lng", place == null ? 0d : place.lng());
     }
 
     private static void changed(String name) {

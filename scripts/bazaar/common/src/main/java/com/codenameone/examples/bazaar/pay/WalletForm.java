@@ -41,7 +41,7 @@ import java.util.List;
 /// comes back is a brand and four digits; the number itself is never kept by
 /// this app, and by the server only long enough to hand it over.
 ///
-/// The same screen answers "which of these, for this delivery?": opened with
+/// The same screen answers "which of these, for this order?": opened with
 /// [#pick], a tap on a method chooses it and goes back.
 public final class WalletForm {
     public interface Picked {
@@ -63,7 +63,7 @@ public final class WalletForm {
         Container page = Ui.page();
         page.add(Ui.text(picked == null
                 ? "Tap a card to make it the one that pays unless you say otherwise."
-                : "Choose how to pay for this delivery.", "SvMuted"));
+                : "Choose how to pay for this order.", "SvMuted"));
         list.setName("methods");
         page.add(list);
         page.add(Ui.secondary("Add a card", "addCard",
@@ -81,9 +81,9 @@ public final class WalletForm {
         wallet.load();
     }
 
-    /// The wallet, to choose from for one delivery.
+    /// The wallet, to choose from for one order.
     ///
-    /// @param chosen the id of the method the delivery has now
+    /// @param chosen the id of the method the order has now
     public static void pick(Form previous, String chosen, Picked picked) {
         WalletForm wallet = new WalletForm(previous, chosen, picked);
         wallet.form.show();
@@ -117,7 +117,7 @@ public final class WalletForm {
             row.add(BorderLayout.WEST, FlowLayout.encloseCenterMiddle(icon));
             Container lines = new Container(BoxLayout.y());
             lines.add(Ui.plain(label(method), "SvRowTitle"));
-            lines.add(Ui.plain(cash ? Lang.tr("Pay the courier directly")
+            lines.add(Ui.plain(cash ? Lang.tr("Pay at pickup")
                     : Lang.tr("Expires {0}", expiry(method)), "SvRowDetail"));
             row.add(BorderLayout.CENTER, lines);
             Container end = new Container(new FlowLayout(Label.RIGHT, Label.CENTER));
