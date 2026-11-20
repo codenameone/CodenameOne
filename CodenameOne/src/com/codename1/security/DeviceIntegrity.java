@@ -243,6 +243,54 @@ public final class DeviceIntegrity {
         return false;
     }
 
+    /// The keyboard (input method) the user has selected, as `package/.Service`. Android only;
+    /// null on iOS and other ports, where an app cannot see it.
+    ///
+    /// #### Returns
+    ///
+    /// the selected keyboard's id, or null when it cannot be determined
+    public static String getActiveKeyboard() {
+        return Display.getInstance().getActiveInputMethod();
+    }
+
+    /// Returns true when the selected keyboard was installed by the user rather than shipped with the
+    /// device, and its package is not in `allowedPackages`.
+    ///
+    /// On Android every keystroke typed into any app goes to the selected keyboard, so a malicious
+    /// one is a keylogger the app cannot switch off: password and [com.codename1.ui.TextArea#SENSITIVE]
+    /// fields already ask the keyboard not to learn what is typed, but only a well-behaved keyboard
+    /// honours that. Check this before a credential screen and warn the user, or switch to
+    /// [SecureKeyboard], which never goes through the system keyboard:
+    ///
+    /// ```java
+    /// if (DeviceIntegrity.isThirdPartyKeyboardActive("com.touchtype.swiftkey")) {
+    ///     SecureKeyboard.install(password);
+    /// }
+    /// ```
+    ///
+    /// Always false on iOS, where third-party keyboards are never used for password fields, and on
+    /// other ports.
+    ///
+    /// #### Parameters
+    ///
+    /// - `allowedPackages`: user-installed keyboard packages your app trusts
+    ///
+    /// #### Returns
+    ///
+    /// true if the selected keyboard is neither preinstalled nor allowed
+    public static boolean isThirdPartyKeyboardActive(String... allowedPackages) {
+        Display d = Display.getInstance();
+        return isUntrustedKeyboard(d.getActiveInputMethod(), d.isActiveInputMethodPreinstalled(), allowedPackages);
+    }
+
+    /// Pure decision behind [#isThirdPartyKeyboardActive(String...)], separated for unit tests.
+    static boolean isUntrustedKeyboard(String keyboardId, boolean preinstalled, String[] allowedPackages) {
+        if (keyboardId == null || keyboardId.length() == 0 || preinstalled) {
+            return false;
+        }
+        return containsUntrustedService(new String[] {keyboardId}, allowedPackages);
+    }
+
     /// Marks the currently displayed screen as secure, blocking OS screenshots, screen recording and
     /// accessibility screen scraping while it is showing (Android `FLAG_SECURE`). Call with `true`
     /// when entering a sensitive screen (PIN entry, transfer confirmation) and `false` when leaving it.

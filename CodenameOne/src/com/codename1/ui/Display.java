@@ -9331,6 +9331,18 @@ public final class Display extends CN1Constants {
         return impl.getEnabledAccessibilityServices();
     }
 
+    /// The platform id of the keyboard the user has selected, or null where it cannot be known.
+    /// See `com.codename1.security.DeviceIntegrity#getActiveKeyboard()`.
+    public String getActiveInputMethod() {
+        return impl.getActiveInputMethod();
+    }
+
+    /// Whether the selected keyboard ships with the device.
+    /// See `com.codename1.security.DeviceIntegrity#isThirdPartyKeyboardActive(String...)`.
+    public boolean isActiveInputMethodPreinstalled() {
+        return impl.isActiveInputMethodPreinstalled();
+    }
+
     /// Discards cached platform attestation state, forcing the next attestation to start from a fresh
     /// hardware key. See `com.codename1.security.DeviceIntegrity#resetAttestation()`.
     public void resetAttestation() {

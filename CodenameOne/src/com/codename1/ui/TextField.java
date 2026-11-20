@@ -1850,24 +1850,25 @@ public class TextField extends TextArea {
         int textLength = text.length();
         int position = 0;
         Font f = getStyle().getFont();
-        x -= getAbsoluteX();
+        // Relative to the field for the caret, while super still gets the absolute point.
+        int relX = x - getAbsoluteX();
         for (int iter = 0; iter < textLength; iter++) {
             int width = f.substringWidth(text, 0, iter);
-            if (x > width) {
+            if (relX > width) {
                 position = iter;
             } else {
                 break;
             }
         }
         if (position == textLength - 1) {
-            if (f.stringWidth(text) < x) {
+            if (f.stringWidth(text) < relX) {
                 position = textLength;
             }
         }
         cursorX = position;
-        if (!isEditable()) {
-            return;
-        }
+        // No early return for an uneditable field: TextArea.pointerReleased already refuses to
+        // edit one, and skipping it also skipped Component.pointerReleased, so the field's
+        // pointer-released listeners never fired. SecureKeyboard opens from exactly that listener.
         super.pointerReleased(x, y);
     }
 
