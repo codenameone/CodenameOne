@@ -135,9 +135,9 @@ public class AdminEndpoint implements AdminApiServer {
     @Override
     @Transactional(rollbackFor = IOException.class)
     public BroadcastDto broadcast(BroadcastDto broadcast) throws Exception {
-        BroadcastDto sent = broadcasts.send(broadcast);
-        moderation.record(Caller.name(), "", "BROADCAST", sent.title());
-        return sent;
+        // Audited before the push, which is the one step a rollback cannot undo.
+        moderation.record(Caller.name(), "", "BROADCAST", broadcast == null ? "" : broadcast.title());
+        return broadcasts.send(broadcast);
     }
 
     @Override

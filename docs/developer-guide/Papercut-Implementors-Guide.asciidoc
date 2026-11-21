@@ -262,9 +262,10 @@ whenever asked, so striking a run takes back what it unlocked, and a new achieve
 counts every run played before it existed.
 Administration::
 `AdminApi` covers the stats, a player search, actions on a player, the flags and their
-resolution, picking the daily seed, broadcasts and the audit log. `Moderation` writes
-every action to the audit log in the same transaction as the change, so the log
-cannot miss one.
+resolution, picking the daily seed, broadcasts and the audit log. Every action is
+written to the audit log in the same transaction as the change, so the log cannot
+miss one; a broadcast's push, which no rollback can recall, is sent only after its
+rows are written.
 
 [[papercut-art]]
 === The art pipeline

@@ -84,12 +84,6 @@ public class Broadcasts {
                 break;
             }
         }
-        if (!targets.isEmpty()) {
-            sender.send(targets, PushNotification.builder().id(id).title(title).body(body)
-                    .collapseKey("broadcast").ttlSeconds(24 * 60 * 60).data("broadcast", id)
-                    // The app opens today's sheet from it (Notifications).
-                    .data("screen", "daily").build(), null);
-        }
         Broadcast row = new Broadcast();
         row.setId(id);
         row.setTitle(title);
@@ -98,6 +92,14 @@ public class Broadcasts {
         row.setTargets(reached);
         row.setCreatedAt(Instant.now());
         broadcasts.insert(row);
+        // The push goes last: it cannot be rolled back, so everything that
+        // can fail is written first. The caller audits before calling this.
+        if (!targets.isEmpty()) {
+            sender.send(targets, PushNotification.builder().id(id).title(title).body(body)
+                    .collapseKey("broadcast").ttlSeconds(24 * 60 * 60).data("broadcast", id)
+                    // The app opens today's sheet from it (Notifications).
+                    .data("screen", "daily").build(), null);
+        }
         return new BroadcastDto(id, title, body, days, reached, row.getCreatedAt().toEpochMilli());
     }
 }

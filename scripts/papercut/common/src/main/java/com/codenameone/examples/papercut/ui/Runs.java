@@ -85,6 +85,9 @@ public final class Runs {
             form.showOver(a, Session.user() == null ? "Sign in to put runs on the boards" : null);
             return;
         }
+        // A run whose submission fails is not kept for later: its ticket is
+        // single use and short lived, so a retry after the app restarts would
+        // be refused anyway. A live game that wants one would queue it here.
         int seconds = Math.max(1, (int) Math.ceil(a.time));
         RunDto run = new RunDto(ticket.token(), ticket.mode(), a.score, a.kills, a.gates, seconds,
                 a.peakMultiplier);
