@@ -22,6 +22,7 @@
  */
 package com.codename1.spreadsheet;
 
+import com.codename1.impl.xml.XmlScanner;
 import com.codename1.junit.UITestBase;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
