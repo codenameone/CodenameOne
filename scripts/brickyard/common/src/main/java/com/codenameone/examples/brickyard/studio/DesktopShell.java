@@ -50,6 +50,7 @@ final class DesktopShell {
     private Label bottomTitle;
     private Button bottomOutputTab;
     private Button bottomScriptTab;
+    private Button bottomLogicTab;
     private Container header;
     private Button saveButton;
     private CodeEditor source;
@@ -87,13 +88,14 @@ final class DesktopShell {
         bottomBody = new Container(new BorderLayout());
         bottomOutputTab = headerTab("Output", "dockOutput", ev -> studio.showTab(3));
         bottomScriptTab = headerTab("Script", "dockScript", ev -> studio.showTab(2));
+        bottomLogicTab = headerTab("Logic", "dockLogic", ev -> studio.showTab(4));
         header = new Container(new BorderLayout());
         header.setUIID("StudioPaneHeader");
         saveButton = new Button("Save", "StudioMiniButton");
         saveButton.setName("saveScript");
         FontImage.setMaterialIcon(saveButton, FontImage.MATERIAL_SAVE, 2.6f);
         saveButton.addActionListener(ev -> studio.saveScript());
-        header.add(BorderLayout.WEST, BoxLayout.encloseX(bottomOutputTab, bottomScriptTab));
+        header.add(BorderLayout.WEST, BoxLayout.encloseX(bottomOutputTab, bottomScriptTab, bottomLogicTab));
         bottomTitle = new Label("", "StudioPaneHeaderHint");
         header.add(BorderLayout.EAST, bottomTitle);
         bottom = new Container(new BorderLayout());
@@ -126,6 +128,7 @@ final class DesktopShell {
         bottomBody.removeAll();
         bottomOutputTab.setUIID(script ? "StudioPaneTab" : "StudioPaneTabSelected");
         bottomScriptTab.setUIID(script ? "StudioPaneTabSelected" : "StudioPaneTab");
+        bottomLogicTab.setUIID("StudioPaneTab");
         if (script) {
             if (source.getParent() != null) {
                 source.remove();
@@ -141,6 +144,24 @@ final class DesktopShell {
             swapHeaderEnd(bottomTitle);
             bottomTitle.setText("");
         }
+        if (bottom.isHidden()) {
+            bottom.setHidden(false);
+        }
+    }
+
+    /// Shows the experimental Logic graph in the bottom dock.
+    void showLogic(Component logic) {
+        bottomBody.removeAll();
+        bottomOutputTab.setUIID("StudioPaneTab");
+        bottomScriptTab.setUIID("StudioPaneTab");
+        bottomLogicTab.setUIID("StudioPaneTabSelected");
+        if (logic.getParent() != null) {
+            logic.remove();
+        }
+        bottomBody.add(BorderLayout.CENTER, logic);
+        bottom.setPreferredH(CN.getDisplayHeight() * 45 / 100);
+        swapHeaderEnd(bottomTitle);
+        bottomTitle.setText("");
         if (bottom.isHidden()) {
             bottom.setHidden(false);
         }
