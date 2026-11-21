@@ -3314,8 +3314,14 @@ public abstract class Executor {
                 public void run() {
                     try {
                         File s = hardenSourceJar(sourceZip, request);
-                        s = SpellcheckDictionaries.inject(Executor.this, s, request);
-                        result[0] = build(s, request);
+                        File withDictionaries = SpellcheckDictionaries.inject(Executor.this, s, request);
+                        try {
+                            result[0] = build(withDictionaries, request);
+                        } finally {
+                            if (withDictionaries != s && !withDictionaries.delete()) {
+                                withDictionaries.deleteOnExit();
+                            }
+                        }
 
                     } catch (Throwable err) {
                         err.printStackTrace();

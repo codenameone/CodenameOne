@@ -36,8 +36,9 @@ import java.util.zip.ZipInputStream;
 /// uses -- so a reader needs them all before it can interpret any. A compressed entry can
 /// unpack to a thousand times its size, so both the total and the number of entries are capped.
 final class ZipParts {
-    /// The most bytes a package may unpack to.
-    static final long MAX_TOTAL = 256L * 1024 * 1024;
+    /// The most bytes a package may unpack to: every part is held in memory at once, and
+    /// buffering one briefly needs twice its size, so this has to fit a phone.
+    static final long MAX_TOTAL = 64L * 1024 * 1024;
 
     /// The most entries a package may have.
     static final int MAX_ENTRIES = 20000;

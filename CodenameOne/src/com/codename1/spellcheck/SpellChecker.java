@@ -22,6 +22,7 @@
  */
 package com.codename1.spellcheck;
 
+import com.codename1.io.Log;
 import com.codename1.ui.Display;
 
 import java.io.ByteArrayOutputStream;
@@ -107,10 +108,11 @@ public abstract class SpellChecker {
     /// The resource listing the languages of the dictionaries the build added, one per line.
     public static final String LANGUAGES_RESOURCE = "/cn1dict_languages.txt";
 
-    private static final Map<String, SpellChecker> LOADED = new HashMap<String, SpellChecker>();
+    private static final Map<String, HunspellDictionary> LOADED = new HashMap<String, HunspellDictionary>();
 
     /// A checker for a language: the dictionary the build added for it, or else the
-    /// platform's own checker. A dictionary is read once and shared; reading one takes a
+    /// platform's own checker. Each call returns a new checker, with its own user words, over a
+    /// dictionary read once and shared; reading one takes a
     /// moment, so call this off the EDT when a delay would show.
     ///
     /// #### Parameters
@@ -122,15 +124,29 @@ public abstract class SpellChecker {
     /// the checker, or null when there is neither a dictionary nor a platform checker
     public static SpellChecker forLanguage(String language) {
         String lang = language == null ? "" : language.replace('-', '_');
+        HunspellDictionary d;
         synchronized (LOADED) {
-            SpellChecker s = LOADED.get(lang);
-            if (s == null && !LOADED.containsKey(lang)) {
-                HunspellDictionary d = bundled(lang);
-                s = d != null ? create(d) : platform(language);
-                LOADED.put(lang, s);
+            // the dictionary is shared, a checker is not: words one editor adds or ignores
+            // stay in that editor. A miss is not remembered, so a call made before the
+            // display is up does not decide every later one.
+            d = LOADED.get(lang);
+            if (d == null) {
+                d = bundled(lang);
+                if (d != null) {
+                    LOADED.put(lang, d);
+                }
             }
-            return s;
         }
+        if (d != null) {
+            return create(d);
+        }
+        SpellChecker p = platform(language);
+        if (p == null) {
+            Log.p("SpellChecker: no dictionary for " + lang + " and no platform checker. The build "
+                    + "adds dictionaries per the spellcheck.languages hint; the simulator finds them "
+                    + "only when the project depends on codenameone-spellcheck-dictionaries.");
+        }
+        return p;
     }
 
     /// The languages of the dictionaries the build added.

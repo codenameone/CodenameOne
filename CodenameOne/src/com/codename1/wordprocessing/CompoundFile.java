@@ -122,15 +122,26 @@ final class CompoundFile {
         byte[] miniStream = rootSize == 0 ? new byte[0] : chain(d, fat, rootStart, ssz, (int) rootSize);
         Map<String, byte[]> out = new LinkedHashMap<String, byte[]>();
         boolean[] seen = new boolean[count];
-        walk(d, dir, count, get32(dir, 76), "", fat, miniFat, miniStream, ssz, mssz, cutoff, out, seen);
+        // every stream materialized counts against one budget: entries may share a chain, so a
+        // per-stream size check alone lets a small file expand into gigabytes
+        long[] budget = {2L * d.length + 4096};
+        walk(d, dir, count, get32(dir, 76), "", fat, miniFat, miniStream, ssz, mssz, cutoff, out, seen,
+                0, budget);
         return out;
     }
 
+    private static final int MAX_DEPTH = 256;
+
     private static void walk(byte[] d, byte[] dir, int count, int id, String prefix, int[] fat, int[] miniFat,
-            byte[] miniStream, int ssz, int mssz, int cutoff, Map<String, byte[]> out, boolean[] seen)
-            throws IOException {
+            byte[] miniStream, int ssz, int mssz, int cutoff, Map<String, byte[]> out, boolean[] seen,
+            int depth, long[] budget) throws IOException {
         if (id == NOSTREAM) {
             return;
+        }
+        // the directory is a red-black tree, so a real file is shallow; a degenerate one
+        // must not overflow the (fixed size, on device) thread stack
+        if (depth > MAX_DEPTH) {
+            throw new IOException("Compound file directory too deep");
         }
         if (id < 0 || id >= count || seen[id]) {
             throw new IOException("Bad compound file directory");
@@ -146,14 +157,15 @@ final class CompoundFile {
             name.append((char) get16(dir, o + i * 2));
         }
         int type = dir[o + 66] & 0xff;
-        walk(d, dir, count, get32(dir, o + 68), prefix, fat, miniFat, miniStream, ssz, mssz, cutoff, out, seen);
+        walk(d, dir, count, get32(dir, o + 68), prefix, fat, miniFat, miniStream, ssz, mssz, cutoff, out, seen, depth + 1, budget);
         String path = prefix + name;
         if (type == 2) {
             long size = get32(dir, o + 120) & 0xffffffffL;
             int start = get32(dir, o + 116);
-            if (size > d.length) {
+            if (size > d.length || size > budget[0]) {
                 throw new IOException("Bad compound file stream size");
             }
+            budget[0] -= size;
             byte[] data;
             if (size == 0) {
                 data = new byte[0];
@@ -164,9 +176,9 @@ final class CompoundFile {
             }
             out.put(path, data);
         } else if (type == 1) {
-            walk(d, dir, count, get32(dir, o + 76), path + "/", fat, miniFat, miniStream, ssz, mssz, cutoff, out, seen);
+            walk(d, dir, count, get32(dir, o + 76), path + "/", fat, miniFat, miniStream, ssz, mssz, cutoff, out, seen, depth + 1, budget);
         }
-        walk(d, dir, count, get32(dir, o + 72), prefix, fat, miniFat, miniStream, ssz, mssz, cutoff, out, seen);
+        walk(d, dir, count, get32(dir, o + 72), prefix, fat, miniFat, miniStream, ssz, mssz, cutoff, out, seen, depth + 1, budget);
     }
 
     /// Follows a regular chain; size -1 means whole sectors.

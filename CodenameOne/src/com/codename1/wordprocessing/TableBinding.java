@@ -138,7 +138,14 @@ public final class TableBinding {
             dispose();
             return;
         }
-        Table u = TableSheets.update(t, sheet);
+        Table u;
+        syncing = true;
+        try {
+            // reading the sheet can fire its listeners (the header row is switched off and on)
+            u = TableSheets.update(t, sheet);
+        } finally {
+            syncing = false;
+        }
         if (u != t) { //NOPMD CompareObjectsWithEquals - update returns the same table when nothing changed
             syncing = true;
             try {

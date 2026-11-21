@@ -85,7 +85,20 @@ final class SpellcheckDictionaries {
             return jar;
         }
         List<String> languages = languages(request.getArg(HINT_LANGUAGES, DEFAULT_LANGUAGE));
-        Set<String> available = available(exec);
+        InputStream indexStream = exec.getResourceAsStream(SOURCE_DIR + "languages.txt");
+        if (indexStream == null) {
+            // A build host that does not resolve the artifact (an older cloud builder) builds
+            // the app as before: SpellChecker.forLanguage then falls back to the platform
+            // checker. Failing here would break apps that built yesterday.
+            exec.log("Warning: the application uses SpellChecker but the "
+                    + "codenameone-spellcheck-dictionaries artifact was not resolved for this "
+                    + "build, so no dictionary is added.");
+            return jar;
+        }
+        Set<String> available;
+        try (InputStream s = indexStream) {
+            available = parseLanguages(readAll(s));
+        }
         for (String lang : languages) {
             if (!available.contains(lang)) {
                 throw new BuildException("The " + HINT_LANGUAGES + " build hint names " + lang
@@ -96,36 +109,55 @@ final class SpellcheckDictionaries {
         }
         File out = File.createTempFile("cn1-spellcheck", ".jar", jar.getParentFile());
         Set<String> names = new HashSet<String>();
+        Set<String> index = new LinkedHashSet<String>();
         try (ZipInputStream in = new ZipInputStream(new FileInputStream(jar));
              ZipOutputStream zip = new ZipOutputStream(new FileOutputStream(out))) {
             byte[] buf = new byte[65536];
             for (ZipEntry e = in.getNextEntry(); e != null; e = in.getNextEntry()) {
-                if (!names.add(e.getName())) {
+                if (e.getName().equals(INDEX)) {
+                    // merged below with the languages added here
+                    index.addAll(parseLanguages(readAll(in)));
                     continue;
                 }
-                zip.putNextEntry(new ZipEntry(e.getName()));
+                if (!names.add(e.getName())) {
+                    // a jar cannot hold two entries of one name; ZipOutputStream would throw
+                    continue;
+                }
+                ZipEntry copy = new ZipEntry(e.getName());
+                copy.setTime(e.getTime());
+                if (e.getComment() != null) {
+                    copy.setComment(e.getComment());
+                }
+                zip.putNextEntry(copy);
                 for (int n = in.read(buf); n >= 0; n = in.read(buf)) {
                     zip.write(buf, 0, n);
                 }
                 zip.closeEntry();
             }
-            StringBuilder index = new StringBuilder();
             for (String lang : languages) {
-                for (String ext : new String[] {".aff", ".dic"}) {
-                    String name = PREFIX + lang + ext;
+                // the license notice travels with the words: SCOWL asks for it in every copy,
+                // and resources are flat on Apple ports, hence no META-INF folder
+                String[][] files = {
+                        {".aff", SOURCE_DIR + lang + ".aff"},
+                        {".dic", SOURCE_DIR + lang + ".dic"},
+                        {".license", "/META-INF/licenses/README_" + lang + ".txt"}};
+                for (String[] f : files) {
+                    String name = PREFIX + lang + f[0];
                     if (names.add(name)) {
                         zip.putNextEntry(new ZipEntry(name));
-                        zip.write(read(exec, SOURCE_DIR + lang + ext));
+                        zip.write(read(exec, f[1]));
                         zip.closeEntry();
                     }
                 }
-                index.append(lang).append('\n');
+                index.add(lang);
             }
-            if (names.add(INDEX)) {
-                zip.putNextEntry(new ZipEntry(INDEX));
-                zip.write(index.toString().getBytes(StandardCharsets.UTF_8));
-                zip.closeEntry();
+            StringBuilder text = new StringBuilder();
+            for (String lang : index) {
+                text.append(lang).append('\n');
             }
+            zip.putNextEntry(new ZipEntry(INDEX));
+            zip.write(text.toString().getBytes(StandardCharsets.UTF_8));
+            zip.closeEntry();
         } catch (IOException | BuildException | RuntimeException err) {
             if (!out.delete()) {
                 out.deleteOnExit();
@@ -151,8 +183,7 @@ final class SpellcheckDictionaries {
         return new ArrayList<String>(out);
     }
 
-    private static Set<String> available(Executor exec) throws IOException, BuildException {
-        byte[] index = read(exec, SOURCE_DIR + "languages.txt");
+    private static Set<String> parseLanguages(byte[] index) {
         Set<String> out = new LinkedHashSet<String>();
         for (String line : new String(index, StandardCharsets.UTF_8).split("\n")) {
             String t = line.trim();
@@ -171,13 +202,18 @@ final class SpellcheckDictionaries {
                     + ", was not resolved for this build.");
         }
         try (InputStream s = in) {
-            ByteArrayOutputStream b = new ByteArrayOutputStream();
-            byte[] buf = new byte[65536];
-            for (int n = s.read(buf); n >= 0; n = s.read(buf)) {
-                b.write(buf, 0, n);
-            }
-            return b.toByteArray();
+            return readAll(s);
         }
+    }
+
+    /** Reads to the end of the stream (or the current zip entry) without closing it. */
+    private static byte[] readAll(InputStream s) throws IOException {
+        ByteArrayOutputStream b = new ByteArrayOutputStream();
+        byte[] buf = new byte[65536];
+        for (int n = s.read(buf); n >= 0; n = s.read(buf)) {
+            b.write(buf, 0, n);
+        }
+        return b.toByteArray();
     }
 
     /**

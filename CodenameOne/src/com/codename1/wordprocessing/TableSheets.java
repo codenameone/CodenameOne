@@ -162,7 +162,9 @@ public final class TableSheets {
             }
             return new Table(id, cells, merges, header ? 1 : 0);
         } finally {
-            s.setHeaderRow(header);
+            if (header) {
+                s.setHeaderRow(true);
+            }
         }
     }
 
@@ -190,7 +192,11 @@ public final class TableSheets {
     /// the updated table, or `t` itself when nothing changed
     public static Table update(Table t, Sheet s) {
         boolean header = s.isHeaderRow();
-        s.setHeaderRow(false);
+        // setHeaderRow tells the sheet's listeners, and a TableBinding answers by calling this
+        // again: only touch it when it has to change
+        if (header) {
+            s.setHeaderRow(false);
+        }
         try {
             Table out = t;
             for (int r = 0; r < t.rows(); r++) {
@@ -204,7 +210,9 @@ public final class TableSheets {
             }
             return out;
         } finally {
-            s.setHeaderRow(header);
+            if (header) {
+                s.setHeaderRow(true);
+            }
         }
     }
 
@@ -233,7 +241,7 @@ public final class TableSheets {
             int at = first.text.plainText().indexOf(RichText.OBJECT);
             next = first.text.withObject(at, field.withResult(text));
         } else {
-            if (formula == null && plain(cell).equals(text)) {
+            if (formula == null && sameValue(plain(cell), text, s.getCellValue(r, c))) {
                 return cell;
             }
             TextStyle style = first.text.isEmpty() ? TextStyle.DEFAULT : first.text.styleAt(0);
@@ -435,6 +443,18 @@ public final class TableSheets {
 
     /// A number when the text is one (thousands separators and a trailing percent allowed),
     /// the text otherwise, null when empty.
+    /// Whether a cell's text already says what the sheet holds: "1,200" and a sheet showing
+    /// 1200 are the same number, and rewriting the cell would lose the author's formatting
+    /// (and, for a binding, echo every edit back as a second change).
+    private static boolean sameValue(String cellText, String sheetText, Object sheetValue) {
+        if (cellText.equals(sheetText)) {
+            return true;
+        }
+        Object v = value(cellText);
+        return v instanceof Double && sheetValue instanceof Number
+                && ((Double) v).doubleValue() == ((Number) sheetValue).doubleValue();
+    }
+
     static Object value(String text) {
         if (text.length() == 0) {
             return null;

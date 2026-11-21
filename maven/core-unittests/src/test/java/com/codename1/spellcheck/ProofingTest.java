@@ -32,8 +32,8 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /// Hunspell dictionaries, the spell and grammar checkers, and proofing in `DocumentView`.
@@ -119,7 +119,12 @@ class ProofingTest extends UITestBase {
         assertNotNull(s);
         assertTrue(s.isCorrect("hellos"));
         assertFalse(s.isCorrect("helo"));
-        assertSame(s, SpellChecker.forLanguage("xx_TEST"));
+        // each call gets its own checker: words added in one editor stay there
+        SpellChecker other = SpellChecker.forLanguage("xx_TEST");
+        assertNotSame(s, other);
+        s.addWord("helo");
+        assertTrue(s.isCorrect("helo"));
+        assertFalse(other.isCorrect("helo"));
         assertEquals(Arrays.asList("xx_TEST"), SpellChecker.getBundledLanguages());
         assertNull(SpellChecker.forLanguage("zz_NONE"));
     }

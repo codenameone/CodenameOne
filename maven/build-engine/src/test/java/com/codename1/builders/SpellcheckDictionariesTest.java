@@ -93,7 +93,7 @@ class SpellcheckDictionariesTest {
     @Test
     void addsTheHintedLanguagesAtTheRoot() throws Exception {
         File j = jar("b.jar", "app/Main.class", classWith("Lcom/codename1/spellcheck/SpellChecker;"),
-                "cn1dict_en_CA.dic", "mine");
+                "cn1dict_en_CA.dic", "mine", "cn1dict_languages.txt", "xx_MINE\n");
         BuildRequest r = new BuildRequest();
         r.putArgument("spellcheck.languages", "en-US, en_CA");
         File out = SpellcheckDictionaries.inject(new TestExecutor(), j, r);
@@ -104,7 +104,10 @@ class SpellcheckDictionariesTest {
             assertNotNull(z.getEntry("cn1dict_en_CA.aff"));
             // the application's own file wins
             assertEquals(4, z.getEntry("cn1dict_en_CA.dic").getSize());
-            assertEquals("en_US\nen_CA\n", new String(readAll(z, "cn1dict_languages.txt"),
+            assertTrue(new String(readAll(z, "cn1dict_en_US.license"), StandardCharsets.UTF_8)
+                    .contains("Copyright"));
+            // the application's own index is merged, not replaced
+            assertEquals("xx_MINE\nen_US\nen_CA\n", new String(readAll(z, "cn1dict_languages.txt"),
                     StandardCharsets.UTF_8));
         }
     }
