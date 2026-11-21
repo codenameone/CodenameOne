@@ -11,7 +11,17 @@ Papercut is a twin-stick arena shooter played on a page torn out of a school not
 
 Under the paper it's the kind of game that usually starts with an engine: crowds of sprites, a page that ripples like a spring grid when something bursts, two thumb sticks, keyboard, mouse and gamepad. In Papercut all of it is ordinary Codename One code, drawn with `com.codename1.gaming`, in one project with its server.
 
-![A Classic run in Papercut: the paper quill among folded creatures on a ruled notebook page, ink stains where they were cut](/developer-guide/img/papercut-arena.png)
+{{< guide-block >}}
+<video controls playsinline preload="metadata" poster="/papercut/papercut-desktop-poster.jpg" style="width:100%;max-width:960px;height:auto;display:block;margin:0 auto" aria-label="Papercut on a desktop: the home screen playing itself behind the menu, a Classic run with creatures cut into ink stains as the multiplier climbs, the result card, then a Fold run steering through paper gates">
+<source src="/papercut/papercut-desktop.mp4" type="video/mp4">
+<a href="/papercut/papercut-desktop.mp4">Download the Papercut desktop video</a>.
+</video>
+
+<video controls playsinline preload="metadata" poster="/papercut/papercut-mobile-poster.jpg" style="width:100%;max-width:360px;height:auto;display:block;margin:1.5rem auto 0" aria-label="The same session on a phone: the home screen, a Classic run, the result card and a Fold run">
+<source src="/papercut/papercut-mobile.mp4" type="video/mp4">
+<a href="/papercut/papercut-mobile.mp4">Download the Papercut phone video</a>.
+</video>
+{{< /guide-block >}}
 
 **[Generate your project](/initializr/)** · **[Read the guide](/developer-guide/papercut-implementors-guide/)** · **[Browse the source](https://github.com/codenameone/CodenameOne/tree/master/scripts/papercut)**
 
