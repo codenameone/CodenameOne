@@ -4549,6 +4549,51 @@ public final class Display extends CN1Constants {
         return Math.round(impl.convertToPixels((int) (dipCount * 1000), true) / 1000.0f);
     }
 
+    /// Whether the platform can route keyboard and input method text straight into a
+    /// `TextInputClient`, for components that draw and edit their own text.
+    ///
+    /// #### Returns
+    ///
+    /// true when `startTextInput` is supported
+    public boolean isTextInputSupported() {
+        return impl.isTextInputSupported();
+    }
+
+    /// Binds a component that edits its own text to the platform's keyboard and input methods.
+    ///
+    /// #### Parameters
+    ///
+    /// - `client`: the component receiving text
+    ///
+    /// - `config`: the keyboard configuration
+    ///
+    /// #### Returns
+    ///
+    /// a handle for `updateTextInputState` and `stopTextInput`, or null when unsupported
+    public Object startTextInput(TextInputClient client, TextInputConfig config) {
+        return impl.startTextInput(client, config);
+    }
+
+    /// Tells the platform the edited text or selection changed.
+    ///
+    /// #### Parameters
+    ///
+    /// - `handle`: from `startTextInput`
+    ///
+    /// - `state`: the new state
+    public void updateTextInputState(Object handle, TextInputState state) {
+        impl.updateTextInputState(handle, state);
+    }
+
+    /// Unbinds a client bound with `startTextInput`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `handle`: from `startTextInput`
+    public void stopTextInput(Object handle) {
+        impl.stopTextInput(handle);
+    }
+
     /// Checks to see if the platform supports a native image cache.
     ///
     /// #### Returns

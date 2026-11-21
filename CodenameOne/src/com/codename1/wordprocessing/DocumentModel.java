@@ -51,6 +51,7 @@ public class DocumentModel {
     private int undoLimit = 200;
     private int groupDepth;
     private boolean groupRecorded;
+    private String typing;
 
     /// A model holding a new empty document.
     public DocumentModel() {
@@ -96,6 +97,7 @@ public class DocumentModel {
             groupRecorded = groupDepth > 0;
         }
         redo.clear();
+        typing = null;
         replace(value);
     }
 
@@ -110,6 +112,7 @@ public class DocumentModel {
         }
         undo.clear();
         redo.clear();
+        typing = null;
         replace(value);
     }
 
@@ -174,6 +177,7 @@ public class DocumentModel {
             return false;
         }
         push(redo, document);
+        typing = null;
         replace(undo.remove(undo.size() - 1));
         return true;
     }
@@ -188,6 +192,7 @@ public class DocumentModel {
             return false;
         }
         push(undo, document);
+        typing = null;
         replace(redo.remove(redo.size() - 1));
         return true;
     }
@@ -289,5 +294,456 @@ public class DocumentModel {
     /// - `index`: the block to remove
     public void removeBlock(int index) {
         setDocument(document.remove(index));
+    }
+
+    // ------------------------------------------------------------------ finding paragraphs
+
+    /// A paragraph anywhere in the document: the body, table cells or notes.
+    ///
+    /// #### Parameters
+    ///
+    /// - `id`: the paragraph id
+    ///
+    /// #### Returns
+    ///
+    /// the paragraph, or null
+    public Paragraph findParagraph(String id) {
+        return find(document.blocks, id);
+    }
+
+    private static Paragraph find(List<Block> blocks, String id) {
+        for (Block b : blocks) {
+            if (b instanceof Paragraph) {
+                Paragraph p = (Paragraph) b;
+                if (p.id.equals(id)) {
+                    return p;
+                }
+                for (int i = 0; i < p.text.length(); i++) {
+                    Inline o = p.text.objectAt(i);
+                    if (o instanceof Note) {
+                        Paragraph q = find(((Note) o).blocks, id);
+                        if (q != null) {
+                            return q;
+                        }
+                    }
+                }
+            } else if (b instanceof Table) {
+                Table t = (Table) b;
+                for (int r = 0; r < t.rows(); r++) {
+                    for (int c = 0; c < t.columns(); c++) {
+                        Paragraph q = find(t.cell(r, c), id);
+                        if (q != null) {
+                            return q;
+                        }
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
+    /// Changes the block list holding a paragraph.
+    interface ListEdit {
+        List<Block> apply(List<Block> list, int index);
+    }
+
+    /// Applies an edit to the list that holds a paragraph, wherever it is, rebuilding only the
+    /// blocks on the way to it.
+    static List<Block> editList(List<Block> blocks, String id, ListEdit edit) {
+        for (int i = 0; i < blocks.size(); i++) {
+            Block b = blocks.get(i);
+            if (b instanceof Paragraph) {
+                Paragraph p = (Paragraph) b;
+                if (p.id.equals(id)) {
+                    return edit.apply(new ArrayList<Block>(blocks), i);
+                }
+                for (int k = 0; k < p.text.length(); k++) {
+                    Inline o = p.text.objectAt(k);
+                    if (o instanceof Note) {
+                        Note n = (Note) o;
+                        List<Block> inner = editList(n.blocks, id, edit);
+                        if (inner != null) {
+                            List<Block> out = new ArrayList<Block>(blocks);
+                            out.set(i, p.withText(p.text.withObject(k,
+                                    new Note(n.id, n.kind, n.mark, inner))));
+                            return out;
+                        }
+                    }
+                }
+            } else if (b instanceof Table) {
+                Table t = (Table) b;
+                for (int r = 0; r < t.rows(); r++) {
+                    for (int c = 0; c < t.columns(); c++) {
+                        List<Block> inner = editList(t.cell(r, c), id, edit);
+                        if (inner != null) {
+                            List<Block> out = new ArrayList<Block>(blocks);
+                            out.set(i, withCell(t, r, c, inner));
+                            return out;
+                        }
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
+    static Table withCell(Table t, int row, int column, List<Block> cell) {
+        List<List<List<Block>>> rows = new ArrayList<List<List<Block>>>();
+        for (int r = 0; r < t.rows(); r++) {
+            List<List<Block>> cells = new ArrayList<List<Block>>();
+            for (int c = 0; c < t.columns(); c++) {
+                cells.add(r == row && c == column ? cell : t.cell(r, c));
+            }
+            rows.add(cells);
+        }
+        return new Table(t.id, rows, t.merges, t.headerRows);
+    }
+
+    private Document withList(String id, ListEdit e) {
+        List<Block> out = editList(document.blocks, id, e);
+        if (out == null) {
+            throw new IllegalArgumentException("No paragraph " + id);
+        }
+        return document.withBlocks(out);
+    }
+
+    /// Replaces a paragraph, wherever it is, by one with the same id.
+    ///
+    /// #### Parameters
+    ///
+    /// - `p`: the new paragraph
+    public void replaceParagraph(final Paragraph p) {
+        setDocument(withList(p.id, new SetAt(p)));
+    }
+
+    // ------------------------------------------------------------------ text edits
+
+    /// Inserts text at a position, as typing does.
+    ///
+    /// #### Parameters
+    ///
+    /// - `at`: where
+    ///
+    /// - `text`: the text; a line break inserts a soft break within the paragraph
+    ///
+    /// - `style`: its style, or null to continue the style before the position
+    ///
+    /// #### Returns
+    ///
+    /// the position after the inserted text
+    public TextPosition insertText(TextPosition at, String text, TextStyle style) {
+        Paragraph p = paragraph(at);
+        int offset = clamp(at.offset, p);
+        TextStyle s = style != null ? style : typingStyle(p, offset);
+        RichText t = p.text.insert(offset, RichText.of(text, s));
+        boolean wordEnd = text.indexOf(' ') >= 0 || text.indexOf('\n') >= 0 || text.length() > 1;
+        replace(p.withText(t), wordEnd ? null : "type:" + p.id);
+        if (wordEnd) {
+            typing = null;
+        }
+        return new TextPosition(p.id, offset + text.length());
+    }
+
+    /// Inserts an inline object: a picture, a component, a field or a note.
+    ///
+    /// #### Parameters
+    ///
+    /// - `at`: where
+    ///
+    /// - `object`: the object
+    ///
+    /// #### Returns
+    ///
+    /// the position after it
+    public TextPosition insertObject(TextPosition at, Inline object) {
+        Paragraph p = paragraph(at);
+        int offset = clamp(at.offset, p);
+        RichText t = p.text.insert(offset, RichText.of(object, typingStyle(p, offset)));
+        replace(p.withText(t), null);
+        return new TextPosition(p.id, offset + 1);
+    }
+
+    /// The style typing at a position continues: that of the character before it, without a
+    /// link or a revision.
+    ///
+    /// #### Parameters
+    ///
+    /// - `p`: the paragraph
+    ///
+    /// - `offset`: the position
+    ///
+    /// #### Returns
+    ///
+    /// the style
+    public static TextStyle typingStyle(Paragraph p, int offset) {
+        if (p.text.isEmpty()) {
+            return TextStyle.DEFAULT;
+        }
+        TextStyle s = p.text.styleAt(Math.max(0, Math.min(p.text.length() - 1, offset - 1)));
+        return s.withLink(null).withRevision(null);
+    }
+
+    /// Deletes the text between two positions, which may lie in different paragraphs of the
+    /// same block list; the paragraphs between them go, and the last one's remaining text joins
+    /// the first.
+    ///
+    /// #### Parameters
+    ///
+    /// - `from`: one end
+    ///
+    /// - `to`: the other end
+    ///
+    /// #### Returns
+    ///
+    /// the position where the deleted text was
+    public TextPosition delete(TextPosition from, TextPosition to) {
+        final TextPosition[] ends = order(from, to);
+        final Paragraph a = paragraph(ends[0]);
+        final int start = clamp(ends[0].offset, a);
+        if (ends[0].paragraphId.equals(ends[1].paragraphId)) {
+            int end = clamp(ends[1].offset, a);
+            if (end > start) {
+                replace(a.withText(a.text.delete(start, end)), null);
+            }
+            return new TextPosition(a.id, start);
+        }
+        final Paragraph b = paragraph(ends[1]);
+        final int end = clamp(ends[1].offset, b);
+        setDocument(withList(a.id, new JoinRange(a, start, b, end)));
+        typing = null;
+        return new TextPosition(a.id, start);
+    }
+
+    /// Splits a paragraph in two at a position, as pressing Enter does. The new paragraph keeps
+    /// the old one's formatting, except that a heading is followed by a normal paragraph.
+    ///
+    /// #### Parameters
+    ///
+    /// - `at`: where
+    ///
+    /// #### Returns
+    ///
+    /// the position at the start of the new paragraph
+    public TextPosition splitParagraph(TextPosition at) {
+        final Paragraph p = paragraph(at);
+        final int offset = clamp(at.offset, p);
+        final String id = nextId();
+        setDocument(withList(p.id, new Split(p, offset, id)).withNextId(document.nextId + 1));
+        typing = null;
+        return new TextPosition(id, 0);
+    }
+
+    /// Joins a paragraph to the one before it in its block list, as Backspace at its start
+    /// does.
+    ///
+    /// #### Parameters
+    ///
+    /// - `paragraphId`: the paragraph
+    ///
+    /// #### Returns
+    ///
+    /// the position at the join, or null when there is no paragraph before it to join
+    public TextPosition joinWithPrevious(final String paragraphId) {
+        JoinPrevious join = new JoinPrevious();
+        List<Block> out = editList(document.blocks, paragraphId, join);
+        if (out == null || join.result == null) {
+            return null;
+        }
+        setDocument(document.withBlocks(out));
+        typing = null;
+        return join.result;
+    }
+
+    /// Changes the character style of the text between two positions in one paragraph.
+    ///
+    /// #### Parameters
+    ///
+    /// - `from`: one end
+    ///
+    /// - `to`: the other end, in the same paragraph
+    ///
+    /// - `mapper`: computes each run's new style
+    public void restyle(TextPosition from, TextPosition to, RichText.StyleMapper mapper) {
+        TextPosition[] ends = order(from, to);
+        if (!ends[0].paragraphId.equals(ends[1].paragraphId)) {
+            throw new IllegalArgumentException("Both ends must be in one paragraph");
+        }
+        Paragraph p = paragraph(ends[0]);
+        int a = clamp(ends[0].offset, p);
+        int b = clamp(ends[1].offset, p);
+        if (b > a) {
+            replace(p.withText(p.text.restyle(a, b, mapper)), null);
+            typing = null;
+        }
+    }
+
+    private String nextId() {
+        return document.newId('p');
+    }
+
+    private void editTyping(Document value, String group) {
+        if (group != null && group.equals(typing) && groupDepth == 0 && !undo.isEmpty()) {
+            // the next keystroke of the same word: no new undo step
+            redo.clear();
+            replace(value);
+        } else {
+            setDocument(value);
+        }
+        typing = group;
+    }
+
+    private void replace(final Paragraph p, String group) {
+        editTyping(withList(p.id, new SetAt(p)), group);
+    }
+
+    private Paragraph paragraph(TextPosition at) {
+        Paragraph p = findParagraph(at.paragraphId);
+        if (p == null) {
+            throw new IllegalArgumentException("No paragraph " + at.paragraphId);
+        }
+        return p;
+    }
+
+    private static int clamp(int offset, Paragraph p) {
+        return Math.max(0, Math.min(p.text.length(), offset));
+    }
+
+    /// Orders two positions by where they are in the document.
+    ///
+    /// #### Parameters
+    ///
+    /// - `a`: one position
+    ///
+    /// - `b`: the other
+    ///
+    /// #### Returns
+    ///
+    /// the two, earlier first
+    public TextPosition[] order(TextPosition a, TextPosition b) {
+        if (a.paragraphId.equals(b.paragraphId)) {
+            return a.offset <= b.offset ? new TextPosition[] {a, b} : new TextPosition[] {b, a};
+        }
+        List<String> ids = new ArrayList<String>();
+        collectIds(document.blocks, ids);
+        int ia = ids.indexOf(a.paragraphId);
+        int ib = ids.indexOf(b.paragraphId);
+        return ia <= ib ? new TextPosition[] {a, b} : new TextPosition[] {b, a};
+    }
+
+    /// Every paragraph id in reading order, cells and notes included.
+    static void collectIds(List<Block> blocks, List<String> out) {
+        for (Block b : blocks) {
+            if (b instanceof Paragraph) {
+                Paragraph p = (Paragraph) b;
+                out.add(p.id);
+                for (int i = 0; i < p.text.length(); i++) {
+                    Inline o = p.text.objectAt(i);
+                    if (o instanceof Note) {
+                        collectIds(((Note) o).blocks, out);
+                    }
+                }
+            } else if (b instanceof Table) {
+                Table t = (Table) b;
+                for (int r = 0; r < t.rows(); r++) {
+                    for (int c = 0; c < t.columns(); c++) {
+                        collectIds(t.cell(r, c), out);
+                    }
+                }
+            }
+        }
+    }
+    /// Puts a paragraph in place of the one at the index.
+    private static final class SetAt implements ListEdit {
+        private final Paragraph p;
+
+        SetAt(Paragraph p) {
+            this.p = p;
+        }
+
+        @Override
+        public List<Block> apply(List<Block> list, int index) {
+            list.set(index, p);
+            return list;
+        }
+    }
+
+    /// Deletes from an offset of one paragraph to an offset of a later one in the same list.
+    private static final class JoinRange implements ListEdit {
+        private final Paragraph a;
+        private final int start;
+        private final Paragraph b;
+        private final int end;
+
+        JoinRange(Paragraph a, int start, Paragraph b, int end) {
+            this.a = a;
+            this.start = start;
+            this.b = b;
+            this.end = end;
+        }
+
+        @Override
+        public List<Block> apply(List<Block> list, int index) {
+            int last = -1;
+            for (int i = index + 1; i < list.size(); i++) {
+                if (list.get(i) instanceof Paragraph && ((Paragraph) list.get(i)).id.equals(b.id)) {
+                    last = i;
+                    break;
+                }
+            }
+            if (last < 0) {
+                // not in the same list: delete to the end of the first paragraph only
+                list.set(index, a.withText(a.text.delete(start, a.text.length())));
+                return list;
+            }
+            RichText joined = a.text.substring(0, start).append(b.text.substring(end, b.text.length()));
+            list.set(index, a.withText(joined));
+            for (int i = last; i > index; i--) {
+                list.remove(i);
+            }
+            return list;
+        }
+    }
+
+    /// Splits a paragraph at an offset into it and a new paragraph.
+    private static final class Split implements ListEdit {
+        private final Paragraph p;
+        private final int offset;
+        private final String id;
+
+        Split(Paragraph p, int offset, String id) {
+            this.p = p;
+            this.offset = offset;
+            this.id = id;
+        }
+
+        @Override
+        public List<Block> apply(List<Block> list, int index) {
+            list.set(index, p.withText(p.text.substring(0, offset)));
+            Paragraph tail = p.withId(id).withText(p.text.substring(offset, p.text.length()))
+                    .withPageBreak(false).withListStart(0);
+            if (p.style.startsWith("Heading") || "Title".equals(p.style)) {
+                tail = tail.withStyle("Normal");
+            }
+            list.add(index + 1, tail);
+            return list;
+        }
+    }
+
+    /// Joins a paragraph to the paragraph before it.
+    private static final class JoinPrevious implements ListEdit {
+        TextPosition result;
+
+        @Override
+        public List<Block> apply(List<Block> list, int index) {
+            if (index == 0 || !(list.get(index - 1) instanceof Paragraph)) {
+                return list;
+            }
+            Paragraph prev = (Paragraph) list.get(index - 1);
+            Paragraph p = (Paragraph) list.get(index);
+            result = new TextPosition(prev.id, prev.text.length());
+            list.set(index - 1, prev.withText(prev.text.append(p.text)));
+            list.remove(index);
+            return list;
+        }
     }
 }

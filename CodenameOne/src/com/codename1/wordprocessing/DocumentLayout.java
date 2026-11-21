@@ -383,10 +383,10 @@ public final class DocumentLayout {
 
     private static String fieldKind(String instruction) {
         String s = Ids.asciiLower(instruction.trim());
-        if (s.equals("page") || s.startsWith("page ")) {
+        if ("page".equals(s) || s.startsWith("page ")) {
             return "PAGE";
         }
-        if (s.equals("numpages") || s.startsWith("numpages ")) {
+        if ("numpages".equals(s) || s.startsWith("numpages ")) {
             return "NUMPAGES";
         }
         return null;
@@ -730,7 +730,7 @@ public final class DocumentLayout {
 
     // ------------------------------------------------------------------ pages
 
-    private final class PageBuilder {
+    private static final class PageBuilder {
         final List<LayoutItem> items = new ArrayList<LayoutItem>();
         final List<Slice> notes = new ArrayList<Slice>();
         float y;
@@ -753,7 +753,7 @@ public final class DocumentLayout {
         Table headersOf = null;
         for (int i = 0; i < slices.size(); i++) {
             Slice s = slices.get(i);
-            if (s.table != headersOf) {
+            if (s.table != headersOf) { //NOPMD CompareObjectsWithEquals - identity of the table being paged
                 headers.clear();
                 headersOf = s.table;
             }
