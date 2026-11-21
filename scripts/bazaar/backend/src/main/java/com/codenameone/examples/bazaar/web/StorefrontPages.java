@@ -374,7 +374,7 @@ public class StorefrontPages {
             vv.title = v.title().length() > 0 ? v.title() : "Default";
             vv.price = Money.format(pricer == null ? v.priceCents()
                     : pricer.price(v.id(), v.priceCents()), shown);
-            vv.available = sellable(v);
+            vv.available = sellable(v) || carts.preorderAllowance(v.id()) > 0;
             vv.selected = v == chosen;
             view.variants.add(vv);
         }
@@ -395,6 +395,10 @@ public class StorefrontPages {
                 view.marketNote = "Shown in " + shown + "; checkout charges " + shown + ".";
             }
             view.available = sellable(chosen);
+            if (!view.available && carts.preorderAllowance(chosen.id()) > 0) {
+                view.available = true;
+                view.preorder = true;
+            }
             java.util.List<com.codenameone.examples.bazaar.api.MetafieldValueDto> fields =
                     metafields.storefront(store.getId(), "PRODUCT", p.id());
             for (int iter = 0; iter < fields.size(); iter++) {
@@ -416,7 +420,8 @@ public class StorefrontPages {
                 view.plans.add(pv);
             }
         }
-        view.availability = view.available ? "https://schema.org/InStock"
+        view.availability = view.preorder ? "https://schema.org/PreOrder"
+                : view.available ? "https://schema.org/InStock"
                 : "https://schema.org/OutOfStock";
         view.ratingCount = p.ratingCount();
         view.rating = p.ratingCount() > 0 ? stars10(p.rating()) : "";
@@ -517,6 +522,13 @@ public class StorefrontPages {
     /// none made: a crawler following the cart link must not fill the table.
     public void cart(String handle, Model model, HttpServer.Request request) throws IOException {
         Store store = stores.activeStore(handle);
+        // `?r=` is the abandoned-cart reminder's recovery token: it puts that
+        // cart back into this session.
+        String recovery = param(request, "r");
+        String recovered = recovery == null ? null : carts.recover(store.getId(), recovery);
+        if (recovered != null) {
+            remember(request, store, recovered);
+        }
         String token = token(request, store, false);
         CartDto dto = token == null ? null : carts.get(store.getId(), null, token);
         PageMeta meta = meta(store, request, "/s/" + store.getHandle() + "/cart");
@@ -538,6 +550,7 @@ public class StorefrontPages {
                 lv.unit = Money.format(l.priceCents(), store.getCurrency());
                 lv.total = Money.format(l.priceCents() * l.quantity(), store.getCurrency());
                 lv.available = l.available();
+                lv.preorder = l.preorder();
                 lv.art = new Art(l.productId(), l.photoId(), l.title());
                 view.lines.add(lv);
                 view.count += l.quantity();

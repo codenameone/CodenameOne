@@ -203,6 +203,8 @@ class OpsTest {
         // The legacy answer while nothing is assigned.
         assertEquals(200, status(picker, get(board), null));
         assertEquals(403, status(picker, get(api(s, "/reports")), null));
+        assertEquals(403, status(picker, get(api(s, "/analytics")), null));
+        assertEquals(200, status(picker, get(api(s, "/inventory")), null));
         assertEquals(403, status(picker, get(api(s, "/permission-sets")), null));
         Map set = json(s.owner, post(api(s, "/permission-sets")),
                 "{\"name\":\"Analyst\",\"grants\":\"reports=R\"}");
@@ -211,6 +213,11 @@ class OpsTest {
                 + "\",\"locationId\":\"\",\"setId\":\"" + set.get("id") + "\"}");
         assertEquals(200, status(picker, get(api(s, "/reports")), null));
         assertEquals(403, status(picker, get(board), null), "inventory is not in the set");
+        // The stock and analytics routes answer to the set too, both ways.
+        assertEquals(403, status(picker, get(api(s, "/inventory")), null), "stock follows the set");
+        assertEquals(200, status(picker, get(api(s, "/analytics")), null), "reports=R reads analytics");
+        assertEquals(200, status(picker, get(api(s, "/analytics/funnel")), null));
+        assertEquals(200, status(s.owner, get(api(s, "/inventory")), null), "the owner keeps it all");
         assertEquals(403, status(picker, post(api(s, "/reports")),
                 "{\"name\":\"x\",\"dimension\":\"day\"}"), "read is not write");
         // The owner is never restricted, and cannot be given a set.

@@ -314,7 +314,10 @@ public class Emails {
         Store s = stores.findById(cart.getStoreId());
         Body b = new Body(s, "You left something behind");
         b.para("Your cart at " + s.getName() + " is saved. Pick up where you left off.");
-        b.button("Back to your cart", urls.appCart(null, s.getHandle(), cart.getToken()));
+        b.button("Back to your cart", urls.absolute(null,
+                SiteUrls.recoverCart(s.getHandle(), cart.getToken())));
+        b.para("Shopping in the app? Open your cart there: "
+                + urls.appCart(null, s.getHandle(), cart.getToken()));
         return builder(s, to, "Your cart at " + s.getName() + " is waiting", b).build();
     }
 

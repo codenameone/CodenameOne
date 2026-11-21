@@ -293,6 +293,41 @@ public class Carts {
         return cart;
     }
 
+    /// Units of `variantId` still sellable ahead of stock ([Quoter#preorderAllowance]).
+    public int preorderAllowance(String variantId) throws IOException {
+        return quoter.preorderAllowance(variantId);
+    }
+
+    /// The guest cart token a reminder's recovery `token` restores in a web
+    /// session, or null when it names no cart of this store. A guest cart is
+    /// answered as it is; a signed-in shopper's cart is never handed to a
+    /// session by its token (the web cart is the guest one), so its lines are
+    /// copied into a fresh guest cart instead and the account's cart is left
+    /// untouched.
+    @Transactional(rollbackFor = IOException.class)
+    public String recover(String storeId, String token) throws IOException {
+        Cart found = token == null || token.length() == 0 || token.length() > 64 ? null
+                : carts.findByToken(token);
+        if (found == null || !found.getStoreId().equals(storeId)) {
+            return null;
+        }
+        if (found.getUsername().length() == 0) {
+            return found.getToken();
+        }
+        Cart guest = cart(storeId, null, null);
+        List<CartLine> have = lines.findByCartId(found.getId());
+        for (int iter = 0; iter < have.size() && iter < MAX_LINES; iter++) {
+            CartLine line = new CartLine();
+            line.setId(Ids.next());
+            line.setCartId(guest.getId());
+            line.setVariantId(have.get(iter).getVariantId());
+            line.setQuantity(have.get(iter).getQuantity());
+            line.setAddedAt(Instant.now());
+            lines.insert(line);
+        }
+        return guest.getToken();
+    }
+
     private void touch(Cart cart) {
         cart.setUpdatedAt(Instant.now());
         carts.save(cart);

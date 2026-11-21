@@ -57,6 +57,7 @@ import com.codenameone.examples.bazaar.repository.StockTransferRepository;
 import com.codenameone.examples.bazaar.repository.SupplierRepository;
 import com.codenameone.examples.bazaar.repository.TransferLineRepository;
 import com.codenameone.examples.bazaar.repository.VariantRepository;
+import com.codenameone.examples.bazaar.ops.Perms;
 import com.codenameone.examples.bazaar.store.StoreAccess;
 
 import com.codenameone.examples.bazaar.ops.Timelines;
@@ -126,7 +127,7 @@ public class Stock {
     @Transactional(readOnly = true)
     public List<LevelDto> levels(String username, String storeId, String locationId,
             String productId, boolean lowOnly) throws IOException {
-        access.requireStaff(username, storeId, StoreAccess.STOCK);
+        access.requireArea(username, storeId, Perms.INVENTORY, false, StoreAccess.STOCK);
         Names names = new Names(storeId);
         List<InventoryLevel> all = levels.findByStoreId(storeId);
         List<LevelDto> out = new ArrayList<LevelDto>();
@@ -154,7 +155,7 @@ public class Stock {
 
     @Transactional(rollbackFor = IOException.class)
     public LevelDto adjust(String username, String storeId, AdjustDto adjust) throws IOException {
-        access.requireStaff(username, storeId, StoreAccess.STOCK);
+        access.requireArea(username, storeId, Perms.INVENTORY, true, StoreAccess.STOCK);
         if (adjust == null || adjust.delta() == 0) {
             throw new ResponseStatusException(400, "Say how many units to add or take away");
         }
@@ -169,7 +170,7 @@ public class Stock {
 
     @Transactional(rollbackFor = IOException.class)
     public LevelDto count(String username, String storeId, AdjustDto count) throws IOException {
-        access.requireStaff(username, storeId, StoreAccess.STOCK);
+        access.requireArea(username, storeId, Perms.INVENTORY, true, StoreAccess.STOCK);
         if (count == null) {
             throw new ResponseStatusException(400, "Nothing counted");
         }
@@ -182,7 +183,7 @@ public class Stock {
     @Transactional(rollbackFor = IOException.class)
     public LevelDto reorderPoint(String username, String storeId, AdjustDto point)
             throws IOException {
-        access.requireStaff(username, storeId, StoreAccess.STOCK);
+        access.requireArea(username, storeId, Perms.INVENTORY, true, StoreAccess.STOCK);
         if (point == null || point.quantity() < 0) {
             throw new ResponseStatusException(400, "A reorder point is zero or more");
         }
@@ -196,7 +197,7 @@ public class Stock {
     @Transactional(readOnly = true)
     public List<MoveDto> moves(String username, String storeId, String variantId,
             String locationId, String limit) throws IOException {
-        access.requireStaff(username, storeId, StoreAccess.STOCK);
+        access.requireArea(username, storeId, Perms.INVENTORY, false, StoreAccess.STOCK);
         int max = 200;
         if (limit != null && limit.length() > 0 && limit.length() < 5) {
             try {
@@ -275,7 +276,7 @@ public class Stock {
 
     @Transactional(readOnly = true)
     public List<TransferDto> transfers(String username, String storeId) throws IOException {
-        access.requireStaff(username, storeId, StoreAccess.STOCK);
+        access.requireArea(username, storeId, Perms.INVENTORY, false, StoreAccess.STOCK);
         Names names = new Names(storeId);
         List<StockTransfer> all = transfers.findByStoreIdOrderByCreatedAtDesc(storeId);
         List<TransferDto> out = new ArrayList<TransferDto>();
@@ -288,7 +289,7 @@ public class Stock {
     @Transactional(rollbackFor = IOException.class)
     public TransferDto createTransfer(String username, String storeId, TransferDto wanted)
             throws IOException {
-        access.requireStaff(username, storeId, StoreAccess.STOCK);
+        access.requireArea(username, storeId, Perms.INVENTORY, true, StoreAccess.STOCK);
         if (wanted == null || wanted.lines() == null || wanted.lines().isEmpty()) {
             throw new ResponseStatusException(400, "A transfer moves at least one variant");
         }
@@ -330,7 +331,7 @@ public class Stock {
     @Transactional(rollbackFor = IOException.class)
     public TransferDto sendTransfer(String username, String storeId, String transferId)
             throws IOException {
-        access.requireStaff(username, storeId, StoreAccess.STOCK);
+        access.requireArea(username, storeId, Perms.INVENTORY, true, StoreAccess.STOCK);
         StockTransfer transfer = transfer(storeId, transferId, DRAFT);
         List<TransferLine> lines = transferLines.findByTransferId(transferId);
         for (int iter = 0; iter < lines.size(); iter++) {
@@ -356,7 +357,7 @@ public class Stock {
     @Transactional(rollbackFor = IOException.class)
     public TransferDto receiveTransfer(String username, String storeId, String transferId,
             ReceiveDto receive) throws IOException {
-        access.requireStaff(username, storeId, StoreAccess.STOCK);
+        access.requireArea(username, storeId, Perms.INVENTORY, true, StoreAccess.STOCK);
         StockTransfer transfer = transfer(storeId, transferId, IN_TRANSIT, PARTIAL);
         String to = transfer.getToLocationId();
         List<TransferLine> lines = transferLines.findByTransferId(transferId);
@@ -394,7 +395,7 @@ public class Stock {
     @Transactional(rollbackFor = IOException.class)
     public TransferDto cancelTransfer(String username, String storeId, String transferId)
             throws IOException {
-        access.requireStaff(username, storeId, StoreAccess.STOCK);
+        access.requireArea(username, storeId, Perms.INVENTORY, true, StoreAccess.STOCK);
         StockTransfer transfer = transfer(storeId, transferId, DRAFT, IN_TRANSIT, PARTIAL);
         if (!DRAFT.equals(transfer.getStatus())) {
             String from = transfer.getFromLocationId();
@@ -452,7 +453,7 @@ public class Stock {
 
     @Transactional(readOnly = true)
     public List<SupplierDto> suppliers(String username, String storeId) throws IOException {
-        access.requireStaff(username, storeId, StoreAccess.STOCK);
+        access.requireArea(username, storeId, Perms.INVENTORY, false, StoreAccess.STOCK);
         List<Supplier> all = suppliers.findByStoreIdOrderByNameAsc(storeId);
         List<SupplierDto> out = new ArrayList<SupplierDto>();
         for (int iter = 0; iter < all.size(); iter++) {
@@ -465,7 +466,7 @@ public class Stock {
     @Transactional(rollbackFor = IOException.class)
     public SupplierDto saveSupplier(String username, String storeId, SupplierDto wanted)
             throws IOException {
-        access.requireStaff(username, storeId, StoreAccess.MANAGERS);
+        access.requireArea(username, storeId, Perms.INVENTORY, true, StoreAccess.MANAGERS);
         if (wanted == null) {
             throw new ResponseStatusException(400, "Nothing to save");
         }
@@ -495,7 +496,7 @@ public class Stock {
     @Transactional(rollbackFor = IOException.class)
     public SupplierDto deleteSupplier(String username, String storeId, String supplierId)
             throws IOException {
-        access.requireStaff(username, storeId, StoreAccess.MANAGERS);
+        access.requireArea(username, storeId, Perms.INVENTORY, true, StoreAccess.MANAGERS);
         Supplier supplier = supplier(storeId, supplierId);
         List<PurchaseOrder> placed = orders.findBySupplierId(supplierId);
         for (int iter = 0; iter < placed.size(); iter++) {
@@ -527,7 +528,7 @@ public class Stock {
     @Transactional(readOnly = true)
     public List<PurchaseOrderDto> purchaseOrders(String username, String storeId)
             throws IOException {
-        access.requireStaff(username, storeId, StoreAccess.STOCK);
+        access.requireArea(username, storeId, Perms.INVENTORY, false, StoreAccess.STOCK);
         Names names = new Names(storeId);
         List<PurchaseOrder> all = orders.findByStoreIdOrderByCreatedAtDesc(storeId);
         List<PurchaseOrderDto> out = new ArrayList<PurchaseOrderDto>();
@@ -540,14 +541,14 @@ public class Stock {
     @Transactional(readOnly = true)
     public PurchaseOrderDto purchaseOrder(String username, String storeId, String orderId)
             throws IOException {
-        access.requireStaff(username, storeId, StoreAccess.STOCK);
+        access.requireArea(username, storeId, Perms.INVENTORY, false, StoreAccess.STOCK);
         return toDto(order(storeId, orderId), new Names(storeId));
     }
 
     @Transactional(rollbackFor = IOException.class)
     public PurchaseOrderDto createPurchaseOrder(String username, String storeId,
             PurchaseOrderDto wanted) throws IOException {
-        access.requireStaff(username, storeId, StoreAccess.MANAGERS);
+        access.requireArea(username, storeId, Perms.INVENTORY, true, StoreAccess.MANAGERS);
         if (wanted == null || wanted.lines() == null || wanted.lines().isEmpty()) {
             throw new ResponseStatusException(400, "A purchase order has at least one line");
         }
@@ -594,7 +595,7 @@ public class Stock {
     @Transactional(rollbackFor = IOException.class)
     public PurchaseOrderDto placePurchaseOrder(String username, String storeId, String orderId)
             throws IOException {
-        access.requireStaff(username, storeId, StoreAccess.MANAGERS);
+        access.requireArea(username, storeId, Perms.INVENTORY, true, StoreAccess.MANAGERS);
         PurchaseOrder order = order(storeId, orderId, DRAFT);
         List<PurchaseLine> lines = orderLines.findByPurchaseOrderId(orderId);
         for (int iter = 0; iter < lines.size(); iter++) {
@@ -609,7 +610,7 @@ public class Stock {
     @Transactional(rollbackFor = IOException.class)
     public PurchaseOrderDto receivePurchaseOrder(String username, String storeId, String orderId,
             ReceiveDto receive) throws IOException {
-        access.requireStaff(username, storeId, StoreAccess.STOCK);
+        access.requireArea(username, storeId, Perms.INVENTORY, true, StoreAccess.STOCK);
         PurchaseOrder order = order(storeId, orderId, ORDERED, PARTIAL);
         String at = order.getLocationId();
         List<PurchaseLine> lines = orderLines.findByPurchaseOrderId(orderId);
@@ -645,7 +646,7 @@ public class Stock {
     @Transactional(rollbackFor = IOException.class)
     public PurchaseOrderDto cancelPurchaseOrder(String username, String storeId, String orderId)
             throws IOException {
-        access.requireStaff(username, storeId, StoreAccess.MANAGERS);
+        access.requireArea(username, storeId, Perms.INVENTORY, true, StoreAccess.MANAGERS);
         PurchaseOrder order = order(storeId, orderId, DRAFT, ORDERED, PARTIAL);
         if (!DRAFT.equals(order.getStatus())) {
             List<PurchaseLine> lines = orderLines.findByPurchaseOrderId(orderId);

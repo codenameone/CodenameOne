@@ -20,7 +20,7 @@ package com.codenameone.examples.bazaar.api;
 
 import com.codename1.annotations.Mapped;
 
-/// A cart line priced from the variant as it is now. `available` is false when the stores cannot supply `quantity`; `availableQty` is how many they can.
+/// A cart line priced from the variant as it is now. `available` is false when the stores cannot supply `quantity`; `availableQty` is how many they can. `preorder` marks a line sold ahead of stock.
 @Mapped
 public record CartLineDto(
         String id,
@@ -35,5 +35,6 @@ public record CartLineDto(
         long discountCents,
         long taxCents,
         boolean available,
-        int availableQty) {
+        int availableQty,
+        boolean preorder) {
 }

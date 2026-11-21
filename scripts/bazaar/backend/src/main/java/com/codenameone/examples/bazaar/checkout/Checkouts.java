@@ -202,6 +202,12 @@ public class Checkouts {
         List<String[]> held = new ArrayList<String[]>();
         for (int iter = 0; iter < quote.lines.size(); iter++) {
             Quote.Line line = quote.lines.get(iter);
+            if (line.preorder) {
+                // Sold ahead of stock: there is nothing on hand to hold, so
+                // the line is placed with no location and reserves nothing;
+                // Quoter#preorderAllowance counts it against the allowance.
+                continue;
+            }
             String location = pickup ? quote.shipping.rate.getLocationId()
                     : inventory.pickLocation(storeId, line.variant.getId(), line.price.quantity);
             if (location == null || !inventory.reserve(storeId, line.variant.getId(), location,

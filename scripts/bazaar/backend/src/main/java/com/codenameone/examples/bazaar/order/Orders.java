@@ -951,6 +951,7 @@ public class Orders {
             line.setDiscountCents(q.price.discountCents);
             line.setTaxCents(q.price.taxCents);
             line.setWeightGrams(q.variant.getWeightGrams());
+            line.setPreorder(q.preorder);
             // A custom sale item (no variant) is held nowhere: nothing to
             // release, ship or restock for it later.
             line.setLocationId(locations == null || locations[iter] == null

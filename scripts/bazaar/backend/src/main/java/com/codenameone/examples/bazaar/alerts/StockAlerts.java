@@ -321,8 +321,12 @@ public class StockAlerts {
     /// the pre-order limit, or the incoming stock when no limit is set.
     @Transactional(readOnly = true)
     public int preorderable(String variantId) {
-        Preorder p = preorders.findByVariantId(variantId);
-        if (p == null || !p.isEnabled() || p.getShipDate().toEpochMilli() <= System.currentTimeMillis()) {
+        return preorderable(preorders.findByVariantId(variantId), System.currentTimeMillis());
+    }
+
+    /// [#preorderable(String)] for a row already read, as of `now`.
+    public static int preorderable(Preorder p, long now) {
+        if (p == null || !p.isEnabled() || p.getShipDate().toEpochMilli() <= now) {
             return 0;
         }
         return p.getLimitQty() > 0 ? p.getLimitQty() : p.getIncomingQty();

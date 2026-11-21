@@ -75,7 +75,18 @@ public class OrderLine {
     @Column(nullable = false, type = "VARCHAR(32)")
     private String locationId = "";
 
+    @Column(nullable = false)
+    private boolean preorder;
+
     public OrderLine() {
+    }
+
+    public boolean isPreorder() {
+        return preorder;
+    }
+
+    public void setPreorder(boolean preorder) {
+        this.preorder = preorder;
     }
 
     public String getId() {

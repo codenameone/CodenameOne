@@ -47,6 +47,8 @@ public final class Quote {
         public PriceLine price;
         /// Units the store can supply; [Integer#MAX_VALUE] when untracked.
         public int availableQty;
+        /// Sold ahead of stock: nothing is reserved for it at checkout.
+        public boolean preorder;
 
         public boolean available() {
             return availableQty >= price.quantity;
@@ -117,7 +119,7 @@ public final class Quote {
                     line.product.getPhotoId(), line.price.quantity, line.price.unitCents,
                     line.price.discountCents, line.price.taxCents, line.available(),
                     line.availableQty == Integer.MAX_VALUE ? line.price.quantity + 999
-                            : Math.max(0, line.availableQty)));
+                            : Math.max(0, line.availableQty), line.preorder));
         }
         List<AppliedDiscountDto> applied = new ArrayList<AppliedDiscountDto>();
         if (discounts != null) {

@@ -103,6 +103,12 @@ public class SiteUrls {
         return "/s/" + encode(handle) + "/checkout";
     }
 
+    /// A store's web cart with the recovery token that restores `token`'s
+    /// cart into the session ([StorefrontPages#cart]), relative.
+    public static String recoverCart(String handle, String token) {
+        return "/s/" + encode(handle) + "/cart?r=" + encode(token);
+    }
+
     /// The confirmation page of an order, with the link token that opens it
     /// to whoever placed it without an account.
     public static String order(String handle, int number, String token) {

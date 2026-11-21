@@ -28,5 +28,6 @@ public final class CartLineView {
     public String unit = "";
     public String total = "";
     public boolean available = true;
+    public boolean preorder;
     public Art art;
 }

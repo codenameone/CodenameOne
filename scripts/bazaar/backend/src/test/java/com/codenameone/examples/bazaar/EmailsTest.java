@@ -59,6 +59,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
@@ -219,5 +220,21 @@ class EmailsTest {
         abandoned.sweepAbandoned(System.currentTimeMillis() + 3 * AbandonedCarts.IDLE_MILLIS);
         Mail reminder = find(to, "Your cart at mail-pos is waiting");
         assertTrue(reminder.getHtml().contains("store="), "opens the cart");
+        // The button is the absolute web cart with the recovery token.
+        String token = carts.cart(s.storeId, user, null).getToken();
+        String path = "/s/mail-pos/cart?r=" + token;
+        assertTrue(reminder.getHtml().contains("http://localhost" + path)
+                || reminder.getHtml().contains("https://") && reminder.getHtml().contains(path),
+                reminder.getHtml());
+        String title = carts.get(s.storeId, user, null).lines().get(0).title();
+        Browser stranger = new Browser(mvc);
+        assertFalse(stranger.get("/s/mail-pos/cart").getContentAsString().contains(title),
+                "a fresh session has an empty cart");
+        Browser back = new Browser(mvc);
+        back.assertPage(back.get(path), title);
+        back.assertPage(back.get("/s/mail-pos/cart"), title);
+        Browser forged = new Browser(mvc);
+        assertFalse(forged.get("/s/mail-pos/cart?r=nope").getContentAsString().contains(title),
+                "an unknown token restores nothing");
     }
 }

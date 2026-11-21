@@ -47,6 +47,7 @@ import com.codenameone.examples.bazaar.repository.OrderLineRepository;
 import com.codenameone.examples.bazaar.repository.RefundRepository;
 import com.codenameone.examples.bazaar.repository.StoreOrderRepository;
 import com.codenameone.examples.bazaar.repository.VariantRepository;
+import com.codenameone.examples.bazaar.ops.Perms;
 import com.codenameone.examples.bazaar.store.StoreAccess;
 
 import java.io.IOException;
@@ -126,7 +127,8 @@ public class Analytics {
     @Transactional(readOnly = true)
     public AnalyticsDto dashboard(String username, String storeId, long from, long to)
             throws IOException {
-        Store store = access.requireStore(username, storeId, StoreAccess.MANAGERS);
+        access.requireArea(username, storeId, Perms.REPORTS, false, StoreAccess.MANAGERS);
+        Store store = access.requireStore(username, storeId);
         long[] p = period(from, to, System.currentTimeMillis());
         Data d = load(storeId, p[2]);
         List<StoreOrder> now = d.between(p[0], p[1]);
@@ -143,7 +145,7 @@ public class Analytics {
     @Transactional(readOnly = true)
     public List<FunnelStepDto> funnel(String username, String storeId, long from, long to)
             throws IOException {
-        access.requireStaff(username, storeId, StoreAccess.MANAGERS);
+        access.requireArea(username, storeId, Perms.REPORTS, false, StoreAccess.MANAGERS);
         long[] p = period(from, to, System.currentTimeMillis());
         Data d = load(storeId, p[0]);
         return funnel(d, d.between(p[0], p[1]), p[0], p[1]);

@@ -40,6 +40,8 @@ public final class ProductView {
     /// The product's storefront metafields, as `{name, value}` pairs.
     public java.util.List<String[]> specs = new java.util.ArrayList<String[]>();
     public boolean available;
+    /// The chosen variant sells ahead of stock.
+    public boolean preorder;
     public String availability = "";
     /// The chosen variant id, for the add-to-cart form.
     public String variantId = "";

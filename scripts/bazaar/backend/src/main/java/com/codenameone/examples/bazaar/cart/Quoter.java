@@ -18,6 +18,7 @@
  */
 package com.codenameone.examples.bazaar.cart;
 
+import com.codename1.backend.DataSource;
 import com.codename1.backend.annotations.Component;
 import com.codename1.backend.annotations.Transactional;
 import com.codenameone.examples.bazaar.api.AddressDto;
@@ -28,6 +29,7 @@ import com.codenameone.examples.bazaar.domain.Discount;
 import com.codenameone.examples.bazaar.domain.GiftCard;
 import com.codenameone.examples.bazaar.domain.InventoryLevel;
 import com.codenameone.examples.bazaar.domain.Location;
+import com.codenameone.examples.bazaar.domain.Preorder;
 import com.codenameone.examples.bazaar.domain.Product;
 import com.codenameone.examples.bazaar.domain.ShippingRate;
 import com.codenameone.examples.bazaar.domain.Store;
@@ -44,6 +46,7 @@ import com.codenameone.examples.bazaar.repository.DiscountUseRepository;
 import com.codenameone.examples.bazaar.repository.GiftCardRepository;
 import com.codenameone.examples.bazaar.repository.InventoryLevelRepository;
 import com.codenameone.examples.bazaar.repository.LocationRepository;
+import com.codenameone.examples.bazaar.repository.PreorderRepository;
 import com.codenameone.examples.bazaar.repository.ProductRepository;
 import com.codenameone.examples.bazaar.repository.ShippingRateRepository;
 import com.codenameone.examples.bazaar.repository.ShippingZoneRepository;
@@ -80,6 +83,8 @@ public class Quoter {
     private final CollectionProductRepository collections;
     private final InventoryLevelRepository levels;
     private final LocationRepository locations;
+    private final PreorderRepository preorders;
+    private final DataSource db;
     private final DiscountRepository discounts;
     private final DiscountUseRepository uses;
     private final TaxRateRepository taxes;
@@ -97,7 +102,10 @@ public class Quoter {
             ShippingZoneRepository zones, ShippingRateRepository rates,
             GiftCardRepository giftCards, Memberships memberships,
             com.codenameone.examples.bazaar.taxes.TaxExemptions exemptions,
-            com.codenameone.examples.bazaar.market.Markets markets) {
+            com.codenameone.examples.bazaar.market.Markets markets,
+            PreorderRepository preorders, DataSource db) {
+        this.preorders = preorders;
+        this.db = db;
         this.stores = stores;
         this.cartLines = cartLines;
         this.variants = variants;
@@ -203,6 +211,15 @@ public class Quoter {
             } else {
                 Integer a = availability.get(variant.getId());
                 line.availableQty = a == null ? 0 : a.intValue();
+                if (line.availableQty < want.quantity) {
+                    // Short of stock: a variant on pre-order sells the whole
+                    // line ahead of stock instead, and reserves nothing.
+                    int ahead = preorderAllowance(variant.getId());
+                    if (ahead >= want.quantity) {
+                        line.preorder = true;
+                        line.availableQty = ahead;
+                    }
+                }
             }
             if (!line.available()) {
                 quote.problems.add(line.availableQty <= 0
@@ -372,6 +389,26 @@ public class Quoter {
             }
         }
         return best;
+    }
+
+    /// Units of a variant that may still be sold ahead of stock: the
+    /// pre-order allowance ([com.codenameone.examples.bazaar.alerts.StockAlerts#preorderable])
+    /// less the pre-ordered units already sold and not yet shipped. Zero when
+    /// the variant is not on pre-order.
+    @Transactional(readOnly = true)
+    public int preorderAllowance(String variantId) throws IOException {
+        Preorder p = variantId == null ? null : preorders.findByVariantId(variantId);
+        int cap = com.codenameone.examples.bazaar.alerts.StockAlerts.preorderable(p,
+                System.currentTimeMillis());
+        if (cap <= 0) {
+            return 0;
+        }
+        Map sold = db.queryOne("SELECT COALESCE(SUM(l.quantity - l.fulfilled_qty), 0) AS n "
+                + "FROM order_line l JOIN store_order o ON o.id = l.order_id WHERE l.variant_id = ? "
+                + "AND l.preorder = 1 AND l.quantity > l.fulfilled_qty AND o.status <> 'CANCELLED'",
+                new Object[] {variantId});
+        long n = sold == null ? 0 : com.codenameone.examples.bazaar.Rows.number(sold.get("n"));
+        return (int) Math.max(0, cap - n);
     }
 
     /// Units available per variant across the active locations that fulfil
