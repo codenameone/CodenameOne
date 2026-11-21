@@ -211,6 +211,19 @@ public class SelfTest {
         check("the grown tail is writable", "42", String.valueOf(grown[65535]));
     }
 
+    /// Whether the server engine a check needs is the one this binary carries.
+    /// A backend is built for one engine, so the PostgreSQL and the MySQL
+    /// checks run in separate builds (BackendRuntimeSelfTest and
+    /// BackendJavaSeRuntimeTest say which); a check for another engine is
+    /// reported as skipped, never counted as passed.
+    private static boolean serves(String engine, String check) {
+        if (engine.equals(com.codename1.backend.sql.ServerEngine.built())) {
+            return true;
+        }
+        System.out.println("skip " + check + ": needs a " + engine + " build");
+        return false;
+    }
+
     public static void main(String[] args) throws Exception {
         threadLocalInitialization();
         crypto();
@@ -1869,6 +1882,9 @@ public class SelfTest {
      * output is observable without a live server and without printing a password.
      */
     private static void urlComponentsKeepTheirUnicode() throws Exception {
+        if (!serves("postgres", "urlComponentsKeepTheirUnicode")) {
+            return;
+        }
         // "caf<a-umlaut>%2Dx" is a literal non-ASCII character and an escaped '-'
         // in one value. Correctly decoded it is "caf<a-umlaut>-x".
         String outcome;
@@ -1909,6 +1925,9 @@ public class SelfTest {
      * the address the URL did name, and the only evidence is that it worked.
      */
     private static void malformedPortsAreRefused() throws Exception {
+        if (!serves("postgres", "malformedPortsAreRefused")) {
+            return;
+        }
         String[] bad = new String[] {
             "postgres://u:p@127.0.0.1:-1/db",      // the finding: a sign parses
             "postgres://u:p@127.0.0.1:+5432/db",   // the same leniency, other sign
@@ -1954,6 +1973,9 @@ public class SelfTest {
      * on one side and a hang on the other.
      */
     private static void negativeConnectTimeoutsAreRefused() throws Exception {
+        if (!serves("postgres", "negativeConnectTimeoutsAreRefused")) {
+            return;
+        }
         String outcome;
         try {
             // A NETWORK url: the query string is only parsed for the engines
@@ -2378,6 +2400,9 @@ public class SelfTest {
      * mysql_native_password.
      */
     private static void aServerThatNamesNoPluginStillConnects() throws Exception {
+        if (!serves("mysql", "aServerThatNamesNoPluginStillConnects")) {
+            return;
+        }
         check("a greeting without plugin auth still connects", "connected",
                 mySqlGreetingOutcome(false));
         // The control: the same stub that DOES name a plugin still works, so this
@@ -2432,6 +2457,9 @@ public class SelfTest {
      * setting.
      */
     private static void aMalformedEscapeInADatabaseUrlIsRefused() throws Exception {
+        if (!serves("postgres", "aMalformedEscapeInADatabaseUrlIsRefused")) {
+            return;
+        }
         String refusal;
         try {
             Database db = Database.open("postgres://u:p%C3%28ss@127.0.0.1:1/db?sslmode=disable");
@@ -2570,8 +2598,12 @@ public class SelfTest {
             mysqlListener.close();
         }
         stub.join(10000);
-        check("a PostgreSQL connection field holding a NUL is refused", "refused", postgres);
-        check("a MySQL connection field holding a NUL is refused", "refused", mysql);
+        if (serves("postgres", "aConnectionFieldCannotHoldASecondField")) {
+            check("a PostgreSQL connection field holding a NUL is refused", "refused", postgres);
+        }
+        if (serves("mysql", "aConnectionFieldCannotHoldASecondField")) {
+            check("a MySQL connection field holding a NUL is refused", "refused", mysql);
+        }
     }
 
     /**
@@ -5301,6 +5333,9 @@ public class SelfTest {
      * without the bound this check fails, and takes those 175 seconds to fail.
      */
     private static void scramIterationCountIsBounded() throws Exception {
+        if (!serves("postgres", "scramIterationCountIsBounded")) {
+            return;
+        }
         final ServerSocket listener = ServerSocket.bind("127.0.0.1", 0, 1);
         final int port = listener.getPort();
         Thread stub = new Thread(new Runnable() {
@@ -5379,6 +5414,9 @@ public class SelfTest {
      * would fail it.
      */
     private static void scramRefusesAPasswordItCannotPrepare() throws Exception {
+        if (!serves("postgres", "scramRefusesAPasswordItCannotPrepare")) {
+            return;
+        }
         // %C2%A0 is U+00A0, RFC 3454 table C.1.2, which SASLprep maps to a space.
         check("a SCRAM password SASLprep would rewrite is refused", "refused",
                 scramOutcomeFor("p%C2%A0w", "SASLprep"));
@@ -5535,6 +5573,9 @@ public class SelfTest {
      * ordinary duplicate key.
      */
     private static void aMalformedRowClosesTheMySqlSession() throws Exception {
+        if (!serves("mysql", "aMalformedRowClosesTheMySqlSession")) {
+            return;
+        }
         final ServerSocket listener = ServerSocket.bind("127.0.0.1", 0, 1);
         final int port = listener.getPort();
         Thread stub = new Thread(new Runnable() {
@@ -5723,6 +5764,9 @@ public class SelfTest {
     }
 
     private static void aTruncatedMySqlHeaderIsRefused() throws Exception {
+        if (!serves("mysql", "aTruncatedMySqlHeaderIsRefused")) {
+            return;
+        }
         final ServerSocket listener = ServerSocket.bind("127.0.0.1", 0, 1);
         final int port = listener.getPort();
         Thread stub = new Thread(new Runnable() {
@@ -5945,6 +5989,9 @@ public class SelfTest {
      * that sends 7 is the smallest form of the fault.
      */
     private static void aMySqlPacketOutOfSequenceIsRefused() throws Exception {
+        if (!serves("mysql", "aMySqlPacketOutOfSequenceIsRefused")) {
+            return;
+        }
         final ServerSocket listener = ServerSocket.bind("127.0.0.1", 0, 1);
         final int port = listener.getPort();
         Thread stub = new Thread(new Runnable() {
@@ -5994,6 +6041,9 @@ public class SelfTest {
      * the next one.
      */
     private static void aNegativePostgresLengthThatIsNotNullIsRefused() throws Exception {
+        if (!serves("postgres", "aNegativePostgresLengthThatIsNotNullIsRefused")) {
+            return;
+        }
         final ServerSocket listener = ServerSocket.bind("127.0.0.1", 0, 1);
         final int port = listener.getPort();
         Thread stub = new Thread(new Runnable() {
@@ -6074,6 +6124,9 @@ public class SelfTest {
      * here more than usual: the unfixed code threw too.
      */
     private static void truncatedRowFramesAreRefused() throws Exception {
+        if (!serves("postgres", "truncatedRowFramesAreRefused")) {
+            return;
+        }
         final ServerSocket listener = ServerSocket.bind("127.0.0.1", 0, 1);
         final int port = listener.getPort();
         Thread stub = new Thread(new Runnable() {
@@ -6137,6 +6190,9 @@ public class SelfTest {
      * URL was parsed as PostgreSQL rather than handed to SQLite.
      */
     private static void aSchemeIsRecognisedInAnyCase() throws Exception {
+        if (!serves("postgres", "aSchemeIsRecognisedInAnyCase")) {
+            return;
+        }
         final ServerSocket listener = ServerSocket.bind("127.0.0.1", 0, 1);
         final int port = listener.getPort();
         Thread stub = new Thread(new Runnable() {
@@ -6192,6 +6248,9 @@ public class SelfTest {
      * before this fix too; what it did not do was leave the session takeable.
      */
     private static void aDeadSessionReportsItselfClosed() throws Exception {
+        if (!serves("postgres", "aDeadSessionReportsItselfClosed")) {
+            return;
+        }
         final ServerSocket listener = ServerSocket.bind("127.0.0.1", 0, 1);
         final int port = listener.getPort();
         Thread stub = new Thread(new Runnable() {

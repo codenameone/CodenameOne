@@ -195,6 +195,8 @@ public class OrmCheck {
     private static void generatedRepositories(EntityManager em, String dialect) {
         com.codename1.orm.session.Session s=em.openSession();
         try {
+            // Native SQL is the caller's own: before 23ai Oracle needs a FROM on every SELECT.
+            String noTable="oracle".equals(dialect) ? " FROM DUAL" : "";
             s.createTables();
             Records records=com.codename1.orm.repository.Repositories.create(Records.class,s);
             s.beginTransaction();
@@ -212,19 +214,19 @@ public class OrmCheck {
                 check("native connection after rejection", "2", ""+records.nativeCount("repository"));
             }
             try {
-                s.createNativeQuery("SELECT 1.5",Long.class).first();
+                s.createNativeQuery("SELECT 1.5"+noTable,Long.class).first();
                 check("native fractional integer", "rejected", "accepted");
             } catch (com.codename1.orm.session.PersistenceException expected) {
                 check("native fractional integer", "rejected", "rejected");
             }
             try {
-                s.createNativeQuery("SELECT 1",String.class).first();
+                s.createNativeQuery("SELECT 1"+noTable,String.class).first();
                 check("native numeric text", "rejected", "accepted");
             } catch (com.codename1.orm.session.PersistenceException expected) {
                 check("native numeric text", "rejected", "rejected");
             }
-            check("native date parameter", "12345", ""+s.createNativeQuery("SELECT :value",Long.class).setParameter("value",new java.util.Date(12345)).first());
-            check("native character parameter", "65", ""+s.createNativeQuery("SELECT :value",Long.class).setParameter("value",Character.valueOf('A')).first());
+            check("native date parameter", "12345", ""+s.createNativeQuery("SELECT :value"+noTable,Long.class).setParameter("value",new java.util.Date(12345)).first());
+            check("native character parameter", "65", ""+s.createNativeQuery("SELECT :value"+noTable,Long.class).setParameter("value",Character.valueOf('A')).first());
             check("repository count", "2", ""+records.count());
             check("repository exists", "true", ""+records.existsByName("repository"));
             check("repository native binding", "2", ""+records.nativeCount("repository"));
