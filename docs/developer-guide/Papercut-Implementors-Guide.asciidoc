@@ -8,7 +8,7 @@ creature you cut up leaves a stain of its own ink behind, so a long run turns th
 page into a record of everything that happened on it.
 
 It shares the module layout and the accounts with <<skirmish-implementors-guide,Skirmish>>
-and <<splat-implementors-guide,Splat>>, but it is deliberately smaller: a game that
+and <<splat-implementors-guide,Splat>>, but it's smaller: a game that
 runs entirely on the phone, and a server that keeps the scores honest without
 playing the game itself. This chapter shows where each part lives and what to change
 to make the game yours.
@@ -83,12 +83,12 @@ waves and competes on the same board.
 Fold:: No pencil. Paper gates drift across the page, and you burst them by steering
 the quill between their two ends.
 
-.The home screen over the attract loop, and a Fold run
+.The home screen playing itself behind the menu, and a Fold run
 image::img/papercut-home.png[The Papercut home screen,scaledwidth=45%]
 image::img/papercut-fold.png[A Fold run ending,scaledwidth=45%]
 
 The controls are a floating stick on each half of the screen: the left thumb moves
-the quill, the right thumb aims and fires while it is held. The eraser, the game's
+the quill, the right thumb aims and fires while it's held. The eraser, the game's
 bomb, is a button at the top right that wipes every creature off the page. On a
 desktop, WASD moves, the arrow keys aim and fire and Space erases; the mouse aims and
 fires while its button is held; and a gamepad uses its two sticks and A or either
@@ -105,7 +105,7 @@ shoulder button.
 | The API between the app and the server: the `com.codenameone.examples.papercut.api`
   interfaces (`AccountApi`, `RunApi`, `ShopApi`, `ProgressApi`, `FriendsApi`,
   `AdminApi`), their DTOs, and `ScoreBounds`, the arithmetic both sides agree a
-  run cannot exceed.
+  run can't exceed.
 
 | `common`
 | The app. `play` is the game: `Arena`, `Sheet`, `Enemy`, `Shot`, `Drop` and `Bot`
@@ -135,7 +135,7 @@ to an `Arena.Listener`, which `ArenaView` implements and turns into paper scraps
 and sound.
 
 That split is what lets `ArenaTest` play a hundred runs with the `Bot` and no
-display, and it is what makes the attract loop on the home screen free: the bot sets
+display, and it's what makes the attract loop on the home screen free: the bot sets
 the same fields a thumb would.
 
 The modes are the constants `Arena.CLASSIC`, `Arena.FOLD` and `Arena.DAILY`, passed
@@ -162,7 +162,7 @@ Every creature is an `Enemy`, and the kinds differ only in how `Arena` steers th
 | `GATE` | The gate of the Fold mode.
 |===
 
-Their size, points, hit points and colour are the arrays `Enemy.RADIUS`,
+Their size, points, hit points and color are the arrays `Enemy.RADIUS`,
 `Enemy.POINTS`, `Enemy.HP` and `Enemy.COLOUR`, indexed by kind. Adding a creature is
 a new constant, a row in each array, a branch in the arena's steering and a shape in
 the art script.
@@ -183,7 +183,7 @@ them back, so the lines ripple and pucker the way paper would if you could poke 
 The view draws the horizontal lines blue and one column red, which is all it takes to
 read as a notebook. Like the arena, the sheet is plain arithmetic and runs in tests.
 
-Every kill leaves an ink stain in the creature's colour. The stains are a ring
+Every kill leaves an ink stain in the creature's color. The stains are a ring
 buffer, so a long run fills the page and the oldest marks give way to new ones
 rather than slowing the game down.
 
@@ -192,7 +192,7 @@ rather than slowing the game down.
 The gaming package's `TouchControls` offers one joystick, and a twin-stick shooter
 needs two. `ArenaView` therefore reads the pointer itself: a thumb that lands on the
 left half of the view becomes `ArenaView.move`, one on the right half `ArenaView.aim`,
-and each `ArenaView.Stick` is centred wherever its thumb landed. The pointer callbacks
+and each `ArenaView.Stick` is centered wherever its thumb landed. The pointer callbacks
 write the sticks on the EDT, and the render thread reads them when it copies the
 controls into the arena. The eraser button is a circle the view and the `Hud` agree on
 through `eraserButton()`.
@@ -201,7 +201,7 @@ through `eraserButton()`.
 === Honest scores without a second copy of the game
 
 Skirmish and Splat run the same deterministic rules on the phone and the server, so
-the server can play a match again and know its outcome. Papercut does not. Keeping a
+the server can play a match again and know its outcome. Papercut doesn't. Keeping a
 second copy of a real-time shooter on the server, in step with every change to the
 game, costs more than a sample's leaderboards are worth, and it would force the game
 to be bit-for-bit deterministic across devices.
@@ -212,7 +212,7 @@ Instead a result is held to two things:
   issues a single-use ticket for that mode. The result must answer a ticket this
   server issued, once, for the mode it was issued for. A daily ticket also pins the
   day's seed, so a daily result is always for the sheet everyone else was dealt.
-* *Arithmetic.* `ScoreBounds` states what a run can honestly claim: the most a
+* *Arithmetic.* `ScoreBounds` states what a run can claim: the most a
   creature is worth, the multiplier's ceiling, the most kills a second and the
   longest run. `Runs.submit` refuses a result past those bounds, and keeps one that
   is merely remarkable but files a flag for the console.
@@ -222,7 +222,7 @@ Instead a result is held to two things:
 include::../../scripts/papercut/shared/src/main/java/com/codenameone/examples/papercut/api/ScoreBounds.java[]
 ----
 
-A cheat that stays under the bound gets a plausible score; that is the trade, and
+A cheat that stays under the bound gets a plausible score; that's the trade, and
 `ScoreBounds` is the place to tighten it. `ArenaTest` plays the real game against
 these numbers, so a change to the game that breaks them fails a test rather than a
 leaderboard.
@@ -241,7 +241,7 @@ Boards::
 `Boards.leaderboard` answers each player's best standing run of a mode over a period:
 `ALL`, `WEEK`, `TODAY` or `FRIENDS` (`Modes`). A board is worked out from the runs on
 every request rather than kept as a table of bests, because a week or a day is a
-window a stored best cannot answer, and a struck run or a benched player has to vanish
+window a stored best can't answer, and a struck run or a benched player has to vanish
 from every board at once. A game with millions of runs would keep a per-period table.
 The daily seed::
 `DailySeeds.seedOf` is a hash of the UTC date unless an admin has picked a seed for
@@ -251,9 +251,9 @@ A friendship goes one way: adding someone puts them on your `FRIENDS` board, not
 on theirs, so nobody has to accept anything and nobody can push onto a stranger's
 board.
 The shop::
-`Catalog` lists the quills (paper colours bought with coins), spare erasers and two
+`Catalog` lists the quills (paper colors bought with coins), spare erasers and two
 coin packs sold through the platform stores. `Shop` takes the profile row's lock
-before every change, so two taps on *Buy* cannot spend the same coins, and checks
+before every change, so two taps on *Buy* can't spend the same coins, and checks
 store receipts through a `ReceiptValidator`; the development profile simulates them.
 Rewarded ads credit coins once per nonce.
 Achievements::
@@ -263,7 +263,7 @@ counts every run played before it existed.
 Administration::
 `AdminApi` covers the stats, a player search, actions on a player, the flags and their
 resolution, picking the daily seed, broadcasts and the audit log. Every action is
-written to the audit log in the same transaction as the change, so the log cannot
+written to the audit log in the same transaction as the change, so the log can't
 miss one; a broadcast's push, which no rollback can recall, is sent only after its
 rows are written.
 
@@ -276,7 +276,7 @@ icon from polygons, then multiplies real photographed paper into every cut-out s
 reads as paper. The paper textures are CC0 from ambientCG, the sounds are CC0 packs
 from OpenGameArt, and the two typefaces, Gochi Hand and Patrick Hand, are under the
 SIL Open Font License. `ART.md` beside the project lists every source, its author and
-its licence.
+its license.
 
 To make the art again, download the sources `ART.md` names into one directory and run
 the script on it. It needs Pillow and ffmpeg, and rewrites every image and sound in
@@ -290,12 +290,12 @@ include::../demos/common/src/main/snippets/developer-guide/papercut.sh[tag=paper
 [[papercut-reskin]]
 === Re-skinning
 
-* *Colours.* A creature's colour is `PALETTE` at the top of the script and
+* *Colors.* A creature's color is `PALETTE` at the top of the script and
   `Enemy.COLOUR` in the game, which its bursts and stains take. Change both together.
 * *Shapes and sizes.* A creature's shape is one function in the script; its size on
   the page is `Enemy.RADIUS`.
 * *The page.* Swap the paper textures for another surface -- graph paper, a
-  blueprint, a chalkboard -- and change the line colours `ArenaView` draws the sheet
+  blueprint, a chalkboard -- and change the line colors `ArenaView` draws the sheet
   with.
 * *Tinted images.* Stains, scraps, pencil strokes and rings are drawn white on
   purpose, because the game tints them at run time.
