@@ -9,7 +9,6 @@
     <description>Scripted Codename One video renderer for LLM and CI workflows.</description>
     <modules>
         <module>common</module>
-        <module>demos</module>
     </modules>
     <properties>
         <cn1.version>8.0-SNAPSHOT</cn1.version>
