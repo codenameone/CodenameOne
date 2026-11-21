@@ -58,6 +58,9 @@ import java.util.Map;
 final class BackendSupport {
     /// The SQLite driver the dev profile's in-memory database uses, as the Maven
     /// backend module declares it.
+    /// Writes `cn1-backend.properties`; see DeclareBackendDatabaseTask.
+    static final String DATABASE_TASK = "declareBackendDatabase";
+
     static final String SQLITE_JDBC = "org.xerial:sqlite-jdbc:3.46.1.0";
     /// The JUnit a backend's tests are written against; the compiled test run
     /// translates them against codenameone-backend-test's subset of the same API.
@@ -81,6 +84,23 @@ final class BackendSupport {
         return project.getProviders().gradleProperty("cn1.backend.webapp.output")
                 .map(projectDirectory::dir)
                 .orElse(project.getLayout().getBuildDirectory().dir(WEB_APP_DIRECTORY));
+    }
+
+    /// The database engine the backend is built for (`cn1.backend.database`),
+    /// absent when nothing declares it. Read as a project property and not with
+    /// `providers.gradleProperty`, which sees `-P` and the root project's
+    /// `gradle.properties` alone: the backend of an application is a subproject,
+    /// and the natural place for what its server is built for is the
+    /// `gradle.properties` beside its own build script. `-P` still wins.
+    ///
+    /// The value is looked up here, outside the lambda: a lambda that held the
+    /// Project could not be stored in the configuration cache. Gradle counts a
+    /// subproject's `gradle.properties` among that cache's inputs by itself, so
+    /// an edit to the file is not answered with the engine of the build before.
+    static Provider<String> database(Project project) {
+        Object declared = project.findProperty(com.codename1.maven.BackendEngines.PROPERTY);
+        final String value = declared == null ? null : String.valueOf(declared);
+        return project.getProviders().provider(() -> value);
     }
 
     private BackendSupport() {
@@ -158,6 +178,16 @@ final class BackendSupport {
                             .withPendingJavaSources(main.getJava().getSrcDirs())
                             .withSourceEncoding(AppSupport.javaEncoding(project, main)));
                 }));
+
+        // The declared engine, as a directory of the main source set's output:
+        // see DeclareBackendDatabaseTask for why no compiler writes it.
+        main.getOutput().dir(project.getTasks().register(DATABASE_TASK,
+                com.codename1.gradle.tasks.DeclareBackendDatabaseTask.class, t -> {
+                    t.setGroup(AppSupport.GROUP);
+                    t.setDescription("Records the database engine the backend is built for");
+                    t.getDatabase().set(database(project));
+                    t.getOutputDirectory().set(new java.io.File(layout.buildDir(), "cn1-backend-database"));
+                }).flatMap(com.codename1.gradle.tasks.DeclareBackendDatabaseTask::getOutputDirectory));
 
         applyTests(project, layout, ext, main);
 

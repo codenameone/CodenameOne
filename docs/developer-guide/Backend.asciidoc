@@ -289,6 +289,10 @@ CN1_PROFILE=dev ./server                         # SQLite, nothing installed
 DATABASE_URL=postgres://app:secret@db/app ./server   # production
 ----
 
+The second line is a server built with `cn1.backend.database` set to `postgres`:
+the engine is chosen when the server is built, and the URL names a database of
+that engine. See <<One engine for each application>>.
+
 A key is resolved in one order, and the first layer that has it wins: a system
 property of that exact name, then the environment variable it maps to
 (`cn1.datasource.url` becomes `CN1_DATASOURCE_URL`), then the environment
@@ -322,8 +326,8 @@ there is nothing next to the binary.
   profiles, which changes two defaults and nothing else.
 
 | `cn1.datasource.url`
-| A SQLite path, or a `postgres://` or `mysql://` URL. Also read from
-  `DATABASE_URL`. On a development profile an unset value means an in-memory
+| A SQLite path, or a `postgres://`, `mysql://`, `sqlserver://` or `oracle://` URL -- of the one engine
+  the build names in `cn1.backend.database`. Also read from `DATABASE_URL`. On a development profile an unset value means an in-memory
   SQLite database; on any other profile it's an error, because a service that
   writes into a database inside its own process, with nothing saying so, loses
   everything at the next deploy. PostgreSQL and MySQL connections set their

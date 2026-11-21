@@ -170,8 +170,8 @@ public class MigrateCheck {
                 + "INSERT INTO mc_no_such_table (id) VALUES (1)").build();
         check("a broken script fails the migration",
                 String.valueOf(MigrationException.SCRIPT_FAILED), codeOf(Migrations.of(pool, broken), "migrate"));
-        if(mysql) {
-            // MySQL committed the CREATE TABLE and cannot take it back.
+        if(mysql || "oracle".equals(pool.dialect().getName())) {
+            // MySQL and Oracle committed the CREATE TABLE and cannot take it back.
             check("mysql keeps what the failed script created", "true", String.valueOf(exists(pool, "mc_half")));
             check("mysql records the failure", "5", count(pool, "cn1_mc_schema_history"));
             check("a recorded failure blocks the next run", String.valueOf(

@@ -388,7 +388,7 @@ class DialectTest {
         // its own dialect. See namesMariaDbSeparately below.
         assertSame(Dialect.MARIADB, Dialect.forName("mariadb"));
         assertSame(Dialect.SQLITE, Dialect.forName("SQLite"));
-        assertEquals(null, Dialect.forName("oracle"));
+        assertEquals(null, Dialect.forName("db2"));
     }
 
     @Test
@@ -531,5 +531,112 @@ class DialectTest {
         // The other two leave it alone.
         assertEquals("lo%", Dialect.POSTGRES.likePattern("lo%"));
         assertEquals("lo%", Dialect.MYSQL.likePattern("lo%"));
+    }
+
+    @Test
+    void sqlServerAndOracleNumberTheirParametersTheirOwnWay() throws Exception {
+        String portable = "SELECT * FROM t WHERE a = ? AND b = '?' AND c = ?";
+        assertEquals("SELECT * FROM t WHERE a = @p1 AND b = '?' AND c = @p2",
+                Dialect.SQLSERVER.bind(portable, 2));
+        assertEquals("SELECT * FROM t WHERE a = :1 AND b = '?' AND c = :2",
+                Dialect.ORACLE.bind(portable, 2));
+        // A bracket quotes an identifier on SQL Server, so a ? inside one stays.
+        assertEquals("SELECT [we?rd] FROM t WHERE a = @p1",
+                Dialect.SQLSERVER.bind("SELECT [we?rd] FROM t WHERE a = ?", 1));
+    }
+
+    @Test
+    void sqlServerAndOracleAnswerToTheirNames() {
+        assertSame(Dialect.SQLSERVER, Dialect.forName("sqlserver"));
+        assertSame(Dialect.SQLSERVER, Dialect.forName("MSSQL"));
+        assertSame(Dialect.ORACLE, Dialect.forName("Oracle"));
+        assertEquals("sqlserver", Dialect.SQLSERVER.getName());
+        assertEquals("oracle", Dialect.ORACLE.getName());
+    }
+
+    @Test
+    void sqlServerQuotesWithBracketsAndOracleWithQuotes() {
+        assertEquals("[order]", Dialect.SQLSERVER.quote("order"));
+        assertEquals("[a]]b]", Dialect.SQLSERVER.quote("a]b"));
+        // Upper case: the name Oracle gives the unquoted `order`.
+        assertEquals("\"ORDER\"", Dialect.ORACLE.quote("order"));
+        // Oracle has no escape for its quote: doubling it ends the name.
+        assertThrows(IllegalArgumentException.class, () -> Dialect.ORACLE.quote("a\"b"));
+        assertThrows(IllegalArgumentException.class, () -> Dialect.SQLSERVER.quote(""));
+    }
+
+    @Test
+    void oracleSpellsTheConditionalFormsAsBlocks() {
+        assertEquals("ALTER TABLE t ADD c NUMBER(19)",
+                Dialect.ORACLE.conditionalDdl("ALTER TABLE t ADD COLUMN c NUMBER(19)"));
+        assertEquals("BEGIN EXECUTE IMMEDIATE 'CREATE TABLE t (a VARCHAR2(5 CHAR) DEFAULT ''x'')'; "
+                + "EXCEPTION WHEN OTHERS THEN IF SQLCODE NOT IN (-955, -1408) THEN RAISE; END IF; END;",
+                Dialect.ORACLE.conditionalDdl("CREATE TABLE IF NOT EXISTS t (a VARCHAR2(5 CHAR) DEFAULT 'x')"));
+        assertEquals("BEGIN EXECUTE IMMEDIATE 'DROP TABLE t CASCADE CONSTRAINTS'; "
+                + "EXCEPTION WHEN OTHERS THEN IF SQLCODE NOT IN (-942) THEN RAISE; END IF; END;",
+                Dialect.ORACLE.conditionalDdl("DROP TABLE IF EXISTS t"));
+        assertEquals("SELECT 1 FROM DUAL", Dialect.ORACLE.conditionalDdl("SELECT 1 FROM DUAL"));
+    }
+
+    @Test
+    void pagingIsOffsetFetchOnBoth() {
+        assertEquals("", Dialect.SQLSERVER.limit(-1, 0));
+        assertEquals("", Dialect.ORACLE.limit(-1, 0));
+        // SQL Server will not take FETCH without an OFFSET before it.
+        assertEquals(" OFFSET 0 ROWS FETCH NEXT 10 ROWS ONLY", Dialect.SQLSERVER.limit(10, 0));
+        assertEquals(" OFFSET 5 ROWS FETCH NEXT 10 ROWS ONLY", Dialect.SQLSERVER.limit(10, 5));
+        assertEquals(" OFFSET 5 ROWS", Dialect.SQLSERVER.limit(-1, 5));
+        assertEquals(" FETCH FIRST 10 ROWS ONLY", Dialect.ORACLE.limit(10, 0));
+        assertEquals(" OFFSET 5 ROWS FETCH NEXT 10 ROWS ONLY", Dialect.ORACLE.limit(10, 5));
+        assertEquals(" OFFSET 5 ROWS", Dialect.ORACLE.limit(-1, 5));
+    }
+
+    @Test
+    void sqlServerPagingSuppliesAnOrderingWhenTheStatementHasNone() {
+        assertEquals(" ORDER BY (SELECT NULL) OFFSET 0 ROWS FETCH NEXT 3 ROWS ONLY",
+                Dialect.SQLSERVER.limit(3, 0, false));
+        assertEquals(" OFFSET 0 ROWS FETCH NEXT 3 ROWS ONLY", Dialect.SQLSERVER.limit(3, 0, true));
+        assertEquals("", Dialect.SQLSERVER.limit(-1, 0, false));
+        // Everywhere else the flag changes nothing.
+        assertEquals(Dialect.POSTGRES.limit(3, 2), Dialect.POSTGRES.limit(3, 2, false));
+        assertEquals(Dialect.ORACLE.limit(3, 2), Dialect.ORACLE.limit(3, 2, false));
+    }
+
+    @Test
+    void sqlServerOrdersWithoutNullsFirst() {
+        assertEquals("[n] ASC", Dialect.SQLSERVER.orderBy("[n]", true, true));
+        assertEquals("[n] DESC", Dialect.SQLSERVER.orderBy("[n]", false));
+    }
+
+    @Test
+    void keyColumnsAreBoundedAndTextIsBinaryOnSqlServer() {
+        assertEquals("BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY",
+                Dialect.SQLSERVER.generatedKeyColumn(Dialect.BIGINT));
+        assertEquals("NVARCHAR(255) COLLATE Latin1_General_100_BIN2 NOT NULL PRIMARY KEY",
+                Dialect.SQLSERVER.assignedKeyColumn(Dialect.TEXT));
+        assertEquals("NVARCHAR(MAX) COLLATE Latin1_General_100_BIN2",
+                Dialect.SQLSERVER.columnType(Dialect.TEXT));
+        assertEquals("NUMBER(19) GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY",
+                Dialect.ORACLE.generatedKeyColumn(Dialect.BIGINT));
+        assertEquals("VARCHAR2(255 CHAR) NOT NULL PRIMARY KEY",
+                Dialect.ORACLE.assignedKeyColumn(Dialect.TEXT));
+        assertEquals("VARCHAR2(4000 CHAR)", Dialect.ORACLE.columnType(Dialect.TEXT));
+    }
+
+    @Test
+    void sqlServerAddsAColumnWithoutTheColumnKeywordAndBoundsTextAsUnicode() throws Exception {
+        assertEquals("ALTER TABLE t ADD window_end BIGINT",
+                Dialect.SQLSERVER.bind("ALTER TABLE t ADD COLUMN window_end BIGINT", 0));
+        assertEquals("ALTER TABLE [t] ADD x INT",
+                Dialect.SQLSERVER.bind("ALTER TABLE [t] ADD COLUMN x INT", 0));
+        // Only the ADD COLUMN form is rewritten.
+        assertEquals("ALTER TABLE t DROP COLUMN x",
+                Dialect.SQLSERVER.bind("ALTER TABLE t DROP COLUMN x", 0));
+        assertEquals("ALTER TABLE t ADD COLUMN x INT",
+                Dialect.POSTGRES.bind("ALTER TABLE t ADD COLUMN x INT", 0));
+        assertEquals("VARCHAR(64)", Dialect.POSTGRES.varchar(64));
+        assertEquals("VARCHAR(64)", Dialect.MYSQL.varchar(64));
+        assertEquals("NVARCHAR(64) COLLATE Latin1_General_100_BIN2", Dialect.SQLSERVER.varchar(64));
+        assertEquals("VARCHAR2(64 CHAR)", Dialect.ORACLE.varchar(64));
     }
 }

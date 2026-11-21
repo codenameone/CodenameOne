@@ -49,7 +49,7 @@ import static org.junit.jupiter.api.Assertions.fail;
  * requires the translated binary and the JVM to print the SAME history against every engine --
  * and every engine to print the same history as every other.
  *
- * SQLite always runs. PostgreSQL and MySQL run when CN1_DBCHECK_POSTGRES / CN1_DBCHECK_MYSQL
+ * SQLite always runs. PostgreSQL and MySQL run when CN1_DBCHECK_POSTGRES / _MYSQL / _SQLSERVER / _ORACLE
  * name a server, the same variables BackendDatabaseTest reads; their absence is a skip on a
  * developer machine and a FAILURE where the backend is required.
  */
@@ -70,21 +70,26 @@ class BackendMigrationTest {
         urls.add(":memory:");
         addIfSet(urls, "CN1_DBCHECK_POSTGRES");
         addIfSet(urls, "CN1_DBCHECK_MYSQL");
+        addIfSet(urls, "CN1_DBCHECK_SQLSERVER");
+        addIfSet(urls, "CN1_DBCHECK_ORACLE");
+        addIfSet(urls, "CN1_DBCHECK_ORACLE21");
         if (urls.size() == 1 && BackendTestSupport.isRequired()) {
-            fail("CN1_DBCHECK_POSTGRES and CN1_DBCHECK_MYSQL are unset, so only SQLite "
+            fail("No CN1_DBCHECK_POSTGRES, _MYSQL, _SQLSERVER or _ORACLE is set, so only SQLite "
                     + "was exercised; the session lock and the failed-migration marker are "
                     + "server-engine behaviour");
         }
 
         Path work = Files.createTempDirectory("backend-migratecheck");
-        Path binary = work.resolve("migratecheck");
-        String failure = BackendTestSupport.build("MigrateCheck", "demo/migratecheck", binary, jdk8);
-        if (failure != null) {
-            BackendTestSupport.skipOrFail(failure);
-        }
+        // One build per server engine: a binary carries a single wire client,
+        // chosen when it is built. The SQLite pass rides on the first of them.
+        List<String> ordered = new ArrayList<String>(urls.subList(1, urls.size()));
+        ordered.add(urls.get(0));
+        urls = ordered;
+        Map<String, Path> binaries = new java.util.LinkedHashMap<String, Path>();
 
         String reference = null;
         for (String url : urls) {
+            Path binary = BackendTestSupport.binaryFor(binaries, url, "MigrateCheck", "demo/migratecheck", work, jdk8);
             String translated = runTranslated(binary, url);
             assertOk("the translated runtime", url, translated);
             String local = runLocal(url, jdk8);
@@ -145,6 +150,7 @@ class BackendMigrationTest {
         env.put("CN1_BACKEND_JAVA", System.getProperty("java.home"));
         env.put("CN1_BACKEND_DEMO", "demo/migratecheck");
         env.put("CN1_BACKEND_JDBC_JARS", BackendTestSupport.jdbcJars());
+        env.put("CN1_BACKEND_DATABASE", BackendTestSupport.engineOf(url));
         env.put("CN1_MIGRATECHECK_URL", url);
         env.put("JDK_8_HOME", jdk8.toString());
         int[] status = new int[1];

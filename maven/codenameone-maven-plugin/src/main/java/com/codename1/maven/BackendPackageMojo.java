@@ -163,6 +163,14 @@ public class BackendPackageMojo extends AbstractMojo {
     private boolean sqlite;
 
     /**
+     * The one database engine this backend is built for: sqlite, postgres, sqlserver, oracle or
+     * mysql. There is no default, because the build compiles only that engine's
+     * client in; BackendEngines judges the value and fails the build without one.
+     */
+    @Parameter(property = BackendEngines.PROPERTY)
+    private String database;
+
+    /**
      * Whether a failed cast throws.
      *
      * On by default here and off for app targets, which is the one place the
@@ -261,7 +269,7 @@ public class BackendPackageMojo extends AbstractMojo {
                 session == null ? new java.util.Properties() : session.getUserProperties(), false,
                 processorRepositorySystem, session == null ? null : session.getRepositorySession()));
         return p.mainClass(mainClass).output(output).target(target).jdk(jdkHome, jdk8Home).cflags(cflags)
-                .sqlite(sqlite).checkedCasts(checkedCasts).devTools(devTools);
+                .sqlite(sqlite).database(database).checkedCasts(checkedCasts).devTools(devTools);
     }
 
     static void configureJavaLevel(BackendPackager packager, MavenProject project,

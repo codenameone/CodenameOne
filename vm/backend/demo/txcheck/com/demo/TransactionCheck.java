@@ -146,7 +146,8 @@ public class TransactionCheck {
             }
 
             // A deferred constraint makes COMMIT fail on both SQLite and PostgreSQL.
-            if (!"mysql".equals(engine)) {
+            // MySQL and SQL Server cannot defer a constraint at all.
+            if (!"mysql".equals(engine) && !"sqlserver".equals(engine)) {
                 pool.execute("DROP TABLE IF EXISTS cn1_sync_child", null);
                 pool.execute("DROP TABLE IF EXISTS cn1_sync_parent", null);
                 pool.execute("CREATE TABLE cn1_sync_parent (id INTEGER PRIMARY KEY)", null);

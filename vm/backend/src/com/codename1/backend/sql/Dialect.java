@@ -103,6 +103,10 @@ public abstract class Dialect {
     /// this is the same wire protocol and the same SQL, and everything that
     /// branches on the engine name means that family.
     public static final Dialect MARIADB = new MariaDbDialect();
+    /// Microsoft SQL Server and Azure SQL.
+    public static final Dialect SQLSERVER = new SqlServerDialect();
+    /// Oracle Database.
+    public static final Dialect ORACLE = new OracleDialect();
 
     Dialect() {
     }
@@ -136,10 +140,16 @@ public abstract class Dialect {
         if (equalsIgnoreCaseAscii(engine, "mysql")) {
             return MYSQL;
         }
+        if (equalsIgnoreCaseAscii(engine, "sqlserver") || equalsIgnoreCaseAscii(engine, "mssql")) {
+            return SQLSERVER;
+        }
+        if (equalsIgnoreCaseAscii(engine, "oracle")) {
+            return ORACLE;
+        }
         return null;
     }
 
-    /// "sqlite", "postgresql" or "mysql".
+    /// "sqlite", "postgresql", "mysql", "sqlserver" or "oracle".
     public abstract String getName();
 
     /// `identifier` quoted so that its case is preserved and a reserved word
@@ -152,7 +162,7 @@ public abstract class Dialect {
     /// it on exactly one of the three.
     ///
     /// The quote character itself is doubled, which is the escape all three
-    /// accept. A name carrying a NUL is refused rather than escaped: no engine can
+    /// accept (Oracle, which has none, refuses a name containing its quote). A name carrying a NUL is refused rather than escaped: no engine can
     /// hold one, and SQLite reads statements as C strings, so passing it through
     /// would truncate the statement instead of failing.
     public abstract String quote(String identifier);
@@ -197,6 +207,23 @@ public abstract class Dialect {
         return false;
     }
 
+    /// Whether an upsert can answer with the key of the row it touched, the
+    /// inserted one or the updated one. Wherever keys come back through
+    /// RETURNING, except Oracle: its upsert is MERGE, which takes no RETURNING.
+    public boolean upsertKeysThroughReturning() {
+        return generatedKeysThroughReturning();
+    }
+
+    /// The clause [#generatedKeysThroughReturning] appends to an INSERT to have
+    /// it answer with `quotedColumn`.
+    ///
+    /// PostgreSQL's RETURNING makes the INSERT return a row. Oracle's
+    /// `RETURNING ... INTO` writes the value into a bind variable instead, which
+    /// the Oracle client hands back as the one row of the result.
+    public String returningClause(String quotedColumn) {
+        return " RETURNING " + quotedColumn;
+    }
+
     /// An INSERT that supplies NO columns, for the entity whose only persisted
     /// field is a key the database generates.
     ///
@@ -207,6 +234,20 @@ public abstract class Dialect {
     /// at all.
     public String insertDefaults(String quotedTable) {
         return "INSERT INTO " + quotedTable + " DEFAULT VALUES";
+    }
+
+    /// [#insertDefaults(String)] for a table whose generated key is
+    /// `quotedKeyColumn`. Oracle has no `DEFAULT VALUES` and names the column
+    /// it fills: `INSERT INTO t (id) VALUES (DEFAULT)`.
+    public String insertDefaults(String quotedTable, String quotedKeyColumn) {
+        return insertDefaults(quotedTable);
+    }
+
+    /// A text column of at most `length` characters, for a column that is
+    /// indexed or bounded: VARCHAR(n) on most engines, NVARCHAR(n) on SQL
+    /// Server, whose VARCHAR is not Unicode, and VARCHAR2(n CHAR) on Oracle.
+    public String varchar(int length) {
+        return "VARCHAR(" + length + ")";
     }
 
     /// `count` rows starting at `offset`, or an empty string when both
@@ -221,6 +262,34 @@ public abstract class Dialect {
         out.append(" LIMIT ").append(count < 0 ? unboundedLimit() : String.valueOf(count));
         if (offset > 0) {
             out.append(" OFFSET ").append(offset);
+        }
+        return out.toString();
+    }
+
+    /// As [#limit(int, int)], told whether the statement it is appended to
+    /// already has an ORDER BY.
+    ///
+    /// It matters on SQL Server alone, where the paging clause is PART of ORDER
+    /// BY and a statement without one cannot be paged at all; there an unordered
+    /// statement is given an ordering that sorts nothing.
+    public String limit(int count, int offset, boolean ordered) {
+        return limit(count, offset);
+    }
+
+    /// The standard paging clause, which SQL Server and Oracle take in place of
+    /// LIMIT. `fetchNeedsOffset` is SQL Server's rule that FETCH cannot stand
+    /// without an OFFSET before it.
+    static String offsetFetch(int count, int offset, boolean fetchNeedsOffset) {
+        if (count < 0 && offset <= 0) {
+            return "";
+        }
+        StringBuilder out = new StringBuilder();
+        if (offset > 0 || fetchNeedsOffset) {
+            out.append(" OFFSET ").append(offset > 0 ? offset : 0).append(" ROWS");
+        }
+        if (count >= 0) {
+            out.append(offset > 0 || fetchNeedsOffset ? " FETCH NEXT " : " FETCH FIRST ")
+                    .append(count).append(" ROWS ONLY");
         }
         return out.toString();
     }
@@ -256,7 +325,7 @@ public abstract class Dialect {
         if (sql == null) {
             throw new IOException("No statement");
         }
-        return Placeholders.render(sql, paramCount, dollarPlaceholders(), nestedBlockComments(),
+        return Placeholders.render(conditionalDdl(sql), paramCount, parameterMarker(), nestedBlockComments(),
                 backslashEscapesInLiterals(), hashLineComments(), dollarQuotedStrings(),
                 dashCommentNeedsSpace(), bracketIdentifiers(),
                 executableComments());
@@ -552,9 +621,148 @@ public abstract class Dialect {
                 executableComments());
     }
 
+    /// `sql` with a leading `CREATE TABLE IF NOT EXISTS`, `CREATE INDEX IF
+    /// NOT EXISTS`, `DROP TABLE IF EXISTS` or `DROP VIEW IF EXISTS` spelled
+    /// the way this engine spells it.
+    ///
+    /// The conditional forms are part of the portable form, like the ?
+    /// placeholder: SQLite, PostgreSQL and MySQL take them as written, and the
+    /// engines that have no such clause get the test their own way here, so the
+    /// runtime's own tables and an application's are created by one statement
+    /// wherever it runs.
+    String conditionalDdl(String sql) {
+        return sql;
+    }
+
+    /// The parts of a conditional DDL statement, or null when `sql` is not one:
+    /// the verb and kind ("CREATE TABLE", "CREATE INDEX", "CREATE UNIQUE INDEX",
+    /// "DROP TABLE", "DROP VIEW"), the object's name as written, and the rest of
+    /// the statement after the name.
+    static String[] conditionalParts(String sql) {
+        int at = blanks(sql, 0);
+        boolean create = sql.regionMatches(true, at, "CREATE", 0, 6);
+        if (!create && !sql.regionMatches(true, at, "DROP", 0, 4)) {
+            return null;
+        }
+        at = blanks(sql, at + (create ? 6 : 4));
+        String unique = "";
+        if (create && word(sql, at, "UNIQUE")) {
+            unique = "UNIQUE ";
+            at = blanks(sql, at + 6);
+        }
+        String kind;
+        if (word(sql, at, "TABLE") && unique.length() == 0) {
+            kind = "TABLE";
+        } else if (word(sql, at, "INDEX") && create) {
+            kind = "INDEX";
+        } else if (word(sql, at, "VIEW") && !create) {
+            kind = "VIEW";
+        } else {
+            return null;
+        }
+        at = blanks(sql, at + kind.length());
+        if (!word(sql, at, "IF")) {
+            return null;
+        }
+        at = blanks(sql, at + 2);
+        if (create) {
+            if (!word(sql, at, "NOT")) {
+                return null;
+            }
+            at = blanks(sql, at + 3);
+        }
+        if (!word(sql, at, "EXISTS")) {
+            return null;
+        }
+        at = blanks(sql, at + 6);
+        int end = nameEnd(sql, at);
+        if (end <= at) {
+            return null;
+        }
+        return new String[] {(create ? "CREATE " : "DROP ") + unique + kind,
+            sql.substring(at, end), sql.substring(end)};
+    }
+
+    /// "ALTER TABLE t ADD COLUMN c ..." without the COLUMN, which SQL Server
+    /// and Oracle do not accept; null for any other statement.
+    static String addColumn(String sql) {
+        int at = blanks(sql, 0);
+        if (!word(sql, at, "ALTER")) {
+            return null;
+        }
+        at = blanks(sql, at + 5);
+        if (!word(sql, at, "TABLE")) {
+            return null;
+        }
+        at = blanks(sql, nameEnd(sql, blanks(sql, at + 5)));
+        if (!word(sql, at, "ADD")) {
+            return null;
+        }
+        int column = blanks(sql, at + 3);
+        if (!word(sql, column, "COLUMN")) {
+            return null;
+        }
+        return sql.substring(0, at + 3) + sql.substring(column + 6);
+    }
+
+    static int blanks(String sql, int from) {
+        int at = from;
+        while (at < sql.length() && sql.charAt(at) <= ' ') {
+            at++;
+        }
+        return at;
+    }
+
+    static boolean word(String sql, int at, String word) {
+        int end = at + word.length();
+        return sql.regionMatches(true, at, word, 0, word.length())
+                && (end >= sql.length() || sql.charAt(end) <= ' ');
+    }
+
+    /// Where the possibly quoted, possibly dotted name starting at `from` ends.
+    static int nameEnd(String sql, int from) {
+        int at = from;
+        while (at < sql.length()) {
+            char c = sql.charAt(at);
+            if (c == '[' || c == '"' || c == '`') {
+                char close = c == '[' ? ']' : c;
+                at++;
+                while (at < sql.length()) {
+                    if (sql.charAt(at) == close) {
+                        if (at + 1 < sql.length() && sql.charAt(at + 1) == close) {
+                            at++;
+                        } else {
+                            break;
+                        }
+                    }
+                    at++;
+                }
+                at++;
+            } else if (c <= ' ' || c == '(' || c == ';') {
+                break;
+            } else {
+                at++;
+            }
+        }
+        return at > sql.length() ? sql.length() : at;
+    }
+
+    /// `text` as the body of a single-quoted SQL literal.
+    static String literalBody(String text) {
+        return text.indexOf('\'') < 0 ? text : text.replace("'", "''");
+    }
+
     /// Whether this engine's parameters are written $1, $2 rather than ?.
     boolean dollarPlaceholders() {
         return false;
+    }
+
+    /// What a numbered parameter opens with, or null where parameters stay ?.
+    ///
+    /// Three engines number them and none agrees on the spelling: $1 on
+    /// PostgreSQL, @p1 on SQL Server, :1 on Oracle.
+    String parameterMarker() {
+        return dollarPlaceholders() ? "$" : null;
     }
 
     /// Whether a backslash escapes the next character inside an ordinary string
@@ -637,6 +845,360 @@ public abstract class Dialect {
     }
 
     /// The shared identifier quoting, parameterised on the quote character.
+    /// Microsoft SQL Server, 2017 and later, and Azure SQL.
+    private static final class SqlServerDialect extends Dialect {
+        /// The collation every text column is given.
+        ///
+        /// The server default is case and accent insensitive, so eq("name", "A")
+        /// would match a stored "a" here and nothing on the other engines; a
+        /// binary collation makes equality byte equality, as MySQL's columns are
+        /// given one for. BIN2 rather than a _UTF8 collation: those arrived in
+        /// SQL Server 2019 and the columns are NVARCHAR, which needs none.
+        ///
+        /// It does NOT make a trailing space significant. SQL Server pads the
+        /// shorter operand of = under every collation, so that difference is
+        /// answered where the comparison is written, not here.
+        private static final String TEXT_COLLATION = "Latin1_General_100_BIN2";
+
+        @Override
+        public String getName() {
+            return "sqlserver";
+        }
+
+        /// Brackets, with a closing bracket doubled. Double quotes would work
+        /// only while QUOTED_IDENTIFIER is on, which a session can turn off.
+        @Override
+        public String quote(String identifier) {
+            if (identifier == null || identifier.length() == 0) {
+                throw new IllegalArgumentException("An SQL identifier cannot be empty");
+            }
+            StringBuilder out = new StringBuilder(identifier.length() + 4);
+            out.append('[');
+            for (int iter = 0 ; iter < identifier.length() ; iter++) {
+                char c = identifier.charAt(iter);
+                if (c == 0) {
+                    throw new IllegalArgumentException("An SQL identifier cannot hold a NUL: '"
+                            + identifier + "'");
+                }
+                if (c == ']') {
+                    out.append(']');
+                }
+                out.append(c);
+            }
+            out.append(']');
+            return out.toString();
+        }
+
+        @Override
+        public String columnType(int kind) {
+            switch (kind) {
+                case INTEGER:
+                    return "INT";
+                case BIGINT:
+                case TIMESTAMP:
+                    return "BIGINT";
+                case BOOLEAN:
+                    // Not BIT, so that every engine stores 0/1 as a number and
+                    // every read decodes the same way.
+                    return "SMALLINT";
+                case REAL:
+                    return "FLOAT(53)";
+                case BLOB:
+                    return "VARBINARY(MAX)";
+                default:
+                    return "NVARCHAR(MAX) COLLATE " + TEXT_COLLATION;
+            }
+        }
+
+        @Override
+        public String varchar(int length) {
+            return "NVARCHAR(" + length + ") COLLATE " + TEXT_COLLATION;
+        }
+
+        @Override
+        public String generatedKeyColumn(int kind) {
+            return (kind == INTEGER ? "INT" : "BIGINT") + " IDENTITY(1,1) NOT NULL PRIMARY KEY";
+        }
+
+        /// A (MAX) column cannot be indexed, so a text key is bounded, at the
+        /// length MySQL's is.
+        @Override
+        public String assignedKeyColumn(int kind) {
+            if (kind == TEXT) {
+                return "NVARCHAR(255) COLLATE " + TEXT_COLLATION + " NOT NULL PRIMARY KEY";
+            }
+            return columnType(kind) + " NOT NULL PRIMARY KEY";
+        }
+
+        /// Appended to a statement the caller says nothing about, this takes it
+        /// to be ordered: an ORDER BY added to one that has its own is a syntax
+        /// error, which is the worse of the two mistakes.
+        @Override
+        public String limit(int count, int offset) {
+            return offsetFetch(count, offset, true);
+        }
+
+        @Override
+        public String limit(int count, int offset, boolean ordered) {
+            String paging = offsetFetch(count, offset, true);
+            if (ordered || paging.length() == 0) {
+                return paging;
+            }
+            return " ORDER BY (SELECT NULL)" + paging;
+        }
+
+        /// NULLS FIRST is a syntax error here and is not needed: SQL Server
+        /// already sorts a null below every value, so ascending puts the nulls
+        /// first and descending puts them last.
+        @Override
+        public String orderBy(String quotedColumn, boolean ascending, boolean text) {
+            return quotedColumn + (ascending ? " ASC" : " DESC");
+        }
+
+        @Override
+        String parameterMarker() {
+            return "@p";
+        }
+
+        /// MERGE is SQL Server's upsert, and like ON CONFLICT it may update a
+        /// row instead of inserting one, so no generated key is its answer.
+        @Override
+        public boolean updatesOnConflict(String sql) throws IOException {
+            if (super.updatesOnConflict(sql)) {
+                return true;
+            }
+            int at = blanks(sql, 0);
+            return word(sql, at, "MERGE");
+        }
+
+        /// SQL Server refuses an empty ESCAPE and has no default one, and it
+        /// reads `[` as the start of a character class. So the escape is `!`,
+        /// and [#likePattern] escapes `!` and `[` to keep both literal.
+        @Override
+        public String likeOperator() {
+            return " LIKE ? ESCAPE '!'";
+        }
+
+        @Override
+        public String likePattern(String pattern) {
+            if (pattern == null || pattern.indexOf('!') < 0 && pattern.indexOf('[') < 0) {
+                return pattern;
+            }
+            StringBuilder out = new StringBuilder(pattern.length() + 4);
+            for (int iter = 0 ; iter < pattern.length() ; iter++) {
+                char c = pattern.charAt(iter);
+                if (c == '!' || c == '[') {
+                    out.append('!');
+                }
+                out.append(c);
+            }
+            return out.toString();
+        }
+
+        /// SQL Server has DROP ... IF EXISTS and no CREATE ... IF NOT EXISTS, so
+        /// the two CREATE forms are guarded by a lookup of the object.
+        @Override
+        String conditionalDdl(String sql) {
+            String added = addColumn(sql);
+            if (added != null) {
+                return added;
+            }
+            String[] parts = conditionalParts(sql);
+            if (parts == null || !parts[0].startsWith("CREATE")) {
+                return sql;
+            }
+            if ("CREATE TABLE".equals(parts[0])) {
+                return "IF OBJECT_ID(N'" + literalBody(parts[1]) + "', N'U') IS NULL CREATE TABLE "
+                        + parts[1] + parts[2];
+            }
+            // CREATE [UNIQUE] INDEX name ON table (...): the index is looked up by
+            // name on its table, since two tables may each have one of that name.
+            String rest = parts[2];
+            int on = blanks(rest, 0);
+            if (!word(rest, on, "ON")) {
+                return sql;
+            }
+            int table = blanks(rest, on + 2);
+            int tableEnd = nameEnd(rest, table);
+            return "IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'"
+                    + literalBody(unquoted(parts[1])) + "' AND object_id = OBJECT_ID(N'"
+                    + literalBody(rest.substring(table, tableEnd)) + "')) " + parts[0] + " "
+                    + parts[1] + rest;
+        }
+
+        private static String unquoted(String name) {
+            if (name.length() >= 2 && name.charAt(0) == '[') {
+                return name.substring(1, name.length() - 1).replace("]]", "]");
+            }
+            if (name.length() >= 2 && name.charAt(0) == '"') {
+                return name.substring(1, name.length() - 1).replace("\"\"", "\"");
+            }
+            return name;
+        }
+
+        @Override
+        boolean bracketIdentifiers() {
+            return true;
+        }
+    }
+
+    /// Oracle Database, 19c and later.
+    private static final class OracleDialect extends Dialect {
+        @Override
+        public String getName() {
+            return "oracle";
+        }
+
+        @Override
+        public String varchar(int length) {
+            return "VARCHAR2(" + length + " CHAR)";
+        }
+
+        /// Oracle before 23ai has no IF [NOT] EXISTS, so the statement runs
+        /// without it in a block that ignores the one error the clause would
+        /// have avoided: ORA-00955 (or ORA-01408, an index on the same columns)
+        /// for a CREATE, ORA-00942 for a DROP.
+        @Override
+        String conditionalDdl(String sql) {
+            String added = addColumn(sql);
+            if (added != null) {
+                return added;
+            }
+            String[] parts = conditionalParts(sql);
+            if (parts == null) {
+                return sql;
+            }
+            boolean create = parts[0].startsWith("CREATE");
+            String plain = parts[0] + " " + parts[1] + parts[2];
+            if (!create && "DROP TABLE".equals(parts[0])) {
+                plain += " CASCADE CONSTRAINTS";
+            }
+            return "BEGIN EXECUTE IMMEDIATE '" + plain.replace("'", "''")
+                    + "'; EXCEPTION WHEN OTHERS THEN IF SQLCODE NOT IN ("
+                    + (create ? "-955, -1408" : "-942") + ") THEN RAISE; END IF; END;";
+        }
+
+        /// Upper case inside the quotes, because Oracle folds an UNQUOTED name to
+        /// upper case: `"USERS"` is the table a hand-written `SELECT * FROM users`
+        /// reads, where `"users"` would be a different table that only quoted
+        /// SQL could reach. The client folds an all-upper-case column label back
+        /// to lower case, so rows are keyed the way they are on PostgreSQL.
+        @Override
+        ///
+        /// Oracle has no escape for `"` inside a quoted name -- doubling it ends
+        /// the identifier and starts another token -- so such a name is refused.
+        public String quote(String identifier) {
+            if (identifier != null && identifier.indexOf('"') >= 0) {
+                throw new IllegalArgumentException("An Oracle identifier cannot contain '\"': "
+                        + identifier);
+            }
+            return quoteWith(asciiUpper(identifier), '"');
+        }
+
+        /// Oracle returns the key through `RETURNING ... INTO`; there is no
+        /// connection-wide last id to ask for afterwards.
+        @Override
+        public boolean generatedKeysThroughReturning() {
+            return true;
+        }
+
+        @Override
+        public String returningClause(String quotedColumn) {
+            return " RETURNING " + quotedColumn + " INTO :cn1_key";
+        }
+
+        @Override
+        public String insertDefaults(String quotedTable, String quotedKeyColumn) {
+            return "INSERT INTO " + quotedTable + " (" + quotedKeyColumn + ") VALUES (DEFAULT)";
+        }
+
+        @Override
+        public boolean upsertKeysThroughReturning() {
+            return false;
+        }
+
+        /// MERGE is Oracle's upsert.
+        @Override
+        public boolean updatesOnConflict(String sql) throws IOException {
+            if (super.updatesOnConflict(sql)) {
+                return true;
+            }
+            return word(sql, blanks(sql, 0), "MERGE");
+        }
+
+        /// Oracle refuses an empty ESCAPE, and LIKE without one has no escape
+        /// character at all, which is what the empty ESCAPE asks for elsewhere.
+        @Override
+        public String likeOperator() {
+            return " LIKE ?";
+        }
+
+        @Override
+        public String columnType(int kind) {
+            switch (kind) {
+                case INTEGER:
+                    return "NUMBER(10)";
+                case BIGINT:
+                case TIMESTAMP:
+                    return "NUMBER(19)";
+                case BOOLEAN:
+                    return "NUMBER(1)";
+                case REAL:
+                    return "BINARY_DOUBLE";
+                case BLOB:
+                    return "BLOB";
+                default:
+                    // VARCHAR2 and not CLOB: a CLOB cannot stand in a
+                    // comparison, an ORDER BY, a GROUP BY or a DISTINCT, so eq()
+                    // on a string column would be refused outright. The price
+                    // is the bound -- 4000 bytes unless the database was created
+                    // with MAX_STRING_SIZE=EXTENDED -- where the other engines'
+                    // string columns have none.
+                    return "VARCHAR2(4000 CHAR)";
+            }
+        }
+
+        /// BY DEFAULT, as on PostgreSQL, so a caller that supplies its own key
+        /// inserts a value the column accepts.
+        @Override
+        public String generatedKeyColumn(int kind) {
+            return (kind == INTEGER ? "NUMBER(10)" : "NUMBER(19)")
+                    + " GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY";
+        }
+
+        @Override
+        public String assignedKeyColumn(int kind) {
+            if (kind == TEXT) {
+                return "VARCHAR2(255 CHAR) NOT NULL PRIMARY KEY";
+            }
+            return columnType(kind) + " NOT NULL PRIMARY KEY";
+        }
+
+        @Override
+        public String limit(int count, int offset) {
+            return offsetFetch(count, offset, false);
+        }
+
+        @Override
+        String parameterMarker() {
+            return ":";
+        }
+    }
+
+    /// ASCII-only upper case: `toUpperCase()` follows the default locale, and
+    /// under Turkish an `i` becomes a dotted capital I that names another table.
+    static String asciiUpper(String text) {
+        if (text == null) {
+            return null;
+        }
+        StringBuilder out = new StringBuilder(text.length());
+        for (int iter = 0 ; iter < text.length() ; iter++) {
+            char c = text.charAt(iter);
+            out.append(c >= 'a' && c <= 'z' ? (char) (c - 32) : c);
+        }
+        return out.toString();
+    }
+
     static String quoteWith(String identifier, char quote) {
         if (identifier == null || identifier.length() == 0) {
             throw new IllegalArgumentException("An SQL identifier cannot be empty");

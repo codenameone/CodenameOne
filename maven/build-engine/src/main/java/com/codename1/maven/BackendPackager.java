@@ -102,6 +102,7 @@ public class BackendPackager {
     protected String cflags;
     /// Link the bundled SQLite engine.
     protected boolean sqlite = true;
+    protected String database;
     /// Make a failed cast throw.
     protected boolean checkedCasts = true;
     /// Whether the binary carries the development MCP tools; see [#devTools(boolean)].
@@ -167,6 +168,13 @@ public class BackendPackager {
     /// Sets [sqlite].
     public BackendPackager sqlite(boolean v) {
         this.sqlite = v;
+        return this;
+    }
+
+    /// Sets the database engine the build declared (`cn1.backend.database`),
+    /// unchecked; [BackendEngines#require] judges it when the package is built.
+    public BackendPackager database(String v) {
+        this.database = v;
         return this;
     }
 
@@ -262,6 +270,10 @@ public class BackendPackager {
         File runtimeJar = resolve("com.codenameone", "codenameone-backend",
                 runtimeVersion, "parparvm-sources");
         unzip(runtimeJar, runtimeSources, nativeSources);
+        // ONE server engine's class out of the several the jar carries; the
+        // clients of the rest are then referenced by nothing. Judged before
+        // anything is compiled, so an undeclared engine is the first error.
+        BackendEngines.select(runtimeSources, BackendEngines.require(database, sqlite));
         File parparvmBundle = resolve("com.codenameone", "codenameone-parparvm",
                 runtimeVersion, "bundle");
         File bundleDir = new File(work, "parparvm");

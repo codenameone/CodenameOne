@@ -270,9 +270,22 @@ public final class Dao<T> {
     /// that matches a large table materialised the whole of it, mapped every row
     /// into an entity, and then dropped all but one. [Query#first] has
     /// always done this; this is the hand-written half catching up.
+    /// Whether caller-written SQL says ORDER BY, compared without folding case
+    /// so a Turkish default locale cannot change the answer. A mention inside
+    /// a literal or subquery reads as ordered, which costs SQL Server an error
+    /// naming the missing ORDER BY rather than a wrong page.
+    static boolean mentionsOrderBy(String sql) {
+        for (int at = 0 ; at + 8 <= sql.length() ; at++) {
+            if (sql.regionMatches(true, at, "ORDER BY", 0, 8)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     public T findOne(String where, Object[] params) throws IOException {
         String tail = where == null || where.length() == 0 ? "" : " WHERE " + where;
-        List found = list(table.select(tail + table.dialect.limit(1, 0)), params);
+        List found = list(table.select(tail + table.dialect.limit(1, 0, mentionsOrderBy(tail))), params);
         return found.isEmpty() ? (T) null : (T) found.get(0);
     }
 

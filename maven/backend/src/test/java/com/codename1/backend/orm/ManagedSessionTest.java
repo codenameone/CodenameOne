@@ -390,7 +390,11 @@ class ManagedSessionTest {
                 public String table() { return explicit?"bulk_text_explicit":"bulk_text_default"; }
                 public Attribute[] attributes() {
                     Attribute[] attrs=super.attributes().clone();
-                    attrs[3]=new Attribute("name","name",Attribute.TEXT,false,false,true,false,explicit?"VARCHAR(512)":null);
+                    // VARCHAR is not Unicode on SQL Server; NVARCHAR is. Oracle's
+                    // VARCHAR counts bytes unless told CHAR.
+                    String declared="sqlserver".equals(db.dialect().getName())?"NVARCHAR(512)"
+                            :"oracle".equals(db.dialect().getName())?"VARCHAR2(512 CHAR)":"VARCHAR(512)";
+                    attrs[3]=new Attribute("name","name",Attribute.TEXT,false,false,true,false,explicit?declared:null);
                     return attrs;
                 }
                 public com.codename1.impl.orm.Index[] indexes() { return new com.codename1.impl.orm.Index[]{new com.codename1.impl.orm.Index("",true,new String[]{"name"})}; }
@@ -407,7 +411,10 @@ class ManagedSessionTest {
                     if(explicit) { assertEquals(1,query.executeUpdate());session.commitTransaction();session.clear(); }
                     else { assertThrows(PersistenceException.class,query::executeUpdate);session.rollbackTransaction();assertEquals("original",session.find(Record.class,row.id).name); }
                 }
-                String unicode=new String(new char[255]).replace("\0","\ud83d\ude00");
+                // SQL Server bounds NVARCHAR(n) in UTF-16 units, so a character
+                // outside the BMP takes two of the 255.
+                boolean utf16Bound="sqlserver".equals(db.dialect().getName());
+                String unicode=new String(new char[utf16Bound?127:255]).replace("\0","\ud83d\ude00");
                 session.beginTransaction();session.find(Record.class,row.id).name=unicode;session.commitTransaction();session.clear();assertEquals(unicode,session.find(Record.class,row.id).name);
                 for(String value:new String[]{boundary,unicode,null}) {
                     session.beginTransaction();assertEquals(1,session.createQuery("update ManagedSessionTest$Record r set r.name=:value").setParameter("value",value).executeUpdate());session.commitTransaction();session.clear();assertEquals(value,session.find(Record.class,row.id).name);

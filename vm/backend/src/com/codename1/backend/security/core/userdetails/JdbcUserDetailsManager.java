@@ -22,6 +22,8 @@
  */
 package com.codename1.backend.security.core.userdetails;
 
+import com.codename1.impl.backend.security.SecuritySupport;
+
 import com.codename1.backend.DataSource;
 import com.codename1.backend.Database;
 import com.codename1.backend.security.AccessDeniedException;
@@ -104,8 +106,8 @@ public class JdbcUserDetailsManager implements UserDetailsManager, UserDetailsPa
         // Ordered here rather than by the database, whose idea of text order
         // follows its locale: the same user reads the same on every engine.
         java.util.Collections.sort(granted);
-        return User.withUsername(String.valueOf(row.get("username")))
-                .password(String.valueOf(row.get("password")))
+        return User.withUsername(SecuritySupport.storedText(row.get("username")))
+                .password(SecuritySupport.storedText(row.get("password")))
                 .authorities(granted.toArray(new String[granted.size()]))
                 .disabled(!truth(row.get("enabled")))
                 .accountExpired(!truth(row.get("account_non_expired")))

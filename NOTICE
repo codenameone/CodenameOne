@@ -380,3 +380,9 @@ is kept verbatim beside the models.
   the Knight, Barbarian, Mage and Rogue of the KayKit "Character Pack:
   Adventurers" by Kay Lousberg (www.kaylousberg.com), CC0 1.0, as repacked
   for scripts/skirmish by scripts/skirmish/tools/pack-models.py.
+
+vm/backend/src/com/codename1/backend/sql/Oracle.java is a Java rewrite of the
+thin-mode protocol layer of python-oracledb
+(https://github.com/oracle/python-oracledb), Copyright (c) 2020, 2024, Oracle
+and/or its affiliates, dual-licensed under the Universal Permissive License
+1.0 and the Apache License 2.0. The file keeps that notice verbatim.

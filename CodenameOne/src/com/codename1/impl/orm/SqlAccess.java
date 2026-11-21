@@ -55,7 +55,7 @@ public interface SqlAccess {
     /// Returns the DDL type for an application-assigned key.
     String assignedKeyColumn(int kind);
     /// Returns an insert-default-values statement for an already quoted table name.
-    String insertDefaults(String quotedTable);
+    String insertDefaults(String quotedTable, String quotedKeyColumn);
     /// Returns the pagination clause; a negative limit means unlimited results.
     String limit(int limit, int offset);
     /// Applies ordering collation to a selected expression so DISTINCT can order it.

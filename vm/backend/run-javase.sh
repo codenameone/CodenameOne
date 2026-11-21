@@ -93,4 +93,6 @@ CP="$OUT"
 if [ -n "$DRIVERS" ]; then CP="$CP:$DRIVERS"; fi
 # Not exec: the trap above has to run so the class directory does not accumulate.
 # The JVM is in this shell's process group, so Ctrl-C still reaches it.
-"$JAVA" -cp "$CP" "$MAIN" "$@"
+# The JVM runtime carries every wire client and still answers for ONE engine, the
+# one declared, exactly as build.sh compiles one in; same variable, same default.
+"$JAVA" -Dcn1.backend.database="${CN1_BACKEND_DATABASE:-sqlite}" -cp "$CP" "$MAIN" "$@"

@@ -59,7 +59,8 @@ if [[ -d "$REPO_ROOT/vm/backend/impl/parparvm" ]] && command -v javac >/dev/null
   # vm/JavaAPI on the class path: the backend installs the class library's
   # file host (com.codename1.impl.JdkHost, PosixJdkHost), which only JavaAPI
   # has. The JDK still answers java.* -- the class path cannot override it.
-  if { find "$REPO_ROOT/vm/backend/src" "$REPO_ROOT/vm/backend/impl/parparvm" -name '*.java' -print \
+  if { find "$REPO_ROOT/vm/backend/src" "$REPO_ROOT/vm/backend/impl/parparvm" \
+              "$REPO_ROOT/vm/backend/engines/none" -name '*.java' -print \
        && "$REPO_ROOT/vm/backend/shared-sources.sh"; } \
        | tr '\n' '\0' | xargs -0 javac -nowarn -cp "$REPO_ROOT/vm/JavaAPI/target/classes" \
            -d "$REPO_ROOT/$backend_build" >/dev/null 2>&1; then

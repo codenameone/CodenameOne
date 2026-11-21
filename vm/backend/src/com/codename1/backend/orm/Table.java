@@ -113,7 +113,7 @@ final class Table {
             // column list builds "INSERT INTO t () VALUES ()", which SQLite and
             // PostgreSQL both refuse, so the row could not be created at all --
             // and each engine spells the no-columns insert its own way.
-            this.insertSql = dialect.insertDefaults(quotedTable);
+            this.insertSql = dialect.insertDefaults(quotedTable, quotedColumns[idIndex]);
         } else {
             StringBuilder insert = new StringBuilder("INSERT INTO ");
             insert.append(quotedTable).append(" (");
@@ -235,7 +235,7 @@ final class Table {
             // other column still goes through the shared value check.
             out[iter] = insertColumns[iter] == idIndex
                     ? key(raw)
-                    : value(raw, columns[insertColumns[iter]].getField());
+                    : required(value(raw, columns[insertColumns[iter]].getField()), columns[insertColumns[iter]]);
         }
         return out;
     }
@@ -249,8 +249,8 @@ final class Table {
     Object[] updateParams(Object entity) throws IOException {
         Object[] out = new Object[updateColumns.length + 1];
         for (int iter = 0 ; iter < updateColumns.length ; iter++) {
-            out[iter] = value(definition.get(entity, updateColumns[iter]),
-                    columns[updateColumns[iter]].getField());
+            out[iter] = required(value(definition.get(entity, updateColumns[iter]),
+                    columns[updateColumns[iter]].getField()), columns[updateColumns[iter]]);
         }
         out[updateColumns.length] = key(definition.get(entity, idIndex));
         return out;
@@ -339,6 +339,9 @@ final class Table {
         Object[] values = new Object[columns.length];
         for (int iter = 0 ; iter < columns.length ; iter++) {
             values[iter] = lookup(row, columns[iter].getColumn());
+            if (values[iter] == null && loose(columns[iter])) {
+                values[iter] = "";
+            }
         }
         return definition.construct(values);
     }
@@ -399,7 +402,23 @@ final class Table {
         }
         String type = column.getDeclaredType() != null
                 ? column.getDeclaredType() : dialect.columnType(column.getKind());
-        return column.isNullable() ? type : type + " NOT NULL";
+        return column.isNullable() || loose(column) ? type : type + " NOT NULL";
+    }
+
+    /// A required text column that is nullable all the same: Oracle stores ""
+    /// as NULL, so a NOT NULL column there could never hold an empty string.
+    /// The write refuses a null itself and the read answers "" for a NULL.
+    private boolean loose(ColumnDefinition column) {
+        return Dialect.ORACLE.equals(dialect) && column.getKind() == Dialect.TEXT
+                && !column.isNullable() && !column.isId();
+    }
+
+    /// `value` for a required column the database does not guard itself.
+    private Object required(Object value, ColumnDefinition column) throws IOException {
+        if (value == null && loose(column)) {
+            throw new IOException("The value for " + column.getField() + " is null, and the field is required");
+        }
+        return value;
     }
 
     private int[] indicesExcept(int skip) {
