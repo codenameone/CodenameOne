@@ -250,7 +250,7 @@ final class DocxReader {
                 }
                 boolean external = "External".equals(x.attr("TargetMode"));
                 rels.put(id, new String[] {type == null ? "" : type,
-                    external ? target : ZipParts.resolve(part, target), external ? "1" : ""});
+                        external ? target : ZipParts.resolve(part, target), external ? "1" : ""});
             }
         }
     }
@@ -660,7 +660,7 @@ final class DocxReader {
         boolean fieldResult;
         boolean fieldAbandoned;
         boolean fieldLocked;
-        final StringBuilder instr = new StringBuilder();
+        final StringBuilder instr = new StringBuilder(); //NOPMD AvoidStringBufferField - one paragraph text, reset per paragraph
         RichText.Builder result;
         TextStyle fieldStyle;
         ParaState(String id) {
@@ -1128,7 +1128,7 @@ final class DocxReader {
                 if ("begin".equals(x.attr("fldCharType")) && st.fieldDepth == 0) {
                     st.fieldLocked = onOffAttr(x.attr("fldLock"));
                 }
-                fieldChar(x.attr("fldCharType"), st, style);
+                fieldChar(x.attr("fldCharType"), st);
             } else if ("footnoteReference".equals(n) || "endnoteReference".equals(n)) {
                 boolean foot = "footnoteReference".equals(n);
                 String id = x.attr("id");
@@ -1249,7 +1249,7 @@ final class DocxReader {
         return v;
     }
 
-    private void fieldChar(String type, ParaState st, TextStyle style) {
+    private void fieldChar(String type, ParaState st) {
         if ("begin".equals(type)) {
             if (st.fieldDepth == 0 && pendingField != null) {
                 pendingField = null;

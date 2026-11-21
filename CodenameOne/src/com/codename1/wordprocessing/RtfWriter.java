@@ -32,7 +32,6 @@ import java.util.List;
 /// annotations, tracked changes, the title and the page geometry.
 final class RtfWriter {
     private final Document doc;
-    private final StringBuilder out = new StringBuilder();
     private final List<String> fonts = new ArrayList<String>();
     private final List<Integer> colors = new ArrayList<Integer>();
     private final List<String> styles = new ArrayList<String>();
@@ -514,7 +513,7 @@ final class RtfWriter {
             } else {
                 f.append("\\clmrg");
             }
-            return f.toString();
+            return f.toString(); //NOPMD AvoidBranchingStatementAsLastInLoop - the first merge holding the cell
         }
         return "";
     }

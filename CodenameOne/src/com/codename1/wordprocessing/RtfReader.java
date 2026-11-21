@@ -47,7 +47,6 @@ final class RtfReader {
     private final String src;
     private int pos;
     private final Ids ids = new Ids();
-    private final List<String> fonts = new ArrayList<String>();
     private final Map<Integer, String> fontsById = new HashMap<Integer, String>();
     private final List<Integer> colors = new ArrayList<Integer>();
     private final Map<Integer, String> styleNames = new HashMap<Integer, String>();
@@ -161,7 +160,6 @@ final class RtfReader {
         String legacyList;
         int legacyStart;
         boolean inTable;
-        boolean headerRow;
 
         void reset() {
             style = 0;
@@ -440,7 +438,7 @@ final class RtfReader {
                         long v = 0;
                         int digits = 0;
                         while (pos < src.length() && Character.isDigit(src.charAt(pos))) {
-                            if (digits++ < 10) {
+                            if (digits++ < 10) { //NOPMD AssignmentInOperand - counts digits while skipping the excess
                                 v = v * 10 + (src.charAt(pos) - '0');
                             }
                             pos++;
@@ -478,7 +476,7 @@ final class RtfReader {
                 pos++;
             }
             word = src.substring(start, pos);
-            return 't';
+            return 't'; //NOPMD AvoidBranchingStatementAsLastInLoop - the loop only skips line breaks
         }
         return -1;
     }
@@ -574,6 +572,9 @@ final class RtfReader {
         for (Map.Entry<String, int[]> e : rangeStarts.entrySet()) {
             String[] end = rangeEnds.get(e.getKey());
             int[] start = e.getValue();
+            if (start[1] < 0 || start[1] >= comments.size()) {
+                continue;
+            }
             Comment c = comments.get(start[1]);
             String startPara = rangeStartParas.get(e.getKey());
             comments.set(start[1], new Comment(c.id, c.author, c.date, c.text, false, startPara,
@@ -597,7 +598,6 @@ final class RtfReader {
             throw new IOException("The RTF document nests too deeply");
         }
         boolean first = true;
-        String pendingAnnotationId = null;
         while (true) {
             int t = token();
             if (t < 0) {
@@ -636,7 +636,7 @@ final class RtfReader {
                 continue;
             }
             first = false;
-            control(sink, chr, link, pendingAnnotationId);
+            control(sink, chr, link);
         }
     }
 
@@ -646,7 +646,7 @@ final class RtfReader {
         }
     }
 
-    private void control(Sink sink, Chr c, String link, String unused) {
+    private void control(Sink sink, Chr c, String link) {
         String w = word;
         Par p = sink.par;
         int v = param;
@@ -808,13 +808,8 @@ final class RtfReader {
             pageSet = true;
         } else if ("deff".equals(w)) {
             defaultFont = v;
-        } else if ("chatn".equals(w)) {
-            // the annotation's anchor character; the annotation group follows
-            pendingAnchor = true;
         }
     }
-
-    private boolean pendingAnchor;
 
     private void mergeFlag(Sink sink, int flag) {
         int i = Math.min(MAX_COLUMNS - 1, sink.cellDefs);
@@ -1010,7 +1005,6 @@ final class RtfReader {
         }
         if (n.length() > 0 && fontsById.size() < 4096) {
             fontsById.put(Integer.valueOf(id), n);
-            fonts.add(n);
         }
     }
 
@@ -1291,7 +1285,19 @@ final class RtfReader {
                 }
             }
         }
-        RichText shown = result == null ? RichText.EMPTY : result.text.build();
+        RichText shown = RichText.EMPTY;
+        if (result != null) {
+            // a result spanning paragraphs (a table of contents) keeps every line
+            RichText.Builder all = new RichText.Builder();
+            for (Block b : result.blocks) {
+                if (b instanceof Paragraph) {
+                    all.append(((Paragraph) b).text);
+                    all.append("\n", TextStyle.DEFAULT);
+                }
+            }
+            all.append(result.text.build());
+            shown = all.build();
+        }
         if (Ids.asciiLower(instruction).startsWith("hyperlink")) {
             sink.text.append(shown);
             return;
@@ -1422,6 +1428,5 @@ final class RtfReader {
         annotationAuthor = null;
         annotationRef = null;
         annotationDate = null;
-        pendingAnchor = false;
     }
 }

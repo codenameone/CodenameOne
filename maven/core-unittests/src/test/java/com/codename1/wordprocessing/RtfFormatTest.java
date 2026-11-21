@@ -258,5 +258,14 @@ class RtfFormatTest extends UITestBase {
         // hex escapes at the end, huge parameters and a bad picture do not throw
         assertNotNull(read("{\\rtf1 \\fs999999999999 a\\'".getBytes("UTF-8")));
         assertNotNull(read("{\\rtf1 {\\pict\\pngblip zz}}".getBytes("UTF-8")));
+        assertNotNull(read("{\\rtf1 {\\*\\atrfstart 1}x}".getBytes("UTF-8")));
+    }
+
+    @Test
+    void fieldResultOverParagraphsKeepsEveryLine() throws IOException {
+        Document d = read(("{\\rtf1 {\\field{\\*\\fldinst TOC}{\\fldrslt one\\par two}}\\par}")
+                .getBytes("UTF-8"));
+        Field f = (Field) ((Paragraph) d.get(0)).text.objectAt(0);
+        assertEquals("one\ntwo", f.result);
     }
 }

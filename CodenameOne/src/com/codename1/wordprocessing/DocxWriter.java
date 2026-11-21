@@ -54,8 +54,8 @@ final class DocxWriter {
     private final Map<String, String> media = new LinkedHashMap<String, String>();
     private final List<byte[]> mediaData = new ArrayList<byte[]>();
     private final List<String[]> rels = new ArrayList<String[]>();
-    private final StringBuilder footnotes = new StringBuilder();
-    private final StringBuilder endnotes = new StringBuilder();
+    private final StringBuilder footnotes = new StringBuilder(); //NOPMD AvoidStringBufferField - a single-use writer owns its output
+    private final StringBuilder endnotes = new StringBuilder(); //NOPMD AvoidStringBufferField - a single-use writer owns its output
     private final Set<String> styleNames = new LinkedHashSet<String>();
     private final List<Integer> restarts = new ArrayList<Integer>();
     private final Map<String, Integer> commentIds = new LinkedHashMap<String, Integer>();

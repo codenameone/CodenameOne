@@ -74,7 +74,12 @@ public final class Document {
         /// Rich Text Format. Reads and writes character formatting, styles, lists, tables
         /// with merged cells, links, fields, notes, PNG and JPEG pictures, annotations and
         /// tracked changes; nested tables are written as tab separated lines.
-        RTF("rtf");
+        RTF("rtf"),
+
+        /// The binary format of Word 97 to 2003. Read only: styles, lists, tables with merged
+        /// cells, pictures, fields, notes, comments and tracked changes are read; writing
+        /// throws, since files should be saved as DOCX.
+        DOC("doc");
 
         private final String extension;
 
@@ -516,6 +521,9 @@ public final class Document {
         if (format == Format.RTF) {
             return RtfReader.read(readAll(in));
         }
+        if (format == Format.DOC) {
+            return DocReader.read(readAll(in));
+        }
         String text = new String(readAll(in), "UTF-8");
         if (text.length() > 0 && text.charAt(0) == 0xfeff) {
             text = text.substring(1);
@@ -552,6 +560,8 @@ public final class Document {
             OdtWriter.write(this, out);
         } else if (format == Format.RTF) {
             RtfWriter.write(this, out);
+        } else if (format == Format.DOC) {
+            throw new IOException("Writing DOC is not supported; write DOCX instead");
         } else {
             String s;
             switch (format) {

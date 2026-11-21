@@ -54,7 +54,7 @@ final class ZipParts {
         byte[] buffer = new byte[8192];
         try {
             for (ZipEntry e = zip.getNextEntry(); e != null; e = zip.getNextEntry()) {
-                if (++entries > MAX_ENTRIES) {
+                if (++entries > MAX_ENTRIES) { //NOPMD AssignmentInOperand - the entry count bounds a hostile archive
                     throw new IOException("The " + kind + " has more than " + MAX_ENTRIES
                             + " entries");
                 }

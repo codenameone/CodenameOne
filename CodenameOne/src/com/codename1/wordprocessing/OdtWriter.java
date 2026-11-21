@@ -65,7 +65,7 @@ final class OdtWriter {
     private final List<String> pictureNames = new ArrayList<String>();
     private final List<byte[]> pictureData = new ArrayList<byte[]>();
     private final List<String> pictureTypes = new ArrayList<String>();
-    private final StringBuilder changes = new StringBuilder();
+    private final StringBuilder changes = new StringBuilder(); //NOPMD AvoidStringBufferField - a single-use writer owns its output
     private int changeCount;
     private int noteCount;
     private int frameCount;

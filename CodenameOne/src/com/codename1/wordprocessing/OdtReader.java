@@ -71,7 +71,6 @@ final class OdtReader {
         String name;
         String display;
         String parent;
-        String family;
         String listStyle;
         Integer outline;
         final DocxReader.Props run = new DocxReader.Props();
@@ -96,7 +95,7 @@ final class OdtReader {
         }
         XmlScanner s = scanner("styles.xml");
         if (s != null) {
-            readStyles(s, false);
+            readStyles(s);
         }
         String title = readTitle();
         readSettings();
@@ -108,7 +107,7 @@ final class OdtReader {
             }
             String n = x.name;
             if ("automatic-styles".equals(n)) {
-                readStyleChildren(x, true);
+                readStyleChildren(x);
             } else if ("tracked-changes".equals(n)) {
                 trackChanges = !"false".equals(x.attr("track-changes"));
                 readChanges(x);
@@ -154,14 +153,14 @@ final class OdtReader {
 
     // ------------------------------------------------------------------ styles
 
-    private void readStyles(XmlScanner x, boolean automatic) throws IOException {
+    private void readStyles(XmlScanner x) throws IOException {
         for (int e = x.next(); e != XmlScanner.EOF; e = x.next()) {
             if (e != XmlScanner.START) {
                 continue;
             }
             String n = x.name;
             if ("styles".equals(n) || "automatic-styles".equals(n)) {
-                readStyleChildren(x, automatic || "automatic-styles".equals(n));
+                readStyleChildren(x);
             } else if ("master-styles".equals(n)) {
                 for (int f = x.next(); f != XmlScanner.END && f != XmlScanner.EOF; f = x.next()) {
                     if (f == XmlScanner.START) {
@@ -179,7 +178,7 @@ final class OdtReader {
         }
     }
 
-    private void readStyleChildren(XmlScanner x, boolean automatic) throws IOException {
+    private void readStyleChildren(XmlScanner x) throws IOException {
         for (int e = x.next(); e != XmlScanner.END; e = x.next()) {
             if (e == XmlScanner.EOF) {
                 throw new IOException("The OpenDocument file is truncated");
@@ -197,7 +196,6 @@ final class OdtReader {
                 if (s.parent == null && !"default-style".equals(n)) {
                     s.parent = "!default-" + x.attr("family");
                 }
-                s.family = x.attr("family");
                 s.listStyle = x.attr("list-style-name");
                 String outline = x.attr("default-outline-level");
                 if (outline != null) {
