@@ -96,56 +96,84 @@ public final class TestUtils {
     /// #### Returns
     ///
     /// the component with the given name within the tree
-    public static Component findByName(String componentName) {
+    public static Component findByName(final String componentName) {
         if (verbose) {
             log("findByName(" + componentName + ")");
         }
-        Component c = (Component) lookupOnEdt(LOOKUP_NAME, componentName);
+        Component c = (Component) lookupOnEdt(new Lookup() {
+            Object find(Form root) {
+                return findByName(root, componentName);
+            }
+        });
         if (c == null) {
             waitFor(30);
-            return (Component) lookupOnEdt(LOOKUP_NAME, componentName);
+            return (Component) lookupOnEdt(new Lookup() {
+            Object find(Form root) {
+                return findByName(root, componentName);
+            }
+        });
         }
         return c;
     }
 
-    private static final int LOOKUP_NAME = 0;
-    private static final int LOOKUP_LABEL_TEXT = 1;
-    private static final int LOOKUP_TEXT_AREA_TEXT = 2;
+    /// A walk of the current form, run by `lookupOnEdt`.
+    private abstract static class Lookup {
+        abstract Object find(Form root);
+    }
 
-    /// Walks the current form for a component on the EDT. A test runs off the
-    /// EDT while the application keeps rebuilding its forms there, so a walk
-    /// from the test thread read a child count and then indexed a container the
-    /// EDT had emptied in between (IndexOutOfBoundsException from
+    /// Walks the current form on the EDT. A test runs off the EDT while the
+    /// application keeps rebuilding its forms there, so a walk from the test
+    /// thread read a child count and then indexed a container the EDT had
+    /// emptied in between (IndexOutOfBoundsException from
     /// `Container.getComponentAt`). The component tree is EDT-only state, so the
     /// walk is marshalled rather than guarded.
-    private static Object lookupOnEdt(final int kind, final String key) {
-        final Object[] result = new Object[1];
+    private static Object lookupOnEdt(final Lookup lookup) {
+        final Object[] result = new Object[2];
+        final boolean[] done = new boolean[1];
         Runnable r = new Runnable() {
             public void run() {
-                Form root = Display.getInstance().getCurrent();
-                if (root == null) {
-                    return;
-                }
-                switch (kind) {
-                    case LOOKUP_NAME:
-                        result[0] = findByName(root, key);
-                        break;
-                    case LOOKUP_LABEL_TEXT:
-                        result[0] = findLabelText(root, key);
-                        break;
-                    default:
-                        result[0] = findTextAreaText(root, key);
-                        break;
+                // Caught here and rethrown on the caller: RunnableWrapper has no
+                // finally, so a throw would leave the waiter polling to the timeout
+                // and report a stuck EDT instead of the real failure.
+                try {
+                    Form root = Display.getInstance().getCurrent();
+                    result[0] = root == null ? null : lookup.find(root);
+                } catch (Throwable t) {
+                    result[1] = t;
+                } finally {
+                    done[0] = true;
                 }
             }
         };
-        if (Display.getInstance().isEdt()) {
+        Display d = Display.getInstance();
+        if (d.isEdt() || !Display.isInitialized()) {
+            // On the EDT already, or no Codename One running at all: no other
+            // thread is mutating the tree, so the walk is safe where it stands.
             r.run();
         } else {
-            Display.getInstance().callSeriallyAndWait(r);
+            // Never the unbounded callSeriallyAndWait(Runnable): it polls forever,
+            // so an EDT that died, or is blocked waiting on this very thread, would
+            // hang the whole test run instead of failing the one test. The bound
+            // is generous so a slow form build on a CI runner is not mistaken for it.
+            d.callSeriallyAndWait(r, EDT_LOOKUP_TIMEOUT);
+            if (!done[0]) {
+                throw new RuntimeException("The EDT did not run a component lookup within "
+                        + EDT_LOOKUP_TIMEOUT + "ms; it is blocked or no longer running");
+            }
+        }
+        if (result[1] instanceof RuntimeException) {
+            throw (RuntimeException) result[1];
+        }
+        if (result[1] instanceof Error) {
+            throw (Error) result[1];
+        }
+        if (result[1] != null) {
+            throw new RuntimeException(result[1].toString());
         }
         return result[0];
     }
+
+    private static final int EDT_LOOKUP_TIMEOUT = 60000;
 
     /// Selects the given offset in a list
     ///
@@ -223,11 +251,15 @@ public final class TestUtils {
     /// #### Returns
     ///
     /// the component with the given label text within the tree
-    public static Label findLabelText(String text) {
+    public static Label findLabelText(final String text) {
         if (verbose) {
             log("findLabelText(" + text + ")");
         }
-        return (Label) lookupOnEdt(LOOKUP_LABEL_TEXT, text);
+        return (Label) lookupOnEdt(new Lookup() {
+            Object find(Form root) {
+                return findLabelText(root, text);
+            }
+        });
     }
 
 
@@ -943,12 +975,16 @@ public final class TestUtils {
     /// #### Returns
     ///
     /// a component
-    public static Component getComponentByPath(int[] path) {
-        Component current = Display.getInstance().getCurrent().getContentPane();
-        for (int offset : path) {
-            current = ((Container) current).getComponentAt(offset);
-        }
-        return current;
+    public static Component getComponentByPath(final int[] path) {
+        return (Component) lookupOnEdt(new Lookup() {
+            Object find(Form root) {
+                Component current = root.getContentPane();
+                for (int offset : path) {
+                    current = ((Container) current).getComponentAt(offset);
+                }
+                return current;
+            }
+        });
     }
 
 
@@ -2135,8 +2171,12 @@ public final class TestUtils {
     /// #### Returns
     ///
     /// the component with the given TextArea text within the tree
-    public static TextArea findTextAreaText(String text) {
-        return (TextArea) lookupOnEdt(LOOKUP_TEXT_AREA_TEXT, text);
+    public static TextArea findTextAreaText(final String text) {
+        return (TextArea) lookupOnEdt(new Lookup() {
+            Object find(Form root) {
+                return findTextAreaText(root, text);
+            }
+        });
     }
 
     /// Finds a component with the given name, works even with UI's that weren't created with the GUI builder
