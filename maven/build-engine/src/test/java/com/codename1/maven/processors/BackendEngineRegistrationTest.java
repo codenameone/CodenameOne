@@ -63,6 +63,9 @@ public class BackendEngineRegistrationTest {
         assertNull(BackendEngineRegistration.named("sqlite:app.db"));
         assertNull(BackendEngineRegistration.named("jdbc:postgresql://h/db"));
         assertNull(BackendEngineRegistration.named("${DATABASE_URL}"));
+        assertEquals("postgres", BackendEngineRegistration.named("${DATABASE_URL:postgres://localhost/app}"));
+        assertEquals("oracle", BackendEngineRegistration.named(" ${DB:oracle://h/s} "));
+        assertNull(BackendEngineRegistration.named("${DATABASE_URL:/var/app.db}"));
         assertEquals("postgres", BackendEngineRegistration.named("postgres://${DB_HOST}/db"));
         assertNull(BackendEngineRegistration.named(null));
     }

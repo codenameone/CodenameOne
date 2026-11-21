@@ -118,15 +118,25 @@ public class ServerDatabase extends Database {
     @Override
     public void commitTransaction() throws IOException {
         refuseEdt();
-        inTransaction = false;
-        session.commit();
+        try {
+            session.commit();
+        } finally {
+            // Whatever the server answered, this session's transaction is over:
+            // a failed COMMIT has rolled back or lost the connection.
+            inTransaction = false;
+        }
     }
 
     @Override
     public void rollbackTransaction() throws IOException {
         refuseEdt();
-        inTransaction = false;
-        session.rollback();
+        try {
+            session.rollback();
+        } finally {
+            // Whatever the server answered, this session's transaction is over:
+            // a failed COMMIT has rolled back or lost the connection.
+            inTransaction = false;
+        }
     }
 
     @Override

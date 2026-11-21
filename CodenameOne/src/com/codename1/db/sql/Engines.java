@@ -55,6 +55,7 @@ public final class Engines {
         if (url == null) {
             return null;
         }
+        url = url.trim();
         if (hasScheme(url, "postgres://") || hasScheme(url, "postgresql://")) {
             return POSTGRES;
         }

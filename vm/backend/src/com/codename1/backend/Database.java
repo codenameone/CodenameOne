@@ -153,9 +153,12 @@ public final class Database {
         }
         if (connector == null) {
             throw new IOException("The database URL names " + engine + ", which this "
-                    + "application does not include. Declare a cn1.datasource.url naming "
-                    + engine + " in application.properties, so the build includes it, or "
-                    + "call Database.useEngine with its connector.");
+                    + "application was not built with. The build includes the engines named by "
+                    + "cn1.datasource.url in application.properties and its profile files -- a URL "
+                    + "supplied only at run time (CN1_DATASOURCE_URL) is not seen. Declare one, "
+                    + "for example cn1.datasource.url=${CN1_DATASOURCE_URL:" + engine
+                    + "://localhost/app} in application-prod.properties, or call "
+                    + "Database.useEngine with the engine's CONNECTOR.");
         }
         return connector;
     }

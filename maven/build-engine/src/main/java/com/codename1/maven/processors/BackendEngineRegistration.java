@@ -104,6 +104,16 @@ final class BackendEngineRegistration {
             return null;
         }
         String u = url.trim();
+        // ${DATABASE_URL:postgres://localhost/app} -- the default names the
+        // engine the deployment is expected to supply.
+        if (u.startsWith("${")) {
+            int colon = u.indexOf(':');
+            int close = u.lastIndexOf('}');
+            if (colon < 0 || close < colon) {
+                return null;
+            }
+            u = u.substring(colon + 1, close).trim();
+        }
         if (scheme(u, "postgres://") || scheme(u, "postgresql://")) {
             return "postgres";
         }
