@@ -401,6 +401,12 @@ public final class Studio implements AgentTools.Studio {
             final int k = i;
             Button b = new Button(TABS[i], i == index ? "StudioTabSelected" : "StudioTab");
             // Words alone: four icons and four words did not fit a phone.
+            // Five equal cells on a phone are narrower than "Properties" at
+            // the tab font: the label shrinks to its cell rather than clip.
+            b.setAutoSizeMode(true);
+            // Never larger than the stylesheet's tab font (StudioTab, 2.5mm).
+            b.setMaxAutoSize(2.5f);
+            b.setMinAutoSize(1.6f);
             b.setName("tab" + TABS[i]);
             b.addActionListener(ev -> showTab(k));
             tabBar.add(b);

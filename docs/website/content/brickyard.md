@@ -75,6 +75,7 @@ The application source is licensed under [MIT-0](https://github.com/codenameone/
 ![Brick Factory Tycoon](/developer-guide/img/brickyard-tycoon.png)
 ![Kart Loop](/developer-guide/img/brickyard-kart.png)
 ![The Luau script editor](/developer-guide/img/brickyard-script-editor.png)
+![The experimental Logic tab: a touch trigger wired to steps that compile to Luau](/developer-guide/img/brickyard-logic-graph.png)
 ![A play test](/developer-guide/img/brickyard-playtest.png)
 ![The tablet studio](/developer-guide/img/brickyard-studio-tablet.png)
 ![The desktop studio](/developer-guide/img/brickyard-desktop-studio.png)

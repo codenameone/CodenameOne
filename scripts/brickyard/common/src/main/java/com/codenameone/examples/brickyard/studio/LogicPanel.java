@@ -29,7 +29,6 @@ import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
-import com.codename1.ui.layouts.FlowLayout;
 import com.codename1.ui.graph.NodeGraph;
 import com.codenameone.examples.brickyard.rbx.Instance;
 import com.codenameone.examples.brickyard.ui.Ui;
@@ -114,7 +113,9 @@ final class LogicPanel {
         int i = 0;
         for (LogicGraph.Step s : graph.steps()) {
             i++;
-            GraphNode n = new GraphNode("step" + i, s.label(), 0, i * (h + gap), w, h);
+            // Left to right: the pane is wider than tall on a phone and on a
+            // desktop, so a column fitted to it shrank every node to a speck.
+            GraphNode n = new GraphNode("step" + i, s.label(), i * (w + gap), 0, w, h);
             model.addNode(n);
             model.addEdge(prev.getId(), n.getId());
             prev = n;
@@ -124,7 +125,10 @@ final class LogicPanel {
         view.setMinimapVisible(false);
         root.add(BorderLayout.CENTER, view);
 
-        Container palette = new Container(new FlowLayout());
+        // One row that scrolls sideways: wrapped, the steps took four rows of
+        // a phone's pane and left the graph above them no height at all.
+        Container palette = new Container(BoxLayout.x());
+        palette.setScrollableX(true);
         palette.setName("logicPalette");
         palette.add(step("Is a player?", LogicGraph.IS_PLAYER));
         palette.add(step("Add to leaderstat", LogicGraph.ADD_STAT));
@@ -141,7 +145,17 @@ final class LogicPanel {
         root.add(BorderLayout.NORTH, hint("Experimental: the graph compiles to the Luau in this part's "
                 + LogicGraph.SCRIPT_NAME + " script."));
         root.revalidate();
-        CN.callSerially(view::fitToView);
+        final GraphNode newest = prev;
+        CN.callSerially(() -> {
+            // Fitted, a long chain in a phone's short pane shrank to boxes no
+            // one could read: below full size it pans instead, on the newest
+            // step, the one just added.
+            view.fitToView();
+            if (view.getZoom() < 1f) {
+                view.setZoom(1f);
+                view.centerOn(newest);
+            }
+        });
     }
 
     private Button step(String label, final String kind) {
