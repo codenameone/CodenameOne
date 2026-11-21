@@ -94,10 +94,13 @@ public class OpsPages {
     private final Permissions permissions;
     private final ChatInbox chat;
     private final Listings listings;
+    private final com.codenameone.examples.bazaar.channel.Channels channels;
 
     public OpsPages(WebPages pages, WebSessions sessions, DataSource db, Warehouse warehouse,
             Timelines timelines, Forecasts forecasts, Reports reports, Permissions permissions,
-            ChatInbox chat, Listings listings) {
+            ChatInbox chat, Listings listings,
+            com.codenameone.examples.bazaar.channel.Channels channels) {
+        this.channels = channels;
         this.pages = pages;
         this.sessions = sessions;
         this.db = db;
@@ -1064,5 +1067,137 @@ public class OpsPages {
         ImportResultDto r = listings.importCsv(Caller.name(), storeId,
                 new ImportDto(param(request, "csv"), "1".equals(param(request, "commit"))));
         return listings(model, request, storeId, r);
+    }
+
+    // ------------------------------------------------------------- channels
+
+    @GetMapping("/admin/{storeId}/channels")
+    public String channelsPage(@PathVariable("storeId") String storeId, Model model,
+            HttpServer.Request request) throws Exception {
+        pages.admin(request, storeId, "Channels");
+        MarketingView v = view("channels");
+        v.intro = "Marketplaces this store sells on. Stock and price changes are pushed to each "
+                + "listed variant, marketplace orders are pulled in as orders here, and shipments "
+                + "go back with their tracking. A kind the server has no credentials for runs "
+                + "the built-in simulated marketplace.";
+        List<com.codenameone.examples.bazaar.api.ChannelDto> list =
+                channels.list(Caller.name(), storeId);
+        v.cardsTitle = "Channels";
+        String b = base(storeId) + "/channels";
+        for (int iter = 0; iter < list.size(); iter++) {
+            com.codenameone.examples.bazaar.api.ChannelDto c = list.get(iter);
+            ActionCard k = new ActionCard();
+            k.title = c.name();
+            k.detail = c.kind() + (c.configured() ? "" : " (simulated)") + " - " + c.listings()
+                    + " listings" + (c.errors() > 0 ? ", " + c.errors() + " failing" : "")
+                    + (c.lastError().length() > 0 ? " - " + c.lastError() : "");
+            k.status = c.status();
+            k.meta = "Notifications: " + c.notifyUrl();
+            k.url = b + "/" + c.id();
+            k.button("Sync now", b + "/" + c.id() + "/sync", false);
+            k.button("Remove", b + "/" + c.id() + "/remove", true);
+            v.cards.add(k);
+        }
+        FormView f = new FormView("connect", "Connect a marketplace", b, "Connect");
+        FormField kind = field("kind", "Marketplace", "select", "SIMULATED");
+        kind.option("SIMULATED", "Simulated marketplace").option("EBAY", "eBay");
+        f.fields.add(kind);
+        f.fields.add(field("name", "Name", "text", ""));
+        f.fields.add(field("refreshToken", "Refresh token from the marketplace's consent page",
+                "password", ""));
+        f.fields.add(field("webhookSecret", "Notification secret (16+ characters)", "password",
+                ""));
+        v.forms.add(f);
+        return render(model, request, storeId, "Channels", v);
+    }
+
+    @GetMapping("/admin/{storeId}/channels/{id}")
+    public String channelPage(@PathVariable("storeId") String storeId,
+            @PathVariable("id") String id, Model model, HttpServer.Request request)
+            throws Exception {
+        pages.admin(request, storeId, "Channels");
+        MarketingView v = view("channels");
+        String b = base(storeId) + "/channels/" + id;
+        List<com.codenameone.examples.bazaar.api.ChannelListingDto> ls =
+                channels.listings(Caller.name(), storeId, id);
+        v.intro = "Listed variants and what was last pushed for each, then the sync log.";
+        v.cardsTitle = "Listings";
+        for (int iter = 0; iter < ls.size(); iter++) {
+            com.codenameone.examples.bazaar.api.ChannelListingDto l = ls.get(iter);
+            ActionCard k = new ActionCard();
+            k.title = l.title();
+            k.detail = "SKU " + l.externalSku() + (l.externalId().length() > 0 ? " - "
+                    + l.externalId() : "") + " - " + l.pushedQty() + " at "
+                    + com.codenameone.examples.bazaar.channel.Cents.format(
+                    l.pushedPriceCents()) + " (v" + l.version() + ")";
+            k.status = l.status();
+            k.meta = l.lastError();
+            v.cards.add(k);
+        }
+        List<com.codenameone.examples.bazaar.api.SyncLogDto> log =
+                channels.log(Caller.name(), storeId, id);
+        v.rowsTitle = "Sync log";
+        v.rowsEmpty = "Nothing synced yet.";
+        v.headA = "When";
+        v.headB = "What";
+        v.headC = "Outcome";
+        v.headD = "";
+        for (int iter = 0; iter < log.size(); iter++) {
+            com.codenameone.examples.bazaar.api.SyncLogDto e = log.get(iter);
+            v.rows.add(row(com.codenameone.examples.bazaar.Days.iso(e.at()), e.action() + " "
+                    + e.ref() + " - " + e.message(), e.outcome(), ""));
+        }
+        FormView f = new FormView("list", "List a variant", b + "/listings", "List");
+        f.fields.add(field("variant", "Variant SKU in this store", "text", ""));
+        f.fields.add(field("externalSku", "SKU on the marketplace (blank: the same)", "text", ""));
+        f.fields.add(field("externalId", "Marketplace offer id (blank: looked up by SKU)", "text",
+                ""));
+        v.forms.add(f);
+        return render(model, request, storeId, "Channels", v);
+    }
+
+    @PostMapping("/admin/{storeId}/channels")
+    public String connectChannel(@PathVariable("storeId") String storeId,
+            HttpServer.Request request) throws Exception {
+        member(request, storeId);
+        return change(request, base(storeId) + "/channels", "Channel connected",
+                () -> channels.connect(Caller.name(), storeId,
+                        new com.codenameone.examples.bazaar.api.ChannelSetupDto(
+                        param(request, "kind"), param(request, "name"),
+                        param(request, "refreshToken"), param(request, "webhookSecret"))));
+    }
+
+    @PostMapping("/admin/{storeId}/channels/{id}/sync")
+    public String syncChannel(@PathVariable("storeId") String storeId,
+            @PathVariable("id") String id, HttpServer.Request request) throws Exception {
+        member(request, storeId);
+        return change(request, base(storeId) + "/channels/" + id, "Synced",
+                () -> channels.syncNow(Caller.name(), storeId, id));
+    }
+
+    @PostMapping("/admin/{storeId}/channels/{id}/remove")
+    public String removeChannel(@PathVariable("storeId") String storeId,
+            @PathVariable("id") String id, HttpServer.Request request) throws Exception {
+        member(request, storeId);
+        return change(request, base(storeId) + "/channels", "Channel removed",
+                () -> channels.remove(Caller.name(), storeId, id));
+    }
+
+    @PostMapping("/admin/{storeId}/channels/{id}/listings")
+    public String listOnChannel(@PathVariable("storeId") String storeId,
+            @PathVariable("id") String id, HttpServer.Request request) throws Exception {
+        member(request, storeId);
+        return change(request, base(storeId) + "/channels/" + id, "Listed", () -> {
+            Map v = db.queryOne("SELECT v.id FROM variant v JOIN product p ON p.id = v.product_id "
+                    + "WHERE p.store_id = ? AND v.sku = ?", new Object[] {storeId,
+                        param(request, "variant")});
+            if (v == null) {
+                throw new ResponseStatusException(400, "No variant of this store has that SKU");
+            }
+            channels.listVariant(Caller.name(), storeId, id,
+                    new com.codenameone.examples.bazaar.api.ChannelListingDto(null,
+                    Rows.text(v.get("id")), null, param(request, "externalSku"),
+                    param(request, "externalId"), null, 0, 0, 0, null));
+        });
     }
 }

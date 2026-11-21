@@ -50,6 +50,7 @@ public final class MerchantSections {
     public static final String PERMISSIONS = "permissions";
     public static final String INBOX = "inbox";
     public static final String LISTINGS = "listings";
+    public static final String CHANNELS = "channels";
 
     private static boolean installed;
 
@@ -114,5 +115,7 @@ public final class MerchantSections {
                 FontImage.MATERIAL_ADMIN_PANEL_SETTINGS, PermissionsPane::new));
         Sections.register(Nav.MERCHANT, new Section(LISTINGS, "Listings", store,
                 FontImage.MATERIAL_VIEW_MODULE, ListingsPane::new));
+        Sections.register(Nav.MERCHANT, new Section(CHANNELS, "Channels", store,
+                FontImage.MATERIAL_SYNC, ChannelsPane::new));
     }
 }

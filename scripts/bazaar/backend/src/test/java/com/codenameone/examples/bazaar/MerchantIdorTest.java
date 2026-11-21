@@ -196,6 +196,10 @@ class MerchantIdorTest {
         "POST /metafield-values", "GET /metaobject-types", "POST /metaobject-types",
         "GET /metaobject-types/{typeId}/objects", "POST /metaobject-types/{typeId}/objects",
         "DELETE /metaobjects/{objectId}",
+        // Live marketplace sync.
+        "GET /channels", "POST /channels", "POST /channels/{channelId}/remove",
+        "POST /channels/{channelId}/sync", "GET /channels/{channelId}/listings",
+        "POST /channels/{channelId}/listings", "GET /channels/{channelId}/log",
     };
 
     /// Routes of [#ROUTES] served as documents by `DocumentPages` rather than
@@ -227,7 +231,7 @@ class MerchantIdorTest {
         {"disputes", "dispute"}, {"pages", "content_page"}, {"blog-posts", "blog_post"},
         {"menu-links", "menu_link"}, {"redirects", "url_redirect"},
         {"metafields", "metafield_def"}, {"metaobject-types", "metaobject_type"},
-        {"metaobjects", "metaobject_entry"},
+        {"metaobjects", "metaobject_entry"}, {"channels", "sales_channel"},
     };
 
     private static final String NO_SUCH = "no-such-id";

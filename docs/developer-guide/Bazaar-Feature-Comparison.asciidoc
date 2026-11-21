@@ -343,11 +343,11 @@ on a row.
 | Password page / pre-launch | &#8211; | core |  | core |  | 
 | Files library | &#10003; | core |  |  |  | 
 | Metafields / metaobjects | &#10003; | core |  |  |  | 
-| Content translation | &#10003; | core |  |  |  | Pages, policies and posts; menu labels are not translated yet. 
+| Content translation | &#10003; | core |  |  |  | Pages, policies, posts, menu labels, metafield names and metaobject entries, per market language with fallback. 
 | Facebook/Instagram shop | &#8211; | core | app/plugin | core | core | 
 | Google & YouTube | &#9681; | core | app/plugin | core | core | A per-market product feed in XML and CSV for shopping channels; no direct API connection. 
 | TikTok / Pinterest | &#8211; | core | app/plugin |  |  | 
-| Amazon/eBay/Walmart marketplace connect | &#9681; | app/plugin | app/plugin | core |  | Marketplace CSV import with a dry run; no live sync. 
+| Amazon/eBay/Walmart marketplace connect | &#10003; | app/plugin | app/plugin | core |  | Live sync behind a connector interface (eBay-style connector, simulated by default): stock and price push, order pull with signed notifications, tracking push back; plus CSV import. 
 | Supplier and retailer dropship network | &#8211; | core |  |  |  | 
 | Buy button / embeddable | &#8211; | core |  |  |  | 
 | Marketplace (multi-merchant browse) | &#9681; | core |  |  |  | The platform hosts many stores and the app lists them.

@@ -51,6 +51,11 @@ final class GlobalSeed {
                 + "(?, ?, 'idor', 'Idor', 0)", new Object[] {type, s.storeId});
         db.execute("INSERT INTO metaobject_entry (id, store_id, type_id, handle, title, created_at) "
                 + "VALUES (?, ?, ?, 'idor', 'Idor', 0)", new Object[] {Ids.next(), s.storeId, type});
+        db.execute("INSERT INTO sales_channel (id, store_id, kind, name, status, refresh_token, "
+                + "access_token, access_expires_at, webhook_secret, last_pull_at, pull_requested, "
+                + "fail_count, next_attempt_at, last_error, ledger_cursor, created_at) VALUES "
+                + "(?, ?, 'SIMULATED', 'Idor', 'PAUSED', 'x', '', 0, 'idor-secret-0123456789', 0, 0, 0, "
+                + "0, '', 0, 0)", new Object[] {Ids.next(), s.storeId});
         db.execute("INSERT INTO market (id, store_id, code, name, currency, countries, locale, "
                 + "rounding, adjust_bps, active, position, created_at) VALUES "
                 + "(?, ?, 'idor', 'Idor', 'USD', 'CA', '', 'NONE', 0, 1, 0, 0)",

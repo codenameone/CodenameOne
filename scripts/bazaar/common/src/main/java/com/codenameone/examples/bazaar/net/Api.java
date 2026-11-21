@@ -55,6 +55,7 @@ import com.codenameone.examples.bazaar.api.SaleApi;
 import com.codenameone.examples.bazaar.api.ClubApi;
 import com.codenameone.examples.bazaar.api.LoyaltyApi;
 import com.codenameone.examples.bazaar.api.OpsApi;
+import com.codenameone.examples.bazaar.api.ChannelsApi;
 
 /// The server, as the app calls it.
 ///
@@ -99,6 +100,7 @@ public final class Api {
     private static ClubApi clubs;
     private static LoyaltyApi loyalty;
     private static OpsApi ops;
+    private static ChannelsApi channels;
 
     private Api() {
     }
@@ -140,6 +142,7 @@ public final class Api {
         clubs = RestClients.create(ClubApi.class, baseUrl);
         loyalty = RestClients.create(LoyaltyApi.class, baseUrl);
         ops = RestClients.create(OpsApi.class, baseUrl);
+        channels = RestClients.create(ChannelsApi.class, baseUrl);
     }
 
     public static AccountApi account() {
@@ -284,6 +287,11 @@ public final class Api {
     /// Warehouse, forecasts, reports, permissions, chat and listings.
     public static OpsApi ops() {
         return ops;
+    }
+
+    /// Marketplace channels and their sync.
+    public static ChannelsApi channels() {
+        return channels;
     }
 
     public static LoyaltyApi loyalty() {

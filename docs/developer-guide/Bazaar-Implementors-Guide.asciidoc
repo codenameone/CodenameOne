@@ -484,6 +484,44 @@ builds the browser version, has the server host it, and drives it in a headless
 browser.
 
 [[bazaar-before-product]]
+=== Marketplace sync
+
+The back office's Channels page (and the app's Channels section) connects a
+store to a marketplace, lists variants on it and shows a per-channel sync log
+and error state. `channel.ChannelSync` runs every 30 seconds: it pulls orders
+(every two minutes, or at once when a notification arrives), pushes each listed
+variant's available quantity and price when it changed and held still for 20
+seconds, and pushes shipments with their carrier and tracking. A pushed listing
+carries `listing-id:version` as its idempotency key; a pulled order becomes one
+`MARKETPLACE` order per external id, however often it is replayed. A pulled
+order the store cannot cover is still accepted, as an offline register sale is:
+the units go below zero, the order and an audit event (`CHANNEL_OVERSOLD`) say
+so, and every listing of the variant is pushed at once. Failures back off from
+30 seconds to an hour and never touch checkout.
+
+Marketplace notifications go to `POST /api/channels/notifications?channel=ID`,
+signed `sha256=<HMAC-SHA256 hex of the body>` in `X-Bazaar-Channel-Signature`
+with the secret entered when the channel was connected. An unknown channel and
+a bad signature both get 401.
+
+Every marketplace sits behind `channel.MarketplaceConnector`. Without
+configuration every channel runs `SimulatedConnector`, an in-memory marketplace.
+The eBay-style connector is enabled by the application's credentials:
+
+[source,properties]
+----
+bazaar.channels.ebay.client-id=...
+bazaar.channels.ebay.client-secret=...
+# optional
+bazaar.channels.ebay.api-base=https://api.ebay.com
+bazaar.channels.ebay.identity-base=https://api.ebay.com
+bazaar.channels.ebay.marketplace-id=EBAY_US
+----
+
+The seller's refresh token, from the marketplace's consent flow, is entered per
+channel; access tokens are refreshed and stored by the sync. Orders in another
+currency than the store's are logged as errors, not converted.
+
 === Before it's a product
 
 Bazaar runs a store end to end, but several parts are stand-ins for services a
@@ -522,11 +560,9 @@ business contracts for. Plan for these before taking real orders:
 * *Geolocation.* The fraud rule on the client's country reads a header from a
   proxy or CDN. There is no IP database in the server, so without such a proxy
   that rule adds nothing, and the storefront does not pick a market by location.
-* *Marketplace sync.* Marketplace listings are imported once from a CSV file.
-  Keeping stock, prices and orders in step with a live marketplace needs that
-  marketplace's API.
-* *Translated navigation.* Products, collections, pages and posts are translated;
-  menu labels and the storefront's own interface text are not.
+* *Storefront interface text.* Products, collections, pages, posts, menu labels,
+  metafield names and metaobject entries are translated per market; the
+  storefront's own interface text (buttons, checkout labels) is not.
 * *Fraud scoring.* The fraud rules are a fixed point table. A store with real
   volume would add the payment provider's risk signals or a fraud service.
 * *Form signing keys.* The bot guard's and the theme preview's signing keys are
