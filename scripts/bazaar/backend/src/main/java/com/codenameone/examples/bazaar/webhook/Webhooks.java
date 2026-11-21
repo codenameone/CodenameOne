@@ -309,6 +309,14 @@ public class Webhooks {
 
     // -------------------------------------------------------------- merchant
 
+    /// The topics a hook may follow. The list is the same for every store, but
+    /// it is answered only to the store's staff: like every other route under
+    /// a store, a store one does not work at answers 404 (MerchantIdorTest).
+    public List<String> topics(String username, String storeId) throws IOException {
+        access.requireStaff(username, storeId, StoreAccess.MANAGERS);
+        return TOPICS;
+    }
+
     @Transactional(readOnly = true)
     public List<WebhookDto> list(String username, String storeId) throws IOException {
         access.requireStaff(username, storeId, StoreAccess.MANAGERS);

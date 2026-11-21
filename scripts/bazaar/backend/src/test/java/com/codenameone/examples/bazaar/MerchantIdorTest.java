@@ -1,0 +1,332 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
+ */
+package com.codenameone.examples.bazaar;
+
+import com.codename1.backend.DataSource;
+import com.codename1.backend.annotations.Autowired;
+import com.codename1.backend.test.BackendTest;
+import com.codename1.backend.test.MockMvc;
+import com.codename1.backend.test.MockRequestBuilder;
+import com.codenameone.examples.bazaar.account.Accounts;
+import com.codenameone.examples.bazaar.cart.Carts;
+import com.codenameone.examples.bazaar.checkout.Checkouts;
+import com.codenameone.examples.bazaar.inventory.Inventory;
+import com.codenameone.examples.bazaar.pricing.DemoPricing;
+import com.codenameone.examples.bazaar.store.Stores;
+import org.junit.jupiter.api.Test;
+
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.InputStream;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import static com.codename1.backend.test.MockMvcRequestBuilders.delete;
+import static com.codename1.backend.test.MockMvcRequestBuilders.get;
+import static com.codename1.backend.test.MockMvcRequestBuilders.post;
+import static com.codename1.backend.test.MockMvcRequestBuilders.put;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+/// Every route under `/api/merchant/stores/{storeId}` refuses a member of
+/// another store's staff with 404 -- the same answer as a store that does not
+/// exist -- and an id of another store's object under one's own store is not
+/// found either.
+///
+/// [#ROUTES] is every such route the shared API interfaces declare.
+/// [#theListIsEveryRouteTheInterfacesDeclare] reads the interfaces when the
+/// sources are beside the test (a JVM run from the module) and fails on a
+/// route missing here, so a new endpoint is a new line in this list.
+///
+/// The nested ids are real where store B has such a row: a handler that loaded
+/// an object by id without asking whose store it is would answer it. A
+/// placeholder with no row of store B falls back to an id nothing has, and the
+/// test prints which tables those were.
+@BackendTest
+class MerchantIdorTest {
+    /// Method and path after `/api/merchant/stores/{storeId}`.
+    static final String[] ROUTES = {
+        "DELETE /automations/{automationId}", "DELETE /collections/{collectionId}",
+        "DELETE /discounts/{discountId}", "DELETE /hero", "DELETE /locations/{locationId}",
+        "DELETE /logo", "DELETE /products/{productId}/photos/{photoId}",
+        "DELETE /shipping/rates/{rateId}", "DELETE /shipping/zones/{zoneId}",
+        "DELETE /staff/{staffId}", "DELETE /suppliers/{supplierId}", "DELETE /tax-rates/{rateId}",
+        "DELETE /webhooks/{webhookId}", "GET ", "GET /analytics", "GET /analytics/funnel",
+        "GET /automation-catalog", "GET /automations", "GET /automations/{automationId}",
+        "GET /automations/{automationId}/activity", "GET /collections", "GET /customer-export",
+        "GET /customer-segments", "GET /customers", "GET /customers/{customerId}",
+        "GET /discounts", "GET /fulfillments/{id}/rates", "GET /fulfilment/board",
+        "GET /fulfilment/queue", "GET /gift-cards", "GET /inventory", "GET /inventory/low",
+        "GET /inventory/moves", "GET /locations", "GET /lookup", "GET /orders",
+        "GET /orders/{orderId}", "GET /orders/{orderId}/fulfillments",
+        "GET /orders/{orderId}/refunds", "GET /pos/customers", "GET /pos/orders/{orderId}/receipt",
+        "GET /pos/registers", "GET /pos/registers/{registerId}/catalog",
+        "GET /pos/shifts/{shiftId}", "GET /pos/shifts/{shiftId}/cash", "GET /products",
+        "GET /products/{productId}", "GET /purchase-orders", "GET /purchase-orders/{orderId}",
+        "GET /returns", "GET /reviews", "GET /shipping", "GET /staff", "GET /suppliers",
+        "GET /tax-rates", "GET /transfers", "GET /webhook-topics", "GET /webhooks",
+        "GET /webhooks/{webhookId}/deliveries", "POST /automations", "POST /automations-validate",
+        "POST /automations/{automationId}", "POST /collections", "POST /customers/{customerId}",
+        "POST /customers/{customerId}/credit", "POST /discounts", "POST /drafts",
+        "POST /drafts/{orderId}/convert", "POST /drafts/{orderId}/invoice",
+        "POST /fulfillments/{id}/cancel", "POST /fulfillments/{id}/delivered",
+        "POST /fulfillments/{id}/label", "POST /fulfillments/{id}/pack",
+        "POST /fulfillments/{id}/picked-up", "POST /fulfillments/{id}/pickup-ready",
+        "POST /fulfillments/{id}/ship", "POST /fulfilment/board/move", "POST /gift-cards",
+        "POST /gift-cards/{cardId}/disable", "POST /hero", "POST /inventory/adjust",
+        "POST /inventory/count", "POST /inventory/reorder-point", "POST /locations", "POST /logo",
+        "POST /orders/{orderId}/cancel", "POST /orders/{orderId}/fulfillments",
+        "POST /orders/{orderId}/mark-paid", "POST /orders/{orderId}/note",
+        "POST /orders/{orderId}/refunds", "POST /pos/orders/{orderId}/receipt",
+        "POST /pos/registers", "POST /pos/registers/{registerId}",
+        "POST /pos/registers/{registerId}/orders/{orderId}/return",
+        "POST /pos/registers/{registerId}/remove", "POST /pos/registers/{registerId}/sales",
+        "POST /pos/registers/{registerId}/shifts", "POST /pos/registers/{registerId}/sign-in",
+        "POST /pos/shifts/{shiftId}/cash", "POST /pos/shifts/{shiftId}/close", "POST /products",
+        "POST /products/bulk", "POST /products/{productId}/archive",
+        "POST /products/{productId}/duplicate", "POST /products/{productId}/photos",
+        "POST /purchase-orders", "POST /purchase-orders/{orderId}/cancel",
+        "POST /purchase-orders/{orderId}/order", "POST /purchase-orders/{orderId}/receive",
+        "POST /returns/{id}/approve", "POST /returns/{id}/decline", "POST /returns/{id}/receive",
+        "POST /returns/{id}/refund", "POST /reviews/{reviewId}/publish",
+        "POST /reviews/{reviewId}/reject", "POST /shipping/rates", "POST /shipping/zones",
+        "POST /staff", "POST /suppliers", "POST /tax-rates", "POST /transfers",
+        "POST /transfers/{transferId}/cancel", "POST /transfers/{transferId}/receive",
+        "POST /transfers/{transferId}/send", "POST /webhook-deliveries/{deliveryId}/redeliver",
+        "POST /webhooks", "POST /webhooks/{webhookId}", "POST /webhooks/{webhookId}/test",
+        "PUT ", "PUT /collections/{collectionId}", "PUT /locations/{locationId}",
+        "PUT /products/{productId}",
+    };
+
+    /// The table an id placeholder names, by the path segment before it.
+    private static final String[][] TABLES = {
+        {"automations", "automation"}, {"collections", "collection"},
+        {"discounts", "discount"}, {"locations", "location"}, {"photos", "product_photo"},
+        {"products", "product"}, {"rates", "shipping_rate"}, {"zones", "shipping_zone"},
+        {"staff", "store_staff"}, {"suppliers", "supplier"}, {"tax-rates", "tax_rate"},
+        {"webhooks", "webhook"}, {"customers", "customer"}, {"fulfillments", "fulfillment"},
+        {"orders", "store_order"}, {"drafts", "store_order"}, {"registers", "register"},
+        {"shifts", "shift"}, {"purchase-orders", "purchase_order"},
+        {"returns", "return_request"}, {"reviews", "review"}, {"gift-cards", "gift_card"},
+        {"transfers", "stock_transfer"}, {"webhook-deliveries", "webhook_delivery"},
+    };
+
+    private static final String NO_SUCH = "no-such-id";
+
+    @Autowired
+    private MockMvc mvc;
+    @Autowired
+    private Accounts accounts;
+    @Autowired
+    private Stores stores;
+    @Autowired
+    private DemoPricing pricing;
+    @Autowired
+    private DataSource db;
+    @Autowired
+    private Inventory inventory;
+    @Autowired
+    private Carts carts;
+    @Autowired
+    private Checkouts checkouts;
+
+    private final Map<String, String> found = new HashMap<String, String>();
+    private final List<String> fake = new ArrayList<String>();
+
+    /// An id of a row of `table` belonging to `storeId`, or one nothing has.
+    private String idOf(String table, String storeId) {
+        String key = table + "/" + storeId;
+        String id = found.get(key);
+        if (id != null) {
+            return id;
+        }
+        id = NO_SUCH;
+        try {
+            List rows = db.query("SELECT id FROM " + table + " WHERE store_id = ?",
+                    new Object[] {storeId});
+            if (rows != null && !rows.isEmpty()) {
+                Object v = ((Map) rows.get(0)).get("id");
+                if (v != null) {
+                    id = v.toString();
+                }
+            }
+        } catch (Exception noStoreColumn) {
+            // A table keyed some other way: the id nothing has.
+        }
+        if (NO_SUCH.equals(id) && !fake.contains(table)) {
+            fake.add(table);
+        }
+        found.put(key, id);
+        return id;
+    }
+
+    private static String tableFor(String segment) {
+        for (int iter = 0; iter < TABLES.length; iter++) {
+            if (TABLES[iter][0].equals(segment)) {
+                return TABLES[iter][1];
+            }
+        }
+        return null;
+    }
+
+    /// `route`'s path at `storeId`, with the rows of store `owner` as the nested ids.
+    private String path(String route, String storeId, String owner) {
+        String p = route.substring(route.indexOf(' ') + 1);
+        StringBuilder out = new StringBuilder("/api/merchant/stores/").append(storeId);
+        String previous = "";
+        int start = 0;
+        while (start < p.length()) {
+            int slash = p.indexOf('/', start + 1);
+            String seg = p.substring(start + 1, slash < 0 ? p.length() : slash);
+            if (seg.startsWith("{")) {
+                String table = tableFor(previous);
+                out.append('/').append(table == null ? NO_SUCH : idOf(table, owner));
+            } else {
+                out.append('/').append(seg);
+                previous = seg;
+            }
+            start = slash < 0 ? p.length() : slash;
+        }
+        return out.toString();
+    }
+
+    private int as(String user, String route, String path) throws Exception {
+        String method = route.substring(0, route.indexOf(' '));
+        MockRequestBuilder b = "GET".equals(method) ? get(path) : "PUT".equals(method) ? put(path)
+                : "DELETE".equals(method) ? delete(path) : post(path);
+        if ("POST".equals(method) || "PUT".equals(method)) {
+            b = Rest.body(b, "{}");
+        }
+        return Rest.statusOf(mvc, People.asMerchant(b, user));
+    }
+
+    @Test
+    void staffOfOneStoreFindNothingAtAnother() throws Exception {
+        Shop a = new Shop("idor-a", 5, accounts, stores, pricing, db, inventory, carts,
+                checkouts, mvc);
+        Shop b = new Shop("idor-b", 5, accounts, stores, pricing, db, inventory, carts,
+                checkouts, mvc);
+        String orderId = b.buy(People.customer(accounts, "idor-buyer"), 1).id();
+        // More of B's objects, each made the way its owner would; one that
+        // does not take is simply left to the id nothing has.
+        String base = "/api/merchant/stores/" + b.storeId;
+        String[][] seeds = {
+            {"/collections", "{\"title\":\"Idor collection\",\"published\":true}"},
+            {"/suppliers", "{\"name\":\"Idor supplier\"}"},
+            {"/gift-cards", "{\"initialCents\":1000,\"note\":\"idor\"}"},
+            {"/orders/" + orderId + "/fulfillments", "{\"locationId\":\"" + b.locationId
+                + "\",\"method\":\"SHIP\",\"lines\":[]}"},
+            {"/pos/registers", "{\"name\":\"Idor till\",\"locationId\":\"" + b.locationId
+                + "\"}"},
+            {"/purchase-orders", "{\"supplierId\":\"\",\"locationId\":\"" + b.locationId
+                + "\",\"lines\":[{\"variantId\":\"" + b.variantId + "\",\"quantity\":1,"
+                + "\"costCents\":100}]}"},
+        };
+        for (int iter = 0; iter < seeds.length; iter++) {
+            Rest.statusOf(mvc, People.asMerchant(Rest.body(post(base + seeds[iter][0]),
+                    seeds[iter][1]), b.owner));
+        }
+        // A manager of A: the merchant role and a place on A's staff, not the owner.
+        String manager = People.customer(accounts, "idor-manager");
+        Rest.json(mvc, People.asMerchant(Rest.body(post("/api/merchant/stores/" + a.storeId
+                + "/staff"), "{\"username\":\"" + manager + "\",\"role\":\"MANAGER\",\"pin\":\"\"}"),
+                a.owner));
+        // Not a false pass: the same caller reaches its own store.
+        assertEquals(200, as(manager, "GET ", "/api/merchant/stores/" + a.storeId));
+        assertEquals(200, as(manager, "GET /products", "/api/merchant/stores/" + a.storeId
+                + "/products"));
+
+        List<String> leaks = new ArrayList<String>();
+        for (int iter = 0; iter < ROUTES.length; iter++) {
+            String route = ROUTES[iter];
+            int status = as(manager, route, path(route, b.storeId, b.storeId));
+            if (status != 404) {
+                leaks.add(route + " at B answered " + status);
+            }
+            if (route.indexOf('}') > 0) {
+                // B's object under A's own store: never found, never changed.
+                int mixed = as(manager, route, path(route, a.storeId, b.storeId));
+                if (mixed >= 200 && mixed < 300) {
+                    leaks.add(route + " at A with B's ids answered " + mixed);
+                }
+            }
+        }
+        assertTrue(leaks.isEmpty(), leaks.toString());
+        System.out.println("MerchantIdorTest: " + ROUTES.length + " routes; no row of store B in "
+                + fake);
+    }
+
+    @Test
+    void theListIsEveryRouteTheInterfacesDeclare() throws Exception {
+        File dir = new File("../shared/src/main/java/com/codenameone/examples/bazaar/api");
+        String[] names = dir.list();
+        if (names == null) {
+            // A compiled test binary does not run beside the sources.
+            return;
+        }
+        String marker = "/api/merchant/stores/{storeId}";
+        List<String> declared = new ArrayList<String>();
+        for (int iter = 0; iter < names.length; iter++) {
+            if (!names[iter].endsWith(".java")) {
+                continue;
+            }
+            String text = read(new File(dir, names[iter]));
+            int at = text.indexOf("(\"" + marker);
+            while (at >= 0) {
+                int open = text.lastIndexOf('@', at);
+                String method = text.substring(open + 1, at);
+                int end = text.indexOf('"', at + 2);
+                String route = method + " " + text.substring(at + 2 + marker.length(), end);
+                if (!declared.contains(route)) {
+                    declared.add(route);
+                }
+                at = text.indexOf("(\"" + marker, end);
+            }
+        }
+        List<String> mine = new ArrayList<String>();
+        for (int iter = 0; iter < ROUTES.length; iter++) {
+            mine.add(ROUTES[iter]);
+        }
+        List<String> missing = new ArrayList<String>();
+        for (int iter = 0; iter < declared.size(); iter++) {
+            if (!mine.contains(declared.get(iter))) {
+                missing.add(declared.get(iter));
+            }
+        }
+        assertTrue(missing.isEmpty(), "Add to MerchantIdorTest.ROUTES: " + missing);
+        assertEquals(declared.size(), ROUTES.length, "a route listed that no interface declares");
+    }
+
+    private static String read(File f) throws Exception {
+        InputStream in = new FileInputStream(f);
+        try {
+            StringBuilder out = new StringBuilder();
+            byte[] buf = new byte[8192];
+            int n;
+            while ((n = in.read(buf)) > 0) {
+                out.append(new String(buf, 0, n, "UTF-8"));
+            }
+            return out.toString();
+        } finally {
+            in.close();
+        }
+    }
+}

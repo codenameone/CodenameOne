@@ -37,7 +37,7 @@ public class WebhookEndpoint implements WebhookApiServer {
 
     @Override
     public List<String> topics(String storeId) throws Exception {
-        return Webhooks.TOPICS;
+        return webhooks.topics(Caller.name(), storeId);
     }
 
     @Override
