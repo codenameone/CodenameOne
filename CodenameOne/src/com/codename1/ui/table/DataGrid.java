@@ -217,17 +217,17 @@ public class DataGrid extends ScrollSurface {
         getSemantics().setRole(com.codename1.ui.accessibility.AccessibilityRole.GRID)
                 .setChildProvider(new com.codename1.ui.accessibility.AccessibilityChildProvider() {
                     @Override
-                    public java.util.List<com.codename1.ui.accessibility.AccessibilityNode> getAccessibilityChildren(
+                    public List<com.codename1.ui.accessibility.AccessibilityNode> getAccessibilityChildren(
                             Component host) {
                         return accessibilityRows();
                     }
                 });
     }
 
-    private java.util.List<com.codename1.ui.accessibility.AccessibilityNode> accessibilityRows() {
+    private List<com.codename1.ui.accessibility.AccessibilityNode> accessibilityRows() {
         refreshLayout();
-        java.util.List<com.codename1.ui.accessibility.AccessibilityNode> out =
-                new java.util.ArrayList<com.codename1.ui.accessibility.AccessibilityNode>();
+        List<com.codename1.ui.accessibility.AccessibilityNode> out =
+                new ArrayList<com.codename1.ui.accessibility.AccessibilityNode>();
         int n = rows.size();
         getSemantics().setCollectionInfo(new com.codename1.ui.accessibility.AccessibilityCollectionInfo(
                 n + (headerH > 0 ? 1 : 0), vis.length));
