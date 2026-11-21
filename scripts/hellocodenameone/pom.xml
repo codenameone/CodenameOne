@@ -79,6 +79,12 @@
         <artifactId>codenameone-compose-compat</artifactId>
         <version>${cn1.version}</version>
       </dependency>
+      <!-- The Rive runtime, which common/src/main/rive compiles against. -->
+      <dependency>
+        <groupId>com.codenameone</groupId>
+        <artifactId>codenameone-rive-runtime</artifactId>
+        <version>${cn1.version}</version>
+      </dependency>
       <dependency>
         <groupId>com.codenameone</groupId>
         <artifactId>codenameone-unity-compat</artifactId>

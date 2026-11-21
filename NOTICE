@@ -380,3 +380,43 @@ is kept verbatim beside the models.
   the Knight, Barbarian, Mage and Rogue of the KayKit "Character Pack:
   Adventurers" by Kay Lousberg (www.kaylousberg.com), CC0 1.0, as repacked
   for scripts/skirmish by scripts/skirmish/tools/pack-models.py.
+
+-------------------------------------------------------------------------------
+rive-runtime (Rive animation runtime)
+-------------------------------------------------------------------------------
+
+maven/rive-runtime (the runtime) and maven/rive-transcoder (the build-time
+.riv reader) are a Java rewrite of rive-runtime
+(https://github.com/rive-app/rive-runtime), and maven/rive-schema-gen generates
+their object model at build time from rive-runtime's generated headers, a
+pinned unmodified copy of which is in
+maven/rive-schema-gen/src/main/schema/rive-runtime-generated.zip with
+rive-runtime's LICENSE and the upstream commit (UPSTREAM.txt). maven/rive-transcoder/src/test/resources/rive and
+scripts/hellocodenameone/common/src/main/rive hold test files from
+rive-runtime's tests/unit_tests/assets, unmodified. Some of them embed fonts
+under the SIL Open Font License 1.1 (Abel Regular, Copyright (c) 2011 Matthew
+Desmond; Inter Regular, Copyright The Inter Project Authors); the READMEs in
+those directories name each file and what it embeds. Each rewritten file carries
+rive-runtime's MIT licence header:
+
+    MIT License
+
+    Copyright (c) 2020 Rive
+
+    Permission is hereby granted, free of charge, to any person obtaining a copy
+    of this software and associated documentation files (the "Software"), to
+    deal in the Software without restriction, including without limitation the
+    rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+    sell copies of the Software, and to permit persons to whom the Software is
+    furnished to do so, subject to the following conditions:
+
+    The above copyright notice and this permission notice shall be included in
+    all copies or substantial portions of the Software.
+
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+    AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+    FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+    IN THE SOFTWARE.

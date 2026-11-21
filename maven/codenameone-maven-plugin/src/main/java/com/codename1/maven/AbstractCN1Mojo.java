@@ -2415,6 +2415,44 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
     }
 
     /** A transcoder configured exactly as the bound goal would be. */
+    /**
+     * Fails the build, naming the dependency to add, when this module has
+     * {@code .riv} files and {@code com.codename1.rive.RiveFile} is on none of
+     * its compile class path entries. Reads the resolved artifacts when the
+     * running goal resolved them, and the declared dependencies otherwise.
+     */
+    protected void requireRiveRuntime() throws MojoExecutionException {
+        if (!SvgTranscodeRunner.hasRiveSources(project.getBasedir())) {
+            return;
+        }
+        java.util.Set<Artifact> artifacts = project.getArtifacts();
+        if (artifacts != null && !artifacts.isEmpty()) {
+            for (Artifact a : artifacts) {
+                if (!"test".equals(a.getScope()) && a.getFile() != null && hasRiveFileClass(a.getFile())) {
+                    return;
+                }
+            }
+        } else {
+            for (org.apache.maven.model.Dependency d : project.getDependencies()) {
+                if (SvgTranscodeRunner.RIVE_RUNTIME_ARTIFACT.equals(d.getArtifactId()) && !"test".equals(d.getScope())) {
+                    return;
+                }
+            }
+        }
+        throw new MojoExecutionException(SvgTranscodeRunner.missingRiveRuntimeMessage(project.getBasedir()));
+    }
+
+    private static boolean hasRiveFileClass(File entry) {
+        if (entry.isDirectory()) {
+            return new File(entry, SvgTranscodeRunner.RIVE_FILE_CLASS).isFile();
+        }
+        try (java.util.zip.ZipFile zip = new java.util.zip.ZipFile(entry)) {
+            return zip.getEntry(SvgTranscodeRunner.RIVE_FILE_CLASS) != null;
+        } catch (java.io.IOException ex) {
+            return false;
+        }
+    }
+
     protected SvgTranscodeRunner newSvgTranscodeRunner() {
         File placeholders = svgPlaceholderDir != null ? svgPlaceholderDir
                 : new File(project.getBuild().getDirectory(), "css-resources");
@@ -2538,6 +2576,7 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
 
         getLog().info("This project has SVG/Lottie assets but its pom does not run the "
                 + "build-time vector transcoder. Transcoding them now.");
+        requireRiveRuntime();
         try {
             runner.run();
             registerSourceRoot(svgOutputDir());

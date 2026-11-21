@@ -1864,6 +1864,11 @@ public class WindowsImplementation extends CodenameOneImplementation {
     }
 
     @Override
+    public void clearRect(Object graphics, int x, int y, int width, int height) {
+        WindowsNative.clearRect(peer(graphics), x, y, width, height);
+    }
+
+    @Override
     public void drawRect(Object graphics, int x, int y, int width, int height) {
         WindowsNative.drawRect(peer(graphics), x, y, width, height);
     }

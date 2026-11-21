@@ -45,6 +45,10 @@ import org.apache.maven.plugins.annotations.ResolutionScope;
  *   <li>{@code src/main/svg/} -- {@code *.svg}</li>
  *   <li>{@code src/main/lottie/} -- {@code *.json}, {@code *.lottie}</li>
  *   <li>{@code src/main/css/} -- either of the above</li>
+ *   <li>{@code src/main/rive/} -- {@code *.riv}, each translated into a
+ *       {@code com.codename1.rive.RiveFile} subclass in
+ *       {@code com.codename1.generated.rive} ({@code coin.riv} becomes
+ *       {@code CoinRive})</li>
  * </ul>
  * Theme CSS keeps the natural {@code background: url(spinner.svg);}
  * reference for SVG, and the same {@code url(...)} syntax resolves
@@ -79,6 +83,10 @@ public class TranscodeSVGMojo extends AbstractCN1Mojo {
         // project whose pom never binds this mojo. See that class.
         // Parameters live on AbstractCN1Mojo so the self-repair and the
         // placeholder diagnostic resolve the same configuration this goal does.
+        // The Rive runtime is a dependency, not part of the core: a module with
+        // .riv files and no runtime would otherwise fail in javac on classes it
+        // never wrote. Resolution is COMPILE so that check can see the class path.
+        requireRiveRuntime();
         try {
             newSvgTranscodeRunner().run();
         } catch (com.codename1.builders.BuildException ex) {

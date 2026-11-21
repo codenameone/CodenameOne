@@ -34,8 +34,9 @@ import org.gradle.api.tasks.PathSensitive;
 import org.gradle.api.tasks.PathSensitivity;
 import org.gradle.api.tasks.TaskAction;
 
-/// Transcodes the SVG and Lottie assets under `src/main/css` and
-/// `src/main/svg` into Java sources, which the main source set compiles. The
+/// Transcodes the SVG and Lottie assets under `src/main/css`, `src/main/svg`
+/// and `src/main/lottie`, and the Rive files under `src/main/rive`, into Java
+/// sources, which the main source set compiles. The
 /// same [SvgTranscodeRunner] as the Maven plugin's `transcode-svg` goal.
 @CacheableTask
 public abstract class TranscodeSvgTask extends Cn1Task {

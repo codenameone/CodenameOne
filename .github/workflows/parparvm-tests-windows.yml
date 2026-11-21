@@ -46,6 +46,10 @@ on:
       - 'vm/**'
       - 'Ports/WindowsPort/**'
       - 'scripts/hellocodenameone/**'
+      # The Rive screenshot tests draw classes this translator generates.
+      - 'maven/rive-transcoder/**'
+      - 'maven/rive-runtime/**'
+      - 'maven/rive-schema-gen/**'
       # The screenshots this leg compares are produced by the core renderer and
       # the port's native theme, so a change to either can move them. Without
       # these the leg does not run on the pull request that changes them and the
@@ -80,6 +84,10 @@ on:
       - 'vm/**'
       - 'Ports/WindowsPort/**'
       - 'scripts/hellocodenameone/**'
+      # The Rive screenshot tests draw classes this translator generates.
+      - 'maven/rive-transcoder/**'
+      - 'maven/rive-runtime/**'
+      - 'maven/rive-schema-gen/**'
       # The screenshots this leg compares are produced by the core renderer and
       # the port's native theme, so a change to either can move them. Without
       # these the leg does not run on the pull request that changes them and the
@@ -183,6 +191,17 @@ jobs:
           }
           if (-not $ok) { throw "Failed to install Ninja after 3 attempts" }
           ninja --version
+
+      # The runner image's MSVC STL (14.52) static_asserts "expected Clang 22
+      # or newer" (STL1000) while the image's own LLVM is 20, which failed every
+      # C++ unit of the native suite (cn1_windows_browser.cpp first) on x64.
+      # The image pairs the two, not us, so take Microsoft's documented escape
+      # hatch for that check; CMake seeds CMAKE_CXX_FLAGS from CXXFLAGS in the
+      # configure the tests spawn. Drop it once the image's clang catches up.
+      - name: Allow the image's clang with its newer STL
+        shell: pwsh
+        run: |
+          "CXXFLAGS=/D_ALLOW_COMPILER_AND_STL_VERSION_MISMATCH" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
       - name: Verify LLVM / Ninja toolchain
         shell: pwsh
@@ -487,7 +506,7 @@ jobs:
               Write-Host "mvn failed; retrying in $delay s..."
               Start-Sleep -Seconds $delay
             }
-            mvn -B -pl windows,codenameone-maven-plugin,cn1-ads-mock,compose-compat,backend,backend-test -am -DskipTests '-Dmaven.javadoc.skip=true' '-Plocal-dev-javase' install
+            mvn -B -pl windows,codenameone-maven-plugin,cn1-ads-mock,compose-compat,rive-runtime,backend,backend-test -am -DskipTests '-Dmaven.javadoc.skip=true' '-Plocal-dev-javase' install
             if ($LASTEXITCODE -eq 0) { $ok = $true; break }
           }
           if (-not $ok) { throw "mvn install failed after all retries" }

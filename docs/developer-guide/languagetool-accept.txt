@@ -925,3 +925,6 @@ worklet
 # PDF standard font names.
 Zapf
 Fieldline
+# Rive: the canvas a Rive file draws on.
+artboard
+artboards

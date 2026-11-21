@@ -126,6 +126,12 @@ final class AppSupport {
                 com.codename1.maven.KmpProjectImporter.kmpDir(layout.projectDir()))) {
             addFramework(project, "implementation", version, com.codename1.maven.KmpProjectImporter.COMPOSE_ARTIFACT);
         }
+        // Rive files (src/main/rive) become RiveFile subclasses: the runtime is
+        // not part of the core and ships in the application like any library.
+        if (com.codename1.maven.SvgTranscodeRunner.hasRiveSources(layout.projectDir())) {
+            addFramework(project, "implementation", version,
+                    com.codename1.maven.SvgTranscodeRunner.RIVE_RUNTIME_ARTIFACT);
+        }
         addFramework(project, "testImplementation", version, "codenameone-core", "codenameone-javase");
         Configuration framework = resolvable(project, "cn1Framework", "codenameone-core and java-runtime, for local builds");
         framework.setTransitive(false);
@@ -190,11 +196,11 @@ final class AppSupport {
 
         TaskProvider<TranscodeSvgTask> svg = project.getTasks().register("transcodeSvg", TranscodeSvgTask.class, t -> {
             common(t, project, layout, ext, userProperties);
-            t.setDescription("Transcodes SVG and Lottie assets into Java sources");
+            t.setDescription("Transcodes SVG, Lottie and Rive assets into Java sources");
             // Every directory the transcoder reads, or adding an asset to one of
             // them leaves the task up to date and its generated classes stale.
             t.getSources().from(layout.cssDir(), new File(layout.projectDir(), "src/main/svg"),
-                    new File(layout.projectDir(), "src/main/lottie"));
+                    new File(layout.projectDir(), "src/main/lottie"), new File(layout.projectDir(), "src/main/rive"));
             t.getOutputDirectory().set(new File(layout.buildDir(), "generated/sources/cn1-svg"));
             t.getPlaceholderDirectory().set(new File(layout.buildDir(), "css-resources"));
         });
