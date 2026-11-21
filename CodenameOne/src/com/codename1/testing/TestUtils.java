@@ -100,12 +100,51 @@ public final class TestUtils {
         if (verbose) {
             log("findByName(" + componentName + ")");
         }
-        Component c = findByName(Display.getInstance().getCurrent(), componentName);
+        Component c = (Component) lookupOnEdt(LOOKUP_NAME, componentName);
         if (c == null) {
             waitFor(30);
-            return findByName(Display.getInstance().getCurrent(), componentName);
+            return (Component) lookupOnEdt(LOOKUP_NAME, componentName);
         }
         return c;
+    }
+
+    private static final int LOOKUP_NAME = 0;
+    private static final int LOOKUP_LABEL_TEXT = 1;
+    private static final int LOOKUP_TEXT_AREA_TEXT = 2;
+
+    /// Walks the current form for a component on the EDT. A test runs off the
+    /// EDT while the application keeps rebuilding its forms there, so a walk
+    /// from the test thread read a child count and then indexed a container the
+    /// EDT had emptied in between (IndexOutOfBoundsException from
+    /// `Container.getComponentAt`). The component tree is EDT-only state, so the
+    /// walk is marshalled rather than guarded.
+    private static Object lookupOnEdt(final int kind, final String key) {
+        final Object[] result = new Object[1];
+        Runnable r = new Runnable() {
+            public void run() {
+                Form root = Display.getInstance().getCurrent();
+                if (root == null) {
+                    return;
+                }
+                switch (kind) {
+                    case LOOKUP_NAME:
+                        result[0] = findByName(root, key);
+                        break;
+                    case LOOKUP_LABEL_TEXT:
+                        result[0] = findLabelText(root, key);
+                        break;
+                    default:
+                        result[0] = findTextAreaText(root, key);
+                        break;
+                }
+            }
+        };
+        if (Display.getInstance().isEdt()) {
+            r.run();
+        } else {
+            Display.getInstance().callSeriallyAndWait(r);
+        }
+        return result[0];
     }
 
     /// Selects the given offset in a list
@@ -188,7 +227,7 @@ public final class TestUtils {
         if (verbose) {
             log("findLabelText(" + text + ")");
         }
-        return findLabelText(Display.getInstance().getCurrent(), text);
+        return (Label) lookupOnEdt(LOOKUP_LABEL_TEXT, text);
     }
 
 
@@ -2097,7 +2136,7 @@ public final class TestUtils {
     ///
     /// the component with the given TextArea text within the tree
     public static TextArea findTextAreaText(String text) {
-        return findTextAreaText(Display.getInstance().getCurrent(), text);
+        return (TextArea) lookupOnEdt(LOOKUP_TEXT_AREA_TEXT, text);
     }
 
     /// Finds a component with the given name, works even with UI's that weren't created with the GUI builder
