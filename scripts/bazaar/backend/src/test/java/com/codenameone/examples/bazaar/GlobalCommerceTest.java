@@ -191,6 +191,46 @@ class GlobalCommerceTest {
     }
 
     @Test
+    void choosingAMarketKeepsItThroughTheCookie() throws Exception {
+        Shop s = shop("gc-pick");
+        euro(s);
+        String page = "/s/gc-pick/products/gc-pick-mug";
+        Browser b = new Browser(mvc);
+        String shown = body(b.get(page));
+        assertTrue(shown.contains("action=\"/market\"") && shown.contains("value=\"eu\""),
+                "the picker is a form that works without script");
+        // Choosing: back to the page, without a query market that would outrank it.
+        MockResponse chose = b.send(Browser.form("/market", "market", "eu", "back",
+                page + "?market=xx&variant=1"));
+        assertEquals(303, chose.getStatus());
+        assertEquals(page + "?variant=1", chose.getHeader("Location"));
+        assertTrue(chose.getHeader("Set-Cookie").startsWith("market=eu;"), chose.getHeader("Set-Cookie"));
+        assertEquals("/", b.send(Browser.form("/market", "market", "eu", "back", "//evil.example"))
+                .getHeader("Location"), "never an open redirect");
+        MockResponse foreign = b.send(Browser.form("/market", "market", "eu", "back", page)
+                .header("Sec-Fetch-Site", "cross-site"));
+        assertEquals(403, foreign.getStatus(), "refused from another site");
+        // The cookie prices every later page; that copy is the shopper's alone.
+        b.market = "eu";
+        MockResponse kept = b.get(page);
+        assertTrue(body(kept).contains("9.20"), "converted without a query");
+        assertTrue(kept.getHeader("Cache-Control").startsWith("private"), kept.getHeader("Cache-Control"));
+        // The store's own prices forget the choice; the shared copy varies by Cookie.
+        MockResponse cleared = b.send(Browser.form("/market", "market", "", "back", page));
+        assertTrue(cleared.getHeader("Set-Cookie").startsWith("market=;")
+                && cleared.getHeader("Set-Cookie").contains("Max-Age=0"), cleared.getHeader("Set-Cookie"));
+        b.market = null;
+        MockResponse plain = b.get(page);
+        assertTrue(plain.getHeader("Cache-Control").startsWith("public"), plain.getHeader("Cache-Control"));
+        assertTrue(plain.getHeader("Vary").contains("Cookie"), plain.getHeader("Vary"));
+        assertNull(plain.getHeader("Set-Cookie"), "a shared page sets no cookie");
+    }
+
+    private static String body(MockResponse r) throws Exception {
+        return r.getContentAsString();
+    }
+
+    @Test
     void marketsAreStoreScopedAndManagersOnly() throws Exception {
         Shop a = shop("gc-mk-a");
         Shop b = shop("gc-mk-b");

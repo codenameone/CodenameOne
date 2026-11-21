@@ -276,14 +276,23 @@ async function storefrontExtras() {
         countries: 'DE, FR', locale: 'de', rounding: 'NONE', adjustBps: '0', active: 'true',
         fxSource: 'manual' });
     const buyer = await browser.newContext({ viewport: { width: 1100, height: 900 } });
-    // ?market= prices one page; the checkout reads the `market` cookie a
-    // shopper's earlier pick left (StorefrontMarkets), so the buyer holds it.
-    await buyer.addCookies([{ name: 'market', value: 'e2e', url: origin }]);
+    // The shopper picks the market on a product page (a form post that sets
+    // the `market` cookie, MarketChoice); every later page and the checkout
+    // keep it with no query in the address.
     const b = await buyer.newPage();
     try {
-      await b.goto(origin + '/s/' + store + '?market=e2e', { waitUntil: 'load' });
+      await b.goto(origin + '/s/' + store, { waitUntil: 'load' });
       await b.locator('a[href*="/products/"]').first().click();
       await b.waitForLoadState('load');
+      await Promise.all([b.waitForNavigation({ waitUntil: 'load' }),
+          b.locator('form[action="/market"] button[value=e2e]').click()]);
+      if (/[?&]market=/.test(b.url())) {
+        throw new Error('choosing a market left a query market: ' + b.url());
+      }
+      const chosen = await b.locator('form[action="/market"] button[value=e2e]').getAttribute('aria-pressed');
+      if (chosen !== 'true') {
+        throw new Error('the picker does not mark the chosen market');
+      }
       await b.locator('form.add button[type=submit]').click();
       await b.waitForURL(/\/cart$/);
       await b.locator('a.checkout').click();

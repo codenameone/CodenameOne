@@ -101,6 +101,8 @@ public final class StorefrontMarkets {
         public String locale;
         /// The interface language ([StoreText#LANGUAGES]).
         public String ui = "en";
+        /// Each choice, its `url` the market code ([MarketChoice]; empty for the
+        /// store's own prices).
         public final List<LinkView> picker = new ArrayList<LinkView>();
         /// The market the visitor's country suggests ([GeoCountry]), offered in a
         /// banner and never applied; null when there is none.
@@ -151,11 +153,12 @@ public final class StorefrontMarkets {
         boolean chose = code != null;
         StringBuilder links = new StringBuilder();
         String current = c.pricer == null ? null : c.pricer.market().getCode();
-        c.picker.add(new LinkView(store.getCurrency() + " (store prices)", path, current == null));
+        c.picker.add(new LinkView(store.getCurrency() + " (store prices)", "", current == null));
         for (int iter = 0; iter < all.size(); iter++) {
             MarketDto m = all.get(iter);
             String href = path + "?market=" + SiteUrls.encode(m.code());
-            c.picker.add(new LinkView(m.name() + " (" + m.currency() + ")", href,
+            // The picker posts the code ([MarketChoice]); the address is the alternate.
+            c.picker.add(new LinkView(m.name() + " (" + m.currency() + ")", m.code(),
                     m.code().equals(current)));
             String lang = Locales.orNull(m.locale());
             if (lang != null) {
@@ -223,7 +226,7 @@ public final class StorefrontMarkets {
         c.chose = chose;
         suggest(c, geo, request, path, ex);
         c.picker.set(0, new LinkView(store.getCurrency() + " ("
-                + StoreText.table(c.ui).get("storePrices") + ")", path, current == null));
+                + StoreText.table(c.ui).get("storePrices") + ")", "", current == null));
         return c;
     }
 
@@ -241,7 +244,8 @@ public final class StorefrontMarkets {
         }
     }
 
-    /// The first active market selling to `country`, as a link, or null.
+    /// The first active market selling to `country`, as a label and the code
+    /// [MarketChoice] posts, or null.
     static LinkView suggest(List<MarketDto> all, String country, String path, String ui) {
         if (country == null) {
             return null;
@@ -253,7 +257,7 @@ public final class StorefrontMarkets {
                 if (country.equalsIgnoreCase(cs.get(at))) {
                     return new LinkView(StoreText.format(StoreText.table(ui), "geoNote",
                             country, m.name(), m.currency()),
-                            path + "?market=" + SiteUrls.encode(m.code()), false);
+                            m.code(), false);
                 }
             }
         }

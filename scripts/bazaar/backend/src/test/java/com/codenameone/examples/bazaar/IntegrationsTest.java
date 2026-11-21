@@ -223,7 +223,8 @@ class IntegrationsTest {
             String shown = body(get(page).header("CF-IPCountry", "de")
                     .header("User-Agent", agent));
             assertTrue(shown.contains("Shopping from DE"), "the banner");
-            assertTrue(shown.contains("?market=de"), "links the market");
+            assertTrue(shown.contains("action=\"/market\"") && shown.contains("value=\"de\""),
+                    "a button that chooses the market");
             // The suggestion never prices the page: still the store's own prices.
             assertTrue(shown.contains(currency + " (store prices)"));
             // Unknown and Tor count as none; the second trusted header is read.
