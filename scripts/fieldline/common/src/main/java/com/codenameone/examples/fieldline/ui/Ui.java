@@ -675,6 +675,12 @@ public final class Ui {
         if ("SCHEDULED".equals(status)) {
             return "Scheduled";
         }
+        if ("AWAITING_PARTS".equals(status)) {
+            return "Awaiting parts";
+        }
+        if ("BLOCKED".equals(status)) {
+            return "Blocked";
+        }
         if ("EN_ROUTE".equals(status)) {
             return "En route";
         }
@@ -695,7 +701,8 @@ public final class Ui {
         if ("EN_ROUTE".equals(status) || "ON_SITE".equals(status)) {
             return "FlBadgeLive";
         }
-        return "UNASSIGNED".equals(status) ? "FlBadgeWarn" : "FlBadge";
+        return "UNASSIGNED".equals(status) || "AWAITING_PARTS".equals(status)
+                || "BLOCKED".equals(status) ? "FlBadgeWarn" : "FlBadge";
     }
 
     /// A time of day, `14:05`.

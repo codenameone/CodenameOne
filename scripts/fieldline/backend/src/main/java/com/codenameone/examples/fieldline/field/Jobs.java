@@ -426,6 +426,63 @@ public class Jobs {
         return out;
     }
 
+    /// Moves a job between the intake states: UNASSIGNED, AWAITING_PARTS and
+    /// BLOCKED. Nothing here schedules: a released job is UNASSIGNED and
+    /// waits for the board or the next planner run. Holding a SCHEDULED job
+    /// takes it off its technician's route, and their day is told. It runs as
+    /// a change to the plan, under `Planner.publish`: a planner run writing
+    /// back at the same moment would otherwise put the job back on a route.
+    public JobDto intake(final String id, final String status) throws IOException {
+        final String[] before = new String[1];
+        final JobDto[] held = new JobDto[1];
+        planner.publish(new Planner.Change() {
+            @Override
+            public ScheduleRunDto run() throws IOException {
+                held[0] = hold(id, status, before);
+                return null;
+            }
+        });
+        JobDto out = held[0];
+        if (before[0] != null) {
+            live.jobChanged(out.id(), out.status(), usernameOf(before[0]));
+        }
+        return out;
+    }
+
+    @Transactional(rollbackFor = IOException.class)
+    JobDto hold(String id, String status, String[] previousTech) throws IOException {
+        if (!Catalog.UNASSIGNED.equals(status) && !Catalog.isHeld(status)) {
+            throw new ResponseStatusException(409, "Jobs are scheduled on the board, not here");
+        }
+        Job job = id == null ? null : jobs.findById(id);
+        if (job == null) {
+            throw new ResponseStatusException(404, "No such job");
+        }
+        String from = job.getStatus();
+        if (!Catalog.isOpen(from)) {
+            throw new ResponseStatusException(409, "That job is closed");
+        }
+        if (Catalog.isUnderWay(from)) {
+            throw new ResponseStatusException(409, "That job has started; it stays with its technician");
+        }
+        if (Catalog.SCHEDULED.equals(from) && Catalog.UNASSIGNED.equals(status)) {
+            throw new ResponseStatusException(409, "Take a scheduled job off the plan on the board");
+        }
+        if (job.getTechId().length() > 0) {
+            previousTech[0] = job.getTechId();
+            job.setPreviousTechId(job.getTechId());
+            job.setTechId("");
+            job.setPlannedStart(0);
+            job.setPlannedEnd(0);
+            job.setTravelBefore(0);
+            job.setSequence(0);
+        }
+        job.setStatus(status);
+        job.setUpdatedAt(System.currentTimeMillis());
+        jobs.save(job);
+        return toDto(job, sites.findById(job.getSiteId()), "", false);
+    }
+
     @Transactional(readOnly = true)
     String usernameOf(String techId) {
         Technician t = techId == null || techId.length() == 0 ? null : technicians.findById(techId);
@@ -439,6 +496,9 @@ public class Jobs {
         String from = job.getStatus();
         int a = order(from);
         int b = order(status);
+        if (Catalog.isHeld(from)) {
+            throw new ResponseStatusException(409, "That job is on hold");
+        }
         if (b < 0 || b <= a || Catalog.CANCELLED.equals(from)) {
             throw new ResponseStatusException(409, "A " + from + " job cannot become " + status);
         }

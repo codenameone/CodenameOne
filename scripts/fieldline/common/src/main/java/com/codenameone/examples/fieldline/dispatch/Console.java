@@ -58,6 +58,7 @@ public final class Console implements Nav.Home {
     static final String JOBS = "jobs";
     static final String CREW = "crew";
     private static final String TIME_OFF = "timeoff";
+    private static final String INTAKE = "intake";
     private static final String RUNS = "runs";
     private static final String ASSISTANT = "assistant";
     static final String ACCOUNTS = "accounts";
@@ -157,6 +158,8 @@ public final class Console implements Nav.Home {
             page("Staffing", Reports.page());
         } else if (RULES.equals(id)) {
             page("Company settings", BackOffice.rules());
+        } else if (INTAKE.equals(id)) {
+            page("Intake", IntakeBoard.content(form, () -> go(BOARD)));
         } else if (TIME_OFF.equals(id)) {
             page("Time-off requests", TimeOffQueueForm.content(form));
         } else if (ASSISTANT.equals(id)) {
@@ -246,6 +249,7 @@ public final class Console implements Nav.Home {
         list.add(Ui.label("Dispatch", "WlSideLabel"));
         place(list, BOARD, FontImage.MATERIAL_VIEW_TIMELINE, "Board");
         place(list, JOBS, FontImage.MATERIAL_HANDYMAN, "Jobs");
+        place(list, INTAKE, FontImage.MATERIAL_VIEW_KANBAN, "Intake");
         place(list, TIME_OFF, FontImage.MATERIAL_BEACH_ACCESS, "Time-off requests");
         place(list, RUNS, FontImage.MATERIAL_HISTORY, "Planner runs");
         place(list, REPORTS, FontImage.MATERIAL_INSERT_CHART, "Staffing");

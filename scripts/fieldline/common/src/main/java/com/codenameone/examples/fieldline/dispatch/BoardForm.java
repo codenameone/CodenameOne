@@ -134,6 +134,8 @@ public final class BoardForm implements Nav.Home {
         Menu menu = new Menu(form, Nav.DISPATCH);
         menu.item(FontImage.MATERIAL_ADD_TASK, "New job", "newJob",
                 () -> NewJobForm.show(form, this::load));
+        menu.item(FontImage.MATERIAL_VIEW_KANBAN, "Intake", "intake",
+                () -> IntakeBoard.show(form));
         menu.item(FontImage.MATERIAL_BEACH_ACCESS, "Time-off requests", "timeOffQueue",
                 () -> TimeOffQueueForm.show(form, this::load));
         menu.item(FontImage.MATERIAL_HANDYMAN, "Jobs", "jobs",
@@ -413,8 +415,11 @@ public final class BoardForm implements Nav.Home {
             ScheduleItem item = new ScheduleItem(j.id(), j.title(), start, end)
                     .setResourceId(row).setDetail(j.siteName()).setUserObject(j)
                     .setColor(jobColor(j));
+            // A held job is released on the intake board before it can be
+            // placed; the server refuses the move either way.
             boolean locked = "COMPLETED".equals(j.status()) || "ON_SITE".equals(j.status())
-                    || "EN_ROUTE".equals(j.status());
+                    || "EN_ROUTE".equals(j.status()) || "AWAITING_PARTS".equals(j.status())
+                    || "BLOCKED".equals(j.status());
             item.setMovable(!locked);
             item.setResizable(false);
             model.addItem(item);
