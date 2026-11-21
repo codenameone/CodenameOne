@@ -106,15 +106,13 @@ JAVA
         $(find "$APP/gen" -name '*.java')
     for engine in $ENGINES; do
         case "$engine" in
-            postgresql) url="$CN1_SQLA_POSTGRES"; db=postgres ;;
-            mysql) url="$CN1_SQLA_MYSQL"; db=mysql ;;
-            mariadb) url="$CN1_SQLA_MARIADB"; db=mysql ;;
+            postgresql) url="$CN1_SQLA_POSTGRES" ;;
+            mysql) url="$CN1_SQLA_MYSQL" ;;
+            mariadb) url="$CN1_SQLA_MARIADB" ;;
         esac
-        # A backend carries one server engine (cn1.backend.database); on Java SE
-        # it is read from this property, and a URL naming any other is refused.
         out="$APP/$engine.out"
-        "$J17/bin/java" -Dcn1.backend.database="$db" -cp "$APP/classes:$BACKEND:$CORE" com.pybackend.Reset "$url"
-        "$J17/bin/java" -Dcn1.backend.database="$db" -cp "$APP/classes:$BACKEND:$CORE" com.pybackend.Main "$url" >"$out" 2>&1 || true
+        "$J17/bin/java" -cp "$APP/classes:$BACKEND:$CORE" com.pybackend.Reset "$url"
+        "$J17/bin/java" -cp "$APP/classes:$BACKEND:$CORE" com.pybackend.Main "$url" >"$out" 2>&1 || true
         if diff -u "$CONF/$prog.out" "$out" >"$APP/$engine.diff"; then
             echo "PASS $prog on $engine"
         else

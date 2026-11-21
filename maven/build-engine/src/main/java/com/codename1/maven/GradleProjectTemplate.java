@@ -24,14 +24,11 @@ package com.codename1.maven;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.util.Properties;
 
 /// The files that make a directory a Codename One Gradle project, from the one
 /// template every generator shares.
@@ -142,39 +139,6 @@ public final class GradleProjectTemplate {
                                 .replace("__BACKEND__", taskPrefix));
             }
         }
-        declareBackendDatabase(backendDir, "sqlite");
-    }
-
-    /// Leaves `cn1.backend.database=engine` in `backendDir/gradle.properties`,
-    /// unless that file declares an engine already. An undeclared engine fails
-    /// the build, so a backend nobody has edited yet has to carry one.
-    ///
-    /// Appended to a file that exists, unlike everything else here: a
-    /// backend-only project's `gradle.properties` is the root one, which the
-    /// scaffolding has just written, and a project that had the file before
-    /// its backend keeps what is in it.
-    public static void declareBackendDatabase(File backendDir, String engine) throws IOException {
-        File f = new File(backendDir, "gradle.properties");
-        String declaration = text("backend/gradle.properties.txt")
-                .replace(BackendEngines.PROPERTY + "=sqlite", BackendEngines.PROPERTY + "=" + engine);
-        if (!f.exists()) {
-            write(f, declaration);
-            return;
-        }
-        // Parsed, not searched: a comment may name the property.
-        Properties existing = new Properties();
-        InputStream in = new FileInputStream(f);
-        try {
-            existing.load(in);
-        } finally {
-            in.close();
-        }
-        if (existing.getProperty(BackendEngines.PROPERTY) != null) {
-            return;
-        }
-        String current = new String(Files.readAllBytes(f.toPath()), StandardCharsets.UTF_8);
-        String separator = current.isEmpty() ? "" : current.endsWith("\n") ? "\n" : "\n\n";
-        Files.write(f.toPath(), (current + separator + declaration).getBytes(StandardCharsets.UTF_8));
     }
 
     private static void write(File f, String text) throws IOException {

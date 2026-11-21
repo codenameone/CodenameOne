@@ -30,10 +30,12 @@ import java.io.UnsupportedEncodingException;
 import java.util.List;
 import java.util.Map;
 
-import com.codename1.backend.sql.Dialect;
-import com.codename1.backend.sql.Engines;
-import com.codename1.backend.sql.QueryRows;
-import com.codename1.backend.sql.ServerEngine;
+import com.codename1.db.sql.Dialect;
+import com.codename1.db.sql.Engines;
+import com.codename1.db.sql.QueryRows;
+import com.codename1.db.sql.ServerSession;
+import com.codename1.db.sql.TransactionIsolation;
+import java.util.HashMap;
 
 /// One database API over SQLite, PostgreSQL and MySQL, chosen by URL.
 ///
@@ -105,22 +107,57 @@ public final class Database {
     /// statement already running on it. HttpServer publishes its own `running` flag
     /// the same way.
     private volatile boolean sqliteClosed; //NOPMD AvoidUsingVolatile - read without the monitor, see above
-    /// The server engine this application was built with, or null when this
-    /// connection is SQLite. One class, whichever engine it is: see
-    /// [ServerEngine].
-    private final ServerEngine engine;
+    /// The server session, or null when this connection is SQLite.
+    private final ServerSession engine;
     private final String describedAs;
     /// WHICH ENGINE THIS IS, as the things that differ between them rather than as
     /// a name to branch on. Chosen from the URL before anything is connected, and
     /// immutable afterwards, so asking is free on the request path.
     private final Dialect dialect;
 
-    private Database(Db sqlite, ServerEngine engine, String describedAs,
+    private Database(Db sqlite, ServerSession engine, String describedAs,
                      Dialect dialect) throws IOException {
         this.sqlite = sqlite;
         this.engine = engine;
         this.describedAs = describedAs;
         this.dialect = dialect;
+    }
+
+    /// The server engines this application can open, by canonical name. The
+    /// build fills it from the URLs the application declares (see
+    /// [#useEngine]); an engine nobody names is never referenced and is stripped.
+    private static final Map<String, ServerSession.Connector> ENGINES =
+            new HashMap<String, ServerSession.Connector>();
+
+    static {
+        BackendSqlPlatform.install();
+    }
+
+    /// Lets [#open] reach the engine `connector` serves, for example
+    /// `Database.useEngine(com.codename1.db.sql.Postgres.CONNECTOR)`.
+    ///
+    /// An application rarely calls this: the build calls it for every engine
+    /// named by a `cn1.datasource.url` in `application.properties` (or its
+    /// profile files). Code that opens other URLs of its own names their engines
+    /// here, which is also what puts each one in the binary.
+    public static void useEngine(ServerSession.Connector connector) {
+        synchronized (ENGINES) {
+            ENGINES.put(connector.engine(), connector);
+        }
+    }
+
+    private static ServerSession.Connector engineFor(String engine) throws IOException {
+        ServerSession.Connector connector;
+        synchronized (ENGINES) {
+            connector = ENGINES.get(engine);
+        }
+        if (connector == null) {
+            throw new IOException("The database URL names " + engine + ", which this "
+                    + "application does not include. Declare a cn1.datasource.url naming "
+                    + engine + " in application.properties, so the build includes it, or "
+                    + "call Database.useEngine with its connector.");
+        }
+        return connector;
     }
 
     /// A unit of work run inside [#transaction].
@@ -136,12 +173,9 @@ public final class Database {
         }
         String wanted = Engines.named(url);
         if (wanted != null) {
-            // ONE server engine is compiled into an application, so a URL naming
-            // another is refused here by name -- it used to be a choice made at
-            // run time between clients that were all linked in.
-            Engines.require(wanted, ServerEngine.built());
+            ServerSession.Connector connector = engineFor(wanted);
             Url parsed = Url.parse(url, Engines.defaultPort(wanted));
-            ServerEngine session = ServerEngine.connect(wanted, parsed.host, parsed.port,
+            ServerSession session = connector.connect(parsed.host, parsed.port,
                     parsed.path, parsed.user, parsed.password, parsed.sslMode,
                     parsed.caFile, parsed.timeoutMillis, parsed.socketTimeoutMillis);
             return new Database(null, session, parsed.describe(wanted), session.dialect());
@@ -954,7 +988,7 @@ public final class Database {
             }
             if (ownsTransactionControl()) {
                 try {
-                    engine.begin(readOnly, isolation);
+                    engine.begin(readOnly, TransactionIsolation.valueOf(isolation.name()));
                 } catch (IOException err) {
                     // A failed START may leave the next-transaction setting armed.
                     // Discard the connection rather than lend that setting to another caller.
@@ -1104,7 +1138,7 @@ public final class Database {
     }
 
     /// Whether the engine takes transaction control through its own calls rather
-    /// than as statements; see [ServerEngine#ownsTransactionControl]. SQLite
+    /// than as statements; see [ServerSession#ownsTransactionControl]. SQLite
     /// never does.
     private boolean ownsTransactionControl() {
         return engine != null && engine.ownsTransactionControl();

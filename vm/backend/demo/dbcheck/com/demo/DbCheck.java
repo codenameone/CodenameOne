@@ -50,6 +50,11 @@ public class DbCheck {
     private static final List failures = new ArrayList();
 
     public static void main(String[] args) throws Exception {
+        // This harness opens whatever URL it is given, so it carries every engine.
+        com.codename1.backend.Database.useEngine(com.codename1.db.sql.Postgres.CONNECTOR);
+        com.codename1.backend.Database.useEngine(com.codename1.db.sql.MySql.CONNECTOR);
+        com.codename1.backend.Database.useEngine(com.codename1.db.sql.SqlServer.CONNECTOR);
+        com.codename1.backend.Database.useEngine(com.codename1.db.sql.Oracle.CONNECTOR);
         String url = System.getenv("CN1_DBCHECK_URL");
         if(url == null || url.length() == 0) {
             url = ":memory:";

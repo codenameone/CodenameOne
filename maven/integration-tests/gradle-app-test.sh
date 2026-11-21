@@ -165,10 +165,6 @@ echo "== backend added to an existing app"
 run_gradle "$APP" addBackend > "$WORKDIR/add-backend.log" 2>&1 || { cat "$WORKDIR/add-backend.log"; fail "addBackend"; }
 [ -f "$APP/backend/application.properties" ] || fail "addBackend wrote no backend/application.properties"
 [ ! -e "$APP/backend/pom.xml" ] || fail "a Gradle backend has no pom"
-# An undeclared engine fails the build, so addBackend has to leave one declared;
-# the run below is also what reads it from the subproject's own file.
-grep -q '^cn1.backend.database=sqlite$' "$APP/backend/gradle.properties" \
-  || fail "addBackend declared no database engine in backend/gradle.properties"
 check_backend_healthz "$APP" ":backend:runBackend" "$WORKDIR/backend-run.log"
 
 echo "== the backend hosts the app's browser build"

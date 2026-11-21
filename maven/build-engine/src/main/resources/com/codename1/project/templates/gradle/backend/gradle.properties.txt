@@ -1,5 +1,0 @@
-# The ONE database engine this server is built for: sqlite, postgres, mysql, sqlserver or oracle
-# (mysql covers MariaDB). Only that engine's client is compiled in, and a URL
-# naming another is refused. sqlite means no database server.
-# -Pcn1.backend.database=... overrides it for one build.
-cn1.backend.database=sqlite

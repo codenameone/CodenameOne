@@ -43,11 +43,14 @@ Everything else in this file applies to both build tools.
   and `backend/application-<profile>.properties`, **not** `src/main/resources`.
   Environment variables override them (`cn1.datasource.url` is also read from
   `CN1_DATASOURCE_URL` and `DATABASE_URL`, `cn1.server.port` from `PORT`).
-- **The database engine is chosen at build time**: `cn1.backend.database` in the
-  backend's `pom.xml` properties (or its `gradle.properties`) is `sqlite`,
-  `postgres` or `mysql` (MariaDB included). Only that engine's client is compiled
-  in, a URL naming another engine is refused, and a build with the property unset
-  fails. Changing the database URL to another engine means changing this too.
+- **The database engines come from the URLs**: the build reads
+  `cn1.datasource.url` (and `cn1.tenancy.datasource.url`) in
+  `application.properties` and every `application-<profile>.properties`, and
+  compiles in the client of each engine named there (`postgres://`, `mysql://`
+  or `mariadb://`, `sqlserver://`, `oracle://`). A URL known only at run time,
+  such as `${DATABASE_URL}`, names none; register that engine in code with
+  `Database.useEngine(Postgres.CONNECTOR)` (`com.codename1.db.sql`) before the
+  first connection.
 - **`application.properties` is compiled into the server** as the bottom layer of
   its configuration, so a single binary runs with no file beside it; a file or the
   environment present at run time still overrides every key. Profile files are not

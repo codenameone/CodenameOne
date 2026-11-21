@@ -95,34 +95,14 @@ public class BackendRunMojo extends AbstractMojo {
     @Parameter(property = "cn1.backend.webapp.output", defaultValue = "${project.build.directory}/webapp")
     private File webApp;
 
-    /** The database engine the backend is built for; see BackendEngines. */
-    @Parameter(property = BackendEngines.PROPERTY)
-    private String database;
-
     public void execute() throws MojoExecutionException, MojoFailureException {
         if (BackendModules.passOver(project, reactorProjects, getLog(), "backend")) {
             return;
-        }
-        // Before anything is started: a server run with no engine declared would
-        // only fail later, at its first connection, without naming the property.
-        final String engine;
-        try {
-            engine = BackendEngines.require(database, true);
-        } catch (com.codename1.build.BuildExecutionException ex) {
-            throw new MojoFailureException(ex.getMessage(), ex);
         }
         File classes = new File(project.getBuild().getOutputDirectory());
         if (!classes.isDirectory()) {
             throw new MojoFailureException("Nothing is compiled in "
                     + classes + "; run `mvn compile` first, or `mvn compile cn1:backend`");
-        }
-        // `mvn compile cn1:backend` stops short of process-classes, where the
-        // declaration is otherwise written, and a -D on this command line may
-        // name another engine than the build before it did.
-        try {
-            BackendEngines.declare(classes, engine);
-        } catch (com.codename1.build.BuildExecutionException ex) {
-            throw new MojoExecutionException(ex.getMessage(), ex);
         }
 
         List<String> classpath = new ArrayList<String>();

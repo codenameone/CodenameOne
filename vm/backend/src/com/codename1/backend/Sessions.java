@@ -31,7 +31,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-import com.codename1.backend.sql.Dialect;
+import com.codename1.db.sql.Dialect;
 
 /// How a server keeps [HttpSession]s: the cookie, the lifetime and the
 /// store, read from configuration when the server starts.

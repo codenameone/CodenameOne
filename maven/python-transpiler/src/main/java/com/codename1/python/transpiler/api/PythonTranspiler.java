@@ -776,6 +776,12 @@ public final class PythonTranspiler {
                 + "import java.util.Map;\n\n"
                 + "final class BackendDb extends PyDb {\n"
                 + "    static void install() {\n"
+                // Python names its database at run time (create_engine), so the
+                // build cannot tell which engine it will be: carry all four.
+                + "        Database.useEngine(com.codename1.db.sql.Postgres.CONNECTOR);\n"
+                + "        Database.useEngine(com.codename1.db.sql.MySql.CONNECTOR);\n"
+                + "        Database.useEngine(com.codename1.db.sql.SqlServer.CONNECTOR);\n"
+                + "        Database.useEngine(com.codename1.db.sql.Oracle.CONNECTOR);\n"
                 + "        PyDb.install(new BackendDb());\n"
                 + "    }\n\n"
                 // sqlite3 in a backend build: the same connections, opened by

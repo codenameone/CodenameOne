@@ -22,7 +22,7 @@
  */
 package com.codename1.backend;
 
-import com.codename1.backend.sql.Dialect;
+import com.codename1.db.sql.Dialect;
 import com.codename1.impl.migration.MigrationRegistry;
 import com.codename1.migration.JavaMigration;
 import com.codename1.migration.MigrateResult;

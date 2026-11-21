@@ -37,6 +37,11 @@ public class TransactionCheck {
     private static int passed;
 
     public static void main(String[] args) throws Exception {
+        // This harness opens whatever URL it is given, so it carries every engine.
+        com.codename1.backend.Database.useEngine(com.codename1.db.sql.Postgres.CONNECTOR);
+        com.codename1.backend.Database.useEngine(com.codename1.db.sql.MySql.CONNECTOR);
+        com.codename1.backend.Database.useEngine(com.codename1.db.sql.SqlServer.CONNECTOR);
+        com.codename1.backend.Database.useEngine(com.codename1.db.sql.Oracle.CONNECTOR);
         String url = System.getenv("CN1_TXCHECK_URL");
         if (url == null || url.length() == 0) {
             url = ":memory:";

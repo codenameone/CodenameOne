@@ -207,14 +207,6 @@
                                 <jar destfile="${project.build.directory}/${project.build.finalName}-parparvm-sources.jar">
                                     <fileset dir="${backend.dir}/src" includes="**/*.java"/>
                                     <fileset dir="${backend.dir}/impl/parparvm" includes="**/*.java"/>
-                                    <!-- One ServerEngine per database engine, each
-                                         under its own name. A build compiles exactly
-                                         one of them (BackendEngines.select), so the
-                                         wire clients of the others are referenced by
-                                         nothing and are stripped. They must not sit
-                                         at the root: five classes of one name. -->
-                                    <zipfileset dir="${backend.dir}/engines" includes="**/*.java"
-                                                prefix="cn1-engines"/>
                                     <fileset dir="${backend.shared.dir}" includes="**/*.java" excludes="**/JavaSEProcessSupport.java"/>
                                     <zipfileset dir="${backend.dir}/native" includes="*.c"
                                                 prefix="cn1-native"/>

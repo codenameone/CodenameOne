@@ -221,6 +221,12 @@ final class BackendWiringWriter {
             }
         }
         sb.append("        }\n");
+        // The database engines the module names, registered before the data
+        // source -- or anything else -- can open a connection.
+        for (String connector : BackendEngineRegistration.connectors(model.ctx)) {
+            sb.append("        com.codename1.backend.Database.useEngine(").append(connector)
+              .append(".CONNECTOR);\n");
+        }
         sb.append("        config = environment.getConfig();\n");
         sb.append("        dataSource = environment.getDataSource();\n");
         if (model.usesMessaging()) {

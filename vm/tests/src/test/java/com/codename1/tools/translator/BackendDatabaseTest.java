@@ -83,8 +83,8 @@ class BackendDatabaseTest {
         }
 
         Path work = Files.createTempDirectory("backend-dbcheck");
-        // One build per server engine: a binary carries a single wire client,
-        // chosen when it is built. The SQLite pass rides on the first of them.
+        // One build, reused for every URL: a binary carries every wire client.
+        // The SQLite pass runs last.
         List<String> ordered = new ArrayList<String>(urls.subList(1, urls.size()));
         ordered.add(urls.get(0));
         urls = ordered;
@@ -132,7 +132,6 @@ class BackendDatabaseTest {
         env.put("CN1_BACKEND_JAVA", System.getProperty("java.home"));
         env.put("CN1_BACKEND_DEMO", "demo/dbcheck");
         env.put("CN1_BACKEND_JDBC_JARS", BackendTestSupport.jdbcJars());
-        env.put("CN1_BACKEND_DATABASE", BackendTestSupport.engineOf(url));
         env.put("CN1_DBCHECK_URL", url);
         env.put("JDK_8_HOME", jdk8.toString());
         int[] status = new int[1];

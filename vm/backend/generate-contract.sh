@@ -102,17 +102,11 @@ done
 # is compiled against the core AND the backend runtime -- the contract names
 # @GET and OnComplete, the generated code names @Generated -- so the classpath
 # cannot answer the question for it the way it does in a real backend module.
-# The goal also requires the one database engine a backend is built for. The
-# generated classes do not depend on it, so the engine build.sh compiles in is
-# passed, and the declaration it writes is left out of gen/: the binary's own
-# build decides the engine, not this module.
 JAVA_HOME="$J8" mvn -q -B -f contract/pom.xml process-classes \
-    -Dcn1.restServer=true -Dcn1.backendOrm=true \
-    -Dcn1.backend.database="${CN1_BACKEND_DATABASE:-sqlite}" -Dmaven.repo.local="$M2"
+    -Dcn1.restServer=true -Dcn1.backendOrm=true -Dmaven.repo.local="$M2"
 
 rm -rf gen && mkdir -p gen
 cp -r contract/target/classes/. gen/
-rm -f gen/cn1-backend.properties
 # The same goal generates BOTH halves. The client half -- <Api>Impl and
 # cn1app.RestClientBootstrap -- belongs to the app: it calls
 # com.codename1.io.rest.Rest, which needs a CodenameOneImplementation the server

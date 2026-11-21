@@ -29,7 +29,6 @@ SOURCE_BASES = [
     Path("vm/backend/src"),
     Path("vm/backend/impl/javase"),
     Path("vm/backend/impl/parparvm"),
-    Path("vm/backend/engines/mysql"),
     # maven/backend-test, built the same way from vm/backend/test.
     Path("vm/backend/test/src"),
     Path("vm/backend/test/javase"),

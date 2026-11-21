@@ -31,7 +31,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-import com.codename1.backend.sql.Dialect;
+import com.codename1.db.sql.Dialect;
 
 /// A pool of connections to ONE database, whichever engine that database is.
 ///
@@ -726,6 +726,6 @@ public final class DataSource {
     /// case, because RFC 3986 says a scheme is case insensitive. Anything else is
     /// a SQLite path.
     private static boolean namesAServerEngine(String url) {
-        return com.codename1.backend.sql.Engines.named(url) != null;
+        return com.codename1.db.sql.Engines.named(url) != null;
     }
 }

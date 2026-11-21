@@ -91,30 +91,32 @@ the database user needs permission to call:
 include::../demos/common/src/main/snippets/developer-guide/backend-data.sql[tag=backend-data-sql-001,indent=0]
 ----
 
-==== One engine for each application
+==== Which engines a server carries
 
-A server is built for one database engine, and the build names it:
+A server carries the client of each database engine its configuration names.
+The build reads `cn1.datasource.url` and `cn1.tenancy.datasource.url` in
+`application.properties` and in every `application-<profile>.properties`, and
+registers the engine of each URL it finds there:
 
-[source,xml]
+[source,properties]
 ----
-include::../demos/common/src/main/snippets/developer-guide/backend-data.xml[tag=backend-data-xml-001,indent=0]
+include::../demos/common/src/main/snippets/developer-guide/backend-data.properties[tag=backend-data-properties-001,indent=0]
 ----
 
-The value is `sqlite`, `postgres`, `mysql`, `sqlserver` or `oracle`, and
-`mysql` covers MariaDB. A
-Gradle project sets the same key in the backend's `gradle.properties`. `sqlite`
-means the server talks to no database server at all.
+A `postgres://` URL names PostgreSQL, `mysql://` and `mariadb://` name MySQL and
+MariaDB, `sqlserver://` names SQL Server and `oracle://` names Oracle. A SQLite
+path needs no registration: SQLite is always there unless
+`cn1.backend.sqlite=false` leaves it out. A URL given to the build itself,
+`-Dcn1.datasource.url=...` to Maven or `-Pcn1.datasource.url=...` to Gradle,
+counts too.
 
-Only the named engine's client is compiled into the binary, so a PostgreSQL
-service doesn't carry a MySQL client it never calls. The choice holds everywhere
-the server runs: on the JVM during development and in tests, a URL that names
-another engine is refused with a message that says which engine the build
-declared, exactly as the packaged binary refuses it. SQLite stays available
-beside a server engine unless `cn1.backend.sqlite=false` leaves it out.
-
-A build that declares no engine stops and names the property. To build the same
-server for another engine once, pass `-Dcn1.backend.database=mysql` to Maven or
-`-Pcn1.backend.database=mysql` to Gradle.
+An engine nothing names isn't compiled in, so a PostgreSQL service doesn't carry
+a MySQL client it never calls, and opening a URL of an engine the server doesn't
+carry fails with an error that says so. A URL the build can't read, such as
+`${DATABASE_URL}` resolved only when the server starts, names no engine. Register
+that engine in code before the first connection, with
+`Database.useEngine(Postgres.CONNECTOR)`; `Postgres`, `MySql`, `SqlServer` and
+`Oracle` are in `com.codename1.db.sql`.
 
 ==== Encrypted connections
 

@@ -59,10 +59,6 @@
                         <configuration>
                             <sources>
                                 <source>${backend.dir}/impl/parparvm</source>
-                                <!-- Exactly one ServerEngine, as in every real
-                                     build. MySQL's, because it is the one whose
-                                     every method does something. -->
-                                <source>${backend.dir}/engines/mysql</source>
                                 <source>${backend.shared.dir}</source>
                             </sources>
                         </configuration>

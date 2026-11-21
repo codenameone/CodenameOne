@@ -3558,11 +3558,11 @@ public class OrmAnnotationProcessorTest {
         List<String> statements=new ArrayList<String>();
         com.codename1.impl.orm.SqlAccess access=(com.codename1.impl.orm.SqlAccess)java.lang.reflect.Proxy.newProxyInstance(
                 getClass().getClassLoader(),new Class[]{com.codename1.impl.orm.SqlAccess.class},(proxy,method,args)-> {
-                    if(method.getName().equals("quote")) return com.codename1.backend.sql.Dialect.POSTGRES.quote((String)args[0]);
+                    if(method.getName().equals("quote")) return com.codename1.db.sql.Dialect.POSTGRES.quote((String)args[0]);
                     if(method.getName().equals("dialect")) return "postgresql";
-                    if(method.getName().equals("orderBy")) return com.codename1.backend.sql.Dialect.POSTGRES.orderBy((String)args[0],(Boolean)args[1],((Integer)args[2])==com.codename1.impl.orm.Attribute.TEXT);
-                    if(method.getName().equals("orderValue")) return com.codename1.backend.sql.Dialect.POSTGRES.comparison((String)args[0],((Integer)args[1])==com.codename1.impl.orm.Attribute.TEXT);
-                    if(method.getName().equals("limit")) return com.codename1.backend.sql.Dialect.POSTGRES.limit((Integer)args[0],(Integer)args[1]);
+                    if(method.getName().equals("orderBy")) return com.codename1.db.sql.Dialect.POSTGRES.orderBy((String)args[0],(Boolean)args[1],((Integer)args[2])==com.codename1.impl.orm.Attribute.TEXT);
+                    if(method.getName().equals("orderValue")) return com.codename1.db.sql.Dialect.POSTGRES.comparison((String)args[0],((Integer)args[1])==com.codename1.impl.orm.Attribute.TEXT);
+                    if(method.getName().equals("limit")) return com.codename1.db.sql.Dialect.POSTGRES.limit((Integer)args[0],(Integer)args[1]);
                     if(method.getName().equals("query")) { statements.add((String)args[0]);return Collections.emptyList(); }
                     if(method.getName().equals("close")) return null;
                     throw new AssertionError("Unexpected SQL adapter operation: "+method.getName());

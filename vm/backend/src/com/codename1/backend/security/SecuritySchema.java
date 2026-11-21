@@ -24,7 +24,7 @@ package com.codename1.backend.security;
 
 import com.codename1.backend.Config;
 import com.codename1.backend.Database;
-import com.codename1.backend.sql.Dialect;
+import com.codename1.db.sql.Dialect;
 import com.codename1.migration.JavaMigration;
 import com.codename1.migration.MigrationContext;
 import com.codename1.migration.MigrationSet;

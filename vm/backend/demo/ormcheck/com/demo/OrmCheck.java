@@ -52,6 +52,11 @@ public class OrmCheck {
     private static final List failures = new ArrayList();
 
     public static void main(String[] args) throws Exception {
+        // This harness opens whatever URL it is given, so it carries every engine.
+        com.codename1.backend.Database.useEngine(com.codename1.db.sql.Postgres.CONNECTOR);
+        com.codename1.backend.Database.useEngine(com.codename1.db.sql.MySql.CONNECTOR);
+        com.codename1.backend.Database.useEngine(com.codename1.db.sql.SqlServer.CONNECTOR);
+        com.codename1.backend.Database.useEngine(com.codename1.db.sql.Oracle.CONNECTOR);
         // What the generated entry point does at start-up, and the only thing
         // that keeps the generated daos in the binary: the translator drops a
         // class nothing references.
@@ -1039,8 +1044,8 @@ public class OrmCheck {
         final String table = "cn1_idsync";
         pool.execute("DROP TABLE IF EXISTS " + table, null);
         pool.execute("CREATE TABLE " + table + " (id "
-                + pool.dialect().generatedKeyColumn(com.codename1.backend.sql.Dialect.BIGINT)
-                + ", name " + pool.dialect().columnType(com.codename1.backend.sql.Dialect.TEXT)
+                + pool.dialect().generatedKeyColumn(com.codename1.db.sql.Dialect.BIGINT)
+                + ", name " + pool.dialect().columnType(com.codename1.db.sql.Dialect.TEXT)
                 + ")", null);
         try {
             // NEGATIVE, because an import can carry them and PostgreSQL accepts
@@ -1089,8 +1094,8 @@ public class OrmCheck {
     private static void aTerminatedStatementStillAnswersItsKey(DataSource pool) throws Exception {
         pool.execute("DROP TABLE IF EXISTS cn1_terminated", null);
         pool.execute("CREATE TABLE cn1_terminated (id "
-                + pool.dialect().generatedKeyColumn(com.codename1.backend.sql.Dialect.BIGINT)
-                + ", name " + pool.dialect().columnType(com.codename1.backend.sql.Dialect.TEXT)
+                + pool.dialect().generatedKeyColumn(com.codename1.db.sql.Dialect.BIGINT)
+                + ", name " + pool.dialect().columnType(com.codename1.db.sql.Dialect.TEXT)
                 + ")", null);
         try {
             long key = pool.insert("INSERT INTO cn1_terminated (name) VALUES (?);",
@@ -1136,7 +1141,7 @@ public class OrmCheck {
         boolean oracle = "oracle".equals(engine);
         pool.execute("DROP TABLE IF EXISTS cn1_ignored", null);
         pool.execute("CREATE TABLE cn1_ignored (id "
-                + pool.dialect().generatedKeyColumn(com.codename1.backend.sql.Dialect.BIGINT)
+                + pool.dialect().generatedKeyColumn(com.codename1.db.sql.Dialect.BIGINT)
                 // SQL Server's INSERT IGNORE is a property of the index:
                 // IGNORE_DUP_KEY drops a duplicate row with a warning.
                 + ", name " + (mysql || oracle ? pool.dialect().varchar(64) : sqlServer ? "NVARCHAR(64)" : "TEXT")
@@ -1181,7 +1186,7 @@ public class OrmCheck {
         boolean oracle = "oracle".equals(engine);
         pool.execute("DROP TABLE IF EXISTS cn1_upsert", null);
         pool.execute("CREATE TABLE cn1_upsert (id "
-                + pool.dialect().generatedKeyColumn(com.codename1.backend.sql.Dialect.BIGINT)
+                + pool.dialect().generatedKeyColumn(com.codename1.db.sql.Dialect.BIGINT)
                 + ", name " + (mysql || oracle ? pool.dialect().varchar(64) : sqlServer ? "NVARCHAR(64)" : "TEXT")
                 + " NOT NULL UNIQUE, hits INTEGER)", null);
         try {
@@ -1275,8 +1280,8 @@ public class OrmCheck {
         pool.execute("SET SESSION sql_mode='NO_BACKSLASH_ESCAPES'", null);
         pool.execute("DROP TABLE IF EXISTS cn1_bsmode", null);
         pool.execute("CREATE TABLE cn1_bsmode (id "
-                + pool.dialect().generatedKeyColumn(com.codename1.backend.sql.Dialect.BIGINT)
-                + ", name " + pool.dialect().columnType(com.codename1.backend.sql.Dialect.TEXT)
+                + pool.dialect().generatedKeyColumn(com.codename1.db.sql.Dialect.BIGINT)
+                + ", name " + pool.dialect().columnType(com.codename1.db.sql.Dialect.TEXT)
                 + ")", null);
         try {
             String[] variants = new String[] {
@@ -1333,7 +1338,7 @@ public class OrmCheck {
         try {
             pool.execute("DROP TABLE IF EXISTS " + quoted, null);
             pool.execute("CREATE TABLE " + quoted + " (id "
-                    + pool.dialect().generatedKeyColumn(com.codename1.backend.sql.Dialect.BIGINT)
+                    + pool.dialect().generatedKeyColumn(com.codename1.db.sql.Dialect.BIGINT)
                     + ", name TEXT)", null);
             try {
                 String outcome;
@@ -1356,8 +1361,8 @@ public class OrmCheck {
     private static void aMultiRowInsertIsRefused(DataSource pool) throws Exception {
         pool.execute("DROP TABLE IF EXISTS cn1_multi", null);
         pool.execute("CREATE TABLE cn1_multi (id "
-                + pool.dialect().generatedKeyColumn(com.codename1.backend.sql.Dialect.BIGINT)
-                + ", name " + pool.dialect().columnType(com.codename1.backend.sql.Dialect.TEXT)
+                + pool.dialect().generatedKeyColumn(com.codename1.db.sql.Dialect.BIGINT)
+                + ", name " + pool.dialect().columnType(com.codename1.db.sql.Dialect.TEXT)
                 + ")", null);
         try {
             String refused;
@@ -1431,7 +1436,7 @@ public class OrmCheck {
     private static void aNulIsRefusedOnTheRawPathToo(DataSource pool) throws Exception {
         pool.execute("DROP TABLE IF EXISTS cn1_rawnul", null);
         pool.execute("CREATE TABLE cn1_rawnul (v "
-                + pool.dialect().columnType(com.codename1.backend.sql.Dialect.TEXT) + ")", null);
+                + pool.dialect().columnType(com.codename1.db.sql.Dialect.TEXT) + ")", null);
         try {
             String refused;
             try {
@@ -1475,7 +1480,7 @@ public class OrmCheck {
             // the same claim on a portable answer as a dao.
             pool.execute("DROP TABLE IF EXISTS cn1_rawbool", null);
             pool.execute("CREATE TABLE cn1_rawbool (flag "
-                    + pool.dialect().columnType(com.codename1.backend.sql.Dialect.BOOLEAN)
+                    + pool.dialect().columnType(com.codename1.db.sql.Dialect.BOOLEAN)
                     + ")", null);
             pool.execute("INSERT INTO cn1_rawbool (flag) VALUES (?)",
                     new Object[] {Boolean.TRUE});
@@ -1530,7 +1535,7 @@ public class OrmCheck {
             // belongs on every engine.
             pool.execute("DROP TABLE IF EXISTS cn1_rawnul", null);
             pool.execute("CREATE TABLE cn1_rawnul (v "
-                    + pool.dialect().columnType(com.codename1.backend.sql.Dialect.BLOB)
+                    + pool.dialect().columnType(com.codename1.db.sql.Dialect.BLOB)
                     + ")", null);
             pool.execute("INSERT INTO cn1_rawnul (v) VALUES (?)",
                     new Object[] {new byte[] {97, 0, 98}});

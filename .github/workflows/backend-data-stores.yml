@@ -34,11 +34,10 @@ on:
       - 'vm/backend/src/com/codename1/backend/mongo/**'
       - 'vm/backend/src/com/codename1/backend/search/**'
       # The SQL clients the full-text search steps run over.
-      - 'vm/backend/src/com/codename1/backend/sql/**'
+      - 'CodenameOne/src/com/codename1/db/sql/**'
       - 'vm/backend/src/com/codename1/backend/Database.java'
       - 'vm/backend/src/com/codename1/impl/orm/**'
-      - 'vm/backend/impl/javase/com/codename1/backend/sql/**'
-      - 'vm/backend/engines/**'
+      - 'vm/backend/impl/javase/com/codename1/db/sql/**'
       - 'maven/backend/src/test/java/com/codename1/backend/document/**'
       - 'maven/backend/src/test/java/com/codename1/backend/dynamo/**'
       - 'maven/backend/src/test/java/com/codename1/backend/mongo/**'
@@ -204,7 +203,6 @@ jobs:
         run: |
           mvn -B -pl backend test \
             -Dtest='MongoClientTest,DynamoDbTest,DocumentSessionTest,SearchEngineTest,SearchIndexerTest,ManagedSessionDatabaseTest' \
-            -Dcn1.backend.database=postgres \
             -Dsurefire.failIfNoSpecifiedTests=false \
             -Dspotbugs.skip=true -Dpmd.skip=true -Dcheckstyle.skip=true \
             -Dmaven.repo.local="$GITHUB_WORKSPACE/.m2-repo"
@@ -218,7 +216,6 @@ jobs:
           CN1_ORM_TEST_DATABASE_URL: mysql://root:cn1secret@127.0.0.1:3306/cn1?sslmode=disable
         run: |
           mvn -B -pl backend test -Dtest='SearchEngineTest,ManagedSessionDatabaseTest' \
-            -Dcn1.backend.database=mysql \
             -Dsurefire.failIfNoSpecifiedTests=false \
             -Dspotbugs.skip=true -Dpmd.skip=true -Dcheckstyle.skip=true \
             -Dmaven.repo.local="$GITHUB_WORKSPACE/.m2-repo"
@@ -230,7 +227,6 @@ jobs:
         run: |
           URL=$(bash "$GITHUB_WORKSPACE/scripts/ci/start-sqlserver-strict.sh" "$RUNNER_TEMP/sqlstrict")
           CN1_TEST_DATABASE_URL="$URL" mvn -B -pl backend test -Dtest='SearchEngineTest' \
-            -Dcn1.backend.database=sqlserver \
             -Dsurefire.failIfNoSpecifiedTests=false \
             -Dspotbugs.skip=true -Dpmd.skip=true -Dcheckstyle.skip=true \
             -Dmaven.repo.local="$GITHUB_WORKSPACE/.m2-repo"
@@ -244,7 +240,6 @@ jobs:
           CN1_ORM_TEST_DATABASE_URL: sqlserver://sa:Cn1-Secret-9x@127.0.0.1:1433/master?sslmode=disable
         run: |
           mvn -B -pl backend test -Dtest='SearchEngineTest,ManagedSessionDatabaseTest' \
-            -Dcn1.backend.database=sqlserver \
             -Dsurefire.failIfNoSpecifiedTests=false \
             -Dspotbugs.skip=true -Dpmd.skip=true -Dcheckstyle.skip=true \
             -Dmaven.repo.local="$GITHUB_WORKSPACE/.m2-repo"
@@ -258,7 +253,6 @@ jobs:
           CN1_ORM_TEST_DATABASE_URL: oracle://cn1:cn1secret@127.0.0.1:1521/FREEPDB1?sslmode=disable
         run: |
           mvn -B -pl backend test -Dtest='SearchEngineTest,ManagedSessionDatabaseTest' \
-            -Dcn1.backend.database=oracle \
             -Dsurefire.failIfNoSpecifiedTests=false \
             -Dspotbugs.skip=true -Dpmd.skip=true -Dcheckstyle.skip=true \
             -Dmaven.repo.local="$GITHUB_WORKSPACE/.m2-repo"

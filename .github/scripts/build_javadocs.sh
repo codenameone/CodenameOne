@@ -156,9 +156,6 @@ rm -rf "$BACKEND_STAGE" "$CN1_DIR/dist/backend-javadoc" "$CN1_DIR/backend-javado
 mkdir -p "$BACKEND_STAGE" "$CN1_DIR/dist/backend-javadoc"
 cp -r "$BACKEND_DIR/src/." "$BACKEND_STAGE/"
 cp -r "$BACKEND_DIR/impl/parparvm/." "$BACKEND_STAGE/"
-# One ServerEngine, as in every build: there is a class of that name per database
-# engine and they cannot all be on one source path.
-cp -r "$BACKEND_DIR/engines/none/." "$BACKEND_STAGE/"
 # The test library, codenameone-backend-test: its public package is the API a
 # backend's tests are written against, so it is documented here. Its translation
 # stubs stand in for the JUnit extension, and the JUnit subset it compiles against

@@ -74,10 +74,11 @@ public class ProcessAnnotationsMojo extends AbstractCN1Mojo {
     @Parameter(defaultValue = "false")
     protected boolean skip;
 
-    /// The database engine a backend module is built for. Read here because
-    /// this is the one goal every backend build runs, whatever follows it.
-    @Parameter(property = BackendEngines.PROPERTY)
-    protected String database;
+    /// A database URL given to this build (`-Dcn1.datasource.url=...`). Its
+    /// engine is registered by the generated backend wiring, beside the ones
+    /// the module's `application.properties` files name.
+    @Parameter(property = "cn1.datasource.url")
+    protected String datasourceUrl;
 
     @Override
     protected void executeImpl() throws MojoExecutionException, MojoFailureException {
@@ -91,14 +92,6 @@ public class ProcessAnnotationsMojo extends AbstractCN1Mojo {
         }
 
         try {
-            if (BackendModules.dependsOnBackend(project)) {
-                // A server only: a client application has no engine to name. The
-                // declaration is written beside the classes for the JVM runtime,
-                // so an IDE run, cn1:backend and the module's tests answer for the
-                // engine the packaged binary has compiled in. Whether SQLite is
-                // linked is the packaging goal's question; the JVM always has it.
-                BackendEngines.declare(outputDirectory, BackendEngines.require(database, true));
-            }
             new AnnotationProcessing(MavenLog.of(getLog()), outputDirectory, stubSourceDirectory,
                     getCN1ProjectDir(), rawProjectSettings(), mainClassBinaryName(),
                     // The roots Maven is actually compiling, and the charset javac is
@@ -108,6 +101,7 @@ public class ProcessAnnotationsMojo extends AbstractCN1Mojo {
                     compileClasspathOf(project))
                     // A server wires its backend libraries as its own classes.
                     .withBackendLibraries(BackendModules.dependsOnBackend(project))
+                    .withDatasourceUrl(datasourceUrl)
                     .run();
         } catch (com.codename1.build.BuildFailureException e) {
             throw new MojoFailureException(e.getMessage(), e.getCause() == null ? e : e.getCause());

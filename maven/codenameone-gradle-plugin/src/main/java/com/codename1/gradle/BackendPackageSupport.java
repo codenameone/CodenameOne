@@ -180,7 +180,6 @@ final class BackendPackageSupport {
         t.getCflags().set(project.getProviders().gradleProperty("cn1.backend.cflags"));
         t.getSqlite().set(project.getProviders().gradleProperty("cn1.backend.sqlite")
                 .map(Boolean::parseBoolean).orElse(Boolean.TRUE));
-        t.getDatabase().set(BackendSupport.database(project));
         t.getCheckedCasts().set(project.getProviders().gradleProperty("cn1.backend.checkedCasts")
                 .map(Boolean::parseBoolean).orElse(Boolean.TRUE));
         t.getDevTools().set(project.getProviders().gradleProperty("cn1.backend.devTools")
@@ -325,13 +324,6 @@ final class BackendPackageSupport {
         @Input
         public abstract Property<Boolean> getSqlite();
 
-        /// The one database engine the binary is built for
-        /// (`cn1.backend.database`). Unset is not a default: the packager
-        /// fails the build, naming the property.
-        @Input
-        @Optional
-        public abstract Property<String> getDatabase();
-
         /// Make a failed cast throw.
         @Input
         public abstract Property<Boolean> getCheckedCasts();
@@ -380,7 +372,7 @@ final class BackendPackageSupport {
                 packager.javaLevel(getJavaSource().get(), getJavaTarget().get(), getJavaRelease().getOrNull());
                 packager.mainClass(getMainClass().getOrNull()).output(getBinary().get().getAsFile())
                         .target(getTarget().getOrNull()).jdk(getJdk().getOrNull(), null).cflags(getCflags().getOrNull())
-                        .sqlite(getSqlite().get()).database(getDatabase().getOrNull())
+                        .sqlite(getSqlite().get())
                         .checkedCasts(getCheckedCasts().get())
                         .devTools(getDevTools().get()).execute();
                 if (getWebAppDirectory().isPresent()) {

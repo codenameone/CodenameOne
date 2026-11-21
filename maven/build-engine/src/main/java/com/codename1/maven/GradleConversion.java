@@ -148,8 +148,8 @@ public final class GradleConversion {
 
     /// Whether a backend's pom is still what the archetype wrote, as far as the
     /// conversion carries anything over: no dependency, build plugin,
-    /// repository or profile beyond the generated ones, and the database engine
-    /// the archetype declares. A missing pom counts as generated. A changed one
+    /// repository or profile beyond the generated ones. A missing pom counts as
+    /// generated. A changed one
     /// is someone's work, and the backend is kept.
     static boolean pomAsGenerated(File pom) {
         if (!pom.isFile()) {
@@ -157,13 +157,6 @@ public final class GradleConversion {
         }
         Element project = parsePomOrNull(pom);
         if (project == null || child(project, "repositories") != null || child(project, "profiles") != null) {
-            return false;
-        }
-        // The engine is carried over, so choosing another one is a change like a
-        // dependency is: left behind, addBackend would bring back a sqlite server.
-        // No declaration at all is a skeleton older than the property.
-        String database = backendDatabase(project);
-        if (database != null && !GENERATED_BACKEND_DATABASE.equals(database)) {
             return false;
         }
         Element deps = child(project, "dependencies");
@@ -185,16 +178,6 @@ public final class GradleConversion {
             }
         }
         return true;
-    }
-
-    /// The engine the archetype's backend pom declares in `cn1.backend.database`.
-    private static final String GENERATED_BACKEND_DATABASE = "sqlite";
-
-    /// The database engine a backend's pom declares as the property
-    /// `cn1.backend.database`, or null when it declares none.
-    private static String backendDatabase(Element project) {
-        Element properties = project == null ? null : child(project, "properties");
-        return properties == null ? null : text(properties, BackendEngines.PROPERTY);
     }
 
     /// Whether a Surefire declaration is the archetype's, which sets only
@@ -397,14 +380,6 @@ public final class GradleConversion {
                     // Without a version when the application declares one: Gradle
                     // refuses a second version of a plugin already on the classpath.
                     addKotlinPlugin(script, !hasSuffix(new File(targetDir, "src"), ".kt"));
-                }
-                // The engine the pom declared, where the Gradle plugin reads it: a
-                // server built for PostgreSQL must not come out built for SQLite.
-                // A pom that declared none is not given one here -- its Maven build
-                // already failed asking for it, and the Gradle one asks the same.
-                String database = backendDatabase(parsePomOrNull(new File(backend, "pom.xml")));
-                if (database != null) {
-                    GradleProjectTemplate.declareBackendDatabase(target, database);
                 }
             }
             GradleProjectTemplate.writeScaffolding(targetDir, projectName(from, settings), cn1Version,

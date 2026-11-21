@@ -69,10 +69,6 @@ class BackendRuntimeSelfTest {
         build.environment().put("JDK_8_HOME", jdk8.toString());
         build.environment().put("JAVA_HOME", jdk8.toString());
         build.environment().put("CN1_BACKEND_DEMO", "demo/selftest");
-        // One server engine per binary. Most wire-client checks are PostgreSQL's;
-        // the MySQL ones run on the Java SE runtime (BackendJavaSeRuntimeTest),
-        // whose client is the same source.
-        build.environment().put("CN1_BACKEND_DATABASE", "postgres");
         build.redirectErrorStream(true);
         Process built = build.start();
         String buildLog = readAll(built);

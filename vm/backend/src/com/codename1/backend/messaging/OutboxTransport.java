@@ -26,7 +26,7 @@ import com.codename1.backend.Base64;
 import com.codename1.backend.DataSource;
 import com.codename1.backend.Json;
 import com.codename1.backend.Transactions;
-import com.codename1.backend.sql.Dialect;
+import com.codename1.db.sql.Dialect;
 import com.codename1.impl.backend.BackendAccess;
 import java.io.IOException;
 import java.util.ArrayList;

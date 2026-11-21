@@ -25,7 +25,7 @@ package com.codename1.impl.orm;
 import com.codename1.backend.Crypto;
 import com.codename1.backend.Database;
 import com.codename1.backend.DataSource;
-import com.codename1.backend.sql.Dialect;
+import com.codename1.db.sql.Dialect;
 import com.codename1.orm.session.LockMode;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -315,7 +315,7 @@ public final class BackendSqlAccess implements SqlAccess, TenantSource {
     public List<Object[]> query(String sql, Object[] params, int[] kinds) throws IOException {
         Database db = connection();
         try {
-            com.codename1.backend.sql.QueryRows rows = (com.codename1.backend.sql.QueryRows) db.query(sql, params);
+            com.codename1.db.sql.QueryRows rows = (com.codename1.db.sql.QueryRows) db.query(sql, params);
             if (rows.getColumnCount() != kinds.length) {
                 throw new IOException("Unexpected SQL projection width");
             }

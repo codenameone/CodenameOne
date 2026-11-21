@@ -39,7 +39,6 @@ import java.nio.file.Path;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -881,88 +880,14 @@ class GradleConversionTest {
         assertTrue(new File(out, "backend/src/main/java/a/backend/Api.java").isFile(),
                 "a changed route body is someone's work, and is converted");
     }
-    private static String withDatabase(String pom, String engine) {
-        int at = pom.indexOf("<dependencies>");
-        assertTrue(at > 0, pom);
-        return pom.substring(0, at) + "<properties><cn1.backend.database>" + engine
-                + "</cn1.backend.database></properties>" + pom.substring(at);
-    }
-
-    private static String declaredDatabase(File gradleProperties) throws IOException {
-        java.util.Properties p = new java.util.Properties();
-        java.io.InputStream in = new java.io.FileInputStream(gradleProperties);
-        try {
-            p.load(in);
-        } finally {
-            in.close();
-        }
-        return p.getProperty(BackendEngines.PROPERTY);
-    }
-
+    /// The engines a backend reaches are read from its application.properties
+    /// at build time, so no Gradle property names one.
     @Test
-    void theArchetypesDatabaseDeclarationIsStillTheSkeleton() throws Exception {
-        File mvn = mavenApp(UNTOUCHED_API);
-        touch(mvn, "backend/pom.xml", withDatabase(GENERATED_BACKEND_POM, "sqlite"));
-        assertTrue(GradleConversion.pomAsGenerated(new File(mvn, "backend/pom.xml")),
-                "the engine the archetype declares is not the developer's work");
-        assertTrue(GradleConversion.isUntouchedSkeleton(new File(mvn, "backend")));
-        // Another engine is a decision someone made, and is carried over.
-        touch(mvn, "backend/pom.xml", withDatabase(GENERATED_BACKEND_POM, "postgres"));
-        assertFalse(GradleConversion.pomAsGenerated(new File(mvn, "backend/pom.xml")),
-                "a backend built for another engine read as generated");
-        File out = new File(tmp.toFile(), "out");
-        converter().convert(mvn, out, "1.0");
-        assertEquals("postgres", declaredDatabase(new File(out, "backend/gradle.properties")),
-                "the converted backend is built for the engine the pom declared");
-    }
-
-    @Test
-    void aConvertedBackendKeepsTheSqliteItDeclared() throws Exception {
-        File mvn = mavenApp(UNTOUCHED_API);
-        touch(mvn, "backend/pom.xml", withDatabase(BACKEND_POM_WITH_PAYMENTS, "sqlite"));
-        File out = new File(tmp.toFile(), "out");
-        converter().convert(mvn, out, "1.0");
-        assertEquals("sqlite", declaredDatabase(new File(out, "backend/gradle.properties")));
-        assertNull(declaredDatabase(new File(out, "gradle.properties")),
-                "the engine belongs to the backend, not to the application's root");
-    }
-
-    @Test
-    void anAddedBackendDeclaresItsDatabase() throws Exception {
+    void anAddedBackendDeclaresNoDatabaseEngine() throws Exception {
         File backend = new File(tmp.toFile(), "app/backend");
         GradleProjectTemplate.writeBackendFiles(backend, "a.backend", ":backend:");
         File properties = new File(backend, "gradle.properties");
-        assertEquals("sqlite", declaredDatabase(properties));
-        String first = read(properties);
-        assertTrue(first.startsWith("#"), "the declaration says what it is: " + first);
-        // Running it again changes nothing, and neither does it replace a choice.
-        GradleProjectTemplate.writeBackendFiles(backend, "a.backend", ":backend:");
-        assertEquals(first, read(properties));
-        File chosen = new File(tmp.toFile(), "chosen/backend");
-        touch(chosen.getParentFile(), "backend/gradle.properties", "cn1.backend.database=mysql");
-        GradleProjectTemplate.writeBackendFiles(chosen, "a.backend", ":backend:");
-        assertEquals("cn1.backend.database=mysql", read(new File(chosen, "gradle.properties")));
-        // A file that names the property in a comment only does not declare it.
-        File commented = new File(tmp.toFile(), "commented/backend");
-        touch(commented.getParentFile(), "backend/gradle.properties",
-                "# cn1.backend.database goes here\norg.gradle.jvmargs=-Xmx1g");
-        GradleProjectTemplate.writeBackendFiles(commented, "a.backend", ":backend:");
-        assertEquals("sqlite", declaredDatabase(new File(commented, "gradle.properties")));
-        assertTrue(read(new File(commented, "gradle.properties")).contains("org.gradle.jvmargs=-Xmx1g\n\n#"),
-                "appended on a line of its own: " + read(new File(commented, "gradle.properties")));
-    }
-
-    @Test
-    void aBackendOnlyProjectDeclaresItsDatabaseInTheRootProperties() throws Exception {
-        File dir = new File(tmp.toFile(), "server");
-        GradleProjectTemplate.writeScaffolding(dir, "server", "1.0", GradleProjectTemplate.Shape.BACKEND_ONLY);
-        String properties = read(new File(dir, "gradle.properties"));
-        assertTrue(properties.contains("org.gradle.configuration-cache=true"),
-                "the root file keeps the template's settings: " + properties);
-        assertEquals("sqlite", declaredDatabase(new File(dir, "gradle.properties")));
-        // An application has no server at its root, so its root file declares none.
-        File app = new File(tmp.toFile(), "app2");
-        GradleProjectTemplate.writeScaffolding(app, "app2", "1.0", GradleProjectTemplate.Shape.APP);
-        assertNull(declaredDatabase(new File(app, "gradle.properties")));
+        assertFalse(properties.exists() && read(properties).contains("cn1.backend.database"),
+                "a backend declares no engine property");
     }
 }

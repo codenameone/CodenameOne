@@ -22,7 +22,7 @@
  */
 package com.codename1.backend.orm;
 
-import com.codename1.backend.sql.Dialect;
+import com.codename1.db.sql.Dialect;
 
 import java.io.IOException;
 import java.util.ArrayList;

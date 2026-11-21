@@ -40,10 +40,8 @@ shift
 URL="${CN1_TEST_DATABASE_URL:?set CN1_TEST_DATABASE_URL to a postgres://, mysql://, sqlserver:// or oracle:// URL}"
 MVN="${MVN:-mvn}"
 
-# A backend is built for ONE database engine (cn1.backend.database), and the JVM
-# runtime these tests run on refuses a URL naming any other. The samples declare
-# sqlite, which is what they run on untouched, so the engine this URL names is
-# declared here for the run.
+# The engine this URL names, for resetting its schema. The build is given the
+# URL too (cn1.datasource.url), so the generated wiring registers its engine.
 case "$URL" in
   postgres://*|postgresql://*) ENGINE=postgres ;;
   mysql://*|mariadb://*) ENGINE=mysql ;;
@@ -123,7 +121,7 @@ if [ -f rules/pom.xml ]; then
   MODULES=rules,$MODULES
 fi
 log "compiling the server and its tests"
-"$MVN" -B -q -Dcodename1.platform=backend -Dcn1.backend.database="$ENGINE" -pl "$MODULES" test-compile "$@"
+"$MVN" -B -q -Dcodename1.platform=backend -Dcn1.datasource.url="$URL" -pl "$MODULES" test-compile "$@"
 
 classes=()
 while IFS= read -r file; do
@@ -145,7 +143,7 @@ failed=()
 for class in "${classes[@]}"; do
   reset_schema
   log "$class"
-  if ! CN1_DATASOURCE_URL="$URL" "$MVN" -B -q -Dcodename1.platform=backend -Dcn1.backend.database="$ENGINE" -pl "$MODULES" \
+  if ! CN1_DATASOURCE_URL="$URL" "$MVN" -B -q -Dcodename1.platform=backend -Dcn1.datasource.url="$URL" -pl "$MODULES" \
       test -Dtest="$class" -Dsurefire.failIfNoSpecifiedTests=false "$@"; then
     failed+=("$class")
   fi

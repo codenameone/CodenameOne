@@ -28,11 +28,6 @@
       mvn -pl backend -Dcodename1.platform=backend cn1:backend-package
   -->
   <properties>
-    <!-- The ONE database engine this server is built for: sqlite, postgres, sqlserver, oracle or
-         mysql (which covers MariaDB). Only that engine's client is compiled in,
-         and a URL naming another is refused. sqlite means no database server.
-         -Dcn1.backend.database=... overrides it for one build. -->
-    <cn1.backend.database>sqlite</cn1.backend.database>
     <maven.compiler.source>1.8</maven.compiler.source>
     <maven.compiler.target>1.8</maven.compiler.target>
     <maven.compiler.testSource>1.8</maven.compiler.testSource>

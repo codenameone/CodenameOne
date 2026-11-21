@@ -32,7 +32,7 @@ import java.util.Map;
 
 import com.codename1.backend.Database;
 import com.codename1.backend.DataSource;
-import com.codename1.backend.sql.Dialect;
+import com.codename1.db.sql.Dialect;
 
 /// The entry point to the build-time ORM: entities in, daos out.
 ///

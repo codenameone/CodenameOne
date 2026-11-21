@@ -838,11 +838,6 @@ public class GeneratorModel {
         String gradleProperties = gradleTemplate(scaffold, "gradle.properties.txt", "");
         if (!options.projectType.hasNoClient()) {
             gradleProperties = withIdeBuildReportingGradle(gradleProperties);
-        } else {
-            // The server is the root project, so the engine it is built for is
-            // declared in the root file. An undeclared engine fails the build.
-            gradleProperties = gradleProperties + (gradleProperties.endsWith("\n") ? "\n" : "\n\n")
-                    + gradleTemplate(scaffold, "backend/gradle.properties.txt", "");
         }
         putGradleText(entries, "gradle.properties", gradleProperties);
         putGradleText(entries, ".gitignore", gradleTemplate(scaffold, "gitignore.txt", ""));
@@ -952,13 +947,6 @@ public class GeneratorModel {
                                          String taskPrefix) throws IOException {
         putGradleText(entries, dir + "build.gradle.kts",
                 gradleTemplate(scaffold, "backend/build.gradle.kts.txt", taskPrefix));
-        if (dir.length() > 0) {
-            // The engine the server is built for, beside its own build script, as
-            // `./gradlew addBackend` leaves it. A backend at the root has it in
-            // the root gradle.properties instead.
-            putGradleText(entries, dir + "gradle.properties",
-                    gradleTemplate(scaffold, "backend/gradle.properties.txt", taskPrefix));
-        }
         if (options.projectType == ProjectOptions.ProjectType.COMMAND_LINE) {
             // The same module, the same build script and the same packaging; only
             // what it holds differs. The Gradle plugin tells a backend from an app

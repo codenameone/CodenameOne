@@ -56,14 +56,7 @@ class BackendJavaSeRuntimeTest {
         }
         BackendTestSupport.require(Files.isDirectory(BackendTestSupport.backendDir()),
                 "vm/backend is not present");
-        // A backend carries one server engine, and the self-test's wire-client
-        // checks belong to two. The translated half runs the PostgreSQL ones;
-        // this half runs both, one engine at a time.
-        selfTest("postgres");
-        selfTest("mysql");
-    }
 
-    private static void selfTest(String engine) throws Exception {
         Path work = Files.createTempDirectory("backend-javase-selftest");
         Map<String, String> env = new HashMap<String, String>();
         // Not needed to RUN the local arm -- it is JDK classes all the way down --
@@ -77,7 +70,6 @@ class BackendJavaSeRuntimeTest {
         // The test's own JVM, so this does not depend on what is on PATH.
         env.put("CN1_BACKEND_JAVA", System.getProperty("java.home"));
         env.put("CN1_BACKEND_DEMO", "demo/selftest");
-        env.put("CN1_BACKEND_DATABASE", engine);
         env.put("CN1_BACKEND_JDBC_JARS", BackendTestSupport.jdbcJars());
         // A real file: an in-memory database cannot be pooled, since every
         // connection would get its own.
@@ -117,7 +109,7 @@ class BackendJavaSeRuntimeTest {
         }
 
         assertTrue(output.indexOf("SELFTEST OK") >= 0,
-                "the local Java SE runtime reported failures (" + engine + "):\n" + output);
+                "the local Java SE runtime reported failures:\n" + output);
         assertEquals(0, status[0], output);
         int passed = passedCount(output);
         assertTrue(passed >= 80,

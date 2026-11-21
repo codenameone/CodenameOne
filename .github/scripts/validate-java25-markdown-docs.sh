@@ -10,7 +10,7 @@
 # was, 77 of its files were classic javadoc and nothing noticed.
 set -euo pipefail
 cd "$(cd "$(dirname "$0")/../.." && pwd)"
-TREES=(CodenameOne Ports/CLDC11 vm/backend/src vm/backend/impl vm/backend/engines)
+TREES=(CodenameOne Ports/CLDC11 vm/backend/src vm/backend/impl)
 for tree in "${TREES[@]}"; do
   [ -d "$tree" ] || { echo "ERROR: Expected directory $tree." >&2; exit 1; }
 done
