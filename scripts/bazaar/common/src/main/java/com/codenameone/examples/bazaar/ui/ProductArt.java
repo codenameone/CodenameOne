@@ -84,6 +84,10 @@ public final class ProductArt {
         return word >= 0 && word < ICONS.length ? ICONS[word] : FontImage.MATERIAL_CATEGORY;
     }
 
+    /// A `type` for [#art] that draws no glyph: for art that text is laid
+    /// over, such as the storefront's hero.
+    public static final String NO_GLYPH = "-no-glyph-";
+
     /// The drawn picture of a product, `width` by `height` pixels.
     public static Image art(String id, String title, String type, int width, int height) {
         int w = Math.max(8, width);
@@ -110,14 +114,16 @@ public final class ProductArt {
         g.fillArc(dx, dy, d, d, 0, 360);
         g.setAlpha(255);
 
-        int side = Math.min(w, h);
-        Font material = FontImage.getMaterialDesignFont().derive(side * 0.42f, Font.STYLE_PLAIN);
-        String glyph = String.valueOf(icon(type, title));
-        g.setFont(material);
-        g.setColor(0xffffff);
-        g.setAlpha(dark ? 150 : 200);
-        g.drawString(glyph, (w - material.stringWidth(glyph)) / 2,
-                (h - material.getHeight()) / 2 - side / 14);
+        if (!NO_GLYPH.equals(type)) {
+            int side = Math.min(w, h);
+            Font material = FontImage.getMaterialDesignFont().derive(side * 0.42f, Font.STYLE_PLAIN);
+            String glyph = String.valueOf(icon(type, title));
+            g.setFont(material);
+            g.setColor(0xffffff);
+            g.setAlpha(dark ? 150 : 200);
+            g.drawString(glyph, (w - material.stringWidth(glyph)) / 2,
+                    (h - material.getHeight()) / 2 - side / 14);
+        }
 
         // No initials: cards lay their caption over the bottom of the art,
         // and letters there read as stray text under the scrim.

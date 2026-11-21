@@ -122,6 +122,14 @@ class WebCheckoutTest {
         Shop s = shop("wc-guest");
         Browser b = guest(s, "wc-guest", 2);
         String key = key(b.last.getContentAsString());
+        // htmx settles a swap by copying attributes with setAttribute; a
+        // `style` copied that way is an inline style attribute the policy
+        // refuses (anything that touched an input's style -- an extension,
+        // an automation tool hiding the caret -- made it fail at random).
+        String settle = b.last.getContentAsString().replace("&quot;", "\"");
+        int settleAt = settle.indexOf("\"attributesToSettle\":[");
+        assertTrue(settleAt > 0, "the checkout names what htmx settles");
+        assertTrue(settle.substring(settleAt, settle.indexOf(']', settleAt)).indexOf("style") < 0, "never style");
         mail.clearSent();
         MockResponse placed = b.post("/s/wc-guest/checkout/place", address(key));
         assertEquals(303, placed.getStatus(), placed.getContentAsString());

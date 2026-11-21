@@ -124,9 +124,15 @@ final class HomePane extends ShopPane {
         int[] colors = ArtPalette.colors(store.id() + "-hero", Look.dark());
         hero.getAllStyles().setBgColor(colors[1]);
         hero.getAllStyles().setBgTransparency(255);
-        Label picture = ProductArt.label(store.id() + "-hero", store.name(), "gift",
-                store.heroPhotoId(), width, height, "ShopHeroArt");
+        // No glyph on the hero's drawn art: the store's name is laid over it.
+        Label picture = ProductArt.label(store.id() + "-hero", store.name(),
+                ProductArt.NO_GLYPH, store.heroPhotoId(), width, height, "ShopHeroArt");
         hero.add(picture);
+        // One scrim over the whole hero, so its top is not a lighter band
+        // above the words.
+        Container shade = new Container();
+        shade.setUIID("ShopHeroShade");
+        hero.add(shade);
         Container words = new Container(BoxLayout.y());
         words.setUIID("ShopHeroWords");
         SpanLabel name = Ui.text(store.name(), "ShopHeroTitle");

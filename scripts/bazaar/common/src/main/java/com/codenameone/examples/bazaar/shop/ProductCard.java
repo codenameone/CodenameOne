@@ -44,7 +44,9 @@ final class ProductCard {
 
     static Container create(final ProductCardDto p, int width) {
         int artW = Math.max(CN.convertToPixels(20), width);
-        int artH = artW * 4 / 5;
+        // A wide photo, so the title and the vendor under it stay in view
+        // with the first row of the grid.
+        int artH = artW * 3 / 5;
         Container card = new Container(new BorderLayout());
         card.setUIID("SvProductCard");
         Label art = ProductArt.label(p.id(), p.title(), p.productType(), p.photoId(), artW, artH,
@@ -98,7 +100,7 @@ final class ProductCard {
         Container card = new Container(BoxLayout.y());
         card.setUIID("SvProductCard");
         Label box = new Label("", "ShopPlaceholderArt");
-        box.setPreferredH(Math.max(CN.convertToPixels(16), width * 4 / 5));
+        box.setPreferredH(Math.max(CN.convertToPixels(16), width * 3 / 5));
         card.add(box);
         Label line = new Label(" ", "ShopPlaceholderLine");
         Label shorter = new Label(" ", "ShopPlaceholderLineShort");

@@ -320,7 +320,7 @@ async function htmlCheckout() {
   const cspErrors = [];
   shop.on('console', m => {
     if (m.type() === 'error' && /Content Security Policy/i.test(m.text())) {
-      cspErrors.push(m.text());
+      cspErrors.push(m.text() + ' at ' + shop.url());
     }
   });
   try {

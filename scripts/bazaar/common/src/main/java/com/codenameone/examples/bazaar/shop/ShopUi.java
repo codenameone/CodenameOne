@@ -31,58 +31,14 @@ import com.codename1.ui.Painter;
 import com.codename1.ui.animations.Animation;
 import com.codename1.ui.animations.Motion;
 import com.codename1.ui.geom.Rectangle;
-import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.layouts.FlowLayout;
-import com.codenameone.examples.bazaar.api.StoreDto;
 import com.codenameone.examples.bazaar.ui.Lang;
 import com.codenameone.examples.bazaar.ui.Ui;
 
-/// Small pieces the shopper's screens share: the store's header, stars,
+/// Small pieces the shopper's screens share: stars,
 /// prices, a tap of feedback, and the flight of a product into the cart.
 final class ShopUi {
     private ShopUi() {
-    }
-
-    /// The header of a store: its name and tagline on its own accent colour.
-    ///
-    /// The one colour set in code in the shopper's screens, because it is the
-    /// merchant's and arrives from the server; the theme gives the shape and
-    /// the type, and the lettering is chosen dark or light against the accent.
-    static Container storeHeader(StoreDto store, Component trailing) {
-        Container header = new Container(BoxLayout.y());
-        header.setUIID("ShopStoreHeader");
-        header.setName("store-header");
-        if (store == null) {
-            return header;
-        }
-        int accent = store.accentColor() & 0xffffff;
-        int ink = light(accent) ? 0x111827 : 0xffffff;
-        header.getAllStyles().setBgColor(accent);
-        header.getAllStyles().setBgTransparency(255);
-        Label name = Ui.plain(store.name(), "ShopStoreName");
-        name.getAllStyles().setFgColor(ink);
-        Container top = new Container(new com.codename1.ui.layouts.BorderLayout());
-        top.add(com.codename1.ui.layouts.BorderLayout.CENTER, name);
-        if (trailing != null) {
-            trailing.getAllStyles().setFgColor(ink);
-            top.add(com.codename1.ui.layouts.BorderLayout.EAST, trailing);
-        }
-        header.add(top);
-        if (store.tagline() != null && store.tagline().length() > 0) {
-            Label tag = Ui.plain(store.tagline(), "ShopStoreTagline");
-            tag.getAllStyles().setFgColor(ink);
-            header.add(tag);
-        }
-        return header;
-    }
-
-    /// Whether lettering on `rgb` should be dark: relative luminance over the
-    /// middle.
-    static boolean light(int rgb) {
-        int r = (rgb >> 16) & 0xff;
-        int g = (rgb >> 8) & 0xff;
-        int b = rgb & 0xff;
-        return r * 299 + g * 587 + b * 114 > 150000;
     }
 
     /// Five stars for `rating` (stars times ten) and the count of reviews;
