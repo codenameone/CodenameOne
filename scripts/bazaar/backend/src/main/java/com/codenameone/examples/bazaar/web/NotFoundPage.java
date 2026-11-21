@@ -30,7 +30,7 @@ final class NotFoundPage {
             + "<meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,"
             + " initial-scale=1\"><meta name=\"robots\" content=\"noindex\">"
             + "<title>Page not found - Bazaar</title>"
-            + "<link rel=\"stylesheet\" href=\"/static/storefront.css\"></head><body>"
+            + "<link rel=\"stylesheet\" href=\"/static/shop.18c86fc7.css\"></head><body>"
             + "<header class=\"bar\"><div class=\"wrap bar-in\"><a class=\"brand\" href=\"/\">"
             + "Bazaar</a></div></header><main class=\"wrap empty-state\">"
             + "<p class=\"big\">404</p><h1>We could not find that page</h1>"

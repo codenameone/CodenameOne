@@ -90,7 +90,7 @@ class StorefrontTest {
             MockResponse r = fetch(paths[iter]);
             assertEquals(200, r.getStatus(), paths[iter]);
             assertTrue(r.getContentType().startsWith("text/html"), paths[iter]);
-            assertTrue(r.getContentAsString().contains("/static/storefront.css"), paths[iter]);
+            assertTrue(r.getContentAsString().contains("/static/shop."), paths[iter]);
         }
         String search = fetch("/s/sf-pages/search?q=mug").getContentAsString();
         assertTrue(search.contains("sf-pages-mug"));
@@ -224,8 +224,10 @@ class StorefrontTest {
     void publicPagesAreCachedAndRevalidated() throws Exception {
         shop("sf-cache");
         MockResponse first = fetch("/s/sf-cache");
-        assertEquals("public, max-age=60, stale-while-revalidate=600",
-                first.getHeader("Cache-Control"));
+        // Pages carry a per-response CSP nonce, so they are private and
+        // revalidated by ETag rather than shared for a minute.
+        assertEquals("private, no-cache", first.getHeader("Cache-Control"));
+        assertNotNull(first.getHeader("ETag"));
         MockResponse map = fetch("/sitemap.xml");
         assertNotNull(map.getHeader("ETag"));
         assertEquals(304, mvc.perform(get("/sitemap.xml")

@@ -66,8 +66,17 @@ public class StorefrontCaching implements HandlerInterceptor {
                 + ">; rel=\"canonical\"");
         if (isCart(request.getTarget())) {
             response.header("Cache-Control", "private, no-store");
+            com.codename1.backend.security.SecurityExchange exchange =
+                    com.codename1.backend.security.SecurityExchange.current();
+            if (exchange != null) {
+                exchange.setAttribute(
+                        com.codenameone.examples.bazaar.web.security.PageEtags.NO_STORE, "1");
+            }
             return;
         }
+        // The page security filter (web.security.PageEtags) replaces this with
+        // "private, no-cache" and an ETag: every page now carries a per-response
+        // CSP nonce, which a shared cache must not hand to a second visitor.
         response.header("Cache-Control", "public, max-age=60, stale-while-revalidate=600");
     }
 

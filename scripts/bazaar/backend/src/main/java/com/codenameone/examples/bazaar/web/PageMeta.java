@@ -22,6 +22,8 @@ package com.codenameone.examples.bazaar.web;
 /// engines and link previews read, and the store it belongs to (none for the
 /// platform pages).
 public final class PageMeta {
+    /// The CSP nonce of this response (see web.security.WebHeaders).
+    public String nonce = com.codenameone.examples.bazaar.web.security.WebHeaders.currentNonce();
     public String title = "Bazaar";
     public String description = "";
     /// The absolute canonical address; also sent as a `Link` header, since a

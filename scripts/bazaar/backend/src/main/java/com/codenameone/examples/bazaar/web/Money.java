@@ -19,13 +19,13 @@
 package com.codenameone.examples.bazaar.web;
 
 /// Prices as a page shows them. Amounts are minor units (cents).
-final class Money {
+public final class Money {
     private Money() {
     }
 
     /// `1250, USD` -> `$12.50`; a currency without a symbol here is spelled
     /// out in front: `CHF 12.50`.
-    static String format(long cents, String currency) {
+    public static String format(long cents, String currency) {
         String symbol = symbol(currency);
         String amount = plain(Math.abs(cents));
         String sign = cents < 0 ? "-" : "";
@@ -33,7 +33,7 @@ final class Money {
     }
 
     /// `1250` -> `12.50`: what structured data wants for a price.
-    static String plain(long cents) {
+    public static String plain(long cents) {
         long a = Math.abs(cents);
         long frac = a % 100;
         return (cents < 0 ? "-" : "") + (a / 100) + "." + (frac < 10 ? "0" : "") + frac;

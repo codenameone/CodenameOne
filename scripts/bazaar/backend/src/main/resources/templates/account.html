@@ -1,0 +1,7 @@
+<!-- cn1:model shell com.codenameone.examples.bazaar.web.Shell -->
+<!doctype html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org"><head th:replace="~{shell :: head}"></head>
+<body hx-boost="true"><header th:replace="~{shell :: topbar}"></header><div class="frame"><nav th:replace="~{shell :: sidebar}"></nav>
+<main id="main" tabindex="-1"><h1 th:text="${'Hello, ' + shell.user}">Hello</h1>
+<p>Your orders, addresses and saved items are in the app. <a href="/">Browse the shops</a>.</p></main></div>
+<div th:replace="~{shell :: toasts}"></div><div th:replace="~{shell :: help}"></div></body></html>

@@ -116,6 +116,12 @@ public class Webhooks {
     static final class HttpTransport implements Transport {
         @Override
         public int post(String url, List<String> headers, byte[] body) throws IOException {
+            // Checked again at delivery, against what the name resolves to now.
+            String unsafe = com.codenameone.examples.bazaar.web.security.UrlGuard.refuse(url,
+                    com.codenameone.examples.bazaar.web.security.UrlGuard.DNS);
+            if (unsafe != null) {
+                throw new IOException(unsafe);
+            }
             List copy = new ArrayList(headers);
             Web.Result answer = Web.request("POST", url, copy, body);
             return answer.getStatus();
@@ -418,6 +424,10 @@ public class Webhooks {
                 || url.regionMatches(true, 0, "http://", 0, 7)) || url.length() > 500
                 || url.indexOf(' ') >= 0) {
             throw new ResponseStatusException(400, "The URL is an http or https address");
+        }
+        String unsafe = com.codenameone.examples.bazaar.web.security.UrlGuard.refuseByName(url);
+        if (unsafe != null) {
+            throw new ResponseStatusException(400, unsafe);
         }
         hook.setTopic(topic);
         hook.setUrl(url);
