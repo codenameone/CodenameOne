@@ -21,6 +21,12 @@ package com.codenameone.examples.bazaar.api;
 import com.codename1.annotations.Mapped;
 
 /// A shipping rate. `minValue`/`maxValue` are grams for WEIGHT and cents for PRICE and FREE_OVER.
+///
+/// A CARRIER rate is priced by the store's carrier at checkout: `service`
+/// lists the services to offer (comma separated, empty for all),
+/// `markupBps` is added to the carrier's price in hundredths of a percent,
+/// `priceCents` is a flat handling fee on top, and `fallbackCents` (0 for
+/// none) is charged when the carrier cannot answer.
 @Mapped
 public record ShippingRateDto(
         String id,
@@ -36,5 +42,7 @@ public record ShippingRateDto(
         int etaDaysMax,
         String locationId,
         int radiusMeters,
-        int position) {
+        int position,
+        int markupBps,
+        long fallbackCents) {
 }

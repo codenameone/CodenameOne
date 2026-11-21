@@ -156,7 +156,7 @@ on a row.
 
 | Shipping zones & rates | &#10003; | core | core | core | core | 
 | Weight/price-based rates | &#10003; | core | core | core | core | 
-| Carrier-calculated rates | &#9681; | core | app/plugin | core |  | Live EasyPost rates on the back-office label screen; checkout charges the merchant's own table. Simulated in development.
+| Carrier-calculated rates | &#10003; | core | app/plugin | core |  | A `CARRIER` zone rate prices checkout live through the store's carrier (EasyPost, or the deterministic simulated carrier in development), per service with the merchant's markup and handling fee; the choice is re-priced on the server at order time, quotes are cached briefly, and a carrier outage falls back to a set price or the zone's other rates.
 | Buy & print shipping labels | &#10003; | core | app/plugin | core |  | Labels bought through EasyPost, with tracking from its signed webhook and polling; local PDF labels 4 by 6 inches with the simulated carrier.
 | Local pickup | &#10003; | core | core | core | core | 
 | Local delivery (radius/zip) | &#10003; | core | app/plugin | core |  | 

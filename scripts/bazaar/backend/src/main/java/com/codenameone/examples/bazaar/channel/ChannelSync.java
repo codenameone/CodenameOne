@@ -28,6 +28,7 @@ import com.codenameone.examples.bazaar.Rows;
 import com.codenameone.examples.bazaar.domain.OrderLine;
 import com.codenameone.examples.bazaar.domain.StoreOrder;
 import com.codenameone.examples.bazaar.inventory.Inventory;
+import com.codenameone.examples.bazaar.market.Markets;
 import com.codenameone.examples.bazaar.marketing.Tokens;
 import com.codenameone.examples.bazaar.order.Orders;
 import com.codenameone.examples.bazaar.repository.OrderLineRepository;
@@ -93,9 +94,11 @@ public class ChannelSync {
     private final Orders orders;
     private final OrderLineRepository lines;
     private final Inventory inventory;
+    private final Markets markets;
 
     public ChannelSync(DataSource db, Connectors connectors, Orders orders,
-            OrderLineRepository lines, Inventory inventory) {
+            OrderLineRepository lines, Inventory inventory, Markets markets) {
+        this.markets = markets;
         this.db = db;
         this.connectors = connectors;
         this.orders = orders;
@@ -260,10 +263,17 @@ public class ChannelSync {
         }
         Map store = db.queryOne("SELECT currency FROM store WHERE id = ?", new Object[] {storeId});
         String currency = store == null ? "" : Rows.text(store.get("currency"));
+        // An order in another currency is imported at the store's rate for
+        // it (the market's chosen source, else ECB, else manual), locked now:
+        // the books keep store currency, the order keeps what the buyer paid
+        // in theirs, and refunds go back in that currency (Orders.refund).
+        Markets.LockedRate fx = null;
         if (!currency.equals(o.currency)) {
-            // Converted money is a decision for the merchant, not the sync.
-            throw new ResponseStatusException(400, "Order " + o.id + " is in " + o.currency
-                    + ", the store sells in " + currency);
+            fx = markets.rateFor(storeId, o.currency);
+            if (fx == null) {
+                throw new ResponseStatusException(400, "Order " + o.id + " is in " + o.currency
+                        + " and the store has no exchange rate for it");
+            }
         }
         if (o.lines.isEmpty()) {
             throw new ResponseStatusException(400, "Order " + o.id + " has no lines");
@@ -281,7 +291,17 @@ public class ChannelSync {
                 throw new ResponseStatusException(400, "Order " + o.id + " has a line that cannot be");
             }
             resolved.add(v);
-            subtotal += l.unitCents * l.quantity;
+            subtotal = addCents(subtotal, lineCents(storeCents(l.unitCents, fx), l.quantity));
+        }
+        long foreignTotal = 0;
+        if (fx != null) {
+            long foreignSubtotal = 0;
+            for (int iter = 0; iter < o.lines.size(); iter++) {
+                MarketplaceConnector.ExternalLine l = o.lines.get(iter);
+                foreignSubtotal = addCents(foreignSubtotal, lineCents(l.unitCents, l.quantity));
+            }
+            foreignTotal = o.totalCents > 0 ? o.totalCents : addCents(addCents(foreignSubtotal,
+                    Math.max(0, o.shippingCents)), Math.max(0, o.taxCents));
         }
         StoreOrder order = new StoreOrder();
         order.setId(Ids.next());
@@ -292,11 +312,17 @@ public class ChannelSync {
         order.setFinancial(Orders.PAID);
         order.setFulfilment(Orders.UNFULFILLED);
         order.setSubtotalCents(subtotal);
-        order.setShippingCents(Math.max(0, o.shippingCents));
-        order.setTaxCents(Math.max(0, o.taxCents));
-        order.setTotalCents(o.totalCents > 0 ? o.totalCents
-                : subtotal + order.getShippingCents() + order.getTaxCents());
+        order.setShippingCents(storeCents(Math.max(0, o.shippingCents), fx));
+        order.setTaxCents(storeCents(Math.max(0, o.taxCents), fx));
+        order.setTotalCents(o.totalCents > 0 ? storeCents(o.totalCents, fx)
+                : addCents(addCents(subtotal, order.getShippingCents()), order.getTaxCents()));
         order.setCurrency(currency);
+        if (fx != null) {
+            order.setPresentmentCurrency(cut(o.currency, 3));
+            order.setPresentmentTotalCents(foreignTotal);
+            order.setFxRateMicros(fx.micros);
+            order.setFxSource(fx.source);
+        }
         order.setEmail(cut(o.buyerEmail, 190));
         order.setShipName(cut(o.shipName, 120));
         order.setShipLine1(cut(o.line1, 200));
@@ -310,7 +336,7 @@ public class ChannelSync {
         order.setClientId(clientId(channelId, o.id));
         order.setCreatedAt(Instant.now());
         order.setUpdatedAt(Instant.now());
-        final MarketplaceConnector.ExternalOrder ext = o;
+        final ConvertedOrder ext = new ConvertedOrder(o, fx);
         final List<String> oversold = new ArrayList<String>();
         final Set<String> variants = new HashSet<String>();
         StoreOrder saved = orders.insertNumbered(order, placed -> {
@@ -338,7 +364,7 @@ public class ChannelSync {
                 line.setVariantTitle(cut(Rows.text(v.get("title")), 200));
                 line.setSku(cut(Rows.text(v.get("sku")), 64));
                 line.setQuantity(l.quantity);
-                line.setPriceCents(l.unitCents);
+                line.setPriceCents(storeCents(l.unitCents, ext.fx));
                 line.setLocationId(loc);
                 lines.insert(line);
                 String ref = "order:" + placed.getId();
@@ -387,6 +413,53 @@ public class ChannelSync {
         log(ch, "ORDER", o.id, oversold.isEmpty() ? OK : ERROR, "Order #" + saved.getNumber()
                 + (oversold.isEmpty() ? "" : ", oversold " + join(oversold)));
         return true;
+    }
+
+    /// An external order with the rate its money converts at (null for the
+    /// store's own currency).
+    private static final class ConvertedOrder {
+        final String id;
+        final List<MarketplaceConnector.ExternalLine> lines;
+        final Markets.LockedRate fx;
+
+        ConvertedOrder(MarketplaceConnector.ExternalOrder o, Markets.LockedRate fx) {
+            this.id = o.id;
+            this.lines = o.lines;
+            this.fx = fx;
+        }
+    }
+
+    /// `cents` of the order's currency in the store's: `cents / rate`, half
+    /// up, at the locked rate in millionths. Unchanged without a rate; an
+    /// amount too large to convert is a 400.
+    static long storeCents(long cents, Markets.LockedRate fx) {
+        if (fx == null) {
+            return cents;
+        }
+        if (fx.micros <= 0) {
+            throw new ResponseStatusException(400, "The exchange rate is not usable");
+        }
+        try {
+            return Math.addExact(Math.multiplyExact(cents, 1000000L), fx.micros / 2) / fx.micros;
+        } catch (ArithmeticException overflow) {
+            throw new ResponseStatusException(400, "That order is too large to convert");
+        }
+    }
+
+    private static long lineCents(long unitCents, int quantity) {
+        try {
+            return Math.multiplyExact(unitCents, (long) quantity);
+        } catch (ArithmeticException overflow) {
+            throw new ResponseStatusException(400, "That order is too large");
+        }
+    }
+
+    private static long addCents(long a, long b) {
+        try {
+            return Math.addExact(a, b);
+        } catch (ArithmeticException overflow) {
+            throw new ResponseStatusException(400, "That order is too large");
+        }
     }
 
     /// The store's `client_id` for an external order: unique per channel and

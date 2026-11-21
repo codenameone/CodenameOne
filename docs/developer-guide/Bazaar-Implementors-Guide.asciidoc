@@ -525,8 +525,17 @@ bazaar.channels.ebay.marketplace-id=EBAY_US
 ----
 
 The seller's refresh token, from the marketplace's consent flow, is entered per
-channel; access tokens are refreshed and stored by the sync. Orders in another
-currency than the store's are logged as errors, not converted.
+channel; access tokens are refreshed and stored by the sync.
+
+An order in another currency than the store's is imported at the store's rate
+for that currency, locked at import: the source an active market selling in it
+chose, otherwise the ECB feed when it has a rate, otherwise the merchant's own
+rate. Lines, shipping, tax and total are converted to the store's currency
+(half up, in integer millionths) for the books, and the order keeps the
+marketplace's currency, its original total, the rate and the rate's source, as
+a checkout in another market does. A refund of such an order records what goes
+back in the buyer's currency at that locked rate. An order in a currency the
+store has no rate for is logged as an error, not imported.
 
 === Live services: carrier, VIES, exchange rates and geolocation
 
@@ -545,6 +554,23 @@ header against the secret and records the scans the way polling does. Polling
 stays on as a backstop, once per parcel every
 `bazaar.carrier.easypost.poll.minutes` (30 by default). A bought label keeps its
 printable URL on the shipment. Development profiles keep the simulated carrier.
+
+The same carrier prices checkout. A shipping rate of type `CARRIER` in a zone
+asks the carrier, for the cart's weight from the store's first active location
+that fulfils online orders to the shipping address, and offers one option per
+service: the rate's services field lists the services to offer (comma
+separated, blank for all), the markup is added as a percentage of the carrier's
+price (stored in hundredths of a percent, half up), and the rate's price is a
+flat handling fee on top. The REST quote, `Checkouts` and the web checkout share
+this path. An option's id is the rate id, `~`, and the service code; placing an
+order prices the chosen id again on the server, so a client names a rate and
+never an amount, and an id the address was not offered is refused. Quotes are
+cached for ten minutes per cart, weight, origin and address, so the form does
+not call the carrier per keystroke. When the carrier fails or is not
+configured, the rate offers its fallback price if it has one, and otherwise
+nothing, while the zone's other rates stand: a carrier outage never blocks
+checkout. The simulated carrier's rates are deterministic, and it refuses
+postal code `00000` so the fallback can be seen in development.
 
 *VAT numbers.* When a company is saved, the server asks the European
 Commission's VIES service whether its VAT number is issued, and stores the

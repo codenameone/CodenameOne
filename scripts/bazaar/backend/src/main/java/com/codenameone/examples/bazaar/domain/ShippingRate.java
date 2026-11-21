@@ -72,6 +72,14 @@ public class ShippingRate {
     @Column(nullable = false)
     private int position;
 
+    /// CARRIER rates: hundredths of a percent added to the carrier's price.
+    @Column(nullable = false)
+    private int markupBps;
+
+    /// CARRIER rates: the price when the carrier cannot answer; 0 = none.
+    @Column(nullable = false)
+    private long fallbackCents;
+
     public ShippingRate() {
     }
 
@@ -193,5 +201,21 @@ public class ShippingRate {
 
     public void setPosition(int position) {
         this.position = position;
+    }
+
+    public int getMarkupBps() {
+        return markupBps;
+    }
+
+    public void setMarkupBps(int markupBps) {
+        this.markupBps = markupBps;
+    }
+
+    public long getFallbackCents() {
+        return fallbackCents;
+    }
+
+    public void setFallbackCents(long fallbackCents) {
+        this.fallbackCents = fallbackCents;
     }
 }

@@ -94,6 +94,7 @@ public class Quoter {
     private final Memberships memberships;
     private final com.codenameone.examples.bazaar.taxes.TaxExemptions exemptions;
     private final com.codenameone.examples.bazaar.market.Markets markets;
+    private final com.codenameone.examples.bazaar.carrier.CarrierRates carrierRates;
 
     public Quoter(StoreRepository stores, CartLineRepository cartLines, VariantRepository variants,
             ProductRepository products, CollectionProductRepository collections,
@@ -103,7 +104,9 @@ public class Quoter {
             GiftCardRepository giftCards, Memberships memberships,
             com.codenameone.examples.bazaar.taxes.TaxExemptions exemptions,
             com.codenameone.examples.bazaar.market.Markets markets,
-            PreorderRepository preorders, DataSource db) {
+            PreorderRepository preorders, DataSource db,
+            com.codenameone.examples.bazaar.carrier.CarrierRates carrierRates) {
+        this.carrierRates = carrierRates;
         this.preorders = preorders;
         this.db = db;
         this.stores = stores;
@@ -237,11 +240,13 @@ public class Quoter {
         List<ShippingRate> storeRates = rates.findByStoreIdOrderByPositionAsc(cart.getStoreId());
         int weight = PriceLine.weight(priceLines);
         long cheapest = 0;
+        ShippingCalculator.CarrierQuotes live = hasAddress
+                ? carrierQuotes(cart, all, address) : null;
         if (hasAddress) {
             List<ShippingCalculator.Option> before = ShippingCalculator.options(
                     zones.findByStoreIdOrderByPositionAsc(cart.getStoreId()), storeRates,
                     locationById, country, hasPoint, hasPoint ? address.lat() : 0,
-                    hasPoint ? address.lng() : 0, quote.subtotalCents, weight, false);
+                    hasPoint ? address.lng() : 0, quote.subtotalCents, weight, false, live);
             cheapest = cheapestDelivery(before);
         }
         // Discounts.
@@ -286,7 +291,7 @@ public class Quoter {
                     zones.findByStoreIdOrderByPositionAsc(cart.getStoreId()), storeRates,
                     locationById, country, hasPoint, hasPoint ? address.lat() : 0,
                     hasPoint ? address.lng() : 0, afterDiscounts, weight,
-                    quote.discounts.freeShipping);
+                    quote.discounts.freeShipping, live);
             quote.shipping = ShippingCalculator.find(quote.options, rateId);
             if (quote.shipping == null) {
                 if (rateId != null && rateId.length() > 0) {
@@ -365,6 +370,36 @@ public class Quoter {
             }
         }
         return null;
+    }
+
+    /// Prices CARRIER rates through [CarrierRates]: from the store's first
+    /// active location that fulfils online orders (the configured origin's
+    /// city otherwise) to `address`, cached per cart and address. The
+    /// carrier is asked at most once per quote and only when the address's
+    /// zone has a CARRIER rate.
+    private ShippingCalculator.CarrierQuotes carrierQuotes(Cart cart, List<Location> all,
+            AddressDto address) {
+        Location origin = null;
+        for (int iter = 0; iter < all.size() && origin == null; iter++) {
+            Location l = all.get(iter);
+            if (l.isActive() && l.isFulfilsOnline()) {
+                origin = l;
+            }
+        }
+        final com.codenameone.examples.bazaar.carrier.CarrierProvider.Place from = origin == null
+                ? new com.codenameone.examples.bazaar.carrier.CarrierProvider.Place("", "", "", 0, 0)
+                : new com.codenameone.examples.bazaar.carrier.CarrierProvider.Place(
+                    origin.getName(), origin.getAddress(), origin.getName(), origin.getLat(),
+                    origin.getLng());
+        final com.codenameone.examples.bazaar.carrier.CarrierProvider.Place to =
+                new com.codenameone.examples.bazaar.carrier.CarrierProvider.Place(
+                    address.name(), address.line1(), address.city(),
+                    Geo.isPoint(address.lat(), address.lng()) ? address.lat() : 0,
+                    Geo.isPoint(address.lat(), address.lng()) ? address.lng() : 0,
+                    address.postal(), address.region(), address.country());
+        final String cartKey = cart.getId() == null || cart.getId().length() == 0
+                ? cart.getStoreId() : cart.getId();
+        return (rate, weightGrams) -> carrierRates.quotes(cartKey, weightGrams, from, to);
     }
 
     private static long cheapestDelivery(List<ShippingCalculator.Option> options) {

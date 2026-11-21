@@ -137,12 +137,12 @@ public final class Quote {
                 cart.getDiscountCode(), cart.getGiftCardCode(), subtotalCents, discountCents(),
                 shippingCents, taxCents(), store.isTaxInclusive(), totalCents, giftCardCents,
                 dueCents(), discounts != null && discounts.freeShipping, applied, opts,
-                shipping == null ? null : shipping.rate.getId(), problems);
+                shipping == null ? null : shipping.id, problems);
     }
 
     static ShippingOptionDto option(ShippingCalculator.Option option) {
         ShippingRate r = option.rate;
-        return new ShippingOptionDto(r.getId(), r.getName(), r.getKind(), option.priceCents,
-                r.getEtaDaysMin(), r.getEtaDaysMax(), r.getLocationId());
+        return new ShippingOptionDto(option.id, option.name, r.getKind(), option.priceCents,
+                option.etaDaysMin, option.etaDaysMax, r.getLocationId());
     }
 }

@@ -606,6 +606,49 @@ public class Markets {
         return p;
     }
 
+    /// A rate locked for an order taken in another currency: units of that
+    /// currency per store unit, in millionths, and where it came from
+    /// ([#MANUAL] or [#ECB]).
+    public static final class LockedRate {
+        public final long micros;
+        public final String source;
+
+        LockedRate(long micros, String source) {
+            this.micros = micros;
+            this.source = source;
+        }
+    }
+
+    /// The rate a store converts `currency` at, for an order that arrived
+    /// already priced in it (a marketplace order): the source an active
+    /// market selling in `currency` chose, else the ECB feed when it has a
+    /// rate, else the manual rate. Null when the store has no rate for it.
+    @Transactional(readOnly = true)
+    public LockedRate rateFor(String storeId, String currency) throws IOException {
+        if (currency == null || currency.length() != 3) {
+            return null;
+        }
+        FxRate r = rates.findByStoreIdAndCurrency(storeId, currency);
+        if (r == null) {
+            return null;
+        }
+        String wanted = null;
+        List<Market> all = markets.findByStoreIdOrderByPositionAsc(storeId);
+        for (int iter = 0; iter < all.size() && wanted == null; iter++) {
+            Market m = all.get(iter);
+            if (m.isActive() && currency.equals(m.getCurrency())) {
+                wanted = fxSource(m.getFxSource());
+            }
+        }
+        if (!MANUAL.equals(wanted) && r.getFeedMicros() > 0) {
+            return new LockedRate(r.getFeedMicros(), ECB);
+        }
+        if (r.getRateMicros() > 0) {
+            return new LockedRate(r.getRateMicros(), MANUAL);
+        }
+        return r.getFeedMicros() > 0 ? new LockedRate(r.getFeedMicros(), ECB) : null;
+    }
+
     /// The active market that serves `country`, or null.
     @Transactional(readOnly = true)
     public Market forCountry(String storeId, String country) throws IOException {

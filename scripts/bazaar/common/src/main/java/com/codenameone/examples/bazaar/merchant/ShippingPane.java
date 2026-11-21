@@ -111,6 +111,13 @@ final class ShippingPane extends MerchantPane {
                 r == null ? "0" : String.valueOf(r.minValue()), TextField.NUMERIC);
         TextField max = Ui.field(body, Lang.tr("Up to (0 for no limit)"), "rate-max",
                 r == null ? "0" : String.valueOf(r.maxValue()), TextField.NUMERIC);
+        // CARRIER rates: the carrier prices each service live at checkout.
+        TextField services = Ui.field(body, Lang.tr("Carrier services (blank for all)"),
+                "rate-services", r == null ? "" : r.service(), TextField.ANY);
+        TextField markup = MUi.number(body, "Carrier markup, %", "rate-markup",
+                r == null ? 0 : r.markupBps() / 100);
+        TextField fallback = MUi.money(body, "Price if the carrier is down", "rate-fallback",
+                r == null ? 0 : r.fallbackCents());
         TextField etaMin = MUi.number(body, "Fastest delivery, days", "rate-eta-min",
                 r == null ? 0 : r.etaDaysMin());
         TextField etaMax = MUi.number(body, "Slowest delivery, days", "rate-eta-max",
@@ -126,8 +133,10 @@ final class ShippingPane extends MerchantPane {
         Api.shipping().saveRate(MerchantState.storeId(), new ShippingRateDto(r == null ? null : r.id(),
                 z.id(), name.getText().trim(), MUi.code(kind, Words.RATE_KINDS), MUi.cents(price),
                 Math.max(0, MUi.integer(min)), Math.max(0, MUi.integer(max)),
-                r == null ? null : r.carrier(), r == null ? null : r.service(), lo, hi,
+                r == null ? null : r.carrier(), services.getText().trim(), lo, hi,
                 r == null ? null : r.locationId(), r == null ? 0 : r.radiusMeters(),
-                r == null ? z.rates().size() : r.position()), Net.to(x -> load(), Ui::fail));
+                r == null ? z.rates().size() : r.position(),
+                Math.max(0, Math.min(1000, MUi.integer(markup))) * 100,
+                Math.max(0, MUi.cents(fallback))), Net.to(x -> load(), Ui::fail));
     }
 }

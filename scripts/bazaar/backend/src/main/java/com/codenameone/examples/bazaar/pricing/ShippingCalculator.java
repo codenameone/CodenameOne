@@ -18,6 +18,7 @@
  */
 package com.codenameone.examples.bazaar.pricing;
 
+import com.codenameone.examples.bazaar.api.RateQuoteDto;
 import com.codenameone.examples.bazaar.domain.Location;
 import com.codenameone.examples.bazaar.domain.ShippingRate;
 import com.codenameone.examples.bazaar.domain.ShippingZone;
@@ -41,6 +42,16 @@ import java.util.Map;
 /// - **LOCAL**: delivery from `locationId`, offered when the address is
 ///   within `radiusMeters` of it ([Geo#meters]).
 ///
+/// - **CARRIER**: priced live by the store's carrier
+///   ([com.codenameone.examples.bazaar.carrier.CarrierProvider]) for the
+///   cart's weight and the address, one option per service. `service` is a
+///   comma separated list of the services to offer (empty offers them all),
+///   `markupBps` is added to the carrier's price (in hundredths of a
+///   percent, half up) and `priceCents` is a flat handling fee on top. When
+///   the carrier cannot answer, the rate offers `fallbackCents` instead if
+///   that is above 0, and otherwise nothing: the zone's other rates still
+///   stand, so a carrier outage never blocks checkout.
+///
 /// **PICKUP** rates are offered whatever the address, from any zone of the
 /// store, when their location is active: the customer comes to the shop.
 /// A free-shipping discount makes every option but pickup cost nothing.
@@ -51,6 +62,10 @@ public final class ShippingCalculator {
     public static final String FREE_OVER = "FREE_OVER";
     public static final String PICKUP = "PICKUP";
     public static final String LOCAL = "LOCAL";
+    public static final String CARRIER = "CARRIER";
+    /// Separates a carrier rate's id from the service in an option id.
+    public static final char SERVICE_SEPARATOR = '~';
+    private static final long BPS = 10000L;
     public static final String REST_OF_WORLD = "*";
 
     private ShippingCalculator() {
@@ -60,11 +75,37 @@ public final class ShippingCalculator {
     public static final class Option {
         public final ShippingRate rate;
         public final long priceCents;
+        /// What the shopper picks: the rate's id, or for a carrier rate the
+        /// rate's id, [#SERVICE_SEPARATOR] and the carrier's service code.
+        public final String id;
+        public final String name;
+        /// The carrier service, or empty for a rate the store prices.
+        public final String service;
+        public final int etaDaysMin;
+        public final int etaDaysMax;
 
         Option(ShippingRate rate, long priceCents) {
+            this(rate, priceCents, rate.getId(), rate.getName(), "", rate.getEtaDaysMin(),
+                    rate.getEtaDaysMax());
+        }
+
+        Option(ShippingRate rate, long priceCents, String id, String name, String service,
+                int etaDaysMin, int etaDaysMax) {
             this.rate = rate;
             this.priceCents = priceCents;
+            this.id = id;
+            this.name = name;
+            this.service = service;
+            this.etaDaysMin = etaDaysMin;
+            this.etaDaysMax = etaDaysMax;
         }
+    }
+
+    /// Asks the carrier what a CARRIER rate's services cost for this cart
+    /// and address. Answers null when the carrier cannot be reached or
+    /// refused, never throws.
+    public interface CarrierQuotes {
+        List<RateQuoteDto> quotes(ShippingRate rate, int weightGrams);
     }
 
     /// The zone serving `country`, or null.
@@ -99,6 +140,16 @@ public final class ShippingCalculator {
     public static List<Option> options(List<ShippingZone> zones, List<ShippingRate> rates,
             Map<String, Location> locations, String country, boolean hasPoint, double lat,
             double lng, long subtotalCents, int weightGrams, boolean freeShipping) {
+        return options(zones, rates, locations, country, hasPoint, lat, lng, subtotalCents,
+                weightGrams, freeShipping, null);
+    }
+
+    /// [#options], with `carrier` pricing the CARRIER rates; without one
+    /// they offer their fallback.
+    public static List<Option> options(List<ShippingZone> zones, List<ShippingRate> rates,
+            Map<String, Location> locations, String country, boolean hasPoint, double lat,
+            double lng, long subtotalCents, int weightGrams, boolean freeShipping,
+            CarrierQuotes carrier) {
         List<Option> out = new ArrayList<Option>();
         ShippingZone zone = zone(zones, country);
         List<Option> pickups = new ArrayList<Option>();
@@ -113,6 +164,11 @@ public final class ShippingCalculator {
                 continue;
             }
             if (zone == null || !zone.getId().equals(rate.getZoneId())) {
+                continue;
+            }
+            if (CARRIER.equals(kind)) {
+                carrierOptions(out, rate, carrier == null ? null : carrier.quotes(rate,
+                        weightGrams), freeShipping);
                 continue;
             }
             long price = Math.max(0, rate.getPriceCents());
@@ -141,13 +197,73 @@ public final class ShippingCalculator {
         return out;
     }
 
-    /// The option for `rateId`, or null when the address does not get it.
+    private static void carrierOptions(List<Option> out, ShippingRate rate,
+            List<RateQuoteDto> quotes, boolean freeShipping) {
+        int before = out.size();
+        for (int iter = 0; quotes != null && iter < quotes.size(); iter++) {
+            RateQuoteDto q = quotes.get(iter);
+            if (q == null || q.service() == null || q.service().length() == 0 || q.cents() < 0
+                    || !offersService(rate.getService(), q.service())) {
+                continue;
+            }
+            long price = carrierPrice(q.cents(), rate.getMarkupBps(), rate.getPriceCents());
+            if (price < 0) {
+                continue;
+            }
+            String title = q.title() == null || q.title().length() == 0 ? q.service() : q.title();
+            String name = rate.getName().length() > 0 ? rate.getName() + " - " + title : title;
+            int days = Math.max(0, q.days());
+            out.add(new Option(rate, freeShipping ? 0 : price, rate.getId() + SERVICE_SEPARATOR
+                    + q.service(), name, q.service(), days, days));
+        }
+        if (out.size() == before && rate.getFallbackCents() > 0) {
+            // The carrier did not answer (or offered none of the services):
+            // the merchant's fallback price keeps checkout open.
+            out.add(new Option(rate, freeShipping ? 0 : rate.getFallbackCents()));
+        }
+    }
+
+    /// The carrier's `cents` with `markupBps` added half up and `handlingCents`
+    /// on top; -1 when the sum would overflow.
+    public static long carrierPrice(long cents, int markupBps, long handlingCents) {
+        try {
+            long base = Math.max(0, cents);
+            long markup = Math.multiplyExact(base, (long) Math.max(0, markupBps));
+            markup = Math.addExact(markup, BPS / 2) / BPS;
+            return Math.addExact(Math.addExact(base, markup), Math.max(0, handlingCents));
+        } catch (ArithmeticException overflow) {
+            return -1;
+        }
+    }
+
+    /// Whether the comma separated `list` (empty = every service) names
+    /// `service`, ignoring ASCII case and spaces.
+    public static boolean offersService(String list, String service) {
+        if (list == null || list.trim().length() == 0) {
+            return true;
+        }
+        int start = 0;
+        while (true) {
+            int comma = list.indexOf(',', start);
+            int end = comma < 0 ? list.length() : comma;
+            if (list.substring(start, end).trim().equalsIgnoreCase(service)) {
+                return true;
+            }
+            if (comma < 0) {
+                return false;
+            }
+            start = comma + 1;
+        }
+    }
+
+    /// The option for `rateId` (an [Option#id]), or null when the address
+    /// does not get it.
     public static Option find(List<Option> options, String rateId) {
         if (rateId == null) {
             return null;
         }
         for (int iter = 0; iter < options.size(); iter++) {
-            if (rateId.equals(options.get(iter).rate.getId())) {
+            if (rateId.equals(options.get(iter).id)) {
                 return options.get(iter);
             }
         }

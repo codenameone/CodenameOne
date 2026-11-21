@@ -31,8 +31,15 @@ import java.util.List;
 /// numbers derived from the fulfilment id (so buying twice answers the same
 /// label), and scans that follow the parcel from the origin through a hub to
 /// the door, one every `stepMillis` after it was handed over.
+///
+/// Rates are deterministic: the same weight and ends always cost the same.
+/// A destination with postal code [#OUTAGE_POSTAL] is refused with an
+/// IOException, as an unreachable carrier would be, so the checkout's
+/// fallback can be seen working in development and tests.
 public class SimulatedCarrier implements CarrierProvider {
     public static final String NAME = "simulated";
+    /// The postal code the simulated carrier fails for.
+    public static final String OUTAGE_POSTAL = "00000";
 
     /// Service code, title, base cents, cents per kilogram, cents per 100 km,
     /// days.
@@ -58,7 +65,10 @@ public class SimulatedCarrier implements CarrierProvider {
     }
 
     @Override
-    public List<RateQuoteDto> rates(Parcel parcel, Place from, Place to) {
+    public List<RateQuoteDto> rates(Parcel parcel, Place from, Place to) throws IOException {
+        if (to != null && OUTAGE_POSTAL.equals(to.postal.trim())) {
+            throw new IOException("The simulated carrier is unreachable for " + OUTAGE_POSTAL);
+        }
         List<RateQuoteDto> out = new ArrayList<RateQuoteDto>();
         for (int iter = 0; iter < SERVICES.length; iter++) {
             out.add(quote(SERVICES[iter], parcel, from, to));

@@ -56,7 +56,9 @@ public class RateSettings {
         DiscountEngine.PRODUCT};
     private static final String[] RATE_KINDS = {ShippingCalculator.FLAT, ShippingCalculator.WEIGHT,
         ShippingCalculator.PRICE, ShippingCalculator.FREE_OVER, ShippingCalculator.PICKUP,
-        ShippingCalculator.LOCAL};
+        ShippingCalculator.LOCAL, ShippingCalculator.CARRIER};
+    /// A carrier markup above 1000% is a typo.
+    private static final int MAX_MARKUP_BPS = 100000;
 
     private final DiscountRepository discounts;
     private final TaxRateRepository taxes;
@@ -327,6 +329,11 @@ public class RateSettings {
             throw new ResponseStatusException(400, "Those amounts do not make a rate");
         }
         String kind = oneOf(w.kind(), RATE_KINDS, "kind of rate");
+        boolean carrier = ShippingCalculator.CARRIER.equals(kind);
+        if (w.markupBps() < 0 || w.markupBps() > MAX_MARKUP_BPS || w.fallbackCents() < 0) {
+            throw new ResponseStatusException(400, "A carrier markup is 0 to 1000%, and a "
+                    + "fallback price is not negative");
+        }
         boolean located = ShippingCalculator.PICKUP.equals(kind)
                 || ShippingCalculator.LOCAL.equals(kind);
         String zoneId = "";
@@ -373,6 +380,8 @@ public class RateSettings {
         r.setLocationId(locationId);
         r.setRadiusMeters(Math.max(0, w.radiusMeters()));
         r.setPosition(w.position());
+        r.setMarkupBps(carrier ? w.markupBps() : 0);
+        r.setFallbackCents(carrier ? w.fallbackCents() : 0);
         if (fresh) {
             rates.insert(r);
         } else {
@@ -397,6 +406,6 @@ public class RateSettings {
         return new ShippingRateDto(r.getId(), r.getZoneId(), r.getName(), r.getKind(),
                 r.getPriceCents(), r.getMinValue(), r.getMaxValue(), r.getCarrier(),
                 r.getService(), r.getEtaDaysMin(), r.getEtaDaysMax(), r.getLocationId(),
-                r.getRadiusMeters(), r.getPosition());
+                r.getRadiusMeters(), r.getPosition(), r.getMarkupBps(), r.getFallbackCents());
     }
 }

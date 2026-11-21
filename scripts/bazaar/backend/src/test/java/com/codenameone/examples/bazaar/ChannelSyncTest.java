@@ -28,6 +28,9 @@ import com.codenameone.examples.bazaar.account.Accounts;
 import com.codenameone.examples.bazaar.api.ChannelDto;
 import com.codenameone.examples.bazaar.api.ChannelListingDto;
 import com.codenameone.examples.bazaar.api.ChannelSetupDto;
+import com.codenameone.examples.bazaar.api.FxRateDto;
+import com.codenameone.examples.bazaar.api.RefundLineDto;
+import com.codenameone.examples.bazaar.api.RefundRequestDto;
 import com.codenameone.examples.bazaar.api.SyncLogDto;
 import com.codenameone.examples.bazaar.cart.Carts;
 import com.codenameone.examples.bazaar.channel.ChannelException;
@@ -41,6 +44,8 @@ import com.codenameone.examples.bazaar.channel.MarketplaceConnector;
 import com.codenameone.examples.bazaar.channel.SimulatedConnector;
 import com.codenameone.examples.bazaar.checkout.Checkouts;
 import com.codenameone.examples.bazaar.inventory.Inventory;
+import com.codenameone.examples.bazaar.market.Markets;
+import com.codenameone.examples.bazaar.order.Orders;
 import com.codenameone.examples.bazaar.pricing.DemoPricing;
 import com.codenameone.examples.bazaar.store.Stores;
 import java.util.ArrayList;
@@ -83,6 +88,10 @@ class ChannelSyncTest {
     private ChannelSync sync;
     @Autowired
     private Connectors connectors;
+    @Autowired
+    private Markets markets;
+    @Autowired
+    private Orders orderService;
 
     private Shop shop(String name, int stock) throws Exception {
         return new Shop(name, stock, accounts, stores, pricing, db, inventory, carts, checkouts, mvc);
@@ -194,6 +203,51 @@ class ChannelSyncTest {
             }
         }
         assertTrue(errors >= 2, "both refused orders are logged");
+    }
+
+    @Test
+    void aForeignCurrencyOrderIsImportedAtTheStoresRateAndRefundedInItsCurrency()
+            throws Exception {
+        Shop s = shop("ch-fx", 30);
+        String ch = connect(s);
+        // 0.92 EUR per USD, entered by hand; no market chose the ECB feed.
+        markets.putRate(s.owner, s.storeId, new FxRateDto("EUR", 920000, 0, "", 0));
+        MarketplaceConnector.ExternalOrder euro = order("EXT-FX-1", s.sku, 2);
+        euro.currency = "EUR";
+        euro.lines.clear();
+        euro.lines.add(new MarketplaceConnector.ExternalLine("EXT-FX-1-1", s.sku, 2, 920));
+        euro.shippingCents = 460;
+        euro.totalCents = 2300;
+        sim().place(ch, euro);
+        sync.run(ch, System.currentTimeMillis(), true);
+        assertEquals(1, orders(s.storeId), "the euro order is imported, not refused");
+        Map o = db.queryOne("SELECT id, currency, subtotal_cents, shipping_cents, total_cents, "
+                + "presentment_currency, presentment_total_cents, fx_rate_micros, fx_source "
+                + "FROM store_order WHERE store_id = ? AND channel = ?",
+                new Object[] {s.storeId, ChannelSync.MARKETPLACE});
+        assertEquals("USD", Rows.text(o.get("currency")));
+        // 920 EUR cents at 0.92 is 1000 USD cents a unit; 460 is 500; 2300 is 2500.
+        assertEquals(2000, Rows.number(o.get("subtotal_cents")));
+        assertEquals(500, Rows.number(o.get("shipping_cents")));
+        assertEquals(2500, Rows.number(o.get("total_cents")));
+        assertEquals("EUR", Rows.text(o.get("presentment_currency")));
+        assertEquals(2300, Rows.number(o.get("presentment_total_cents")));
+        assertEquals(920000, Rows.number(o.get("fx_rate_micros")));
+        assertEquals(Markets.MANUAL, Rows.text(o.get("fx_source")));
+        String orderId = Rows.text(o.get("id"));
+        Map line = db.queryOne("SELECT id, price_cents FROM order_line WHERE order_id = ?",
+                new Object[] {orderId});
+        assertEquals(1000, Rows.number(line.get("price_cents")));
+
+        // One unit back: 1000 USD cents in the books, 920 EUR cents to the buyer.
+        List<RefundLineDto> back = new ArrayList<RefundLineDto>();
+        back.add(new RefundLineDto(Rows.text(line.get("id")), 1));
+        orderService.refund(s.owner, s.storeId, orderId, new RefundRequestDto(back, 0, false,
+                "changed mind"));
+        Map r = db.queryOne("SELECT amount_cents, presentment_cents FROM refund WHERE order_id = ?",
+                new Object[] {orderId});
+        assertEquals(1000, Rows.number(r.get("amount_cents")));
+        assertEquals(920, Rows.number(r.get("presentment_cents")));
     }
 
     @Test

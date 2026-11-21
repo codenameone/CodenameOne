@@ -546,6 +546,12 @@ public class Orders {
                 cardPart = Math.min(amount, cardLeft);
                 presentmentPart = cardPart;
             }
+        } else if (foreign && payment == null && !byHand) {
+            // A marketplace order imported from another currency: the
+            // marketplace holds the money and refunds it in the buyer's
+            // currency, so the refund records that amount at the order's
+            // locked rate, never more than the order's presentment total.
+            presentmentPart = presentmentRefund(order, amount, order.getPresentmentTotalCents());
         }
         long giftPart = amount - cardPart;
         String card = giftCards.cardOf(orderId);
@@ -919,7 +925,7 @@ public class Orders {
         }
         if (quote.shipping != null) {
             order.setShippingRateId(quote.shipping.rate.getId());
-            order.setShippingTitle(Codes.cut(quote.shipping.rate.getName(), 120));
+            order.setShippingTitle(Codes.cut(quote.shipping.name, 120));
         }
         order.setClientId(clientId);
         order.setCreatedAt(Instant.now());

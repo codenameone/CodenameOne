@@ -30,11 +30,12 @@ final class Words {
     static final String[] CHANNELS = {"ONLINE", "POS", "DRAFT"};
     static final String[] ROLES = {"OWNER", "MANAGER", "CASHIER", "FULFILMENT"};
     static final String[] DISCOUNT_KINDS = {"PERCENT", "FIXED", "FREE_SHIPPING", "BUY_X_GET_Y"};
-    static final String[] RATE_KINDS = {"FLAT", "WEIGHT", "PRICE", "FREE_OVER", "PICKUP", "LOCAL"};
+    static final String[] RATE_KINDS = {"FLAT", "WEIGHT", "PRICE", "FREE_OVER", "PICKUP", "LOCAL",
+        "CARRIER"};
     /// The marketplaces a channel connects to: the server's connector kinds
     /// (`channel.SimulatedConnector.KIND`, `channel.EbayConnector.KIND`).
     static final String[] CHANNEL_KINDS = {"SIMULATED", "EBAY"};
-    static final String[] ADJUST_REASONS ={"RESTOCK", "DAMAGE", "CORRECTION", "RETURN", "RECEIVE"};
+    static final String[] ADJUST_REASONS = {"RESTOCK", "DAMAGE", "CORRECTION", "RETURN", "RECEIVE"};
 
     private Words() {
     }
