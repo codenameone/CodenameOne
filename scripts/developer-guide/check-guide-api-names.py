@@ -88,6 +88,7 @@ IDENTIFIER_ROOTS = [os.path.join(ROOT, d)
                               os.path.join('scripts', 'bastion'),
                               os.path.join('scripts', 'dash'),
                               os.path.join('scripts', 'splat'),
+                              os.path.join('scripts', 'papercut'),
                               os.path.join('scripts', 'fieldline'))]
 # '.py' because the Python support ships real Python packages under maven/
 # (starlette's TestClient is one edit from RestClient and is a real class).

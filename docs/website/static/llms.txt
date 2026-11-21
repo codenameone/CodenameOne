@@ -34,7 +34,7 @@ Windows (PowerShell): `$c = irm https://www.codenameone.com/agents/create-app.ps
 - REEL: video streaming with downloads and DRM.
 - [PULSE](https://www.codenameone.com/pulse/): gym and studio class booking.
 - [SLATE](https://www.codenameone.com/slate/): appointment booking with calendar sync.
-- [SKIRMISH](https://www.codenameone.com/skirmish/), [DASH](https://www.codenameone.com/dash/), [SPLAT](https://www.codenameone.com/splat/): games (card battle, endless runner, 3D team shooter).
+- [SKIRMISH](https://www.codenameone.com/skirmish/), [DASH](https://www.codenameone.com/dash/), [SPLAT](https://www.codenameone.com/splat/), [PAPERCUT](https://www.codenameone.com/papercut/): games (card battle, endless runner, 3D team shooter, twin-stick arena shooter).
 
 ## What the framework covers
 

@@ -118,4 +118,5 @@ Each is a complete app with a Java backend, MIT-0 licensed:
 [Wayline](/wayline/) (ride hailing), [Savor](/savor/) (food delivery),
 [Bastion](/bastion/) (banking), [Parley](/parley/) (messaging),
 [Pulse](/pulse/) (gym and studio), [Slate](/slate/) (appointments), and the
-games [Skirmish](/skirmish/), [Dash](/dash/) and [Splat](/splat/).
+games [Skirmish](/skirmish/), [Dash](/dash/), [Splat](/splat/) and
+[Papercut](/papercut/).

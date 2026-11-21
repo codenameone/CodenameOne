@@ -91,6 +91,11 @@ public class GeneratorModel {
     /// compile, so it is neither offered nor generated.
     static final String SPLAT_SINCE = "7.0.282";
 
+    /// The first release whose build plugin and core carry everything the arena
+    /// shooter template is built on. It is gated on the release that follows its
+    /// addition, so it is neither offered nor generated before then.
+    static final String PAPERCUT_SINCE = "7.0.284";
+
     /// The first release whose framework has what the banking template's app calls:
     /// timed clipboard clearing, the P-256 key and signature API it signs requests
     /// with, and the `BigDecimal` arithmetic its ledger rounds with. Against an
@@ -124,6 +129,7 @@ public class GeneratorModel {
         return template == Template.BASTION ? BASTION_SINCE
                 : template == Template.REEL ? REEL_SINCE
                 : template == Template.SPLAT ? SPLAT_SINCE
+                : template == Template.PAPERCUT ? PAPERCUT_SINCE
                 : template == Template.SLATE ? SLATE_SINCE
                 : template == Template.FIELDLINE ? FIELDLINE_SINCE : JAVA_TIME_ENTITIES_SINCE;
     }
@@ -147,6 +153,9 @@ public class GeneratorModel {
 
     /// The paintball template's accent, used for its icon: it has no `--brand`.
     public static final int SPLAT_BRAND = 0xff7a1f;
+
+    /// The arena shooter template's accent, used for its icon: it has no `--brand`.
+    public static final int PAPERCUT_BRAND = 0x2b3a67;
 
     /// The messaging template's `--brand`, held to its theme.css the same way.
     public static final int PARLEY_BRAND = 0x0a7d6b;
@@ -187,7 +196,8 @@ public class GeneratorModel {
         return template == Template.SAVOR ? SAVOR_BRAND
                 : template == Template.SKIRMISH ? SKIRMISH_BRAND
                 : template == Template.DASH ? DASH_BRAND
-                : template == Template.SPLAT ? SPLAT_BRAND : FULL_STACK_BRAND;
+                : template == Template.SPLAT ? SPLAT_BRAND
+                : template == Template.PAPERCUT ? PAPERCUT_BRAND : FULL_STACK_BRAND;
     }
 
     /// Whether `template` can be generated at [CN1_PLUGIN_VERSION]: the UI offers
@@ -2158,6 +2168,21 @@ public class GeneratorModel {
                     .append("- `shared/` is the contract: the REST interfaces and the objects they carry.\n")
                     .append("- `backend/` is the server.\n")
                     .append("- `common/` is the app.\n\n")
+                    .append("Start the server, then, in a second terminal, the app:\n\n```\n")
+                    .append("./run-server.sh\n")
+                    .append("./run.sh\n```\n\n")
+                    .append("On Windows: `run-server.bat`, then `run.bat`. Your IDE's run menu has both: ")
+                    .append("\"Run Server\" and the simulator.\n\n")
+                    .append("`./mvnw -pl backend -am -Dcodename1.platform=backend test` runs the server's tests.\n\n");
+        } else if (template == Template.PAPERCUT) {
+            out.append("## The game and its server\n\n")
+                    .append("This project is a working twin-stick arena shooter in cut paper and ink: three modes, ")
+                    .append("a daily seed, leaderboards, a shop, achievements and an admin console, and the server ")
+                    .append("they talk to.\n\n")
+                    .append("- `shared/` is the contract: the REST interfaces, the objects they carry and the ")
+                    .append("bounds the server holds a score to.\n")
+                    .append("- `backend/` is the server.\n")
+                    .append("- `common/` is the app, and the game: the arena runs there.\n\n")
                     .append("Start the server, then, in a second terminal, the app:\n\n```\n")
                     .append("./run-server.sh\n")
                     .append("./run.sh\n```\n\n")
