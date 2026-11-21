@@ -60,7 +60,16 @@ public final class Document {
         HTML("html"),
 
         /// Markdown with GitHub tables.
-        MARKDOWN("md");
+        MARKDOWN("md"),
+
+        /// Office Open XML, the format of Word 2007 and later. Reads styles, lists, tables
+        /// with merged cells, pictures, fields, notes, comments and tracked changes; headers,
+        /// footers, text boxes and charts are skipped.
+        DOCX("docx"),
+
+        /// OpenDocument text, the format of LibreOffice Writer. Reads and writes styles,
+        /// lists, tables with spans, pictures, notes, annotations and tracked changes.
+        ODT("odt");
 
         private final String extension;
 
@@ -94,6 +103,9 @@ public final class Document {
             String ext = fileName.substring(dot + 1);
             if ("htm".equalsIgnoreCase(ext)) {
                 return HTML;
+            }
+            if ("docm".equalsIgnoreCase(ext) || "dotx".equalsIgnoreCase(ext)) {
+                return DOCX;
             }
             if ("markdown".equalsIgnoreCase(ext)) {
                 return MARKDOWN;
@@ -490,6 +502,12 @@ public final class Document {
         if (format == Format.NATIVE) {
             return NativeFormat.read(in);
         }
+        if (format == Format.DOCX) {
+            return DocxReader.read(in);
+        }
+        if (format == Format.ODT) {
+            return OdtReader.read(in);
+        }
         String text = new String(readAll(in), "UTF-8");
         if (text.length() > 0 && text.charAt(0) == 0xfeff) {
             text = text.substring(1);
@@ -520,6 +538,10 @@ public final class Document {
     public void write(OutputStream out, Format format) throws IOException {
         if (format == Format.NATIVE) {
             NativeFormat.write(this, out);
+        } else if (format == Format.DOCX) {
+            DocxWriter.write(this, out);
+        } else if (format == Format.ODT) {
+            OdtWriter.write(this, out);
         } else {
             String s;
             switch (format) {

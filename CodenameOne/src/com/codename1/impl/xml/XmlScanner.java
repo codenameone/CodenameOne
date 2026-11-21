@@ -27,10 +27,10 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
 
-/// Reads the XML of a spreadsheet part as a sequence of tags and text, without building a
+/// Reads the XML of an office document part as a sequence of tags and text, without building a
 /// tree: a sheet of a hundred thousand cells is a hundred thousand elements.
 ///
-/// It reads what spreadsheet programs write -- elements, attributes, text, CDATA, the five
+/// It reads what office programs write -- elements, attributes, text, CDATA, the five
 /// named entities and numeric ones -- and skips comments, processing instructions and a
 /// document type. Namespace prefixes are cut from element names, and from attribute names
 /// that are asked for without one.
@@ -61,7 +61,7 @@ public final class XmlScanner {
     private int attrCount;
     private final StringBuilder sb = new StringBuilder(); //NOPMD AvoidStringBufferField - one buffer for every token of one file
 
-    /// Reads a part as UTF-8, the encoding every spreadsheet program writes. The stream is
+    /// Reads a part as UTF-8, the encoding every office program writes. The stream is
     /// not closed: it is one entry of an archive that has more.
     public XmlScanner(InputStream stream) throws IOException {
         this(stream, new long[] {MAX_DOCUMENT});
@@ -86,10 +86,10 @@ public final class XmlScanner {
             // says nothing about what reading it takes.
             budget[0] -= limit;
             if (budget[0] < 0) {
-                throw new IOException("The spreadsheet unpacks to more than " + MAX_DOCUMENT + " characters");
+                throw new IOException("The file unpacks to more than " + MAX_DOCUMENT + " characters");
             }
             if (sb.length() > MAX_TEXT) {
-                throw new IOException("The spreadsheet has a text of more than " + MAX_TEXT + " characters");
+                throw new IOException("The file has a text of more than " + MAX_TEXT + " characters");
             }
         }
         return buffer[pos++];
@@ -108,7 +108,7 @@ public final class XmlScanner {
             if (c < 0) {
                 if (depth > 0) {
                     // half a part read as if it were whole is rows missing without a word
-                    throw new IOException("The spreadsheet ends in the middle of an element");
+                    throw new IOException("The file ends in the middle of an element");
                 }
                 return EOF;
             }

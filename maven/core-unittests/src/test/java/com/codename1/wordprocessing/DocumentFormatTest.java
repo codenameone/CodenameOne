@@ -237,7 +237,8 @@ class DocumentFormatTest extends UITestBase {
         assertEquals(Document.Format.NATIVE, Document.Format.forFileName("a/b.CN1DOC"));
         assertEquals(Document.Format.HTML, Document.Format.forFileName("x.htm"));
         assertEquals(Document.Format.MARKDOWN, Document.Format.forFileName("README.md"));
-        assertNull(Document.Format.forFileName("x.docx"));
+        assertEquals(Document.Format.DOCX, Document.Format.forFileName("x.Docx"));
+        assertNull(Document.Format.forFileName("x.pages"));
     }
 
     private static TextStyle styleOf(RichText t, String text) {
