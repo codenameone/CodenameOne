@@ -904,6 +904,26 @@ BnTableTotal {
     margin: 0;
 }
 
+/* The audit chain's events are a DataGrid (com.codename1.ui.table), which
+   paints its own rows: only colours, fonts and paddings are read. */
+DataGrid { background-color: var(--surface); }
+DataGridHeader {
+    background-color: var(--surface-alt);
+    color: var(--text-muted);
+    font-family: "native:MainBold";
+    font-size: 2.1mm;
+    padding: 1.4mm 1.4mm 1.4mm 1.4mm;
+}
+DataGridRow {
+    background-color: var(--surface);
+    color: var(--text);
+    font-family: "native:MainRegular";
+    font-size: 2.3mm;
+    padding: 1.2mm 1.4mm 1.2mm 1.4mm;
+}
+DataGridRowAlt { background-color: var(--surface-alt); color: var(--text); }
+DataGridLine { color: var(--line); }
+
 BnTableRowBad {
     background-color: var(--danger-tint);
     border-bottom: 1px solid var(--line);
@@ -1056,6 +1076,11 @@ BnAmountNegative {
     BnTableGroup { background-color: var(--surface-alt-dark); border-bottom: 1px solid var(--line-dark); }
     BnTableTotal { background-color: var(--surface-alt-dark); border-top: 2px solid var(--text-muted-dark); }
     BnTableRowBad { background-color: var(--danger-tint-dark); border-bottom: 1px solid var(--line-dark); }
+    DataGrid { background-color: var(--surface-dark); }
+    DataGridHeader { background-color: var(--surface-alt-dark); color: var(--text-muted-dark); }
+    DataGridRow { background-color: var(--surface-dark); color: var(--text-dark); }
+    DataGridRowAlt { background-color: var(--surface-alt-dark); color: var(--text-dark); }
+    DataGridLine { color: var(--line-dark); }
     BnTableRowWarn { background-color: var(--warning-tint-dark); border-bottom: 1px solid var(--line-dark); }
     BnCellHead { color: var(--text-muted-dark); }
     BnCellHeadNum { color: var(--text-muted-dark); }
