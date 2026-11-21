@@ -67,8 +67,16 @@ public class StorefrontCaching implements HandlerInterceptor {
         if (type == null || !type.startsWith("text/html")) {
             return;
         }
+        com.codename1.backend.security.SecurityExchange here =
+                com.codename1.backend.security.SecurityExchange.current();
+        Object alternates = here == null ? null : here.getAttribute(StorefrontMarkets.LINKS);
+        Object vary = here == null ? null : here.getAttribute(StorefrontMarkets.VARY);
+        // One Link header: the canonical address, then each market's alternate.
         response.header("Link", "<" + urls.absolute(request, canonicalPath(request.getTarget()))
-                + ">; rel=\"canonical\"");
+                + ">; rel=\"canonical\"" + (alternates instanceof String ? ", " + alternates : ""));
+        if (vary instanceof String) {
+            response.header("Vary", (String) vary);
+        }
         if (isCart(request.getTarget())) {
             noStore(response);
             return;
@@ -104,17 +112,23 @@ public class StorefrontCaching implements HandlerInterceptor {
         }
         String path = target.substring(0, q);
         String query = target.substring(q + 1);
+        String kept = null;
+        String market = null;
         int start = 0;
         while (start <= query.length()) {
             int amp = query.indexOf('&', start);
             int end = amp < 0 ? query.length() : amp;
             String part = query.substring(start, end);
             if (part.startsWith("page=") && !"page=0".equals(part) && part.length() > 5) {
-                return path + "?" + part;
+                kept = kept == null ? part : kept + "&" + part;
+            } else if (part.startsWith("market=") && part.length() > 7 && market == null) {
+                // Each market's copy is its own document (prices, language).
+                market = part;
             }
             start = end + 1;
         }
-        return path;
+        String q2 = market == null ? kept : kept == null ? market : market + "&" + kept;
+        return q2 == null ? path : path + "?" + q2;
     }
 
     static boolean storefront(String target) {

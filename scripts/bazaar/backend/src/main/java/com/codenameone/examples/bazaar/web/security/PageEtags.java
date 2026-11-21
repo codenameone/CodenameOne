@@ -125,15 +125,11 @@ public final class PageEtags implements SecurityFilter {
         if (nonce != null && nonce.length() > 0) {
             text = text.replace(nonce, "");
         }
-        String marker = "name=\"_csrf\" value=\"";
-        int at = text.indexOf(marker);
-        if (at >= 0) {
-            int end = text.indexOf('"', at + marker.length());
-            String token = text.substring(at + marker.length(), end < 0 ? text.length() : end);
-            if (token.length() > 0) {
-                text = text.replace(token, "");
-            }
-        }
+        text = cut(text, "name=\"_csrf\" value=\"");
+        // The bot guard's timing token is per response too. A 304 hands the
+        // browser its older copy, whose token is older still -- a slower
+        // fill, which the guard accepts.
+        text = cut(text, "name=\"_ft\" value=\"");
         byte[] d = MessageDigest.getInstance("SHA-256").digest(text.getBytes("ISO-8859-1"));
         StringBuilder out = new StringBuilder();
         for (int iter = 0; iter < 12; iter++) {
@@ -141,5 +137,15 @@ public final class PageEtags implements SecurityFilter {
                     .append(Character.forDigit(d[iter] & 15, 16));
         }
         return out.toString();
+    }
+
+    private static String cut(String text, String marker) {
+        int at = text.indexOf(marker);
+        if (at < 0) {
+            return text;
+        }
+        int end = text.indexOf('"', at + marker.length());
+        String token = text.substring(at + marker.length(), end < 0 ? text.length() : end);
+        return token.length() > 0 ? text.replace(token, "") : text;
     }
 }

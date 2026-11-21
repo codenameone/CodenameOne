@@ -88,12 +88,19 @@ public class StorefrontPages {
     private final Slots slots;
     private final com.codenameone.examples.bazaar.subscribe.Subscriptions subscriptions;
 
+    private final com.codenameone.examples.bazaar.market.Markets markets;
+    private final com.codenameone.examples.bazaar.market.Translations translations;
+
     public StorefrontPages(Stores stores, Catalog catalog, Carts carts, StoreRepository storeRows,
             ProductRepository products, CollectionRepository collections,
             ReviewRepository reviews, FulfillmentRepository fulfillments,
             TrackingEventRepository tracking, SiteUrls urls, Slots slots,
-            com.codenameone.examples.bazaar.subscribe.Subscriptions subscriptions) {
+            com.codenameone.examples.bazaar.subscribe.Subscriptions subscriptions,
+            com.codenameone.examples.bazaar.market.Markets markets,
+            com.codenameone.examples.bazaar.market.Translations translations) {
         this.subscriptions = subscriptions;
+        this.markets = markets;
+        this.translations = translations;
         this.stores = stores;
         this.catalog = catalog;
         this.carts = carts;
@@ -272,6 +279,24 @@ public class StorefrontPages {
         view.vendor = p.vendor();
         view.description = p.description();
         view.currency = store.getCurrency();
+        StorefrontMarkets.Choice market = StorefrontMarkets.choose(store, path, request, markets,
+                translations, urls);
+        view.markets = market.picker.size() > 1 ? market.picker : new ArrayList<LinkView>();
+        if (market.locale != null) {
+            Map<String, String> tr = translations.fields(store.getId(),
+                    com.codenameone.examples.bazaar.market.Translations.PRODUCT, p.id(),
+                    market.locale);
+            view.title = StorefrontMarkets.text(tr, "title", view.title);
+            view.description = StorefrontMarkets.text(tr, "description", view.description);
+            meta.title = StorefrontMarkets.text(tr, "seoTitle", view.title) + " - "
+                    + store.getName();
+            meta.description = describe(StorefrontMarkets.text(tr, "seoDescription",
+                    view.description));
+            view.lang = market.locale;
+        }
+        final com.codenameone.examples.bazaar.market.Markets.Pricer pricer = market.pricer;
+        final String shown = pricer == null ? store.getCurrency() : pricer.currency();
+        view.currency = shown;
         List<String> images = new ArrayList<String>();
         List<ProductPhotoDto> photos = p.photos() == null ? new ArrayList<ProductPhotoDto>()
                 : p.photos();
@@ -306,7 +331,8 @@ public class StorefrontPages {
             VariantView vv = new VariantView();
             vv.id = v.id();
             vv.title = v.title().length() > 0 ? v.title() : "Default";
-            vv.price = Money.format(v.priceCents(), store.getCurrency());
+            vv.price = Money.format(pricer == null ? v.priceCents()
+                    : pricer.price(v.id(), v.priceCents()), shown);
             vv.available = sellable(v);
             vv.selected = v == chosen;
             view.variants.add(vv);
@@ -315,10 +341,17 @@ public class StorefrontPages {
         if (chosen != null) {
             view.variantId = chosen.id();
             view.variantTitle = chosen.title();
-            view.price = Money.format(chosen.priceCents(), store.getCurrency());
-            view.amount = Money.plain(chosen.priceCents());
+            long cents = pricer == null ? chosen.priceCents()
+                    : pricer.price(chosen.id(), chosen.priceCents());
+            view.price = Money.format(cents, shown);
+            view.amount = Money.plain(cents);
             view.compareAt = chosen.compareAtCents() > chosen.priceCents()
-                    ? Money.format(chosen.compareAtCents(), store.getCurrency()) : "";
+                    ? Money.format(pricer == null ? chosen.compareAtCents()
+                        : pricer.price("", chosen.compareAtCents()), shown) : "";
+            if (pricer != null) {
+                view.marketNote = "Shown in " + shown + "; checkout charges "
+                        + store.getCurrency() + ".";
+            }
             view.available = sellable(chosen);
             // The same for every visitor, so the page stays public and cached.
             java.util.List<com.codenameone.examples.bazaar.api.SellingPlanDto> plans =

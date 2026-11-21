@@ -86,11 +86,17 @@ public class Checkouts {
     private final CustomerRepository customers;
     private final StoreOrderRepository orderRows;
     private final StoreEvents storeEvents;
+    private final com.codenameone.examples.bazaar.risk.RiskHolds holds;
+    private final com.codenameone.examples.bazaar.risk.Fraud fraud;
+    private final com.codenameone.examples.bazaar.taxes.TaxExemptions exemptions;
 
     public Checkouts(Carts carts, Quoter quoter, Inventory inventory, Orders orders,
             Payments payments, GiftCards giftCards, DiscountRepository discounts,
             DiscountUseRepository uses, CustomerRepository customers,
-            StoreOrderRepository orderRows, StoreEvents storeEvents) {
+            StoreOrderRepository orderRows, StoreEvents storeEvents,
+            com.codenameone.examples.bazaar.risk.RiskHolds holds,
+            com.codenameone.examples.bazaar.risk.Fraud fraud,
+            com.codenameone.examples.bazaar.taxes.TaxExemptions exemptions) {
         this.carts = carts;
         this.quoter = quoter;
         this.inventory = inventory;
@@ -102,6 +108,9 @@ public class Checkouts {
         this.customers = customers;
         this.orderRows = orderRows;
         this.storeEvents = storeEvents;
+        this.holds = holds;
+        this.fraud = fraud;
+        this.exemptions = exemptions;
     }
 
     /// The `client_id` an idempotency key becomes: per shopper, so two
@@ -231,12 +240,18 @@ public class Checkouts {
                         : payments.authorize(orderId, username, method, due,
                             quote.store.getCurrency());
             } catch (IOException | RuntimeException failed) {
+                // The fraud score counts refused payments; the order itself is erased.
+                holds.recordFailure(storeId, username);
                 undo(quote, orderId, username);
                 orders.releaseAll(storeId, held, orderId, username);
                 throw failed;
             }
         }
         StoreOrder done = finish(orderId, quote, due, reference, username);
+        if (quote.exemptCertificate != null) {
+            exemptions.recordUse(storeId, orderId, quote.exemptCertificate);
+        }
+        fraud.assess(orderId, username);
         carts.clear(cart.getId());
         orders.publish(done);
         storeEvents.orderPlaced(orderId);

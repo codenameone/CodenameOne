@@ -105,12 +105,21 @@ public class CheckoutPages {
     private final Documents documents;
     private final StorefrontPages pages;
     private final com.codenameone.examples.bazaar.trade.Trade trade;
+    private final com.codenameone.examples.bazaar.web.security.BotGuard bots;
+    private final com.codenameone.examples.bazaar.market.Markets markets;
+    private final com.codenameone.examples.bazaar.taxes.TaxExemptions exemptions;
 
     public CheckoutPages(Stores stores, Carts carts, Checkouts checkouts, Payments payments,
             CustomerAddressRepository addresses, StoreOrderRepository orderRows,
             FulfillmentRepository fulfillments, Orders orders, Documents documents,
-            StorefrontPages pages, com.codenameone.examples.bazaar.trade.Trade trade) {
+            StorefrontPages pages, com.codenameone.examples.bazaar.trade.Trade trade,
+            com.codenameone.examples.bazaar.web.security.BotGuard bots,
+            com.codenameone.examples.bazaar.market.Markets markets,
+            com.codenameone.examples.bazaar.taxes.TaxExemptions exemptions) {
         this.trade = trade;
+        this.bots = bots;
+        this.markets = markets;
+        this.exemptions = exemptions;
         this.stores = stores;
         this.carts = carts;
         this.checkouts = checkouts;
@@ -445,6 +454,7 @@ public class CheckoutPages {
         view.action = base;
         view.codesAction = base + "/codes";
         view.placeAction = base + "/place";
+        view.fillToken = bots.issue();
         if (me != null && trade.buyerStores(me).contains(store.getId())) {
             com.codenameone.examples.bazaar.trade.Trade.BuyerTerms t = trade.myTerms(me,
                     store.getId());
@@ -542,6 +552,26 @@ public class CheckoutPages {
             view.giftCard = dto.giftCardCents() > 0 ? "-" + Money.format(dto.giftCardCents(),
                     currency) : "";
             view.due = Money.format(dto.dueCents(), currency);
+            if (f.country.length() == 2) {
+                List<String[]> dutiable = new java.util.ArrayList<String[]>();
+                for (int iter = 0; iter < dto.lines().size(); iter++) {
+                    CartLineDto l = dto.lines().get(iter);
+                    dutiable.add(new String[] {l.productId(),
+                        Long.toString(l.priceCents() * l.quantity())});
+                }
+                long duty = markets.dutyEstimate(store.getId(), f.country, dutiable);
+                view.duty = duty > 0 ? Money.format(duty, currency) : "";
+                String cert = me == null || dto.taxInclusive() ? null : exemptions
+                        .certificateFor(store.getId(), me, f.country, f.region,
+                                java.time.Instant.now());
+                view.exemption = cert == null ? "" : "Tax exemption certificate " + cert
+                        + " applies to this order.";
+            }
+            String browsed = StorefrontMarkets.cookie(request);
+            if (browsed != null && markets.pricer(store, browsed) != null) {
+                view.marketNote = "Prices you browsed were shown in another currency; "
+                        + "this order is charged in " + currency + ".";
+            }
             view.nothingDue = dto.dueCents() <= 0;
             view.discountCode = dto.discountCode() == null ? "" : dto.discountCode();
             view.giftCardCode = dto.giftCardCode() == null || dto.giftCardCode().length() < 4

@@ -34,6 +34,9 @@ final class Browser {
     final MockMvc mvc;
     String session;
     String csrf;
+    /// The bot guard's timing token of the last page with a form, as a page
+    /// sends it back (web.security.BotGuard).
+    String fill;
     MockResponse last;
 
     Browser(MockMvc mvc) {
@@ -60,6 +63,10 @@ final class Browser {
             if (token != null) {
                 csrf = token;
             }
+            String ft = token(r.getContentAsString(), "_ft");
+            if (ft != null) {
+                fill = ft;
+            }
         }
         last = r;
         return r;
@@ -67,10 +74,12 @@ final class Browser {
 
     /// A form post with this session's CSRF token.
     MockResponse post(String path, String... pairs) throws Exception {
-        String[] all = new String[pairs.length + 2];
+        String[] all = new String[pairs.length + 4];
         System.arraycopy(pairs, 0, all, 0, pairs.length);
         all[pairs.length] = "_csrf";
         all[pairs.length + 1] = csrf == null ? "" : csrf;
+        all[pairs.length + 2] = "_ft";
+        all[pairs.length + 3] = fill == null ? "" : fill;
         return send(form(path, all));
     }
 
@@ -102,7 +111,11 @@ final class Browser {
     }
 
     static String token(String html) {
-        int at = html.indexOf("name=\"_csrf\"");
+        return token(html, "_csrf");
+    }
+
+    static String token(String html, String name) {
+        int at = html.indexOf("name=\"" + name + "\"");
         if (at < 0) {
             return null;
         }

@@ -87,13 +87,17 @@ public class Quoter {
     private final ShippingRateRepository rates;
     private final GiftCardRepository giftCards;
     private final Memberships memberships;
+    private final com.codenameone.examples.bazaar.taxes.TaxExemptions exemptions;
+    private final com.codenameone.examples.bazaar.market.Markets markets;
 
     public Quoter(StoreRepository stores, CartLineRepository cartLines, VariantRepository variants,
             ProductRepository products, CollectionProductRepository collections,
             InventoryLevelRepository levels, LocationRepository locations,
             DiscountRepository discounts, DiscountUseRepository uses, TaxRateRepository taxes,
             ShippingZoneRepository zones, ShippingRateRepository rates,
-            GiftCardRepository giftCards, Memberships memberships) {
+            GiftCardRepository giftCards, Memberships memberships,
+            com.codenameone.examples.bazaar.taxes.TaxExemptions exemptions,
+            com.codenameone.examples.bazaar.market.Markets markets) {
         this.stores = stores;
         this.cartLines = cartLines;
         this.variants = variants;
@@ -108,6 +112,8 @@ public class Quoter {
         this.rates = rates;
         this.giftCards = giftCards;
         this.memberships = memberships;
+        this.exemptions = exemptions;
+        this.markets = markets;
     }
 
     /// One wanted variant and quantity, from a cart line or a draft.
@@ -279,6 +285,26 @@ public class Quoter {
         quote.tax = TaxCalculator.apply(priceLines, quote.shippingCents,
                 hasAddress ? taxes.findByStoreId(cart.getStoreId()) : null, country,
                 hasAddress ? address.region() : null, store.isTaxInclusive());
+        // A signed-in shopper's tax exemption covering the address takes the
+        // tax off (TaxExemptions: not in a store whose prices include it).
+        if (hasAddress && username != null && !store.isTaxInclusive()
+                && quote.tax.totalCents() > 0) {
+            String cert = exemptions.certificateFor(cart.getStoreId(), username, country,
+                    address.region(), now);
+            if (cert != null) {
+                quote.exemptCertificate = cert;
+                quote.tax = TaxCalculator.apply(priceLines, quote.shippingCents, null, country,
+                        address.region(), false);
+            }
+        }
+        if (hasAddress) {
+            List<String[]> dutiable = new ArrayList<String[]>();
+            for (int iter = 0; iter < priceLines.size(); iter++) {
+                PriceLine pl = priceLines.get(iter);
+                dutiable.add(new String[] {pl.productId, Long.toString(pl.netCents())});
+            }
+            quote.dutyCents = markets.dutyEstimate(cart.getStoreId(), country, dutiable);
+        }
         quote.totalCents = afterDiscounts + quote.shippingCents + quote.tax.addedCents();
         if (giftCode != null && giftCode.length() > 0) {
             GiftCard card = giftCards.findByCode(giftCode);

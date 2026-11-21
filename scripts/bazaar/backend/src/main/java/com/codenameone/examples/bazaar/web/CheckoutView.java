@@ -27,6 +27,15 @@ public final class CheckoutView {
     public String action = "";
     public String codesAction = "";
     public String placeAction = "";
+    /// The bot guard's timing token for the place form (BotGuard).
+    public String fillToken = "";
+    /// The estimated import duties, or empty.
+    public String duty = "";
+    /// Which tax exemption certificate applies, or empty.
+    public String exemption = "";
+    /// That the order is charged in the store's currency, for a shopper who
+    /// browsed another market's prices; or empty.
+    public String marketNote = "";
     /// A company buyer on net terms may place the cart on account instead:
     /// what that means in words, and where the button posts.
     public boolean netTerms;

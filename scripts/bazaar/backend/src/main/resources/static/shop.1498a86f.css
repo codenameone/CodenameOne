@@ -90,3 +90,6 @@ h1{font-size:clamp(1.6rem,4vw,2.4rem);line-height:1.15;margin:24px 0 8px}
 .consent button{font:inherit;padding:6px 14px;border-radius:8px;border:1px solid var(--line);background:var(--soft);color:inherit;cursor:pointer}
 .consent details{margin-top:10px}
 .consent label{margin-right:12px}
+
+/* Bot protection: the honeypot field people never see (BotGuard). */
+.hp{position:absolute;left:-10000px;width:1px;height:1px;overflow:hidden}

@@ -113,7 +113,7 @@ public class WebSecurity {
     @Bean
     @Order(3)
     public SecurityFilterChain webAppChain(HttpSecurity http, TotpService totp,
-            RecoveryCodeService recoveryCodes, final Throttle throttle,
+            RecoveryCodeService recoveryCodes, final Throttle throttle, BotGuard bots,
             @Value("${bazaar.web.hsts:true}") boolean hsts) throws IOException {
         final SavedRequestAwareAuthenticationSuccessHandler saved =
                 new SavedRequestAwareAuthenticationSuccessHandler();
@@ -126,6 +126,7 @@ public class WebSecurity {
             .addFilterBefore(new WebHeaders(hsts), CsrfFilter.class)
             .addFilterBefore(new PageEtags(), CsrfFilter.class)
             .addFilterBefore(lockout(throttle), CsrfFilter.class)
+            .addFilterAfter(bots.filter(), CsrfFilter.class)
             .rateLimit(AntPathRequestMatcher.antMatcher("POST", SIGN_IN),
                     RateLimitKeys.clientAddress(), throttle.limiter("signin"))
             .rateLimit(AntPathRequestMatcher.antMatcher("POST", "/s/*/checkout/**"),

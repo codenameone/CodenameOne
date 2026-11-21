@@ -65,6 +65,11 @@ public final class Quote {
     public long shippingCents;
     public long totalCents;
     public long giftCardCents;
+    /// The tax exemption certificate that took the tax off, or null.
+    public String exemptCertificate;
+    /// The import duties a buyer may pay on delivery (Markets#dutyEstimate):
+    /// shown, never charged.
+    public long dutyCents;
     public final List<String> problems = new ArrayList<String>();
 
     public List<PriceLine> priceLines() {

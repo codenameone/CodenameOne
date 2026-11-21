@@ -67,3 +67,6 @@ iframe.widget{width:100%;border:1px solid var(--line);border-radius:var(--r);bac
 .flow .node rect{fill:var(--card);stroke:var(--line);stroke-width:1.5}.flow .node.entry rect{stroke:var(--accent)}.flow .node.split rect{stroke:#c58b00}.flow .node.end rect{stroke:var(--muted)}
 .flow text{fill:var(--fg);font-size:12px}.flow .title{font-weight:700}.flow .edge{fill:none;stroke:var(--muted);stroke-width:1.5}.flow marker path,.flow .port{fill:var(--muted)}.flow .edge-label{fill:var(--muted);font-size:11px}
 .parcel{border-top:1px solid var(--line);padding-top:10px;margin-top:10px}
+
+/* Bot protection: the honeypot field people never see (BotGuard). */
+.hp{position:absolute;left:-10000px;width:1px;height:1px;overflow:hidden}

@@ -6,6 +6,7 @@
 <h1 th:text="${shell.heading}">Sign in</h1>
 <p class="toast bad" role="alert" th:unless="${form.problem.empty}" th:text="${form.problem}">Wrong</p>
 <form th:unless="${form.secondFactor}" method="post" action="/auth/signin" class="stack">
+<input type="hidden" name="_ft" th:value="${form.fillToken}"><div class="hp" aria-hidden="true"><label for="website">Website</label><input id="website" name="website" tabindex="-1" autocomplete="off"></div>
 <label for="username">Email</label><input id="username" name="username" type="email" autocomplete="username" required autofocus>
 <label for="password">Password</label><input id="password" name="password" type="password" autocomplete="current-password" required>
 <button class="button" type="submit">Sign in</button></form>

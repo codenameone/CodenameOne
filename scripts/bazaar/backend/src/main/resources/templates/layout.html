@@ -16,7 +16,7 @@
 <meta name="twitter:image" th:unless="${page.image.empty}" th:attr="content=${page.image}">
 <meta name="theme-color" th:attr="content=${page.accent}">
 <style th:attr="nonce=${page.nonce}">:root{--accent:#4f46e5;--ink:#1f2328;--muted:#5f6670;--line:#e3e5e8;--bg:#fff;--soft:#f6f7f9}@media (prefers-color-scheme:dark){:root{--ink:#e8eaed;--muted:#a3a9b1;--line:#30353b;--bg:#15181c;--soft:#1d2126}}*{box-sizing:border-box}body{margin:0;font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:var(--ink);background:var(--bg)}a{color:inherit}img,svg{display:block;width:100%;height:auto}.wrap{max-width:1120px;margin:0 auto;padding:0 16px}.bar{border-bottom:1px solid var(--line);background:var(--bg);position:sticky;top:0;z-index:2}.bar-in{max-width:1120px;margin:0 auto;padding:10px 16px;display:flex;gap:12px;align-items:center}</style>
-<link rel="stylesheet" href="/static/shop.46baf561.css"><script src="/static/shop.c791daf1.js" defer th:attr="nonce=${page.nonce}"></script></head>
+<link rel="stylesheet" href="/static/shop.1498a86f.css"><script src="/static/shop.c791daf1.js" defer th:attr="nonce=${page.nonce}"></script></head>
 <body><header th:fragment="header" class="bar"><div class="bar-in"><a class="brand" th:href="${page.home}" th:text="${page.brand}">Bazaar</a>
 <form class="search" method="get" role="search" th:unless="${page.searchUrl.empty}" th:action="${page.searchUrl}"><input type="search" name="q" placeholder="Search" aria-label="Search" th:value="${page.query}"></form>
 <a class="cart-link" th:unless="${page.cartUrl.empty}" th:href="${page.cartUrl}">Cart</a></div>

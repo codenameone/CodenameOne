@@ -5,6 +5,7 @@
 <main class="wrap" id="main"><h1>Checkout</h1>
 <div class="empty-state" th:if="${checkout.empty}"><p>Your cart is empty.</p><a class="button" th:href="${page.home}">Keep shopping</a></div>
 <form th:unless="${checkout.empty}" method="post" th:action="${checkout.placeAction}" novalidate>
+<input type="hidden" name="_ft" th:value="${checkout.fillToken}"><div class="hp" aria-hidden="true"><label for="website">Website</label><input id="website" name="website" tabindex="-1" autocomplete="off"></div>
 <input type="hidden" name="idempotencyKey" th:value="${checkout.key}">
 <div id="sections" class="co">
 <div>
@@ -60,7 +61,10 @@
 <p th:unless="${checkout.giftCardCode.empty}"><span th:text="${checkout.giftCardCode}">ending 1234</span> <button class="quiet" type="submit" th:attr="formaction=${checkout.codesAction}" name="codeAction" value="remove-gift" formnovalidate>Remove</button></p>
 <div class="codes" th:if="${checkout.giftCardCode.empty}"><input id="gift-card" name="giftCardCode" autocomplete="off"><button class="quiet" type="submit" th:attr="formaction=${checkout.codesAction}" name="codeAction" value="apply-gift" formnovalidate>Apply</button></div></div>
 <p class="err" role="alert" th:unless="${checkout.codeError.empty}" th:text="${checkout.codeError}">Error</p>
-<dl class="totals"><dt>Subtotal</dt><dd th:text="${checkout.subtotal}">$1</dd><dt th:unless="${checkout.discount.empty}">Discount</dt><dd th:unless="${checkout.discount.empty}" th:text="${checkout.discount}">-$1</dd><dt>Shipping</dt><dd th:text="${checkout.shipping}">$1</dd><dt th:text="${checkout.taxInclusive ? 'Tax included' : 'Tax'}">Tax</dt><dd th:text="${checkout.tax}">$0</dd><dt>Total</dt><dd class="total" th:text="${checkout.total}">$1</dd><dt th:unless="${checkout.giftCard.empty}">Gift card</dt><dd th:unless="${checkout.giftCard.empty}" th:text="${checkout.giftCard}">-$1</dd><dt th:unless="${checkout.giftCard.empty}">To pay</dt><dd th:unless="${checkout.giftCard.empty}" th:text="${checkout.due}">$1</dd></dl>
+<dl class="totals"><dt>Subtotal</dt><dd th:text="${checkout.subtotal}">$1</dd><dt th:unless="${checkout.discount.empty}">Discount</dt><dd th:unless="${checkout.discount.empty}" th:text="${checkout.discount}">-$1</dd><dt>Shipping</dt><dd th:text="${checkout.shipping}">$1</dd><dt th:text="${checkout.taxInclusive ? 'Tax included' : 'Tax'}">Tax</dt><dd th:text="${checkout.tax}">$0</dd><dt>Total</dt><dd class="total" th:text="${checkout.total}">$1</dd><dt th:unless="${checkout.duty.empty}">Import duties (estimate)</dt><dd th:unless="${checkout.duty.empty}" th:text="${checkout.duty}">$1</dd><dt th:unless="${checkout.giftCard.empty}">Gift card</dt><dd th:unless="${checkout.giftCard.empty}" th:text="${checkout.giftCard}">-$1</dd><dt th:unless="${checkout.giftCard.empty}">To pay</dt><dd th:unless="${checkout.giftCard.empty}" th:text="${checkout.due}">$1</dd></dl>
+<p class="muted" th:unless="${checkout.exemption.empty}" th:text="${checkout.exemption}">Exempt</p>
+<p class="muted" th:unless="${checkout.duty.empty}">Duties are an estimate the carrier collects on delivery; they are not part of this charge.</p>
+<p class="muted" th:unless="${checkout.marketNote.empty}" th:text="${checkout.marketNote}">Charged in USD</p>
 <button class="button place" type="submit">Place order</button>
 <p><a th:href="${checkout.cartUrl}">Back to cart</a></p>
 </aside>

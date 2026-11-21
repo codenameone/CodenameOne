@@ -31,11 +31,18 @@ import com.codenameone.examples.bazaar.web.WebPages;
 /// out at `POST /auth/signout`. These only draw the forms.
 @Controller
 public class AuthPages {
+    private final com.codenameone.examples.bazaar.web.security.BotGuard bots;
+
+    public AuthPages(com.codenameone.examples.bazaar.web.security.BotGuard bots) {
+        this.bots = bots;
+    }
+
     @GetMapping("/auth/signin")
     public String signIn(@RequestParam(value = "error", required = false) String error,
             @RequestParam(value = "locked", required = false) String locked,
-            Model model, HttpServer.Request request) {
+            Model model, HttpServer.Request request) throws java.io.IOException {
         SignInView form = new SignInView();
+        form.fillToken = bots.issue();
         if (locked != null) {
             form.problem = "Too many wrong passwords for that account. Try again in a few "
                     + "minutes.";

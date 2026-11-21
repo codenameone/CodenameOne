@@ -23,4 +23,6 @@ package com.codenameone.examples.bazaar.web.auth;
 public class SignInView {
     public boolean secondFactor;
     public String problem = "";
+    /// The bot guard's timing token for the form (BotGuard).
+    public String fillToken = "";
 }

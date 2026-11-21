@@ -131,12 +131,17 @@ public class Fulfillments {
     private final PushDevices devices;
     private final Emails emails;
 
+    /// Refuses to fulfil an order held for a fraud review.
+    private final com.codenameone.examples.bazaar.risk.RiskHolds holds;
+
     public Fulfillments(FulfillmentRepository fulfillments,
             FulfillmentLineRepository fulfillmentLines, TrackingEventRepository tracking,
             StoreOrderRepository orders, OrderLineRepository lines, LocationRepository locations,
             VariantRepository variants, Inventory inventory, Orders orderService,
-            StoreAccess access, CarrierProvider carrier, PushSender push, PushDevices devices, Emails emails) {
+            StoreAccess access, CarrierProvider carrier, PushSender push, PushDevices devices, Emails emails,
+            com.codenameone.examples.bazaar.risk.RiskHolds holds) {
         this.emails = emails;
+        this.holds = holds;
         this.fulfillments = fulfillments;
         this.fulfillmentLines = fulfillmentLines;
         this.tracking = tracking;
@@ -265,6 +270,7 @@ public class Fulfillments {
         if (!awaitsShipping(order)) {
             throw new ResponseStatusException(409, "The order has nothing to send");
         }
+        holds.requireReleased(orderId);
         if (req == null || req.lines() == null || req.lines().isEmpty()) {
             throw new ResponseStatusException(400, "Choose what goes in the parcel");
         }

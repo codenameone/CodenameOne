@@ -31,6 +31,12 @@ public final class ProductView {
     /// The price as a plain decimal (`12.50`), for structured data.
     public String amount = "";
     public String currency = "";
+    /// The market picker: links to this page in each market, or empty.
+    public java.util.List<LinkView> markets = new java.util.ArrayList<LinkView>();
+    /// The language the text is translated to, or empty.
+    public String lang = "";
+    /// That checkout charges the store's currency, when another is shown.
+    public String marketNote = "";
     public boolean available;
     public String availability = "";
     /// The chosen variant id, for the add-to-cart form.

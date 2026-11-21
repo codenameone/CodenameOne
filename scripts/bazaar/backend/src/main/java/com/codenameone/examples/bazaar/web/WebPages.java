@@ -64,6 +64,11 @@ public class WebPages {
         {"Price lists", "/price-lists", "k"},
         {"Quotes", "/quotes", "q"},
         {"Invoices", "/invoices", "v"},
+        {"Markets", "/markets", "m"},
+        {"Translations", "/translations", "x"},
+        {"Tax", "/tax", "z"},
+        {"Fraud review", "/risk", "h"},
+        {"Disputes", "/disputes", "w"},
         {"Apps", "/apps", "a"},
     };
     /// Account sections: label, path, shortcut.

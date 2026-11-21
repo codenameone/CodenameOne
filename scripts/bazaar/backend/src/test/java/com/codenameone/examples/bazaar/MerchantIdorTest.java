@@ -156,6 +156,18 @@ class MerchantIdorTest {
         "POST /subscriptions/{subscriptionId}/pause", "POST /subscriptions/{subscriptionId}/resume",
         "POST /subscriptions/{subscriptionId}/skip", "POST /vat-check",
         "GET /pos/labels.pdf",
+        // Markets, translations, tax, fraud review and disputes.
+        "GET /markets", "POST /markets", "POST /markets/{marketId}",
+        "DELETE /markets/{marketId}", "GET /markets/{marketId}/prices",
+        "POST /markets/{marketId}/prices", "GET /fx-rates", "POST /fx-rates", "GET /duty-rates",
+        "POST /duty-rates", "DELETE /duty-rates/{dutyId}", "GET /customs-codes",
+        "POST /customs-codes", "GET /translations", "POST /translations",
+        "GET /tax-exemptions", "POST /tax-exemptions", "DELETE /tax-exemptions/{exemptionId}",
+        "GET /tax-report", "GET /order-risks", "GET /order-risks/{orderId}",
+        "POST /order-risks/{orderId}/approve", "POST /order-risks/{orderId}/cancel",
+        "GET /disputes", "GET /disputes/{disputeId}", "GET /disputes/{disputeId}/evidence",
+        "POST /disputes/{disputeId}/evidence", "POST /disputes/{disputeId}/submit",
+        "POST /disputes/{disputeId}/accept",
     };
 
     /// Routes of [#ROUTES] served as documents by `DocumentPages` rather than
@@ -180,6 +192,9 @@ class MerchantIdorTest {
         {"selling-plans", "selling_plan"}, {"subscriptions", "subscription"},
         {"companies", "company"}, {"buyers", "company_buyer"}, {"price-lists", "price_list"},
         {"entries", "price_list_entry"}, {"quotes", "trade_quote"}, {"net-terms", "net_term"},
+        {"markets", "market"}, {"duty-rates", "duty_rate"},
+        {"tax-exemptions", "tax_exemption"}, {"order-risks", "store_order"},
+        {"disputes", "dispute"},
     };
 
     private static final String NO_SUCH = "no-such-id";
@@ -320,6 +335,7 @@ class MerchantIdorTest {
         // B's loyalty programme, club, segments, campaigns, form and journey.
         marketing.seed(b.storeId);
         new CommerceSeed(b, "idorcd", accounts, mvc, subscriptions, trade);
+        GlobalSeed.seed(b, orderId, db);
         // A manager of A: the merchant role and a place on A's staff, not the owner.
         String manager = People.customer(accounts, "idor-manager");
         Rest.json(mvc, People.asMerchant(Rest.body(post("/api/merchant/stores/" + a.storeId
