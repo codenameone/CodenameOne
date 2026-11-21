@@ -9,6 +9,8 @@ commerce platform adds: a catalog with variants, an inventory ledger that never
 oversells, orders paid in two steps, a point of sale that keeps selling with no
 network, fulfilment, signed webhooks, automations drawn as graphs, documents
 rendered as PDF files and a storefront that search engines can read.
+<<bazaar-feature-comparison>> lists what Bazaar has and lacks, next to
+other commerce platforms.
 
 [[bazaar-launch]]
 === Running it

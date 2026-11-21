@@ -11,6 +11,8 @@ sides.
 This chapter is the user's guide: what each kind of user sees and can do.
 <<bazaar-implementors-guide>> is the other half. It explains how the project is
 built and what to replace before it takes real orders.
+<<bazaar-feature-comparison>> sets Bazaar's features beside other commerce
+platforms.
 
 One app serves everyone, on a phone, a tablet, a desktop or in a browser. The
 server gives every account a set of roles, and the app opens on the screen that

@@ -1,0 +1,448 @@
+[[bazaar-feature-comparison]]
+== Bazaar: Feature comparison
+
+This chapter lists what Bazaar does next to the commerce platforms people most
+often compare a store against: Shopify, WooCommerce, BigCommerce and Square
+Online. For the point of sale rows, the Square column describes Square Point of
+Sale. <<bazaar-users-guide>> describes each feature from the user's side, and
+<<bazaar-implementors-guide>> explains how each one is built.
+
+The tables read as follows.
+
+* In the Bazaar column, &#10003; means supported, &#9681; means partly supported
+  (the Notes column says what differs) and &#8211; means absent.
+* In the other columns, "core" means the platform includes it and "app/plugin"
+  means stores commonly add it through the platform's app store or plugin
+  directory. An empty cell means the table makes no claim either way.
+* Where Bazaar talks to an outside service, such as a card processor or a
+  shipping carrier, it does so through an interface. The sample ships a
+  simulated implementation beside the real one, and the Notes say so where it
+  matters.
+
+The other platforms change often. Check their own documentation before relying
+on a row.
+
+=== Catalog
+
+[cols="3,1,1,1,1,1,4",options="header"]
+|===
+| Feature | Bazaar | Shopify | WooCommerce | BigCommerce | Square | Notes
+
+| Products with title/description/price | &#10003; | core | core | core | core | 
+| Variants & options matrix | &#10003; | core | core | core | core | 
+| Product media (multiple photos) | &#10003; | core | core | core | core | 
+| Product video / 3D models | &#8211; | core |  | core |  | 
+| Compare-at price | &#10003; | core | core | core | core | 
+| Cost per item / margin | &#9681; | core | core | core | core | Cost is kept on purchase lines; margin isn't shown per variant.
+| SKU / barcode | &#10003; | core | core | core | core | 
+| Weight / dimensions | &#10003; | core | core | core | core | 
+| Vendor / product type / tags | &#10003; | core | core | core | core | 
+| Manual collections | &#10003; | core | core | core | core | 
+| Smart (rule-based) collections | &#10003; | core | app/plugin |  |  | 
+| Product status draft/active/archived | &#10003; | core | core | core | core | 
+| Scheduled publishing per channel | &#8211; | core |  |  |  | 
+| Bulk editor | &#10003; | core | core | core | core | 
+| CSV import/export of products | &#10003; | core | core | core | core | 
+| Gift card products | &#10003; | core | core | core | core | 
+| Digital products / downloads | &#8211; | core | core |  | core | 
+| Bundles (fixed bundles / mix-and-match) | &#9681; | app/plugin | app/plugin |  |  | A BUNDLE discount prices a set of items together; there is no bundle product type.
+| Combined listings (parent/child products) | &#8211; | core |  |  |  | 
+| Metafields on products/variants | &#8211; | core |  | core |  | 
+| Metaobjects (custom content types) | &#8211; | core |  |  |  | 
+| Product taxonomy / standardized categories | &#8211; | core |  |  |  | 
+| Customs info (HS code, country of origin) | &#8211; | core |  |  |  | 
+| Unit pricing (per kg/l) | &#8211; | core |  |  |  | 
+| Product reviews | &#10003; | app/plugin | core | core |  | 
+| Wishlist | &#10003; | app/plugin | app/plugin | core | app/plugin | 
+| Product translations | &#8211; | core | app/plugin |  |  | 
+|===
+
+=== Inventory
+
+[cols="3,1,1,1,1,1,4",options="header"]
+|===
+| Feature | Bazaar | Shopify | WooCommerce | BigCommerce | Square | Notes
+
+| Track quantity per variant | &#10003; | core | core | core | core | 
+| Multi-location inventory | &#10003; | core | app/plugin | core |  | 
+| Inventory adjustments with reasons / history | &#10003; | core | core | core | core | 
+| Stock transfers between locations | &#10003; | core | app/plugin |  | core | 
+| Purchase orders & receiving | &#10003; | core | app/plugin |  | core | 
+| Suppliers | &#10003; | core |  |  | core | 
+| Stocktakes / counts | &#10003; | core |  |  | core | 
+| Low-stock alerts / reorder points | &#10003; | core | core | core | core | 
+| Continue selling when out of stock (oversell) | &#9681; | core |  | core |  | Stock is reserved atomically and never oversold; there is no per-variant oversell switch.
+| Committed / unavailable / incoming states | &#9681; | core |  | core |  | Reserved and incoming (from purchase orders) are tracked.
+| Inventory value report | &#10003; | core |  |  | core | 
+| Barcode label printing | &#9681; | core |  | core |  | Code 128 barcodes are drawn; no label-sheet layout.
+| Serial / lot tracking | &#8211; |  |  |  |  | 
+|===
+
+=== Checkout and payments
+
+[cols="3,1,1,1,1,1,4",options="header"]
+|===
+| Feature | Bazaar | Shopify | WooCommerce | BigCommerce | Square | Notes
+
+| Guest checkout | &#10003; | core | core | core | core | 
+| Customer accounts (login, saved addresses) | &#10003; | core | core | core | core | 
+| Passwordless / code sign-in | &#10003; | core |  |  |  | 
+| One-page / accelerated checkout | &#8211; | core |  |  |  | 
+| Apple Pay / Google Pay | &#9681; | core | core | core | core | Through the card provider when it offers wallets.
+| Discount code field | &#10003; | core | core | core | core | 
+| Gift card redemption at checkout | &#10003; | core | core | core | core | 
+| Address autocomplete / validation | &#10003; | core |  |  |  | 
+| Abandoned checkout recovery | &#10003; | core | core | core |  | 
+| Checkout customization / extensibility (UI extensions) | &#8211; | core | core |  |  | 
+| Order notes / custom attributes at checkout | &#9681; | core | core | core | core | Order notes are merchant-side.
+| Tipping at online checkout | &#8211; | core |  |  | core | 
+| Post-purchase upsell | &#8211; | app/plugin | app/plugin |  |  | 
+| Marketing consent checkbox | &#10003; | core | core | core | core | 
+| Bot protection / rate limiting | &#9681; | core | core | core | core | Rate limits and honeypot fields; no CAPTCHA.
+| Server-rendered SEO cart/session | &#10003; |  |  |  |  | 
+| Integrated card processing | &#10003; | core | core | core | core | 
+| Third-party gateways | &#9681; | core | core | core | &#8211; | One provider interface with a Stripe implementation and a simulated one.
+| Manual payment methods (COD, bank) | &#9681; | core | core | core | core | Manual tenders at the register only.
+| Saved cards | &#10003; | core | core | core | core | 
+| Payouts / balance | &#10003; | core | core | core | core | 
+| Refunds (full/partial) | &#10003; | core | core | core | core | 
+| Chargeback / dispute management | &#8211; | core |  |  | core | 
+| Buy now pay later / installments | &#8211; | core | core | core | core | 
+| Multi-currency payouts | &#8211; |  |  |  |  | 
+| Local payment methods (iDEAL etc.) | &#8211; | core | core | core |  | 
+| Fraud analysis / risk score | &#8211; | core |  |  |  | 
+| Fraud filter rules / automatic cancellation | &#8211; | core |  |  |  | 
+| Chargeback protection | &#8211; | core |  |  |  | 
+|===
+
+=== Orders and fulfilment
+
+[cols="3,1,1,1,1,1,4",options="header"]
+|===
+| Feature | Bazaar | Shopify | WooCommerce | BigCommerce | Square | Notes
+
+| Order list, filters, search | &#10003; | core | core | core | core | 
+| Order detail timeline / notes | &#10003; | core | core | core | core | 
+| Order tags | &#10003; | core | core | core | core | 
+| Edit order after placement | &#8211; | core | core |  |  | 
+| Draft orders | &#10003; | core | core | core | core | 
+| Invoices (PDF) / send invoice | &#10003; | core | core | core | core | 
+| Payment links for drafts | &#9681; | core | core | core | core | Draft orders exist; there is no pay link for the buyer.
+| Manual capture / authorize-only | &#10003; | core | core | core | core | Online orders are authorized at checkout and captured when paid in full.
+| Partial fulfillment | &#10003; | core | core | core | core | 
+| Order archiving / cancel | &#9681; | core | core | core | core | Orders can be cancelled; there is no archive.
+| Order export CSV | &#10003; | core | core | core | core | 
+| Order status page for buyer | &#10003; | core | core | core | core | 
+| Bulk order actions (bulk fulfil/print) | &#9681; | core | core | core | core | Pick lists print for many orders.
+| Kanban fulfilment board | &#10003; |  |  |  |  | 
+| Customer self-serve return requests | &#10003; | core |  |  |  | 
+| Return reasons | &#10003; | core |  |  |  | 
+| Receive & restock returns | &#10003; | core |  |  |  | 
+| Exchanges (online) | &#9681; | core |  |  |  | Exchanges at the register.
+| Return rules / windows / fees | &#8211; | core |  |  |  | 
+| Draft order creation | &#10003; | core |  | core |  | 
+| Send invoice / checkout link | &#9681; | core |  | core |  | PDF invoices; no pay link.
+| Transactional email notifications | &#10003; | core | core | core | core | 
+| SMS notifications | &#10003; | core | core | core | core | 
+| Editable notification templates | &#8211; | core | core | core | core | 
+| Staff notifications | &#10003; | core | core | core | core | 
+|===
+
+=== Shipping
+
+[cols="3,1,1,1,1,1,4",options="header"]
+|===
+| Feature | Bazaar | Shopify | WooCommerce | BigCommerce | Square | Notes
+
+| Shipping zones & rates | &#10003; | core | core | core | core | 
+| Weight/price-based rates | &#10003; | core | core | core | core | 
+| Carrier-calculated rates | &#9681; | core | app/plugin | core |  | A carrier interface; the bundled carrier is simulated.
+| Buy & print shipping labels | &#9681; | core | app/plugin | core |  | PDF labels 4 by 6 inches through the carrier interface; the bundled carrier is simulated.
+| Local pickup | &#10003; | core | core | core | core | 
+| Local delivery (radius/zip) | &#10003; | core | app/plugin | core |  | 
+| Free-shipping threshold | &#10003; | core | core | core | core | 
+| Packing slips / pick lists | &#10003; | core | core | core | core | 
+| Tracking numbers & tracking events | &#10003; | core | core | core | core | 
+| Delivery date estimates | &#10003; | core | core | core | core | 
+| Shipping profiles (per-product rates) | &#8211; | core |  | core |  | 
+| Fulfillment network / 3PL integration | &#8211; | app/plugin | app/plugin | app/plugin |  | 
+| Fulfillment orders / routing rules across locations | &#9681; | core | core | core | core | Multiple locations; no automatic routing.
+| Ship from store / BOPIS from POS | &#9681; | core | core | core | core | Local pickup online; not started from the register.
+| Customs forms / international docs | &#8211; | core |  |  |  | 
+| Returns label generation | &#8211; | core |  |  |  | 
+|===
+
+=== Point of sale
+
+[cols="3,1,1,1,1,1,4",options="header"]
+|===
+| Feature | Bazaar | Shopify | WooCommerce | BigCommerce | Square | Notes
+
+| Sell screen with product grid & search | &#10003; | core |  |  | core | 
+| Barcode scanning (camera / scanner) | &#10003; | core |  |  | core | 
+| Custom sale / custom amount | &#8211; | core |  |  | core | 
+| Line & cart discounts | &#10003; | core |  |  | core | 
+| Split tender / multiple payments | &#10003; | core |  |  | core | 
+| Cash management (float, cash in/out, counts) | &#10003; | core |  |  | core | 
+| Shifts / register sessions / Z report | &#10003; | core |  |  | core | 
+| Staff PIN login | &#10003; | core |  |  | core | 
+| Staff roles (OWNER/MANAGER/FULFILMENT/CASHIER) | &#10003; | core |  |  | core | 
+| Receipts print/email/SMS | &#10003; | core |  |  | core | 
+| Customer-facing display | &#10003; | core |  |  | core | 
+| Offline mode with sync | &#10003; | core |  |  | core | 
+| Returns & exchanges at POS | &#10003; | core |  |  | core | 
+| Refund to store credit | &#10003; | core |  |  | core | 
+| Park / hold carts | &#8211; | core |  |  | core | 
+| Tipping | &#8211; | core |  |  | core | 
+| Card reader hardware (tap/chip) | &#8211; | core |  |  | core | 
+| Tap to pay on phone | &#8211; | core |  |  | core | 
+| Cash drawer / receipt printer hardware | &#9681; | core |  |  | core | Receipts are PDF, e-mail or text; no device drivers.
+| Customer lookup & attach to sale | &#10003; | core |  |  | core | 
+| Loyalty at POS | &#10003; | core |  |  | core | Member cards are scanned at the register.
+| Ship to customer / order from other location | &#8211; | core |  |  | core | 
+| Staff commissions / performance reports | &#9681; |  |  |  |  | Sales by register and staff; no commission payouts.
+| Multiple registers per location | &#10003; | core |  |  | core | 
+| Live tickets / kitchen-style queue | &#10003; |  |  |  | core | 
+|===
+
+=== Customers and accounts
+
+[cols="3,1,1,1,1,1,4",options="header"]
+|===
+| Feature | Bazaar | Shopify | WooCommerce | BigCommerce | Square | Notes
+
+| Customer profiles | &#10003; | core | core | core | core | 
+| Customer tags & notes | &#10003; | core | core | core | core | 
+| Customer segments (built-in) | &#10003; | core |  |  | core | Saved segments built from a rule tree, evaluated when used.
+| Segment query editor | &#9681; | core |  |  |  | A rule-tree editor rather than a query language.
+| Customer import/export CSV | &#10003; | core | core | core | core | 
+| Customer accounts self-service (orders, addresses) | &#10003; | core | core | core | core | 
+| Account deletion / GDPR data requests | &#10003; | core | core | core | core | 
+| Customer lifetime value / order count | &#10003; | core | core | core | core | 
+| Customer merge | &#8211; | core |  |  |  | 
+| Tax exemptions per customer | &#8211; | core | app/plugin | core |  | 
+| Store credit | &#10003; | core | core | core | core | 
+| Live chat widget | &#8211; | core | app/plugin |  |  | 
+| Unified inbox (email/social messages) | &#8211; | core |  |  |  | 
+| AI assistant | &#8211; | core |  |  |  | 
+| Issue/adjust store credit | &#10003; | core |  |  |  | 
+| Redeem at checkout | &#9681; | core |  |  |  | Store credit pays at the register.
+| Expiring credit | &#8211; | core |  |  |  | 
+| Privacy / terms / refund policies | &#10003; | core | core | core | core | 
+| Cookie consent banner / privacy API | &#10003; | core | app/plugin | core |  | A consent banner by category gates the scripts in app slots.
+| Customer data export (GDPR) | &#9681; | core | core |  |  | Account closure removes personal data; there is no export download.
+| Accessibility (storefront) | &#9681; |  |  |  |  | Semantic HTML pages.
+|===
+
+=== Marketing and loyalty
+
+[cols="3,1,1,1,1,1,4",options="header"]
+|===
+| Feature | Bazaar | Shopify | WooCommerce | BigCommerce | Square | Notes
+
+| Discount codes (percent / fixed) | &#10003; | core | core | core | core | 
+| Automatic discounts | &#10003; | core | core | core | core | 
+| Buy X get Y | &#10003; | core | core | core | core | 
+| Free shipping discount | &#10003; | core | core | core | core | 
+| Tiered / volume discounts | &#10003; | core | app/plugin |  |  | TIERED and VOLUME discount kinds with quantity or spend breaks.
+| Bulk-generated unique codes | &#9681; | core | core | core | core | Single-use codes are issued per reward and per signup; there is no bulk generator.
+| Min requirements / usage limits / once per customer | &#10003; | core | core | core | core | 
+| Discount combinations rules | &#10003; | core | core | core | core | 
+| Scheduled discounts (start/end) | &#10003; | core | core | core | core | 
+| Scheduled sale price changes (compare-at bulk schedule) | &#10003; | core | core | core | core | Sale events on a promotions calendar, with start and end times.
+| Flash sales with countdown | &#10003; | app/plugin | app/plugin |  |  | Sale events with an optional unit cap and a storefront countdown.
+| Email marketing campaigns (editor, templates) | &#10003; | app/plugin | app/plugin |  | core | Campaigns to a segment, scheduled, with A/B subjects, open and click tracking and signed unsubscribe links.
+| SMS marketing campaigns | &#10003; | app/plugin |  |  | core | Campaigns can go by text message to consenting customers.
+| Push notifications to shoppers | &#10003; |  |  |  |  | 
+| Marketing automations (graph-based) | &#10003; | app/plugin | app/plugin |  |  | 
+| Welcome / win-back / post-purchase flows | &#10003; | app/plugin | app/plugin |  |  | Journeys enter on a trigger or a segment, wait, branch and send e-mail, text or push.
+| Browse abandonment | &#8211; | app/plugin | app/plugin |  |  | 
+| Signup forms / popups | &#10003; | app/plugin | app/plugin |  |  | Newsletter forms with double opt-in, a honeypot, rate limits and an optional welcome code.
+| Campaign attribution / UTM reports | &#9681; | core |  |  |  | Orders within the attribution window of an opened or clicked message are credited; no UTM reports.
+| Ads integrations (Google/Meta) | &#8211; | core | app/plugin | core | app/plugin | 
+| Customer reviews requests | &#9681; | app/plugin | app/plugin |  |  | Reviews are collected; no automatic request message.
+| Points programs | &#10003; | app/plugin | app/plugin | app/plugin | core | Points earned on paid orders, reversed on refunds, with expiry.
+| VIP tiers / membership clubs | &#10003; | app/plugin | app/plugin | app/plugin | core | Loyalty tiers with member prices and free shipping; clubs with member-only products and early access.
+| Referral programs | &#10003; | app/plugin | app/plugin | app/plugin | core | 
+| Rewards redemption at POS | &#9681; | app/plugin |  |  | core | A register scans the member card and earns points; rewards redeem as single-use codes.
+| Paid membership | &#10003; | app/plugin | app/plugin |  |  | Clubs can charge for membership.
+| Issue / sell gift cards | &#10003; | core | app/plugin | core | core | 
+| Balance check & transactions | &#10003; | core | app/plugin | core | core | 
+| Digital gift card delivery to recipient with message/scheduled date | &#9681; | core | app/plugin | core | core | Cards are issued and e-mailed; no scheduled send.
+| Gift card at POS | &#10003; | core | app/plugin | core | core | 
+|===
+
+=== B2B
+
+[cols="3,1,1,1,1,1,4",options="header"]
+|===
+| Feature | Bazaar | Shopify | WooCommerce | BigCommerce | Square | Notes
+
+| Company accounts with locations/buyers | &#8211; | core | app/plugin | core |  | 
+| Price lists / catalogs per company | &#8211; | core | app/plugin | core |  | 
+| Net payment terms | &#8211; | core | app/plugin |  |  | 
+| Quantity rules / min order | &#8211; | core | app/plugin | core |  | 
+| Quotes / draft-to-order for B2B | &#9681; |  |  |  |  | Draft orders only.
+| B2B storefront / customer-specific catalog | &#8211; |  |  |  |  | 
+| Vaulted card / pay on account | &#8211; |  |  |  |  | 
+|===
+
+=== Subscriptions and pre-orders
+
+[cols="3,1,1,1,1,1,4",options="header"]
+|===
+| Feature | Bazaar | Shopify | WooCommerce | BigCommerce | Square | Notes
+
+| Subscriptions / selling plans | &#8211; | app/plugin | app/plugin | app/plugin | core | 
+| Pre-orders | &#10003; | app/plugin | app/plugin |  |  | Per variant, with a ship date and a choice to charge now or later.
+| Back-in-stock alerts to shoppers | &#10003; | app/plugin | app/plugin |  |  | Shoppers subscribe on the product page; the alert is sent once when stock returns.
+| Try before you buy / deferred payment | &#8211; | app/plugin |  |  |  | 
+|===
+
+=== Markets and tax
+
+[cols="3,1,1,1,1,1,4",options="header"]
+|===
+| Feature | Bazaar | Shopify | WooCommerce | BigCommerce | Square | Notes
+
+| Multi-currency storefront | &#8211; | core | app/plugin | core |  | 
+| Multi-language storefront content | &#9681; | core | app/plugin | core |  | The app UI ships in several languages including a right-to-left one; catalog content isn't translated.
+| Per-market pricing / price adjustments | &#8211; | core |  | core |  | 
+| Duties & import taxes at checkout | &#8211; | core |  |  |  | 
+| Domains / subfolders per market | &#8211; | core |  |  |  | 
+| Geolocation redirects / country selector | &#8211; | core |  |  |  | 
+| Tax rates by region | &#10003; | core | core | core | core | 
+| Tax-inclusive pricing | &#10003; | core | core | core | core | 
+| Automatic tax calculation (United States and European Union) | &#8211; | core | app/plugin | core |  | 
+| Tax overrides per product/collection | &#8211; | core |  | core |  | 
+| Tax exemptions | &#8211; | core | core | core | core | 
+| VAT/GST registration & reports | &#8211; |  |  |  |  | 
+|===
+
+=== Storefront, web and SEO
+
+[cols="3,1,1,1,1,1,4",options="header"]
+|===
+| Feature | Bazaar | Shopify | WooCommerce | BigCommerce | Square | Notes
+
+| Themes / theme editor | &#8211; | core | core | core | core | 
+| Theme customization (sections/blocks) | &#8211; | core | core | core | core | 
+| Custom pages | &#8211; | core | core | core | core | 
+| Blog / articles | &#8211; | core | core | core |  | 
+| Navigation menus editor | &#8211; | core | core | core | core | 
+| SEO titles/meta/canonical | &#10003; | core | core | core | core | 
+| JSON-LD structured data | &#10003; | core |  |  |  | 
+| Sitemap / robots.txt | &#10003; | core | core | core | core | 
+| URL redirects manager | &#8211; | core | app/plugin | core |  | 
+| Storefront search | &#10003; | core | core | core | core | 
+| Search filters / facets | &#10003; | core | core | core | core | 
+| Predictive search / autocomplete | &#8211; | core |  | core |  | 
+| Product recommendations (related) | &#9681; | core | core | core | core | Related products from the same collection.
+| Synonyms / boosts (search tuning) | &#8211; | core |  | core |  | 
+| Custom domain | &#8211; | core | core | core | core | 
+| Password page / pre-launch | &#8211; | core |  | core |  | 
+| Files library | &#10003; | core |  |  |  | 
+| Metafields / metaobjects | &#8211; | core |  |  |  | 
+| Content translation | &#8211; | core |  |  |  | 
+| Facebook/Instagram shop | &#8211; | core | app/plugin | core | core | 
+| Google & YouTube | &#8211; | core | app/plugin | core | core | 
+| TikTok / Pinterest | &#8211; | core | app/plugin |  |  | 
+| Amazon/eBay/Walmart marketplace connect | &#8211; | app/plugin | app/plugin | core |  | 
+| Supplier and retailer dropship network | &#8211; | core |  |  |  | 
+| Buy button / embeddable | &#8211; | core |  |  |  | 
+| Marketplace (multi-merchant browse) | &#9681; | core |  |  |  | The platform hosts many stores and the app lists them.
+|===
+
+=== Extensibility and apps
+
+[cols="3,1,1,1,1,1,4",options="header"]
+|===
+| Feature | Bazaar | Shopify | WooCommerce | BigCommerce | Square | Notes
+
+| REST/HTTP API | &#10003; | core | core | core | core | 
+| GraphQL API | &#8211; | core |  | core |  | 
+| Webhooks with delivery log & retries | &#10003; | core | core | core | core | 
+| App store / third-party app installs | &#9681; | core | core | core |  | App slots place owner-approved snippets and sandboxed widgets; there is no app marketplace.
+| API access tokens / custom apps | &#9681; | core | core | core | core | Session and OAuth 2 tokens; no per-app scoped keys.
+| Bulk operations API | &#8211; | core |  |  |  | 
+| Functions / checkout scripts | &#8211; | core |  |  |  | 
+|===
+
+=== Analytics
+
+[cols="3,1,1,1,1,1,4",options="header"]
+|===
+| Feature | Bazaar | Shopify | WooCommerce | BigCommerce | Square | Notes
+
+| Dashboard KPIs | &#10003; | core | core | core | core | 
+| Sales over time / breakdowns | &#10003; | core | core | core | core | 
+| Conversion funnel | &#10003; | core | core | core | core | 
+| Top products / items | &#10003; | core | core | core | core | 
+| Live view (real-time) | &#9681; | core |  |  |  | A live channel streams sales to the dashboard.
+| Custom reports / report builder | &#8211; | core |  | core |  | 
+| Cohort / retention analysis | &#8211; | core |  |  |  | 
+| Inventory / sell-through reports | &#9681; | core | core | core | core | Inventory value only.
+| Finance / tax / payout reports | &#9681; | core | core | core | core | Payout list; no tax liability report.
+| Session / traffic source analytics | &#9681; | core | core | core | core | Referrers are recorded; no UTM reporting.
+| Benchmarks vs peers | &#8211; | core |  |  |  | 
+|===
+
+=== Staff and security
+
+[cols="3,1,1,1,1,1,4",options="header"]
+|===
+| Feature | Bazaar | Shopify | WooCommerce | BigCommerce | Square | Notes
+
+| Staff accounts & invites | &#10003; | core | core | core | core | 
+| Roles & permissions | &#9681; | core | core | core | core | Four fixed roles.
+| Audit log / activity | &#10003; | core |  |  |  | 
+| Two-factor authentication | &#8211; | core |  | core | core | 
+| SSO / SAML | &#8211; | core |  | core |  | 
+| Organization admin across stores | &#9681; | core |  |  |  | A platform administrator manages all stores.
+|===
+
+=== Platform
+
+[cols="3,1,1,1,1,1,4",options="header"]
+|===
+| Feature | Bazaar | Shopify | WooCommerce | BigCommerce | Square | Notes
+
+| Storefront caching / CDN | &#10003; | core |  | core |  | 
+| Headless storefront API | &#10003; | core | core | core |  | 
+| Multiple stores per account | &#10003; |  |  | core |  | 
+| Native mobile shopping app | &#10003; |  |  |  |  | 
+|===
+
+=== Beyond the usual feature list
+
+Some of what Bazaar offers doesn't fit a row in the tables above, because it's
+about how the platform is built and run rather than what a store sells.
+
+* *One codebase for every client.* The same Java application runs on iOS,
+  Android, the desktop and in a browser, for shoppers, staff and the
+  administrator. The server is Java too, in the same Maven project.
+* *A register that keeps selling offline.* Sales made with no network are kept
+  on the device and sent when it reconnects. Each sale carries a client id the
+  server stores as unique, so a batch sent twice records every sale once.
+* *A browser-native storefront.* Product, collection, cart, checkout and account
+  pages are server-rendered HTML that works without the app, with titles,
+  canonical links, structured data and a sitemap for search engines. Each page
+  sends a Content Security Policy built from script hashes and a per-request
+  nonce.
+* *Sandboxed app slots.* An owner can place third-party snippets and widgets at
+  named places of the storefront. Widgets run in a sandboxed frame, every change
+  is audited, and scripts in an optional category load only after the visitor
+  accepts that category in the cookie banner.
+* *Journeys drawn as flowcharts.* Automations and customer journeys are graphs
+  of triggers, waits, splits and messages, edited on a canvas, with per-step
+  counts of who passed through.
+* *A Kanban board for fulfilment.* Orders move through columns from paid to
+  delivered.
+* *Charts drawn by the server.* The back-office dashboard draws its charts on
+  the server, so they show in any browser with no chart library.
+* *Documents as PDF files.* Invoices, receipts, pick lists and shipping
+  labels are rendered as PDF files.
+* *Any of four databases.* The same server and migrations run on SQLite,
+  PostgreSQL, MySQL and MariaDB.
+* *Self-hosted, with the source.* The whole sample is released under the MIT No
+  Attribution license, so it can be copied, changed and run anywhere.
