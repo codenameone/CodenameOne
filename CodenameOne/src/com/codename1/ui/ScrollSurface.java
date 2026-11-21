@@ -225,6 +225,42 @@ public abstract class ScrollSurface extends Component {
 
     /// Sets the width of the pinned left column and the height of the pinned
     /// top row, in pixels. Called from `layoutSurface`.
+    /// True when the surface is laid out right to left: the left header is
+    /// painted at the right edge, the body to its left, and the start of the
+    /// content (offset 0) is at the body's right edge. A subclass that turns
+    /// this on measures its own content from the right too; the `x` it is
+    /// handed for the body is still where content position 0 would be if the
+    /// content ran left to right from there, so it paints what it measured
+    /// mirrored at `x + contentWidth - position - width`, or, more simply,
+    /// mirrors the positions it lays out. Pointer and hover positions are
+    /// always the component's own, unmirrored. Off by default.
+    protected boolean isMirrored() {
+        return false;
+    }
+
+    /// Where the body begins, in the component's coordinates: after the left
+    /// header, or at the left edge when the surface is mirrored.
+    public final int getBodyX() {
+        return isMirrored() ? 0 : headerWidth;
+    }
+
+    /// Where the left header begins, in the component's coordinates: the left
+    /// edge, or after the body when the surface is mirrored.
+    public final int getHeaderX() {
+        return isMirrored() ? Math.max(0, getWidth() - headerWidth) : 0;
+    }
+
+    /// Where content position 0 is painted, in the component's coordinates.
+    /// Left to right that is the body's left edge less the offset; mirrored,
+    /// the content is placed against the body's right edge and the offset
+    /// moves it right, so what comes later in the content is revealed.
+    public final int getContentOriginX() {
+        if (isMirrored()) {
+            return getBodyWidth() - getContentWidth() + offX;
+        }
+        return headerWidth - offX;
+    }
+
     protected final void setHeaderSize(int width, int height) {
         headerWidth = Math.max(0, width);
         headerHeight = Math.max(0, height);
@@ -754,24 +790,27 @@ public abstract class ScrollSurface extends Component {
         int cy = g.getClipY();
         int cw = g.getClipWidth();
         int ch = g.getClipHeight();
-        int bx = x0 + headerWidth;
+        boolean mirrored = isMirrored();
+        int bx = mirrored ? x0 : x0 + headerWidth;
+        int hx = mirrored ? x0 + bw : x0;
+        int ox = mirrored ? bx + bw - getContentWidth() + sx : bx - sx;
         int by = y0 + headerHeight;
         g.clipRect(bx, by, bw, bh);
-        paintContent(g, bx - sx, by - sy);
+        paintContent(g, ox, by - sy);
         g.setClip(cx, cy, cw, ch);
         if (headerHeight > 0) {
             g.clipRect(bx, y0, bw, headerHeight);
-            paintTopHeader(g, bx - sx, y0);
+            paintTopHeader(g, ox, y0);
             g.setClip(cx, cy, cw, ch);
         }
         if (headerWidth > 0) {
-            g.clipRect(x0, by, headerWidth, bh);
-            paintLeftHeader(g, x0, by - sy);
+            g.clipRect(hx, by, headerWidth, bh);
+            paintLeftHeader(g, hx, by - sy);
             g.setClip(cx, cy, cw, ch);
         }
         if (headerWidth > 0 && headerHeight > 0) {
-            g.clipRect(x0, y0, headerWidth, headerHeight);
-            paintCorner(g, x0, y0);
+            g.clipRect(hx, y0, headerWidth, headerHeight);
+            paintCorner(g, hx, y0);
             g.setClip(cx, cy, cw, ch);
         }
     }
@@ -951,7 +990,8 @@ public abstract class ScrollSurface extends Component {
             autoScroll(lx, ly);
             repaint();
         } else {
-            scrollTo(offX - (lx - lastX), offY - (ly - lastY));
+            int dx = lx - lastX;
+            scrollTo(isMirrored() ? offX + dx : offX - dx, offY - (ly - lastY));
             lastX = lx;
             lastY = ly;
         }
@@ -1021,6 +1061,10 @@ public abstract class ScrollSurface extends Component {
 
     private void fling() {
         float vx = Display.getInstance().getDragSpeed(false);
+        if (isMirrored()) {
+            // A mirrored body scrolls the other way under the finger.
+            vx = -vx;
+        }
         float vy = Display.getInstance().getDragSpeed(true);
         boolean any = false;
         if (Math.abs(vx) > 0.1f && (!bounded || getMaxOffsetX() > 0)) {
@@ -1058,7 +1102,8 @@ public abstract class ScrollSurface extends Component {
         }
         int band = mm(6);
         int step = mm(2.5f);
-        autoX = edgeSpeed(lx, headerWidth, getWidth(), band, step);
+        autoX = isMirrored() ? -edgeSpeed(lx, 0, getWidth() - headerWidth, band, step)
+                : edgeSpeed(lx, headerWidth, getWidth(), band, step);
         autoY = edgeSpeed(ly, headerHeight, getHeight(), band, step);
         if (autoX != 0 || autoY != 0) {
             requestAnimation();

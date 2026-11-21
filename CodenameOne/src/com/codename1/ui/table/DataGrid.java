@@ -198,6 +198,7 @@ public class DataGrid extends ScrollSurface {
     public DataGrid(TableModel model) {
         setUIID("DataGrid");
         setModel(model);
+        initSemantics();
     }
 
     /// A tree grid over a tree table model, with a column for each of its
@@ -205,6 +206,111 @@ public class DataGrid extends ScrollSurface {
     public DataGrid(TreeTableModel model) {
         setUIID("DataGrid");
         setModel(model);
+        initSemantics();
+    }
+
+    // A screen reader cannot read painted cells, so the grid describes what
+    // is on screen as virtual nodes: a header row, then a row per visible row
+    // with a cell per column. Rows are keyed by model row (or tree node) so a
+    // sort moves a node without renaming it.
+    private void initSemantics() {
+        getSemantics().setRole(com.codename1.ui.accessibility.AccessibilityRole.GRID)
+                .setChildProvider(new com.codename1.ui.accessibility.AccessibilityChildProvider() {
+                    @Override
+                    public java.util.List<com.codename1.ui.accessibility.AccessibilityNode> getAccessibilityChildren(
+                            Component host) {
+                        return accessibilityRows();
+                    }
+                });
+    }
+
+    private java.util.List<com.codename1.ui.accessibility.AccessibilityNode> accessibilityRows() {
+        refreshLayout();
+        java.util.List<com.codename1.ui.accessibility.AccessibilityNode> out =
+                new java.util.ArrayList<com.codename1.ui.accessibility.AccessibilityNode>();
+        int n = rows.size();
+        getSemantics().setCollectionInfo(new com.codename1.ui.accessibility.AccessibilityCollectionInfo(
+                n + (headerH > 0 ? 1 : 0), vis.length));
+        int[] b = new int[4];
+        if (headerH > 0) {
+            com.codename1.ui.accessibility.AccessibilityNode head =
+                    new com.codename1.ui.accessibility.AccessibilityNode("header");
+            head.setRole(com.codename1.ui.accessibility.AccessibilityRole.ROW);
+            for (int i = 0; i < vis.length; i++) {
+                getCellBounds(0, i, b);
+                int dir = getSortDirection(vis[i]);
+                head.addChild(new com.codename1.ui.accessibility.AccessibilityNode("h" + vis[i].getModelColumn())
+                        .setRole(com.codename1.ui.accessibility.AccessibilityRole.COLUMN_HEADER)
+                        .setLabel(vis[i].getTitle())
+                        .setValue(dir > 0 ? "ascending" : dir < 0 ? "descending" : null)
+                        .setCollectionItemInfo(new com.codename1.ui.accessibility.AccessibilityCollectionItemInfo(0, i))
+                        .setBounds(new com.codename1.ui.geom.Rectangle(b[0], 0, b[2], headerH)));
+            }
+            out.add(head);
+        }
+        if (n == 0 || rowH <= 0) {
+            return out;
+        }
+        int first = Math.max(0, getOffsetY() / rowH);
+        int last = Math.min(n - 1, (getOffsetY() + getBodyHeight()) / rowH);
+        for (int r = first; r <= last; r++) {
+            final int view = r;
+            int model = getModelRow(r);
+            Object node = getNode(r);
+            String key = model >= 0 ? "r" + model : node != null ? "n" + System.identityHashCode(node) : "v" + r;
+            com.codename1.ui.accessibility.AccessibilityNode row =
+                    new com.codename1.ui.accessibility.AccessibilityNode(key);
+            row.setRole(com.codename1.ui.accessibility.AccessibilityRole.ROW)
+                    .setSelected(Boolean.valueOf(selection.contains(r)))
+                    .setCollectionItemInfo(new com.codename1.ui.accessibility.AccessibilityCollectionItemInfo(
+                            r + (headerH > 0 ? 1 : 0), 0));
+            if (rows.isExpandable(r)) {
+                row.setExpanded(Boolean.valueOf(rows.isExpanded(r)));
+            }
+            row.addAction(new com.codename1.ui.accessibility.AccessibilityAction(
+                    com.codename1.ui.accessibility.AccessibilityAction.ACTIVATE, null,
+                    new com.codename1.ui.accessibility.AccessibilityAction.Handler() {
+                        @Override
+                        public boolean perform(Component component, Object argument) {
+                            activateRow(view);
+                            return true;
+                        }
+                    }));
+            StringBuilder label = new StringBuilder();
+            for (int i = 0; i < vis.length; i++) {
+                getCellBounds(r, i, b);
+                String text = rows.isGroup(r) && i == 0 ? rows.groupLabel(r)
+                        : vis[i].format(rows.value(r, vis[i].getModelColumn()));
+                if (label.length() > 0) {
+                    label.append(", ");
+                }
+                label.append(text);
+                row.addChild(new com.codename1.ui.accessibility.AccessibilityNode(key + "c" + vis[i].getModelColumn())
+                        .setRole(com.codename1.ui.accessibility.AccessibilityRole.CELL)
+                        .setLabel(vis[i].getTitle() + ": " + text)
+                        .setCollectionItemInfo(new com.codename1.ui.accessibility.AccessibilityCollectionItemInfo(
+                                r + (headerH > 0 ? 1 : 0), i))
+                        .setBounds(new com.codename1.ui.geom.Rectangle(b[0], b[1], b[2], b[3])));
+            }
+            row.setLabel(label.toString());
+            out.add(row);
+        }
+        return out;
+    }
+
+    // What a screen reader's activation of a row does: what a tap does.
+    private void activateRow(int r) {
+        if (r < 0 || r >= rows.size()) {
+            return;
+        }
+        if (rows.isExpandable(r)) {
+            setExpanded(r, !rows.isExpanded(r));
+            return;
+        }
+        if (selectionMode != SelectionMode.NONE) {
+            setSelectedRow(r);
+        }
+        actionListeners.fireActionEvent(new ActionEvent(this, ActionEvent.Type.Other));
     }
 
     // ------------------------------------------------------------- models
@@ -1159,7 +1265,29 @@ public class DataGrid extends ScrollSurface {
             x += colW[i];
         }
         scrollW = x;
+        if (isRTL()) {
+            // Right to left the first column is at the right of each region:
+            // the positions are mirrored once here, so painting and hit
+            // testing read them as they are.
+            for (int i = 0; i < n; i++) {
+                int region = i < frozenCount ? frozenW : scrollW;
+                colX[i] = region - colX[i] - colW[i];
+            }
+        }
         setHeaderSize(frozenW, headerH);
+    }
+
+    /// Right to left the grid is mirrored: the first column, and the frozen
+    /// ones, are at the right, and it scrolls toward the left.
+    @Override
+    protected boolean isMirrored() {
+        return isRTL();
+    }
+
+    // Where a visible column's position is measured from, in the component's
+    // coordinates.
+    private int originX(int i) {
+        return i < frozenCount ? getHeaderX() : getContentOriginX();
     }
 
     private boolean hasArrows() {
@@ -1240,7 +1368,7 @@ public class DataGrid extends ScrollSurface {
             g.setColor(GridLook.mix(GridLook.under(st), st.getFgColor(), 140));
             int bw = getBodyWidth();
             String t = GridLook.fit(emptyText, f, bw - GridLook.mm(4));
-            g.drawString(t, getX() + getHeaderWidth() + (bw - f.stringWidth(t)) / 2, y + GridLook.mm(4));
+            g.drawString(t, getX() + getBodyX() + (bw - f.stringWidth(t)) / 2, y + GridLook.mm(4));
         }
     }
 
@@ -1250,7 +1378,8 @@ public class DataGrid extends ScrollSurface {
         GridLook.fill(g, bg, g.getClipX(), g.getClipY(), g.getClipWidth(), g.getClipHeight());
         paintRows(g, x, y, 0, frozenCount);
         g.setColor(lineColor(150));
-        g.drawLine(x + frozenW - 1, g.getClipY(), x + frozenW - 1, g.getClipY() + g.getClipHeight());
+        int sep = isRTL() ? x : x + frozenW - 1;
+        g.drawLine(sep, g.getClipY(), sep, g.getClipY() + g.getClipHeight());
     }
 
     @Override
@@ -1262,7 +1391,8 @@ public class DataGrid extends ScrollSurface {
     protected void paintCorner(Graphics g, int x, int y) {
         paintHeaders(g, x, y, 0, frozenCount);
         g.setColor(lineColor(150));
-        g.drawLine(x + frozenW - 1, y, x + frozenW - 1, y + headerH);
+        int sep = isRTL() ? x : x + frozenW - 1;
+        g.drawLine(sep, y, sep, y + headerH);
     }
 
     private int lineColor(int amount) {
@@ -1353,14 +1483,22 @@ public class DataGrid extends ScrollSurface {
         int oh = g.getClipHeight();
         g.clipRect(x0, ry, w, rowH);
         fillCell(r, c, st);
+        // The cell's contents run from cx for cw: right to left the indent
+        // and the arrow of a tree take the right end, and the rest is left.
+        boolean rtl = isRTL();
         int cx = x0;
+        int cw = w;
         if (arrowW > 0 && c == effectiveTreeColumn()) { //NOPMD CompareObjectsWithEquals - a column is an identity
-            cx += rows.depth(r) * indentW;
+            int lead = rows.depth(r) * indentW;
+            int ax = rtl ? x0 + w - lead - arrowW : x0 + lead;
             if (rows.isExpandable(r)) {
                 g.setColor(GridLook.mix(GridLook.under(st), st.getFgColor(), sel ? 230 : 170));
-                GridLook.arrow(g, cx, ry + (rowH - arrowW) / 2, arrowW, rows.isExpanded(r));
+                GridLook.arrow(g, ax, ry + (rowH - arrowW) / 2, arrowW, rows.isExpanded(r), rtl);
             }
-            cx += arrowW;
+            cw = w - lead - arrowW;
+            if (!rtl) {
+                cx = x0 + lead + arrowW;
+            }
         }
         if (cell.group && c == effectiveTreeColumn()) { //NOPMD CompareObjectsWithEquals - a column is an identity
             Font f = st.getFont();
@@ -1369,18 +1507,22 @@ public class DataGrid extends ScrollSurface {
             String label = rows.groupLabel(r) + "  (" + rows.groupCount(r) + ")";
             // A group's label may run over the columns after it that show
             // nothing for the group.
-            int span = w - (cx - x0);
+            int span = cw;
             for (int k = i + 1; k < vis.length && vis[k].getAggregate() == null
                     && (i >= frozenCount || k < frozenCount); k++) {
                 span += colW[k];
             }
+            // Right to left the label runs over the columns to its left.
+            int sx = rtl ? cx + cw - span : cx;
             g.setClip(ox, oy, ow, oh);
-            g.clipRect(cx, ry, span, rowH);
-            g.drawString(GridLook.fit(label, f, span - GridLook.mm(1.5f)), cx + GridLook.mm(1), ry + (rowH - f.getHeight()) / 2);
+            g.clipRect(sx, ry, span, rowH);
+            String shown = GridLook.fit(label, f, span - GridLook.mm(1.5f));
+            int lx = rtl ? sx + span - GridLook.mm(1) - f.stringWidth(shown) : sx + GridLook.mm(1);
+            g.drawString(shown, lx, ry + (rowH - f.getHeight()) / 2);
         } else if (!cell.group || c.getAggregate() != null) {
             GridCellRenderer rend = c.getRenderer() != null ? c.getRenderer() : defaultRenderer;
             if (!(editRow == r && editColumn == c && editor != null)) { //NOPMD CompareObjectsWithEquals - a column is an identity
-                rend.paint(g, cell, cx, ry, x0 + w - cx, rowH);
+                rend.paint(g, cell, cx, ry, cw, rowH);
             }
         }
         g.setClip(ox, oy, ow, oh);
@@ -1417,11 +1559,16 @@ public class DataGrid extends ScrollSurface {
             if (c.getKind() == GridColumn.Kind.NUMBER) {
                 align = Component.RIGHT;
             }
+            boolean rtl = isRTL();
+            align = DefaultGridCellRenderer.mirror(align, rtl);
             int tw = f.stringWidth(t);
-            int tx = DefaultGridCellRenderer.place(align, x0 + pad, textW, tw);
+            // The sort arrow is at the column's end: its right, or its left
+            // right to left, where the title then starts after it.
+            int textX = rtl && dir != 0 ? x0 + pad + arrow + GridLook.mm(1) : x0 + pad;
+            int tx = DefaultGridCellRenderer.place(align, textX, textW, tw);
             g.drawString(t, tx, y + (headerH - f.getHeight()) / 2);
             if (dir != 0) {
-                int ax = x0 + w - pad - arrow;
+                int ax = rtl ? x0 + pad : x0 + w - pad - arrow;
                 int ay = y + (headerH - arrow) / 2;
                 if (dir > 0) {
                     g.fillTriangle(ax, ay + arrow * 3 / 4, ax + arrow, ay + arrow * 3 / 4, ax + arrow / 2, ay + arrow / 4);
@@ -1431,11 +1578,13 @@ public class DataGrid extends ScrollSurface {
                 if (sortColumns.size() > 1) {
                     Font small = f;
                     String num = String.valueOf(sortColumns.indexOf(c) + 1);
-                    g.drawString(num, ax - small.stringWidth(num) - 1, y + (headerH - small.getHeight()) / 2);
+                    int nx = rtl ? ax + arrow + 1 : ax - small.stringWidth(num) - 1;
+                    g.drawString(num, nx, y + (headerH - small.getHeight()) / 2);
                 }
             }
             g.setColor(line);
-            g.drawLine(x0 + w - 1, y + headerH / 4, x0 + w - 1, y + headerH * 3 / 4);
+            int ex = rtl ? x0 : x0 + w - 1;
+            g.drawLine(ex, y + headerH / 4, ex, y + headerH * 3 / 4);
         }
         g.setColor(line);
         g.drawLine(cx, y + headerH - 1, cx + cw, y + headerH - 1);
@@ -1471,9 +1620,10 @@ public class DataGrid extends ScrollSurface {
 
     // Where a visible column's left edge, or its right edge, is in the
     // component's coordinates.
+    // Right to left the edges trade places: `rightEdge` is the column's end,
+    // which is then its left edge.
     private int columnScreenX(int i, boolean rightEdge) {
-        int e = colX[i] + (rightEdge ? colW[i] : 0);
-        return i < frozenCount ? e : getHeaderWidth() + e - getOffsetX();
+        return originX(i) + colX[i] + (rightEdge != isRTL() ? colW[i] : 0);
     }
 
     /// Sets what takes the taps on cells while it asks for them, as the formula editor of a
@@ -1531,7 +1681,7 @@ public class DataGrid extends ScrollSurface {
             out[3] = 0;
             return;
         }
-        out[0] = columnScreenX(column, false);
+        out[0] = originX(column) + colX[column];
         out[1] = (int) (headerH + (long) row * rowH - getOffsetY());
         out[2] = colW[column];
         out[3] = rowH;
@@ -1563,7 +1713,9 @@ public class DataGrid extends ScrollSurface {
         }
         if (column >= frozenCount && column < vis.length) {
             int bw = getBodyWidth();
-            int l = colX[column];
+            // The offset counts from the start of the content, which right to
+            // left is its right end.
+            int l = isRTL() ? scrollW - colX[column] - colW[column] : colX[column];
             int r = l + colW[column];
             if (l < ox) {
                 ox = l;
@@ -1578,8 +1730,9 @@ public class DataGrid extends ScrollSurface {
 
     // The visible column at a point of the component, or -1.
     private int columnAt(int x) {
-        boolean inFrozen = x < getHeaderWidth();
-        int cx = inFrozen ? x : x - getHeaderWidth() + getOffsetX();
+        int hx = getHeaderX();
+        boolean inFrozen = getHeaderWidth() > 0 && x >= hx && x < hx + getHeaderWidth();
+        int cx = x - (inFrozen ? hx : getContentOriginX());
         int from = inFrozen ? 0 : frozenCount;
         int to = inFrozen ? frozenCount : vis.length;
         for (int i = from; i < to; i++) {
@@ -1607,7 +1760,7 @@ public class DataGrid extends ScrollSurface {
         for (int i = 0; i < vis.length; i++) {
             int e = columnScreenX(i, true);
             if (Math.abs(x - e) <= slop && vis[i].isResizable()
-                    && (i < frozenCount || e > getHeaderWidth())) {
+                    && (i < frozenCount || (e >= getBodyX() && e <= getBodyX() + getBodyWidth()))) {
                 return i;
             }
         }
@@ -1618,7 +1771,8 @@ public class DataGrid extends ScrollSurface {
         if (arrowW == 0 || col < 0 || vis[col] != effectiveTreeColumn() || !rows.isExpandable(row)) { //NOPMD CompareObjectsWithEquals - a column is an identity
             return false;
         }
-        int left = columnScreenX(col, false) + rows.depth(row) * indentW;
+        int left = isRTL() ? columnScreenX(col, false) - rows.depth(row) * indentW - arrowW
+                : columnScreenX(col, false) + rows.depth(row) * indentW;
         return x >= left - GridLook.mm(1) && x < left + arrowW + GridLook.mm(1);
     }
 
@@ -1809,7 +1963,7 @@ public class DataGrid extends ScrollSurface {
     protected void editMoved(int x, int y) {
         if (gesture == GESTURE_RESIZE) {
             GridColumn c = vis[dragColumn];
-            int w = Math.max(GridLook.mm(c.getMinWidthMM()), dragStartW + (x - dragStartX));
+            int w = Math.max(GridLook.mm(c.getMinWidthMM()), dragStartW + (isRTL() ? dragStartX - x : x - dragStartX));
             c.resizedTo(w);
             dirty = true;
         } else if (gesture == GESTURE_MOVE) {
@@ -1904,6 +2058,11 @@ public class DataGrid extends ScrollSurface {
         boolean extend = Display.getInstance().isShiftKeyDown() && selectionMode == SelectionMode.MULTIPLE_ROWS;
         int row = lead < 0 ? 0 : lead;
         int col = leadColumn;
+        // The arrows go back and forward in the reading direction: right to
+        // left, the left arrow moves to the next column and opens a node.
+        if (isRTL() && (ga == Display.GAME_LEFT || ga == Display.GAME_RIGHT)) {
+            ga = ga == Display.GAME_LEFT ? Display.GAME_RIGHT : Display.GAME_LEFT;
+        }
         switch (ga) {
             case Display.GAME_UP:
                 moveLead(Math.max(0, row - (lead < 0 ? 0 : 1)), col, extend);
