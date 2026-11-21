@@ -161,6 +161,7 @@ public class StorefrontPages {
         page.title = "Bazaar - independent shops";
         page.description = "Shop independent stores on Bazaar.";
         page.canonical = urls.absolute(request, "/");
+        StoreText.fromHeader(page, request);
         model.addAttribute("page", page).addAttribute("stores", out);
     }
 
@@ -539,7 +540,7 @@ public class StorefrontPages {
         String token = token(request, store, false);
         CartDto dto = token == null ? null : carts.get(store.getId(), null, token);
         PageMeta meta = meta(store, request, "/s/" + store.getHandle() + "/cart");
-        meta.title = "Your cart - " + store.getName();
+        meta.title = meta.t.get("cart.title") + " - " + store.getName();
         meta.noindex = true;
         CartView view = new CartView();
         if (dto != null) {
@@ -663,6 +664,12 @@ public class StorefrontPages {
         meta.brand = store.getName();
         meta.home = view.storeUrl.length() > 0 ? view.storeUrl : "/";
         meta.noindex = true;
+        StoreText.fromHeader(meta, request);
+        meta.title = meta.t.get("tracking") + " " + view.number + " - " + store.getName();
+        view.status = StoreText.translate(meta.t, view.status);
+        for (int iter = 0; iter < view.steps.size(); iter++) {
+            view.steps.get(iter).status = StoreText.translate(meta.t, view.steps.get(iter).status);
+        }
         model.addAttribute("page", meta).addAttribute("track", view);
     }
 
@@ -703,7 +710,7 @@ public class StorefrontPages {
         Store store = stores.activeStore(handle);
         String path = "/s/" + store.getHandle() + "/privacy";
         PageMeta meta = meta(store, request, path);
-        meta.title = "Privacy and cookies - " + store.getName();
+        meta.title = meta.t.get("privacy") + " - " + store.getName();
         meta.consentAsk = false;
         meta.consentBack = path;
         model.addAttribute("page", meta).addAttribute("privacy", slots.privacy(store, request));
@@ -715,7 +722,7 @@ public class StorefrontPages {
         Store store = stores.activeStore(handle);
         String path = "/s/" + store.getHandle() + "/chat";
         PageMeta meta = meta(store, request, path);
-        meta.title = "Chat - " + store.getName();
+        meta.title = meta.t.get("chat.link") + " - " + store.getName();
         meta.noindex = true;
         ChatView view = new ChatView();
         view.action = path;
@@ -759,6 +766,12 @@ public class StorefrontPages {
         page.chatUrl = "/s/" + store.getHandle() + "/chat";
         page.description = describe(store.getTagline());
         try {
+            // The interface language; choose() records the Vary (or the
+            // private copy) the choice needs, once per request.
+            int query = path.indexOf('?');
+            StoreText.apply(page, StorefrontMarkets.choose(store,
+                    query < 0 ? path : path.substring(0, query), request, markets,
+                    translations, urls).ui);
             decorate(page, store, request, path);
             slots.decorate(page, store, request);
         } catch (IOException e) {

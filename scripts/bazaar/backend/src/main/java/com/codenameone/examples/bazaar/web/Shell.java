@@ -34,6 +34,13 @@ public class Shell {
     /// "account", "admin" or "platform": the `data-area` of the page.
     public String area = "account";
     public String title = "Bazaar";
+    /// The interface language of the sign-in and sign-up pages ([StoreText]);
+    /// the back office stays English.
+    public String lang = "en";
+    /// `rtl` for a right-to-left language, else `ltr`.
+    public String dir = "ltr";
+    /// The interface text in [#lang], by key.
+    public java.util.Map<String, String> t = StoreText.table("en");
     /// The CSP nonce of this response, printed on its style and script elements.
     public String nonce = "";
     /// The brand in the top bar, and where it links.

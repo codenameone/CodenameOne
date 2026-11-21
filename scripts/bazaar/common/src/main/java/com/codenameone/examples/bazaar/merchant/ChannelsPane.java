@@ -21,6 +21,7 @@ package com.codenameone.examples.bazaar.merchant;
 import com.codename1.appkit.Net;
 import com.codename1.ui.Container;
 import com.codename1.ui.FontImage;
+import com.codename1.ui.spinner.Picker;
 import com.codename1.ui.TextField;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codenameone.examples.bazaar.api.ChannelDto;
@@ -101,15 +102,16 @@ final class ChannelsPane extends MerchantPane {
     private void connect() {
         final Container page = new Container(BoxLayout.y());
         page.setName("channels-connect-page");
-        final TextField kind = MUi.text(page, "Marketplace (SIMULATED or EBAY)", "channel-kind",
-                "SIMULATED");
+        final Picker kind = MUi.picker(page, Lang.tr("Marketplace"), "channel-kind",
+                Words.CHANNEL_KINDS, Words.CHANNEL_KINDS[0]);
         final TextField name = MUi.text(page, "Name", "channel-name", "");
         final TextField token = MUi.text(page, "Refresh token", "channel-token", "");
         token.setConstraint(TextField.PASSWORD);
         final TextField secret = MUi.text(page, "Notification secret", "channel-secret", "");
         secret.setConstraint(TextField.PASSWORD);
         page.add(Ui.primary(Lang.tr("Connect"), "channel-connect-save", e -> Api.channels()
-                .connectChannel(MerchantState.storeId(), new ChannelSetupDto(kind.getText(),
+                .connectChannel(MerchantState.storeId(), new ChannelSetupDto(
+                MUi.code(kind, Words.CHANNEL_KINDS),
                 name.getText(), token.getText(), secret.getText()), Net.to(r -> {
                     pop();
                     showChannels(r);

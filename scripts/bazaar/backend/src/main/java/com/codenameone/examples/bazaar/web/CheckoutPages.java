@@ -605,8 +605,17 @@ public class CheckoutPages {
         }
         view.invalid = view.invalid || anyFieldError(view);
         PageMeta meta = pages.meta(store, request, base);
-        meta.title = "Checkout - " + store.getName();
+        meta.title = meta.t.get("checkout") + " - " + store.getName();
         meta.noindex = true;
+        // The field errors were written in English; show them in the page's language.
+        view.emailError = StoreText.translate(meta.t, view.emailError);
+        view.nameError = StoreText.translate(meta.t, view.nameError);
+        view.line1Error = StoreText.translate(meta.t, view.line1Error);
+        view.cityError = StoreText.translate(meta.t, view.cityError);
+        view.countryError = StoreText.translate(meta.t, view.countryError);
+        view.rateError = StoreText.translate(meta.t, view.rateError);
+        view.cardError = StoreText.translate(meta.t, view.cardError);
+        view.codeError = StoreText.translate(meta.t, view.codeError);
         model.addAttribute("page", meta).addAttribute("checkout", view);
         return dto;
     }
@@ -798,7 +807,7 @@ public class CheckoutPages {
             }
         }
         PageMeta meta = pages.meta(store, request, view.storeUrl + "/orders/" + o.number());
-        meta.title = "Order #" + o.number() + " - " + store.getName();
+        meta.title = meta.t.get("order") + " #" + o.number() + " - " + store.getName();
         meta.noindex = true;
         model.addAttribute("page", meta).addAttribute("order", view);
     }

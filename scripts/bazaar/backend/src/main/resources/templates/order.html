@@ -1,14 +1,14 @@
 <!-- cn1:model page com.codenameone.examples.bazaar.web.PageMeta -->
 <!-- cn1:model order com.codenameone.examples.bazaar.web.OrderView -->
 <!doctype html>
-<html lang="en" xmlns:th="http://www.thymeleaf.org"><head th:replace="~{layout :: head}"></head><body th:class="${page.themeClass}" th:attr="data-accent=${page.accent}"><header th:replace="~{layout :: header}"></header>
-<main class="wrap confirm" id="main"><h1>Thank you! Order #<span th:text="${order.number}">1</span></h1>
+<html th:attr="lang=${page.lang},dir=${page.dir}" xmlns:th="http://www.thymeleaf.org"><head th:replace="~{layout :: head}"></head><body th:class="${page.themeClass}" th:attr="data-accent=${page.accent}"><header th:replace="~{layout :: header}"></header>
+<main class="wrap confirm" id="main"><h1><span th:text="${page.t['thanks'] + ' #'}">Thank you! Order #</span><span th:text="${order.number}">1</span></h1>
 <p class="status" th:text="${order.status}">Confirmed</p>
-<p>A confirmation was sent to <strong th:text="${order.email}">you@example.com</strong>.</p>
-<dl><dt>Placed</dt><dd th:text="${order.placed}">2026-01-01</dd><dt th:unless="${order.shipTo.empty}">Ship to</dt><dd th:unless="${order.shipTo.empty}" th:text="${order.shipTo}">Address</dd><dt th:unless="${order.shippingTitle.empty}">Delivery</dt><dd th:unless="${order.shippingTitle.empty}" th:text="${order.shippingTitle}">Standard</dd></dl>
-<section th:unless="${order.tracking.empty}"><h2>Tracking</h2><ul><li th:each="t : ${order.tracking}"><a th:href="${t.url}" th:text="${t.label}">UPS 1Z</a></li></ul></section>
-<table class="lines"><thead><tr><th>Item</th><th>Quantity</th><th>Total</th></tr></thead><tbody>
+<p><span th:text="${page.t['confirmSent']}">A confirmation was sent to</span> <strong th:text="${order.email}">you@example.com</strong>.</p>
+<dl><dt th:text="${page.t['placed']}">Placed</dt><dd th:text="${order.placed}">2026-01-01</dd><dt th:unless="${order.shipTo.empty}" th:text="${page.t['shipTo']}">Ship to</dt><dd th:unless="${order.shipTo.empty}" th:text="${order.shipTo}">Address</dd><dt th:unless="${order.shippingTitle.empty}" th:text="${page.t['delivery']}">Delivery</dt><dd th:unless="${order.shippingTitle.empty}" th:text="${order.shippingTitle}">Standard</dd></dl>
+<section th:unless="${order.tracking.empty}"><h2 th:text="${page.t['tracking']}">Tracking</h2><ul><li th:each="t : ${order.tracking}"><a th:href="${t.url}" th:text="${t.label}">UPS 1Z</a></li></ul></section>
+<table class="lines"><thead><tr><th th:text="${page.t['item']}">Item</th><th th:text="${page.t['quantity']}">Quantity</th><th th:text="${page.t['total']}">Total</th></tr></thead><tbody>
 <tr th:each="l : ${order.lines}"><td><span th:text="${l.title}">Item</span> <span class="variant" th:unless="${l.variant.empty}" th:text="${l.variant}">Variant</span> <span class="unit" th:text="${l.unit}">$1</span></td><td th:text="${l.quantity}">1</td><td th:text="${l.total}">$1</td></tr></tbody></table>
-<dl class="totals"><dt>Subtotal</dt><dd th:text="${order.subtotal}">$1</dd><dt th:unless="${order.discount.empty}">Discount</dt><dd th:unless="${order.discount.empty}" th:text="${order.discount}">-$1</dd><dt>Shipping</dt><dd th:text="${order.shipping}">$1</dd><dt>Tax</dt><dd th:text="${order.tax}">$0</dd><dt>Total</dt><dd class="total" th:text="${order.total}">$1</dd></dl><div th:replace="~{layout :: thanks}"></div>
-<p><a class="button" th:href="${order.invoiceUrl}">Download invoice (PDF)</a> <a th:href="${order.storeUrl}">Keep shopping</a></p></main>
+<dl class="totals"><dt th:text="${page.t['subtotal']}">Subtotal</dt><dd th:text="${order.subtotal}">$1</dd><dt th:unless="${order.discount.empty}" th:text="${page.t['discount']}">Discount</dt><dd th:unless="${order.discount.empty}" th:text="${order.discount}">-$1</dd><dt th:text="${page.t['shipping']}">Shipping</dt><dd th:text="${order.shipping}">$1</dd><dt th:text="${page.t['tax']}">Tax</dt><dd th:text="${order.tax}">$0</dd><dt th:text="${page.t['total']}">Total</dt><dd class="total" th:text="${order.total}">$1</dd></dl><div th:replace="~{layout :: thanks}"></div>
+<p><a class="button" th:href="${order.invoiceUrl}" th:text="${page.t['invoice']}">Download invoice (PDF)</a> <a th:href="${order.storeUrl}" th:text="${page.t['keepShopping']}">Keep shopping</a></p></main>
 <footer th:replace="~{layout :: footer}"></footer></body></html>

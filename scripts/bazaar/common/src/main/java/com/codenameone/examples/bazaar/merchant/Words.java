@@ -31,7 +31,10 @@ final class Words {
     static final String[] ROLES = {"OWNER", "MANAGER", "CASHIER", "FULFILMENT"};
     static final String[] DISCOUNT_KINDS = {"PERCENT", "FIXED", "FREE_SHIPPING", "BUY_X_GET_Y"};
     static final String[] RATE_KINDS = {"FLAT", "WEIGHT", "PRICE", "FREE_OVER", "PICKUP", "LOCAL"};
-    static final String[] ADJUST_REASONS = {"RESTOCK", "DAMAGE", "CORRECTION", "RETURN", "RECEIVE"};
+    /// The marketplaces a channel connects to: the server's connector kinds
+    /// (`channel.SimulatedConnector.KIND`, `channel.EbayConnector.KIND`).
+    static final String[] CHANNEL_KINDS = {"SIMULATED", "EBAY"};
+    static final String[] ADJUST_REASONS ={"RESTOCK", "DAMAGE", "CORRECTION", "RETURN", "RECEIVE"};
 
     private Words() {
     }
@@ -63,7 +66,7 @@ final class Words {
             {"PICKED_UP", "Picked up"}, {"SHIP", "Ship"}, {"REQUESTED", "Requested"},
             {"APPROVED", "Approved"}, {"DECLINED", "Declined"}, {"TO_PACK", "To pack"},
             {"PUBLISHED", "Published"}, {"REJECTED", "Rejected"}, {"SUSPENDED", "Suspended"},
-            {"FAILED", "Failed"}
+            {"FAILED", "Failed"}, {"SIMULATED", "Simulated marketplace"}, {"EBAY", "eBay"}
         };
         for (int iter = 0; iter < words.length; iter++) {
             if (words[iter][0].equals(code)) {

@@ -83,7 +83,11 @@ public class SignUpPages {
             throws IOException {
         form.fillToken = bots.issue();
         model.addAttribute("form", form);
-        model.addAttribute("shell", WebPages.anonymous(request, "Create an account"));
+        com.codenameone.examples.bazaar.web.Shell shell =
+                WebPages.anonymous(request, "Create an account");
+        form.problem = com.codenameone.examples.bazaar.web.StoreText.translate(shell.t,
+                form.problem);
+        model.addAttribute("shell", shell);
         return "signup";
     }
 

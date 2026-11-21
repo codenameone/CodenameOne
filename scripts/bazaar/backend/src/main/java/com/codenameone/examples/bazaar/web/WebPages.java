@@ -121,8 +121,15 @@ public class WebPages {
     public static Shell anonymous(HttpServer.Request request, String title) {
         Shell s = new Shell();
         s.area = "auth";
-        s.title = title + " - Bazaar";
-        s.heading = title;
+        // The visitor's language (these pages are never shared-cached: each
+        // carries its own form token).
+        s.lang = StoreText.pick(null, com.codenameone.examples.bazaar.market.Locales.accepted(
+                request.getHeader("Accept-Language")));
+        s.dir = StoreText.rtl(s.lang) ? "rtl" : "ltr";
+        s.t = StoreText.table(s.lang);
+        String heading = StoreText.translate(s.t, title);
+        s.title = heading + " - Bazaar";
+        s.heading = heading;
         s.nonce = WebHeaders.currentNonce();
         s.toast = takeToast(request);
         return s;

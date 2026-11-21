@@ -25,6 +25,12 @@ public final class PageMeta {
     /// The CSP nonce of this response (see web.security.WebHeaders).
     public String nonce = com.codenameone.examples.bazaar.web.security.WebHeaders.currentNonce();
     public String title = "Bazaar";
+    /// The interface language ([StoreText]): the `lang` of the page.
+    public String lang = "en";
+    /// `rtl` for a right-to-left language, else `ltr`.
+    public String dir = "ltr";
+    /// The interface text in [#lang], by key: `${page.t['cart.title']}`.
+    public java.util.Map<String, String> t = StoreText.table("en");
     public String description = "";
     /// The absolute canonical address; also sent as a `Link` header, since a
     /// compiled view keeps link-element addresses static.

@@ -89,6 +89,8 @@ public final class StorefrontMarkets {
         String storeId;
         public Markets.Pricer pricer;
         public String locale;
+        /// The interface language ([StoreText#LANGUAGES]).
+        public String ui = "en";
         public final List<LinkView> picker = new ArrayList<LinkView>();
         /// The market the visitor's country suggests ([GeoCountry]), offered in a
         /// banner and never applied; null when there is none.
@@ -173,6 +175,21 @@ public final class StorefrontMarkets {
                 ex.setAttribute(VARY, "Accept-Language");
             }
         }
+        // The interface text: the content language when the app ships text
+        // for it, else the visitor's best (StoreText). A market whose locale
+        // has no interface text falls back on the header too, so that page
+        // varies by it as well.
+        String spoken = c.locale == null ? null : Locales.language(c.locale);
+        if (spoken != null && StoreText.supported(spoken)) {
+            c.ui = spoken;
+        } else {
+            c.ui = StoreText.pick(null, Locales.accepted(request.getHeader("Accept-Language")));
+            if (ex != null) {
+                ex.setAttribute(VARY, "Accept-Language");
+            }
+        }
+        c.picker.set(0, new LinkView(store.getCurrency() + " ("
+                + StoreText.table(c.ui).get("storePrices") + ")", path, current == null));
         return c;
     }
 

@@ -23,6 +23,8 @@ import com.codename1.backend.annotations.Controller;
 import com.codename1.backend.annotations.GetMapping;
 import com.codename1.backend.annotations.RequestParam;
 import com.codename1.backend.mvc.Model;
+import com.codenameone.examples.bazaar.web.Shell;
+import com.codenameone.examples.bazaar.web.StoreText;
 import com.codenameone.examples.bazaar.web.WebPages;
 
 /// The sign-in pages of the web app. The posts are the security chain's own
@@ -50,7 +52,9 @@ public class AuthPages {
             form.problem = "That email and password do not match an account.";
         }
         model.addAttribute("form", form);
-        model.addAttribute("shell", WebPages.anonymous(request, "Sign in"));
+        Shell shell = WebPages.anonymous(request, "Sign in");
+        form.problem = StoreText.translate(shell.t, form.problem);
+        model.addAttribute("shell", shell);
         return "signin";
     }
 
@@ -63,7 +67,9 @@ public class AuthPages {
             form.problem = "That code is not right, or has been used. Try the next one.";
         }
         model.addAttribute("form", form);
-        model.addAttribute("shell", WebPages.anonymous(request, "Two-step verification"));
+        Shell shell = WebPages.anonymous(request, "Two-step verification");
+        form.problem = StoreText.translate(shell.t, form.problem);
+        model.addAttribute("shell", shell);
         return "signin";
     }
 }
