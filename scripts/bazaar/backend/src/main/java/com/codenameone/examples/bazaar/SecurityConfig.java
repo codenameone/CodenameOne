@@ -38,6 +38,7 @@ import com.codename1.backend.security.oauth2.server.authorization.OAuth2Authoriz
 import com.codename1.backend.security.oauth2.server.authorization.RegisteredClientRepository;
 import com.codename1.backend.security.ratelimit.InMemoryRateLimiter;
 import com.codename1.backend.security.ratelimit.RateLimitKeys;
+import com.codenameone.examples.bazaar.web.security.Throttle;
 
 import java.io.IOException;
 
@@ -60,6 +61,10 @@ import java.io.IOException;
 public class SecurityConfig {
     public static final String CLIENT_ID = "bazaar-app";
     public static final String AUDIENCE = "urn:bazaar:api";
+    /// A storefront signup form's submission; open to guests.
+    static final String SIGNUP_SUBMIT = "/api/shop/stores/*/signup-forms/*/submit";
+    /// A back-in-stock alert; open to guests, who give an e-mail address.
+    static final String STOCK_ALERT = "/api/shop/stores/*/stock-alerts";
 
     @Bean
     public PasswordEncoder passwordEncoder() {
@@ -109,7 +114,7 @@ public class SecurityConfig {
     @Order(2)
     public SecurityFilterChain api(HttpSecurity http, JwkSource signingKeys,
             @Value("${" + AccountSecurity.ISSUER_KEY + ":}") String issuer,
-            JdbcUserDetailsManager users) throws IOException {
+            JdbcUserDetailsManager users, Throttle throttle) throws IOException {
         http.securityMatcher("/api/**")
             .sessionManagement(session ->
                     session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
@@ -148,6 +153,13 @@ public class SecurityConfig {
             .rateLimit("/api/payments/methods/setup",
                     RateLimitKeys.firstOf(RateLimitKeys.principal(), RateLimitKeys.clientAddress()),
                     new InMemoryRateLimiter(30, 3600))
+            // The two things a stranger may post: a newsletter signup and a
+            // back-in-stock alert. Both write a row and may send a mail, so
+            // they share the web forms' bucket (`bazaar.limit.form`) per
+            // address; each also drops a filled honeypot and refuses a
+            // malformed address before anything is written.
+            .rateLimit(SIGNUP_SUBMIT, RateLimitKeys.clientAddress(), throttle.limiter("form"))
+            .rateLimit(STOCK_ALERT, RateLimitKeys.clientAddress(), throttle.limiter("form"))
             // tag::bazaar-api-rules[]
             .authorizeHttpRequests(auth -> auth
                     .requestMatchers(AntPathRequestMatcher.antMatcher("POST",
@@ -159,6 +171,8 @@ public class SecurityConfig {
                     // A cart is usable before signing in: a guest's is found
                     // by the token its first answer carried.
                     .requestMatchers("/api/shop/cart/**").permitAll()
+                    .requestMatchers(AntPathRequestMatcher.antMatcher("POST", SIGNUP_SUBMIT)).permitAll()
+                    .requestMatchers(AntPathRequestMatcher.antMatcher("POST", STOCK_ALERT)).permitAll()
                     .requestMatchers("/api/admin/**").hasRole(Roles.ADMIN)
                     .requestMatchers("/api/merchant/**").hasRole(Roles.MERCHANT)
                     .anyRequest().authenticated())

@@ -36,6 +36,7 @@ import com.codenameone.examples.bazaar.api.ProductPageDto;
 import com.codenameone.examples.bazaar.api.ProductPhotoDto;
 import com.codenameone.examples.bazaar.api.StockDto;
 import com.codenameone.examples.bazaar.api.VariantDto;
+import com.codenameone.examples.bazaar.cart.Codes;
 import com.codenameone.examples.bazaar.domain.Collection;
 import com.codenameone.examples.bazaar.domain.CollectionProduct;
 import com.codenameone.examples.bazaar.domain.InventoryLevel;
@@ -47,6 +48,7 @@ import com.codenameone.examples.bazaar.domain.ProductPhoto;
 import com.codenameone.examples.bazaar.domain.Store;
 import com.codenameone.examples.bazaar.domain.Variant;
 import com.codenameone.examples.bazaar.inventory.Inventory;
+import com.codenameone.examples.bazaar.loyalty.Memberships;
 import com.codenameone.examples.bazaar.repository.CollectionProductRepository;
 import com.codenameone.examples.bazaar.repository.CollectionRepository;
 import com.codenameone.examples.bazaar.repository.InventoryLevelRepository;
@@ -66,6 +68,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /// The catalog: products with their options, variants and pictures, and the
 /// collections they are grouped in.
@@ -98,12 +101,15 @@ public class Catalog {
     private final PhotoRepository photos;
     private final StoreAccess access;
     private final Stores storeService;
+    private final Memberships memberships;
 
     public Catalog(StoreRepository stores, ProductRepository products, VariantRepository variants,
             ProductOptionRepository options, ProductPhotoRepository gallery,
             CollectionRepository collections, CollectionProductRepository members,
             InventoryLevelRepository levels, LocationRepository locations,
-            PhotoRepository photos, StoreAccess access, Stores storeService) {
+            PhotoRepository photos, StoreAccess access, Stores storeService,
+            Memberships memberships) {
+        this.memberships = memberships;
         this.stores = stores;
         this.products = products;
         this.variants = variants;
@@ -122,7 +128,7 @@ public class Catalog {
 
     /// One store's catalog, read once for a search.
     private final class Snapshot {
-        final List<Product> list;
+        List<Product> list;
         final Map<String, List<Variant>> byProduct;
         final Map<String, Integer> available = new HashMap<String, Integer>();
         final Map<String, List<String>> membership = new HashMap<String, List<String>>();
@@ -163,6 +169,27 @@ public class Catalog {
                     in.add(collection.getId());
                 }
             }
+        }
+
+        /// Drops what the signed-in shopper (a guest when there is none)
+        /// may not see: members-only products of clubs they are not in.
+        Snapshot forViewer(String storeId) {
+            List<String> ids = new ArrayList<String>();
+            for (int iter = 0; iter < list.size(); iter++) {
+                ids.add(list.get(iter).getId());
+            }
+            Set<String> hide = memberships.hidden(storeId, ids, membership,
+                    memberships.of(storeId, Codes.callerOrNull(), Instant.now()));
+            if (!hide.isEmpty()) {
+                List<Product> kept = new ArrayList<Product>();
+                for (int iter = 0; iter < list.size(); iter++) {
+                    if (!hide.contains(list.get(iter).getId())) {
+                        kept.add(list.get(iter));
+                    }
+                }
+                list = kept;
+            }
+            return this;
         }
 
         List<Variant> variantsOf(String productId) {
@@ -238,7 +265,7 @@ public class Catalog {
     public ProductPageDto products(String handle, String collection, Search search)
             throws IOException {
         Store store = storeService.activeStore(handle);
-        Snapshot snapshot = new Snapshot(store.getId(), ACTIVE, true);
+        Snapshot snapshot = new Snapshot(store.getId(), ACTIVE, true).forViewer(store.getId());
         search.collectionId = collectionId(snapshot, collection, true);
         return page(snapshot, search);
     }
@@ -263,7 +290,7 @@ public class Catalog {
     @Transactional(readOnly = true)
     public FacetsDto facets(String handle, String collection, Search search) throws IOException {
         Store store = storeService.activeStore(handle);
-        Snapshot snapshot = new Snapshot(store.getId(), ACTIVE, true);
+        Snapshot snapshot = new Snapshot(store.getId(), ACTIVE, true).forViewer(store.getId());
         search.collectionId = collectionId(snapshot, collection, true);
         Map<String, Integer> typeCounts = new HashMap<String, Integer>();
         Map<String, Integer> vendorCounts = new HashMap<String, Integer>();
@@ -320,7 +347,7 @@ public class Catalog {
     @Transactional(readOnly = true)
     public List<CollectionDto> publicCollections(String handle) throws IOException {
         Store store = storeService.activeStore(handle);
-        Snapshot snapshot = new Snapshot(store.getId(), ACTIVE, true);
+        Snapshot snapshot = new Snapshot(store.getId(), ACTIVE, true).forViewer(store.getId());
         List<CollectionDto> out = new ArrayList<CollectionDto>();
         for (int iter = 0; iter < snapshot.allCollections.size(); iter++) {
             Collection collection = snapshot.allCollections.get(iter);
@@ -354,6 +381,7 @@ public class Catalog {
         if (store == null || !Stores.ACTIVE.equals(store.getStatus())) {
             throw new ResponseStatusException(404, "No such product");
         }
+        requireVisible(product);
         return detail(product, false);
     }
 
@@ -366,7 +394,23 @@ public class Catalog {
         if (product == null || !ACTIVE.equals(product.getStatus())) {
             throw new ResponseStatusException(404, "No such product");
         }
+        requireVisible(product);
         return detail(product, false);
+    }
+
+    /// 404 for a members-only product the caller's clubs do not open: to
+    /// anyone else it does not exist, as in the lists.
+    private void requireVisible(Product product) {
+        if (!memberships.anyRules(product.getStoreId())) {
+            return;
+        }
+        Snapshot snapshot = new Snapshot(product.getStoreId(), ACTIVE, true).forViewer(product.getStoreId());
+        for (int iter = 0; iter < snapshot.list.size(); iter++) {
+            if (product.getId().equals(snapshot.list.get(iter).getId())) {
+                return;
+            }
+        }
+        throw new ResponseStatusException(404, "No such product");
     }
 
     /// A stored picture, if it belongs to an active store.

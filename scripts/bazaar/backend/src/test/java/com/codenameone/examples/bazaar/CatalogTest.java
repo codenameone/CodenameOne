@@ -237,8 +237,9 @@ class CatalogTest {
         assertEquals("Northwind Outfitters", northwind.get("name"));
         Map page = Rest.json(mvc, get("/api/shop/stores/" + DemoStores.LITTLE_CLAY
                 + "/products?size=100"));
-        // Thirty products, one a draft and one archived.
-        assertEquals(28L, Rest.number(page, "total"));
+        // Thirty products, one a draft, one archived and one for the
+        // Insiders club's members only, which a guest does not see.
+        assertEquals(27L, Rest.number(page, "total"));
         Map bad = db.queryOne("SELECT COUNT(*) AS n FROM inventory_level l WHERE l.on_hand <> "
                 + "(SELECT COALESCE(SUM(m.on_hand_delta), 0) FROM inventory_move m "
                 + "WHERE m.variant_id = l.variant_id AND m.location_id = l.location_id)",

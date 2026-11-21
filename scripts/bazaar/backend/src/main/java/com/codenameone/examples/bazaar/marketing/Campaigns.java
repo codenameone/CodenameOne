@@ -29,6 +29,7 @@ import com.codenameone.examples.bazaar.cart.Codes;
 import com.codenameone.examples.bazaar.domain.Campaign;
 import com.codenameone.examples.bazaar.domain.CampaignLink;
 import com.codenameone.examples.bazaar.domain.CampaignSend;
+import com.codenameone.examples.bazaar.domain.Customer;
 import com.codenameone.examples.bazaar.domain.MarketingConsent;
 import com.codenameone.examples.bazaar.domain.MarketingKey;
 import com.codenameone.examples.bazaar.domain.StoreOrder;
@@ -36,6 +37,7 @@ import com.codenameone.examples.bazaar.notify.Emails;
 import com.codenameone.examples.bazaar.repository.CampaignLinkRepository;
 import com.codenameone.examples.bazaar.repository.CampaignRepository;
 import com.codenameone.examples.bazaar.repository.CampaignSendRepository;
+import com.codenameone.examples.bazaar.repository.CustomerRepository;
 import com.codenameone.examples.bazaar.repository.MarketingConsentRepository;
 import com.codenameone.examples.bazaar.repository.MarketingKeyRepository;
 import com.codenameone.examples.bazaar.repository.StoreOrderRepository;
@@ -98,10 +100,14 @@ public class Campaigns {
     private final SiteUrls urls;
     private final StoreAccess access;
 
+    private final CustomerRepository customers;
+
     public Campaigns(CampaignRepository campaigns, CampaignSendRepository sends,
             CampaignLinkRepository links, MarketingKeyRepository keys,
             MarketingConsentRepository consents, StoreOrderRepository orders, Audiences audiences,
-            Emails emails, SmsSender sms, SiteUrls urls, StoreAccess access) {
+            Emails emails, SmsSender sms, SiteUrls urls, StoreAccess access,
+            CustomerRepository customers) {
+        this.customers = customers;
         this.campaigns = campaigns;
         this.sends = sends;
         this.links = links;
@@ -547,6 +553,14 @@ public class Campaigns {
         Campaign c = campaigns.findById(s.getCampaignId());
         setConsent(s.getStoreId(), s.getAddress(), c == null ? EMAIL : c.getChannel(), UNSUBSCRIBED,
                 "campaign:" + s.getCampaignId());
+        // The customer the message was written for, whatever address their
+        // row now holds: segments select on accepts_marketing.
+        Customer who = s.getCustomerId().length() == 0 ? null : customers.findById(s.getCustomerId());
+        if (who != null && who.isAcceptsMarketing()) {
+            who.setAcceptsMarketing(false);
+            who.setUpdatedAt(Instant.now());
+            customers.save(who);
+        }
         return true;
     }
 
@@ -571,6 +585,41 @@ public class Campaigns {
             consents.insert(m);
         } else {
             consents.save(m);
+        }
+        if (EMAIL.equals(channel)) {
+            marketingFlag(storeId, Tokens.fold(address), SUBSCRIBED.equals(status));
+        }
+    }
+
+    /// Keeps the store's customer row in step with an e-mail consent: a
+    /// segment selects on `accepts_marketing`, so an address that opted in
+    /// through a form is a customer who accepts marketing -- made here when
+    /// the store has never seen it -- and one that opted out is not. The
+    /// consent row itself (source and time) is the record of how.
+    void marketingFlag(String storeId, String email, boolean on) throws IOException {
+        if (email.length() == 0 || email.length() > 190) {
+            return;
+        }
+        Customer c = customers.findByStoreIdAndEmail(storeId, email);
+        Instant now = Instant.now();
+        if (c == null) {
+            if (!on) {
+                return;
+            }
+            c = new Customer();
+            c.setId(Ids.next());
+            c.setStoreId(storeId);
+            c.setEmail(email);
+            c.setAcceptsMarketing(true);
+            c.setCreatedAt(now);
+            c.setUpdatedAt(now);
+            customers.insert(c);
+            return;
+        }
+        if (c.isAcceptsMarketing() != on) {
+            c.setAcceptsMarketing(on);
+            c.setUpdatedAt(now);
+            customers.save(c);
         }
     }
 

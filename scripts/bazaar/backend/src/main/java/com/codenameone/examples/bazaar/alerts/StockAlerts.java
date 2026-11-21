@@ -121,6 +121,11 @@ public class StockAlerts {
             throw new ResponseStatusException(400, "Choose a variant");
         }
         Variant v = variant(storeId, in.variantId());
+        if (in.trap() != null && in.trap().length() > 0) {
+            // A bot filled the field a person never sees: answered like a
+            // success, so it learns nothing, and dropped.
+            return new StockAlertDto("", v.getId(), "", EMAIL, PENDING, 0, "");
+        }
         String email = Tokens.fold(in.email() == null || in.email().length() == 0 ? username : in.email());
         if (!Mail.isAddress(email) || email.length() > 254) {
             throw new ResponseStatusException(400, "Give an e-mail address");
@@ -162,7 +167,7 @@ public class StockAlerts {
 
     static StockAlertDto dto(StockAlert a) {
         return new StockAlertDto(a.getId(), a.getVariantId(), a.getEmail(), a.getChannel(),
-                a.getStatus(), a.getCreatedAt().toEpochMilli());
+                a.getStatus(), a.getCreatedAt().toEpochMilli(), "");
     }
 
     @Transactional(readOnly = true)

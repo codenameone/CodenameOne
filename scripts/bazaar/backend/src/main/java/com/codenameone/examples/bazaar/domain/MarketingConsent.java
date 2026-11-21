@@ -43,7 +43,7 @@ public class MarketingConsent {
     @Column(nullable = false, type = "VARCHAR(16)")
     private String status = "";
 
-    @Column(nullable = false, type = "VARCHAR(32)")
+    @Column(nullable = false, type = "VARCHAR(80)")
     private String source = "";
 
     @Column(nullable = false)

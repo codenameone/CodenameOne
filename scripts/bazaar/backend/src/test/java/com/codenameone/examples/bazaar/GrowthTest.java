@@ -239,7 +239,7 @@ class GrowthTest {
         Shop s = shop("gr-alert", 1);
         db.execute("UPDATE inventory_level SET on_hand = 0 WHERE variant_id = ?", new Object[] {s.variantId});
         StockAlertDto a = alerts.subscribe("gr-alert-shopper", s.storeId,
-                new StockAlertDto(null, s.variantId, "alert@example.com", "EMAIL", "", 0));
+                new StockAlertDto(null, s.variantId, "alert@example.com", "EMAIL", "", 0, ""));
         assertEquals("PENDING", a.status());
         assertEquals(0, alerts.tick());
         db.execute("UPDATE inventory_level SET on_hand = 5 WHERE variant_id = ?", new Object[] {s.variantId});

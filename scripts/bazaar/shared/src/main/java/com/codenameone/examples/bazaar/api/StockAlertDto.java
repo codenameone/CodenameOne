@@ -22,6 +22,7 @@ package com.codenameone.examples.bazaar.api;
 import com.codename1.annotations.Mapped;
 
 /// A request to hear when a variant is back. `channel` EMAIL or PUSH; `status` WAITING, READY, SENT or CANCELLED.
+/// `trap` is the honeypot field a guest's form carries: a person leaves it empty.
 @Mapped
 public record StockAlertDto(
         String id,
@@ -29,5 +30,6 @@ public record StockAlertDto(
         String email,
         String channel,
         String status,
-        long createdAt) {
+        long createdAt,
+        String trap) {
 }

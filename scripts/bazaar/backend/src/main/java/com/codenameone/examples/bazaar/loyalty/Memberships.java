@@ -104,6 +104,41 @@ public class Memberships {
         return best;
     }
 
+    /// Whether the store puts anything behind a club.
+    @Transactional(readOnly = true)
+    public boolean anyRules(String storeId) {
+        return !items.findByStoreId(storeId).isEmpty();
+    }
+
+    /// The products of the store a shopper with `memberships` may not even
+    /// see: those a members-only rule covers, for anyone outside its club.
+    /// Early access is different -- the product shows, and the quote refuses
+    /// it ([#restriction]) until the shopper's window opens.
+    ///
+    /// @param membership product id -> ids of the collections it is in
+    @Transactional(readOnly = true)
+    public Set<String> hidden(String storeId, Iterable<String> productIds,
+            java.util.Map<String, List<String>> membership, Set<String> memberships) {
+        Set<String> out = new HashSet<String>();
+        List<ClubItem> rules = items.findByStoreId(storeId);
+        if (rules.isEmpty()) {
+            return out;
+        }
+        for (String id : productIds) {
+            List<String> in = membership.get(id);
+            for (int iter = 0; iter < rules.size(); iter++) {
+                ClubItem r = rules.get(iter);
+                boolean covers = id.equals(r.getProductId())
+                        || r.getCollectionId().length() > 0 && in != null && in.contains(r.getCollectionId());
+                if (covers && r.isMembersOnly() && !memberships.contains("CLUB:" + r.getClubId())) {
+                    out.add(id);
+                    break;
+                }
+            }
+        }
+        return out;
+    }
+
     /// Why the shopper may not buy `productId` (in `collectionIds`) yet, or
     /// null when they may.
     @Transactional(readOnly = true)

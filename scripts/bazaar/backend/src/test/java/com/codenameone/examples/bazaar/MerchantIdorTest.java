@@ -114,6 +114,24 @@ class MerchantIdorTest {
         "POST /webhooks", "POST /webhooks/{webhookId}", "POST /webhooks/{webhookId}/test",
         "PUT ", "PUT /collections/{collectionId}", "PUT /locations/{locationId}",
         "PUT /products/{productId}",
+        // The growth features: loyalty, clubs, sales, alerts, marketing, journeys.
+        "DELETE /clubs/{clubId}/items/{itemId}", "DELETE /segments/{segmentId}",
+        "GET /campaigns", "GET /campaigns/{campaignId}/stats", "GET /clubs",
+        "GET /clubs/{clubId}/items", "GET /clubs/{clubId}/members",
+        "GET /discounts/{discountId}/rules", "GET /journey-catalog", "GET /journeys",
+        "GET /journeys/{journeyId}", "GET /journeys/{journeyId}/stats",
+        "GET /loyalty/cards/{token}", "GET /loyalty/members",
+        "GET /loyalty/members/{memberId}/ledger", "GET /loyalty/program", "GET /preorders",
+        "GET /promotions/calendar", "GET /sales", "GET /sales/{saleId}", "GET /segments",
+        "GET /signup-forms", "GET /stock-alerts", "POST /campaigns",
+        "POST /campaigns/{campaignId}", "POST /campaigns/{campaignId}/cancel",
+        "POST /campaigns/{campaignId}/schedule", "POST /clubs", "POST /clubs/{clubId}",
+        "POST /clubs/{clubId}/items", "POST /discounts/{discountId}/rules", "POST /journeys",
+        "POST /journeys/{journeyId}", "POST /loyalty/members/{memberId}/adjust",
+        "POST /loyalty/members/{memberId}/redeem", "POST /loyalty/program",
+        "POST /promotions/calendar/reschedule", "POST /sales", "POST /sales/{saleId}/cancel",
+        "POST /segments", "POST /segments-preview", "POST /segments/{segmentId}",
+        "POST /signup-forms", "POST /signup-forms/{formId}", "POST /variants/{variantId}/preorder",
     };
 
     /// The table an id placeholder names, by the path segment before it.
@@ -127,6 +145,9 @@ class MerchantIdorTest {
         {"shifts", "shift"}, {"purchase-orders", "purchase_order"},
         {"returns", "return_request"}, {"reviews", "review"}, {"gift-cards", "gift_card"},
         {"transfers", "stock_transfer"}, {"webhook-deliveries", "webhook_delivery"},
+        {"clubs", "club"}, {"items", "club_item"}, {"segments", "audience"},
+        {"campaigns", "campaign"}, {"journeys", "journey"}, {"members", "loyalty_member"},
+        {"sales", "sale_event"}, {"signup-forms", "signup_form"}, {"variants", "variant"},
     };
 
     private static final String NO_SUCH = "no-such-id";
@@ -147,6 +168,8 @@ class MerchantIdorTest {
     private Carts carts;
     @Autowired
     private Checkouts checkouts;
+    @Autowired
+    private com.codenameone.examples.bazaar.marketing.DemoMarketing marketing;
 
     private final Map<String, String> found = new HashMap<String, String>();
     private final List<String> fake = new ArrayList<String>();
@@ -244,6 +267,8 @@ class MerchantIdorTest {
             Rest.statusOf(mvc, People.asMerchant(Rest.body(post(base + seeds[iter][0]),
                     seeds[iter][1]), b.owner));
         }
+        // B's loyalty programme, club, segments, campaigns, form and journey.
+        marketing.seed(b.storeId);
         // A manager of A: the merchant role and a place on A's staff, not the owner.
         String manager = People.customer(accounts, "idor-manager");
         Rest.json(mvc, People.asMerchant(Rest.body(post("/api/merchant/stores/" + a.storeId
@@ -272,6 +297,43 @@ class MerchantIdorTest {
         assertTrue(leaks.isEmpty(), leaks.toString());
         System.out.println("MerchantIdorTest: " + ROUTES.length + " routes; no row of store B in "
                 + fake);
+    }
+
+    /// A signed-in shopper with no merchant role is refused every route,
+    /// and a guest is asked to sign in, before any store is looked at.
+    @Test
+    void shoppersAndGuestsReachNoMerchantRoute() throws Exception {
+        Shop a = new Shop("idor-shopper", 1, accounts, stores, pricing, db, inventory, carts,
+                checkouts, mvc);
+        marketing.seed(a.storeId);
+        String shopper = People.customer(accounts, "idor-plain-shopper");
+        List<String> leaks = new ArrayList<String>();
+        for (int iter = 0; iter < ROUTES.length; iter++) {
+            String route = ROUTES[iter];
+            String method = route.substring(0, route.indexOf(' '));
+            String path = path(route, a.storeId, a.storeId);
+            MockRequestBuilder b = "GET".equals(method) ? get(path) : "PUT".equals(method) ? put(path)
+                    : "DELETE".equals(method) ? delete(path) : post(path);
+            if ("POST".equals(method) || "PUT".equals(method)) {
+                b = Rest.body(b, "{}");
+            }
+            int signedIn = Rest.statusOf(mvc, People.asCustomer(b, shopper));
+            if (signedIn != 403) {
+                leaks.add(route + " answered a shopper " + signedIn);
+            }
+        }
+        // A guest, on a sample of reads and writes.
+        String[] sample = {"GET /loyalty/program", "GET /campaigns", "POST /clubs", "GET /sales",
+            "GET /journeys", "GET /stock-alerts", "POST /segments"};
+        for (int iter = 0; iter < sample.length; iter++) {
+            String route = sample[iter];
+            String path = path(route, a.storeId, a.storeId);
+            int guest = Rest.statusOf(mvc, route.startsWith("GET") ? get(path) : Rest.body(post(path), "{}"));
+            if (guest != 401) {
+                leaks.add(route + " answered a guest " + guest);
+            }
+        }
+        assertTrue(leaks.isEmpty(), leaks.toString());
     }
 
     @Test
