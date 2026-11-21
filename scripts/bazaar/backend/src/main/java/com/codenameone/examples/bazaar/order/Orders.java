@@ -902,7 +902,10 @@ public class Orders {
             line.setDiscountCents(q.price.discountCents);
             line.setTaxCents(q.price.taxCents);
             line.setWeightGrams(q.variant.getWeightGrams());
-            line.setLocationId(locations == null || locations[iter] == null ? "" : locations[iter]);
+            // A custom sale item (no variant) is held nowhere: nothing to
+            // release, ship or restock for it later.
+            line.setLocationId(locations == null || locations[iter] == null
+                    || q.variant.getId().length() == 0 ? "" : locations[iter]);
             lines.insert(line);
         }
     }

@@ -20,6 +20,7 @@ package com.codenameone.examples.bazaar.pos;
 
 import com.codename1.appkit.server.Caller;
 import com.codename1.backend.annotations.Component;
+import com.codenameone.examples.bazaar.domain.PosApproval;
 import com.codenameone.examples.bazaar.api.CashMoveDto;
 import com.codenameone.examples.bazaar.api.CloseShiftDto;
 import com.codenameone.examples.bazaar.api.OpenShiftDto;
@@ -44,10 +45,12 @@ import java.util.List;
 public class PosEndpoint implements PosApiServer {
     private final Pos pos;
     private final PosSales sales;
+    private final PosTools tools;
 
-    public PosEndpoint(Pos pos, PosSales sales) {
+    public PosEndpoint(Pos pos, PosSales sales, PosTools tools) {
         this.pos = pos;
         this.sales = sales;
+        this.tools = tools;
     }
 
     @Override
@@ -124,7 +127,14 @@ public class PosEndpoint implements PosApiServer {
     @Override
     public PosReturnResultDto counterReturn(String storeId, String registerId, String orderId,
             PosReturnDto body) throws Exception {
-        return pos.counterReturn(Caller.name(), storeId, registerId, orderId, body);
+        PosApproval approval = tools.refundApproval(Caller.name(), storeId,
+                body == null ? null : body.approvalId());
+        PosReturnResultDto out = pos.counterReturn(Caller.name(), storeId, registerId, orderId,
+                body);
+        if (approval != null) {
+            tools.spend(storeId, approval.getId(), orderId, Caller.name());
+        }
+        return out;
     }
 
     @Override

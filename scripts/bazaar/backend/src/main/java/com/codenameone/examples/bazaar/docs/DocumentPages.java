@@ -28,6 +28,8 @@ import com.codenameone.examples.bazaar.api.OrderDto;
 import com.codenameone.examples.bazaar.order.Orders;
 import com.codenameone.examples.bazaar.store.StoreAccess;
 
+import java.util.ArrayList;
+import java.util.List;
 /// The documents as real PDF responses, so a browser, a print dialog or the
 /// app's PDF viewer opens the address as it is. All sit under `/api`, behind
 /// the same sign-in as the JSON API: the merchant ones need staff of the
@@ -98,6 +100,51 @@ public class DocumentPages {
         access.requireStaff(Caller.name(), storeId, StoreAccess.ANYONE);
         int number = documents.order(storeId, orderId).getNumber();
         return pdf(documents.receipt(storeId, orderId), "receipt-" + number);
+    }
+
+    /// Price labels with barcodes for `variants` (ids separated by commas),
+    /// `copies` of each, for any of the store's staff.
+    @GetMapping("/api/merchant/stores/{storeId}/pos/labels.pdf")
+    public HttpServer.Response priceLabels(@PathVariable("storeId") String storeId,
+            @RequestParam(value = "variants", required = false) String variants,
+            @RequestParam(value = "copies", required = false) String copies) throws Exception {
+        access.requireStaff(Caller.name(), storeId, StoreAccess.ANYONE);
+        return pdf(documents.priceLabels(storeId, ids(variants), count(copies)), "labels");
+    }
+
+    /// The ids of a comma separated list, blanks dropped.
+    static List<String> ids(String text) {
+        List<String> out = new ArrayList<String>();
+        if (text == null) {
+            return out;
+        }
+        int start = 0;
+        for (int iter = 0; iter <= text.length(); iter++) {
+            if (iter == text.length() || text.charAt(iter) == ',') {
+                String id = text.substring(start, iter).trim();
+                if (id.length() > 0 && id.length() <= 32) {
+                    out.add(id);
+                }
+                start = iter + 1;
+            }
+        }
+        return out;
+    }
+
+    static int count(String text) {
+        if (text == null || text.trim().length() == 0) {
+            return 1;
+        }
+        String t = text.trim();
+        int n = 0;
+        for (int iter = 0; iter < t.length(); iter++) {
+            char ch = t.charAt(iter);
+            if (ch < '0' || ch > '9' || n > 1000) {
+                return -1;
+            }
+            n = n * 10 + (ch - '0');
+        }
+        return n;
     }
 
     /// The shopper's own invoice; 404 for anybody else's order.

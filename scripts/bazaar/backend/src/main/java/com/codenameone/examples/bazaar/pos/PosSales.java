@@ -37,11 +37,14 @@ import com.codenameone.examples.bazaar.domain.Discount;
 import com.codenameone.examples.bazaar.domain.DiscountUse;
 import com.codenameone.examples.bazaar.domain.GiftCard;
 import com.codenameone.examples.bazaar.domain.OrderLine;
+import com.codenameone.examples.bazaar.domain.PosApproval;
+import com.codenameone.examples.bazaar.domain.PosPolicy;
 import com.codenameone.examples.bazaar.domain.Product;
 import com.codenameone.examples.bazaar.domain.Register;
 import com.codenameone.examples.bazaar.domain.Shift;
 import com.codenameone.examples.bazaar.domain.Store;
 import com.codenameone.examples.bazaar.domain.StoreOrder;
+import com.codenameone.examples.bazaar.domain.StoreStaff;
 import com.codenameone.examples.bazaar.domain.Tender;
 import com.codenameone.examples.bazaar.domain.Variant;
 import com.codenameone.examples.bazaar.giftcard.GiftCards;
@@ -121,6 +124,7 @@ public class PosSales {
     private final GiftCards giftCards;
     private final Payments payments;
     private final StoreEvents storeEvents;
+    private final PosTools tools;
 
     public PosSales(Pos pos, StoreAccess access, StoreRepository stores,
             VariantRepository variants, ProductRepository products, TaxRateRepository taxes,
@@ -129,7 +133,7 @@ public class PosSales {
             StoreOrderRepository orderRows, OrderLineRepository lineRows,
             TenderRepository tenders, ShiftRepository shifts, AuditEventRepository audits,
             Quoter quoter, Orders orders, Inventory inventory, GiftCards giftCards,
-            Payments payments, StoreEvents storeEvents) {
+            Payments payments, StoreEvents storeEvents, PosTools tools) {
         this.pos = pos;
         this.access = access;
         this.stores = stores;
@@ -151,6 +155,7 @@ public class PosSales {
         this.giftCards = giftCards;
         this.payments = payments;
         this.storeEvents = storeEvents;
+        this.tools = tools;
     }
 
     /// Records a batch; one result per sale, in the order sent. A sale that
@@ -210,6 +215,10 @@ public class PosSales {
         /// What the tenders fell short of this server's total, within tolerance().
         long shortCents;
         final List<String> oversoldSkus = new ArrayList<String>();
+        /// Who made the sale, and the manager approval it spends (null for none).
+        StoreStaff seller;
+        PosApproval approval;
+        long tipCents;
     }
 
     /// How far a register's total may fall short of this server's before the
@@ -232,10 +241,11 @@ public class PosSales {
         if (again != null) {
             return duplicate(sale, again);
         }
-        final Quote quote = price(storeId, register, sale);
+        final Quote quote = price(storeId, register.getTaxCountry(), register.getTaxRegion(),
+                sale.lines(), sale.discountCode());
         final Shift shift = shiftFor(storeId, register, sale.shiftId());
-        final Plan plan = plan(storeId, register, sale, quote);
-        final String staffName = username;
+        final Plan plan = plan(username, storeId, register, sale, quote);
+        final String staffName = plan.seller.getUsername();
         StoreOrder order = orders.newOrder(quote, Orders.POS,
                 plan.customer == null ? "" : plan.customer.getUsername(),
                 sale.email() != null && sale.email().trim().length() > 0 ? sale.email().trim()
@@ -247,7 +257,8 @@ public class PosSales {
         order.setLocationId(register.getLocationId());
         order.setRegisterId(register.getId());
         order.setShiftId(shift.getId());
-        order.setStaffUsername(username);
+        order.setStaffUsername(plan.seller.getUsername());
+        order.setTipCents(plan.tipCents);
         order.setCustomerId(plan.customer == null ? "" : plan.customer.getId());
         order.setNote(Codes.cut(sale.note() == null ? "" : sale.note(), 1000));
         long now = System.currentTimeMillis();
@@ -330,8 +341,8 @@ public class PosSales {
     /// Prices the sale: the register's prices (the catalog's when it sent
     /// none), the store's discounts, the register's tax, no shipping.
     @Transactional(readOnly = true)
-    private Quote price(String storeId, Register register, PosSaleDto sale) throws IOException {
-        List<PosLineDto> wanted = sale.lines();
+    public Quote price(String storeId, String taxCountry, String taxRegion, List<PosLineDto> wanted,
+            String discountCode) throws IOException {
         if (wanted == null || wanted.isEmpty()) {
             throw new ResponseStatusException(400, "The sale has no lines");
         }
@@ -341,14 +352,19 @@ public class PosSales {
         List<String> ids = new ArrayList<String>();
         for (int iter = 0; iter < wanted.size(); iter++) {
             PosLineDto l = wanted.get(iter);
-            if (l == null || l.variantId() == null || l.quantity() <= 0 || l.quantity() > 10000
-                    || l.unitCents() < 0) {
+            if (l == null || l.quantity() <= 0 || l.quantity() > 10000 || l.unitCents() < 0) {
                 throw new ResponseStatusException(400, "A line of the sale is not an item and a quantity");
             }
-            ids.add(l.variantId());
+            if (custom(l)) {
+                if (l.title() == null || l.title().trim().length() == 0 || l.unitCents() <= 0) {
+                    throw new ResponseStatusException(400, "A custom item needs a title and a price");
+                }
+            } else {
+                ids.add(l.variantId());
+            }
         }
         Map<String, Variant> byId = new HashMap<String, Variant>();
-        List<Variant> found = variants.findByIdIn(ids);
+        List<Variant> found = ids.isEmpty() ? new ArrayList<Variant>() : variants.findByIdIn(ids);
         List<String> productIds = new ArrayList<String>();
         for (int iter = 0; iter < found.size(); iter++) {
             byId.put(found.get(iter).getId(), found.get(iter));
@@ -365,8 +381,9 @@ public class PosSales {
         quote.store = store;
         for (int iter = 0; iter < wanted.size(); iter++) {
             PosLineDto l = wanted.get(iter);
-            Variant v = byId.get(l.variantId());
-            Product p = v == null ? null : productById.get(v.getProductId());
+            Variant v = custom(l) ? customVariant(storeId, l) : byId.get(l.variantId());
+            Product p = v == null ? null : custom(l) ? customProduct(l)
+                    : productById.get(v.getProductId());
             // Sold even when archived since: the register sold what it had.
             if (v == null || p == null || !storeId.equals(v.getStoreId())) {
                 throw new ResponseStatusException(400, "An item of the sale is not the store's");
@@ -383,27 +400,61 @@ public class PosSales {
         }
         List<PriceLine> priceLines = quote.priceLines();
         quote.subtotalCents = PriceLine.subtotal(priceLines);
-        String code = sale.discountCode() == null ? "" : sale.discountCode().trim();
+        String code = discountCode == null ? "" : discountCode.trim();
         Discount typed = code.length() > 0 ? quoter.byCode(storeId, code) : null;
         quote.discounts = DiscountEngine.apply(priceLines,
                 discounts.findByStoreIdAndAutomatic(storeId, true), typed,
                 code.length() > 0 ? code : null, Instant.now(), new HashSet<String>(), 0);
         quote.shippingCents = 0;
-        String country = register.getTaxCountry();
+        String country = taxCountry == null ? "" : taxCountry;
         quote.tax = TaxCalculator.apply(priceLines, 0,
                 country.length() == 0 ? null : taxes.findByStoreId(storeId),
-                country.length() == 0 ? null : country, register.getTaxRegion(),
+                country.length() == 0 ? null : country, taxRegion,
                 store.isTaxInclusive());
         quote.totalCents = quote.subtotalCents - quote.discountCents() + quote.tax.addedCents();
         return quote;
     }
 
+    /// Whether a line is a custom sale item: a title and a price, no SKU.
+    public static boolean custom(PosLineDto l) {
+        return l.variantId() == null || l.variantId().length() == 0;
+    }
+
+    /// The stand-in variant a custom item is priced and written with: no id,
+    /// so nothing is stocked, reserved or restocked for it.
+    private static Variant customVariant(String storeId, PosLineDto l) {
+        Variant v = new Variant();
+        v.setId("");
+        v.setStoreId(storeId);
+        v.setProductId("");
+        v.setTitle("");
+        v.setSku("");
+        v.setPriceCents(l.unitCents());
+        v.setTaxable(l.taxable());
+        v.setTrackInventory(false);
+        return v;
+    }
+
+    private static Product customProduct(PosLineDto l) {
+        Product p = new Product();
+        p.setId("");
+        p.setTitle(Codes.cut(l.title().trim(), 200));
+        return p;
+    }
+
     /// Sorts the tenders out and checks they pay the total, before anything
     /// is written.
     @Transactional(readOnly = true)
-    private Plan plan(String storeId, Register register, PosSaleDto sale, Quote quote)
+    private Plan plan(String username, String storeId, Register register, PosSaleDto sale,
+            Quote quote)
             throws IOException {
         Plan plan = new Plan();
+        plan.seller = tools.seller(storeId, sale.staffUsername(), username);
+        if (sale.tipCents() < 0) {
+            throw new ResponseStatusException(400, "A tip cannot be negative");
+        }
+        plan.tipCents = sale.tipCents();
+        plan.approval = approvalFor(storeId, plan.seller, sale, quote);
         if (sale.customerId() != null && sale.customerId().length() > 0) {
             plan.customer = customers.findById(sale.customerId());
             if (plan.customer == null || !storeId.equals(plan.customer.getStoreId())) {
@@ -412,7 +463,8 @@ public class PosSales {
         }
         List<PosTenderDto> ts = sale.tenders() == null ? new ArrayList<PosTenderDto>()
                 : sale.tenders();
-        long due = quote.totalCents;
+        // A tip rides on the card: it is paid, but it is not part of the total.
+        long due = quote.totalCents + plan.tipCents;
         for (int iter = 0; iter < ts.size(); iter++) {
             PosTenderDto t = ts.get(iter);
             if (t == null || t.kind() == null || t.amountCents() <= 0) {
@@ -460,6 +512,9 @@ public class PosSales {
         // Only a shortfall past the tolerance is refused -- that sale was
         // genuinely not paid for.
         // tag::bazaar-pos-sync[]
+        if (plan.tipCents > 0 && plan.cardCents < plan.tipCents) {
+            throw new ResponseStatusException(400, "A tip is taken on the card");
+        }
         long other = plan.giftCents + plan.creditCents + plan.cardCents;
         long rest = Math.max(0, due - other);
         plan.overCents = Math.max(0, other - due);
@@ -492,6 +547,43 @@ public class PosSales {
         return plan;
     }
 
+    /// The approval a sale needs and names, or null when it needs none. A
+    /// sale needs one, unless its seller is an owner or a manager, when the
+    /// store's policy says so: a hand-changed price under
+    /// `approvePriceOverrides`, or more off the list price than
+    /// `discountApprovalBp` (hand-changed prices and discounts together).
+    private PosApproval approvalFor(String storeId, StoreStaff seller, PosSaleDto sale,
+            Quote quote) {
+        if (PosTools.approvesItself(seller)) {
+            return null;
+        }
+        PosPolicy policy = tools.policyOf(storeId);
+        long list = 0;
+        long byHand = 0;
+        boolean overridden = false;
+        for (int iter = 0; iter < quote.lines.size(); iter++) {
+            Quote.Line l = quote.lines.get(iter);
+            PosLineDto sent = sale.lines().get(iter);
+            long catalog = custom(sent) ? l.price.unitCents : l.variant.getPriceCents();
+            list += catalog * l.price.quantity;
+            if (sent.overridden()) {
+                overridden = true;
+                byHand += Math.max(0, (catalog - l.price.unitCents) * l.price.quantity);
+            }
+        }
+        boolean needs = overridden && policy.isApprovePriceOverrides();
+        long off = byHand + quote.discountCents();
+        long bp = policy.getDiscountApprovalBp();
+        if (bp > 0 && list > 0 && off * 10000L > bp * list) {
+            needs = true;
+        }
+        if (!needs) {
+            return null;
+        }
+        return tools.requireApproval(storeId, sale.approvalId(), PosTools.DISCOUNT,
+                PosTools.PRICE_OVERRIDE);
+    }
+
     /// Everything a sale writes, inside the transaction that inserts its order.
     private void writeSale(StoreOrder o, Quote quote, Plan plan, String[] where,
             Register register, Shift shift, String staffName) throws IOException {
@@ -505,6 +597,9 @@ public class PosSales {
         }
         for (int iter = 0; iter < quote.lines.size(); iter++) {
             Quote.Line l = quote.lines.get(iter);
+            if (l.variant.getId().length() == 0) {
+                continue;
+            }
             inventory.recordPosSale(storeId, l.variant.getId(), register.getLocationId(),
                     l.price.quantity, o.getId(), staffName);
         }
@@ -522,6 +617,11 @@ public class PosSales {
                 use.setCreatedAt(Instant.now());
                 uses.insert(use);
             }
+        }
+        if (plan.approval != null) {
+            tools.use(storeId, plan.approval.getId(), o.getId(), staffName);
+            orders.event(o.getId(), "APPROVED", plan.approval.getKind() + " approved by "
+                    + plan.approval.getApprover(), staffName);
         }
         if (plan.giftCard != null) {
             if (!giftCards.redeem(plan.giftCard.getId(), o.getId(), plan.giftCents)) {

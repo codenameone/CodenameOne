@@ -79,6 +79,11 @@ public class StoreOrder {
     @Column(nullable = false)
     private long refundedCents;
 
+    /// A tip taken with the card at the counter: paid, but not a sale -- no
+    /// tax, no discount, no commission, and outside [#getTotalCents].
+    @Column(nullable = false)
+    private long tipCents;
+
     @Column(nullable = false, type = "VARCHAR(3)")
     private String currency = "";
 
@@ -280,6 +285,14 @@ public class StoreOrder {
 
     public void setTotalCents(long totalCents) {
         this.totalCents = totalCents;
+    }
+
+    public long getTipCents() {
+        return tipCents;
+    }
+
+    public void setTipCents(long tipCents) {
+        this.tipCents = tipCents;
     }
 
     public long getRefundedCents() {

@@ -21,12 +21,14 @@ package com.codenameone.examples.bazaar.api;
 import com.codename1.annotations.Mapped;
 
 /// A return at the counter: lines and units, refunded `refundTo` CASH or ORIGINAL (the tenders the
-/// sale was paid with), restocked at the register's location when `restock`.
+/// sale was paid with), restocked at the register's location when `restock`. `approvalId` is a
+/// manager's approval when the store's policy wants one for refunds.
 @Mapped
 public record PosReturnDto(
         String shiftId,
         java.util.List<RefundLineDto> lines,
         String refundTo,
         String reason,
-        boolean restock) {
+        boolean restock,
+        String approvalId) {
 }

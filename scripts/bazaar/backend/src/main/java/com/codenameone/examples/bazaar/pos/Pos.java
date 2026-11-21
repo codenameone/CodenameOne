@@ -314,7 +314,7 @@ public class Pos {
     /// Counts a wrong PIN; answers true when that was the last try and the
     /// PIN is now locked.
     @Transactional
-    private boolean wrongPin(String staffId) {
+    boolean wrongPin(String staffId) {
         staff.countPinFailure(staffId);
         StoreStaff member = staff.findById(staffId);
         if (member != null && member.getPinFailures() >= PIN_TRIES) {
@@ -325,7 +325,7 @@ public class Pos {
     }
 
     @Transactional
-    private void rightPin(String staffId) {
+    void rightPin(String staffId) {
         staff.clearPinFailures(staffId);
     }
 

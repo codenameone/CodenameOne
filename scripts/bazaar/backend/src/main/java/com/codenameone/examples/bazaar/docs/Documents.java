@@ -310,6 +310,60 @@ public class Documents {
         return doc.toByteArray();
     }
 
+    // ------------------------------------------------------- price labels
+
+    /// A shelf label, 2.25 x 1.25 inches, in points.
+    static final float TAG_W = 162;
+    static final float TAG_H = 90;
+    /// Most labels in one document.
+    public static final int MAX_TAGS = 500;
+
+    /// Price labels for the store's variants, `copies` of each, one per page
+    /// of a label printer's roll: the product, the variant, the price and the
+    /// barcode (the SKU, or the variant's id, when it has none) as Code 128.
+    @Transactional(readOnly = true)
+    public byte[] priceLabels(String storeId, List<String> variantIds, int copies)
+            throws IOException {
+        if (variantIds == null || variantIds.isEmpty()) {
+            throw new ResponseStatusException(400, "Name the variants to label");
+        }
+        if (copies <= 0 || copies > 100 || variantIds.size() * (long) copies > MAX_TAGS) {
+            throw new ResponseStatusException(400, "At most " + MAX_TAGS + " labels at once");
+        }
+        Store s = stores.findById(storeId);
+        PdfDocument doc = new PdfDocument();
+        doc.setTitle("Price labels").setAuthor(s.getName()).setCreator("Bazaar");
+        float m = 6;
+        float w = TAG_W - 2 * m;
+        for (int iter = 0; iter < variantIds.size(); iter++) {
+            Variant v = variants.findById(variantIds.get(iter));
+            if (v == null || !storeId.equals(v.getStoreId())) {
+                throw new ResponseStatusException(404, "No such variant");
+            }
+            Product p = products.findById(v.getProductId());
+            String name = p == null ? "" : p.getTitle();
+            String code = v.getBarcode().length() > 0 ? v.getBarcode()
+                    : v.getSku().length() > 0 ? v.getSku() : v.getId();
+            String price = Sheet.money(v.getPriceCents(), s.getCurrency());
+            for (int copy = 0; copy < copies; copy++) {
+                PdfCanvas c = doc.addPage(TAG_W, TAG_H).getCanvas();
+                c.setFillColor(0x000000).setFont(PdfFont.HELVETICA_BOLD, 8)
+                        .drawText(Sheet.fit(name, PdfFont.HELVETICA_BOLD, 8, w), m, m + 7);
+                if (v.getTitle().length() > 0) {
+                    c.setFont(PdfFont.HELVETICA, 7)
+                            .drawText(Sheet.fit(v.getTitle(), PdfFont.HELVETICA, 7, w), m, m + 16);
+                }
+                c.setFont(PdfFont.HELVETICA_BOLD, 13);
+                c.drawText(price, TAG_W - m - PdfFont.HELVETICA_BOLD.getStringWidth(price, 13),
+                        m + 31);
+                Code128.draw(c, code, m, 46, w, 28);
+                c.setFont(PdfFont.COURIER, 6).drawText(Sheet.fit(code, PdfFont.COURIER, 6, w), m,
+                        TAG_H - m);
+            }
+        }
+        return doc.toByteArray();
+    }
+
     // ------------------------------------------------------- purchase order
 
     @Transactional(readOnly = true)

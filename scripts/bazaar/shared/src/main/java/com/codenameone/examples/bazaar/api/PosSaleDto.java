@@ -21,7 +21,10 @@ package com.codenameone.examples.bazaar.api;
 import com.codename1.annotations.Mapped;
 
 /// A sale a register made, possibly offline. `clientId` is made by the register and names the sale
-/// for good: sending it again is answered as a duplicate.
+/// for good: sending it again is answered as a duplicate. `staffUsername` is who signed in with
+/// their PIN and made the sale (the device's account when empty); `tipCents` is a tip taken
+/// with the card, on top of the total; `approvalId` is a manager's approval from
+/// `PosToolsApi.approve` when the sale needs one.
 @Mapped
 public record PosSaleDto(
         String clientId,
@@ -32,5 +35,8 @@ public record PosSaleDto(
         String note,
         long createdAt,
         java.util.List<PosLineDto> lines,
-        java.util.List<PosTenderDto> tenders) {
+        java.util.List<PosTenderDto> tenders,
+        String staffUsername,
+        long tipCents,
+        String approvalId) {
 }

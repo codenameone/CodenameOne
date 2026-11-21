@@ -21,10 +21,15 @@ package com.codenameone.examples.bazaar.api;
 import com.codename1.annotations.Mapped;
 
 /// A line of a counter sale. `unitCents` is the price the register sold at (0 for the catalog
-/// price).
+/// price). A custom sale item has no `variantId`: it is `title` at `unitCents`, taxed when
+/// `taxable`. `overridden` says the cashier changed the price or discounted the line by hand,
+/// which a store's policy may want a manager to approve.
 @Mapped
 public record PosLineDto(
         String variantId,
         int quantity,
-        long unitCents) {
+        long unitCents,
+        String title,
+        boolean taxable,
+        boolean overridden) {
 }
