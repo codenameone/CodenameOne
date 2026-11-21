@@ -448,6 +448,7 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new ChartCombinedXYScreenshotTest(),
             new ChartTransformScreenshotTest(),
             new ChartRotatedScreenshotTest(),
+            new MutableImageDisposeWhileDrawingTest(),
             new Chart2MixedScreenshotTest(),
             new Chart2DenseLabelsScreenshotTest(),
             new Chart2CandlesScreenshotTest(),
