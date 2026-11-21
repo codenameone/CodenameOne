@@ -66,7 +66,10 @@ const browser = await chromium.launch({
 });
 // A browser reports where it is; the storefront uses it only to estimate
 // shipping, so any location near the seeded stores does.
-const page = await browser.newPage({ viewport: { width: 420, height: 860 },
+// PHONE_HEIGHT and PHONE_SCALE size the phone screenshots; the Initializr
+// preview is taken at 909 and 562/420 to match its siblings' 562x1217.
+const page = await browser.newPage({ viewport: { width: 420, height: Number(process.env.PHONE_HEIGHT || 860) },
+  deviceScaleFactor: Number(process.env.PHONE_SCALE || 1),
   geolocation: { latitude: 37.8080, longitude: -122.4120 }, permissions: ['geolocation'] });
 page.on('console', message => {
   const text = message.text();
