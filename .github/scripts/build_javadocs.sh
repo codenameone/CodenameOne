@@ -31,27 +31,6 @@ mkdir -p "$CN1_DIR/dist/javadoc"
 
 cp -r "$CN1_DIR/src/"* "$CN1_DIR/build/tempJavaSources/"
 
-# The Rive runtime (com.codename1.rive) is published in the client API but
-# lives in maven/rive-runtime, outside the core, because only applications with
-# .riv files ship it. Its object model's Base and placeholder classes are
-# generated at build time, never committed, so they are rendered here first --
-# the generator replaces whatever its output directory holds -- and the
-# hand-written sources are copied over them after.
-if [ -n "$JDK_HOME" ] && [ -x "$JDK_HOME/bin/javac" ]; then
-  JAVA_BIN="$JDK_HOME/bin"
-else
-  JAVA_BIN="$(dirname "$(command -v javac)")"
-fi
-RIVE_GEN_CLASSES="$CN1_DIR/build/riveSchemaGen"
-rm -rf "$RIVE_GEN_CLASSES"
-mkdir -p "$RIVE_GEN_CLASSES"
-"$JAVA_BIN/javac" -nowarn -d "$RIVE_GEN_CLASSES" \
-  "$ROOT_DIR/maven/rive-schema-gen/src/main/java/com/codename1/rive/schema/RiveSchemaGenerator.java"
-"$JAVA_BIN/java" -cp "$RIVE_GEN_CLASSES" com.codename1.rive.schema.RiveSchemaGenerator runtime \
-  "$ROOT_DIR/maven/rive-schema-gen/src/main/schema/rive-runtime-generated.zip" \
-  "$ROOT_DIR/maven/rive-runtime/src/main/java" "$CN1_DIR/build/tempJavaSources"
-cp -r "$ROOT_DIR/maven/rive-runtime/src/main/java/"* "$CN1_DIR/build/tempJavaSources/"
-
 VALIDATE_SNIPPETS_SCRIPT="${SCRIPT_DIR}/validate-extracted-javadoc-snippets.sh"
 if [ -x "${VALIDATE_SNIPPETS_SCRIPT}" ]; then
   echo "Validating JavaDoc snippets prior to JavaDoc generation..." >&2

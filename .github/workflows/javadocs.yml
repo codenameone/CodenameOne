@@ -11,7 +11,6 @@ on:
       - 'vm/backend/shared-sources.sh'
       - 'vm/backend/package-docs/**'
       - 'maven/**/src/main/java/**/*.java'
-      - 'maven/rive-schema-gen/src/main/schema/**'
       - '.github/scripts/build_javadocs.sh'
       - 'scripts/check-package-info.sh'
       - '.github/workflows/javadocs.yml'
@@ -68,8 +67,6 @@ jobs:
           # need a description too. impl/ adds classes to com.codename1.backend
           # only, whose package-info lives in src/.
           scripts/check-package-info.sh vm/backend/src
-          # The Rive runtime is client API that lives outside the core.
-          scripts/check-package-info.sh maven/rive-runtime/src/main/java
 
       - name: Build JavaDocs
         run: ./.github/scripts/build_javadocs.sh

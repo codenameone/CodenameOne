@@ -22,9 +22,6 @@ on:
       - 'vm/ByteCodeTranslator/**'
       - 'vm/JavaAPI/**'
       - 'CodenameOne/src/**'
-      # The Rive runtime's API (com.codename1.rive) is published from here.
-      - 'maven/rive-runtime/src/**'
-      - 'maven/rive-schema-gen/src/main/schema/**'
       # The other root build_javadocs.sh generates from, and the other one
       # check-guide-links.py indexes. Without it, deleting a linked CLDC type
       # merges unvalidated and the next scheduled build is where it surfaces.
@@ -86,9 +83,6 @@ on:
       - 'vm/ByteCodeTranslator/**'
       - 'vm/JavaAPI/**'
       - 'CodenameOne/src/**'
-      # The Rive runtime's API (com.codename1.rive) is published from here.
-      - 'maven/rive-runtime/src/**'
-      - 'maven/rive-schema-gen/src/main/schema/**'
       # The other root build_javadocs.sh generates from, and the other one
       # check-guide-links.py indexes. Without it, deleting a linked CLDC type
       # merges unvalidated and the next scheduled build is where it surfaces.
