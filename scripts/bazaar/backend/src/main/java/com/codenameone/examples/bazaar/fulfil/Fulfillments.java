@@ -26,6 +26,8 @@ import com.codename1.backend.annotations.Transactional;
 import com.codename1.backend.push.PushNotification;
 import com.codename1.backend.push.PushTarget;
 import com.codenameone.examples.bazaar.notify.Emails;
+import com.codenameone.examples.bazaar.notify.ShopperLanguage;
+import com.codenameone.examples.bazaar.web.StoreText;
 import com.codenameone.examples.bazaar.Ids;
 import com.codenameone.examples.bazaar.api.BoardColumnDto;
 import com.codenameone.examples.bazaar.api.BoardMoveDto;
@@ -130,6 +132,11 @@ public class Fulfillments {
     private final PushSender push;
     private final PushDevices devices;
     private final Emails emails;
+
+    /// The language pushes to the shopper go out in. Field-injected, so the
+    /// constructor stays as it was.
+    @com.codename1.backend.annotations.Autowired
+    private ShopperLanguage language;
 
     /// Refuses to fulfil an order held for a fraud review.
     private final com.codenameone.examples.bazaar.risk.RiskHolds holds;
@@ -354,8 +361,8 @@ public class Fulfillments {
         } else if (!PACKED.equals(f.getStatus())) {
             throw new ResponseStatusException(409, "The pickup is " + f.getStatus());
         }
-        notifyShopper(f.getOrderId(), "Ready for pickup", "Your order is ready to collect at "
-                + locationName(f.getLocationId()) + ".");
+        notifyShopper(f.getOrderId(), "push.pickup.title", "push.pickup.body",
+                locationName(f.getLocationId()));
         return published(id);
     }
 
@@ -427,9 +434,8 @@ public class Fulfillments {
         }
         dispatch(f, SHIPPED, LOCAL.equals(method) ? "Out with the store's driver"
                 : "Handed to " + f.getCarrier(), username);
-        notifyShopper(f.getOrderId(), "Your order has shipped", LOCAL.equals(method)
-                ? "It is on its way with our driver."
-                : "Tracking number " + f.getTrackingNumber() + ".");
+        notifyShopper(f.getOrderId(), "push.shipped.title", LOCAL.equals(method)
+                ? "push.shipped.driver" : "push.shipped.tracking", f.getTrackingNumber());
         emails.shipped(id);
         return published(id);
     }
@@ -459,7 +465,7 @@ public class Fulfillments {
         } else {
             move(f, SHIPPED, DELIVERED, 0, "Delivered by the store", username);
         }
-        notifyShopper(f.getOrderId(), "Delivered", "Your order was delivered.");
+        notifyShopper(f.getOrderId(), "mail.delivered.title", "push.delivered.body");
         emails.delivered(id);
         return published(id);
     }
@@ -713,7 +719,7 @@ public class Fulfillments {
                     move(f, s, DELIVERED, 0, "Marked delivered by the store", username);
                 }
             }
-            notifyShopper(order.getId(), "Delivered", "Your order was delivered.");
+            notifyShopper(order.getId(), "mail.delivered.title", "push.delivered.body");
             orderService.publish(orders.findById(order.getId()));
         }
         return board(username, storeId);
@@ -862,9 +868,9 @@ public class Fulfillments {
     /// Tells the shopper a parcel moved to `to` and republishes the order.
     private void announce(Fulfillment f, String to) throws IOException {
         if (OUT_FOR_DELIVERY.equals(to)) {
-            notifyShopper(f.getOrderId(), "Out for delivery", "Your parcel arrives today.");
+            notifyShopper(f.getOrderId(), "push.outForDelivery.title", "push.outForDelivery.body");
         } else if (DELIVERED.equals(to)) {
-            notifyShopper(f.getOrderId(), "Delivered", "Your parcel was delivered.");
+            notifyShopper(f.getOrderId(), "mail.delivered.title", "push.parcelDelivered.body");
             emails.delivered(f.getId());
         }
         orderService.publish(orderRead(f.getStoreId(), f.getOrderId()));
@@ -1031,7 +1037,10 @@ public class Fulfillments {
 
     // ------------------------------------------------------------- pushing
 
-    private void notifyShopper(String orderId, String title, String body) {
+    /// Pushes `titleKey` and `bodyKey` ([StoreText] keys, `args` filled into
+    /// the body) to the shopper's devices, in the order's language.
+    private void notifyShopper(String orderId, String titleKey, String bodyKey,
+            Object... args) {
         try {
             StoreOrder o = orderRead(null, orderId);
             if (o == null || o.getUsername().length() == 0) {
@@ -1041,9 +1050,11 @@ public class Fulfillments {
             if (to.isEmpty()) {
                 return;
             }
+            Map<String, String> t = StoreText.table(language.of(o));
             push.send(to, PushNotification.builder()
-                    .title(title)
-                    .body("Order #" + o.getNumber() + ": " + body)
+                    .title(StoreText.format(t, titleKey))
+                    .body(StoreText.format(t, "push.order", o.getNumber(),
+                            StoreText.format(t, bodyKey, args)))
                     .collapseKey("order-" + orderId)
                     .data("orderId", orderId)
                     .data("kind", "shipment")

@@ -150,6 +150,13 @@ public final class Account {
                 } else {
                     apply(preferences);
                     preferencesLoaded = preferences != null;
+                    if (preferencesLoaded && (preferences.language() == null
+                            || preferences.language().length() == 0)) {
+                        // The account has no language yet: the device's is
+                        // sent, so the store's mail speaks it.
+                        preferencesChanged = true;
+                        schedule(SETTLE_MILLIS);
+                    }
                 }
             }
             thenProfile.run();

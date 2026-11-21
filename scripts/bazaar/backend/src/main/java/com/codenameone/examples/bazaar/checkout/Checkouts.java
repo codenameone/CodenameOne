@@ -22,6 +22,7 @@ import com.codename1.backend.ResponseStatusException;
 import com.codename1.backend.annotations.Component;
 import com.codename1.backend.annotations.Transactional;
 import com.codenameone.examples.bazaar.Ids;
+import com.codenameone.examples.bazaar.notify.ShopperLanguage;
 import com.codenameone.examples.bazaar.api.AddressDto;
 import com.codenameone.examples.bazaar.api.OrderDto;
 import com.codenameone.examples.bazaar.api.PlaceOrderDto;
@@ -195,6 +196,10 @@ public class Checkouts {
         final StoreOrder order = orders.newOrder(quote, Orders.ONLINE, username,
                 empty(req.email()) ? username : req.email(), address, clientId);
         order.setNote(Codes.cut(req.note(), 1000));
+        // The language its mail goes out in: the storefront's, or what the
+        // app or API client asked for (Accept-Language), else the cart's.
+        String language = ShopperLanguage.fromRequest();
+        order.setLanguage(language.length() > 0 ? language : cart.getLanguage());
         String orderId = order.getId();
 
         // Reserve, all or nothing.
@@ -421,6 +426,9 @@ public class Checkouts {
             customer.setFirstName(Codes.cut(space > 0 ? name.substring(0, space) : name, 80));
             customer.setLastName(Codes.cut(space > 0 ? name.substring(space + 1) : "", 80));
             customer.setCreatedAt(Instant.now());
+        }
+        if (order.getLanguage().length() > 0) {
+            customer.setLanguage(order.getLanguage());
         }
         customer.setOrdersCount(customer.getOrdersCount() + 1);
         customer.setSpentCents(customer.getSpentCents() + order.getTotalCents());

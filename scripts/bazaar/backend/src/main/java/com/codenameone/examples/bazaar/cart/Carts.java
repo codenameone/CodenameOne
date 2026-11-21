@@ -22,6 +22,7 @@ import com.codename1.backend.ResponseStatusException;
 import com.codename1.backend.annotations.Component;
 import com.codename1.backend.annotations.Transactional;
 import com.codenameone.examples.bazaar.Ids;
+import com.codenameone.examples.bazaar.notify.ShopperLanguage;
 import com.codenameone.examples.bazaar.api.CartDto;
 import com.codenameone.examples.bazaar.api.CartLineChangeDto;
 import com.codenameone.examples.bazaar.api.EstimateDto;
@@ -286,6 +287,7 @@ public class Carts {
             // Every cart gets a token, a signed-in one too: the column is
             // unique, and an empty one would be shared.
             cart.setToken(Ids.next());
+            cart.setLanguage(ShopperLanguage.fromRequest());
             cart.setCreatedAt(Instant.now());
             cart.setUpdatedAt(Instant.now());
             carts.insert(cart);
@@ -330,6 +332,11 @@ public class Carts {
 
     private void touch(Cart cart) {
         cart.setUpdatedAt(Instant.now());
+        // The language the shopper is filling it in, for its reminder.
+        String language = ShopperLanguage.fromRequest();
+        if (language.length() > 0) {
+            cart.setLanguage(language);
+        }
         carts.save(cart);
     }
 }

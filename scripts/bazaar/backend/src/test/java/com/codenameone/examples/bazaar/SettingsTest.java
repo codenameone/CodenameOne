@@ -48,7 +48,9 @@ class SettingsTest {
         String who = People.customer(accounts, "prefers");
         mvc.perform(People.asCustomer(get("/api/account/preferences"), who))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.language").value("en"))
+                // Signed up with no language known: none, so the app keeps
+                // (and sends) the device's.
+                .andExpect(jsonPath("$.language").value(""))
                 .andExpect(jsonPath("$.theme").value("system"))
                 .andExpect(jsonPath("$.units").value("km"))
                 .andExpect(jsonPath("$.notifyOrderUpdates").value(true))

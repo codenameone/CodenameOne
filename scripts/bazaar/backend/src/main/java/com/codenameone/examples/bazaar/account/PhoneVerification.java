@@ -29,6 +29,7 @@ import com.codenameone.examples.bazaar.api.UserDto;
 import com.codenameone.examples.bazaar.domain.PhoneCode;
 import com.codenameone.examples.bazaar.repository.PhoneCodeRepository;
 import com.codenameone.examples.bazaar.sms.SmsSender;
+import com.codenameone.examples.bazaar.web.StoreText;
 
 import java.io.IOException;
 import java.time.Instant;
@@ -75,7 +76,9 @@ public class PhoneVerification {
         String codeHash = hash(username, code);
         store(username, codeHash, System.currentTimeMillis());
         try {
-            sms.send(user.phone(), "Your Bazaar code is " + code);
+            // In the account's language (English when it has none).
+            sms.send(user.phone(), StoreText.format(StoreText.table(user.language()),
+                    "sms.phoneCode", code));
         } catch (IOException failed) {
             System.err.println("could not send a verification code: " + failed.getMessage());
             discard(username, codeHash);

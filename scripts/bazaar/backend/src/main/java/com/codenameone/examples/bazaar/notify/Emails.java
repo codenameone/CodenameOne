@@ -48,10 +48,12 @@ import com.codenameone.examples.bazaar.repository.StoreOrderRepository;
 import com.codenameone.examples.bazaar.repository.StoreRepository;
 import com.codenameone.examples.bazaar.repository.StoreStaffRepository;
 import com.codenameone.examples.bazaar.web.SiteUrls;
+import com.codenameone.examples.bazaar.web.StoreText;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 /// The mail a store sends: branded HTML with a plain-text twin, in the store's
 /// accent colour and with its logo, and the PDF the occasion calls for.
@@ -87,6 +89,11 @@ public class Emails {
     /// constructor dependency would be a cycle.
     @Autowired
     private Documents documents;
+
+    /// The language each mail is written in. Field-injected like the
+    /// documents, so the constructor stays as it was.
+    @Autowired
+    private ShopperLanguage language;
 
     public Emails(MailSender mail, StoreRepository stores, StoreOrderRepository orders,
             OrderLineRepository lines, CustomerRepository customers, RefundRepository refunds,
@@ -126,13 +133,13 @@ public class Emails {
         }
         Store s = stores.findById(o.getStoreId());
         List<OrderLine> ls = lines.findByOrderId(orderId);
-        Body b = new Body(s, "Thanks for your order");
-        b.para("We have your order #" + o.getNumber() + " and are getting it ready.");
+        Body b = new Body(s, language.of(o), "mail.order.title");
+        b.para(b.f("mail.order.body", o.getNumber()));
         b.lines(ls, o.getCurrency());
-        b.total("Total", o.getTotalCents(), o.getCurrency());
-        b.para("Your invoice is attached.");
-        b.button("Track your order", track(o));
-        return builder(s, o.getEmail(), "Order #" + o.getNumber() + " confirmed", b)
+        b.total(b.f("total"), o.getTotalCents(), o.getCurrency());
+        b.para(b.f("mail.invoice"));
+        b.button(b.f("mail.track"), track(o));
+        return builder(s, o.getEmail(), b.f("mail.order.subject", o.getNumber()), b)
                 .attach("invoice-" + o.getNumber() + ".pdf", "application/pdf",
                         documents.invoice(o.getStoreId(), orderId))
                 .build();
@@ -155,15 +162,15 @@ public class Emails {
             return null;
         }
         Store s = stores.findById(o.getStoreId());
-        Body b = new Body(s, "Your order is on its way");
+        Body b = new Body(s, language.of(o), "mail.shipped.title");
         if (f.getTrackingNumber().length() > 0) {
-            b.para("Order #" + o.getNumber() + " left with " + f.getCarrier()
-                    + ". Tracking number " + f.getTrackingNumber() + ".");
+            b.para(b.f("mail.shipped.carrier", o.getNumber(), f.getCarrier(),
+                    f.getTrackingNumber()));
         } else {
-            b.para("Order #" + o.getNumber() + " is out with our own driver.");
+            b.para(b.f("mail.shipped.driver", o.getNumber()));
         }
-        b.button("Track your parcel", track(o));
-        return builder(s, o.getEmail(), "Order #" + o.getNumber() + " has shipped", b).build();
+        b.button(b.f("mail.shipped.button"), track(o));
+        return builder(s, o.getEmail(), b.f("mail.shipped.subject", o.getNumber()), b).build();
     }
 
     /// A parcel arrived: the delivery notice and, beside it, a request to
@@ -188,22 +195,23 @@ public class Emails {
             return null;
         }
         Store s = stores.findById(o.getStoreId());
-        Body d = new Body(s, "Delivered");
-        d.para("Order #" + o.getNumber() + " was delivered. We hope you love it.");
-        d.button("See your order", track(o));
-        Mail delivered = builder(s, o.getEmail(), "Order #" + o.getNumber() + " was delivered", d)
+        String lang = language.of(o);
+        Body d = new Body(s, lang, "mail.delivered.title");
+        d.para(d.f("mail.delivered.body", o.getNumber()));
+        d.button(d.f("mail.seeOrder"), track(o));
+        Mail delivered = builder(s, o.getEmail(), d.f("mail.delivered.subject", o.getNumber()), d)
                 .build();
-        Body r = new Body(s, "How did we do?");
-        r.para("A few words about what you bought help other shoppers choose.");
+        Body r = new Body(s, lang, "mail.review.title");
+        r.para(r.f("mail.review.body"));
         List<OrderLine> ls = lines.findByOrderId(o.getId());
         for (int iter = 0; iter < ls.size(); iter++) {
             Product p = products.findById(ls.get(iter).getProductId());
             if (p != null) {
-                r.link("Review " + p.getTitle(), urls.absolute(null, "/s/" + enc(s.getHandle())
-                        + "/products/" + enc(p.getHandle()) + "#reviews"));
+                r.link(r.f("mail.review.link", p.getTitle()), urls.absolute(null, "/s/"
+                        + enc(s.getHandle()) + "/products/" + enc(p.getHandle()) + "#reviews"));
             }
         }
-        Mail review = builder(s, o.getEmail(), "Tell us about order #" + o.getNumber(), r)
+        Mail review = builder(s, o.getEmail(), r.f("mail.review.subject", o.getNumber()), r)
                 .build();
         return new Mail[] {delivered, review};
     }
@@ -235,11 +243,10 @@ public class Emails {
             return null;
         }
         Store s = stores.findById(o.getStoreId());
-        Body b = new Body(s, "Your refund is on its way");
-        b.total("Refunded", latest.getAmountCents(), o.getCurrency());
-        b.para("It goes back to the way you paid for order #" + o.getNumber()
-                + ". The credit note is attached.");
-        return builder(s, o.getEmail(), "Refund for order #" + o.getNumber(), b)
+        Body b = new Body(s, language.of(o), "mail.refund.title");
+        b.total(b.f("mail.refunded"), latest.getAmountCents(), o.getCurrency());
+        b.para(b.f("mail.refund.body", o.getNumber()));
+        return builder(s, o.getEmail(), b.f("mail.refund.subject", o.getNumber()), b)
                 .attach("credit-note-" + latest.getId() + ".pdf", "application/pdf",
                         documents.creditNote(o.getStoreId(), latest.getId()))
                 .build();
@@ -262,13 +269,11 @@ public class Emails {
             return null;
         }
         Store s = stores.findById(o.getStoreId());
-        Body b = new Body(s, "Your return is approved");
-        b.para("Send the items from order #" + o.getNumber() + " back to "
-                + (s.getAddress().length() > 0 ? s.getAddress() : s.getName())
-                + ". We refund you as soon as they arrive.");
-        b.button("See your order", track(o));
-        return builder(s, o.getEmail(), "Return approved for order #" + o.getNumber(), b)
-                .build();
+        Body b = new Body(s, language.of(o), "mail.return.title");
+        b.para(b.f("mail.return.body", o.getNumber(),
+                s.getAddress().length() > 0 ? s.getAddress() : s.getName()));
+        b.button(b.f("mail.seeOrder"), track(o));
+        return builder(s, o.getEmail(), b.f("mail.return.subject", o.getNumber()), b).build();
     }
 
     /// A receipt from the register, with the receipt PDF.
@@ -287,17 +292,18 @@ public class Emails {
             return null;
         }
         Store s = stores.findById(storeId);
-        Body b = new Body(s, "Your receipt");
+        Body b = new Body(s, language.of(o), "mail.receipt.title");
         b.lines(lines.findByOrderId(orderId), o.getCurrency());
-        b.total("Total", o.getTotalCents(), o.getCurrency());
-        b.para("Thanks for shopping with us. The receipt is attached.");
-        return builder(s, to.trim(), "Your receipt from " + s.getName(), b)
+        b.total(b.f("total"), o.getTotalCents(), o.getCurrency());
+        b.para(b.f("mail.receipt.body"));
+        return builder(s, to.trim(), b.f("mail.receipt.subject", s.getName()), b)
                 .attach("receipt-" + o.getNumber() + ".pdf", "application/pdf",
                         documents.receipt(storeId, orderId))
                 .build();
     }
 
-    /// A cart sat untouched: a reminder that opens it again.
+    /// A cart sat untouched: a reminder that opens it again, in the language
+    /// the cart was filled in.
     public void abandonedCart(Cart cart, String to) {
         try {
             send(cartMail(cart, to));
@@ -312,13 +318,12 @@ public class Emails {
             return null;
         }
         Store s = stores.findById(cart.getStoreId());
-        Body b = new Body(s, "You left something behind");
-        b.para("Your cart at " + s.getName() + " is saved. Pick up where you left off.");
-        b.button("Back to your cart", urls.absolute(null,
+        Body b = new Body(s, language.of(cart), "mail.cart.title");
+        b.para(b.f("mail.cart.body", s.getName()));
+        b.button(b.f("mail.cart.button"), urls.absolute(null,
                 SiteUrls.recoverCart(s.getHandle(), cart.getToken())));
-        b.para("Shopping in the app? Open your cart there: "
-                + urls.appCart(null, s.getHandle(), cart.getToken()));
-        return builder(s, to, "Your cart at " + s.getName() + " is waiting", b).build();
+        b.para(b.f("mail.cart.app", urls.appCart(null, s.getHandle(), cart.getToken())));
+        return builder(s, to, b.f("mail.cart.subject", s.getName()), b).build();
     }
 
     /// A gift card was issued to a customer: the code and a QR code to show
@@ -341,19 +346,20 @@ public class Emails {
             return null;
         }
         Store s = stores.findById(storeId);
-        Body b = new Body(s, "A gift card for you");
-        b.total("Worth", cents, currency);
-        b.para("Use the code at checkout, or show the QR code at the till.");
+        Body b = new Body(s, language.shopper(storeId, c.getUsername(), c.getEmail()),
+                "mail.gift.title");
+        b.total(b.f("mail.gift.worth"), cents, currency);
+        b.para(b.f("mail.gift.body"));
         b.code(group(code));
         b.html.append("<p style=\"text-align:center\"><img src=\"cid:giftcard-qr\" width=\"180\" "
                 + "height=\"180\" alt=\"QR code\"></p>");
-        return builder(s, c.getEmail(), "Your " + s.getName() + " gift card", b)
+        return builder(s, c.getEmail(), b.f("mail.gift.subject", s.getName()), b)
                 .inline("giftcard-qr", "image/png", qrPng(code))
                 .build();
     }
 
     /// A variant fell to its reorder point: told to the store's owners and
-    /// managers, and to the store's own address.
+    /// managers, and to the store's own address. Staff mail, so English.
     public void lowStock(String storeId, String sku, int available, int reorderPoint) {
         try {
             send(lowStockMail(storeId, sku, available, reorderPoint));
@@ -384,14 +390,17 @@ public class Emails {
         if (to.isEmpty()) {
             return null;
         }
-        Body b = new Body(s, "Running low: " + sku);
+        Body b = new Body(s, "en", null);
+        b.heading("Running low: " + sku);
         b.para(sku + " is down to " + available + " (reorder point " + reorderPoint + ").");
         b.button("Open inventory", urls.absolute(null, "/app/"));
         return builder(s, to.toArray(new String[to.size()]), "Low stock: " + sku, b).build();
     }
 
     /// The automation action `email.customer`: the merchant's own subject and
-    /// message, in the store's frame.
+    /// message, in the store's frame. The merchant wrote the message in one
+    /// language and it goes out as written; only the frame around it (the
+    /// default subject, the button) follows the shopper's language.
     public void custom(String storeId, String to, String subject, String message)
             throws IOException {
         Mail m = customMail(storeId, to, subject, message);
@@ -408,11 +417,12 @@ public class Emails {
             return null;
         }
         Store s = stores.findById(storeId);
-        String title = subject == null || subject.trim().length() == 0 ? "A note from "
-                + s.getName() : subject.trim();
-        Body b = new Body(s, title);
+        Body b = new Body(s, language.shopper(storeId, null, to), null);
+        String title = subject == null || subject.trim().length() == 0
+                ? b.f("mail.note", s.getName()) : subject.trim();
+        b.heading(title);
         b.para(message == null ? "" : message);
-        b.button("Visit the store", urls.absolute(null, "/s/" + enc(s.getHandle())));
+        b.button(b.f("mail.visit"), urls.absolute(null, "/s/" + enc(s.getHandle())));
         return builder(s, to, title, b).build();
     }
 
@@ -436,17 +446,23 @@ public class Emails {
             return null;
         }
         Store s = stores.findById(storeId);
-        String subject = title + " is back in stock";
-        Body b = new Body(s, subject);
-        b.para("You asked us to tell you when " + title + " was back. It is, while it lasts.");
-        b.button("Shop now", urls.absolute(null, path));
-        b.para("This is the only message you will get about it.");
+        Body b = new Body(s, language.shopper(storeId, null, to), null);
+        String subject = b.f("mail.stock.subject", title);
+        b.heading(subject);
+        b.para(b.f("mail.stock.body", title));
+        b.button(b.f("mail.stock.button"), urls.absolute(null, path));
+        b.para(b.f("mail.stock.once"));
         return builder(s, to, subject, b).build();
     }
 
     /// One campaign message: the merchant's text, the campaign's tracked
     /// links, an open pixel and the unsubscribe link (also as a
     /// `List-Unsubscribe` header). `links` holds label and URL pairs.
+    ///
+    /// A campaign has one subject and body (two subjects when it is split
+    /// tested), written by the merchant in one language, so the text goes out
+    /// as written; the frame (the unsubscribe link, the page direction)
+    /// follows the subscriber's language.
     public boolean campaign(String storeId, String to, String subject, String message,
             List<String[]> links, String pixelUrl, String unsubscribeUrl) throws IOException {
         Mail m = campaignMail(storeId, to, subject, message, links, pixelUrl, unsubscribeUrl);
@@ -464,7 +480,8 @@ public class Emails {
             return null;
         }
         Store s = stores.findById(storeId);
-        Body b = new Body(s, subject);
+        Body b = new Body(s, language.shopper(storeId, null, to), null);
+        b.heading(subject);
         b.para(message == null ? "" : message);
         for (int iter = 0; iter < links.size(); iter++) {
             if (iter == 0) {
@@ -473,13 +490,14 @@ public class Emails {
                 b.link(links.get(iter)[0], links.get(iter)[1]);
             }
         }
-        b.link("Unsubscribe", unsubscribeUrl);
+        b.link(b.f("mail.unsubscribe"), unsubscribeUrl);
         b.pixel(pixelUrl);
         return builder(s, to, subject, b).header("List-Unsubscribe", "<" + unsubscribeUrl + ">")
                 .build();
     }
 
-    /// Asks a new subscriber to confirm the address they signed up with.
+    /// Asks a new subscriber to confirm the address they signed up with, in
+    /// the language of the page they signed up on.
     public boolean confirmSignup(String storeId, String to, String confirmUrl) throws IOException {
         Mail m = confirmMail(storeId, to, confirmUrl);
         if (m == null) {
@@ -495,12 +513,12 @@ public class Emails {
             return null;
         }
         Store s = stores.findById(storeId);
-        String subject = "Confirm your subscription to " + s.getName();
-        Body b = new Body(s, subject);
-        b.para("Someone, hopefully you, signed this address up for news from " + s.getName()
-                + ". Confirm it and we will start writing.");
-        b.button("Confirm", confirmUrl);
-        b.para("If it was not you, ignore this message and nothing more will come.");
+        Body b = new Body(s, here(storeId, to), null);
+        String subject = b.f("mail.confirm.subject", s.getName());
+        b.heading(subject);
+        b.para(b.f("mail.confirm.body", s.getName()));
+        b.button(b.f("mail.confirm.button"), confirmUrl);
+        b.para(b.f("mail.confirm.ignore"));
         return builder(s, to, subject, b).build();
     }
 
@@ -520,12 +538,20 @@ public class Emails {
             return null;
         }
         Store s = stores.findById(storeId);
-        String subject = "Your welcome code for " + s.getName();
-        Body b = new Body(s, subject);
-        b.para("Thanks for subscribing. Use this code at checkout:");
+        Body b = new Body(s, here(storeId, to), null);
+        String subject = b.f("mail.reward.subject", s.getName());
+        b.heading(subject);
+        b.para(b.f("mail.reward.body"));
         b.code(code);
-        b.button("Visit the store", urls.absolute(null, "/s/" + enc(s.getHandle())));
+        b.button(b.f("mail.visit"), urls.absolute(null, "/s/" + enc(s.getHandle())));
         return builder(s, to, subject, b).build();
+    }
+
+    /// The language of the request being served when it says one (a signup
+    /// form posted from a storefront page), else the shopper's.
+    private String here(String storeId, String to) {
+        String now = ShopperLanguage.fromRequest();
+        return now.length() > 0 ? now : language.shopper(storeId, null, to);
     }
 
     // -------------------------------------------------------------- inside
@@ -652,11 +678,28 @@ public class Emails {
         final StringBuilder text = new StringBuilder();
         private final Store store;
         private final String accent;
+        private final String lang;
+        private final Map<String, String> t;
 
-        Body(Store store, String heading) {
+        /// A body in `lang` ([StoreText#LANGUAGES]), headed by the text of
+        /// `headingKey`, or with no heading yet when it is null.
+        Body(Store store, String lang, String headingKey) {
             this.store = store;
+            this.lang = StoreText.supported(lang) ? lang : "en";
+            this.t = StoreText.table(this.lang);
             this.accent = hex(store == null || store.getAccentColor() == 0 ? DEFAULT_ACCENT
                     : store.getAccentColor());
+            if (headingKey != null) {
+                heading(f(headingKey));
+            }
+        }
+
+        /// The text of `key` in this mail's language, with `args` filled in.
+        String f(String key, Object... args) {
+            return StoreText.format(t, key, args);
+        }
+
+        void heading(String heading) {
             html.append("<h1 style=\"font-size:22px;margin:0 0 16px;color:#0f172a\">")
                     .append(esc(heading)).append("</h1>");
             text.append(heading).append("\n\n");
@@ -726,7 +769,12 @@ public class Emails {
         String html() {
             String name = store == null ? "Bazaar" : store.getName();
             StringBuilder page = new StringBuilder();
-            page.append("<!doctype html><html><body style=\"margin:0;background:#f1f5f9;"
+            // Hebrew reads right to left: the whole page turns, the table
+            // cells and the text alignment with it.
+            String dir = StoreText.rtl(lang) ? "rtl" : "ltr";
+            page.append("<!doctype html><html lang=\"").append(lang).append("\" dir=\"")
+                    .append(dir).append("\"><body dir=\"").append(dir)
+                    .append("\" style=\"margin:0;background:#f1f5f9;"
                     + "font-family:Helvetica,Arial,sans-serif;color:#334155\">")
                     .append("<table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\"><tr>"
                             + "<td align=\"center\" style=\"padding:24px 12px\">")

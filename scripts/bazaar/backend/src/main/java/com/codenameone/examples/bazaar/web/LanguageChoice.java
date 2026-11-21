@@ -22,6 +22,8 @@ import com.codename1.backend.HttpServer;
 import com.codename1.backend.annotations.Controller;
 import com.codename1.backend.annotations.PostMapping;
 import com.codename1.backend.annotations.Value;
+import com.codenameone.examples.bazaar.domain.Profile;
+import com.codenameone.examples.bazaar.repository.ProfileRepository;
 
 /// The shopper's language picker: a form on every storefront and account
 /// page posts `lang` (a code, or `auto` to forget the choice) and `back`, the
@@ -38,9 +40,12 @@ public class LanguageChoice {
     static final int MAX_AGE = 365 * 24 * 3600;
 
     private final boolean secureCookies;
+    private final ProfileRepository profiles;
 
-    public LanguageChoice(@Value("${bazaar.web.hsts:true}") boolean secureCookies) {
+    public LanguageChoice(@Value("${bazaar.web.hsts:true}") boolean secureCookies,
+            ProfileRepository profiles) {
         this.secureCookies = secureCookies;
+        this.profiles = profiles;
     }
 
     @PostMapping("/lang")
@@ -50,11 +55,31 @@ public class LanguageChoice {
         String cookie = StoreText.supported(lang)
                 ? StoreText.COOKIE + "=" + lang + "; Path=/; Max-Age=" + MAX_AGE
                 : StoreText.COOKIE + "=; Path=/; Max-Age=0";
+        remember(lang);
         return HttpServer.Response.text(303, "")
                 .header("Location", StoreText.back(param(request, "back")))
                 .header("Set-Cookie", cookie + "; SameSite=Lax; HttpOnly"
                         + (secureCookies ? "; Secure" : ""))
                 .header("Cache-Control", "no-store");
+    }
+
+    /// A signed-in shopper's choice is the account's language too, which the
+    /// store's mail to them follows ([com.codenameone.examples.bazaar.notify.ShopperLanguage]).
+    private void remember(String lang) {
+        String me = CheckoutPages.signedIn();
+        if (me == null || !StoreText.supported(lang)) {
+            return;
+        }
+        try {
+            Profile p = profiles.findById(me);
+            if (p != null && !lang.equals(p.getLanguage())) {
+                p.setLanguage(lang);
+                profiles.save(p);
+            }
+        } catch (RuntimeException failed) {
+            // The cookie is the choice; the account's copy is a convenience.
+            System.err.println("[lang] the account's language was not saved: " + failed);
+        }
     }
 
     private static String param(HttpServer.Request request, String name) {

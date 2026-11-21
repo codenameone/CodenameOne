@@ -84,6 +84,16 @@ public final class StorefrontMarkets {
 
     static final String CHOICE = "bazaar.market.choice";
 
+    /// The interface language this request's storefront page resolved
+    /// ([#choose]), or null when no storefront page chose one. The checkout
+    /// records it on the order, so its mail speaks the language the shopper
+    /// read the store in.
+    public static String chosenUi() {
+        SecurityExchange ex = SecurityExchange.current();
+        Object made = ex == null ? null : ex.getAttribute(CHOICE);
+        return made instanceof Choice ? ((Choice) made).ui : null;
+    }
+
     /// What a product page needs: the pricer (or null), the locale (or null).
     public static final class Choice {
         String storeId;

@@ -37,6 +37,7 @@ import com.codenameone.examples.bazaar.api.RegisterDto;
 import com.codenameone.examples.bazaar.api.UserDto;
 import com.codenameone.examples.bazaar.domain.ClosedAccount;
 import com.codenameone.examples.bazaar.domain.Profile;
+import com.codenameone.examples.bazaar.notify.ShopperLanguage;
 import com.codenameone.examples.bazaar.domain.StoreStaff;
 import com.codenameone.examples.bazaar.live.LiveHub;
 import com.codenameone.examples.bazaar.pay.Payments;
@@ -170,6 +171,11 @@ public class Accounts {
         profile.setPhone(phone);
         profile.setPhoneVerified(phoneVerified);
         profile.setCreatedAt(Instant.ofEpochMilli(openedAt));
+        // The language the shopper signed up in (the storefront's choice, or
+        // the app's Accept-Language), or empty: the app then keeps the
+        // device's and sends it with the settings, and mail falls back to the
+        // store's language.
+        profile.setLanguage(ShopperLanguage.fromRequest());
         profiles.insert(profile);
     }
 

@@ -195,4 +195,16 @@ public class Customer {
     public void setUpdatedAt(Instant updatedAt) {
         this.updatedAt = updatedAt;
     }
+
+    /// The language mail to this customer goes out in (a `StoreText` code), or empty when not known.
+    @Column(nullable = false, type = "VARCHAR(8)")
+    private String language = "";
+
+    public String getLanguage() {
+        return language;
+    }
+
+    public void setLanguage(String language) {
+        this.language = language == null ? "" : language;
+    }
 }

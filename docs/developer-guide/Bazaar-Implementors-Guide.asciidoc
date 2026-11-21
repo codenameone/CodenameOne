@@ -643,10 +643,25 @@ business contracts for. Plan for these before taking real orders:
   browser's `Accept-Language`, then English. A page drawn from the cookie is
   the shopper's private copy, every shared page says `Vary: Cookie`, and each
   language also has an address of its own (`?lang=fr`) that crawlers find as
-  an `hreflang` alternate. The back office and platform admin stay English.
-  So do the e-mails to shoppers, because an order does not record the
-  language it was placed in, and messages that come from the services
-  (validation errors, refusals) arrive in English.
+  an `hreflang` alternate. The back office and platform admin stay English,
+  and messages that come from the services (validation errors, refusals)
+  arrive in English. Shopper mail, SMS and push follow the shopper
+  (`notify.ShopperLanguage`): the order and the cart record the language they
+  were placed or filled in (the storefront's resolved language, or an API
+  client's `Accept-Language`), the store's customer record keeps the
+  language of the last order, and the account keeps the language it signed up
+  in, the one picked on the storefront while signed in, or the one the app
+  sends with its settings (the device's, when the shopper never picked one).
+  A message uses the order's language, then the customer's, then the
+  account's, then the language of the store's first market, then English;
+  Hebrew mail is drawn right to left. That covers the order confirmation,
+  shipping and delivery notices, review requests, returns and refunds,
+  receipts, cart reminders, gift cards, back-in-stock alerts, signup
+  confirmations and codes, phone verification codes and shipment pushes.
+  Text a merchant writes (campaign, journey and automation messages) has one
+  version and goes out as written; only its frame (the unsubscribe link, the
+  default subject, the page direction) follows the shopper. Staff mail stays
+  English.
 * *Fraud scoring.* The fraud rules are a fixed point table. A store with real
   volume would add the payment provider's risk signals or a fraud service.
 * *Form signing keys.* The bot guard's and the theme preview's signing keys are
