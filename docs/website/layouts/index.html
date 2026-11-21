@@ -46,9 +46,9 @@ app.show();</code></pre>
 
   <section class="cn1-v2-section cn1-home-templates" id="full-stack-templates">
     <div class="cn1-v2-section__intro">
-      <p class="cn1-eyebrow">Complete full-stack templates</p>
+      <p class="cn1-eyebrow">Complete full-stack apps and templates</p>
       <h2>Start with an application. Make it yours.</h2>
-      <p>Generate the Java client, backend, database and administration screens in one project. Run it, change the branding and build on the features already connected. Template source is free under MIT-0.</p>
+      <p>Generate an app template with its Java client, backend, database and administration screens, or explore Brickyard's complete game platform and creator studio. Build on working features; source is free under MIT-0.</p>
       <div class="cn1-action-row">
         {{ partial "cn1-cta.html" (dict "label" "Generate your application" "href" "/initializr/" "event" "home-template-start") }}
         {{ partial "cn1-cta.html" (dict "label" "Explore all templates" "href" "/demos/" "event" "home-fullstack-samples" "variant" "secondary") }}
@@ -176,29 +176,17 @@ app.show();</code></pre>
           <a href="/developer-guide/reel-users-guide/" data-cn1-conversion="home-reel">Explore Reel →</a>
         </div>
       </article>
-    </div>
-  </section>
-
-  <section class="cn1-v2-section" id="brickyard">
-    <div class="cn1-v2-section__intro">
-      <p class="cn1-eyebrow">Game platform sample</p>
-      <h2>Build a game platform in Java</h2>
-      <div class="cn1-home-stories">
-        <article class="cn1-home-story">
-          <div>
-            <h3>Brickyard: games, studio and server</h3>
-            <p>A reskinnable game-platform sample with a pure-Java Luau runtime, GPU game engine, authoritative multiplayer backend, and creator studio for phone, tablet and desktop.</p>
-            <p>Read and write Roblox place files with a compatibility report. The MIT-0 source includes game templates, an economy, social features and creator tools; running the platform requires your own hosting and configured services.</p>
-            <a href="/brickyard/" data-cn1-conversion="home-brickyard">Explore Brickyard →</a>
-          </div>
-          <figure class="cn1-home-visual">
-            <a href="/brickyard/" data-cn1-conversion="home-brickyard" aria-label="Explore the Brickyard game platform sample">
-              <img src="/developer-guide/img/brickyard-desktop-studio.png" alt="Brickyard creator studio editing a game world on desktop" loading="lazy">
-            </a>
-            <figcaption>One complete game-platform sample, with its source, server and creator studio.</figcaption>
-          </figure>
-        </article>
-      </div>
+      <article class="cn1-home-template">
+        <a class="cn1-home-template__screen" href="/brickyard/" data-cn1-conversion="home-brickyard" aria-label="Explore Brickyard, the Java game platform sample">
+          <img src="/developer-guide/img/brickyard-desktop-studio.png" alt="Brickyard creator studio editing a game world on desktop" loading="lazy">
+        </a>
+        <div class="cn1-home-template__body">
+          <p class="cn1-eyebrow">Game platform</p>
+          <h3>Brickyard</h3>
+          <p>A reskinnable game platform with a pure-Java Luau runtime, GPU engine, multiplayer backend and creator studio. Roblox place-file compatibility is reported per file.</p>
+          <a href="/brickyard/" data-cn1-conversion="home-brickyard">Explore Brickyard →</a>
+        </div>
+      </article>
     </div>
   </section>
 

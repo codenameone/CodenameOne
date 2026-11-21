@@ -14,9 +14,9 @@
 
 The UI ships with your app, so you control its components and theme. Native interfaces and peer components give you access to platform SDKs and views. The framework is GPLv2 with the Classpath Exception: free for commercial applications, with no royalties.
 
-## Start with a complete full-stack application
+## Start with a complete application
 
-Generate a complete application from Initializr, then make it your own. These templates include the Java client, backend, database and administration screens, with guides for running and customizing them. The template source is free under MIT-0.
+Choose an Initializr full-stack template or explore Brickyard, a complete game-platform sample. The templates include a Java client, backend, database and administration screens, with guides for running and customizing them. Brickyard has its own game engine, multiplayer server and creator studio. All source is free under MIT-0.
 
 | [Savor — Food delivery](https://www.codenameone.com/savor/?utm_source=github&utm_medium=oss&utm_campaign=repo-readme&utm_content=savor) | [Parley — Private messaging](https://www.codenameone.com/parley/?utm_source=github&utm_medium=oss&utm_campaign=repo-readme&utm_content=parley) |
 | --- | --- |
@@ -42,15 +42,11 @@ Generate a complete application from Initializr, then make it your own. These te
 | --- |
 | <a href="https://www.codenameone.com/fieldline/?utm_source=github&utm_medium=oss&utm_campaign=repo-readme&utm_content=fieldline"><img src="docs/developer-guide/img/fieldline-today.png" alt="Fieldline technician day with the route on a map" width="200"></a><br><br>Technician and dispatch apps, with a Java backend whose scheduling engine plans the crew around skills, hours, time off and travel, plus AI photo diagnosis and sealed customer signatures. |
 
+| [Brickyard — Game platform](https://www.codenameone.com/brickyard/?utm_source=github&utm_medium=oss&utm_campaign=repo-readme&utm_content=brickyard) | |
+| --- | --- |
+| <a href="https://www.codenameone.com/brickyard/?utm_source=github&utm_medium=oss&utm_campaign=repo-readme&utm_content=brickyard"><img src="docs/developer-guide/img/brickyard-desktop-studio.png" alt="Brickyard creator studio editing a game world on desktop" width="200"></a><br><br>A full-stack Java game-platform sample with a Luau runtime, GPU engine, multiplayer server and creator studio. Roblox place-file compatibility is reported per file; run it with your own hosting and configured services. | |
+
 [Generate your application](https://www.codenameone.com/initializr/?utm_source=github&utm_medium=oss&utm_campaign=repo-readme&utm_content=template-start) · [Explore the complete templates](https://www.codenameone.com/demos/?utm_source=github&utm_medium=oss&utm_campaign=repo-readme&utm_content=fullstack-samples)
-
-## A game platform you can build on
-
-[Brickyard](https://www.codenameone.com/brickyard/?utm_source=github&utm_medium=oss&utm_campaign=repo-readme&utm_content=brickyard) is a complete game-platform sample with a pure-Java Luau runtime, GPU game engine, authoritative multiplayer backend, and a creator studio for phone, tablet and desktop. It reads and writes Roblox place files (`.rbxl` and `.rbxlx`) and reports compatibility for each place. The application source is MIT-0; running the platform requires your own hosting and configured services.
-
-<a href="https://www.codenameone.com/brickyard/?utm_source=github&utm_medium=oss&utm_campaign=repo-readme&utm_content=brickyard"><img src="docs/developer-guide/img/brickyard-desktop-studio.png" alt="Brickyard creator studio editing a game world on desktop" width="480"></a>
-
-[Explore Brickyard, the source and the guide](https://www.codenameone.com/brickyard/?utm_source=github&utm_medium=oss&utm_campaign=repo-readme&utm_content=brickyard).
 
 | What do you want to build? | Start here |
 | --- | --- |
