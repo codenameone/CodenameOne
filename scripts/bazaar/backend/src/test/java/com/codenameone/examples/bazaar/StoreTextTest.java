@@ -77,9 +77,9 @@ class StoreTextTest {
         Shop s = new Shop("st-text", 300, accounts, stores, pricing, db, inventory, carts,
                 checkouts, mvc);
         markets.save(s.owner, s.storeId, null, new MarketDto(null, "mx", "Mexico", "USD",
-                Arrays.asList("MX"), "es-MX", Markets.NONE, 0, true));
+                Arrays.asList("MX"), "es-MX", Markets.NONE, 0, true, Markets.MANUAL));
         markets.save(s.owner, s.storeId, null, new MarketDto(null, "il", "Israel", "USD",
-                Arrays.asList("IL"), "he", Markets.NONE, 0, true));
+                Arrays.asList("IL"), "he", Markets.NONE, 0, true, Markets.MANUAL));
         String page = "/s/st-text/products/st-text-mug";
 
         String es = body(mvc.perform(get(page + "?market=mx").header("Host", SignIn.HOST))
