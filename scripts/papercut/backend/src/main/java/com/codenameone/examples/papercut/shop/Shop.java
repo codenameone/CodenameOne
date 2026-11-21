@@ -35,6 +35,7 @@ import com.codenameone.examples.papercut.repository.AdNonceRepository;
 import com.codenameone.examples.papercut.repository.ProfileRepository;
 import com.codenameone.examples.papercut.repository.StorePurchaseRepository;
 import java.io.IOException;
+import com.codenameone.examples.papercut.Clock;
 import java.time.Instant;
 
 /// The wallet. Every change takes the profile row's lock first, so two taps
@@ -43,6 +44,13 @@ import java.time.Instant;
 public class Shop {
     /// What one watched rewarded ad pays.
     public static final int AD_REWARD = 15;
+    /// Rewarded ads paid per account per UTC day. The nonce is the client's,
+    /// so it proves nothing by itself: without a server-to-server callback
+    /// from a real ad network, this cap (and the route's rate limit) is what
+    /// bounds the coins a modified client can mint -- a few hundred a day,
+    /// less than a single coin pack. A fork wiring a real network should
+    /// grant from that network's verification callback instead.
+    public static final int AD_REWARDS_PER_DAY = 10;
 
     private final ProfileRepository profiles;
     private final StorePurchaseRepository purchases;
@@ -157,9 +165,8 @@ public class Shop {
         return toDto(p);
     }
 
-    /// Pays for a watched rewarded ad. The nonce comes from the ad network's
-    /// callback; each pays once, which is all a sample can promise without a
-    /// server-to-server verification with a real network.
+    /// Pays for a watched rewarded ad: each nonce once, and at most
+    /// [#AD_REWARDS_PER_DAY] a day.
     @Transactional(rollbackFor = IOException.class)
     public WalletDto adReward(String username, AdRewardDto reward) throws IOException {
         String nonce = Text.required(reward == null ? null : reward.nonce(), 190, "the ad nonce");
@@ -168,6 +175,11 @@ public class Shop {
         String key = Ids.sha256(nonce);
         if (nonces.findById(key) != null) {
             throw new ResponseStatusException(409, "That ad was already rewarded");
+        }
+        long dayStart = Clock.now() / 86400000L * 86400000L;
+        if (nonces.countByUsernameAndCreatedAtAfter(username, Instant.ofEpochMilli(dayStart))
+                >= AD_REWARDS_PER_DAY) {
+            throw new ResponseStatusException(429, "That's all the ads for today");
         }
         AdNonce row = new AdNonce();
         row.setId(key);

@@ -359,6 +359,11 @@ public class SecurityConfig {
             .rateLimit("/api/shop/receipt",
                     RateLimitKeys.firstOf(RateLimitKeys.principal(), RateLimitKeys.clientAddress()),
                     new InMemoryRateLimiter(60, 3600))
+            // Rewarded ads are capped per day in Shop; this keeps a script
+            // from hammering the route to find out.
+            .rateLimit("/api/shop/ad-reward",
+                    RateLimitKeys.firstOf(RateLimitKeys.principal(), RateLimitKeys.clientAddress()),
+                    new InMemoryRateLimiter(30, 3600))
             // tag::papercut-api-access[]
             .authorizeHttpRequests(auth -> auth
                     .requestMatchers(AntPathRequestMatcher.antMatcher("POST",

@@ -81,8 +81,7 @@ class AdminTest {
     void removingAFlaggedRunStrikesItAndRecomputesTheBest() throws Exception {
         String who = Api.player(accounts, "suspect");
         Api.submit(mvc, who, "FOLD", 4000, 60);
-        Map odd = Api.json(mvc, Api.as(Api.body(post("/api/runs"),
-                Api.run(Api.ticket(mvc, who, "FOLD"), "FOLD", 900000, 300, 10, 60, 20)), who));
+        Map odd = Api.played(mvc, who, "FOLD", 900000, 300, 10, 60, 20);
         assertTrue((Boolean) odd.get("flagged"));
         String flag = null;
         for (Object f : Api.list(mvc, Api.asAdmin(get("/api/admin/flags?open=true"), ADMIN))) {

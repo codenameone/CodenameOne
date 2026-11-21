@@ -81,8 +81,28 @@ public final class Api {
     /// Plays one plausible run of `mode` scoring `score` over `seconds`.
     public static Map submit(MockMvc mvc, String who, String mode, long score, int seconds) throws Exception {
         String token = ticket(mvc, who, mode);
-        return json(mvc, as(body(com.codename1.backend.test.MockMvcRequestBuilders.post("/api/runs"),
-                run(token, mode, score, (int) (score / 2000) + 10, 0, seconds, 5)), who));
+        // The run takes as long as it says: the server refuses a run longer
+        // than the time since its ticket was issued.
+        Clock.shiftForTests(seconds * 1000L);
+        try {
+            return json(mvc, as(body(com.codename1.backend.test.MockMvcRequestBuilders.post("/api/runs"),
+                    run(token, mode, score, (int) (score / 2000) + 10, 0, seconds, 5)), who));
+        } finally {
+            Clock.shiftForTests(0);
+        }
+    }
+
+    /// A run with every number given, played for as long as it claims.
+    public static Map played(MockMvc mvc, String who, String mode, long score, int kills, int gates,
+            int seconds, int multiplier) throws Exception {
+        String token = ticket(mvc, who, mode);
+        Clock.shiftForTests(seconds * 1000L);
+        try {
+            return json(mvc, as(body(com.codename1.backend.test.MockMvcRequestBuilders.post("/api/runs"),
+                    run(token, mode, score, kills, gates, seconds, multiplier)), who));
+        } finally {
+            Clock.shiftForTests(0);
+        }
     }
 
     public static String run(String token, String mode, long score, int kills, int gates, int seconds,

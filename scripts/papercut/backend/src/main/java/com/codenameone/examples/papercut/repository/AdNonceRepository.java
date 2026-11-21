@@ -31,4 +31,6 @@ import com.codenameone.examples.papercut.domain.AdNonce;
 /// Rewarded-ad nonces already paid.
 @Repository(entity = AdNonce.class, key = String.class)
 public interface AdNonceRepository extends CrudRepository<AdNonce, String> {
+    /// How many ads `username` was paid for since `since`: the daily cap.
+    long countByUsernameAndCreatedAtAfter(String username, Instant since);
 }

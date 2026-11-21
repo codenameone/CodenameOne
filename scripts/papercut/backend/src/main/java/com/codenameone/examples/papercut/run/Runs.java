@@ -122,6 +122,14 @@ public class Runs {
         if (tickets.use(t.getToken()) == 0) {
             throw new ResponseStatusException(409, "That ticket was already used");
         }
+        // The run cannot have lasted longer than the ticket has existed: the
+        // seconds the client claims are what every bound below scales with.
+        long issued = t.getExpiresAt().toEpochMilli() - TICKET_MILLIS;
+        long elapsed = (Clock.now() - issued) / 1000 + 5;
+        if (run.seconds() > elapsed) {
+            return new RunResultDto(false, false, false, best(profile(username), t.getMode()), 0, 0,
+                    "That run claims " + run.seconds() + " seconds, but it started " + elapsed + " seconds ago");
+        }
         int cuts = Math.max(0, run.kills()) + Math.max(0, run.gates());
         if (!ScoreBounds.possible(run.score(), cuts, run.seconds())
                 || run.peakMultiplier() > ScoreBounds.MAX_MULTIPLIER) {

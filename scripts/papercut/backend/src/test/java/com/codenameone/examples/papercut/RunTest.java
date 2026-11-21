@@ -104,10 +104,18 @@ class RunTest {
         assertEquals(0L, Api.number(refused, "rank"));
         assertTrue(((String) refused.get("message")).length() > 0);
         assertEquals(0L, Api.number(Api.json(mvc, Api.as(get("/api/me"), who)), "runs"));
-        Map odd = Api.json(mvc, Api.as(Api.body(post("/api/runs"),
-                Api.run(Api.ticket(mvc, who, "CLASSIC"), "CLASSIC", 700000, 200, 0, 60, 20)), who));
+        Map odd = Api.played(mvc, who, "CLASSIC", 700000, 200, 0, 60, 20);
         assertTrue((Boolean) odd.get("accepted"));
         assertTrue((Boolean) odd.get("flagged"));
         assertTrue((Boolean) Api.json(mvc, Api.as(get("/api/me"), who)).get("flagged"));
+    }
+
+    @Test
+    void aRunCannotLastLongerThanItsTicket() throws Exception {
+        String who = Api.player(accounts, "hasty");
+        Map early = Api.json(mvc, Api.as(Api.body(post("/api/runs"),
+                Api.run(Api.ticket(mvc, who, "CLASSIC"), "CLASSIC", 1000000, 4000, 0, 3600, 20)), who));
+        assertFalse((Boolean) early.get("accepted"));
+        assertEquals(0L, Api.number(Api.json(mvc, Api.as(get("/api/me"), who)), "runs"));
     }
 }

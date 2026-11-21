@@ -99,5 +99,12 @@ class ShopTest {
         assertEquals(409, Api.statusOf(mvc, Api.as(Api.body(post("/api/shop/ad-reward"),
                 "{\"nonce\":\"ad-77\"}"), who)));
         assertFalse(Api.statusOf(mvc, Api.as(Api.body(post("/api/shop/ad-reward"), "{}"), who)) == 200);
+        // A client mints its own nonces, so the day's count is what bounds it.
+        for (int i = 1; i < com.codenameone.examples.papercut.shop.Shop.AD_REWARDS_PER_DAY; i++) {
+            assertEquals(200, Api.statusOf(mvc, Api.as(Api.body(post("/api/shop/ad-reward"),
+                    "{\"nonce\":\"cap-" + i + "\"}"), who)));
+        }
+        assertEquals(429, Api.statusOf(mvc, Api.as(Api.body(post("/api/shop/ad-reward"),
+                "{\"nonce\":\"cap-over\"}"), who)));
     }
 }

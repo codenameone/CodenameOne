@@ -26,8 +26,16 @@ public final class Clock {
     private Clock() {
     }
 
+    private static long offset;
+
     public static long now() {
-        return System.currentTimeMillis();
+        return System.currentTimeMillis() + offset;
+    }
+
+    /// Moves `now()` by `millis`, for the tests: a run that claims an hour
+    /// is only accepted an hour after its ticket was issued.
+    static void shiftForTests(long millis) {
+        offset = millis;
     }
 
     /// Midnight UTC at the start of the day `millis` falls in.

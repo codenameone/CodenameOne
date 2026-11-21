@@ -47,8 +47,7 @@ class ProgressTest {
         assertFalse((Boolean) ((Map) before.get("first-cut")).get("unlocked"));
         assertEquals(1L, Api.number((Map) before.get("papers-3"), "progress"));
         Api.submit(mvc, who, "CLASSIC", 150000, 200);
-        Api.json(mvc, Api.as(Api.body(post("/api/runs"), Api.run(Api.ticket(mvc, who, "FOLD"), "FOLD",
-                30000, 30, 27, 190, 20)), who));
+        Api.played(mvc, who, "FOLD", 30000, 30, 27, 190, 20);
         Map after = byId(Api.list(mvc, Api.as(get("/api/achievements"), who)));
         assertTrue((Boolean) ((Map) after.get("first-cut")).get("unlocked"));
         assertTrue((Boolean) ((Map) after.get("classic-100k")).get("unlocked"));
