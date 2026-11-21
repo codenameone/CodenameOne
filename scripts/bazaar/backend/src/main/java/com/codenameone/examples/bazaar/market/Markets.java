@@ -63,11 +63,10 @@ import java.util.Map;
 /// arithmetic on cents, rounded half up, with every product checked for
 /// overflow.
 ///
-/// **What is charged.** Market prices are what the storefront shows. The
-/// order is still placed and charged in the store's currency: the checkout
-/// says so beside the converted total. Charging in the market currency would
-/// take shipping rates, fixed discounts, gift cards, refunds and payouts in
-/// every currency too, which this sample does not attempt.
+/// **What is charged.** Market prices are what the storefront shows, and the
+/// checkout charges them in the market currency: the order keeps the
+/// presentment currency, total and rate, and refunds go back in that
+/// currency (see `Checkouts`).
 ///
 /// **Duties.** A product may carry an HS code ([CustomsCode]) and the
 /// merchant keeps import rates per destination country and code prefix
