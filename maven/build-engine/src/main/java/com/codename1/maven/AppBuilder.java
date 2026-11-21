@@ -1690,6 +1690,9 @@ public class AppBuilder {
     /// The order of the tests is the order the dispatch always had, and it matters:
     /// `local-mac-device` has to be recognised before anything asks whether a target
     /// "contains ios".
+    /// The Hunspell dictionaries every local target can add to an application.
+    static final String SPELLCHECK_DICTIONARIES = "codenameone-spellcheck-dictionaries";
+
     enum LocalBuild {
         // Native ParparVM Windows cross-compile (clang-cl) and the windows-source
         // project generation. The cloud win32 build (windows-device) is NOT local.
@@ -1710,7 +1713,11 @@ public class AppBuilder {
         private final List<String> ports;
 
         LocalBuild(String... ports) {
-            this.ports = Collections.unmodifiableList(Arrays.asList(ports));
+            List<String> all = new ArrayList<String>(Arrays.asList(ports));
+            // Data, not a port, resolved the same way: Executor reads the dictionaries it adds
+            // to an application that uses SpellChecker from it (SpellcheckDictionaries).
+            all.add(SPELLCHECK_DICTIONARIES);
+            this.ports = Collections.unmodifiableList(all);
         }
 
         /// The builder `buildTarget` runs, or null when it is not a local target

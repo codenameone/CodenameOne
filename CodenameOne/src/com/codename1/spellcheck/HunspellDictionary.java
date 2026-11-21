@@ -20,7 +20,7 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codename1.wordprocessing;
+package com.codename1.spellcheck;
 
 import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
@@ -103,6 +103,7 @@ public final class HunspellDictionary {
     private String tryChars = "";
     private String flagMode = "";
     private String forbidden;
+    private String noSuggest;
     private String needAffix;
     private String onlyInCompound;
     private String compoundFlag;
@@ -143,7 +144,7 @@ public final class HunspellDictionary {
     }
 
     static String decode(byte[] bytes, String set) {
-        String s = set == null ? "" : Ids.asciiLower(set);
+        String s = set == null ? "" : asciiLower(set);
         if (s.startsWith("utf")) {
             try {
                 return new String(bytes, "UTF-8");
@@ -168,6 +169,16 @@ public final class HunspellDictionary {
             }
         }
         return "";
+    }
+
+    private static String asciiLower(String s) {
+        char[] c = s.toCharArray();
+        for (int i = 0; i < c.length; i++) {
+            if (c[i] >= 'A' && c[i] <= 'Z') {
+                c[i] = (char) (c[i] + 32);
+            }
+        }
+        return new String(c);
     }
 
     static List<String> split(String s, char sep) {
@@ -251,6 +262,8 @@ public final class HunspellDictionary {
             tryChars = v;
         } else if ("FORBIDDENWORD".equals(k)) {
             forbidden = v;
+        } else if ("NOSUGGEST".equals(k)) {
+            noSuggest = v;
         } else if ("NEEDAFFIX".equals(k)) {
             needAffix = v;
         } else if ("ONLYINCOMPOUND".equals(k)) {
@@ -680,7 +693,9 @@ public final class HunspellDictionary {
                 }
                 b.append(w);
             }
-            keep(b.toString(), cost);
+            if (suggestable(cand)) {
+                keep(b.toString(), cost);
+            }
         }
 
         void keep(String text, int cost) {
@@ -700,6 +715,30 @@ public final class HunspellDictionary {
             }
             return n;
         }
+    }
+
+    /// False for a word whose every root entry carries the NOSUGGEST flag: such words are
+    /// accepted when typed but never offered.
+    private boolean suggestable(String cand) {
+        if (noSuggest == null) {
+            return true;
+        }
+        for (String part : split(cand, ' ')) {
+            for (String form : new String[] {part, capitalize(part)}) {
+                List<String[]> list = roots.get(form);
+                if (list == null) {
+                    continue;
+                }
+                boolean any = false;
+                for (String[] fl : list) {
+                    any |= !has(fl, noSuggest);
+                }
+                if (!any) {
+                    return false;
+                }
+            }
+        }
+        return true;
     }
 
     private static boolean ascii(char c) {
@@ -840,8 +879,7 @@ public final class HunspellDictionary {
             if (leadingWords.contains(a) && b.length() >= 3
                     || a.length() >= 3 && trailingWords.contains(b)) {
                 cost = COST_SPLIT;
-            } else if (a.length() >= 3 && b.length() >= 3
-                    || leadingWords.isEmpty() && a.length() > 1 && b.length() > 1) {
+            } else if (a.length() >= 3 && b.length() >= 3) {
                 cost = COST_SPLIT_RARE;
             } else {
                 continue;

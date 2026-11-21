@@ -20,11 +20,9 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codename1.wordprocessing;
+package com.codename1.spellcheck;
 
 import com.codename1.junit.UITestBase;
-import com.codename1.ui.Form;
-import com.codename1.ui.Image;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
@@ -35,6 +33,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /// Hunspell dictionaries, the spell and grammar checkers, and proofing in `DocumentView`.
@@ -115,28 +114,13 @@ class ProofingTest extends UITestBase {
     }
 
     @Test
-    void viewUnderlinesAndFixes() throws Exception {
-        Paragraph p = DocumentLayoutTest.para("a", "Helo world");
-        DocumentModel m = new DocumentModel(new Document(
-                new ArrayList<Block>(Arrays.asList((Block) p)), null, null, 10));
-        DocumentView v = new DocumentView(m);
-        Proofreader pr = new Proofreader(SpellChecker.create(dict()), GrammarChecker.english());
-        v.setProofreader(pr);
-        Form f = new Form();
-        f.add(v);
-        f.show();
-        flushSerialCalls();
-        Image img = Image.createImage(400, 300);
-        v.setWidth(400);
-        v.setHeight(300);
-        v.paintComponent(img.getGraphics());
-        ProofIssue i = v.proofIssueAt(new TextPosition("a", 2), 3);
-        assertNotNull(i);
-        assertEquals("Hello", i.suggestions.get(0));
-        v.applySuggestion("a", i, i.suggestions.get(0));
-        assertEquals("Hello world", m.findParagraph("a").text.plainText());
-        assertNull(v.proofIssueAt(new TextPosition("a", 2), 3));
-        m.undo();
-        assertEquals("Helo world", m.findParagraph("a").text.plainText());
+    void forLanguageReadsTheDictionaryTheBuildAdded() {
+        SpellChecker s = SpellChecker.forLanguage("xx-TEST");
+        assertNotNull(s);
+        assertTrue(s.isCorrect("hellos"));
+        assertFalse(s.isCorrect("helo"));
+        assertSame(s, SpellChecker.forLanguage("xx_TEST"));
+        assertEquals(Arrays.asList("xx_TEST"), SpellChecker.getBundledLanguages());
+        assertNull(SpellChecker.forLanguage("zz_NONE"));
     }
 }

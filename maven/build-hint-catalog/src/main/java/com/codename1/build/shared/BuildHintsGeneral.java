@@ -52,6 +52,24 @@ final class BuildHintsGeneral {
                 .doc("Whether video calls are offered, on both platforms. `ios.call.video` and "
                         + "`android.call.video` override it per platform."));
 
+        h.add(new Hint("spellcheck.languages")
+                .group(HintGroup.GENERAL)
+                .type(HintType.STRING_LIST)
+                .def("en_US")
+                .platform("general")
+                .doc("The languages whose Hunspell dictionaries the build adds to an application "
+                        + "that uses `com.codename1.spellcheck.SpellChecker`, comma separated. "
+                        + "Bundled: `en_US`, `en_CA`, `en_AU`. Read them with "
+                        + "`SpellChecker.forLanguage`."));
+
+        h.add(new Hint("spellcheck.dictionaries")
+                .group(HintGroup.GENERAL)
+                .type(HintType.BOOLEAN)
+                .def("true")
+                .platform("general")
+                .doc("Set to `false` to add no dictionary to an application that uses "
+                        + "`SpellChecker`, for one that supplies its own to `SpellChecker.create`."));
+
         h.add(new Hint("commerce.cloud.enabled")
                 .group(HintGroup.GENERAL)
                 .type(HintType.BOOLEAN)

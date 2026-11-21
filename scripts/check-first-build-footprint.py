@@ -73,6 +73,8 @@ PORT_ARTIFACTS = (
     "codenameone-windows",
     "codenameone-linux",
     "codenameone-parparvm",
+    # data every local target reads like a port (AppBuilder.SPELLCHECK_DICTIONARIES)
+    "codenameone-spellcheck-dictionaries",
 )
 
 # Artifacts the build tools use at build time only, in the same position the

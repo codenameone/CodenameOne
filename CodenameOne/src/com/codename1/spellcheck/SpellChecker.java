@@ -20,14 +20,19 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codename1.wordprocessing;
+package com.codename1.spellcheck;
 
 import com.codename1.ui.Display;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /// Checks the spelling of words and text. A checker reads either a Hunspell dictionary the
@@ -36,8 +41,16 @@ import java.util.Set;
 /// what is not a word to check: numbers, single letters, acronyms in capitals, URLs and email
 /// addresses.
 ///
+/// The build adds a Hunspell dictionary to an application that uses this class, for each
+/// language named by the `spellcheck.languages` build hint (`en_US` when it is not set), and
+/// `forLanguage` reads it. An application that brings its own dictionary sets
+/// `spellcheck.dictionaries=false` and calls `create`. The simulator runs the application
+/// unbuilt, so there `forLanguage` finds a dictionary only when the project depends on
+/// `com.codenameone:codenameone-spellcheck-dictionaries`, and otherwise falls back to the
+/// platform checker.
+///
 /// ```java
-/// SpellChecker spell = SpellChecker.platform("en_US");
+/// SpellChecker spell = SpellChecker.forLanguage("en_US");
 /// if (spell == null) {
 ///     spell = SpellChecker.create(HunspellDictionary.fromBytes(aff, dic));
 /// }
@@ -84,6 +97,104 @@ public abstract class SpellChecker {
     /// the checker
     public static SpellChecker create(HunspellDictionary d) {
         return new Hunspell(d);
+    }
+
+    /// The resource name prefix of the dictionaries the build adds: `cn1dict_en_US.aff` and
+    /// `cn1dict_en_US.dic` for `en_US`. Names are flat because some ports flatten resource
+    /// folders.
+    public static final String DICTIONARY_PREFIX = "cn1dict_";
+
+    /// The resource listing the languages of the dictionaries the build added, one per line.
+    public static final String LANGUAGES_RESOURCE = "/cn1dict_languages.txt";
+
+    private static final Map<String, SpellChecker> LOADED = new HashMap<String, SpellChecker>();
+
+    /// A checker for a language: the dictionary the build added for it, or else the
+    /// platform's own checker. A dictionary is read once and shared; reading one takes a
+    /// moment, so call this off the EDT when a delay would show.
+    ///
+    /// #### Parameters
+    ///
+    /// - `language`: a language tag such as `en_US`; `en-US` is the same language
+    ///
+    /// #### Returns
+    ///
+    /// the checker, or null when there is neither a dictionary nor a platform checker
+    public static SpellChecker forLanguage(String language) {
+        String lang = language == null ? "" : language.replace('-', '_');
+        synchronized (LOADED) {
+            SpellChecker s = LOADED.get(lang);
+            if (s == null && !LOADED.containsKey(lang)) {
+                HunspellDictionary d = bundled(lang);
+                s = d != null ? create(d) : platform(language);
+                LOADED.put(lang, s);
+            }
+            return s;
+        }
+    }
+
+    /// The languages of the dictionaries the build added.
+    ///
+    /// #### Returns
+    ///
+    /// the language tags, empty when there are none
+    public static List<String> getBundledLanguages() {
+        List<String> out = new ArrayList<String>();
+        byte[] b = resource(LANGUAGES_RESOURCE);
+        if (b == null) {
+            return out;
+        }
+        for (String line : HunspellDictionary.split(HunspellDictionary.decode(b, "UTF-8"), '\n')) {
+            String t = line.trim();
+            if (t.length() > 0 && t.charAt(0) != '#') {
+                out.add(t);
+            }
+        }
+        return out;
+    }
+
+    private static HunspellDictionary bundled(String lang) {
+        if (lang.length() == 0) {
+            return null;
+        }
+        String base = "/" + DICTIONARY_PREFIX + lang;
+        byte[] aff = resource(base + ".aff");
+        if (aff == null) {
+            // The simulator and desktop runs are not built by the builder: there the
+            // codenameone-spellcheck-dictionaries artifact, when the project depends on it,
+            // is on the class path in its own layout.
+            base = "/cn1dict/" + lang;
+            aff = resource(base + ".aff");
+        }
+        byte[] dic = aff == null ? null : resource(base + ".dic");
+        return dic == null ? null : HunspellDictionary.fromBytes(aff, dic);
+    }
+
+    private static byte[] resource(String name) {
+        InputStream in = Display.isInitialized()
+                ? Display.getInstance().getResourceAsStream(SpellChecker.class, name) : null;
+        if (in == null) {
+            in = SpellChecker.class.getResourceAsStream(name);
+        }
+        if (in == null) {
+            return null;
+        }
+        try {
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            byte[] buf = new byte[16384];
+            for (int n = in.read(buf); n >= 0; n = in.read(buf)) {
+                out.write(buf, 0, n);
+            }
+            return out.toByteArray();
+        } catch (IOException e) {
+            return null;
+        } finally {
+            try {
+                in.close();
+            } catch (IOException ignored) {
+                // nothing left to read
+            }
+        }
     }
 
     /// The platform's own checker for a language, where the port has one.

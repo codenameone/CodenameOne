@@ -3314,6 +3314,7 @@ public abstract class Executor {
                 public void run() {
                     try {
                         File s = hardenSourceJar(sourceZip, request);
+                        s = SpellcheckDictionaries.inject(Executor.this, s, request);
                         result[0] = build(s, request);
 
                     } catch (Throwable err) {

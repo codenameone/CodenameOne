@@ -38,6 +38,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 /// found". The table is therefore spelled out here a second time, so that a
 /// change to it is a change someone made on purpose.
 class LocalBuildPortsTest {
+    private static final String DICT = AppBuilder.SPELLCHECK_DICTIONARIES;
+
     private static final String VM = "codenameone-parparvm:bundle";
 
     private static List<String> ports(String target) {
@@ -46,28 +48,28 @@ class LocalBuildPortsTest {
 
     @Test
     void iosAndMacReadTheirPortAndTheTranslator() {
-        assertEquals(Arrays.asList("codenameone-ios:bundle", VM), ports("ios-source"));
-        assertEquals(Arrays.asList("codenameone-mac:bundle", VM), ports("mac-source"));
-        assertEquals(Arrays.asList("codenameone-mac:bundle", VM), ports("local-mac-device"));
+        assertEquals(Arrays.asList("codenameone-ios:bundle", VM, DICT), ports("ios-source"));
+        assertEquals(Arrays.asList("codenameone-mac:bundle", VM, DICT), ports("mac-source"));
+        assertEquals(Arrays.asList("codenameone-mac:bundle", VM, DICT), ports("local-mac-device"));
     }
 
     @Test
     void windowsLinuxAndSteamReadTheirPortAndTheTranslator() {
-        assertEquals(Arrays.asList("codenameone-windows:bundle", VM), ports("windows-source"));
-        assertEquals(Arrays.asList("codenameone-windows:bundle", VM), ports("local-windows-device"));
-        assertEquals(Arrays.asList("codenameone-linux:bundle", VM), ports("local-linux-device"));
-        assertEquals(Arrays.asList("codenameone-linux:bundle", VM), ports("local-steam"));
+        assertEquals(Arrays.asList("codenameone-windows:bundle", VM, DICT), ports("windows-source"));
+        assertEquals(Arrays.asList("codenameone-windows:bundle", VM, DICT), ports("local-windows-device"));
+        assertEquals(Arrays.asList("codenameone-linux:bundle", VM, DICT), ports("local-linux-device"));
+        assertEquals(Arrays.asList("codenameone-linux:bundle", VM, DICT), ports("local-steam"));
     }
 
     @Test
     void androidReadsItsPortAlone() {
-        assertEquals(Collections.singletonList("codenameone-android"), ports("android-source"));
+        assertEquals(Arrays.asList("codenameone-android", DICT), ports("android-source"));
     }
 
     @Test
     void javascriptReadsTheTranslatorBundleAlone() {
         // The JavaScript port and the proxy servlets travel in the translator's bundle.
-        assertEquals(Collections.singletonList(VM), ports("local-javascript"));
+        assertEquals(Arrays.asList(VM, DICT), ports("local-javascript"));
     }
 
     @Test

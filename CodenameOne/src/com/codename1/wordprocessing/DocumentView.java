@@ -24,6 +24,8 @@ package com.codename1.wordprocessing;
 
 import com.codename1.ui.Display;
 import com.codename1.ui.EncodedImage;
+import com.codename1.spellcheck.ProofIssue;
+import com.codename1.spellcheck.Proofreader;
 import com.codename1.ui.Font;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Image;
