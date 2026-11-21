@@ -67,6 +67,9 @@ public final class Quote {
     public long giftCardCents;
     /// The tax exemption certificate that took the tax off, or null.
     public String exemptCertificate;
+    /// In a tax-inclusive store, the tax inside the prices that an exemption
+    /// took off the total; counted with the discounts.
+    public long exemptCents;
     /// The import duties a buyer may pay on delivery (Markets#dutyEstimate):
     /// shown, never charged.
     public long dutyCents;
@@ -81,7 +84,7 @@ public final class Quote {
     }
 
     public long discountCents() {
-        return discounts == null ? 0 : discounts.totalCents;
+        return (discounts == null ? 0 : discounts.totalCents) + exemptCents;
     }
 
     public long taxCents() {

@@ -1,7 +1,7 @@
 <!-- cn1:model page com.codenameone.examples.bazaar.web.PageMeta -->
 <!-- cn1:model track com.codenameone.examples.bazaar.web.TrackView -->
 <!doctype html>
-<html lang="en" xmlns:th="http://www.thymeleaf.org"><head th:replace="~{layout :: head}"></head><body th:attr="data-accent=${page.accent}"><header th:replace="~{layout :: header}"></header>
+<html lang="en" xmlns:th="http://www.thymeleaf.org"><head th:replace="~{layout :: head}"></head><body th:class="${page.themeClass}" th:attr="data-accent=${page.accent}"><header th:replace="~{layout :: header}"></header>
 <main class="wrap"><h1>Tracking <span th:text="${track.number}">1Z</span></h1>
 <p class="lede"><span th:text="${track.store}">Store</span> via <span th:text="${track.carrier}">Carrier</span></p>
 <p class="status" th:classappend="${track.delivered ? 'done' : (track.cancelled ? 'gone' : '')}" th:text="${track.status}">In transit</p>

@@ -291,7 +291,8 @@ public class CheckoutPages {
             OrderDto placed = checkouts.place(payer, store.getId(), null,
                     new PlaceOrderDto(address, dto.shippingRateId(),
                         card ? null : f.methodId, f.email, f.note, f.idempotencyKey),
-                    cart(store, request), oneOff);
+                    cart(store, request), oneOff,
+                    markets.pricer(store, StorefrontMarkets.cookie(request)));
             StoreOrder row = orderRows.findById(placed.id());
             return SiteUrls.order(store.getHandle(), placed.number(), linkToken(row));
         } catch (ResponseStatusException refused) {
@@ -561,16 +562,22 @@ public class CheckoutPages {
                 }
                 long duty = markets.dutyEstimate(store.getId(), f.country, dutiable);
                 view.duty = duty > 0 ? Money.format(duty, currency) : "";
-                String cert = me == null || dto.taxInclusive() ? null : exemptions
+                String cert = me == null ? null : exemptions
                         .certificateFor(store.getId(), me, f.country, f.region,
                                 java.time.Instant.now());
                 view.exemption = cert == null ? "" : "Tax exemption certificate " + cert
                         + " applies to this order.";
             }
             String browsed = StorefrontMarkets.cookie(request);
-            if (browsed != null && markets.pricer(store, browsed) != null) {
-                view.marketNote = "Prices you browsed were shown in another currency; "
-                        + "this order is charged in " + currency + ".";
+            com.codenameone.examples.bazaar.market.Markets.Pricer shown =
+                    browsed == null ? null : markets.pricer(store, browsed);
+            if (shown != null && !shown.currency().equals(currency)) {
+                // Charged in the shopper's currency at the rate the prices were
+                // shown in (Checkouts.place); worked out in the store's.
+                view.marketNote = "This order is charged in " + shown.currency() + ": "
+                        + Money.format(com.codenameone.examples.bazaar.checkout.Checkouts.atRate(
+                            dto.dueCents(), shown.rateMicros()), shown.currency())
+                        + " for " + Money.format(dto.dueCents(), currency) + ".";
             }
             view.nothingDue = dto.dueCents() <= 0;
             view.discountCode = dto.discountCode() == null ? "" : dto.discountCode();

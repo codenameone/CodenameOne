@@ -156,6 +156,18 @@ public class StoreOrder {
     @Column(nullable = false)
     private Instant closedAt = Instant.EPOCH;
 
+    /// The market currency the shopper was charged in, or empty for the store's own.
+    @Column(nullable = false, type = "VARCHAR(3)")
+    private String presentmentCurrency = "";
+
+    /// The total in [#getPresentmentCurrency], at [#getFxRateMicros].
+    @Column(nullable = false)
+    private long presentmentTotalCents;
+
+    /// Units of the presentment currency per store unit, in millionths, locked at checkout.
+    @Column(nullable = false)
+    private long fxRateMicros;
+
     public StoreOrder() {
     }
 
@@ -493,5 +505,28 @@ public class StoreOrder {
 
     public void setClosedAt(Instant closedAt) {
         this.closedAt = closedAt;
+    }
+    public String getPresentmentCurrency() {
+        return presentmentCurrency;
+    }
+
+    public void setPresentmentCurrency(String presentmentCurrency) {
+        this.presentmentCurrency = presentmentCurrency;
+    }
+
+    public long getPresentmentTotalCents() {
+        return presentmentTotalCents;
+    }
+
+    public void setPresentmentTotalCents(long presentmentTotalCents) {
+        this.presentmentTotalCents = presentmentTotalCents;
+    }
+
+    public long getFxRateMicros() {
+        return fxRateMicros;
+    }
+
+    public void setFxRateMicros(long fxRateMicros) {
+        this.fxRateMicros = fxRateMicros;
     }
 }

@@ -77,6 +77,7 @@ public class WebPages {
         {"Inbox", "/inbox", "5"},
         {"Permissions", "/permissions", "6"},
         {"Listings", "/listings", "7"},
+        {"Online store", "/online-store", "a"},
         {"Apps", "/apps", "a"},
     };
     /// Account sections: label, path, shortcut.

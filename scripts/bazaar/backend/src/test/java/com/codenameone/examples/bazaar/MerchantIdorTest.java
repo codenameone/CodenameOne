@@ -182,6 +182,16 @@ class MerchantIdorTest {
         "POST /chats/{chatId}/reply", "POST /chats/{chatId}/assign", "POST /chats/{chatId}/close",
         "GET /canned-replies", "POST /canned-replies", "GET /combined-listings",
         "POST /combined-listings", "POST /imports/marketplace",
+        // Online store: theme, pages, blog, menus, redirects, metafields, metaobjects.
+        "GET /theme", "POST /theme", "POST /theme/publish", "GET /pages", "POST /pages",
+        "POST /pages/{pageId}", "DELETE /pages/{pageId}", "GET /blog-posts", "POST /blog-posts",
+        "POST /blog-posts/{postId}", "DELETE /blog-posts/{postId}", "GET /menu-links",
+        "POST /menu-links", "POST /menu-links/{linkId}/move", "DELETE /menu-links/{linkId}",
+        "GET /redirects", "POST /redirects", "DELETE /redirects/{redirectId}", "GET /metafields",
+        "POST /metafields", "DELETE /metafields/{fieldId}", "GET /metafield-values",
+        "POST /metafield-values", "GET /metaobject-types", "POST /metaobject-types",
+        "GET /metaobject-types/{typeId}/objects", "POST /metaobject-types/{typeId}/objects",
+        "DELETE /metaobjects/{objectId}",
     };
 
     /// Routes of [#ROUTES] served as documents by `DocumentPages` rather than
@@ -210,6 +220,10 @@ class MerchantIdorTest {
         {"tax-exemptions", "tax_exemption"}, {"order-risks", "store_order"},
         {"disputes", "dispute"}, {"warehouse", "location"}, {"reports", "saved_report"},
         {"permission-sets", "permission_set"}, {"chats", "chat_conversation"},
+        {"disputes", "dispute"}, {"pages", "content_page"}, {"blog-posts", "blog_post"},
+        {"menu-links", "menu_link"}, {"redirects", "url_redirect"},
+        {"metafields", "metafield_def"}, {"metaobject-types", "metaobject_type"},
+        {"metaobjects", "metaobject_entry"},
     };
 
     private static final String NO_SUCH = "no-such-id";

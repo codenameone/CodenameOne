@@ -70,4 +70,16 @@ public final class PageMeta {
     public String privacyUrl = "";
     /// The store's chat page, or empty off a store.
     public String chatUrl = "";
+    /// The theme classes on the page's body (palette, font, corner style), or empty.
+    public String themeClass = "";
+    /// The store logo's address, or empty.
+    public String logoUrl = "";
+    /// The store's main menu, two levels deep.
+    public java.util.List<MenuView> menu = new java.util.ArrayList<MenuView>();
+    /// The footer's links: the footer menu, then the published policies.
+    public java.util.List<LinkView> footerLinks = new java.util.ArrayList<LinkView>();
+    /// The home page's sections in the theme's order.
+    public java.util.List<String> sections = new java.util.ArrayList<String>();
+    /// Whether this is a signed theme preview (never cached, never indexed).
+    public boolean preview;
 }

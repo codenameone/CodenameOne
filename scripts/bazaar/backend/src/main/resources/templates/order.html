@@ -1,7 +1,7 @@
 <!-- cn1:model page com.codenameone.examples.bazaar.web.PageMeta -->
 <!-- cn1:model order com.codenameone.examples.bazaar.web.OrderView -->
 <!doctype html>
-<html lang="en" xmlns:th="http://www.thymeleaf.org"><head th:replace="~{layout :: head}"></head><body th:attr="data-accent=${page.accent}"><header th:replace="~{layout :: header}"></header>
+<html lang="en" xmlns:th="http://www.thymeleaf.org"><head th:replace="~{layout :: head}"></head><body th:class="${page.themeClass}" th:attr="data-accent=${page.accent}"><header th:replace="~{layout :: header}"></header>
 <main class="wrap confirm" id="main"><h1>Thank you! Order #<span th:text="${order.number}">1</span></h1>
 <p class="status" th:text="${order.status}">Confirmed</p>
 <p>A confirmation was sent to <strong th:text="${order.email}">you@example.com</strong>.</p>

@@ -1,0 +1,8 @@
+<!-- cn1:model page com.codenameone.examples.bazaar.web.PageMeta -->
+<!-- cn1:model posts java.util.List<com.codenameone.examples.bazaar.web.PostView> -->
+<!-- cn1:model tag java.lang.String -->
+<!-- cn1:model feedUrl java.lang.String -->
+<!doctype html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org"><head th:replace="~{layout :: head}"></head><body th:class="${page.themeClass}" th:attr="data-accent=${page.accent}"><header th:replace="~{layout :: header}"></header>
+<main class="wrap rich"><h1>Blog</h1><p class="muted" th:unless="${tag.empty}">Posts tagged <strong th:text="${tag}">tag</strong></p><ul class="post-list"><li th:each="b : ${posts}"><h2><a th:href="${b.url}" th:text="${b.title}">Post</a></h2><p class="byline"><span th:text="${b.author}">Author</span> <time th:text="${b.date}">2026-01-01</time></p><p th:text="${b.excerpt}">Excerpt</p></li></ul><p class="empty-state" th:if="${posts.empty}">No posts yet.</p><p><a th:href="${feedUrl}">Subscribe (Atom)</a></p></main>
+<footer th:replace="~{layout :: footer}"></footer></body></html>

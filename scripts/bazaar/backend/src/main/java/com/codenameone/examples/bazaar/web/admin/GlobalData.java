@@ -326,9 +326,10 @@ public class GlobalData {
         FormView pick = new FormView("pick", "Translate", base + "/open", "Open");
         pick.add("kind", "What", "select", kind == null ? Translations.PRODUCT : kind)
                 .option(Translations.PRODUCT, "Product").option(Translations.COLLECTION,
-                "Collection").option(Translations.PAGE, "Page");
+                "Collection").option(Translations.PAGE, "Page").option(Translations.CONTENT,
+                "Online store page").option(Translations.POST, "Blog post");
         pick.add("refId", "Id", "text", refId == null ? "" : refId)
-                .hint("The product or collection id, or privacy");
+                .hint("The product, collection, page or post id, or privacy");
         pick.add("locale", "Language", "text", locale == null ? "" : locale)
                 .hint(locales.isEmpty() ? "e.g. de or fr-CA" : "In use: " + join(locales));
         CommerceData.selectChosen(pick);

@@ -48,9 +48,15 @@ public class StorefrontFiles {
     private final CollectionRepository collections;
     private final Catalog catalog;
     private final SiteUrls urls;
+    private final com.codenameone.examples.bazaar.content.Pages pages;
+    private final com.codenameone.examples.bazaar.market.Markets markets;
 
     public StorefrontFiles(StoreRepository stores, ProductRepository products,
-            CollectionRepository collections, Catalog catalog, SiteUrls urls) {
+            CollectionRepository collections, Catalog catalog, SiteUrls urls,
+            com.codenameone.examples.bazaar.content.Pages pages,
+            com.codenameone.examples.bazaar.market.Markets markets) {
+        this.pages = pages;
+        this.markets = markets;
         this.stores = stores;
         this.products = products;
         this.collections = collections;
@@ -85,7 +91,8 @@ public class StorefrontFiles {
     public HttpServer.Response sitemap(HttpServer.Request request) throws IOException {
         StringBuilder xml = new StringBuilder(4096);
         xml.append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n")
-                .append("<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">\n");
+                .append("<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\" ")
+                .append("xmlns:xhtml=\"http://www.w3.org/1999/xhtml\">\n");
         long newest = 0;
         List<Store> active = stores.findByStatusOrderByNameAsc(Stores.ACTIVE);
         for (int s = 0; s < active.size(); s++) {
@@ -96,19 +103,53 @@ public class StorefrontFiles {
             for (int p = 0; p < ps.size(); p++) {
                 storeChanged = later(storeChanged, ps.get(p).getUpdatedAt());
             }
+            // Each active market with a language is an alternate of every
+            // page, the way the pages' own Link headers say (StorefrontMarkets).
+            List<com.codenameone.examples.bazaar.api.MarketDto> ms = markets.active(store.getId());
+            List<String[]> alternates = new java.util.ArrayList<String[]>();
+            for (int m = 0; m < ms.size(); m++) {
+                String lang = com.codenameone.examples.bazaar.market.Locales.orNull(
+                        ms.get(m).locale());
+                if (lang != null) {
+                    alternates.add(new String[] {lang, ms.get(m).code()});
+                }
+            }
+            List<com.codenameone.examples.bazaar.domain.ContentPage> content =
+                    pages.publishedAll(store.getId());
+            List<com.codenameone.examples.bazaar.domain.BlogPost> posts =
+                    pages.publishedPosts(store.getId(), null);
+            for (int c = 0; c < content.size(); c++) {
+                storeChanged = later(storeChanged, content.get(c).getUpdatedAt());
+            }
+            for (int c = 0; c < posts.size(); c++) {
+                storeChanged = later(storeChanged, posts.get(c).getUpdatedAt());
+            }
             newest = Math.max(newest, millis(storeChanged));
-            url(xml, urls.absolute(request, StorefrontPages.storeUrl(store.getHandle())),
-                    storeChanged);
+            String base = StorefrontPages.storeUrl(store.getHandle());
+            url(xml, request, base, storeChanged, alternates);
+            for (int c = 0; c < content.size(); c++) {
+                com.codenameone.examples.bazaar.domain.ContentPage cp = content.get(c);
+                url(xml, request, base + (com.codenameone.examples.bazaar.content.Pages.POLICY
+                        .equals(cp.getKind()) ? "/policies/" : "/pages/")
+                        + SiteUrls.encode(cp.getHandle()), cp.getUpdatedAt(), alternates);
+            }
+            if (!posts.isEmpty()) {
+                url(xml, request, base + "/blog", posts.get(0).getUpdatedAt(), alternates);
+            }
+            for (int c = 0; c < posts.size(); c++) {
+                url(xml, request, base + "/blog/" + SiteUrls.encode(posts.get(c).getHandle()),
+                        posts.get(c).getUpdatedAt(), alternates);
+            }
             List<Collection> cs = collections.findByStoreIdOrderByPositionAsc(store.getId());
             for (int c = 0; c < cs.size(); c++) {
                 if (cs.get(c).isPublished()) {
-                    url(xml, urls.absolute(request, StorefrontPages.collectionUrl(
-                            store.getHandle(), cs.get(c).getHandle())), storeChanged);
+                    url(xml, request, StorefrontPages.collectionUrl(
+                            store.getHandle(), cs.get(c).getHandle()), storeChanged, alternates);
                 }
             }
             for (int p = 0; p < ps.size(); p++) {
-                url(xml, urls.absolute(request, StorefrontPages.productUrl(store.getHandle(),
-                        ps.get(p).getHandle())), ps.get(p).getUpdatedAt());
+                url(xml, request, StorefrontPages.productUrl(store.getHandle(),
+                        ps.get(p).getHandle()), ps.get(p).getUpdatedAt(), alternates);
             }
         }
         xml.append("</urlset>\n");
@@ -146,10 +187,25 @@ public class StorefrontFiles {
         return HttpServer.Response.text(e.getStatus(), e.getReason() == null ? "" : e.getReason());
     }
 
-    private static void url(StringBuilder xml, String loc, Instant changed) {
+    private void url(StringBuilder xml, HttpServer.Request request, String path,
+            Instant changed, List<String[]> alternates) {
+        String loc = urls.absolute(request, path);
         xml.append("  <url><loc>");
         escape(xml, loc);
         xml.append("</loc>");
+        for (int iter = 0; iter < alternates.size(); iter++) {
+            xml.append("<xhtml:link rel=\"alternate\" hreflang=\"");
+            escape(xml, alternates.get(iter)[0]);
+            xml.append("\" href=\"");
+            escape(xml, urls.absolute(request, path + "?market="
+                    + SiteUrls.encode(alternates.get(iter)[1])));
+            xml.append("\"/>");
+        }
+        if (!alternates.isEmpty()) {
+            xml.append("<xhtml:link rel=\"alternate\" hreflang=\"x-default\" href=\"");
+            escape(xml, loc);
+            xml.append("\"/>");
+        }
         if (changed != null && changed.toEpochMilli() > 0) {
             xml.append("<lastmod>").append(StorefrontPages.day(changed)).append("</lastmod>");
         }

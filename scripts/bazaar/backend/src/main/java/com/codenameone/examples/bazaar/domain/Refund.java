@@ -52,6 +52,10 @@ public class Refund {
     @Column(nullable = false)
     private Instant createdAt = Instant.EPOCH;
 
+    /// What went back to the card in the order's presentment currency, or 0.
+    @Column(nullable = false)
+    private long presentmentCents;
+
     public Refund() {
     }
 
@@ -117,5 +121,12 @@ public class Refund {
 
     public void setCreatedAt(Instant createdAt) {
         this.createdAt = createdAt;
+    }
+    public long getPresentmentCents() {
+        return presentmentCents;
+    }
+
+    public void setPresentmentCents(long presentmentCents) {
+        this.presentmentCents = presentmentCents;
     }
 }

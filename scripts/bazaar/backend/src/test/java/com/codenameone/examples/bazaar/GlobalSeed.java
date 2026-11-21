@@ -28,6 +28,29 @@ final class GlobalSeed {
     }
 
     static void seed(Shop s, String orderId, DataSource db) throws Exception {
+        // The online store's rows: a page, a post, a menu link, a redirect, a
+        // metafield and a metaobject type with one entry.
+        db.execute("INSERT INTO content_page (id, store_id, kind, handle, title, body, published, "
+                + "updated_at) VALUES (?, ?, 'PAGE', 'idor', 'Idor', '<p>x</p>', 1, 0)",
+                new Object[] {Ids.next(), s.storeId});
+        db.execute("INSERT INTO blog_post (id, store_id, handle, title, author, tags, excerpt, "
+                + "body, published, published_at, updated_at) VALUES "
+                + "(?, ?, 'idor', 'Idor', 'Idor', '', '', '<p>x</p>', 1, 0, 0)",
+                new Object[] {Ids.next(), s.storeId});
+        db.execute("INSERT INTO menu_link (id, store_id, menu, parent_id, title, url, position) "
+                + "VALUES (?, ?, 'main', '', 'Idor', '/', 0)", new Object[] {Ids.next(), s.storeId});
+        db.execute("INSERT INTO url_redirect (id, store_id, from_path, to_path, hits, created_at) "
+                + "VALUES (?, ?, '/s/idor/old', '/s/idor/new', 0, 0)",
+                new Object[] {Ids.next(), s.storeId});
+        db.execute("INSERT INTO metafield_def (id, store_id, owner_kind, field_key, name, "
+                + "field_type, ref_kind, storefront, position, created_at) VALUES "
+                + "(?, ?, 'PRODUCT', 'idor', 'Idor', 'text', '', 1, 0, 0)",
+                new Object[] {Ids.next(), s.storeId});
+        String type = Ids.next();
+        db.execute("INSERT INTO metaobject_type (id, store_id, handle, name, created_at) VALUES "
+                + "(?, ?, 'idor', 'Idor', 0)", new Object[] {type, s.storeId});
+        db.execute("INSERT INTO metaobject_entry (id, store_id, type_id, handle, title, created_at) "
+                + "VALUES (?, ?, ?, 'idor', 'Idor', 0)", new Object[] {Ids.next(), s.storeId, type});
         db.execute("INSERT INTO market (id, store_id, code, name, currency, countries, locale, "
                 + "rounding, adjust_bps, active, position, created_at) VALUES "
                 + "(?, ?, 'idor', 'Idor', 'USD', 'CA', '', 'NONE', 0, 1, 0, 0)",

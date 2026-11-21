@@ -434,7 +434,18 @@ public class OrderEdits {
                 throw new ResponseStatusException(402, "The saved card was declined");
             }
         } else if (ORIGINAL.equals(plan.settlement)) {
-            payments.refund(o.getId(), -plan.delta, "Order edited");
+            // The difference is in the store's currency; a card charged in the
+            // shopper's gets it back in theirs, at the order's own rate.
+            long back = -plan.delta;
+            if (Orders.foreign(o)) {
+                com.codenameone.examples.bazaar.domain.Payment pay = paymentRows.findById(o.getId());
+                long left = pay == null ? 0 : pay.getAmountCents() - pay.getRefundedCents();
+                back = Orders.presentmentRefund(o, back, left);
+            }
+            if (back > 0) {
+                // Never 0: Payments.refund reads 0 as "everything left".
+                payments.refund(o.getId(), back, "Order edited");
+            }
         }
     }
 

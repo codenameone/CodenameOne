@@ -77,7 +77,9 @@ public class StorefrontCaching implements HandlerInterceptor {
         if (vary instanceof String) {
             response.header("Vary", (String) vary);
         }
-        if (isCart(request.getTarget())) {
+        if (isCart(request.getTarget())
+                || here != null && here.getAttribute(StorefrontPages.PREVIEW) != null) {
+            // A theme preview shows an unpublished draft: never kept by anyone.
             noStore(response);
             return;
         }

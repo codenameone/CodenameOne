@@ -286,15 +286,22 @@ public class Quoter {
                 hasAddress ? taxes.findByStoreId(cart.getStoreId()) : null, country,
                 hasAddress ? address.region() : null, store.isTaxInclusive());
         // A signed-in shopper's tax exemption covering the address takes the
-        // tax off (TaxExemptions: not in a store whose prices include it).
-        if (hasAddress && username != null && !store.isTaxInclusive()
-                && quote.tax.totalCents() > 0) {
+        // tax off. Added tax is simply not added; in a store whose prices
+        // include it, the tax inside the prices (lines and shipping) comes
+        // off the total as a reduction, so the exempt buyer pays the net.
+        if (hasAddress && username != null && quote.tax.totalCents() > 0) {
             String cert = exemptions.certificateFor(cart.getStoreId(), username, country,
                     address.region(), now);
             if (cert != null) {
                 quote.exemptCertificate = cert;
+                if (store.isTaxInclusive()) {
+                    quote.exemptCents = quote.tax.totalCents();
+                }
+                for (int iter = 0; iter < priceLines.size(); iter++) {
+                    priceLines.get(iter).taxCents = 0;
+                }
                 quote.tax = TaxCalculator.apply(priceLines, quote.shippingCents, null, country,
-                        address.region(), false);
+                        address.region(), store.isTaxInclusive());
             }
         }
         if (hasAddress) {
@@ -305,7 +312,8 @@ public class Quoter {
             }
             quote.dutyCents = markets.dutyEstimate(cart.getStoreId(), country, dutiable);
         }
-        quote.totalCents = afterDiscounts + quote.shippingCents + quote.tax.addedCents();
+        quote.totalCents = Math.max(0, afterDiscounts + quote.shippingCents
+                + quote.tax.addedCents() - quote.exemptCents);
         if (giftCode != null && giftCode.length() > 0) {
             GiftCard card = giftCards.findByCode(giftCode);
             if (usable(card, cart.getStoreId(), now)) {

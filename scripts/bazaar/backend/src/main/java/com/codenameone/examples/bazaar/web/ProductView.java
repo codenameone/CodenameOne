@@ -37,6 +37,8 @@ public final class ProductView {
     public String lang = "";
     /// That checkout charges the store's currency, when another is shown.
     public String marketNote = "";
+    /// The product's storefront metafields, as `{name, value}` pairs.
+    public java.util.List<String[]> specs = new java.util.ArrayList<String[]>();
     public boolean available;
     public String availability = "";
     /// The chosen variant id, for the add-to-cart form.

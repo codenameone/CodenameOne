@@ -528,8 +528,24 @@ public class Orders {
         long amount = refundAmount(order, req, store.isTaxInclusive());
         Payment payment = paymentRows.findById(orderId);
         long cardPart = 0;
+        long presentmentPart = 0;
+        boolean foreign = foreign(order);
         if (payment != null && !byHand) {
-            cardPart = Math.min(amount, payment.getAmountCents() - payment.getRefundedCents());
+            long cardLeft = payment.getAmountCents() - payment.getRefundedCents();
+            if (foreign) {
+                // The card was charged in the shopper's currency: what is left
+                // on it is worth this much of the store's, at the order's rate.
+                long settlementLeft = scale(cardLeft, order.getTotalCents(),
+                        order.getPresentmentTotalCents());
+                cardPart = Math.min(amount, settlementLeft);
+                // The refund that empties the card takes exactly what is left,
+                // so rounding never strands a cent on it.
+                presentmentPart = cardPart >= settlementLeft ? cardLeft
+                        : presentmentRefund(order, cardPart, cardLeft);
+            } else {
+                cardPart = Math.min(amount, cardLeft);
+                presentmentPart = cardPart;
+            }
         }
         long giftPart = amount - cardPart;
         String card = giftCards.cardOf(orderId);
@@ -537,16 +553,48 @@ public class Orders {
             // Paid by hand (mark paid): the money goes back the same way.
             giftPart = 0;
         }
-        if (cardPart > 0) {
-            payments.refund(orderId, cardPart, Codes.cut(req.reason(), 200));
+        if (cardPart > 0 && presentmentPart > 0) {
+            payments.refund(orderId, presentmentPart, Codes.cut(req.reason(), 200));
         }
         if (giftPart > 0) {
             giftCards.credit(card, orderId, giftPart, "Refund");
         }
-        StoreOrder done = recordRefund(orderId, req, amount, username);
+        StoreOrder done = recordRefund(orderId, req, amount, username,
+                foreign ? presentmentPart : 0);
         publish(done);
         storeEvents.refunded(orderId, amount);
         return new long[] {amount, cardPart, giftPart, amount - cardPart - giftPart};
+    }
+
+    /// Whether the order was charged in a currency other than the store's.
+    public static boolean foreign(StoreOrder o) {
+        String p = o.getPresentmentCurrency();
+        return p != null && p.length() > 0 && !p.equals(o.getCurrency())
+                && o.getPresentmentTotalCents() > 0;
+    }
+
+    /// The part of the order's card charge, in its presentment currency, that
+    /// gives back `settlementCents` of the store's: the same share of the
+    /// presentment total as of the store total, half up, never more than
+    /// `cardLeft`. For an order in the store's currency it is `settlementCents`.
+    public static long presentmentRefund(StoreOrder o, long settlementCents, long cardLeft) {
+        if (!foreign(o)) {
+            return Math.min(settlementCents, cardLeft);
+        }
+        long p = scale(settlementCents, o.getPresentmentTotalCents(), o.getTotalCents());
+        return Math.max(0, Math.min(p, cardLeft));
+    }
+
+    /// `amount * to / from`, half up; 0 when `from` is 0 or less. Overflow is a 400.
+    static long scale(long amount, long to, long from) {
+        if (from <= 0) {
+            return 0;
+        }
+        try {
+            return Math.addExact(Math.multiplyExact(amount, to), from / 2) / from;
+        } catch (ArithmeticException overflow) {
+            throw new ResponseStatusException(400, "That amount is too large");
+        }
     }
 
     /// What a refund request is worth; 400 for one that asks for more than
@@ -611,12 +659,13 @@ public class Orders {
 
     @Transactional(rollbackFor = IOException.class)
     private StoreOrder recordRefund(String orderId, RefundRequestDto req, long amount,
-            String username) throws IOException {
+            String username, long presentmentCents) throws IOException {
         StoreOrder order = orders.findById(orderId);
         Refund refund = new Refund();
         refund.setId(Ids.next());
         refund.setOrderId(orderId);
         refund.setAmountCents(amount);
+        refund.setPresentmentCents(presentmentCents);
         refund.setShippingCents(req.shippingCents());
         refund.setReason(Codes.cut(req.reason(), 500));
         refund.setRestock(req.restock());

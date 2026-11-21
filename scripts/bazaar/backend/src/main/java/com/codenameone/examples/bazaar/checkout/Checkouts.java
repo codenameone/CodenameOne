@@ -38,6 +38,7 @@ import com.codenameone.examples.bazaar.events.StoreEvents;
 import com.codenameone.examples.bazaar.giftcard.GiftCards;
 import com.codenameone.examples.bazaar.inventory.Inventory;
 import com.codenameone.examples.bazaar.order.Orders;
+import com.codenameone.examples.bazaar.market.Markets;
 import com.codenameone.examples.bazaar.pay.Payments;
 import com.codenameone.examples.bazaar.pricing.DiscountEngine;
 import com.codenameone.examples.bazaar.pricing.ShippingCalculator;
@@ -140,6 +141,23 @@ public class Checkouts {
     ///     `req.paymentMethodId()` (or the account's default)
     public OrderDto place(String username, String storeId, String headerKey, PlaceOrderDto req,
             Cart given, Payments.OneOffCard card) throws IOException {
+        return place(username, storeId, headerKey, req, given, card, null);
+    }
+
+    /// [#place] charged in the shopper's market currency.
+    ///
+    /// Prices are worked out in the store's currency, as always; the amount
+    /// due is then converted at `pricer`'s rate -- the rate the storefront
+    /// showed, locked for this order -- and held on the card in the market's
+    /// currency. The order keeps both: its totals in the store's currency
+    /// (what the books settle in) and the presentment currency, total and
+    /// rate (what the shopper paid), so refunds go back in what was charged
+    /// (`Orders.presentmentRefund`).
+    ///
+    /// @param pricer the shopper's market, or null (or one in the store's
+    ///     currency) to charge the store's currency
+    public OrderDto place(String username, String storeId, String headerKey, PlaceOrderDto req,
+            Cart given, Payments.OneOffCard card, Markets.Pricer pricer) throws IOException {
         if (req == null) {
             throw new ResponseStatusException(400, "Say where the order goes");
         }
@@ -234,15 +252,25 @@ public class Checkouts {
 
         long due = quote.dueCents();
         String reference = "";
+        String chargeCurrency = quote.store.getCurrency();
+        long charge = due;
+        long rate = 0;
+        long presentmentTotal = 0;
+        if (pricer != null && !pricer.currency().equals(quote.store.getCurrency())) {
+            rate = pricer.rateMicros();
+            chargeCurrency = pricer.currency();
+            charge = atRate(due, rate);
+            presentmentTotal = atRate(quote.totalCents, rate);
+        }
         if (due > 0) {
             String method = empty(req.paymentMethodId()) ? payments.defaultMethod(username)
                     : req.paymentMethodId();
             try {
                 reference = card != null
-                        ? payments.authorizeCard(orderId, username, card, due,
-                            quote.store.getCurrency())
-                        : payments.authorize(orderId, username, method, due,
-                            quote.store.getCurrency());
+                        ? payments.authorizeCard(orderId, username, card, charge,
+                            chargeCurrency)
+                        : payments.authorize(orderId, username, method, charge,
+                            chargeCurrency);
             } catch (IOException | RuntimeException failed) {
                 // The fraud score counts refused payments; the order itself is erased.
                 holds.recordFailure(storeId, username);
@@ -252,6 +280,9 @@ public class Checkouts {
             }
         }
         StoreOrder done = finish(orderId, quote, due, reference, username);
+        if (rate > 0) {
+            done = presentment(orderId, chargeCurrency, presentmentTotal, rate);
+        }
         if (quote.exemptCertificate != null) {
             exemptions.recordUse(storeId, orderId, quote.exemptCertificate);
         }
@@ -332,6 +363,26 @@ public class Checkouts {
             discounts.unuse(rows.get(iter).getDiscountId());
         }
         uses.deleteByOrderId(orderId);
+    }
+
+    /// Store cents at a rate in millionths, half up; a total too large is a 400.
+    public static long atRate(long cents, long rateMicros) {
+        try {
+            return Math.addExact(Math.multiplyExact(cents, rateMicros), 500000L) / 1000000L;
+        } catch (ArithmeticException overflow) {
+            throw new ResponseStatusException(400, "That order is too large to convert");
+        }
+    }
+
+    @Transactional(rollbackFor = IOException.class)
+    private StoreOrder presentment(String orderId, String currency, long total, long rate)
+            throws IOException {
+        StoreOrder order = orderRows.findById(orderId);
+        order.setPresentmentCurrency(currency);
+        order.setPresentmentTotalCents(total);
+        order.setFxRateMicros(rate);
+        orderRows.save(order);
+        return order;
     }
 
     @Transactional(rollbackFor = IOException.class)

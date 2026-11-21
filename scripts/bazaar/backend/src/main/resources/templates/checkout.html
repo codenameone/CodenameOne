@@ -1,7 +1,7 @@
 <!-- cn1:model page com.codenameone.examples.bazaar.web.PageMeta -->
 <!-- cn1:model checkout com.codenameone.examples.bazaar.web.CheckoutView -->
 <!doctype html>
-<html lang="en" xmlns:th="http://www.thymeleaf.org"><head th:replace="~{layout :: head}"></head><body th:attr="data-accent=${page.accent}"><header th:replace="~{layout :: header}"></header>
+<html lang="en" xmlns:th="http://www.thymeleaf.org"><head th:replace="~{layout :: head}"></head><body th:class="${page.themeClass}" th:attr="data-accent=${page.accent}"><header th:replace="~{layout :: header}"></header>
 <main class="wrap" id="main"><h1>Checkout</h1>
 <div class="empty-state" th:if="${checkout.empty}"><p>Your cart is empty.</p><a class="button" th:href="${page.home}">Keep shopping</a></div>
 <form th:unless="${checkout.empty}" method="post" th:action="${checkout.placeAction}" novalidate>

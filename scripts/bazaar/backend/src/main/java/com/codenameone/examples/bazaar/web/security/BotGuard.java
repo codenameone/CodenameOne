@@ -108,7 +108,7 @@ public class BotGuard {
             return false;
         }
         String p = request.pathFrom(0);
-        if ("/auth/signin".equals(p)) {
+        if ("/auth/signin".equals(p) || "/auth/signup".equals(p)) {
             return true;
         }
         return p != null && p.startsWith("/s/") && p.endsWith("/checkout/place");

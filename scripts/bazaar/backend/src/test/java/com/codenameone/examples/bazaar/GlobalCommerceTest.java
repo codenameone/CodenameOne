@@ -172,7 +172,7 @@ class GlobalCommerceTest {
         MockResponse eu = mvc.perform(get(page + "?market=eu").header("Host", SignIn.HOST))
                 .andReturn().getResponse();
         assertTrue(eu.getContentAsString().contains("9.20"), "converted price");
-        assertTrue(eu.getContentAsString().contains("checkout charges USD"));
+        assertTrue(eu.getContentAsString().contains("checkout charges EUR"));
         assertTrue(eu.getHeader("Link").contains("/products/gc-market-mug?market=eu>; "
                 + "rel=\"canonical\""), eu.getHeader("Link"));
         assertTrue(eu.getHeader("Cache-Control").contains("public"), eu.getHeader("Cache-Control"));

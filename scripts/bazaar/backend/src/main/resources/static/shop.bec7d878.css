@@ -93,3 +93,31 @@ h1{font-size:clamp(1.6rem,4vw,2.4rem);line-height:1.15;margin:24px 0 8px}
 
 /* Bot protection: the honeypot field people never see (BotGuard). */
 .hp{position:absolute;left:-10000px;width:1px;height:1px;overflow:hidden}
+/* Theme: the body carries th-<palette> font-<font> radius-<radius> from the
+   store's published theme (content/Themes); every value is a custom property. */
+body.th-warm{--bg:#fffaf3;--soft:#f7efe3;--line:#eadfce;--ink:#2b2118;--muted:#6b5d4f}
+body.th-dark{--bg:#121417;--soft:#1c1f24;--line:#2d3238;--ink:#eceef1;--muted:#a1a8b0}
+body.th-contrast{--bg:#fff;--soft:#f2f2f2;--line:#000;--ink:#000;--muted:#222}
+body{--font:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;--radius:10px;font-family:var(--font)}
+body.font-serif{--font:Georgia,"Times New Roman",serif}
+body.font-mono{--font:ui-monospace,Menlo,Consolas,monospace}
+body.font-humanist{--font:"Gill Sans","Trebuchet MS",Optima,sans-serif}
+body.font-rounded{--font:ui-rounded,"Arial Rounded MT Bold",system-ui,sans-serif}
+body.radius-square{--radius:0}
+body.radius-round{--radius:22px}
+.button,.card,input,select,textarea{border-radius:var(--radius)}
+.logo{max-height:40px;width:auto;vertical-align:middle}
+.menu ul{list-style:none;margin:0;padding:0;display:flex;gap:16px;flex-wrap:wrap}
+.menu li{position:relative}
+.menu li ul{display:none;position:absolute;background:var(--bg);border:1px solid var(--line);padding:8px;flex-direction:column;z-index:5}
+.menu li:hover>ul,.menu li:focus-within>ul{display:flex}
+.foot-links{display:flex;gap:16px;flex-wrap:wrap}
+.preview-note{background:var(--accent);color:#fff;text-align:center;margin:0;padding:6px}
+.rich{max-width:720px}
+.rt-b{font-weight:700}
+.rt-i{font-style:italic}
+.post-list{list-style:none;padding:0}
+.post-list li{border-bottom:1px solid var(--line);padding:12px 0}
+.specs dl{display:grid;grid-template-columns:max-content 1fr;gap:4px 16px}
+.specs dt{font-weight:600}
+.specs dd{margin:0}

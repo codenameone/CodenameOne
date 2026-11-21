@@ -537,6 +537,11 @@ public class Markets {
             return market;
         }
 
+        /// Store currency to market currency, in millionths, locked when the pricer was made.
+        public long rateMicros() {
+            return rateMicros;
+        }
+
         /// The price of `variantId` whose store price is `storeCents`.
         public long price(String variantId, long storeCents) {
             Long f = fixed.get(variantId);

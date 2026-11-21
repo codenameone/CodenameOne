@@ -50,11 +50,17 @@ public class Translations {
     public static final String PRODUCT = "PRODUCT";
     public static final String COLLECTION = "COLLECTION";
     public static final String PAGE = "PAGE";
+    /// A page or policy of the online store (`content.Pages`).
+    public static final String CONTENT = "CONTENT";
+    /// A blog post.
+    public static final String POST = "POST";
     /// The translatable fields of each kind.
     static final String[][] FIELDS = {
         {PRODUCT, "title", "description", "seoTitle", "seoDescription"},
         {COLLECTION, "title", "description"},
         {PAGE, "body"},
+        {CONTENT, "title", "body"},
+        {POST, "title", "excerpt", "body"},
     };
     /// The pages a store has: the privacy and cookie policy.
     public static final String[] PAGES = {"privacy"};
@@ -64,9 +70,15 @@ public class Translations {
     private final ProductRepository products;
     private final CollectionRepository collections;
     private final StoreAccess access;
+    private final com.codenameone.examples.bazaar.repository.ContentPageRepository pages;
+    private final com.codenameone.examples.bazaar.repository.BlogPostRepository posts;
 
     public Translations(TranslationRepository rows, ProductRepository products,
-            CollectionRepository collections, StoreAccess access) {
+            CollectionRepository collections, StoreAccess access,
+            com.codenameone.examples.bazaar.repository.ContentPageRepository pages,
+            com.codenameone.examples.bazaar.repository.BlogPostRepository posts) {
+        this.pages = pages;
+        this.posts = posts;
         this.rows = rows;
         this.products = products;
         this.collections = collections;
@@ -84,7 +96,7 @@ public class Translations {
                 return out;
             }
         }
-        throw new ResponseStatusException(400, "Translations are of a PRODUCT, COLLECTION or PAGE");
+        throw new ResponseStatusException(400, "Translations are of a PRODUCT, COLLECTION, PAGE, CONTENT or POST");
     }
 
     /// Every translation of one thing, for the editor.
@@ -134,6 +146,12 @@ public class Translations {
         requireRef(storeId, in.kind(), in.refId());
         String locale = Locales.normalize(in.locale());
         String value = in.value() == null ? "" : in.value().trim();
+        if ("body".equals(in.field()) && (CONTENT.equals(in.kind()) || POST.equals(in.kind()))) {
+            // Rich text, drawn on the storefront: held to the same allow-list
+            // as the original (content.RichText), so a translation cannot
+            // carry what the original could not.
+            value = com.codenameone.examples.bazaar.content.RichText.sanitize(value).trim();
+        }
         if (value.length() > MAX_BODY) {
             throw new ResponseStatusException(400, "A translation is at most " + MAX_BODY
                     + " characters");
@@ -179,6 +197,15 @@ public class Translations {
             Collection c = collections.findById(refId);
             out.put("title", c.getTitle());
             out.put("description", c.getDescription());
+        } else if (CONTENT.equals(kind)) {
+            com.codenameone.examples.bazaar.domain.ContentPage c = pages.findById(refId);
+            out.put("title", c.getTitle());
+            out.put("body", c.getBody());
+        } else if (POST.equals(kind)) {
+            com.codenameone.examples.bazaar.domain.BlogPost b = posts.findById(refId);
+            out.put("title", b.getTitle());
+            out.put("excerpt", b.getExcerpt());
+            out.put("body", b.getBody());
         } else {
             out.put("body", privacyText == null ? "" : privacyText);
         }
@@ -195,6 +222,14 @@ public class Translations {
         } else if (COLLECTION.equals(kind)) {
             Collection c = collections.findById(refId);
             ok = c != null && storeId.equals(c.getStoreId());
+        } else if (CONTENT.equals(kind)) {
+            com.codenameone.examples.bazaar.domain.ContentPage c =
+                    refId.length() > 32 ? null : pages.findById(refId);
+            ok = c != null && storeId.equals(c.getStoreId());
+        } else if (POST.equals(kind)) {
+            com.codenameone.examples.bazaar.domain.BlogPost b =
+                    refId.length() > 32 ? null : posts.findById(refId);
+            ok = b != null && storeId.equals(b.getStoreId());
         } else {
             ok = false;
             for (int iter = 0; iter < PAGES.length; iter++) {

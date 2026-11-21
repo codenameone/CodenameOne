@@ -90,6 +90,13 @@ public class StorefrontPages {
 
     private final com.codenameone.examples.bazaar.market.Markets markets;
     private final com.codenameone.examples.bazaar.market.Translations translations;
+    private final com.codenameone.examples.bazaar.content.Themes themes;
+    private final com.codenameone.examples.bazaar.content.Navigation navigation;
+    private final com.codenameone.examples.bazaar.content.Pages content;
+    private final com.codenameone.examples.bazaar.content.Metafields metafields;
+
+    /// The exchange attribute a signed theme preview sets (see [StorefrontCaching]).
+    public static final String PREVIEW = "bazaar.themePreview";
 
     private final com.codenameone.examples.bazaar.ops.Attribution attribution;
     private final com.codenameone.examples.bazaar.ops.ChatInbox chatInbox;
@@ -102,7 +109,15 @@ public class StorefrontPages {
             com.codenameone.examples.bazaar.market.Markets markets,
             com.codenameone.examples.bazaar.market.Translations translations,
             com.codenameone.examples.bazaar.ops.Attribution attribution,
-            com.codenameone.examples.bazaar.ops.ChatInbox chatInbox) {
+            com.codenameone.examples.bazaar.ops.ChatInbox chatInbox,
+            com.codenameone.examples.bazaar.content.Themes themes,
+            com.codenameone.examples.bazaar.content.Navigation navigation,
+            com.codenameone.examples.bazaar.content.Pages content,
+            com.codenameone.examples.bazaar.content.Metafields metafields) {
+        this.themes = themes;
+        this.navigation = navigation;
+        this.content = content;
+        this.metafields = metafields;
         this.attribution = attribution;
         this.chatInbox = chatInbox;
         this.subscriptions = subscriptions;
@@ -185,7 +200,26 @@ public class StorefrontPages {
                 .addAttribute("tagline", store.getTagline())
                 .addAttribute("about", store.getDescription())
                 .addAttribute("collections", links)
-                .addAttribute("products", cards(store, featured.items(), null));
+                .addAttribute("products", cards(store, featured.items(), null))
+                .addAttribute("posts", latestPosts(store));
+    }
+
+    /// The three newest posts, for the home page's blog section.
+    private List<PostView> latestPosts(Store store) throws IOException {
+        List<com.codenameone.examples.bazaar.domain.BlogPost> rows =
+                content.publishedPosts(store.getId(), null);
+        List<PostView> out = new ArrayList<PostView>();
+        for (int iter = 0; iter < rows.size() && iter < 3; iter++) {
+            com.codenameone.examples.bazaar.domain.BlogPost b = rows.get(iter);
+            PostView v = new PostView();
+            v.title = b.getTitle();
+            v.excerpt = b.getExcerpt();
+            v.author = b.getAuthor();
+            v.date = day(b.getPublishedAt());
+            v.url = storeUrl(store.getHandle()) + "/blog/" + SiteUrls.encode(b.getHandle());
+            out.add(v);
+        }
+        return out;
     }
 
     /// A published collection, a page of it, in the order asked for.
@@ -356,10 +390,16 @@ public class StorefrontPages {
                     ? Money.format(pricer == null ? chosen.compareAtCents()
                         : pricer.price("", chosen.compareAtCents()), shown) : "";
             if (pricer != null) {
-                view.marketNote = "Shown in " + shown + "; checkout charges "
-                        + store.getCurrency() + ".";
+                // Checkout charges the market's currency at this rate
+                // (Checkouts.place), so the price shown is the price paid.
+                view.marketNote = "Shown in " + shown + "; checkout charges " + shown + ".";
             }
             view.available = sellable(chosen);
+            java.util.List<com.codenameone.examples.bazaar.api.MetafieldValueDto> fields =
+                    metafields.storefront(store.getId(), "PRODUCT", p.id());
+            for (int iter = 0; iter < fields.size(); iter++) {
+                view.specs.add(new String[] {fields.get(iter).name(), fields.get(iter).value()});
+            }
             // The same for every visitor, so the page stays public and cached.
             java.util.List<com.codenameone.examples.bazaar.api.SellingPlanDto> plans =
                     subscriptions.productPlans(store.getId(), p.id());
@@ -699,11 +739,76 @@ public class StorefrontPages {
         page.chatUrl = "/s/" + store.getHandle() + "/chat";
         page.description = describe(store.getTagline());
         try {
+            decorate(page, store, request);
             slots.decorate(page, store, request);
         } catch (IOException e) {
             throw new java.io.UncheckedIOException(e);
         }
         return page;
+    }
+
+    /// The theme (or a signed preview of the draft), the logo, the menus and
+    /// the policy links every storefront page carries.
+    private void decorate(PageMeta page, Store store, HttpServer.Request request)
+            throws IOException {
+        com.codenameone.examples.bazaar.domain.StoreTheme theme = null;
+        String token = param(request, "preview");
+        if (token != null) {
+            theme = themes.preview(store, token);
+        }
+        if (theme != null) {
+            page.preview = true;
+            page.noindex = true;
+            com.codename1.backend.security.SecurityExchange here =
+                    com.codename1.backend.security.SecurityExchange.current();
+            if (here != null) {
+                here.setAttribute(PREVIEW, "1");
+            }
+        } else {
+            theme = themes.liveOf(store.getId());
+        }
+        page.themeClass = com.codenameone.examples.bazaar.content.Themes.classes(theme);
+        if (theme.getAccent().length() == 7) {
+            page.accent = theme.getAccent();
+        }
+        String logo = theme.getLogoPhotoId();
+        if (logo.length() == 0) {
+            logo = store.getLogoPhotoId();
+        }
+        page.logoUrl = logo.length() > 0 ? "/media/" + logo : "";
+        page.sections = com.codenameone.examples.bazaar.content.Themes.sectionList(theme);
+        List<com.codenameone.examples.bazaar.domain.MenuLink> links =
+                navigation.ordered(store.getId());
+        MenuView top = null;
+        for (int iter = 0; iter < links.size(); iter++) {
+            com.codenameone.examples.bazaar.domain.MenuLink l = links.get(iter);
+            if (com.codenameone.examples.bazaar.content.Navigation.FOOTER.equals(l.getMenu())) {
+                page.footerLinks.add(new LinkView(l.getTitle(), l.getUrl(), false));
+            } else if (l.getParentId().length() == 0) {
+                top = new MenuView();
+                top.label = l.getTitle();
+                top.url = l.getUrl();
+                page.menu.add(top);
+            } else if (top != null) {
+                top.children.add(new LinkView(l.getTitle(), l.getUrl(), false));
+            }
+        }
+        List<com.codenameone.examples.bazaar.domain.ContentPage> policies =
+                content.publishedPolicies(store.getId());
+        for (int iter = 0; iter < policies.size(); iter++) {
+            com.codenameone.examples.bazaar.domain.ContentPage c = policies.get(iter);
+            page.footerLinks.add(new LinkView(c.getTitle(),
+                    storeUrl(store.getHandle()) + "/policies/" + c.getHandle(), false));
+        }
+    }
+
+    static String param(HttpServer.Request request, String name) {
+        try {
+            String v = request.param(name);
+            return v == null || v.length() == 0 ? null : v;
+        } catch (RuntimeException malformed) {
+            return null;
+        }
     }
 
     private List<CardView> cards(Store store, List<ProductCardDto> items, String skip) {

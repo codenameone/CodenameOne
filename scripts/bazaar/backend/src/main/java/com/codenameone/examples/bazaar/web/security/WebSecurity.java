@@ -168,10 +168,12 @@ public class WebSecurity {
     @Bean
     @Order(4)
     public SecurityFilterChain shopChain(HttpSecurity http,
-            @Value("${bazaar.web.hsts:true}") boolean hsts) throws IOException {
+            @Value("${bazaar.web.hsts:true}") boolean hsts,
+            com.codenameone.examples.bazaar.web.StorefrontRedirects redirects) throws IOException {
         http.securityMatcher("/", "/s/**", "/track/**", "/consent", "/consent/**")
             .csrf(c -> c.disable())
             .addFilterBefore(ErrorPages.filter(), RateLimitFilter.class)
+            .addFilterBefore(redirects.filter(), RateLimitFilter.class)
             .addFilterBefore(new WebHeaders(hsts, true), CsrfFilter.class)
             .addFilterBefore(new PageEtags(), CsrfFilter.class)
             .authorizeHttpRequests(auth -> auth.anyRequest().permitAll());
