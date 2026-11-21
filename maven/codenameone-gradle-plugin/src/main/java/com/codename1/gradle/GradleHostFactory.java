@@ -95,6 +95,18 @@ public final class GradleHostFactory {
                                      FileCollection classpath, List<String> sourceRoots, List<String> artifacts,
                                      FileCollection frameworkJars, String codenameOneVersion,
                                      List<String> ports, FileCollection portJars) {
+        return create(task, log, layout, finalName, groupId, projectProperties, userProperties, classpath,
+                sourceRoots, artifacts, frameworkJars, codenameOneVersion, ports, portJars, null);
+    }
+
+    /// As above, with the artifacts the builder fetches only when it finds the
+    /// application needs them (`Executor.setOnDemandArtifacts`); nothing reads
+    /// `onDemandJars` before that.
+    public static ProjectHost create(Task task, Log log, ProjectLayout layout, String finalName, String groupId,
+                                     Map<String, String> projectProperties, Map<String, String> userProperties,
+                                     FileCollection classpath, List<String> sourceRoots, List<String> artifacts,
+                                     FileCollection frameworkJars, String codenameOneVersion,
+                                     List<String> ports, FileCollection portJars, FileCollection onDemandJars) {
         GradleProjectHost host = (GradleProjectHost) create(task, log, layout, finalName, groupId,
                 projectProperties, userProperties, classpath, sourceRoots, artifacts, frameworkJars,
                 codenameOneVersion);
@@ -108,6 +120,7 @@ public final class GradleHostFactory {
             }
             host.portJars(resolved);
         }
+        host.onDemandJars(onDemandJars);
         return host;
     }
 

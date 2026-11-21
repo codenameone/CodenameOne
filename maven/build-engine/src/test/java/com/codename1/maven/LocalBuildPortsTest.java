@@ -29,6 +29,7 @@ import java.util.Collections;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 
 /// The ports each local target reads.
 ///
@@ -38,38 +39,47 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 /// found". The table is therefore spelled out here a second time, so that a
 /// change to it is a change someone made on purpose.
 class LocalBuildPortsTest {
-    private static final String DICT = AppBuilder.SPELLCHECK_DICTIONARIES;
-
     private static final String VM = "codenameone-parparvm:bundle";
 
     private static List<String> ports(String target) {
         return AppBuilder.portArtifacts(target);
     }
 
+    /// The spell checking dictionaries are fetched only after the builder finds an
+    /// application that uses SpellChecker; listed here they would be downloaded by every
+    /// local build.
+    @Test
+    void noTargetListsTheSpellcheckDictionaries() {
+        for (String t : new String[] {"ios-source", "android-source", "local-android-device",
+                "mac-source", "windows-source", "local-linux-device", "local-steam", "javascript"}) {
+            assertFalse(ports(t).contains("codenameone-spellcheck-dictionaries"), t);
+        }
+    }
+
     @Test
     void iosAndMacReadTheirPortAndTheTranslator() {
-        assertEquals(Arrays.asList("codenameone-ios:bundle", VM, DICT), ports("ios-source"));
-        assertEquals(Arrays.asList("codenameone-mac:bundle", VM, DICT), ports("mac-source"));
-        assertEquals(Arrays.asList("codenameone-mac:bundle", VM, DICT), ports("local-mac-device"));
+        assertEquals(Arrays.asList("codenameone-ios:bundle", VM), ports("ios-source"));
+        assertEquals(Arrays.asList("codenameone-mac:bundle", VM), ports("mac-source"));
+        assertEquals(Arrays.asList("codenameone-mac:bundle", VM), ports("local-mac-device"));
     }
 
     @Test
     void windowsLinuxAndSteamReadTheirPortAndTheTranslator() {
-        assertEquals(Arrays.asList("codenameone-windows:bundle", VM, DICT), ports("windows-source"));
-        assertEquals(Arrays.asList("codenameone-windows:bundle", VM, DICT), ports("local-windows-device"));
-        assertEquals(Arrays.asList("codenameone-linux:bundle", VM, DICT), ports("local-linux-device"));
-        assertEquals(Arrays.asList("codenameone-linux:bundle", VM, DICT), ports("local-steam"));
+        assertEquals(Arrays.asList("codenameone-windows:bundle", VM), ports("windows-source"));
+        assertEquals(Arrays.asList("codenameone-windows:bundle", VM), ports("local-windows-device"));
+        assertEquals(Arrays.asList("codenameone-linux:bundle", VM), ports("local-linux-device"));
+        assertEquals(Arrays.asList("codenameone-linux:bundle", VM), ports("local-steam"));
     }
 
     @Test
     void androidReadsItsPortAlone() {
-        assertEquals(Arrays.asList("codenameone-android", DICT), ports("android-source"));
+        assertEquals(Collections.singletonList("codenameone-android"), ports("android-source"));
     }
 
     @Test
     void javascriptReadsTheTranslatorBundleAlone() {
         // The JavaScript port and the proxy servlets travel in the translator's bundle.
-        assertEquals(Arrays.asList(VM, DICT), ports("local-javascript"));
+        assertEquals(Collections.singletonList(VM), ports("local-javascript"));
     }
 
     @Test

@@ -1691,7 +1691,10 @@ public class AppBuilder {
     /// `local-mac-device` has to be recognised before anything asks whether a target
     /// "contains ios".
     /// The Hunspell dictionaries every local target can add to an application.
-    static final String SPELLCHECK_DICTIONARIES = "codenameone-spellcheck-dictionaries";
+
+    /// The spell checking dictionaries: NOT a port, and in no target's list. A build fetches
+    /// them on demand, only for an application the builder finds using SpellChecker.
+    public static final String SPELLCHECK_DICTIONARIES = "codenameone-spellcheck-dictionaries";
 
     enum LocalBuild {
         // Native ParparVM Windows cross-compile (clang-cl) and the windows-source
@@ -1713,11 +1716,7 @@ public class AppBuilder {
         private final List<String> ports;
 
         LocalBuild(String... ports) {
-            List<String> all = new ArrayList<String>(Arrays.asList(ports));
-            // Data, not a port, resolved the same way: Executor reads the dictionaries it adds
-            // to an application that uses SpellChecker from it (SpellcheckDictionaries).
-            all.add(SPELLCHECK_DICTIONARIES);
-            this.ports = Collections.unmodifiableList(all);
+            this.ports = Collections.unmodifiableList(Arrays.asList(ports));
         }
 
         /// The builder `buildTarget` runs, or null when it is not a local target
@@ -1770,6 +1769,14 @@ public class AppBuilder {
         for (File jar : resolvePorts()) {
             builder.addPortJar(jar);
         }
+        // Not a port: data only an application that uses SpellChecker needs. The builder
+        // asks for it after it has scanned the application, so no other build fetches it.
+        builder.setOnDemandArtifacts(new Executor.OnDemandArtifacts() {
+            @Override
+            public File resolve(String artifactId) {
+                return host.getPortJar(artifactId, null);
+            }
+        });
     }
 
     /// The jars of [#portArtifacts(String)] for this build's target, in that order.

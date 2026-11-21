@@ -805,6 +805,22 @@ final class AppSupport {
             return out;
         })).orElse(Collections.<org.gradle.api.artifacts.Dependency>emptyList()));
 
+        // Data only an application that uses SpellChecker needs. Not an input: the task
+        // reads these files only when the builder has found the class in the application,
+        // so no other build ever resolves -- or downloads -- them.
+        final Configuration onDemand = resolvable(project, "cn1OnDemand"
+                + name.substring(0, 1).toUpperCase(java.util.Locale.ROOT) + name.substring(1),
+                "Artifacts a local build of " + name + " fetches only when the application needs them");
+        onDemand.setTransitive(false);
+        onDemand.getDependencies().addAllLater(targetProvider.flatMap(target -> portVersion.map(v -> {
+            List<org.gradle.api.artifacts.Dependency> out = new ArrayList<org.gradle.api.artifacts.Dependency>();
+            if (!com.codename1.maven.AppBuilder.portArtifacts(target).isEmpty()) {
+                out.add(project.getDependencies().create(PluginInfo.GROUP + ":"
+                        + com.codename1.maven.AppBuilder.SPELLCHECK_DICTIONARIES + ":" + v));
+            }
+            return out;
+        })).orElse(Collections.<org.gradle.api.artifacts.Dependency>emptyList()));
+
         project.getTasks().register(name, Cn1BuildTask.class, t -> {
             common(t, project, layout, ext, userProperties);
             t.setGroup(BUILD_GROUP);
@@ -824,6 +840,7 @@ final class AppSupport {
             t.getOpen().set(ext.getOpenGeneratedProjects());
             t.getFrameworkJars().from(framework);
             t.getPortJars().from(ports);
+            t.getOnDemandJars().from(onDemand);
             // Resolve after build-script configuration, including Kotlin and added/generated roots.
             t.getSourceRoots().set(project.provider(() -> sourceRoots(main, layout)));
             t.getFinalName().set(project.getName());

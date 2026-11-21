@@ -130,6 +130,84 @@ class SpellcheckDictionariesTest {
         assertEquals(Arrays.asList("en_US"), SpellcheckDictionaries.languages(" "));
     }
 
+    /// The class path hides the dictionaries, as a customer's build tool's does: only the
+    /// on-demand fetch can supply them.
+    private static final class CustomerExecutor extends Executor {
+        int fetches;
+
+        CustomerExecutor() {
+            setOnDemandArtifacts(new OnDemandArtifacts() {
+                @Override
+                public File resolve(String artifactId) {
+                    fetches++;
+                    assertEquals("codenameone-spellcheck-dictionaries", artifactId);
+                    String u = SpellcheckDictionaries.class.getResource("/cn1dict/languages.txt").toString();
+                    // jar:file:/.../x.jar!/cn1dict/languages.txt
+                    return new File(java.net.URI.create(u.substring(4, u.indexOf("!/"))));
+                }
+            });
+        }
+
+        @Override
+        public java.io.InputStream getResourceAsStream(String res) {
+            return res.startsWith("/cn1dict/") || res.startsWith("/META-INF/licenses/") ? openPortResourceForTest(res)
+                    : super.getResourceAsStream(res);
+        }
+
+        private java.io.InputStream openPortResourceForTest(String res) {
+            for (File jar : getPortJars()) {
+                try {
+                    ZipFile z = new ZipFile(jar);
+                    ZipEntry e = z.getEntry(res.substring(1));
+                    if (e != null) {
+                        return z.getInputStream(e);
+                    }
+                    z.close();
+                } catch (java.io.IOException err) {
+                    throw new IllegalStateException(err);
+                }
+            }
+            return null;
+        }
+
+        @Override
+        protected String getDeviceIdCode() {
+            return "";
+        }
+
+        @Override
+        protected String generatePeerComponentCreationCode(String methodCallString) {
+            return "";
+        }
+
+        @Override
+        protected String convertPeerComponentToNative(String param) {
+            return "";
+        }
+
+        @Override
+        public boolean build(File sourceZip, BuildRequest request) {
+            return true;
+        }
+    }
+
+    @Test
+    void theDictionariesAreFetchedOnlyForAnAppThatUsesSpellChecker() throws Exception {
+        CustomerExecutor plain = new CustomerExecutor();
+        File j = jar("d.jar", "app/Main.class", classWith("com/codename1/ui/Form"));
+        assertSame(j, SpellcheckDictionaries.inject(plain, j, new BuildRequest()));
+        assertEquals(0, plain.fetches);
+        assertTrue(plain.getPortJars().isEmpty());
+
+        CustomerExecutor user = new CustomerExecutor();
+        File k = jar("e.jar", "app/Main.class", classWith("com/codename1/spellcheck/SpellChecker"));
+        File out = SpellcheckDictionaries.inject(user, k, new BuildRequest());
+        assertEquals(1, user.fetches);
+        try (ZipFile z = new ZipFile(out)) {
+            assertNotNull(z.getEntry("cn1dict_en_US.dic"));
+        }
+    }
+
     private static byte[] readAll(ZipFile z, String name) throws Exception {
         try (java.io.InputStream in = z.getInputStream(z.getEntry(name))) {
             java.io.ByteArrayOutputStream b = new java.io.ByteArrayOutputStream();

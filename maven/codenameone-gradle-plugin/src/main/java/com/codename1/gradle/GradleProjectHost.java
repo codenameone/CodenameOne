@@ -29,6 +29,7 @@ import com.codename1.project.ProjectLayout;
 import org.gradle.api.artifacts.component.ComponentIdentifier;
 import org.gradle.api.artifacts.component.ModuleComponentIdentifier;
 import org.gradle.api.artifacts.result.ResolvedArtifactResult;
+import org.gradle.api.file.FileCollection;
 
 import java.io.File;
 import java.io.IOException;
@@ -240,9 +241,25 @@ final class GradleProjectHost implements ProjectHost {
         this.portJars = resolved;
     }
 
+    private FileCollection onDemandJars;
+
+    /// Artifacts resolved only when the builder asks for one by name.
+    void onDemandJars(FileCollection value) {
+        this.onDemandJars = value;
+    }
+
     @Override
     public File getPortJar(String artifactId, String classifier) {
         File f = portJars.get(classifier == null ? artifactId : artifactId + ":" + classifier);
+        if (f == null && classifier == null && onDemandJars != null) {
+            // iterating resolves the configuration: this is the first and only time
+            List<String> wanted = Collections.singletonList(artifactId);
+            for (File candidate : onDemandJars) {
+                if (GradleHostFactory.portOf(candidate.getName(), wanted) != null) {
+                    return candidate;
+                }
+            }
+        }
         return f != null ? f : getJar("com.codenameone", artifactId, classifier);
     }
 

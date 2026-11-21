@@ -53,8 +53,9 @@ import java.util.zip.ZipOutputStream;
  * brings its own dictionaries.</p>
  *
  * <p>The dictionaries come from the {@code codenameone-spellcheck-dictionaries}
- * artifact, which the build tools resolve with the ports
- * ({@code AppBuilder.SPELLCHECK_DICTIONARIES}). They are written at the root of
+ * artifact. It is NOT one of a target's ports: the host fetches it through
+ * {@link Executor#setOnDemandArtifacts} only after the scan above found the class,
+ * so no other build ever downloads it. They are written at the root of
  * the jar as {@code cn1dict_<lang>.aff} and {@code .dic}, with
  * {@code cn1dict_languages.txt} listing them, because the Apple ports flatten
  * resource folders. A file the application already carries under one of those
@@ -64,6 +65,8 @@ final class SpellcheckDictionaries {
     static final String HINT_LANGUAGES = "spellcheck.languages";
     static final String HINT_ENABLED = "spellcheck.dictionaries";
     static final String DEFAULT_LANGUAGE = "en_US";
+    /// The artifact holding the dictionaries, fetched on demand.
+    public static final String ARTIFACT = "codenameone-spellcheck-dictionaries";
     private static final byte[] NEEDLE =
             "com/codename1/spellcheck/SpellChecker".getBytes(StandardCharsets.US_ASCII);
     private static final String OWN_PACKAGE = "com/codename1/spellcheck/";
@@ -86,6 +89,11 @@ final class SpellcheckDictionaries {
         }
         List<String> languages = languages(request.getArg(HINT_LANGUAGES, DEFAULT_LANGUAGE));
         InputStream indexStream = exec.getResourceAsStream(SOURCE_DIR + "languages.txt");
+        if (indexStream == null && exec.addOnDemandArtifact(ARTIFACT)) {
+            // fetched now, and only now: an application that never names SpellChecker
+            // never downloads the dictionaries
+            indexStream = exec.getResourceAsStream(SOURCE_DIR + "languages.txt");
+        }
         if (indexStream == null) {
             // A build host that does not resolve the artifact (an older cloud builder) builds
             // the app as before: SpellChecker.forLanguage then falls back to the platform

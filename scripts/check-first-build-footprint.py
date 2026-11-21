@@ -73,7 +73,7 @@ PORT_ARTIFACTS = (
     "codenameone-windows",
     "codenameone-linux",
     "codenameone-parparvm",
-    # data every local target reads like a port (AppBuilder.SPELLCHECK_DICTIONARIES)
+    # fetched only by a build of an app that uses SpellChecker, never by a first build
     "codenameone-spellcheck-dictionaries",
 )
 
