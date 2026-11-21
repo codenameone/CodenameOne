@@ -522,6 +522,51 @@ The seller's refresh token, from the marketplace's consent flow, is entered per
 channel; access tokens are refreshed and stored by the sync. Orders in another
 currency than the store's are logged as errors, not converted.
 
+=== Live services: carrier, VIES, exchange rates and geolocation
+
+Each of these talks to an outside service through a small interface, so the
+tests answer from canned replies and never reach the network. Each one is off,
+or simulated, until configured.
+
+*Carrier.* `bazaar.carrier.provider=easypost` selects `EasyPostCarrier`, which
+quotes rates, buys labels and tracks parcels through EasyPost's API. It needs
+`bazaar.carrier.easypost.key` and `bazaar.carrier.easypost.webhook-secret`;
+with either missing, the server logs what is absent and refuses to buy labels.
+`bazaar.carrier.origin.country`, `.postal`, `.city` and `.region` give the
+ship-from address. Point EasyPost's tracker webhook at
+`/api/carrier/webhooks/easypost`: the server checks the `X-Hmac-Signature`
+header against the secret and records the scans the way polling does. Polling
+stays on as a backstop, once per parcel every
+`bazaar.carrier.easypost.poll.minutes` (30 by default). A bought label keeps its
+printable URL on the shipment. Development profiles keep the simulated carrier.
+
+*VAT numbers.* When a company is saved, the server asks the European
+Commission's VIES service whether its VAT number is issued, and stores the
+outcome, the trader's name and the date on the company. A number VIES says is
+not issued is refused. When VIES or the member state's service is down, the
+company is saved as `unverified` and the next save asks again. Answers are
+cached for `bazaar.vat.cache-days` days (7 by default); outages are never
+cached. `bazaar.vat.registry=none` checks the format only, which is the default
+under the `test` profile, and `bazaar.vat.vies.url` points at another endpoint.
+
+*Exchange rates.* Each market chooses its rate source: the rate the merchant
+enters, or the European Central Bank's daily reference rates. A scheduled job
+fetches the ECB file every six hours, converts each rate to millionths, and
+derives the store's cross rates in integer arithmetic. The merchant's own rate
+stays beside the feed's, with the feed's source and publication date, and every
+order records which source priced it. `bazaar.fx.feed=off` stops the job, and
+`bazaar.fx.ecb.url` names another copy of the file.
+
+*Geolocation.* `bazaar.geo.trusted-headers` lists country headers a CDN in front
+of the server sets, such as `CF-IPCountry`, `CloudFront-Viewer-Country` or
+`X-Country-Code`. The list is empty by default, because without a proxy that
+overwrites them anyone can send those headers. `bazaar.geo.ranges` names an
+optional CSV file of IPv4 ranges (`first,last,country`) loaded at start. The
+storefront uses the country only to offer the matching market in a banner on
+the product page. A `?market=` link or the shopper's `market` cookie always
+wins, crawlers never see the banner, and the page's address and canonical URL
+stay the same. The fraud rule keeps its own header, `bazaar.risk.country-header`.
+
 === Before it's a product
 
 Bazaar runs a store end to end, but several parts are stand-ins for services a
@@ -533,10 +578,9 @@ business contracts for. Plan for these before taking real orders:
 * *A tax engine.* The tax rates are a table the merchant edits. Real sales tax and
   VAT depend on the product category, the destination, thresholds per
   jurisdiction and filing obligations, which a tax service tracks.
-* *Carrier contracts.* Shipping rates are the merchant's own table and labels are
-  rendered locally, and the carrier the back office buys labels from is
-  simulated, tracking events included. Live rates, purchased labels and tracking updates need
-  accounts with carriers or a shipping aggregator.
+* *Carrier rates at checkout.* Checkout still charges the merchant's own
+  shipping table. The live rates of a carrier account reach the back office's
+  label screen only.
 * *PCI scope.* Keep card entry on the provider's hosted page or SDK so card data
   never touches the app or the server, and confirm the deployment's
   self-assessment with the provider.
@@ -550,19 +594,10 @@ business contracts for. Plan for these before taking real orders:
   currency. The platform console adds store totals unconverted, which is only
   right while every store uses the same currency; reporting gross merchandise
   value across currencies needs exchange rates recorded at the time of each sale.
-* *VAT number verification.* Only the format of an EU VAT number is checked. A
-  production store calls the European Commission's VIES service when a company
-  is saved, handles its outages, and keeps the consultation number.
 * *Tax for B2B orders.* Quotes and B2B orders are priced net of tax. Reverse
   charge and per-company tax treatment need the tax engine above.
-* *Exchange rates.* Market rates are entered by the merchant; there is no rate
-  feed. Only two-decimal currencies are supported.
-* *Geolocation.* The fraud rule on the client's country reads a header from a
-  proxy or CDN. There is no IP database in the server, so without such a proxy
-  that rule adds nothing, and the storefront does not pick a market by location.
-* *Storefront interface text.* Products, collections, pages, posts, menu labels,
-  metafield names and metaobject entries are translated per market; the
-  storefront's own interface text (buttons, checkout labels) is not.
+* *Currencies with other than two decimals.* Only two-decimal currencies are
+  supported.
 * *Fraud scoring.* The fraud rules are a fixed point table. A store with real
   volume would add the payment provider's risk signals or a fraud service.
 * *Form signing keys.* The bot guard's and the theme preview's signing keys are

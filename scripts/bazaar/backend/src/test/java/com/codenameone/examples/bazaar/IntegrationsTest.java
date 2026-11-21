@@ -24,6 +24,11 @@ import com.codename1.backend.test.BackendTest;
 import com.codename1.backend.test.MockMvc;
 import com.codename1.backend.test.MockResponse;
 import com.codenameone.examples.bazaar.web.GeoCountry;
+import com.codenameone.examples.bazaar.api.RateQuoteDto;
+import com.codenameone.examples.bazaar.carrier.CarrierProvider;
+import com.codenameone.examples.bazaar.carrier.CarrierWebhook;
+import com.codenameone.examples.bazaar.carrier.EasyPostCarrier;
+import static com.codename1.backend.test.MockMvcRequestBuilders.post;
 import static com.codename1.backend.test.MockMvcRequestBuilders.get;
 import com.codenameone.examples.bazaar.account.Accounts;
 import com.codenameone.examples.bazaar.api.FxRateDto;
@@ -259,5 +264,90 @@ class IntegrationsTest {
         MockResponse res = mvc.perform(r.header("Host", SignIn.HOST)).andReturn().getResponse();
         assertEquals(200, res.getStatus());
         return res.getContentAsString();
+    }
+
+    // ============================================================= Carrier
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void easyPostRatesLabelsSignaturesAndTrackingAgainstCannedAnswers() throws Exception {
+        final List<String> calls = new java.util.ArrayList<String>();
+        String shipment = "{\"id\":\"shp_1\",\"rates\":["
+                + "{\"id\":\"rate_a\",\"carrier\":\"USPS\",\"service\":\"Priority\","
+                + "\"rate\":\"7.58\",\"delivery_days\":2},"
+                + "{\"id\":\"rate_b\",\"carrier\":\"UPS\",\"service\":\"Ground\",\"rate\":\"12\"},"
+                + "{\"id\":\"rate_c\",\"carrier\":\"X\",\"service\":\"Y\",\"rate\":\"1e3\"}]}";
+        EasyPostCarrier.Transport fake = (method, path, json) -> {
+            calls.add(method + " " + path);
+            if (path.equals("/shipments")) {
+                assertTrue(json.contains("\"zip\":\"10001\""), json);
+                return new EasyPostCarrier.Reply(201, shipment);
+            }
+            if (path.equals("/shipments/shp_1/buy")) {
+                assertTrue(json.contains("rate_a"), json);
+                return new EasyPostCarrier.Reply(200, "{\"tracking_code\":\"EZ100\","
+                        + "\"postage_label\":{\"label_url\":\"https://labels.example/1.png\"},"
+                        + "\"selected_rate\":{\"rate\":\"7.58\"}}");
+            }
+            if (path.startsWith("/trackers")) {
+                return new EasyPostCarrier.Reply(200, "{\"trackers\":[{\"tracking_code\":"
+                        + "\"EZ100\",\"tracking_details\":[{\"status\":\"pre_transit\"},"
+                        + "{\"status\":\"in_transit\",\"message\":\"Departed\",\"datetime\":"
+                        + "\"2026-11-20T10:00:00Z\",\"tracking_location\":{\"city\":\"Reno\"}}]}]}");
+            }
+            return new EasyPostCarrier.Reply(500, "");
+        };
+        CarrierProvider.Place origin = new CarrierProvider.Place("", "", "New York", 0, 0,
+                "10001", "NY", "US");
+        EasyPostCarrier ep = new EasyPostCarrier(fake, "whsec", origin, 60000L);
+        CarrierProvider.Place to = new CarrierProvider.Place("Ann", "1 Main St", "Austin", 0, 0,
+                "73301", "TX", "US");
+        CarrierProvider.Parcel parcel = new CarrierProvider.Parcel(500);
+        List<RateQuoteDto> rates = ep.rates(parcel, new CarrierProvider.Place("Shop", "", "",
+                0, 0), to);
+        assertEquals(2, rates.size());
+        assertEquals("USPS Priority", rates.get(0).service());
+        assertEquals(758L, rates.get(0).cents());
+        assertEquals(2, rates.get(0).days());
+        assertEquals(1200L, rates.get(1).cents());
+        CarrierProvider.Label label = ep.buyLabel(parcel, new CarrierProvider.Place("Shop", "",
+                "", 0, 0), to, "USPS Priority", "f1");
+        assertEquals("EZ100", label.trackingNumber);
+        assertEquals(758L, label.costCents);
+        assertEquals("https://labels.example/1.png", label.labelUrl);
+        assertThrows(IOException.class, () -> ep.buyLabel(parcel, origin, to, "FedEx Air", "f2"));
+        // Polling maps the statuses it knows and is throttled per parcel.
+        List<CarrierProvider.Scan> scans = ep.track("EZ100", 0, 1000000L, origin, to);
+        assertEquals(1, scans.size());
+        assertEquals("IN_TRANSIT", scans.get(0).status);
+        assertEquals("Reno", scans.get(0).place);
+        int before = calls.size();
+        assertTrue(ep.track("EZ100", 0, 1030000L, origin, to).isEmpty());
+        assertEquals(before, calls.size());
+        // Webhook signatures: HMAC-SHA256 of the raw body under the secret.
+        byte[] body = ("{\"description\":\"tracker.updated\",\"result\":{\"tracking_code\":"
+                + "\"EZ100\",\"tracking_details\":[{\"status\":\"delivered\",\"message\":"
+                + "\"Left at door\",\"datetime\":\"2026-11-21T09:00:00Z\"}]}}").getBytes("UTF-8");
+        String good = "hmac-sha256-hex=" + com.codenameone.examples.bazaar.Ids.hex(
+                com.codename1.backend.Crypto.hmacSha256("whsec".getBytes("UTF-8"), body));
+        assertTrue(ep.verify(body, good));
+        assertTrue(!ep.verify(body, good.substring(0, good.length() - 1) + "0"));
+        assertTrue(!ep.verify(body, null));
+        assertTrue(!new EasyPostCarrier(fake, "", origin, 0).verify(body, good));
+        Object[] event = EasyPostCarrier.event(new String(body, "UTF-8"));
+        assertEquals("EZ100", event[0]);
+        assertEquals("DELIVERED", ((List<CarrierProvider.Scan>) event[1]).get(0).status);
+        assertNull(EasyPostCarrier.event("{\"description\":\"batch.created\"}"));
+        // The webhook route refuses everything while EasyPost is not configured.
+        assertEquals(404, mvc.perform(post(CarrierWebhook.PATH).header("Host", SignIn.HOST)
+                .header(EasyPostCarrier.SIGNATURE_HEADER, good).content(new String(body,
+                "UTF-8"))).andReturn().getResponse().getStatus());
+        // Money is parsed by hand into cents.
+        assertEquals(758L, EasyPostCarrier.cents("7.58"));
+        assertEquals(50L, EasyPostCarrier.cents("0.5"));
+        assertEquals(1200L, EasyPostCarrier.cents("12"));
+        assertEquals(-1L, EasyPostCarrier.cents("7.581"));
+        assertEquals(-1L, EasyPostCarrier.cents("-3"));
+        assertEquals(-1L, EasyPostCarrier.cents("."));
     }
 }

@@ -27,10 +27,8 @@ import java.util.List;
 /// up: every call fails with an `IOException` naming what to fix, as an outage
 /// of the carrier would, and the problem is logged at start-up.
 ///
-/// There is deliberately no real carrier integration in this sample. A
-/// production store writes one more [CarrierProvider] (EasyPost and Shippo
-/// both take a parcel, two addresses and a service over REST and answer a
-/// label URL and a tracking number) and selects it in
+/// [EasyPostCarrier] without its key or webhook secret is one of these, so a
+/// half-configured account never buys labels; see
 /// [com.codenameone.examples.bazaar.Services#carrierProvider].
 public class MisconfiguredCarrier implements CarrierProvider {
     private final String provider;

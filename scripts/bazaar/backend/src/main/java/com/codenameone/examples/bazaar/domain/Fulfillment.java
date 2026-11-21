@@ -52,6 +52,10 @@ public class Fulfillment {
     @Column(nullable = false, type = "VARCHAR(64)")
     private String trackingNumber = "";
 
+    /// Where the carrier's printable label is, or empty.
+    @Column(nullable = false, type = "VARCHAR(500)")
+    private String labelUrl = "";
+
     @Column(nullable = false)
     private long labelCents;
 
@@ -161,5 +165,13 @@ public class Fulfillment {
 
     public void setUpdatedAt(Instant updatedAt) {
         this.updatedAt = updatedAt;
+    }
+
+    public String getLabelUrl() {
+        return labelUrl;
+    }
+
+    public void setLabelUrl(String labelUrl) {
+        this.labelUrl = labelUrl;
     }
 }

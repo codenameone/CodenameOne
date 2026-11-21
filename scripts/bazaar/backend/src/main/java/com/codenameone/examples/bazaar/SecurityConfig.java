@@ -166,6 +166,9 @@ public class SecurityConfig {
             // Marketplace order notifications: signed per channel, not signed in.
             .rateLimit(com.codenameone.examples.bazaar.channel.ChannelWebhook.PATH,
                     RateLimitKeys.clientAddress(), new InMemoryRateLimiter(120, 60))
+            // The carrier's tracking events: signed, not signed in.
+            .rateLimit(com.codenameone.examples.bazaar.carrier.CarrierWebhook.PATH,
+                    RateLimitKeys.clientAddress(), new InMemoryRateLimiter(120, 60))
             // tag::bazaar-api-rules[]
             .authorizeHttpRequests(auth -> auth
                     .requestMatchers(AntPathRequestMatcher.antMatcher("POST",
@@ -183,6 +186,8 @@ public class SecurityConfig {
                             com.codenameone.examples.bazaar.dispute.DisputeWebhook.PATH)).permitAll()
                     .requestMatchers(AntPathRequestMatcher.antMatcher("POST",
                             com.codenameone.examples.bazaar.channel.ChannelWebhook.PATH)).permitAll()
+                    .requestMatchers(AntPathRequestMatcher.antMatcher("POST",
+                            com.codenameone.examples.bazaar.carrier.CarrierWebhook.PATH)).permitAll()
                     .requestMatchers("/api/admin/**").hasRole(Roles.ADMIN)
                     .requestMatchers("/api/merchant/**").hasRole(Roles.MERCHANT)
                     .anyRequest().authenticated())

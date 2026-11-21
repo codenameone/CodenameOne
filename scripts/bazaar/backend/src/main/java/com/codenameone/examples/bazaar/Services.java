@@ -26,6 +26,7 @@ import com.codename1.backend.annotations.Configuration;
 import com.codename1.backend.annotations.Value;
 import com.codename1.backend.push.CloudPush;
 import com.codenameone.examples.bazaar.carrier.CarrierProvider;
+import com.codenameone.examples.bazaar.carrier.EasyPostCarrier;
 import com.codenameone.examples.bazaar.carrier.MisconfiguredCarrier;
 import com.codenameone.examples.bazaar.carrier.SimulatedCarrier;
 import com.codenameone.examples.bazaar.geo.Geocoder;
@@ -244,18 +245,46 @@ public class Services {
     /// distance, labels with made-up tracking numbers, and scans that walk
     /// each parcel to the door one `bazaar.carrier.simulated.step.seconds`
     /// (default 75) at a time. Unset, it is `simulated` on a development
-    /// profile; any other profile gets a [MisconfiguredCarrier], because the
-    /// sample ships no real carrier integration and must not print labels for
-    /// parcels nobody will collect. A real one is one more [CarrierProvider]
-    /// chosen here.
+    /// profile; any other profile gets a [MisconfiguredCarrier], so labels are
+    /// never printed for parcels nobody will collect.
+    ///
+    /// `easypost` is a real carrier account ([EasyPostCarrier]): it needs
+    /// `bazaar.carrier.easypost.key` and `bazaar.carrier.easypost.webhook-secret`,
+    /// and without both it is a [MisconfiguredCarrier] naming the missing one --
+    /// a missing key never selects it. `bazaar.carrier.origin.{country,postal,city,
+    /// region}` is the ship-from address, and `bazaar.carrier.easypost.poll.minutes`
+    /// (default 30) how often a parcel is polled besides the webhook.
     @Bean
     public CarrierProvider carrierProvider(Config config,
             @Value("${bazaar.carrier.provider:}") String chosen,
-            @Value("${bazaar.carrier.simulated.step.seconds:75}") int stepSeconds) {
+            @Value("${bazaar.carrier.simulated.step.seconds:75}") int stepSeconds)
+            throws IOException {
         String kind = chosen.trim().length() > 0 ? chosen.trim()
                 : config.isDevelopmentProfile() ? SimulatedCarrier.NAME : "";
         if (SimulatedCarrier.NAME.equalsIgnoreCase(kind)) {
             return new SimulatedCarrier(Math.max(1, stepSeconds) * 1000L);
+        }
+        if (EasyPostCarrier.NAME.equalsIgnoreCase(kind)) {
+            String key = config.get("bazaar.carrier.easypost.key", "").trim();
+            String secret = config.get("bazaar.carrier.easypost.webhook-secret", "").trim();
+            String missing = missing("bazaar.carrier.easypost.",
+                    new String[] {"key", key, "webhook-secret", secret});
+            if (missing.length() > 0) {
+                return new MisconfiguredCarrier(EasyPostCarrier.NAME, "set " + missing);
+            }
+            int minutes = 30;
+            try {
+                minutes = Integer.parseInt(config.get("bazaar.carrier.easypost.poll.minutes",
+                        "30").trim());
+            } catch (NumberFormatException bad) {
+                minutes = 30;
+            }
+            CarrierProvider.Place origin = new CarrierProvider.Place("", "",
+                    config.get("bazaar.carrier.origin.city", ""), 0, 0,
+                    config.get("bazaar.carrier.origin.postal", ""),
+                    config.get("bazaar.carrier.origin.region", ""),
+                    config.get("bazaar.carrier.origin.country", ""));
+            return EasyPostCarrier.live(key, secret, origin, Math.max(1, minutes) * 60000L);
         }
         if (kind.length() == 0) {
             return new MisconfiguredCarrier("none", "carrier provider is not configured; this "
@@ -263,7 +292,7 @@ public class Services {
                     + "simulated or add a CarrierProvider");
         }
         return new MisconfiguredCarrier(kind, "bazaar.carrier.provider is '" + kind
-                + "', which is not simulated");
+                + "', which is neither simulated nor easypost");
     }
 
     /// The names, after `prefix`, of the settings in `namesAndValues` whose

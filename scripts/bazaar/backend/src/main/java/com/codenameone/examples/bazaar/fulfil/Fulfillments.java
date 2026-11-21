@@ -402,6 +402,7 @@ public class Fulfillments {
         f.setService(label.service);
         f.setTrackingNumber(label.trackingNumber);
         f.setLabelCents(label.costCents);
+        f.setLabelUrl(Codes.cut(label.labelUrl, 500));
         f.setUpdatedAt(Instant.now());
         fulfillments.save(f);
         Location from = locations.findById(f.getLocationId());
@@ -849,20 +850,46 @@ public class Fulfillments {
                 String to = advanceOne(f, now);
                 if (to != null) {
                     changed++;
-                    if (OUT_FOR_DELIVERY.equals(to)) {
-                        notifyShopper(f.getOrderId(), "Out for delivery",
-                                "Your parcel arrives today.");
-                    } else if (DELIVERED.equals(to)) {
-                        notifyShopper(f.getOrderId(), "Delivered", "Your parcel was delivered.");
-                        emails.delivered(f.getId());
-                    }
-                    orderService.publish(orderRead(f.getStoreId(), f.getOrderId()));
+                    announce(f, to);
                 }
             } catch (IOException | RuntimeException err) {
                 System.err.println("[tracking] " + f.getTrackingNumber() + ": " + err);
             }
         }
         return changed;
+    }
+
+    /// Tells the shopper a parcel moved to `to` and republishes the order.
+    private void announce(Fulfillment f, String to) throws IOException {
+        if (OUT_FOR_DELIVERY.equals(to)) {
+            notifyShopper(f.getOrderId(), "Out for delivery", "Your parcel arrives today.");
+        } else if (DELIVERED.equals(to)) {
+            notifyShopper(f.getOrderId(), "Delivered", "Your parcel was delivered.");
+            emails.delivered(f.getId());
+        }
+        orderService.publish(orderRead(f.getStoreId(), f.getOrderId()));
+    }
+
+    /// Scans a carrier pushed for `trackingNumber` (its signed webhook): recorded
+    /// as polling records them, and the shopper hears the same news. Answers
+    /// false when no parcel of this carrier has that number.
+    public boolean trackingUpdate(String trackingNumber, List<CarrierProvider.Scan> scans)
+            throws IOException {
+        Fulfillment f = byTracking(trackingNumber);
+        if (f == null || !carrier.name().equals(f.getCarrier())) {
+            return false;
+        }
+        String to = recordScans(f.getId(), scans);
+        if (to != null) {
+            announce(f, to);
+        }
+        return true;
+    }
+
+    @Transactional(readOnly = true)
+    private Fulfillment byTracking(String trackingNumber) throws IOException {
+        return trackingNumber == null || trackingNumber.length() == 0 ? null
+                : fulfillments.findByTrackingNumber(trackingNumber);
     }
 
     @Transactional(readOnly = true)
@@ -1105,7 +1132,7 @@ public class Fulfillments {
                 f.getLocationId(), method(f), f.getStatus(), f.getCarrier(), f.getService(),
                 f.getTrackingNumber(), anonymous ? 0 : f.getLabelCents(), f.getWeightGrams(),
                 millis(f.getCreatedAt()), millis(f.getUpdatedAt()),
-                anonymous ? null : linesOf(f), evs);
+                anonymous ? null : linesOf(f), evs, anonymous ? "" : f.getLabelUrl());
     }
 
     private CarrierProvider.Place from(String locationId) {
@@ -1119,7 +1146,8 @@ public class Fulfillments {
 
     private static CarrierProvider.Place to(StoreOrder o) {
         return new CarrierProvider.Place(o.getShipName(), o.getShipLine1(), o.getShipCity(),
-                o.getShipLat(), o.getShipLng());
+                o.getShipLat(), o.getShipLng(), o.getShipPostal(), o.getShipRegion(),
+                o.getShipCountry());
     }
 
     @Transactional(readOnly = true)

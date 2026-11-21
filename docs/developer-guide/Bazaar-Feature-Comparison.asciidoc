@@ -156,8 +156,8 @@ on a row.
 
 | Shipping zones & rates | &#10003; | core | core | core | core | 
 | Weight/price-based rates | &#10003; | core | core | core | core | 
-| Carrier-calculated rates | &#9681; | core | app/plugin | core |  | A carrier interface; the bundled carrier is simulated.
-| Buy & print shipping labels | &#9681; | core | app/plugin | core |  | PDF labels 4 by 6 inches through the carrier interface; the bundled carrier is simulated.
+| Carrier-calculated rates | &#9681; | core | app/plugin | core |  | Live EasyPost rates on the back-office label screen; checkout charges the merchant's own table. Simulated in development.
+| Buy & print shipping labels | &#10003; | core | app/plugin | core |  | Labels bought through EasyPost, with tracking from its signed webhook and polling; local PDF labels 4 by 6 inches with the simulated carrier.
 | Local pickup | &#10003; | core | core | core | core | 
 | Local delivery (radius/zip) | &#10003; | core | app/plugin | core |  | 
 | Free-shipping threshold | &#10003; | core | core | core | core | 
@@ -278,7 +278,7 @@ on a row.
 |===
 | Feature | Bazaar | Shopify | WooCommerce | BigCommerce | Square | Notes
 
-| Company accounts with locations/buyers | &#10003; | core | app/plugin | core |  | Companies with sites and buyer customers.
+| Company accounts with locations/buyers | &#10003; | core | app/plugin | core |  | Companies with sites and buyer customers. EU VAT numbers are checked against VIES, and the outcome, trader name and date are kept on the company.
 | Price lists / catalogs per company | &#10003; | core | app/plugin | core |  | Fixed price per variant or a percentage off, applied in buyer quotes.
 | Net payment terms | &#10003; | core | app/plugin |  |  | Net 15, 30 or 60 with a due date, an invoice PDF and mark-paid.
 | Quantity rules / min order | &#10003; | core | app/plugin | core |  | Minimum, maximum and step per variant.
@@ -305,18 +305,18 @@ on a row.
 |===
 | Feature | Bazaar | Shopify | WooCommerce | BigCommerce | Square | Notes
 
-| Multi-currency storefront | &#10003; | core | app/plugin | core |  | Market prices in the local currency; checkout and refunds are charged in that currency. 
+| Multi-currency storefront | &#10003; | core | app/plugin | core |  | Market prices in the local currency; checkout and refunds are charged in that currency. Rates are the merchant's own or the European Central Bank's daily feed, per market, and each order keeps the rate it used. 
 | Multi-language storefront content | &#10003; | core | app/plugin | core |  | Pages, policies and posts translate per market, with hreflang alternates in the sitemap. 
 | Per-market pricing / price adjustments | &#10003; | core |  | core |  | Per-market price lists and adjustments. 
 | Duties & import taxes at checkout | &#8211; | core |  |  |  | 
 | Domains / subfolders per market | &#8211; | core |  |  |  | 
-| Geolocation redirects / country selector | &#9681; | core |  |  |  | A market selector with a cookie; no IP geolocation. 
+| Geolocation redirects / country selector | &#10003; | core |  |  |  | A market selector with a cookie, and a banner suggesting the market of the visitor's country from trusted CDN headers or an IP range table. It never redirects, so crawlers and canonical URLs are unaffected. 
 | Tax rates by region | &#10003; | core | core | core | core | 
 | Tax-inclusive pricing | &#10003; | core | core | core | core | 
 | Automatic tax calculation (United States and European Union) | &#8211; | core | app/plugin | core |  | 
 | Tax overrides per product/collection | &#8211; | core |  | core |  | 
 | Tax exemptions | &#10003; | core | core | core | core | Per customer, with certificate details. 
-| VAT/GST registration & reports | &#8211; |  |  |  |  | 
+| VAT/GST registration & reports | &#8211; |  |  |  |  | VAT numbers of business customers are verified with VIES; registration and filing reports are not covered.
 |===
 
 === Storefront, web and SEO

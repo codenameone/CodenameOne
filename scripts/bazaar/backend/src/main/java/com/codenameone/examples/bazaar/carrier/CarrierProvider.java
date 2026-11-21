@@ -26,8 +26,8 @@ import java.util.List;
 /// A parcel carrier: prices, labels and scans.
 ///
 /// [com.codenameone.examples.bazaar.Services#carrierProvider] picks one from
-/// `bazaar.carrier.provider`. Only [SimulatedCarrier] ships with the sample: a
-/// real integration (EasyPost, Shippo, a carrier's own API) is one more class
+/// `bazaar.carrier.provider`: [SimulatedCarrier] for development, or
+/// [EasyPostCarrier] for a real account. Another carrier is one more class
 /// implementing this, chosen there the way the payment provider is.
 public interface CarrierProvider {
     /// The carrier's name as stored on a fulfilment.
@@ -64,8 +64,20 @@ public interface CarrierProvider {
         public final String city;
         public final double lat;
         public final double lng;
+        /// Postal code, region and two-letter country; empty when unknown.
+        public final String postal;
+        public final String region;
+        public final String country;
 
         public Place(String name, String address, String city, double lat, double lng) {
+            this(name, address, city, lat, lng, "", "", "");
+        }
+
+        public Place(String name, String address, String city, double lat, double lng,
+                String postal, String region, String country) {
+            this.postal = postal == null ? "" : postal;
+            this.region = region == null ? "" : region;
+            this.country = country == null ? "" : country;
             this.name = name == null ? "" : name;
             this.address = address == null ? "" : address;
             this.city = city == null ? "" : city;
@@ -79,8 +91,15 @@ public interface CarrierProvider {
         public final String trackingNumber;
         public final String service;
         public final long costCents;
+        /// Where the printable label is, or empty.
+        public final String labelUrl;
 
         public Label(String trackingNumber, String service, long costCents) {
+            this(trackingNumber, service, costCents, "");
+        }
+
+        public Label(String trackingNumber, String service, long costCents, String labelUrl) {
+            this.labelUrl = labelUrl == null ? "" : labelUrl;
             this.trackingNumber = trackingNumber;
             this.service = service;
             this.costCents = costCents;

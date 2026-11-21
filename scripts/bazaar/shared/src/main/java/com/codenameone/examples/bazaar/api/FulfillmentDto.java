@@ -23,6 +23,9 @@ import com.codename1.annotations.Mapped;
 import java.util.List;
 
 /// A shipment of part or all of an order, with its lines and its tracking history.
+///
+/// `labelUrl` is where a real carrier's printable label is (empty for the
+/// simulated carrier and for a shopper's view).
 @Mapped
 public record FulfillmentDto(
         String id,
@@ -40,5 +43,6 @@ public record FulfillmentDto(
         long createdAt,
         long updatedAt,
         List<FulfilLineDto> lines,
-        List<TrackingEventDto> events) {
+        List<TrackingEventDto> events,
+        String labelUrl) {
 }
