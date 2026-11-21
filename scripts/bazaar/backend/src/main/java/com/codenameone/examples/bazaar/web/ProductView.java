@@ -33,6 +33,10 @@ public final class ProductView {
     public String currency = "";
     /// The market picker: links to this page in each market, or empty.
     public java.util.List<LinkView> markets = new java.util.ArrayList<LinkView>();
+    /// A banner suggesting the market of the visitor's country, or empty.
+    public String geoNote = "";
+    /// Where that banner links.
+    public String geoUrl = "";
     /// The language the text is translated to, or empty.
     public String lang = "";
     /// That checkout charges the store's currency, when another is shown.

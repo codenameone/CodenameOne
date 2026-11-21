@@ -22,6 +22,9 @@ import com.codename1.backend.DataSource;
 import com.codename1.backend.annotations.Autowired;
 import com.codename1.backend.test.BackendTest;
 import com.codename1.backend.test.MockMvc;
+import com.codename1.backend.test.MockResponse;
+import com.codenameone.examples.bazaar.web.GeoCountry;
+import static com.codename1.backend.test.MockMvcRequestBuilders.get;
 import com.codenameone.examples.bazaar.account.Accounts;
 import com.codenameone.examples.bazaar.api.FxRateDto;
 import com.codenameone.examples.bazaar.api.MarketDto;
@@ -84,6 +87,8 @@ class IntegrationsTest {
     private StoreRepository storeRows;
     @Autowired
     private VatVerification vat;
+    @Autowired
+    private GeoCountry geo;
 
     private Shop shop(String name) throws Exception {
         return new Shop(name, 300, accounts, stores, pricing, db, inventory, carts, checkouts, mvc);
@@ -190,5 +195,69 @@ class IntegrationsTest {
         assertEquals(before, asked[0]);
         assertEquals(VatIds.FORMAT, vat.verify("NL123456789B01", VatRegistry.NONE, now)
                 .status());
+    }
+
+    // ================================================================= Geo
+
+    @Test
+    void geoSuggestsAMarketOnlyFromTrustedHeadersAndNeverOverAChoice() throws Exception {
+        Shop s = shop("geo");
+        String currency = storeRows.findById(s.storeId).getCurrency();
+        String other = "USD".equals(currency) ? "EUR" : "USD";
+        markets.putRate(s.owner, s.storeId, new FxRateDto(other, 900000, 0, "", 0));
+        markets.save(s.owner, s.storeId, null, new MarketDto(null, "de", "Germany", other,
+                Arrays.asList("DE"), "", Markets.NONE, 0, true, Markets.MANUAL));
+        String page = "/s/geo/products/geo-mug";
+        String agent = "Mozilla/5.0 (Macintosh) Safari/605";
+        try {
+            // Untrusted by default: the header alone suggests nothing.
+            geo.setTrustedHeaders("");
+            assertTrue(!body(get(page).header("CF-IPCountry", "DE").header("User-Agent", agent))
+                    .contains("Shopping from DE"));
+            geo.setTrustedHeaders("CF-IPCountry,X-Country-Code");
+            String shown = body(get(page).header("CF-IPCountry", "de")
+                    .header("User-Agent", agent));
+            assertTrue(shown.contains("Shopping from DE"), "the banner");
+            assertTrue(shown.contains("?market=de"), "links the market");
+            // The suggestion never prices the page: still the store's own prices.
+            assertTrue(shown.contains(currency + " (store prices)"));
+            // Unknown and Tor count as none; the second trusted header is read.
+            assertTrue(!body(get(page).header("CF-IPCountry", "XX").header("User-Agent", agent))
+                    .contains("Shopping from"));
+            assertTrue(!body(get(page).header("CF-IPCountry", "T1").header("User-Agent", agent))
+                    .contains("Shopping from"));
+            assertTrue(body(get(page).header("X-Country-Code", "DE").header("User-Agent", agent))
+                    .contains("Shopping from DE"));
+            // Crawlers see the shared page.
+            assertTrue(!body(get(page).header("CF-IPCountry", "DE")
+                    .header("User-Agent", "Googlebot/2.1")).contains("Shopping from"));
+            // An explicit choice -- the cookie or the query -- always wins.
+            assertTrue(!body(get(page).header("CF-IPCountry", "DE").header("User-Agent", agent)
+                    .cookie("market", "de")).contains("Shopping from"));
+            assertTrue(!body(get(page + "?market=de").header("CF-IPCountry", "DE")
+                    .header("User-Agent", agent)).contains("Shopping from"));
+            // The pluggable lookup: a CSV range table by client address.
+            geo.setTrustedHeaders("");
+            GeoCountry.RangeTable table = new GeoCountry.RangeTable(Arrays.asList(
+                    "\"10.0.0.0\",\"10.255.255.255\",\"FR\"", "1.0.0.0,1.0.0.255,AU",
+                    "garbage", "5.0.0.0,4.0.0.0,US"));
+            assertEquals(2, table.size());
+            assertEquals("FR", table.country("10.1.2.3"));
+            assertEquals("AU", table.country("1.0.0.7"));
+            assertEquals(null, table.country("1.0.1.0"));
+            assertEquals(null, table.country("not-an-ip"));
+            geo.setLookup(address -> "DE");
+            assertTrue(body(get(page).header("User-Agent", agent)).contains("Shopping from DE"));
+        } finally {
+            geo.setTrustedHeaders("");
+            geo.setLookup(null);
+        }
+    }
+
+    private String body(com.codename1.backend.test.MockRequestBuilder r)
+            throws Exception {
+        MockResponse res = mvc.perform(r.header("Host", SignIn.HOST)).andReturn().getResponse();
+        assertEquals(200, res.getStatus());
+        return res.getContentAsString();
     }
 }

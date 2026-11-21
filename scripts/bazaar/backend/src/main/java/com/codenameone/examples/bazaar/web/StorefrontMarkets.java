@@ -90,11 +90,24 @@ public final class StorefrontMarkets {
         public Markets.Pricer pricer;
         public String locale;
         public final List<LinkView> picker = new ArrayList<LinkView>();
+        /// The market the visitor's country suggests ([GeoCountry]), offered in a
+        /// banner and never applied; null when there is none.
+        public LinkView suggested;
     }
 
     /// Chooses for `path` (no query) at `store`, and records the headers.
     public static Choice choose(Store store, String path, HttpServer.Request request,
             Markets markets, Translations translations, SiteUrls urls) throws IOException {
+        return choose(store, path, request, markets, translations, urls, null);
+    }
+
+    /// [#choose] that also suggests a market from the visitor's country when
+    /// `geo` knows it, the shopper chose nothing (no query, no cookie) and the
+    /// visitor is not a crawler. A page with a suggestion is private
+    /// ([Slots#PERSONAL]); its prices, address and canonical are unchanged.
+    public static Choice choose(Store store, String path, HttpServer.Request request,
+            Markets markets, Translations translations, SiteUrls urls, GeoCountry geo)
+            throws IOException {
         SecurityExchange ex = SecurityExchange.current();
         // Once per request: the page body and the menus every page carries
         // ask the same question, and the headers are recorded once.
@@ -118,6 +131,7 @@ public final class StorefrontMarkets {
             ex.setAttribute(Slots.PERSONAL, "1");
         }
         List<MarketDto> all = markets.active(store.getId());
+        boolean chose = code != null;
         StringBuilder links = new StringBuilder();
         String current = c.pricer == null ? null : c.pricer.market().getCode();
         c.picker.add(new LinkView(store.getCurrency() + " (store prices)", path, current == null));
@@ -133,6 +147,13 @@ public final class StorefrontMarkets {
                 }
                 links.append('<').append(urls.absolute(request, href))
                         .append(">; rel=\"alternate\"; hreflang=\"").append(lang).append('"');
+            }
+        }
+        if (geo != null && !chose && request != null
+                && !GeoCountry.crawler(request.getHeader("User-Agent"))) {
+            c.suggested = suggest(all, geo.country(request), path);
+            if (c.suggested != null && ex != null) {
+                ex.setAttribute(Slots.PERSONAL, "1");
             }
         }
         if (links.length() > 0) {
@@ -153,6 +174,25 @@ public final class StorefrontMarkets {
             }
         }
         return c;
+    }
+
+    /// The first active market selling to `country`, as a link, or null.
+    static LinkView suggest(List<MarketDto> all, String country, String path) {
+        if (country == null) {
+            return null;
+        }
+        for (int iter = 0; iter < all.size(); iter++) {
+            MarketDto m = all.get(iter);
+            List<String> cs = m.countries();
+            for (int at = 0; cs != null && at < cs.size(); at++) {
+                if (country.equalsIgnoreCase(cs.get(at))) {
+                    return new LinkView("Shopping from " + country + "? See prices for "
+                            + m.name() + " (" + m.currency() + ")",
+                            path + "?market=" + SiteUrls.encode(m.code()), false);
+                }
+            }
+        }
+        return null;
     }
 
     /// The translated value of `field`, or `original`.

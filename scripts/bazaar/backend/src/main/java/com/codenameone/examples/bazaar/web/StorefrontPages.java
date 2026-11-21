@@ -85,6 +85,7 @@ public class StorefrontPages {
     private final FulfillmentRepository fulfillments;
     private final TrackingEventRepository tracking;
     private final SiteUrls urls;
+    private final GeoCountry geo;
     private final Slots slots;
     private final com.codenameone.examples.bazaar.subscribe.Subscriptions subscriptions;
 
@@ -113,7 +114,9 @@ public class StorefrontPages {
             com.codenameone.examples.bazaar.content.Themes themes,
             com.codenameone.examples.bazaar.content.Navigation navigation,
             com.codenameone.examples.bazaar.content.Pages content,
-            com.codenameone.examples.bazaar.content.Metafields metafields) {
+            com.codenameone.examples.bazaar.content.Metafields metafields,
+            GeoCountry geo) {
+        this.geo = geo;
         this.themes = themes;
         this.navigation = navigation;
         this.content = content;
@@ -321,7 +324,11 @@ public class StorefrontPages {
         view.description = p.description();
         view.currency = store.getCurrency();
         StorefrontMarkets.Choice market = StorefrontMarkets.choose(store, path, request, markets,
-                translations, urls);
+                translations, urls, geo);
+        if (market.suggested != null) {
+            view.geoNote = market.suggested.label;
+            view.geoUrl = market.suggested.url;
+        }
         view.markets = market.picker.size() > 1 ? market.picker : new ArrayList<LinkView>();
         if (market.locale != null) {
             Map<String, String> tr = translations.fields(store.getId(),
