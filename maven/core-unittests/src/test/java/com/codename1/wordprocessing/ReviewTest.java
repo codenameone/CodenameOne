@@ -213,4 +213,28 @@ class ReviewTest extends UITestBase {
         v.deleteForward();
         assertEquals("b", text(m, "q"));
     }
+
+    @Test
+    void commentsSurviveDeletesAfterThemPointsAndRejectedRevisions() {
+        DocumentModel m = model("one two three four");
+        m.addComment(new TextPosition("p0", 4), new TextPosition("p0", 7), "x");
+        m.delete(new TextPosition("p0", 10), new TextPosition("p0", 12));
+        Comment d = m.getDocument().comments.get(0);
+        assertEquals("two", text(m, "p0").substring(d.start, d.end));
+        Comment point = m.addComment(new TextPosition("p0", 1), new TextPosition("p0", 1), "here");
+        m.insertText(new TextPosition("p0", 1), "zz", null);
+        for (Comment c : m.getDocument().comments) {
+            if (c.id.equals(point.id)) {
+                assertEquals(c.start, c.end);
+            }
+        }
+        DocumentModel r = model("one two");
+        r.setTrackChanges(true);
+        r.insertText(new TextPosition("p0", 0), "zero ", null);
+        r.setTrackChanges(false);
+        r.addComment(new TextPosition("p0", 9), new TextPosition("p0", 12), "y");
+        r.rejectRevisions(null);
+        d = r.getDocument().comments.get(0);
+        assertEquals("two", text(r, "p0").substring(d.start, d.end));
+    }
 }

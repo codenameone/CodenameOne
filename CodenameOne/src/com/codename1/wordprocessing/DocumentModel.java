@@ -23,7 +23,9 @@
 package com.codename1.wordprocessing;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /// The editable state behind a document view: the current immutable `Document`, its listeners
 /// and its undo history.
@@ -696,9 +698,10 @@ public class DocumentModel {
                 Paragraph p = findParagraph(order.get(i));
                 int a = i == ia ? clamp(ends[0].offset, p) : 0;
                 int b = i == ib ? clamp(ends[1].offset, p) : p.text.length();
-                RichText t = markDeleted(p.text, a, b, del);
+                boolean[] removed = new boolean[p.text.length()];
+                RichText t = markDeleted(p.text, a, b, del, removed);
                 if (!t.equals(p.text)) {
-                    replaceParagraph(p.withText(t));
+                    replace(p.withText(t), null, Anchors.removed(p.id, removed));
                 }
             }
         } finally {
@@ -709,13 +712,15 @@ public class DocumentModel {
 
     /// Marks a range deleted: text inserted under tracking simply goes, other text is kept
     /// marked as a deletion.
-    private static RichText markDeleted(RichText text, int start, int end, Revision del) {
+    private static RichText markDeleted(RichText text, int start, int end, Revision del,
+            boolean[] removed) {
         RichText t = text;
         for (int i = end - 1; i >= start; i--) {
             Revision r = t.styleAt(i).revision;
             if (r != null && !r.isDeletion() && r.author.equals(del.author)) {
                 // taking back one's own pending insertion leaves no trace, as in Word
                 t = t.delete(i, i + 1);
+                removed[i] = true;
             } else if (r == null || !r.isDeletion()) {
                 // someone else's insertion is marked deleted, so the deletion can be
                 // rejected; a character holds one revision, so rejecting it then
@@ -774,6 +779,7 @@ public class DocumentModel {
             for (String id : ids) {
                 Paragraph p = findParagraph(id);
                 RichText t = p.text;
+                boolean[] removed = new boolean[t.length()];
                 for (int i = t.length() - 1; i >= 0; i--) {
                     Revision r = t.styleAt(i).revision;
                     if (r == null || revisionId != null && !revisionId.equals(r.id)) {
@@ -782,12 +788,13 @@ public class DocumentModel {
                     changed++;
                     if (accept == r.isDeletion()) {
                         t = t.delete(i, i + 1);
+                        removed[i] = true;
                     } else {
                         t = t.restyle(i, i + 1, new SetRevision(null));
                     }
                 }
                 if (!t.equals(p.text)) {
-                    replaceParagraph(p.withText(t));
+                    replace(p.withText(t), null, Anchors.removed(p.id, removed));
                 }
             }
         } finally {
@@ -962,11 +969,16 @@ public class DocumentModel {
             if (d.comments.isEmpty()) {
                 return d;
             }
+            // one pass over the document, not one per anchor: this runs on every keystroke
+            Map<String, Integer> lengths = new HashMap<String, Integer>();
+            lengths(d.blocks, lengths);
             List<Comment> out = new ArrayList<Comment>(d.comments.size());
             boolean changed = false;
             for (Comment c : d.comments) {
-                TextPosition a = place(d, m, c.startId, c.start, true, fallbackId, fallbackOffset);
-                TextPosition b = place(d, m, c.endId, c.end, false, fallbackId, fallbackOffset);
+                // a point comment moves as one point, or typing at it would invert it
+                boolean point = c.startId.equals(c.endId) && c.start == c.end;
+                TextPosition a = place(lengths, m, c.startId, c.start, !point, fallbackId, fallbackOffset);
+                TextPosition b = place(lengths, m, c.endId, c.end, false, fallbackId, fallbackOffset);
                 if (a.paragraphId.equals(c.startId) && a.offset == c.start
                         && b.paragraphId.equals(c.endId) && b.offset == c.end) {
                     out.add(c);
@@ -979,17 +991,58 @@ public class DocumentModel {
             return changed ? d.withComments(out) : d;
         }
 
-        private static TextPosition place(Document d, Anchors m, String id, int offset, boolean isStart,
-                String fallbackId, int fallbackOffset) {
+        private static TextPosition place(Map<String, Integer> lengths, Anchors m, String id, int offset,
+                boolean isStart, String fallbackId, int fallbackOffset) {
             TextPosition t = m.map(id, offset, isStart);
             if (t == null) {
                 t = new TextPosition(id, offset);
             }
-            Paragraph p = find(d.blocks, t.paragraphId);
-            if (p == null) {
+            Integer length = lengths.get(t.paragraphId);
+            if (length == null) {
                 return new TextPosition(fallbackId, fallbackOffset);
             }
-            return new TextPosition(t.paragraphId, Math.min(t.offset, p.text.length()));
+            return new TextPosition(t.paragraphId, Math.min(t.offset, length.intValue()));
+        }
+
+        private static void lengths(List<Block> blocks, Map<String, Integer> out) {
+            for (Block b : blocks) {
+                if (b instanceof Paragraph) {
+                    Paragraph p = (Paragraph) b;
+                    out.put(p.id, Integer.valueOf(p.text.length()));
+                    for (int i = 0; i < p.text.length(); i++) {
+                        Inline o = p.text.objectAt(i);
+                        if (o instanceof Note) {
+                            lengths(((Note) o).blocks, out);
+                        }
+                    }
+                } else if (b instanceof Table) {
+                    Table t = (Table) b;
+                    for (int r = 0; r < t.rows(); r++) {
+                        for (int c = 0; c < t.columns(); c++) {
+                            lengths(t.cell(r, c), out);
+                        }
+                    }
+                }
+            }
+        }
+
+        /// Characters removed from `pid` where `removed` is set, by index before the edit.
+        static Anchors removed(final String pid, final boolean[] removed) {
+            return new Anchors() {
+                @Override
+                TextPosition map(String id, int offset, boolean isStart) {
+                    if (!id.equals(pid)) {
+                        return null;
+                    }
+                    int o = offset;
+                    for (int k = 0; k < offset && k < removed.length; k++) {
+                        if (removed[k]) {
+                            o--;
+                        }
+                    }
+                    return o == offset ? null : new TextPosition(id, o);
+                }
+            };
         }
 
         /// Text inserted at `at`: what follows moves on; an anchor right at the insertion
@@ -1012,7 +1065,7 @@ public class DocumentModel {
             return new Anchors() {
                 @Override
                 TextPosition map(String id, int offset, boolean isStart) {
-                    if (id.equals(bId)) {
+                    if (id.equals(bId) && (offset >= start || !aId.equals(bId))) {
                         int o = offset <= end ? start : start + offset - end;
                         return new TextPosition(aId, o);
                     }
