@@ -404,7 +404,10 @@ public class Automations {
             }
             String l = to.length() == 0 ? null : AutomationGraph.variantLanguage(n,
                     language.shopper(storeId, c == null ? null : c.getUsername(), to),
-                    "subject", "message");
+                    // No subject means the mail's default one, which is
+                    // already in the reader's language.
+                    AutomationGraph.param(n, "subject").length() == 0
+                            ? new String[] {"message"} : new String[] {"subject", "message"});
             String subject = AutomationGraph.param(n, "subject", l);
             String sent = "To " + to + ": " + subject;
             if (to.length() == 0) {

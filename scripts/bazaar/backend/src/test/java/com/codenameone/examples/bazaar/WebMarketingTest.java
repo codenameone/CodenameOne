@@ -51,6 +51,7 @@ import com.codenameone.examples.bazaar.sale.SaleEvents;
 import com.codenameone.examples.bazaar.store.Stores;
 import org.junit.jupiter.api.Test;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -310,6 +311,51 @@ class WebMarketingTest {
         b.assertPage(page, "<svg");
         b.assertPage(page, "class=\"edge\"");
         b.assertPage(page, "0 passed, 0 here now");
+    }
+
+    @Test
+    void messagesAreTranslatedFromTheBackOffice() throws Exception {
+        Shop s = shop("wmk-translate");
+        Shop theirs = shop("wmk-translate-b");
+        String graph = "{\"nodes\":[{\"id\":\"e\",\"data\":{\"type\":\"" + JourneyCatalog.ENTRY_TRIGGER
+                + "\",\"event\":\"order.paid\"}},{\"id\":\"m\",\"data\":{\"type\":\""
+                + JourneyCatalog.SEND_SMS + "\",\"body\":\"Thanks\"}},{\"id\":\"x\",\"data\":"
+                + "{\"type\":\"" + JourneyCatalog.EXIT + "\"}}],\"edges\":[{\"from\":\"e\","
+                + "\"fromPort\":\"out\",\"to\":\"m\"},{\"from\":\"m\",\"fromPort\":\"out\","
+                + "\"to\":\"x\"}]}";
+        JourneyDto j = journeys.write(s.storeId, null, new JourneyDto(null, "Thanks", graph,
+                Journeys.ACTIVE, 0, null));
+        Browser b = signedIn(s.owner);
+        String base = "/admin/" + s.storeId;
+        MockResponse page = b.get(base + "/journeys/" + j.id() + "?lang=fr");
+        b.assertPage(page, "Save translation");
+        b.assertPage(page, "name=\"node\"");
+        b.assertPage(page, "?lang=he");
+        redirected(b.post(base + "/journeys/" + j.id() + "/translate", "node", "m", "lang", "fr",
+                "body", "Merci"));
+        assertTrue(journeys.get(s.owner, s.storeId, j.id()).graphJson().contains(
+                "\"body@fr\":\"Merci\""));
+        b.assertPage(b.get(base + "/journeys/" + j.id() + "?lang=fr"), "Merci");
+
+        Browser stranger = signedIn(theirs.owner);
+        stranger.get("/admin/" + theirs.storeId + "/journeys");
+        assertEquals(404, stranger.post(base + "/journeys/" + j.id() + "/translate", "node", "m",
+                "lang", "fr", "body", "Mine").getStatus());
+        assertEquals(404, stranger.post("/admin/" + theirs.storeId + "/journeys/" + j.id()
+                + "/translate", "node", "m", "lang", "fr", "body", "Mine").getStatus());
+        assertTrue(journeys.get(s.owner, s.storeId, j.id()).graphJson().contains("Merci"));
+
+        AudienceDto seg = audiences.save(s.owner, s.storeId, null, new AudienceDto(null, "All",
+                "{\"op\":\"AND\",\"rules\":[]}", 0));
+        CampaignDto c = campaigns.write(s.storeId, null, new CampaignDto(null, "Launch",
+                Campaigns.EMAIL, seg.id(), "Hello", "", "New things", 0, 60, "", 0, "", "#000000",
+                new ArrayList<String>()));
+        b.assertPage(b.get(base + "/campaigns/" + c.id()), "kind=CAMPAIGN");
+        MockResponse tr = b.get(base + "/translations?kind=CAMPAIGN&refId=" + c.id() + "&locale=es");
+        b.assertPage(tr, "subjectA");
+        b.assertPage(tr, "New things");
+        assertEquals(404, stranger.get("/admin/" + theirs.storeId + "/translations?kind=CAMPAIGN&refId="
+                + c.id() + "&locale=es").getStatus());
     }
 
     @Test

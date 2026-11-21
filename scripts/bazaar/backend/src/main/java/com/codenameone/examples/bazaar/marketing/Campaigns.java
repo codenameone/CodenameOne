@@ -501,12 +501,13 @@ public class Campaigns {
         return sent;
     }
 
-    /// The language a subscriber reads: by address for e-mail, by the
-    /// customer with that phone number for SMS ([ShopperLanguage#shopper]).
+    /// The language a subscriber reads ([ShopperLanguage#shopper]): by
+    /// address for e-mail, as the mail's frame is; by the customer the row
+    /// was written for when the address is a phone number.
     String languageOf(Campaign c, CampaignSend s) {
         if (SMS.equals(c.getChannel())) {
-            List<Customer> found = customers.findByStoreIdAndPhone(c.getStoreId(), s.getAddress());
-            Customer k = found == null || found.isEmpty() ? null : found.get(0);
+            Customer k = s.getCustomerId() == null || s.getCustomerId().length() == 0 ? null
+                    : customers.findById(s.getCustomerId());
             return k == null ? language.store(c.getStoreId())
                     : language.shopper(c.getStoreId(), k.getUsername(), k.getEmail());
         }

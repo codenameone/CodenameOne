@@ -171,6 +171,10 @@ public class Translations {
         }
         requireRef(storeId, in.kind(), in.refId());
         String locale = Locales.normalize(in.locale());
+        if (CAMPAIGN.equals(in.kind())) {
+            // A message is sent by the reader's language, never a region.
+            locale = Locales.language(locale);
+        }
         String value = in.value() == null ? "" : in.value().trim();
         if ("body".equals(in.field()) && (CONTENT.equals(in.kind()) || POST.equals(in.kind()))) {
             // Rich text, drawn on the storefront: held to the same allow-list
@@ -182,6 +186,14 @@ public class Translations {
                 && value.length() > MAX_SUBJECT) {
             throw new ResponseStatusException(400, "A subject is at most " + MAX_SUBJECT
                     + " characters");
+        }
+        if (CAMPAIGN.equals(in.kind()) && "body".equals(in.field()) && value.length() > 480) {
+            Map row = db.queryOne("SELECT channel FROM campaign WHERE id = ?",
+                    new Object[] {in.refId()});
+            if (row != null && "SMS".equals(com.codenameone.examples.bazaar.Rows.text(
+                    row.get("channel")))) {
+                throw new ResponseStatusException(400, "A text message is at most 480 characters");
+            }
         }
         if (value.length() > MAX_BODY) {
             throw new ResponseStatusException(400, "A translation is at most " + MAX_BODY

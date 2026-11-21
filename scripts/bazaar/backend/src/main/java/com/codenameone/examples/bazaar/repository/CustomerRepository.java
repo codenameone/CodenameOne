@@ -36,8 +36,6 @@ public interface CustomerRepository extends CrudRepository<Customer, String> {
 
     Customer findByStoreIdAndEmail(String storeId, String email);
 
-    List<Customer> findByStoreIdAndPhone(String storeId, String phone);
-
     List<Customer> findByUsername(String username);
 
     /// Takes `amount` of a customer's store credit if they have that much.

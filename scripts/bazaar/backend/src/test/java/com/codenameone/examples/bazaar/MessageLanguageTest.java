@@ -103,6 +103,8 @@ class MessageLanguageTest {
     private ProfileRepository profiles;
     @Autowired
     private RecordingSms sms;
+    @Autowired
+    private com.codenameone.examples.bazaar.automation.Automations automations;
     private final MailSender mail = MailSender.current();
 
     /// Texts that are recorded instead of sent, and that count as delivered
@@ -289,6 +291,79 @@ class MessageLanguageTest {
         assertTrue(text.contains(t("es", "receipt.thanks")), text);
         assertTrue(text.contains(t("es", "receipt.order", o.number())), text);
         assertTrue(!text.contains("Thank you"), text);
+    }
+
+    @Test
+    void eachSubjectOfAnAbTestIsTranslatedAndAnSmsCampaignToo() throws Exception {
+        Shop s = shop("ml-ab");
+        String[] who = {"ml-ab-one", "ml-ab-two"};
+        String[] phones = {"+15550003001", "+15550003002"};
+        String[] lang = {"es", "de"};
+        for (int iter = 0; iter < who.length; iter++) {
+            String user = People.customer(accounts, who[iter]);
+            s.buy(user, 1, who[iter] + "@example.com");
+        }
+        AudienceDto seg = audiences.write(s.storeId, null, new AudienceDto(null, "Buyers",
+                "{\"op\":\"AND\",\"rules\":[{\"field\":\"ordersCount\",\"op\":\">=\",\"value\":1}]}",
+                0));
+        speaks(s, "ml-ab-one@example.com", "es", phones[0]);
+        speaks(s, "ml-ab-two@example.com", "es", phones[1]);
+        CampaignDto c = campaigns.write(s.storeId, null, new CampaignDto(null, "Split",
+                Campaigns.EMAIL, seg.id(), "Subject A", "Subject B", "The body", 50, 60, "", 0, "",
+                "#000000", new ArrayList<String>()));
+        translate(s, Translations.CAMPAIGN, c.id(), "es-MX", "subjectA", "Asunto A");
+        translate(s, Translations.CAMPAIGN, c.id(), "es", "subjectB", "Asunto B");
+        translate(s, Translations.CAMPAIGN, c.id(), "es", "body", "El cuerpo");
+        assertEquals(3, translations.of(s.owner, s.storeId, Translations.CAMPAIGN, c.id()).size(),
+                "a region is stored as its language");
+        mail.clearSent();
+        campaigns.schedule(s.owner, s.storeId, c.id(), 0);
+        campaigns.tick(Instant.now());
+        java.util.Set<String> subjects = new java.util.HashSet<String>();
+        subjects.add(only("ml-ab-one@example.com").getSubject());
+        subjects.add(only("ml-ab-two@example.com").getSubject());
+        assertEquals(new java.util.HashSet<String>(java.util.Arrays.asList("Asunto A",
+                "Asunto B")), subjects);
+
+        // A text message goes to the customer's phone in the customer's language.
+        speaks(s, "ml-ab-two@example.com", lang[1], phones[1]);
+        CampaignDto text = campaigns.write(s.storeId, null, new CampaignDto(null, "Text",
+                Campaigns.SMS, seg.id(), "", "", "Half price today", 0, 0, "", 0, "", "#000000",
+                new ArrayList<String>()));
+        translate(s, Translations.CAMPAIGN, text.id(), "es", "body", "Mitad de precio hoy");
+        StringBuilder tooLong = new StringBuilder();
+        while (tooLong.length() < 500) {
+            tooLong.append("texto ");
+        }
+        assertEquals(400, refusal(() -> translate(s, Translations.CAMPAIGN, text.id(), "fr",
+                "body", tooLong.toString())), "a text's translation is held to a text's length");
+        campaigns.schedule(s.owner, s.storeId, text.id(), 0);
+        campaigns.tick(Instant.now());
+        assertTrue(sms.to(phones[0]).startsWith("Mitad de precio hoy Stop: "), sms.to(phones[0]));
+        assertTrue(sms.to(phones[1]).startsWith("Half price today Stop: "), sms.to(phones[1]));
+    }
+
+    @Test
+    void anAutomationMailIsSentInTheShoppersLanguage() throws Exception {
+        Shop s = shop("ml-auto");
+        String user = People.customer(accounts, "ml-auto-es");
+        s.buy(user, 1, "ml-auto-es@example.com");
+        speaks(s, "ml-auto-es@example.com", "es", "");
+        String graph = "{\"nodes\":["
+                + "{\"id\":\"t\",\"style\":\"cart.abandoned\",\"outputs\":[{\"id\":\"out\"}]},"
+                + "{\"id\":\"m\",\"style\":\"email.customer\",\"data\":{\"subject\":\"\","
+                + "\"message\":\"Your cart misses you\",\"message@es\":\"Tu carrito te extra\\u00f1a\"},"
+                + "\"inputs\":[{\"id\":\"in\"}],"
+                + "\"outputs\":[{\"id\":\"out\"}]}],\"edges\":[{\"id\":\"e\",\"from\":\"t\","
+                + "\"fromPort\":\"out\",\"to\":\"m\",\"toPort\":\"in\"}]}";
+        automations.create(s.owner, s.storeId, new com.codenameone.examples.bazaar.api.AutomationDto(
+                null, "Win back", "", graph, true, 0, 0, 0));
+        mail.clearSent();
+        Map<String, String> ctx = new HashMap<String, String>();
+        ctx.put("email", "ml-auto-es@example.com");
+        automations.fire(s.storeId, "cart.abandoned", ctx);
+        Mail m = only("ml-auto-es@example.com");
+        assertTrue(m.getText().contains("Tu carrito te extra\u00f1a"), m.getText());
     }
 
     @Test
