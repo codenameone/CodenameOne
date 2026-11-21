@@ -29,6 +29,10 @@ public final class PageMeta {
     public String lang = "en";
     /// `rtl` for a right-to-left language, else `ltr`.
     public String dir = "ltr";
+    /// The language picker ([StoreText#options]): `url` is the code.
+    public java.util.List<LinkView> langs = new java.util.ArrayList<LinkView>();
+    /// Where the picker returns to (this page's address).
+    public String langBack = "/";
     /// The interface text in [#lang], by key: `${page.t['cart.title']}`.
     public java.util.Map<String, String> t = StoreText.table("en");
     public String description = "";

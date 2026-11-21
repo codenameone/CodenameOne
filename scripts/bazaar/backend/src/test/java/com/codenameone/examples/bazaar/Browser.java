@@ -40,6 +40,10 @@ final class Browser {
     MockResponse last;
     /// The storefront market cookie to send, or null.
     String market;
+    /// The storefront language cookie to send, or null.
+    String lang;
+    /// The Accept-Language header to send, or null.
+    String acceptLanguage;
 
     Browser(MockMvc mvc) {
         this.mvc = mvc;
@@ -56,6 +60,12 @@ final class Browser {
         }
         if (market != null) {
             b.cookie("market", market);
+        }
+        if (lang != null) {
+            b.cookie("lang", lang);
+        }
+        if (acceptLanguage != null) {
+            b.header("Accept-Language", acceptLanguage);
         }
         MockResponse r = mvc.perform(b).andReturn().getResponse();
         String s = r.getCookie("CN1SESSION");

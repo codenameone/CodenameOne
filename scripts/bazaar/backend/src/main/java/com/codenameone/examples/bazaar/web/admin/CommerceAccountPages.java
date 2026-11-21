@@ -52,6 +52,7 @@ import com.codenameone.examples.bazaar.trade.Trade;
 import com.codenameone.examples.bazaar.trade.TradeDocumentPages;
 import com.codenameone.examples.bazaar.web.Money;
 import com.codenameone.examples.bazaar.web.Shell;
+import com.codenameone.examples.bazaar.web.StoreText;
 import com.codenameone.examples.bazaar.web.WebPages;
 import com.codenameone.examples.bazaar.web.account.WebSessions;
 import com.codenameone.examples.bazaar.web.security.PageEtags;
@@ -116,9 +117,68 @@ public class CommerceAccountPages {
             view.heading = title;
         }
         view.hasTable = table != null;
+        localize(view, table, shell.t);
         model.addAttribute("view", view);
         model.addAttribute("table", table == null ? new DataTable() : table);
         return WebPages.view(model, shell, "marketing");
+    }
+
+    /// The shopper's interface text ([StoreText#forRequest]).
+    private static java.util.Map<String, String> t(HttpServer.Request request) {
+        return StoreText.table(StoreText.forRequest(request, false));
+    }
+
+    /// The fixed English these pages wrote -- headings, labels, buttons,
+    /// statuses, messages -- in the shopper's language ([StoreText#translate]
+    /// leaves anything that is not one of the table's texts, such as a
+    /// product or company name, as it is). The back office draws the same
+    /// template and stays English.
+    static void localize(MarketingView v, DataTable table, java.util.Map<String, String> t) {
+        v.heading = StoreText.translate(t, v.heading);
+        v.intro = StoreText.translate(t, v.intro);
+        v.backLabel = StoreText.translate(t, v.backLabel);
+        v.cardsTitle = StoreText.translate(t, v.cardsTitle);
+        v.rowsTitle = StoreText.translate(t, v.rowsTitle);
+        v.rowsEmpty = StoreText.translate(t, v.rowsEmpty);
+        rows(v.links, t);
+        rows(v.facts, t);
+        rows(v.problems, t);
+        rows(v.rows, t);
+        for (int iter = 0; iter < v.forms.size(); iter++) {
+            FormView f = v.forms.get(iter);
+            f.title = StoreText.translate(t, f.title);
+            f.text = StoreText.translate(t, f.text);
+            f.submit = StoreText.translate(t, f.submit);
+            f.confirm = StoreText.translate(t, f.confirm);
+            for (int at = 0; at < f.fields.size(); at++) {
+                f.fields.get(at).label = StoreText.translate(t, f.fields.get(at).label);
+                f.fields.get(at).hint = StoreText.translate(t, f.fields.get(at).hint);
+            }
+        }
+        for (int iter = 0; iter < v.cards.size(); iter++) {
+            ActionCard k = v.cards.get(iter);
+            k.title = StoreText.translate(t, k.title);
+            k.status = StoreText.translate(t, k.status);
+            k.detail = StoreText.translate(t, k.detail);
+            k.extraLabel = StoreText.translate(t, k.extraLabel);
+            rows(k.buttons, t);
+        }
+        if (table != null) {
+            table.searchLabel = StoreText.translate(t, table.searchLabel);
+            table.empty = StoreText.translate(t, table.empty);
+            for (int iter = 0; iter < table.columns.size(); iter++) {
+                table.columns.get(iter).label = StoreText.translate(t,
+                        table.columns.get(iter).label);
+            }
+        }
+    }
+
+    private static void rows(List<AdminRow> rows, java.util.Map<String, String> t) {
+        for (int iter = 0; iter < rows.size(); iter++) {
+            AdminRow r = rows.get(iter);
+            r.title = StoreText.translate(t, r.title);
+            r.status = StoreText.translate(t, r.status);
+        }
     }
 
     private static MarketingView view(String page) {
@@ -192,6 +252,7 @@ public class CommerceAccountPages {
     @GetMapping("/account/subscriptions")
     public String subscriptions(Model model, HttpServer.Request request) throws Exception {
         String me = me(request);
+        java.util.Map<String, String> words = t(request);
         MarketingView v = view("subscriptions");
         v.cardsTitle = "Your subscriptions";
         List<Customer> mine = customers.findByUsername(me);
@@ -204,11 +265,12 @@ public class CommerceAccountPages {
                         + d.id());
                 k.title = itemName(d.variantId()) + " x " + d.quantity();
                 k.status = AdminData.words(d.status());
-                k.detail = storeName(storeId) + ", " + CommerceData.cadence(d.unit(), d.cadence())
-                        + ", saves " + CommerceData.percent(d.discountBps()) + "%";
+                k.detail = StoreText.format(words, "a.subDetail", storeName(storeId),
+                        CommerceData.cadence(d.unit(), d.cadence()),
+                        CommerceData.percent(d.discountBps()));
                 k.meta = Subscriptions.CANCELLED.equals(d.status()) ? ""
-                        : Subscriptions.PAUSED.equals(d.status()) ? "paused"
-                        : "next delivery " + AdminData.date(d.dueAt());
+                        : Subscriptions.PAUSED.equals(d.status()) ? words.get("a.paused")
+                        : StoreText.format(words, "a.nextDelivery", AdminData.date(d.dueAt()));
                 v.cards.add(k);
             }
         }
@@ -366,15 +428,15 @@ public class CommerceAccountPages {
         final String cur = store.getCurrency();
         String base = "/account/company/" + storeId;
         v.heading = terms.companyName;
-        v.intro = "Buying at " + store.getName() + " for " + terms.companyName + ".";
+        v.intro = StoreText.format(t(request), "a.buyingAt", store.getName(), terms.companyName);
         v.links.add(link("Quotes", base + "/quotes"));
         v.links.add(link("Invoices", base + "/invoices"));
         v.facts.add(fact("Payment terms", CommerceData.terms(terms.termsDays)));
         v.facts.add(fact("Price list", terms.priceListName.length() == 0 ? "List prices"
                 : terms.priceListName));
         if (terms.percentOffBps > 0) {
-            v.facts.add(fact("Everything else", CommerceData.percent(terms.percentOffBps)
-                    + "% off list"));
+            v.facts.add(fact("Everything else", StoreText.format(t(request), "a.pctOff",
+                    CommerceData.percent(terms.percentOffBps))));
         }
         FormView quick = new FormView("quick", "Quick order", base + "/quick-order",
                 "Request a quote");
@@ -539,7 +601,8 @@ public class CommerceAccountPages {
             k.title = "Your answer";
             v.cards.add(k);
         }
-        return render(model, request, "Quote " + CommerceData.shortId(q.id()), v, null);
+        return render(model, request, StoreText.format(t(request), "a.quoteN",
+                CommerceData.shortId(q.id())), v, null);
     }
 
     @PostMapping("/account/company/{store}/quotes/{id}/{to}")

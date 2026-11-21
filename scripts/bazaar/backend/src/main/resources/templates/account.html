@@ -1,152 +1,152 @@
 <!-- cn1:model shell com.codenameone.examples.bazaar.web.Shell -->
 <!-- cn1:model view com.codenameone.examples.bazaar.web.account.AccountView -->
 <!doctype html>
-<html lang="en" xmlns:th="http://www.thymeleaf.org"><head th:replace="~{shell :: head}"></head>
+<html th:attr="lang=${shell.lang},dir=${shell.dir}" xmlns:th="http://www.thymeleaf.org"><head th:replace="~{shell :: head}"></head>
 <body hx-boost="true"><header th:replace="~{shell :: topbar}"></header><div class="frame"><nav th:replace="~{shell :: sidebar}"></nav>
 <main id="main" tabindex="-1">
 
-<th:block th:if="${view.page == 'home'}"><h1 th:text="${'Hello, ' + shell.user}">Hello</h1>
-<section class="card"><h2>Recent orders</h2>
-<p th:if="${view.items.empty}" class="muted">No orders yet. <a href="/">Browse the shops</a>.</p>
+<th:block th:if="${view.page == 'home'}"><h1 th:text="${shell.t['a.hello'] + ', ' + shell.user}">Hello</h1>
+<section class="card"><h2 th:text="${shell.t['a.recentOrders']}">Recent orders</h2>
+<p th:if="${view.items.empty}" class="muted"><span th:text="${shell.t['a.noOrdersYet']}">No orders yet.</span> <a href="/" th:text="${shell.t['a.browse']}">Browse the shops</a>.</p>
 <ul th:unless="${view.items.empty}"><li th:each="o : ${view.items}"><a th:href="${o.url}" th:text="${o.title}">Order #1</a> <span class="muted" th:text="${o.detail + ' - ' + o.meta}">Store</span> <span class="pill" th:text="${o.status}">Processing</span> <span th:text="${o.amount}">$1</span></li></ul>
-<p><a href="/account/orders">All orders</a></p></section>
-<div class="grid2"><section class="card"><h2>Your details</h2><ul><li><a href="/account/addresses">Addresses</a></li><li><a href="/account/wishlist">Wishlist</a></li><li><a href="/account/reviews">Reviews</a></li></ul></section>
-<section class="card"><h2>Rewards and settings</h2><ul><li><a href="/account/loyalty">Loyalty and referrals</a></li><li><a href="/account/clubs">Clubs</a></li><li><a href="/account/alerts">Stock alerts</a></li><li><a href="/account/marketing">Marketing preferences</a></li><li><a href="/account/security">Security</a></li></ul></section></div>
+<p><a href="/account/orders" th:text="${shell.t['a.allOrders']}">All orders</a></p></section>
+<div class="grid2"><section class="card"><h2 th:text="${shell.t['a.details']}">Your details</h2><ul><li><a href="/account/addresses" th:text="${shell.t['a.addresses']}">Addresses</a></li><li><a href="/account/wishlist" th:text="${shell.t['a.wishlist']}">Wishlist</a></li><li><a href="/account/reviews" th:text="${shell.t['reviews.title']}">Reviews</a></li></ul></section>
+<section class="card"><h2 th:text="${shell.t['a.rewards']}">Rewards and settings</h2><ul><li><a href="/account/loyalty" th:text="${shell.t['a.loyaltyRef']}">Loyalty and referrals</a></li><li><a href="/account/clubs" th:text="${shell.t['a.clubs']}">Clubs</a></li><li><a href="/account/alerts" th:text="${shell.t['a.alerts']}">Stock alerts</a></li><li><a href="/account/marketing" th:text="${shell.t['a.marketingPrefs']}">Marketing preferences</a></li><li><a href="/account/security" th:text="${shell.t['a.security']}">Security</a></li></ul></section></div>
 </th:block>
 
-<th:block th:if="${view.page == 'orders'}"><h1>Orders</h1>
-<p th:if="${view.items.empty}" class="muted">No orders here.</p>
-<div class="table-wrap" th:unless="${view.items.empty}"><table class="data"><thead><tr><th>Order</th><th>Store</th><th>Placed</th><th>Status</th><th class="num">Total</th></tr></thead><tbody>
+<th:block th:if="${view.page == 'orders'}"><h1 th:text="${shell.t['a.orders']}">Orders</h1>
+<p th:if="${view.items.empty}" class="muted" th:text="${shell.t['a.noOrders']}">No orders here.</p>
+<div class="table-wrap" th:unless="${view.items.empty}"><table class="data"><thead><tr><th th:text="${shell.t['order']}">Order</th><th th:text="${shell.t['store.links']}">Store</th><th th:text="${shell.t['placed']}">Placed</th><th th:text="${shell.t['a.status']}">Status</th><th class="num" th:text="${shell.t['total']}">Total</th></tr></thead><tbody>
 <tr th:each="o : ${view.items}"><td><a th:href="${o.url}" th:text="${o.title}">Order #1</a></td><td th:text="${o.detail}">Store</td><td th:text="${o.meta}">2026-01-01</td><td><span class="pill" th:text="${o.status}">Processing</span></td><td class="num" th:text="${o.amount}">$1</td></tr>
 </tbody></table>
-<nav class="pager" aria-label="Pages"><a th:unless="${view.prevUrl.empty}" th:href="${view.prevUrl}" rel="prev">Newer</a><span th:text="${view.pageLabel}">Page 1</span><a th:unless="${view.nextUrl.empty}" th:href="${view.nextUrl}" rel="next">Older</a></nav></div>
+<nav class="pager" th:attr="aria-label=${shell.t['pages']}"><a th:unless="${view.prevUrl.empty}" th:href="${view.prevUrl}" rel="prev" th:text="${shell.t['a.newer']}">Newer</a><span th:text="${view.pageLabel}">Page 1</span><a th:unless="${view.nextUrl.empty}" th:href="${view.nextUrl}" rel="next" th:text="${shell.t['a.older']}">Older</a></nav></div>
 </th:block>
 
 <th:block th:if="${view.page == 'order'}"><h1 th:text="${view.order.title}">Order #1</h1>
-<p><span class="pill" th:text="${view.order.status}">Processing</span> <span class="muted" th:text="${view.order.detail + ' - placed ' + view.order.meta}">Store</span></p>
-<p><a class="button quiet" th:href="${view.invoiceUrl}" hx-boost="false">Invoice (PDF)</a></p>
+<p><span class="pill" th:text="${view.order.status}">Processing</span> <span class="muted" th:text="${view.order.detail + ' - ' + shell.t['a.placed'] + ' ' + view.order.meta}">Store</span></p>
+<p><a class="button quiet" th:href="${view.invoiceUrl}" hx-boost="false" th:text="${shell.t['a.invoicePdf']}">Invoice (PDF)</a></p>
 <div class="grid2">
-<section class="card"><h2>Items</h2><div class="table-wrap"><table class="data"><thead><tr><th>Item</th><th class="num">Qty</th><th class="num">Total</th></tr></thead><tbody>
+<section class="card"><h2 th:text="${shell.t['a.items']}">Items</h2><div class="table-wrap"><table class="data"><thead><tr><th th:text="${shell.t['item']}">Item</th><th class="num" th:text="${shell.t['a.qty']}">Qty</th><th class="num" th:text="${shell.t['total']}">Total</th></tr></thead><tbody>
 <tr th:each="l : ${view.lines}"><td><span th:text="${l.title}">Item</span> <span class="muted" th:text="${l.detail}">Variant</span></td><td class="num" th:text="${l.quantity}">1</td><td class="num" th:text="${l.amount}">$1</td></tr></tbody></table></div>
-<p>Total <strong th:text="${view.order.amount}">$1</strong></p>
-<p th:unless="${view.shipTo.empty}">Ship to: <span th:text="${view.shipTo}">Address</span></p></section>
-<section class="card"><h2>Timeline</h2><p th:if="${view.events.empty}" class="muted">Nothing yet.</p>
+<p><span th:text="${shell.t['total']}">Total</span> <strong th:text="${view.order.amount}">$1</strong></p>
+<p th:unless="${view.shipTo.empty}"><span th:text="${shell.t['a.shipToColon']}">Ship to:</span> <span th:text="${view.shipTo}">Address</span></p></section>
+<section class="card"><h2 th:text="${shell.t['a.timeline']}">Timeline</h2><p th:if="${view.events.empty}" class="muted" th:text="${shell.t['a.nothingYet']}">Nothing yet.</p>
 <ol th:unless="${view.events.empty}"><li th:each="e : ${view.events}"><time th:text="${e.meta}">2026-01-01</time> <span th:text="${e.title}">Placed</span></li></ol>
-<h2>Tracking</h2><p th:if="${view.tracking.empty}" class="muted">Not shipped yet.</p>
+<h2 th:text="${shell.t['tracking']}">Tracking</h2><p th:if="${view.tracking.empty}" class="muted" th:text="${shell.t['a.notShipped']}">Not shipped yet.</p>
 <ol th:unless="${view.tracking.empty}"><li th:each="t : ${view.tracking}"><time th:text="${t.meta}">2026-01-01</time> <span th:text="${t.title}">In transit</span> <span class="muted" th:text="${t.detail}">Place</span> <a th:unless="${t.url.empty}" th:href="${t.url}" th:text="${t.extra}">UPS 1Z</a></li></ol></section>
 </div>
-<section class="card" th:if="${view.canCancel}"><h2>Cancel</h2><p>Nothing has shipped yet, so you can still cancel this order.</p>
-<form method="post" th:action="${view.cancelAction}" hx-confirm="Cancel this order?"><button class="danger" type="submit">Cancel order</button></form></section>
-<section class="card" th:unless="${view.returns.empty}"><h2>Returns</h2><ul><li th:each="r : ${view.returns}"><span class="pill" th:text="${r.status}">REQUESTED</span> <span th:text="${r.quantity + ' item(s), ' + r.title}">1 item</span> <span class="muted" th:text="${r.meta}">2026-01-01</span> <span th:text="${r.amount}">$1</span></li></ul></section>
-<section class="card" th:if="${view.canReturn}"><h2>Request a return</h2>
+<section class="card" th:if="${view.canCancel}"><h2 th:text="${shell.t['a.cancel']}">Cancel</h2><p th:text="${shell.t['a.canCancel']}">Nothing has shipped yet, so you can still cancel this order.</p>
+<form method="post" th:action="${view.cancelAction}" th:attr="hx-confirm=${shell.t['a.cancelConfirm']}"><button class="danger" type="submit" th:text="${shell.t['a.cancelOrder']}">Cancel order</button></form></section>
+<section class="card" th:unless="${view.returns.empty}"><h2 th:text="${shell.t['a.returns']}">Returns</h2><ul><li th:each="r : ${view.returns}"><span class="pill" th:text="${r.status}">REQUESTED</span> <span th:text="${r.quantity + ' x ' + r.title}">1 item</span> <span class="muted" th:text="${r.meta}">2026-01-01</span> <span th:text="${r.amount}">$1</span></li></ul></section>
+<section class="card" th:if="${view.canReturn}"><h2 th:text="${shell.t['a.requestReturn']}">Request a return</h2>
 <form method="post" th:action="${view.returnAction}" class="stack">
-<th:block th:each="l : ${view.lines}"><div class="field" th:if="${l.flag}"><label th:attr="for=${'qty-' + l.id}" th:text="${l.title + ' (up to ' + l.max + ')'}">Item</label><input type="number" min="0" th:attr="id=${'qty-' + l.id},max=${l.max}" th:name="${'qty-' + l.id}" value="0"></div></th:block>
-<label for="reason">Reason</label><select id="reason" name="reason"><option value="DAMAGED">Arrived damaged</option><option value="WRONG_ITEM">Wrong item</option><option value="NOT_AS_DESCRIBED">Not as described</option><option value="CHANGED_MIND">Changed my mind</option><option value="OTHER">Other</option></select>
-<label for="note">Note (optional)</label><textarea id="note" name="note" rows="2"></textarea>
-<button type="submit">Request return</button></form></section>
-<p><a href="/account/orders">All orders</a></p>
+<th:block th:each="l : ${view.lines}"><div class="field" th:if="${l.flag}"><label th:attr="for=${'qty-' + l.id}" th:text="${l.title + ' (' + shell.t['a.upTo'] + ' ' + l.max + ')'}">Item</label><input type="number" min="0" th:attr="id=${'qty-' + l.id},max=${l.max}" th:name="${'qty-' + l.id}" value="0"></div></th:block>
+<label for="reason" th:text="${shell.t['a.reason']}">Reason</label><select id="reason" name="reason"><option value="DAMAGED" th:text="${shell.t['a.damaged']}">Arrived damaged</option><option value="WRONG_ITEM" th:text="${shell.t['a.wrongItem']}">Wrong item</option><option value="NOT_AS_DESCRIBED" th:text="${shell.t['a.notAsDescribed']}">Not as described</option><option value="CHANGED_MIND" th:text="${shell.t['a.changedMind']}">Changed my mind</option><option value="OTHER" th:text="${shell.t['a.other']}">Other</option></select>
+<label for="note" th:text="${shell.t['a.noteOpt']}">Note (optional)</label><textarea id="note" name="note" rows="2"></textarea>
+<button type="submit" th:text="${shell.t['a.requestReturnBtn']}">Request return</button></form></section>
+<p><a href="/account/orders" th:text="${shell.t['a.allOrders']}">All orders</a></p>
 </th:block>
 
-<th:block th:if="${view.page == 'addresses'}"><h1>Addresses</h1>
-<p th:if="${view.addresses.empty}" class="muted">No saved addresses yet.</p>
-<div class="grid2"><section class="card" th:each="a : ${view.addresses}"><h2><span th:text="${a.name}">Name</span> <span class="pill ok" th:if="${a.isDefault}">Default</span></h2><p th:text="${a.summary}">Address</p>
-<details><summary>Edit</summary><form method="post" th:action="${a.action}" class="stack">
-<label th:attr="for=${'name-' + a.id}">Full name</label><input name="name" required autocomplete="name" th:attr="id=${'name-' + a.id}" th:value="${a.name}">
-<label th:attr="for=${'line1-' + a.id}">Street address</label><input name="line1" required th:attr="id=${'line1-' + a.id}" th:value="${a.line1}">
-<label th:attr="for=${'line2-' + a.id}">Apartment, suite</label><input name="line2" th:attr="id=${'line2-' + a.id}" th:value="${a.line2}">
-<label th:attr="for=${'city-' + a.id}">City</label><input name="city" required th:attr="id=${'city-' + a.id}" th:value="${a.city}">
-<label th:attr="for=${'region-' + a.id}">State or region</label><input name="region" th:attr="id=${'region-' + a.id}" th:value="${a.region}">
-<label th:attr="for=${'postal-' + a.id}">Postal code</label><input name="postal" th:attr="id=${'postal-' + a.id}" th:value="${a.postal}">
-<label th:attr="for=${'country-' + a.id}">Country (2 letters)</label><input name="country" required maxlength="2" th:attr="id=${'country-' + a.id}" th:value="${a.country}">
-<label th:attr="for=${'phone-' + a.id}">Phone</label><input name="phone" type="tel" th:attr="id=${'phone-' + a.id}" th:value="${a.phone}">
-<button type="submit">Save</button></form></details>
-<div class="row"><form method="post" th:action="${a.action + '/default'}" th:unless="${a.isDefault}"><button class="quiet" type="submit">Make default</button></form>
-<form method="post" th:action="${a.action + '/delete'}" hx-confirm="Remove this address?"><button class="quiet" type="submit">Remove</button></form></div></section></div>
-<section class="card"><h2>Add an address</h2><form method="post" th:action="${view.addAction}" class="stack">
-<label for="name">Full name</label><input id="name" name="name" required autocomplete="name">
-<label for="line1">Street address</label><input id="line1" name="line1" required autocomplete="address-line1">
-<label for="line2">Apartment, suite (optional)</label><input id="line2" name="line2" autocomplete="address-line2">
-<label for="city">City</label><input id="city" name="city" required autocomplete="address-level2">
-<label for="region">State or region</label><input id="region" name="region" autocomplete="address-level1">
-<label for="postal">Postal code</label><input id="postal" name="postal" autocomplete="postal-code">
-<label for="country">Country (2 letters)</label><input id="country" name="country" required maxlength="2" autocomplete="country">
-<label for="phone">Phone (optional)</label><input id="phone" name="phone" type="tel" autocomplete="tel">
-<label><input type="checkbox" name="isDefault"> Make this my default address</label>
-<button type="submit">Add address</button></form></section>
+<th:block th:if="${view.page == 'addresses'}"><h1 th:text="${shell.t['a.addresses']}">Addresses</h1>
+<p th:if="${view.addresses.empty}" class="muted" th:text="${shell.t['a.noAddresses']}">No saved addresses yet.</p>
+<div class="grid2"><section class="card" th:each="a : ${view.addresses}"><h2><span th:text="${a.name}">Name</span> <span class="pill ok" th:if="${a.isDefault}" th:text="${shell.t['a.default']}">Default</span></h2><p th:text="${a.summary}">Address</p>
+<details><summary th:text="${shell.t['a.edit']}">Edit</summary><form method="post" th:action="${a.action}" class="stack">
+<label th:attr="for=${'name-' + a.id}" th:text="${shell.t['fullName']}">Full name</label><input name="name" required autocomplete="name" th:attr="id=${'name-' + a.id}" th:value="${a.name}">
+<label th:attr="for=${'line1-' + a.id}" th:text="${shell.t['street']}">Street address</label><input name="line1" required th:attr="id=${'line1-' + a.id}" th:value="${a.line1}">
+<label th:attr="for=${'line2-' + a.id}" th:text="${shell.t['a.apartment']}">Apartment, suite</label><input name="line2" th:attr="id=${'line2-' + a.id}" th:value="${a.line2}">
+<label th:attr="for=${'city-' + a.id}" th:text="${shell.t['city']}">City</label><input name="city" required th:attr="id=${'city-' + a.id}" th:value="${a.city}">
+<label th:attr="for=${'region-' + a.id}" th:text="${shell.t['region']}">State or region</label><input name="region" th:attr="id=${'region-' + a.id}" th:value="${a.region}">
+<label th:attr="for=${'postal-' + a.id}" th:text="${shell.t['postal']}">Postal code</label><input name="postal" th:attr="id=${'postal-' + a.id}" th:value="${a.postal}">
+<label th:attr="for=${'country-' + a.id}" th:text="${shell.t['a.country2']}">Country (2 letters)</label><input name="country" required maxlength="2" th:attr="id=${'country-' + a.id}" th:value="${a.country}">
+<label th:attr="for=${'phone-' + a.id}" th:text="${shell.t['phone']}">Phone</label><input name="phone" type="tel" th:attr="id=${'phone-' + a.id}" th:value="${a.phone}">
+<button type="submit" th:text="${shell.t['a.save']}">Save</button></form></details>
+<div class="row"><form method="post" th:action="${a.action + '/default'}" th:unless="${a.isDefault}"><button class="quiet" type="submit" th:text="${shell.t['a.makeDefault']}">Make default</button></form>
+<form method="post" th:action="${a.action + '/delete'}" th:attr="hx-confirm=${shell.t['a.removeAddress']}"><button class="quiet" type="submit" th:text="${shell.t['remove']}">Remove</button></form></div></section></div>
+<section class="card"><h2 th:text="${shell.t['a.addAddress']}">Add an address</h2><form method="post" th:action="${view.addAction}" class="stack">
+<label for="name" th:text="${shell.t['fullName']}">Full name</label><input id="name" name="name" required autocomplete="name">
+<label for="line1" th:text="${shell.t['street']}">Street address</label><input id="line1" name="line1" required autocomplete="address-line1">
+<label for="line2" th:text="${shell.t['line2']}">Apartment, suite (optional)</label><input id="line2" name="line2" autocomplete="address-line2">
+<label for="city" th:text="${shell.t['city']}">City</label><input id="city" name="city" required autocomplete="address-level2">
+<label for="region" th:text="${shell.t['region']}">State or region</label><input id="region" name="region" autocomplete="address-level1">
+<label for="postal" th:text="${shell.t['postal']}">Postal code</label><input id="postal" name="postal" autocomplete="postal-code">
+<label for="country" th:text="${shell.t['a.country2']}">Country (2 letters)</label><input id="country" name="country" required maxlength="2" autocomplete="country">
+<label for="phone" th:text="${shell.t['phoneOpt']}">Phone (optional)</label><input id="phone" name="phone" type="tel" autocomplete="tel">
+<label><input type="checkbox" name="isDefault"> <span th:text="${shell.t['a.makeMyDefault']}">Make this my default address</span></label>
+<button type="submit" th:text="${shell.t['a.addAddressBtn']}">Add address</button></form></section>
 </th:block>
 
-<th:block th:if="${view.page == 'wishlist'}"><h1>Wishlist</h1>
-<p th:if="${view.items.empty}" class="muted">Nothing saved yet.</p>
-<div class="grid2"><section class="card" th:each="w : ${view.items}"><h2><a th:href="${w.url}" th:text="${w.title}">Product</a></h2><p><span th:text="${w.amount}">$1</span> <span class="muted" th:text="${w.detail}">Store</span> <span class="pill warn" th:unless="${w.flag}">Sold out</span></p>
-<div class="row"><form method="post" th:action="${w.extra}" th:unless="${w.extra.empty}"><input type="hidden" name="variantId" th:value="${w.meta}"><input type="hidden" name="quantity" value="1"><button type="submit">Add to cart</button></form>
-<form method="post" th:action="${w.action}"><button class="quiet" type="submit">Remove</button></form></div></section></div>
+<th:block th:if="${view.page == 'wishlist'}"><h1 th:text="${shell.t['a.wishlist']}">Wishlist</h1>
+<p th:if="${view.items.empty}" class="muted" th:text="${shell.t['a.nothingSaved']}">Nothing saved yet.</p>
+<div class="grid2"><section class="card" th:each="w : ${view.items}"><h2><a th:href="${w.url}" th:text="${w.title}">Product</a></h2><p><span th:text="${w.amount}">$1</span> <span class="muted" th:text="${w.detail}">Store</span> <span class="pill warn" th:unless="${w.flag}" th:text="${shell.t['soldOut']}">Sold out</span></p>
+<div class="row"><form method="post" th:action="${w.extra}" th:unless="${w.extra.empty}"><input type="hidden" name="variantId" th:value="${w.meta}"><input type="hidden" name="quantity" value="1"><button type="submit" th:text="${shell.t['addToCart']}">Add to cart</button></form>
+<form method="post" th:action="${w.action}"><button class="quiet" type="submit" th:text="${shell.t['remove']}">Remove</button></form></div></section></div>
 </th:block>
 
-<th:block th:if="${view.page == 'reviews'}"><h1>Your reviews</h1>
-<p th:if="${view.items.empty}" class="muted">You have not reviewed anything yet.</p>
-<section class="card" th:each="r : ${view.items}"><h2 th:text="${r.title}">Product</h2><p><span class="pill" th:text="${r.status}">PENDING</span> <span th:text="${r.rating + ' of 5'}">5 of 5</span></p><p><strong th:text="${r.detail}">Title</strong></p><p th:text="${r.meta}">Body</p>
-<th:block th:if="${r.flag}"><details><summary>Edit</summary><form method="post" th:action="${r.action}" class="stack">
-<label th:attr="for=${'rating-' + r.id}">Rating</label><select name="rating" th:attr="id=${'rating-' + r.id}"><option value="5" th:selected="${r.rating == '5'}">5 stars</option><option value="4" th:selected="${r.rating == '4'}">4 stars</option><option value="3" th:selected="${r.rating == '3'}">3 stars</option><option value="2" th:selected="${r.rating == '2'}">2 stars</option><option value="1" th:selected="${r.rating == '1'}">1 star</option></select>
-<label th:attr="for=${'title-' + r.id}">Title</label><input name="title" maxlength="120" th:attr="id=${'title-' + r.id}" th:value="${r.detail}">
-<label th:attr="for=${'body-' + r.id}">Review</label><textarea name="body" rows="4" maxlength="2000" th:attr="id=${'body-' + r.id}" th:text="${r.meta}"></textarea>
-<button type="submit">Save</button></form></details>
-<form method="post" th:action="${r.action + '/delete'}" hx-confirm="Delete this review?"><button class="quiet" type="submit">Delete</button></form></th:block>
-<p class="muted" th:unless="${r.flag}">Published and rejected reviews can no longer be changed.</p></section>
+<th:block th:if="${view.page == 'reviews'}"><h1 th:text="${shell.t['a.yourReviews']}">Your reviews</h1>
+<p th:if="${view.items.empty}" class="muted" th:text="${shell.t['a.noReviews']}">You have not reviewed anything yet.</p>
+<section class="card" th:each="r : ${view.items}"><h2 th:text="${r.title}">Product</h2><p><span class="pill" th:text="${r.status}">PENDING</span> <span th:text="${r.rating + ' / 5'}">5 of 5</span></p><p><strong th:text="${r.detail}">Title</strong></p><p th:text="${r.meta}">Body</p>
+<th:block th:if="${r.flag}"><details><summary th:text="${shell.t['a.edit']}">Edit</summary><form method="post" th:action="${r.action}" class="stack">
+<label th:attr="for=${'rating-' + r.id}" th:text="${shell.t['a.rating']}">Rating</label><select name="rating" th:attr="id=${'rating-' + r.id}"><option value="5" th:selected="${r.rating == '5'}" th:text="${shell.t['a.stars5']}">5 stars</option><option value="4" th:selected="${r.rating == '4'}" th:text="${shell.t['a.stars4']}">4 stars</option><option value="3" th:selected="${r.rating == '3'}" th:text="${shell.t['a.stars3']}">3 stars</option><option value="2" th:selected="${r.rating == '2'}" th:text="${shell.t['a.stars2']}">2 stars</option><option value="1" th:selected="${r.rating == '1'}" th:text="${shell.t['a.stars1']}">1 star</option></select>
+<label th:attr="for=${'title-' + r.id}" th:text="${shell.t['a.title']}">Title</label><input name="title" maxlength="120" th:attr="id=${'title-' + r.id}" th:value="${r.detail}">
+<label th:attr="for=${'body-' + r.id}" th:text="${shell.t['a.review']}">Review</label><textarea name="body" rows="4" maxlength="2000" th:attr="id=${'body-' + r.id}" th:text="${r.meta}"></textarea>
+<button type="submit" th:text="${shell.t['a.save']}">Save</button></form></details>
+<form method="post" th:action="${r.action + '/delete'}" th:attr="hx-confirm=${shell.t['a.deleteReview']}"><button class="quiet" type="submit" th:text="${shell.t['a.delete']}">Delete</button></form></th:block>
+<p class="muted" th:unless="${r.flag}" th:text="${shell.t['a.locked']}">Published and rejected reviews can no longer be changed.</p></section>
 </th:block>
 
-<th:block th:if="${view.page == 'loyalty'}"><h1>Loyalty</h1>
-<p th:if="${view.cards.empty}" class="muted">None of the stores you shop at runs a loyalty programme yet.</p>
+<th:block th:if="${view.page == 'loyalty'}"><h1 th:text="${shell.t['a.loyalty']}">Loyalty</h1>
+<p th:if="${view.cards.empty}" class="muted" th:text="${shell.t['a.noLoyalty']}">None of the stores you shop at runs a loyalty programme yet.</p>
 <section class="card" th:each="c : ${view.cards}"><h2 th:text="${c.storeName}">Store</h2>
-<form method="post" th:action="${c.joinAction}" th:unless="${c.member}"><p>Earn points on every order.</p><button type="submit">Join the programme</button></form>
-<th:block th:if="${c.member}"><div class="kpis"><div class="kpi"><b th:text="${c.balance}">0</b>points</div><div class="kpi"><b th:text="${c.tierName.empty ? 'Member' : c.tierName}">Gold</b>tier</div></div>
-<p th:unless="${c.nextTierName.empty}"><label th:attr="for=${'tier-' + c.storeId}" th:text="${c.toNext + ' points to ' + c.nextTierName}">100 points to Gold</label><br><progress th:attr="id=${'tier-' + c.storeId},value=${c.progress},max=${c.progressMax}"></progress></p>
-<div class="grid2"><div><h3>Refer a friend</h3><p>Your code: <strong th:text="${c.referralCode}">CODE</strong></p><p><label th:attr="for=${'share-' + c.storeId}">Share link</label><input readonly th:attr="id=${'share-' + c.storeId}" th:value="${c.shareUrl}"></p></div>
-<div><h3>Member card</h3><svg class="qr" width="180" height="180" role="img" aria-label="Member card QR code" th:attr="viewbox=${c.qrBox}" shape-rendering="crispEdges"><rect width="100%" height="100%" fill="#fff"></rect><path fill="#000" th:attr="d=${c.qrPath}"></path></svg><p class="muted">Show this at the till to earn and spend points.</p></div></div>
-<h3>History</h3><p th:if="${c.history.empty}" class="muted">No points yet.</p>
-<div class="table-wrap" th:unless="${c.history.empty}"><table class="data"><thead><tr><th>Date</th><th>What</th><th class="num">Points</th></tr></thead><tbody><tr th:each="h : ${c.history}"><td th:text="${h.meta}">2026-01-01</td><td th:text="${h.title.empty ? h.status : h.title}">Order</td><td class="num" th:text="${h.amount}">+10</td></tr></tbody></table></div></th:block>
+<form method="post" th:action="${c.joinAction}" th:unless="${c.member}"><p th:text="${shell.t['a.earn']}">Earn points on every order.</p><button type="submit" th:text="${shell.t['a.join']}">Join the programme</button></form>
+<th:block th:if="${c.member}"><div class="kpis"><div class="kpi"><b th:text="${c.balance}">0</b><span th:text="${shell.t['a.points']}">points</span></div><div class="kpi"><b th:text="${c.tierName.empty ? shell.t['a.member'] : c.tierName}">Gold</b><span th:text="${shell.t['a.tier']}">tier</span></div></div>
+<p th:unless="${c.nextTierName.empty}"><label th:attr="for=${'tier-' + c.storeId}" th:text="${c.toNext + ' ' + shell.t['a.toNext'] + ' ' + c.nextTierName}">100 points to Gold</label><br><progress th:attr="id=${'tier-' + c.storeId},value=${c.progress},max=${c.progressMax}"></progress></p>
+<div class="grid2"><div><h3 th:text="${shell.t['a.refer']}">Refer a friend</h3><p><span th:text="${shell.t['a.yourCode']}">Your code:</span> <strong th:text="${c.referralCode}">CODE</strong></p><p><label th:attr="for=${'share-' + c.storeId}" th:text="${shell.t['a.shareLink']}">Share link</label><input readonly th:attr="id=${'share-' + c.storeId}" th:value="${c.shareUrl}"></p></div>
+<div><h3 th:text="${shell.t['a.memberCard']}">Member card</h3><svg class="qr" width="180" height="180" role="img" th:attr="aria-label=${shell.t['a.memberQr']},viewbox=${c.qrBox}" shape-rendering="crispEdges"><rect width="100%" height="100%" fill="#fff"></rect><path fill="#000" th:attr="d=${c.qrPath}"></path></svg><p class="muted" th:text="${shell.t['a.till']}">Show this at the till to earn and spend points.</p></div></div>
+<h3 th:text="${shell.t['a.history']}">History</h3><p th:if="${c.history.empty}" class="muted" th:text="${shell.t['a.noPoints']}">No points yet.</p>
+<div class="table-wrap" th:unless="${c.history.empty}"><table class="data"><thead><tr><th th:text="${shell.t['a.date']}">Date</th><th th:text="${shell.t['a.what']}">What</th><th class="num" th:text="${shell.t['a.pointsCol']}">Points</th></tr></thead><tbody><tr th:each="h : ${c.history}"><td th:text="${h.meta}">2026-01-01</td><td th:text="${h.title.empty ? h.status : h.title}">Order</td><td class="num" th:text="${h.amount}">+10</td></tr></tbody></table></div></th:block>
 </section>
 </th:block>
 
-<th:block th:if="${view.page == 'clubs'}"><h1>Clubs</h1>
-<p th:if="${view.items.empty}" class="muted">You have not joined a club yet.</p>
-<div class="table-wrap" th:unless="${view.items.empty}"><table class="data"><thead><tr><th>Club</th><th>Store</th><th>Status</th><th>Joined</th><th>Renews</th></tr></thead><tbody>
+<th:block th:if="${view.page == 'clubs'}"><h1 th:text="${shell.t['a.clubs']}">Clubs</h1>
+<p th:if="${view.items.empty}" class="muted" th:text="${shell.t['a.noClubs']}">You have not joined a club yet.</p>
+<div class="table-wrap" th:unless="${view.items.empty}"><table class="data"><thead><tr><th th:text="${shell.t['a.club']}">Club</th><th th:text="${shell.t['store.links']}">Store</th><th th:text="${shell.t['a.status']}">Status</th><th th:text="${shell.t['a.joined']}">Joined</th><th th:text="${shell.t['a.renews']}">Renews</th></tr></thead><tbody>
 <tr th:each="m : ${view.items}"><td th:text="${m.title}">Club</td><td th:text="${m.detail}">Store</td><td><span class="pill" th:text="${m.status}">ACTIVE</span></td><td th:text="${m.meta}">Joined</td><td th:text="${m.extra}">2026-01-01</td></tr></tbody></table></div>
 </th:block>
 
-<th:block th:if="${view.page == 'alerts'}"><h1>Stock alerts</h1>
-<p th:if="${view.items.empty}" class="muted">You are not waiting for anything to come back in stock.</p>
-<div class="table-wrap" th:unless="${view.items.empty}"><table class="data"><thead><tr><th>Product</th><th>Store</th><th>Status</th><th>Since</th><th></th></tr></thead><tbody>
-<tr th:each="a : ${view.items}"><td><span th:text="${a.title}">Product</span> <span class="muted" th:text="${a.detail}">Variant</span></td><td th:text="${a.extra}">Store</td><td><span class="pill" th:text="${a.status}">PENDING</span></td><td th:text="${a.meta}">2026-01-01</td><td><form method="post" th:action="${a.action}" th:if="${a.flag}"><button class="quiet" type="submit">Stop waiting</button></form></td></tr></tbody></table></div>
+<th:block th:if="${view.page == 'alerts'}"><h1 th:text="${shell.t['a.alerts']}">Stock alerts</h1>
+<p th:if="${view.items.empty}" class="muted" th:text="${shell.t['a.noAlerts']}">You are not waiting for anything to come back in stock.</p>
+<div class="table-wrap" th:unless="${view.items.empty}"><table class="data"><thead><tr><th th:text="${shell.t['a.product']}">Product</th><th th:text="${shell.t['store.links']}">Store</th><th th:text="${shell.t['a.status']}">Status</th><th th:text="${shell.t['a.since']}">Since</th><th></th></tr></thead><tbody>
+<tr th:each="a : ${view.items}"><td><span th:text="${a.title}">Product</span> <span class="muted" th:text="${a.detail}">Variant</span></td><td th:text="${a.extra}">Store</td><td><span class="pill" th:text="${a.status}">PENDING</span></td><td th:text="${a.meta}">2026-01-01</td><td><form method="post" th:action="${a.action}" th:if="${a.flag}"><button class="quiet" type="submit" th:text="${shell.t['a.stopWaiting']}">Stop waiting</button></form></td></tr></tbody></table></div>
 </th:block>
 
-<th:block th:if="${view.page == 'marketing'}"><h1>Marketing preferences</h1>
-<p class="muted">News and offers from each store you shop at. Order and shipping messages are always sent.</p>
-<p th:if="${view.items.empty}" class="muted">You are not a customer of any store yet.</p>
+<th:block th:if="${view.page == 'marketing'}"><h1 th:text="${shell.t['a.marketingPrefs']}">Marketing preferences</h1>
+<p class="muted" th:text="${shell.t['a.mktIntro']}">News and offers from each store you shop at. Order and shipping messages are always sent.</p>
+<p th:if="${view.items.empty}" class="muted" th:text="${shell.t['a.notCustomer']}">You are not a customer of any store yet.</p>
 <section class="card" th:each="m : ${view.items}"><h2 th:text="${m.title}">Store</h2><form method="post" th:action="${m.action}" class="stack">
-<label><input type="checkbox" name="email" th:checked="${m.flag}"> <span th:text="${'E-mail to ' + m.detail}">E-mail</span></label>
-<label><input type="checkbox" name="sms" th:checked="${m.flag2}" th:disabled="${m.disabled}"> <span th:text="${m.disabled ? 'Text messages (add a phone number first)' : 'Text messages to ' + m.meta}">SMS</span></label>
-<button type="submit">Save</button></form></section>
+<label><input type="checkbox" name="email" th:checked="${m.flag}"> <span th:text="${shell.t['a.emailTo'] + ' ' + m.detail}">E-mail</span></label>
+<label><input type="checkbox" name="sms" th:checked="${m.flag2}" th:disabled="${m.disabled}"> <span th:text="${m.disabled ? shell.t['a.smsNeedsPhone'] : shell.t['a.smsTo'] + ' ' + m.meta}">SMS</span></label>
+<button type="submit" th:text="${shell.t['a.save']}">Save</button></form></section>
 </th:block>
 
-<th:block th:if="${view.page == 'security'}"><h1>Security</h1>
-<section class="card" th:unless="${view.recoveryCodes.empty}" role="alert"><h2>Your recovery codes</h2><p>Keep these somewhere safe. Each signs you in once if you lose your phone. <strong>They will not be shown again.</strong></p>
+<th:block th:if="${view.page == 'security'}"><h1 th:text="${shell.t['a.security']}">Security</h1>
+<section class="card" th:unless="${view.recoveryCodes.empty}" role="alert"><h2 th:text="${shell.t['a.recoveryCodes']}">Your recovery codes</h2><p><span th:text="${shell.t['a.keepSafe']}">Keep these somewhere safe. Each signs you in once if you lose your phone.</span> <strong th:text="${shell.t['a.notAgain']}">They will not be shown again.</strong></p>
 <ul class="codes"><li th:each="code : ${view.recoveryCodes}"><code th:text="${code}">xxxxx-xxxxx</code></li></ul></section>
-<section class="card"><h2>Two-step sign-in</h2>
-<th:block th:if="${view.totpEnabled}"><p><span class="pill ok">On</span> Signing in asks for a code from your authenticator app. <span th:text="${view.recoveryLeft + ' recovery codes left.'}">10 recovery codes left.</span></p>
-<details><summary>Make new recovery codes</summary><form method="post" action="/account/security/recovery" class="stack"><label for="rc-password">Your password</label><input id="rc-password" name="password" type="password" required autocomplete="current-password"><button type="submit">Make new codes</button></form></details>
-<details><summary>Turn off two-step sign-in</summary><form method="post" action="/account/security/totp/disable" class="stack"><label for="off-password">Your password</label><input id="off-password" name="password" type="password" required autocomplete="current-password"><button class="danger" type="submit">Turn off</button></form></details></th:block>
+<section class="card"><h2 th:text="${shell.t['twoStepSignIn']}">Two-step sign-in</h2>
+<th:block th:if="${view.totpEnabled}"><p><span class="pill ok" th:text="${shell.t['a.on']}">On</span> <span th:text="${shell.t['a.asksCode']}">Signing in asks for a code from your authenticator app.</span> <span th:text="${shell.t['a.codesLeft'] + ' ' + view.recoveryLeft}">10 recovery codes left.</span></p>
+<details><summary th:text="${shell.t['a.newCodes']}">Make new recovery codes</summary><form method="post" action="/account/security/recovery" class="stack"><label for="rc-password" th:text="${shell.t['a.yourPassword']}">Your password</label><input id="rc-password" name="password" type="password" required autocomplete="current-password"><button type="submit" th:text="${shell.t['a.makeCodes']}">Make new codes</button></form></details>
+<details><summary th:text="${shell.t['a.turnOff2']}">Turn off two-step sign-in</summary><form method="post" action="/account/security/totp/disable" class="stack"><label for="off-password" th:text="${shell.t['a.yourPassword']}">Your password</label><input id="off-password" name="password" type="password" required autocomplete="current-password"><button class="danger" type="submit" th:text="${shell.t['a.turnOff']}">Turn off</button></form></details></th:block>
 <th:block th:unless="${view.totpEnabled}">
-<th:block th:if="${view.enrolling}"><p>Scan this with your authenticator app, or type the key, then enter the code it shows.</p>
-<svg class="qr" width="200" height="200" role="img" aria-label="Authenticator QR code" th:attr="viewbox=${view.qrBox}" shape-rendering="crispEdges"><rect width="100%" height="100%" fill="#fff"></rect><path fill="#000" th:attr="d=${view.qrPath}"></path></svg>
-<p>Key: <code th:text="${view.secret}">SECRET</code></p>
-<form method="post" action="/account/security/totp/confirm" class="stack"><label for="code">Code from the app</label><input id="code" name="code" inputmode="numeric" autocomplete="one-time-code" required maxlength="8"><button type="submit">Turn on</button></form></th:block>
-<th:block th:unless="${view.enrolling}"><p><span class="pill">Off</span> Add a code from an authenticator app to your password.</p>
-<form method="post" action="/account/security/totp/start"><button type="submit">Set up an authenticator app</button></form></th:block>
+<th:block th:if="${view.enrolling}"><p th:text="${shell.t['a.scan']}">Scan this with your authenticator app, or type the key, then enter the code it shows.</p>
+<svg class="qr" width="200" height="200" role="img" th:attr="aria-label=${shell.t['a.authQr']},viewbox=${view.qrBox}" shape-rendering="crispEdges"><rect width="100%" height="100%" fill="#fff"></rect><path fill="#000" th:attr="d=${view.qrPath}"></path></svg>
+<p><span th:text="${shell.t['a.key']}">Key:</span> <code th:text="${view.secret}">SECRET</code></p>
+<form method="post" action="/account/security/totp/confirm" class="stack"><label for="code" th:text="${shell.t['a.appCode']}">Code from the app</label><input id="code" name="code" inputmode="numeric" autocomplete="one-time-code" required maxlength="8"><button type="submit" th:text="${shell.t['a.turnOn']}">Turn on</button></form></th:block>
+<th:block th:unless="${view.enrolling}"><p><span class="pill" th:text="${shell.t['a.off']}">Off</span> <span th:text="${shell.t['a.addCode']}">Add a code from an authenticator app to your password.</span></p>
+<form method="post" action="/account/security/totp/start"><button type="submit" th:text="${shell.t['a.setUp']}">Set up an authenticator app</button></form></th:block>
 </th:block></section>
-<section class="card"><h2>Where you are signed in</h2>
-<div class="table-wrap"><table class="data"><thead><tr><th>Browser</th><th>Address</th><th>Since</th><th>Last seen</th></tr></thead><tbody>
-<tr th:each="s : ${view.sessions}"><td><span th:text="${s.title}">Browser</span> <span class="pill ok" th:if="${s.flag}">This browser</span></td><td th:text="${s.detail}">127.0.0.1</td><td th:text="${s.meta}">Signed in</td><td th:text="${s.extra}">2026-01-01</td></tr></tbody></table></div>
-<form method="post" action="/account/security/sessions/end-others" hx-confirm="Sign out every other browser?"><button class="quiet" type="submit">Sign out everywhere else</button></form></section>
+<section class="card"><h2 th:text="${shell.t['a.whereSignedIn']}">Where you are signed in</h2>
+<div class="table-wrap"><table class="data"><thead><tr><th th:text="${shell.t['a.browser']}">Browser</th><th th:text="${shell.t['a.address']}">Address</th><th th:text="${shell.t['a.since']}">Since</th><th th:text="${shell.t['a.lastSeen']}">Last seen</th></tr></thead><tbody>
+<tr th:each="s : ${view.sessions}"><td><span th:text="${s.title}">Browser</span> <span class="pill ok" th:if="${s.flag}" th:text="${shell.t['a.thisBrowser']}">This browser</span></td><td th:text="${s.detail}">127.0.0.1</td><td th:text="${s.meta}">Signed in</td><td th:text="${s.extra}">2026-01-01</td></tr></tbody></table></div>
+<form method="post" action="/account/security/sessions/end-others" th:attr="hx-confirm=${shell.t['a.endOthersConfirm']}"><button class="quiet" type="submit" th:text="${shell.t['a.endOthers']}">Sign out everywhere else</button></form></section>
 </th:block>
 
 </main></div>

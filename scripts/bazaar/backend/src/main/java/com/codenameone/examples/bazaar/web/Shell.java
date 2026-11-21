@@ -34,11 +34,15 @@ public class Shell {
     /// "account", "admin" or "platform": the `data-area` of the page.
     public String area = "account";
     public String title = "Bazaar";
-    /// The interface language of the sign-in and sign-up pages ([StoreText]);
-    /// the back office stays English.
+    /// The interface language of the sign-in, sign-up and account pages
+    /// ([StoreText]); the back office and platform admin stay English.
     public String lang = "en";
     /// `rtl` for a right-to-left language, else `ltr`.
     public String dir = "ltr";
+    /// The language picker of the account pages ([StoreText#options]).
+    public List<LinkView> langs = new ArrayList<LinkView>();
+    /// Where the picker returns to.
+    public String langBack = "/account";
     /// The interface text in [#lang], by key.
     public java.util.Map<String, String> t = StoreText.table("en");
     /// The CSP nonce of this response, printed on its style and script elements.

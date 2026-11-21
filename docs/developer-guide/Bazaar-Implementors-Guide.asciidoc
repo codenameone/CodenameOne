@@ -631,13 +631,22 @@ business contracts for. Plan for these before taking real orders:
 * *Currencies with other than two decimals.* Only two-decimal currencies are
   supported.
 * *Storefront interface text.* The storefront's own text (buttons, cart,
-  checkout labels and errors, the consent banner, chat, sign-in and sign-up)
-  ships in English, Spanish, French, German and Hebrew, generated into
-  `web.StoreText` from `backend/storetext.py`. The translations were written
-  for the sample and need a native speaker's review. The signed-in account
-  pages and the back office are English only, and a shopper cannot pick a
-  language apart from a market; it follows the market's locale or the
-  browser's `Accept-Language`.
+  checkout labels and errors, the consent banner, chat, sign-in and sign-up,
+  and the signed-in account pages: orders, returns, addresses, wishlist,
+  reviews, loyalty, subscriptions, two-step sign-in and the company buyer's
+  quick order, quotes and invoices) ships in English, Spanish, French, German
+  and Hebrew, generated into `web.StoreText` from `backend/storetext.py`.
+  Hebrew pages are drawn right to left. The translations were written for the
+  sample and need a native speaker's review. A language picker on every
+  storefront and account page posts to `/lang` and keeps the choice in a
+  `lang` cookie; the choice comes first, then the market's locale, then the
+  browser's `Accept-Language`, then English. A page drawn from the cookie is
+  the shopper's private copy, every shared page says `Vary: Cookie`, and each
+  language also has an address of its own (`?lang=fr`) that crawlers find as
+  an `hreflang` alternate. The back office and platform admin stay English.
+  So do the e-mails to shoppers, because an order does not record the
+  language it was placed in, and messages that come from the services
+  (validation errors, refusals) arrive in English.
 * *Fraud scoring.* The fraud rules are a fixed point table. A store with real
   volume would add the payment provider's risk signals or a fraud service.
 * *Form signing keys.* The bot guard's and the theme preview's signing keys are

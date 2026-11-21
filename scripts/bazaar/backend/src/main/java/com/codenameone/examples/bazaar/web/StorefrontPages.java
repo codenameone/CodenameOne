@@ -772,6 +772,7 @@ public class StorefrontPages {
             StoreText.apply(page, StorefrontMarkets.choose(store,
                     query < 0 ? path : path.substring(0, query), request, markets,
                     translations, urls).ui);
+            StoreText.offer(page, request);
             decorate(page, store, request, path);
             slots.decorate(page, store, request);
         } catch (IOException e) {

@@ -127,6 +127,95 @@ class StoreTextTest {
     }
 
     @Test
+    void accountPagesFollowTheShoppersLanguage() throws Exception {
+        String user = People.customer(accounts, "st-acct-buyer");
+        Browser b = new Browser(mvc);
+        b.signIn(user, People.PASSWORD);
+
+        b.acceptLanguage = "es-ES,es;q=0.9";
+        MockResponse home = b.get("/account");
+        String es = body(home);
+        assertTrue(es.contains("lang=\"es\"") && es.contains("dir=\"ltr\""), "Spanish shell");
+        assertTrue(es.contains("Pedidos recientes"), "the heading in Spanish");
+        assertTrue(es.contains(">Pedidos<"), "the sidebar in Spanish");
+        assertFalse(es.contains("Recent orders"));
+        assertTrue(home.getHeader("Cache-Control").contains("no-store"), "an account page is never kept");
+        assertTrue(es.contains("action=\"/lang\""), "the picker is on the page");
+        String addr = body(b.get("/account/addresses"));
+        assertTrue(addr.contains("A\u00f1adir una direcci\u00f3n"), "the address form in Spanish");
+        assertTrue(body(b.get("/account/subscriptions")).contains("Suscripciones"),
+                "the Java-built pages too");
+
+        b.acceptLanguage = "he-IL";
+        String he = body(b.get("/account/security"));
+        assertTrue(he.contains("lang=\"he\"") && he.contains("dir=\"rtl\""), "Hebrew is rtl");
+        assertTrue(he.contains("\u05db\u05e0\u05d9\u05e1\u05d4 \u05d1\u05e9\u05e0\u05d9 \u05e9\u05dc\u05d1\u05d9\u05dd"),
+                "two-step sign-in in Hebrew");
+
+        // The picker's cookie outranks the header.
+        b.lang = "de";
+        String de = body(b.get("/account"));
+        assertTrue(de.contains("lang=\"de\"") && de.contains("Letzte Bestellungen"), "the choice wins");
+        b.lang = null;
+        b.acceptLanguage = null;
+        assertTrue(body(b.get("/account")).contains("Recent orders"), "English by default");
+    }
+
+    @Test
+    void thePickerOutranksTheMarketAndTheHeader() throws Exception {
+        Shop s = new Shop("st-pick", 300, accounts, stores, pricing, db, inventory, carts,
+                checkouts, mvc);
+        markets.save(s.owner, s.storeId, null, new MarketDto(null, "mx", "Mexico", "USD",
+                Arrays.asList("MX"), "es-MX", Markets.NONE, 0, true, Markets.MANUAL));
+        String page = "/s/st-pick/products/st-pick-mug";
+
+        // Choosing: a form post, no script, back to the page with a cookie.
+        Browser b = new Browser(mvc);
+        MockResponse chose = b.send(Browser.form("/lang", "lang", "de", "back",
+                page + "?market=mx&lang=fr"));
+        assertEquals(303, chose.getStatus());
+        assertEquals(page + "?market=mx", chose.getHeader("Location"), "back, without the old lang");
+        assertTrue(chose.getHeader("Set-Cookie").startsWith("lang=de;"), chose.getHeader("Set-Cookie"));
+        MockResponse away = b.send(Browser.form("/lang", "lang", "de", "back", "//evil.example"));
+        assertEquals("/", away.getHeader("Location"), "never an open redirect");
+
+        // The cookie beats the market's Spanish and the header's French, and
+        // the copy is the shopper's alone.
+        b.lang = "de";
+        b.acceptLanguage = "fr";
+        MockResponse de = b.get(page + "?market=mx");
+        String deBody = body(de);
+        assertTrue(deBody.contains("lang=\"de\"") && deBody.contains("In den Warenkorb"), "German");
+        assertTrue(de.getHeader("Cache-Control").startsWith("private"), de.getHeader("Cache-Control"));
+        assertTrue(deBody.contains("aria-pressed=\"true\""), "the picker marks the choice");
+
+        // Without the cookie: the market, then the header; a shared copy
+        // that varies by the cookie and the header.
+        b.lang = null;
+        assertTrue(body(b.get(page + "?market=mx")).contains("A\u00f1adir al carrito"));
+        MockResponse fr = b.get(page);
+        assertTrue(body(fr).contains("Ajouter au panier"));
+        assertTrue(fr.getHeader("Cache-Control").startsWith("public"), fr.getHeader("Cache-Control"));
+        assertTrue(fr.getHeader("Vary").contains("Cookie") && fr.getHeader("Vary").contains("Accept-Language"),
+                fr.getHeader("Vary"));
+
+        // Crawlers: every language is an address of its own, listed as an
+        // alternate, shared-cacheable and canonical to itself.
+        String link = fr.getHeader("Link");
+        assertTrue(link.contains(page + "?lang=he>; rel=\"alternate\"; hreflang=\"he\""), link);
+        assertFalse(link.contains("?lang=es"), "Spanish is the Mexico market's address");
+        b.acceptLanguage = null;
+        MockResponse he = b.get(page + "?lang=he");
+        String heBody = body(he);
+        assertTrue(heBody.contains("dir=\"rtl\"") && heBody.contains(
+                "\u05dc\u05d4\u05d5\u05e1\u05d9\u05e3 \u05dc\u05e2\u05d2\u05dc\u05d4"), "Hebrew by address");
+        assertTrue(he.getHeader("Cache-Control").startsWith("public"), he.getHeader("Cache-Control"));
+        assertTrue(he.getHeader("Link").startsWith("<") && he.getHeader("Link")
+                .contains(page + "?lang=he>; rel=\"canonical\""), he.getHeader("Link"));
+        assertFalse(he.getHeader("Vary").contains("Cookie"), "the address fixes the language");
+    }
+
+    @Test
     void aMissingTranslationFallsBackToEnglishPerKey() {
         Map<String, String> t = StoreText.merge(
                 new String[] {"a", "Apple", "b", "Bread"}, new String[] {"a", "Manzana"});

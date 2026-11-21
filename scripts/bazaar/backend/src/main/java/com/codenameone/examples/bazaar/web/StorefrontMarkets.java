@@ -95,9 +95,8 @@ public final class StorefrontMarkets {
         /// The market the visitor's country suggests ([GeoCountry]), offered in a
         /// banner and never applied; null when there is none.
         public LinkView suggested;
-        /// Whether the shopper picked a market (query or cookie).
+        List<MarketDto> all = new ArrayList<MarketDto>();
         boolean chose;
-        /// Whether a country lookup has been asked for this request.
         boolean geoAsked;
     }
 
@@ -119,21 +118,9 @@ public final class StorefrontMarkets {
         // ask the same question, and the headers are recorded once.
         Object made = ex == null ? null : ex.getAttribute(CHOICE);
         if (made instanceof Choice && store.getId().equals(((Choice) made).storeId)) {
-            Choice prior = (Choice) made;
-            // An earlier caller (the page shell) may have chosen without a
-            // country lookup; the product page asks with one, so suggest now.
-            if (geo != null && !prior.geoAsked) {
-                prior.geoAsked = true;
-                if (!prior.chose && request != null
-                        && !GeoCountry.crawler(request.getHeader("User-Agent"))) {
-                    prior.suggested = suggest(markets.active(store.getId()),
-                            geo.country(request), path);
-                    if (prior.suggested != null) {
-                        ex.setAttribute(Slots.PERSONAL, "1");
-                    }
-                }
-            }
-            return prior;
+            // The page's frame may have asked first, without the visitor's country.
+            suggest((Choice) made, geo, request, path, ex);
+            return (Choice) made;
         }
         Choice c = new Choice();
         c.storeId = store.getId();
@@ -152,8 +139,6 @@ public final class StorefrontMarkets {
         }
         List<MarketDto> all = markets.active(store.getId());
         boolean chose = code != null;
-        c.chose = chose;
-        c.geoAsked = geo != null;
         StringBuilder links = new StringBuilder();
         String current = c.pricer == null ? null : c.pricer.market().getCode();
         c.picker.add(new LinkView(store.getCurrency() + " (store prices)", path, current == null));
@@ -171,19 +156,25 @@ public final class StorefrontMarkets {
                         .append(">; rel=\"alternate\"; hreflang=\"").append(lang).append('"');
             }
         }
-        if (geo != null && !chose && request != null
-                && !GeoCountry.crawler(request.getHeader("User-Agent"))) {
-            c.suggested = suggest(all, geo.country(request), path);
-            if (c.suggested != null && ex != null) {
-                ex.setAttribute(Slots.PERSONAL, "1");
+        // Each interface language is an address of its own too (`?lang=`),
+        // so a crawler finds every translation without a cookie; a language
+        // a market already stands for keeps the market's address.
+        for (int iter = 0; iter < StoreText.LANGUAGES.length; iter++) {
+            String l = StoreText.LANGUAGES[iter];
+            if (links.indexOf("hreflang=\"" + l + "\"") >= 0
+                    || links.indexOf("hreflang=\"" + l + "-") >= 0) {
+                continue;
             }
+            if (links.length() > 0) {
+                links.append(", ");
+            }
+            links.append('<').append(urls.absolute(request, path + "?lang=" + l))
+                    .append(">; rel=\"alternate\"; hreflang=\"").append(l).append('"');
         }
-        if (links.length() > 0) {
-            links.append(", <").append(urls.absolute(request, path))
-                    .append(">; rel=\"alternate\"; hreflang=\"x-default\"");
-            if (ex != null) {
-                ex.setAttribute(LINKS, links.toString());
-            }
+        links.append(", <").append(urls.absolute(request, path))
+                .append(">; rel=\"alternate\"; hreflang=\"x-default\"");
+        if (ex != null) {
+            ex.setAttribute(LINKS, links.toString());
         }
         if (c.pricer != null) {
             c.locale = Locales.orNull(c.pricer.market().getLocale());
@@ -191,30 +182,57 @@ public final class StorefrontMarkets {
         if (c.locale == null) {
             List<String> wanted = Locales.accepted(request.getHeader("Accept-Language"));
             c.locale = wanted.isEmpty() ? null : translations.pick(store.getId(), wanted);
-            if (ex != null) {
-                ex.setAttribute(VARY, "Accept-Language");
-            }
+            StoreText.vary(ex, "Accept-Language");
         }
-        // The interface text: the content language when the app ships text
-        // for it, else the visitor's best (StoreText). A market whose locale
-        // has no interface text falls back on the header too, so that page
-        // varies by it as well.
+        // The interface text: the shopper's explicit choice (`?lang=`, an
+        // address of its own; else the `lang` cookie, which makes the copy
+        // private), then the content language when the app ships text for
+        // it, then the visitor's best (StoreText). Without `?lang=` the page
+        // varies by the cookie; a market whose locale has no interface text
+        // falls back on the header, so that page varies by it as well.
+        String asked = StoreText.query(request);
         String spoken = c.locale == null ? null : Locales.language(c.locale);
-        if (spoken != null && StoreText.supported(spoken)) {
-            c.ui = spoken;
+        if (asked != null) {
+            c.ui = asked;
         } else {
-            c.ui = StoreText.pick(null, Locales.accepted(request.getHeader("Accept-Language")));
-            if (ex != null) {
-                ex.setAttribute(VARY, "Accept-Language");
+            StoreText.vary(ex, "Cookie");
+            String kept = StoreText.cookie(request);
+            if (kept != null) {
+                c.ui = kept;
+                if (ex != null) {
+                    ex.setAttribute(Slots.PERSONAL, "1");
+                }
+            } else if (spoken != null && StoreText.supported(spoken)) {
+                c.ui = spoken;
+            } else {
+                c.ui = StoreText.pick(null, Locales.accepted(request.getHeader("Accept-Language")));
+                StoreText.vary(ex, "Accept-Language");
             }
         }
+        c.all = all;
+        c.chose = chose;
+        suggest(c, geo, request, path, ex);
         c.picker.set(0, new LinkView(store.getCurrency() + " ("
                 + StoreText.table(c.ui).get("storePrices") + ")", path, current == null));
         return c;
     }
 
+    /// Fills [Choice#suggested] once `geo` is known (see [#choose]).
+    private static void suggest(Choice c, GeoCountry geo, HttpServer.Request request,
+            String path, SecurityExchange ex) {
+        if (geo == null || c.geoAsked || c.chose || request == null
+                || GeoCountry.crawler(request.getHeader("User-Agent"))) {
+            return;
+        }
+        c.geoAsked = true;
+        c.suggested = suggest(c.all, geo.country(request), path, c.ui);
+        if (c.suggested != null && ex != null) {
+            ex.setAttribute(Slots.PERSONAL, "1");
+        }
+    }
+
     /// The first active market selling to `country`, as a link, or null.
-    static LinkView suggest(List<MarketDto> all, String country, String path) {
+    static LinkView suggest(List<MarketDto> all, String country, String path, String ui) {
         if (country == null) {
             return null;
         }
@@ -223,8 +241,8 @@ public final class StorefrontMarkets {
             List<String> cs = m.countries();
             for (int at = 0; cs != null && at < cs.size(); at++) {
                 if (country.equalsIgnoreCase(cs.get(at))) {
-                    return new LinkView("Shopping from " + country + "? See prices for "
-                            + m.name() + " (" + m.currency() + ")",
+                    return new LinkView(StoreText.format(StoreText.table(ui), "geoNote",
+                            country, m.name(), m.currency()),
                             path + "?market=" + SiteUrls.encode(m.code()), false);
                 }
             }

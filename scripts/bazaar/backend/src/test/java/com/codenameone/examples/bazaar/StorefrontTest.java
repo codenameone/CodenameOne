@@ -110,7 +110,8 @@ class StorefrontTest {
         assertEquals("Offer", offer.get("@type"));
         assertEquals("USD", offer.get("priceCurrency"));
         String canonical = r.getHeader("Link");
-        assertTrue(canonical.endsWith("/s/sf-ld/products/sf-ld-mug>; rel=\"canonical\""),
+        // The canonical first, then each language's alternate (StoreText#query).
+        assertTrue(canonical.contains("/s/sf-ld/products/sf-ld-mug>; rel=\"canonical\", <"),
                 canonical);
         assertTrue(html.contains("property=\"og:url\""));
         assertTrue(attribute(html, "property=\"og:url\" content").endsWith("/s/sf-ld/products/sf-ld-mug"));

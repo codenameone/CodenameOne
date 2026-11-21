@@ -31,6 +31,7 @@ import com.codename1.backend.mvc.Model;
 import com.codename1.backend.security.SecurityExchange;
 import com.codenameone.examples.bazaar.web.NotFoundPage;
 import com.codenameone.examples.bazaar.web.Shell;
+import com.codenameone.examples.bazaar.web.StoreText;
 import com.codenameone.examples.bazaar.web.WebPages;
 import com.codenameone.examples.bazaar.web.security.PageEtags;
 
@@ -63,8 +64,56 @@ public class AccountPages {
             AccountView view) throws java.io.IOException {
         Shell shell = pages.shell(request, "account", title);
         SecurityExchange.current().setAttribute(PageEtags.NO_STORE, "1");
+        localize(view, shell.t);
         model.addAttribute("view", view);
         return WebPages.view(model, shell, "account");
+    }
+
+    /// The words [AccountData] wrote in English -- statuses, "Order #12",
+    /// "Page 2", timeline events -- in the shopper's language. Names, dates
+    /// and amounts are left as they are.
+    static void localize(AccountView v, java.util.Map<String, String> t) {
+        java.util.List<java.util.List<AccountItem>> lists =
+                new java.util.ArrayList<java.util.List<AccountItem>>();
+        lists.add(v.items);
+        lists.add(v.events);
+        lists.add(v.tracking);
+        lists.add(v.returns);
+        lists.add(v.sessions);
+        lists.add(java.util.Collections.singletonList(v.order));
+        for (int l = 0; l < lists.size(); l++) {
+            java.util.List<AccountItem> items = lists.get(l);
+            for (int iter = 0; iter < items.size(); iter++) {
+                AccountItem i = items.get(iter);
+                i.title = StoreText.translate(t, i.title);
+                i.status = status(t, i.status);
+            }
+        }
+        v.pageLabel = StoreText.translate(t, v.pageLabel);
+    }
+
+    /// A status as a word: "Processing" as written, or a service's
+    /// `REQUESTED` read as "Requested" -- kept as it was when the table has
+    /// no other language's word for it.
+    static String status(java.util.Map<String, String> t, String s) {
+        String done = StoreText.translate(t, s);
+        if (!done.equals(s) || s == null || s.length() < 2) {
+            return done;
+        }
+        StringBuilder word = new StringBuilder();
+        for (int iter = 0; iter < s.length(); iter++) {
+            char c = s.charAt(iter);
+            if (c == '_') {
+                word.append(' ');
+            } else if (iter > 0 && c >= 'A' && c <= 'Z') {
+                word.append((char) (c - 'A' + 'a'));
+            } else {
+                word.append(c);
+            }
+        }
+        String english = word.toString();
+        String other = StoreText.translate(t, english);
+        return other.equals(english) ? s : other;
     }
 
     private static AccountView view(String page) {

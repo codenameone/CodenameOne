@@ -170,7 +170,7 @@ public class WebSecurity {
     public SecurityFilterChain shopChain(HttpSecurity http,
             @Value("${bazaar.web.hsts:true}") boolean hsts,
             com.codenameone.examples.bazaar.web.StorefrontRedirects redirects) throws IOException {
-        http.securityMatcher("/", "/s/**", "/track/**", "/consent", "/consent/**")
+        http.securityMatcher("/", "/s/**", "/track/**", "/consent", "/consent/**", "/lang")
             .csrf(c -> c.disable())
             .addFilterBefore(ErrorPages.filter(), RateLimitFilter.class)
             .addFilterBefore(redirects.filter(), RateLimitFilter.class)

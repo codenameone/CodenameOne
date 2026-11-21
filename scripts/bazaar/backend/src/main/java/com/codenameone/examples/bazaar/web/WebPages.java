@@ -123,10 +123,7 @@ public class WebPages {
         s.area = "auth";
         // The visitor's language (these pages are never shared-cached: each
         // carries its own form token).
-        s.lang = StoreText.pick(null, com.codenameone.examples.bazaar.market.Locales.accepted(
-                request.getHeader("Accept-Language")));
-        s.dir = StoreText.rtl(s.lang) ? "rtl" : "ltr";
-        s.t = StoreText.table(s.lang);
+        language(s, request);
         String heading = StoreText.translate(s.t, title);
         s.title = heading + " - Bazaar";
         s.heading = heading;
@@ -172,7 +169,29 @@ public class WebPages {
             s.home = table[0][1];
         }
         s.toast = takeToast(request);
+        if ("account".equals(area)) {
+            // The shopper's language (StoreText#forRequest); every account
+            // page is no-store, so nothing about caching depends on it. The
+            // back office and the platform admin stay English.
+            language(s, request);
+            s.title = StoreText.translate(s.t, title) + " - Bazaar";
+            s.heading = StoreText.translate(s.t, title);
+            s.toast = StoreText.translate(s.t, s.toast);
+            for (int iter = 0; iter < s.nav.size(); iter++) {
+                s.nav.get(iter).label = StoreText.translate(s.t, s.nav.get(iter).label);
+            }
+        }
         return s;
+    }
+
+    /// Sets the language of `s` from the shopper's choice, else their
+    /// `Accept-Language`, and fills its picker.
+    static void language(Shell s, HttpServer.Request request) {
+        s.lang = StoreText.forRequest(request, false);
+        s.dir = StoreText.rtl(s.lang) ? "rtl" : "ltr";
+        s.t = StoreText.table(s.lang);
+        s.langs = StoreText.options(s.lang);
+        s.langBack = StoreText.back(request.getTarget());
     }
 
     /// A back-office shell for `storeId`, after checking the caller works

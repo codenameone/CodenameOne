@@ -116,6 +116,7 @@ public class StorefrontCaching implements HandlerInterceptor {
         String query = target.substring(q + 1);
         String kept = null;
         String market = null;
+        String lang = null;
         int start = 0;
         while (start <= query.length()) {
             int amp = query.indexOf('&', start);
@@ -126,8 +127,14 @@ public class StorefrontCaching implements HandlerInterceptor {
             } else if (part.startsWith("market=") && part.length() > 7 && market == null) {
                 // Each market's copy is its own document (prices, language).
                 market = part;
+            } else if (part.startsWith("lang=") && part.length() > 5 && lang == null) {
+                // So is each interface language's (StoreText#query).
+                lang = part;
             }
             start = end + 1;
+        }
+        if (lang != null) {
+            market = market == null ? lang : market + "&" + lang;
         }
         String q2 = market == null ? kept : kept == null ? market : market + "&" + kept;
         return q2 == null ? path : path + "?" + q2;
