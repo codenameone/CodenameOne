@@ -175,6 +175,20 @@ final class ReturnsPane {
 
     private static void refund(OrderDto o, List<OrderLineDto> lines, int[] back, String to,
             boolean restock, final Container result) {
+        refund(o, lines, back, to, restock, result, "");
+    }
+
+    /// Sends the return; asks a manager first when the store's policy wants
+    /// one for refunds, or when the server says so.
+    private static void refund(final OrderDto o, final List<OrderLineDto> lines, final int[] back,
+            final String to, final boolean restock, final Container result,
+            final String approvalId) {
+        if (approvalId.length() == 0 && hasPicks(back)
+                && PosRules.refundNeedsApproval(PosState.policy(), PosState.role())) {
+            ManagerApproval.ask(PosRules.REFUND, 0, "Order #" + o.number(),
+                    id -> refund(o, lines, back, to, restock, result, id));
+            return;
+        }
         List<RefundLineDto> picked = new ArrayList<RefundLineDto>();
         for (int iter = 0; iter < lines.size(); iter++) {
             if (back[iter] > 0) {
@@ -186,7 +200,8 @@ final class ReturnsPane {
             return;
         }
         Api.pos().counterReturn(PosState.storeId(), PosState.registerId(), o.id(),
-                new PosReturnDto(PosState.shiftId(), picked, to, "Counter return", restock, ""),
+                new PosReturnDto(PosState.shiftId(), picked, to, "Counter return", restock,
+                        approvalId),
                 Net.to(r -> {
                     result.removeAll();
                     result.add(PosUi.data(Lang.tr("Refunded {0}", PosState.money(r.refundCents())),
@@ -197,6 +212,22 @@ final class ReturnsPane {
                     }
                     result.revalidateLater();
                     PosState.refreshCatalog(null);
-                }, Ui::fail));
+                }, (status, message) -> {
+                    if (approvalId.length() == 0 && ManagerApproval.wanted(status, message)) {
+                        ManagerApproval.ask(PosRules.REFUND, 0, "Order #" + o.number(),
+                                id -> refund(o, lines, back, to, restock, result, id));
+                    } else {
+                        Ui.fail(status, message);
+                    }
+                }));
+    }
+
+    private static boolean hasPicks(int[] back) {
+        for (int iter = 0; iter < back.length; iter++) {
+            if (back[iter] > 0) {
+                return true;
+            }
+        }
+        return false;
     }
 }

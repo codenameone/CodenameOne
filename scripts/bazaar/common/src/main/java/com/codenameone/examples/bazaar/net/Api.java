@@ -27,6 +27,9 @@ import com.codenameone.examples.bazaar.api.CheckoutApi;
 import com.codenameone.examples.bazaar.api.DiscountApi;
 import com.codenameone.examples.bazaar.api.FulfillmentApi;
 import com.codenameone.examples.bazaar.api.PosApi;
+import com.codenameone.examples.bazaar.api.PosToolsApi;
+import com.codenameone.examples.bazaar.api.LayawayApi;
+import com.codenameone.examples.bazaar.api.OrderEditApi;
 import com.codenameone.examples.bazaar.api.ReturnApi;
 import com.codenameone.examples.bazaar.api.GiftCardApi;
 import com.codenameone.examples.bazaar.api.InventoryApi;
@@ -68,6 +71,9 @@ public final class Api {
     private static FulfillmentApi fulfilment;
     private static ReturnApi returns;
     private static PosApi pos;
+    private static PosToolsApi posTools;
+    private static LayawayApi layaways;
+    private static OrderEditApi orderEdits;
     private static AutomationApi automations;
     private static AnalyticsApi analytics;
     private static CustomerApi customers;
@@ -98,6 +104,9 @@ public final class Api {
         fulfilment = RestClients.create(FulfillmentApi.class, baseUrl);
         returns = RestClients.create(ReturnApi.class, baseUrl);
         pos = RestClients.create(PosApi.class, baseUrl);
+        posTools = RestClients.create(PosToolsApi.class, baseUrl);
+        layaways = RestClients.create(LayawayApi.class, baseUrl);
+        orderEdits = RestClients.create(OrderEditApi.class, baseUrl);
         automations = RestClients.create(AutomationApi.class, baseUrl);
         analytics = RestClients.create(AnalyticsApi.class, baseUrl);
         customers = RestClients.create(CustomerApi.class, baseUrl);
@@ -171,6 +180,21 @@ public final class Api {
 
     public static PosApi pos() {
         return pos;
+    }
+
+    /// Policy, approvals, parked carts and the smart grid.
+    public static PosToolsApi posTools() {
+        return posTools;
+    }
+
+    /// Layaways.
+    public static LayawayApi layaways() {
+        return layaways;
+    }
+
+    /// Edits of placed orders.
+    public static OrderEditApi orderEdits() {
+        return orderEdits;
     }
 
     public static AutomationApi automations() {

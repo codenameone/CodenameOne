@@ -98,6 +98,8 @@ final class PosHome {
         } else {
             set(SellScreen.create());
             PosState.refreshCatalog(null);
+            PosState.refreshPolicy();
+            PosState.refreshGrid();
         }
     }
 

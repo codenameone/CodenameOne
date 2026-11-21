@@ -22,7 +22,6 @@ import com.codename1.annotations.rest.Body;
 import com.codename1.annotations.rest.GET;
 import com.codename1.annotations.rest.POST;
 import com.codename1.annotations.rest.Path;
-import com.codename1.annotations.rest.Query;
 import com.codename1.annotations.rest.RestClient;
 import com.codename1.io.rest.Response;
 import com.codename1.util.OnComplete;

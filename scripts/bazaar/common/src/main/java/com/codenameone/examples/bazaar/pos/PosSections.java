@@ -35,6 +35,9 @@ public final class PosSections {
     public static final String SHIFT = "pos-shift";
     public static final String RETURNS = "pos-returns";
     public static final String OUTBOX = "pos-outbox";
+    public static final String PARKED = "pos-parked";
+    public static final String LAYAWAYS = "pos-layaways";
+    public static final String EDITS = "pos-order-edit";
 
     private static boolean installed;
 
@@ -51,6 +54,12 @@ public final class PosSections {
                 ShiftPane::create));
         Sections.register(Nav.POS, new Section(RETURNS, "Returns",
                 FontImage.MATERIAL_ASSIGNMENT_RETURN, ReturnsPane::create));
+        Sections.register(Nav.POS, new Section(PARKED, "Parked", FontImage.MATERIAL_PAUSE_CIRCLE,
+                ParkedPane::create));
+        Sections.register(Nav.POS, new Section(LAYAWAYS, "Layaways", FontImage.MATERIAL_SAVINGS,
+                LayawayPane::create));
+        Sections.register(Nav.POS, new Section(EDITS, "Edit order", FontImage.MATERIAL_EDIT_NOTE,
+                OrderEditPane::create));
         Sections.register(Nav.POS, new Section(OUTBOX, "Outbox", FontImage.MATERIAL_CLOUD_UPLOAD,
                 OutboxPane::create));
         Sections.content(Nav.MERCHANT, Sections.POS, PosSections::launcher);

@@ -155,7 +155,12 @@ class MerchantIdorTest {
         "POST /selling-plans/{planId}", "POST /subscriptions/{subscriptionId}/cancel",
         "POST /subscriptions/{subscriptionId}/pause", "POST /subscriptions/{subscriptionId}/resume",
         "POST /subscriptions/{subscriptionId}/skip", "POST /vat-check",
+        "GET /pos/labels.pdf",
     };
+
+    /// Routes of [#ROUTES] served as documents by `DocumentPages` rather than
+    /// declared by a shared API interface.
+    static final String[] DOCUMENT_ROUTES = {"GET /pos/labels.pdf"};
 
     /// The table an id placeholder names, by the path segment before it.
     private static final String[][] TABLES = {
@@ -298,6 +303,20 @@ class MerchantIdorTest {
             Rest.statusOf(mvc, People.asMerchant(Rest.body(post(base + seeds[iter][0]),
                     seeds[iter][1]), b.owner));
         }
+        // A parked cart and a layaway of B's, written straight to the tables:
+        // both need a signed-in register to make the usual way, and the test
+        // only needs rows whose ids belong to B.
+        String bRegister = idOf("register", b.storeId);
+        long now = System.currentTimeMillis();
+        db.execute("INSERT INTO parked_cart (id, store_id, register_id, client_id, label, "
+                + "customer_id, staff_username, status, note, created_at, resumed_at) "
+                + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", new Object[] {"idorparkedb",
+                    b.storeId, bRegister, "idor-parked-b", "Idor", "", b.owner, "PARKED", "", now,
+                    0L});
+        db.execute("INSERT INTO layaway (id, store_id, order_id, register_id, customer_id, status, "
+                + "total_cents, paid_cents, cancel_fee_bp, refunded_cents, created_at, updated_at) "
+                + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", new Object[] {"idorlayawayb",
+                    b.storeId, orderId, bRegister, "", "OPEN", 1000L, 200L, 0L, 0L, now, now});
         // B's loyalty programme, club, segments, campaigns, form and journey.
         marketing.seed(b.storeId);
         new CommerceSeed(b, "idorcd", accounts, mvc, subscriptions, trade);
@@ -397,7 +416,9 @@ class MerchantIdorTest {
         }
         List<String> mine = new ArrayList<String>();
         for (int iter = 0; iter < ROUTES.length; iter++) {
-            mine.add(ROUTES[iter]);
+            if (!java.util.Arrays.asList(DOCUMENT_ROUTES).contains(ROUTES[iter])) {
+                mine.add(ROUTES[iter]);
+            }
         }
         List<String> missing = new ArrayList<String>();
         for (int iter = 0; iter < declared.size(); iter++) {
@@ -406,7 +427,8 @@ class MerchantIdorTest {
             }
         }
         assertTrue(missing.isEmpty(), "Add to MerchantIdorTest.ROUTES: " + missing);
-        assertEquals(declared.size(), ROUTES.length, "a route listed that no interface declares");
+        assertEquals(declared.size(), ROUTES.length - DOCUMENT_ROUTES.length,
+                "a route listed that no interface declares");
     }
 
     private static String read(File f) throws Exception {

@@ -25,6 +25,8 @@ import com.codename1.mapping.Mappers;
 import com.codenameone.examples.bazaar.api.CollectionDto;
 import com.codenameone.examples.bazaar.api.PosCatalogDto;
 import com.codenameone.examples.bazaar.api.PosSaleDto;
+import com.codenameone.examples.bazaar.api.ParkedCartDto;
+import com.codenameone.examples.bazaar.api.PosGridDto;
 import com.codenameone.examples.bazaar.api.PosPolicyDto;
 import com.codenameone.examples.bazaar.api.PosSessionDto;
 import com.codenameone.examples.bazaar.api.ShiftDto;
@@ -432,6 +434,8 @@ public final class PosState {
     }
 
     /// Keeps the store's point-of-sale policy for offline use.
+    /// Caches the store's policy: the tip presets and everything the
+    /// approval and layaway decisions read, so they hold offline.
     public static void policy(PosPolicyDto p) {
         if (p == null) {
             return;
@@ -444,9 +448,96 @@ public final class PosState {
             }
         }
         write(key("tips"), b.toString());
+        write(key("policy"), PosRules.encode(p));
     }
 
-    /// Basis points separated by commas; anything else is skipped.
+    /// The cached policy, or null before the register first fetched it.
+    public static PosPolicyDto policy() {
+        Object stored = read(key("policy"));
+        return stored instanceof String ? PosRules.decode((String) stored) : null;
+    }
+
+    /// Fetches the policy when the register opens; a register offline keeps
+    /// the one it cached.
+    public static void refreshPolicy() {
+        if (!hasRegister() || Api.posTools() == null) {
+            return;
+        }
+        Api.posTools().policy(storeId(), Net.to(p -> policy(p), (status, message) -> { }));
+    }
+
+    /// The staff role of the signed-in session, "" when nobody is signed in.
+    public static String role() {
+        PosSessionDto s = session();
+        return s == null || s.role() == null ? "" : s.role();
+    }
+
+    // ------------------------------------------------------------------ grid
+    /// The cached smart grid of this register's location, or null.
+    public static PosGridDto grid() {
+        Object stored = read(key("grid"));
+        if (stored instanceof String) {
+            try {
+                return Mappers.fromJson((String) stored, PosGridDto.class);
+            } catch (RuntimeException bad) {
+                return null;
+            }
+        }
+        return null;
+    }
+
+    /// Fetches the location's grid and caches it for offline use.
+    public static void refreshGrid() {
+        if (!hasRegister() || locationId().length() == 0 || Api.posTools() == null) {
+            return;
+        }
+        Api.posTools().grid(storeId(), locationId(), Net.to(g -> {
+            if (g != null) {
+                write(key("grid"), Mappers.toJson(g));
+                fireCart();
+            }
+        }, (status, message) -> { }));
+    }
+
+    // ---------------------------------------------------------------- parked
+    private static ParkedCarts parked;
+    private static String parkedFor = "";
+
+    /// This register's parked carts, kept on the device until synced.
+    public static ParkedCarts parked() {
+        String reg = registerId();
+        if (parked == null || !reg.equals(parkedFor)) {
+            parkedFor = reg;
+            parked = new ParkedCarts(new Outbox.Persist() {
+                @Override
+                public String read(String k) {
+                    Object o = PosState.read(key(k));
+                    return o instanceof String ? (String) o : null;
+                }
+
+                @Override
+                public void write(String k, String value) {
+                    PosState.write(key(k), value);
+                }
+            }, new ParkedCarts.Codec() {
+                @Override
+                public String encode(ParkedCartDto cart) {
+                    return Mappers.toJson(cart);
+                }
+
+                @Override
+                public ParkedCartDto decode(String text) {
+                    try {
+                        return Mappers.fromJson(text, ParkedCartDto.class);
+                    } catch (RuntimeException bad) {
+                        return null;
+                    }
+                }
+            });
+        }
+        return parked;
+    }
+
     static long[] parseBp(String text) {
         List<Long> out = new ArrayList<Long>();
         long n = 0;

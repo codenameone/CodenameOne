@@ -35,6 +35,9 @@ import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.layouts.FlowLayout;
 import com.codename1.ui.layouts.GridLayout;
 import com.codenameone.examples.bazaar.api.DiscountDto;
+import com.codenameone.examples.bazaar.api.GridTileDto;
+import com.codenameone.examples.bazaar.api.PosGridDto;
+import com.codenameone.examples.bazaar.docs.Pdfs;
 import com.codenameone.examples.bazaar.api.PosCatalogDto;
 import com.codenameone.examples.bazaar.api.PosCustomerDto;
 import com.codenameone.examples.bazaar.api.PosItemDto;
@@ -165,6 +168,9 @@ final class SellScreen {
     private void fillChips() {
         chips.removeAll();
         Map<String, String> titles = PosState.collectionTitles();
+        if (homeTiles() != null) {
+            chip(HOME, Lang.tr("Home"));
+        }
         chip("", Lang.tr("All"));
         for (Map.Entry<String, String> e : titles.entrySet()) {
             chip(e.getKey(), e.getValue());
@@ -195,6 +201,10 @@ final class SellScreen {
             grid.revalidateLater();
             return;
         }
+        if (HOME.equals(collection) && homeTiles() != null) {
+            fillHome(c, homeTiles());
+            return;
+        }
         List<String> ids = collection.length() == 0 ? null : PosState.collections().get(collection);
         List<List<PosItemDto>> products = Snapshot.products(Snapshot.filter(c.items(), query, ids));
         int width = PosUi.wide() ? CN.getDisplayWidth() * 3 / 5 : CN.getDisplayWidth();
@@ -210,6 +220,112 @@ final class SellScreen {
                     "Try another word, or scan the item."));
         }
         grid.revalidateLater();
+    }
+
+    private static final String HOME = "home";
+
+    /// The server's grid for this location, sorted by position, or null
+    /// when the store has not laid one out.
+    private static List<GridTileDto> homeTiles() {
+        PosGridDto g = PosState.grid();
+        if (g == null || g.tiles() == null || g.tiles().isEmpty()) {
+            return null;
+        }
+        List<GridTileDto> out = new ArrayList<GridTileDto>(g.tiles());
+        for (int a = 1; a < out.size(); a++) {
+            GridTileDto t = out.get(a);
+            int b = a - 1;
+            while (b >= 0 && out.get(b).position() > t.position()) {
+                out.set(b + 1, out.get(b));
+                b--;
+            }
+            out.set(b + 1, t);
+        }
+        return out;
+    }
+
+    /// The smart grid: a tile per product, variant or collection the store
+    /// placed, in its order; a tile whose target left the catalog is skipped.
+    private void fillHome(PosCatalogDto c, List<GridTileDto> tiles) {
+        int width = PosUi.wide() ? CN.getDisplayWidth() * 3 / 5 : CN.getDisplayWidth();
+        int cols = Layouts.columns(width, 30f, 6);
+        int side = CN.convertToPixels(22);
+        List<Component> shown = new ArrayList<Component>();
+        for (int iter = 0; iter < tiles.size(); iter++) {
+            final GridTileDto t = tiles.get(iter);
+            String kind = t.kind() == null ? "" : t.kind();
+            String ref = t.ref() == null ? "" : t.ref();
+            if ("COLLECTION".equalsIgnoreCase(kind)) {
+                if (!PosState.collections().containsKey(ref)) {
+                    continue;
+                }
+                String label = t.label() != null && t.label().length() > 0 ? t.label()
+                        : PosState.collectionTitles().get(ref);
+                Button b = new Button(label == null ? "" : label, "PosChoice");
+                b.setShouldLocalize(false);
+                b.setName("pos-grid-" + iter);
+                if (t.color() != 0) {
+                    b.getAllStyles().setBgColor(t.color() & 0xffffff);
+                    b.getAllStyles().setBgTransparency(255);
+                }
+                b.addActionListener(e -> {
+                    collection = t.ref();
+                    fillChips();
+                    fillGrid();
+                    chips.revalidateLater();
+                });
+                shown.add(b);
+                continue;
+            }
+            if ("ACTION".equalsIgnoreCase(kind)) {
+                final String action = ref;
+                Button b = new Button(t.label() != null && t.label().length() > 0 ? t.label()
+                        : action, "PosChoice");
+                b.setShouldLocalize(false);
+                b.setName("pos-grid-" + iter);
+                b.addActionListener(e -> action(action));
+                shown.add(b);
+                continue;
+            }
+            // A PRODUCT tile names one variant.
+            List<PosItemDto> variants = new ArrayList<PosItemDto>();
+            for (int v = 0; v < c.items().size(); v++) {
+                PosItemDto it = c.items().get(v);
+                if (ref.equals(it.variantId())) {
+                    variants.add(it);
+                }
+            }
+            if (!variants.isEmpty()) {
+                shown.add(tile(variants, side));
+            }
+        }
+        grid.setLayout(new GridLayout(Math.max(1, (shown.size() + cols - 1) / cols), cols));
+        for (int iter = 0; iter < shown.size(); iter++) {
+            grid.add(shown.get(iter));
+        }
+        if (shown.isEmpty()) {
+            grid.setLayout(new BorderLayout());
+            grid.add(BorderLayout.CENTER, Ui.empty(FontImage.MATERIAL_APPS, "Nothing on the grid",
+                    "The grid's items are not in this register's catalog yet."));
+        }
+        grid.revalidateLater();
+    }
+
+    /// What an ACTION tile of the smart grid does.
+    private void action(String action) {
+        if ("CUSTOM_ITEM".equals(action)) {
+            customItem();
+        } else if ("PARK".equals(action)) {
+            park();
+        } else if ("PARKED".equals(action)) {
+            PosSections.show(PosSections.PARKED);
+        } else if ("LAYAWAY".equals(action)) {
+            PosSections.show(PosSections.LAYAWAYS);
+        } else if ("CUSTOMER".equals(action)) {
+            customer();
+        } else if ("DISCOUNT".equals(action)) {
+            orderDiscount();
+        }
     }
 
     private Component tile(final List<PosItemDto> variants, int side) {
@@ -362,6 +478,13 @@ final class SellScreen {
                 e -> orderDiscount()));
         head.add(PosUi.icon(FontImage.MATERIAL_DELETE_SWEEP, "Clear", "pos-clear", "PosTool",
                 e -> clearSale()));
+        head.add(PosUi.icon(FontImage.MATERIAL_POST_ADD, "Custom", "pos-custom", "PosTool",
+                e -> customItem()));
+        head.add(PosUi.icon(FontImage.MATERIAL_PAUSE_CIRCLE, "Park", "pos-park", "PosTool",
+                e -> park()));
+        head.add(PosUi.icon(FontImage.MATERIAL_SELL, "Labels", "pos-labels", "PosTool",
+                e -> labels()));
+        head.setScrollableX(true);
         panel.add(BorderLayout.NORTH, head);
         cartBox.setScrollableY(true);
         cartBox.setName("pos-cart-lines");
@@ -716,11 +839,92 @@ final class SellScreen {
             content.add(BorderLayout.SOUTH, PosUi.key(pay.getText(), "pos-tender", "PosPay",
                     e -> {
                         cartSheet.back();
-                        TenderSheet.show();
+                        tender();
                     }));
             cartSheet.show();
             return;
         }
+        tender();
+    }
+
+    /// Opens the tender sheet, first asking a manager when the store's
+    /// policy says this sale's discounts or changed prices need one.
+    static void tender() {
+        final PosCart cart = PosState.cart();
+        if (cart.approvalId().length() == 0) {
+            long[] list = new long[cart.items().size()];
+            for (int iter = 0; iter < list.length; iter++) {
+                list[iter] = cart.items().get(iter).item.priceCents();
+            }
+            PosPricing.Totals t = PosState.totals();
+            String kind = PosRules.saleApproval(PosState.policy(), PosState.role(),
+                    cart.uploadLines(), list, t.discountCents);
+            if (kind != null) {
+                ManagerApproval.ask(kind, t.totalCents, "Sale", id -> {
+                    cart.setApprovalId(id);
+                    TenderSheet.show();
+                });
+                return;
+            }
+        }
         TenderSheet.show();
+    }
+
+    // ---------------------------------------------------------------- tools
+    /// A sale line of a typed title and price, for something not in the catalog.
+    private void customItem() {
+        final Sheet sheet = new Sheet(null, Lang.tr("Custom item"));
+        sheet.setName("pos-custom-sheet");
+        Container c = sheet.getContentPane();
+        c.setLayout(BoxLayout.y());
+        final TextField title = new TextField("", Lang.tr("What is it?"), 20, TextField.ANY);
+        title.setUIID("PosField");
+        title.setName("pos-custom-title");
+        final boolean[] taxable = {true};
+        c.add(title);
+        c.add(Ui.toggle("pos-custom-taxable", true, v -> taxable[0] = v));
+        c.add(PosUi.key(Lang.tr("Price"), "pos-custom-price", "PosPay", e -> {
+            final String t = title.getText().trim();
+            if (t.length() == 0) {
+                Ui.say("Name the item first");
+                return;
+            }
+            sheet.back();
+            askAmount("Price", false, cents -> {
+                if (cents > 0) {
+                    add(PosCart.customItem(t, cents, taxable[0]), 1);
+                }
+            });
+        }));
+        sheet.show();
+        title.startEditingAsync();
+    }
+
+    /// Price labels for the catalog items in the cart, one per unit, as a
+    /// PDF to print or share.
+    private void labels() {
+        PosCart cart = PosState.cart();
+        StringBuilder ids = new StringBuilder();
+        for (int iter = 0; iter < cart.items().size(); iter++) {
+            PosItemDto it = cart.items().get(iter).item;
+            if (!PosCart.custom(it) && ids.indexOf(it.variantId()) < 0) {
+                ids.append(ids.length() > 0 ? "," : "").append(it.variantId());
+            }
+        }
+        if (ids.length() == 0) {
+            Ui.say("Add the items to label to the sale first");
+            return;
+        }
+        Pdfs.open(Lang.tr("Price labels"), "labels.pdf", "/api/merchant/stores/"
+                + PosState.storeId() + "/pos/labels.pdf?variants=" + ids + "&copies=1");
+    }
+
+    /// Puts the sale aside under a label, to ring up the next customer.
+    private void park() {
+        if (PosState.cart().isEmpty()) {
+            return;
+        }
+        ParkedPane.parkCurrent();
+        refocus();
     }
 }

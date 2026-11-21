@@ -106,6 +106,7 @@ public final class PosSync {
         if (busy || !PosState.hasRegister() || Api.pos() == null) {
             return;
         }
+        ParkedPane.sync();
         final Outbox box = PosState.outbox();
         final List<Outbox.Entry> batch = box.due(System.currentTimeMillis());
         if (batch.isEmpty()) {
