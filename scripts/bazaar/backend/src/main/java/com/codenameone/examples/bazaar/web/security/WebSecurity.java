@@ -28,6 +28,7 @@ import com.codename1.backend.annotations.Value;
 import com.codename1.backend.security.AntPathRequestMatcher;
 import com.codename1.backend.security.CsrfFilter;
 import com.codename1.backend.security.HttpSecurity;
+import com.codename1.backend.security.RateLimitFilter;
 import com.codename1.backend.security.SavedRequestAwareAuthenticationSuccessHandler;
 import com.codename1.backend.security.SecurityExchange;
 import com.codename1.backend.security.SecurityFilter;
@@ -37,6 +38,7 @@ import com.codename1.backend.security.mfa.JdbcTotpRepository;
 import com.codename1.backend.security.mfa.TotpService;
 import com.codename1.backend.security.ratelimit.RateLimitKeys;
 import com.codenameone.examples.bazaar.Roles;
+import com.codenameone.examples.bazaar.web.ErrorPages;
 
 import java.io.IOException;
 
@@ -95,6 +97,7 @@ public class WebSecurity {
         http.securityMatcher("/auth/**", "/account", "/account/**", "/admin", "/admin/**",
                     "/platform", "/platform/**", "/s/*/checkout", "/s/*/checkout/**")
             .sessionManagement(s -> s.sessionFixation(f -> f.changeSessionId()))
+            .addFilterBefore(ErrorPages.filter(), RateLimitFilter.class)
             .addFilterBefore(new WebHeaders(hsts), CsrfFilter.class)
             .addFilterBefore(new PageEtags(), CsrfFilter.class)
             .addFilterBefore(lockout(throttle), CsrfFilter.class)
@@ -139,6 +142,7 @@ public class WebSecurity {
             @Value("${bazaar.web.hsts:true}") boolean hsts) throws IOException {
         http.securityMatcher("/", "/s/**", "/track/**", "/consent", "/consent/**")
             .csrf(c -> c.disable())
+            .addFilterBefore(ErrorPages.filter(), RateLimitFilter.class)
             .addFilterBefore(new WebHeaders(hsts, true), CsrfFilter.class)
             .addFilterBefore(new PageEtags(), CsrfFilter.class)
             .authorizeHttpRequests(auth -> auth.anyRequest().permitAll());

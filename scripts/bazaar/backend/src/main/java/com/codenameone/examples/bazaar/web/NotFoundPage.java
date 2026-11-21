@@ -22,26 +22,13 @@ import com.codename1.backend.HttpServer;
 
 import java.io.IOException;
 
-/// The storefront's 404 page. A compiled view answers 200, and an exception
-/// handler answers with a response rather than a view, so this one page is a
-/// constant: it shows nothing of the request, so there is nothing to escape.
+/// The storefront's 404 page: [ErrorPages]'s, a constant that shows nothing of
+/// the request.
 final class NotFoundPage {
-    private static final String HTML = "<!doctype html><html lang=\"en\"><head>"
-            + "<meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,"
-            + " initial-scale=1\"><meta name=\"robots\" content=\"noindex\">"
-            + "<title>Page not found - Bazaar</title>"
-            + "<link rel=\"stylesheet\" href=\"/static/shop.18c86fc7.css\"></head><body>"
-            + "<header class=\"bar\"><div class=\"wrap bar-in\"><a class=\"brand\" href=\"/\">"
-            + "Bazaar</a></div></header><main class=\"wrap empty-state\">"
-            + "<p class=\"big\">404</p><h1>We could not find that page</h1>"
-            + "<p>The shop, product or shipment may have moved or is no longer available.</p>"
-            + "<p><a class=\"button\" href=\"/\">Browse the shops</a></p></main></body></html>";
-
     private NotFoundPage() {
     }
 
     static HttpServer.Response response() throws IOException {
-        return new HttpServer.Response(404, "text/html; charset=utf-8", HTML.getBytes("UTF-8"))
-                .header("Cache-Control", "public, max-age=60");
+        return ErrorPages.response(404);
     }
 }

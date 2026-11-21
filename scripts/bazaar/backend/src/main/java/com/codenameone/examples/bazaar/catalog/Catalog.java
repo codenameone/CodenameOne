@@ -653,16 +653,16 @@ public class Catalog {
         if (bytes == null || bytes.length < 8) {
             throw new ResponseStatusException(400, "The photo is not base64");
         }
-        boolean png = (bytes[0] & 0xff) == 0x89 && bytes[1] == 'P' && bytes[2] == 'N';
-        boolean jpeg = (bytes[0] & 0xff) == 0xff && (bytes[1] & 0xff) == 0xd8;
-        if ("image/png".equals(type) ? !png : !jpeg) {
-            throw new ResponseStatusException(400, "The photo is not a JPEG or a PNG");
-        }
+        // Sniffed by its bytes, held to a size, and kept only as the server
+        // re-encoded it: nothing the upload carried besides its pixels stays.
+        com.codenameone.examples.bazaar.web.security.Uploads.Image clean =
+                com.codenameone.examples.bazaar.web.security.Uploads.image(bytes, type,
+                        MAX_PHOTO_CHARS / 4 * 3);
         Photo row = new Photo();
         row.setId(Ids.next());
         row.setOwnerId(storeId);
-        row.setContentType(type);
-        row.setData(bytes);
+        row.setContentType(clean.contentType);
+        row.setData(clean.bytes);
         row.setCreatedAt(Instant.now());
         photos.insert(row);
         return row.getId();
