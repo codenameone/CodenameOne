@@ -84,7 +84,7 @@ Swap in any rigged glTF character with the same animation names and it fights.
 
 ## Multiplayer without a networking team
 
-The game rules live in their own module, `rules`. It's deterministic Java with no floating point and no clock, and four things compile it: the app, the server, the replays and the tests. Adding a card is one line:
+The game rules live in the `shared` module, in the `rules` package. It's deterministic Java with no floating point and no clock, and four things compile it: the app, the server, the replays and the tests. Adding a card is one line:
 
 ```java {class="cn1-no-try"}
 add(new CardDef("squire", "Squire", CardDef.TROOP, 3)
@@ -142,7 +142,7 @@ The admin console ships in the same app. Moderators see live matches, automatic 
 Skirmish is meant to be remixed. A few directions it could take:
 
 - **Re-skin it** for a different setting: space, pirates, a cartoon farm. Swap the CSS palette, the glTF models and the card portraits. `PortraitStudio` renders new portraits from the models so the art stays consistent.
-- **Change the game.** New cards, new arenas and a different elixir economy are data in the `rules` module. Bump `RulesVersion.ID` and the golden replay tests tell you which recorded battles changed.
+- **Change the game.** New cards, new arenas and a different elixir economy are data in the `rules` package of the `shared` module. Bump `RulesVersion.ID` and the golden replay tests tell you which recorded battles changed.
 - **Let players make content.** The Forge lets players build and share packs of cards, arenas and missions, and lets your designers publish official campaigns from the same editor.
 - **Point an AI agent at it.** The whole game is one readable Java project, so "turn this into a cyberpunk tower defense with four lanes" is a reasonable prompt to start from.
 

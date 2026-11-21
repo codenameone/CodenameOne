@@ -6,7 +6,7 @@ Friends race on the same track at the same moment and talk while they run, their
 voices going peer to peer over WebRTC (<<dash-races>>). A player picks two points on a
 real street map and runs that route through their own city, the street names overhead
 and the landmarks beside the track (<<dash-city-runs>>). And every score on a board is a run
-the server played again from its inputs, by the same Java rules module the game runs.
+the server played again from its inputs, by the same Java rules the game runs.
 In other game frameworks each of those is a plugin, a second language or a separate
 backend. Here they're ordinary Codename One code in one project, beside the levels
 that are data, the camera that swings from side on into 3D halfway down a track, and
@@ -124,10 +124,10 @@ image::img/dash-settings.png["The settings",scaledwidth=30%]
 |===
 | Module | What it holds
 
-| `rules` | The deterministic simulation: tracks, runners, obstacles, pickups, camera
-  cues, the bot, replays and level packs. No floating point, no clock, no
-  `java.util.Random`.
-| `shared` | The data transfer objects and `@RestClient` interfaces.
+| `shared` | The deterministic simulation, in the `rules` package: tracks, runners,
+  obstacles, pickups, camera cues, the bot, replays and level packs. No floating
+  point, no clock, no `java.util.Random`. Beside it, the data transfer objects and
+  `@RestClient` interfaces.
 | `common` | The app: the 3D track, the menus, the track editor, the race lobby and
   voice, the store, the admin console.
 | `backend` | The server: accounts, re-simulated scores and leaderboards, the
@@ -399,8 +399,8 @@ from the same lobby a player uses to spectate.
 [[dash-reskin]]
 === Making it yours
 
-* *Levels*: `Content` in `rules` holds the official levels and the chunks the
-  procedural tails are built from. Change one and run `mvn -pl rules test`: the
+* *Levels*: `Content` in the `rules` package holds the official levels and the chunks the
+  procedural tails are built from. Change one and run `mvn -pl shared test`: the
   golden replays will tell you which recorded runs no longer end the same way, and
   the bot test whether every level can still be finished. Bump `RulesVersion.ID`
   when you change the rules themselves, so old replays aren't judged by new rules.

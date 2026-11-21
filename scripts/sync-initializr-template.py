@@ -117,9 +117,13 @@ def expected():
     modules = {}
     modules.update(tree(sample / 'shared', 'shared/', skip=('target',)))
     modules.update(tree(sample / 'backend', 'backend/', skip=('target',)))
-    # A sample may also carry its game rules (or any logic both halves run) as a
-    # module of its own, which `shared` and `backend` and the app depend on.
-    modules.update(tree(sample / 'rules', 'rules/', skip=('target',)))
+    # Logic both halves run (a game's simulation) lives in `shared`, never in a
+    # module of its own: a sample with any other module is refused below.
+    for extra in sorted(p.name for p in sample.iterdir() if (p / 'pom.xml').is_file()):
+        if extra not in ('shared', 'backend', 'common', 'android', 'ios', 'javase',
+                         'javascript', 'win', 'linux', 'mac', 'cn1libs'):
+            raise SystemExit('scripts/' + name + '/' + extra + ' is a module the template '
+                             'cannot carry; code both halves run belongs in shared.')
     return {
         name + '-src.zip': sources,
         name + '-css.zip': css,
@@ -133,15 +137,6 @@ SHARED_DEPENDENCY = """        <!-- The contract shared with the server; see sha
         <dependency>
             <groupId>${project.groupId}</groupId>
             <artifactId>myappname-shared</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-"""
-
-
-RULES_DEPENDENCY = """        <!-- The rules both the app and the server run; see rules/pom.xml. -->
-        <dependency>
-            <groupId>${project.groupId}</groupId>
-            <artifactId>myappname-rules</artifactId>
             <version>${project.version}</version>
         </dependency>
 """
@@ -164,8 +159,7 @@ def common_pom():
     Not the sample's own: that one belongs to the reactor the sample has, built
     from the archetype in this tree, while a generated project gets the reactor in
     common.zip, and a module pom is only right for the reactor it was written for.
-    The application adds `shared` to a plain project's pom, and `rules` and
-    the app kit when the sample's own pom has them.
+    The application adds `shared` to a plain project's pom, and the app kit when the sample's own pom has them.
     """
     if '<artifactId>' + name + '-shared</artifactId>' not in (sample / 'common/pom.xml').read_text('utf-8'):
         raise SystemExit('scripts/' + name + '/common/pom.xml no longer depends on ' + name + '-shared; '
@@ -175,10 +169,6 @@ def common_pom():
     if pom.count(marker) < 1:
         raise SystemExit('barebones-pom.xml has no <dependencies> to add the shared module to')
     added = SHARED_DEPENDENCY
-    if (sample / 'rules/pom.xml').is_file():
-        if '<artifactId>' + name + '-rules</artifactId>' not in (sample / 'common/pom.xml').read_text('utf-8'):
-            raise SystemExit('scripts/' + name + '/common/pom.xml no longer depends on ' + name + '-rules.')
-        added += RULES_DEPENDENCY
     if '<artifactId>cn1-app-kit-lib</artifactId>' in (sample / 'common/pom.xml').read_text('utf-8'):
         added += APP_KIT_DEPENDENCY
     return pom.replace(marker, marker + added, 1).encode('utf-8')

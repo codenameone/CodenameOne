@@ -62,7 +62,7 @@ PACKAGE=com/example/probe
 
 minimal="$(extract APP_WITH_BACKEND)"
 log "running the generated server's tests"
-(cd "$minimal" && "$MVN" -B -q -Dcodename1.platform=backend -pl rules,shared,backend -am test)
+(cd "$minimal" && "$MVN" -B -q -Dcodename1.platform=backend -pl shared,backend -am test)
 ls "$minimal"/backend/target/surefire-reports/TEST-*.xml >/dev/null 2>&1 \
     || { log "the generated server's tests did not run"; exit 1; }
 [ -f "$minimal/backend/target/generated-sources/cn1-annotations/$PACKAGE/api/AccountApiServer.java" ] \

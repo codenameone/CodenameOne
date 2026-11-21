@@ -32,11 +32,6 @@
             <artifactId>splat-shared</artifactId>
             <version>${project.version}</version>
         </dependency>
-        <dependency>
-            <groupId>com.codenameone.examples.splat</groupId>
-            <artifactId>splat-rules</artifactId>
-            <version>${project.version}</version>
-        </dependency>
 
         <!--
           Test-scope deps needed if you add JUnit 5 tests under

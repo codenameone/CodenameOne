@@ -120,10 +120,10 @@ image::img/splat-desktop-shop.png["The store on a desktop, with its title bar an
 [[splat-modules]]
 === The modules
 
-* `rules` is the game: a deterministic simulation in fixed-point integers with no
-  dependencies. The app predicts with it, the server runs it as the authority and the
-  replay viewer re-runs it.
-* `shared` holds the REST interfaces and the objects they carry.
+* `shared` holds the game, in the `rules` package: a deterministic simulation in
+  fixed-point integers. The app predicts with it, the server runs it as the authority
+  and the replay viewer re-runs it. Beside it are the REST interfaces and the objects
+  they carry.
 * `backend` is the server: accounts, matchmaking, the match rooms, results, the shop,
   social features and the admin API.
 * `common` is the app. `play/` is the match itself, `ui/` the surrounding screens,
@@ -156,7 +156,7 @@ include::../../scripts/splat/rules/src/main/java/com/codenameone/examples/splat/
 
 A box's kind (`bunker`, `minivan`, `snackbar`) picks its color and shape in the
 client; the rules only see its extent. Change any of these and run
-`mvn -pl rules test`: the golden replays report which recorded matches no longer end
+`mvn -pl shared test`: the golden replays report which recorded matches no longer end
 the same way. Bump `RulesVersion.ID` when you change the rules themselves, so old
 replays aren't judged by new rules.
 
@@ -279,7 +279,7 @@ follows any player, pauses, plays at double speed and skips ahead.
 Players build fields of their own. The editor shows one half of the field from above;
 the other half is that half turned around, built by the same `Arena.Builder.mirror` the
 built-in yards use, so a player-made field is fair by construction. A `Mission` in the
-rules module holds the props, spawns, flag, mode and briefing, travels as JSON, and is
+`rules` package holds the props, spawns, flag, mode and briefing, travels as JSON, and is
 checked by `Mission.problem()` on the phone and again on the server before it's
 stored:
 

@@ -172,13 +172,11 @@ image::img/skirmish-settings.png["The settings screen with the battle name, soun
 |===
 | Module | What it holds
 
-| `rules`
-| The game itself: the cards, the arena, the units, the bot and replays. It uses
-  nothing but a handful of `java.*` classes, no Codename One API and no floating
-  point, so the app, the server and the tests compile the same classes.
-
 | `shared`
-| The contract: the data transfer objects and the `@RestClient` interfaces both
+| The game itself, in the `rules` package: the cards, the arena, the units, the bot
+  and replays. It uses nothing but a handful of `java.*` classes, no Codename One
+  API and no floating point, so the app, the server and the tests run the same
+  classes. Beside it, the contract: the data transfer objects and the `@RestClient` interfaces both
   sides compile against.
 
 | `common`
@@ -706,7 +704,7 @@ through its built-in MCP server; see <<_mcp_headless_api,the MCP headless API>>.
 
 === Content packs and the Forge
 
-Everything the Forge edits is data in `rules`: a `ContentPack` holds cards
+Everything the Forge edits is data in the `rules` package: a `ContentPack` holds cards
 (`CardDef`), arenas (`Arena`), missions (`MissionDef`) and campaigns
 (`CampaignDef`), and `PackCodec` reads and writes it as JSON. The classic game is
 the same model: `Arena.CLASSIC` and the built-in cards describe the field and
@@ -816,7 +814,7 @@ day. The amounts are constants at the top of the server's `Forge` class.
 
 === Tests
 
-`rules` has the determinism tests and the golden replays; `backend` plays whole
+`shared` has the determinism tests and the golden replays; `backend` plays whole
 online matches over its sockets and checks receipts, progression, moderation and
 the Forge's publishing and mission results, the invite rewards and their
 refusals, and the broadcast limits;

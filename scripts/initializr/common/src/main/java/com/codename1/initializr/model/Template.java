@@ -61,8 +61,8 @@ public enum Template {
             "The food-delivery template is an app, a server and the contract module they share; "
                     + "an Initializr Gradle project is a single project.",
             new String[0], "/savor-modules.zip", "/savor-settings.properties"),
-    // A card battler: a real-time arena, rules shared by the app and the server, and
-    // a `rules` module of its own besides `shared`. It is the project in
+    // A card battler: a real-time arena, and the rules in
+    // `shared`, which the app and the server both run. It is the project in
     // scripts/skirmish; its resources come from
     // `scripts/sync-initializr-template.py skirmish`. Its look is painted art, so it
     // has no colour scheme to choose.
@@ -190,12 +190,6 @@ public enum Template {
         SETTINGS = settings;
     }
 
-    /// Whether the template carries a `rules` module: logic that depends on
-    /// nothing, built ahead of the contract, which the app and the server both
-    /// depend on -- a game's simulation.
-    public boolean hasRules() {
-        return this == SKIRMISH || this == DASH || this == SPLAT;
-    }
 
     /// Whether the template is an app together with its server: the project is
     /// then Maven, has the `backend` and `shared` modules, and targets Java 17.
