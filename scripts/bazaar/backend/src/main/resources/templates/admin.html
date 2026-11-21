@@ -1,0 +1,78 @@
+<!-- cn1:model shell com.codenameone.examples.bazaar.web.Shell -->
+<!-- cn1:model view com.codenameone.examples.bazaar.web.admin.AdminView -->
+<!-- cn1:model table com.codenameone.examples.bazaar.web.table.DataTable -->
+<!doctype html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org"><head th:replace="~{shell :: head}"></head>
+<body hx-boost="true"><header th:replace="~{shell :: topbar}"></header><div class="frame"><nav th:replace="~{shell :: sidebar}"></nav>
+<main id="main" tabindex="-1">
+
+<th:block th:if="${view.page == 'dashboard'}"><h1>Dashboard</h1>
+<p th:unless="${view.figures}" class="muted">Your role at this store does not include its sales figures. <a th:href="${view.base + '/orders'}">Open the orders</a>.</p>
+<th:block th:if="${view.figures}"><p class="muted">The last 30 days.</p>
+<div class="kpis"><div class="kpi" th:each="k : ${view.kpis}"><span class="muted" th:text="${k.label}">Net sales</span><b th:text="${k.value}">$0.00</b><small th:classappend="${k.trend}" th:text="${k.change}">+0%</small></div></div>
+<div class="grid2">
+<section class="card"><h2 id="sales-t">Sales over 30 days</h2><p class="muted" th:text="${view.salesSummary}">Sales</p>
+<svg class="chart" viewBox="0 0 600 200" role="img" aria-labelledby="sales-t" th:attr="aria-describedby=${'sales-d'}"><line class="axis" x1="8" y1="176" x2="592" y2="176"></line><path class="area" fill-opacity="0.12" fill="currentColor" th:attr="d=${view.salesArea}"></path><polyline class="line" th:attr="points=${view.salesLine}"></polyline><text x="8" y="10" th:text="${view.salesMax}">$0</text><text th:each="t : ${view.salesTicks}" text-anchor="middle" th:attr="x=${t.textX}, y=${t.textY}" th:text="${t.label}">2026-01-01</text></svg>
+<details id="sales-d"><summary>Sales by day</summary><div class="table-wrap"><table class="data"><thead><tr><th scope="col">Day</th><th scope="col" class="num">Orders</th><th scope="col" class="num">Sales</th></tr></thead><tbody><tr th:each="d : ${view.salesDays}"><td th:text="${d.title}">2026-01-01</td><td class="num" th:text="${d.quantity}">0</td><td class="num" th:text="${d.amount}">$0</td></tr></tbody></table></div></details></section>
+<section class="card"><h2 id="top-t">Top products</h2><p th:if="${view.topBars.empty}" class="muted">Nothing sold yet.</p>
+<svg th:unless="${view.topBars.empty}" class="chart" role="img" aria-labelledby="top-t" th:attr="viewbox=${view.topBox}"><g th:each="b : ${view.topBars}"><text th:attr="x=${b.textX}, y=${b.textY}" th:text="${b.label}">Mug</text><rect class="bar" rx="3" th:attr="x=${b.x}, y=${b.y}, width=${b.width}, height=${b.height}"></rect><text th:attr="x=${b.valueX}, y=${b.textY}" th:text="${b.value}">$0</text></g></svg>
+<ol class="sr"><li th:each="b : ${view.topBars}" th:text="${b.label + ': ' + b.value}">Mug</li></ol></section>
+</div></th:block>
+<nav class="card" aria-label="Back office"><ul><li><a th:href="${view.base + '/orders'}">Orders</a></li><li><a th:href="${view.base + '/products'}">Products</a></li><li><a th:href="${view.base + '/inventory'}">Inventory</a></li><li><a th:href="${view.base + '/customers'}">Customers</a></li></ul></nav>
+</th:block>
+
+<th:block th:if="${view.page == 'orders'}"><h1>Orders</h1><section th:replace="~{table :: grid}"></section></th:block>
+<th:block th:if="${view.page == 'products'}"><h1>Products</h1><section th:replace="~{table :: grid}"></section></th:block>
+<th:block th:if="${view.page == 'inventory'}"><h1>Inventory</h1><section th:replace="~{table :: grid}"></section></th:block>
+<th:block th:if="${view.page == 'customers'}"><h1>Customers</h1><section th:replace="~{table :: grid}"></section></th:block>
+
+<th:block th:if="${view.page == 'order'}"><p><a th:href="${view.base + '/orders'}">Orders</a></p><h1 th:text="${view.order.title}">Order #1</h1>
+<p><span class="pill" th:text="${view.order.status}">Open</span> <span class="muted" th:text="${view.order.detail + ' - placed ' + view.order.meta}">Paid</span></p>
+<div class="grid2">
+<section class="card"><h2>Items</h2><div class="table-wrap"><table class="data"><caption class="sr">Items</caption><thead><tr><th scope="col">Item</th><th scope="col">SKU</th><th scope="col" class="num">Qty</th><th scope="col" class="num">Price</th><th scope="col" class="num">Total</th></tr></thead><tbody>
+<tr th:each="l : ${view.lines}"><td><span th:text="${l.title}">Item</span> <span class="muted" th:text="${l.detail}">Variant</span><br><small class="muted" th:text="${l.meta}">0 sent</small></td><td th:text="${l.sku}">SKU</td><td class="num" th:text="${l.quantity}">1</td><td class="num" th:text="${l.price}">$1</td><td class="num" th:text="${l.amount}">$1</td></tr></tbody></table></div>
+<dl class="totals"><th:block th:each="t : ${view.totals}"><dt th:text="${t.title}">Total</dt><dd class="num" th:text="${t.amount}">$1</dd></th:block></dl></section>
+<section class="card"><h2>Customer</h2><p th:text="${view.customer}">ada@example.com</p><p th:unless="${view.shipTo.empty}">Ship to: <span th:text="${view.shipTo}">Address</span></p>
+<h2>Timeline</h2><p th:if="${view.events.empty}" class="muted">Nothing yet.</p>
+<ol class="timeline" th:unless="${view.events.empty}"><li th:each="e : ${view.events}"><time th:text="${e.meta}">2026-01-01</time> <span th:text="${e.title}">Placed</span> <span class="muted" th:text="${e.detail}">who</span></li></ol></section>
+</div>
+<section class="card" th:if="${view.canFulfil}"><h2 id="fulfil-t">Fulfil</h2>
+<form method="post" class="stack" th:action="${view.fulfilAction}" aria-labelledby="fulfil-t">
+<label for="f-location">Ship from</label><select id="f-location" name="location"><option th:each="p : ${view.locations}" th:value="${p.id}" th:text="${p.title}">Warehouse</option></select>
+<th:block th:each="l : ${view.lines}"><label th:attr="for=${'f-' + l.field}" th:text="${l.title + ' ' + l.detail + ' (up to ' + l.max + ')'}">Item</label><input type="number" min="0" step="1" th:attr="id=${'f-' + l.field}, max=${l.max}" th:name="${l.field}" th:value="${l.max}"></th:block>
+<button type="submit">Create fulfilment</button></form></section>
+<section class="card" th:if="${view.canRefund}"><h2 id="refund-t">Refund</h2>
+<form method="post" class="stack" th:action="${view.refundAction}" aria-labelledby="refund-t" hx-confirm="Refund the amounts entered?">
+<th:block th:each="l : ${view.lines}"><label th:attr="for=${'r-' + l.field2}" th:text="${l.title + ' ' + l.detail + ' (up to ' + l.status + ')'}">Item</label><input type="number" min="0" step="1" value="0" th:attr="id=${'r-' + l.field2}, max=${l.status}" th:name="${l.field2}"></th:block>
+<label for="r-shipping">Shipping to refund</label><input id="r-shipping" name="shipping" inputmode="decimal" placeholder="0.00">
+<label><input type="checkbox" name="restock" checked> Put the items back in stock</label>
+<label for="r-reason">Reason</label><input id="r-reason" name="reason" maxlength="200">
+<button class="danger" type="submit">Refund</button></form></section>
+<section class="card" th:if="${view.canCancel}"><h2>Cancel</h2><p>Nothing has shipped, so the order can be cancelled: the stock goes back and the payment is released.</p>
+<form method="post" th:action="${view.cancelAction}" hx-confirm="Cancel this order?"><button class="danger" type="submit">Cancel order</button></form></section>
+</th:block>
+
+<th:block th:if="${view.page == 'product'}"><p><a th:href="${view.base + '/products'}">Products</a></p><h1 th:text="${view.title}">Product</h1>
+<form method="post" class="card" th:action="${view.saveAction}"><h2>Details</h2>
+<div class="stack"><label for="p-title">Title</label><input id="p-title" name="title" required maxlength="200" th:value="${view.title}">
+<label for="p-description">Description</label><textarea id="p-description" name="description" rows="6" maxlength="20000" th:text="${view.description}">Text</textarea>
+<label for="p-status">Status</label><select id="p-status" name="status"><option th:each="s : ${view.statuses}" th:value="${s.id}" th:selected="${s.flag}" th:text="${s.title}">Active</option></select></div>
+<h2>Variants</h2><div class="table-wrap"><table class="data"><caption class="sr">Variants</caption><thead><tr><th scope="col">Variant</th><th scope="col">SKU</th><th scope="col" class="num">Price</th><th scope="col" class="num">Available</th></tr></thead><tbody>
+<tr th:each="x : ${view.variants}"><td><input type="hidden" th:name="${x.field + '_id'}" th:value="${x.id}"><input th:name="${x.field}" th:value="${x.title}" maxlength="200" th:attr="aria-label=${'Title of ' + x.title}"></td><td><input th:name="${x.field2}" th:value="${x.sku}" maxlength="64" th:attr="aria-label=${'SKU of ' + x.title}"></td><td class="num"><input th:name="${x.field3}" th:value="${x.price}" inputmode="decimal" required th:attr="aria-label=${'Price of ' + x.title}"></td><td class="num" th:text="${x.quantity}">0</td></tr></tbody></table></div>
+<p><button type="submit">Save product</button></p></form>
+<section class="card"><h2>Inventory by location</h2><p th:if="${view.levels.empty}" class="muted">No stock is tracked for this product.</p>
+<div class="table-wrap" th:unless="${view.levels.empty}"><table class="data"><caption class="sr">Inventory by location</caption><thead><tr><th scope="col">Variant</th><th scope="col">Location</th><th scope="col" class="num">On hand</th><th scope="col" class="num">Committed</th><th scope="col" class="num">Available</th><th scope="col">Adjust</th></tr></thead><tbody>
+<tr th:each="l : ${view.levels}"><td><span th:text="${l.title}">Blue</span> <small class="muted" th:text="${l.sku}">SKU</small></td><td th:text="${l.detail}">Warehouse</td><td class="num" th:text="${l.quantity}">0</td><td class="num" th:text="${l.meta}">0</td><td class="num" th:text="${l.max}">0</td>
+<td><form method="post" class="inline" th:action="${view.adjustAction}"><input type="hidden" name="variant" th:value="${l.id}"><input type="hidden" name="location" th:value="${l.field}"><input type="number" name="delta" step="1" required placeholder="+/-" th:attr="aria-label=${'Units to add or take away, ' + l.title + ' at ' + l.detail}"><select name="reason" aria-label="Reason"><option th:each="r : ${view.reasons}" th:value="${r.id}" th:text="${r.title}">Correction</option></select><button class="quiet" type="submit">Adjust</button></form></td></tr></tbody></table></div></section>
+</th:block>
+
+<th:block th:if="${view.page == 'customer'}"><p><a th:href="${view.base + '/customers'}">Customers</a></p><h1 th:text="${shell.heading}">Customer</h1>
+<div class="grid2"><section class="card"><h2>Details</h2><dl class="facts"><th:block th:each="f : ${view.facts}"><dt th:text="${f.title}">Email</dt><dd th:text="${f.detail}">ada@example.com</dd></th:block></dl>
+<h2>Addresses</h2><p th:if="${view.addresses.empty}" class="muted">None saved.</p><ul th:unless="${view.addresses.empty}"><li th:each="a : ${view.addresses}"><span th:text="${a.title}">Address</span> <span th:if="${a.flag}" class="pill">Default</span></li></ul></section>
+<section class="card"><h2>Orders</h2><p th:if="${view.orders.empty}" class="muted">No orders at this store.</p>
+<div class="table-wrap" th:unless="${view.orders.empty}"><table class="data"><caption class="sr">Orders</caption><thead><tr><th scope="col">Order</th><th scope="col">Placed</th><th scope="col">Status</th><th scope="col" class="num">Total</th></tr></thead><tbody>
+<tr th:each="o : ${view.orders}"><td><a th:href="${o.url}" th:text="${o.title}">#1</a></td><td th:text="${o.meta}">2026-01-01</td><td><span class="pill" th:text="${o.status}">Open</span> <small class="muted" th:text="${o.detail}">Paid</small></td><td class="num" th:text="${o.amount}">$1</td></tr></tbody></table></div></section></div>
+</th:block>
+
+</main></div>
+<div th:replace="~{shell :: toasts}"></div><div th:replace="~{shell :: help}"></div></body></html>

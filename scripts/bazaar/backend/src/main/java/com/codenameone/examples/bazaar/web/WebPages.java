@@ -39,7 +39,7 @@ import java.util.List;
 ///
 /// The sections of each area are tables here, and the same tables drive the
 /// sidebar, the `g`+letter shortcuts and the test that walks every back-office
-/// route as a member of another store (`WebIdorTest`), so a section added to
+/// route as a member of another store (`WebAdminTest`), so a section added to
 /// the sidebar is a section that test covers.
 @Component
 public class WebPages {

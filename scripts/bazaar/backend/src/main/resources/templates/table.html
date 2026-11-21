@@ -4,7 +4,7 @@
 <form class="toolbar" method="get" role="search" th:action="${table.base}" th:attr="hx-get=${table.base}, hx-target=${'#grid-' + table.id}" hx-select="section.grid" hx-swap="outerHTML" hx-push-url="true">
 <label class="sr" th:attr="for=${'q-' + table.id}" th:text="${table.searchLabel}">Search</label><input type="search" name="q" th:attr="id=${'q-' + table.id}, placeholder=${table.searchLabel}" th:value="${table.q}">
 <th:block th:each="f : ${table.filters}"><label class="sr" th:attr="for=${'f-' + f.name}" th:text="${f.label}">Filter</label><select th:attr="id=${'f-' + f.name}" th:name="${f.name}"><option th:each="o : ${f.options}" th:value="${o.value}" th:selected="${o.selected}" th:text="${o.label}">All</option></select></th:block>
-<th:block th:each="k : ${table.keep}"><input type="hidden" th:name="${k.name}" th:value="${k.value}"></th:block>
+<th:block th:each="k : ${table.keep}"><input th:if="${k.hidden}" type="hidden" th:name="${k.name}" th:value="${k.value}"></th:block>
 <button class="quiet" type="submit">Apply</button><span class="grow"></span>
 <details class="cols" th:attr="data-cols=${table.id}"><summary class="button quiet">Columns</summary><ul><li th:each="c : ${table.columns}"><label><input type="checkbox" th:value="${c.key}" checked> <span th:text="${c.label}">Column</span></label></li></ul></details>
 <a class="button quiet" th:href="${table.csvUrl}" download>Export CSV</a></form>

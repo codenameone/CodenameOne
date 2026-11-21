@@ -113,6 +113,9 @@ public class DataTable {
     public static class Param {
         public String name = "";
         public String value = "";
+        /// False for a value a filter's own select already submits: it is
+        /// kept in the sort and page links, but not repeated as a hidden input.
+        public boolean hidden = true;
 
         public Param() {
         }
