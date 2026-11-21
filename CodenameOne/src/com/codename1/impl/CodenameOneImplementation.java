@@ -5173,6 +5173,53 @@ public abstract class CodenameOneImplementation {
         return ixFound;
     }
 
+    /// Can the platform's own spell checker check a language? Ports with a system checker
+    /// (`UITextChecker`, Android's spell checker service) override this and the two methods
+    /// after it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `language`: a language tag such as `en_US`, or null for the device's language
+    ///
+    /// #### Returns
+    ///
+    /// false by default
+    public boolean isNativeSpellCheckSupported(String language) {
+        return false;
+    }
+
+    /// Asks the platform's spell checker about a word.
+    ///
+    /// #### Parameters
+    ///
+    /// - `word`: the word
+    ///
+    /// - `language`: the language tag, or null
+    ///
+    /// #### Returns
+    ///
+    /// true when it is spelled correctly; true by default
+    public boolean isNativeSpelledCorrectly(String word, String language) {
+        return true;
+    }
+
+    /// Asks the platform's spell checker for replacements.
+    ///
+    /// #### Parameters
+    ///
+    /// - `word`: the misspelled word
+    ///
+    /// - `language`: the language tag, or null
+    ///
+    /// - `max`: the most to return
+    ///
+    /// #### Returns
+    ///
+    /// the suggestions, or null for none
+    public String[] getNativeSpellingSuggestions(String word, String language, int max) {
+        return null;
+    }
+
     /// This method is essentially equivalent to cls.getResourceAsStream(String)
     /// however some platforms might define unique ways in which to load resources
     /// within the implementation.

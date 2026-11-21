@@ -4594,6 +4594,51 @@ public final class Display extends CN1Constants {
         impl.stopTextInput(handle);
     }
 
+    /// Can the platform's own spell checker check a language?
+    ///
+    /// #### Parameters
+    ///
+    /// - `language`: a language tag such as `en_US`, or null for the device's language
+    ///
+    /// #### Returns
+    ///
+    /// true when the port has a checker for it
+    public boolean isNativeSpellCheckSupported(String language) {
+        return impl.isNativeSpellCheckSupported(language);
+    }
+
+    /// Asks the platform's spell checker about a word.
+    ///
+    /// #### Parameters
+    ///
+    /// - `word`: the word
+    ///
+    /// - `language`: the language tag, or null
+    ///
+    /// #### Returns
+    ///
+    /// true when it is spelled correctly
+    public boolean isNativeSpelledCorrectly(String word, String language) {
+        return impl.isNativeSpelledCorrectly(word, language);
+    }
+
+    /// Asks the platform's spell checker for replacements.
+    ///
+    /// #### Parameters
+    ///
+    /// - `word`: the misspelled word
+    ///
+    /// - `language`: the language tag, or null
+    ///
+    /// - `max`: the most to return
+    ///
+    /// #### Returns
+    ///
+    /// the suggestions, or null for none
+    public String[] getNativeSpellingSuggestions(String word, String language, int max) {
+        return impl.getNativeSpellingSuggestions(word, language, max);
+    }
+
     /// Checks to see if the platform supports a native image cache.
     ///
     /// #### Returns

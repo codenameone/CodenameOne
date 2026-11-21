@@ -86,6 +86,10 @@ public class DocumentView extends ScrollSurface implements TextInputClient {
     private final EventDispatcher caretListeners = new EventDispatcher();
     private int gapPx;
     private Runnable viewportListener;
+    private Proofreader proofreader;
+    private final Map<String, String> paintTexts = new HashMap<String, String>();
+    private static final int SPELLING_COLOR = 0xe03131;
+    private static final int GRAMMAR_COLOR = 0x1c7ed6;
 
     /// A view of an empty document.
     public DocumentView() {
@@ -474,8 +478,66 @@ public class DocumentView extends ScrollSurface implements TextInputClient {
 
     // ------------------------------------------------------------------ painting
 
+    /// Underlines spelling and grammar problems with a wavy line, red for spelling and blue
+    /// for grammar.
+    ///
+    /// #### Parameters
+    ///
+    /// - `p`: the proofreader, or null to stop
+    public void setProofreader(Proofreader p) {
+        proofreader = p;
+        repaint();
+    }
+
+    /// The proofreader underlining problems.
+    ///
+    /// #### Returns
+    ///
+    /// the proofreader, or null
+    public Proofreader getProofreader() {
+        return proofreader;
+    }
+
+    /// The problem under a text position, with spelling suggestions, for a menu of fixes.
+    ///
+    /// #### Parameters
+    ///
+    /// - `at`: the position
+    ///
+    /// - `max`: the most suggestions
+    ///
+    /// #### Returns
+    ///
+    /// the issue, or null when there is none or no proofreader
+    public ProofIssue proofIssueAt(TextPosition at, int max) {
+        Paragraph p = at == null || proofreader == null ? null
+                : model.findParagraph(at.paragraphId);
+        return p == null ? null : proofreader.issueAt(p.text.plainText(), at.offset, max);
+    }
+
+    /// Replaces the range of a problem with one of its suggestions, as one undoable edit.
+    ///
+    /// #### Parameters
+    ///
+    /// - `paragraphId`: the paragraph the issue was found in
+    ///
+    /// - `issue`: the issue
+    ///
+    /// - `replacement`: the text to put in its place
+    public void applySuggestion(String paragraphId, ProofIssue issue, String replacement) {
+        TextPosition a = new TextPosition(paragraphId, issue.start);
+        model.beginGroup();
+        try {
+            TextPosition end = model.delete(a, new TextPosition(paragraphId, issue.end));
+            setCaret(model.insertText(end, replacement, null));
+        } finally {
+            model.endGroup();
+        }
+    }
+
     @Override
     protected void paintContent(Graphics g, int x, int y) {
+        paintTexts.clear();
         g.setColor(DESK);
         g.fillRect(x, y, getContentWidth(), getContentHeight());
         DocumentLayout l = getLayout();
@@ -609,6 +671,40 @@ public class DocumentView extends ScrollSurface implements TextInputClient {
         }
         if (st.strike || r != null && r.isDeletion()) {
             g.fillRect(x, baseline - px / 3, textW, thick);
+        }
+        if (proofreader != null && it.paragraphId != null) {
+            paintIssues(g, it, f, x, baseline + Math.max(2, px / 6), Math.max(2, px / 8));
+        }
+    }
+
+    private void paintIssues(Graphics g, LayoutItem it, Font f, int x, int y, int amp) {
+        String text = paintTexts.get(it.paragraphId);
+        if (text == null) {
+            Paragraph p = model.findParagraph(it.paragraphId);
+            text = p == null ? "" : p.text.plainText();
+            paintTexts.put(it.paragraphId, text);
+        }
+        int from = it.start;
+        int to = from + it.text.length();
+        for (ProofIssue i : proofreader.check(text)) {
+            if (i.end <= from || i.start >= to) {
+                continue;
+            }
+            int a = Math.max(i.start, from) - from;
+            int b = Math.min(i.end, to) - from;
+            int x0 = x + f.stringWidth(it.text.substring(0, a));
+            int x1 = x + f.stringWidth(it.text.substring(0, b));
+            g.setColor(i.isSpelling() ? SPELLING_COLOR : GRAMMAR_COLOR);
+            wave(g, x0, x1, y, amp);
+        }
+    }
+
+    private static void wave(Graphics g, int x0, int x1, int y, int amp) {
+        boolean up = true;
+        for (int x = x0; x < x1; x += amp) {
+            int nx = Math.min(x1, x + amp);
+            g.drawLine(x, up ? y + amp : y, nx, up ? y : y + amp);
+            up = !up;
         }
     }
 
