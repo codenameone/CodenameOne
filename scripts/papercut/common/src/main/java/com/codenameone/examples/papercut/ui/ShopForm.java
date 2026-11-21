@@ -68,7 +68,7 @@ public final class ShopForm {
         top.add(BorderLayout.WEST, Ui.wallet(w.inkCoins()));
         top.add(BorderLayout.EAST, new Label(w.erasers() + " spare erasers", "Muted"));
         body.add(top);
-        body.add(Ui.secondary("Watch an ad for 15 ink", "adReward", e -> Ads.rewarded(
+        body.add(Ui.button("Watch an ad for 15 ink", "Secondary", "adReward", e -> Ads.rewarded(
                 () -> Api.shop().adReward(new AdRewardDto("ad-" + System.currentTimeMillis()),
                         Net.to(after -> Ui.later(() -> reload(body)), Ui::failed)),
                 () -> Ui.toast("No ad right now. Try again later."))));
@@ -76,7 +76,12 @@ public final class ShopForm {
             Container row = new Container(new BorderLayout(), "Row");
             Label name = new Label(item.name());
             if (item.colour() != null && item.colour().startsWith("#")) {
-                name.getAllStyles().setFgColor(Integer.parseInt(item.colour().substring(1), 16));
+                int c = Integer.parseInt(item.colour().substring(1), 16);
+                // The paper's own colour, unless it is too pale to read on the card.
+                int lum = ((c >> 16) & 0xff) * 3 + ((c >> 8) & 0xff) * 6 + (c & 0xff);
+                if (lum < 2000) {
+                    name.getAllStyles().setFgColor(c);
+                }
             }
             row.add(BorderLayout.CENTER, name);
             row.add(BorderLayout.EAST, action(body, w, item));

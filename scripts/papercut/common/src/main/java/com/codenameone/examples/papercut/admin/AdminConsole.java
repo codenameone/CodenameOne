@@ -60,7 +60,7 @@ public final class AdminConsole {
         tabs.addTab("Today", page(AdminConsole::overview));
         tabs.addTab("Players", page(AdminConsole::players));
         tabs.addTab("Flags", page(AdminConsole::flags));
-        tabs.addTab("Sheet & push", page(AdminConsole::sheet));
+        tabs.addTab("Daily", page(AdminConsole::sheet));
         tabs.addTab("Audit", page(AdminConsole::audit));
         f.add(BorderLayout.CENTER, tabs);
         f.show();

@@ -3,7 +3,7 @@ title: "Build a Twin-Stick Arena Shooter in Java with Papercut"
 description: "Papercut is a twin-stick arena shooter in Java, drawn in cut paper and ink on a notebook page: three modes, a daily sheet, leaderboards kept honest by single-use run tickets, a shop, achievements and an admin console. Free MIT-0 source."
 url: "/papercut/"
 summary: "A cut-paper arena shooter: a rippling notebook page, ink stains that never wash off, a multiplier to x20 and a server that keeps the scores honest."
-images: ["/developer-guide/img/papercut-icon.png"]
+images: ["/developer-guide/img/papercut-arena.png"]
 ShowToc: true
 ---
 
@@ -11,11 +11,16 @@ Papercut is a twin-stick arena shooter played on a page torn out of a school not
 
 Under the paper it's the kind of game that usually starts with an engine: crowds of sprites, a page that ripples like a spring grid when something bursts, two thumb sticks, keyboard, mouse and gamepad. In Papercut all of it is ordinary Codename One code, drawn with `com.codename1.gaming`, in one project with its server.
 
+![A Classic run in Papercut: the paper quill among folded creatures on a ruled notebook page, ink stains where they were cut](/developer-guide/img/papercut-arena.png)
+
 **[Generate your project](/initializr/)** · **[Read the guide](/developer-guide/papercut-implementors-guide/)** · **[Browse the source](https://github.com/codenameone/CodenameOne/tree/master/scripts/papercut)**
 
 In the Initializr, choose the **Papercut** arena shooter template, set your application name and package, and generate the project. The application source is licensed under [MIT-0](https://github.com/codenameone/CodenameOne/blob/master/scripts/papercut/LICENSE): you can modify it, use it commercially and keep your changes private without royalties. The art is drawn by a script in the project over CC0 paper textures from ambientCG, the sounds are CC0 from OpenGameArt, and the type is Gochi Hand and Patrick Hand under the SIL Open Font License, so there is nothing to buy or license.
 
 ## What comes with the application?
+
+![The Papercut home screen](/developer-guide/img/papercut-home.png)
+
 
 | Part | Included workflows |
 | --- | --- |

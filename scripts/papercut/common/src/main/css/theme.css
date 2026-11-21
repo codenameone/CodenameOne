@@ -79,6 +79,8 @@ TitleCommand, BackCommand {
 }
 
 Label {
+    font-family: "Patrick Hand";
+    font-size: 4mm;
     color: var(--ink);
     background-color: transparent;
 }
@@ -158,14 +160,14 @@ Secondary.pressed {
 Plain {
     font-family: "Patrick Hand";
     font-size: 3.6mm;
-    color: var(--card);
+    color: var(--ballpoint);
     background-color: transparent;
     padding: 1mm 2mm 1mm 2mm;
     margin: 0;
     text-align: center;
 }
 Plain.pressed {
-    color: #ffffff;
+    color: var(--pen);
 }
 /* The small round paper buttons over the game: pause. */
 HudButton {
@@ -189,10 +191,14 @@ BigScore {
     background-color: transparent;
 }
 Accent {
+    font-family: "Patrick Hand";
+    font-size: 4mm;
     color: var(--pen);
     background-color: transparent;
 }
 Muted {
+    font-family: "Patrick Hand";
+    font-size: 3.4mm;
     color: var(--ink-muted);
     background-color: transparent;
 }
@@ -240,31 +246,36 @@ DialogAction {
     padding: 1.5mm 3mm 1.5mm 3mm;
 }
 
+/* Tabs are a strip of the card, so their ink reads on any page. */
 Tab, TabSelected {
     font-family: "Patrick Hand";
-    font-size: 3.6mm;
-    color: var(--card);
-    background-color: transparent;
-    padding: 1.5mm 2.5mm 1.5mm 2.5mm;
+    font-size: 3.4mm;
+    color: var(--ink-muted);
+    background-color: var(--card);
+    padding: 1.5mm 1.2mm 1.5mm 1.2mm;
 }
 TabSelected {
-    color: #ffffff;
+    color: var(--pen);
     border-bottom: 0.6mm solid var(--pen);
 }
-Tabs, TabsContainer {
+Tabs {
     background-color: transparent;
+}
+TabsContainer {
+    background-color: var(--card);
 }
 
-/* Leaderboard rows: ruled lines like the page. */
+/* List rows (boards, shop, console): ruled lines on a strip of paper,
+   so the ink reads on the desk. */
 Row {
-    background-color: transparent;
+    background-color: var(--card);
     border-bottom: 0.2mm solid var(--rule);
-    padding: 1.4mm 1mm 1.4mm 1mm;
+    padding: 1.4mm 2mm 1.4mm 2mm;
 }
 RowMe {
-    background-color: rgba(212, 72, 60, 0.12);
+    background-color: #f7dcd6;
     border-bottom: 0.2mm solid var(--rule);
-    padding: 1.4mm 1mm 1.4mm 1mm;
+    padding: 1.4mm 2mm 1.4mm 2mm;
 }
 Rank {
     font-family: "Gochi Hand";

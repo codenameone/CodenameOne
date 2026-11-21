@@ -69,6 +69,9 @@ development profile only the admin is made, and only when the
 [[papercut-what]]
 === What the sample does
 
+.A Classic run: the page ripples where creatures burst, and their ink stays on it
+image::img/papercut-arena.png[A Classic run in Papercut,scaledwidth=90%]
+
 The home screen plays the game by itself behind the menu: a `Bot` flies an
 `ArenaView` in Classic mode as an attract loop. The menu offers three ways to play:
 
@@ -79,6 +82,10 @@ Today's sheet:: Classic on the day's seed, so everyone who plays today faces the
 waves and competes on the same board.
 Fold:: No pencil. Paper gates drift across the page, and you burst them by steering
 the quill between their two ends.
+
+.The home screen over the attract loop, and a Fold run
+image::img/papercut-home.png[The Papercut home screen,scaledwidth=45%]
+image::img/papercut-fold.png[A Fold run ending,scaledwidth=45%]
 
 The controls are a floating stick on each half of the screen: the left thumb moves
 the quill, the right thumb aims and fires while it is held. The eraser, the game's
@@ -222,6 +229,11 @@ leaderboard.
 
 [[papercut-server]]
 === The server
+
+.The boards, the shop and the admin console's flagged runs
+image::img/papercut-boards.png[Leaderboards,scaledwidth=30%]
+image::img/papercut-shop.png[The shop,scaledwidth=30%]
+image::img/papercut-console.png[A flagged run in the console,scaledwidth=30%]
 
 Accounts and sign-in::
 `account` registers players, signs them in and makes the demo accounts.
