@@ -112,6 +112,21 @@ public class Checkouts {
 
     public OrderDto place(String username, String storeId, String headerKey, PlaceOrderDto req)
             throws IOException {
+        return place(username, storeId, headerKey, req, null, null);
+    }
+
+    /// [#place] for the web checkout, whose cart is the visitor's session cart
+    /// (found by its token, signed in or not) and whose card may be one typed
+    /// for this order alone ([Payments#checkCard]).
+    ///
+    /// @param username the account, or for a guest a name of the guest's own
+    ///     that no account can have (see the web checkout), so the idempotency
+    ///     key, the customer record and once-per-customer codes stay theirs
+    /// @param given the cart to place, or null for `username`'s own
+    /// @param card the card to hold the amount on, or null for
+    ///     `req.paymentMethodId()` (or the account's default)
+    public OrderDto place(String username, String storeId, String headerKey, PlaceOrderDto req,
+            Cart given, Payments.OneOffCard card) throws IOException {
         if (req == null) {
             throw new ResponseStatusException(400, "Say where the order goes");
         }
@@ -127,7 +142,7 @@ public class Checkouts {
         } else {
             clientId = Ids.next();
         }
-        Cart cart = carts.cart(storeId, username, null);
+        Cart cart = given != null ? given : carts.cart(storeId, username, null);
         AddressDto address = req.address();
         if (address == null || address.country() == null || address.country().trim().length() != 2) {
             throw new ResponseStatusException(400, "The address needs a two letter country");
@@ -210,8 +225,11 @@ public class Checkouts {
             String method = empty(req.paymentMethodId()) ? payments.defaultMethod(username)
                     : req.paymentMethodId();
             try {
-                reference = payments.authorize(orderId, username, method, due,
-                        quote.store.getCurrency());
+                reference = card != null
+                        ? payments.authorizeCard(orderId, username, card, due,
+                            quote.store.getCurrency())
+                        : payments.authorize(orderId, username, method, due,
+                            quote.store.getCurrency());
             } catch (IOException | RuntimeException failed) {
                 undo(quote, orderId, username);
                 orders.releaseAll(storeId, held, orderId, username);
@@ -223,6 +241,16 @@ public class Checkouts {
         orders.publish(done);
         storeEvents.orderPlaced(orderId);
         return orders.detailOf(orderId);
+    }
+
+    /// The order `username` already placed with idempotency key `key`, or
+    /// null: what a repeated submit of a checkout page answers, before it
+    /// looks at a cart that placing the order has emptied.
+    public OrderDto placedBefore(String username, String key) throws IOException {
+        if (key == null || key.trim().length() == 0) {
+            return null;
+        }
+        return existing(clientId(username, key.trim()));
     }
 
     private static boolean empty(String text) {

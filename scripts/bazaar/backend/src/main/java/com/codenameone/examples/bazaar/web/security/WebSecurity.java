@@ -49,7 +49,7 @@ import java.io.IOException;
 ///   (`app.1a2b3c4d.css`) never changes, so it is cached for a year as
 ///   immutable; anything else keeps the server's `no-cache`.
 /// - **Signed-in pages** (`/auth/**`, `/account/**`, `/admin/**`,
-///   `/platform/**`, checkout): a session cookie from a password form (and an
+///   `/platform/**`, checkout and order pages): a session cookie from a password form (and an
 ///   authenticator code once enrolled), CSRF tokens on every state-changing
 ///   request, the session id replaced at sign-in, sign-out by POST only, and the
 ///   password guarded twice -- per address by rate ([Throttle] `signin`) and per
@@ -95,7 +95,8 @@ public class WebSecurity {
                 new SavedRequestAwareAuthenticationSuccessHandler();
         saved.setDefaultTargetUrl("/account");
         http.securityMatcher("/auth/**", "/account", "/account/**", "/admin", "/admin/**",
-                    "/platform", "/platform/**", "/s/*/checkout", "/s/*/checkout/**")
+                    "/platform", "/platform/**", "/s/*/checkout", "/s/*/checkout/**",
+                    "/s/*/orders/**")
             .sessionManagement(s -> s.sessionFixation(f -> f.changeSessionId()))
             .addFilterBefore(ErrorPages.filter(), RateLimitFilter.class)
             .addFilterBefore(new WebHeaders(hsts), CsrfFilter.class)
@@ -110,6 +111,9 @@ public class WebSecurity {
                     RateLimitKeys.clientAddress(), throttle.limiter("sms"))
             .authorizeHttpRequests(auth -> auth
                     .requestMatchers("/auth/**").permitAll()
+                    // Guests check out and open their order by its link token.
+                    .requestMatchers("/s/*/checkout", "/s/*/checkout/**", "/s/*/orders/**")
+                        .permitAll()
                     .requestMatchers("/platform", "/platform/**").hasRole(Roles.ADMIN)
                     .requestMatchers("/admin", "/admin/**").hasRole(Roles.MERCHANT)
                     .anyRequest().authenticated())

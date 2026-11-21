@@ -31,11 +31,10 @@ import com.codename1.backend.mvc.Model;
 
 import java.io.IOException;
 
-/// The server-rendered storefront: the half of the web store search engines
-/// index and a shared link opens, as compiled HTML views
-/// (`src/main/resources/templates`). The app's web build is the other half,
-/// and checkout happens there: the cart page hands over to it rather than
-/// repeating checkout in HTML.
+/// The server-rendered storefront: the pages search engines index and a
+/// shared link opens, as compiled HTML views (`src/main/resources/templates`).
+/// The cart page leads to the HTML checkout ([CheckoutController]), which
+/// places the same session cart.
 ///
 /// Every page works without JavaScript. The cart forms are plain posts
 /// answered with a redirect (post/redirect/get), and the cart they change is

@@ -24,7 +24,7 @@ import com.codename1.backend.annotations.Component;
 import com.codename1.backend.annotations.Value;
 
 /// The absolute addresses the storefront hands out: canonical links, the
-/// sitemap, link previews and the checkout hand-off to the web app.
+/// sitemap, link previews and the checkout.
 ///
 /// `bazaar.public.url` is the address this server is reached at, and the
 /// authorization server's issuer when it is unset, as for the payment return
@@ -32,9 +32,10 @@ import com.codename1.backend.annotations.Value;
 /// `Host`, which is right on a laptop and never trusted in production,
 /// where a canonical link must not be whatever a client typed.
 ///
-/// `bazaar.app.url` is where the web build of the app is served. A cart page
-/// sends the shopper there to check out, with `?store=<handle>&cart=<token>`;
-/// unset it is `<public url>/app/`.
+/// `bazaar.app.url` is where the web build of the app is served, unset
+/// `<public url>/app/`. The cart reminder mail opens the cart there
+/// ([#appCart]): its token travels in the link, and the web storefront's cart
+/// lives in a browser session the mail cannot reach.
 @Component
 public class SiteUrls {
     private final String publicUrl;
@@ -45,6 +46,13 @@ public class SiteUrls {
             @Value("${bazaar.app.url:}") String appUrl) {
         this.publicUrl = trim(publicUrl.trim().length() > 0 ? publicUrl.trim() : issuer.trim());
         this.appUrl = appUrl.trim();
+    }
+
+    /// The app opened on a store's cart, `?store=<handle>&cart=<token>`.
+    public String appCart(HttpServer.Request request, String handle, String token) {
+        String app = appUrl.length() > 0 ? appUrl : base(request) + "/app/";
+        return app + (app.indexOf('?') >= 0 ? "&" : "?") + "store=" + encode(handle)
+                + (token == null || token.length() == 0 ? "" : "&cart=" + encode(token));
     }
 
     private static String trim(String url) {
@@ -89,11 +97,16 @@ public class SiteUrls {
         return base(request) + path;
     }
 
-    /// The web app opened on a store's cart, where checkout happens.
-    public String checkout(HttpServer.Request request, String handle, String token) {
-        String app = appUrl.length() > 0 ? appUrl : base(request) + "/app/";
-        return app + (app.indexOf('?') >= 0 ? "&" : "?") + "store=" + encode(handle)
-                + (token == null || token.length() == 0 ? "" : "&cart=" + encode(token));
+    /// A store's HTML checkout ([CheckoutController]), relative: the session
+    /// cart it places is this server's, so it never leaves this origin.
+    public static String checkout(String handle) {
+        return "/s/" + encode(handle) + "/checkout";
+    }
+
+    /// The confirmation page of an order, with the link token that opens it
+    /// to whoever placed it without an account.
+    public static String order(String handle, int number, String token) {
+        return "/s/" + encode(handle) + "/orders/" + number + "?t=" + encode(token);
     }
 
     /// Percent-encodes everything but unreserved ASCII.

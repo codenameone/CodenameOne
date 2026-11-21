@@ -37,7 +37,9 @@ import com.codenameone.examples.bazaar.web.security.PageEtags;
 ///   public` for a minute (a cache may serve a stale copy for ten more while it
 ///   refetches) and an `ETag` it answers with 304. They carry no CSP nonce: the
 ///   shop chain allows their inline style by hash.
-/// - The cart is one visitor's: `private, no-store`.
+/// - The cart, the checkout and an order's pages are one visitor's:
+///   `private, no-store`, whatever the method -- a checkout page drawn
+///   again for a post holds the address typed into it.
 ///
 /// Requests outside the storefront pass untouched.
 @Component
@@ -51,8 +53,14 @@ public class StorefrontCaching implements HandlerInterceptor {
     @Override
     public void postHandle(HttpServer.Request request, HandlerMethod handler,
             HttpServer.Response response) throws Exception {
-        if (response == null || response.getStatus() != 200
-                || !"GET".equals(request.getMethod()) || !storefront(request.getTarget())) {
+        if (response == null || !storefront(request.getTarget())) {
+            return;
+        }
+        if (isPrivate(request.getTarget()) && !isCart(request.getTarget())) {
+            noStore(response);
+            return;
+        }
+        if (response.getStatus() != 200 || !"GET".equals(request.getMethod())) {
             return;
         }
         String type = response.getContentType();
@@ -62,13 +70,7 @@ public class StorefrontCaching implements HandlerInterceptor {
         response.header("Link", "<" + urls.absolute(request, canonicalPath(request.getTarget()))
                 + ">; rel=\"canonical\"");
         if (isCart(request.getTarget())) {
-            response.header("Cache-Control", "private, no-store");
-            com.codename1.backend.security.SecurityExchange exchange =
-                    com.codename1.backend.security.SecurityExchange.current();
-            if (exchange != null) {
-                exchange.setAttribute(
-                        com.codenameone.examples.bazaar.web.security.PageEtags.NO_STORE, "1");
-            }
+            noStore(response);
             return;
         }
         // The page filter (web.security.PageEtags) writes the header and an
@@ -111,6 +113,30 @@ public class StorefrontCaching implements HandlerInterceptor {
     static boolean storefront(String target) {
         return target != null && (target.equals("/") || target.startsWith("/?")
                 || target.startsWith("/s/") || target.startsWith("/track/"));
+    }
+
+    private static void noStore(HttpServer.Response response) {
+        response.header("Cache-Control", "private, no-store");
+        com.codename1.backend.security.SecurityExchange exchange =
+                com.codename1.backend.security.SecurityExchange.current();
+        if (exchange != null) {
+            exchange.setAttribute(
+                    com.codenameone.examples.bazaar.web.security.PageEtags.NO_STORE, "1");
+        }
+    }
+
+    /// The checkout (`/s/<handle>/checkout...`) and an order's pages
+    /// (`/s/<handle>/orders/...`), besides the cart.
+    static boolean isPrivate(String target) {
+        int q = target.indexOf('?');
+        String path = q < 0 ? target : target.substring(0, q);
+        if (!path.startsWith("/s/")) {
+            return false;
+        }
+        int slash = path.indexOf('/', 3);
+        String rest = slash < 0 ? "" : path.substring(slash);
+        return rest.equals("/cart") || rest.equals("/checkout") || rest.startsWith("/checkout/")
+                || rest.startsWith("/orders/");
     }
 
     private static boolean isCart(String target) {

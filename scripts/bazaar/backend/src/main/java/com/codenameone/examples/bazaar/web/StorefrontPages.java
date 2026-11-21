@@ -58,8 +58,8 @@ import java.util.List;
 import java.util.Map;
 
 /// Builds the models of the server-rendered storefront: what search engines
-/// index and what a shared link opens, with the app's web build as the place
-/// a shopper checks out.
+/// index and what a shared link opens, and the cart its HTML checkout
+/// ([CheckoutPages]) places.
 ///
 /// Everything here reads what the app's own public endpoints read -- only
 /// ACTIVE stores, ACTIVE products, published collections and reviews -- through
@@ -443,8 +443,7 @@ public class StorefrontPages {
             view.problems = dto.problems() == null ? new ArrayList<String>() : dto.problems();
         }
         view.empty = view.lines.isEmpty();
-        view.checkoutUrl = urls.checkout(request, store.getHandle(),
-                dto == null ? null : dto.token());
+        view.checkoutUrl = SiteUrls.checkout(store.getHandle());
         model.addAttribute("page", meta).addAttribute("cart", view);
     }
 
@@ -470,20 +469,20 @@ public class StorefrontPages {
         remember(request, store, dto.token());
     }
 
-    private static String token(HttpServer.Request request, Store store, boolean create) {
+    static String token(HttpServer.Request request, Store store, boolean create) {
         com.codename1.backend.HttpSession session = request.getSession(create);
         Object token = session == null ? null : session.getAttribute(CART_KEY + store.getId());
         return token instanceof String ? (String) token : null;
     }
 
-    private static void remember(HttpServer.Request request, Store store, String token) {
+    static void remember(HttpServer.Request request, Store store, String token) {
         com.codename1.backend.HttpSession session = request.getSession(true);
         if (session != null && token != null) {
             session.setAttribute(CART_KEY + store.getId(), token);
         }
     }
 
-    private Map<String, String> handles(List<CartLineDto> lines) {
+    Map<String, String> handles(List<CartLineDto> lines) {
         List<String> ids = new ArrayList<String>();
         for (int iter = 0; iter < lines.size(); iter++) {
             ids.add(lines.get(iter).productId());
@@ -569,7 +568,7 @@ public class StorefrontPages {
 
     // -------------------------------------------------------------- helpers
 
-    private PageMeta meta(Store store, HttpServer.Request request, String path) {
+    PageMeta meta(Store store, HttpServer.Request request, String path) {
         PageMeta page = new PageMeta();
         page.canonical = urls.absolute(request, path);
         page.accent = accent(store.getAccentColor());

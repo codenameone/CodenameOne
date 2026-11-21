@@ -5,7 +5,8 @@
 // It checks what a person opening the server's address gets: the app loads from
 // the server, reaches the welcome screen, signs in as the demo shopper, lands on
 // the home screen with its map, and has its live channel open. Then it signs
-// out, signs in as the demo admin and reaches the admin console.
+// out, signs in as the demo admin and reaches the admin console. Last, a guest
+// buys on the website through the HTML checkout and opens the confirmation.
 // run-web-e2e.sh builds everything, starts the server and runs this; see there.
 //
 // The app draws on a canvas, so there are no buttons in the page to ask a
@@ -202,6 +203,65 @@ async function noErrorDialog() {
   }
 }
 
+/// The website's purchase path, by ordinary page navigation: a product of the
+/// seeded store into the cart, the checkout form filled as a guest, the order
+/// placed, and the confirmation page with its invoice.
+async function htmlCheckout() {
+  const store = process.env.BAZAAR_WEB_STORE || 'northwind';
+  const context = await browser.newContext({ viewport: { width: 1100, height: 900 } });
+  const shop = await context.newPage();
+  const cspErrors = [];
+  shop.on('console', m => {
+    if (m.type() === 'error' && /Content Security Policy/i.test(m.text())) {
+      cspErrors.push(m.text());
+    }
+  });
+  try {
+    const home = await shop.goto(origin + '/s/' + store, { waitUntil: 'load' });
+    if (!home || home.status() !== 200) {
+      throw new Error('the store page answered ' + (home ? home.status() : 'nothing'));
+    }
+    await shop.locator('a[href*="/products/"]').first().click();
+    await shop.waitForLoadState('load');
+    await shop.locator('form.add button[type=submit]').click();
+    await shop.waitForURL(/\/cart$/);
+    await shop.locator('a.checkout').click();
+    await shop.waitForURL(/\/checkout$/);
+    await shop.fill('#email', 'guest@bazaar.example');
+    await shop.fill('#name', 'Grace Hopper');
+    await shop.fill('#line1', '1 Main St');
+    await shop.fill('#city', 'Albany');
+    await shop.fill('#region', 'NY');
+    await shop.fill('#postal', '12207');
+    // Changing the country asks for the rates again (htmx swaps the summary).
+    await shop.selectOption('#country', 'CA');
+    await shop.selectOption('#country', 'US');
+    await shop.waitForSelector('#summary input[name=rateId]', { timeout: stepSeconds * 1000 });
+    await shop.fill('#card-number', '4242 4242 4242 4242');
+    await shop.fill('#card-expiry', '12/39');
+    await shop.fill('#card-cvc', '123');
+    await shop.screenshot({ path: path.join(out, '7-checkout.png') });
+    await shop.locator('button.place').click();
+    await shop.waitForURL(/\/orders\/\d+\?t=[0-9a-f]{32}$/, { timeout: stepSeconds * 1000 });
+    const heading = await shop.locator('h1').innerText();
+    if (!heading.includes('Thank you')) {
+      throw new Error('the confirmation page says "' + heading + '"');
+    }
+    const invoice = await shop.locator('a[href*="invoice.pdf"]').getAttribute('href');
+    const pdf = await shop.request.get(origin + invoice);
+    if (pdf.status() !== 200 || !(pdf.headers()['content-type'] || '').startsWith('application/pdf')) {
+      throw new Error('the invoice answered ' + pdf.status());
+    }
+    await shop.screenshot({ path: path.join(out, '8-confirmation.png') });
+    if (cspErrors.length > 0) {
+      throw new Error('the checkout broke its content security policy: ' + cspErrors[0]);
+    }
+    say('a guest bought through the HTML checkout: ' + heading);
+  } finally {
+    await context.close();
+  }
+}
+
 let failed = null;
 try {
   say('opening ' + url);
@@ -318,6 +378,10 @@ try {
   await noErrorDialog();
   await page.screenshot({ path: path.join(out, '6-admin.png') });
   say('signed in as ' + admin + ': the admin console is up');
+
+  // 8. A guest buys on the website: the server-rendered storefront and its
+  //    HTML checkout, in a browser of its own (no app, no account).
+  await htmlCheckout();
 } catch (err) {
   failed = err;
   try {

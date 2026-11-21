@@ -193,7 +193,7 @@ class StorefrontTest {
         String html = cart.getContentAsString();
         assertTrue(html.contains(">Mug</a>"), html);
         assertTrue(html.contains("value=\"2\""));
-        assertTrue(html.contains("store=sf-cart&amp;cart="));
+        assertTrue(html.contains("href=\"/s/sf-cart/checkout\""));
         assertEquals("private, no-store", cart.getHeader("Cache-Control"));
         // Another visitor sees their own, empty cart.
         assertTrue(fetch("/s/sf-cart/cart").getContentAsString().contains("Your cart is empty"));

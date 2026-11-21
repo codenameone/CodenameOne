@@ -1,0 +1,69 @@
+<!-- cn1:model page com.codenameone.examples.bazaar.web.PageMeta -->
+<!-- cn1:model checkout com.codenameone.examples.bazaar.web.CheckoutView -->
+<!doctype html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org"><head th:replace="~{layout :: head}"></head><body th:attr="data-accent=${page.accent}"><header th:replace="~{layout :: header}"></header>
+<main class="wrap" id="main"><h1>Checkout</h1>
+<div class="empty-state" th:if="${checkout.empty}"><p>Your cart is empty.</p><a class="button" th:href="${page.home}">Keep shopping</a></div>
+<form th:unless="${checkout.empty}" method="post" th:action="${checkout.placeAction}" novalidate>
+<input type="hidden" name="idempotencyKey" th:value="${checkout.key}">
+<div id="sections" class="co">
+<div>
+<div class="alert" role="alert" th:if="${checkout.invalid or !checkout.problems.empty}" tabindex="-1"><strong th:if="${checkout.invalid}">Please check the highlighted fields.</strong><ul th:unless="${checkout.problems.empty}"><li th:each="m : ${checkout.problems}" th:text="${m}">Problem</li></ul></div>
+
+<fieldset><legend>Contact</legend>
+<div class="field"><label for="email">Email</label><input id="email" name="email" type="email" autocomplete="email" required th:value="${checkout.email}" th:attr="aria-invalid=${!checkout.emailError.empty},aria-describedby=${checkout.emailError.empty ? '' : 'email-error'}"><p class="err" id="email-error" th:unless="${checkout.emailError.empty}" th:text="${checkout.emailError}">Error</p></div>
+<p class="meta" th:unless="${checkout.signedIn}">Checking out as a guest. <a href="/auth/signin">Sign in</a> to use your saved addresses.</p>
+</fieldset>
+
+<fieldset><legend>Shipping address</legend>
+<div class="field" th:unless="${checkout.addresses.empty}"><label for="address-id">Saved addresses</label><select id="address-id" name="addressId" th:attr="hx-post=${checkout.action}" hx-trigger="change" hx-target="#sections" hx-select="#sections" hx-swap="outerHTML"><option value="">Enter a new address</option><option th:each="a : ${checkout.addresses}" th:value="${a.value}" th:selected="${a.chosen}" th:text="${a.label}">Address</option></select><button class="quiet" type="submit" th:attr="formaction=${checkout.action}" formnovalidate>Use this address</button></div>
+<div class="field"><label for="name">Full name</label><input id="name" name="name" autocomplete="name" th:value="${checkout.name}" th:attr="aria-invalid=${!checkout.nameError.empty},aria-describedby=${checkout.nameError.empty ? '' : 'name-error'}"><p class="err" id="name-error" th:unless="${checkout.nameError.empty}" th:text="${checkout.nameError}">Error</p></div>
+<div class="field"><label for="line1">Street address</label><input id="line1" name="line1" autocomplete="address-line1" th:value="${checkout.line1}" th:attr="aria-invalid=${!checkout.line1Error.empty},aria-describedby=${checkout.line1Error.empty ? '' : 'line1-error'}"><p class="err" id="line1-error" th:unless="${checkout.line1Error.empty}" th:text="${checkout.line1Error}">Error</p></div>
+<div class="field"><label for="line2">Apartment, suite (optional)</label><input id="line2" name="line2" autocomplete="address-line2" th:value="${checkout.line2}"></div>
+<div class="row2"><div class="field"><label for="city">City</label><input id="city" name="city" autocomplete="address-level2" th:value="${checkout.city}" th:attr="aria-invalid=${!checkout.cityError.empty},aria-describedby=${checkout.cityError.empty ? '' : 'city-error'}"><p class="err" id="city-error" th:unless="${checkout.cityError.empty}" th:text="${checkout.cityError}">Error</p></div>
+<div class="field"><label for="region">State or region</label><input id="region" name="region" autocomplete="address-level1" th:value="${checkout.region}"></div></div>
+<div class="row2"><div class="field"><label for="postal">Postal code</label><input id="postal" name="postal" autocomplete="postal-code" th:value="${checkout.postal}"></div>
+<div class="field"><label for="country">Country</label><select id="country" name="country" autocomplete="country" th:attr="hx-post=${checkout.action},aria-invalid=${!checkout.countryError.empty},aria-describedby=${checkout.countryError.empty ? '' : 'country-error'}" hx-trigger="change" hx-target="#summary" hx-select="#summary" hx-swap="outerHTML"><option th:each="c : ${checkout.countries}" th:value="${c.value}" th:selected="${c.chosen}" th:text="${c.label}">Country</option></select><p class="err" id="country-error" th:unless="${checkout.countryError.empty}" th:text="${checkout.countryError}">Error</p></div></div>
+<div class="field"><label for="phone">Phone (optional)</label><input id="phone" name="phone" type="tel" autocomplete="tel" th:value="${checkout.phone}"></div>
+<button class="quiet" type="submit" th:attr="formaction=${checkout.action}" formnovalidate>Update delivery options</button>
+</fieldset>
+
+<fieldset><legend>Payment</legend>
+<p th:if="${checkout.nothingDue}">Nothing is left to pay.</p>
+<div th:unless="${checkout.nothingDue}">
+<div class="choice" th:each="m : ${checkout.methods}"><input type="radio" name="methodId" th:attr="id=${'method-' + m.value}" th:value="${m.value}" th:checked="${m.chosen}"><label th:attr="for=${'method-' + m.value}" th:text="${m.label}">Card</label></div>
+<div class="choice" th:if="${checkout.signedIn and checkout.typedCards}"><input type="radio" name="methodId" id="method-new" value="" th:checked="${checkout.typedChosen}"><label for="method-new">A new card</label></div>
+<div th:if="${checkout.typedCards}">
+<div class="field"><label for="card-number">Card number</label><input id="card-number" name="cardNumber" inputmode="numeric" autocomplete="cc-number" th:attr="aria-invalid=${!checkout.cardError.empty},aria-describedby=${checkout.cardError.empty ? 'card-hint' : 'card-error card-hint'}"><p class="meta" id="card-hint">Test mode: 4242 4242 4242 4242 pays; 4000 0000 0000 0002 is declined.</p></div>
+<div class="row2"><div class="field"><label for="card-expiry">Expiry (MM/YY)</label><input id="card-expiry" name="cardExpiry" inputmode="numeric" autocomplete="cc-exp" placeholder="MM/YY"></div>
+<div class="field"><label for="card-cvc">Security code</label><input id="card-cvc" name="cardCvc" inputmode="numeric" autocomplete="cc-csc"></div></div>
+</div>
+<p class="err" id="card-error" role="alert" th:unless="${checkout.cardError.empty}" th:text="${checkout.cardError}">Error</p>
+</div>
+<div class="field"><label for="note">Note for the store (optional)</label><textarea id="note" name="note" rows="2" th:text="${checkout.note}"></textarea></div>
+</fieldset>
+</div>
+
+<aside id="summary" class="summary" aria-live="polite"><h2>Order summary</h2>
+<ul><li th:each="l : ${checkout.lines}"><span><span th:text="${l.title}">Item</span> <span class="variant" th:unless="${l.variant.empty}" th:text="${l.variant}">Variant</span> x <span th:text="${l.quantity}">1</span></span><span th:text="${l.total}">$1</span></li></ul>
+<fieldset><legend>Delivery</legend>
+<p th:if="${checkout.rates.empty}">Enter an address to see delivery options.</p>
+<div class="choice" th:each="r : ${checkout.rates}"><input type="radio" name="rateId" th:value="${r.value}" th:checked="${r.chosen}" th:attr="id=${'rate-' + r.value},hx-post=${checkout.action}" hx-trigger="change" hx-target="#summary" hx-select="#summary" hx-swap="outerHTML"><label th:attr="for=${'rate-' + r.value}"><span th:text="${r.label}">Standard</span> <span class="meta" th:text="${r.detail}">3-5 days</span></label></div>
+<p class="err" id="rate-error" th:unless="${checkout.rateError.empty}" th:text="${checkout.rateError}">Error</p>
+</fieldset>
+<div class="field"><label for="discount-code">Discount code</label>
+<p th:unless="${checkout.discountCode.empty}"><span th:text="${checkout.discountCode}">CODE</span> <button class="quiet" type="submit" th:attr="formaction=${checkout.codesAction}" name="codeAction" value="remove-discount" formnovalidate>Remove</button></p>
+<div class="codes" th:if="${checkout.discountCode.empty}"><input id="discount-code" name="discountCode" autocomplete="off"><button class="quiet" type="submit" th:attr="formaction=${checkout.codesAction}" name="codeAction" value="apply-discount" formnovalidate>Apply</button></div></div>
+<div class="field"><label for="gift-card">Gift card</label>
+<p th:unless="${checkout.giftCardCode.empty}"><span th:text="${checkout.giftCardCode}">ending 1234</span> <button class="quiet" type="submit" th:attr="formaction=${checkout.codesAction}" name="codeAction" value="remove-gift" formnovalidate>Remove</button></p>
+<div class="codes" th:if="${checkout.giftCardCode.empty}"><input id="gift-card" name="giftCardCode" autocomplete="off"><button class="quiet" type="submit" th:attr="formaction=${checkout.codesAction}" name="codeAction" value="apply-gift" formnovalidate>Apply</button></div></div>
+<p class="err" role="alert" th:unless="${checkout.codeError.empty}" th:text="${checkout.codeError}">Error</p>
+<dl class="totals"><dt>Subtotal</dt><dd th:text="${checkout.subtotal}">$1</dd><dt th:unless="${checkout.discount.empty}">Discount</dt><dd th:unless="${checkout.discount.empty}" th:text="${checkout.discount}">-$1</dd><dt>Shipping</dt><dd th:text="${checkout.shipping}">$1</dd><dt th:text="${checkout.taxInclusive ? 'Tax included' : 'Tax'}">Tax</dt><dd th:text="${checkout.tax}">$0</dd><dt>Total</dt><dd class="total" th:text="${checkout.total}">$1</dd><dt th:unless="${checkout.giftCard.empty}">Gift card</dt><dd th:unless="${checkout.giftCard.empty}" th:text="${checkout.giftCard}">-$1</dd><dt th:unless="${checkout.giftCard.empty}">To pay</dt><dd th:unless="${checkout.giftCard.empty}" th:text="${checkout.due}">$1</dd></dl>
+<button class="button place" type="submit">Place order</button>
+<p><a th:href="${checkout.cartUrl}">Back to cart</a></p>
+</aside>
+</div>
+</form>
+<meta name="htmx-config" content='{"includeIndicatorStyles":false,"allowEval":false,"allowScriptTags":false}'>
+<script src="/static/htmx.d6fdc75f.js" defer th:attr="nonce=${page.nonce}"></script></main>
+<footer th:replace="~{layout :: footer}"></footer></body></html>

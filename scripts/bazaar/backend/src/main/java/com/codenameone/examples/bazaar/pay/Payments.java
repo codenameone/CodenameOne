@@ -511,6 +511,71 @@ public class Payments {
     }
     // end::bazaar-authorize[]
 
+    /// A card typed into the web checkout for this one order, checked with
+    /// the processor and saved to no account: what a guest pays with. The
+    /// number and security code go to the processor in [#checkCard] and no
+    /// further; what comes back is its customer, its token, a brand and four
+    /// digits.
+    public static final class OneOffCard {
+        public String customer = "";
+        public String token = "";
+        public String label = "";
+    }
+
+    /// Whether a typed card can be checked here. A processor whose setup is
+    /// hosted (Stripe) takes the number on its own page and never from this
+    /// server, so there the web checkout offers saved cards only.
+    public boolean takesTypedCards() {
+        return "simulated".equals(provider.name());
+    }
+
+    /// Checks a typed card with the processor before anything is reserved:
+    /// a mistyped number, an expired card or a declined one is refused here
+    /// with 402 and the reason, and checkout has nothing to undo.
+    public OneOffCard checkCard(String payer, CardDto typed) throws IOException {
+        if (!takesTypedCards()) {
+            throw new ResponseStatusException(402, "Pay with a card saved in the app");
+        }
+        PaymentProvider.Card card;
+        String customer;
+        try {
+            customer = provider.createCustomer(payer, "");
+            PaymentProvider.Setup setup = provider.startCardSetup(customer, Ids.next());
+            card = provider.finishCardSetup(customer, setup.reference, typed);
+        } catch (PaymentDeclinedException declined) {
+            throw new ResponseStatusException(402, declined.getMessage());
+        } catch (IOException failed) {
+            throw unavailable("card check", failed);
+        }
+        OneOffCard out = new OneOffCard();
+        out.customer = customer;
+        out.token = card.token;
+        out.label = card.brand + " ending " + card.last4;
+        return out;
+    }
+
+    /// [#authorize] for a [OneOffCard]: holds the amount on it and records the
+    /// payment, keyed by the order as every payment is.
+    public String authorizeCard(String orderId, String payer, OneOffCard card, long amountCents,
+            String currency) throws IOException {
+        Payment kept = payment(orderId);
+        if (kept != null) {
+            return kept.getProviderRef();
+        }
+        String reference;
+        try {
+            reference = cut(provider.authorize("order-" + orderId, card.customer, card.token,
+                    amountCents, currency, "Bazaar order"), 64);
+        } catch (PaymentDeclinedException declined) {
+            throw new ResponseStatusException(402, declined.getMessage());
+        } catch (IOException unknown) {
+            throw unavailable("card check", unknown);
+        }
+        keepPayment(orderId, payer, new String[] {"card", card.label}, amountCents, currency,
+                reference);
+        return reference;
+    }
+
     /// The prefix of a card payment taken on a register's card terminal. The
     /// terminal settled it with the processor itself, so nothing here asks
     /// the processor about it: capture, void and refund only move the row.
