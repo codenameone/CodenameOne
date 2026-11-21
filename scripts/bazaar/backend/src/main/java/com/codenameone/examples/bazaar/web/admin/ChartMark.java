@@ -32,4 +32,8 @@ public class ChartMark {
     public int textX;
     public int textY;
     public int valueX;
+    /// A second line of text, and the fill opacity of a heat-map cell (a
+    /// presentation attribute, so no inline style is needed under CSP).
+    public String detail = "";
+    public String opacity = "1";
 }

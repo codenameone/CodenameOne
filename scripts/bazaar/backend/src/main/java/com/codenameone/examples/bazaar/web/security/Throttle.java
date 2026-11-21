@@ -53,7 +53,7 @@ public class Throttle {
         {"sms", "5/600"},
         {"checkout", "10/60"},
         {"pin", "10/300"},
-        {"form", "30/60"},
+        {"form", "30/60"}, {"chat", "5/600"},
         {"upload", "30/600"},
         {"totp-enrol", "10/600"},
     };

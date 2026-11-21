@@ -69,6 +69,14 @@ public class WebPages {
         {"Tax", "/tax", "z"},
         {"Fraud review", "/risk", "h"},
         {"Disputes", "/disputes", "w"},
+        {"Warehouse", "/warehouse", "g"},
+        {"Forecast", "/forecast", "1"},
+        {"Reports", "/reports", "2"},
+        {"Cohorts", "/cohorts", "3"},
+        {"Attribution", "/attribution", "4"},
+        {"Inbox", "/inbox", "5"},
+        {"Permissions", "/permissions", "6"},
+        {"Listings", "/listings", "7"},
         {"Apps", "/apps", "a"},
     };
     /// Account sections: label, path, shortcut.

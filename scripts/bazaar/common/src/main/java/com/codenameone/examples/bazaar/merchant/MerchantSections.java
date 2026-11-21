@@ -44,6 +44,12 @@ public final class MerchantSections {
     public static final String SUBSCRIPTIONS = "subscriptions";
     public static final String QUOTES = "quotes";
     public static final String COMPANIES = "companies";
+    public static final String WAREHOUSE = "warehouse";
+    public static final String FORECAST = "forecast";
+    public static final String REPORTS = "reports";
+    public static final String PERMISSIONS = "permissions";
+    public static final String INBOX = "inbox";
+    public static final String LISTINGS = "listings";
 
     private static boolean installed;
 
@@ -96,5 +102,17 @@ public final class MerchantSections {
                 FontImage.MATERIAL_REQUEST_QUOTE, QuotesPane::new));
         Sections.register(Nav.MERCHANT, new Section(COMPANIES, "Companies", manage,
                 FontImage.MATERIAL_BUSINESS, CompaniesPane::new));
+        Sections.register(Nav.MERCHANT, new Section(WAREHOUSE, "Warehouse", store,
+                FontImage.MATERIAL_WAREHOUSE, WarehousePane::new));
+        Sections.register(Nav.MERCHANT, new Section(FORECAST, "Forecast", manage,
+                FontImage.MATERIAL_TRENDING_UP, ForecastPane::new));
+        Sections.register(Nav.MERCHANT, new Section(REPORTS, "Reports", manage,
+                FontImage.MATERIAL_INSIGHTS, ReportsPane::new));
+        Sections.register(Nav.MERCHANT, new Section(INBOX, "Inbox", store,
+                FontImage.MATERIAL_FORUM, InboxPane::new));
+        Sections.register(Nav.MERCHANT, new Section(PERMISSIONS, "Permissions", manage,
+                FontImage.MATERIAL_ADMIN_PANEL_SETTINGS, PermissionsPane::new));
+        Sections.register(Nav.MERCHANT, new Section(LISTINGS, "Listings", store,
+                FontImage.MATERIAL_VIEW_MODULE, ListingsPane::new));
     }
 }

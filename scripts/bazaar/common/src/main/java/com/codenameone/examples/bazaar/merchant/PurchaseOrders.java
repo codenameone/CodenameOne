@@ -142,6 +142,7 @@ final class PurchaseOrders extends Container {
                     Ui.plain(l.received() + " / " + l.quantity(), "SvRowValue")));
         }
         page.add(card);
+        page.add(TimelineView.load(false, po.id()));
         Container buttons = MUi.buttons();
         if ("DRAFT".equals(po.status())) {
             buttons.add(Ui.primary(Lang.tr("Place order"), "po-place", e -> Api.inventory()

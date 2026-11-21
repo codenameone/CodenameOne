@@ -90,13 +90,17 @@ public class Checkouts {
     private final com.codenameone.examples.bazaar.risk.Fraud fraud;
     private final com.codenameone.examples.bazaar.taxes.TaxExemptions exemptions;
 
+    private final com.codenameone.examples.bazaar.ops.Attribution attribution;
+
     public Checkouts(Carts carts, Quoter quoter, Inventory inventory, Orders orders,
             Payments payments, GiftCards giftCards, DiscountRepository discounts,
             DiscountUseRepository uses, CustomerRepository customers,
             StoreOrderRepository orderRows, StoreEvents storeEvents,
             com.codenameone.examples.bazaar.risk.RiskHolds holds,
             com.codenameone.examples.bazaar.risk.Fraud fraud,
-            com.codenameone.examples.bazaar.taxes.TaxExemptions exemptions) {
+            com.codenameone.examples.bazaar.taxes.TaxExemptions exemptions,
+            com.codenameone.examples.bazaar.ops.Attribution attribution) {
+        this.attribution = attribution;
         this.carts = carts;
         this.quoter = quoter;
         this.inventory = inventory;
@@ -252,6 +256,7 @@ public class Checkouts {
             exemptions.recordUse(storeId, orderId, quote.exemptCertificate);
         }
         fraud.assess(orderId, username);
+        attribution.stampOrder(storeId, cart.getId(), orderId);
         carts.clear(cart.getId());
         orders.publish(done);
         storeEvents.orderPlaced(orderId);

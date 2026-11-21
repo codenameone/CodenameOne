@@ -44,5 +44,13 @@ final class GlobalSeed {
                     Long.valueOf(System.currentTimeMillis() + 86400000L)});
         db.execute("UPDATE order_risk SET status = 'HELD' WHERE order_id = ?",
                 new Object[] {orderId});
+        // The operations features: a saved report, a permission set, a chat.
+        db.execute("INSERT INTO saved_report (id, store_id, name, spec, created_by, created_at) "
+                + "VALUES (?, ?, 'Idor', 'dimension=day', 'x', 0)", new Object[] {Ids.next(), s.storeId});
+        db.execute("INSERT INTO permission_set (id, store_id, name, grants, created_at) VALUES "
+                + "(?, ?, 'Idor', 'orders=R', 0)", new Object[] {Ids.next(), s.storeId});
+        db.execute("INSERT INTO chat_conversation (id, store_id, token, email, name, subject, status, "
+                + "assignee, created_at, updated_at) VALUES (?, ?, ?, 'x@example.com', 'X', 'Hi', "
+                + "'OPEN', '', 0, 0)", new Object[] {Ids.next(), s.storeId, "idor" + Ids.next()});
     }
 }

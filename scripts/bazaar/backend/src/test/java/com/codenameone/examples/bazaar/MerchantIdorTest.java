@@ -169,6 +169,19 @@ class MerchantIdorTest {
         "GET /disputes", "GET /disputes/{disputeId}", "GET /disputes/{disputeId}/evidence",
         "POST /disputes/{disputeId}/evidence", "POST /disputes/{disputeId}/submit",
         "POST /disputes/{disputeId}/accept",
+        // Operations: warehouse, timelines, forecast, reports, permissions, chat, listings.
+        "GET /warehouse/{locationId}/board", "POST /warehouse/{locationId}/sync",
+        "POST /warehouse/move", "GET /warehouse/{locationId}/bins",
+        "POST /warehouse/{locationId}/bins", "GET /warehouse/{locationId}/pick-list",
+        "GET /transfers/{transferId}/timeline", "GET /purchase-orders/{orderId}/timeline",
+        "GET /forecast", "GET /forecast/suggestions", "POST /forecast/reorder",
+        "POST /forecast/rebalance", "POST /reports/run", "GET /reports", "POST /reports",
+        "GET /reports/{reportId}", "GET /cohorts", "GET /attribution",
+        "GET /permission-sets", "POST /permission-sets", "POST /permission-sets/{setId}",
+        "GET /staff-permissions", "POST /staff-permissions", "GET /chats", "GET /chats/{chatId}",
+        "POST /chats/{chatId}/reply", "POST /chats/{chatId}/assign", "POST /chats/{chatId}/close",
+        "GET /canned-replies", "POST /canned-replies", "GET /combined-listings",
+        "POST /combined-listings", "POST /imports/marketplace",
     };
 
     /// Routes of [#ROUTES] served as documents by `DocumentPages` rather than
@@ -195,7 +208,8 @@ class MerchantIdorTest {
         {"entries", "price_list_entry"}, {"quotes", "trade_quote"}, {"net-terms", "net_term"},
         {"markets", "market"}, {"duty-rates", "duty_rate"},
         {"tax-exemptions", "tax_exemption"}, {"order-risks", "store_order"},
-        {"disputes", "dispute"},
+        {"disputes", "dispute"}, {"warehouse", "location"}, {"reports", "saved_report"},
+        {"permission-sets", "permission_set"}, {"chats", "chat_conversation"},
     };
 
     private static final String NO_SUCH = "no-such-id";

@@ -59,6 +59,7 @@ import com.codenameone.examples.bazaar.repository.TransferLineRepository;
 import com.codenameone.examples.bazaar.repository.VariantRepository;
 import com.codenameone.examples.bazaar.store.StoreAccess;
 
+import com.codenameone.examples.bazaar.ops.Timelines;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -97,13 +98,15 @@ public class Stock {
     private final SupplierRepository suppliers;
     private final PurchaseOrderRepository orders;
     private final PurchaseLineRepository orderLines;
+    private final Timelines timelines;
 
     public Stock(Inventory inventory, StoreAccess access, InventoryLevelRepository levels,
             InventoryMoveRepository moves, VariantRepository variants,
             ProductRepository products, LocationRepository locations,
             StockTransferRepository transfers, TransferLineRepository transferLines,
             SupplierRepository suppliers, PurchaseOrderRepository orders,
-            PurchaseLineRepository orderLines) {
+            PurchaseLineRepository orderLines, Timelines timelines) {
+        this.timelines = timelines;
         this.inventory = inventory;
         this.access = access;
         this.levels = levels;
@@ -304,6 +307,8 @@ public class Stock {
         transfer.setCreatedAt(Instant.now());
         transfer.setUpdatedAt(Instant.now());
         transfers.insert(transfer);
+        timelines.record(storeId, Timelines.TRANSFER, transfer.getId(), Timelines.CREATED,
+                "Transfer created", username);
         for (int iter = 0; iter < wanted.lines().size(); iter++) {
             TransferLineDto w = wanted.lines().get(iter);
             variant(storeId, w.variantId());
@@ -345,7 +350,7 @@ public class Stock {
             inventory.change(storeId, line.getVariantId(), transfer.getToLocationId(),
                     0, 0, line.getQuantity(), Inventory.TRANSFER_IN, transferId, username);
         }
-        return status(transferId, IN_TRANSIT, storeId);
+        return status(transferId, IN_TRANSIT, storeId, username);
     }
 
     @Transactional(rollbackFor = IOException.class)
@@ -381,7 +386,7 @@ public class Stock {
                 transferLines.save(fresh);
             }
         }
-        return status(transferId, done ? RECEIVED : PARTIAL, storeId);
+        return status(transferId, done ? RECEIVED : PARTIAL, storeId, username);
     }
 
     /// Cancels a transfer: a sent one returns what had not arrived to the
@@ -406,11 +411,12 @@ public class Stock {
                 }
             }
         }
-        return status(transferId, CANCELLED, storeId);
+        return status(transferId, CANCELLED, storeId, username);
     }
 
-    private TransferDto status(String transferId, String status, String storeId)
-            throws IOException {
+    private TransferDto status(String transferId, String status, String storeId,
+            String username) throws IOException {
+        timelines.status(storeId, Timelines.TRANSFER, transferId, status, username);
         StockTransfer transfer = transfers.findById(transferId);
         transfer.setStatus(status);
         transfer.setUpdatedAt(Instant.now());
@@ -576,6 +582,8 @@ public class Stock {
         }
         order.setTotalCents(total);
         orders.insert(order);
+        timelines.record(storeId, Timelines.PURCHASE, order.getId(), Timelines.CREATED,
+                "Purchase order created", username);
         for (int iter = 0; iter < made.size(); iter++) {
             orderLines.insert(made.get(iter));
         }
@@ -593,7 +601,7 @@ public class Stock {
             inventory.change(storeId, lines.get(iter).getVariantId(), order.getLocationId(), 0, 0,
                     lines.get(iter).getQuantity(), Inventory.RECEIVE, orderId, username);
         }
-        return orderStatus(orderId, ORDERED, storeId);
+        return orderStatus(orderId, ORDERED, storeId, username);
     }
 
     /// Books in what arrived: RECEIVE moves add it on hand, and it stops
@@ -629,7 +637,7 @@ public class Stock {
                 orderLines.save(fresh);
             }
         }
-        return orderStatus(orderId, done ? RECEIVED : PARTIAL, storeId);
+        return orderStatus(orderId, done ? RECEIVED : PARTIAL, storeId, username);
     }
 
     /// Cancels an order; what was ordered and never arrived stops counting
@@ -650,11 +658,12 @@ public class Stock {
                 }
             }
         }
-        return orderStatus(orderId, CANCELLED, storeId);
+        return orderStatus(orderId, CANCELLED, storeId, username);
     }
 
-    private PurchaseOrderDto orderStatus(String orderId, String status, String storeId)
-            throws IOException {
+    private PurchaseOrderDto orderStatus(String orderId, String status, String storeId,
+            String username) throws IOException {
+        timelines.status(storeId, Timelines.PURCHASE, orderId, status, username);
         PurchaseOrder order = orders.findById(orderId);
         order.setStatus(status);
         order.setUpdatedAt(Instant.now());

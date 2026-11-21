@@ -1,0 +1,11 @@
+<!-- cn1:model page com.codenameone.examples.bazaar.web.PageMeta -->
+<!-- cn1:model chat com.codenameone.examples.bazaar.web.ChatView -->
+<!doctype html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org"><head th:replace="~{layout :: head}"></head><body th:attr="data-accent=${page.accent}"><header th:replace="~{layout :: header}"></header>
+<main class="wrap" id="chat"><h1>Chat with the shop</h1>
+<p th:unless="${chat.started}">Ask anything about an order or a product. The shop answers here and by email.</p>
+<p th:if="${chat.started}">Keep this page's address to come back to the conversation.</p>
+<p class="error" role="alert" th:unless="${chat.error.empty}" th:text="${chat.error}">Error</p>
+<ol class="chat" th:unless="${chat.lines.empty}"><li th:each="l : ${chat.lines}" th:classappend="${l.staff ? 'staff' : 'customer'}"><strong th:text="${l.author}">Name</strong> <time th:text="${l.when}">when</time><p th:text="${l.body}">Message</p></li></ol>
+<form method="post" th:action="${chat.action}" hx-boost="true" hx-target="#chat" hx-select="#chat" hx-swap="outerHTML"><input type="hidden" name="token" th:value="${chat.token}"><th:block th:unless="${chat.started}"><label>Name <input name="name" maxlength="100" autocomplete="name"></label> <label>Email <input type="email" name="email" maxlength="200" required autocomplete="email"></label></th:block><label>Message <textarea name="message" maxlength="2000" required rows="4"></textarea></label> <button type="submit">Send</button></form></main>
+<footer th:replace="~{layout :: footer}"></footer></body></html>

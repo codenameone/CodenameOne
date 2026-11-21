@@ -132,6 +132,7 @@ final class Transfers extends Container {
                     "SvRowValue")));
         }
         page.add(card);
+        page.add(TimelineView.load(true, t.id()));
         Container buttons = MUi.buttons();
         if ("DRAFT".equals(t.status())) {
             buttons.add(Ui.primary(Lang.tr("Send"), "transfer-send", e -> Api.inventory()

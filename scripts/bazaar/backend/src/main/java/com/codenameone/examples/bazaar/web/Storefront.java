@@ -49,9 +49,12 @@ import java.io.IOException;
 @Controller
 public class Storefront {
     private final StorefrontPages pages;
+    private final com.codenameone.examples.bazaar.ops.Attribution attribution;
 
-    public Storefront(StorefrontPages pages) {
+    public Storefront(StorefrontPages pages,
+            com.codenameone.examples.bazaar.ops.Attribution attribution) {
         this.pages = pages;
+        this.attribution = attribution;
     }
 
     @GetMapping("/")
@@ -63,6 +66,7 @@ public class Storefront {
     @GetMapping("/s/{handle}")
     public String home(@PathVariable("handle") String handle, Model model,
             HttpServer.Request request) throws IOException {
+        attribution.capture(request, handle);
         pages.home(handle, model, request);
         return "home";
     }
@@ -73,6 +77,7 @@ public class Storefront {
             @RequestParam(value = "sort", required = false) String sort,
             @RequestParam(value = "page", required = false) String page,
             Model model, HttpServer.Request request) throws IOException {
+        attribution.capture(request, handle);
         pages.collection(handle, collection, sort, number(page), model, request);
         return "listing";
     }
@@ -83,6 +88,7 @@ public class Storefront {
             @RequestParam(value = "sort", required = false) String sort,
             @RequestParam(value = "page", required = false) String page,
             Model model, HttpServer.Request request) throws IOException {
+        attribution.capture(request, handle);
         pages.search(handle, q, sort, number(page), model, request);
         return "listing";
     }
@@ -92,6 +98,7 @@ public class Storefront {
             @PathVariable("product") String product,
             @RequestParam(value = "variant", required = false) String variant,
             Model model, HttpServer.Request request) throws IOException {
+        attribution.capture(request, handle);
         pages.product(handle, product, variant, model, request);
         return "product";
     }
@@ -145,6 +152,43 @@ public class Storefront {
     }
 
     /// The store's privacy and cookie policy, with the consent choice.
+    /// The chat page; `?t=` reopens a conversation by its token.
+    @GetMapping("/s/{handle}/chat")
+    public String chat(@PathVariable("handle") String handle, Model model,
+            HttpServer.Request request) throws IOException {
+        pages.chat(handle, param(request, "t"), null, model, request);
+        return "chat";
+    }
+
+    /// A shopper's message: post/redirect/get back to the thread. A refused
+    /// message (empty, no address, too many) shows the page again with why.
+    @PostMapping("/s/{handle}/chat")
+    public String ask(@PathVariable("handle") String handle, Model model,
+            HttpServer.Request request) throws IOException {
+        sameSite(request);
+        String token = param(request, "token");
+        try {
+            token = pages.ask(handle, token, param(request, "name"), param(request, "email"),
+                    param(request, "message"), request);
+        } catch (ResponseStatusException refused) {
+            if (refused.getStatus() == 404) {
+                throw refused;
+            }
+            pages.chat(handle, token, refused.getReason(), model, request);
+            return "chat";
+        }
+        return "redirect:" + StorefrontPages.storeUrl(handle) + "/chat?t=" + SiteUrls.encode(token);
+    }
+
+    private static String param(HttpServer.Request request, String name) {
+        try {
+            String v = request.param(name);
+            return v == null ? "" : v;
+        } catch (RuntimeException malformed) {
+            return "";
+        }
+    }
+
     @GetMapping("/s/{handle}/privacy")
     public String privacy(@PathVariable("handle") String handle, Model model,
             HttpServer.Request request) throws IOException {

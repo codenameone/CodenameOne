@@ -56,6 +56,19 @@
 <form method="post" th:action="${view.base + '/quotes/move'}" hx-target="#board" hx-select="#board" hx-swap="outerHTML"><input type="hidden" name="quote" th:value="${o.id}"><select name="to" th:attr="aria-label=${'Move ' + o.title + ' to'}"><option th:each="t : ${view.columns}" th:value="${t.id}" th:selected="${t.id == c.next}" th:text="${t.title}">Sent</option></select><button type="submit">Move</button></form></li></ul></div>
 </section>
 
+<section th:if="${view.page == 'warehouse'}" id="board" class="board" aria-label="Warehouse flow">
+<div class="kanban" th:each="c : ${view.columns}"><h2><span th:text="${c.title}">Pick</span> <span class="pill" th:text="${c.count}">0</span></h2>
+<p th:if="${c.cards.empty}" class="muted">Nothing here.</p>
+<ul><li class="item" th:each="o : ${c.cards}"><b th:text="${o.title}">Order</b> <small class="muted" th:text="${o.detail}">Inbound</small>
+<form method="post" th:action="${view.base + '/warehouse/move'}" hx-boost="true" hx-target="#board" hx-select="#board" hx-swap="outerHTML"><input type="hidden" name="task" th:value="${o.id}"><input type="hidden" name="location" th:value="${o.field}"><select name="to" th:attr="aria-label=${'Move ' + o.title + ' to'}"><option th:each="t : ${view.columns}" th:value="${t.id}" th:selected="${t.id == o.status}" th:text="${t.title}">Pack</option></select><button type="submit">Move</button></form></li></ul></div>
+</section>
+
+<figure th:unless="${view.marks.empty}" class="card chart"><figcaption th:text="${view.chartTitle}">Chart</figcaption><svg role="img" th:attr="viewbox=${view.chartBox}, aria-label=${view.chartTitle}">
+<path th:each="e : ${view.lines}" class="edge" th:attr="d=${e.path}"></path>
+<g th:each="m : ${view.marks}" class="mark"><circle th:if="${view.page == 'timeline'}" r="7" th:attr="cx=${m.x}, cy=${m.y}, fill-opacity=${m.opacity}"></circle><rect th:unless="${view.page == 'timeline'}" rx="2" th:attr="x=${m.x}, y=${m.y}, width=${m.width}, height=${m.height}, fill-opacity=${m.opacity}"></rect>
+<text class="title" th:attr="x=${m.textX}, y=${m.textY}" th:text="${m.label}">Label</text><text th:attr="x=${m.valueX}, y=${m.textY + 16}" th:text="${m.detail}">Detail</text><title th:text="${m.label + ' ' + m.value}">Value</title></g>
+</svg></figure>
+
 <section th:unless="${view.cards.empty}" class="card" aria-label="Items"><h2 th:unless="${view.cardsTitle.empty}" th:text="${view.cardsTitle}">Items</h2>
 <ul><li class="item" th:each="k : ${view.cards}"><a th:unless="${k.url.empty}" th:href="${k.url}" th:text="${k.title}">Item</a><b th:if="${k.url.empty}" th:text="${k.title}">Item</b> <span class="pill" th:unless="${k.status.empty}" th:text="${k.status}">ACTIVE</span> <span th:text="${k.detail}">Detail</span> <small class="muted" th:text="${k.meta}">Meta</small> <b th:text="${k.amount}">$1</b> <a th:unless="${k.extraUrl.empty}" th:href="${k.extraUrl}" th:text="${k.extraLabel}">PDF</a>
 <span class="row"><form th:each="btn : ${k.buttons}" method="post" th:action="${btn.action}"><button type="submit" th:classappend="${btn.flag ? 'danger' : ''}" th:text="${btn.title}" th:attr="aria-label=${btn.title + ': ' + k.title}">Go</button></form></span></li></ul></section>

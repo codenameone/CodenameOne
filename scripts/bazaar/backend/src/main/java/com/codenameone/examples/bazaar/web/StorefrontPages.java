@@ -91,13 +91,20 @@ public class StorefrontPages {
     private final com.codenameone.examples.bazaar.market.Markets markets;
     private final com.codenameone.examples.bazaar.market.Translations translations;
 
+    private final com.codenameone.examples.bazaar.ops.Attribution attribution;
+    private final com.codenameone.examples.bazaar.ops.ChatInbox chatInbox;
+
     public StorefrontPages(Stores stores, Catalog catalog, Carts carts, StoreRepository storeRows,
             ProductRepository products, CollectionRepository collections,
             ReviewRepository reviews, FulfillmentRepository fulfillments,
             TrackingEventRepository tracking, SiteUrls urls, Slots slots,
             com.codenameone.examples.bazaar.subscribe.Subscriptions subscriptions,
             com.codenameone.examples.bazaar.market.Markets markets,
-            com.codenameone.examples.bazaar.market.Translations translations) {
+            com.codenameone.examples.bazaar.market.Translations translations,
+            com.codenameone.examples.bazaar.ops.Attribution attribution,
+            com.codenameone.examples.bazaar.ops.ChatInbox chatInbox) {
+        this.attribution = attribution;
+        this.chatInbox = chatInbox;
         this.subscriptions = subscriptions;
         this.markets = markets;
         this.translations = translations;
@@ -515,6 +522,7 @@ public class StorefrontPages {
         CartDto dto = carts.add(store.getId(), null, token(request, store, true),
                 new CartLineChangeDto(form == null ? null : form.variantId, qty));
         remember(request, store, dto.token());
+        attribution.stampCart(request, handle, store.getId(), dto.id());
     }
 
     /// Sets a line's quantity; zero or less removes it.
@@ -641,6 +649,43 @@ public class StorefrontPages {
         model.addAttribute("page", meta).addAttribute("privacy", slots.privacy(store, request));
     }
 
+    /// The chat page: the thread `token` opens (none yet when empty).
+    public void chat(String handle, String token, String error, Model model,
+            HttpServer.Request request) throws IOException {
+        Store store = stores.activeStore(handle);
+        String path = "/s/" + store.getHandle() + "/chat";
+        PageMeta meta = meta(store, request, path);
+        meta.title = "Chat - " + store.getName();
+        meta.noindex = true;
+        ChatView view = new ChatView();
+        view.action = path;
+        view.error = error == null ? "" : error;
+        if (token != null && token.length() > 0) {
+            List<com.codenameone.examples.bazaar.api.ChatMessageDto> m =
+                    chatInbox.thread(store.getId(), token);
+            view.token = token;
+            view.started = true;
+            for (int iter = 0; iter < m.size(); iter++) {
+                ChatView.Line l = new ChatView.Line();
+                l.author = m.get(iter).staff() ? store.getName() : m.get(iter).author();
+                l.body = m.get(iter).body();
+                l.staff = m.get(iter).staff();
+                l.when = com.codenameone.examples.bazaar.Days.iso(m.get(iter).at());
+                view.lines.add(l);
+            }
+        }
+        model.addAttribute("page", meta).addAttribute("chat", view);
+    }
+
+    /// A shopper's chat message; answers the conversation's token.
+    public String ask(String handle, String token, String name, String email, String message,
+            HttpServer.Request request) throws IOException {
+        Store store = stores.activeStore(handle);
+        return chatInbox.ask(store.getId(),
+                com.codenameone.examples.bazaar.web.security.Throttle.client(request), token, name,
+                email, message);
+    }
+
     // -------------------------------------------------------------- helpers
 
     PageMeta meta(Store store, HttpServer.Request request, String path) {
@@ -651,6 +696,7 @@ public class StorefrontPages {
         page.home = storeUrl(store.getHandle());
         page.cartUrl = "/s/" + store.getHandle() + "/cart";
         page.searchUrl = "/s/" + store.getHandle() + "/search";
+        page.chatUrl = "/s/" + store.getHandle() + "/chat";
         page.description = describe(store.getTagline());
         try {
             slots.decorate(page, store, request);

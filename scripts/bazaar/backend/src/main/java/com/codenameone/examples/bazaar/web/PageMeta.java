@@ -68,4 +68,6 @@ public final class PageMeta {
     public String consentBack = "/";
     /// The store's privacy and cookie policy page, or empty.
     public String privacyUrl = "";
+    /// The store's chat page, or empty off a store.
+    public String chatUrl = "";
 }

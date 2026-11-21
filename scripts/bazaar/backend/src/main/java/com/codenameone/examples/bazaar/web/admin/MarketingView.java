@@ -85,4 +85,9 @@ public class MarketingView {
     public List<FlowNode> nodes = new ArrayList<FlowNode>();
     public List<FlowEdge> edges = new ArrayList<FlowEdge>();
     public List<AdminRow> problems = new ArrayList<AdminRow>();
+    /// A server-drawn chart (warehouse, timeline, report, cohort pages).
+    public String chartTitle = "";
+    public String chartBox = "0 0 100 100";
+    public List<ChartMark> marks = new ArrayList<ChartMark>();
+    public List<FlowEdge> lines = new ArrayList<FlowEdge>();
 }
