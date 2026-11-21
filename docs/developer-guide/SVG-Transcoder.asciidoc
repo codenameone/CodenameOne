@@ -304,7 +304,7 @@ include::../demos/common/src/main/snippets/developer-guide/svg-transcoder.xml[ta
 
 `RiveView` plays a file. It runs the artboard's first state machine, or
 its first animation when the artboard has no state machine, from the
-moment it is shown:
+moment it's shown:
 
 [source]
 ----
@@ -317,7 +317,7 @@ form.add(BorderLayout.CENTER, view);
 A state machine is driven by its inputs, which are set by name.
 Rive's listeners react to touches and mouse hover on the view by
 themselves. While a state machine has listeners, a drag inside the view
-belongs to it and does not scroll the form:
+belongs to it and doesn't scroll the form:
 
 [source]
 ----
@@ -357,7 +357,7 @@ and delivered with the first batch after a listener is added.
 A paused view still reacts: an input, a view model property or a pointer
 event takes effect at once, at the paused time, without moving the
 animation. `advance(seconds)` moves time by hand, which together with
-`pause()` gives a frame that does not depend on the clock, for example in
+`pause()` gives a frame that doesn't depend on the clock, for example in
 a screenshot test.
 
 ==== Rive feature coverage
