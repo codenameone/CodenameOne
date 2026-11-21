@@ -112,7 +112,7 @@ class DocumentFormatTest extends UITestBase {
         zip.finish();
         Document d = read(bytes.toByteArray(), Document.Format.NATIVE);
         assertEquals(1, d.size());
-        assertEquals(" a 3", ((Paragraph) d.get(0)).plainText());
+        assertEquals(" a 3", ((Paragraph) d.get(0)).text.displayText());
         assertEquals(TextStyle.NO_BACKGROUND, ((Paragraph) d.get(0)).text.runStyle(0).background);
         assertEquals(PageSpec.LETTER, d.page);
         assertEquals("T", d.title);

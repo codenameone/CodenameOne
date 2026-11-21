@@ -76,6 +76,10 @@ final class HtmlFormat {
                 // ends empty once the list is out.
                 return;
             }
+            if ("\n".equals(t.plainText())) {
+                // `<p><br></p>`: a deliberately blank paragraph, as editors write one
+                t = RichText.EMPTY;
+            }
             out.add(new Paragraph(next('p'), style, align, list, Math.max(0, listLevel), 0,
                     0, 8, 0, 1.15f, false, false, t));
             text = new RichText.Builder();
@@ -589,15 +593,29 @@ final class HtmlFormat {
 
     static String write(Document d) {
         StringBuilder b = new StringBuilder();
+        List<Note> notes = new ArrayList<Note>();
         b.append("<!DOCTYPE html>\n<html><head><meta charset=\"utf-8\"><title>");
         escape(b, d.title);
         b.append("</title></head>\n<body>\n");
-        blocks(b, d.blocks);
+        blocks(b, d.blocks, notes);
+        for (int n = 0; n < notes.size(); n++) {
+            if (n == 0) {
+                b.append("<hr>\n<ol class=\"notes\">\n");
+            }
+            Note note = notes.get(n);
+            b.append("<li id=\"note-").append(n + 1).append("\">");
+            List<Note> inner = new ArrayList<Note>();
+            blocks(b, note.blocks, inner);
+            b.append("</li>\n");
+            if (n == notes.size() - 1) {
+                b.append("</ol>\n");
+            }
+        }
         b.append("</body></html>\n");
         return b.toString();
     }
 
-    private static void blocks(StringBuilder b, List<Block> blocks) {
+    private static void blocks(StringBuilder b, List<Block> blocks, List<Note> notes) {
         // Open lists, innermost last: "ul" or "ol". Every open list also has an open `li`, so a
         // deeper list nests inside the item before it, as HTML requires.
         List<String> open = new ArrayList<String>();
@@ -624,9 +642,9 @@ final class HtmlFormat {
                 }
             }
             if (p != null) {
-                paragraph(b, p, want > 0);
+                paragraph(b, p, want > 0, notes);
             } else if (block instanceof Table) {
-                table(b, (Table) block);
+                table(b, (Table) block, notes);
             } else if (block instanceof Picture) {
                 b.append("<p>");
                 picture(b, (Picture) block);
@@ -638,7 +656,8 @@ final class HtmlFormat {
         }
     }
 
-    private static void paragraph(StringBuilder b, Paragraph p, boolean item) {
+    private static void paragraph(StringBuilder b, Paragraph p, boolean item,
+            List<Note> notes) {
         int h = p.headingLevel();
         String t = item ? "li" : h > 0 ? "h" + h : "Quote".equals(p.style) ? "blockquote"
                 : "Code".equals(p.style) ? "pre" : "p";
@@ -647,18 +666,54 @@ final class HtmlFormat {
             b.append(" style=\"text-align:").append(p.align).append('"');
         }
         b.append('>');
+        if (p.text.isEmpty()) {
+            b.append("<br>");
+        }
         runs(b, p.text, h > 0 ? TextStyle.DEFAULT.withBold(true).withSize(headingSize(h))
                 : "Code".equals(p.style) ? TextStyle.DEFAULT.withFont("Monospace")
-                : TextStyle.DEFAULT);
+                : TextStyle.DEFAULT, notes);
         if (!item) {
             b.append("</").append(t).append(">\n");
         }
     }
 
-    private static void runs(StringBuilder b, RichText text, TextStyle base) {
+    private static void runs(StringBuilder b, RichText text, TextStyle base,
+            List<Note> notes) {
         for (int i = 0; i < text.runCount(); i++) {
             TextStyle s = text.runStyle(i);
+            Inline object = text.runObject(i);
+            if (object instanceof Picture) {
+                picture(b, (Picture) object);
+                continue;
+            }
+            if (object instanceof EmbeddedComponent) {
+                Picture snap = ((EmbeddedComponent) object).toPicture("c");
+                if (snap != null) {
+                    picture(b, snap);
+                }
+                continue;
+            }
+            if (object instanceof Note) {
+                Note note = (Note) object;
+                notes.add(note);
+                String mark = note.mark.length() > 0 ? note.mark : String.valueOf(notes.size());
+                b.append("<sup><a href=\"#note-").append(notes.size()).append("\">");
+                escape(b, mark);
+                b.append("</a></sup>");
+                continue;
+            }
             List<String> close = new ArrayList<String>();
+            if (s.revision != null) {
+                String tag = s.revision.isDeletion() ? "del" : "ins";
+                b.append('<').append(tag);
+                if (s.revision.author.length() > 0) {
+                    b.append(" title=\"");
+                    escape(b, s.revision.author);
+                    b.append('"');
+                }
+                b.append('>');
+                close.add(tag);
+            }
             if (s.link.length() > 0) {
                 b.append("<a href=\"");
                 escape(b, s.link);
@@ -706,7 +761,7 @@ final class HtmlFormat {
                 b.append("<sub>");
                 close.add("sub");
             }
-            String run = text.runText(i);
+            String run = object instanceof Field ? ((Field) object).result : text.runText(i);
             int start = 0;
             for (int k = 0; k <= run.length(); k++) {
                 if (k == run.length() || run.charAt(k) == '\n') {
@@ -728,7 +783,7 @@ final class HtmlFormat {
         return "#" + h.substring(1);
     }
 
-    private static void table(StringBuilder b, Table t) {
+    private static void table(StringBuilder b, Table t, List<Note> notes) {
         b.append("<table border=\"1\" style=\"border-collapse:collapse\">\n");
         for (int r = 0; r < t.rows(); r++) {
             if (r == 0 && t.headerRows > 0) {
@@ -754,9 +809,9 @@ final class HtmlFormat {
                         && Paragraph.NO_LIST.equals(((Paragraph) cell.get(0)).list)
                         && !((Paragraph) cell.get(0)).isHeading()) {
                     runs(b, ((Paragraph) cell.get(0)).text, "th".equals(cellTag)
-                            ? TextStyle.DEFAULT.withBold(true) : TextStyle.DEFAULT);
+                            ? TextStyle.DEFAULT.withBold(true) : TextStyle.DEFAULT, notes);
                 } else {
-                    blocks(b, cell);
+                    blocks(b, cell, notes);
                 }
                 b.append("</").append(cellTag).append('>');
             }

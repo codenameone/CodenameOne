@@ -54,12 +54,13 @@ final class NativeFormat {
         XmlOut x = new XmlOut(zip);
         x.raw("<?xml version=\"1.0\" encoding=\"UTF-8\"?><document version=\"1\"");
         x.attr("title", d.title).attr("next", String.valueOf(d.nextId));
-        x.raw(" trackChanges=\"false\"><page");
+        x.raw(" trackChanges=\"").raw(String.valueOf(d.trackChanges)).raw("\"><page");
         x.attr("width", Ids.fmt(d.page.width)).attr("height", Ids.fmt(d.page.height));
         x.attr("top", Ids.fmt(d.page.top)).attr("right", Ids.fmt(d.page.right));
         x.attr("bottom", Ids.fmt(d.page.bottom)).attr("left", Ids.fmt(d.page.left));
         x.raw("/>");
         blocks(x, d.blocks);
+        comments(x, d.comments);
         x.raw("</document>");
         x.flush();
         zip.closeEntry();
@@ -89,18 +90,74 @@ final class NativeFormat {
         RichText t = p.text;
         for (int i = 0; i < t.runCount(); i++) {
             TextStyle s = t.runStyle(i);
-            x.raw("<r").attr("font", s.font).attr("size", Ids.fmt(s.size))
-                    .attr("color", Integer.toHexString(s.color))
-                    .attr("background", s.background == TextStyle.NO_BACKGROUND ? "ffffff"
-                            : Integer.toHexString(s.background))
-                    .attr("bold", String.valueOf(s.bold)).attr("italic", String.valueOf(s.italic))
-                    .attr("underline", String.valueOf(s.underline))
-                    .attr("strike", String.valueOf(s.strike)).attr("link", s.link)
-                    .attr("script", s.script).raw(">");
-            x.text(t.runText(i), false);
-            x.raw("</r>");
+            Inline o = t.runObject(i);
+            if (o instanceof Field) {
+                Field f = (Field) o;
+                x.raw("<field").attr("instruction", f.instruction).attr("result", f.result)
+                        .attr("locked", String.valueOf(f.locked)).raw(" showCode=\"false\">");
+                run(x, s, "");
+                x.raw("</field>");
+            } else if (o instanceof Note) {
+                Note n = (Note) o;
+                x.raw("<note").attr("id", n.id).attr("kind", n.kind).attr("mark", n.mark)
+                        .attr("label", "").raw(">");
+                run(x, s, "");
+                blocks(x, n.blocks);
+                x.raw("</note>");
+            } else if (o instanceof Picture) {
+                // the empty run carries the style the object's character has
+                run(x, s, "");
+                picture(x, (Picture) o);
+            } else if (o instanceof EmbeddedComponent) {
+                EmbeddedComponent e = (EmbeddedComponent) o;
+                run(x, s, "");
+                x.raw("<component").attr("type", e.type).attr("width", Ids.fmt(e.width))
+                        .attr("height", Ids.fmt(e.height)).raw("><state>");
+                x.text(e.state, false);
+                x.raw("</state>");
+                byte[] snap = e.snapshot();
+                if (snap != null) {
+                    x.raw("<snapshot>").raw(Base64.encodeNoNewline(snap)).raw("</snapshot>");
+                }
+                x.raw("</component>");
+            } else {
+                run(x, s, t.runText(i));
+            }
         }
         x.raw("</p>");
+    }
+
+    private static void run(XmlOut x, TextStyle s, String text) throws IOException {
+        x.raw("<r").attr("font", s.font).attr("size", Ids.fmt(s.size))
+                .attr("color", Integer.toHexString(s.color))
+                .attr("background", s.background == TextStyle.NO_BACKGROUND ? "ffffff"
+                        : Integer.toHexString(s.background))
+                .attr("bold", String.valueOf(s.bold)).attr("italic", String.valueOf(s.italic))
+                .attr("underline", String.valueOf(s.underline))
+                .attr("strike", String.valueOf(s.strike)).attr("link", s.link)
+                .attr("script", s.script);
+        Revision r = s.revision;
+        if (r != null) {
+            x.attr("revision-id", r.id.length() == 0 ? "r0" : r.id).attr("revision-kind", r.kind)
+                    .attr("revision-author", r.author).attr("revision-date", r.date);
+        }
+        x.raw(">");
+        x.text(text, false);
+        x.raw("</r>");
+    }
+
+    private static void comments(XmlOut x, List<Comment> comments) throws IOException {
+        for (Comment c : comments) {
+            x.raw("<comment").attr("id", c.id).attr("author", c.author).attr("startId", c.startId)
+                    .attr("start", c.start).attr("endId", c.endId).attr("end", c.end)
+                    .attr("resolved", String.valueOf(c.resolved));
+            if (c.date.length() > 0) {
+                x.attr("date", c.date);
+            }
+            x.raw("><text>");
+            x.text(c.text, false);
+            x.raw("</text></comment>");
+        }
     }
 
     private static void table(XmlOut x, Table t) throws IOException {
@@ -152,6 +209,8 @@ final class NativeFormat {
             throw new IOException("Unsupported .cn1doc version " + x.attr("version"));
         }
         String title = x.attr("title");
+        boolean track = x.boolAttr("trackChanges");
+        List<Comment> comments = new ArrayList<Comment>();
         long next = (long) x.doubleAttr("next", 1);
         PageSpec page = null;
         Set<String> ids = new HashSet<String>();
@@ -169,11 +228,16 @@ final class NativeFormat {
                         (float) x.doubleAttr("right", 54), (float) x.doubleAttr("bottom", 54),
                         (float) x.doubleAttr("left", 54));
                 x.skipElement();
+            } else if ("comment".equals(x.name)) {
+                Comment c = readComment(x);
+                if (c != null) {
+                    comments.add(c);
+                }
             } else if (!block(x, blocks, ids)) {
                 x.skipElement();
             }
         }
-        return new Document(blocks, page, title, next);
+        return new Document(blocks, page, title, next, comments, track);
     }
 
     /// Reads the block whose start tag the scanner is on into `out`, or answers false when the
@@ -235,12 +299,23 @@ final class NativeFormat {
                 } else if ("r".equals(x.name)) {
                     style0 = readStyle(x);
                     depth++;
-                } else if ("field".equals(x.name) || "note".equals(x.name)) {
-                    // A field shows its cached result; a note's mark has no text of its own.
-                    String result = "field".equals(x.name) ? x.attr("result") : "";
-                    x.skipElement();
-                    if (result != null && result.length() > 0) {
-                        text.append(result, style0);
+                } else if ("field".equals(x.name)) {
+                    Field f = new Field(x.attr("instruction"), x.attr("result"),
+                            x.boolAttr("locked"));
+                    text.append(f, objectStyle(x));
+                } else if ("note".equals(x.name)) {
+                    TextStyle[] noteStyle = {style0};
+                    Note note = readNote(x, noteStyle);
+                    text.append(note, noteStyle[0]);
+                } else if ("picture".equals(x.name)) {
+                    Picture pic = readPicture(x, ids);
+                    if (pic != null) {
+                        text.append(pic, style0);
+                    }
+                } else if ("component".equals(x.name)) {
+                    Inline o = readComponent(x);
+                    if (o != null) {
+                        text.append(o, style0);
                     }
                 } else {
                     x.skipElement();
@@ -260,6 +335,100 @@ final class NativeFormat {
                 pageBreak, keepNext, text.build());
     }
 
+    /// Reads to the end of a field and answers the style of the run inside it.
+    private static TextStyle objectStyle(XmlScanner x) throws IOException {
+        TextStyle style = null;
+        for (int ev = x.next(); ev != XmlScanner.END; ev = x.next()) {
+            if (ev == XmlScanner.EOF) {
+                throw new IOException("Truncated field");
+            }
+            if (ev == XmlScanner.START) {
+                if ("r".equals(x.name) && style == null) {
+                    style = readStyle(x);
+                }
+                x.skipElement();
+            }
+        }
+        return style;
+    }
+
+    private static EmbeddedComponent readComponent(XmlScanner x) throws IOException {
+        String type = x.attr("type");
+        float w = (float) x.doubleAttr("width", 0);
+        float h = (float) x.doubleAttr("height", 0);
+        String state = "";
+        byte[] snap = null;
+        for (int ev = x.next(); ev != XmlScanner.END; ev = x.next()) {
+            if (ev == XmlScanner.EOF) {
+                throw new IOException("Truncated component");
+            }
+            if (ev == XmlScanner.START) {
+                if ("state".equals(x.name)) {
+                    state = x.elementText();
+                } else if ("snapshot".equals(x.name)) {
+                    snap = Base64.decode(Ids.ascii(x.elementText().trim()));
+                } else {
+                    x.skipElement();
+                }
+            }
+        }
+        if (type == null || type.length() == 0 || Float.isNaN(w) || Float.isNaN(h) || w <= 0
+                || h <= 0) {
+            return null;
+        }
+        return new EmbeddedComponent(type, state, w, h, snap);
+    }
+
+    private static Note readNote(XmlScanner x, TextStyle[] style) throws IOException {
+        String id = x.attr("id");
+        String kind = x.attr("kind");
+        String mark = x.attr("mark");
+        List<Block> content = new ArrayList<Block>();
+        Set<String> storyIds = new HashSet<String>();
+        for (int ev = x.next(); ev != XmlScanner.END; ev = x.next()) {
+            if (ev == XmlScanner.EOF) {
+                throw new IOException("Truncated note");
+            }
+            if (ev == XmlScanner.START) {
+                if ("r".equals(x.name)) {
+                    style[0] = readStyle(x);
+                    x.skipElement();
+                } else if (!block(x, content, storyIds)) {
+                    x.skipElement();
+                }
+            }
+        }
+        return new Note(id == null || id.length() == 0 ? "n0" : id, kind, mark, content);
+    }
+
+    private static Comment readComment(XmlScanner x) throws IOException {
+        String id = x.attr("id");
+        String author = x.attr("author");
+        String date = x.attr("date");
+        String startId = x.attr("startId");
+        String endId = x.attr("endId");
+        int start = x.intAttr("start", 0);
+        int end = x.intAttr("end", 0);
+        boolean resolved = x.boolAttr("resolved");
+        String text = "";
+        for (int ev = x.next(); ev != XmlScanner.END; ev = x.next()) {
+            if (ev == XmlScanner.EOF) {
+                throw new IOException("Truncated comment");
+            }
+            if (ev == XmlScanner.START) {
+                if ("text".equals(x.name)) {
+                    text = x.elementText();
+                } else {
+                    x.skipElement();
+                }
+            }
+        }
+        if (id == null || id.length() == 0 || startId == null || endId == null) {
+            return null;
+        }
+        return new Comment(id, author, date, text, resolved, startId, start, endId, end);
+    }
+
     private static TextStyle readStyle(XmlScanner x) {
         float size = (float) x.doubleAttr("size", 12);
         if (Float.isNaN(size) || size <= 0 || size > 1638) {
@@ -270,7 +439,16 @@ final class NativeFormat {
                 x.boolAttr("bold"), x.boolAttr("italic"), x.boolAttr("underline"),
                 x.boolAttr("strike"),
                 background == 0xffffff ? TextStyle.NO_BACKGROUND : background, x.attr("link"),
-                x.attr("script"));
+                x.attr("script"), revision(x));
+    }
+
+    private static Revision revision(XmlScanner x) {
+        String id = x.attr("revision-id");
+        if (id == null || id.length() == 0) {
+            return null;
+        }
+        return new Revision(id, x.attr("revision-kind"), x.attr("revision-author"),
+                x.attr("revision-date"));
     }
 
     private static int hex(String s, int fallback) {

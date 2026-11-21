@@ -509,6 +509,7 @@ final class MarkdownFormat {
 
     static String write(Document d) {
         StringBuilder b = new StringBuilder();
+        List<Note> notes = new ArrayList<Note>();
         List<Block> blocks = d.blocks;
         boolean previousList = false;
         boolean previousCode = false;
@@ -529,9 +530,9 @@ final class MarkdownFormat {
                 }
                 b.append(p.plainText()).append('\n');
             } else if (p != null) {
-                paragraph(b, p, i, blocks);
+                paragraph(b, p, i, blocks, notes);
             } else if (block instanceof Table) {
-                table(b, (Table) block);
+                table(b, (Table) block, notes);
             } else if (block instanceof Picture) {
                 picture(b, (Picture) block);
                 b.append('\n');
@@ -542,10 +543,15 @@ final class MarkdownFormat {
         if (previousCode) {
             b.append("```\n");
         }
+        for (int n = 0; n < notes.size(); n++) {
+            b.append(n == 0 ? "\n" : "").append("[^").append(n + 1).append("]: ")
+                    .append(escape(notes.get(n).plainText().replace('\n', ' '))).append('\n');
+        }
         return b.toString();
     }
 
-    private static void paragraph(StringBuilder b, Paragraph p, int index, List<Block> blocks) {
+    private static void paragraph(StringBuilder b, Paragraph p, int index, List<Block> blocks,
+            List<Note> notes) {
         int h = p.headingLevel();
         TextStyle base = TextStyle.DEFAULT;
         if (h > 0) {
@@ -566,7 +572,7 @@ final class MarkdownFormat {
                 b.append("- ");
             }
         }
-        String text = runs(p.text, base);
+        String text = runs(p.text, base, notes);
         // A line that would read as other syntax is escaped at its start.
         if (h == 0 && Paragraph.NO_LIST.equals(p.list) && text.length() > 0
                 && (text.charAt(0) == '#' || text.charAt(0) == '>' || text.charAt(0) == '|'
@@ -597,11 +603,30 @@ final class MarkdownFormat {
         return p.listStart > 0 ? p.listStart : n;
     }
 
-    private static String runs(RichText text, TextStyle base) {
+    private static String runs(RichText text, TextStyle base, List<Note> notes) {
         StringBuilder b = new StringBuilder();
         for (int i = 0; i < text.runCount(); i++) {
             TextStyle s = text.runStyle(i);
-            String t = text.runText(i);
+            Inline object = text.runObject(i);
+            if (s.revision != null && s.revision.isDeletion()) {
+                continue;
+            }
+            if (object instanceof Picture || object instanceof EmbeddedComponent) {
+                Picture pic = object instanceof Picture ? (Picture) object
+                        : ((EmbeddedComponent) object).toPicture("c");
+                if (pic != null) {
+                    StringBuilder img = new StringBuilder();
+                    picture(img, pic);
+                    b.append(img);
+                }
+                continue;
+            }
+            if (object instanceof Note) {
+                notes.add((Note) object);
+                b.append("[^").append(notes.size()).append(']');
+                continue;
+            }
+            String t = object instanceof Field ? ((Field) object).result : text.runText(i);
             if ("Monospace".equals(s.font) && !"Monospace".equals(base.font)
                     && t.indexOf('`') < 0) {
                 b.append('`').append(t).append('`');
@@ -651,7 +676,7 @@ final class MarkdownFormat {
         return b.toString();
     }
 
-    private static void table(StringBuilder b, Table t) {
+    private static void table(StringBuilder b, Table t, List<Note> notes) {
         for (int r = 0; r < t.rows(); r++) {
             b.append('|');
             for (int c = 0; c < t.columns(); c++) {
@@ -665,7 +690,7 @@ final class MarkdownFormat {
                         Block inner = cell.get(k);
                         if (inner instanceof Paragraph) {
                             b.append(runs(((Paragraph) inner).text, r == 0
-                                    ? TextStyle.DEFAULT.withBold(true) : TextStyle.DEFAULT)
+                                    ? TextStyle.DEFAULT.withBold(true) : TextStyle.DEFAULT, notes)
                                     .replace("\n", "<br>"));
                         } else {
                             StringBuilder plain = new StringBuilder();

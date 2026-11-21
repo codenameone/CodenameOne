@@ -77,6 +77,9 @@ public final class TextStyle {
     /// One of `BASELINE`, `SUPERSCRIPT` or `SUBSCRIPT`.
     public final String script;
 
+    /// The tracked change this run belongs to, or null.
+    public final Revision revision;
+
     /// Creates a style.
     ///
     /// #### Parameters
@@ -102,6 +105,37 @@ public final class TextStyle {
     /// - `script`: `BASELINE`, `SUPERSCRIPT` or `SUBSCRIPT`; null means `BASELINE`
     public TextStyle(String font, float size, int color, boolean bold, boolean italic,
             boolean underline, boolean strike, int background, String link, String script) {
+        this(font, size, color, bold, italic, underline, strike, background, link, script, null);
+    }
+
+    /// Creates a style with a tracked change.
+    ///
+    /// #### Parameters
+    ///
+    /// - `font`: the font family, or null for `Serif`
+    ///
+    /// - `size`: the size in points
+    ///
+    /// - `color`: the text color
+    ///
+    /// - `bold`: bold
+    ///
+    /// - `italic`: italic
+    ///
+    /// - `underline`: underline
+    ///
+    /// - `strike`: strikethrough
+    ///
+    /// - `background`: the highlight color, or `NO_BACKGROUND`
+    ///
+    /// - `link`: the hyperlink target, or null or empty for none
+    ///
+    /// - `script`: `BASELINE`, `SUPERSCRIPT` or `SUBSCRIPT`; null means `BASELINE`
+    ///
+    /// - `revision`: the tracked change the run belongs to, or null
+    public TextStyle(String font, float size, int color, boolean bold, boolean italic,
+            boolean underline, boolean strike, int background, String link, String script,
+            Revision revision) {
         if (Float.isNaN(size) || size <= 0 || size > 1638) {
             throw new IllegalArgumentException("Invalid font size " + size);
         }
@@ -115,6 +149,7 @@ public final class TextStyle {
         this.background = background < 0 ? NO_BACKGROUND : background & 0xffffff;
         this.link = link == null ? "" : link;
         this.script = SUPERSCRIPT.equals(script) || SUBSCRIPT.equals(script) ? script : BASELINE;
+        this.revision = revision;
     }
 
     /// A copy with a different font family.
@@ -128,7 +163,7 @@ public final class TextStyle {
     /// the derived style
     public TextStyle withFont(String value) {
         return new TextStyle(value, size, color, bold, italic, underline, strike, background, link,
-                script);
+                script, revision);
     }
 
     /// A copy with a different size.
@@ -142,7 +177,7 @@ public final class TextStyle {
     /// the derived style
     public TextStyle withSize(float value) {
         return new TextStyle(font, value, color, bold, italic, underline, strike, background, link,
-                script);
+                script, revision);
     }
 
     /// A copy with a different text color.
@@ -156,7 +191,7 @@ public final class TextStyle {
     /// the derived style
     public TextStyle withColor(int value) {
         return new TextStyle(font, size, value, bold, italic, underline, strike, background, link,
-                script);
+                script, revision);
     }
 
     /// A copy with a different highlight.
@@ -170,7 +205,7 @@ public final class TextStyle {
     /// the derived style
     public TextStyle withBackground(int value) {
         return new TextStyle(font, size, color, bold, italic, underline, strike, value, link,
-                script);
+                script, revision);
     }
 
     /// A copy with bold switched.
@@ -184,7 +219,7 @@ public final class TextStyle {
     /// the derived style
     public TextStyle withBold(boolean value) {
         return new TextStyle(font, size, color, value, italic, underline, strike, background, link,
-                script);
+                script, revision);
     }
 
     /// A copy with italic switched.
@@ -198,7 +233,7 @@ public final class TextStyle {
     /// the derived style
     public TextStyle withItalic(boolean value) {
         return new TextStyle(font, size, color, bold, value, underline, strike, background, link,
-                script);
+                script, revision);
     }
 
     /// A copy with underline switched.
@@ -212,7 +247,7 @@ public final class TextStyle {
     /// the derived style
     public TextStyle withUnderline(boolean value) {
         return new TextStyle(font, size, color, bold, italic, value, strike, background, link,
-                script);
+                script, revision);
     }
 
     /// A copy with strike-through switched.
@@ -226,7 +261,7 @@ public final class TextStyle {
     /// the derived style
     public TextStyle withStrike(boolean value) {
         return new TextStyle(font, size, color, bold, italic, underline, value, background, link,
-                script);
+                script, revision);
     }
 
     /// A copy with a different hyperlink.
@@ -240,7 +275,7 @@ public final class TextStyle {
     /// the derived style
     public TextStyle withLink(String value) {
         return new TextStyle(font, size, color, bold, italic, underline, strike, background, value,
-                script);
+                script, revision);
     }
 
     /// A copy with a different baseline position.
@@ -254,7 +289,21 @@ public final class TextStyle {
     /// the derived style
     public TextStyle withScript(String value) {
         return new TextStyle(font, size, color, bold, italic, underline, strike, background, link,
-                value);
+                value, revision);
+    }
+
+    /// A copy marked as a tracked change, or with the mark removed.
+    ///
+    /// #### Parameters
+    ///
+    /// - `value`: the revision, or null
+    ///
+    /// #### Returns
+    ///
+    /// the derived style
+    public TextStyle withRevision(Revision value) {
+        return new TextStyle(font, size, color, bold, italic, underline, strike, background, link,
+                script, value);
     }
 
     /// Two styles are equal when every attribute is.
@@ -278,7 +327,8 @@ public final class TextStyle {
         return font.equals(t.font) && Float.floatToIntBits(size) == Float.floatToIntBits(t.size)
                 && color == t.color && background == t.background && bold == t.bold
                 && italic == t.italic && underline == t.underline && strike == t.strike
-                && link.equals(t.link) && script.equals(t.script);
+                && link.equals(t.link) && script.equals(t.script)
+                && (revision == null ? t.revision == null : revision.equals(t.revision));
     }
 
     /// A hash consistent with `equals`.
@@ -294,6 +344,7 @@ public final class TextStyle {
         h = h * 31 + background;
         h = h * 31 + (bold ? 1 : 0) + (italic ? 2 : 0) + (underline ? 4 : 0) + (strike ? 8 : 0);
         h = h * 31 + link.hashCode();
-        return h * 31 + script.hashCode();
+        h = h * 31 + script.hashCode();
+        return h * 31 + (revision == null ? 0 : revision.hashCode());
     }
 }

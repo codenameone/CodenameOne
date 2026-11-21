@@ -24,7 +24,7 @@ package com.codename1.wordprocessing;
 
 /// An immutable picture block: the original encoded image bytes, kept as they were read so a
 /// document written back carries the same image, plus its displayed size in points.
-public final class Picture implements Block {
+public final class Picture implements Block, Inline {
     /// The block id.
     public final String id;
 
@@ -187,5 +187,15 @@ public final class Picture implements Block {
     @Override
     public int hashCode() {
         return id.hashCode() * 31 + data.length;
+    }
+
+    /// A picture in a line reads as nothing in plain text.
+    ///
+    /// #### Returns
+    ///
+    /// the empty string
+    @Override
+    public String displayText() {
+        return "";
     }
 }

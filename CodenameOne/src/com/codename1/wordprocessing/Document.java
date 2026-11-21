@@ -120,6 +120,12 @@ public final class Document {
     /// The next free numeric id; see `newId`.
     public final long nextId;
 
+    /// The review comments, in document order.
+    public final List<Comment> comments;
+
+    /// Whether edits made through an editor are recorded as revisions.
+    public final boolean trackChanges;
+
     /// A document with one empty paragraph, on A4.
     public Document() {
         this(single(new Paragraph("p1", RichText.EMPTY)), PageSpec.A4, "Untitled", 2);
@@ -139,6 +145,26 @@ public final class Document {
     /// - `nextId`: the next free numeric id; it is raised past any `p`/`t`/`i` + digits id in
     /// the body so `newId` never collides
     public Document(List<Block> blocks, PageSpec page, String title, long nextId) {
+        this(blocks, page, title, nextId, null, false);
+    }
+
+    /// Creates a document with review comments.
+    ///
+    /// #### Parameters
+    ///
+    /// - `blocks`: the body; copied. An empty body gets one empty paragraph.
+    ///
+    /// - `page`: the page geometry, or null for A4
+    ///
+    /// - `title`: the title, or null
+    ///
+    /// - `nextId`: the next free numeric id
+    ///
+    /// - `comments`: the review comments, or null for none; copied
+    ///
+    /// - `trackChanges`: whether edits are recorded as revisions
+    public Document(List<Block> blocks, PageSpec page, String title, long nextId,
+            List<Comment> comments, boolean trackChanges) {
         List<Block> b = new ArrayList<Block>(blocks == null ? Collections.<Block>emptyList()
                 : blocks);
         long next = Math.max(1, nextId);
@@ -155,6 +181,17 @@ public final class Document {
         this.blocks = Collections.unmodifiableList(b);
         this.page = page == null ? PageSpec.A4 : page;
         this.title = title == null ? "" : title;
+        List<Comment> c = new ArrayList<Comment>();
+        if (comments != null) {
+            for (Comment x : comments) {
+                if (x != null) {
+                    c.add(x);
+                    next = Math.max(next, numericId(x.id) + 1);
+                }
+            }
+        }
+        this.comments = Collections.unmodifiableList(c);
+        this.trackChanges = trackChanges;
         this.nextId = next;
     }
 
@@ -248,7 +285,7 @@ public final class Document {
     ///
     /// the copy
     public Document withBlocks(List<Block> value) {
-        return new Document(value, page, title, nextId);
+        return new Document(value, page, title, nextId, comments, trackChanges);
     }
 
     /// A copy with one block replaced.
@@ -310,7 +347,7 @@ public final class Document {
     ///
     /// the copy
     public Document withPage(PageSpec value) {
-        return new Document(blocks, value, title, nextId);
+        return new Document(blocks, value, title, nextId, comments, trackChanges);
     }
 
     /// A copy with a different title.
@@ -323,7 +360,7 @@ public final class Document {
     ///
     /// the copy
     public Document withTitle(String value) {
-        return new Document(blocks, page, value, nextId);
+        return new Document(blocks, page, value, nextId, comments, trackChanges);
     }
 
     /// A copy with a different next id.
@@ -336,7 +373,51 @@ public final class Document {
     ///
     /// the copy
     public Document withNextId(long value) {
-        return new Document(blocks, page, title, value);
+        return new Document(blocks, page, title, value, comments, trackChanges);
+    }
+
+    /// A copy with different review comments.
+    ///
+    /// #### Parameters
+    ///
+    /// - `value`: the comments
+    ///
+    /// #### Returns
+    ///
+    /// the new document
+    public Document withComments(List<Comment> value) {
+        return new Document(blocks, page, title, nextId, value, trackChanges);
+    }
+
+    /// A copy with change tracking turned on or off.
+    ///
+    /// #### Parameters
+    ///
+    /// - `value`: whether edits are tracked
+    ///
+    /// #### Returns
+    ///
+    /// the new document
+    public Document withTrackChanges(boolean value) {
+        return new Document(blocks, page, title, nextId, comments, value);
+    }
+
+    /// The comment with an id.
+    ///
+    /// #### Parameters
+    ///
+    /// - `id`: the id
+    ///
+    /// #### Returns
+    ///
+    /// the comment, or null
+    public Comment comment(String id) {
+        for (Comment c : comments) {
+            if (c.id.equals(id)) {
+                return c;
+            }
+        }
+        return null;
     }
 
     /// The whole text without formatting: paragraphs separated by newlines, table cells by tabs.
@@ -357,7 +438,7 @@ public final class Document {
 
     static void appendPlainText(StringBuilder b, Block block) {
         if (block instanceof Paragraph) {
-            b.append(((Paragraph) block).plainText());
+            appendReadable(b, ((Paragraph) block).text);
         } else if (block instanceof Table) {
             Table t = (Table) block;
             for (int r = 0; r < t.rows(); r++) {
@@ -375,6 +456,18 @@ public final class Document {
             }
         } else if (block instanceof Picture) {
             b.append(((Picture) block).description);
+        }
+    }
+
+    /// Appends text as a reader sees it: fields show results, deleted revisions are skipped.
+    static void appendReadable(StringBuilder b, RichText t) {
+        for (int i = 0; i < t.runCount(); i++) {
+            TextStyle s = t.runStyle(i);
+            if (s.revision != null && s.revision.isDeletion()) {
+                continue;
+            }
+            Inline o = t.runObject(i);
+            b.append(o == null ? t.runText(i) : o.displayText());
         }
     }
 
@@ -497,7 +590,8 @@ public final class Document {
             return false;
         }
         Document d = (Document) o;
-        return blocks.equals(d.blocks) && page.equals(d.page) && title.equals(d.title);
+        return blocks.equals(d.blocks) && page.equals(d.page) && title.equals(d.title)
+                && comments.equals(d.comments) && trackChanges == d.trackChanges;
     }
 
     /// A hash consistent with `equals`.

@@ -26,15 +26,22 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-/// Immutable styled text: a sequence of runs, each a string with one `TextStyle`.
+/// Immutable styled text: a sequence of runs, each a string with one `TextStyle`, and inline
+/// objects -- fields, note references, pictures and embedded components -- each of which takes
+/// exactly one character, `OBJECT`.
 ///
-/// Adjacent runs with equal styles are merged and empty runs are dropped, so two texts that read
-/// the same and look the same are `equals`.
+/// Adjacent text runs with equal styles are merged and empty runs are dropped, so two texts that
+/// read the same and look the same are `equals`. An object run is never merged.
 public final class RichText {
+    /// The character an inline object occupies, U+FFFC OBJECT REPLACEMENT CHARACTER.
+    public static final char OBJECT = 0xfffc;
+
+    private static final String OBJECT_STRING = String.valueOf(OBJECT);
+
     /// Receives the runs of a text in order. Subclass it and override what you need; methods may
     /// be added here for new kinds of inline content, and they will do nothing unless overridden.
     public abstract static class Visitor {
-        /// Called once per run.
+        /// Called once per text run.
         ///
         /// #### Parameters
         ///
@@ -44,18 +51,32 @@ public final class RichText {
         ///
         /// - `style`: the run's style
         public abstract void run(int offset, String text, TextStyle style);
+
+        /// Called once per inline object. Does nothing unless overridden.
+        ///
+        /// #### Parameters
+        ///
+        /// - `offset`: the object's character within the whole text
+        ///
+        /// - `object`: the object
+        ///
+        /// - `style`: the style the object's character has
+        public void inline(int offset, Inline object, TextStyle style) {
+        }
     }
 
     /// The empty text.
-    public static final RichText EMPTY = new RichText(new String[0], new TextStyle[0]);
+    public static final RichText EMPTY = new RichText(new String[0], new TextStyle[0], new Inline[0]);
 
     private final String[] texts;
     private final TextStyle[] styles;
+    private final Inline[] objects;
     private final int length;
 
-    private RichText(String[] texts, TextStyle[] styles) {
+    private RichText(String[] texts, TextStyle[] styles, Inline[] objects) {
         this.texts = texts;
         this.styles = styles;
+        this.objects = objects;
         int n = 0;
         for (String t : texts) {
             n += t.length();
@@ -88,18 +109,34 @@ public final class RichText {
     ///
     /// the text
     public static RichText of(String s, TextStyle style) {
-        if (s == null || s.length() == 0) {
-            return EMPTY;
-        }
-        return new RichText(new String[] {s}, new TextStyle[] {style});
+        return new Builder().append(s, style).build();
+    }
+
+    /// A text holding one inline object.
+    ///
+    /// #### Parameters
+    ///
+    /// - `object`: the object
+    ///
+    /// - `style`: the style of its character
+    ///
+    /// #### Returns
+    ///
+    /// the text
+    public static RichText of(Inline object, TextStyle style) {
+        return new Builder().append(object, style).build();
     }
 
     /// Accumulates runs into a `RichText`.
     public static final class Builder {
         private final List<String> texts = new ArrayList<String>();
         private final List<TextStyle> styles = new ArrayList<TextStyle>();
+        private final List<Inline> objects = new ArrayList<Inline>();
+        private int length;
 
-        /// Appends a run, merging it into the previous one when the styles are equal.
+        /// Appends a run, merging it into the previous one when the styles are equal. An
+        /// `OBJECT` character in plain text is replaced by a space: only `append(Inline, ...)`
+        /// places objects.
         ///
         /// #### Parameters
         ///
@@ -114,16 +151,43 @@ public final class RichText {
             if (text == null || text.length() == 0) {
                 return this;
             }
+            if (text.indexOf(OBJECT) >= 0) {
+                text = text.replace(OBJECT, ' ');
+            }
             if (style == null) {
                 style = TextStyle.DEFAULT;
             }
             int last = texts.size() - 1;
-            if (last >= 0 && styles.get(last).equals(style)) {
+            if (last >= 0 && objects.get(last) == null && styles.get(last).equals(style)) {
                 texts.set(last, texts.get(last) + text);
             } else {
                 texts.add(text);
                 styles.add(style);
+                objects.add(null);
             }
+            length += text.length();
+            return this;
+        }
+
+        /// Appends an inline object.
+        ///
+        /// #### Parameters
+        ///
+        /// - `object`: the object; null adds nothing
+        ///
+        /// - `style`: the style of its character
+        ///
+        /// #### Returns
+        ///
+        /// this builder
+        public Builder append(Inline object, TextStyle style) {
+            if (object == null) {
+                return this;
+            }
+            texts.add(OBJECT_STRING);
+            styles.add(style == null ? TextStyle.DEFAULT : style);
+            objects.add(object);
+            length++;
             return this;
         }
 
@@ -138,7 +202,11 @@ public final class RichText {
         /// this builder
         public Builder append(RichText text) {
             for (int i = 0; i < text.texts.length; i++) {
-                append(text.texts[i], text.styles[i]);
+                if (text.objects[i] != null) {
+                    append(text.objects[i], text.styles[i]);
+                } else {
+                    append(text.texts[i], text.styles[i]);
+                }
             }
             return this;
         }
@@ -149,11 +217,7 @@ public final class RichText {
         ///
         /// the length
         public int length() {
-            int n = 0;
-            for (String t : texts) {
-                n += t.length();
-            }
-            return n;
+            return length;
         }
 
         /// The text built so far.
@@ -166,7 +230,8 @@ public final class RichText {
                 return EMPTY;
             }
             return new RichText(texts.toArray(new String[texts.size()]),
-                    styles.toArray(new TextStyle[styles.size()]));
+                    styles.toArray(new TextStyle[styles.size()]),
+                    objects.toArray(new Inline[objects.size()]));
         }
     }
 
@@ -188,7 +253,7 @@ public final class RichText {
         return length == 0;
     }
 
-    /// The number of runs.
+    /// The number of runs, inline objects included.
     ///
     /// #### Returns
     ///
@@ -197,7 +262,7 @@ public final class RichText {
         return texts.length;
     }
 
-    /// The characters of one run.
+    /// The characters of one run; `OBJECT` for an inline object.
     ///
     /// #### Parameters
     ///
@@ -223,7 +288,54 @@ public final class RichText {
         return styles[index];
     }
 
-    /// The characters without formatting.
+    /// The inline object of one run.
+    ///
+    /// #### Parameters
+    ///
+    /// - `index`: the run, from zero
+    ///
+    /// #### Returns
+    ///
+    /// the object, or null for a text run
+    public Inline runObject(int index) {
+        return objects[index];
+    }
+
+    /// The inline object at a character offset.
+    ///
+    /// #### Parameters
+    ///
+    /// - `offset`: the character offset
+    ///
+    /// #### Returns
+    ///
+    /// the object, or null when the character is not an object
+    public Inline objectAt(int offset) {
+        int start = 0;
+        for (int i = 0; i < texts.length; i++) {
+            start += texts[i].length();
+            if (offset < start) {
+                return objects[i];
+            }
+        }
+        return null;
+    }
+
+    /// Whether the text holds any inline object.
+    ///
+    /// #### Returns
+    ///
+    /// true when it does
+    public boolean hasObjects() {
+        for (Inline o : objects) {
+            if (o != null) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// The characters without formatting. Every inline object is one `OBJECT` character.
     ///
     /// #### Returns
     ///
@@ -235,6 +347,24 @@ public final class RichText {
         StringBuilder b = new StringBuilder(length);
         for (String t : texts) {
             b.append(t);
+        }
+        return b.toString();
+    }
+
+    /// The text as a reader sees it: a field shows its result, a note reference its mark, and
+    /// other objects nothing.
+    ///
+    /// #### Returns
+    ///
+    /// the readable text
+    public String displayText() {
+        StringBuilder b = new StringBuilder(length);
+        for (int i = 0; i < texts.length; i++) {
+            if (objects[i] == null) {
+                b.append(texts[i]);
+            } else {
+                b.append(objects[i].displayText());
+            }
         }
         return b.toString();
     }
@@ -268,12 +398,16 @@ public final class RichText {
     public void visit(Visitor visitor) {
         int offset = 0;
         for (int i = 0; i < texts.length; i++) {
-            visitor.run(offset, texts[i], styles[i]);
+            if (objects[i] != null) {
+                visitor.inline(offset, objects[i], styles[i]);
+            } else {
+                visitor.run(offset, texts[i], styles[i]);
+            }
             offset += texts[i].length();
         }
     }
 
-    /// The characters in `[start, end)` with their styles.
+    /// The characters in `[start, end)` with their styles and objects.
     ///
     /// #### Parameters
     ///
@@ -295,7 +429,11 @@ public final class RichText {
             int s = Math.max(start, pos);
             int e = Math.min(end, runEnd);
             if (s < e) {
-                b.append(texts[i].substring(s - pos, e - pos), styles[i]);
+                if (objects[i] != null) {
+                    b.append(objects[i], styles[i]);
+                } else {
+                    b.append(texts[i].substring(s - pos, e - pos), styles[i]);
+                }
             }
             pos = runEnd;
         }
@@ -363,9 +501,32 @@ public final class RichText {
         Builder b = new Builder().append(substring(0, start));
         RichText middle = substring(start, end);
         for (int i = 0; i < middle.texts.length; i++) {
-            b.append(middle.texts[i], mapper.map(middle.styles[i]));
+            if (middle.objects[i] != null) {
+                b.append(middle.objects[i], mapper.map(middle.styles[i]));
+            } else {
+                b.append(middle.texts[i], mapper.map(middle.styles[i]));
+            }
         }
         return b.append(substring(end, length)).build();
+    }
+
+    /// This text with the object at `offset` replaced.
+    ///
+    /// #### Parameters
+    ///
+    /// - `offset`: the object's character
+    ///
+    /// - `object`: the replacement
+    ///
+    /// #### Returns
+    ///
+    /// the new text
+    public RichText withObject(int offset, Inline object) {
+        if (objectAt(offset) == null) {
+            throw new IllegalArgumentException("No object at " + offset);
+        }
+        return new Builder().append(substring(0, offset)).append(object, styleAt(offset))
+                .append(substring(offset + 1, length)).build();
     }
 
     /// Computes a new style from an old one, for `restyle`.
@@ -397,7 +558,7 @@ public final class RichText {
         return Collections.unmodifiableList(out);
     }
 
-    /// Two texts are equal when they have the same runs.
+    /// Two texts are equal when they have the same runs and objects.
     ///
     /// #### Parameters
     ///
@@ -422,6 +583,11 @@ public final class RichText {
             if (!texts[i].equals(r.texts[i]) || !styles[i].equals(r.styles[i])) {
                 return false;
             }
+            Inline a = objects[i];
+            Inline b = r.objects[i];
+            if (a == null ? b != null : !a.equals(b)) {
+                return false;
+            }
         }
         return true;
     }
@@ -437,6 +603,7 @@ public final class RichText {
         for (int i = 0; i < texts.length; i++) {
             h = h * 31 + texts[i].hashCode();
             h = h * 31 + styles[i].hashCode();
+            h = h * 31 + (objects[i] == null ? 0 : objects[i].hashCode());
         }
         return h;
     }
