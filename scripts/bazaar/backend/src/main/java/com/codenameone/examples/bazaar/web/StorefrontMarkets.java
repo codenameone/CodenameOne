@@ -95,6 +95,10 @@ public final class StorefrontMarkets {
         /// The market the visitor's country suggests ([GeoCountry]), offered in a
         /// banner and never applied; null when there is none.
         public LinkView suggested;
+        /// Whether the shopper picked a market (query or cookie).
+        boolean chose;
+        /// Whether a country lookup has been asked for this request.
+        boolean geoAsked;
     }
 
     /// Chooses for `path` (no query) at `store`, and records the headers.
@@ -115,7 +119,21 @@ public final class StorefrontMarkets {
         // ask the same question, and the headers are recorded once.
         Object made = ex == null ? null : ex.getAttribute(CHOICE);
         if (made instanceof Choice && store.getId().equals(((Choice) made).storeId)) {
-            return (Choice) made;
+            Choice prior = (Choice) made;
+            // An earlier caller (the page shell) may have chosen without a
+            // country lookup; the product page asks with one, so suggest now.
+            if (geo != null && !prior.geoAsked) {
+                prior.geoAsked = true;
+                if (!prior.chose && request != null
+                        && !GeoCountry.crawler(request.getHeader("User-Agent"))) {
+                    prior.suggested = suggest(markets.active(store.getId()),
+                            geo.country(request), path);
+                    if (prior.suggested != null) {
+                        ex.setAttribute(Slots.PERSONAL, "1");
+                    }
+                }
+            }
+            return prior;
         }
         Choice c = new Choice();
         c.storeId = store.getId();
@@ -134,6 +152,8 @@ public final class StorefrontMarkets {
         }
         List<MarketDto> all = markets.active(store.getId());
         boolean chose = code != null;
+        c.chose = chose;
+        c.geoAsked = geo != null;
         StringBuilder links = new StringBuilder();
         String current = c.pricer == null ? null : c.pricer.market().getCode();
         c.picker.add(new LinkView(store.getCurrency() + " (store prices)", path, current == null));
