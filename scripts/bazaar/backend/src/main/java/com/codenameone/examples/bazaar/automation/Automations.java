@@ -112,6 +112,7 @@ public class Automations {
     private final Webhooks webhooks;
     private final StoreAccess access;
     private final Emails emails;
+    private final com.codenameone.examples.bazaar.notify.ShopperLanguage language;
 
     public Automations(AutomationRepository automations, AutomationRunRepository runs,
             AuditEventRepository audits, StoreOrderRepository orders,
@@ -119,7 +120,9 @@ public class Automations {
             InventoryLevelRepository levels, DiscountRepository discounts,
             SupplierRepository suppliers, PurchaseOrderRepository purchaseOrders,
             PurchaseLineRepository purchaseLines, StoreStaffRepository staff, PushSender push,
-            PushDevices devices, Webhooks webhooks, StoreAccess access, Emails emails) {
+            PushDevices devices, Webhooks webhooks, StoreAccess access, Emails emails,
+            com.codenameone.examples.bazaar.notify.ShopperLanguage language) {
+        this.language = language;
         this.emails = emails;
         this.automations = automations;
         this.runs = runs;
@@ -392,20 +395,23 @@ public class Automations {
             customers.save(c);
             record(storeId, a.getId(), "TAG_CUSTOMER", name(c) + " tagged " + tag);
         } else if (NodeCatalog.NOTIFY_STAFF.equals(type)) {
-            notifyStaff(a, AutomationGraph.param(n, "message"), ctx);
+            notifyStaff(a, n, ctx);
         } else if (NodeCatalog.EMAIL_CUSTOMER.equals(type)) {
             String to = text(ctx.get("email"));
             Customer c = to.length() == 0 ? customer(ctx) : null;
             if (c != null) {
                 to = c.getEmail();
             }
-            String subject = AutomationGraph.param(n, "subject");
+            String l = to.length() == 0 ? null : AutomationGraph.variantLanguage(n,
+                    language.shopper(storeId, c == null ? null : c.getUsername(), to),
+                    "subject", "message");
+            String subject = AutomationGraph.param(n, "subject", l);
             String sent = "To " + to + ": " + subject;
             if (to.length() == 0) {
                 sent = "No address to write to";
             } else {
                 try {
-                    emails.custom(storeId, to, subject, AutomationGraph.param(n, "message"));
+                    emails.custom(storeId, to, subject, AutomationGraph.param(n, "message", l));
                 } catch (IOException failed) {
                     sent = "Not sent to " + to + ": " + failed.getMessage();
                 }
@@ -432,20 +438,28 @@ public class Automations {
         return Json.write(out);
     }
 
-    private void notifyStaff(Automation a, String message, Map<String, String> ctx)
+    /// Pushes the step's message to every member of staff, each in their
+    /// account's language when the merchant translated it
+    /// ([ShopperLanguage#staff]).
+    private void notifyStaff(Automation a, AutomationGraph.Node n, Map<String, String> ctx)
             throws IOException {
+        String message = AutomationGraph.param(n, "message");
         String body = message.length() == 0 ? a.getName() : message;
         StoreOrder o = ctx.get("orderId") == null ? null : orders.findById(ctx.get("orderId"));
+        String order = o == null ? "" : " (#" + o.getNumber() + ")";
         if (o != null) {
             body = body + " (order #" + o.getNumber() + ")";
         }
         List<StoreStaff> team = staff.findByStoreId(a.getStoreId());
         int reached = 0;
         for (int iter = 0; iter < team.size(); iter++) {
+            String l = message.length() == 0 ? null : AutomationGraph.variantLanguage(n,
+                    language.staff(team.get(iter).getUsername()), "message");
+            String mine = l == null ? body : AutomationGraph.param(n, "message", l) + order;
             try {
                 List<PushTarget> to = devices.targets(team.get(iter).getUsername());
                 if (!to.isEmpty()) {
-                    push.send(to, PushNotification.builder().title(a.getName()).body(body)
+                    push.send(to, PushNotification.builder().title(a.getName()).body(mine)
                             .data("kind", "automation").data("automationId", a.getId()).build(),
                             null);
                     reached++;

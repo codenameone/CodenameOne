@@ -46,8 +46,10 @@ import com.codenameone.examples.bazaar.api.SaleEventDto;
 import com.codenameone.examples.bazaar.api.SaleItemDto;
 import com.codenameone.examples.bazaar.club.Clubs;
 import com.codenameone.examples.bazaar.inventory.InventoryEndpoint;
+import com.codenameone.examples.bazaar.automation.AutomationGraph;
 import com.codenameone.examples.bazaar.journey.JourneyCatalog;
 import com.codenameone.examples.bazaar.journey.Journeys;
+import com.codenameone.examples.bazaar.market.Translations;
 import com.codenameone.examples.bazaar.loyalty.Loyalty;
 import com.codenameone.examples.bazaar.marketing.Audiences;
 import com.codenameone.examples.bazaar.marketing.Campaigns;
@@ -1123,6 +1125,8 @@ public class MarketingData {
             return v.heading;
         }
         v.heading = c.name();
+        v.links.add(link("Translate this message", "/admin/" + storeId
+                + "/translations?kind=" + Translations.CAMPAIGN + "&refId=" + id));
         v.facts.add(fact("Status", AdminData.words(c.status())));
         if (Campaigns.SCHEDULED.equals(c.status())) {
             v.facts.add(fact("Goes out", AdminData.date(c.scheduledAt())));
@@ -1228,7 +1232,21 @@ public class MarketingData {
     /// [Journeys] keeps. The graph is the JSON the app's NodeGraph editor
     /// writes: `nodes` with `id` and `data.type` (or `style`), `edges` with
     /// `from`, `fromPort` and `to`.
-    String journey(String storeId, String id, MarketingView v) throws IOException {
+    /// The languages a message can be translated into, beside the original.
+    private static final String[] MESSAGE_LANGUAGES = {"es", "fr", "de", "he", "en"};
+    private static final String[] MESSAGE_LANGUAGE_NAMES = {"Spanish", "French", "German",
+        "Hebrew", "English"};
+
+    void translateJourney(String storeId, String id, HttpServer.Request request)
+            throws IOException {
+        Map<String, String> values = new HashMap<String, String>();
+        values.put("subject", f(request, "subject"));
+        values.put("body", f(request, "body"));
+        values.put("title", f(request, "title"));
+        journeys.translate(me(), storeId, id, f(request, "node"), f(request, "lang"), values);
+    }
+
+    String journey(String storeId, String id, String lang, MarketingView v) throws IOException {
         JourneyDto j = journeys.get(me(), storeId, id);
         List<JourneyNodeStatDto> stats = journeys.stats(me(), storeId, id);
         v.back = "/admin/" + storeId + "/journeys";
@@ -1295,7 +1313,64 @@ public class MarketingData {
             }
         }
         layout(ids, types, edges, stats, v);
+        translationForms(storeId, id, lang, root, types, v);
         return j.name();
+    }
+
+    /// One form per message step: its texts in the language picked
+    /// (`?lang=`, Spanish by default), sent to a customer who reads that
+    /// language. A step translated only in part goes out in the original.
+    private void translationForms(String storeId, String id, String lang, Map root,
+            Map<String, String> types, MarketingView v) {
+        String chosen = "es";
+        for (int iter = 0; iter < MESSAGE_LANGUAGES.length; iter++) {
+            if (MESSAGE_LANGUAGES[iter].equals(lang)) {
+                chosen = lang;
+            }
+        }
+        String base = "/admin/" + storeId + "/journeys/" + id;
+        Object nl = root.get("nodes");
+        boolean any = false;
+        for (int iter = 0; nl instanceof List && iter < ((List) nl).size(); iter++) {
+            if (!(((List) nl).get(iter) instanceof Map)) {
+                continue;
+            }
+            Map n = (Map) ((List) nl).get(iter);
+            String nid = text(n.get("id"));
+            String[] texts = Journeys.translatable(types.get(nid));
+            if (texts.length == 0) {
+                continue;
+            }
+            any = true;
+            Map data = n.get("data") instanceof Map ? (Map) n.get("data") : new HashMap();
+            NodeTypeDto t = JourneyCatalog.find(types.get(nid));
+            FormView form = new FormView("translate-" + nid, "Translate: "
+                    + (t == null ? types.get(nid) : t.label()), base + "/translate",
+                    "Save translation");
+            form.text = "The original: " + cut(text(data.get(texts[texts.length - 1])));
+            form.add("node", "", "hidden", nid);
+            form.add("lang", "", "hidden", chosen);
+            for (int f = 0; f < texts.length; f++) {
+                form.add(texts[f], words(texts[f]) + " (" + chosen + ")",
+                        "body".equals(texts[f]) ? "textarea" : "text",
+                        text(data.get(texts[f] + AutomationGraph.VARIANT + chosen)));
+            }
+            v.forms.add(form);
+        }
+        if (any) {
+            for (int iter = 0; iter < MESSAGE_LANGUAGES.length; iter++) {
+                v.links.add(link("Translate into " + MESSAGE_LANGUAGE_NAMES[iter],
+                        base + "?lang=" + MESSAGE_LANGUAGES[iter]));
+            }
+        }
+    }
+
+    private static String words(String param) {
+        return "subject".equals(param) ? "Subject" : "title".equals(param) ? "Title" : "Message";
+    }
+
+    private static String cut(String s) {
+        return s.length() > 120 ? s.substring(0, 119) + "..." : s;
     }
 
     private static void layout(List<String> ids, Map<String, String> types, List<String[]> edges,

@@ -138,6 +138,34 @@ public final class AutomationGraph {
     /// The node's parameter `name`: an entry of its `data` (or of
     /// `data.params`), else the value of its input port of that name, else
     /// the catalog's default, else "".
+    /// What joins a parameter's name to a language in a message step's
+    /// translation: `body@es` is the merchant's Spanish text of `body`. The
+    /// translations travel inside the node, saved with the graph and gone
+    /// with the step.
+    public static final String VARIANT = "@";
+
+    /// The language a message step goes out in to a reader of `lang`: `lang`
+    /// when the merchant translated every one of `needed` into it, else null,
+    /// meaning the original. Whole or nothing, so a reader never gets a
+    /// translated body under an untranslated subject.
+    public static String variantLanguage(Node node, String lang, String... needed) {
+        if (lang == null || lang.length() == 0) {
+            return null;
+        }
+        for (int iter = 0; iter < needed.length; iter++) {
+            if (param(node, needed[iter] + VARIANT + lang).length() == 0) {
+                return null;
+            }
+        }
+        return lang;
+    }
+
+    /// `name` in `lang` (an answer of [#variantLanguage]), or the original
+    /// when `lang` is null.
+    public static String param(Node node, String name, String lang) {
+        return lang == null ? param(node, name) : param(node, name + VARIANT + lang);
+    }
+
     public static String param(Node node, String name) {
         Object v = node.data.get(name);
         if (v == null && node.data.get("params") instanceof Map) {

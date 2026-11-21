@@ -124,6 +124,14 @@ public class ShopperLanguage {
         return store(storeId);
     }
 
+    /// The language of mail to a member of a store's staff: the one their
+    /// account is set to ([Profile#getLanguage]), else English -- the staff's
+    /// working language in this sample, never the store's market.
+    public String staff(String username) {
+        Profile p = username == null || username.length() == 0 ? null : profiles.findById(username);
+        return p != null && StoreText.supported(p.getLanguage()) ? p.getLanguage() : "en";
+    }
+
     /// The store's own language: that of its first market with text for it,
     /// else English.
     public String store(String storeId) {

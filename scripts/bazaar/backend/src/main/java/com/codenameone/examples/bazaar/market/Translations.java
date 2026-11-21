@@ -63,6 +63,11 @@ public class Translations {
     /// A metaobject entry's title: what a shopper reads as the value of a
     /// reference metafield.
     public static final String METAOBJECT_ENTRY = "METAOBJECT_ENTRY";
+    /// A marketing campaign's message: its subject (and A/B subject) and
+    /// body, sent to each subscriber in their language
+    /// (`marketing.Campaigns`). A message, not storefront text, so it never
+    /// decides the language a storefront is shown in ([#pick]).
+    public static final String CAMPAIGN = "CAMPAIGN";
     /// The translatable fields of each kind.
     static final String[][] FIELDS = {
         {PRODUCT, "title", "description", "seoTitle", "seoDescription"},
@@ -74,7 +79,10 @@ public class Translations {
         {METAFIELD, "name"},
         {METAOBJECT_TYPE, "name"},
         {METAOBJECT_ENTRY, "title"},
+        {CAMPAIGN, "subjectA", "subjectB", "body"},
     };
+    /// The longest translated campaign subject, as the original's.
+    static final int MAX_SUBJECT = 160;
     /// The pages a store has: the privacy and cookie policy.
     public static final String[] PAGES = {"privacy"};
     static final int MAX_BODY = 20000;
@@ -114,7 +122,7 @@ public class Translations {
             }
         }
         throw new ResponseStatusException(400, "Translations are of a PRODUCT, COLLECTION, PAGE, CONTENT, POST, "
-                + "MENU_LINK, METAFIELD, METAOBJECT_TYPE or METAOBJECT_ENTRY");
+                + "MENU_LINK, METAFIELD, METAOBJECT_TYPE, METAOBJECT_ENTRY or CAMPAIGN");
     }
 
     /// Every translation of one thing, for the editor.
@@ -170,6 +178,11 @@ public class Translations {
             // carry what the original could not.
             value = com.codenameone.examples.bazaar.content.RichText.sanitize(value).trim();
         }
+        if (CAMPAIGN.equals(in.kind()) && in.field().startsWith("subject")
+                && value.length() > MAX_SUBJECT) {
+            throw new ResponseStatusException(400, "A subject is at most " + MAX_SUBJECT
+                    + " characters");
+        }
         if (value.length() > MAX_BODY) {
             throw new ResponseStatusException(400, "A translation is at most " + MAX_BODY
                     + " characters");
@@ -224,6 +237,15 @@ public class Translations {
             out.put("title", b.getTitle());
             out.put("excerpt", b.getExcerpt());
             out.put("body", b.getBody());
+        } else if (CAMPAIGN.equals(kind)) {
+            Map row = db.queryOne("SELECT subject_a, subject_b, body FROM campaign WHERE id = ?",
+                    new Object[] {refId});
+            out.put("subjectA", row == null ? "" : com.codenameone.examples.bazaar.Rows.text(
+                    row.get("subject_a")));
+            out.put("subjectB", row == null ? "" : com.codenameone.examples.bazaar.Rows.text(
+                    row.get("subject_b")));
+            out.put("body", row == null ? "" : com.codenameone.examples.bazaar.Rows.text(
+                    row.get("body")));
         } else if (NAMED.containsKey(kind)) {
             String[] t = NAMED.get(kind);
             Map row = db.queryOne("SELECT " + t[1] + " AS v FROM " + t[0] + " WHERE id = ?",
@@ -313,6 +335,11 @@ public class Translations {
             com.codenameone.examples.bazaar.domain.BlogPost b =
                     refId.length() > 32 ? null : posts.findById(refId);
             ok = b != null && storeId.equals(b.getStoreId());
+        } else if (CAMPAIGN.equals(kind)) {
+            Map row = refId.length() > 32 ? null : db.queryOne(
+                    "SELECT store_id FROM campaign WHERE id = ?", new Object[] {refId});
+            ok = row != null && storeId.equals(com.codenameone.examples.bazaar.Rows.text(
+                    row.get("store_id")));
         } else if (NAMED.containsKey(kind)) {
             Map row = refId.length() > 32 ? null : db.queryOne("SELECT store_id FROM "
                     + NAMED.get(kind)[0] + " WHERE id = ?", new Object[] {refId});
@@ -355,6 +382,22 @@ public class Translations {
         return out;
     }
 
+    /// The translated fields of a message for `locale` when every one of
+    /// `needed` is translated, else null: the caller then sends the whole
+    /// original rather than a translated body under an untranslated subject.
+    @Transactional(readOnly = true)
+    public Map<String, String> complete(String storeId, String kind, String refId, String locale,
+            String... needed) throws IOException {
+        Map<String, String> got = fields(storeId, kind, refId, locale);
+        for (int iter = 0; iter < needed.length; iter++) {
+            String v = got.get(needed[iter]);
+            if (v == null || v.trim().length() == 0) {
+                return null;
+            }
+        }
+        return got;
+    }
+
     /// The first of `wanted` (best first) that the store has translations
     /// in, exactly or by language; null when none.
     @Transactional(readOnly = true)
@@ -368,7 +411,7 @@ public class Translations {
         }
         List<String> have = new ArrayList<String>();
         for (int iter = 0; iter < rs.size(); iter++) {
-            if (!have.contains(rs.get(iter).getLocale())) {
+            if (!CAMPAIGN.equals(rs.get(iter).getKind()) && !have.contains(rs.get(iter).getLocale())) {
                 have.add(rs.get(iter).getLocale());
             }
         }

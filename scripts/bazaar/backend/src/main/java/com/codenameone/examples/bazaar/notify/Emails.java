@@ -359,21 +359,34 @@ public class Emails {
     }
 
     /// A variant fell to its reorder point: told to the store's owners and
-    /// managers, and to the store's own address. Staff mail, so English.
+    /// managers, and to the store's own address. Each member reads it in
+    /// their account's language ([ShopperLanguage#staff]); the store's
+    /// address, which is nobody's account, in English. One mail per
+    /// language, so a failure to send one does not stop the others.
     public void lowStock(String storeId, String sku, int available, int reorderPoint) {
+        List<Mail> ms;
         try {
-            send(lowStockMail(storeId, sku, available, reorderPoint));
+            ms = lowStockMails(storeId, sku, available, reorderPoint);
         } catch (IOException | RuntimeException failed) {
             log("low stock alert", sku, failed);
+            return;
+        }
+        for (int iter = 0; iter < ms.size(); iter++) {
+            try {
+                send(ms.get(iter));
+            } catch (IOException | RuntimeException failed) {
+                log("low stock alert", sku, failed);
+            }
         }
     }
 
     @Transactional(readOnly = true)
-    private Mail lowStockMail(String storeId, String sku, int available, int reorderPoint)
+    private List<Mail> lowStockMails(String storeId, String sku, int available, int reorderPoint)
             throws IOException {
+        List<Mail> out = new ArrayList<Mail>();
         Store s = stores.findById(storeId);
         if (s == null) {
-            return null;
+            return out;
         }
         List<String> to = new ArrayList<String>();
         List<StoreStaff> team = staff.findByStoreId(storeId);
@@ -387,20 +400,47 @@ public class Emails {
         if (Mail.isAddress(s.getEmail()) && !to.contains(s.getEmail())) {
             to.add(s.getEmail());
         }
-        if (to.isEmpty()) {
-            return null;
+        // Group the addresses by language, keeping the order they came in.
+        List<String> langs = new ArrayList<String>();
+        List<List<String>> groups = new ArrayList<List<String>>();
+        for (int iter = 0; iter < to.size(); iter++) {
+            String address = to.get(iter);
+            boolean member = !address.equals(s.getEmail()) || isStaff(team, address);
+            String lang = member ? language.staff(address) : "en";
+            int at = langs.indexOf(lang);
+            if (at < 0) {
+                langs.add(lang);
+                groups.add(new ArrayList<String>());
+                at = langs.size() - 1;
+            }
+            groups.get(at).add(address);
         }
-        Body b = new Body(s, "en", null);
-        b.heading("Running low: " + sku);
-        b.para(sku + " is down to " + available + " (reorder point " + reorderPoint + ").");
-        b.button("Open inventory", urls.absolute(null, "/app/"));
-        return builder(s, to.toArray(new String[to.size()]), "Low stock: " + sku, b).build();
+        for (int iter = 0; iter < langs.size(); iter++) {
+            Body b = new Body(s, langs.get(iter), null);
+            b.heading(b.f("mail.low.heading", sku));
+            b.para(b.f("mail.low.body", sku, available, reorderPoint));
+            b.button(b.f("mail.low.button"), urls.absolute(null, "/app/"));
+            List<String> group = groups.get(iter);
+            out.add(builder(s, group.toArray(new String[group.size()]),
+                    b.f("mail.low.subject", sku), b).build());
+        }
+        return out;
     }
 
-    /// The automation action `email.customer`: the merchant's own subject and
-    /// message, in the store's frame. The merchant wrote the message in one
-    /// language and it goes out as written; only the frame around it (the
-    /// default subject, the button) follows the shopper's language.
+    private static boolean isStaff(List<StoreStaff> team, String address) {
+        for (int iter = 0; iter < team.size(); iter++) {
+            if (address.equals(team.get(iter).getUsername())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// The automation action `email.customer` and a journey's e-mail step:
+    /// the merchant's own subject and message, in the store's frame. The
+    /// caller has already picked the merchant's translation for the
+    /// shopper's language, if there is one; the frame around it (the default
+    /// subject, the button) follows the shopper's language.
     public void custom(String storeId, String to, String subject, String message)
             throws IOException {
         Mail m = customMail(storeId, to, subject, message);
@@ -459,9 +499,9 @@ public class Emails {
     /// links, an open pixel and the unsubscribe link (also as a
     /// `List-Unsubscribe` header). `links` holds label and URL pairs.
     ///
-    /// A campaign has one subject and body (two subjects when it is split
-    /// tested), written by the merchant in one language, so the text goes out
-    /// as written; the frame (the unsubscribe link, the page direction)
+    /// The subject and body are the merchant's translation for the
+    /// subscriber's language when there is one (`Campaigns.variant`), else
+    /// the original; the frame (the unsubscribe link, the page direction)
     /// follows the subscriber's language.
     public boolean campaign(String storeId, String to, String subject, String message,
             List<String[]> links, String pixelUrl, String unsubscribeUrl) throws IOException {

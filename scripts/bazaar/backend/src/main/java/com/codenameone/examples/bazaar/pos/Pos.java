@@ -117,6 +117,7 @@ public class Pos {
     private final PasswordEncoder encoder;
     private final SmsSender sms;
     private final Emails emails;
+    private final com.codenameone.examples.bazaar.notify.ShopperLanguage language;
 
     public Pos(StoreAccess access, StoreRepository stores, RegisterRepository registers,
             ShiftRepository shifts, CashMoveRepository cashMoves, StoreStaffRepository staff,
@@ -124,7 +125,9 @@ public class Pos {
             InventoryLevelRepository levels, TaxRateRepository taxes,
             DiscountRepository discounts, CustomerRepository customers,
             StoreOrderRepository orderRows, Orders orders, Documents documents,
-            PasswordEncoder encoder, SmsSender sms, Emails emails) {
+            PasswordEncoder encoder, SmsSender sms, Emails emails,
+            com.codenameone.examples.bazaar.notify.ShopperLanguage language) {
+        this.language = language;
         this.emails = emails;
         this.access = access;
         this.stores = stores;
@@ -669,7 +672,10 @@ public class Pos {
         PosReceiptDto r = receiptOf(storeId, orderId, false, false);
         boolean texted = false;
         if (!empty(to.phone())) {
-            sms.send(to.phone().trim(), r.text());
+            // The till shows the receipt in English (the staff's working
+            // text); the shopper's copy is in the shopper's language.
+            sms.send(to.phone().trim(), documents.receiptText(storeId, orderId,
+                    language.of(orderRows.findById(orderId))));
             texted = true;
             orders.event(orderId, "RECEIPT_TEXTED", "Receipt texted", username);
         }

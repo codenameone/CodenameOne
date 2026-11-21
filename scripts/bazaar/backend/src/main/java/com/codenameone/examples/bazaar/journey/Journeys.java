@@ -90,11 +90,14 @@ public class Journeys {
     private final PushSender push;
     private final PushDevices devices;
     private final StoreAccess access;
+    private final com.codenameone.examples.bazaar.notify.ShopperLanguage language;
 
     public Journeys(JourneyRepository journeys, JourneyEnrollmentRepository enrollments,
             JourneyNodeStatRepository stats, CustomerRepository customers, StoreOrderRepository orders,
             Audiences audiences, Campaigns campaigns, Loyalty loyalty, Emails emails, SmsSender sms,
-            PushSender push, PushDevices devices, StoreAccess access) {
+            PushSender push, PushDevices devices, StoreAccess access,
+            com.codenameone.examples.bazaar.notify.ShopperLanguage language) {
+        this.language = language;
         this.journeys = journeys;
         this.enrollments = enrollments;
         this.stats = stats;
@@ -151,6 +154,79 @@ public class Journeys {
     public JourneyDto save(String username, String storeId, String id, JourneyDto in) throws IOException {
         access.requireStaff(username, storeId, StoreAccess.MANAGERS);
         return write(storeId, id, in);
+    }
+
+    /// The texts of each message step that a merchant can translate.
+    public static String[] translatable(String type) {
+        if (JourneyCatalog.SEND_EMAIL.equals(type)) {
+            return new String[] {"subject", "body"};
+        }
+        if (JourneyCatalog.SEND_SMS.equals(type)) {
+            return new String[] {"body"};
+        }
+        if (JourneyCatalog.SEND_PUSH.equals(type)) {
+            return new String[] {"title", "body"};
+        }
+        return new String[0];
+    }
+
+    /// Writes the translation of one message step into `lang`
+    /// (`subject@es`, `body@es`: [AutomationGraph#VARIANT]), for an editor
+    /// that is not the graph itself -- the back office. `values` holds the
+    /// step's texts by name; an empty one removes that text's translation.
+    @Transactional(rollbackFor = IOException.class)
+    public JourneyDto translate(String username, String storeId, String id, String nodeId,
+            String lang, java.util.Map<String, String> values) throws IOException {
+        access.requireStaff(username, storeId, StoreAccess.MANAGERS);
+        Journey j = journey(storeId, id);
+        if (!com.codenameone.examples.bazaar.web.StoreText.supported(lang)) {
+            throw new ResponseStatusException(400, "Pick a language to translate into");
+        }
+        java.util.Map root;
+        try {
+            root = com.codename1.backend.Json.parseObject(j.getGraphJson());
+        } catch (IOException | RuntimeException unreadable) {
+            root = null;
+        }
+        java.util.Map node = null;
+        Object nl = root == null ? null : root.get("nodes");
+        for (int iter = 0; nl instanceof List && iter < ((List) nl).size(); iter++) {
+            Object n = ((List) nl).get(iter);
+            if (n instanceof java.util.Map && nodeId != null
+                    && nodeId.equals(String.valueOf(((java.util.Map) n).get("id")))) {
+                node = (java.util.Map) n;
+            }
+        }
+        if (node == null) {
+            throw new ResponseStatusException(404, "No such step");
+        }
+        AutomationGraph.Node parsed = null;
+        List<AutomationGraph.Node> all = AutomationGraph.parse(j.getGraphJson()).nodes();
+        for (int iter = 0; iter < all.size(); iter++) {
+            if (nodeId.equals(all.get(iter).id)) {
+                parsed = all.get(iter);
+            }
+        }
+        String[] texts = translatable(parsed == null ? "" : parsed.type);
+        if (texts.length == 0) {
+            throw new ResponseStatusException(400, "Only a message step is translated");
+        }
+        java.util.Map data = node.get("data") instanceof java.util.Map
+                ? (java.util.Map) node.get("data") : new java.util.HashMap();
+        node.put("data", data);
+        for (int iter = 0; iter < texts.length; iter++) {
+            String v = values == null || values.get(texts[iter]) == null ? ""
+                    : values.get(texts[iter]).trim();
+            String key = texts[iter] + AutomationGraph.VARIANT + lang;
+            if (v.length() == 0) {
+                data.remove(key);
+            } else {
+                data.put(key, Codes.cut(v, 2000));
+            }
+        }
+        JourneyDto now = dto(j);
+        return write(storeId, id, new JourneyDto(now.id(), now.name(),
+                com.codename1.backend.Json.write(root), now.status(), now.createdAt(), null));
     }
 
     /// Creates or edits a journey. A draft may be saved half drawn; going
@@ -505,6 +581,11 @@ public class Journeys {
         return steps;
     }
 
+    /// The language `c` reads a journey's message in ([ShopperLanguage]).
+    private String readerOf(String storeId, Customer c) {
+        return language.shopper(storeId, c.getUsername(), c.getEmail());
+    }
+
     /// Runs one step; answers the branch to follow (null for the only one).
     String act(Journey j, JourneyEnrollment e, AutomationGraph.Node n, Customer c) throws IOException {
         String t = n.type;
@@ -523,20 +604,26 @@ public class Journeys {
             if (JourneyCatalog.SEND_EMAIL.equals(t)) {
                 if (c.getEmail().indexOf('@') > 0 && c.isAcceptsMarketing()
                         && campaigns.consented(storeId, c.getEmail(), Campaigns.EMAIL)) {
-                    emails.custom(storeId, c.getEmail(), AutomationGraph.param(n, "subject"),
-                            AutomationGraph.param(n, "body"));
+                    String l = AutomationGraph.variantLanguage(n, readerOf(storeId, c), "subject",
+                            "body");
+                    emails.custom(storeId, c.getEmail(), AutomationGraph.param(n, "subject", l),
+                            AutomationGraph.param(n, "body", l));
                 }
             } else if (JourneyCatalog.SEND_SMS.equals(t)) {
                 if (c.getPhone().length() > 0 && sms.delivers()
                         && campaigns.consented(storeId, c.getPhone(), Campaigns.SMS)) {
-                    sms.send(c.getPhone(), AutomationGraph.param(n, "body"));
+                    String l = AutomationGraph.variantLanguage(n, readerOf(storeId, c), "body");
+                    sms.send(c.getPhone(), AutomationGraph.param(n, "body", l));
                 }
             } else if (JourneyCatalog.SEND_PUSH.equals(t)) {
                 List<PushTarget> to = c.getUsername().length() == 0 ? new ArrayList<PushTarget>()
                         : devices.targets(c.getUsername());
                 if (!to.isEmpty()) {
-                    push.send(to, PushNotification.builder().title(value(n, "title", j.getName()))
-                            .body(AutomationGraph.param(n, "body")).data("kind", "journey")
+                    String l = AutomationGraph.variantLanguage(n, readerOf(storeId, c), "body");
+                    String title = l == null ? "" : AutomationGraph.param(n, "title", l);
+                    push.send(to, PushNotification.builder().title(title.length() > 0 ? title
+                            : value(n, "title", j.getName()))
+                            .body(AutomationGraph.param(n, "body", l)).data("kind", "journey")
                             .data("journeyId", j.getId()).build(), null);
                 }
             }

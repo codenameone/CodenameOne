@@ -482,7 +482,17 @@ public class MarketingPages {
             @PathVariable("id") String id, Model model, HttpServer.Request request)
             throws Exception {
         MarketingView v = view("journey");
-        String title = marketing.journey(storeId, id, v);
+        String title = marketing.journey(storeId, id, AdminForms.field(request, "lang"), v);
         return render(model, request, storeId, title, v, null);
+    }
+
+    /// Saves one message step's translation into a language.
+    @PostMapping("/admin/{storeId}/journeys/{id}/translate")
+    public String translateJourney(@PathVariable("storeId") String storeId,
+            @PathVariable("id") String id, HttpServer.Request request) throws Exception {
+        member(request, storeId);
+        return change(request, base(storeId) + "/journeys/" + id + "?lang="
+                + java.net.URLEncoder.encode(AdminForms.field(request, "lang"), "UTF-8"),
+                "Translation saved", () -> marketing.translateJourney(storeId, id, request));
     }
 }

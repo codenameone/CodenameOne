@@ -59,11 +59,13 @@ import com.codenameone.examples.bazaar.repository.StoreRepository;
 import com.codenameone.examples.bazaar.repository.SupplierRepository;
 import com.codenameone.examples.bazaar.repository.TenderRepository;
 import com.codenameone.examples.bazaar.repository.VariantRepository;
+import com.codenameone.examples.bazaar.web.StoreText;
 
 import java.io.IOException;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 /// The printable documents, made on the server with `com.codename1.pdf` --
 /// the same classes an app uses on the device -- and answered as PDF bytes:
@@ -543,6 +545,15 @@ public class Documents {
     /// the lines, the totals, how it was paid and the change.
     @Transactional(readOnly = true)
     public List<String[]> receiptRows(String storeId, String orderId) throws IOException {
+        return receiptRows(storeId, orderId, "en");
+    }
+
+    /// The receipt rows with their words in `lang` ([StoreText#LANGUAGES]),
+    /// for a receipt that goes to the shopper rather than onto the till.
+    @Transactional(readOnly = true)
+    public List<String[]> receiptRows(String storeId, String orderId, String lang)
+            throws IOException {
+        Map<String, String> words = StoreText.table(StoreText.supported(lang) ? lang : "en");
         StoreOrder o = order(storeId, orderId);
         Store s = stores.findById(storeId);
         String cur = o.getCurrency();
@@ -556,9 +567,9 @@ public class Documents {
             rows.add(new String[] {"=" + at.getName(), ""});
         }
         rows.add(new String[] {"-", ""});
-        rows.add(new String[] {"Order #" + o.getNumber(), Sheet.dateTime(millis(o.getCreatedAt()))});
+        rows.add(new String[] {fmt(words, "receipt.order", o.getNumber()), Sheet.dateTime(millis(o.getCreatedAt()))});
         if (o.getStaffUsername().length() > 0) {
-            rows.add(new String[] {"Served by " + o.getStaffUsername(), ""});
+            rows.add(new String[] {fmt(words, "receipt.servedBy", o.getStaffUsername()), ""});
         }
         rows.add(new String[] {"-", ""});
         List<OrderLine> ls = lines.findByOrderId(orderId);
@@ -570,31 +581,31 @@ public class Documents {
                     cur), ""});
             }
             if (l.getDiscountCents() > 0) {
-                rows.add(new String[] {"  Discount", Sheet.money(-l.getDiscountCents(), cur)});
+                rows.add(new String[] {"  " + fmt(words, "discount"), Sheet.money(-l.getDiscountCents(), cur)});
             }
             if (l.getRefundedQty() > 0) {
-                rows.add(new String[] {"  Returned " + l.getRefundedQty(), ""});
+                rows.add(new String[] {"  " + fmt(words, "receipt.returned", l.getRefundedQty()), ""});
             }
         }
         rows.add(new String[] {"-", ""});
-        rows.add(new String[] {"Subtotal", Sheet.money(o.getSubtotalCents(), cur)});
+        rows.add(new String[] {fmt(words, "subtotal"), Sheet.money(o.getSubtotalCents(), cur)});
         if (o.getDiscountCents() > 0) {
-            rows.add(new String[] {"Discounts", Sheet.money(-o.getDiscountCents(), cur)});
+            rows.add(new String[] {fmt(words, "receipt.discounts"), Sheet.money(-o.getDiscountCents(), cur)});
         }
         if (o.getShippingCents() > 0) {
-            rows.add(new String[] {"Shipping", Sheet.money(o.getShippingCents(), cur)});
+            rows.add(new String[] {fmt(words, "shipping"), Sheet.money(o.getShippingCents(), cur)});
         }
-        rows.add(new String[] {s.isTaxInclusive() ? "Tax included" : "Tax",
+        rows.add(new String[] {s.isTaxInclusive() ? fmt(words, "tax.included") : fmt(words, "tax"),
             Sheet.money(o.getTaxCents(), cur)});
-        rows.add(new String[] {"*TOTAL", Sheet.money(o.getTotalCents(), cur)});
+        rows.add(new String[] {"*" + fmt(words, "receipt.total"), Sheet.money(o.getTotalCents(), cur)});
         List<Tender> ts = tenders.findByOrderId(orderId);
         long change = 0;
         for (int iter = 0; iter < ts.size(); iter++) {
             Tender t = ts.get(iter);
             String kind = t.getKind();
-            String label = "CASH".equals(kind) ? "Cash" : "CARD".equals(kind) ? "Card"
-                    : "GIFT_CARD".equals(kind) ? "Gift card" : "STORE_CREDIT".equals(kind)
-                    ? "Store credit" : kind;
+            String label = "CASH".equals(kind) ? fmt(words, "receipt.cash") : "CARD".equals(kind)
+                    ? fmt(words, "receipt.card") : "GIFT_CARD".equals(kind) ? fmt(words, "receipt.giftCard")
+                    : "STORE_CREDIT".equals(kind) ? fmt(words, "receipt.storeCredit") : kind;
             if (t.getReference().length() > 0 && "GIFT_CARD".equals(kind)) {
                 label += " ..." + t.getReference();
             }
@@ -602,25 +613,35 @@ public class Documents {
             change += t.getChangeCents();
         }
         if (change > 0) {
-            rows.add(new String[] {"Change", Sheet.money(change, cur)});
+            rows.add(new String[] {fmt(words, "receipt.change"), Sheet.money(change, cur)});
         }
         if (o.getRefundedCents() > 0) {
-            rows.add(new String[] {"Refunded", Sheet.money(-o.getRefundedCents(), cur)});
+            rows.add(new String[] {fmt(words, "receipt.refunded"), Sheet.money(-o.getRefundedCents(), cur)});
         }
         rows.add(new String[] {"-", ""});
-        rows.add(new String[] {"=Thank you for shopping with us", ""});
+        rows.add(new String[] {"=" + fmt(words, "receipt.thanks"), ""});
         return rows;
     }
 
     /// The receipt as plain text, [#ROLL_COLUMNS] wide, for a text message
     /// or an e-mail body.
     public String receiptText(String storeId, String orderId) throws IOException {
-        List<String[]> rows = receiptRows(storeId, orderId);
+        return receiptText(storeId, orderId, "en");
+    }
+
+    /// [#receiptText] with its words in `lang`: the receipt texted to a
+    /// shopper, in the shopper's language.
+    public String receiptText(String storeId, String orderId, String lang) throws IOException {
+        List<String[]> rows = receiptRows(storeId, orderId, lang);
         StringBuilder out = new StringBuilder();
         for (int iter = 0; iter < rows.size(); iter++) {
             out.append(textRow(rows.get(iter))).append('\n');
         }
         return out.toString();
+    }
+
+    private static String fmt(Map<String, String> t, String key, Object... args) {
+        return StoreText.format(t, key, args);
     }
 
     private static String textRow(String[] row) {

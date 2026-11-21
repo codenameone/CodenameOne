@@ -48,7 +48,9 @@ import com.codenameone.examples.bazaar.web.SiteUrls;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /// E-mail and SMS campaigns to a segment.
 ///
@@ -101,12 +103,18 @@ public class Campaigns {
     private final StoreAccess access;
 
     private final CustomerRepository customers;
+    private final com.codenameone.examples.bazaar.market.Translations translations;
+    private final com.codenameone.examples.bazaar.notify.ShopperLanguage language;
 
     public Campaigns(CampaignRepository campaigns, CampaignSendRepository sends,
             CampaignLinkRepository links, MarketingKeyRepository keys,
             MarketingConsentRepository consents, StoreOrderRepository orders, Audiences audiences,
             Emails emails, SmsSender sms, SiteUrls urls, StoreAccess access,
-            CustomerRepository customers) {
+            CustomerRepository customers,
+            com.codenameone.examples.bazaar.market.Translations translations,
+            com.codenameone.examples.bazaar.notify.ShopperLanguage language) {
+        this.translations = translations;
+        this.language = language;
         this.customers = customers;
         this.campaigns = campaigns;
         this.sends = sends;
@@ -473,6 +481,7 @@ public class Campaigns {
         String secret = secret(c.getStoreId());
         List<CampaignLink> ls = links.findByCampaignIdOrderByPositionAsc(c.getId());
         int sent = 0;
+        Map<String, Map<String, String>> variants = new HashMap<String, Map<String, String>>();
         for (int iter = 0; iter < queued.size() && iter < BATCH; iter++) {
             CampaignSend s = queued.get(iter);
             if (sends.move(s.getId(), QUEUED, SENDING, now) != 1) {
@@ -480,7 +489,7 @@ public class Campaigns {
             }
             String status;
             try {
-                status = deliver(c, s, ls, secret) ? SENT : SKIPPED;
+                status = deliver(c, s, ls, secret, variants) ? SENT : SKIPPED;
             } catch (IOException | RuntimeException failed) {
                 status = FAILED;
             }
@@ -492,8 +501,38 @@ public class Campaigns {
         return sent;
     }
 
-    boolean deliver(Campaign c, CampaignSend s, List<CampaignLink> ls, String secret)
-            throws IOException {
+    /// The language a subscriber reads: by address for e-mail, by the
+    /// customer with that phone number for SMS ([ShopperLanguage#shopper]).
+    String languageOf(Campaign c, CampaignSend s) {
+        if (SMS.equals(c.getChannel())) {
+            List<Customer> found = customers.findByStoreIdAndPhone(c.getStoreId(), s.getAddress());
+            Customer k = found == null || found.isEmpty() ? null : found.get(0);
+            return k == null ? language.store(c.getStoreId())
+                    : language.shopper(c.getStoreId(), k.getUsername(), k.getEmail());
+        }
+        return language.shopper(c.getStoreId(), null, s.getAddress());
+    }
+
+    /// The merchant's translation of the message for `lang` and the
+    /// subject variant `ab` ("A" or "B"), or null for the original. Only a
+    /// whole translation is used -- body and, for e-mail, that subject -- so
+    /// a subscriber never gets a translated body under an untranslated
+    /// subject. Looked up once per batch and language.
+    Map<String, String> variant(Campaign c, String lang, String ab,
+            Map<String, Map<String, String>> cache) throws IOException {
+        String key = lang + "/" + ab;
+        if (!cache.containsKey(key)) {
+            String[] needed = SMS.equals(c.getChannel()) ? new String[] {"body"}
+                    : new String[] {"body", "B".equals(ab) ? "subjectB" : "subjectA"};
+            cache.put(key, translations.complete(c.getStoreId(),
+                    com.codenameone.examples.bazaar.market.Translations.CAMPAIGN, c.getId(), lang,
+                    needed));
+        }
+        return cache.get(key);
+    }
+
+    boolean deliver(Campaign c, CampaignSend s, List<CampaignLink> ls, String secret,
+            Map<String, Map<String, String>> variants) throws IOException {
         // Consent is asked again at the last moment: an unsubscribe can
         // arrive between the rows being written and the batch going out.
         if (!consented(c.getStoreId(), s.getAddress(), c.getChannel())) {
@@ -501,11 +540,14 @@ public class Campaigns {
         }
         String unsubscribe = urls.absolute(null, "/api/shop/m/u/" + s.getToken() + "?s="
                 + Tokens.sign(secret, "u:" + s.getToken()));
+        boolean b = "B".equals(s.getVariant());
+        Map<String, String> tr = variant(c, languageOf(c, s), b ? "B" : "A", variants);
+        String body = tr == null ? c.getBody() : tr.get("body");
         if (SMS.equals(c.getChannel())) {
             if (!sms.delivers()) {
                 return false;
             }
-            sms.send(s.getAddress(), c.getBody() + " Stop: " + unsubscribe);
+            sms.send(s.getAddress(), body + " Stop: " + unsubscribe);
             return true;
         }
         List<String[]> tracked = new ArrayList<String[]>();
@@ -513,8 +555,9 @@ public class Campaigns {
             tracked.add(new String[] {iter == 0 ? "Shop now" : "Read more",
                     urls.absolute(null, "/api/shop/m/c/" + s.getToken() + "/" + ls.get(iter).getPosition())});
         }
-        String subject = "B".equals(s.getVariant()) ? c.getSubjectB() : c.getSubjectA();
-        return emails.campaign(c.getStoreId(), s.getAddress(), subject, c.getBody(), tracked,
+        String subject = tr != null ? tr.get(b ? "subjectB" : "subjectA")
+                : b ? c.getSubjectB() : c.getSubjectA();
+        return emails.campaign(c.getStoreId(), s.getAddress(), subject, body, tracked,
                 urls.absolute(null, "/api/shop/m/o/" + s.getToken() + ".gif"), unsubscribe);
     }
 
