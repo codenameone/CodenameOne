@@ -31,7 +31,7 @@ import java.util.List;
 /// - [ReplayDriver]: a finished match's log, at any speed, seekable.
 ///
 /// All three run the same [Match] -- the class the server runs -- which is why
-/// a unit changed in the rules module is changed in every one of them.
+/// a unit changed in the shared simulation code is changed in every one of them.
 // tag::skirmish-driver[]
 public abstract class Driver {
     protected Match match;

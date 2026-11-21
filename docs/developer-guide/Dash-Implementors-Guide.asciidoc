@@ -144,7 +144,7 @@ that starts as a side-scroller and becomes a 3D runner:
 
 [source,java,role=cn1-no-try]
 ----
-include::../../scripts/dash/rules/src/main/java/com/codenameone/examples/dash/rules/Content.java[tag=dash-causeway,indent=0]
+include::../../scripts/dash/shared/src/main/java/com/codenameone/examples/dash/rules/Content.java[tag=dash-causeway,indent=0]
 ----
 
 The cues never reach the simulation. A runner always has a lane, a height and a
@@ -284,7 +284,7 @@ two streets meet, and hands the result to the rules as a `CityRoute`:
 
 [source,java,role=cn1-no-try]
 ----
-include::../../scripts/dash/rules/src/test/java/com/codenameone/examples/dash/rules/CityRouteTest.java[tag=dash-city-route,indent=0]
+include::../../scripts/dash/shared/src/test/java/com/codenameone/examples/dash/rules/CityRouteTest.java[tag=dash-city-route,indent=0]
 ----
 
 `level()` is deterministic, so the server needs no map. A city run's result
@@ -313,7 +313,7 @@ same boards:
 
 [source,java,role=cn1-no-try]
 ----
-include::../../scripts/dash/rules/src/test/java/com/codenameone/examples/dash/rules/CityRouteTest.java[tag=dash-city-landmark,indent=0]
+include::../../scripts/dash/shared/src/test/java/com/codenameone/examples/dash/rules/CityRouteTest.java[tag=dash-city-landmark,indent=0]
 ----
 
 The public Overpass server is shared and rate limited. A game with players points

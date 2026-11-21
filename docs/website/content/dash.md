@@ -7,7 +7,7 @@ images: ["/developer-guide/img/dash-run-chase.png"]
 ShowToc: true
 ---
 
-Dash is an endless runner that does what a game engine leaves to you. Race your friends and talk to them while you run: the voice goes peer to peer over WebRTC, from the same Java code on iPhone, Android, desktop and the web. Pick two points on a real street map and run that route through your own city, every street a stretch of track with its name overhead and the landmarks beside it. And every score on a board was played again on the server from the run's inputs, by the same rules module the game runs, so a cheated run never shows up.
+Dash is an endless runner that does what a game engine leaves to you. Race your friends and talk to them while you run: the voice goes peer to peer over WebRTC, from the same Java code on iPhone, Android, desktop and the web. Pick two points on a real street map and run that route through your own city, every street a stretch of track with its name overhead and the landmarks beside it. And every score on a board was played again on the server from the run's inputs, by the same shared simulation code the game runs, so a cheated run never shows up.
 
 Those are the parts other game frameworks leave to plugins, a second language and a separate backend team. In Dash they're ordinary Codename One code in one project: the game, its server, its maps, its voice chat and its admin console. Around them is everything a live game needs: accounts, levels with stars, ghosts and replays, a track editor, crews, a shop and pushes. Use it to build your own game, or to see how a Codename One app and server share one codebase.
 

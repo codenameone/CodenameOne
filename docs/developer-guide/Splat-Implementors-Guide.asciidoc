@@ -142,7 +142,7 @@ and rebalancing the game is editing one of them:
 
 [source,java,role=cn1-no-try]
 ----
-include::../../scripts/splat/rules/src/main/java/com/codenameone/examples/splat/rules/Catalog.java[tag=splat-markers,indent=0]
+include::../../scripts/splat/shared/src/main/java/com/codenameone/examples/splat/rules/Catalog.java[tag=splat-markers,indent=0]
 ----
 
 A field is a size, a base, a hill for the snack bar mode, the spawns, and boxes of
@@ -151,7 +151,7 @@ side, so a field is fair by construction:
 
 [source,java,role=cn1-no-try]
 ----
-include::../../scripts/splat/rules/src/main/java/com/codenameone/examples/splat/rules/Catalog.java[tag=splat-arena,indent=0]
+include::../../scripts/splat/shared/src/main/java/com/codenameone/examples/splat/rules/Catalog.java[tag=splat-arena,indent=0]
 ----
 
 A box's kind (`bunker`, `minivan`, `snackbar`) picks its color and shape in the
@@ -239,7 +239,7 @@ few ticks later, the ball is flown forward the ticks it lost on the way:
 
 [source,java,role=cn1-no-try]
 ----
-include::../../scripts/splat/rules/src/main/java/com/codenameone/examples/splat/rules/Match.java[tag=splat-lag-comp,indent=0]
+include::../../scripts/splat/shared/src/main/java/com/codenameone/examples/splat/rules/Match.java[tag=splat-lag-comp,indent=0]
 ----
 
 The cap keeps a player with a slow connection from painting people around corners.

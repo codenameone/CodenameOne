@@ -95,11 +95,11 @@ Online matches run in lockstep over a WebSocket. The server is the referee: it s
 
 {{< mermaid >}}
 flowchart LR
-    A["Player A's phone<br/>rules module"] -- "play card" --> S["Server MatchRoom<br/>rules module"]
-    B["Player B's phone<br/>rules module"] -- "play card" --> S
+    A["Player A's phone<br/>shared rules"] -- "play card" --> S["Server MatchRoom<br/>shared rules"]
+    B["Player B's phone<br/>shared rules"] -- "play card" --> S
     S -- "card at tick N" --> A
     S -- "card at tick N" --> B
-    S --> R["Replay<br/>rules module"]
+    S --> R["Replay<br/>shared rules"]
 {{< /mermaid >}}
 
 ## Promotion and monetization are built in
