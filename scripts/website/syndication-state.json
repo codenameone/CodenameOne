@@ -3489,6 +3489,11 @@
         "tags_set": true,
         "canonical_set": true,
         "syndicated_at": "2026-11-21T01:01:10+00:00"
+      },
+      "devto": {
+        "id": 5088674,
+        "url": "https://dev.to/codenameone/calendars-gantt-charts-and-booking-apps-without-writing-a-calendar-42ng",
+        "syndicated_at": "2026-11-21T14:26:15+00:00"
       }
     }
   }
