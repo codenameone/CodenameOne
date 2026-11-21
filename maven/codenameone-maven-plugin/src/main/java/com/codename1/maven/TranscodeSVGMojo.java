@@ -85,7 +85,8 @@ public class TranscodeSVGMojo extends AbstractCN1Mojo {
         // placeholder diagnostic resolve the same configuration this goal does.
         // The Rive runtime is a dependency, not part of the core: a module with
         // .riv files and no runtime would otherwise fail in javac on classes it
-        // never wrote. Resolution is COMPILE so that check can see the class path.
+        // never wrote. This goal resolves nothing, so the check reads the
+        // declared dependencies and only warns (see requireRiveRuntime).
         requireRiveRuntime();
         try {
             newSvgTranscodeRunner().run();

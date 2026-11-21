@@ -2416,10 +2416,11 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
 
     /** A transcoder configured exactly as the bound goal would be. */
     /**
-     * Fails the build, naming the dependency to add, when this module has
-     * {@code .riv} files and {@code com.codename1.rive.RiveFile} is on none of
-     * its compile class path entries. Reads the resolved artifacts when the
-     * running goal resolved them, and the declared dependencies otherwise.
+     * Names the dependency to add when this module has {@code .riv} files and
+     * no Rive runtime. Fails the build when the running goal resolved its
+     * class path and {@code com.codename1.rive.RiveFile} is on none of it;
+     * with nothing resolved it can see only declared dependencies, so a miss
+     * there is a warning.
      */
     protected void requireRiveRuntime() throws MojoExecutionException {
         if (!SvgTranscodeRunner.hasRiveSources(project.getBasedir())) {
@@ -2433,11 +2434,18 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
                 }
             }
         } else {
+            // Nothing resolved (transcode-svg resolves nothing, so the SVG
+            // build stays as cheap and offline-safe as it was): only the
+            // declared dependencies are visible, and the runtime may still
+            // arrive transitively, through a cn1lib or a shared parent. So a
+            // miss here only warns; javac reports a real absence.
             for (org.apache.maven.model.Dependency d : project.getDependencies()) {
                 if (SvgTranscodeRunner.RIVE_RUNTIME_ARTIFACT.equals(d.getArtifactId()) && !"test".equals(d.getScope())) {
                     return;
                 }
             }
+            getLog().warn(SvgTranscodeRunner.missingRiveRuntimeMessage(project.getBasedir()));
+            return;
         }
         throw new MojoExecutionException(SvgTranscodeRunner.missingRiveRuntimeMessage(project.getBasedir()));
     }
@@ -2576,8 +2584,9 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
 
         getLog().info("This project has SVG/Lottie assets but its pom does not run the "
                 + "build-time vector transcoder. Transcoding them now.");
-        requireRiveRuntime();
         try {
+            // inside the try: a repair nobody asked for never aborts a build
+            requireRiveRuntime();
             runner.run();
             registerSourceRoot(svgOutputDir());
         } catch (Exception ex) {
