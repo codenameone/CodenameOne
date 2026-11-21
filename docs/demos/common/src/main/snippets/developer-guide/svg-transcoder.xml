@@ -9,3 +9,11 @@
     </goals>
 </execution>
 // end::svg-transcoder-xml-001[]
+
+// tag::svg-transcoder-xml-002[]
+<dependency>
+    <groupId>com.codenameone</groupId>
+    <artifactId>codenameone-rive-runtime</artifactId>
+    <version>${cn1.version}</version>
+</dependency>
+// end::svg-transcoder-xml-002[]

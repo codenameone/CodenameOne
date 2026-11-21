@@ -299,11 +299,7 @@ dependency when a `.riv` file is present without it:
 
 [source,xml]
 ----
-<dependency>
-    <groupId>com.codenameone</groupId>
-    <artifactId>codenameone-rive-runtime</artifactId>
-    <version>${cn1.version}</version>
-</dependency>
+include::../demos/common/src/main/snippets/developer-guide/svg-transcoder.xml[tag=svg-transcoder-xml-002,indent=0]
 ----
 
 `RiveView` plays a file. It runs the artboard's first state machine, or
