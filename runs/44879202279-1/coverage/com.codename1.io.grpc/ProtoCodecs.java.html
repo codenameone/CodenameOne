@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ProtoCodecs.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.io.grpc</a> &gt; <span class="el_source">ProtoCodecs.java</span></div><h1>ProtoCodecs.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ */
+package com.codename1.io.grpc;
+
+import java.util.HashMap;
+import java.util.Map;
+
+/// Runtime registry that wires `@ProtoMessage` classes to their
+/// build-time-generated [ProtoCodec]s. The generated
+/// `cn1app.ProtoBootstrap` calls [#register(Class, ProtoCodec)] for
+/// every protobuf message in the project; generated gRPC client
+/// impls and per-class codecs call [#lookup(Class)] to resolve
+/// nested-message types at runtime.
+///
+/// Mirrors [com.codename1.io.rest.RestClients].
+public final class ProtoCodecs {
+
+<span class="nc" id="L25">    private static final Map&lt;Class&lt;?&gt;, ProtoCodec&lt;?&gt;&gt; REGISTRY = new HashMap&lt;Class&lt;?&gt;, ProtoCodec&lt;?&gt;&gt;();</span>
+
+    private ProtoCodecs() {
+    }
+
+    /// Registers a codec for a `@ProtoMessage` class. Called from
+    /// the generated `cn1app.ProtoBootstrap`.
+    public static &lt;T&gt; void register(Class&lt;T&gt; type, ProtoCodec&lt;T&gt; codec) {
+<span class="nc bnc" id="L33" title="All 4 branches missed.">        if (type == null || codec == null) {</span>
+<span class="nc" id="L34">            return;</span>
+        }
+<span class="nc" id="L36">        REGISTRY.put(type, codec);</span>
+<span class="nc" id="L37">    }</span>
+
+    /// Returns the codec previously registered for `type`. Throws
+    /// [IllegalStateException] when no codec is registered so the
+    /// failure is loud rather than silent (typical cause: the
+    /// generated `cn1app.ProtoBootstrap` hasn't run, or `type` isn't
+    /// annotated `@ProtoMessage`).
+    @SuppressWarnings(&quot;unchecked&quot;)
+    public static &lt;T&gt; ProtoCodec&lt;T&gt; lookup(Class&lt;T&gt; type) {
+<span class="nc" id="L46">        ProtoCodec&lt;?&gt; c = REGISTRY.get(type);</span>
+<span class="nc bnc" id="L47" title="All 2 branches missed.">        if (c == null) {</span>
+<span class="nc" id="L48">            throw new IllegalStateException(</span>
+<span class="nc" id="L49">                    &quot;No ProtoCodec registered for &quot; + type.getName()</span>
+                            + &quot; -- did cn1:process-annotations run and is the &quot;
+                            + &quot;class annotated @ProtoMessage?&quot;);
+        }
+<span class="nc" id="L53">        return (ProtoCodec&lt;T&gt;) c;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

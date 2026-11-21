@@ -1,0 +1,855 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>OdsReader.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.spreadsheet</a> &gt; <span class="el_source">OdsReader.java</span></div><h1>OdsReader.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.spreadsheet;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
+
+/// Reads an OpenDocument spreadsheet: a zip archive whose `content.xml` holds the sheets.
+///
+/// The format describes a number format as elements -- a year, a separator, a month -- and
+/// not as a code; they are turned into the code Excel would write for the same thing, which
+/// is what the rest of this package speaks. Formulas are in OpenFormula syntax and are
+/// parsed into the same trees Excel's are.
+final class OdsReader {
+    private final Workbook book;
+<span class="fc" id="L40">    private final long[] budget = {XmlScanner.MAX_DOCUMENT};</span>
+<span class="fc" id="L41">    private final HashMap&lt;String, String&gt; dataStyles = new HashMap&lt;String, String&gt;();</span>
+    /// The sections of a style that maps values to other styles: condition and style name,
+    /// in order.
+<span class="fc" id="L44">    private final java.util.HashSet&lt;String&gt; textStyles = new java.util.HashSet&lt;String&gt;();</span>
+<span class="fc" id="L45">    private final HashMap&lt;String, ArrayList&lt;String[]&gt;&gt; styleMaps = new HashMap&lt;String, ArrayList&lt;String[]&gt;&gt;();</span>
+<span class="fc" id="L46">    private final HashMap&lt;String, String&gt; cellStyles = new HashMap&lt;String, String&gt;();</span>
+<span class="fc" id="L47">    private final HashMap&lt;String, Double&gt; columnStyleWidths = new HashMap&lt;String, Double&gt;();</span>
+<span class="fc" id="L48">    private final HashMap&lt;String, int[]&gt; panes = new HashMap&lt;String, int[]&gt;();</span>
+<span class="fc" id="L49">    private final ArrayList&lt;String[]&gt; names = new ArrayList&lt;String[]&gt;();</span>
+<span class="fc" id="L50">    private final StringBuilder text = new StringBuilder(); //NOPMD AvoidStringBufferField - one buffer for every token of one file</span>
+
+<span class="fc" id="L52">    OdsReader(Workbook book) {</span>
+<span class="fc" id="L53">        this.book = book;</span>
+<span class="fc" id="L54">    }</span>
+
+    void read(InputStream in) throws IOException {
+<span class="fc" id="L57">        ZipInputStream zip = new ZipInputStream(in);</span>
+<span class="fc" id="L58">        boolean content = false;</span>
+<span class="fc bfc" id="L59" title="All 2 branches covered.">        for (ZipEntry entry = zip.getNextEntry(); entry != null; entry = zip.getNextEntry()) {</span>
+<span class="fc" id="L60">            String path = entry.getName();</span>
+<span class="fc bfc" id="L61" title="All 2 branches covered.">            if (&quot;content.xml&quot;.equals(path)) {</span>
+<span class="fc" id="L62">                content = true;</span>
+<span class="fc" id="L63">                readContent(new XmlScanner(zip, budget));</span>
+<span class="fc bfc" id="L64" title="All 2 branches covered.">            } else if (&quot;styles.xml&quot;.equals(path)) {</span>
+                // number formats a document shares between its cells are here, and this part
+                // may come before the cells or after them
+<span class="fc" id="L67">                readContent(new XmlScanner(zip, budget));</span>
+<span class="fc bfc" id="L68" title="All 2 branches covered.">            } else if (&quot;settings.xml&quot;.equals(path)) {</span>
+<span class="fc" id="L69">                readSettings(new XmlScanner(zip, budget));</span>
+            }
+<span class="fc" id="L71">            zip.closeEntry();</span>
+        }
+<span class="fc bfc" id="L73" title="All 2 branches covered.">        if (!content) {</span>
+<span class="fc" id="L74">            throw new IOException(&quot;Not an OpenDocument spreadsheet: the archive has no content.xml&quot;);</span>
+        }
+<span class="fc bfc" id="L76" title="All 2 branches covered.">        if (book.getSheetCount() == 0) {</span>
+            // a text document or a drawing has a content.xml too
+<span class="fc" id="L78">            throw new IOException(&quot;Not an OpenDocument spreadsheet: it has no tables&quot;);</span>
+        }
+<span class="fc" id="L80">        resolveFormats();</span>
+<span class="fc bfc" id="L81" title="All 2 branches covered.">        for (int i = 0; i &lt; book.getSheetCount(); i++) {</span>
+<span class="fc" id="L82">            Sheet sheet = book.getSheet(i);</span>
+<span class="fc" id="L83">            int[] pane = panes.get(sheet.getName());</span>
+<span class="fc bfc" id="L84" title="All 2 branches covered.">            if (pane != null) {</span>
+<span class="fc" id="L85">                sheet.setFrozenPanes(pane[0], pane[1]);</span>
+            }
+        }
+<span class="fc bfc" id="L88" title="All 2 branches covered.">        for (String[] d : names) {</span>
+            try {
+<span class="fc" id="L90">                Node node = FormulaParser.parse(d[1], true);</span>
+                // OpenDocument keeps a name's relative references relative to its base cell;
+                // here, as in Excel, they are relative to A1
+<span class="pc bpc" id="L93" title="1 of 2 branches missed.">                Node base = d[2] == null ? null : baseCell(d[2]);</span>
+<span class="pc bpc" id="L94" title="1 of 2 branches missed.">                if (base != null) {</span>
+<span class="fc" id="L95">                    node = FormulaParser.fromCell(node, -base.r1, -base.c1);</span>
+                }
+<span class="fc" id="L97">                book.defineName(d[0], FormulaParser.display(node), node);</span>
+<span class="fc" id="L98">            } catch (FormulaSyntaxException e) {</span>
+<span class="fc" id="L99">                book.defineName(d[0], d[1], null);</span>
+<span class="fc" id="L100">                book.odsNameText.add(FormulaParser.asciiUpper(d[0]));</span>
+<span class="fc" id="L101">            }</span>
+<span class="fc" id="L102">        }</span>
+<span class="fc" id="L103">    }</span>
+
+    // ------------------------------------------------------------------ settings
+
+    /// The frozen panes are not in the document but in the settings of the view of it.
+    private void readSettings(XmlScanner x) throws IOException {
+<span class="fc" id="L109">        String table = null;</span>
+<span class="fc" id="L110">        int depth = 0;</span>
+<span class="fc" id="L111">        int tableDepth = -1;</span>
+<span class="fc" id="L112">        int[] pane = null;</span>
+<span class="fc" id="L113">        int[] modes = null;</span>
+<span class="fc bfc" id="L114" title="All 2 branches covered.">        for (int e = x.next(); e != XmlScanner.EOF; e = x.next()) {</span>
+<span class="fc bfc" id="L115" title="All 2 branches covered.">            if (e == XmlScanner.START) {</span>
+<span class="fc" id="L116">                depth++;</span>
+<span class="fc" id="L117">                String name = x.attr(&quot;config:name&quot;);</span>
+<span class="pc bpc" id="L118" title="1 of 6 branches missed.">                if (&quot;config-item-map-entry&quot;.equals(x.name) &amp;&amp; name != null &amp;&amp; tableDepth &lt; 0) {</span>
+<span class="fc" id="L119">                    table = name;</span>
+<span class="fc" id="L120">                    tableDepth = depth;</span>
+<span class="fc" id="L121">                    pane = new int[2];</span>
+<span class="fc" id="L122">                    modes = new int[2];</span>
+<span class="pc bpc" id="L123" title="1 of 6 branches missed.">                } else if (&quot;config-item&quot;.equals(x.name) &amp;&amp; table != null &amp;&amp; name != null) {</span>
+<span class="fc" id="L124">                    String value = x.elementText().trim();</span>
+<span class="fc" id="L125">                    depth--;</span>
+                    int v;
+                    try {
+<span class="fc" id="L128">                        v = Integer.parseInt(value);</span>
+<span class="nc" id="L129">                    } catch (NumberFormatException err) {</span>
+<span class="nc" id="L130">                        continue;</span>
+<span class="fc" id="L131">                    }</span>
+<span class="fc bfc" id="L132" title="All 2 branches covered.">                    if (&quot;HorizontalSplitMode&quot;.equals(name)) {</span>
+<span class="fc" id="L133">                        modes[1] = v;</span>
+<span class="fc bfc" id="L134" title="All 2 branches covered.">                    } else if (&quot;VerticalSplitMode&quot;.equals(name)) {</span>
+<span class="fc" id="L135">                        modes[0] = v;</span>
+<span class="fc bfc" id="L136" title="All 2 branches covered.">                    } else if (&quot;HorizontalSplitPosition&quot;.equals(name)) {</span>
+<span class="fc" id="L137">                        pane[1] = v;</span>
+<span class="fc bfc" id="L138" title="All 2 branches covered.">                    } else if (&quot;VerticalSplitPosition&quot;.equals(name)) {</span>
+<span class="fc" id="L139">                        pane[0] = v;</span>
+                    }
+<span class="pc bpc" id="L141" title="4 of 8 branches missed.">                    if (pane[0] &lt; 0 || pane[0] &gt; Node.MAX_ROW || pane[1] &lt; 0 || pane[1] &gt; Node.MAX_COL) {</span>
+<span class="nc" id="L142">                        throw new IllegalArgumentException(&quot;a split outside the sheet: &quot; + value);</span>
+                    }
+                }
+<span class="fc bfc" id="L145" title="All 2 branches covered.">            } else if (e == XmlScanner.END) {</span>
+<span class="pc bpc" id="L146" title="1 of 4 branches missed.">                if (table != null &amp;&amp; depth == tableDepth) {</span>
+                    // mode 2 is a frozen split; 1 is a split that scrolls, at a pixel position
+<span class="pc bpc" id="L148" title="1 of 2 branches missed.">                    if (modes[0] != 2) {</span>
+<span class="nc" id="L149">                        pane[0] = 0;</span>
+                    }
+<span class="pc bpc" id="L151" title="1 of 2 branches missed.">                    if (modes[1] != 2) {</span>
+<span class="nc" id="L152">                        pane[1] = 0;</span>
+                    }
+<span class="pc bpc" id="L154" title="3 of 4 branches missed.">                    if (pane[0] &gt; 0 || pane[1] &gt; 0) {</span>
+<span class="fc" id="L155">                        panes.put(table, pane);</span>
+                    }
+<span class="fc" id="L157">                    table = null;</span>
+<span class="fc" id="L158">                    tableDepth = -1;</span>
+                }
+<span class="fc" id="L160">                depth--;</span>
+            }
+        }
+<span class="fc" id="L163">    }</span>
+
+    // ------------------------------------------------------------------ content
+
+    private Sheet sheet;
+    private String sheetName;
+    private int row;
+    private int col;
+    private int rowRepeat;
+    private int groupDepth;
+    private boolean rowHasContent;
+    private String currentColumnStyle;
+    /// For each run of columns: first column, last column, default cell style.
+<span class="fc" id="L176">    private final ArrayList&lt;Object[]&gt; columnDefaults = new ArrayList&lt;Object[]&gt;();</span>
+    private int declaredColumn;
+
+    private void readContent(XmlScanner x) throws IOException {
+<span class="fc bfc" id="L180" title="All 2 branches covered.">        for (int e = x.next(); e != XmlScanner.EOF; e = x.next()) {</span>
+<span class="fc" id="L181">            String tag = x.name;</span>
+<span class="fc bfc" id="L182" title="All 2 branches covered.">            if (e == XmlScanner.END) {</span>
+<span class="fc bfc" id="L183" title="All 4 branches covered.">                if (&quot;table-row&quot;.equals(tag) &amp;&amp; sheet != null) {</span>
+<span class="fc" id="L184">                    endRow();</span>
+<span class="fc bfc" id="L185" title="All 2 branches covered.">                } else if (&quot;table-row-group&quot;.equals(tag)) {</span>
+<span class="fc" id="L186">                    groupDepth--;</span>
+<span class="fc bfc" id="L187" title="All 4 branches covered.">                } else if (&quot;table&quot;.equals(tag) &amp;&amp; sheet != null) {</span>
+<span class="fc" id="L188">                    book.attach(sheet, sheetName);</span>
+<span class="fc" id="L189">                    sheet = null;</span>
+                }
+                continue;
+            }
+<span class="fc bfc" id="L193" title="All 2 branches covered.">            if (e != XmlScanner.START) {</span>
+<span class="fc" id="L194">                continue;</span>
+            }
+<span class="fc bfc" id="L196" title="All 4 branches covered.">            if (&quot;table-cell&quot;.equals(tag) || &quot;covered-table-cell&quot;.equals(tag)) {</span>
+<span class="fc bfc" id="L197" title="All 2 branches covered.">                if (sheet != null) {</span>
+<span class="fc" id="L198">                    readCell(x, &quot;covered-table-cell&quot;.equals(tag));</span>
+                }
+<span class="fc bfc" id="L200" title="All 2 branches covered.">            } else if (&quot;table-row&quot;.equals(tag)) {</span>
+<span class="fc" id="L201">                rowRepeat = x.count(&quot;table:number-rows-repeated&quot;, 1, 1, Integer.MAX_VALUE);</span>
+<span class="fc" id="L202">                col = 0;</span>
+<span class="fc" id="L203">                rowHasContent = false;</span>
+<span class="fc bfc" id="L204" title="All 2 branches covered.">            } else if (&quot;table&quot;.equals(tag)) {</span>
+<span class="fc" id="L205">                sheet = book.detachedSheet();</span>
+<span class="fc" id="L206">                sheetName = x.attr(&quot;table:name&quot;);</span>
+<span class="fc bfc" id="L207" title="All 2 branches covered.">                if (sheetName == null) {</span>
+<span class="fc" id="L208">                    sheetName = &quot;Sheet&quot; + (book.getSheetCount() + 1);</span>
+                }
+<span class="fc" id="L210">                row = 0;</span>
+<span class="fc" id="L211">                groupDepth = 0;</span>
+<span class="fc" id="L212">                declaredColumn = 0;</span>
+<span class="fc" id="L213">                columnDefaults.clear();</span>
+<span class="fc bfc" id="L214" title="All 2 branches covered.">            } else if (&quot;table-column&quot;.equals(tag)) {</span>
+<span class="pc bpc" id="L215" title="1 of 2 branches missed.">                if (sheet != null) {</span>
+<span class="fc" id="L216">                    int n = x.count(&quot;table:number-columns-repeated&quot;, 1, 1, Integer.MAX_VALUE);</span>
+<span class="fc" id="L217">                    Double width = columnStyleWidths.get(x.attr(&quot;table:style-name&quot;));</span>
+<span class="fc bfc" id="L218" title="All 2 branches covered.">                    if (width != null) {</span>
+<span class="pc bpc" id="L219" title="1 of 4 branches missed.">                        for (int c = declaredColumn; c &lt; declaredColumn + n &amp;&amp; c &lt;= Node.MAX_COL; c++) {</span>
+<span class="fc" id="L220">                            sheet.setColumnWidth(c, width.doubleValue());</span>
+                        }
+                    }
+<span class="fc" id="L223">                    String cellStyle = x.attr(&quot;table:default-cell-style-name&quot;);</span>
+<span class="fc bfc" id="L224" title="All 2 branches covered.">                    if (cellStyle != null) {</span>
+<span class="fc" id="L225">                        Integer first = Integer.valueOf(declaredColumn);</span>
+<span class="fc" id="L226">                        Integer last = Integer.valueOf(declaredColumn + n - 1);</span>
+<span class="fc" id="L227">                        columnDefaults.add(new Object[] {first, last, cellStyle});</span>
+                    }
+<span class="fc" id="L229">                    declaredColumn += n;</span>
+<span class="fc" id="L230">                }</span>
+<span class="fc bfc" id="L231" title="All 2 branches covered.">            } else if (&quot;table-row-group&quot;.equals(tag)) {</span>
+<span class="fc" id="L232">                groupDepth++;</span>
+<span class="fc bfc" id="L233" title="All 2 branches covered.">            } else if (&quot;style&quot;.equals(tag)) {</span>
+<span class="fc" id="L234">                String family = x.attr(&quot;style:family&quot;);</span>
+<span class="fc" id="L235">                String name = x.attr(&quot;style:name&quot;);</span>
+<span class="fc" id="L236">                currentColumnStyle = null;</span>
+<span class="pc bpc" id="L237" title="1 of 4 branches missed.">                if (&quot;table-cell&quot;.equals(family) &amp;&amp; name != null) {</span>
+<span class="fc" id="L238">                    String data = x.attr(&quot;style:data-style-name&quot;);</span>
+<span class="fc bfc" id="L239" title="All 2 branches covered.">                    if (data != null) {</span>
+<span class="fc" id="L240">                        cellStyles.put(name, data);</span>
+                    }
+<span class="fc bfc" id="L242" title="All 2 branches covered.">                } else if (&quot;table-column&quot;.equals(family)) {</span>
+<span class="fc" id="L243">                    currentColumnStyle = name;</span>
+                }
+<span class="fc bfc" id="L245" title="All 2 branches covered.">            } else if (&quot;table-column-properties&quot;.equals(tag)) {</span>
+<span class="fc" id="L246">                double mm = length(x.attr(&quot;style:column-width&quot;));</span>
+<span class="pc bpc" id="L247" title="2 of 4 branches missed.">                if (currentColumnStyle != null &amp;&amp; mm &gt; 0) {</span>
+<span class="fc" id="L248">                    columnStyleWidths.put(currentColumnStyle, Double.valueOf(mm / OdsWriter.MM_PER_CHARACTER));</span>
+                }
+<span class="fc bfc" id="L250" title="All 6 branches covered.">            } else if (&quot;number-style&quot;.equals(tag) || &quot;currency-style&quot;.equals(tag) || &quot;percentage-style&quot;.equals(tag)</span>
+<span class="fc bfc" id="L251" title="All 6 branches covered.">                    || &quot;date-style&quot;.equals(tag) || &quot;time-style&quot;.equals(tag) || &quot;text-style&quot;.equals(tag)</span>
+<span class="pc bpc" id="L252" title="1 of 2 branches missed.">                    || &quot;boolean-style&quot;.equals(tag)) {</span>
+<span class="fc" id="L253">                String name = x.attr(&quot;style:name&quot;);</span>
+<span class="fc" id="L254">                boolean elapsed = &quot;false&quot;.equals(x.attr(&quot;number:truncate-on-overflow&quot;));</span>
+<span class="fc" id="L255">                ArrayList&lt;String[]&gt; maps = new ArrayList&lt;String[]&gt;();</span>
+<span class="fc" id="L256">                String code = readDataStyle(x, tag, elapsed, maps);</span>
+<span class="pc bpc" id="L257" title="1 of 4 branches missed.">                if (name != null &amp;&amp; &quot;text-style&quot;.equals(tag)) {</span>
+<span class="fc" id="L258">                    textStyles.add(name);</span>
+                }
+                // an empty style is kept too: a section of a format that shows nothing
+<span class="pc bpc" id="L261" title="1 of 2 branches missed.">                if (name != null) {</span>
+<span class="fc" id="L262">                    dataStyles.put(name, code);</span>
+<span class="fc bfc" id="L263" title="All 2 branches covered.">                    if (!maps.isEmpty()) {</span>
+<span class="fc" id="L264">                        styleMaps.put(name, maps);</span>
+                    }
+                }
+<span class="pc bpc" id="L267" title="1 of 2 branches missed.">            } else if (&quot;null-date&quot;.equals(tag)) {</span>
+                // table:case-sensitive is not read: comparisons are Excel's, without case,
+                // which is also what LibreOffice writes unless a user changed it.
+<span class="nc" id="L270">                String date = x.attr(&quot;table:date-value&quot;);</span>
+<span class="nc bnc" id="L271" title="All 4 branches missed.">                book.setDate1904(date != null &amp;&amp; date.startsWith(&quot;1904&quot;));</span>
+<span class="pc bfc" id="L272" title="All 2 branches covered.">            } else if (&quot;named-range&quot;.equals(tag)) {</span>
+<span class="fc" id="L273">                String name = x.attr(&quot;table:name&quot;);</span>
+<span class="fc" id="L274">                String address = x.attr(&quot;table:cell-range-address&quot;);</span>
+<span class="pc bpc" id="L275" title="2 of 4 branches missed.">                if (name != null &amp;&amp; address != null) {</span>
+<span class="fc" id="L276">                    names.add(new String[] {name, &quot;[&quot; + address + &quot;]&quot;, x.attr(&quot;table:base-cell-address&quot;)});</span>
+                }
+<span class="fc bfc" id="L278" title="All 2 branches covered.">            } else if (&quot;named-expression&quot;.equals(tag)) {</span>
+<span class="fc" id="L279">                String name = x.attr(&quot;table:name&quot;);</span>
+<span class="fc" id="L280">                String expression = x.attr(&quot;table:expression&quot;);</span>
+<span class="pc bpc" id="L281" title="2 of 4 branches missed.">                if (name != null &amp;&amp; expression != null) {</span>
+<span class="fc" id="L282">                    names.add(new String[] {name, stripFormulaPrefix(expression), x.attr(&quot;table:base-cell-address&quot;)});</span>
+                }
+<span class="pc bpc" id="L284" title="2 of 6 branches missed.">            } else if (&quot;shapes&quot;.equals(tag) || &quot;forms&quot;.equals(tag) || &quot;content-validations&quot;.equals(tag)</span>
+<span class="pc bpc" id="L285" title="2 of 4 branches missed.">                    || &quot;tracked-changes&quot;.equals(tag) || &quot;database-ranges&quot;.equals(tag)</span>
+<span class="pc bpc" id="L286" title="2 of 4 branches missed.">                    || &quot;data-pilot-tables&quot;.equals(tag) || &quot;annotation&quot;.equals(tag)) {</span>
+<span class="fc" id="L287">                x.skipElement();</span>
+            }
+        }
+<span class="fc" id="L290">    }</span>
+
+    private static Node baseCell(String address) {
+        try {
+<span class="fc" id="L294">            Node n = FormulaParser.parse(&quot;[&quot; + address + &quot;]&quot;, true);</span>
+<span class="pc bpc" id="L295" title="1 of 2 branches missed.">            return n.kind == Node.REF ? n : null;</span>
+<span class="nc" id="L296">        } catch (FormulaSyntaxException e) {</span>
+<span class="nc" id="L297">            return null;</span>
+        }
+    }
+
+    private static String stripFormulaPrefix(String formula) {
+<span class="fc" id="L302">        String f = formula;</span>
+<span class="fc bfc" id="L303" title="All 2 branches covered.">        if (f.startsWith(&quot;of:&quot;)) {</span>
+<span class="fc" id="L304">            f = f.substring(3);</span>
+        }
+<span class="fc bfc" id="L306" title="All 2 branches covered.">        return f.startsWith(&quot;=&quot;) ? f.substring(1) : f;</span>
+    }
+
+    /// A length such as `2.258cm` in millimetres, 0 when it cannot be read.
+    private static double length(String s) {
+<span class="pc bpc" id="L311" title="2 of 4 branches missed.">        if (s == null || s.length() &lt; 3) {</span>
+<span class="nc" id="L312">            return 0;</span>
+        }
+<span class="fc" id="L314">        int n = s.length();</span>
+<span class="fc" id="L315">        int unit = n;</span>
+<span class="pc bpc" id="L316" title="1 of 4 branches missed.">        while (unit &gt; 0 &amp;&amp; FormulaParser.isLetter(s.charAt(unit - 1))) {</span>
+<span class="fc" id="L317">            unit--;</span>
+        }
+        double v;
+        try {
+<span class="fc" id="L321">            v = Double.parseDouble(s.substring(0, unit));</span>
+<span class="nc" id="L322">        } catch (NumberFormatException e) {</span>
+<span class="nc" id="L323">            return 0;</span>
+<span class="fc" id="L324">        }</span>
+<span class="fc" id="L325">        String u = s.substring(unit);</span>
+<span class="pc bpc" id="L326" title="1 of 2 branches missed.">        if (&quot;cm&quot;.equals(u)) {</span>
+<span class="nc" id="L327">            return v * 10;</span>
+        }
+<span class="fc bfc" id="L329" title="All 2 branches covered.">        if (&quot;mm&quot;.equals(u)) {</span>
+<span class="fc" id="L330">            return v;</span>
+        }
+<span class="pc bpc" id="L332" title="1 of 2 branches missed.">        if (&quot;in&quot;.equals(u)) {</span>
+<span class="fc" id="L333">            return v * 25.4;</span>
+        }
+<span class="nc bnc" id="L335" title="All 2 branches missed.">        if (&quot;pt&quot;.equals(u)) {</span>
+<span class="nc" id="L336">            return v * 25.4 / 72;</span>
+        }
+<span class="nc" id="L338">        return 0;</span>
+    }
+
+    private void endRow() {
+<span class="fc bfc" id="L342" title="All 4 branches covered.">        if (rowHasContent &amp;&amp; rowRepeat &gt; 1) {</span>
+<span class="fc" id="L343">            Cell[] cells = sheet.rowCells(row);</span>
+<span class="pc bpc" id="L344" title="1 of 2 branches missed.">            if ((long) row + rowRepeat - 1 &gt; Node.MAX_ROW) {</span>
+<span class="nc" id="L345">                throw new IllegalArgumentException(&quot;a row with values repeated past the last row of a sheet&quot;);</span>
+            }
+<span class="fc" id="L347">            int copies = rowRepeat - 1;</span>
+<span class="fc bfc" id="L348" title="All 4 branches covered.">            for (int i = 1; i &lt;= copies &amp;&amp; cells != null; i++) {</span>
+<span class="fc bfc" id="L349" title="All 2 branches covered.">                for (int c = 0; c &lt; cells.length; c++) {</span>
+<span class="fc" id="L350">                    Cell from = cells[c];</span>
+<span class="fc bfc" id="L351" title="All 2 branches covered.">                    if (from == null) {</span>
+<span class="fc" id="L352">                        continue;</span>
+                    }
+<span class="fc bfc" id="L354" title="All 2 branches covered.">                    if (from.formula != null) {</span>
+                        // the value beside the formula is the first row's; it is the next row's only
+                        // until that row is calculated, which a formula with no value is at once
+<span class="fc bfc" id="L357" title="All 2 branches covered.">                        sheet.loadFormula(row + i, c, FormulaParser.shift(from.formula, i, 0), from.value,</span>
+                                from.value != null, false);
+<span class="fc bfc" id="L359" title="All 2 branches covered.">                    } else if (from.value != null) {</span>
+<span class="fc" id="L360">                        sheet.storeRaw(row + i, c, from.value);</span>
+                    } else {
+                        continue;
+                    }
+<span class="fc" id="L364">                    sheet.storeFormat(row + i, c, from.format);</span>
+                }
+            }
+        }
+<span class="fc bfc" id="L368" title="All 2 branches covered.">        if (groupDepth &gt; 0) {</span>
+            // a group of empty rows is still a group; what a repeat asks for is counted
+<span class="fc" id="L370">            int grouped = Math.min(rowRepeat, 4096);</span>
+<span class="fc" id="L371">            book.allocated(grouped);</span>
+<span class="fc bfc" id="L372" title="All 2 branches covered.">            for (int i = 0; i &lt; grouped; i++) {</span>
+<span class="fc" id="L373">                sheet.setRowOutlineLevel(row + i, groupDepth);</span>
+            }
+        }
+<span class="fc" id="L376">        row = (int) Math.min((long) row + rowRepeat, (long) Node.MAX_ROW + 1);</span>
+<span class="fc" id="L377">    }</span>
+
+    /// What a cell said about its format, which cannot be resolved until every part that may
+    /// define a style has been read: the name of its style and the format its type implies.
+<span class="fc" id="L381">    private final ArrayList&lt;String[]&gt; pendingFormats = new ArrayList&lt;String[]&gt;();</span>
+<span class="fc" id="L382">    private final HashMap&lt;String, Integer&gt; pendingIndex = new HashMap&lt;String, Integer&gt;();</span>
+
+    /// A number standing for a style and a fallback until `resolveFormats`; 0 for neither.
+    private int pendingFormat(String style, int column, String fallback) {
+<span class="fc" id="L386">        String name = style;</span>
+<span class="fc bfc" id="L387" title="All 2 branches covered.">        if (name == null) {</span>
+<span class="fc bfc" id="L388" title="All 2 branches covered.">            for (Object[] d : columnDefaults) {</span>
+<span class="pc bpc" id="L389" title="1 of 4 branches missed.">                if (column &gt;= ((Integer) d[0]).intValue() &amp;&amp; column &lt;= ((Integer) d[1]).intValue()) {</span>
+<span class="fc" id="L390">                    name = (String) d[2];</span>
+<span class="fc" id="L391">                    break;</span>
+                }
+<span class="fc" id="L393">            }</span>
+        }
+<span class="fc bfc" id="L395" title="All 4 branches covered.">        if (name == null &amp;&amp; fallback == null) {</span>
+<span class="fc" id="L396">            return 0;</span>
+        }
+<span class="fc" id="L398">        String key = name + &quot;\n&quot; + fallback;</span>
+<span class="fc" id="L399">        Integer index = pendingIndex.get(key);</span>
+<span class="fc bfc" id="L400" title="All 2 branches covered.">        if (index == null) {</span>
+<span class="fc" id="L401">            pendingFormats.add(new String[] {name, fallback});</span>
+<span class="fc" id="L402">            index = Integer.valueOf(pendingFormats.size());</span>
+<span class="fc" id="L403">            pendingIndex.put(key, index);</span>
+        }
+<span class="fc" id="L405">        return index.intValue();</span>
+    }
+
+    /// The format code of a data style, with the sections its maps name before its own: a
+    /// map to a style for `value()&gt;=0` is the first section of a code of two.
+    private String sectioned(String name) {
+<span class="fc" id="L411">        String own = dataStyles.get(name);</span>
+<span class="fc" id="L412">        ArrayList&lt;String[]&gt; maps = styleMaps.get(name);</span>
+<span class="pc bpc" id="L413" title="1 of 4 branches missed.">        if (own == null || maps == null) {</span>
+<span class="fc" id="L414">            return own;</span>
+        }
+<span class="fc" id="L416">        ArrayList&lt;String&gt; conditions = new ArrayList&lt;String&gt;();</span>
+<span class="fc" id="L417">        ArrayList&lt;String&gt; codes = new ArrayList&lt;String&gt;();</span>
+        // a text style sends numbers to three number styles, the sections before its own
+<span class="fc bfc" id="L419" title="All 2 branches covered.">        int most = textStyles.contains(name) ? 3 : 2;</span>
+<span class="fc bfc" id="L420" title="All 4 branches covered.">        for (int i = 0; i &lt; maps.size() &amp;&amp; codes.size() &lt; most; i++) {</span>
+<span class="fc" id="L421">            String[] m = maps.get(i);</span>
+<span class="fc" id="L422">            String code = dataStyles.get(m[1]);</span>
+<span class="fc" id="L423">            String condition = m[0];</span>
+<span class="pc bpc" id="L424" title="3 of 6 branches missed.">            if (code == null || condition == null || !condition.startsWith(&quot;value()&quot;)) {</span>
+<span class="nc" id="L425">                continue;</span>
+            }
+<span class="fc" id="L427">            conditions.add(condition.substring(7).trim());</span>
+<span class="fc" id="L428">            codes.add(code);</span>
+        }
+<span class="pc bpc" id="L430" title="1 of 2 branches missed.">        if (codes.isEmpty()) {</span>
+<span class="nc" id="L431">            return own;</span>
+        }
+<span class="fc" id="L433">        StringBuilder sb = new StringBuilder();</span>
+<span class="fc bfc" id="L434" title="All 2 branches covered.">        boolean implicit = codes.size() == 1 ? &quot;&gt;=0&quot;.equals(conditions.get(0))</span>
+<span class="pc bpc" id="L435" title="1 of 4 branches missed.">                : &quot;&gt;0&quot;.equals(conditions.get(0)) &amp;&amp; &quot;&lt;0&quot;.equals(conditions.get(1))</span>
+<span class="pc bpc" id="L436" title="1 of 4 branches missed.">                        &amp;&amp; (codes.size() == 2 || &quot;=0&quot;.equals(conditions.get(2)));</span>
+<span class="fc bfc" id="L437" title="All 2 branches covered.">        for (int i = 0; i &lt; codes.size(); i++) {</span>
+            // a third section is what is left, which Excel's code spells with no condition
+<span class="fc bfc" id="L439" title="All 4 branches covered.">            if (!implicit &amp;&amp; i &lt; 2) {</span>
+<span class="fc" id="L440">                String c = conditions.get(i);</span>
+<span class="pc bpc" id="L441" title="1 of 2 branches missed.">                sb.append('[').append(c.startsWith(&quot;!=&quot;) ? &quot;&lt;&gt;&quot; + c.substring(2) : c).append(']');</span>
+            }
+<span class="fc" id="L443">            sb.append(codes.get(i)).append(';');</span>
+        }
+<span class="fc" id="L445">        return sb.append(own).toString();</span>
+    }
+
+    private void resolveFormats() {
+<span class="fc" id="L449">        int[] ids = new int[pendingFormats.size() + 1];</span>
+<span class="fc bfc" id="L450" title="All 2 branches covered.">        for (int i = 1; i &lt; ids.length; i++) {</span>
+<span class="fc" id="L451">            String[] pending = pendingFormats.get(i - 1);</span>
+<span class="fc bfc" id="L452" title="All 2 branches covered.">            String data = pending[0] == null ? null : cellStyles.get(pending[0]);</span>
+<span class="fc bfc" id="L453" title="All 2 branches covered.">            String code = data == null ? null : sectioned(data);</span>
+<span class="fc bfc" id="L454" title="All 2 branches covered.">            int id = code == null ? 0 : book.formatId(code);</span>
+<span class="fc" id="L455">            String fallback = pending[1];</span>
+<span class="fc bfc" id="L456" title="All 2 branches covered.">            if (fallback != null) {</span>
+                // The type of a cell says it is a date or a percentage even when its style says
+                // nothing, or names a style this reader could not turn into a format.
+<span class="fc" id="L459">                CellFormat f = book.format(id);</span>
+<span class="fc bfc" id="L460" title="All 2 branches covered.">                boolean wantsDate = fallback.charAt(0) != '0';</span>
+<span class="fc bfc" id="L461" title="All 6 branches covered.">                if (wantsDate ? !f.isDate() : f.isGeneral()) {</span>
+<span class="fc" id="L462">                    id = book.formatId(fallback);</span>
+                }
+            }
+<span class="fc" id="L465">            ids[i] = id;</span>
+        }
+<span class="fc bfc" id="L467" title="All 2 branches covered.">        for (int s = 0; s &lt; book.getSheetCount(); s++) {</span>
+<span class="fc" id="L468">            Sheet sheet = book.getSheet(s);</span>
+<span class="fc bfc" id="L469" title="All 2 branches covered.">            for (int r = sheet.usedRows() - 1; r &gt;= 0; r--) {</span>
+<span class="fc" id="L470">                Cell[] cells = sheet.rowCells(r);</span>
+<span class="fc bfc" id="L471" title="All 4 branches covered.">                for (int c = 0; cells != null &amp;&amp; c &lt; cells.length; c++) {</span>
+<span class="pc bpc" id="L472" title="1 of 6 branches missed.">                    if (cells[c] != null &amp;&amp; cells[c].format &gt; 0 &amp;&amp; cells[c].format &lt; ids.length) {</span>
+<span class="fc" id="L473">                        cells[c].format = ids[cells[c].format];</span>
+                    }
+                }
+            }
+        }
+<span class="fc" id="L478">    }</span>
+
+    /// The column after a run of cells. Empty cells repeated past the last column are what
+    /// LibreOffice writes to the end of a row; the count stops there and never wraps.
+    private static int advance(int col, int repeat) {
+<span class="fc" id="L483">        return (int) Math.min((long) col + repeat, (long) Node.MAX_COL + 1);</span>
+    }
+
+    private void readCell(XmlScanner x, boolean covered) throws IOException {
+<span class="fc" id="L487">        int repeat = x.count(&quot;table:number-columns-repeated&quot;, 1, 1, Integer.MAX_VALUE);</span>
+<span class="fc" id="L488">        String type = x.attr(&quot;office:value-type&quot;);</span>
+<span class="fc" id="L489">        String number = x.attr(&quot;office:value&quot;);</span>
+<span class="fc" id="L490">        String date = x.attr(&quot;office:date-value&quot;);</span>
+<span class="fc" id="L491">        String time = x.attr(&quot;office:time-value&quot;);</span>
+<span class="fc" id="L492">        String bool = x.attr(&quot;office:boolean-value&quot;);</span>
+<span class="fc" id="L493">        String string = x.attr(&quot;office:string-value&quot;);</span>
+<span class="fc" id="L494">        String formula = x.attr(&quot;table:formula&quot;);</span>
+<span class="fc" id="L495">        String style = x.attr(&quot;table:style-name&quot;);</span>
+<span class="fc" id="L496">        boolean error = &quot;error&quot;.equals(x.attr(&quot;calcext:value-type&quot;));</span>
+<span class="fc" id="L497">        int spanColumns = x.count(&quot;table:number-columns-spanned&quot;, 1, 1, Node.MAX_COL + 1);</span>
+<span class="fc" id="L498">        int spanRows = x.count(&quot;table:number-rows-spanned&quot;, 1, 1, Node.MAX_ROW + 1);</span>
+<span class="fc bfc" id="L499" title="All 2 branches covered.">        boolean array = x.attr(&quot;table:number-matrix-columns-spanned&quot;) != null;</span>
+<span class="fc" id="L500">        int matrixColumns = x.count(&quot;table:number-matrix-columns-spanned&quot;, 1, 1, Node.MAX_COL + 1);</span>
+<span class="fc" id="L501">        int matrixRows = x.count(&quot;table:number-matrix-rows-spanned&quot;, 1, 1, Node.MAX_ROW + 1);</span>
+<span class="fc bfc" id="L502" title="All 2 branches covered.">        String end = covered ? &quot;covered-table-cell&quot; : &quot;table-cell&quot;;</span>
+
+<span class="fc" id="L504">        text.setLength(0);</span>
+<span class="fc" id="L505">        int paragraphs = 0;</span>
+<span class="fc" id="L506">        boolean inParagraph = false;</span>
+<span class="fc bfc" id="L507" title="All 2 branches covered.">        for (int e = x.next(); e != XmlScanner.EOF; e = x.next()) {</span>
+<span class="fc bfc" id="L508" title="All 2 branches covered.">            if (e == XmlScanner.END) {</span>
+<span class="fc bfc" id="L509" title="All 2 branches covered.">                if (end.equals(x.name)) {</span>
+<span class="fc" id="L510">                    break;</span>
+                }
+<span class="fc bfc" id="L512" title="All 2 branches covered.">                if (&quot;p&quot;.equals(x.name)) {</span>
+<span class="fc" id="L513">                    inParagraph = false;</span>
+                }
+<span class="fc bfc" id="L515" title="All 2 branches covered.">            } else if (e == XmlScanner.TEXT) {</span>
+<span class="fc bfc" id="L516" title="All 2 branches covered.">                if (inParagraph) {</span>
+<span class="fc" id="L517">                    text.append(x.text);</span>
+                }
+<span class="pc bpc" id="L519" title="1 of 2 branches missed.">            } else if (&quot;annotation&quot;.equals(x.name)) {</span>
+<span class="nc" id="L520">                x.skipElement();</span>
+<span class="fc bfc" id="L521" title="All 2 branches covered.">            } else if (&quot;p&quot;.equals(x.name)) {</span>
+<span class="fc bfc" id="L522" title="All 2 branches covered.">                if (paragraphs &gt; 0) {</span>
+<span class="fc" id="L523">                    text.append('\n');</span>
+                }
+<span class="fc" id="L525">                paragraphs++;</span>
+<span class="fc" id="L526">                inParagraph = true;</span>
+<span class="fc bfc" id="L527" title="All 2 branches covered.">            } else if (inParagraph) {</span>
+<span class="fc bfc" id="L528" title="All 2 branches covered.">                if (&quot;s&quot;.equals(x.name)) {</span>
+<span class="fc" id="L529">                    int n = x.count(&quot;text:c&quot;, 1, 0, XmlScanner.MAX_TEXT - text.length());</span>
+<span class="pc bpc" id="L530" title="1 of 2 branches missed.">                    if (n &gt; 0) {</span>
+                        // Spaces the file asks for take memory it never sent: two bytes each,
+                        // and a cell is counted as about seventy.
+<span class="fc" id="L533">                        book.allocated(n / 36);</span>
+                    }
+<span class="pc bpc" id="L535" title="1 of 4 branches missed.">                    for (int i = 0; i &lt; n &amp;&amp; text.length() &lt; XmlScanner.MAX_TEXT; i++) {</span>
+<span class="fc" id="L536">                        text.append(' ');</span>
+                    }
+<span class="fc bfc" id="L538" title="All 2 branches covered.">                } else if (&quot;tab&quot;.equals(x.name)) {</span>
+<span class="fc" id="L539">                    text.append('\t');</span>
+<span class="fc bfc" id="L540" title="All 2 branches covered.">                } else if (&quot;line-break&quot;.equals(x.name)) {</span>
+<span class="fc" id="L541">                    text.append('\n');</span>
+                }
+            }
+        }
+<span class="fc bfc" id="L545" title="All 2 branches covered.">        if (covered) {</span>
+<span class="fc" id="L546">            col = advance(col, repeat);</span>
+<span class="fc" id="L547">            return;</span>
+        }
+
+<span class="fc" id="L550">        Object value = null;</span>
+<span class="fc" id="L551">        String fallbackFormat = null;</span>
+<span class="fc bfc" id="L552" title="All 2 branches covered.">        if (error) {</span>
+<span class="fc" id="L553">            CellError err = CellError.valueOf(text.toString().trim());</span>
+<span class="pc bpc" id="L554" title="1 of 2 branches missed.">            value = err == null ? CellError.VALUE : err;</span>
+<span class="fc bfc" id="L555" title="All 6 branches covered.">        } else if (&quot;float&quot;.equals(type) || &quot;currency&quot;.equals(type) || &quot;percentage&quot;.equals(type)) {</span>
+<span class="fc" id="L556">            value = parseDouble(number);</span>
+            // LibreOffice has no logical cells: a truth value is the number 1 or 0 shown as a
+            // word. What it shows is the only thing that tells it from a number.
+<span class="fc bfc" id="L559" title="All 4 branches covered.">            if (value instanceof Double &amp;&amp; style == null) {</span>
+<span class="fc" id="L560">                double d = ((Double) value).doubleValue();</span>
+<span class="fc" id="L561">                String shown = text.toString();</span>
+<span class="fc bfc" id="L562" title="All 4 branches covered.">                if (d == 1 &amp;&amp; &quot;TRUE&quot;.equals(shown)) {</span>
+<span class="fc" id="L563">                    value = Boolean.TRUE;</span>
+<span class="fc bfc" id="L564" title="All 4 branches covered.">                } else if (d == 0 &amp;&amp; &quot;FALSE&quot;.equals(shown)) {</span>
+<span class="fc" id="L565">                    value = Boolean.FALSE;</span>
+                }
+            }
+<span class="fc bfc" id="L568" title="All 2 branches covered.">            if (&quot;percentage&quot;.equals(type)) {</span>
+<span class="fc" id="L569">                fallbackFormat = &quot;0.00%&quot;;</span>
+            }
+<span class="fc bfc" id="L571" title="All 2 branches covered.">        } else if (&quot;date&quot;.equals(type)) {</span>
+<span class="pc bpc" id="L572" title="1 of 2 branches missed.">            Double d = date == null ? null : Values.parseDateTime(date);</span>
+<span class="pc bpc" id="L573" title="1 of 2 branches missed.">            if (d != null) {</span>
+<span class="fc" id="L574">                double serial = d.doubleValue();</span>
+<span class="pc bpc" id="L575" title="1 of 2 branches missed.">                if (book.isDate1904()) {</span>
+<span class="nc" id="L576">                    serial -= 1462;</span>
+                }
+<span class="fc" id="L578">                value = Double.valueOf(serial);</span>
+<span class="fc bfc" id="L579" title="All 2 branches covered.">                fallbackFormat = date.indexOf('T') &gt; 0 ? &quot;yyyy-mm-dd hh:mm:ss&quot; : &quot;yyyy-mm-dd&quot;;</span>
+<span class="fc" id="L580">            } else {</span>
+                // a date before 1900 has no day number here; what the cell shows is kept
+<span class="nc" id="L582">                value = text.toString();</span>
+            }
+<span class="fc bfc" id="L584" title="All 2 branches covered.">        } else if (&quot;time&quot;.equals(type)) {</span>
+<span class="fc" id="L585">            value = duration(time);</span>
+<span class="fc" id="L586">            fallbackFormat = &quot;[h]:mm:ss&quot;;</span>
+<span class="fc bfc" id="L587" title="All 2 branches covered.">        } else if (&quot;boolean&quot;.equals(type)) {</span>
+<span class="pc bpc" id="L588" title="1 of 4 branches missed.">            if (&quot;true&quot;.equals(bool) || &quot;1&quot;.equals(bool)) {</span>
+<span class="fc" id="L589">                value = Boolean.TRUE;</span>
+<span class="pc bpc" id="L590" title="3 of 4 branches missed.">            } else if (&quot;false&quot;.equals(bool) || &quot;0&quot;.equals(bool)) {</span>
+<span class="fc" id="L591">                value = Boolean.FALSE;</span>
+            } else {
+                // xsd:boolean is these four spellings; anything else is a damaged file
+<span class="nc" id="L594">                throw new IllegalArgumentException(&quot;Not a boolean: &quot; + bool);</span>
+            }
+<span class="fc bfc" id="L596" title="All 2 branches covered.">        } else if (&quot;string&quot;.equals(type)) {</span>
+<span class="fc bfc" id="L597" title="All 2 branches covered.">            value = string != null ? string : text.toString();</span>
+        }
+
+<span class="fc" id="L600">        Node node = null;</span>
+<span class="fc" id="L601">        String formulaText = null;</span>
+<span class="fc bfc" id="L602" title="All 4 branches covered.">        if (formula != null &amp;&amp; formula.length() &gt; 0) {</span>
+<span class="fc" id="L603">            formulaText = stripFormulaPrefix(formula);</span>
+        }
+<span class="pc bpc" id="L605" title="1 of 4 branches missed.">        if (spanColumns &gt; 1 || spanRows &gt; 1) {</span>
+<span class="pc bpc" id="L606" title="2 of 4 branches missed.">            if ((long) row + spanRows - 1 &gt; Node.MAX_ROW || (long) col + spanColumns - 1 &gt; Node.MAX_COL) {</span>
+<span class="nc" id="L607">                throw new IllegalArgumentException(&quot;a merge runs past the edge of the sheet&quot;);</span>
+            }
+            // a merge over another is repaired on opening by Excel; it is dropped here too
+<span class="fc" id="L610">            sheet.loadMergedRegion(row, col, row + spanRows - 1, col + spanColumns - 1);</span>
+        }
+<span class="pc bpc" id="L612" title="2 of 6 branches missed.">        if (array &amp;&amp; ((long) row + matrixRows - 1 &gt; Node.MAX_ROW || (long) col + matrixColumns - 1 &gt; Node.MAX_COL)) {</span>
+<span class="nc" id="L613">            throw new IllegalArgumentException(&quot;an array formula runs past the edge of the sheet&quot;);</span>
+        }
+<span class="fc bfc" id="L615" title="All 4 branches covered.">        if (value == null &amp;&amp; formulaText == null) {</span>
+<span class="fc" id="L616">            col = advance(col, repeat);</span>
+<span class="fc" id="L617">            return;</span>
+        }
+<span class="fc bfc" id="L619" title="All 2 branches covered.">        int format = pendingFormat(style, col, value instanceof Double ? fallbackFormat : null);</span>
+<span class="fc" id="L620">        rowHasContent = true;</span>
+<span class="pc bpc" id="L621" title="1 of 2 branches missed.">        if (col &gt; Node.MAX_COL) {</span>
+<span class="nc" id="L622">            throw new IllegalArgumentException(&quot;a cell with a value stands past the last column of a sheet&quot;);</span>
+        }
+<span class="fc bfc" id="L624" title="All 2 branches covered.">        if ((long) col + repeat - 1 &gt; Node.MAX_COL) {</span>
+<span class="fc" id="L625">            throw new IllegalArgumentException(&quot;a cell with a value repeated past the last column of a sheet&quot;);</span>
+        }
+<span class="fc" id="L627">        int count = repeat;</span>
+<span class="fc bfc" id="L628" title="All 2 branches covered.">        for (int i = 0; i &lt; count; i++) {</span>
+<span class="fc" id="L629">            int c = col + i;</span>
+<span class="fc bfc" id="L630" title="All 2 branches covered.">            if (formulaText != null) {</span>
+<span class="fc bfc" id="L631" title="All 2 branches covered.">                if (i == 0) {</span>
+<span class="fc bfc" id="L632" title="All 2 branches covered.">                    sheet.loadFormula(row, c, formulaText, true, value, value != null, array);</span>
+<span class="fc bfc" id="L633" title="All 2 branches covered.">                    if (array) {</span>
+<span class="fc" id="L634">                        book.arraySpan(sheet, row, c, matrixRows, matrixColumns);</span>
+                    }
+<span class="fc" id="L636">                    node = sheet.cell(row, c).formula;</span>
+<span class="pc bpc" id="L637" title="1 of 2 branches missed.">                } else if (node != null) {</span>
+<span class="pc bpc" id="L638" title="1 of 2 branches missed.">                    sheet.loadFormula(row, c, FormulaParser.shift(node, 0, i), value, value != null, false);</span>
+                } else {
+<span class="nc bnc" id="L640" title="All 2 branches missed.">                    sheet.loadFormula(row, c, formulaText, true, value, value != null, false);</span>
+                }
+            } else {
+<span class="fc" id="L643">                sheet.storeRaw(row, c, value);</span>
+            }
+<span class="fc bfc" id="L645" title="All 2 branches covered.">            if (format != 0) {</span>
+<span class="fc" id="L646">                sheet.storeFormat(row, c, format);</span>
+            }
+        }
+<span class="fc" id="L649">        col = advance(col, repeat);</span>
+<span class="fc" id="L650">    }</span>
+
+    private static Object parseDouble(String s) {
+<span class="fc bfc" id="L653" title="All 4 branches covered.">        if (s == null || !Values.isDecimal(s.trim())) {</span>
+<span class="fc" id="L654">            return null;</span>
+        }
+        try {
+<span class="fc" id="L657">            return Double.valueOf(Double.parseDouble(s.trim()));</span>
+<span class="nc" id="L658">        } catch (NumberFormatException e) {</span>
+<span class="nc" id="L659">            return null;</span>
+        }
+    }
+
+    /// A duration such as `PT13H45M10.5S` as a fraction of a day.
+    static Object duration(String s) {
+<span class="pc bpc" id="L665" title="2 of 4 branches missed.">        if (s == null || !s.startsWith(&quot;PT&quot;)) {</span>
+<span class="nc" id="L666">            return null;</span>
+        }
+<span class="fc" id="L668">        double seconds = 0;</span>
+<span class="fc" id="L669">        int start = 2;</span>
+<span class="fc bfc" id="L670" title="All 2 branches covered.">        for (int i = 2; i &lt; s.length(); i++) {</span>
+<span class="fc" id="L671">            char c = s.charAt(i);</span>
+<span class="fc bfc" id="L672" title="All 6 branches covered.">            if (c == 'H' || c == 'M' || c == 'S') {</span>
+                double v;
+                try {
+<span class="fc" id="L675">                    v = Double.parseDouble(s.substring(start, i));</span>
+<span class="nc" id="L676">                } catch (NumberFormatException e) {</span>
+<span class="nc" id="L677">                    return null;</span>
+<span class="fc" id="L678">                }</span>
+<span class="fc bfc" id="L679" title="All 4 branches covered.">                seconds += c == 'H' ? v * 3600 : c == 'M' ? v * 60 : v;</span>
+<span class="fc" id="L680">                start = i + 1;</span>
+            }
+        }
+<span class="fc" id="L683">        return Double.valueOf(seconds / 86400);</span>
+    }
+
+    // ------------------------------------------------------------------ number formats
+
+    private static void repeat(StringBuilder sb, char c, int count) {
+        // a style is a few placeholders; a count from the file past the longest format code
+        // is not written out
+<span class="fc" id="L691">        int n = Math.min(count, CellFormat.MAX_CODE);</span>
+<span class="fc bfc" id="L692" title="All 2 branches covered.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc" id="L693">            sb.append(c);</span>
+        }
+<span class="fc" id="L695">    }</span>
+
+    /// Writes text of a format so that a format code shows it as it is.
+    private static void literal(StringBuilder sb, String s, String plain) {
+<span class="fc" id="L699">        boolean quoted = false;</span>
+<span class="fc bfc" id="L700" title="All 2 branches covered.">        for (int i = 0; i &lt; s.length(); i++) {</span>
+<span class="fc" id="L701">            char c = s.charAt(i);</span>
+<span class="fc bfc" id="L702" title="All 2 branches covered.">            boolean bare = plain.indexOf(c) &gt;= 0;</span>
+<span class="fc bfc" id="L703" title="All 2 branches covered.">            if (bare == quoted) {</span>
+<span class="fc" id="L704">                sb.append('&quot;');</span>
+<span class="fc bfc" id="L705" title="All 2 branches covered.">                quoted = !quoted;</span>
+            }
+            // a quote cannot be written inside quotes; the nearest thing is two apostrophes
+<span class="pc bpc" id="L708" title="1 of 2 branches missed.">            sb.append(c == '&quot;' ? &quot;''&quot; : String.valueOf(c));</span>
+        }
+<span class="fc bfc" id="L710" title="All 2 branches covered.">        if (quoted) {</span>
+<span class="fc" id="L711">            sb.append('&quot;');</span>
+        }
+<span class="fc" id="L713">    }</span>
+
+    /// The format code that says what a data style says.
+    private static String readDataStyle(XmlScanner x, String styleTag, boolean elapsed, ArrayList&lt;String[]&gt; maps)
+            throws IOException {
+<span class="fc" id="L718">        StringBuilder sb = new StringBuilder();</span>
+<span class="fc bfc" id="L719" title="All 4 branches covered.">        boolean date = &quot;date-style&quot;.equals(styleTag) || &quot;time-style&quot;.equals(styleTag);</span>
+<span class="fc" id="L720">        boolean percent = &quot;percentage-style&quot;.equals(styleTag);</span>
+<span class="fc" id="L721">        boolean elapsedPending = elapsed;</span>
+<span class="pc bpc" id="L722" title="1 of 2 branches missed.">        for (int e = x.next(); e != XmlScanner.EOF; e = x.next()) {</span>
+<span class="fc bfc" id="L723" title="All 4 branches covered.">            if (e == XmlScanner.END &amp;&amp; styleTag.equals(x.name)) {</span>
+<span class="fc" id="L724">                break;</span>
+            }
+<span class="fc bfc" id="L726" title="All 2 branches covered.">            if (e != XmlScanner.START) {</span>
+<span class="fc" id="L727">                continue;</span>
+            }
+<span class="fc" id="L729">            String tag = x.name;</span>
+<span class="fc" id="L730">            boolean longStyle = &quot;long&quot;.equals(x.attr(&quot;number:style&quot;));</span>
+<span class="fc bfc" id="L731" title="All 2 branches covered.">            if (&quot;map&quot;.equals(tag)) {</span>
+<span class="fc" id="L732">                maps.add(new String[] {x.attr(&quot;style:condition&quot;), x.attr(&quot;style:apply-style-name&quot;)});</span>
+<span class="fc bfc" id="L733" title="All 2 branches covered.">            } else if (&quot;text&quot;.equals(tag)) {</span>
+<span class="fc" id="L734">                String s = x.elementText();</span>
+<span class="fc bfc" id="L735" title="All 4 branches covered.">                literal(sb, s, date ? &quot; -/:.,&quot; : percent ? &quot; $-+()%&quot; : &quot; $-+()&quot;);</span>
+<span class="fc bfc" id="L736" title="All 2 branches covered.">            } else if (&quot;currency-symbol&quot;.equals(tag)) {</span>
+<span class="fc" id="L737">                literal(sb, x.elementText(), &quot;$&quot;);</span>
+<span class="fc bfc" id="L738" title="All 4 branches covered.">            } else if (&quot;number&quot;.equals(tag) &amp;&amp; x.attr(&quot;number:decimal-places&quot;) == null</span>
+<span class="pc bpc" id="L739" title="1 of 2 branches missed.">                    &amp;&amp; !x.boolAttr(&quot;number:grouping&quot;)</span>
+<span class="pc bpc" id="L740" title="2 of 4 branches missed.">                    &amp;&amp; x.attr(&quot;number:display-factor&quot;) == null &amp;&amp; x.attr(&quot;number:min-decimal-places&quot;) == null) {</span>
+                // a number with nothing said about its decimals is General: LibreOffice writes
+                // General so (min-integer-digits=&quot;1&quot; and no decimal-places), as CellFormat does,
+                // and writes decimal-places for every fixed format, 0 included
+<span class="fc" id="L744">                sb.append(&quot;General&quot;);</span>
+<span class="fc bfc" id="L745" title="All 2 branches covered.">            } else if (&quot;number&quot;.equals(tag)) {</span>
+<span class="fc" id="L746">                int decimals = x.count(&quot;number:decimal-places&quot;, 0, 0, 1024);</span>
+<span class="fc" id="L747">                int minDecimals = Math.min(decimals, x.count(&quot;number:min-decimal-places&quot;, decimals, 0, 1024));</span>
+<span class="fc" id="L748">                int minInteger = x.count(&quot;number:min-integer-digits&quot;, 1, 0, 1024);</span>
+<span class="fc" id="L749">                boolean grouping = x.boolAttr(&quot;number:grouping&quot;);</span>
+<span class="fc" id="L750">                double factor = x.doubleAttr(&quot;number:display-factor&quot;, 1);</span>
+<span class="fc" id="L751">                StringBuilder whole = new StringBuilder();</span>
+<span class="fc bfc" id="L752" title="All 2 branches covered.">                if (grouping) {</span>
+<span class="pc bpc" id="L753" title="1 of 2 branches missed.">                    whole.append(minInteger == 0 ? &quot;#,###&quot; : &quot;#,##&quot;);</span>
+<span class="fc" id="L754">                    repeat(whole, '0', Math.max(1, minInteger));</span>
+<span class="fc bfc" id="L755" title="All 2 branches covered.">                } else if (minInteger == 0) {</span>
+<span class="fc" id="L756">                    whole.append('#');</span>
+                } else {
+<span class="fc" id="L758">                    repeat(whole, '0', minInteger);</span>
+                }
+                // text inside the digits, 000-00-0000, placed by the count of digits after it
+<span class="pc bpc" id="L761" title="1 of 2 branches missed.">                for (int n = x.next(); n != XmlScanner.EOF; n = x.next()) {</span>
+<span class="pc bpc" id="L762" title="1 of 4 branches missed.">                    if (n == XmlScanner.END &amp;&amp; &quot;number&quot;.equals(x.name)) {</span>
+<span class="fc" id="L763">                        break;</span>
+                    }
+<span class="pc bpc" id="L765" title="2 of 4 branches missed.">                    if (n == XmlScanner.START &amp;&amp; &quot;embedded-text&quot;.equals(x.name)) {</span>
+<span class="fc" id="L766">                        int position = x.intAttr(&quot;number:position&quot;, 0);</span>
+<span class="fc" id="L767">                        StringBuilder text = new StringBuilder();</span>
+<span class="fc" id="L768">                        literal(text, x.elementText(), &quot; -/()&quot;);</span>
+<span class="fc" id="L769">                        int at = whole.length();</span>
+<span class="fc bfc" id="L770" title="All 4 branches covered.">                        for (int digits = 0; at &gt; 0 &amp;&amp; digits &lt; position; at--) {</span>
+<span class="fc" id="L771">                            char ch = whole.charAt(at - 1);</span>
+<span class="pc bpc" id="L772" title="3 of 4 branches missed.">                            digits += ch == '0' || ch == '#' ? 1 : 0;</span>
+                        }
+<span class="fc" id="L774">                        whole.insert(at, text);</span>
+                    }
+                }
+<span class="fc" id="L777">                sb.append(whole);</span>
+<span class="fc bfc" id="L778" title="All 2 branches covered.">                if (decimals &gt; 0) {</span>
+<span class="fc" id="L779">                    sb.append('.');</span>
+<span class="fc" id="L780">                    repeat(sb, '0', minDecimals);</span>
+<span class="fc" id="L781">                    repeat(sb, '#', decimals - minDecimals);</span>
+                }
+                // shown in thousands or in millions: a comma after the digits for each three
+                // places the number is divided by
+<span class="fc bfc" id="L785" title="All 4 branches covered.">                for (int k = 0; k &lt; 5 &amp;&amp; factor &gt;= 1000; k++) {</span>
+<span class="fc" id="L786">                    sb.append(',');</span>
+<span class="fc" id="L787">                    factor /= 1000;</span>
+                }
+<span class="fc bfc" id="L789" title="All 2 branches covered.">            } else if (&quot;scientific-number&quot;.equals(tag)) {</span>
+<span class="fc" id="L790">                int decimals = x.count(&quot;number:decimal-places&quot;, 0, 0, 1024);</span>
+<span class="fc" id="L791">                int minInteger = Math.max(1, x.count(&quot;number:min-integer-digits&quot;, 1, 0, 1024));</span>
+                // an interval of 3 is engineering notation, ##0.0E+0: one place for each step
+<span class="fc" id="L793">                repeat(sb, '#', Math.max(0, x.intAttr(&quot;number:exponent-interval&quot;, 1) - minInteger));</span>
+<span class="fc" id="L794">                repeat(sb, '0', minInteger);</span>
+<span class="fc bfc" id="L795" title="All 2 branches covered.">                if (decimals &gt; 0) {</span>
+<span class="fc" id="L796">                    sb.append('.');</span>
+<span class="fc" id="L797">                    repeat(sb, '0', decimals);</span>
+                }
+<span class="fc" id="L799">                sb.append(&quot;E+&quot;);</span>
+<span class="fc" id="L800">                repeat(sb, '0', Math.max(1, x.intAttr(&quot;number:min-exponent-digits&quot;, 2)));</span>
+<span class="fc bfc" id="L801" title="All 2 branches covered.">            } else if (&quot;fraction&quot;.equals(tag)) {</span>
+                // the attribute is there, even at zero, when a whole number is written before
+                // the fraction; a format that is a fraction alone leaves it out
+<span class="fc bfc" id="L804" title="All 2 branches covered.">                if (x.attr(&quot;number:min-integer-digits&quot;) != null) {</span>
+<span class="fc" id="L805">                    sb.append(&quot;# &quot;);</span>
+                }
+<span class="fc" id="L807">                repeat(sb, '?', Math.max(1, x.intAttr(&quot;number:min-numerator-digits&quot;, 1)));</span>
+<span class="fc" id="L808">                sb.append('/');</span>
+<span class="fc" id="L809">                String fixed = x.attr(&quot;number:denominator-value&quot;);</span>
+<span class="fc bfc" id="L810" title="All 2 branches covered.">                if (fixed != null) {</span>
+<span class="fc" id="L811">                    sb.append(fixed);</span>
+                } else {
+<span class="fc" id="L813">                    repeat(sb, '?', Math.max(1, x.intAttr(&quot;number:min-denominator-digits&quot;, 1)));</span>
+                }
+<span class="fc bfc" id="L815" title="All 2 branches covered.">            } else if (&quot;year&quot;.equals(tag)) {</span>
+<span class="fc bfc" id="L816" title="All 2 branches covered.">                sb.append(longStyle ? &quot;yyyy&quot; : &quot;yy&quot;);</span>
+<span class="fc bfc" id="L817" title="All 2 branches covered.">            } else if (&quot;month&quot;.equals(tag)) {</span>
+<span class="fc bfc" id="L818" title="All 2 branches covered.">                if (x.boolAttr(&quot;number:textual&quot;)) {</span>
+<span class="fc bfc" id="L819" title="All 2 branches covered.">                    sb.append(longStyle ? &quot;mmmm&quot; : &quot;mmm&quot;);</span>
+                } else {
+<span class="fc bfc" id="L821" title="All 2 branches covered.">                    sb.append(longStyle ? &quot;mm&quot; : &quot;m&quot;);</span>
+                }
+<span class="fc bfc" id="L823" title="All 2 branches covered.">            } else if (&quot;day&quot;.equals(tag)) {</span>
+<span class="fc bfc" id="L824" title="All 2 branches covered.">                sb.append(longStyle ? &quot;dd&quot; : &quot;d&quot;);</span>
+<span class="fc bfc" id="L825" title="All 2 branches covered.">            } else if (&quot;day-of-week&quot;.equals(tag)) {</span>
+<span class="pc bpc" id="L826" title="1 of 2 branches missed.">                sb.append(longStyle ? &quot;dddd&quot; : &quot;ddd&quot;);</span>
+<span class="fc bfc" id="L827" title="All 2 branches covered.">            } else if (&quot;hours&quot;.equals(tag)) {</span>
+<span class="fc bfc" id="L828" title="All 2 branches covered.">                if (elapsedPending) {</span>
+<span class="fc bfc" id="L829" title="All 2 branches covered.">                    sb.append(longStyle ? &quot;[hh]&quot; : &quot;[h]&quot;);</span>
+<span class="fc" id="L830">                    elapsedPending = false;</span>
+                } else {
+<span class="fc bfc" id="L832" title="All 2 branches covered.">                    sb.append(longStyle ? &quot;hh&quot; : &quot;h&quot;);</span>
+                }
+<span class="fc bfc" id="L834" title="All 2 branches covered.">            } else if (&quot;minutes&quot;.equals(tag)) {</span>
+                // truncate-on-overflow=&quot;false&quot; belongs to the first unit, whichever it is
+<span class="pc bpc" id="L836" title="3 of 6 branches missed.">                sb.append(elapsedPending ? (longStyle ? &quot;[mm]&quot; : &quot;[m]&quot;) : (longStyle ? &quot;mm&quot; : &quot;m&quot;));</span>
+<span class="fc" id="L837">                elapsedPending = false;</span>
+<span class="fc bfc" id="L838" title="All 2 branches covered.">            } else if (&quot;seconds&quot;.equals(tag)) {</span>
+<span class="pc bpc" id="L839" title="1 of 6 branches missed.">                sb.append(elapsedPending ? (longStyle ? &quot;[ss]&quot; : &quot;[s]&quot;) : (longStyle ? &quot;ss&quot; : &quot;s&quot;));</span>
+<span class="fc" id="L840">                elapsedPending = false;</span>
+<span class="fc" id="L841">                int decimals = x.count(&quot;number:decimal-places&quot;, 0, 0, 1024);</span>
+<span class="fc bfc" id="L842" title="All 2 branches covered.">                if (decimals &gt; 0) {</span>
+<span class="fc" id="L843">                    sb.append('.');</span>
+<span class="fc" id="L844">                    repeat(sb, '0', decimals);</span>
+                }
+<span class="fc bfc" id="L846" title="All 2 branches covered.">            } else if (&quot;am-pm&quot;.equals(tag)) {</span>
+<span class="fc" id="L847">                sb.append(&quot;AM/PM&quot;);</span>
+<span class="fc bfc" id="L848" title="All 2 branches covered.">            } else if (&quot;text-content&quot;.equals(tag)) {</span>
+<span class="fc" id="L849">                sb.append('@');</span>
+            }
+        }
+<span class="fc" id="L852">        return sb.toString();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,1412 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Sheet.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.spreadsheet</a> &gt; <span class="el_source">Sheet.java</span></div><h1>Sheet.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.spreadsheet;
+
+import com.codename1.ui.events.DataChangedListener;
+import com.codename1.ui.table.AbstractTableModel;
+import com.codename1.ui.table.GridColumn;
+import com.codename1.ui.table.GridFormatter;
+import com.codename1.ui.util.EventDispatcher;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.HashMap;
+
+/// One sheet of a [Workbook]: a grid of cells with no fixed size, each empty or holding a
+/// number, text, a logical value, an error or a formula.
+///
+/// #### Two ways to address a cell
+///
+/// The methods named `...Cell...` address the sheet the way a formula does: row 0, column 0
+/// is `A1`, whatever the sheet is used for. The [com.codename1.ui.table.TableModel] methods
+/// address the *data*: when [#setHeaderRow(boolean)] is on, the first row of the sheet is
+/// the column names and model row 0 is the row under it.
+///
+/// #### Values
+///
+/// A cell's value is a `Double`, a `String`, a `Boolean`, a [CellError], a `java.util.Date`
+/// for a number whose format shows a date, or null for an empty cell. The value of a formula
+/// is what it calculates to; [#getCellFormula(int, int)] answers the formula itself.
+///
+/// A `String` passed to [#setValueAt(int, int, Object)] is read as if it had been typed into
+/// a spreadsheet: `=A1*2` is a formula, `12.5` a number, `45%` a number shown as a
+/// percentage, `2024-03-01` a date, `TRUE` a logical value, and `'12` the text 12.
+/// [#setCellValue(int, int, Object)] stores what it is given, so a `String` stays text.
+public final class Sheet extends AbstractTableModel {
+    /// The width in millimetres of one character of the width unit spreadsheets use for
+    /// columns: a digit of the default font at 96 dots per inch.
+    static final float MM_PER_CHARACTER = 1.85f;
+
+
+    private final Workbook workbook;
+    private String name;
+<span class="fc" id="L62">    private final ArrayList&lt;Cell[]&gt; rows = new ArrayList&lt;Cell[]&gt;();</span>
+<span class="fc" id="L63">    private final EventDispatcher dispatcher = new EventDispatcher();</span>
+<span class="fc" id="L64">    private final ArrayList&lt;int[]&gt; merges = new ArrayList&lt;int[]&gt;();</span>
+<span class="fc" id="L65">    private final HashMap&lt;Integer, Double&gt; columnWidths = new HashMap&lt;Integer, Double&gt;();</span>
+<span class="fc" id="L66">    private final HashMap&lt;Integer, Integer&gt; outlineLevels = new HashMap&lt;Integer, Integer&gt;();</span>
+    private int usedColumns;
+    private boolean headerRow;
+<span class="fc" id="L69">    private boolean editable = true;</span>
+    private int frozenRows;
+    private int frozenColumns;
+
+<span class="fc" id="L73">    Sheet(Workbook workbook, String name) {</span>
+<span class="fc" id="L74">        this.workbook = workbook;</span>
+<span class="fc" id="L75">        this.name = name;</span>
+<span class="fc" id="L76">    }</span>
+
+    /// The name of the sheet, which formulas on other sheets refer to it by.
+    ///
+    /// #### Returns
+    ///
+    /// the name
+    public String getName() {
+<span class="fc" id="L84">        return name;</span>
+    }
+
+    /// The workbook the sheet is part of.
+    ///
+    /// #### Returns
+    ///
+    /// the workbook
+    public Workbook getWorkbook() {
+<span class="fc" id="L93">        return workbook;</span>
+    }
+
+    // ------------------------------------------------------------------ storage
+
+    void rename(String name) {
+<span class="fc" id="L99">        this.name = name;</span>
+<span class="fc" id="L100">    }</span>
+
+    Cell cell(int row, int col) {
+<span class="pc bpc" id="L103" title="2 of 6 branches missed.">        if (row &lt; 0 || row &gt;= rows.size() || col &lt; 0) {</span>
+<span class="fc" id="L104">            return null;</span>
+        }
+<span class="fc" id="L106">        Cell[] cells = rows.get(row);</span>
+<span class="fc bfc" id="L107" title="All 4 branches covered.">        return cells == null || col &gt;= cells.length ? null : cells[col];</span>
+    }
+
+    Cell[] rowCells(int row) {
+<span class="pc bpc" id="L111" title="1 of 4 branches missed.">        return row &lt; 0 || row &gt;= rows.size() ? null : rows.get(row);</span>
+    }
+
+    int usedRows() {
+<span class="fc" id="L115">        return rows.size();</span>
+    }
+
+    int usedColumns() {
+<span class="fc" id="L119">        return usedColumns;</span>
+    }
+
+    Cell ensure(int row, int col) {
+<span class="fc bfc" id="L123" title="All 8 branches covered.">        if (row &lt; 0 || col &lt; 0 || row &gt; Node.MAX_ROW || col &gt; Node.MAX_COL) {</span>
+<span class="fc" id="L124">            throw new IllegalArgumentException(&quot;No such cell: row &quot; + row + &quot;, column &quot; + col);</span>
+        }
+<span class="fc bfc" id="L126" title="All 2 branches covered.">        if (rows.size() &lt;= row) {</span>
+            // The rows above a cell far down take room too, though they hold nothing: a
+            // reference each, an eighth of what a cell takes.
+<span class="fc" id="L129">            workbook.allocated((row + 1 - rows.size() + 7) / 8);</span>
+        }
+<span class="fc bfc" id="L131" title="All 2 branches covered.">        while (rows.size() &lt;= row) {</span>
+<span class="fc" id="L132">            rows.add(null);</span>
+        }
+<span class="fc" id="L134">        Cell[] cells = rows.get(row);</span>
+<span class="fc bfc" id="L135" title="All 4 branches covered.">        if (cells == null || cells.length &lt;= col) {</span>
+<span class="fc bfc" id="L136" title="All 2 branches covered.">            int size = cells == null ? Math.max(col + 1, Math.min(usedColumns, 64)) : Math.max(col + 1, cells.length * 2);</span>
+<span class="fc bfc" id="L137" title="All 2 branches covered.">            workbook.allocated(size - (cells == null ? 0 : cells.length));</span>
+<span class="fc" id="L138">            Cell[] grown = new Cell[size];</span>
+<span class="fc bfc" id="L139" title="All 2 branches covered.">            if (cells != null) {</span>
+<span class="fc" id="L140">                System.arraycopy(cells, 0, grown, 0, cells.length);</span>
+            }
+<span class="fc" id="L142">            cells = grown;</span>
+<span class="fc" id="L143">            rows.set(row, cells);</span>
+        }
+<span class="fc" id="L145">        Cell c = cells[col];</span>
+<span class="fc bfc" id="L146" title="All 2 branches covered.">        if (c == null) {</span>
+<span class="fc" id="L147">            c = new Cell(this, row, col);</span>
+<span class="fc" id="L148">            cells[col] = c;</span>
+        }
+<span class="fc bfc" id="L150" title="All 2 branches covered.">        if (col &gt;= usedColumns) {</span>
+<span class="fc" id="L151">            usedColumns = col + 1;</span>
+        }
+<span class="fc" id="L153">        return c;</span>
+    }
+
+    /// Puts a value into a cell without telling anyone: what the file readers and the
+    /// copies from a grid use. A date becomes a day number with a date format.
+    void store(int row, int col, Object value) {
+<span class="fc bfc" id="L159" title="All 2 branches covered.">        if (value == null) {</span>
+<span class="fc" id="L160">            Cell old = cell(row, col);</span>
+<span class="fc bfc" id="L161" title="All 2 branches covered.">            if (old != null) {</span>
+<span class="fc" id="L162">                dissolveArray(old);</span>
+<span class="fc" id="L163">                old.value = null;</span>
+<span class="fc" id="L164">                clearFormula(old);</span>
+            }
+<span class="fc" id="L166">            return;</span>
+        }
+<span class="fc" id="L168">        Cell c = ensure(row, col);</span>
+<span class="fc" id="L169">        dissolveArray(c);</span>
+<span class="fc" id="L170">        clearFormula(c);</span>
+<span class="fc bfc" id="L171" title="All 2 branches covered.">        if (value instanceof Date) {</span>
+<span class="fc" id="L172">            double serial = workbook.toSerial((Date) value);</span>
+<span class="fc" id="L173">            c.value = Double.valueOf(serial);</span>
+<span class="pc bpc" id="L174" title="1 of 2 branches missed.">            if (!workbook.format(c.format).isDate()) {</span>
+<span class="pc bpc" id="L175" title="1 of 2 branches missed.">                c.format = workbook.formatId(serial == Math.floor(serial) ? &quot;yyyy-mm-dd&quot; : &quot;yyyy-mm-dd hh:mm:ss&quot;);</span>
+            }
+<span class="fc bfc" id="L177" title="All 2 branches covered.">        } else if (value instanceof Double) {</span>
+<span class="fc" id="L178">            double d = ((Double) value).doubleValue();</span>
+            // a spreadsheet has no NaN or infinity: every file writes them as #NUM!, so the
+            // cell holds that error from the start rather than a number that acts as one
+<span class="pc bpc" id="L181" title="1 of 4 branches missed.">            c.value = Double.isNaN(d) || Double.isInfinite(d) ? CellError.NUM : value;</span>
+<span class="fc bfc" id="L182" title="All 2 branches covered.">        } else if (value instanceof Float) {</span>
+            // 1.1f widened is 1.100000023841858: the number meant is the one it prints as
+<span class="fc" id="L184">            double d = Double.parseDouble(value.toString());</span>
+<span class="pc bpc" id="L185" title="1 of 4 branches missed.">            c.value = Double.isNaN(d) || Double.isInfinite(d) ? CellError.NUM : Double.valueOf(d);</span>
+<span class="fc bfc" id="L186" title="All 2 branches covered.">        } else if (value instanceof Number) {</span>
+<span class="fc" id="L187">            double d = ((Number) value).doubleValue();</span>
+<span class="pc bpc" id="L188" title="1 of 4 branches missed.">            c.value = Double.isNaN(d) || Double.isInfinite(d) ? CellError.NUM : Double.valueOf(d);</span>
+<span class="fc bfc" id="L189" title="All 6 branches covered.">        } else if (value instanceof Boolean || value instanceof String || value instanceof CellError) {</span>
+<span class="fc" id="L190">            c.value = value;</span>
+        } else {
+<span class="fc" id="L192">            c.value = value.toString();</span>
+        }
+<span class="fc" id="L194">    }</span>
+
+    /// An edit of a cell an array formula of several cells fills, or of the cell holding it,
+    /// ends the array, which Excel would refuse to edit in part. Replacing or clearing the
+    /// formula clears the cells it filled, as in Excel; editing one of the filled cells leaves
+    /// the formula in its own cell only and the other cells holding the values they showed.
+    private void dissolveArray(Cell c) {
+<span class="fc bfc" id="L201" title="All 2 branches covered.">        if (c.isArrayMember()) {</span>
+<span class="fc" id="L202">            dissolve(c.arrayAnchor, false);</span>
+<span class="pc bpc" id="L203" title="1 of 6 branches missed.">        } else if (c.formula != null &amp;&amp; c.arrayFormula &amp;&amp; c.arrayRows * c.arrayCols &gt; 1) {</span>
+<span class="fc" id="L204">            dissolve(c, true);</span>
+        }
+<span class="fc" id="L206">    }</span>
+
+    private void dissolve(Cell anchor, boolean clear) {
+<span class="fc" id="L209">        int rows = anchor.arrayRows;</span>
+<span class="fc" id="L210">        int cols = anchor.arrayCols;</span>
+<span class="fc" id="L211">        anchor.arrayRows = 1;</span>
+<span class="fc" id="L212">        anchor.arrayCols = 1;</span>
+<span class="fc bfc" id="L213" title="All 2 branches covered.">        for (int r = 0; r &lt; rows; r++) {</span>
+<span class="fc bfc" id="L214" title="All 2 branches covered.">            for (int k = 0; k &lt; cols; k++) {</span>
+<span class="pc bpc" id="L215" title="1 of 4 branches missed.">                Cell m = r == 0 &amp;&amp; k == 0 ? null : cell(anchor.row + r, anchor.col + k);</span>
+<span class="pc bpc" id="L216" title="1 of 4 branches missed.">                if (m == null || m.arrayAnchor != anchor) { //NOPMD CompareObjectsWithEquals - a cell is an identity</span>
+<span class="nc" id="L217">                    continue;</span>
+                }
+<span class="fc" id="L219">                m.arrayAnchor = null;</span>
+<span class="fc bfc" id="L220" title="All 2 branches covered.">                if (clear) {</span>
+<span class="fc" id="L221">                    m.value = null;</span>
+<span class="fc" id="L222">                    workbook.cellChanged(this, m.row, m.col);</span>
+                }
+            }
+        }
+<span class="fc" id="L226">    }</span>
+
+    /// Ends every array formula of several cells that an insertion or removal of rows or
+    /// columns would cut through, keeping the values its cells show; one moved whole stays.
+    private void dissolveCrossed(boolean byRow, int at, int count, boolean insert) {
+<span class="fc bfc" id="L231" title="All 2 branches covered.">        for (int r = 0; r &lt; usedRows(); r++) {</span>
+<span class="fc" id="L232">            Cell[] cells = rowCells(r);</span>
+<span class="fc bfc" id="L233" title="All 2 branches covered.">            if (cells == null) {</span>
+<span class="fc" id="L234">                continue;</span>
+            }
+<span class="fc bfc" id="L236" title="All 2 branches covered.">            for (Cell c : cells) {</span>
+<span class="pc bpc" id="L237" title="1 of 8 branches missed.">                if (c == null || c.formula == null || !c.arrayFormula || c.arrayRows * c.arrayCols &lt;= 1) {</span>
+<span class="nc" id="L238">                    continue;</span>
+                }
+<span class="pc bpc" id="L240" title="1 of 2 branches missed.">                int first = byRow ? c.row : c.col;</span>
+<span class="pc bpc" id="L241" title="1 of 2 branches missed.">                int last = first + (byRow ? c.arrayRows : c.arrayCols) - 1;</span>
+<span class="pc bpc" id="L242" title="7 of 10 branches missed.">                boolean crossed = insert ? at &gt; first &amp;&amp; at &lt;= last : at &lt;= last &amp;&amp; at + count - 1 &gt;= first;</span>
+<span class="pc bpc" id="L243" title="1 of 2 branches missed.">                if (crossed) {</span>
+<span class="fc" id="L244">                    dissolve(c, false);</span>
+                }
+            }
+        }
+<span class="fc" id="L248">    }</span>
+
+    private static void clearFormula(Cell c) {
+<span class="fc" id="L251">        c.formula = null;</span>
+<span class="fc" id="L252">        c.formulaText = null;</span>
+<span class="fc" id="L253">        c.refs = null;</span>
+<span class="fc" id="L254">        c.odsSyntax = false;</span>
+<span class="fc" id="L255">        c.alwaysDirty = false;</span>
+<span class="fc" id="L256">        c.arrayFormula = false;</span>
+<span class="fc" id="L257">        c.implicit = false;</span>
+<span class="fc" id="L258">        c.spreadsKnown = false;</span>
+<span class="fc" id="L259">        c.arrayAnchor = null;</span>
+<span class="fc" id="L260">        c.arrayRows = 1;</span>
+<span class="fc" id="L261">        c.arrayCols = 1;</span>
+<span class="fc" id="L262">        c.keepsCached = false;</span>
+<span class="fc" id="L263">        c.circular = false;</span>
+<span class="fc" id="L264">        c.state = Cell.CLEAN;</span>
+<span class="fc bfc" id="L265" title="All 2 branches covered.">        if (c.autoFormat) {</span>
+            // the date format =TODAY() brought would turn the 5 typed over it into a date
+<span class="fc" id="L267">            c.autoFormat = false;</span>
+<span class="fc" id="L268">            c.format = 0;</span>
+        }
+<span class="fc" id="L270">    }</span>
+
+    /// What a formula read from a file is counted as against the cell limit. A formula cell
+    /// holds its text and a tree of it, measured at about eight times what a number takes,
+    /// and more for a long formula.
+    static long formulaCost(int length) {
+<span class="fc" id="L276">        return 8 + length / 8;</span>
+    }
+
+    /// Puts a formula read from a file into a cell, with the value the file stored for it.
+    /// A formula that cannot be read keeps its text and that value, and is written back as
+    /// it came.
+    void loadFormula(int row, int col, String text, boolean ods, Object cached, boolean hasCached,
+            boolean array) {
+<span class="fc" id="L284">        Cell c = ensure(row, col);</span>
+<span class="fc" id="L285">        workbook.allocated(formulaCost(text.length()));</span>
+<span class="fc" id="L286">        storeRaw(row, col, cached);</span>
+<span class="fc" id="L287">        c.arrayFormula = array;</span>
+<span class="fc" id="L288">        c.spreadsKnown = false;</span>
+<span class="fc" id="L289">        c.arrayAnchor = null;</span>
+<span class="fc" id="L290">        c.arrayRows = 1;</span>
+<span class="fc" id="L291">        c.arrayCols = 1;</span>
+        try {
+<span class="fc" id="L293">            c.formula = FormulaParser.parse(text, ods);</span>
+<span class="fc" id="L294">            c.formulaText = FormulaParser.display(c.formula);</span>
+<span class="fc bfc" id="L295" title="All 2 branches covered.">            c.state = hasCached ? Cell.CLEAN : Cell.DIRTY;</span>
+<span class="fc bfc" id="L296" title="All 4 branches covered.">            c.keepsCached = hasCached &amp;&amp; Workbook.callsUnknown(c.formula, 0);</span>
+<span class="fc" id="L297">            workbook.formulaSet(c);</span>
+<span class="fc" id="L298">        } catch (FormulaSyntaxException e) {</span>
+<span class="fc" id="L299">            c.formula = null;</span>
+<span class="fc" id="L300">            c.formulaText = text;</span>
+<span class="fc" id="L301">            c.odsSyntax = ods;</span>
+<span class="fc" id="L302">            c.state = Cell.CLEAN;</span>
+<span class="fc" id="L303">        }</span>
+<span class="fc" id="L304">    }</span>
+
+    /// Puts a formula a file reader has already parsed -- one cell of a shared formula --
+    /// into a cell.
+    void loadFormula(int row, int col, Node node, Object cached, boolean hasCached, boolean array) {
+<span class="fc" id="L309">        Cell c = ensure(row, col);</span>
+<span class="fc" id="L310">        storeRaw(row, col, cached);</span>
+<span class="fc" id="L311">        c.arrayFormula = array;</span>
+<span class="fc" id="L312">        c.spreadsKnown = false;</span>
+<span class="fc" id="L313">        c.arrayAnchor = null;</span>
+<span class="fc" id="L314">        c.arrayRows = 1;</span>
+<span class="fc" id="L315">        c.arrayCols = 1;</span>
+<span class="fc" id="L316">        c.formula = node;</span>
+<span class="fc" id="L317">        c.formulaText = FormulaParser.display(node);</span>
+<span class="fc" id="L318">        workbook.allocated(formulaCost(c.formulaText.length()));</span>
+<span class="fc bfc" id="L319" title="All 2 branches covered.">        c.state = hasCached ? Cell.CLEAN : Cell.DIRTY;</span>
+<span class="pc bpc" id="L320" title="1 of 4 branches missed.">        c.keepsCached = hasCached &amp;&amp; Workbook.callsUnknown(node, 0);</span>
+<span class="fc" id="L321">        workbook.formulaSet(c);</span>
+<span class="fc" id="L322">    }</span>
+
+    /// Puts a value into a cell exactly as it is given, whatever its class: a file reader
+    /// leaves a marker here that it replaces when it has read the rest of the file.
+    void storeRaw(int row, int col, Object value) {
+<span class="fc" id="L327">        Cell c = ensure(row, col);</span>
+<span class="fc" id="L328">        dissolveArray(c);</span>
+<span class="fc" id="L329">        clearFormula(c);</span>
+<span class="fc" id="L330">        c.value = value;</span>
+<span class="fc" id="L331">    }</span>
+
+    // ------------------------------------------------------------------ cells
+
+    /// The value of a cell.
+    ///
+    /// #### Parameters
+    ///
+    /// - `row`: the row of the sheet, 0 for the first
+    ///
+    /// - `column`: the column of the sheet, 0 for `A`
+    ///
+    /// #### Returns
+    ///
+    /// a `Double`, `String`, `Boolean`, [CellError] or `Date`, or null for an empty cell
+    public Object getCellValue(int row, int column) {
+<span class="fc" id="L347">        Cell c = cell(row, column);</span>
+<span class="fc bfc" id="L348" title="All 2 branches covered.">        if (c == null) {</span>
+<span class="fc" id="L349">            return null;</span>
+        }
+<span class="fc" id="L351">        Object v = workbook.valueOf(c);</span>
+<span class="fc bfc" id="L352" title="All 4 branches covered.">        if (v instanceof Double &amp;&amp; c.format != 0) {</span>
+<span class="fc" id="L353">            CellFormat f = workbook.format(c.format);</span>
+<span class="fc bfc" id="L354" title="All 4 branches covered.">            if (f.isDate() &amp;&amp; !f.isTimeOnly()) {</span>
+<span class="fc" id="L355">                double d = ((Double) v).doubleValue();</span>
+<span class="fc bfc" id="L356" title="All 2 branches covered.">                if (d &gt;= 0) {</span>
+<span class="fc" id="L357">                    return DateUtil.toDate(d, workbook.isDate1904());</span>
+                }
+            }
+        }
+<span class="fc" id="L361">        return v;</span>
+    }
+
+    /// The value of a cell named the way a formula names it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `address`: an address such as `B7`
+    ///
+    /// #### Returns
+    ///
+    /// the value, see [#getCellValue(int, int)]
+    public Object getCellValue(String address) {
+<span class="fc" id="L374">        int[] rc = address(address);</span>
+<span class="fc" id="L375">        return getCellValue(rc[0], rc[1]);</span>
+    }
+
+    /// Stores a value in a cell, replacing a formula it held, and recalculates what depends
+    /// on it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `row`: the row of the sheet
+    ///
+    /// - `column`: the column of the sheet
+    ///
+    /// - `value`: a `Number`, `String`, `Boolean`, `Date` or [CellError]; null empties the
+    ///   cell. A `String` is stored as text even when it looks like a number or a formula.
+    public void setCellValue(int row, int column, Object value) {
+<span class="fc" id="L390">        store(row, column, value);</span>
+<span class="fc" id="L391">        workbook.cellChanged(this, row, column);</span>
+<span class="fc" id="L392">    }</span>
+
+    /// Stores a value in a cell named the way a formula names it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `address`: an address such as `B7`
+    ///
+    /// - `value`: the value, see [#setCellValue(int, int, Object)]
+    public void setCellValue(String address, Object value) {
+<span class="fc" id="L402">        int[] rc = address(address);</span>
+<span class="fc" id="L403">        setCellValue(rc[0], rc[1], value);</span>
+<span class="fc" id="L404">    }</span>
+
+    /// The formula of a cell.
+    ///
+    /// #### Parameters
+    ///
+    /// - `row`: the row of the sheet
+    ///
+    /// - `column`: the column of the sheet
+    ///
+    /// #### Returns
+    ///
+    /// the formula with its leading `=`, or null when the cell holds no formula
+    public String getCellFormula(int row, int column) {
+<span class="fc" id="L418">        Cell c = cell(row, column);</span>
+<span class="fc bfc" id="L419" title="All 4 branches covered.">        return c == null || c.formulaText == null ? null : &quot;=&quot; + c.formulaText;</span>
+    }
+
+    /// Puts a formula into a cell and recalculates what depends on it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `row`: the row of the sheet
+    ///
+    /// - `column`: the column of the sheet
+    ///
+    /// - `formula`: a formula in Excel's syntax, with or without the leading `=`
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: when the formula cannot be read
+    public void setCellFormula(int row, int column, String formula) {
+<span class="fc bfc" id="L436" title="All 2 branches covered.">        if (formula == null) {</span>
+<span class="fc" id="L437">            setCellValue(row, column, null);</span>
+<span class="fc" id="L438">            return;</span>
+        }
+<span class="fc bfc" id="L440" title="All 2 branches covered.">        String text = formula.startsWith(&quot;=&quot;) ? formula.substring(1) : formula;</span>
+        Node node;
+        try {
+<span class="fc" id="L443">            node = FormulaParser.parse(text, false);</span>
+<span class="fc" id="L444">        } catch (FormulaSyntaxException e) {</span>
+<span class="fc" id="L445">            throw new IllegalArgumentException(e.getMessage()); //NOPMD PreserveStackTrace - the device library has no constructor that takes a cause</span>
+<span class="fc" id="L446">        }</span>
+<span class="fc" id="L447">        putFormula(row, column, text, node);</span>
+<span class="fc" id="L448">    }</span>
+
+    /// The format a formula typed into a cell with none gives it, as a spreadsheet does for
+    /// the functions that make a date: `=TODAY()` shows a date and not the number of a day.
+    private void formatOfTyped(Cell c, Node node) {
+<span class="pc bpc" id="L453" title="1 of 6 branches missed.">        if (node.kind != Node.FUNC || !(node.value instanceof String) || !workbook.format(c.format).isGeneral()) {</span>
+<span class="fc" id="L454">            return;</span>
+        }
+<span class="fc" id="L456">        String name = (String) node.value;</span>
+<span class="fc bfc" id="L457" title="All 4 branches covered.">        if (&quot;DATE&quot;.equalsIgnoreCase(name) || &quot;TODAY&quot;.equalsIgnoreCase(name)) {</span>
+<span class="fc" id="L458">            c.format = workbook.formatId(&quot;yyyy-mm-dd&quot;);</span>
+<span class="fc" id="L459">            c.autoFormat = true;</span>
+<span class="fc bfc" id="L460" title="All 2 branches covered.">        } else if (&quot;NOW&quot;.equalsIgnoreCase(name)) {</span>
+<span class="fc" id="L461">            c.format = workbook.formatId(&quot;yyyy-mm-dd hh:mm:ss&quot;);</span>
+<span class="fc" id="L462">            c.autoFormat = true;</span>
+<span class="fc bfc" id="L463" title="All 2 branches covered.">        } else if (&quot;TIME&quot;.equalsIgnoreCase(name)) {</span>
+<span class="fc" id="L464">            c.format = workbook.formatId(&quot;hh:mm:ss&quot;);</span>
+<span class="fc" id="L465">            c.autoFormat = true;</span>
+        }
+<span class="fc" id="L467">    }</span>
+
+    /// Puts a formula into a cell named the way a formula names it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `address`: an address such as `B7`
+    ///
+    /// - `formula`: the formula, see [#setCellFormula(int, int, String)]
+    public void setCellFormula(String address, String formula) {
+<span class="fc" id="L477">        int[] rc = address(address);</span>
+<span class="fc" id="L478">        setCellFormula(rc[0], rc[1], formula);</span>
+<span class="fc" id="L479">    }</span>
+
+    private void putFormula(int row, int column, String text, Node node) {
+<span class="fc" id="L482">        Cell c = ensure(row, column);</span>
+<span class="fc" id="L483">        dissolveArray(c);</span>
+<span class="fc" id="L484">        clearFormula(c);</span>
+<span class="fc" id="L485">        c.formula = node;</span>
+<span class="fc" id="L486">        c.formulaText = text;</span>
+<span class="fc" id="L487">        c.state = Cell.DIRTY;</span>
+<span class="fc" id="L488">        formatOfTyped(c, node);</span>
+<span class="fc" id="L489">        workbook.formulaSet(c);</span>
+<span class="fc" id="L490">        workbook.cellChanged(this, row, column);</span>
+<span class="fc" id="L491">    }</span>
+
+    /// The text a cell shows: its value in its number format.
+    ///
+    /// #### Parameters
+    ///
+    /// - `row`: the row of the sheet
+    ///
+    /// - `column`: the column of the sheet
+    ///
+    /// #### Returns
+    ///
+    /// the text, empty for an empty cell
+    public String getCellText(int row, int column) {
+<span class="fc" id="L505">        Cell c = cell(row, column);</span>
+<span class="fc bfc" id="L506" title="All 2 branches covered.">        if (c == null) {</span>
+<span class="fc" id="L507">            return &quot;&quot;;</span>
+        }
+<span class="fc" id="L509">        return workbook.format(c.format).format(workbook.valueOf(c), workbook.isDate1904());</span>
+    }
+
+    /// The number format of a cell.
+    ///
+    /// #### Parameters
+    ///
+    /// - `row`: the row of the sheet
+    ///
+    /// - `column`: the column of the sheet
+    ///
+    /// #### Returns
+    ///
+    /// a format code such as `#,##0.00`, `General` when the cell has none
+    public String getCellFormat(int row, int column) {
+<span class="fc" id="L524">        Cell c = cell(row, column);</span>
+<span class="fc bfc" id="L525" title="All 2 branches covered.">        return workbook.format(c == null ? 0 : c.format).code();</span>
+    }
+
+    /// Sets the number format of a cell: how its value is shown, and for a number whether
+    /// it is a date.
+    ///
+    /// #### Parameters
+    ///
+    /// - `row`: the row of the sheet
+    ///
+    /// - `column`: the column of the sheet
+    ///
+    /// - `format`: a format code in Excel's syntax, such as `0.0%` or `d mmm yyyy`; null for
+    ///   none
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: for a format code no file can hold: more than four sections, or a quote, bracket or escape left open
+    public void setCellFormat(int row, int column, String format) {
+<span class="fc" id="L544">        CellFormat.check(format);</span>
+<span class="fc" id="L545">        Cell c = ensure(row, column);</span>
+<span class="fc" id="L546">        c.format = workbook.formatId(format);</span>
+<span class="fc" id="L547">        c.autoFormat = false;</span>
+<span class="fc" id="L548">        fire(row, column);</span>
+<span class="fc" id="L549">    }</span>
+
+    void storeFormat(int row, int col, int format) {
+<span class="fc" id="L552">        ensure(row, col).format = format;</span>
+<span class="fc" id="L553">    }</span>
+
+    private static int[] address(String a) {
+<span class="fc" id="L556">        int n = a.length();</span>
+<span class="fc" id="L557">        int i = 0;</span>
+<span class="fc bfc" id="L558" title="All 4 branches covered.">        while (i &lt; n &amp;&amp; FormulaParser.isLetter(a.charAt(i))) {</span>
+<span class="fc" id="L559">            i++;</span>
+        }
+<span class="fc" id="L561">        int row = -1;</span>
+<span class="pc bpc" id="L562" title="2 of 6 branches missed.">        if (i &gt; 0 &amp;&amp; i &lt; n &amp;&amp; i &lt;= 3) {</span>
+            try {
+<span class="fc" id="L564">                row = Integer.parseInt(a.substring(i)) - 1;</span>
+<span class="fc" id="L565">            } catch (NumberFormatException e) {</span>
+<span class="fc" id="L566">                row = -1;</span>
+<span class="fc" id="L567">            }</span>
+        }
+<span class="fc bfc" id="L569" title="All 2 branches covered.">        if (row &lt; 0) {</span>
+<span class="fc" id="L570">            throw new IllegalArgumentException(&quot;Not a cell address: &quot; + a);</span>
+        }
+<span class="fc" id="L572">        return new int[] {row, FormulaParser.column(a, 0, i)};</span>
+    }
+
+    /// Reads text as if it had been typed into the cell.
+    private void input(int row, int column, String text) {
+<span class="fc bfc" id="L577" title="All 2 branches covered.">        if (text.length() == 0) {</span>
+<span class="fc" id="L578">            setCellValue(row, column, null);</span>
+<span class="fc" id="L579">            return;</span>
+        }
+<span class="fc bfc" id="L581" title="All 2 branches covered.">        if (text.charAt(0) == '\'') {</span>
+<span class="fc" id="L582">            setCellValue(row, column, text.substring(1));</span>
+<span class="fc" id="L583">            return;</span>
+        }
+<span class="fc" id="L585">        Cell typedInto = cell(row, column);</span>
+<span class="fc bfc" id="L586" title="All 6 branches covered.">        if (typedInto != null &amp;&amp; !typedInto.autoFormat &amp;&amp; workbook.format(typedInto.format).isText()) {</span>
+            // a cell formatted as text keeps what is typed: the zeros of 00123, and a formula
+            // as its text
+<span class="fc" id="L589">            setCellValue(row, column, text);</span>
+<span class="fc" id="L590">            return;</span>
+        }
+<span class="pc bpc" id="L592" title="1 of 4 branches missed.">        if (text.charAt(0) == '=' &amp;&amp; text.length() &gt; 1) {</span>
+            try {
+<span class="fc" id="L594">                String body = text.substring(1);</span>
+<span class="fc" id="L595">                putFormula(row, column, body, FormulaParser.parse(body, false));</span>
+<span class="fc" id="L596">            } catch (FormulaSyntaxException e) {</span>
+                // a spreadsheet refuses the entry; a model has nobody to refuse it to
+<span class="fc" id="L598">                setCellValue(row, column, text);</span>
+<span class="fc" id="L599">            }</span>
+<span class="fc" id="L600">            return;</span>
+        }
+<span class="fc" id="L602">        String trimmed = text.trim();</span>
+<span class="fc bfc" id="L603" title="All 2 branches covered.">        if (&quot;TRUE&quot;.equalsIgnoreCase(trimmed)) {</span>
+<span class="fc" id="L604">            setCellValue(row, column, Boolean.TRUE);</span>
+<span class="fc" id="L605">            return;</span>
+        }
+<span class="fc bfc" id="L607" title="All 2 branches covered.">        if (&quot;FALSE&quot;.equalsIgnoreCase(trimmed)) {</span>
+<span class="fc" id="L608">            setCellValue(row, column, Boolean.FALSE);</span>
+<span class="fc" id="L609">            return;</span>
+        }
+<span class="fc" id="L611">        CellError error = CellError.valueOf(trimmed);</span>
+<span class="fc bfc" id="L612" title="All 2 branches covered.">        if (error != null) {</span>
+<span class="fc" id="L613">            setCellValue(row, column, error);</span>
+<span class="fc" id="L614">            return;</span>
+        }
+<span class="fc" id="L616">        Double number = Values.parseNumber(trimmed);</span>
+        // 1E400 reads as a number and is none a cell can hold
+<span class="pc bpc" id="L618" title="1 of 6 branches missed.">        if (number == null || Double.isInfinite(number.doubleValue()) || Double.isNaN(number.doubleValue())) {</span>
+<span class="fc" id="L619">            setCellValue(row, column, text);</span>
+<span class="fc" id="L620">            return;</span>
+        }
+<span class="fc" id="L622">        double d = number.doubleValue();</span>
+<span class="fc" id="L623">        String format = null;</span>
+        // 1.2E-05 has a dash where a year would end, and is no date
+<span class="fc bfc" id="L625" title="All 4 branches covered.">        boolean date = Values.namedDate(trimmed, new int[1]) &gt;= 0 || trimmed.indexOf('-', 1) == 4</span>
+<span class="pc bpc" id="L626" title="1 of 4 branches missed.">                &amp;&amp; trimmed.indexOf('e') &lt; 0 &amp;&amp; trimmed.indexOf('E') &lt; 0;</span>
+<span class="fc bfc" id="L627" title="All 2 branches covered.">        boolean time = trimmed.indexOf(':') &gt;= 0;</span>
+<span class="fc bfc" id="L628" title="All 2 branches covered.">        if (trimmed.endsWith(&quot;%&quot;)) {</span>
+<span class="pc bpc" id="L629" title="1 of 2 branches missed.">            format = trimmed.indexOf('.') &lt; 0 ? &quot;0%&quot; : &quot;0.00%&quot;;</span>
+<span class="fc bfc" id="L630" title="All 4 branches covered.">        } else if (date || time) {</span>
+            // a time past a day, as 36:30, is shown as hours elapsed, as Excel shows it
+<span class="pc bpc" id="L632" title="2 of 6 branches missed.">            format = date ? time ? &quot;yyyy-mm-dd hh:mm:ss&quot; : &quot;yyyy-mm-dd&quot; : d &gt;= 1 ? &quot;[h]:mm:ss&quot; : &quot;hh:mm:ss&quot;;</span>
+<span class="pc bpc" id="L633" title="1 of 4 branches missed.">            if (date &amp;&amp; workbook.isDate1904()) {</span>
+<span class="nc" id="L634">                d -= 1462;</span>
+            }
+        }
+<span class="fc" id="L637">        store(row, column, Double.valueOf(d));</span>
+<span class="fc" id="L638">        Cell c = cell(row, column);</span>
+<span class="fc bfc" id="L639" title="All 4 branches covered.">        if (format != null &amp;&amp; workbook.format(c.format).isGeneral()) {</span>
+<span class="fc" id="L640">            c.format = workbook.formatId(format);</span>
+        }
+<span class="fc" id="L642">        workbook.cellChanged(this, row, column);</span>
+<span class="fc" id="L643">    }</span>
+
+    // ------------------------------------------------------------------ the table model
+
+    /// Whether the first row of the sheet holds the names of the columns. When it does, the
+    /// table model's rows start under it.
+    ///
+    /// #### Returns
+    ///
+    /// true when the first row is a header
+    public boolean isHeaderRow() {
+<span class="fc" id="L654">        return headerRow;</span>
+    }
+
+    /// Sets whether the first row of the sheet holds the names of the columns.
+    ///
+    /// #### Parameters
+    ///
+    /// - `headerRow`: true to take the column names from the first row
+    public void setHeaderRow(boolean headerRow) {
+<span class="pc bpc" id="L663" title="1 of 2 branches missed.">        if (this.headerRow != headerRow) {</span>
+<span class="fc" id="L664">            this.headerRow = headerRow;</span>
+<span class="fc" id="L665">            fireAll();</span>
+        }
+<span class="fc" id="L667">    }</span>
+
+    /// Sets whether the table model reports its cells as editable.
+    ///
+    /// #### Parameters
+    ///
+    /// - `editable`: false for a grid that only shows the sheet
+    public void setEditable(boolean editable) {
+<span class="fc" id="L675">        this.editable = editable;</span>
+<span class="fc" id="L676">    }</span>
+
+    private int offset() {
+<span class="fc bfc" id="L679" title="All 2 branches covered.">        return headerRow ? 1 : 0;</span>
+    }
+
+    int headerRows() {
+<span class="fc" id="L683">        return offset();</span>
+    }
+
+    /// What an editor opens with for a cell: the formula, or the value written so that
+    /// typing it back gives the same value.
+    String editText(int row, int column) {
+<span class="fc" id="L689">        Cell c = cell(row, column);</span>
+<span class="pc bpc" id="L690" title="1 of 2 branches missed.">        if (c == null) {</span>
+<span class="nc" id="L691">            return &quot;&quot;;</span>
+        }
+<span class="fc bfc" id="L693" title="All 2 branches covered.">        if (c.isFormula()) {</span>
+<span class="fc" id="L694">            return getCellFormula(row, column);</span>
+        }
+<span class="fc" id="L696">        Object v = c.value;</span>
+<span class="pc bpc" id="L697" title="1 of 2 branches missed.">        if (v == null) {</span>
+<span class="nc" id="L698">            return &quot;&quot;;</span>
+        }
+<span class="pc bpc" id="L700" title="1 of 2 branches missed.">        if (v instanceof Boolean) {</span>
+<span class="nc bnc" id="L701" title="All 2 branches missed.">            return ((Boolean) v).booleanValue() ? &quot;TRUE&quot; : &quot;FALSE&quot;;</span>
+        }
+<span class="fc bfc" id="L703" title="All 2 branches covered.">        if (!(v instanceof Double)) {</span>
+<span class="fc" id="L704">            return v.toString();</span>
+        }
+<span class="fc" id="L706">        double d = ((Double) v).doubleValue();</span>
+<span class="fc" id="L707">        CellFormat format = workbook.format(c.format);</span>
+<span class="pc bpc" id="L708" title="1 of 2 branches missed.">        if (format.isDate()) {</span>
+<span class="nc bnc" id="L709" title="All 2 branches missed.">            boolean day = d &gt;= 1;</span>
+<span class="nc bnc" id="L710" title="All 2 branches missed.">            boolean time = d - Math.floor(d) &gt; 0;</span>
+<span class="nc bnc" id="L711" title="All 4 branches missed.">            String code = day ? time ? &quot;yyyy-mm-dd hh:mm:ss&quot; : &quot;yyyy-mm-dd&quot; : &quot;hh:mm:ss&quot;;</span>
+<span class="nc" id="L712">            return new CellFormat(code).format(v, workbook.isDate1904());</span>
+        }
+<span class="fc bfc" id="L714" title="All 2 branches covered.">        if (format.isPercent()) {</span>
+<span class="fc" id="L715">            return Values.general(d * 100) + &quot;%&quot;;</span>
+        }
+<span class="fc" id="L717">        return Values.general(d);</span>
+    }
+
+    @Override
+    public int getRowCount() {
+<span class="fc" id="L722">        return Math.max(0, rows.size() - offset());</span>
+    }
+
+    @Override
+    public int getColumnCount() {
+<span class="fc" id="L727">        return usedColumns;</span>
+    }
+
+    /// The name of a column: the text of the header row's cell when the sheet has a header
+    /// row and the cell is not empty, the letters of the column otherwise.
+    @Override
+    public String getColumnName(int i) {
+<span class="fc bfc" id="L734" title="All 2 branches covered.">        if (headerRow) {</span>
+<span class="fc" id="L735">            String text = getCellText(0, i);</span>
+<span class="pc bpc" id="L736" title="1 of 2 branches missed.">            if (text.length() &gt; 0) {</span>
+<span class="fc" id="L737">                return text;</span>
+            }
+        }
+<span class="fc" id="L740">        StringBuilder sb = new StringBuilder();</span>
+<span class="fc" id="L741">        FormulaParser.appendColumn(sb, i);</span>
+<span class="fc" id="L742">        return sb.toString();</span>
+    }
+
+    @Override
+    public boolean isCellEditable(int row, int column) {
+<span class="fc" id="L747">        return editable;</span>
+    }
+
+    @Override
+    public Object getValueAt(int row, int column) {
+<span class="fc" id="L752">        return getCellValue(row + offset(), column);</span>
+    }
+
+    /// Stores a value. A `String` is read as if it had been typed into a spreadsheet, see
+    /// the class description; anything else is stored as it is.
+    @Override
+    public void setValueAt(int row, int column, Object o) {
+<span class="fc bfc" id="L759" title="All 2 branches covered.">        if (o instanceof String) {</span>
+<span class="fc" id="L760">            input(row + offset(), column, (String) o);</span>
+        } else {
+<span class="fc" id="L762">            setCellValue(row + offset(), column, o);</span>
+        }
+<span class="fc" id="L764">    }</span>
+
+    /// The formula of a cell of the table model.
+    ///
+    /// #### Parameters
+    ///
+    /// - `row`: the row of the model
+    ///
+    /// - `column`: the column
+    ///
+    /// #### Returns
+    ///
+    /// the formula with its leading `=`, or null
+    public String getFormulaAt(int row, int column) {
+<span class="fc" id="L778">        return getCellFormula(row + offset(), column);</span>
+    }
+
+    /// Adds a listener that is told when a cell changes: the cell that was edited, and every
+    /// formula that reads it, directly or through other formulas.
+    ///
+    /// A formula is calculated when its value is asked for, not when what it reads changes,
+    /// so the event says that the cell is out of date. A cell that is out of date already,
+    /// because nobody read it since the last event, is not announced a second time.
+    ///
+    /// #### Parameters
+    ///
+    /// - `d`: the listener
+    @Override
+    public void addDataChangeListener(DataChangedListener d) {
+<span class="fc" id="L793">        dispatcher.addListener(d);</span>
+<span class="fc" id="L794">    }</span>
+
+    @Override
+    public void removeDataChangeListener(DataChangedListener d) {
+<span class="fc" id="L798">        dispatcher.removeListener(d);</span>
+<span class="fc" id="L799">    }</span>
+
+    /// Tells the listeners about a cell of the sheet.
+    void fire(int row, int col) {
+<span class="fc bfc" id="L803" title="All 2 branches covered.">        if (!dispatcher.hasListeners()) {</span>
+<span class="fc" id="L804">            return;</span>
+        }
+<span class="fc" id="L806">        int modelRow = row - offset();</span>
+<span class="pc bpc" id="L807" title="1 of 2 branches missed.">        if (modelRow &lt; 0) {</span>
+            // a column name changed
+<span class="nc" id="L809">            dispatcher.fireDataChangeEvent(Integer.MIN_VALUE, Integer.MIN_VALUE);</span>
+        } else {
+<span class="fc" id="L811">            dispatcher.fireDataChangeEvent(col, modelRow);</span>
+        }
+<span class="fc" id="L813">    }</span>
+
+    void fireAll() {
+<span class="fc bfc" id="L816" title="All 2 branches covered.">        if (dispatcher.hasListeners()) {</span>
+<span class="fc" id="L817">            dispatcher.fireDataChangeEvent(Integer.MIN_VALUE, Integer.MIN_VALUE);</span>
+        }
+<span class="fc" id="L819">    }</span>
+
+    /// Adds a row under the last one.
+    ///
+    /// #### Parameters
+    ///
+    /// - `values`: the values of the row's cells from the first column on; each is stored
+    ///   as [#setCellValue(int, int, Object)] stores it
+    public void addRow(Object... values) {
+<span class="fc" id="L828">        int row = rows.size();</span>
+<span class="fc" id="L829">        rows.add(null);</span>
+<span class="fc bfc" id="L830" title="All 2 branches covered.">        for (int c = 0; c &lt; values.length; c++) {</span>
+<span class="fc" id="L831">            store(row, c, values[c]);</span>
+        }
+<span class="fc bfc" id="L833" title="All 2 branches covered.">        for (int c = 0; c &lt; values.length; c++) {</span>
+<span class="fc" id="L834">            workbook.cellChanged(this, row, c);</span>
+        }
+<span class="pc bpc" id="L836" title="1 of 2 branches missed.">        if (values.length == 0) {</span>
+<span class="nc" id="L837">            fireAll();</span>
+        }
+<span class="fc" id="L839">    }</span>
+
+    // ------------------------------------------------------------------ rows and columns
+
+    /// Inserts empty rows. Formulas that refer to cells under them are rewritten to follow
+    /// the cells, as a spreadsheet does.
+    ///
+    /// #### Parameters
+    ///
+    /// - `row`: the row of the sheet the first new row becomes
+    ///
+    /// - `count`: how many rows to insert
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: for a row outside the sheet or a negative count
+    public void insertRows(int row, int count) {
+<span class="pc bpc" id="L856" title="2 of 6 branches missed.">        if (count &lt; 0 || row &lt; 0 || row &gt; Node.MAX_ROW) {</span>
+<span class="fc" id="L857">            throw new IllegalArgumentException(&quot;Not a row of the sheet, or a negative count: &quot; + row + &quot;, &quot; + count);</span>
+        }
+<span class="pc bpc" id="L859" title="1 of 2 branches missed.">        if (count == 0) {</span>
+<span class="nc" id="L860">            return;</span>
+        }
+<span class="fc" id="L862">        dissolveCrossed(true, row, count, true);</span>
+        // no more than reach the edge of the grid, so that no position overflows
+<span class="fc" id="L864">        count = Math.min(count, Node.MAX_ROW + 1 - row);</span>
+<span class="fc bfc" id="L865" title="All 2 branches covered.">        if (row &lt; rows.size()) {</span>
+<span class="fc bfc" id="L866" title="All 2 branches covered.">            if ((long) rows.size() - 1 + count &gt; Node.MAX_ROW) {</span>
+                // the last row of data would leave the grid, where no reference can reach it
+<span class="fc" id="L868">                throw new IllegalArgumentException(&quot;Inserting &quot; + count + &quot; rows pushes row &quot; + rows.size()</span>
+                        + &quot; past the last row of a sheet, &quot; + (Node.MAX_ROW + 1));
+            }
+            // one move of the rows under the insertion, however many rows go in
+<span class="fc" id="L872">            ArrayList&lt;Cell[]&gt; empty = new ArrayList&lt;Cell[]&gt;(count);</span>
+<span class="fc bfc" id="L873" title="All 2 branches covered.">            for (int i = 0; i &lt; count; i++) {</span>
+<span class="fc" id="L874">                empty.add(null);</span>
+            }
+<span class="fc" id="L876">            rows.addAll(row, empty);</span>
+        }
+<span class="fc" id="L878">        renumber();</span>
+<span class="fc" id="L879">        shiftKeys(outlineLevels, row, count, Node.MAX_ROW);</span>
+<span class="fc bfc" id="L880" title="All 2 branches covered.">        for (int i = merges.size() - 1; i &gt;= 0; i--) {</span>
+<span class="fc" id="L881">            int[] m = merges.get(i);</span>
+<span class="fc bfc" id="L882" title="All 2 branches covered.">            if (m[0] &gt;= row) {</span>
+<span class="fc" id="L883">                m[0] += count;</span>
+            }
+<span class="fc bfc" id="L885" title="All 2 branches covered.">            if (m[2] &gt;= row) {</span>
+<span class="fc" id="L886">                m[2] += count;</span>
+            }
+<span class="fc bfc" id="L888" title="All 2 branches covered.">            if (m[2] &gt; Node.MAX_ROW) {</span>
+<span class="fc" id="L889">                merges.remove(i);</span>
+            }
+        }
+<span class="fc" id="L892">        workbook.restructured(this, true, row, count);</span>
+<span class="fc" id="L893">    }</span>
+
+    /// Removes rows. A formula that referred to a removed cell evaluates to `#REF!`; a range
+    /// that included removed rows shrinks.
+    ///
+    /// #### Parameters
+    ///
+    /// - `row`: the first row of the sheet to remove
+    ///
+    /// - `count`: how many rows to remove
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: for a row outside the sheet or a negative count
+    public void removeRows(int row, int count) {
+<span class="pc bpc" id="L908" title="3 of 6 branches missed.">        if (count &lt; 0 || row &lt; 0 || row &gt; Node.MAX_ROW) {</span>
+<span class="nc" id="L909">            throw new IllegalArgumentException(&quot;Not a row of the sheet, or a negative count: &quot; + row + &quot;, &quot; + count);</span>
+        }
+<span class="pc bpc" id="L911" title="1 of 2 branches missed.">        if (count == 0) {</span>
+<span class="nc" id="L912">            return;</span>
+        }
+<span class="fc" id="L914">        dissolveCrossed(true, row, count, false);</span>
+        // no more than reach the edge of the grid, so that no position overflows
+<span class="fc" id="L916">        count = Math.min(count, Node.MAX_ROW + 1 - row);</span>
+<span class="fc bfc" id="L917" title="All 4 branches covered.">        for (int i = 0; i &lt; count &amp;&amp; row &lt; rows.size(); i++) {</span>
+<span class="fc" id="L918">            orphan(rows.remove(row));</span>
+        }
+<span class="fc" id="L920">        renumber();</span>
+<span class="fc" id="L921">        shiftKeys(outlineLevels, row, -count, Node.MAX_ROW);</span>
+<span class="fc bfc" id="L922" title="All 2 branches covered.">        for (int i = merges.size() - 1; i &gt;= 0; i--) {</span>
+<span class="fc" id="L923">            int[] m = merges.get(i);</span>
+<span class="fc bfc" id="L924" title="All 4 branches covered.">            if (m[0] &gt;= row &amp;&amp; m[2] &lt; row + count) {</span>
+<span class="fc" id="L925">                merges.remove(i);</span>
+<span class="fc" id="L926">                continue;</span>
+            }
+<span class="fc bfc" id="L928" title="All 2 branches covered.">            m[0] = m[0] &gt;= row + count ? m[0] - count : Math.min(m[0], row);</span>
+<span class="fc bfc" id="L929" title="All 2 branches covered.">            m[2] = m[2] &gt;= row + count ? m[2] - count : Math.min(m[2], row - 1);</span>
+        }
+<span class="fc" id="L931">        workbook.restructured(this, true, row, -count);</span>
+<span class="fc" id="L932">    }</span>
+
+    /// Inserts empty columns. Formulas follow the cells that move.
+    ///
+    /// #### Parameters
+    ///
+    /// - `column`: the column the first new column becomes
+    ///
+    /// - `count`: how many columns to insert
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: for a column outside the sheet or a negative count
+    public void insertColumns(int column, int count) {
+<span class="pc bpc" id="L946" title="3 of 6 branches missed.">        if (count &lt; 0 || column &lt; 0 || column &gt; Node.MAX_COL) {</span>
+<span class="nc" id="L947">            throw new IllegalArgumentException(&quot;Not a column of the sheet, or a negative count: &quot; + column + &quot;, &quot; + count);</span>
+        }
+<span class="pc bpc" id="L949" title="1 of 2 branches missed.">        if (count == 0) {</span>
+<span class="nc" id="L950">            return;</span>
+        }
+<span class="fc" id="L952">        dissolveCrossed(false, column, count, true);</span>
+        // no more than reach the edge of the grid, so that no position overflows
+<span class="fc" id="L954">        count = Math.min(count, Node.MAX_COL + 1 - column);</span>
+<span class="fc bfc" id="L955" title="All 4 branches covered.">        if (column &lt; usedColumns &amp;&amp; (long) usedColumns - 1 + count &gt; Node.MAX_COL) {</span>
+<span class="fc" id="L956">            throw new IllegalArgumentException(&quot;Inserting &quot; + count + &quot; columns pushes column &quot; + usedColumns</span>
+                    + &quot; past the last column of a sheet, &quot; + (Node.MAX_COL + 1));
+        }
+<span class="fc bfc" id="L959" title="All 2 branches covered.">        for (int r = 0; r &lt; rows.size(); r++) {</span>
+<span class="fc" id="L960">            Cell[] cells = rows.get(r);</span>
+<span class="pc bpc" id="L961" title="1 of 4 branches missed.">            if (cells == null || cells.length &lt;= column) {</span>
+<span class="nc" id="L962">                continue;</span>
+            }
+<span class="fc" id="L964">            Cell[] grown = new Cell[cells.length + count];</span>
+<span class="fc" id="L965">            System.arraycopy(cells, 0, grown, 0, column);</span>
+<span class="fc" id="L966">            System.arraycopy(cells, column, grown, column + count, cells.length - column);</span>
+<span class="fc" id="L967">            rows.set(r, grown);</span>
+        }
+<span class="fc bfc" id="L969" title="All 2 branches covered.">        if (column &lt; usedColumns) {</span>
+<span class="fc" id="L970">            usedColumns += count;</span>
+        }
+<span class="fc" id="L972">        renumber();</span>
+<span class="fc" id="L973">        shiftKeys(columnWidths, column, count, Node.MAX_COL);</span>
+<span class="fc bfc" id="L974" title="All 2 branches covered.">        for (int i = merges.size() - 1; i &gt;= 0; i--) {</span>
+<span class="fc" id="L975">            int[] m = merges.get(i);</span>
+<span class="pc bpc" id="L976" title="1 of 2 branches missed.">            if (m[1] &gt;= column) {</span>
+<span class="nc" id="L977">                m[1] += count;</span>
+            }
+<span class="pc bpc" id="L979" title="1 of 2 branches missed.">            if (m[3] &gt;= column) {</span>
+<span class="fc" id="L980">                m[3] += count;</span>
+            }
+<span class="pc bpc" id="L982" title="1 of 2 branches missed.">            if (m[3] &gt; Node.MAX_COL) {</span>
+<span class="nc" id="L983">                merges.remove(i);</span>
+            }
+        }
+<span class="fc" id="L986">        workbook.restructured(this, false, column, count);</span>
+<span class="fc" id="L987">    }</span>
+
+    /// Removes columns. A formula that referred to a removed cell evaluates to `#REF!`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `column`: the first column to remove
+    ///
+    /// - `count`: how many columns to remove
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: for a column outside the sheet or a negative count
+    public void removeColumns(int column, int count) {
+<span class="pc bpc" id="L1001" title="3 of 6 branches missed.">        if (count &lt; 0 || column &lt; 0 || column &gt; Node.MAX_COL) {</span>
+<span class="nc" id="L1002">            throw new IllegalArgumentException(&quot;Not a column of the sheet, or a negative count: &quot; + column + &quot;, &quot; + count);</span>
+        }
+<span class="pc bpc" id="L1004" title="1 of 2 branches missed.">        if (count == 0) {</span>
+<span class="nc" id="L1005">            return;</span>
+        }
+<span class="fc" id="L1007">        dissolveCrossed(false, column, count, false);</span>
+        // no more than reach the edge of the grid, so that no position overflows
+<span class="fc" id="L1009">        count = Math.min(count, Node.MAX_COL + 1 - column);</span>
+        // the cells go only as far as the data, but references move by the whole count
+<span class="fc" id="L1011">        int n = Math.max(0, Math.min(count, usedColumns - column));</span>
+<span class="fc bfc" id="L1012" title="All 2 branches covered.">        for (int r = 0; r &lt; rows.size(); r++) {</span>
+<span class="fc" id="L1013">            Cell[] cells = rows.get(r);</span>
+<span class="pc bpc" id="L1014" title="1 of 4 branches missed.">            if (cells == null || cells.length &lt;= column) {</span>
+<span class="fc" id="L1015">                continue;</span>
+            }
+<span class="fc" id="L1017">            int end = Math.min(cells.length, column + n);</span>
+<span class="fc" id="L1018">            Cell[] removed = new Cell[end - column];</span>
+<span class="fc" id="L1019">            System.arraycopy(cells, column, removed, 0, removed.length);</span>
+<span class="fc" id="L1020">            orphan(removed);</span>
+<span class="fc" id="L1021">            Cell[] shrunk = new Cell[cells.length - removed.length];</span>
+<span class="fc" id="L1022">            System.arraycopy(cells, 0, shrunk, 0, column);</span>
+<span class="fc" id="L1023">            System.arraycopy(cells, end, shrunk, column, cells.length - end);</span>
+<span class="fc" id="L1024">            rows.set(r, shrunk);</span>
+        }
+<span class="fc" id="L1026">        usedColumns -= n;</span>
+<span class="fc" id="L1027">        renumber();</span>
+<span class="fc" id="L1028">        shiftKeys(columnWidths, column, -count, Node.MAX_COL);</span>
+<span class="fc bfc" id="L1029" title="All 2 branches covered.">        for (int i = merges.size() - 1; i &gt;= 0; i--) {</span>
+<span class="fc" id="L1030">            int[] m = merges.get(i);</span>
+<span class="pc bpc" id="L1031" title="1 of 4 branches missed.">            if (m[1] &gt;= column &amp;&amp; m[3] &lt; column + count) {</span>
+<span class="fc" id="L1032">                merges.remove(i);</span>
+<span class="fc" id="L1033">                continue;</span>
+            }
+<span class="pc bpc" id="L1035" title="1 of 2 branches missed.">            m[1] = m[1] &gt;= column + count ? m[1] - count : Math.min(m[1], column);</span>
+<span class="pc bpc" id="L1036" title="1 of 2 branches missed.">            m[3] = m[3] &gt;= column + count ? m[3] - count : Math.min(m[3], column - 1);</span>
+        }
+<span class="fc" id="L1038">        workbook.restructured(this, false, column, -count);</span>
+<span class="fc" id="L1039">    }</span>
+
+    private static void orphan(Cell[] cells) {
+<span class="fc bfc" id="L1042" title="All 2 branches covered.">        if (cells != null) {</span>
+<span class="fc bfc" id="L1043" title="All 2 branches covered.">            for (int i = 0; i &lt; cells.length; i++) {</span>
+<span class="fc bfc" id="L1044" title="All 2 branches covered.">                if (cells[i] != null) {</span>
+<span class="fc" id="L1045">                    cells[i].sheet = null;</span>
+                }
+            }
+        }
+<span class="fc" id="L1049">    }</span>
+
+    private void renumber() {
+<span class="fc bfc" id="L1052" title="All 2 branches covered.">        for (int r = 0; r &lt; rows.size(); r++) {</span>
+<span class="fc" id="L1053">            Cell[] cells = rows.get(r);</span>
+<span class="fc bfc" id="L1054" title="All 2 branches covered.">            if (cells == null) {</span>
+<span class="fc" id="L1055">                continue;</span>
+            }
+<span class="fc bfc" id="L1057" title="All 2 branches covered.">            for (int c = 0; c &lt; cells.length; c++) {</span>
+<span class="fc bfc" id="L1058" title="All 2 branches covered.">                if (cells[c] != null) {</span>
+<span class="fc" id="L1059">                    cells[c].row = r;</span>
+<span class="fc" id="L1060">                    cells[c].col = c;</span>
+                }
+            }
+        }
+<span class="fc" id="L1064">    }</span>
+
+    /// Moves the entries of a map keyed by row or column to where the rows or columns went.
+    private static &lt;T&gt; void shiftKeys(HashMap&lt;Integer, T&gt; map, int at, int delta, int max) {
+<span class="fc bfc" id="L1068" title="All 2 branches covered.">        if (map.isEmpty()) {</span>
+<span class="fc" id="L1069">            return;</span>
+        }
+<span class="fc" id="L1071">        HashMap&lt;Integer, T&gt; moved = new HashMap&lt;Integer, T&gt;();</span>
+<span class="fc bfc" id="L1072" title="All 2 branches covered.">        for (java.util.Map.Entry&lt;Integer, T&gt; e : map.entrySet()) {</span>
+<span class="fc" id="L1073">            int k = e.getKey().intValue();</span>
+<span class="pc bpc" id="L1074" title="1 of 2 branches missed.">            if (k &lt; at) {</span>
+<span class="nc" id="L1075">                moved.put(e.getKey(), e.getValue());</span>
+<span class="fc bfc" id="L1076" title="All 6 branches covered.">            } else if ((delta &gt; 0 || k &gt;= at - delta) &amp;&amp; (long) k + delta &lt;= max) {</span>
+                // a key pushed past the edge of the grid leaves it, as a merge does
+<span class="fc" id="L1078">                moved.put(Integer.valueOf(k + delta), e.getValue());</span>
+            }
+<span class="fc" id="L1080">        }</span>
+<span class="fc" id="L1081">        map.clear();</span>
+<span class="fc" id="L1082">        map.putAll(moved);</span>
+<span class="fc" id="L1083">    }</span>
+
+    // ------------------------------------------------------------------ presentation
+
+    /// Describes the columns of the sheet for a [com.codename1.ui.table.DataGrid]: the kind
+    /// of each -- number, date, logical, text -- from the values it holds, a formatter that
+    /// shows values in the number format most of the column's cells have, and the width the
+    /// file gave the column.
+    ///
+    /// The columns describe the sheet as it is now. Call this again after loading other data
+    /// into it.
+    ///
+    /// #### Returns
+    ///
+    /// one column per column of the sheet
+    public GridColumn[] createColumns() {
+<span class="fc" id="L1099">        GridColumn[] out = new GridColumn[usedColumns];</span>
+<span class="fc" id="L1100">        int first = offset();</span>
+<span class="fc" id="L1101">        int last = Math.min(rows.size(), first + 500);</span>
+<span class="fc bfc" id="L1102" title="All 2 branches covered.">        for (int col = 0; col &lt; usedColumns; col++) {</span>
+<span class="fc" id="L1103">            int numbers = 0;</span>
+<span class="fc" id="L1104">            int dates = 0;</span>
+<span class="fc" id="L1105">            int logicals = 0;</span>
+<span class="fc" id="L1106">            int texts = 0;</span>
+<span class="fc" id="L1107">            HashMap&lt;Integer, int[]&gt; formatCounts = new HashMap&lt;Integer, int[]&gt;();</span>
+<span class="fc bfc" id="L1108" title="All 2 branches covered.">            for (int r = first; r &lt; last; r++) {</span>
+<span class="fc" id="L1109">                Cell c = cell(r, col);</span>
+<span class="fc bfc" id="L1110" title="All 2 branches covered.">                if (c == null) {</span>
+<span class="fc" id="L1111">                    continue;</span>
+                }
+<span class="fc" id="L1113">                Object v = workbook.valueOf(c);</span>
+<span class="fc bfc" id="L1114" title="All 2 branches covered.">                if (v instanceof Double) {</span>
+<span class="fc bfc" id="L1115" title="All 2 branches covered.">                    if (workbook.format(c.format).isDate()) {</span>
+<span class="fc" id="L1116">                        dates++;</span>
+                    } else {
+<span class="fc" id="L1118">                        numbers++;</span>
+                    }
+<span class="fc" id="L1120">                    Integer key = Integer.valueOf(c.format);</span>
+<span class="fc" id="L1121">                    int[] n = formatCounts.get(key);</span>
+<span class="fc bfc" id="L1122" title="All 2 branches covered.">                    if (n == null) {</span>
+<span class="fc" id="L1123">                        n = new int[1];</span>
+<span class="fc" id="L1124">                        formatCounts.put(key, n);</span>
+                    }
+<span class="fc" id="L1126">                    n[0]++;</span>
+<span class="fc bfc" id="L1127" title="All 2 branches covered.">                } else if (v instanceof Boolean) {</span>
+<span class="fc" id="L1128">                    logicals++;</span>
+<span class="pc bpc" id="L1129" title="1 of 2 branches missed.">                } else if (v instanceof String) {</span>
+<span class="fc" id="L1130">                    texts++;</span>
+                }
+            }
+<span class="fc" id="L1133">            int format = 0;</span>
+<span class="fc" id="L1134">            int best = 0;</span>
+<span class="fc bfc" id="L1135" title="All 2 branches covered.">            for (java.util.Map.Entry&lt;Integer, int[]&gt; e : formatCounts.entrySet()) {</span>
+<span class="fc" id="L1136">                int n = e.getValue()[0];</span>
+<span class="pc bpc" id="L1137" title="2 of 6 branches missed.">                if (n &gt; best || n == best &amp;&amp; e.getKey().intValue() &lt; format) {</span>
+<span class="fc" id="L1138">                    best = n;</span>
+<span class="fc" id="L1139">                    format = e.getKey().intValue();</span>
+                }
+<span class="fc" id="L1141">            }</span>
+<span class="fc" id="L1142">            GridColumn column = new GridColumn(col, getColumnName(col));</span>
+<span class="fc" id="L1143">            int total = numbers + dates + logicals + texts;</span>
+<span class="fc" id="L1144">            CellFormat cellFormat = workbook.format(format);</span>
+<span class="fc bfc" id="L1145" title="All 2 branches covered.">            if (total == 0) {</span>
+<span class="fc" id="L1146">                column.setKind(GridColumn.Kind.AUTO);</span>
+<span class="fc bfc" id="L1147" title="All 4 branches covered.">            } else if (dates == total &amp;&amp; !cellFormat.isTimeOnly()) {</span>
+<span class="fc" id="L1148">                column.setKind(GridColumn.Kind.DATE);</span>
+<span class="fc bfc" id="L1149" title="All 2 branches covered.">            } else if (numbers + dates == total) {</span>
+<span class="fc" id="L1150">                column.setKind(GridColumn.Kind.NUMBER);</span>
+<span class="fc bfc" id="L1151" title="All 2 branches covered.">            } else if (logicals == total) {</span>
+<span class="fc" id="L1152">                column.setKind(GridColumn.Kind.BOOLEAN);</span>
+<span class="fc bfc" id="L1153" title="All 2 branches covered.">            } else if (texts == total) {</span>
+<span class="fc" id="L1154">                column.setKind(GridColumn.Kind.TEXT);</span>
+            } else {
+<span class="fc" id="L1156">                column.setKind(GridColumn.Kind.AUTO);</span>
+            }
+<span class="fc bfc" id="L1158" title="All 4 branches covered.">            if (logicals != total || total == 0) {</span>
+<span class="fc" id="L1159">                column.setFormatter(new Formatter(workbook, cellFormat));</span>
+            }
+            // the formatter is the column's: what the grid sorts, filters and groups by. The
+            // cells are painted and edited one by one, each in its own format
+<span class="fc" id="L1163">            column.setRenderer(new SheetCells.Renderer(this));</span>
+<span class="fc" id="L1164">            column.setEditor(new SheetCells.Editor(this));</span>
+<span class="fc" id="L1165">            Double width = columnWidths.get(Integer.valueOf(col));</span>
+<span class="pc bpc" id="L1166" title="1 of 4 branches missed.">            if (width != null &amp;&amp; width.doubleValue() &gt; 0) {</span>
+<span class="fc" id="L1167">                column.setWidthMM((float) (width.doubleValue() * MM_PER_CHARACTER));</span>
+            }
+<span class="fc" id="L1169">            out[col] = column;</span>
+        }
+<span class="fc" id="L1171">        return out;</span>
+    }
+
+    /// Shows the values of a column in its number format. What is typed goes to the sheet as
+    /// text, which reads it the way a spreadsheet reads what is typed into a cell.
+    private static final class Formatter implements GridFormatter {
+        private final Workbook workbook;
+        private final CellFormat format;
+
+<span class="fc" id="L1180">        Formatter(Workbook workbook, CellFormat format) {</span>
+<span class="fc" id="L1181">            this.workbook = workbook;</span>
+<span class="fc" id="L1182">            this.format = format;</span>
+<span class="fc" id="L1183">        }</span>
+
+        @Override
+        public String format(Object value) {
+<span class="fc" id="L1187">            Object v = value;</span>
+<span class="pc bpc" id="L1188" title="1 of 2 branches missed.">            if (v instanceof Date) {</span>
+<span class="nc" id="L1189">                v = Double.valueOf(workbook.toSerial((Date) v));</span>
+            }
+<span class="fc" id="L1191">            return format.format(v, workbook.isDate1904());</span>
+        }
+
+        @Override
+        public Object parse(String text, Object previous) {
+<span class="nc" id="L1196">            return text;</span>
+        }
+    }
+
+    /// The width of a column.
+    ///
+    /// #### Parameters
+    ///
+    /// - `column`: the column
+    ///
+    /// #### Returns
+    ///
+    /// the width in characters of the default font, the unit spreadsheet files use; 0 when
+    /// the column has the default width
+    public double getColumnWidth(int column) {
+<span class="fc" id="L1211">        Double w = columnWidths.get(Integer.valueOf(column));</span>
+<span class="fc bfc" id="L1212" title="All 2 branches covered.">        return w == null ? 0 : w.doubleValue();</span>
+    }
+
+    /// Sets the width of a column.
+    ///
+    /// #### Parameters
+    ///
+    /// - `column`: the column
+    ///
+    /// - `characters`: the width in characters of the default font; 0 for the default width
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: for a width that is negative, not a number or infinite, which
+    ///   no file can hold, or a column outside the sheet
+    public void setColumnWidth(int column, double characters) {
+<span class="pc bpc" id="L1228" title="2 of 6 branches missed.">        if (Double.isNaN(characters) || Double.isInfinite(characters) || characters &lt; 0) {</span>
+<span class="fc" id="L1229">            throw new IllegalArgumentException(&quot;Not a column width: &quot; + characters);</span>
+        }
+<span class="pc bpc" id="L1231" title="1 of 4 branches missed.">        if (column &lt; 0 || column &gt; Node.MAX_COL) {</span>
+<span class="fc" id="L1232">            throw new IllegalArgumentException(&quot;No such column: &quot; + column);</span>
+        }
+<span class="pc bpc" id="L1234" title="1 of 2 branches missed.">        if (characters &gt; 0) {</span>
+<span class="fc" id="L1235">            columnWidths.put(Integer.valueOf(column), Double.valueOf(characters));</span>
+        } else {
+<span class="nc" id="L1237">            columnWidths.remove(Integer.valueOf(column));</span>
+        }
+<span class="fc" id="L1239">    }</span>
+
+    /// The outline level of a row: how deep it is nested in the groups a spreadsheet can
+    /// collapse.
+    ///
+    /// #### Parameters
+    ///
+    /// - `row`: the row of the sheet
+    ///
+    /// #### Returns
+    ///
+    /// the level, 0 for a row in no group
+    public int getRowOutlineLevel(int row) {
+<span class="fc" id="L1252">        Integer level = outlineLevels.get(Integer.valueOf(row));</span>
+<span class="fc bfc" id="L1253" title="All 2 branches covered.">        return level == null ? 0 : level.intValue();</span>
+    }
+
+    /// Sets the outline level of a row.
+    ///
+    /// #### Parameters
+    ///
+    /// - `row`: the row of the sheet
+    ///
+    /// - `level`: the level, 0 to 7
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: for a row outside the sheet, or a level outside 0 to 7,
+    ///   the levels the file formats hold
+    public void setRowOutlineLevel(int row, int level) {
+<span class="pc bpc" id="L1269" title="1 of 4 branches missed.">        if (row &lt; 0 || row &gt; Node.MAX_ROW) {</span>
+<span class="fc" id="L1270">            throw new IllegalArgumentException(&quot;No such row: &quot; + row);</span>
+        }
+<span class="pc bpc" id="L1272" title="1 of 4 branches missed.">        if (level &lt; 0 || level &gt; 7) {</span>
+<span class="fc" id="L1273">            throw new IllegalArgumentException(&quot;Not an outline level, 0 to 7: &quot; + level);</span>
+        }
+<span class="fc bfc" id="L1275" title="All 2 branches covered.">        if (level &gt; 0) {</span>
+<span class="fc" id="L1276">            outlineLevels.put(Integer.valueOf(row), Integer.valueOf(level));</span>
+        } else {
+<span class="fc" id="L1278">            outlineLevels.remove(Integer.valueOf(row));</span>
+        }
+<span class="fc" id="L1280">    }</span>
+
+    /// One past the last row with an outline level, which may hold nothing: a writer
+    /// writes rows that far so that a group of empty rows is kept.
+    int outlineExtent() {
+<span class="fc" id="L1285">        int last = 0;</span>
+<span class="fc bfc" id="L1286" title="All 2 branches covered.">        for (Integer row : outlineLevels.keySet()) {</span>
+<span class="fc" id="L1287">            last = Math.max(last, row.intValue() + 1);</span>
+<span class="fc" id="L1288">        }</span>
+<span class="fc" id="L1289">        return last;</span>
+    }
+
+    /// One past the last column with a width of its own.
+    int widthExtent() {
+<span class="fc" id="L1294">        int last = 0;</span>
+<span class="fc bfc" id="L1295" title="All 2 branches covered.">        for (Integer col : columnWidths.keySet()) {</span>
+<span class="fc" id="L1296">            last = Math.max(last, col.intValue() + 1);</span>
+<span class="fc" id="L1297">        }</span>
+<span class="fc" id="L1298">        return last;</span>
+    }
+
+    /// The number of rows at the top that stay in place while the rest scrolls.
+    ///
+    /// #### Returns
+    ///
+    /// the count of frozen rows
+    public int getFrozenRows() {
+<span class="fc" id="L1307">        return frozenRows;</span>
+    }
+
+    /// The number of columns at the left that stay in place while the rest scrolls.
+    ///
+    /// #### Returns
+    ///
+    /// the count of frozen columns
+    public int getFrozenColumns() {
+<span class="fc" id="L1316">        return frozenColumns;</span>
+    }
+
+    /// Sets the rows and columns that stay in place while the rest of the sheet scrolls.
+    ///
+    /// #### Parameters
+    ///
+    /// - `rows`: the count of rows at the top
+    ///
+    /// - `columns`: the count of columns at the left
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: for a negative count, or one that leaves no row or column
+    ///   of the sheet to scroll
+    public void setFrozenPanes(int rows, int columns) {
+<span class="pc bpc" id="L1332" title="3 of 8 branches missed.">        if (rows &lt; 0 || rows &gt; Node.MAX_ROW || columns &lt; 0 || columns &gt; Node.MAX_COL) {</span>
+<span class="fc" id="L1333">            throw new IllegalArgumentException(&quot;Not a frozen pane of the sheet: &quot; + rows + &quot; rows, &quot; + columns + &quot; columns&quot;);</span>
+        }
+<span class="fc" id="L1335">        frozenRows = rows;</span>
+<span class="fc" id="L1336">        frozenColumns = columns;</span>
+<span class="fc" id="L1337">    }</span>
+
+    /// Merges a rectangle of cells into one, as the file formats record it. The value shown
+    /// is the one of the top left cell.
+    ///
+    /// #### Parameters
+    ///
+    /// - `firstRow`: the top row
+    ///
+    /// - `firstColumn`: the left column
+    ///
+    /// - `lastRow`: the bottom row
+    ///
+    /// - `lastColumn`: the right column
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: for a rectangle outside the sheet or over a merge the sheet has
+    public void addMergedRegion(int firstRow, int firstColumn, int lastRow, int lastColumn) {
+<span class="fc bfc" id="L1356" title="All 2 branches covered.">        if (!mergeRegion(firstRow, firstColumn, lastRow, lastColumn, Integer.MAX_VALUE)) {</span>
+<span class="fc" id="L1357">            throw new IllegalArgumentException(&quot;Not a rectangle of the sheet, or over a merge it has: rows &quot; + firstRow + &quot; to &quot; + lastRow</span>
+                    + &quot;, columns &quot; + firstColumn + &quot; to &quot; + lastColumn);
+        }
+<span class="fc" id="L1360">    }</span>
+
+    /// Records a merge a file names. Corners given the wrong way around are put right; a
+    /// rectangle that leaves the sheet is not recorded, and false is the answer.
+    boolean loadMergedRegion(int firstRow, int firstColumn, int lastRow, int lastColumn) {
+        // a file with merges by the hundred thousand is not compared pair by pair
+<span class="fc" id="L1366">        return mergeRegion(firstRow, firstColumn, lastRow, lastColumn, 4096);</span>
+    }
+
+    private boolean mergeRegion(int firstRow, int firstColumn, int lastRow, int lastColumn, int compareLimit) {
+<span class="fc" id="L1370">        int r1 = Math.min(firstRow, lastRow);</span>
+<span class="fc" id="L1371">        int r2 = Math.max(firstRow, lastRow);</span>
+<span class="fc" id="L1372">        int c1 = Math.min(firstColumn, lastColumn);</span>
+<span class="fc" id="L1373">        int c2 = Math.max(firstColumn, lastColumn);</span>
+<span class="pc bpc" id="L1374" title="3 of 8 branches missed.">        if (r1 &lt; 0 || c1 &lt; 0 || r2 &gt; Node.MAX_ROW || c2 &gt; Node.MAX_COL) {</span>
+<span class="fc" id="L1375">            return false;</span>
+        }
+        // a cell is in one merge; a file with two over one cell is repaired on opening
+<span class="fc" id="L1378">        int compared = Math.min(merges.size(), compareLimit);</span>
+<span class="fc bfc" id="L1379" title="All 2 branches covered.">        for (int i = 0; i &lt; compared; i++) {</span>
+<span class="fc" id="L1380">            int[] m = merges.get(i);</span>
+<span class="pc bpc" id="L1381" title="3 of 8 branches missed.">            if (r1 &lt;= m[2] &amp;&amp; r2 &gt;= m[0] &amp;&amp; c1 &lt;= m[3] &amp;&amp; c2 &gt;= m[1]) {</span>
+<span class="fc" id="L1382">                return false;</span>
+            }
+        }
+<span class="fc" id="L1385">        merges.add(new int[] {r1, c1, r2, c2});</span>
+<span class="fc" id="L1386">        return true;</span>
+    }
+
+    /// The number of merged regions.
+    ///
+    /// #### Returns
+    ///
+    /// the count
+    public int getMergedRegionCount() {
+<span class="fc" id="L1395">        return merges.size();</span>
+    }
+
+    /// A merged region.
+    ///
+    /// #### Parameters
+    ///
+    /// - `index`: which one, from 0
+    ///
+    /// #### Returns
+    ///
+    /// a new array of the top row, left column, bottom row and right column
+    public int[] getMergedRegion(int index) {
+<span class="fc" id="L1408">        int[] m = merges.get(index);</span>
+<span class="fc" id="L1409">        return new int[] {m[0], m[1], m[2], m[3]};</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

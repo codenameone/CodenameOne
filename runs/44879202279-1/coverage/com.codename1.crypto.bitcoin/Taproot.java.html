@@ -1,0 +1,144 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Taproot.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.crypto.bitcoin</a> &gt; <span class="el_source">Taproot.java</span></div><h1>Taproot.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008-2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.crypto.bitcoin;
+
+import com.codename1.crypto.UInt256;
+import com.codename1.security.Hash;
+import com.codename1.security.Schnorr;
+import com.codename1.security.Secp256k1;
+
+/// Taproot (BIP-341) key tweaking and script trees.
+///
+/// A Taproot output commits to an internal key and, optionally, the Merkle root of a tree
+/// of scripts: `Q = P + H_TapTweak(P || root) * G`. A key-path spend signs with the tweaked
+/// private key; [#tweakPrivateKey] gives it. BIP-86 wallets use no script tree.
+@com.codename1.impl.SharedWithBackend
+public final class Taproot {
+    /// The leaf version of a Tapscript leaf.
+    public static final int LEAF_VERSION_TAPSCRIPT = 0xc0;
+
+<span class="fc" id="L40">    private static final UInt256 N = UInt256.parse(</span>
+            &quot;0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141&quot;);
+
+    private Taproot() {
+    }
+
+    /// `SHA256(SHA256(tag) || SHA256(tag) || data)`, BIP-340's tagged hash.
+    public static byte[] taggedHash(String tag, byte[] data) {
+<span class="fc" id="L48">        byte[] t = Hash.sha256(ascii(tag));</span>
+<span class="fc" id="L49">        byte[] all = new byte[64 + data.length];</span>
+<span class="fc" id="L50">        System.arraycopy(t, 0, all, 0, 32);</span>
+<span class="fc" id="L51">        System.arraycopy(t, 0, all, 32, 32);</span>
+<span class="fc" id="L52">        System.arraycopy(data, 0, all, 64, data.length);</span>
+<span class="fc" id="L53">        return Hash.sha256(all);</span>
+    }
+
+    /// The tweak `H_TapTweak(internalKey || merkleRoot)`; pass `null` for a key-only output.
+    public static byte[] tweak(byte[] internalKey32, byte[] merkleRoot) {
+<span class="fc bfc" id="L58" title="All 2 branches covered.">        return taggedHash(&quot;TapTweak&quot;, merkleRoot == null ? internalKey32 : Wire.concat(internalKey32, merkleRoot));</span>
+    }
+
+    /// The x-only output key of an internal key and an optional Merkle root.
+    public static byte[] outputKey(byte[] internalKey32, byte[] merkleRoot) {
+<span class="fc" id="L63">        return tweakPublicKey(internalKey32, merkleRoot)[0];</span>
+    }
+
+    /// The output key and its parity: `{x-only key, {0 or 1}}`. The parity goes into the
+    /// control block of a script-path spend.
+    public static byte[][] tweakPublicKey(byte[] internalKey32, byte[] merkleRoot) {
+<span class="pc bpc" id="L69" title="2 of 4 branches missed.">        if (internalKey32 == null || internalKey32.length != 32) {</span>
+<span class="nc" id="L70">            throw new IllegalArgumentException(&quot;an x-only key is 32 bytes&quot;);</span>
+        }
+<span class="fc" id="L72">        byte[] even = new byte[33];</span>
+<span class="fc" id="L73">        even[0] = 2;</span>
+<span class="fc" id="L74">        System.arraycopy(internalKey32, 0, even, 1, 32);</span>
+<span class="fc" id="L75">        byte[] q = Secp256k1.publicKeyTweakAdd(even, tweak(internalKey32, merkleRoot), true);</span>
+<span class="fc" id="L76">        byte[] x = new byte[32];</span>
+<span class="fc" id="L77">        System.arraycopy(q, 1, x, 0, 32);</span>
+<span class="fc bfc" id="L78" title="All 2 branches covered.">        return new byte[][] {x, {(byte) (q[0] == 3 ? 1 : 0)}};</span>
+    }
+
+    /// The private key that signs for [#outputKey] on the key path.
+    public static byte[] tweakPrivateKey(byte[] privateKey, byte[] merkleRoot) {
+<span class="fc" id="L83">        byte[] full = Secp256k1.publicKey(privateKey, true);</span>
+<span class="fc" id="L84">        byte[] x = new byte[32];</span>
+<span class="fc" id="L85">        System.arraycopy(full, 1, x, 0, 32);</span>
+<span class="fc" id="L86">        byte[] d = privateKey;</span>
+<span class="fc" id="L87">        boolean negated = false;</span>
+<span class="fc bfc" id="L88" title="All 2 branches covered.">        if (full[0] == 3) {</span>
+<span class="fc" id="L89">            d = N.subtract(UInt256.fromBytes(privateKey)).toBytes32();</span>
+<span class="fc" id="L90">            negated = true;</span>
+        }
+        try {
+<span class="fc" id="L93">            return Secp256k1.privateKeyTweakAdd(d, tweak(x, merkleRoot));</span>
+        } finally {
+<span class="fc bfc" id="L95" title="All 2 branches covered.">            if (negated) {</span>
+<span class="fc bfc" id="L96" title="All 2 branches covered.">                for (int iter = 0; iter &lt; d.length; iter++) {</span>
+<span class="fc" id="L97">                    d[iter] = 0;</span>
+                }
+            }
+        }
+    }
+
+    /// The x-only internal key of a private key, as BIP-86 derives it.
+    public static byte[] internalKey(byte[] privateKey) {
+<span class="nc" id="L105">        return Schnorr.publicKey(privateKey);</span>
+    }
+
+    /// The hash of a script leaf: `H_TapLeaf(version || compactSize(len) || script)`.
+    public static byte[] leafHash(int leafVersion, Script script) {
+<span class="nc" id="L110">        Wire w = new Wire().u8(leafVersion).varBytes(script.raw());</span>
+<span class="nc" id="L111">        return taggedHash(&quot;TapLeaf&quot;, w.toBytes());</span>
+    }
+
+    /// The hash of a branch: `H_TapBranch` of the two children in byte order.
+    public static byte[] branchHash(byte[] a, byte[] b) {
+<span class="nc bnc" id="L116" title="All 2 branches missed.">        boolean aFirst = compare(a, b) &lt;= 0;</span>
+<span class="nc bnc" id="L117" title="All 2 branches missed.">        return taggedHash(&quot;TapBranch&quot;, aFirst ? Wire.concat(a, b) : Wire.concat(b, a));</span>
+    }
+
+    /// The P2TR output script of an internal key and optional Merkle root.
+    public static Script outputScript(byte[] internalKey32, byte[] merkleRoot) {
+<span class="fc" id="L122">        return Script.p2tr(outputKey(internalKey32, merkleRoot));</span>
+    }
+
+    private static int compare(byte[] a, byte[] b) {
+<span class="nc bnc" id="L126" title="All 2 branches missed.">        for (int iter = 0; iter &lt; 32; iter++) {</span>
+<span class="nc" id="L127">            int x = a[iter] &amp; 0xff;</span>
+<span class="nc" id="L128">            int y = b[iter] &amp; 0xff;</span>
+<span class="nc bnc" id="L129" title="All 2 branches missed.">            if (x != y) {</span>
+<span class="nc" id="L130">                return x - y;</span>
+            }
+        }
+<span class="nc" id="L133">        return 0;</span>
+    }
+
+    static byte[] ascii(String text) {
+<span class="fc" id="L137">        byte[] out = new byte[text.length()];</span>
+<span class="fc bfc" id="L138" title="All 2 branches covered.">        for (int iter = 0; iter &lt; out.length; iter++) {</span>
+<span class="fc" id="L139">            out[iter] = (byte) text.charAt(iter);</span>
+        }
+<span class="fc" id="L141">        return out;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

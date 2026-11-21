@@ -1,0 +1,284 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>KdfProfile.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.security.vault</a> &gt; <span class="el_source">KdfProfile.java</span></div><h1>KdfProfile.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.security.vault;
+
+import com.codename1.io.Util;
+import com.codename1.security.Hash;
+import com.codename1.security.Hmac;
+
+/// The portable password key derivation this package uses, as a versioned profile rather than a
+/// set of numbers each caller picks.
+///
+/// #### Why PBKDF2 and not something better
+///
+/// Argon2id and scrypt are better password KDFs, and neither exists in a browser. Web Crypto
+/// implements exactly one -- `PBKDF2` -- and a password vault whose whole point is that Android,
+/// iOS and the browser derive the same key from the same password cannot use a KDF that one of
+/// the three has to emulate in application code. A JavaScript Argon2 would be orders of magnitude
+/// slower than the native one the phone uses, which in practice means the parameters get lowered
+/// until the browser is usable and every platform is then weaker than PBKDF2 would have been.
+///
+/// So: PBKDF2-HMAC-SHA256, with the iteration count carried in the envelope so it can be raised
+/// without breaking anything already written. [#current()] is what new material is derived with;
+/// [#needsUpgrade()] tells a caller that an envelope it just opened was written under a weaker
+/// profile and should be rewrapped.
+///
+/// #### Bounds
+///
+/// The iteration count is clamped into [#MIN_ITERATIONS] to [#MAX_ITERATIONS] on the way in and
+/// **rejected** rather than clamped on the way out of a parsed envelope. The asymmetry is the
+/// point: an attacker who can edit stored bytes would otherwise set the count to 1 and turn a
+/// password check into a guessable one, or set it to two billion and make the application hang on
+/// open. A count outside the range in a stored envelope is [VaultError#UNSUPPORTED_FORMAT].
+///
+/// #### Where the work happens
+///
+/// The derivation is one native call on every port that has one ([Util#pbkdf2]), and a pure Java
+/// loop over [Hmac] where there is none. The pure Java path produces identical bytes -- it is
+/// RFC 8018 with no latitude in it -- but 600000 iterations of software HMAC is slow enough to be
+/// a problem, so a port without the hook should add one rather than rely on it.
+public final class KdfProfile {
+
+    /// PBKDF2 with HMAC-SHA-256, the only KDF identifier version 1 of the envelope defines.
+    public static final int PBKDF2_HMAC_SHA256 = 1;
+
+    /// No derivation: the envelope is sealed directly under a key the caller already has.
+    public static final int DIRECT = 0;
+
+    /// Below this an iteration count is not a password KDF, it is a formality. OWASP's 2023
+    /// floor for PBKDF2-HMAC-SHA256 is 600000; 100000 is the oldest count this will still open
+    /// material written under, and [#needsUpgrade()] reports it.
+    public static final int MIN_ITERATIONS = 100000;
+
+    /// Above this the derivation is a denial of service against the user's own device. Ten
+    /// million iterations is roughly a minute of a phone's time.
+    public static final int MAX_ITERATIONS = 10000000;
+
+    /// What new material is derived with today. Raising this is a compatible change: existing
+    /// envelopes carry their own count and keep opening.
+    public static final int DEFAULT_ITERATIONS = 600000;
+
+    /// The salt length this package generates. Sixteen bytes of fresh randomness per envelope,
+    /// which is what stops one precomputation covering two users.
+    public static final int SALT_LENGTH = 16;
+
+    private final int kdfId;
+    private final int iterations;
+
+<span class="fc" id="L88">    private KdfProfile(int kdfId, int iterations) {</span>
+<span class="fc" id="L89">        this.kdfId = kdfId;</span>
+<span class="fc" id="L90">        this.iterations = iterations;</span>
+<span class="fc" id="L91">    }</span>
+
+    /// The profile new material should be derived with.
+    public static KdfProfile current() {
+<span class="fc" id="L95">        return new KdfProfile(PBKDF2_HMAC_SHA256, DEFAULT_ITERATIONS);</span>
+    }
+
+    /// A profile with an explicit iteration count, clamped into the supported range.
+    ///
+    /// Clamping rather than throwing because this is the caller-facing constructor and a caller
+    /// asking for 1000 iterations has made a mistake worth correcting silently upward. The
+    /// parsing path does not clamp -- see [#forStored(int, int)].
+    ///
+    /// #### Parameters
+    ///
+    /// - `iterations`: the requested count
+    public static KdfProfile pbkdf2(int iterations) {
+<span class="fc" id="L108">        int clamped = iterations;</span>
+<span class="fc bfc" id="L109" title="All 2 branches covered.">        if (clamped &lt; MIN_ITERATIONS) {</span>
+<span class="fc" id="L110">            clamped = MIN_ITERATIONS;</span>
+        }
+<span class="fc bfc" id="L112" title="All 2 branches covered.">        if (clamped &gt; MAX_ITERATIONS) {</span>
+<span class="fc" id="L113">            clamped = MAX_ITERATIONS;</span>
+        }
+<span class="fc" id="L115">        return new KdfProfile(PBKDF2_HMAC_SHA256, clamped);</span>
+    }
+
+    /// The profile an envelope declared, validated rather than clamped.
+    ///
+    /// #### Parameters
+    ///
+    /// - `kdfId`: the identifier read from the envelope
+    ///
+    /// - `iterations`: the count read from the envelope
+    ///
+    /// #### Returns
+    ///
+    /// the profile
+    ///
+    /// #### Throws
+    ///
+    /// - `VaultException`: [VaultError#UNSUPPORTED_FORMAT] for an unknown identifier or a count
+    ///   outside the supported range
+    static KdfProfile forStored(int kdfId, int iterations) {
+<span class="fc bfc" id="L135" title="All 2 branches covered.">        if (kdfId == DIRECT) {</span>
+<span class="pc bpc" id="L136" title="1 of 2 branches missed.">            if (iterations != 0) {</span>
+<span class="nc" id="L137">                throw new VaultException(VaultError.UNSUPPORTED_FORMAT,</span>
+                        &quot;envelope declares no key derivation but carries an iteration count&quot;);
+            }
+<span class="fc" id="L140">            return new KdfProfile(DIRECT, 0);</span>
+        }
+<span class="fc bfc" id="L142" title="All 2 branches covered.">        if (kdfId != PBKDF2_HMAC_SHA256) {</span>
+<span class="fc" id="L143">            throw new VaultException(VaultError.UNSUPPORTED_FORMAT,</span>
+                    &quot;unsupported key derivation function id &quot; + kdfId);
+        }
+<span class="fc bfc" id="L146" title="All 4 branches covered.">        if (iterations &lt; MIN_ITERATIONS || iterations &gt; MAX_ITERATIONS) {</span>
+            // Not clamped. A stored count is attacker-reachable on any platform where the
+            // ciphertext is, and accepting a low one would silently turn the password check into
+            // one a laptop can brute force.
+<span class="fc" id="L150">            throw new VaultException(VaultError.UNSUPPORTED_FORMAT,</span>
+                    &quot;envelope declares &quot; + iterations + &quot; KDF iterations, outside the supported &quot;
+                    + MIN_ITERATIONS + &quot; to &quot; + MAX_ITERATIONS + &quot; range&quot;);
+        }
+<span class="fc" id="L154">        return new KdfProfile(PBKDF2_HMAC_SHA256, iterations);</span>
+    }
+
+    /// The envelope's KDF identifier: [#PBKDF2_HMAC_SHA256] or [#DIRECT].
+    public int getKdfId() {
+<span class="fc" id="L159">        return kdfId;</span>
+    }
+
+    /// The iteration count, or zero for [#DIRECT].
+    public int getIterations() {
+<span class="fc" id="L164">        return iterations;</span>
+    }
+
+    /// Whether material written under this profile should be rewrapped under [#current()].
+    ///
+    /// True for anything weaker than today's default. An application that opens a vault, sees
+    /// this, and has the password in hand should re-derive and rewrite; one that does not can
+    /// carry on, because the envelope still opens.
+    public boolean needsUpgrade() {
+<span class="pc bpc" id="L173" title="1 of 4 branches missed.">        return kdfId == PBKDF2_HMAC_SHA256 &amp;&amp; iterations &lt; DEFAULT_ITERATIONS;</span>
+    }
+
+    /// Derives `length` bytes from a password and salt.
+    ///
+    /// #### Parameters
+    ///
+    /// - `password`: the password, as characters so the caller can clear them. Encoded with this
+    ///   package's UTF-8 and not normalized -- see [Bytes#utf8(char[])].
+    ///
+    /// - `salt`: fresh per envelope, at least [#SALT_LENGTH] bytes for new material
+    ///
+    /// - `length`: how many bytes to produce, normally 32 for an AES-256 key
+    ///
+    /// #### Returns
+    ///
+    /// the derived bytes, which the caller owns and should clear
+    public byte[] derive(char[] password, byte[] salt, int length) {
+<span class="pc bpc" id="L191" title="1 of 2 branches missed.">        if (kdfId == DIRECT) {</span>
+<span class="nc" id="L192">            throw new VaultException(VaultError.UNSUPPORTED_FORMAT,</span>
+                    &quot;this profile performs no derivation&quot;);
+        }
+<span class="pc bpc" id="L195" title="2 of 4 branches missed.">        if (salt == null || salt.length == 0) {</span>
+<span class="nc" id="L196">            throw new VaultException(VaultError.CORRUPT, &quot;key derivation requires a salt&quot;);</span>
+        }
+<span class="pc bpc" id="L198" title="2 of 4 branches missed.">        if (length &lt;= 0 || length &gt; 1024) {</span>
+<span class="nc" id="L199">            throw new VaultException(VaultError.UNSUPPORTED_FORMAT,</span>
+                    &quot;unsupported derived key length &quot; + length);
+        }
+<span class="fc" id="L202">        byte[] passwordBytes = Bytes.utf8(password);</span>
+        try {
+            // An empty password never goes to a platform implementation. JCE rejects a
+            // zero-length key outright -- SecretKeySpec throws IllegalArgumentException
+            // (&quot;Empty key&quot;), which is not a GeneralSecurityException and so slipped past the
+            // ports' catch: on the EDT the vault's worker died without ever completing its
+            // AsyncResource, and off it the failure came out of the asynchronous API as a raw
+            // throw. RFC 8018 and RFC 2104 define this case perfectly well -- a short HMAC key
+            // is zero-padded -- and the portable path below already does exactly that, so every
+            // port now answers the same defined bytes instead of two of them dying.
+<span class="fc bfc" id="L212" title="All 2 branches covered.">            byte[] platform = passwordBytes.length == 0 ? null</span>
+<span class="fc" id="L213">                    : Util.pbkdf2(Hash.SHA256, passwordBytes, salt, iterations, length);</span>
+<span class="pc bpc" id="L214" title="1 of 2 branches missed.">            if (platform != null) {</span>
+<span class="nc" id="L215">                return platform;</span>
+            }
+<span class="fc" id="L217">            return pbkdf2Portable(passwordBytes, salt, iterations, length);</span>
+        } finally {
+<span class="fc" id="L219">            Bytes.zero(passwordBytes);</span>
+        }
+    }
+
+    /// RFC 8018 PBKDF2 over [Hmac], for a port with no native derivation.
+    ///
+    /// Package visible rather than private so the test vectors can reach it directly. The public
+    /// entry point clamps the iteration count into the supported range, and the published vectors
+    /// are at RFC 8018's counts -- which are far below that floor on purpose, because a vector
+    /// nobody can run in under a minute is a vector nobody checks.
+    ///
+    /// Byte-identical to the native path by construction: PBKDF2 has no implementation latitude,
+    /// which is exactly why it can be the interoperable choice. Slow, though -- see the class
+    /// note.
+    static byte[] pbkdf2Portable(byte[] password, byte[] salt, int iterations, int length) {
+<span class="fc" id="L234">        int hashLength = 32;</span>
+<span class="fc" id="L235">        int blocks = (length + hashLength - 1) / hashLength;</span>
+<span class="fc" id="L236">        byte[] out = new byte[blocks * hashLength];</span>
+<span class="fc" id="L237">        byte[] block = new byte[salt.length + 4];</span>
+<span class="fc" id="L238">        System.arraycopy(salt, 0, block, 0, salt.length);</span>
+<span class="fc" id="L239">        Hmac mac = Hmac.create(Hash.SHA256, password);</span>
+<span class="fc bfc" id="L240" title="All 2 branches covered.">        for (int index = 1; index &lt;= blocks; index++) {</span>
+<span class="fc" id="L241">            Bytes.putInt(block, salt.length, index);</span>
+<span class="fc" id="L242">            mac.reset();</span>
+<span class="fc" id="L243">            mac.update(block, 0, block.length);</span>
+<span class="fc" id="L244">            byte[] u = mac.doFinal();</span>
+<span class="fc" id="L245">            byte[] accumulated = new byte[hashLength];</span>
+<span class="fc" id="L246">            System.arraycopy(u, 0, accumulated, 0, hashLength);</span>
+<span class="fc bfc" id="L247" title="All 2 branches covered.">            for (int round = 1; round &lt; iterations; round++) {</span>
+<span class="fc" id="L248">                mac.reset();</span>
+<span class="fc" id="L249">                mac.update(u, 0, u.length);</span>
+<span class="fc" id="L250">                u = mac.doFinal();</span>
+<span class="fc bfc" id="L251" title="All 2 branches covered.">                for (int iter = 0; iter &lt; hashLength; iter++) {</span>
+<span class="fc" id="L252">                    accumulated[iter] ^= u[iter];</span>
+                }
+            }
+<span class="fc" id="L255">            System.arraycopy(accumulated, 0, out, (index - 1) * hashLength, hashLength);</span>
+<span class="fc" id="L256">            Bytes.zero(accumulated);</span>
+        }
+<span class="fc" id="L258">        byte[] exact = new byte[length];</span>
+<span class="fc" id="L259">        System.arraycopy(out, 0, exact, 0, length);</span>
+<span class="fc" id="L260">        Bytes.zero(out);</span>
+<span class="fc" id="L261">        Bytes.zero(block);</span>
+<span class="fc" id="L262">        return exact;</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="nc bnc" id="L267" title="All 2 branches missed.">        return kdfId == DIRECT ? &quot;direct&quot; : (&quot;PBKDF2-HMAC-SHA256/&quot; + iterations);</span>
+    }
+
+    @Override
+    public boolean equals(Object other) {
+<span class="nc bnc" id="L272" title="All 2 branches missed.">        if (!(other instanceof KdfProfile)) {</span>
+<span class="nc" id="L273">            return false;</span>
+        }
+<span class="nc" id="L275">        KdfProfile o = (KdfProfile) other;</span>
+<span class="nc bnc" id="L276" title="All 4 branches missed.">        return kdfId == o.kdfId &amp;&amp; iterations == o.iterations;</span>
+    }
+
+    @Override
+    public int hashCode() {
+<span class="nc" id="L281">        return kdfId * 31 + iterations;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

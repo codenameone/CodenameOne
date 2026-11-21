@@ -1,0 +1,359 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Light.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.gpu</a> &gt; <span class="el_source">Light.java</span></div><h1>Light.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.gpu;
+
+/// A single directional light plus a global ambient term, consumed by lit
+/// materials (`Material.Type.LAMBERT` and `Material.Type.PHONG`). The direction
+/// is the direction the light travels, in world space. Set the active light on
+/// the device with `GraphicsDevice.setLight(Light)`.
+<span class="fc" id="L29">public final class Light {</span>
+<span class="fc" id="L30">    private float dirX = -0.5f;</span>
+<span class="fc" id="L31">    private float dirY = -1.0f;</span>
+<span class="fc" id="L32">    private float dirZ = -0.5f;</span>
+<span class="fc" id="L33">    private int color = 0xffffffff;</span>
+<span class="fc" id="L34">    private int ambientColor = 0xff404040;</span>
+    private boolean shadows;
+<span class="fc" id="L36">    private int shadowMapSize = 1024;</span>
+<span class="fc" id="L37">    private float shadowExtent = 20f;</span>
+    private float shadowCenterX;
+    private float shadowCenterY;
+    private float shadowCenterZ;
+<span class="fc" id="L41">    private float shadowBias = 0.0015f;</span>
+<span class="fc" id="L42">    private float shadowSoftness = 1f;</span>
+<span class="fc" id="L43">    private float shadowStrength = 0.8f;</span>
+<span class="fc" id="L44">    private int shadowCascades = 1;</span>
+    private float shadowFarExtent;
+
+    /// Sets the world space direction the light travels.
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: the x component
+    ///
+    /// - `y`: the y component
+    ///
+    /// - `z`: the z component
+    ///
+    /// #### Returns
+    ///
+    /// this light for chaining
+    public Light setDirection(float x, float y, float z) {
+<span class="fc" id="L61">        this.dirX = x;</span>
+<span class="fc" id="L62">        this.dirY = y;</span>
+<span class="fc" id="L63">        this.dirZ = z;</span>
+<span class="fc" id="L64">        return this;</span>
+    }
+
+    /// Returns the x component of the light direction.
+    public float getDirectionX() {
+<span class="nc" id="L69">        return dirX;</span>
+    }
+
+    /// Returns the y component of the light direction.
+    public float getDirectionY() {
+<span class="nc" id="L74">        return dirY;</span>
+    }
+
+    /// Returns the z component of the light direction.
+    public float getDirectionZ() {
+<span class="nc" id="L79">        return dirZ;</span>
+    }
+
+    /// Returns the light color as a packed ARGB integer.
+    public int getColor() {
+<span class="nc" id="L84">        return color;</span>
+    }
+
+    /// Sets the light color as a packed ARGB integer.
+    ///
+    /// #### Parameters
+    ///
+    /// - `argb`: the packed ARGB color
+    ///
+    /// #### Returns
+    ///
+    /// this light for chaining
+    public Light setColor(int argb) {
+<span class="fc" id="L97">        this.color = argb;</span>
+<span class="fc" id="L98">        return this;</span>
+    }
+
+    /// Returns the ambient color as a packed ARGB integer.
+    public int getAmbientColor() {
+<span class="nc" id="L103">        return ambientColor;</span>
+    }
+
+    /// Sets the ambient color as a packed ARGB integer.
+    ///
+    /// #### Parameters
+    ///
+    /// - `argb`: the packed ARGB color
+    ///
+    /// #### Returns
+    ///
+    /// this light for chaining
+    public Light setAmbientColor(int argb) {
+<span class="fc" id="L116">        this.ambientColor = argb;</span>
+<span class="fc" id="L117">        return this;</span>
+    }
+
+    /// Turns shadow casting on or off. With shadows on, a `GraphicsDevice`
+    /// that supports them (`GpuCapabilities.isShadowsSupported`) renders the
+    /// scene from the light into a shadow map before each frame, and lit
+    /// materials that receive shadows are darkened where it is blocked.
+    ///
+    /// The map covers a square `extent` units either side of the shadow centre,
+    /// seen along the light's direction; move the centre with the camera
+    /// (`setShadowCenter`) and keep the extent as small as the view allows,
+    /// since the map's resolution is spread over it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `shadows`: true to cast shadows
+    ///
+    /// #### Returns
+    ///
+    /// this light for chaining
+    public Light setShadows(boolean shadows) {
+<span class="fc" id="L138">        this.shadows = shadows;</span>
+<span class="fc" id="L139">        return this;</span>
+    }
+
+    /// Returns true if the light casts shadows.
+    public boolean isShadows() {
+<span class="fc" id="L144">        return shadows;</span>
+    }
+
+    /// Sets the area and resolution of the shadow map.
+    ///
+    /// #### Parameters
+    ///
+    /// - `size`: the width and height of the map in texels; clamped to 256 to 4096
+    ///
+    /// - `extent`: the half width of the square it covers, in world units
+    ///
+    /// #### Returns
+    ///
+    /// this light for chaining
+    public Light setShadowMap(int size, float extent) {
+<span class="fc" id="L159">        this.shadowMapSize = Math.max(256, Math.min(4096, size));</span>
+<span class="fc" id="L160">        this.shadowExtent = Math.max(0.01f, extent);</span>
+<span class="fc" id="L161">        return this;</span>
+    }
+
+    /// Returns the shadow map's width and height in texels.
+    public int getShadowMapSize() {
+<span class="fc" id="L166">        return shadowMapSize;</span>
+    }
+
+    /// Returns the x of the point the shadow map is centred on.
+    public float getShadowCenterX() {
+<span class="fc" id="L171">        return shadowCenterX;</span>
+    }
+
+    /// Returns the z of the point the shadow map is centred on.
+    public float getShadowCenterZ() {
+<span class="fc" id="L176">        return shadowCenterZ;</span>
+    }
+
+    /// Returns the half width of the area the shadow map covers.
+    public float getShadowExtent() {
+<span class="fc" id="L181">        return shadowExtent;</span>
+    }
+
+    /// Centres the shadow map on a world point, normally the one the camera
+    /// looks at.
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: the x coordinate
+    ///
+    /// - `y`: the y coordinate
+    ///
+    /// - `z`: the z coordinate
+    ///
+    /// #### Returns
+    ///
+    /// this light for chaining
+    public Light setShadowCenter(float x, float y, float z) {
+<span class="fc" id="L199">        this.shadowCenterX = x;</span>
+<span class="fc" id="L200">        this.shadowCenterY = y;</span>
+<span class="fc" id="L201">        this.shadowCenterZ = z;</span>
+<span class="fc" id="L202">        return this;</span>
+    }
+
+    /// Sets how dark a shadow is and how far a surface must be behind the
+    /// shadow map before it counts as shadowed.
+    ///
+    /// #### Parameters
+    ///
+    /// - `strength`: 0 for no darkening, 1 for no direct light at all
+    ///
+    /// - `bias`: the depth offset in the map's 0..1 range; raise it if
+    ///   surfaces shadow themselves in stripes (&quot;acne&quot;), lower it if shadows
+    ///   detach from the objects that cast them
+    ///
+    /// #### Returns
+    ///
+    /// this light for chaining
+    public Light setShadowStyle(float strength, float bias) {
+<span class="fc" id="L220">        this.shadowStrength = Math.max(0f, Math.min(1f, strength));</span>
+<span class="fc" id="L221">        this.shadowBias = Math.max(0f, bias);</span>
+<span class="fc" id="L222">        return this;</span>
+    }
+
+    /// Returns how dark a shadow is, from 0 to 1.
+    public float getShadowStrength() {
+<span class="fc" id="L227">        return shadowStrength;</span>
+    }
+
+    /// Sets how soft shadow edges are: the spacing, in shadow map texels, of
+    /// the 3 by 3 samples every shaded pixel averages. 1 is a crisp edge
+    /// with its stair steps smoothed; 2 to 3 is a soft outdoor penumbra.
+    /// Larger values start to show the sample pattern.
+    ///
+    /// #### Parameters
+    ///
+    /// - `softness`: the sample spacing in texels, at least 0.5
+    ///
+    /// #### Returns
+    ///
+    /// this light for chaining
+    public Light setShadowSoftness(float softness) {
+<span class="fc" id="L243">        this.shadowSoftness = Math.max(0.5f, softness);</span>
+<span class="fc" id="L244">        return this;</span>
+    }
+
+    /// Returns the shadow softness set with `setShadowSoftness`.
+    public float getShadowSoftness() {
+<span class="nc" id="L249">        return shadowSoftness;</span>
+    }
+
+    /// Splits the shadow map into cascades. With two, the map set by
+    /// `setShadowMap` keeps its resolution for the area near the shadow
+    /// centre, and a second map of the same size covers `farExtent` units
+    /// either side of it, so a large scene gets crisp shadows up close and
+    /// coarse ones in the distance instead of coarse shadows everywhere. Each
+    /// shaded pixel uses the near map when it falls inside it and the far one
+    /// otherwise. Casters are drawn once per cascade.
+    ///
+    /// #### Parameters
+    ///
+    /// - `count`: 1 for a single map, 2 for a near and a far cascade
+    ///
+    /// - `farExtent`: the half width of the far cascade in world units;
+    ///   ignored with one cascade, and never less than the near extent
+    ///
+    /// #### Returns
+    ///
+    /// this light for chaining
+    public Light setShadowCascades(int count, float farExtent) {
+<span class="fc bfc" id="L271" title="All 2 branches covered.">        this.shadowCascades = count &gt;= 2 ? 2 : 1;</span>
+<span class="fc" id="L272">        this.shadowFarExtent = farExtent;</span>
+<span class="fc" id="L273">        return this;</span>
+    }
+
+    /// Returns the number of shadow cascades, 1 or 2.
+    public int getShadowCascades() {
+<span class="fc" id="L278">        return shadowCascades;</span>
+    }
+
+    /// Returns the half width of the far cascade, or the shadow extent with a
+    /// single cascade.
+    public float getShadowFarExtent() {
+<span class="fc bfc" id="L284" title="All 2 branches covered.">        return shadowCascades &gt; 1 ? Math.max(shadowExtent, shadowFarExtent) : shadowExtent;</span>
+    }
+
+    /// For a backend: the factor the far cascade scales the near cascade's
+    /// x and y by, the near extent over the far one; 0 with a single cascade.
+    /// It is the fourth component of the shadow parameters every generated
+    /// shader receives.
+    ///
+    /// #### Returns
+    ///
+    /// the ratio in (0, 1], or 0 when the map is not split
+    public float getShadowCascadeRatio() {
+<span class="fc bfc" id="L296" title="All 2 branches covered.">        return shadowCascades &gt; 1 ? shadowExtent / getShadowFarExtent() : 0f;</span>
+    }
+
+    /// For a backend: the matrix of one cascade. Cascade 0 is
+    /// `computeShadowMatrix`; cascade 1 is the same view scaled in x and y by
+    /// `getShadowCascadeRatio`, so both share one depth range. A backend draws
+    /// cascade `i` into the `i`th square of a map `getShadowCascades` squares
+    /// wide.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cascade`: 0 or 1
+    ///
+    /// - `out`: a 16 element array that receives the column-major matrix
+    public void computeCascadeMatrix(int cascade, float[] out) {
+<span class="fc" id="L311">        computeShadowMatrix(out);</span>
+<span class="pc bpc" id="L312" title="1 of 4 branches missed.">        if (cascade &gt; 0 &amp;&amp; shadowCascades &gt; 1) {</span>
+<span class="fc" id="L313">            float r = getShadowCascadeRatio();</span>
+<span class="fc bfc" id="L314" title="All 2 branches covered.">            for (int c = 0; c &lt; 4; c++) {</span>
+<span class="fc" id="L315">                out[c * 4] *= r;</span>
+<span class="fc" id="L316">                out[c * 4 + 1] *= r;</span>
+            }
+        }
+<span class="fc" id="L319">    }</span>
+
+    /// Returns the shadow depth bias.
+    public float getShadowBias() {
+<span class="fc" id="L323">        return shadowBias;</span>
+    }
+
+    /// Computes the matrix that takes a world position to the shadow map's
+    /// clip space: an orthographic view along the light's direction, centred
+    /// on the shadow centre. Every backend uses this one, so shadows land in
+    /// the same place on each.
+    ///
+    /// #### Parameters
+    ///
+    /// - `out`: a 16 element array that receives the column-major matrix
+    public void computeShadowMatrix(float[] out) {
+<span class="fc" id="L335">        float len = (float) Math.sqrt(dirX * dirX + dirY * dirY + dirZ * dirZ);</span>
+<span class="pc bpc" id="L336" title="1 of 2 branches missed.">        float dx = len &gt; 0 ? dirX / len : 0;</span>
+<span class="pc bpc" id="L337" title="1 of 2 branches missed.">        float dy = len &gt; 0 ? dirY / len : -1;</span>
+<span class="pc bpc" id="L338" title="1 of 2 branches missed.">        float dz = len &gt; 0 ? dirZ / len : 0;</span>
+        // the far cascade shares this depth range, so it reaches past both
+<span class="fc" id="L340">        float back = getShadowFarExtent() * 2f;</span>
+<span class="fc" id="L341">        float upX = 0;</span>
+<span class="fc" id="L342">        float upY = 1;</span>
+<span class="fc" id="L343">        float upZ = 0;</span>
+<span class="pc bpc" id="L344" title="1 of 2 branches missed.">        if (Math.abs(dy) &gt; 0.99f) {</span>
+<span class="nc" id="L345">            upY = 0;</span>
+<span class="nc" id="L346">            upZ = 1;</span>
+        }
+<span class="fc" id="L348">        float[] view = Matrix4.lookAt(shadowCenterX - dx * back, shadowCenterY - dy * back,</span>
+                shadowCenterZ - dz * back, shadowCenterX, shadowCenterY, shadowCenterZ, upX, upY, upZ);
+        // Snap the centre to whole texels in light space, so the map does not
+        // shimmer as the camera moves.
+<span class="fc" id="L352">        float texel = shadowExtent * 2f / shadowMapSize;</span>
+<span class="fc" id="L353">        view[12] = (float) Math.floor(view[12] / texel) * texel;</span>
+<span class="fc" id="L354">        view[13] = (float) Math.floor(view[13] / texel) * texel;</span>
+<span class="fc" id="L355">        float[] proj = Matrix4.ortho(-shadowExtent, shadowExtent, -shadowExtent, shadowExtent, 0.05f, back * 2f);</span>
+<span class="fc" id="L356">        Matrix4.multiply(proj, view, out);</span>
+<span class="fc" id="L357">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

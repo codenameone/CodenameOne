@@ -1,0 +1,338 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EnvironmentMaps.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.gpu</a> &gt; <span class="el_source">EnvironmentMaps.java</span></div><h1>EnvironmentMaps.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.gpu;
+
+import com.codename1.ui.Image;
+
+/// Bakes the environment map that image based lighting reads
+/// (`Environment.setEnvironmentMap`): what a shiny or rough surface reflects,
+/// and the soft light every surface receives from all around it.
+///
+/// The bake runs once, on the CPU, into an ordinary RGB texture every backend
+/// samples the same way -- no cube maps and no float textures, so it works on
+/// the oldest GL ES and WebGL devices too. The texture is `WIDTH` texels wide
+/// and holds `BANDS` equirectangular bands of `BAND_HEIGHT` texels stacked
+/// top to bottom: the sharp environment, three progressively blurred copies
+/// for rougher surfaces, the roughest, and last the diffuse irradiance. Colours
+/// are stored at half intensity, so an environment may be up to twice as
+/// bright as white.
+///
+/// ```java
+/// import com.codename1.gpu.*;
+/// import com.codename1.gpu.shaders.ScenePresets;
+///
+/// void light(GraphicsDevice device, ScenePresets.Preset look, Light light) {
+///     Environment env = look.getEnvironment();
+///     env.setEnvironmentMap(EnvironmentMaps.fromSky(device, env, light));
+/// }
+/// ```
+///
+/// Rebake when the sky changes; a bake costs a few tens of milliseconds.
+public final class EnvironmentMaps {
+    /// The width of the baked texture in texels.
+    public static final int WIDTH = 128;
+
+    /// The height of one band in texels.
+    public static final int BAND_HEIGHT = 64;
+
+    /// The number of bands: five roughness levels and the irradiance.
+    public static final int BANDS = 6;
+
+    // the blur of each band, in radians: 0 for the sharp copy, then rougher
+    // levels, then a wide lobe standing in for the cosine of irradiance
+<span class="fc" id="L63">    private static final float[] BLUR = {0f, 0.07f, 0.17f, 0.38f, 0.7f, 0.95f};</span>
+
+    private EnvironmentMaps() {
+    }
+
+    /// Bakes the procedural sky of an environment (`Environment.setSky`), lit
+    /// by a light's sun, into an environment map texture. Below the horizon
+    /// it reflects the hemisphere ground colour, or a darkened horizon when
+    /// the environment has none.
+    ///
+    /// #### Parameters
+    ///
+    /// - `device`: the device the texture is created on
+    ///
+    /// - `env`: the environment whose sky colours to bake
+    ///
+    /// - `light`: the light whose direction places the sun, or null for none
+    ///
+    /// #### Returns
+    ///
+    /// the environment map texture
+    public static Texture fromSky(GraphicsDevice device, Environment env, Light light) {
+<span class="nc" id="L85">        return upload(device, bake(skyRadiance(env, light)));</span>
+    }
+
+    /// Bakes an equirectangular panorama -- an image twice as wide as it is
+    /// tall whose x runs once around the horizon and whose y runs from
+    /// straight up to straight down -- into an environment map texture.
+    ///
+    /// #### Parameters
+    ///
+    /// - `device`: the device the texture is created on
+    ///
+    /// - `panorama`: the panorama
+    ///
+    /// - `intensity`: how bright the environment is; 1 keeps the image's own
+    ///   colours, up to 2
+    ///
+    /// #### Returns
+    ///
+    /// the environment map texture
+    public static Texture fromImage(GraphicsDevice device, Image panorama, float intensity) {
+<span class="nc" id="L105">        return upload(device, bake(imageRadiance(panorama, intensity)));</span>
+    }
+
+    private static Texture upload(GraphicsDevice device, int[] argb) {
+<span class="nc" id="L109">        Texture t = device.createTexture(WIDTH, BAND_HEIGHT * BANDS, argb);</span>
+        // clamped: the texture is not a power of two, which GL ES 2 and WebGL 1
+        // cannot repeat; every lookup keeps half a texel inside its band and
+        // inside the seam behind the viewer
+<span class="nc" id="L113">        t.setWrap(Texture.Wrap.CLAMP);</span>
+<span class="nc" id="L114">        t.setFilter(Texture.Filter.LINEAR);</span>
+<span class="nc" id="L115">        return t;</span>
+    }
+
+    /// Bakes a radiance panorama of `WIDTH` by `BAND_HEIGHT` linear RGB
+    /// triples into the band layout. Public for tests and for applications
+    /// that compute their own environment.
+    ///
+    /// #### Parameters
+    ///
+    /// - `radiance`: `WIDTH * BAND_HEIGHT * 3` floats, row by row from
+    ///   straight up
+    ///
+    /// #### Returns
+    ///
+    /// the ARGB pixels of the texture, `WIDTH` by `BAND_HEIGHT * BANDS`
+    public static int[] bake(float[] radiance) {
+<span class="fc" id="L131">        int[] out = new int[WIDTH * BAND_HEIGHT * BANDS];</span>
+<span class="fc" id="L132">        float[] tmp = new float[radiance.length];</span>
+<span class="fc" id="L133">        float[] level = new float[radiance.length];</span>
+<span class="fc bfc" id="L134" title="All 2 branches covered.">        for (int b = 0; b &lt; BANDS; b++) {</span>
+<span class="fc bfc" id="L135" title="All 2 branches covered.">            if (BLUR[b] &lt;= 0f) {</span>
+<span class="fc" id="L136">                System.arraycopy(radiance, 0, level, 0, radiance.length);</span>
+            } else {
+<span class="fc" id="L138">                blurRows(radiance, tmp, BLUR[b]);</span>
+<span class="fc" id="L139">                blurColumns(tmp, level, BLUR[b]);</span>
+            }
+<span class="fc" id="L141">            int base = b * WIDTH * BAND_HEIGHT;</span>
+<span class="fc bfc" id="L142" title="All 2 branches covered.">            for (int i = 0; i &lt; WIDTH * BAND_HEIGHT; i++) {</span>
+<span class="fc" id="L143">                out[base + i] = 0xff000000 | (channel(level[i * 3]) &lt;&lt; 16) | (channel(level[i * 3 + 1]) &lt;&lt; 8)</span>
+<span class="fc" id="L144">                        | channel(level[i * 3 + 2]);</span>
+            }
+        }
+<span class="fc" id="L147">        return out;</span>
+    }
+
+    private static int channel(float v) {
+<span class="fc" id="L151">        int c = (int) (v * 0.5f * 255f + 0.5f);</span>
+<span class="pc bpc" id="L152" title="2 of 4 branches missed.">        return c &lt; 0 ? 0 : (c &gt; 255 ? 255 : c);</span>
+    }
+
+    // the radians one texel spans, around and down
+    private static final float TEXEL = (float) (Math.PI / BAND_HEIGHT);
+
+    // A gaussian along each row. A row near a pole is a small circle, so the
+    // same angle spans more texels there; past a full turn it wraps.
+    private static void blurRows(float[] src, float[] dst, float sigma) {
+<span class="fc" id="L161">        float[] w = new float[WIDTH];</span>
+<span class="fc bfc" id="L162" title="All 2 branches covered.">        for (int y = 0; y &lt; BAND_HEIGHT; y++) {</span>
+<span class="fc" id="L163">            double lat = Math.PI * (y + 0.5) / BAND_HEIGHT;</span>
+<span class="fc" id="L164">            float ring = (float) Math.max(Math.sin(lat), 0.05);</span>
+<span class="fc" id="L165">            float s = sigma / (TEXEL * ring);</span>
+            // 2r + 1 taps at most one full turn, so no texel is counted twice
+<span class="fc" id="L167">            int r = Math.min(WIDTH / 2 - 1, (int) Math.ceil(s * 2.5f));</span>
+<span class="fc" id="L168">            float sum = 0f;</span>
+<span class="fc bfc" id="L169" title="All 2 branches covered.">            for (int k = -r; k &lt;= r; k++) {</span>
+<span class="fc" id="L170">                w[k + r] = (float) com.codename1.util.MathUtil.exp(-0.5 * (k * k) / (s * s));</span>
+<span class="fc" id="L171">                sum += w[k + r];</span>
+            }
+<span class="fc" id="L173">            int row = y * WIDTH;</span>
+<span class="fc bfc" id="L174" title="All 2 branches covered.">            for (int x = 0; x &lt; WIDTH; x++) {</span>
+<span class="fc" id="L175">                float cr = 0f;</span>
+<span class="fc" id="L176">                float cg = 0f;</span>
+<span class="fc" id="L177">                float cb = 0f;</span>
+<span class="fc bfc" id="L178" title="All 2 branches covered.">                for (int k = -r; k &lt;= r; k++) {</span>
+<span class="fc" id="L179">                    int i = (row + ((x + k) % WIDTH + WIDTH) % WIDTH) * 3;</span>
+<span class="fc" id="L180">                    float wk = w[k + r];</span>
+<span class="fc" id="L181">                    cr += src[i] * wk;</span>
+<span class="fc" id="L182">                    cg += src[i + 1] * wk;</span>
+<span class="fc" id="L183">                    cb += src[i + 2] * wk;</span>
+                }
+<span class="fc" id="L185">                int o = (row + x) * 3;</span>
+<span class="fc" id="L186">                dst[o] = cr / sum;</span>
+<span class="fc" id="L187">                dst[o + 1] = cg / sum;</span>
+<span class="fc" id="L188">                dst[o + 2] = cb / sum;</span>
+            }
+        }
+<span class="fc" id="L191">    }</span>
+
+    // A gaussian down each column, clamped at the poles.
+    private static void blurColumns(float[] src, float[] dst, float sigma) {
+<span class="fc" id="L195">        float s = sigma / TEXEL;</span>
+<span class="fc" id="L196">        int r = Math.min(BAND_HEIGHT, (int) Math.ceil(s * 2.5f));</span>
+<span class="fc" id="L197">        float[] w = new float[2 * r + 1];</span>
+<span class="fc bfc" id="L198" title="All 2 branches covered.">        for (int k = -r; k &lt;= r; k++) {</span>
+<span class="fc" id="L199">            w[k + r] = (float) com.codename1.util.MathUtil.exp(-0.5 * (k * k) / (s * s));</span>
+        }
+<span class="fc bfc" id="L201" title="All 2 branches covered.">        for (int x = 0; x &lt; WIDTH; x++) {</span>
+<span class="fc bfc" id="L202" title="All 2 branches covered.">            for (int y = 0; y &lt; BAND_HEIGHT; y++) {</span>
+<span class="fc" id="L203">                float cr = 0f;</span>
+<span class="fc" id="L204">                float cg = 0f;</span>
+<span class="fc" id="L205">                float cb = 0f;</span>
+<span class="fc" id="L206">                float sum = 0f;</span>
+<span class="fc bfc" id="L207" title="All 2 branches covered.">                for (int k = -r; k &lt;= r; k++) {</span>
+<span class="fc" id="L208">                    int yy = y + k;</span>
+<span class="fc bfc" id="L209" title="All 4 branches covered.">                    if (yy &lt; 0 || yy &gt;= BAND_HEIGHT) {</span>
+<span class="fc" id="L210">                        continue;</span>
+                    }
+<span class="fc" id="L212">                    int i = (yy * WIDTH + x) * 3;</span>
+<span class="fc" id="L213">                    float wk = w[k + r];</span>
+<span class="fc" id="L214">                    cr += src[i] * wk;</span>
+<span class="fc" id="L215">                    cg += src[i + 1] * wk;</span>
+<span class="fc" id="L216">                    cb += src[i + 2] * wk;</span>
+<span class="fc" id="L217">                    sum += wk;</span>
+                }
+<span class="fc" id="L219">                int o = (y * WIDTH + x) * 3;</span>
+<span class="fc" id="L220">                dst[o] = cr / sum;</span>
+<span class="fc" id="L221">                dst[o + 1] = cg / sum;</span>
+<span class="fc" id="L222">                dst[o + 2] = cb / sum;</span>
+            }
+        }
+<span class="fc" id="L225">    }</span>
+
+    // The direction a texel of a band looks along: x around the horizon from
+    // +x toward +z, y from straight up. Matches the lookup every generator
+    // prints.
+    static void direction(int x, int y, float[] out) {
+<span class="nc" id="L231">        double phi = 2 * Math.PI * ((x + 0.5) / WIDTH - 0.5);</span>
+<span class="nc" id="L232">        double theta = Math.PI * (y + 0.5) / BAND_HEIGHT;</span>
+<span class="nc" id="L233">        double st = Math.sin(theta);</span>
+<span class="nc" id="L234">        out[0] = (float) (Math.cos(phi) * st);</span>
+<span class="nc" id="L235">        out[1] = (float) Math.cos(theta);</span>
+<span class="nc" id="L236">        out[2] = (float) (Math.sin(phi) * st);</span>
+<span class="nc" id="L237">    }</span>
+
+    static float[] skyRadiance(Environment env, Light light) {
+<span class="nc" id="L240">        float[] zen = rgb(env.getZenithColor());</span>
+<span class="nc" id="L241">        float[] hor = rgb(env.getHorizonColor());</span>
+<span class="nc" id="L242">        float[] sun = rgb(env.getSunColor());</span>
+<span class="nc bnc" id="L243" title="All 2 branches missed.">        float[] ground = env.isHemisphere() ? rgb(env.getGroundColor())</span>
+                : new float[] {hor[0] * 0.35f, hor[1] * 0.35f, hor[2] * 0.35f};
+<span class="nc" id="L245">        float sx = 0f;</span>
+<span class="nc" id="L246">        float sy = 1f;</span>
+<span class="nc" id="L247">        float sz = 0f;</span>
+<span class="nc bnc" id="L248" title="All 2 branches missed.">        if (light != null) {</span>
+<span class="nc" id="L249">            float len = (float) Math.sqrt(light.getDirectionX() * light.getDirectionX()</span>
+<span class="nc" id="L250">                    + light.getDirectionY() * light.getDirectionY()</span>
+<span class="nc" id="L251">                    + light.getDirectionZ() * light.getDirectionZ());</span>
+<span class="nc bnc" id="L252" title="All 2 branches missed.">            if (len &gt; 0f) {</span>
+<span class="nc" id="L253">                sx = -light.getDirectionX() / len;</span>
+<span class="nc" id="L254">                sy = -light.getDirectionY() / len;</span>
+<span class="nc" id="L255">                sz = -light.getDirectionZ() / len;</span>
+            }
+        }
+<span class="nc" id="L258">        float[] out = new float[WIDTH * BAND_HEIGHT * 3];</span>
+<span class="nc" id="L259">        float[] d = new float[3];</span>
+<span class="nc bnc" id="L260" title="All 2 branches missed.">        for (int y = 0; y &lt; BAND_HEIGHT; y++) {</span>
+<span class="nc bnc" id="L261" title="All 2 branches missed.">            for (int x = 0; x &lt; WIDTH; x++) {</span>
+<span class="nc" id="L262">                direction(x, y, d);</span>
+                float r;
+                float g;
+                float b;
+<span class="nc bnc" id="L266" title="All 2 branches missed.">                if (d[1] &gt;= 0f) {</span>
+<span class="nc" id="L267">                    float t = (float) com.codename1.util.MathUtil.pow(d[1], 0.55);</span>
+<span class="nc" id="L268">                    r = hor[0] + (zen[0] - hor[0]) * t;</span>
+<span class="nc" id="L269">                    g = hor[1] + (zen[1] - hor[1]) * t;</span>
+<span class="nc" id="L270">                    b = hor[2] + (zen[2] - hor[2]) * t;</span>
+                    // overcast skies flatten toward a brighter grey
+<span class="nc" id="L272">                    float c = env.getCloudCover() * 0.5f;</span>
+<span class="nc" id="L273">                    float grey = (r + g + b) / 3f * 1.1f;</span>
+<span class="nc" id="L274">                    r += (grey - r) * c;</span>
+<span class="nc" id="L275">                    g += (grey - g) * c;</span>
+<span class="nc" id="L276">                    b += (grey - b) * c;</span>
+<span class="nc" id="L277">                } else {</span>
+                    // the ground fades in just below the horizon
+<span class="nc" id="L279">                    float t = Math.min(1f, -d[1] * 6f);</span>
+<span class="nc" id="L280">                    r = hor[0] + (ground[0] - hor[0]) * t;</span>
+<span class="nc" id="L281">                    g = hor[1] + (ground[1] - hor[1]) * t;</span>
+<span class="nc" id="L282">                    b = hor[2] + (ground[2] - hor[2]) * t;</span>
+                }
+<span class="nc" id="L284">                float sd = Math.max(0f, d[0] * sx + d[1] * sy + d[2] * sz);</span>
+<span class="nc" id="L285">                float glow = (float) (com.codename1.util.MathUtil.pow(sd, 8.0) * 0.35 + com.codename1.util.MathUtil.pow(sd, 64.0) * 0.8);</span>
+<span class="nc bnc" id="L286" title="All 2 branches missed.">                if (sd &gt; 0.9990f) {</span>
+<span class="nc" id="L287">                    glow += 1.2f;</span>
+                }
+<span class="nc" id="L289">                int o = (y * WIDTH + x) * 3;</span>
+<span class="nc" id="L290">                out[o] = r + sun[0] * glow;</span>
+<span class="nc" id="L291">                out[o + 1] = g + sun[1] * glow;</span>
+<span class="nc" id="L292">                out[o + 2] = b + sun[2] * glow;</span>
+            }
+        }
+<span class="nc" id="L295">        return out;</span>
+    }
+
+    static float[] imageRadiance(Image panorama, float intensity) {
+<span class="nc" id="L299">        int w = panorama.getWidth();</span>
+<span class="nc" id="L300">        int h = panorama.getHeight();</span>
+<span class="nc" id="L301">        int[] px = panorama.getRGB();</span>
+<span class="nc" id="L302">        float k = Math.max(0f, Math.min(2f, intensity)) / 255f;</span>
+<span class="nc" id="L303">        float[] out = new float[WIDTH * BAND_HEIGHT * 3];</span>
+<span class="nc bnc" id="L304" title="All 2 branches missed.">        for (int y = 0; y &lt; BAND_HEIGHT; y++) {</span>
+<span class="nc" id="L305">            int sy0 = y * h / BAND_HEIGHT;</span>
+<span class="nc" id="L306">            int sy1 = Math.max(sy0 + 1, (y + 1) * h / BAND_HEIGHT);</span>
+<span class="nc bnc" id="L307" title="All 2 branches missed.">            for (int x = 0; x &lt; WIDTH; x++) {</span>
+<span class="nc" id="L308">                int sx0 = x * w / WIDTH;</span>
+<span class="nc" id="L309">                int sx1 = Math.max(sx0 + 1, (x + 1) * w / WIDTH);</span>
+                // a box average, so a large panorama does not alias
+<span class="nc" id="L311">                float r = 0f;</span>
+<span class="nc" id="L312">                float g = 0f;</span>
+<span class="nc" id="L313">                float b = 0f;</span>
+<span class="nc" id="L314">                int n = 0;</span>
+<span class="nc bnc" id="L315" title="All 4 branches missed.">                for (int sy = sy0; sy &lt; sy1 &amp;&amp; sy &lt; h; sy++) {</span>
+<span class="nc bnc" id="L316" title="All 4 branches missed.">                    for (int sx = sx0; sx &lt; sx1 &amp;&amp; sx &lt; w; sx++) {</span>
+<span class="nc" id="L317">                        int c = px[sy * w + sx];</span>
+<span class="nc" id="L318">                        r += (c &gt;&gt; 16) &amp; 0xff;</span>
+<span class="nc" id="L319">                        g += (c &gt;&gt; 8) &amp; 0xff;</span>
+<span class="nc" id="L320">                        b += c &amp; 0xff;</span>
+<span class="nc" id="L321">                        n++;</span>
+                    }
+                }
+<span class="nc" id="L324">                int o = (y * WIDTH + x) * 3;</span>
+<span class="nc bnc" id="L325" title="All 2 branches missed.">                float s = n == 0 ? 0f : k / n;</span>
+<span class="nc" id="L326">                out[o] = r * s;</span>
+<span class="nc" id="L327">                out[o + 1] = g * s;</span>
+<span class="nc" id="L328">                out[o + 2] = b * s;</span>
+            }
+        }
+<span class="nc" id="L331">        return out;</span>
+    }
+
+    private static float[] rgb(int argb) {
+<span class="nc" id="L335">        return new float[] {((argb &gt;&gt; 16) &amp; 0xff) / 255f, ((argb &gt;&gt; 8) &amp; 0xff) / 255f, (argb &amp; 0xff) / 255f};</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,291 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DefaultGraphModel.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.graph</a> &gt; <span class="el_source">DefaultGraphModel.java</span></div><h1>DefaultGraphModel.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.graph;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/// An editable graph kept in memory.
+///
+/// Edits made by a user are checked by the `ConnectionValidator` before an
+/// edge is made. Ids of edges the model makes itself are `&quot;e&quot;` followed by a
+/// counter, skipping any already taken.
+<span class="fc" id="L35">public class DefaultGraphModel extends AbstractGraphModel {</span>
+<span class="fc" id="L36">    private final List&lt;GraphNode&gt; nodes = new ArrayList&lt;GraphNode&gt;();</span>
+<span class="fc" id="L37">    private final List&lt;GraphEdge&gt; edges = new ArrayList&lt;GraphEdge&gt;();</span>
+<span class="fc" id="L38">    private final List&lt;GraphGroup&gt; groups = new ArrayList&lt;GraphGroup&gt;();</span>
+<span class="fc" id="L39">    private final Map&lt;String, GraphNode&gt; nodeIndex = new HashMap&lt;String, GraphNode&gt;();</span>
+<span class="fc" id="L40">    private final Map&lt;String, GraphEdge&gt; edgeIndex = new HashMap&lt;String, GraphEdge&gt;();</span>
+<span class="fc" id="L41">    private ConnectionValidator validator = new ConnectionValidator();</span>
+    private int edgeCounter;
+
+    @Override
+    public List&lt;GraphNode&gt; getNodes() {
+<span class="fc" id="L46">        return nodes;</span>
+    }
+
+    @Override
+    public List&lt;GraphEdge&gt; getEdges() {
+<span class="fc" id="L51">        return edges;</span>
+    }
+
+    @Override
+    public List&lt;GraphGroup&gt; getGroups() {
+<span class="fc" id="L56">        return groups;</span>
+    }
+
+    @Override
+    public GraphNode getNode(String id) {
+<span class="pc bpc" id="L61" title="1 of 2 branches missed.">        return id == null ? null : nodeIndex.get(id);</span>
+    }
+
+    /// The edge with this id, or null.
+    public GraphEdge getEdge(String id) {
+<span class="pc bpc" id="L66" title="1 of 2 branches missed.">        return id == null ? null : edgeIndex.get(id);</span>
+    }
+
+    /// The validator `connect` asks. Never null.
+    public ConnectionValidator getValidator() {
+<span class="fc" id="L71">        return validator;</span>
+    }
+
+    /// Replaces the validator; null restores the default one.
+    public void setValidator(ConnectionValidator validator) {
+<span class="nc bnc" id="L76" title="All 2 branches missed.">        this.validator = validator == null ? new ConnectionValidator() : validator;</span>
+<span class="nc" id="L77">    }</span>
+
+    /// Adds a node, replacing one with the same id.
+    ///
+    /// #### Returns
+    ///
+    /// the node
+    public GraphNode addNode(GraphNode node) {
+<span class="fc" id="L85">        GraphNode old = nodeIndex.put(node.getId(), node);</span>
+<span class="fc bfc" id="L86" title="All 2 branches covered.">        if (old != null) {</span>
+<span class="fc" id="L87">            nodes.remove(old);</span>
+        }
+<span class="fc" id="L89">        nodes.add(node);</span>
+<span class="fc" id="L90">        fireChanged();</span>
+<span class="fc" id="L91">        return node;</span>
+    }
+
+    /// Adds an edge as it is, without asking the validator.
+    ///
+    /// #### Returns
+    ///
+    /// the edge
+    public GraphEdge addEdge(GraphEdge edge) {
+<span class="fc" id="L100">        GraphEdge old = edgeIndex.put(edge.getId(), edge);</span>
+<span class="pc bpc" id="L101" title="1 of 2 branches missed.">        if (old != null) {</span>
+<span class="nc" id="L102">            edges.remove(old);</span>
+        }
+<span class="fc" id="L104">        edges.add(edge);</span>
+<span class="fc" id="L105">        fireChanged();</span>
+<span class="fc" id="L106">        return edge;</span>
+    }
+
+    /// Adds an edge between two nodes with a generated id.
+    public GraphEdge addEdge(String sourceId, String targetId) {
+<span class="fc" id="L111">        return addEdge(new GraphEdge(nextEdgeId(), sourceId, targetId));</span>
+    }
+
+    /// Adds a group.
+    public GraphGroup addGroup(GraphGroup group) {
+<span class="fc" id="L116">        groups.add(group);</span>
+<span class="fc" id="L117">        fireChanged();</span>
+<span class="fc" id="L118">        return group;</span>
+    }
+
+    /// Removes every node, edge and group.
+    public void clear() {
+<span class="nc" id="L123">        nodes.clear();</span>
+<span class="nc" id="L124">        edges.clear();</span>
+<span class="nc" id="L125">        groups.clear();</span>
+<span class="nc" id="L126">        nodeIndex.clear();</span>
+<span class="nc" id="L127">        edgeIndex.clear();</span>
+<span class="nc" id="L128">        fireChanged();</span>
+<span class="nc" id="L129">    }</span>
+
+    /// The edges that touch a node.
+    public List&lt;GraphEdge&gt; getEdges(GraphNode node) {
+<span class="nc" id="L133">        List&lt;GraphEdge&gt; out = new ArrayList&lt;GraphEdge&gt;();</span>
+<span class="nc" id="L134">        int n = edges.size();</span>
+<span class="nc bnc" id="L135" title="All 2 branches missed.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="nc" id="L136">            GraphEdge e = edges.get(i);</span>
+<span class="nc bnc" id="L137" title="All 2 branches missed.">            if (e.touches(node.getId())) {</span>
+<span class="nc" id="L138">                out.add(e);</span>
+            }
+        }
+<span class="nc" id="L141">        return out;</span>
+    }
+
+    @Override
+    public boolean moveNode(GraphNode node, double x, double y) {
+<span class="fc" id="L146">        node.setPosition(x, y);</span>
+<span class="fc" id="L147">        fireChanged();</span>
+<span class="fc" id="L148">        return true;</span>
+    }
+
+    @Override
+    public GraphEdge connect(GraphNode source, GraphPort sourcePort, GraphNode target, GraphPort targetPort) {
+<span class="fc bfc" id="L153" title="All 2 branches covered.">        if (!validator.canConnect(this, source, sourcePort, target, targetPort)) {</span>
+<span class="fc" id="L154">            return null;</span>
+        }
+<span class="fc bfc" id="L156" title="All 2 branches covered.">        GraphEdge e = new GraphEdge(nextEdgeId(), source.getId(),</span>
+<span class="fc" id="L157">                sourcePort == null ? null : sourcePort.getId(),</span>
+<span class="fc bfc" id="L158" title="All 2 branches covered.">                target.getId(), targetPort == null ? null : targetPort.getId());</span>
+<span class="fc" id="L159">        return addEdge(e);</span>
+    }
+
+    @Override
+    public boolean removeEdge(GraphEdge edge) {
+<span class="pc bpc" id="L164" title="1 of 2 branches missed.">        if (!edges.remove(edge)) {</span>
+<span class="nc" id="L165">            return false;</span>
+        }
+<span class="fc" id="L167">        edgeIndex.remove(edge.getId());</span>
+<span class="fc" id="L168">        fireChanged();</span>
+<span class="fc" id="L169">        return true;</span>
+    }
+
+    @Override
+    public boolean removeNode(GraphNode node) {
+<span class="pc bpc" id="L174" title="1 of 2 branches missed.">        if (!nodes.remove(node)) {</span>
+<span class="nc" id="L175">            return false;</span>
+        }
+<span class="fc" id="L177">        nodeIndex.remove(node.getId());</span>
+<span class="fc bfc" id="L178" title="All 2 branches covered.">        for (int i = edges.size() - 1; i &gt;= 0; i--) {</span>
+<span class="fc" id="L179">            GraphEdge e = edges.get(i);</span>
+<span class="fc bfc" id="L180" title="All 2 branches covered.">            if (e.touches(node.getId())) {</span>
+<span class="fc" id="L181">                edges.remove(i);</span>
+<span class="fc" id="L182">                edgeIndex.remove(e.getId());</span>
+            }
+        }
+<span class="fc" id="L185">        fireChanged();</span>
+<span class="fc" id="L186">        return true;</span>
+    }
+
+    @Override
+    public boolean renameNode(GraphNode node, String label) {
+<span class="nc" id="L191">        node.setLabel(label);</span>
+<span class="nc" id="L192">        fireChanged();</span>
+<span class="nc" id="L193">        return true;</span>
+    }
+
+    @Override
+    public boolean setCollapsed(GraphGroup group, boolean collapsed) {
+<span class="fc" id="L198">        group.setCollapsed(collapsed);</span>
+<span class="fc" id="L199">        fireChanged();</span>
+<span class="fc" id="L200">        return true;</span>
+    }
+
+    @Override
+    public boolean insertNode(GraphNode node, int index) {
+<span class="pc bpc" id="L205" title="2 of 4 branches missed.">        if (node == null || nodeIndex.containsKey(node.getId())) {</span>
+<span class="nc" id="L206">            return false;</span>
+        }
+<span class="fc" id="L208">        nodeIndex.put(node.getId(), node);</span>
+<span class="pc bpc" id="L209" title="1 of 4 branches missed.">        if (index &lt; 0 || index &gt;= nodes.size()) {</span>
+<span class="fc" id="L210">            nodes.add(node);</span>
+        } else {
+<span class="fc" id="L212">            nodes.add(index, node);</span>
+        }
+<span class="fc" id="L214">        fireChanged();</span>
+<span class="fc" id="L215">        return true;</span>
+    }
+
+    @Override
+    public boolean insertEdge(GraphEdge edge, int index) {
+<span class="pc bpc" id="L220" title="2 of 4 branches missed.">        if (edge == null || edgeIndex.containsKey(edge.getId())</span>
+<span class="pc bpc" id="L221" title="2 of 4 branches missed.">                || !nodeIndex.containsKey(edge.getSourceId()) || !nodeIndex.containsKey(edge.getTargetId())) {</span>
+<span class="nc" id="L222">            return false;</span>
+        }
+<span class="fc" id="L224">        edgeIndex.put(edge.getId(), edge);</span>
+<span class="pc bpc" id="L225" title="1 of 4 branches missed.">        if (index &lt; 0 || index &gt;= edges.size()) {</span>
+<span class="fc" id="L226">            edges.add(edge);</span>
+        } else {
+<span class="nc" id="L228">            edges.add(index, edge);</span>
+        }
+<span class="fc" id="L230">        fireChanged();</span>
+<span class="fc" id="L231">        return true;</span>
+    }
+
+    @Override
+    public boolean resizeNode(GraphNode node, double width, double height) {
+<span class="fc" id="L236">        node.setSize(width, height);</span>
+<span class="fc" id="L237">        fireChanged();</span>
+<span class="fc" id="L238">        return true;</span>
+    }
+
+    @Override
+    public boolean setNodeGroup(GraphNode node, String groupId) {
+<span class="fc" id="L243">        node.setGroupId(groupId);</span>
+<span class="fc" id="L244">        fireChanged();</span>
+<span class="fc" id="L245">        return true;</span>
+    }
+
+    @Override
+    public boolean resizeGroup(GraphGroup group, double x, double y, double width, double height) {
+<span class="fc" id="L250">        group.setBounds(x, y, width, height);</span>
+<span class="fc" id="L251">        fireChanged();</span>
+<span class="fc" id="L252">        return true;</span>
+    }
+
+    @Override
+    public boolean setPortValue(GraphPort port, Object value) {
+<span class="fc" id="L257">        port.setValue(value);</span>
+<span class="fc" id="L258">        fireChanged();</span>
+<span class="fc" id="L259">        return true;</span>
+    }
+
+    /// Removes a group. Its members stay, in no group.
+    ///
+    /// #### Returns
+    ///
+    /// false when the model has no such group
+    public boolean removeGroup(GraphGroup group) {
+<span class="nc bnc" id="L268" title="All 2 branches missed.">        if (!groups.remove(group)) {</span>
+<span class="nc" id="L269">            return false;</span>
+        }
+<span class="nc" id="L271">        int n = nodes.size();</span>
+<span class="nc bnc" id="L272" title="All 2 branches missed.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="nc" id="L273">            GraphNode node = nodes.get(i);</span>
+<span class="nc bnc" id="L274" title="All 2 branches missed.">            if (group.getId().equals(node.getGroupId())) {</span>
+<span class="nc" id="L275">                node.setGroupId(null);</span>
+            }
+        }
+<span class="nc" id="L278">        fireChanged();</span>
+<span class="nc" id="L279">        return true;</span>
+    }
+
+    private String nextEdgeId() {
+        String id;
+        do {
+<span class="fc" id="L285">            edgeCounter++;</span>
+<span class="fc" id="L286">            id = &quot;e&quot; + edgeCounter;</span>
+<span class="fc bfc" id="L287" title="All 2 branches covered.">        } while (edgeIndex.containsKey(id));</span>
+<span class="fc" id="L288">        return id;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,295 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AnalyserNode.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.media.audio</a> &gt; <span class="el_source">AnalyserNode.java</span></div><h1>AnalyserNode.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.media.audio;
+
+import com.codename1.util.MathUtil;
+
+import java.util.concurrent.atomic.AtomicLong;
+
+/// Exposes the recent signal and its spectrum for visualisation, passing its
+/// input through unchanged: the Web Audio `AnalyserNode`.
+///
+/// ```java
+/// OfflineAudioContext audio = new OfflineAudioContext(2, 44100, 44100);
+/// OscillatorNode player = audio.createOscillator();
+/// AnalyserNode an = audio.createAnalyser();
+/// an.setFftSize(1024);
+/// player.connect(an).connect(audio.getDestination());
+/// byte[] bars = new byte[an.getFrequencyBinCount()];
+/// // in an animation callback
+/// an.getByteFrequencyData(bars);
+/// ```
+///
+/// The input is down-mixed to mono for analysis. The frequency data is a
+/// Blackman windowed FFT of the newest [#getFftSize()] samples, smoothed over
+/// time and converted to decibels, as the specification defines it.
+///
+/// Call the getters from one thread, normally the EDT: the spectrum getters
+/// share their working arrays. With a real-time
+/// [AudioContext] the render thread keeps writing while they copy, so a copy
+/// is the latest audio at the moment it was taken; it is meant for drawing,
+/// not for sample-exact measurement, which belongs to an [OfflineAudioContext].
+public final class AnalyserNode extends AudioNode {
+    private static final int RING = 32768;
+    private static final double BLACKMAN_ALPHA = 0.16;
+
+<span class="fc" id="L56">    private final float[] ring = new float[RING];</span>
+    /// Frames written to `ring`, published after each quantum.
+<span class="fc" id="L58">    private final AtomicLong written = new AtomicLong();</span>
+
+<span class="fc" id="L60">    private int fftSize = 2048;</span>
+<span class="fc" id="L61">    private double minDecibels = -100;</span>
+<span class="fc" id="L62">    private double maxDecibels = -30;</span>
+<span class="fc" id="L63">    private double smoothing = 0.8;</span>
+
+    // ---- reader side, used by whichever thread calls the getters ----
+    private double[] re;
+    private double[] im;
+    private float[] smoothed;
+    private float[] decibels;
+<span class="fc" id="L70">    private long analysedAt = -1;</span>
+
+    AnalyserNode(BaseAudioContext context) {
+<span class="fc" id="L73">        super(context, 1, 1, 2, ChannelCountMode.MAX, ChannelInterpretation.SPEAKERS);</span>
+<span class="fc" id="L74">    }</span>
+
+    /// The analysis window, 2048 by default.
+    ///
+    /// #### Returns
+    ///
+    /// a power of two from 32 to 32768
+    public int getFftSize() {
+<span class="nc" id="L82">        return fftSize;</span>
+    }
+
+    /// Sets the analysis window.
+    ///
+    /// #### Parameters
+    ///
+    /// - `size`: a power of two from 32 to 32768
+    public void setFftSize(int size) {
+<span class="pc bpc" id="L91" title="3 of 6 branches missed.">        if (size &lt; 32 || size &gt; RING || (size &amp; (size - 1)) != 0) {</span>
+<span class="nc" id="L92">            throw new IllegalArgumentException(&quot;fftSize must be a power of two from 32 to 32768: &quot; + size);</span>
+        }
+<span class="fc" id="L94">        resetAnalysis(size);</span>
+<span class="fc" id="L95">    }</span>
+
+    private void resetAnalysis(int size) {
+<span class="fc" id="L98">        fftSize = size;</span>
+<span class="fc" id="L99">        re = null;</span>
+<span class="fc" id="L100">        smoothed = null;</span>
+<span class="fc" id="L101">        analysedAt = -1;</span>
+<span class="fc" id="L102">    }</span>
+
+    /// Half the FFT size: the number of values the frequency getters fill.
+    ///
+    /// #### Returns
+    ///
+    /// the bin count
+    public int getFrequencyBinCount() {
+<span class="fc" id="L110">        return fftSize / 2;</span>
+    }
+
+    /// The decibel value that maps to byte 0, -100 by default.
+    ///
+    /// #### Returns
+    ///
+    /// decibels
+    public double getMinDecibels() {
+<span class="nc" id="L119">        return minDecibels;</span>
+    }
+
+    /// Sets the decibel value that maps to byte 0.
+    ///
+    /// #### Parameters
+    ///
+    /// - `db`: less than [#getMaxDecibels()]
+    public void setMinDecibels(double db) {
+<span class="nc bnc" id="L128" title="All 2 branches missed.">        if (!(db &lt; maxDecibels)) { // NOPMD LogicInversion - also rejects NaN</span>
+<span class="nc" id="L129">            throw new IllegalArgumentException(&quot;minDecibels must be below maxDecibels: &quot; + db);</span>
+        }
+<span class="nc" id="L131">        minDecibels = db;</span>
+<span class="nc" id="L132">    }</span>
+
+    /// The decibel value that maps to byte 255, -30 by default.
+    ///
+    /// #### Returns
+    ///
+    /// decibels
+    public double getMaxDecibels() {
+<span class="nc" id="L140">        return maxDecibels;</span>
+    }
+
+    /// Sets the decibel value that maps to byte 255.
+    ///
+    /// #### Parameters
+    ///
+    /// - `db`: more than [#getMinDecibels()]
+    public void setMaxDecibels(double db) {
+<span class="nc bnc" id="L149" title="All 2 branches missed.">        if (!(db &gt; minDecibels)) { // NOPMD LogicInversion - also rejects NaN</span>
+<span class="nc" id="L150">            throw new IllegalArgumentException(&quot;maxDecibels must be above minDecibels: &quot; + db);</span>
+        }
+<span class="nc" id="L152">        maxDecibels = db;</span>
+<span class="nc" id="L153">    }</span>
+
+    /// How much of the previous spectrum each new one keeps, 0.8 by default.
+    ///
+    /// #### Returns
+    ///
+    /// 0 to 1
+    public double getSmoothingTimeConstant() {
+<span class="nc" id="L161">        return smoothing;</span>
+    }
+
+    /// Sets how much of the previous spectrum each new one keeps.
+    ///
+    /// #### Parameters
+    ///
+    /// - `value`: 0 (no smoothing) to 1
+    public void setSmoothingTimeConstant(double value) {
+<span class="pc bpc" id="L170" title="3 of 6 branches missed.">        if (Double.isNaN(value) || value &lt; 0 || value &gt; 1) {</span>
+<span class="nc" id="L171">            throw new IllegalArgumentException(&quot;smoothingTimeConstant must be between 0 and 1: &quot; + value);</span>
+        }
+<span class="fc" id="L173">        smoothing = value;</span>
+<span class="fc" id="L174">    }</span>
+
+    /// Copies the newest samples, as -1 to 1.
+    ///
+    /// #### Parameters
+    ///
+    /// - `array`: filled with up to [#getFftSize()] values
+    public void getFloatTimeDomainData(float[] array) {
+<span class="fc" id="L182">        int n = Math.min(array.length, fftSize);</span>
+<span class="fc" id="L183">        long end = written.get();</span>
+<span class="fc" id="L184">        long start = end - fftSize;</span>
+<span class="fc bfc" id="L185" title="All 2 branches covered.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc" id="L186">            long p = start + i;</span>
+<span class="pc bpc" id="L187" title="1 of 2 branches missed.">            array[i] = p &lt; 0 ? 0f : ring[(int) (p &amp; (RING - 1))];</span>
+        }
+<span class="fc" id="L189">    }</span>
+
+    /// Copies the newest samples as bytes, 128 being silence.
+    ///
+    /// #### Parameters
+    ///
+    /// - `array`: filled with up to [#getFftSize()] values
+    public void getByteTimeDomainData(byte[] array) {
+<span class="nc" id="L197">        int n = Math.min(array.length, fftSize);</span>
+<span class="nc" id="L198">        long end = written.get();</span>
+<span class="nc" id="L199">        long start = end - fftSize;</span>
+<span class="nc bnc" id="L200" title="All 2 branches missed.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="nc" id="L201">            long p = start + i;</span>
+<span class="nc bnc" id="L202" title="All 2 branches missed.">            float v = p &lt; 0 ? 0f : ring[(int) (p &amp; (RING - 1))];</span>
+<span class="nc" id="L203">            array[i] = (byte) clampByte(Math.floor(128 * (1 + v)));</span>
+        }
+<span class="nc" id="L205">    }</span>
+
+    /// Copies the spectrum in decibels, bin `k` being `k * sampleRate / fftSize` Hz.
+    ///
+    /// #### Parameters
+    ///
+    /// - `array`: filled with up to [#getFrequencyBinCount()] values
+    public void getFloatFrequencyData(float[] array) {
+<span class="fc" id="L213">        analyse();</span>
+<span class="fc" id="L214">        int n = Math.min(array.length, fftSize / 2);</span>
+<span class="fc" id="L215">        System.arraycopy(decibels, 0, array, 0, n);</span>
+<span class="fc" id="L216">    }</span>
+
+    /// Copies the spectrum scaled from [#getMinDecibels()] (0) to
+    /// [#getMaxDecibels()] (255).
+    ///
+    /// #### Parameters
+    ///
+    /// - `array`: filled with up to [#getFrequencyBinCount()] values
+    public void getByteFrequencyData(byte[] array) {
+<span class="fc" id="L225">        analyse();</span>
+<span class="fc" id="L226">        int n = Math.min(array.length, fftSize / 2);</span>
+<span class="fc" id="L227">        double scale = 255 / (maxDecibels - minDecibels);</span>
+<span class="fc bfc" id="L228" title="All 2 branches covered.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc" id="L229">            array[i] = (byte) clampByte(Math.floor(scale * (decibels[i] - minDecibels)));</span>
+        }
+<span class="fc" id="L231">    }</span>
+
+    private static int clampByte(double v) {
+<span class="fc bfc" id="L234" title="All 4 branches covered.">        return v &lt; 0 ? 0 : v &gt; 255 ? 255 : (int) v;</span>
+    }
+
+    private void analyse() {
+<span class="fc" id="L238">        int n = fftSize;</span>
+<span class="pc bpc" id="L239" title="1 of 4 branches missed.">        if (re == null || re.length != n) {</span>
+<span class="fc" id="L240">            re = new double[n];</span>
+<span class="fc" id="L241">            im = new double[n];</span>
+<span class="fc" id="L242">            smoothed = new float[n / 2];</span>
+<span class="fc" id="L243">            decibels = new float[n / 2];</span>
+<span class="fc" id="L244">            analysedAt = -1;</span>
+        }
+<span class="fc" id="L246">        long end = written.get();</span>
+<span class="fc bfc" id="L247" title="All 2 branches covered.">        if (end == analysedAt) {</span>
+<span class="fc" id="L248">            return;</span>
+        }
+<span class="fc" id="L250">        analysedAt = end;</span>
+<span class="fc" id="L251">        long start = end - n;</span>
+<span class="fc bfc" id="L252" title="All 2 branches covered.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc" id="L253">            long p = start + i;</span>
+<span class="pc bpc" id="L254" title="1 of 2 branches missed.">            double x = p &lt; 0 ? 0 : ring[(int) (p &amp; (RING - 1))];</span>
+<span class="fc" id="L255">            double w = (1 - BLACKMAN_ALPHA) / 2 - 0.5 * Math.cos(2 * Math.PI * i / n)</span>
+<span class="fc" id="L256">                    + BLACKMAN_ALPHA / 2 * Math.cos(4 * Math.PI * i / n);</span>
+<span class="fc" id="L257">            re[i] = x * w;</span>
+<span class="fc" id="L258">            im[i] = 0;</span>
+        }
+<span class="fc" id="L260">        FFT.transform(re, im, false);</span>
+<span class="fc" id="L261">        double tau = smoothing;</span>
+<span class="fc bfc" id="L262" title="All 2 branches covered.">        for (int k = 0; k &lt; n / 2; k++) {</span>
+<span class="fc" id="L263">            double mag = Math.sqrt(re[k] * re[k] + im[k] * im[k]) / n;</span>
+<span class="fc" id="L264">            double v = tau * smoothed[k] + (1 - tau) * mag;</span>
+<span class="pc bpc" id="L265" title="2 of 4 branches missed.">            if (Double.isNaN(v) || Double.isInfinite(v)) {</span>
+<span class="nc" id="L266">                v = 0;</span>
+            }
+<span class="fc" id="L268">            smoothed[k] = (float) v;</span>
+<span class="pc bpc" id="L269" title="1 of 2 branches missed.">            decibels[k] = v == 0 ? Float.NEGATIVE_INFINITY : (float) (20 * MathUtil.log10(v));</span>
+        }
+<span class="fc" id="L271">    }</span>
+
+    @Override
+    void process(long q) {
+<span class="fc" id="L275">        AudioBus in = inBuses[0];</span>
+<span class="fc" id="L276">        AudioBus out = outBuses[0];</span>
+<span class="fc" id="L277">        out.setChannels(in.channels);</span>
+<span class="fc" id="L278">        int n = BaseAudioContext.RENDER_QUANTUM;</span>
+<span class="fc" id="L279">        long w = written.get();</span>
+<span class="fc" id="L280">        int base = (int) (w &amp; (RING - 1));</span>
+<span class="fc" id="L281">        float scale = 1f / in.channels;</span>
+<span class="fc bfc" id="L282" title="All 2 branches covered.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc" id="L283">            float sum = 0;</span>
+<span class="fc bfc" id="L284" title="All 2 branches covered.">            for (int c = 0; c &lt; in.channels; c++) {</span>
+<span class="fc" id="L285">                sum += in.data[c][i];</span>
+            }
+<span class="pc bpc" id="L287" title="1 of 2 branches missed.">            ring[base + i] = in.channels == 1 ? sum : sum * scale;</span>
+        }
+<span class="fc bfc" id="L289" title="All 2 branches covered.">        for (int c = 0; c &lt; in.channels; c++) {</span>
+<span class="fc" id="L290">            System.arraycopy(in.data[c], 0, out.data[c], 0, n);</span>
+        }
+<span class="fc" id="L292">        written.set(w + n);</span>
+<span class="fc" id="L293">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,323 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CustomerInfo.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.payment</a> &gt; <span class="el_source">CustomerInfo.java</span></div><h1>CustomerInfo.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Codename One in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.payment;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/// What the Codename One Commerce service knows about one customer: the
+/// entitlements held, the subscriptions that are active and the attributes
+/// the application attached.
+///
+/// Instances are immutable. [CommerceManager#getCustomerInfo()] returns the
+/// last one the service answered with, and an empty one before any answer.
+public final class CustomerInfo {
+    private final String appUserId;
+    private final String originalAppUserId;
+    private final String managementUrl;
+    private final long serverTime;
+<span class="fc" id="L41">    private final Map&lt;String, EntitlementInfo&gt; entitlements = new HashMap&lt;String, EntitlementInfo&gt;();</span>
+<span class="fc" id="L42">    private final List&lt;String&gt; activeSubscriptions = new ArrayList&lt;String&gt;();</span>
+<span class="fc" id="L43">    private final Map&lt;String, String&gt; attributes = new HashMap&lt;String, String&gt;();</span>
+<span class="fc" id="L44">    private final Map&lt;String, Long&gt; currencies = new HashMap&lt;String, Long&gt;();</span>
+<span class="fc" id="L45">    private final List&lt;ReferralReward&gt; referralRewards = new ArrayList&lt;ReferralReward&gt;();</span>
+
+    /// Builds a customer from the parsed JSON object of the service's
+    /// customer payload.
+    ///
+    /// #### Parameters
+    ///
+    /// - `json`: the parsed payload; null makes an empty customer
+<span class="fc" id="L53">    CustomerInfo(Map json) {</span>
+<span class="fc bfc" id="L54" title="All 2 branches covered.">        Map m = json == null ? new HashMap() : json;</span>
+<span class="fc" id="L55">        appUserId = asString(m.get(&quot;appUserId&quot;));</span>
+<span class="fc" id="L56">        originalAppUserId = asString(m.get(&quot;originalAppUserId&quot;));</span>
+<span class="fc" id="L57">        managementUrl = asString(m.get(&quot;managementUrl&quot;));</span>
+<span class="fc" id="L58">        serverTime = asLong(m.get(&quot;serverTime&quot;));</span>
+<span class="fc" id="L59">        Object ents = m.get(&quot;entitlements&quot;);</span>
+<span class="fc bfc" id="L60" title="All 2 branches covered.">        if (ents instanceof Map) {</span>
+<span class="fc bfc" id="L61" title="All 2 branches covered.">            for (Object o : ((Map) ents).entrySet()) {</span>
+<span class="fc" id="L62">                Map.Entry e = (Map.Entry) o;</span>
+<span class="pc bpc" id="L63" title="1 of 2 branches missed.">                if (e.getKey() == null) {</span>
+<span class="nc" id="L64">                    continue;</span>
+                }
+<span class="fc" id="L66">                String id = String.valueOf(e.getKey());</span>
+<span class="fc" id="L67">                Object v = e.getValue();</span>
+<span class="pc bpc" id="L68" title="1 of 2 branches missed.">                entitlements.put(id, new EntitlementInfo(id, v instanceof Map ? (Map) v : null));</span>
+<span class="fc" id="L69">            }</span>
+        }
+<span class="fc" id="L71">        Object subs = m.get(&quot;activeSubscriptions&quot;);</span>
+<span class="fc bfc" id="L72" title="All 2 branches covered.">        if (subs instanceof List) {</span>
+<span class="fc bfc" id="L73" title="All 2 branches covered.">            for (Object o : (List) subs) {</span>
+<span class="pc bpc" id="L74" title="1 of 2 branches missed.">                if (o != null) {</span>
+<span class="fc" id="L75">                    activeSubscriptions.add(String.valueOf(o));</span>
+                }
+<span class="fc" id="L77">            }</span>
+        }
+<span class="fc" id="L79">        Object attrs = m.get(&quot;attributes&quot;);</span>
+<span class="fc bfc" id="L80" title="All 2 branches covered.">        if (attrs instanceof Map) {</span>
+<span class="fc bfc" id="L81" title="All 2 branches covered.">            for (Object o : ((Map) attrs).entrySet()) {</span>
+<span class="fc" id="L82">                Map.Entry e = (Map.Entry) o;</span>
+<span class="pc bpc" id="L83" title="2 of 4 branches missed.">                if (e.getKey() != null &amp;&amp; e.getValue() != null) {</span>
+<span class="fc" id="L84">                    attributes.put(String.valueOf(e.getKey()), String.valueOf(e.getValue()));</span>
+                }
+<span class="fc" id="L86">            }</span>
+        }
+<span class="fc" id="L88">        Object cur = m.get(&quot;currencies&quot;);</span>
+<span class="fc bfc" id="L89" title="All 2 branches covered.">        if (cur instanceof Map) {</span>
+<span class="fc bfc" id="L90" title="All 2 branches covered.">            for (Object o : ((Map) cur).entrySet()) {</span>
+<span class="fc" id="L91">                Map.Entry e = (Map.Entry) o;</span>
+<span class="pc bpc" id="L92" title="1 of 2 branches missed.">                if (e.getKey() != null) {</span>
+<span class="fc" id="L93">                    currencies.put(String.valueOf(e.getKey()), Long.valueOf(asLong(e.getValue())));</span>
+                }
+<span class="fc" id="L95">            }</span>
+        }
+<span class="fc" id="L97">        Object rewards = m.get(&quot;rewards&quot;);</span>
+<span class="fc bfc" id="L98" title="All 2 branches covered.">        if (rewards instanceof List) {</span>
+<span class="fc bfc" id="L99" title="All 2 branches covered.">            for (Object o : (List) rewards) {</span>
+<span class="fc bfc" id="L100" title="All 2 branches covered.">                if (o instanceof Map) {</span>
+<span class="fc" id="L101">                    referralRewards.add(new ReferralReward((Map) o));</span>
+                }
+<span class="fc" id="L103">            }</span>
+        }
+<span class="fc" id="L105">    }</span>
+
+    /// The id the service knows this customer by, or null for the empty
+    /// customer.
+    public String getAppUserId() {
+<span class="fc" id="L110">        return appUserId;</span>
+    }
+
+    /// The first id this customer was known by, when a later one replaced it
+    /// (an anonymous id that became an account), or null.
+    public String getOriginalAppUserId() {
+<span class="fc" id="L116">        return originalAppUserId;</span>
+    }
+
+    /// The page where the customer manages the subscription with the store,
+    /// or null when there is none.
+    public String getManagementUrl() {
+<span class="fc" id="L122">        return managementUrl;</span>
+    }
+
+    /// The service's clock when it answered, in milliseconds since the
+    /// epoch, or 0 for the empty customer.
+    public long getServerTime() {
+<span class="fc" id="L128">        return serverTime;</span>
+    }
+
+    /// The entitlement with this id, active or not.
+    ///
+    /// #### Returns
+    ///
+    /// the entitlement, or null when the service reported none by that id
+    public EntitlementInfo getEntitlement(String entitlementId) {
+<span class="pc bpc" id="L137" title="1 of 2 branches missed.">        if (entitlementId == null) {</span>
+<span class="nc" id="L138">            return null;</span>
+        }
+<span class="fc" id="L140">        return entitlements.get(entitlementId);</span>
+    }
+
+    /// Whether the service reported this entitlement as active.
+    public boolean isEntitled(String entitlementId) {
+<span class="fc" id="L145">        EntitlementInfo e = getEntitlement(entitlementId);</span>
+<span class="pc bpc" id="L146" title="3 of 4 branches missed.">        return e != null &amp;&amp; e.isActive();</span>
+    }
+
+    /// Every entitlement the service reported, active or not, by id.
+    ///
+    /// #### Returns
+    ///
+    /// a new map, which the caller may change
+    public Map&lt;String, EntitlementInfo&gt; getEntitlements() {
+<span class="fc" id="L155">        return new HashMap&lt;String, EntitlementInfo&gt;(entitlements);</span>
+    }
+
+    /// The entitlements the service reported as active.
+    ///
+    /// #### Returns
+    ///
+    /// a new list, which the caller may change
+    public List&lt;EntitlementInfo&gt; getActiveEntitlements() {
+<span class="fc" id="L164">        List&lt;EntitlementInfo&gt; out = new ArrayList&lt;EntitlementInfo&gt;();</span>
+<span class="fc bfc" id="L165" title="All 2 branches covered.">        for (EntitlementInfo e : entitlements.values()) {</span>
+<span class="fc bfc" id="L166" title="All 2 branches covered.">            if (e.isActive()) {</span>
+<span class="fc" id="L167">                out.add(e);</span>
+            }
+<span class="fc" id="L169">        }</span>
+<span class="fc" id="L170">        return out;</span>
+    }
+
+    /// The store product ids of the subscriptions that are active.
+    ///
+    /// #### Returns
+    ///
+    /// a new list, which the caller may change
+    public List&lt;String&gt; getActiveSubscriptions() {
+<span class="fc" id="L179">        return new ArrayList&lt;String&gt;(activeSubscriptions);</span>
+    }
+
+    /// The attributes attached to this customer.
+    ///
+    /// #### Returns
+    ///
+    /// a new map, which the caller may change
+    public Map&lt;String, String&gt; getAttributes() {
+<span class="fc" id="L188">        return new HashMap&lt;String, String&gt;(attributes);</span>
+    }
+
+    /// The customer's balance of a virtual currency.
+    ///
+    /// #### Parameters
+    ///
+    /// - `code`: the code of the currency, as defined in the console
+    ///
+    /// #### Returns
+    ///
+    /// the balance, or 0 when the customer holds none of that currency
+    public long getCurrencyBalance(String code) {
+<span class="fc bfc" id="L201" title="All 2 branches covered.">        if (code == null) {</span>
+<span class="fc" id="L202">            return 0;</span>
+        }
+<span class="fc" id="L204">        Long balance = currencies.get(code);</span>
+<span class="fc bfc" id="L205" title="All 2 branches covered.">        return balance == null ? 0 : balance.longValue();</span>
+    }
+
+    /// The customer's virtual currency balances, by currency code.
+    ///
+    /// #### Returns
+    ///
+    /// a new map, which the caller may change
+    public Map&lt;String, Long&gt; getCurrencies() {
+<span class="fc" id="L214">        return new HashMap&lt;String, Long&gt;(currencies);</span>
+    }
+
+    /// The rewards the service granted this customer for referrals: an
+    /// entitlement or an amount of a virtual currency each, as configured in
+    /// the console. A reward that is an entitlement is also among
+    /// [#getEntitlements()], and a currency reward is already part of
+    /// [#getCurrencyBalance(String)]; this list says where they came from.
+    ///
+    /// #### Returns
+    ///
+    /// a new list, which the caller may change; empty when the service
+    /// reported no reward
+    public List&lt;ReferralReward&gt; getReferralRewards() {
+<span class="fc" id="L228">        return new ArrayList&lt;ReferralReward&gt;(referralRewards);</span>
+    }
+
+    /// This customer as the JSON object it was built from, for storage.
+    /// Passing the result to the constructor gives an equal customer.
+    ///
+    /// #### Returns
+    ///
+    /// a new map, which the caller may change
+    public Map&lt;String, Object&gt; toMap() {
+<span class="fc" id="L238">        Map&lt;String, Object&gt; out = new HashMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L239">        putIfSet(out, &quot;appUserId&quot;, appUserId);</span>
+<span class="fc" id="L240">        putIfSet(out, &quot;originalAppUserId&quot;, originalAppUserId);</span>
+<span class="fc" id="L241">        putIfSet(out, &quot;managementUrl&quot;, managementUrl);</span>
+<span class="fc" id="L242">        out.put(&quot;serverTime&quot;, Long.valueOf(serverTime));</span>
+<span class="fc" id="L243">        Map&lt;String, Object&gt; ents = new HashMap&lt;String, Object&gt;();</span>
+<span class="fc bfc" id="L244" title="All 2 branches covered.">        for (Map.Entry&lt;String, EntitlementInfo&gt; e : entitlements.entrySet()) {</span>
+<span class="fc" id="L245">            ents.put(e.getKey(), e.getValue().toMap());</span>
+<span class="fc" id="L246">        }</span>
+<span class="fc" id="L247">        out.put(&quot;entitlements&quot;, ents);</span>
+<span class="fc" id="L248">        out.put(&quot;activeSubscriptions&quot;, new ArrayList&lt;String&gt;(activeSubscriptions));</span>
+<span class="fc" id="L249">        out.put(&quot;attributes&quot;, new HashMap&lt;String, Object&gt;(attributes));</span>
+<span class="fc" id="L250">        out.put(&quot;currencies&quot;, new HashMap&lt;String, Object&gt;(currencies));</span>
+<span class="fc bfc" id="L251" title="All 2 branches covered.">        if (!referralRewards.isEmpty()) {</span>
+<span class="fc" id="L252">            List&lt;Object&gt; rewards = new ArrayList&lt;Object&gt;();</span>
+<span class="fc bfc" id="L253" title="All 2 branches covered.">            for (ReferralReward r : referralRewards) {</span>
+<span class="fc" id="L254">                rewards.add(r.toMap());</span>
+<span class="fc" id="L255">            }</span>
+<span class="fc" id="L256">            out.put(&quot;rewards&quot;, rewards);</span>
+        }
+<span class="fc" id="L258">        return out;</span>
+    }
+
+    /// Whether the other customer says the same thing as this one. The
+    /// service's clock is left out: it differs in every answer, and a
+    /// listener is told about a change of state, not about a new answer.
+    boolean sameState(CustomerInfo other) {
+<span class="pc bpc" id="L265" title="1 of 2 branches missed.">        if (other == null) {</span>
+<span class="nc" id="L266">            return false;</span>
+        }
+<span class="fc" id="L268">        Map&lt;String, Object&gt; a = toMap();</span>
+<span class="fc" id="L269">        Map&lt;String, Object&gt; b = other.toMap();</span>
+<span class="fc" id="L270">        a.remove(&quot;serverTime&quot;);</span>
+<span class="fc" id="L271">        b.remove(&quot;serverTime&quot;);</span>
+<span class="fc" id="L272">        return a.equals(b);</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="nc" id="L277">        return &quot;CustomerInfo{&quot; + appUserId + &quot;, entitlements=&quot; + entitlements.values() + &quot;}&quot;;</span>
+    }
+
+    static void putIfSet(Map&lt;String, Object&gt; out, String key, String value) {
+<span class="fc bfc" id="L281" title="All 2 branches covered.">        if (value != null) {</span>
+<span class="fc" id="L282">            out.put(key, value);</span>
+        }
+<span class="fc" id="L284">    }</span>
+
+    static String asString(Object o) {
+<span class="fc bfc" id="L287" title="All 2 branches covered.">        return o == null ? null : o.toString();</span>
+    }
+
+    static boolean asBoolean(Object o) {
+<span class="pc bpc" id="L291" title="1 of 2 branches missed.">        if (o instanceof Boolean) {</span>
+<span class="nc" id="L292">            return ((Boolean) o).booleanValue();</span>
+        }
+<span class="fc bfc" id="L294" title="All 4 branches covered.">        return o != null &amp;&amp; &quot;true&quot;.equalsIgnoreCase(o.toString());</span>
+    }
+
+    /// A JSON number as a long. The parser hands numbers over as `Double` or
+    /// `Long` depending on its settings, and a hand-edited value may be a
+    /// string; anything else is 0.
+    static long asLong(Object o) {
+<span class="fc bfc" id="L301" title="All 2 branches covered.">        if (o instanceof Number) {</span>
+<span class="fc" id="L302">            return ((Number) o).longValue();</span>
+        }
+<span class="pc bpc" id="L304" title="1 of 2 branches missed.">        if (o instanceof String) {</span>
+<span class="nc" id="L305">            String s = (String) o;</span>
+<span class="nc bnc" id="L306" title="All 2 branches missed.">            if (s.length() == 0) {</span>
+<span class="nc" id="L307">                return 0;</span>
+            }
+<span class="nc bnc" id="L309" title="All 2 branches missed.">            for (int i = 0; i &lt; s.length(); i++) {</span>
+<span class="nc" id="L310">                char c = s.charAt(i);</span>
+<span class="nc bnc" id="L311" title="All 10 branches missed.">                if ((c &lt; '0' || c &gt; '9') &amp;&amp; !(i == 0 &amp;&amp; c == '-' &amp;&amp; s.length() &gt; 1)) {</span>
+<span class="nc" id="L312">                    return 0;</span>
+                }
+            }
+<span class="nc bnc" id="L315" title="All 2 branches missed.">            if (s.length() &gt; 18) {</span>
+<span class="nc" id="L316">                return 0;</span>
+            }
+<span class="nc" id="L318">            return Long.parseLong(s);</span>
+        }
+<span class="fc" id="L320">        return 0;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,694 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Material.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.gpu</a> &gt; <span class="el_source">Material.java</span></div><h1>Material.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.gpu;
+
+import com.codename1.gpu.shader.ShaderMaterial;
+import com.codename1.gpu.shader.ShaderNode;
+import com.codename1.gpu.shader.ShaderType;
+
+/// A declarative description of how a surface should be shaded. The 3D engine is
+/// responsible for translating a material into a platform shader (GLSL on OpenGL
+/// ES and WebGL, Metal Shading Language on iOS); applications never write shader
+/// source. A material combines a lighting model (`Type`), a base color, an
+/// optional texture and pipeline `RenderState`.
+public final class Material {
+    /// The built in lighting model used to shade a surface.
+<span class="fc" id="L36">    public enum Type {</span>
+        /// Flat, unlit shading. The fragment color is the base color modulated
+        /// by the texture and vertex color. Ideal for UI, sprites and emissive
+        /// surfaces.
+<span class="fc" id="L40">        UNLIT,</span>
+        /// Diffuse only (Lambert) lighting using a single directional light.
+<span class="fc" id="L42">        LAMBERT,</span>
+        /// Diffuse and specular (Blinn-Phong) lighting using a single
+        /// directional light and the `shininess` property.
+<span class="fc" id="L45">        PHONG,</span>
+        /// Physically based shading (metallic/roughness with a GGX specular
+        /// lobe, the model glTF describes) using the directional light, the
+        /// environment's hemisphere ambient and, when the light casts them,
+        /// shadows. See `setMetallic`, `setRoughness` and `setEmissive`.
+<span class="fc" id="L50">        PBR,</span>
+        /// Unlit shading intended for screen aligned sprites and billboards.
+<span class="fc" id="L52">        SPRITE,</span>
+        /// Unlit shading sampling a background cube/sky texture, rendered behind
+        /// all other geometry.
+<span class="fc" id="L55">        SKYBOX</span>
+    }
+
+<span class="fc" id="L58">    private Type type = Type.UNLIT;</span>
+<span class="fc" id="L59">    private int color = 0xffffffff;</span>
+    private Texture texture;
+<span class="fc" id="L61">    private float shininess = 32.0f;</span>
+<span class="fc" id="L62">    private RenderState renderState = RenderState.opaque();</span>
+    private float metallic;
+<span class="fc" id="L64">    private float roughness = 0.8f;</span>
+<span class="fc" id="L65">    private int emissive = 0xff000000;</span>
+<span class="fc" id="L66">    private boolean receiveShadows = true;</span>
+<span class="fc" id="L67">    private boolean castShadows = true;</span>
+<span class="fc" id="L68">    private boolean fogged = true;</span>
+    private float[] jointRows;
+    private int jointCount;
+    private ShaderMaterial shader;
+    private Texture normalMap;
+<span class="fc" id="L73">    private float normalStrength = 1f;</span>
+    private Texture detailNormal;
+<span class="fc" id="L75">    private float detailScale = 1f;</span>
+    private float detailScrollU;
+    private float detailScrollV;
+<span class="fc" id="L78">    private float detailStrength = 1f;</span>
+    private Texture metallicRoughnessMap;
+    private Texture occlusionMap;
+<span class="fc" id="L81">    private float occlusionStrength = 1f;</span>
+    private Texture emissiveMap;
+    private ShaderMaterial composed;
+<span class="fc" id="L84">    private int composedUserVersion = -1;</span>
+    private ShaderMaterial composedUser;
+<span class="fc" id="L86">    private boolean mapsChanged = true;</span>
+
+    /// Creates an unlit white material.
+<span class="fc" id="L89">    public Material() {</span>
+<span class="fc" id="L90">    }</span>
+
+    /// Creates a material of the supplied type.
+    ///
+    /// #### Parameters
+    ///
+    /// - `type`: the lighting model
+<span class="fc" id="L97">    public Material(Type type) {</span>
+<span class="fc" id="L98">        this.type = type;</span>
+<span class="fc" id="L99">    }</span>
+
+    /// Returns the lighting model.
+    public Type getType() {
+<span class="fc" id="L103">        return type;</span>
+    }
+
+    /// Sets the lighting model.
+    ///
+    /// #### Parameters
+    ///
+    /// - `type`: the lighting model
+    ///
+    /// #### Returns
+    ///
+    /// this material for chaining
+    public Material setType(Type type) {
+<span class="nc" id="L116">        this.type = type;</span>
+<span class="nc" id="L117">        return this;</span>
+    }
+
+    /// Returns the base color as a packed ARGB integer.
+    public int getColor() {
+<span class="fc" id="L122">        return color;</span>
+    }
+
+    /// Sets the base color as a packed ARGB integer (0xAARRGGBB).
+    ///
+    /// #### Parameters
+    ///
+    /// - `argb`: the packed ARGB color
+    ///
+    /// #### Returns
+    ///
+    /// this material for chaining
+    public Material setColor(int argb) {
+<span class="fc" id="L135">        this.color = argb;</span>
+<span class="fc" id="L136">        return this;</span>
+    }
+
+    /// Returns the diffuse texture, or null when the material is untextured.
+    public Texture getTexture() {
+<span class="fc" id="L141">        return texture;</span>
+    }
+
+    /// Sets the diffuse texture. Pass null for an untextured material.
+    ///
+    /// #### Parameters
+    ///
+    /// - `texture`: the diffuse texture or null
+    ///
+    /// #### Returns
+    ///
+    /// this material for chaining
+    public Material setTexture(Texture texture) {
+<span class="fc" id="L154">        this.texture = texture;</span>
+<span class="fc" id="L155">        return this;</span>
+    }
+
+    /// Returns the Phong specular exponent.
+    public float getShininess() {
+<span class="nc" id="L160">        return shininess;</span>
+    }
+
+    /// Sets the Phong specular exponent (used only by `Type.PHONG`).
+    ///
+    /// #### Parameters
+    ///
+    /// - `shininess`: the specular exponent
+    ///
+    /// #### Returns
+    ///
+    /// this material for chaining
+    public Material setShininess(float shininess) {
+<span class="nc" id="L173">        this.shininess = shininess;</span>
+<span class="nc" id="L174">        return this;</span>
+    }
+
+    /// Returns the pipeline render state.
+    public RenderState getRenderState() {
+<span class="nc" id="L179">        return renderState;</span>
+    }
+
+    /// Sets the pipeline render state.
+    ///
+    /// #### Parameters
+    ///
+    /// - `renderState`: the render state
+    ///
+    /// #### Returns
+    ///
+    /// this material for chaining
+    public Material setRenderState(RenderState renderState) {
+<span class="fc" id="L192">        this.renderState = renderState;</span>
+<span class="fc" id="L193">        return this;</span>
+    }
+
+    /// Returns how metallic a `Type.PBR` surface is, from 0 (a dielectric such
+    /// as paint, plastic or wood) to 1 (bare metal).
+    public float getMetallic() {
+<span class="nc" id="L199">        return metallic;</span>
+    }
+
+    /// Sets how metallic a `Type.PBR` surface is.
+    ///
+    /// #### Parameters
+    ///
+    /// - `metallic`: 0 for a dielectric, 1 for metal
+    ///
+    /// #### Returns
+    ///
+    /// this material for chaining
+    public Material setMetallic(float metallic) {
+<span class="fc" id="L212">        this.metallic = Math.max(0f, Math.min(1f, metallic));</span>
+<span class="fc" id="L213">        return this;</span>
+    }
+
+    /// Returns how rough a `Type.PBR` surface is, from 0 (mirror) to 1 (chalk).
+    public float getRoughness() {
+<span class="nc" id="L218">        return roughness;</span>
+    }
+
+    /// Sets how rough a `Type.PBR` surface is. Rough surfaces spread their
+    /// highlight wide and dim; smooth ones make it small and bright.
+    ///
+    /// #### Parameters
+    ///
+    /// - `roughness`: 0 for a mirror, 1 for fully diffuse
+    ///
+    /// #### Returns
+    ///
+    /// this material for chaining
+    public Material setRoughness(float roughness) {
+<span class="fc" id="L232">        this.roughness = Math.max(0.04f, Math.min(1f, roughness));</span>
+<span class="fc" id="L233">        return this;</span>
+    }
+
+    /// Returns the light the surface gives off by itself, as RGB in an ARGB
+    /// int; black for none.
+    public int getEmissive() {
+<span class="fc" id="L239">        return emissive;</span>
+    }
+
+    /// Sets the light the surface gives off by itself: a lamp, a screen, wet
+    /// paint catching the sun. Emissive colour is added after lighting and is
+    /// what a bloom post effect picks up. Used by `Type.PBR`, `Type.LAMBERT`
+    /// and `Type.PHONG`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `argb`: the emitted colour; black for none
+    ///
+    /// #### Returns
+    ///
+    /// this material for chaining
+    public Material setEmissive(int argb) {
+<span class="fc" id="L255">        this.emissive = argb | 0xff000000;</span>
+<span class="fc" id="L256">        return this;</span>
+    }
+
+    /// Returns true if the surface is darkened by shadows the light casts.
+    public boolean isReceiveShadows() {
+<span class="fc" id="L261">        return receiveShadows;</span>
+    }
+
+    /// Sets whether the surface is darkened by the light's shadows. A ground
+    /// plane receives them; a particle or a muzzle flash should not.
+    ///
+    /// #### Parameters
+    ///
+    /// - `receiveShadows`: true to receive shadows
+    ///
+    /// #### Returns
+    ///
+    /// this material for chaining
+    public Material setReceiveShadows(boolean receiveShadows) {
+<span class="nc" id="L275">        this.receiveShadows = receiveShadows;</span>
+<span class="nc" id="L276">        return this;</span>
+    }
+
+    /// Returns true if geometry drawn with this material casts a shadow.
+    public boolean isCastShadows() {
+<span class="nc" id="L281">        return castShadows;</span>
+    }
+
+    /// Sets whether geometry drawn with this material casts a shadow.
+    /// Transparent and unlit effects normally should not.
+    ///
+    /// #### Parameters
+    ///
+    /// - `castShadows`: true to cast shadows
+    ///
+    /// #### Returns
+    ///
+    /// this material for chaining
+    public Material setCastShadows(boolean castShadows) {
+<span class="nc" id="L295">        this.castShadows = castShadows;</span>
+<span class="nc" id="L296">        return this;</span>
+    }
+
+    /// Returns true if this material is lit by the directional light.
+    public boolean isLit() {
+<span class="pc bpc" id="L301" title="1 of 6 branches missed.">        return type == Type.LAMBERT || type == Type.PHONG || type == Type.PBR;</span>
+    }
+
+    /// Returns a stable string identifying the shader variant required by this
+    /// material. Backends use it together with the mesh `VertexFormat` to cache
+    /// generated and compiled shader programs. The key intentionally depends
+    /// only on properties that change the generated source, not on values such
+    /// as the color which are passed as uniforms.
+    ///
+    /// #### Returns
+    ///
+    /// a shader variant cache key
+    public String getShaderKey() {
+<span class="pc bpc" id="L314" title="4 of 8 branches missed.">        String k = type.name() + (texture != null ? &quot;|tex&quot; : &quot;|notex&quot;)</span>
+                + (receiveShadows ? &quot;|rs&quot; : &quot;|nrs&quot;) + (fogged ? &quot;&quot; : &quot;|nofog&quot;) + ((emissive &amp; 0xffffff) != 0 ? &quot;|em&quot; : &quot;&quot;);
+<span class="fc bfc" id="L316" title="All 2 branches covered.">        if (jointRows != null) {</span>
+<span class="fc" id="L317">            k += &quot;|skin&quot; + jointCount;</span>
+        }
+<span class="fc" id="L319">        ShaderMaterial eff = getEffectiveShader();</span>
+<span class="fc bfc" id="L320" title="All 2 branches covered.">        return eff == null ? k : k + &quot;|sh:&quot; + eff.getShaderKey();</span>
+    }
+
+    /// The most joints `setSkinning` takes. A rig of more is skinned on the
+    /// CPU by `com.codename1.gaming.AnimatedModel`.
+    public static final int MAX_JOINTS = 64;
+
+    /// Skins the meshes drawn with this material on the GPU. Each joint is
+    /// three rows of its 4x4 matrix (the fourth is always 0, 0, 0, 1), so
+    /// joint `j` is `rows[j * 12 .. j * 12 + 11]`: the first row's four
+    /// values, then the second's, then the third's. A mesh in
+    /// `VertexFormat.SKINNED` moves each vertex by its four joints blended by
+    /// their weights; a mesh without joints draws as it is. The array is read
+    /// at every draw, so an animation updates it in place. Use it only where
+    /// `GraphicsDevice.isGpuSkinning` says the device can.
+    ///
+    /// #### Parameters
+    ///
+    /// - `rows`: the joint rows, at least `count * 12` floats, or null to
+    ///   stop skinning
+    ///
+    /// - `count`: the number of joints, at most `MAX_JOINTS`
+    ///
+    /// #### Returns
+    ///
+    /// this material
+    public Material setSkinning(float[] rows, int count) {
+<span class="pc bpc" id="L347" title="1 of 8 branches missed.">        if (rows != null &amp;&amp; (count &lt; 1 || count &gt; MAX_JOINTS || rows.length &lt; count * 12)) {</span>
+<span class="fc" id="L348">            throw new IllegalArgumentException(&quot;joint count &quot; + count);</span>
+        }
+<span class="fc" id="L350">        this.jointRows = rows;</span>
+<span class="fc bfc" id="L351" title="All 2 branches covered.">        this.jointCount = rows == null ? 0 : count;</span>
+<span class="fc" id="L352">        return this;</span>
+    }
+
+    /// Returns the joint rows `setSkinning` gave, or null.
+    ///
+    /// #### Returns
+    ///
+    /// the rows, shared and not copied
+    public float[] getJointRows() {
+<span class="fc" id="L361">        return jointRows;</span>
+    }
+
+    /// Returns the number of joints `setSkinning` gave, 0 without skinning.
+    ///
+    /// #### Returns
+    ///
+    /// the joint count
+    public int getJointCount() {
+<span class="fc" id="L370">        return jointCount;</span>
+    }
+
+    /// True if the material skins its meshes on the GPU.
+    ///
+    /// #### Returns
+    ///
+    /// true after `setSkinning` with joints
+    public boolean isSkinned() {
+<span class="fc bfc" id="L379" title="All 2 branches covered.">        return jointRows != null;</span>
+    }
+
+    /// Returns false when the environment's fog skips this material.
+    ///
+    /// #### Returns
+    ///
+    /// true when fogged, the default
+    public boolean isFogged() {
+<span class="fc" id="L388">        return fogged;</span>
+    }
+
+    /// Sets whether the environment's fog applies to this material. Turn it
+    /// off for sky domes and distant backdrops that already paint their own
+    /// haze, which fog would wash out to a flat colour.
+    ///
+    /// #### Parameters
+    ///
+    /// - `fogged`: false to draw without fog
+    ///
+    /// #### Returns
+    ///
+    /// this material
+    public Material setFogged(boolean fogged) {
+<span class="fc" id="L403">        this.fogged = fogged;</span>
+<span class="fc" id="L404">        return this;</span>
+    }
+
+    /// Returns the custom shading attached to this material.
+    ///
+    /// #### Returns
+    ///
+    /// the shader, or null for the engine's own
+    public ShaderMaterial getShader() {
+<span class="fc" id="L413">        return shader;</span>
+    }
+
+    /// Attaches custom shading: graphs that replace inputs of the shader the
+    /// material's type selects. The library in `com.codename1.gpu.shaders`
+    /// builds ready made ones.
+    ///
+    /// #### Parameters
+    ///
+    /// - `shader`: the shader, or null for the engine's own
+    ///
+    /// #### Returns
+    ///
+    /// this material
+    public Material setShader(ShaderMaterial shader) {
+<span class="fc" id="L428">        this.shader = shader;</span>
+<span class="fc" id="L429">        return this;</span>
+    }
+
+    /// Sets a tangent space normal map, sampled with the primary texture
+    /// coordinate. The tangent frame comes from the surface normal (see
+    /// `ShaderNode.perturbNormal`), so a mesh needs no tangents. Lit types
+    /// only.
+    ///
+    /// #### Parameters
+    ///
+    /// - `map`: the normal map, or null for none
+    ///
+    /// - `strength`: 1 for the map as authored
+    ///
+    /// #### Returns
+    ///
+    /// this material
+    public Material setNormalMap(Texture map, float strength) {
+<span class="fc" id="L447">        normalMap = map;</span>
+<span class="fc" id="L448">        normalStrength = strength;</span>
+<span class="fc" id="L449">        mapsChanged = true;</span>
+<span class="fc" id="L450">        return this;</span>
+    }
+
+    /// Returns the normal map.
+    ///
+    /// #### Returns
+    ///
+    /// the map, or null
+    public Texture getNormalMap() {
+<span class="nc" id="L459">        return normalMap;</span>
+    }
+
+    /// Sets a tiling detail normal map, layered over the normal map, that can
+    /// scroll with time: ripples on water, grain on stone.
+    ///
+    /// #### Parameters
+    ///
+    /// - `map`: a tileable normal map, or null for none
+    ///
+    /// - `scale`: how many times it repeats per unit of texture coordinate
+    ///
+    /// - `scrollU`: texture coordinate units per second along u
+    ///
+    /// - `scrollV`: texture coordinate units per second along v
+    ///
+    /// - `strength`: 1 for the map as authored
+    ///
+    /// #### Returns
+    ///
+    /// this material
+    public Material setDetailNormal(Texture map, float scale, float scrollU, float scrollV, float strength) {
+<span class="nc" id="L481">        detailNormal = map;</span>
+<span class="nc" id="L482">        detailScale = scale;</span>
+<span class="nc" id="L483">        detailScrollU = scrollU;</span>
+<span class="nc" id="L484">        detailScrollV = scrollV;</span>
+<span class="nc" id="L485">        detailStrength = strength;</span>
+<span class="nc" id="L486">        mapsChanged = true;</span>
+<span class="nc" id="L487">        return this;</span>
+    }
+
+    /// Returns the detail normal map.
+    ///
+    /// #### Returns
+    ///
+    /// the map, or null
+    public Texture getDetailNormal() {
+<span class="nc" id="L496">        return detailNormal;</span>
+    }
+
+    /// Sets a glTF style metallic-roughness map: roughness in green and
+    /// metallic in blue, each multiplying the material's own factor. PBR only.
+    ///
+    /// #### Parameters
+    ///
+    /// - `map`: the map, or null for none
+    ///
+    /// #### Returns
+    ///
+    /// this material
+    public Material setMetallicRoughnessMap(Texture map) {
+<span class="fc" id="L510">        metallicRoughnessMap = map;</span>
+<span class="fc" id="L511">        mapsChanged = true;</span>
+<span class="fc" id="L512">        return this;</span>
+    }
+
+    /// Returns the metallic-roughness map.
+    ///
+    /// #### Returns
+    ///
+    /// the map, or null
+    public Texture getMetallicRoughnessMap() {
+<span class="nc" id="L521">        return metallicRoughnessMap;</span>
+    }
+
+    /// Sets an ambient occlusion map, read from its red channel, that darkens
+    /// creases and contact areas.
+    ///
+    /// #### Parameters
+    ///
+    /// - `map`: the map, or null for none
+    ///
+    /// - `strength`: 0 for no effect, 1 for the full map
+    ///
+    /// #### Returns
+    ///
+    /// this material
+    public Material setOcclusionMap(Texture map, float strength) {
+<span class="nc" id="L537">        occlusionMap = map;</span>
+<span class="nc" id="L538">        occlusionStrength = strength;</span>
+<span class="nc" id="L539">        mapsChanged = true;</span>
+<span class="nc" id="L540">        return this;</span>
+    }
+
+    /// Returns the occlusion map.
+    ///
+    /// #### Returns
+    ///
+    /// the map, or null
+    public Texture getOcclusionMap() {
+<span class="nc" id="L549">        return occlusionMap;</span>
+    }
+
+    /// Sets an emissive map, multiplied by the emissive colour (or by white
+    /// when that is black): windows lit at night, glowing runes.
+    ///
+    /// #### Parameters
+    ///
+    /// - `map`: the map, or null for none
+    ///
+    /// #### Returns
+    ///
+    /// this material
+    public Material setEmissiveMap(Texture map) {
+<span class="nc" id="L563">        emissiveMap = map;</span>
+<span class="nc" id="L564">        mapsChanged = true;</span>
+<span class="nc" id="L565">        return this;</span>
+    }
+
+    /// Returns the emissive map.
+    ///
+    /// #### Returns
+    ///
+    /// the map, or null
+    public Texture getEmissiveMap() {
+<span class="nc" id="L574">        return emissiveMap;</span>
+    }
+
+    private boolean hasMaps() {
+<span class="pc bpc" id="L578" title="4 of 10 branches missed.">        return normalMap != null || detailNormal != null || metallicRoughnessMap != null</span>
+                || occlusionMap != null || emissiveMap != null;
+    }
+
+    /// Returns the shading backends draw this material with: the attached
+    /// `ShaderMaterial` combined with the graphs the texture maps on this
+    /// material need. A hook the attached shader sets wins over a map. For
+    /// backends; applications use `getShader`.
+    ///
+    /// #### Returns
+    ///
+    /// the shader to draw with, or null for the engine's own
+    public ShaderMaterial getEffectiveShader() {
+<span class="fc bfc" id="L591" title="All 2 branches covered.">        if (!hasMaps()) {</span>
+<span class="fc" id="L592">            return shader;</span>
+        }
+<span class="fc bfc" id="L594" title="All 2 branches covered.">        int userVersion = shader == null ? -1 : shader.getVersion();</span>
+<span class="pc bpc" id="L595" title="2 of 8 branches missed.">        if (composed == null || mapsChanged || composedUser != shader || composedUserVersion != userVersion) { //NOPMD CompareObjectsWithEquals - a different ShaderMaterial instance needs a new composition</span>
+<span class="fc" id="L596">            composed = compose();</span>
+<span class="fc" id="L597">            composedUser = shader;</span>
+<span class="fc" id="L598">            composedUserVersion = userVersion;</span>
+<span class="fc" id="L599">            mapsChanged = false;</span>
+        }
+<span class="fc" id="L601">        syncComposed();</span>
+<span class="fc" id="L602">        return composed;</span>
+    }
+
+    private static final String U_MR = &quot;cn1MetalRough&quot;;
+    private static final String U_DETAIL = &quot;cn1Detail&quot;;
+    private static final String U_EMIT = &quot;cn1EmitColor&quot;;
+
+    private ShaderMaterial compose() {
+<span class="fc" id="L610">        ShaderMaterial m = new ShaderMaterial();</span>
+<span class="fc" id="L611">        ShaderMaterial.Hook[] hooks = ShaderMaterial.Hook.values();</span>
+<span class="fc bfc" id="L612" title="All 2 branches covered.">        if (shader != null) {</span>
+<span class="fc bfc" id="L613" title="All 2 branches covered.">            for (int i = 0; i &lt; shader.getUniformCount(); i++) {</span>
+<span class="fc" id="L614">                m.declareUniform(shader.getUniformName(i), shader.getUniformType(i));</span>
+            }
+<span class="pc bpc" id="L616" title="1 of 2 branches missed.">            for (int i = 0; i &lt; shader.getTextureCount(); i++) {</span>
+<span class="nc" id="L617">                m.declareTexture(shader.getTextureName(i), shader.getTexture(i));</span>
+            }
+<span class="fc bfc" id="L619" title="All 2 branches covered.">            for (ShaderMaterial.Hook h : hooks) {</span>
+<span class="fc" id="L620">                m.set(h, shader.get(h));</span>
+            }
+        }
+<span class="fc" id="L623">        ShaderNode uv = ShaderNode.uv();</span>
+<span class="pc bpc" id="L624" title="4 of 6 branches missed.">        if (m.get(ShaderMaterial.Hook.NORMAL) == null &amp;&amp; (normalMap != null || detailNormal != null)) {</span>
+<span class="fc" id="L625">            ShaderNode tn = null;</span>
+<span class="pc bpc" id="L626" title="1 of 2 branches missed.">            if (normalMap != null) {</span>
+<span class="fc" id="L627">                m.declareTexture(&quot;cn1NormalMap&quot;, normalMap);</span>
+<span class="fc" id="L628">                tn = ShaderNode.unpackNormal(ShaderNode.sample(&quot;cn1NormalMap&quot;, uv), normalStrength);</span>
+            }
+<span class="pc bpc" id="L630" title="1 of 2 branches missed.">            if (detailNormal != null) {</span>
+<span class="nc" id="L631">                m.declareTexture(&quot;cn1DetailMap&quot;, detailNormal);</span>
+<span class="nc" id="L632">                m.declareUniform(U_DETAIL, ShaderType.VEC3);</span>
+<span class="nc" id="L633">                ShaderNode d = ShaderNode.uniform(U_DETAIL, ShaderType.VEC3);</span>
+<span class="nc" id="L634">                ShaderNode duv = uv.mul(d.x()).add(d.swizzle(&quot;yz&quot;).mul(ShaderNode.time()));</span>
+<span class="nc" id="L635">                ShaderNode dn = ShaderNode.unpackNormal(ShaderNode.sample(&quot;cn1DetailMap&quot;, duv), detailStrength);</span>
+<span class="nc bnc" id="L636" title="All 2 branches missed.">                tn = tn == null ? dn : ShaderNode.blendNormals(tn, dn);</span>
+            }
+<span class="fc" id="L638">            m.set(ShaderMaterial.Hook.NORMAL, ShaderNode.perturbNormal(tn));</span>
+        }
+<span class="pc bpc" id="L640" title="1 of 4 branches missed.">        if (metallicRoughnessMap != null &amp;&amp; (m.get(ShaderMaterial.Hook.METALLIC) == null</span>
+<span class="pc bpc" id="L641" title="1 of 2 branches missed.">                || m.get(ShaderMaterial.Hook.ROUGHNESS) == null)) {</span>
+<span class="fc" id="L642">            m.declareTexture(&quot;cn1MrMap&quot;, metallicRoughnessMap);</span>
+<span class="fc" id="L643">            m.declareUniform(U_MR, ShaderType.VEC2);</span>
+<span class="fc" id="L644">            ShaderNode mr = ShaderNode.sample(&quot;cn1MrMap&quot;, uv);</span>
+<span class="fc" id="L645">            ShaderNode factors = ShaderNode.uniform(U_MR, ShaderType.VEC2);</span>
+<span class="fc bfc" id="L646" title="All 2 branches covered.">            if (m.get(ShaderMaterial.Hook.METALLIC) == null) {</span>
+<span class="fc" id="L647">                m.set(ShaderMaterial.Hook.METALLIC, mr.z().mul(factors.x()));</span>
+            }
+<span class="pc bpc" id="L649" title="1 of 2 branches missed.">            if (m.get(ShaderMaterial.Hook.ROUGHNESS) == null) {</span>
+<span class="fc" id="L650">                m.set(ShaderMaterial.Hook.ROUGHNESS, mr.y().mul(factors.y()));</span>
+            }
+        }
+<span class="pc bpc" id="L653" title="3 of 4 branches missed.">        if (occlusionMap != null &amp;&amp; m.get(ShaderMaterial.Hook.BASE_COLOR) == null) {</span>
+<span class="nc" id="L654">            m.declareTexture(&quot;cn1AoMap&quot;, occlusionMap);</span>
+<span class="nc" id="L655">            ShaderNode ao = ShaderNode.mix(ShaderNode.f(1f), ShaderNode.sample(&quot;cn1AoMap&quot;, uv).x(),</span>
+<span class="nc" id="L656">                    ShaderNode.f(occlusionStrength));</span>
+<span class="nc" id="L657">            ShaderNode base = ShaderNode.baseColor();</span>
+<span class="nc" id="L658">            m.set(ShaderMaterial.Hook.BASE_COLOR, ShaderNode.vec(base.rgb().mul(ao), base.w()));</span>
+        }
+<span class="pc bpc" id="L660" title="3 of 4 branches missed.">        if (emissiveMap != null &amp;&amp; m.get(ShaderMaterial.Hook.EMISSIVE) == null) {</span>
+<span class="nc" id="L661">            m.declareTexture(&quot;cn1EmitMap&quot;, emissiveMap);</span>
+<span class="nc" id="L662">            m.declareUniform(U_EMIT, ShaderType.VEC3);</span>
+<span class="nc" id="L663">            m.set(ShaderMaterial.Hook.EMISSIVE, ShaderNode.sample(&quot;cn1EmitMap&quot;, uv).rgb()</span>
+<span class="nc" id="L664">                    .mul(ShaderNode.uniform(U_EMIT, ShaderType.VEC3)));</span>
+        }
+<span class="fc" id="L666">        return m;</span>
+    }
+
+    private void syncComposed() {
+<span class="fc bfc" id="L670" title="All 2 branches covered.">        if (shader != null) {</span>
+<span class="fc bfc" id="L671" title="All 2 branches covered.">            for (int i = 0; i &lt; shader.getUniformCount(); i++) {</span>
+<span class="fc" id="L672">                float[] v = shader.getUniformValues();</span>
+<span class="fc" id="L673">                composed.setUniform(shader.getUniformName(i), v[i * 4], v[i * 4 + 1], v[i * 4 + 2], v[i * 4 + 3]);</span>
+            }
+<span class="pc bpc" id="L675" title="1 of 2 branches missed.">            for (int i = 0; i &lt; shader.getTextureCount(); i++) {</span>
+<span class="nc" id="L676">                composed.setTexture(shader.getTextureName(i), shader.getTexture(i));</span>
+            }
+        }
+<span class="pc bpc" id="L679" title="1 of 2 branches missed.">        if (composed.getUniformSlot(U_MR) &gt;= 0) {</span>
+<span class="fc" id="L680">            composed.setUniform(U_MR, metallic, roughness);</span>
+        }
+<span class="pc bpc" id="L682" title="1 of 2 branches missed.">        if (composed.getUniformSlot(U_DETAIL) &gt;= 0) {</span>
+<span class="nc" id="L683">            composed.setUniform(U_DETAIL, detailScale, detailScrollU, detailScrollV);</span>
+        }
+<span class="pc bpc" id="L685" title="1 of 2 branches missed.">        if (composed.getUniformSlot(U_EMIT) &gt;= 0) {</span>
+<span class="nc bnc" id="L686" title="All 2 branches missed.">            if ((emissive &amp; 0xffffff) == 0) {</span>
+<span class="nc" id="L687">                composed.setUniform(U_EMIT, 1f, 1f, 1f);</span>
+            } else {
+<span class="nc" id="L689">                composed.setColorUniform(U_EMIT, emissive);</span>
+            }
+        }
+<span class="fc" id="L692">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

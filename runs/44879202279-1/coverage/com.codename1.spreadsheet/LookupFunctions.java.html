@@ -1,0 +1,476 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>LookupFunctions.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.spreadsheet</a> &gt; <span class="el_source">LookupFunctions.java</span></div><h1>LookupFunctions.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.spreadsheet;
+
+/// The lookup and reference functions.
+final class LookupFunctions {
+    static final String RANGE_NAMES = &quot;ADDRESS AREAS COLUMNS HLOOKUP INDEX INDIRECT LOOKUP MATCH OFFSET ROWS SHEET&quot;
+            + &quot; SHEETS TRANSPOSE VLOOKUP XLOOKUP XMATCH&quot;;
+
+    private LookupFunctions() {
+    }
+
+    private static Double d(double v) {
+<span class="fc" id="L34">        return Double.valueOf(v);</span>
+    }
+
+    static Object call(String name, Evaluator ev, Object[] a) {
+<span class="pc bpc" id="L38" title="1 of 15 branches missed.">        switch (Functions.index(SWITCH_1, name)) {</span>
+            case 0: // ROWS
+            case 1: { // COLUMNS
+<span class="fc" id="L41">                Object arg = Evaluator.arg(a, 0);</span>
+<span class="fc" id="L42">                boolean rows = &quot;ROWS&quot;.equals(name);</span>
+<span class="fc bfc" id="L43" title="All 2 branches covered.">                if (arg instanceof Ref) {</span>
+<span class="fc" id="L44">                    Ref r = (Ref) arg;</span>
+<span class="fc bfc" id="L45" title="All 2 branches covered.">                    return d(rows ? r.rows() : r.cols());</span>
+                }
+<span class="fc bfc" id="L47" title="All 2 branches covered.">                if (arg instanceof CellError) {</span>
+<span class="fc" id="L48">                    return arg;</span>
+                }
+<span class="fc" id="L50">                Object[][] m = ev.matrix(arg);</span>
+<span class="fc bfc" id="L51" title="All 2 branches covered.">                return d(rows ? m.length : Evaluator.width(m));</span>
+            }
+            case 2: { // AREAS
+<span class="fc" id="L54">                Object arg = Evaluator.arg(a, 0);</span>
+<span class="fc bfc" id="L55" title="All 2 branches covered.">                if (!(arg instanceof Ref)) {</span>
+<span class="fc" id="L56">                    throw EvalError.VALUE;</span>
+                }
+<span class="fc" id="L58">                int count = 0;</span>
+<span class="fc bfc" id="L59" title="All 2 branches covered.">                for (Ref r = (Ref) arg; r != null; r = r.next) {</span>
+<span class="fc" id="L60">                    count++;</span>
+                }
+<span class="fc" id="L62">                return d(count);</span>
+            }
+            case 3: { // SHEET
+<span class="fc" id="L65">                Object arg = Evaluator.arg(a, 0);</span>
+<span class="fc bfc" id="L66" title="All 2 branches covered.">                if (arg instanceof Ref) {</span>
+<span class="fc" id="L67">                    return d(ev.workbook.indexOf(((Ref) arg).sheet) + 1);</span>
+                }
+<span class="fc bfc" id="L69" title="All 2 branches covered.">                if (arg instanceof String) {</span>
+<span class="fc" id="L70">                    Sheet s = ev.workbook.getSheet((String) arg);</span>
+<span class="pc bpc" id="L71" title="1 of 2 branches missed.">                    if (s == null) {</span>
+<span class="fc" id="L72">                        throw EvalError.NA;</span>
+                    }
+<span class="nc" id="L74">                    return d(ev.workbook.indexOf(s) + 1);</span>
+                }
+<span class="fc" id="L76">                return d(ev.workbook.indexOf(ev.sheet) + 1);</span>
+            }
+            case 4: { // SHEETS
+<span class="fc" id="L79">                Object arg = Evaluator.arg(a, 0);</span>
+<span class="fc bfc" id="L80" title="All 2 branches covered.">                if (arg instanceof Ref) {</span>
+<span class="fc" id="L81">                    Ref r = (Ref) arg;</span>
+<span class="pc bpc" id="L82" title="1 of 2 branches missed.">                    return d(r.lastSheet == null ? 1 : ev.workbook.indexOf(r.lastSheet) - ev.workbook.indexOf(r.sheet) + 1);</span>
+                }
+<span class="fc" id="L84">                return d(ev.workbook.getSheetCount());</span>
+            }
+            case 5: // ADDRESS
+<span class="fc" id="L87">                return address(ev, a);</span>
+            case 6: { // TRANSPOSE
+<span class="fc" id="L89">                Object[][] m = ev.matrix(Evaluator.arg(a, 0));</span>
+<span class="fc" id="L90">                int w = Evaluator.width(m);</span>
+<span class="fc" id="L91">                Object[][] out = new Object[w][m.length];</span>
+<span class="fc bfc" id="L92" title="All 2 branches covered.">                for (int r = 0; r &lt; m.length; r++) {</span>
+<span class="fc bfc" id="L93" title="All 2 branches covered.">                    for (int c = 0; c &lt; w; c++) {</span>
+<span class="fc" id="L94">                        out[c][r] = m[r][c];</span>
+                    }
+                }
+<span class="fc" id="L97">                return out;</span>
+            }
+            case 7: // INDEX
+<span class="fc" id="L100">                return index(ev, a);</span>
+            case 8: { // OFFSET
+<span class="fc" id="L102">                Object arg = Evaluator.arg(a, 0);</span>
+<span class="fc bfc" id="L103" title="All 2 branches covered.">                if (!(arg instanceof Ref)) {</span>
+<span class="pc bpc" id="L104" title="1 of 2 branches missed.">                    throw arg instanceof CellError ? EvalError.of((CellError) arg) : EvalError.VALUE;</span>
+                }
+<span class="fc" id="L106">                Ref base = (Ref) arg;</span>
+<span class="fc" id="L107">                int r = base.r1 + (int) ev.scalarNum(a, 1);</span>
+<span class="fc" id="L108">                int c = base.c1 + (int) ev.scalarNum(a, 2, 0);</span>
+<span class="fc" id="L109">                int h = (int) ev.scalarNum(a, 3, base.rows());</span>
+<span class="fc" id="L110">                int w = (int) ev.scalarNum(a, 4, base.cols());</span>
+<span class="pc bpc" id="L111" title="2 of 4 branches missed.">                if (h == 0 || w == 0) {</span>
+<span class="nc" id="L112">                    throw EvalError.REF;</span>
+                }
+                // a negative height or width extends up or to the left of the anchor
+<span class="fc bfc" id="L115" title="All 2 branches covered.">                if (h &lt; 0) {</span>
+<span class="fc" id="L116">                    r += h + 1;</span>
+<span class="fc" id="L117">                    h = -h;</span>
+                }
+<span class="pc bpc" id="L119" title="1 of 2 branches missed.">                if (w &lt; 0) {</span>
+<span class="nc" id="L120">                    c += w + 1;</span>
+<span class="nc" id="L121">                    w = -w;</span>
+                }
+<span class="pc bpc" id="L123" title="4 of 8 branches missed.">                if (r &lt; 0 || c &lt; 0 || r + h - 1 &gt; Node.MAX_ROW || c + w - 1 &gt; Node.MAX_COL) {</span>
+<span class="nc" id="L124">                    throw EvalError.REF;</span>
+                }
+<span class="fc" id="L126">                return new Ref(base.sheet, null, r, c, r + h - 1, c + w - 1);</span>
+            }
+            case 9: { // INDIRECT
+<span class="fc" id="L129">                String text = ev.scalarText(a, 0).trim();</span>
+<span class="fc bfc" id="L130" title="All 4 branches covered.">                if (Evaluator.has(a, 1) &amp;&amp; !Values.bool(ev.scalar(a[1]))) {</span>
+                    // R1C1 notation is not read
+<span class="fc" id="L132">                    throw EvalError.REF;</span>
+                }
+                Node n;
+                try {
+<span class="fc" id="L136">                    n = FormulaParser.parse(text, false);</span>
+<span class="fc" id="L137">                } catch (FormulaSyntaxException e) {</span>
+<span class="fc" id="L138">                    throw EvalError.REF;</span>
+<span class="fc" id="L139">                }</span>
+<span class="fc bfc" id="L140" title="All 4 branches covered.">                if (n.kind != Node.REF &amp;&amp; n.kind != Node.NAME) {</span>
+<span class="fc" id="L141">                    throw EvalError.REF;</span>
+                }
+<span class="fc" id="L143">                Object v = ev.eval(n);</span>
+<span class="fc bfc" id="L144" title="All 2 branches covered.">                if (!(v instanceof Ref)) {</span>
+<span class="fc" id="L145">                    throw EvalError.REF;</span>
+                }
+<span class="fc" id="L147">                return v;</span>
+            }
+            case 10: { // MATCH
+<span class="fc" id="L150">                Object key = ev.scalar(Evaluator.arg(a, 0));</span>
+<span class="fc" id="L151">                Object[] vector = vector(ev, Evaluator.arg(a, 1));</span>
+<span class="fc" id="L152">                int type = (int) ev.scalarNum(a, 2, 1);</span>
+                // a sorted list is searched the way the lookups search it: among equal entries the
+                // last one answers, and MATCH(1E+99, list) is the place of the last number
+<span class="fc bfc" id="L155" title="All 10 branches covered.">                int at = find(key, vector, type == 0 ? 0 : type &gt; 0 ? -1 : 1, type == 0,</span>
+                        type == 0 ? 1 : type &gt; 0 ? 2 : -2);
+<span class="fc bfc" id="L157" title="All 2 branches covered.">                if (at &lt; 0) {</span>
+<span class="fc" id="L158">                    throw EvalError.NA;</span>
+                }
+<span class="fc" id="L160">                return d(at + 1);</span>
+            }
+            case 11: { // XMATCH
+<span class="fc" id="L163">                Object key = ev.scalar(Evaluator.arg(a, 0));</span>
+<span class="fc" id="L164">                Object[] vector = vector(ev, Evaluator.arg(a, 1));</span>
+<span class="fc" id="L165">                int mode = (int) ev.scalarNum(a, 2, 0);</span>
+<span class="fc" id="L166">                int search = (int) ev.scalarNum(a, 3, 1);</span>
+<span class="fc" id="L167">                checkModes(mode, search);</span>
+<span class="fc bfc" id="L168" title="All 4 branches covered.">                int at = find(key, vector, mode == 2 ? 0 : mode, mode == 2, search);</span>
+<span class="fc bfc" id="L169" title="All 2 branches covered.">                if (at &lt; 0) {</span>
+<span class="fc" id="L170">                    throw EvalError.NA;</span>
+                }
+<span class="fc" id="L172">                return d(at + 1);</span>
+            }
+            case 12: // VLOOKUP
+            case 13: { // HLOOKUP
+<span class="fc" id="L176">                boolean vertical = &quot;VLOOKUP&quot;.equals(name);</span>
+<span class="fc" id="L177">                Object key = ev.scalar(Evaluator.arg(a, 0));</span>
+<span class="fc" id="L178">                Object[][] table = ev.matrix(Evaluator.arg(a, 1));</span>
+<span class="fc" id="L179">                int n = (int) ev.scalarNum(a, 2);</span>
+<span class="fc bfc" id="L180" title="All 4 branches covered.">                boolean approximate = !Evaluator.has(a, 3) || Values.bool(ev.scalar(a[3]));</span>
+<span class="fc bfc" id="L181" title="All 2 branches covered.">                if (n &lt; 1) {</span>
+<span class="fc" id="L182">                    throw EvalError.VALUE;</span>
+                }
+<span class="fc bfc" id="L184" title="All 4 branches covered.">                if (n &gt; (vertical ? Evaluator.width(table) : table.length)) {</span>
+<span class="fc" id="L185">                    throw EvalError.REF;</span>
+                }
+<span class="pc bpc" id="L187" title="1 of 4 branches missed.">                Object[] keys = vertical ? column(table, 0) : table.length == 0 ? new Object[0] : table[0];</span>
+<span class="fc bfc" id="L188" title="All 6 branches covered.">                int at = find(key, keys, approximate ? -1 : 0, !approximate, approximate ? 2 : 1);</span>
+<span class="fc bfc" id="L189" title="All 2 branches covered.">                if (at &lt; 0) {</span>
+<span class="fc" id="L190">                    throw EvalError.NA;</span>
+                }
+<span class="fc bfc" id="L192" title="All 2 branches covered.">                return vertical ? table[at][n - 1] : table[n - 1][at];</span>
+            }
+            case 14: { // LOOKUP
+<span class="fc" id="L195">                Object key = ev.scalar(Evaluator.arg(a, 0));</span>
+<span class="fc" id="L196">                Object[][] table = ev.matrix(Evaluator.arg(a, 1));</span>
+<span class="fc bfc" id="L197" title="All 2 branches covered.">                boolean byColumn = table.length &gt;= Evaluator.width(table);</span>
+<span class="fc bfc" id="L198" title="All 2 branches covered.">                Object[] keys = byColumn ? column(table, 0) : table[0];</span>
+<span class="fc" id="L199">                int at = find(key, keys, -1, false, 2);</span>
+<span class="fc bfc" id="L200" title="All 2 branches covered.">                if (at &lt; 0) {</span>
+<span class="fc" id="L201">                    throw EvalError.NA;</span>
+                }
+<span class="fc bfc" id="L203" title="All 2 branches covered.">                if (Evaluator.has(a, 2)) {</span>
+<span class="fc" id="L204">                    Object[] results = vector(ev, a[2]);</span>
+<span class="pc bpc" id="L205" title="1 of 2 branches missed.">                    if (at &gt;= results.length) {</span>
+<span class="nc" id="L206">                        throw EvalError.NA;</span>
+                    }
+<span class="fc" id="L208">                    return results[at];</span>
+                }
+<span class="pc bpc" id="L210" title="1 of 2 branches missed.">                return byColumn ? table[at][Evaluator.width(table) - 1] : table[table.length - 1][at];</span>
+            }
+            case 15: { // XLOOKUP
+<span class="fc" id="L213">                Object key = ev.scalar(Evaluator.arg(a, 0));</span>
+<span class="fc" id="L214">                Object[][] lookup = ev.matrix(Evaluator.arg(a, 1));</span>
+<span class="fc bfc" id="L215" title="All 2 branches covered.">                boolean down = Evaluator.width(lookup) == 1;</span>
+<span class="fc bfc" id="L216" title="All 2 branches covered.">                Object[] keys = down ? column(lookup, 0) : lookup[0];</span>
+<span class="fc" id="L217">                Object[][] results = ev.shaped2(Evaluator.arg(a, 2), down, keys.length);</span>
+<span class="fc" id="L218">                int mode = (int) ev.scalarNum(a, 4, 0);</span>
+<span class="fc" id="L219">                int search = (int) ev.scalarNum(a, 5, 1);</span>
+<span class="fc" id="L220">                checkModes(mode, search);</span>
+<span class="fc bfc" id="L221" title="All 4 branches covered.">                int at = find(key, keys, mode == 2 ? 0 : mode, mode == 2, search);</span>
+<span class="fc bfc" id="L222" title="All 2 branches covered.">                if (at &lt; 0) {</span>
+<span class="fc bfc" id="L223" title="All 2 branches covered.">                    if (Evaluator.has(a, 3)) {</span>
+<span class="fc" id="L224">                        return a[3];</span>
+                    }
+<span class="fc" id="L226">                    throw EvalError.NA;</span>
+                }
+<span class="pc bpc" id="L228" title="1 of 2 branches missed.">                if (down) {</span>
+<span class="pc bpc" id="L229" title="1 of 2 branches missed.">                    if (Evaluator.width(results) == 1) {</span>
+<span class="fc" id="L230">                        return results[at][0];</span>
+                    }
+<span class="nc" id="L232">                    return new Object[][] {results[at]};</span>
+                }
+<span class="nc bnc" id="L234" title="All 2 branches missed.">                if (results.length == 1) {</span>
+<span class="nc" id="L235">                    return results[0][at];</span>
+                }
+<span class="nc" id="L237">                Object[][] out = new Object[results.length][1];</span>
+<span class="nc bnc" id="L238" title="All 2 branches missed.">                for (int r = 0; r &lt; results.length; r++) {</span>
+<span class="nc" id="L239">                    out[r][0] = results[r][at];</span>
+                }
+<span class="nc" id="L241">                return out;</span>
+            }
+            default:
+<span class="nc" id="L244">                return CellError.NAME;</span>
+        }
+    }
+
+    private static Object[] column(Object[][] m, int c) {
+<span class="fc" id="L249">        Object[] out = new Object[m.length];</span>
+<span class="fc bfc" id="L250" title="All 2 branches covered.">        for (int r = 0; r &lt; m.length; r++) {</span>
+<span class="fc" id="L251">            out[r] = m[r][c];</span>
+        }
+<span class="fc" id="L253">        return out;</span>
+    }
+
+    /// A row or a column of values as one list.
+    static Object[] vector(Evaluator ev, Object arg) {
+<span class="pc bpc" id="L258" title="1 of 2 branches missed.">        if (arg instanceof CellError) {</span>
+<span class="nc" id="L259">            throw EvalError.of((CellError) arg);</span>
+        }
+<span class="fc" id="L261">        Object[][] m = ev.matrix(arg);</span>
+<span class="fc bfc" id="L262" title="All 2 branches covered.">        if (m.length == 1) {</span>
+<span class="fc" id="L263">            return m[0];</span>
+        }
+<span class="fc bfc" id="L265" title="All 2 branches covered.">        if (Evaluator.width(m) != 1) {</span>
+<span class="fc" id="L266">            throw EvalError.NA;</span>
+        }
+<span class="fc" id="L268">        return column(m, 0);</span>
+    }
+
+    /// Finds a key in a list.
+    ///
+    /// #### Parameters
+    ///
+    /// - `nearest`: 0 for the key itself, -1 to settle for the largest value below it, 1 for
+    ///   the smallest above it.
+    /// - `wildcards`: a text key may hold `*` and `?`.
+    /// - `search`: 1 first to last, -1 last to first, 2 a binary search of an ascending
+    ///   list, -2 of a descending one.
+    ///
+    /// #### Returns
+    ///
+    /// the index, or -1
+    static int find(Object key, Object[] list, int nearest, boolean wildcards, int search) {
+<span class="pc bpc" id="L285" title="1 of 2 branches missed.">        if (key instanceof CellError) {</span>
+<span class="nc" id="L286">            throw EvalError.of((CellError) key);</span>
+        }
+<span class="fc bfc" id="L288" title="All 2 branches covered.">        if (key == null) {</span>
+<span class="fc" id="L289">            key = Double.valueOf(0);</span>
+        }
+<span class="fc" id="L291">        int n = list.length;</span>
+<span class="fc bfc" id="L292" title="All 4 branches covered.">        if (search == 2 || search == -2) {</span>
+            // the list is sorted: the last entry not past the key
+<span class="fc" id="L294">            int lo = 0;</span>
+<span class="fc" id="L295">            int hi = n - 1;</span>
+<span class="fc" id="L296">            int best = -1;</span>
+<span class="fc bfc" id="L297" title="All 2 branches covered.">            while (lo &lt;= hi) {</span>
+<span class="fc" id="L298">                int mid = (lo + hi) &gt;&gt;&gt; 1;</span>
+<span class="fc" id="L299">                Object v = list[mid];</span>
+<span class="fc" id="L300">                int probe = mid;</span>
+                // an entry of another type cannot be compared: look to its left
+<span class="fc bfc" id="L302" title="All 4 branches covered.">                while (probe &gt;= lo &amp;&amp; !sameType(v, key)) {</span>
+<span class="fc" id="L303">                    probe--;</span>
+<span class="pc bpc" id="L304" title="1 of 2 branches missed.">                    v = probe &gt;= lo ? list[probe] : null;</span>
+                }
+<span class="fc bfc" id="L306" title="All 2 branches covered.">                if (probe &lt; lo) {</span>
+<span class="fc" id="L307">                    lo = mid + 1;</span>
+<span class="fc" id="L308">                    continue;</span>
+                }
+                // a list sorted downwards is searched as an upward one read the other way
+<span class="fc bfc" id="L311" title="All 2 branches covered.">                int cmp = search == -2 ? Values.compare(key, v) : Values.compare(v, key);</span>
+<span class="fc bfc" id="L312" title="All 2 branches covered.">                if (cmp &lt;= 0) {</span>
+<span class="fc" id="L313">                    best = probe;</span>
+<span class="fc" id="L314">                    lo = mid + 1;</span>
+                } else {
+<span class="fc" id="L316">                    hi = probe - 1;</span>
+                }
+<span class="fc" id="L318">            }</span>
+<span class="fc bfc" id="L319" title="All 2 branches covered.">            if (best &lt; 0) {</span>
+<span class="pc bpc" id="L320" title="2 of 8 branches missed.">                if (nearest == 1 &amp;&amp; n &gt; 0 &amp;&amp; search == 2 &amp;&amp; sameType(list[0], key)) {</span>
+<span class="nc" id="L321">                    return 0;</span>
+                }
+<span class="fc" id="L323">                return -1;</span>
+            }
+<span class="fc" id="L325">            int cmp = Values.compare(list[best], key);</span>
+<span class="pc bpc" id="L326" title="3 of 10 branches missed.">            if (cmp == 0 || nearest == -1 &amp;&amp; search == 2 || nearest == 1 &amp;&amp; search == -2) {</span>
+<span class="fc" id="L327">                return best;</span>
+            }
+<span class="nc bnc" id="L329" title="All 6 branches missed.">            if (nearest != 0 &amp;&amp; best + 1 &lt; n &amp;&amp; sameType(list[best + 1], key)) {</span>
+<span class="nc" id="L330">                return best + 1;</span>
+            }
+<span class="nc" id="L332">            return -1;</span>
+        }
+<span class="fc bfc" id="L334" title="All 6 branches covered.">        boolean pattern = wildcards &amp;&amp; key instanceof String &amp;&amp; Criteria.hasWildcards((String) key);</span>
+<span class="fc" id="L335">        int bestIndex = -1;</span>
+<span class="fc" id="L336">        Object bestValue = null;</span>
+<span class="fc bfc" id="L337" title="All 2 branches covered.">        for (int k = 0; k &lt; n; k++) {</span>
+<span class="fc bfc" id="L338" title="All 2 branches covered.">            int i = search &lt; 0 ? n - 1 - k : k;</span>
+<span class="fc" id="L339">            Object v = list[i];</span>
+<span class="fc bfc" id="L340" title="All 2 branches covered.">            if (!sameType(v, key)) {</span>
+<span class="fc" id="L341">                continue;</span>
+            }
+<span class="fc bfc" id="L343" title="All 2 branches covered.">            if (pattern) {</span>
+<span class="fc bfc" id="L344" title="All 2 branches covered.">                if (Criteria.wildcardMatch((String) key, 0, (String) v, 0)) {</span>
+<span class="fc" id="L345">                    return i;</span>
+                }
+                continue;
+            }
+<span class="fc" id="L349">            int cmp = Values.compare(v, key);</span>
+<span class="fc bfc" id="L350" title="All 2 branches covered.">            if (cmp == 0) {</span>
+<span class="fc" id="L351">                return i;</span>
+            }
+<span class="pc bpc" id="L353" title="9 of 14 branches missed.">            if (nearest &lt; 0 &amp;&amp; cmp &lt; 0 &amp;&amp; (bestIndex &lt; 0 || Values.compare(v, bestValue) &gt; 0)</span>
+<span class="nc bnc" id="L354" title="All 2 branches missed.">                    || nearest &gt; 0 &amp;&amp; cmp &gt; 0 &amp;&amp; (bestIndex &lt; 0 || Values.compare(v, bestValue) &lt; 0)) {</span>
+<span class="fc" id="L355">                bestIndex = i;</span>
+<span class="fc" id="L356">                bestValue = v;</span>
+            }
+        }
+<span class="fc" id="L359">        return bestIndex;</span>
+    }
+
+    private static boolean sameType(Object v, Object key) {
+<span class="fc bfc" id="L363" title="All 2 branches covered.">        if (key instanceof Double) {</span>
+<span class="fc" id="L364">            return v instanceof Double;</span>
+        }
+<span class="fc bfc" id="L366" title="All 2 branches covered.">        if (key instanceof String) {</span>
+<span class="fc" id="L367">            return v instanceof String;</span>
+        }
+<span class="pc bpc" id="L369" title="2 of 4 branches missed.">        return key instanceof Boolean &amp;&amp; v instanceof Boolean;</span>
+    }
+
+    private static Object index(Evaluator ev, Object[] a) {
+<span class="fc" id="L373">        Object arg = Evaluator.arg(a, 0);</span>
+<span class="pc bpc" id="L374" title="1 of 2 branches missed.">        if (arg instanceof CellError) {</span>
+<span class="nc" id="L375">            return arg;</span>
+        }
+<span class="fc" id="L377">        int row = (int) ev.scalarNum(a, 1, 0);</span>
+<span class="fc" id="L378">        int col = (int) ev.scalarNum(a, 2, 0);</span>
+<span class="fc bfc" id="L379" title="All 4 branches covered.">        if (row &lt; 0 || col &lt; 0) {</span>
+<span class="fc" id="L380">            throw EvalError.VALUE;</span>
+        }
+<span class="fc bfc" id="L382" title="All 2 branches covered.">        if (arg instanceof Ref) {</span>
+<span class="fc" id="L383">            Ref ref = (Ref) arg;</span>
+<span class="fc" id="L384">            int area = (int) ev.scalarNum(a, 3, 1);</span>
+<span class="pc bpc" id="L385" title="3 of 4 branches missed.">            for (int i = 1; i &lt; area &amp;&amp; ref != null; i++) {</span>
+<span class="nc" id="L386">                ref = ref.next;</span>
+            }
+<span class="pc bpc" id="L388" title="1 of 4 branches missed.">            if (ref == null || area &lt; 1) {</span>
+<span class="fc" id="L389">                throw EvalError.REF;</span>
+            }
+<span class="fc" id="L391">            int rows = ref.rows();</span>
+<span class="fc" id="L392">            int cols = ref.cols();</span>
+<span class="pc bpc" id="L393" title="1 of 4 branches missed.">            if (!Evaluator.has(a, 2) &amp;&amp; rows == 1) {</span>
+                // one row and one index: the index is the column
+<span class="nc" id="L395">                col = row;</span>
+<span class="nc" id="L396">                row = 1;</span>
+<span class="pc bpc" id="L397" title="1 of 4 branches missed.">            } else if (!Evaluator.has(a, 2) &amp;&amp; cols == 1) {</span>
+<span class="fc" id="L398">                col = 1;</span>
+            }
+<span class="pc bpc" id="L400" title="1 of 4 branches missed.">            if (row &gt; rows || col &gt; cols) {</span>
+<span class="fc" id="L401">                throw EvalError.REF;</span>
+            }
+<span class="fc bfc" id="L403" title="All 2 branches covered.">            int r1 = row == 0 ? ref.r1 : ref.r1 + row - 1;</span>
+<span class="fc bfc" id="L404" title="All 2 branches covered.">            int r2 = row == 0 ? ref.r2 : r1;</span>
+<span class="pc bpc" id="L405" title="1 of 2 branches missed.">            int c1 = col == 0 ? ref.c1 : ref.c1 + col - 1;</span>
+<span class="pc bpc" id="L406" title="1 of 2 branches missed.">            int c2 = col == 0 ? ref.c2 : c1;</span>
+<span class="fc" id="L407">            return new Ref(ref.sheet, null, r1, c1, r2, c2);</span>
+        }
+<span class="fc" id="L409">        Object[][] m = ev.matrix(arg);</span>
+<span class="fc" id="L410">        int rows = m.length;</span>
+<span class="fc" id="L411">        int cols = Evaluator.width(m);</span>
+<span class="fc bfc" id="L412" title="All 4 branches covered.">        if (!Evaluator.has(a, 2) &amp;&amp; rows == 1) {</span>
+<span class="fc" id="L413">            col = row;</span>
+<span class="fc" id="L414">            row = 1;</span>
+<span class="fc bfc" id="L415" title="All 4 branches covered.">        } else if (!Evaluator.has(a, 2) &amp;&amp; cols == 1) {</span>
+<span class="fc" id="L416">            col = 1;</span>
+        }
+<span class="pc bpc" id="L418" title="1 of 4 branches missed.">        if (row &gt; rows || col &gt; cols) {</span>
+<span class="fc" id="L419">            throw EvalError.REF;</span>
+        }
+<span class="fc bfc" id="L421" title="All 4 branches covered.">        if (row &gt; 0 &amp;&amp; col &gt; 0) {</span>
+<span class="fc" id="L422">            return m[row - 1][col - 1];</span>
+        }
+<span class="fc bfc" id="L424" title="All 2 branches covered.">        if (row &gt; 0) {</span>
+<span class="fc" id="L425">            return new Object[][] {m[row - 1]};</span>
+        }
+<span class="pc bpc" id="L427" title="1 of 2 branches missed.">        if (col &gt; 0) {</span>
+<span class="fc" id="L428">            Object[][] out = new Object[rows][1];</span>
+<span class="fc bfc" id="L429" title="All 2 branches covered.">            for (int r = 0; r &lt; rows; r++) {</span>
+<span class="fc" id="L430">                out[r][0] = m[r][col - 1];</span>
+            }
+<span class="fc" id="L432">            return out;</span>
+        }
+<span class="nc" id="L434">        return m;</span>
+    }
+
+    private static Object address(Evaluator ev, Object[] a) {
+<span class="fc" id="L438">        int row = (int) ev.scalarNum(a, 0);</span>
+<span class="fc" id="L439">        int col = (int) ev.scalarNum(a, 1);</span>
+<span class="fc" id="L440">        int abs = (int) ev.scalarNum(a, 2, 1);</span>
+<span class="pc bpc" id="L441" title="3 of 12 branches missed.">        if (row &lt; 1 || col &lt; 1 || row &gt; Node.MAX_ROW + 1 || col &gt; Node.MAX_COL + 1 || abs &lt; 1 || abs &gt; 4) {</span>
+<span class="fc" id="L442">            throw EvalError.VALUE;</span>
+        }
+<span class="pc bpc" id="L444" title="1 of 4 branches missed.">        if (Evaluator.has(a, 3) &amp;&amp; !Values.bool(ev.scalar(a[3]))) {</span>
+<span class="nc" id="L445">            throw EvalError.VALUE;</span>
+        }
+<span class="fc" id="L447">        StringBuilder sb = new StringBuilder();</span>
+<span class="fc bfc" id="L448" title="All 2 branches covered.">        if (Evaluator.has(a, 4)) {</span>
+<span class="fc" id="L449">            FormulaParser.appendSheetName(sb, ev.scalarText(a, 4));</span>
+<span class="fc" id="L450">            sb.append('!');</span>
+        }
+<span class="pc bpc" id="L452" title="1 of 4 branches missed.">        if (abs == 1 || abs == 3) {</span>
+<span class="fc" id="L453">            sb.append('$');</span>
+        }
+<span class="fc" id="L455">        FormulaParser.appendColumn(sb, col - 1);</span>
+<span class="pc bpc" id="L456" title="1 of 4 branches missed.">        if (abs == 1 || abs == 2) {</span>
+<span class="fc" id="L457">            sb.append('$');</span>
+        }
+<span class="fc" id="L459">        sb.append(row);</span>
+<span class="fc" id="L460">        return sb.toString();</span>
+    }
+
+<span class="fc" id="L463">    private static final java.util.HashMap&lt;String, Integer&gt; SWITCH_1 = Functions.switchTable(</span>
+            &quot;ROWS&quot;, &quot;COLUMNS&quot;, &quot;AREAS&quot;, &quot;SHEET&quot;, &quot;SHEETS&quot;, &quot;ADDRESS&quot;, &quot;TRANSPOSE&quot;, &quot;INDEX&quot;,
+            &quot;OFFSET&quot;, &quot;INDIRECT&quot;, &quot;MATCH&quot;, &quot;XMATCH&quot;, &quot;VLOOKUP&quot;, &quot;HLOOKUP&quot;, &quot;LOOKUP&quot;, &quot;XLOOKUP&quot;);
+
+    /// The match modes XMATCH and XLOOKUP know are -1, 0, 1 and 2, and the search modes 1,
+    /// -1, 2 and -2; Excel answers #VALUE! for any other.
+    private static void checkModes(int mode, int search) {
+<span class="pc bpc" id="L470" title="2 of 10 branches missed.">        if (mode &lt; -1 || mode &gt; 2 || search == 0 || search &lt; -2 || search &gt; 2) {</span>
+<span class="fc" id="L471">            throw EvalError.VALUE;</span>
+        }
+<span class="fc" id="L473">    }</span>
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

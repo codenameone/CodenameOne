@@ -1,0 +1,256 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Rlp.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.crypto.encoding</a> &gt; <span class="el_source">Rlp.java</span></div><h1>Rlp.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008-2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.crypto.encoding;
+
+import com.codename1.crypto.UInt256;
+import java.util.ArrayList;
+import java.util.List;
+
+/// Recursive Length Prefix encoding as used by Ethereum. Items are either byte
+/// arrays or lists of items. Decoding rejects every non-canonical form.
+@com.codename1.impl.SharedWithBackend
+public final class Rlp {
+
+    private Rlp() {
+    }
+
+    /// Encodes a byte array or a nested [List] of them.
+    ///
+    /// #### Parameters
+    ///
+    /// - `item`: a `byte[]` or a `java.util.List` whose elements are again either
+    ///
+    /// #### Returns
+    ///
+    /// the RLP bytes
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: if an element is neither a byte array nor a list
+    public static byte[] encode(Object item) {
+<span class="fc bfc" id="L51" title="All 2 branches covered.">        if (item instanceof byte[]) {</span>
+<span class="fc" id="L52">            byte[] b = (byte[]) item;</span>
+<span class="fc bfc" id="L53" title="All 4 branches covered.">            if (b.length == 1 &amp;&amp; (b[0] &amp; 0xff) &lt; 0x80) {</span>
+<span class="fc" id="L54">                return new byte[] {b[0]};</span>
+            }
+<span class="fc" id="L56">            return concat(prefix(b.length, 0x80), b);</span>
+        }
+<span class="fc bfc" id="L58" title="All 2 branches covered.">        if (item instanceof List) {</span>
+<span class="fc" id="L59">            List l = (List) item;</span>
+<span class="fc" id="L60">            List&lt;byte[]&gt; parts = new ArrayList&lt;byte[]&gt;(l.size());</span>
+<span class="fc" id="L61">            int total = 0;</span>
+<span class="fc bfc" id="L62" title="All 2 branches covered.">            for (Object element : l) {</span>
+<span class="fc" id="L63">                byte[] e = encode(element);</span>
+<span class="fc" id="L64">                parts.add(e);</span>
+<span class="fc" id="L65">                total += e.length;</span>
+<span class="fc" id="L66">            }</span>
+<span class="fc" id="L67">            byte[] pre = prefix(total, 0xc0);</span>
+<span class="fc" id="L68">            byte[] out = new byte[pre.length + total];</span>
+<span class="fc" id="L69">            System.arraycopy(pre, 0, out, 0, pre.length);</span>
+<span class="fc" id="L70">            int p = pre.length;</span>
+<span class="fc bfc" id="L71" title="All 2 branches covered.">            for (byte[] e : parts) {</span>
+<span class="fc" id="L72">                System.arraycopy(e, 0, out, p, e.length);</span>
+<span class="fc" id="L73">                p += e.length;</span>
+<span class="fc" id="L74">            }</span>
+<span class="fc" id="L75">            return out;</span>
+        }
+<span class="fc" id="L77">        throw new IllegalArgumentException(&quot;RLP items must be byte[] or List&quot;);</span>
+    }
+
+    /// Encodes a non-negative long as a minimal big-endian byte string (zero is the empty string).
+    ///
+    /// #### Parameters
+    ///
+    /// - `value`: a value of zero or more
+    ///
+    /// #### Returns
+    ///
+    /// the RLP bytes
+    public static byte[] encodeLong(long value) {
+<span class="fc" id="L90">        return encode(longBytes(value));</span>
+    }
+
+    /// Encodes a 256-bit quantity as a minimal big-endian byte string (zero is the empty string).
+    ///
+    /// #### Parameters
+    ///
+    /// - `value`: the quantity
+    ///
+    /// #### Returns
+    ///
+    /// the RLP bytes
+    public static byte[] encodeQuantity(UInt256 value) {
+<span class="fc" id="L103">        return encode(value.toMinimalBytes());</span>
+    }
+
+    /// Returns the minimal big-endian bytes of a non-negative long, empty for zero.
+    ///
+    /// #### Parameters
+    ///
+    /// - `value`: a value of zero or more
+    ///
+    /// #### Returns
+    ///
+    /// the unpadded bytes, for use as an RLP string item
+    public static byte[] longBytes(long value) {
+<span class="fc bfc" id="L116" title="All 2 branches covered.">        if (value &lt; 0) {</span>
+<span class="fc" id="L117">            throw new IllegalArgumentException(&quot;Negative value&quot;);</span>
+        }
+<span class="fc" id="L119">        int n = 0;</span>
+<span class="fc bfc" id="L120" title="All 2 branches covered.">        for (long v = value; v != 0; v &gt;&gt;&gt;= 8) {</span>
+<span class="fc" id="L121">            n++;</span>
+        }
+<span class="fc" id="L123">        byte[] out = new byte[n];</span>
+<span class="fc bfc" id="L124" title="All 2 branches covered.">        for (int i = n - 1; i &gt;= 0; i--) {</span>
+<span class="fc" id="L125">            out[i] = (byte) value;</span>
+<span class="fc" id="L126">            value &gt;&gt;&gt;= 8;</span>
+        }
+<span class="fc" id="L128">        return out;</span>
+    }
+
+    /// Decodes one RLP item that must span the whole input.
+    ///
+    /// #### Parameters
+    ///
+    /// - `data`: the RLP bytes
+    ///
+    /// #### Returns
+    ///
+    /// a `byte[]` for a string or a `java.util.List` of decoded items for a list
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: if the input is truncated, has trailing bytes or is not canonical
+    public static Object decode(byte[] data) {
+<span class="fc" id="L145">        int[] end = new int[1];</span>
+<span class="fc" id="L146">        Object o = decodeAt(data, 0, data.length, end);</span>
+<span class="fc bfc" id="L147" title="All 2 branches covered.">        if (end[0] != data.length) {</span>
+<span class="fc" id="L148">            throw new IllegalArgumentException(&quot;Trailing bytes after RLP item&quot;);</span>
+        }
+<span class="fc" id="L150">        return o;</span>
+    }
+
+    private static Object decodeAt(byte[] d, int pos, int limit, int[] end) {
+<span class="fc bfc" id="L154" title="All 2 branches covered.">        if (pos &gt;= limit) {</span>
+<span class="fc" id="L155">            throw new IllegalArgumentException(&quot;Truncated RLP&quot;);</span>
+        }
+<span class="fc" id="L157">        int b = d[pos] &amp; 0xff;</span>
+<span class="fc bfc" id="L158" title="All 2 branches covered.">        if (b &lt; 0x80) {</span>
+<span class="fc" id="L159">            end[0] = pos + 1;</span>
+<span class="fc" id="L160">            return new byte[] {d[pos]};</span>
+        }
+<span class="fc bfc" id="L162" title="All 2 branches covered.">        if (b &lt; 0xb8) {</span>
+<span class="fc" id="L163">            int len = b - 0x80;</span>
+<span class="fc" id="L164">            int start = pos + 1;</span>
+<span class="fc" id="L165">            check(start, len, limit);</span>
+<span class="fc bfc" id="L166" title="All 4 branches covered.">            if (len == 1 &amp;&amp; (d[start] &amp; 0xff) &lt; 0x80) {</span>
+<span class="fc" id="L167">                throw new IllegalArgumentException(&quot;Non-canonical single byte&quot;);</span>
+            }
+<span class="fc" id="L169">            end[0] = start + len;</span>
+<span class="fc" id="L170">            return slice(d, start, len);</span>
+        }
+<span class="fc bfc" id="L172" title="All 2 branches covered.">        if (b &lt; 0xc0) {</span>
+<span class="fc" id="L173">            int ll = b - 0xb7;</span>
+<span class="fc" id="L174">            int len = readLength(d, pos + 1, ll, limit);</span>
+<span class="fc bfc" id="L175" title="All 2 branches covered.">            if (len &lt; 56) {</span>
+<span class="fc" id="L176">                throw new IllegalArgumentException(&quot;Non-canonical long string&quot;);</span>
+            }
+<span class="fc" id="L178">            int start = pos + 1 + ll;</span>
+<span class="fc" id="L179">            check(start, len, limit);</span>
+<span class="fc" id="L180">            end[0] = start + len;</span>
+<span class="fc" id="L181">            return slice(d, start, len);</span>
+        }
+        int len;
+        int start;
+<span class="fc bfc" id="L185" title="All 2 branches covered.">        if (b &lt; 0xf8) {</span>
+<span class="fc" id="L186">            len = b - 0xc0;</span>
+<span class="fc" id="L187">            start = pos + 1;</span>
+        } else {
+<span class="fc" id="L189">            int ll = b - 0xf7;</span>
+<span class="fc" id="L190">            len = readLength(d, pos + 1, ll, limit);</span>
+<span class="fc bfc" id="L191" title="All 2 branches covered.">            if (len &lt; 56) {</span>
+<span class="fc" id="L192">                throw new IllegalArgumentException(&quot;Non-canonical long list&quot;);</span>
+            }
+<span class="fc" id="L194">            start = pos + 1 + ll;</span>
+        }
+<span class="fc" id="L196">        check(start, len, limit);</span>
+<span class="fc" id="L197">        int stop = start + len;</span>
+<span class="fc" id="L198">        List&lt;Object&gt; items = new ArrayList&lt;Object&gt;();</span>
+<span class="fc" id="L199">        int p = start;</span>
+<span class="fc bfc" id="L200" title="All 2 branches covered.">        while (p &lt; stop) {</span>
+<span class="fc" id="L201">            items.add(decodeAt(d, p, stop, end));</span>
+<span class="fc" id="L202">            p = end[0];</span>
+        }
+<span class="fc" id="L204">        end[0] = stop;</span>
+<span class="fc" id="L205">        return items;</span>
+    }
+
+    private static int readLength(byte[] d, int pos, int ll, int limit) {
+<span class="fc bfc" id="L209" title="All 2 branches covered.">        if (pos + ll &gt; limit) {</span>
+<span class="fc" id="L210">            throw new IllegalArgumentException(&quot;Truncated RLP length&quot;);</span>
+        }
+<span class="fc bfc" id="L212" title="All 2 branches covered.">        if (d[pos] == 0) {</span>
+<span class="fc" id="L213">            throw new IllegalArgumentException(&quot;Leading zero in RLP length&quot;);</span>
+        }
+<span class="pc bpc" id="L215" title="4 of 6 branches missed.">        if (ll &gt; 4 || (ll == 4 &amp;&amp; (d[pos] &amp; 0x80) != 0)) {</span>
+<span class="nc" id="L216">            throw new IllegalArgumentException(&quot;RLP length too large&quot;);</span>
+        }
+<span class="fc" id="L218">        int len = 0;</span>
+<span class="fc bfc" id="L219" title="All 2 branches covered.">        for (int i = 0; i &lt; ll; i++) {</span>
+<span class="fc" id="L220">            len = (len &lt;&lt; 8) | (d[pos + i] &amp; 0xff);</span>
+        }
+<span class="fc" id="L222">        return len;</span>
+    }
+
+    private static void check(int start, int len, int limit) {
+<span class="pc bpc" id="L226" title="1 of 4 branches missed.">        if (len &lt; 0 || len &gt; limit - start) {</span>
+<span class="fc" id="L227">            throw new IllegalArgumentException(&quot;Truncated RLP payload&quot;);</span>
+        }
+<span class="fc" id="L229">    }</span>
+
+    private static byte[] slice(byte[] d, int start, int len) {
+<span class="fc" id="L232">        byte[] out = new byte[len];</span>
+<span class="fc" id="L233">        System.arraycopy(d, start, out, 0, len);</span>
+<span class="fc" id="L234">        return out;</span>
+    }
+
+    private static byte[] prefix(int len, int base) {
+<span class="fc bfc" id="L238" title="All 2 branches covered.">        if (len &lt; 56) {</span>
+<span class="fc" id="L239">            return new byte[] {(byte) (base + len)};</span>
+        }
+<span class="fc" id="L241">        byte[] lb = longBytes(len);</span>
+<span class="fc" id="L242">        byte[] out = new byte[1 + lb.length];</span>
+<span class="fc" id="L243">        out[0] = (byte) (base + 55 + lb.length);</span>
+<span class="fc" id="L244">        System.arraycopy(lb, 0, out, 1, lb.length);</span>
+<span class="fc" id="L245">        return out;</span>
+    }
+
+    /// `a` followed by `b`; Bech32 shares it.
+    static byte[] concat(byte[] a, byte[] b) {
+<span class="fc" id="L250">        byte[] out = new byte[a.length + b.length];</span>
+<span class="fc" id="L251">        System.arraycopy(a, 0, out, 0, a.length);</span>
+<span class="fc" id="L252">        System.arraycopy(b, 0, out, a.length, b.length);</span>
+<span class="fc" id="L253">        return out;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

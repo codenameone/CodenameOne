@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MifareClassic.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.nfc</a> &gt; <span class="el_source">MifareClassic.java</span></div><h1>MifareClassic.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.nfc;
+
+import com.codename1.util.AsyncResource;
+
+/// NXP MIFARE Classic 1K/4K technology view. Block-level read and write
+/// with key A or key B authentication.
+///
+/// **Android-only** -- iOS Core NFC intentionally rejects MIFARE Classic.
+/// On iOS, [Tag#getMifareClassic()] returns `null` for the same physical
+/// tag and the caller should fall back to [Tag#getNfcA()] or fail
+/// gracefully.
+///
+/// The default factory keys are widely published; use them only on
+/// untransitioned demo / blank cards.
+<span class="fc" id="L37">public class MifareClassic extends TagTechnology {</span>
+
+    // Well-known MIFARE Classic keys are returned via accessors so callers
+    // can't mutate a shared instance (SpotBugs MS_PKGPROTECT).
+
+    /// Default MIFARE Classic key A used by NXP shipping cards
+    /// (`FF FF FF FF FF FF`). Returns a fresh defensive copy.
+    public static byte[] keyDefault() {
+<span class="fc" id="L45">        return new byte[] {</span>
+                (byte) 0xFF, (byte) 0xFF, (byte) 0xFF,
+                (byte) 0xFF, (byte) 0xFF, (byte) 0xFF
+        };
+    }
+
+    /// MIFARE Application Directory (MAD) key A from NXP AN10787
+    /// (`A0 A1 A2 A3 A4 A5`). Returns a fresh defensive copy.
+    public static byte[] keyMifareApplicationDirectory() {
+<span class="fc" id="L54">        return new byte[] {</span>
+                (byte) 0xA0, (byte) 0xA1, (byte) 0xA2,
+                (byte) 0xA3, (byte) 0xA4, (byte) 0xA5
+        };
+    }
+
+    /// NFC Forum key A for NDEF-formatted MIFARE Classic blocks
+    /// (`D3 F7 D3 F7 D3 F7`). Returns a fresh defensive copy.
+    public static byte[] keyNfcForum() {
+<span class="fc" id="L63">        return new byte[] {</span>
+                (byte) 0xD3, (byte) 0xF7, (byte) 0xD3,
+                (byte) 0xF7, (byte) 0xD3, (byte) 0xF7
+        };
+    }
+
+    /// Total sectors on the tag (16 on Classic 1K, 40 on Classic 4K).
+    public int getSectorCount() {
+<span class="fc" id="L71">        return 0;</span>
+    }
+
+    /// Total addressable blocks (each 16 bytes).
+    public int getBlockCount() {
+<span class="fc" id="L76">        return 0;</span>
+    }
+
+    /// First block index inside the given sector. Sectors 0-31 contain 4
+    /// blocks each; sectors 32-39 (4K cards only) contain 16 blocks.
+    public int sectorToBlock(int sectorIndex) {
+<span class="fc bfc" id="L82" title="All 2 branches covered.">        if (sectorIndex &lt; 32) {</span>
+<span class="fc" id="L83">            return sectorIndex * 4;</span>
+        }
+<span class="fc" id="L85">        return 32 * 4 + (sectorIndex - 32) * 16;</span>
+    }
+
+    /// Authenticates a sector with the given key A. Required before any
+    /// read/write on the sector. Fails with [NfcError#IO_ERROR] when the
+    /// key is wrong.
+    public AsyncResource&lt;Boolean&gt; authenticateSectorWithKeyA(int sector,
+            byte[] key) {
+<span class="fc" id="L93">        return notImplemented();</span>
+    }
+
+    /// Authenticates a sector with the given key B.
+    public AsyncResource&lt;Boolean&gt; authenticateSectorWithKeyB(int sector,
+            byte[] key) {
+<span class="fc" id="L99">        return notImplemented();</span>
+    }
+
+    /// Reads a single 16-byte data block. The sector containing the block
+    /// must have been authenticated first.
+    public AsyncResource&lt;byte[]&gt; readBlock(int block) {
+<span class="fc" id="L105">        AsyncResource&lt;byte[]&gt; r = new AsyncResource&lt;byte[]&gt;();</span>
+<span class="fc" id="L106">        r.error(new NfcException(NfcError.UNSUPPORTED_TAG,</span>
+                &quot;MIFARE Classic read not implemented on this port&quot;));
+<span class="fc" id="L108">        return r;</span>
+    }
+
+    /// Writes the 16-byte payload to the given data block. Fails with
+    /// [NfcError#READ_ONLY] when access bits forbid the write.
+    public AsyncResource&lt;Boolean&gt; writeBlock(int block, byte[] data) {
+<span class="fc" id="L114">        return notImplemented();</span>
+    }
+
+    @Override
+    public final TagType getType() {
+<span class="fc" id="L119">        return TagType.MIFARE_CLASSIC;</span>
+    }
+
+    private static AsyncResource&lt;Boolean&gt; notImplemented() {
+<span class="fc" id="L123">        AsyncResource&lt;Boolean&gt; r = new AsyncResource&lt;Boolean&gt;();</span>
+<span class="fc" id="L124">        r.error(new NfcException(NfcError.UNSUPPORTED_TAG,</span>
+                &quot;MIFARE Classic not implemented on this port&quot;));
+<span class="fc" id="L126">        return r;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

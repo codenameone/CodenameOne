@@ -1,0 +1,149 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Terrain.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.gpu.shaders</a> &gt; <span class="el_source">Terrain.java</span></div><h1>Terrain.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.gpu.shaders;
+
+import com.codename1.gpu.shader.ShaderMaterial;
+import com.codename1.gpu.shader.ShaderNode;
+import com.codename1.gpu.shader.ShaderType;
+
+import static com.codename1.gpu.shader.ShaderNode.*;
+
+/// Ground. Layers are chosen per pixel from height and slope, so any mesh
+/// (a heightfield, a `Primitives.grid` displaced by `VERTEX_OFFSET`, a level
+/// built from boxes) is painted without UVs or splat textures. Use with
+/// `Material.Type.PBR` or `Material.Type.LAMBERT`.
+public final class Terrain {
+    /// `VEC3` colour below `LEVELS.x`: beach, mud.
+    public static final String SAND = &quot;terSand&quot;;
+    /// `VEC3` colour of flat ground.
+    public static final String GRASS = &quot;terGrass&quot;;
+    /// `VEC3` colour of steep ground.
+    public static final String ROCK = &quot;terRock&quot;;
+    /// `VEC3` colour above `LEVELS.y`.
+    public static final String SNOW = &quot;terSnow&quot;;
+    /// `VEC4`: sand top height, snow line height, the slope (normal y) below
+    /// which rock shows, and the blend width.
+    public static final String LEVELS = &quot;terLevels&quot;;
+    /// `FLOAT` repeats of the detail noise per world unit.
+    public static final String SCALE = &quot;terScale&quot;;
+    /// `FLOAT` world height of the waterline, under which ground darkens as
+    /// if wet. Set it below the terrain to turn it off.
+    public static final String WATERLINE = &quot;terWater&quot;;
+
+    private Terrain() {
+    }
+
+    /// Sand, grass, rock and snow by height and slope, with noise breaking
+    /// up every boundary and wet ground along the waterline.
+    ///
+    /// #### Returns
+    ///
+    /// a new shader material
+    public static ShaderMaterial layered() {
+<span class="fc" id="L63">        ShaderMaterial m = new ShaderMaterial()</span>
+<span class="fc" id="L64">                .declareUniform(SAND, ShaderType.VEC3).declareUniform(GRASS, ShaderType.VEC3)</span>
+<span class="fc" id="L65">                .declareUniform(ROCK, ShaderType.VEC3).declareUniform(SNOW, ShaderType.VEC3)</span>
+<span class="fc" id="L66">                .declareUniform(LEVELS, ShaderType.VEC4).declareUniform(SCALE, ShaderType.FLOAT)</span>
+<span class="fc" id="L67">                .declareUniform(WATERLINE, ShaderType.FLOAT);</span>
+<span class="fc" id="L68">        ShaderNode lv = uniform(LEVELS, ShaderType.VEC4);</span>
+<span class="fc" id="L69">        ShaderNode p = worldPos().xz().mul(uniform(SCALE, ShaderType.FLOAT));</span>
+<span class="fc" id="L70">        ShaderNode big = Noise.fbm(p.mul(0.15f), 3);</span>
+<span class="fc" id="L71">        ShaderNode fine = Noise.fbm(p, 3);</span>
+<span class="fc" id="L72">        ShaderNode y = worldPos().y().add(big.sub(0.5f).mul(lv.w().mul(2f)));</span>
+<span class="fc" id="L73">        ShaderNode up = normalize(worldNormal()).y();</span>
+<span class="fc" id="L74">        ShaderNode blend = max(lv.w(), f(0.001f));</span>
+
+<span class="fc" id="L76">        ShaderNode grass = uniform(GRASS, ShaderType.VEC3).mul(fine.mul(0.5f).add(0.75f));</span>
+<span class="fc" id="L77">        ShaderNode sand = uniform(SAND, ShaderType.VEC3).mul(fine.mul(0.2f).add(0.9f));</span>
+<span class="fc" id="L78">        ShaderNode rock = uniform(ROCK, ShaderType.VEC3).mul(Noise.ridged(p.mul(1.7f), 3).mul(0.5f).add(0.7f));</span>
+<span class="fc" id="L79">        ShaderNode snow = uniform(SNOW, ShaderType.VEC3);</span>
+
+<span class="fc" id="L81">        ShaderNode rgb = mix(sand, grass, smoothstep(lv.x(), lv.x().add(blend), y));</span>
+<span class="fc" id="L82">        ShaderNode rockAmt = smoothstep(lv.z().add(0.08f), lv.z().sub(0.08f), up.add(fine.sub(0.5f).mul(0.15f)));</span>
+<span class="fc" id="L83">        rgb = mix(rgb, rock, rockAmt);</span>
+        // snow settles on what is flat enough to hold it
+<span class="fc" id="L85">        ShaderNode snowAmt = smoothstep(lv.y(), lv.y().add(blend), y).mul(smoothstep(0.45f, 0.75f, up));</span>
+<span class="fc" id="L86">        rgb = mix(rgb, snow, snowAmt);</span>
+<span class="fc" id="L87">        ShaderNode wet = smoothstep(f(0.6f), f(0f), worldPos().y().sub(uniform(WATERLINE, ShaderType.FLOAT)));</span>
+<span class="fc" id="L88">        rgb = rgb.mul(f(1f).sub(wet.mul(0.45f)));</span>
+<span class="fc" id="L89">        m.set(ShaderMaterial.Hook.BASE_COLOR, vec(rgb, f(1f)));</span>
+<span class="fc" id="L90">        ShaderNode rough = mix(mix(f(0.9f), f(0.75f), rockAmt), f(0.35f), snowAmt);</span>
+<span class="fc" id="L91">        m.set(ShaderMaterial.Hook.ROUGHNESS, mix(rough, f(0.15f), wet));</span>
+<span class="fc" id="L92">        m.set(ShaderMaterial.Hook.METALLIC, f(0f));</span>
+<span class="fc" id="L93">        ShaderNode bump = Noise.bumpNormal(p.mul(2f), 2, 0.25f);</span>
+<span class="fc" id="L94">        m.set(ShaderMaterial.Hook.NORMAL, perturbNormal(mix(bump, vec3(0f, 0f, 1f), wet)));</span>
+<span class="fc" id="L95">        m.setColorUniform(SAND, 0xc9b48a).setColorUniform(GRASS, 0x5a7f3a).setColorUniform(ROCK, 0x7a756c)</span>
+<span class="fc" id="L96">                .setColorUniform(SNOW, 0xf1f4f7).setUniform(LEVELS, 0.4f, 9f, 0.72f, 0.6f)</span>
+<span class="fc" id="L97">                .setUniform(SCALE, 0.5f).setUniform(WATERLINE, -1000f);</span>
+<span class="fc" id="L98">        return m;</span>
+    }
+
+    /// Bare stone on every face, its strata and grain mapped by `Shading.boxUv`
+    /// so cliffs and boulders need no UVs.
+    ///
+    /// #### Returns
+    ///
+    /// a new shader material
+    public static ShaderMaterial rock() {
+<span class="fc" id="L108">        ShaderMaterial m = new ShaderMaterial().declareUniform(ROCK, ShaderType.VEC3)</span>
+<span class="fc" id="L109">                .declareUniform(SCALE, ShaderType.FLOAT);</span>
+<span class="fc" id="L110">        ShaderNode uv = Shading.boxUv(1f).mul(uniform(SCALE, ShaderType.FLOAT));</span>
+<span class="fc" id="L111">        ShaderNode strata = sin(worldPos().y().mul(3f).add(Noise.fbm(uv.mul(0.5f), 3).mul(4f))).mul(0.5f).add(0.5f);</span>
+<span class="fc" id="L112">        ShaderNode grain = Noise.fbm(uv.mul(3f), 3);</span>
+<span class="fc" id="L113">        ShaderNode tone = strata.mul(0.15f).add(grain.mul(0.4f)).add(0.65f);</span>
+<span class="fc" id="L114">        m.set(ShaderMaterial.Hook.BASE_COLOR, vec(uniform(ROCK, ShaderType.VEC3).mul(tone), f(1f)));</span>
+<span class="fc" id="L115">        m.set(ShaderMaterial.Hook.ROUGHNESS, f(0.85f).sub(grain.mul(0.2f)));</span>
+<span class="fc" id="L116">        m.set(ShaderMaterial.Hook.NORMAL, perturbNormal(Noise.bumpNormal(uv.mul(2f), 3, 0.4f)));</span>
+<span class="fc" id="L117">        m.setColorUniform(ROCK, 0x8a8178).setUniform(SCALE, 0.8f);</span>
+<span class="fc" id="L118">        return m;</span>
+    }
+
+    /// Turf for a flat grass part: the part's own colour broken into
+    /// lighter and darker patches, a few sun-dried spots, and the fine bumps
+    /// of blades under a low sun. It reads as a lawn at any distance, where
+    /// a flat colour reads as felt. The tint comes from the instance colour,
+    /// so a creator's grass colour is kept.
+    ///
+    /// #### Returns
+    ///
+    /// a new shader material
+    public static ShaderMaterial turf() {
+<span class="nc" id="L131">        ShaderMaterial m = new ShaderMaterial().declareUniform(SCALE, ShaderType.FLOAT);</span>
+<span class="nc" id="L132">        ShaderNode uv = Shading.worldUv(1f).mul(uniform(SCALE, ShaderType.FLOAT));</span>
+<span class="nc" id="L133">        ShaderNode patches = Noise.fbm(uv.mul(0.18f), 3);</span>
+<span class="nc" id="L134">        ShaderNode clumps = Noise.fbm(uv.mul(1.7f), 2);</span>
+<span class="nc" id="L135">        ShaderNode dry = smoothstep(0.68f, 0.85f, Noise.fbm(uv.mul(0.09f).add(vec2(11.3f, 4.1f)), 3));</span>
+<span class="nc" id="L136">        ShaderNode base = instanceColor().rgb();</span>
+<span class="nc" id="L137">        ShaderNode tone = base.mul(patches.mul(0.7f).add(clumps.mul(0.35f)).add(0.42f));</span>
+<span class="nc" id="L138">        ShaderNode straw = vec3(0.62f, 0.56f, 0.30f).mul(clumps.mul(0.3f).add(0.7f));</span>
+<span class="nc" id="L139">        m.set(ShaderMaterial.Hook.BASE_COLOR, vec(mix(tone, straw, dry.mul(0.55f)), f(1f)));</span>
+<span class="nc" id="L140">        m.set(ShaderMaterial.Hook.ROUGHNESS, f(0.92f));</span>
+<span class="nc" id="L141">        m.set(ShaderMaterial.Hook.METALLIC, f(0f));</span>
+        // Blade bumps fade out with distance, where they would only shimmer.
+<span class="nc" id="L143">        m.set(ShaderMaterial.Hook.NORMAL, perturbNormal(mix(vec3(0f, 0f, 1f), Noise.bumpNormal(uv.mul(6f), 2, 0.6f),</span>
+<span class="nc" id="L144">                Shading.distanceFade(15f, 60f))));</span>
+<span class="nc" id="L145">        m.setUniform(SCALE, 1f);</span>
+<span class="nc" id="L146">        return m;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

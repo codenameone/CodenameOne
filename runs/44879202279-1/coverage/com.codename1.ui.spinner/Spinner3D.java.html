@@ -1,0 +1,452 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Spinner3D.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.spinner</a> &gt; <span class="el_source">Spinner3D.java</span></div><h1>Spinner3D.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2018, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+
+package com.codename1.ui.spinner;
+
+import com.codename1.l10n.DateFormat;
+import com.codename1.l10n.SimpleDateFormat;
+import com.codename1.ui.Container;
+import com.codename1.ui.Display;
+import com.codename1.ui.Graphics;
+import com.codename1.ui.events.DataChangedListener;
+import com.codename1.ui.events.ScrollListener;
+import com.codename1.ui.events.SelectionListener;
+import com.codename1.ui.geom.Dimension;
+import com.codename1.ui.layouts.BoxLayout;
+import com.codename1.ui.layouts.LayeredLayout;
+import com.codename1.ui.list.ListModel;
+import com.codename1.ui.plaf.Border;
+import com.codename1.ui.plaf.Style;
+import com.codename1.ui.scene.PerspectiveCamera;
+import com.codename1.ui.scene.Scene;
+
+import java.util.Calendar;
+import java.util.Date;
+
+import static com.codename1.ui.ComponentSelector.$;
+
+/// A scrolling wheel of values styled after the iOS picker, and the body of a
+/// lightweight [Picker][com.codename1.ui.spinner.Picker].
+///
+/// Rows come from a [ListModel][com.codename1.ui.list.ListModel], so the
+/// contents can be anything a model can produce; the selection is whatever
+/// that model holds at the selected index. `Spinner3D` is the plain-list
+/// member of the family, beside
+/// [DateSpinner3D][com.codename1.ui.spinner.DateSpinner3D],
+/// [TimeSpinner3D][com.codename1.ui.spinner.TimeSpinner3D],
+/// [DateTimeSpinner3D][com.codename1.ui.spinner.DateTimeSpinner3D] and
+/// [DurationSpinner3D][com.codename1.ui.spinner.DurationSpinner3D].
+///
+/// It is an ordinary `Container`, so it can be added to a form directly rather
+/// than shown through a picker dialog -- which is why it is public. Use
+/// `Picker` instead when you want the platform's native picker where one
+/// exists, because a `Picker` falls back to this only in lightweight mode.
+///
+/// [getValue()][#getValue()] and [setValue(Object)][#setValue(Object)] carry
+/// the selected model element.
+public class Spinner3D extends Container implements InternalPickerWidget {
+    private final SpinnerNode root;
+
+    private final ScrollingContainer scroller;
+
+
+    /// Creates a new Spinner3D with the given listModel.
+    ///
+    /// #### Parameters
+    ///
+    /// - `listModel`
+    public Spinner3D(ListModel&lt;String&gt; listModel) {
+<span class="fc" id="L79">        super(BoxLayout.y());</span>
+<span class="fc" id="L80">        setScrollableY(false);</span>
+<span class="fc" id="L81">        root = new SpinnerNode();</span>
+<span class="fc" id="L82">        Scene scene = new Scene() {</span>
+            @Override
+            public void setWidth(int width) {
+<span class="fc" id="L85">                super.setWidth(width);</span>
+<span class="fc" id="L86">                root.boundsInLocal.get().setWidth(width);</span>
+<span class="fc" id="L87">            }</span>
+
+            @Override
+            public void setHeight(int height) {
+<span class="fc" id="L91">                super.setHeight(height);</span>
+<span class="fc" id="L92">                root.boundsInLocal.get().setHeight(height);</span>
+<span class="fc" id="L93">            }</span>
+        };
+
+<span class="fc" id="L96">        scene.setName(&quot;Scene&quot;);</span>
+<span class="fc" id="L97">        root.boundsInLocal.get().setWidth(Display.getInstance().getDisplayWidth());</span>
+<span class="fc" id="L98">        root.boundsInLocal.get().setHeight(1000);</span>
+<span class="fc" id="L99">        setModel(listModel);</span>
+<span class="fc" id="L100">        scene.setRoot(root);</span>
+
+<span class="pc bpc" id="L102" title="1 of 2 branches missed.">        if (usePerspective()) {</span>
+<span class="nc" id="L103">            scene.camera.set(new PerspectiveCamera(scene, 0.25, 1600, 1600 + 3000));</span>
+        }
+
+<span class="fc" id="L106">        scroller = new ScrollingContainer() {</span>
+            @Override
+            protected Dimension calcPreferredSize() {
+<span class="fc" id="L109">                return new Dimension(500, (int) root.calcViewportHeight());</span>
+            }
+
+            @Override
+            protected Dimension calcScrollSize() {
+<span class="fc" id="L114">                final int viewportHeight = (int) root.calcViewportHeight();</span>
+<span class="fc" id="L115">                final int listHeight = (int) root.calcFlatListHeight();</span>
+<span class="fc" id="L116">                final int rowHeight = (int) root.calcRowHeight();</span>
+<span class="fc" id="L117">                return new Dimension(</span>
+                        500, // Width doesn't matter - only doing Y scroll.
+<span class="fc" id="L119">                        Math.max(viewportHeight, listHeight + (6 * rowHeight))</span>
+                );
+            }
+
+            @Override
+            protected int getGridPosY() {
+<span class="nc" id="L125">                final int rowHeight = (int) root.calcRowHeight();</span>
+<span class="nc" id="L126">                final int scrollY = getScrollY();</span>
+<span class="nc" id="L127">                final int rowOffsetY = scrollY % rowHeight;</span>
+<span class="nc bnc" id="L128" title="All 2 branches missed.">                final boolean roundUp = rowOffsetY &gt; rowHeight - rowOffsetY;</span>
+<span class="nc" id="L129">                return (int) Math.min(</span>
+<span class="nc bnc" id="L130" title="All 2 branches missed.">                        root.calcFlatListHeight() - rowHeight,</span>
+<span class="nc" id="L131">                        Math.max(</span>
+                                0,
+                                roundUp
+                                        ? (scrollY + rowHeight - rowOffsetY)
+                                        : (scrollY - rowOffsetY)
+                        )
+                );
+            }
+
+            @Override
+            protected void onScrollY(int scrollY) {
+<span class="fc" id="L142">                super.onScrollY(scrollY);</span>
+<span class="fc" id="L143">            }</span>
+        };
+<span class="fc" id="L145">        scroller.setSnapToGrid(true);</span>
+<span class="fc" id="L146">        scroller.setScrollVisible(false);</span>
+<span class="fc" id="L147">        scroller.setScrollableY(true);</span>
+<span class="fc" id="L148">        scroller.setName(&quot;Scroller&quot;);</span>
+<span class="fc" id="L149">        scroller.addScrollListener(new ScrollListener() {</span>
+            @Override
+            public void scrollChanged(int scrollX, int scrollY, int oldscrollX, int oldscrollY) {
+<span class="fc" id="L152">                root.setScrollY(scrollY);</span>
+<span class="fc" id="L153">            }</span>
+        });
+<span class="fc" id="L155">        root.addScrollListener(new ScrollListener() {</span>
+            @Override
+            public void scrollChanged(int scrollX, int scrollY, int oldscrollX, int oldscrollY) {
+<span class="fc" id="L158">                scroller.setScrollY(scrollY);</span>
+<span class="fc" id="L159">            }</span>
+        });
+
+<span class="fc" id="L162">        $(scroller, scene).setMargin(0).setPadding(0);</span>
+<span class="fc" id="L163">        scroller.setScrollY((int) root.getScrollY());</span>
+<span class="fc" id="L164">        Container wrapper = LayeredLayout.encloseIn(scene, scroller);</span>
+<span class="fc" id="L165">        $(wrapper).setBorder(Border.createEmpty()).setMargin(0).setPadding(0).setBgTransparency(0);</span>
+<span class="fc" id="L166">        wrapper.setName(&quot;Wrapper&quot;);</span>
+<span class="fc" id="L167">        LayeredLayout ll = (LayeredLayout) wrapper.getLayout();</span>
+<span class="fc" id="L168">        ll.setInsets(scroller, &quot;0 0 auto 0&quot;)</span>
+<span class="fc" id="L169">                .setInsets(scene, &quot;0 0 auto 0&quot;);</span>
+<span class="fc" id="L170">        add(wrapper);</span>
+<span class="fc" id="L171">    }</span>
+
+    private static boolean usePerspective() {
+<span class="fc" id="L174">        return false; //Transform.isPerspectiveSupported();</span>
+    }
+
+    /// Creates a new numeric spinner instance
+    ///
+    /// #### Parameters
+    ///
+    /// - `min`: lowest value allowed
+    ///
+    /// - `max`: maximum value allowed
+    ///
+    /// - `currentValue`: the starting value for the mode
+    ///
+    /// - `step`: the value by which we increment the entries in the model
+    ///
+    /// #### Returns
+    ///
+    /// new spinner instance
+    public static Spinner3D create(double min, double max, double currentValue, double step) {
+<span class="nc" id="L193">        return new Spinner3D(new SpinnerNumberModel(min, max, currentValue, step));</span>
+    }
+
+    public static Spinner3D create(int min, int max, int currentValue, int step) {
+<span class="fc" id="L197">        return new Spinner3D(new SpinnerNumberModel(min, max, currentValue, step));</span>
+    }
+
+    /// Creates a new date spinner instance
+    ///
+    /// #### Parameters
+    ///
+    /// - `min`: lowest value allowed
+    ///
+    /// - `max`: maximum value allowed
+    ///
+    /// - `currentValue`: the starting value for the mode
+    ///
+    /// #### Returns
+    ///
+    /// new spinner instance
+    public static Spinner3D createDate(long min, long max, long currentValue) {
+<span class="fc" id="L214">        return new Spinner3D(new SpinnerDateModel(min, max, currentValue));</span>
+    }
+
+    public int getSelectedIndex() {
+<span class="nc" id="L218">        return root.getSelectedIndex();</span>
+    }
+
+    public void setModel(ListModel model) {
+<span class="fc bfc" id="L222" title="All 2 branches covered.">        if (model instanceof SpinnerNumberModel) {</span>
+<span class="fc" id="L223">            model = new NumberModelAdapter((SpinnerNumberModel) model);</span>
+        }
+<span class="fc bfc" id="L225" title="All 2 branches covered.">        if (model instanceof SpinnerDateModel) {</span>
+<span class="fc" id="L226">            model = new DateModelAdapter((SpinnerDateModel) model);</span>
+        }
+<span class="fc" id="L228">        root.setListModel(model);</span>
+<span class="fc bfc" id="L229" title="All 2 branches covered.">        if (scroller != null) {</span>
+<span class="fc" id="L230">            scroller.setShouldCalcPreferredSize(true);</span>
+        }
+
+<span class="fc" id="L233">    }</span>
+
+    @Override
+    public Object getValue() {
+<span class="fc" id="L237">        ListModel lm = root.getListModel();</span>
+<span class="fc bfc" id="L238" title="All 2 branches covered.">        if (lm instanceof NumberModelAdapter) {</span>
+<span class="fc" id="L239">            NumberModelAdapter adapter = (NumberModelAdapter) lm;</span>
+<span class="fc" id="L240">            int selectedIndex = adapter.getSelectedIndex();</span>
+<span class="fc" id="L241">            return adapter.inner.getItemAt(selectedIndex);</span>
+        }
+<span class="fc bfc" id="L243" title="All 2 branches covered.">        if (lm instanceof DateModelAdapter) {</span>
+<span class="fc" id="L244">            DateModelAdapter adapter = (DateModelAdapter) lm;</span>
+<span class="fc" id="L245">            return adapter.inner.getItemAt(adapter.getSelectedIndex());</span>
+        }
+<span class="fc" id="L247">        return lm.getItemAt(lm.getSelectedIndex());</span>
+    }
+
+    @Override
+    public void setValue(Object value) {
+<span class="pc bpc" id="L252" title="1 of 2 branches missed.">        if (value == null) {</span>
+            // A null value (e.g. Picker.setSelectedString(null) / setDate(null)
+            // while the popup is on screen) has no row to select; leave the
+            // current selection untouched instead of NPE'ing in the model
+            // adapters. Mirrors TimeSpinner3D's null tolerance. #5069
+<span class="nc" id="L257">            return;</span>
+        }
+<span class="fc" id="L259">        ListModel lm = root.getListModel();</span>
+<span class="fc bfc" id="L260" title="All 2 branches covered.">        if (lm instanceof NumberModelAdapter) {</span>
+<span class="fc" id="L261">            NumberModelAdapter adapter = (NumberModelAdapter) lm;</span>
+<span class="fc" id="L262">            adapter.inner.setValue(value);</span>
+<span class="fc" id="L263">            return;</span>
+        }
+<span class="fc bfc" id="L265" title="All 2 branches covered.">        if (lm instanceof DateModelAdapter) {</span>
+<span class="fc" id="L266">            DateModelAdapter adapter = (DateModelAdapter) lm;</span>
+<span class="fc" id="L267">            adapter.inner.setValue((Date) value);</span>
+<span class="fc" id="L268">            return;</span>
+        }
+<span class="fc" id="L270">        int len = lm.getSize();</span>
+<span class="pc bpc" id="L271" title="1 of 2 branches missed.">        for (int i = 0; i &lt; len; i++) {</span>
+<span class="fc" id="L272">            Object val = lm.getItemAt(i);</span>
+<span class="pc bpc" id="L273" title="1 of 4 branches missed.">            if (val != null &amp;&amp; val.equals(value)) {</span>
+<span class="fc" id="L274">                lm.setSelectedIndex(i);</span>
+<span class="fc" id="L275">                break;</span>
+            }
+        }
+<span class="fc" id="L278">    }</span>
+
+    public Style getRowStyle() {
+<span class="fc" id="L281">        return root.getRowStyle();</span>
+    }
+
+    public Style getSelectedRowStyle() {
+<span class="fc" id="L285">        return root.getSelectedRowStyle();</span>
+    }
+
+    public Style getSelectedOverlayStyle() {
+<span class="fc" id="L289">        return root.getSelectedOverlayStyle();</span>
+    }
+
+    void setRowFormatter(SpinnerNode.RowFormatter formatter) {
+<span class="fc" id="L293">        root.setRowFormatter(formatter);</span>
+<span class="fc" id="L294">    }</span>
+
+    @Override
+    public void paint(Graphics g) {
+<span class="fc" id="L298">        int alpha = g.getAlpha();</span>
+<span class="fc" id="L299">        g.setColor(root.getSelectedOverlayStyle().getBgColor());</span>
+<span class="fc" id="L300">        g.setAlpha(255);</span>
+<span class="fc" id="L301">        g.fillRect(getX(), getY(), getWidth(), getHeight());</span>
+<span class="fc" id="L302">        g.setAlpha(alpha);</span>
+<span class="fc" id="L303">        super.paint(g);</span>
+<span class="fc" id="L304">    }</span>
+
+    private static class ScrollingContainer extends Container {
+        ScrollingContainer() {
+<span class="fc" id="L308">            super(BoxLayout.y());</span>
+<span class="fc" id="L309">            getUnselectedStyle().setBorder(Border.createEmpty());</span>
+<span class="fc" id="L310">        }</span>
+
+        @Override
+        public void setScrollY(int scrollY) {
+<span class="fc" id="L314">            super.setScrollY(scrollY);</span>
+<span class="fc" id="L315">        }</span>
+    }
+
+    private static class DateModelAdapter implements ListModel&lt;String&gt; {
+        final SpinnerDateModel inner;
+<span class="fc" id="L320">        DateFormat fmt = new SimpleDateFormat(&quot;EEE MMM d&quot;);</span>
+
+<span class="fc" id="L322">        DateModelAdapter(SpinnerDateModel inner) {</span>
+<span class="fc" id="L323">            this.inner = inner;</span>
+<span class="fc" id="L324">        }</span>
+
+        @Override
+        public String getItemAt(int index) {
+<span class="nc" id="L328">            Date dt = (Date) inner.getItemAt(index);</span>
+<span class="nc" id="L329">            Calendar startToday = Calendar.getInstance();</span>
+<span class="nc" id="L330">            startToday.setTime(new Date());</span>
+<span class="nc" id="L331">            startToday.set(Calendar.HOUR_OF_DAY, 0);</span>
+<span class="nc" id="L332">            startToday.set(Calendar.MINUTE, 0);</span>
+
+<span class="nc" id="L334">            Calendar endToday = Calendar.getInstance();</span>
+<span class="nc" id="L335">            endToday.setTime(new Date());</span>
+<span class="nc" id="L336">            endToday.set(Calendar.HOUR_OF_DAY, 23);</span>
+<span class="nc" id="L337">            endToday.set(Calendar.MINUTE, 59);</span>
+<span class="nc" id="L338">            endToday.set(Calendar.SECOND, 59);</span>
+
+<span class="nc bnc" id="L340" title="All 4 branches missed.">            if (dt.getTime() &gt;= startToday.getTime().getTime() &amp;&amp; dt.getTime() &lt; endToday.getTime().getTime()) {</span>
+<span class="nc" id="L341">                return &quot;Today&quot;;</span>
+            }
+<span class="nc" id="L343">            return fmt.format(dt);</span>
+        }
+
+        @Override
+        public int getSize() {
+<span class="fc" id="L348">            return inner.getSize();</span>
+        }
+
+        @Override
+        public int getSelectedIndex() {
+<span class="fc" id="L353">            return inner.getSelectedIndex();</span>
+        }
+
+        @Override
+        public void setSelectedIndex(int index) {
+<span class="fc" id="L358">            inner.setSelectedIndex(index);</span>
+<span class="fc" id="L359">        }</span>
+
+        @Override
+        public void addDataChangedListener(DataChangedListener l) {
+<span class="fc" id="L363">            inner.addDataChangedListener(l);</span>
+<span class="fc" id="L364">        }</span>
+
+        @Override
+        public void removeDataChangedListener(DataChangedListener l) {
+<span class="fc" id="L368">            inner.removeDataChangedListener(l);</span>
+<span class="fc" id="L369">        }</span>
+
+        @Override
+        public void addSelectionListener(SelectionListener l) {
+<span class="fc" id="L373">            inner.addSelectionListener(l);</span>
+<span class="fc" id="L374">        }</span>
+
+        @Override
+        public void removeSelectionListener(SelectionListener l) {
+<span class="fc" id="L378">            inner.removeSelectionListener(l);</span>
+<span class="fc" id="L379">        }</span>
+
+        @Override
+        public void addItem(String item) {
+<span class="nc" id="L383">            inner.addItem(item);</span>
+<span class="nc" id="L384">        }</span>
+
+        @Override
+        public void removeItem(int index) {
+<span class="nc" id="L388">            inner.removeItem(index);</span>
+<span class="nc" id="L389">        }</span>
+
+    }
+
+    private static class NumberModelAdapter implements ListModel&lt;String&gt; {
+        private final SpinnerNumberModel inner;
+
+<span class="fc" id="L396">        NumberModelAdapter(SpinnerNumberModel inner) {</span>
+<span class="fc" id="L397">            this.inner = inner;</span>
+<span class="fc" id="L398">        }</span>
+
+        @Override
+        public String getItemAt(int index) {
+<span class="fc" id="L402">            return inner.getItemAt(index).toString();</span>
+        }
+
+        @Override
+        public int getSize() {
+<span class="fc" id="L407">            return inner.getSize();</span>
+        }
+
+        @Override
+        public int getSelectedIndex() {
+<span class="fc" id="L412">            return inner.getSelectedIndex();</span>
+        }
+
+        @Override
+        public void setSelectedIndex(int index) {
+<span class="fc" id="L417">            inner.setSelectedIndex(index);</span>
+<span class="fc" id="L418">        }</span>
+
+        @Override
+        public void addDataChangedListener(DataChangedListener l) {
+<span class="fc" id="L422">            inner.addDataChangedListener(l);</span>
+<span class="fc" id="L423">        }</span>
+
+        @Override
+        public void removeDataChangedListener(DataChangedListener l) {
+<span class="fc" id="L427">            inner.removeDataChangedListener(l);</span>
+<span class="fc" id="L428">        }</span>
+
+        @Override
+        public void addSelectionListener(SelectionListener l) {
+<span class="fc" id="L432">            inner.addSelectionListener(l);</span>
+<span class="fc" id="L433">        }</span>
+
+        @Override
+        public void removeSelectionListener(SelectionListener l) {
+<span class="fc" id="L437">            inner.removeSelectionListener(l);</span>
+<span class="fc" id="L438">        }</span>
+
+        @Override
+        public void addItem(String item) {
+<span class="nc" id="L442">            inner.addItem(item);</span>
+<span class="nc" id="L443">        }</span>
+
+        @Override
+        public void removeItem(int index) {
+<span class="nc" id="L447">            inner.removeItem(index);</span>
+<span class="nc" id="L448">        }</span>
+
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

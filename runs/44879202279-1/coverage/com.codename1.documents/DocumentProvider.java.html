@@ -1,0 +1,288 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DocumentProvider.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.documents</a> &gt; <span class="el_source">DocumentProvider.java</span></div><h1>DocumentProvider.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.documents;
+
+import com.codename1.documents.spi.DocumentProviderBridge;
+import com.codename1.io.Log;
+import com.codename1.ui.Display;
+
+/// The static entry point for exposing your app's documents to the system file browser: the Files
+/// app on iOS, the storage picker on Android. Publish a tree, and your
+/// content becomes browsable from outside your app -- and openable by other apps -- without the
+/// user launching yours.
+///
+/// ```java
+/// DocumentNode root = DocumentNode.folder(&quot;root&quot;, &quot;My Invoices&quot;);
+/// root.add(DocumentNode.file(&quot;inv-2031&quot;, &quot;January.pdf&quot;)
+///         .setContentType(&quot;application/pdf&quot;)
+///         .setPath(&quot;invoices/january.pdf&quot;));
+/// DocumentProvider.publish(root);
+/// ```
+///
+/// #### Two ways to supply content
+///
+/// *From the shared directory.* Write the bytes under `getSharedDirectory()` and point each node
+/// at a relative `path`. Nothing else is involved: no server, no network code, and the content
+/// opens instantly because it is already on the device.
+///
+/// *From your server.* Call `setRemoteEndpoint(String)` and give each node a `remoteId`. Content
+/// is fetched on demand over HTTPS, which is what a cloud drive wants -- the index can list far
+/// more than the device holds. A node may carry both, and a local copy always wins, which is how
+/// a cached document opens without a round trip.
+///
+/// #### The reader is not your app
+///
+/// On iOS the browser talks to a generated app *extension*, a separate process that runs
+/// while your app is dead and cannot call your Java code. That is why this API publishes data
+/// rather than installing callbacks: the tree is serialized into a container both processes can
+/// read, and the extension serves the browser from it. Publish whenever your data changes -- after
+/// a sync, after a login -- not in response to being browsed, because you will not be asked.
+///
+/// Android has no such split (the provider runs in your app's process), but the same rule applies
+/// so that one publishing discipline works everywhere.
+///
+/// #### Zero cost when unused
+///
+/// Merely referencing this package makes the build inject the native plumbing -- the file provider
+/// extension and App Group on Apple platforms, the documents provider in the Android manifest.
+/// Apps that never touch `com.codename1.documents` get none of it, and on unsupported ports the
+/// whole API is an inert no-op.
+///
+/// If all you want is for your app's own documents folder to be visible in the Files app, you do
+/// not need any of this -- see the developer guide, which describes the two build hints that do
+/// that with no extension at all.
+public final class DocumentProvider {
+    private static DocumentProviderBridge bridge;
+    private static boolean bridgeOverridden;
+
+    private DocumentProvider() {
+    }
+
+    /// Returns true when this platform can expose documents to the system file browser.
+    ///
+    /// #### Returns
+    ///
+    /// true when document providing is supported
+    public static boolean isSupported() {
+<span class="nc" id="L87">        DocumentProviderBridge b = bridgeInternal();</span>
+<span class="nc bnc" id="L88" title="All 4 branches missed.">        return b != null &amp;&amp; b.isDocumentProviderSupported();</span>
+    }
+
+    /// Returns the directory whose contents the platform reader can also see, creating it if
+    /// needed. Write the bytes of any node that carries a `path` under here, using the ordinary
+    /// `com.codename1.io.FileSystemStorage` API.
+    ///
+    /// On Apple platforms this is inside the App Group container rather than in your app's own
+    /// sandbox, so a file written to `FileSystemStorage`'s home directory is *not* visible to the
+    /// extension. Always resolve paths against this value.
+    ///
+    /// Update published content by writing a NEW file and republishing the tree against it,
+    /// never by rewriting a file already in the published tree. Another app can be reading a
+    /// published file at any moment, and rewriting one in place refills the same file underneath
+    /// that reader, which sees the two versions spliced together. Publishing the replacement
+    /// under a new name and then calling `publish` gives every reader a whole document: the ones
+    /// already reading finish the old file, and the ones that come after open the new one.
+    ///
+    /// #### Returns
+    ///
+    /// the shared directory path, or null when unsupported on this port
+    public static String getSharedDirectory() {
+<span class="nc" id="L110">        DocumentProviderBridge b = bridgeInternal();</span>
+<span class="nc bnc" id="L111" title="All 2 branches missed.">        return b == null ? null : b.getSharedDirectory();</span>
+    }
+
+    /// Publishes the tree the file browser should show, replacing whatever was published before.
+    ///
+    /// The call returns as soon as the index is persisted; the browser picks it up on its own
+    /// schedule. Publishing the same tree twice is harmless.
+    ///
+    /// #### Parameters
+    ///
+    /// - `root`: the root of the tree, must not be null
+    public static void publish(DocumentNode root) {
+<span class="nc bnc" id="L123" title="All 2 branches missed.">        if (root == null) {</span>
+<span class="nc" id="L124">            throw new IllegalArgumentException(&quot;Cannot publish a null document tree&quot;);</span>
+        }
+<span class="nc" id="L126">        DocumentProviderBridge b = bridgeInternal();</span>
+<span class="nc bnc" id="L127" title="All 2 branches missed.">        if (b == null) {</span>
+<span class="nc" id="L128">            return;</span>
+        }
+        try {
+<span class="nc" id="L131">            b.publishIndex(DocumentIndexSerializer.serialize(root));</span>
+<span class="nc" id="L132">            b.signalChange();</span>
+<span class="nc" id="L133">        } catch (Throwable t) {</span>
+            // A publish is housekeeping on whatever thread the app's data happened to change on.
+            // Letting a serialization or storage failure escape would take down that unrelated
+            // flow, so it is logged and the previously published index simply stays current.
+<span class="nc" id="L137">            Log.e(t);</span>
+<span class="nc" id="L138">        }</span>
+<span class="nc" id="L139">    }</span>
+
+    /// Sets the HTTPS endpoint the platform reader fetches remote content from, and the bearer
+    /// token it presents. Call before publishing nodes that carry a `remoteId`.
+    ///
+    /// The endpoint is contacted by the extension, not by your app, so it must be reachable
+    /// without any state your app holds in memory -- the token given here is all it carries. Keep
+    /// the token fresh by calling this again whenever you renew it; the extension reads the latest
+    /// value each time it runs.
+    ///
+    /// The developer guide documents the two requests the reader makes and the JSON it expects
+    /// back.
+    ///
+    /// #### Parameters
+    ///
+    /// - `endpoint`: the HTTPS base URL, or null to serve only from the shared directory
+    /// - `authToken`: a bearer token sent with each request, or null for none
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: when the endpoint is not HTTPS
+    public static void setRemoteEndpoint(String endpoint, String authToken) {
+<span class="pc bpc" id="L161" title="2 of 6 branches missed.">        if (endpoint != null &amp;&amp; endpoint.length() &gt; 0 &amp;&amp; !isHttps(endpoint)) {</span>
+            // Refused rather than passed on. The readers send the bearer token as an
+            // Authorization header on every fetch, and they run outside this app -- so an
+            // &quot;http://&quot; typo here would hand the token, and the documents it unlocks, to the
+            // network in the clear on any platform whose cleartext policy still allows it.
+<span class="fc" id="L166">            throw new IllegalArgumentException(&quot;The document endpoint must be HTTPS; got \&quot;&quot;</span>
+                    + endpoint + &quot;\&quot;.&quot;);
+        }
+        // Both values are written to disk as UTF-8, by every bridge. An unpaired surrogate has
+        // no UTF-8 encoding and becomes &quot;?&quot;, so the endpoint that is read back is a different URL
+        // and the token that is sent is a different credential -- a request to the wrong place,
+        // or one the server rejects, with nothing in either message pointing at the character
+        // that did it.
+<span class="pc bpc" id="L174" title="1 of 2 branches missed.">        int badEndpoint = endpoint == null ? -1</span>
+<span class="fc" id="L175">                : DocumentIndexSerializer.loneSurrogateAt(endpoint);</span>
+<span class="fc bfc" id="L176" title="All 2 branches covered.">        if (badEndpoint &gt;= 0) {</span>
+<span class="fc" id="L177">            throw new IllegalArgumentException(&quot;The document endpoint contains an unpaired &quot;</span>
+                    + &quot;surrogate at index &quot; + badEndpoint + &quot;. It cannot be encoded as UTF-8, &quot;
+                    + &quot;and the readers store it as UTF-8, so the URL they use would not be the &quot;
+                    + &quot;one given here.&quot;);
+        }
+<span class="pc bpc" id="L182" title="1 of 2 branches missed.">        int badToken = authToken == null ? -1</span>
+<span class="fc" id="L183">                : DocumentIndexSerializer.loneSurrogateAt(authToken);</span>
+<span class="pc bpc" id="L184" title="1 of 2 branches missed.">        if (badToken &gt;= 0) {</span>
+<span class="fc" id="L185">            throw new IllegalArgumentException(&quot;The document endpoint's auth token contains an &quot;</span>
+                    + &quot;unpaired surrogate at index &quot; + badToken + &quot;. It cannot be encoded as &quot;
+                    + &quot;UTF-8, and the readers store it as UTF-8, so the credential they send &quot;
+                    + &quot;would not be the one given here.&quot;);
+        }
+<span class="nc" id="L190">        DocumentProviderBridge b = bridgeInternal();</span>
+<span class="nc bnc" id="L191" title="All 2 branches missed.">        if (b == null) {</span>
+<span class="nc" id="L192">            return;</span>
+        }
+        try {
+<span class="nc" id="L195">            b.setRemoteEndpoint(endpoint, authToken);</span>
+<span class="nc" id="L196">        } catch (Throwable t) {</span>
+<span class="nc" id="L197">            Log.e(t);</span>
+<span class="nc" id="L198">        }</span>
+<span class="nc" id="L199">    }</span>
+
+    /// Sets the HTTPS endpoint with no bearer token.
+    ///
+    /// #### Parameters
+    ///
+    /// - `endpoint`: the HTTPS base URL, or null to serve only from the shared directory
+    public static void setRemoteEndpoint(String endpoint) {
+<span class="nc" id="L207">        setRemoteEndpoint(endpoint, null);</span>
+<span class="nc" id="L208">    }</span>
+
+    /// Asks the platform browser to re-enumerate the published tree. `publish` already does this;
+    /// call it directly only when the bytes behind an unchanged tree changed.
+    public static void signalChange() {
+<span class="nc" id="L213">        DocumentProviderBridge b = bridgeInternal();</span>
+<span class="nc bnc" id="L214" title="All 2 branches missed.">        if (b == null) {</span>
+<span class="nc" id="L215">            return;</span>
+        }
+        try {
+<span class="nc" id="L218">            b.signalChange();</span>
+<span class="nc" id="L219">        } catch (Throwable t) {</span>
+<span class="nc" id="L220">            Log.e(t);</span>
+<span class="nc" id="L221">        }</span>
+<span class="nc" id="L222">    }</span>
+
+    /// Withdraws everything: the published tree disappears from the file browser, the endpoint and
+    /// token are forgotten and the shared directory is emptied. Call this on logout -- the shared
+    /// container outlives your process, so documents left there stay browsable by anyone holding
+    /// the device.
+    ///
+    /// Everything the app owns is gone by the time this returns. On Apple platforms one step is
+    /// the system's rather than the app's: taking the published location away is a request to the
+    /// file provider daemon, and this waits a few seconds for it. If the daemon is slow the call
+    /// returns anyway rather than holding up a logout, and items the system had already copied out
+    /// of the container can stay visible until it catches up. Nothing is left pending on the app's
+    /// side, and there is no API that makes the system faster.
+    public static void clear() {
+<span class="nc" id="L236">        DocumentProviderBridge b = bridgeInternal();</span>
+<span class="nc bnc" id="L237" title="All 2 branches missed.">        if (b == null) {</span>
+<span class="nc" id="L238">            return;</span>
+        }
+        try {
+<span class="nc" id="L241">            b.clear();</span>
+<span class="nc" id="L242">        } catch (Throwable t) {</span>
+<span class="nc" id="L243">            Log.e(t);</span>
+<span class="nc" id="L244">        }</span>
+<span class="nc" id="L245">    }</span>
+
+    private static boolean isHttps(String endpoint) {
+        // Deliberately not a URI parse: this runs on every port including ones with a reduced
+        // java.net, and the only question is the scheme.
+<span class="pc bpc" id="L250" title="1 of 2 branches missed.">        if (endpoint.length() &lt; 8) {</span>
+<span class="nc" id="L251">            return false;</span>
+        }
+<span class="fc" id="L253">        String scheme = endpoint.substring(0, 8);</span>
+<span class="fc" id="L254">        return &quot;https://&quot;.equals(scheme.toLowerCase());</span>
+    }
+
+    /// Test seam: installs a bridge, bypassing platform resolution.
+    ///
+    /// #### Parameters
+    ///
+    /// - `b`: the bridge, or null to resolve from the platform again
+    public static void setBridge(DocumentProviderBridge b) {
+<span class="nc" id="L263">        bridge = b;</span>
+<span class="nc bnc" id="L264" title="All 2 branches missed.">        bridgeOverridden = b != null;</span>
+<span class="nc" id="L265">    }</span>
+
+    static DocumentProviderBridge bridgeInternal() {
+<span class="nc bnc" id="L268" title="All 2 branches missed.">        if (bridgeOverridden) {</span>
+<span class="nc" id="L269">            return bridge;</span>
+        }
+<span class="nc bnc" id="L271" title="All 2 branches missed.">        if (!Display.isInitialized()) {</span>
+<span class="nc" id="L272">            return null;</span>
+        }
+        try {
+<span class="nc" id="L275">            return Display.getInstance().getDocumentProviderBridge();</span>
+<span class="nc" id="L276">        } catch (Throwable t) {</span>
+<span class="nc" id="L277">            Log.e(t);</span>
+<span class="nc" id="L278">            return null;</span>
+        }
+    }
+
+    /// Test seam: clears the bridge override.
+    static void reset() {
+<span class="nc" id="L284">        bridge = null;</span>
+<span class="nc" id="L285">        bridgeOverridden = false;</span>
+<span class="nc" id="L286">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

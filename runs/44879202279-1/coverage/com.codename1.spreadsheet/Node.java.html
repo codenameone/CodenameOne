@@ -1,0 +1,139 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Node.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.spreadsheet</a> &gt; <span class="el_source">Node.java</span></div><h1>Node.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.spreadsheet;
+
+/// One node of a parsed formula. A formula is kept as a tree so that it can be evaluated,
+/// moved (a shared formula, an inserted row) and written back in either file dialect.
+final class Node {
+    static final int NUM = 0;
+    static final int STR = 1;
+    static final int BOOL = 2;
+    static final int ERR = 3;
+    static final int REF = 4;
+    static final int NAME = 5;
+    static final int FUNC = 6;
+    static final int BINARY = 7;
+    static final int UNARY = 8;
+    static final int PERCENT = 9;
+    static final int ARRAY = 10;
+    static final int MISSING = 11;
+    static final int PAREN = 12;
+
+    static final int MAX_ROW = 1048575;
+    static final int MAX_COL = 16383;
+
+    final int kind;
+    /// The literal of NUM, STR, BOOL and ERR; the name of NAME and FUNC; the operator of
+    /// BINARY and UNARY.
+    Object value;
+    Node[] args;
+    /// The rows of an ARRAY constant.
+    Object[][] array;
+
+    // REF only. Rows and columns are zero based; a whole column spans row 0 to MAX_ROW.
+    String sheet;
+    String sheet2;
+    int r1;
+    int c1;
+    int r2;
+    int c2;
+    boolean absR1;
+    boolean absC1;
+    boolean absR2;
+    boolean absC2;
+    boolean area;
+    boolean wholeCol;
+    boolean wholeRow;
+
+<span class="fc" id="L68">    Node(int kind) {</span>
+<span class="fc" id="L69">        this.kind = kind;</span>
+<span class="fc" id="L70">    }</span>
+
+<span class="fc" id="L72">    Node(int kind, Object value, Node... args) {</span>
+<span class="fc" id="L73">        this.kind = kind;</span>
+<span class="fc" id="L74">        this.value = value;</span>
+<span class="fc" id="L75">        this.args = args;</span>
+<span class="fc" id="L76">    }</span>
+
+    /// The operators of a chain such as `a+b+c+d`, innermost first, and the leftmost operand
+    /// under them at index 0 of the result's companion, `spine[0].args[0]`.
+    ///
+    /// A chain parses into a tree that leans left, as deep as the chain is long, and a long
+    /// sum is an ordinary formula. Whatever walks a formula walks this list in a loop and
+    /// recurses only into the right-hand operands, whose depth the parser limits: a stack
+    /// that overflows is not an exception on every device.
+    static Node[] spine(Node top) {
+<span class="fc" id="L86">        int count = 0;</span>
+<span class="fc bfc" id="L87" title="All 2 branches covered.">        for (Node x = top; x.kind == BINARY; x = x.args[0]) {</span>
+<span class="fc" id="L88">            count++;</span>
+        }
+<span class="fc" id="L90">        Node[] spine = new Node[count];</span>
+<span class="fc" id="L91">        Node x = top;</span>
+<span class="fc bfc" id="L92" title="All 2 branches covered.">        for (int i = count - 1; i &gt;= 0; i--) {</span>
+<span class="fc" id="L93">            spine[i] = x;</span>
+<span class="fc" id="L94">            x = x.args[0];</span>
+        }
+<span class="fc" id="L96">        return spine;</span>
+    }
+
+    String name() {
+<span class="fc" id="L100">        return (String) value;</span>
+    }
+
+    Node copyRef() {
+<span class="fc" id="L104">        Node n = new Node(REF);</span>
+<span class="fc" id="L105">        n.sheet = sheet;</span>
+<span class="fc" id="L106">        n.sheet2 = sheet2;</span>
+<span class="fc" id="L107">        n.r1 = r1;</span>
+<span class="fc" id="L108">        n.c1 = c1;</span>
+<span class="fc" id="L109">        n.r2 = r2;</span>
+<span class="fc" id="L110">        n.c2 = c2;</span>
+<span class="fc" id="L111">        n.absR1 = absR1;</span>
+<span class="fc" id="L112">        n.absC1 = absC1;</span>
+<span class="fc" id="L113">        n.absR2 = absR2;</span>
+<span class="fc" id="L114">        n.absC2 = absC2;</span>
+<span class="fc" id="L115">        n.area = area;</span>
+<span class="fc" id="L116">        n.wholeCol = wholeCol;</span>
+<span class="fc" id="L117">        n.wholeRow = wholeRow;</span>
+<span class="fc" id="L118">        return n;</span>
+    }
+
+    /// Whether evaluating this node may answer a reference, which is what the range and
+    /// intersection operators take.
+    boolean isReferenceLike() {
+<span class="fc bfc" id="L124" title="All 4 branches covered.">        switch (kind) {</span>
+            case REF:
+            case NAME:
+            case FUNC:
+<span class="fc" id="L128">                return true;</span>
+            case PAREN:
+<span class="fc" id="L130">                return args[0].isReferenceLike();</span>
+            case BINARY:
+<span class="fc" id="L132">                String op = name();</span>
+<span class="pc bpc" id="L133" title="1 of 6 branches missed.">                return &quot;:&quot;.equals(op) || &quot; &quot;.equals(op) || &quot;,&quot;.equals(op);</span>
+            default:
+<span class="fc" id="L135">                return false;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

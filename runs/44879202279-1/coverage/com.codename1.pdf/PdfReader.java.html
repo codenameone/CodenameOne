@@ -1,0 +1,179 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PdfReader.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.pdf</a> &gt; <span class="el_source">PdfReader.java</span></div><h1>PdfReader.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.pdf;
+
+import com.codename1.impl.pdf.PdfContent;
+import com.codename1.impl.pdf.PdfDict;
+import com.codename1.impl.pdf.PdfFile;
+import com.codename1.impl.pdf.PdfTextExtractor;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.List;
+
+/// Reads an existing PDF: its pages, their sizes, its metadata and its
+/// text. Runs headless, so it works on a server as well as on a device.
+///
+/// ```java
+/// PdfDocument doc = new PdfDocument();
+/// doc.addPage(PdfPageSize.A4).getCanvas().drawText(&quot;Hello&quot;, 72, 72);
+/// byte[] bytes = doc.toByteArray();
+/// PdfReader r = PdfReader.open(bytes);
+/// for (int i = 0; i &lt; r.getPageCount(); i++) {
+///     String text = r.extractText(i);
+/// }
+/// ```
+///
+/// Files with a broken cross-reference table are repaired as they are
+/// read. Encrypted files that use the standard security handler (RC4,
+/// AES-128 or AES-256) open with the user or owner password, and those
+/// encrypted with an empty user password open without one.
+@com.codename1.impl.SharedWithBackend
+public final class PdfReader {
+    private final PdfFile file;
+
+<span class="fc" id="L55">    private PdfReader(PdfFile file) {</span>
+<span class="fc" id="L56">        this.file = file;</span>
+<span class="fc" id="L57">    }</span>
+
+    /// Opens a PDF held in memory.
+    ///
+    /// @throws IOException if the data is not a PDF, is damaged beyond
+    /// repair, or is encrypted with a password other than the empty one
+    public static PdfReader open(byte[] data) throws IOException {
+<span class="fc" id="L64">        return open(data, null);</span>
+    }
+
+    /// Opens an encrypted PDF with `password`, the user or owner password.
+    ///
+    /// @throws IOException if the data cannot be read or the password is wrong
+    public static PdfReader open(byte[] data, String password) throws IOException {
+<span class="fc" id="L71">        return new PdfReader(new PdfFile(data, password));</span>
+    }
+
+    /// Reads `in` to its end and opens it. The stream is not closed.
+    public static PdfReader open(InputStream in) throws IOException {
+<span class="nc" id="L76">        ByteArrayOutputStream bo = new ByteArrayOutputStream();</span>
+<span class="nc" id="L77">        byte[] buf = new byte[16384];</span>
+        int n;
+<span class="nc bnc" id="L79" title="All 2 branches missed.">        while ((n = in.read(buf)) &gt; 0) {</span>
+<span class="nc" id="L80">            bo.write(buf, 0, n);</span>
+        }
+<span class="nc" id="L82">        return open(bo.toByteArray(), null);</span>
+    }
+
+    /// The number of pages.
+    public int getPageCount() {
+<span class="fc" id="L87">        return file.getPages().size();</span>
+    }
+
+    /// True when the file was encrypted.
+    public boolean isEncrypted() {
+<span class="fc" id="L92">        return file.isEncrypted();</span>
+    }
+
+    private PdfDict page(int index) {
+<span class="fc" id="L96">        List&lt;PdfDict&gt; pages = file.getPages();</span>
+<span class="pc bpc" id="L97" title="2 of 4 branches missed.">        if (index &lt; 0 || index &gt;= pages.size()) {</span>
+<span class="nc" id="L98">            throw new IndexOutOfBoundsException(&quot;Page &quot; + index + &quot; of &quot; + pages.size());</span>
+        }
+<span class="fc" id="L100">        return pages.get(index);</span>
+    }
+
+    /// The rotation of page `index` in clockwise degrees: 0, 90, 180 or 270.
+    public int getPageRotation(int index) {
+<span class="nc" id="L105">        return PdfContent.rotation(page(index));</span>
+    }
+
+    /// The width of page `index` in points as displayed, after rotation.
+    public double getPageWidth(int index) {
+<span class="fc" id="L110">        PdfDict p = page(index);</span>
+<span class="fc" id="L111">        double[] b = PdfContent.box(p);</span>
+<span class="pc bpc" id="L112" title="1 of 2 branches missed.">        return PdfContent.rotation(p) % 180 == 0 ? b[2] : b[3];</span>
+    }
+
+    /// The height of page `index` in points as displayed, after rotation.
+    public double getPageHeight(int index) {
+<span class="nc" id="L117">        PdfDict p = page(index);</span>
+<span class="nc" id="L118">        double[] b = PdfContent.box(p);</span>
+<span class="nc bnc" id="L119" title="All 2 branches missed.">        return PdfContent.rotation(p) % 180 == 0 ? b[3] : b[2];</span>
+    }
+
+    /// The text of page `index`, in drawing order, with lines separated by `\n`.
+    public String extractText(int index) {
+<span class="fc" id="L124">        return PdfTextExtractor.extract(page(index));</span>
+    }
+
+    /// The text of every page, pages separated by a form feed (`\f`).
+    public String extractText() {
+<span class="fc" id="L129">        StringBuilder sb = new StringBuilder();</span>
+<span class="fc bfc" id="L130" title="All 2 branches covered.">        for (int i = 0; i &lt; getPageCount(); i++) {</span>
+<span class="fc bfc" id="L131" title="All 2 branches covered.">            if (i &gt; 0) {</span>
+<span class="fc" id="L132">                sb.append('\f');</span>
+            }
+<span class="fc" id="L134">            sb.append(extractText(i));</span>
+        }
+<span class="fc" id="L136">        return sb.toString();</span>
+    }
+
+    private String info(String key) {
+<span class="fc" id="L140">        PdfDict info = file.getInfo();</span>
+<span class="pc bpc" id="L141" title="1 of 2 branches missed.">        return info == null ? null : info.getText(key);</span>
+    }
+
+    /// The document title, or null.
+    public String getTitle() {
+<span class="fc" id="L146">        return info(&quot;Title&quot;);</span>
+    }
+
+    /// The author, or null.
+    public String getAuthor() {
+<span class="fc" id="L151">        return info(&quot;Author&quot;);</span>
+    }
+
+    /// The subject, or null.
+    public String getSubject() {
+<span class="nc" id="L156">        return info(&quot;Subject&quot;);</span>
+    }
+
+    /// The keywords, or null.
+    public String getKeywords() {
+<span class="nc" id="L161">        return info(&quot;Keywords&quot;);</span>
+    }
+
+    /// The application that created the original document, or null.
+    public String getCreator() {
+<span class="nc" id="L166">        return info(&quot;Creator&quot;);</span>
+    }
+
+    /// The application that wrote the PDF, or null.
+    public String getProducer() {
+<span class="nc" id="L171">        return info(&quot;Producer&quot;);</span>
+    }
+
+    /// The parsed file, for the client renderer.
+    PdfFile file() {
+<span class="nc" id="L176">        return file;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

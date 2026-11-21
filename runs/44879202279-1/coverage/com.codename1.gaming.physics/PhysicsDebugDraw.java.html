@@ -1,0 +1,176 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PhysicsDebugDraw.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.gaming.physics</a> &gt; <span class="el_source">PhysicsDebugDraw.java</span></div><h1>PhysicsDebugDraw.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.gaming.physics;
+
+import com.codename1.gaming.physics.box2d.callbacks.DebugDraw;
+import com.codename1.gaming.physics.box2d.common.Color3f;
+import com.codename1.gaming.physics.box2d.common.OBBViewportTransform;
+import com.codename1.gaming.physics.box2d.common.Transform;
+import com.codename1.gaming.physics.box2d.common.Vec2;
+import com.codename1.ui.Graphics;
+
+/// Internal Box2D `DebugDraw` adapter that renders a `PhysicsWorld`'s collision
+/// shapes, joints and bounding boxes onto a Codename One `com.codename1.ui.Graphics`.
+/// It converts Box2D's meters (y up) to the world's pixels (y down) using the same
+/// scale and flip the rest of the wrapper uses, so the debug overlay lines up exactly
+/// with the sprites driven by the bodies.
+///
+/// This class is package-private on purpose: it implements an engine-level callback
+/// interface whose methods speak in Box2D types (`Vec2`, `Color3f`, `Transform`), so
+/// it is not part of the public wrapper API. Drive it through
+/// `PhysicsWorld#debugDraw(com.codename1.ui.Graphics)` and tune it with
+/// `PhysicsWorld#setDebugFillAlpha(int)`.
+class PhysicsDebugDraw extends DebugDraw {
+    private final PhysicsWorld world;
+    private Graphics g;
+<span class="fc" id="L46">    private int fillAlpha = 90;</span>
+
+    /// Creates a debug renderer for the given world.
+    PhysicsDebugDraw(PhysicsWorld world) {
+<span class="fc" id="L50">        super(new OBBViewportTransform());</span>
+<span class="fc" id="L51">        this.world = world;</span>
+<span class="fc" id="L52">    }</span>
+
+    /// Sets the alpha (0..255) used to fill solid shapes; outlines are always opaque.
+    void setFillAlpha(int alpha) {
+<span class="fc" id="L56">        this.fillAlpha = alpha;</span>
+<span class="fc" id="L57">    }</span>
+
+    /// The graphics the next `drawDebugData` pass renders to (set by `PhysicsWorld`).
+    void setGraphics(Graphics graphics) {
+<span class="fc" id="L61">        this.g = graphics;</span>
+<span class="fc" id="L62">    }</span>
+
+    private int px(float meters) {
+<span class="fc" id="L65">        return (int) world.toPixels(meters);</span>
+    }
+
+    private int py(float meters) {
+<span class="fc" id="L69">        return (int) -world.toPixels(meters);</span>
+    }
+
+    private static int rgb(Color3f c) {
+<span class="fc" id="L73">        int r = clamp(c.x);</span>
+<span class="fc" id="L74">        int gr = clamp(c.y);</span>
+<span class="fc" id="L75">        int b = clamp(c.z);</span>
+<span class="fc" id="L76">        return (r &lt;&lt; 16) | (gr &lt;&lt; 8) | b;</span>
+    }
+
+    private static int clamp(float channel) {
+<span class="fc" id="L80">        int v = (int) (channel * 255);</span>
+<span class="pc bpc" id="L81" title="2 of 4 branches missed.">        return v &lt; 0 ? 0 : (v &gt; 255 ? 255 : v);</span>
+    }
+
+    @Override
+    public void drawPolygon(Vec2[] vertices, int vertexCount, Color3f color) {
+<span class="fc" id="L86">        int[] xs = new int[vertexCount];</span>
+<span class="fc" id="L87">        int[] ys = new int[vertexCount];</span>
+<span class="fc bfc" id="L88" title="All 2 branches covered.">        for (int i = 0; i &lt; vertexCount; i++) {</span>
+<span class="fc" id="L89">            xs[i] = px(vertices[i].x);</span>
+<span class="fc" id="L90">            ys[i] = py(vertices[i].y);</span>
+        }
+<span class="fc" id="L92">        g.setColor(rgb(color));</span>
+<span class="fc" id="L93">        g.drawPolygon(xs, ys, vertexCount);</span>
+<span class="fc" id="L94">    }</span>
+
+    @Override
+    public void drawSolidPolygon(Vec2[] vertices, int vertexCount, Color3f color) {
+<span class="fc" id="L98">        int[] xs = new int[vertexCount];</span>
+<span class="fc" id="L99">        int[] ys = new int[vertexCount];</span>
+<span class="fc bfc" id="L100" title="All 2 branches covered.">        for (int i = 0; i &lt; vertexCount; i++) {</span>
+<span class="fc" id="L101">            xs[i] = px(vertices[i].x);</span>
+<span class="fc" id="L102">            ys[i] = py(vertices[i].y);</span>
+        }
+<span class="fc" id="L104">        int c = rgb(color);</span>
+<span class="fc" id="L105">        int oldAlpha = g.getAlpha();</span>
+<span class="fc" id="L106">        g.setColor(c);</span>
+<span class="fc" id="L107">        g.setAlpha(fillAlpha);</span>
+<span class="fc" id="L108">        g.fillPolygon(xs, ys, vertexCount);</span>
+<span class="fc" id="L109">        g.setAlpha(oldAlpha);</span>
+<span class="fc" id="L110">        g.drawPolygon(xs, ys, vertexCount);</span>
+<span class="fc" id="L111">    }</span>
+
+    @Override
+    public void drawCircle(Vec2 center, float radius, Color3f color) {
+<span class="nc" id="L115">        int r = px(radius);</span>
+<span class="nc" id="L116">        int cx = px(center.x);</span>
+<span class="nc" id="L117">        int cy = py(center.y);</span>
+<span class="nc" id="L118">        g.setColor(rgb(color));</span>
+<span class="nc" id="L119">        g.drawArc(cx - r, cy - r, r * 2, r * 2, 0, 360);</span>
+<span class="nc" id="L120">    }</span>
+
+    @Override
+    public void drawSolidCircle(Vec2 center, float radius, Vec2 axis, Color3f color) {
+<span class="fc" id="L124">        int r = px(radius);</span>
+<span class="fc" id="L125">        int cx = px(center.x);</span>
+<span class="fc" id="L126">        int cy = py(center.y);</span>
+<span class="fc" id="L127">        int c = rgb(color);</span>
+<span class="fc" id="L128">        int oldAlpha = g.getAlpha();</span>
+<span class="fc" id="L129">        g.setColor(c);</span>
+<span class="fc" id="L130">        g.setAlpha(fillAlpha);</span>
+<span class="fc" id="L131">        g.fillArc(cx - r, cy - r, r * 2, r * 2, 0, 360);</span>
+<span class="fc" id="L132">        g.setAlpha(oldAlpha);</span>
+<span class="fc" id="L133">        g.drawArc(cx - r, cy - r, r * 2, r * 2, 0, 360);</span>
+<span class="pc bpc" id="L134" title="1 of 2 branches missed.">        if (axis != null) {</span>
+            // a spoke showing the body's orientation
+<span class="fc" id="L136">            g.drawLine(cx, cy, px(center.x + radius * axis.x), py(center.y + radius * axis.y));</span>
+        }
+<span class="fc" id="L138">    }</span>
+
+    @Override
+    public void drawSegment(Vec2 p1, Vec2 p2, Color3f color) {
+<span class="fc" id="L142">        g.setColor(rgb(color));</span>
+<span class="fc" id="L143">        g.drawLine(px(p1.x), py(p1.y), px(p2.x), py(p2.y));</span>
+<span class="fc" id="L144">    }</span>
+
+    @Override
+    public void drawTransform(Transform xf) {
+<span class="nc" id="L148">        float len = world.toMeters(12);   // ~12px axes</span>
+<span class="nc" id="L149">        int ox = px(xf.p.x);</span>
+<span class="nc" id="L150">        int oy = py(xf.p.y);</span>
+        // x axis (red), y axis (green) of the body frame
+<span class="nc" id="L152">        g.setColor(0xff0000);</span>
+<span class="nc" id="L153">        g.drawLine(ox, oy, px(xf.p.x + xf.q.getCos() * len), py(xf.p.y + xf.q.getSin() * len));</span>
+<span class="nc" id="L154">        g.setColor(0x00ff00);</span>
+<span class="nc" id="L155">        g.drawLine(ox, oy, px(xf.p.x - xf.q.getSin() * len), py(xf.p.y + xf.q.getCos() * len));</span>
+<span class="nc" id="L156">    }</span>
+
+    @Override
+    public void drawPoint(Vec2 argPoint, float argRadiusOnScreen, Color3f color) {
+<span class="nc" id="L160">        int r = Math.max(1, (int) argRadiusOnScreen);</span>
+<span class="nc" id="L161">        int cx = px(argPoint.x);</span>
+<span class="nc" id="L162">        int cy = py(argPoint.y);</span>
+<span class="nc" id="L163">        g.setColor(rgb(color));</span>
+<span class="nc" id="L164">        g.fillArc(cx - r, cy - r, r * 2, r * 2, 0, 360);</span>
+<span class="nc" id="L165">    }</span>
+
+    @Override
+    public void drawString(float x, float y, String s, Color3f color) {
+<span class="nc bnc" id="L169" title="All 2 branches missed.">        if (s == null) {</span>
+<span class="nc" id="L170">            return;</span>
+        }
+<span class="nc" id="L172">        g.setColor(rgb(color));</span>
+<span class="nc" id="L173">        g.drawString(s, (int) x, (int) y);</span>
+<span class="nc" id="L174">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

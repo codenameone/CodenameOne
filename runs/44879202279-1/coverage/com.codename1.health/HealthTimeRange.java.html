@@ -1,0 +1,308 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>HealthTimeRange.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.health</a> &gt; <span class="el_source">HealthTimeRange.java</span></div><h1>HealthTimeRange.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.health;
+
+import java.util.Calendar;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.util.TimeZone;
+
+/// A half-open span of time, `[start, end)`, in epoch milliseconds UTC.
+///
+/// #### Why epoch millis rather than java.time
+///
+/// `java.time` is available in Codename One, and the calendar API uses it.
+/// Health does not, for three reasons: a month of continuous heart rate is
+/// tens of thousands of points and one `Instant` per point is real memory
+/// pressure on a phone; `com.codename1.location` and
+/// `com.codename1.bluetooth` already speak `long` millis and health data
+/// flows between all three; and both platform SDKs are millisecond-based
+/// at the boundary anyway.
+///
+/// Where calendar semantics genuinely matter -- &quot;the last seven days&quot; is
+/// not &quot;the last 604800000 milliseconds&quot; across a daylight-saving
+/// transition -- the factory takes an explicit [TimeZone]. Nothing in this
+/// API silently reads the JVM default.
+public final class HealthTimeRange {
+
+    private final long startMillis;
+    private final long endMillis;
+    private final boolean openEnded;
+
+    private HealthTimeRange(long startMillis, long endMillis,
+<span class="fc" id="L54">            boolean openEnded) {</span>
+<span class="pc bpc" id="L55" title="1 of 2 branches missed.">        if (endMillis &lt; startMillis) {</span>
+<span class="nc" id="L56">            throw new IllegalArgumentException(</span>
+                    &quot;time range ends before it starts: &quot; + startMillis
+                            + &quot; .. &quot; + endMillis);
+        }
+<span class="fc" id="L60">        this.startMillis = startMillis;</span>
+<span class="fc" id="L61">        this.endMillis = endMillis;</span>
+<span class="fc" id="L62">        this.openEnded = openEnded;</span>
+<span class="fc" id="L63">    }</span>
+
+    /// An explicit span. `end` is exclusive: a sample stamped exactly at
+    /// `end` belongs to the next range, which is what makes adjacent
+    /// buckets tile without double-counting.
+    public static HealthTimeRange between(long startMillis, long endMillis) {
+<span class="fc" id="L69">        return new HealthTimeRange(startMillis, endMillis, false);</span>
+    }
+
+    /// A range covering exactly one instant.
+    ///
+    /// One millisecond wide rather than zero: ranges are half-open, so
+    /// `[t,t)` contains nothing at all and the factory documented for
+    /// querying a single moment returned an empty result for every input,
+    /// including a sample stamped exactly at `t`.
+    public static HealthTimeRange at(long instantMillis) {
+<span class="fc" id="L79">        return new HealthTimeRange(instantMillis, instantMillis + 1, false);</span>
+    }
+
+    /// The last `durationMillis` milliseconds, ending now.
+    public static HealthTimeRange lastMillis(long durationMillis) {
+<span class="fc" id="L84">        long now = System.currentTimeMillis();</span>
+<span class="fc" id="L85">        return new HealthTimeRange(now - durationMillis, now, false);</span>
+    }
+
+    /// The last `hours` hours, ending now.
+    public static HealthTimeRange lastHours(int hours) {
+<span class="fc" id="L90">        return lastMillis(hours * 3600000L);</span>
+    }
+
+    /// The last `days` times 24 hours, ending now. This is a rolling
+    /// window, **not** a calendar span -- for &quot;the last seven calendar
+    /// days&quot; use [#calendarDays(int,ZoneId)].
+    public static HealthTimeRange lastDays(int days) {
+<span class="fc" id="L97">        return lastMillis(days * 86400000L);</span>
+    }
+
+    /// Today, from local midnight to now, in `zone`.
+    public static HealthTimeRange today(ZoneId zone) {
+<span class="nc" id="L102">        Calendar c = calendarIn(zone);</span>
+<span class="nc" id="L103">        long now = millisOf(c);</span>
+<span class="nc" id="L104">        startOfDay(c);</span>
+<span class="nc" id="L105">        return new HealthTimeRange(millisOf(c), now, false);</span>
+    }
+
+    /// The last `count` calendar days in `zone`, from local midnight at the
+    /// start of the first day through now. Correct across daylight-saving
+    /// transitions, where a day is 23 or 25 hours.
+    public static HealthTimeRange calendarDays(int count, ZoneId zone) {
+<span class="pc bpc" id="L112" title="1 of 2 branches missed.">        if (count &lt; 1) {</span>
+<span class="nc" id="L113">            throw new IllegalArgumentException(</span>
+                    &quot;calendarDays requires a positive count, got &quot; + count);
+        }
+<span class="fc" id="L116">        Calendar c = calendarIn(zone);</span>
+<span class="fc" id="L117">        long now = millisOf(c);</span>
+<span class="fc" id="L118">        startOfDay(c);</span>
+<span class="fc" id="L119">        c.add(Calendar.DAY_OF_MONTH, -(count - 1));</span>
+<span class="fc" id="L120">        return new HealthTimeRange(millisOf(c), now, false);</span>
+    }
+
+    /// Everything from `startMillis` onwards. The end is resolved to the
+    /// wall clock at the moment the query executes.
+    public static HealthTimeRange since(long startMillis) {
+<span class="fc" id="L126">        return new HealthTimeRange(startMillis, Long.MAX_VALUE, true);</span>
+    }
+
+    /// Everything from `start` onwards.
+    public static HealthTimeRange since(Instant start) {
+<span class="fc" id="L131">        return since(requireInstant(start, &quot;start&quot;).toEpochMilli());</span>
+    }
+
+    /// The window between two instants.
+    public static HealthTimeRange between(Instant start, Instant end) {
+<span class="fc" id="L136">        return between(requireInstant(start, &quot;start&quot;).toEpochMilli(),</span>
+<span class="fc" id="L137">                requireInstant(end, &quot;end&quot;).toEpochMilli());</span>
+    }
+
+    /// The instant `at`, with no duration.
+    public static HealthTimeRange at(Instant at) {
+<span class="nc" id="L142">        return at(requireInstant(at, &quot;at&quot;).toEpochMilli());</span>
+    }
+
+    /// The last `window`, ending now.
+    public static HealthTimeRange last(Duration window) {
+<span class="pc bpc" id="L147" title="1 of 2 branches missed.">        if (window == null) {</span>
+<span class="nc" id="L148">            throw new IllegalArgumentException(&quot;a window is required&quot;);</span>
+        }
+<span class="fc" id="L150">        return lastMillis(window.toMillis());</span>
+    }
+
+    /// The start of this range.
+    public Instant getStart() {
+<span class="fc" id="L155">        return Instant.ofEpochMilli(startMillis);</span>
+    }
+
+    /// The end of this range, or **null** while it is still open-ended --
+    /// there is no instant to name until [#resolve(long)] picks one.
+    public Instant getEnd() {
+<span class="fc bfc" id="L161" title="All 2 branches covered.">        return openEnded ? null : Instant.ofEpochMilli(endMillis);</span>
+    }
+
+    /// How long this range covers, or **null** while it is open-ended.
+    public Duration getDuration() {
+<span class="fc bfc" id="L166" title="All 2 branches covered.">        return openEnded ? null</span>
+<span class="fc" id="L167">                : Duration.ofMillis(endMillis - startMillis);</span>
+    }
+
+    private static Instant requireInstant(Instant value, String name) {
+<span class="pc bpc" id="L171" title="1 of 2 branches missed.">        if (value == null) {</span>
+<span class="nc" id="L172">            throw new IllegalArgumentException(name + &quot; is required&quot;);</span>
+        }
+<span class="fc" id="L174">        return value;</span>
+    }
+
+    /// A calendar in `zone`.
+    ///
+    /// `ZoneId` is the type this API speaks, because it is immutable and
+    /// because [com.codename1.calendar] already speaks it; `TimeZone` is
+    /// mutable in principle -- `SimpleTimeZone` has setters -- which is why
+    /// holding one meant reasoning about defensive copies that the CLDC 1.1
+    /// subset cannot make cleanly. The bucket arithmetic below is still
+    /// `Calendar`, which is correct across daylight-saving transitions and
+    /// well covered, so the zone is handed over by id rather than the
+    /// arithmetic being rewritten.
+    static Calendar calendarIn(ZoneId zone) {
+<span class="pc bpc" id="L188" title="1 of 2 branches missed.">        if (zone == null) {</span>
+<span class="nc" id="L189">            throw new IllegalArgumentException(</span>
+                    &quot;a calendar-based range requires an explicit ZoneId&quot;);
+        }
+<span class="fc" id="L192">        return Calendar.getInstance(TimeZone.getTimeZone(zoneIdToTz(</span>
+<span class="fc" id="L193">                zone.getId())));</span>
+    }
+
+    /// A `TimeZone` id for `zoneId`.
+    ///
+    /// A fixed-offset zone -- `ZoneOffset.ofHours(2)`, or
+    /// `ZoneId.of(&quot;+02:00&quot;)` -- has the id `+02:00`, and
+    /// `TimeZone.getTimeZone(&quot;+02:00&quot;)` does not recognise that form: it
+    /// falls back to GMT and says nothing. Every calendar bucket then aligned
+    /// two hours early and samples landed in the wrong local day, which is
+    /// precisely the drift this API takes an explicit zone to avoid.
+    ///
+    /// The offset forms are translated to the `GMT+02:00` spelling
+    /// `TimeZone` does understand; `Z` is GMT. Named zones pass through, and
+    /// those `TimeZone` resolves correctly. Same rule as the CLDC
+    /// `ZoneId.toTimeZone()`, which is package-private in `java.time` and so
+    /// cannot be called from here.
+    static String zoneIdToTz(String zoneId) {
+<span class="pc bpc" id="L211" title="2 of 4 branches missed.">        if (zoneId == null || zoneId.length() == 0) {</span>
+<span class="nc" id="L212">            return &quot;GMT&quot;;</span>
+        }
+<span class="fc bfc" id="L214" title="All 2 branches covered.">        if (&quot;Z&quot;.equals(zoneId)) {</span>
+<span class="fc" id="L215">            return &quot;GMT&quot;;</span>
+        }
+<span class="fc" id="L217">        char c = zoneId.charAt(0);</span>
+<span class="fc bfc" id="L218" title="All 4 branches covered.">        if (c == '+' || c == '-') {</span>
+<span class="fc" id="L219">            return &quot;GMT&quot; + zoneId;</span>
+        }
+        // The prefixed spellings too. A standard java.time runtime keeps
+        // ZoneId.of(&quot;UTC+02:00&quot;) and ZoneId.of(&quot;UT-05:00&quot;) with those ids
+        // rather than normalising them to a bare offset, and TimeZone knows
+        // neither -- it answers GMT for both, silently, which is the same
+        // wrong-local-midnight this method exists to prevent.
+        //
+        // GMT+02:00 is already the form TimeZone wants, so it passes through
+        // the final return along with the named zones.
+<span class="fc bfc" id="L229" title="All 2 branches covered.">        if (startsWithOffset(zoneId, &quot;UTC&quot;)) {</span>
+<span class="fc" id="L230">            return &quot;GMT&quot; + zoneId.substring(3);</span>
+        }
+<span class="fc bfc" id="L232" title="All 2 branches covered.">        if (startsWithOffset(zoneId, &quot;UT&quot;)) {</span>
+<span class="fc" id="L233">            return &quot;GMT&quot; + zoneId.substring(2);</span>
+        }
+<span class="fc" id="L235">        return zoneId;</span>
+    }
+
+    /// Whether `zoneId` is `prefix` followed by a signed offset.
+    private static boolean startsWithOffset(String zoneId, String prefix) {
+<span class="fc bfc" id="L240" title="All 4 branches covered.">        if (!zoneId.startsWith(prefix) || zoneId.length() &lt;= prefix.length()) {</span>
+<span class="fc" id="L241">            return false;</span>
+        }
+<span class="fc" id="L243">        char next = zoneId.charAt(prefix.length());</span>
+<span class="fc bfc" id="L244" title="All 4 branches covered.">        return next == '+' || next == '-';</span>
+    }
+
+    /// Reads a calendar's instant.
+    ///
+    /// `Calendar.getTimeInMillis()` is protected in the CLDC profile this
+    /// framework targets, so the value has to come through `getTime()`.
+    /// The desktop JDK exposes it publicly, which is why this only shows up
+    /// in a device build.
+    private static long millisOf(Calendar c) {
+<span class="fc" id="L254">        return c.getTime().getTime();</span>
+    }
+
+    private static void startOfDay(Calendar c) {
+<span class="fc" id="L258">        c.set(Calendar.HOUR_OF_DAY, 0);</span>
+<span class="fc" id="L259">        c.set(Calendar.MINUTE, 0);</span>
+<span class="fc" id="L260">        c.set(Calendar.SECOND, 0);</span>
+<span class="fc" id="L261">        c.set(Calendar.MILLISECOND, 0);</span>
+<span class="fc" id="L262">    }</span>
+
+    /// Inclusive start, epoch millis UTC.
+    public long getStartMillis() {
+<span class="fc" id="L266">        return startMillis;</span>
+    }
+
+    /// Exclusive end, epoch millis UTC. `Long.MAX_VALUE` when
+    /// [#isOpenEnded()].
+    public long getEndMillis() {
+<span class="fc" id="L272">        return endMillis;</span>
+    }
+
+    /// `true` when this range was built by [#since(long)] and its end is
+    /// resolved at query time rather than fixed.
+    public boolean isOpenEnded() {
+<span class="fc" id="L278">        return openEnded;</span>
+    }
+
+    /// The span in milliseconds, or `Long.MAX_VALUE` when open-ended.
+    public long getDurationMillis() {
+<span class="nc bnc" id="L283" title="All 2 branches missed.">        return openEnded ? Long.MAX_VALUE : endMillis - startMillis;</span>
+    }
+
+    /// `true` when `millis` falls in `[start, end)`. A zero-width range
+    /// contains nothing.
+    public boolean contains(long millis) {
+<span class="nc bnc" id="L289" title="All 4 branches missed.">        return millis &gt;= startMillis &amp;&amp; millis &lt; endMillis;</span>
+    }
+
+    /// This range with its open end resolved to `nowMillis`. Returns
+    /// `this` when the range is already closed.
+    public HealthTimeRange resolve(long nowMillis) {
+<span class="fc bfc" id="L295" title="All 2 branches covered.">        if (!openEnded) {</span>
+<span class="fc" id="L296">            return this;</span>
+        }
+<span class="fc" id="L298">        return new HealthTimeRange(startMillis,</span>
+<span class="fc" id="L299">                Math.max(startMillis, nowMillis), false);</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="nc bnc" id="L304" title="All 2 branches missed.">        return &quot;[&quot; + startMillis + &quot;, &quot;</span>
+<span class="nc" id="L305">                + (openEnded ? &quot;now&quot; : String.valueOf(endMillis)) + &quot;)&quot;;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

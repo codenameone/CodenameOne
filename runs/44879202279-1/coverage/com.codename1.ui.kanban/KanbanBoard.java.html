@@ -1,0 +1,2036 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>KanbanBoard.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.kanban</a> &gt; <span class="el_source">KanbanBoard.java</span></div><h1>KanbanBoard.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ui.kanban;
+
+import com.codename1.io.JSONParser;
+import com.codename1.kanban.DefaultKanbanModel;
+import com.codename1.kanban.KanbanCard;
+import com.codename1.kanban.KanbanChangeListener;
+import com.codename1.kanban.KanbanColumn;
+import com.codename1.kanban.KanbanJson;
+import com.codename1.kanban.KanbanLane;
+import com.codename1.kanban.KanbanModel;
+import com.codename1.ui.Component;
+import com.codename1.ui.ComponentEdit;
+import com.codename1.ui.Container;
+import com.codename1.ui.Display;
+import com.codename1.ui.Font;
+import com.codename1.ui.Graphics;
+import com.codename1.ui.Image;
+import com.codename1.ui.ScrollSurface;
+import com.codename1.ui.TextField;
+import com.codename1.ui.TopLevelContainer;
+import com.codename1.ui.animations.Motion;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.events.FocusListener;
+import com.codename1.ui.geom.Dimension;
+import com.codename1.ui.layouts.Layout;
+import com.codename1.ui.plaf.Style;
+import com.codename1.util.UndoHistory;
+import com.codename1.util.UndoableEdit;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/// A Kanban board: columns of cards, dragged from one stage to the next.
+///
+/// ```java
+/// DefaultKanbanModel model = new DefaultKanbanModel();
+/// model.addColumn(new KanbanColumn(&quot;todo&quot;, &quot;To do&quot;));
+/// model.addColumn(new KanbanColumn(&quot;doing&quot;, &quot;Doing&quot;).setWipLimit(3));
+/// model.addColumn(new KanbanColumn(&quot;done&quot;, &quot;Done&quot;));
+/// model.addCard(&quot;todo&quot;, new KanbanCard(&quot;c1&quot;, &quot;Write the release notes&quot;).addTag(&quot;docs&quot;));
+///
+/// Form form = new Form(&quot;Board&quot;, new BorderLayout());
+/// KanbanBoard board = new KanbanBoard(model);
+/// form.add(BorderLayout.CENTER, board);
+/// form.show();
+/// ```
+///
+/// The whole board scrolls as one surface, both ways, under column titles
+/// that stay in view. A card is dragged with a mouse, or after a long press
+/// with a finger, which leaves a plain drag free to scroll; the other cards
+/// make room where it would land. Column titles are dragged the same way to
+/// reorder the columns, and the mark at the end of a title folds the column
+/// to a strip. With `KanbanLane`s in the model the board has swimlanes, each
+/// under a title that folds it.
+///
+/// A column shows how many cards it holds, against its limit when it has
+/// one, and is marked when it is over. A model that enforces its limits
+/// (`DefaultKanbanModel.setEnforceWipLimits`) shows the refusal while the
+/// card is still held over the column.
+///
+/// On a narrow screen `setColumnSnap` brings scrolling to rest on a column.
+/// A `KanbanCardFactory` puts a component in each card; it is drawn with the
+/// card, and a tap on it reaches it.
+///
+/// The row under the cards of a column adds a card, typed in place, and a
+/// double tap renames one. Every edit is offered to the `KanbanListener`s
+/// and then to the model, and with `setUndoHistory` can be undone. With a
+/// keyboard, Delete removes the selected card, and with Control or Command,
+/// C, X, V and D copy, cut, paste and duplicate it, Z undoes and Shift-Z
+/// redoes.
+///
+/// #### Styling
+///
+/// The UIIDs are `KanbanBoard`, `KanbanColumn`, `KanbanColumnHeader`,
+/// `KanbanColumnOverLimit`, `KanbanCard`, `KanbanCardSelected`,
+/// `KanbanCardTag`, `KanbanLane`, `KanbanAddCard` and `KanbanDropSlot`. A
+/// theme that defines none of them gets defaults that follow its light or
+/// dark mode.
+public class KanbanBoard extends ScrollSurface {
+    private KanbanModel model;
+<span class="fc" id="L107">    private final List&lt;KanbanListener&gt; listeners = new ArrayList&lt;KanbanListener&gt;();</span>
+<span class="fc" id="L108">    private final KanbanChangeListener modelListener = new KanbanChangeListener() {</span>
+        @Override
+        public void boardChanged(KanbanModel m) {
+<span class="fc" id="L111">            modelChanged();</span>
+<span class="fc" id="L112">        }</span>
+    };
+<span class="fc" id="L114">    private KanbanCardRenderer renderer = new DefaultKanbanCardRenderer();</span>
+    private KanbanCardFactory cardFactory;
+<span class="fc" id="L116">    private final Map&lt;String, Component&gt; components = new HashMap&lt;String, Component&gt;();</span>
+<span class="fc" id="L117">    private UndoHistory undoHistory = UndoHistory.getGlobal();</span>
+    private KanbanJson.UserDataCodec userDataCodec;
+    private KanbanCard selected;
+<span class="fc" id="L120">    private boolean editable = true;</span>
+<span class="fc" id="L121">    private boolean columnReorder = true;</span>
+<span class="fc" id="L122">    private boolean inlineAdd = true;</span>
+<span class="fc" id="L123">    private boolean inlineEditing = true;</span>
+    private boolean columnSnap;
+    // scrolling coming to rest on a column
+    private boolean snapPending;
+    private int snapLastX;
+    private Motion snapMotion;
+<span class="fc" id="L129">    private float columnWidth = 42;</span>
+<span class="fc" id="L130">    private String addCardText = &quot;+ Add card&quot;;</span>
+    private int idCounter;
+
+    // the layout, in content coordinates; rebuilt when the model or the width changes
+<span class="fc" id="L134">    private boolean dirty = true;</span>
+<span class="fc" id="L135">    private int laidWidth = -1;</span>
+<span class="fc" id="L136">    private List&lt;KanbanColumn&gt; cols = new ArrayList&lt;KanbanColumn&gt;();</span>
+<span class="fc" id="L137">    private List&lt;KanbanLane&gt; lanes = new ArrayList&lt;KanbanLane&gt;();</span>
+<span class="fc" id="L138">    private int[] colX = new int[0];</span>
+<span class="fc" id="L139">    private int[] colW = new int[0];</span>
+<span class="fc" id="L140">    private int[] laneTop = new int[0];</span>
+<span class="fc" id="L141">    private int[] laneBodyH = new int[0];</span>
+<span class="fc" id="L142">    private Cell[][] cells = new Cell[0][];</span>
+    private int contentW;
+    private int contentH;
+    private int headerH;
+    private int bandH;
+    private int pad;
+    private int gap;
+    private int addH;
+
+    // a card being dragged
+    private KanbanCard dragCard;
+    private int[] dragFrom;
+    private int grabX;
+    private int grabY;
+    private int dragW;
+    private int dragH;
+    private int dragX;
+    private int dragY;
+<span class="fc" id="L160">    private int dropCol = -1;</span>
+<span class="fc" id="L161">    private int dropLane = -1;</span>
+<span class="fc" id="L162">    private int dropIndex = -1;</span>
+    private boolean dropAllowed;
+    private long slotSince;
+
+    // a column being dragged
+    private KanbanColumn dragColumn;
+    private int dragColumnFrom;
+    private int dragColumnTo;
+
+    // the field a title is typed in
+    private TextField editor;
+    private Container editorHolder;
+    private KanbanCard editCard;
+    private KanbanColumn editColumn;
+    private KanbanLane editLane;
+
+<span class="fc" id="L178">    private final int[] rectBuf = new int[4];</span>
+<span class="fc" id="L179">    private final int[] cmpBuf = new int[4];</span>
+
+    /// The cards of one column in one lane, and where each is.
+    private static final class Cell {
+        List&lt;KanbanCard&gt; cards;
+        // the top of each card under the top of the lane's body, and its height
+        int[] y;
+        int[] h;
+        int addY;
+        int height;
+    }
+
+    /// An empty board backed by a new `DefaultKanbanModel`.
+    public KanbanBoard() {
+<span class="nc" id="L193">        this(new DefaultKanbanModel());</span>
+<span class="nc" id="L194">    }</span>
+
+    /// A board showing `model`.
+<span class="fc" id="L197">    public KanbanBoard(KanbanModel model) {</span>
+<span class="fc" id="L198">        setUIID(&quot;KanbanBoard&quot;);</span>
+<span class="fc" id="L199">        setFocusable(true);</span>
+        // asks a desktop port for the letter of a Control or Command
+        // combination, which it otherwise keeps from a component
+<span class="fc" id="L202">        putClientProperty(&quot;cn1$shortcutKeys&quot;, Boolean.TRUE);</span>
+<span class="fc" id="L203">        setModel(model);</span>
+<span class="fc" id="L204">    }</span>
+
+    // ------------------------------------------------------------------ model
+
+    /// The model shown.
+    public KanbanModel getModel() {
+<span class="nc" id="L210">        return model;</span>
+    }
+
+    /// Shows another model. An edit under way ends, and the undo history is
+    /// cleared: its steps belong to the model that was shown. That is the
+    /// whole history, the steps of another component sharing it included.
+    public void setModel(KanbanModel model) {
+<span class="pc bpc" id="L217" title="1 of 2 branches missed.">        if (model == null) {</span>
+<span class="nc" id="L218">            throw new IllegalArgumentException(&quot;model is null&quot;);</span>
+        }
+<span class="fc" id="L220">        endEdit(false);</span>
+<span class="fc" id="L221">        dropDrag();</span>
+<span class="pc bpc" id="L222" title="1 of 2 branches missed.">        if (this.model != null) {</span>
+<span class="nc" id="L223">            this.model.removeChangeListener(modelListener);</span>
+        }
+<span class="fc" id="L225">        this.model = model;</span>
+<span class="fc" id="L226">        model.addChangeListener(modelListener);</span>
+        // its steps would edit a model that is no longer shown; the rest of a
+        // shared history stays
+<span class="pc bpc" id="L229" title="1 of 2 branches missed.">        if (undoHistory != null) {</span>
+<span class="fc" id="L230">            undoHistory.discardDead();</span>
+        }
+<span class="fc" id="L232">        selected = null;</span>
+<span class="fc" id="L233">        components.clear();</span>
+<span class="fc" id="L234">        modelChanged();</span>
+<span class="fc" id="L235">    }</span>
+
+    /// The model changed: the board is laid out again before it is next
+    /// painted or asked where something is. Called by the model's listener,
+    /// and by an application that changed a card behind the model's back,
+    /// such as its tags.
+    ///
+    /// Nothing is measured here, so filling a model a card at a time while
+    /// a board shows it costs one layout and not one per card.
+    public void modelChanged() {
+<span class="fc" id="L245">        dirty = true;</span>
+<span class="fc bfc" id="L246" title="All 4 branches covered.">        if (selected != null &amp;&amp; model.getCard(selected.getId()) != selected) { // NOPMD CompareObjectsWithEquals - the card of the model itself</span>
+<span class="fc" id="L247">            selected = null;</span>
+<span class="fc" id="L248">            fireSelection();</span>
+        }
+        // what is held may be gone, or its column
+<span class="pc bpc" id="L251" title="4 of 6 branches missed.">        if (dragCard != null &amp;&amp; model.getCard(dragCard.getId()) != dragCard // NOPMD CompareObjectsWithEquals - the card of the model itself</span>
+<span class="nc bnc" id="L252" title="All 2 branches missed.">                || dragColumn != null &amp;&amp; (model.getColumns().indexOf(dragColumn) != dragColumnFrom</span>
+<span class="nc bnc" id="L253" title="All 2 branches missed.">                || model.getColumns().size() != cols.size())) {</span>
+<span class="nc" id="L254">            dropDrag();</span>
+        }
+<span class="fc" id="L256">        repaint();</span>
+<span class="fc" id="L257">    }</span>
+
+    // Lets go of what is held without moving it.
+    private void dropDrag() {
+<span class="pc bpc" id="L261" title="2 of 4 branches missed.">        if (dragCard != null || dragColumn != null) {</span>
+<span class="nc" id="L262">            cancelEdit();</span>
+<span class="nc" id="L263">            dragCard = null;</span>
+<span class="nc" id="L264">            dragColumn = null;</span>
+<span class="nc" id="L265">            dragFrom = null;</span>
+<span class="nc" id="L266">            dropCol = -1;</span>
+<span class="nc" id="L267">            dropLane = -1;</span>
+<span class="nc" id="L268">            dropIndex = -1;</span>
+<span class="nc" id="L269">            dirty = true;</span>
+        }
+<span class="fc" id="L271">    }</span>
+
+    /// Paints the cards. Never null.
+    public KanbanCardRenderer getCardRenderer() {
+<span class="nc" id="L275">        return renderer;</span>
+    }
+
+    /// Sets the renderer of the cards.
+    public void setCardRenderer(KanbanCardRenderer renderer) {
+<span class="pc bpc" id="L280" title="1 of 2 branches missed.">        if (renderer == null) {</span>
+<span class="nc" id="L281">            throw new IllegalArgumentException(&quot;renderer is null&quot;);</span>
+        }
+<span class="fc" id="L283">        this.renderer = renderer;</span>
+<span class="fc" id="L284">        modelChanged();</span>
+<span class="fc" id="L285">    }</span>
+
+    /// Makes the components inside the cards, or null.
+    public KanbanCardFactory getCardFactory() {
+<span class="nc" id="L289">        return cardFactory;</span>
+    }
+
+    /// Puts a real component inside each card; null, the default, for cards
+    /// that are only painted.
+    public void setCardFactory(KanbanCardFactory cardFactory) {
+<span class="fc" id="L295">        components.clear();</span>
+<span class="fc" id="L296">        this.cardFactory = cardFactory;</span>
+<span class="fc" id="L297">        modelChanged();</span>
+<span class="fc" id="L298">    }</span>
+
+    /// The component the factory made for a card, or null.
+    public Component getCardComponent(KanbanCard card) {
+<span class="fc" id="L302">        ensureLayout();</span>
+<span class="fc" id="L303">        return components.get(card.getId());</span>
+    }
+
+    /// The height, in pixels, the component of a card takes at the bottom of
+    /// it; 0 for a card without one.
+    public int getCardComponentHeight(KanbanCard card) {
+        // a layout under way has already cleared the flag
+<span class="pc bpc" id="L310" title="1 of 2 branches missed.">        if (dirty) {</span>
+<span class="nc" id="L311">            ensureLayout();</span>
+        }
+<span class="fc" id="L313">        Component c = components.get(card.getId());</span>
+<span class="fc bfc" id="L314" title="All 2 branches covered.">        return c == null ? 0 : c.getPreferredH() + KanbanLook.mm(1.5f);</span>
+    }
+
+    /// Adds a listener.
+    public void addKanbanListener(KanbanListener l) {
+<span class="pc bpc" id="L319" title="2 of 4 branches missed.">        if (l != null &amp;&amp; !listeners.contains(l)) {</span>
+<span class="fc" id="L320">            listeners.add(l);</span>
+        }
+<span class="fc" id="L322">    }</span>
+
+    /// Removes a listener.
+    public void removeKanbanListener(KanbanListener l) {
+<span class="nc" id="L326">        listeners.remove(l);</span>
+<span class="nc" id="L327">    }</span>
+
+    // ---------------------------------------------------------------- options
+
+    /// True when the user can move, add, rename and remove cards.
+    public boolean isEditingEnabled() {
+<span class="nc" id="L333">        return editable;</span>
+    }
+
+    /// Lets the user edit the board, the default, or only look at it. A
+    /// board that is not editable still folds its columns and lanes.
+    public void setEditingEnabled(boolean editable) {
+<span class="fc" id="L339">        this.editable = editable;</span>
+<span class="fc" id="L340">        endEdit(false);</span>
+<span class="fc" id="L341">        modelChanged();</span>
+<span class="fc" id="L342">    }</span>
+
+    /// True when the columns can be dragged into another order.
+    public boolean isColumnReorderEnabled() {
+<span class="nc" id="L346">        return columnReorder;</span>
+    }
+
+    /// Lets the user drag a column by its title to another place; on by
+    /// default.
+    public void setColumnReorderEnabled(boolean columnReorder) {
+<span class="nc" id="L352">        this.columnReorder = columnReorder;</span>
+<span class="nc" id="L353">    }</span>
+
+    /// True when every column ends in a row that adds a card.
+    public boolean isInlineAdd() {
+<span class="nc" id="L357">        return inlineAdd;</span>
+    }
+
+    /// Shows a row under the cards of each column that adds a card typed in
+    /// place; on by default.
+    public void setInlineAdd(boolean inlineAdd) {
+<span class="nc" id="L363">        this.inlineAdd = inlineAdd;</span>
+<span class="nc" id="L364">        modelChanged();</span>
+<span class="nc" id="L365">    }</span>
+
+    /// True when a double tap renames a card in place.
+    public boolean isInlineEditing() {
+<span class="nc" id="L369">        return inlineEditing;</span>
+    }
+
+    /// Makes a double tap on a card rename it in place, the default, or
+    /// only tell the listeners the card was opened.
+    public void setInlineEditing(boolean inlineEditing) {
+<span class="fc" id="L375">        this.inlineEditing = inlineEditing;</span>
+<span class="fc" id="L376">    }</span>
+
+    /// True when scrolling comes to rest on a column.
+    public boolean isColumnSnap() {
+<span class="nc" id="L380">        return columnSnap;</span>
+    }
+
+    /// Makes scrolling across the board come to rest with a column at its
+    /// leading edge, so a narrow screen shows one whole column at a time
+    /// and not the halves of two. Off by default.
+    public void setColumnSnap(boolean columnSnap) {
+<span class="fc" id="L387">        this.columnSnap = columnSnap;</span>
+<span class="pc bpc" id="L388" title="1 of 2 branches missed.">        if (!columnSnap) {</span>
+<span class="nc" id="L389">            snapPending = false;</span>
+<span class="nc" id="L390">            snapMotion = null;</span>
+        }
+<span class="fc" id="L392">    }</span>
+
+    /// Where scrolling across the board rests nearest to `x`: the start of a
+    /// column, or the end of the board.
+    private int snapTarget(int x) {
+<span class="fc" id="L397">        ensureLayout();</span>
+<span class="fc" id="L398">        int max = getMaxOffsetX();</span>
+<span class="fc" id="L399">        int best = Math.max(0, Math.min(x, max));</span>
+<span class="fc" id="L400">        int dist = Integer.MAX_VALUE;</span>
+<span class="fc bfc" id="L401" title="All 2 branches covered.">        for (int c = 0; c &lt;= colX.length; c++) {</span>
+<span class="fc bfc" id="L402" title="All 2 branches covered.">            int at = c == colX.length ? max : Math.max(0, Math.min(colX[c] - gap, max));</span>
+<span class="fc bfc" id="L403" title="All 2 branches covered.">            if (Math.abs(at - x) &lt; dist) {</span>
+<span class="fc" id="L404">                dist = Math.abs(at - x);</span>
+<span class="fc" id="L405">                best = at;</span>
+            }
+        }
+<span class="fc" id="L408">        return best;</span>
+    }
+
+    // Called every frame after a release: waits for the fling to stop, then
+    // eases to the column.
+    private boolean animateSnap() {
+<span class="fc bfc" id="L414" title="All 2 branches covered.">        if (!snapPending) {</span>
+<span class="fc" id="L415">            return false;</span>
+        }
+<span class="fc bfc" id="L417" title="All 2 branches covered.">        if (snapMotion == null) {</span>
+<span class="fc" id="L418">            int x = getOffsetX();</span>
+<span class="fc bfc" id="L419" title="All 2 branches covered.">            if (x != snapLastX) {</span>
+<span class="fc" id="L420">                snapLastX = x;</span>
+<span class="fc" id="L421">                return true;</span>
+            }
+<span class="fc" id="L423">            int to = snapTarget(x);</span>
+<span class="pc bpc" id="L424" title="1 of 2 branches missed.">            if (to == x) {</span>
+<span class="nc" id="L425">                snapPending = false;</span>
+<span class="nc" id="L426">                return false;</span>
+            }
+<span class="fc" id="L428">            snapMotion = Motion.createEaseInOutMotion(x, to, 180);</span>
+<span class="fc" id="L429">            snapMotion.start();</span>
+<span class="fc" id="L430">            return true;</span>
+        }
+<span class="fc" id="L432">        scrollTo(snapMotion.getValue(), getOffsetY());</span>
+<span class="fc bfc" id="L433" title="All 2 branches covered.">        if (snapMotion.isFinished()) {</span>
+<span class="fc" id="L434">            snapMotion = null;</span>
+<span class="fc" id="L435">            snapPending = false;</span>
+<span class="fc" id="L436">            return false;</span>
+        }
+<span class="fc" id="L438">        return true;</span>
+    }
+
+    /// The text of the row that adds a card.
+    public String getAddCardText() {
+<span class="nc" id="L443">        return addCardText;</span>
+    }
+
+    /// Sets the text of the row that adds a card, for another language.
+    public void setAddCardText(String addCardText) {
+<span class="nc" id="L448">        this.addCardText = addCardText;</span>
+<span class="nc" id="L449">        repaint();</span>
+<span class="nc" id="L450">    }</span>
+
+    /// The width of a column, in millimetres.
+    public float getColumnWidth() {
+<span class="nc" id="L454">        return columnWidth;</span>
+    }
+
+    /// Sets the width of a column, in millimetres; 42 by default. On a
+    /// screen narrower than that a column takes the screen, less a strip
+    /// that shows there is a next one.
+    public void setColumnWidth(float millimetres) {
+<span class="fc" id="L461">        columnWidth = Math.max(15, millimetres);</span>
+<span class="fc" id="L462">        modelChanged();</span>
+<span class="fc" id="L463">    }</span>
+
+    // -------------------------------------------------------------- selection
+
+    /// The selected card, or null.
+    public KanbanCard getSelectedCard() {
+<span class="fc" id="L469">        return selected;</span>
+    }
+
+    /// Selects a card, or with null none.
+    public void select(KanbanCard card) {
+<span class="fc bfc" id="L474" title="All 2 branches covered.">        if (card == selected) { // NOPMD CompareObjectsWithEquals - the same card</span>
+<span class="fc" id="L475">            return;</span>
+        }
+<span class="fc" id="L477">        selected = card;</span>
+<span class="fc" id="L478">        fireSelection();</span>
+<span class="fc" id="L479">    }</span>
+
+    private void fireSelection() {
+<span class="fc" id="L482">        repaint();</span>
+<span class="fc bfc" id="L483" title="All 2 branches covered.">        for (int i = 0; i &lt; listeners.size(); i++) { // NOPMD ForLoopCanBeForeach - a listener may remove itself</span>
+<span class="fc" id="L484">            listeners.get(i).selectionChanged(this);</span>
+        }
+<span class="fc" id="L486">    }</span>
+
+    /// Scrolls so a column is at the leading edge of the view.
+    public void scrollToColumn(KanbanColumn column) {
+<span class="nc" id="L490">        ensureLayout();</span>
+<span class="nc" id="L491">        int c = cols.indexOf(column);</span>
+<span class="nc bnc" id="L492" title="All 2 branches missed.">        if (c &gt;= 0) {</span>
+<span class="nc" id="L493">            scrollTo(colX[c] - gap, getOffsetY());</span>
+        }
+<span class="nc" id="L495">    }</span>
+
+    /// Scrolls so a card is in view.
+    public void scrollToCard(KanbanCard card) {
+<span class="fc" id="L499">        ensureLayout();</span>
+<span class="fc" id="L500">        int[] at = locate(card);</span>
+<span class="pc bpc" id="L501" title="2 of 4 branches missed.">        if (at == null || !cardRect(at[0], at[1], at[2], rectBuf)) {</span>
+<span class="nc" id="L502">            return;</span>
+        }
+<span class="fc" id="L504">        int ox = getOffsetX();</span>
+<span class="fc" id="L505">        int oy = getOffsetY();</span>
+<span class="fc" id="L506">        int bw = getBodyWidth();</span>
+<span class="fc" id="L507">        int bh = getBodyHeight();</span>
+<span class="pc bpc" id="L508" title="1 of 2 branches missed.">        if (rectBuf[0] &lt; ox) {</span>
+<span class="nc" id="L509">            ox = rectBuf[0] - gap;</span>
+<span class="pc bpc" id="L510" title="1 of 2 branches missed.">        } else if (rectBuf[0] + rectBuf[2] &gt; ox + bw) {</span>
+<span class="nc" id="L511">            ox = rectBuf[0] + rectBuf[2] + gap - bw;</span>
+        }
+<span class="pc bpc" id="L513" title="1 of 2 branches missed.">        if (rectBuf[1] &lt; oy) {</span>
+<span class="nc" id="L514">            oy = rectBuf[1] - gap;</span>
+<span class="pc bpc" id="L515" title="1 of 2 branches missed.">        } else if (rectBuf[1] + rectBuf[3] &gt; oy + bh) {</span>
+<span class="nc" id="L516">            oy = rectBuf[1] + rectBuf[3] + gap - bh;</span>
+        }
+<span class="fc" id="L518">        scrollTo(ox, oy);</span>
+<span class="fc" id="L519">    }</span>
+
+    // ------------------------------------------------------------------ edits
+
+    /// The history edits are recorded in, or null.
+    public UndoHistory getUndoHistory() {
+<span class="fc" id="L525">        return undoHistory;</span>
+    }
+
+    /// Records every edit the user makes in a history, so it can be undone.
+    /// The application's history, `UndoHistory.getGlobal()`, by default; null
+    /// records nothing. An undone or redone step brings the board back into
+    /// view (`ComponentEdit`). Changes the application makes to the model directly are not
+    /// recorded.
+    public void setUndoHistory(UndoHistory undoHistory) {
+<span class="fc" id="L534">        this.undoHistory = undoHistory;</span>
+<span class="fc" id="L535">    }</span>
+
+    /// Takes back the last edit in the history.
+    ///
+    /// #### Returns
+    ///
+    /// false when there is no history, nothing to undo, editing is off, or a
+    /// card or column is being dragged
+    public boolean undo() {
+<span class="fc" id="L544">        endEdit(true);</span>
+        // a read-only board changes nothing, and nothing in the middle of a drag
+<span class="pc bpc" id="L546" title="3 of 10 branches missed.">        return editable &amp;&amp; dragCard == null &amp;&amp; dragColumn == null &amp;&amp; undoHistory != null &amp;&amp; undoHistory.undo();</span>
+    }
+
+    /// Makes the last undone edit again.
+    ///
+    /// #### Returns
+    ///
+    /// false when there is no history, nothing to redo, editing is off, or a
+    /// card or column is being dragged
+    public boolean redo() {
+<span class="fc" id="L556">        endEdit(true);</span>
+<span class="pc bpc" id="L557" title="5 of 10 branches missed.">        return editable &amp;&amp; dragCard == null &amp;&amp; dragColumn == null &amp;&amp; undoHistory != null &amp;&amp; undoHistory.redo();</span>
+    }
+
+    private void record(UndoableEdit edit) {
+<span class="pc bpc" id="L561" title="1 of 2 branches missed.">        if (undoHistory != null) {</span>
+<span class="fc" id="L562">            undoHistory.record(new ModelEdit(this, model, edit));</span>
+        }
+<span class="fc" id="L564">    }</span>
+
+    /// An edit of the model that was shown when it was made: it expires once
+    /// the board is given another model.
+    private static final class ModelEdit extends ComponentEdit {
+        private final KanbanBoard board;
+        private final KanbanModel madeIn;
+
+        ModelEdit(KanbanBoard board, KanbanModel madeIn, UndoableEdit edit) {
+<span class="fc" id="L573">            super(board, edit);</span>
+<span class="fc" id="L574">            this.board = board;</span>
+<span class="fc" id="L575">            this.madeIn = madeIn;</span>
+<span class="fc" id="L576">        }</span>
+
+        @Override
+        public boolean isAlive() {
+<span class="pc bpc" id="L580" title="2 of 4 branches missed.">            return board.model == madeIn &amp;&amp; super.isAlive();</span>
+        }
+    }
+
+    private KanbanEdits.Place placeOf(KanbanCard card) {
+<span class="fc" id="L585">        ensureLayout();</span>
+<span class="fc" id="L586">        int[] at = locate(card);</span>
+<span class="pc bpc" id="L587" title="1 of 2 branches missed.">        if (at == null) {</span>
+<span class="nc" id="L588">            return null;</span>
+        }
+<span class="fc bfc" id="L590" title="All 2 branches covered.">        return new KanbanEdits.Place(cols.get(at[1]), lanes.isEmpty() ? null : lanes.get(at[0]), at[2]);</span>
+    }
+
+    /// Moves a card to an index of a cell, as a drop there does: offered to
+    /// the listeners, then to the model, and recorded for undo. `lane` is
+    /// null on a board without lanes. The index counts the cell without the
+    /// card.
+    ///
+    /// #### Returns
+    ///
+    /// false when a listener or the model refused
+    public boolean moveCard(KanbanCard card, KanbanColumn column, KanbanLane lane, int index) {
+<span class="fc" id="L602">        KanbanEdits.Place from = placeOf(card);</span>
+<span class="pc bpc" id="L603" title="2 of 4 branches missed.">        if (from == null || column == null) {</span>
+<span class="nc" id="L604">            return false;</span>
+        }
+<span class="fc" id="L606">        String fromLaneId = card.getLaneId();</span>
+<span class="fc bfc" id="L607" title="All 2 branches covered.">        for (int i = 0; i &lt; listeners.size(); i++) { // NOPMD ForLoopCanBeForeach - a listener may remove itself</span>
+<span class="fc bfc" id="L608" title="All 2 branches covered.">            if (!listeners.get(i).cardMoving(this, card, column, lane, index)) {</span>
+<span class="fc" id="L609">                return false;</span>
+            }
+        }
+<span class="pc bpc" id="L612" title="1 of 2 branches missed.">        if (!model.moveCard(card, column, lane, index)) {</span>
+<span class="nc" id="L613">            return false;</span>
+        }
+<span class="fc" id="L615">        KanbanEdits.Place to = placeOf(card);</span>
+        // a model of your own may have put it where the board cannot find it,
+        // and a card that ended where it was leaves no step to undo
+<span class="pc bpc" id="L618" title="1 of 8 branches missed.">        if (to != null &amp;&amp; (to.column != from.column || to.lane != from.lane || to.index != from.index)) { // NOPMD CompareObjectsWithEquals - the model's own objects</span>
+<span class="fc" id="L619">            record(new KanbanEdits.Move(model, card, from, to, fromLaneId));</span>
+        }
+<span class="fc bfc" id="L621" title="All 2 branches covered.">        for (int i = 0; i &lt; listeners.size(); i++) { // NOPMD ForLoopCanBeForeach - a listener may remove itself</span>
+<span class="fc" id="L622">            listeners.get(i).cardMoved(this, card);</span>
+        }
+<span class="fc" id="L624">        return true;</span>
+    }
+
+    /// Moves a column to an index, counted without it, as dragging its title
+    /// does.
+    ///
+    /// #### Returns
+    ///
+    /// false when a listener or the model refused
+    public boolean moveColumn(KanbanColumn column, int index) {
+<span class="fc" id="L634">        int from = model.getColumns().indexOf(column);</span>
+        // the index it ends at, which is what undo and redo replay
+<span class="fc" id="L636">        index = Math.max(0, Math.min(index, model.getColumns().size() - 1));</span>
+<span class="pc bpc" id="L637" title="2 of 4 branches missed.">        if (from &lt; 0 || from == index) {</span>
+<span class="nc" id="L638">            return false;</span>
+        }
+<span class="fc bfc" id="L640" title="All 2 branches covered.">        for (int i = 0; i &lt; listeners.size(); i++) { // NOPMD ForLoopCanBeForeach - a listener may remove itself</span>
+<span class="pc bpc" id="L641" title="1 of 2 branches missed.">            if (!listeners.get(i).columnMoving(this, column, index)) {</span>
+<span class="nc" id="L642">                return false;</span>
+            }
+        }
+<span class="pc bpc" id="L645" title="1 of 2 branches missed.">        if (!model.moveColumn(column, index)) {</span>
+<span class="nc" id="L646">            return false;</span>
+        }
+<span class="fc" id="L648">        record(new KanbanEdits.ColumnMove(model, column, from, index));</span>
+<span class="fc bfc" id="L649" title="All 2 branches covered.">        for (int i = 0; i &lt; listeners.size(); i++) { // NOPMD ForLoopCanBeForeach - a listener may remove itself</span>
+<span class="fc" id="L650">            listeners.get(i).columnMoved(this, column);</span>
+        }
+<span class="fc" id="L652">        return true;</span>
+    }
+
+    private String freeCardId() {
+        String id;
+        do {
+<span class="fc" id="L658">            idCounter++;</span>
+<span class="fc" id="L659">            id = &quot;card&quot; + idCounter;</span>
+<span class="pc bpc" id="L660" title="1 of 2 branches missed.">        } while (model.getCard(id) != null);</span>
+<span class="fc" id="L661">        return id;</span>
+    }
+
+    private boolean insert(KanbanCard card, KanbanColumn column, KanbanLane lane, int index, String name) {
+<span class="pc bpc" id="L665" title="1 of 2 branches missed.">        for (int i = 0; i &lt; listeners.size(); i++) { // NOPMD ForLoopCanBeForeach - a listener may remove itself</span>
+<span class="nc bnc" id="L666" title="All 2 branches missed.">            if (!listeners.get(i).cardAdding(this, card, column, lane)) {</span>
+<span class="nc" id="L667">                return false;</span>
+            }
+        }
+<span class="pc bpc" id="L670" title="1 of 2 branches missed.">        if (!model.insertCard(card, column, lane, index)) {</span>
+<span class="nc" id="L671">            return false;</span>
+        }
+<span class="fc" id="L673">        KanbanEdits.Place at = placeOf(card);</span>
+<span class="pc bpc" id="L674" title="1 of 2 branches missed.">        if (at != null) {</span>
+<span class="fc" id="L675">            record(new KanbanEdits.Presence(model, card, at, false, name));</span>
+        }
+<span class="fc" id="L677">        select(card);</span>
+<span class="pc bpc" id="L678" title="1 of 2 branches missed.">        for (int i = 0; i &lt; listeners.size(); i++) { // NOPMD ForLoopCanBeForeach - a listener may remove itself</span>
+<span class="nc" id="L679">            listeners.get(i).cardAdded(this, card);</span>
+        }
+<span class="fc" id="L681">        return true;</span>
+    }
+
+    /// Adds a card with a title at the end of a cell, as typing it into the
+    /// row under the column does: offered to the listeners, then to the
+    /// model, recorded for undo and selected. `lane` is null on a board
+    /// without lanes.
+    ///
+    /// #### Returns
+    ///
+    /// the card, or null when it was refused
+    public KanbanCard addCard(KanbanColumn column, KanbanLane lane, String title) {
+<span class="fc" id="L693">        KanbanCard card = new KanbanCard(freeCardId(), title);</span>
+<span class="pc bpc" id="L694" title="1 of 2 branches missed.">        if (lane != null) {</span>
+<span class="nc" id="L695">            card.setLaneId(lane.getId());</span>
+        }
+<span class="pc bpc" id="L697" title="1 of 2 branches missed.">        return insert(card, column, lane, Integer.MAX_VALUE, &quot;Add card&quot;) ? card : null;</span>
+    }
+
+    /// Gives a card another title, as renaming it in place does.
+    ///
+    /// #### Returns
+    ///
+    /// false when a listener or the model refused
+    public boolean renameCard(KanbanCard card, String title) {
+<span class="fc" id="L706">        String old = card.getTitle();</span>
+<span class="fc bfc" id="L707" title="All 2 branches covered.">        for (int i = 0; i &lt; listeners.size(); i++) { // NOPMD ForLoopCanBeForeach - a listener may remove itself</span>
+<span class="pc bpc" id="L708" title="1 of 2 branches missed.">            if (!listeners.get(i).cardRenaming(this, card, title)) {</span>
+<span class="nc" id="L709">                return false;</span>
+            }
+        }
+<span class="pc bpc" id="L712" title="1 of 2 branches missed.">        if (!model.renameCard(card, title)) {</span>
+<span class="nc" id="L713">            return false;</span>
+        }
+<span class="fc" id="L715">        record(new KanbanEdits.Rename(model, card, old, title));</span>
+<span class="fc bfc" id="L716" title="All 2 branches covered.">        for (int i = 0; i &lt; listeners.size(); i++) { // NOPMD ForLoopCanBeForeach - a listener may remove itself</span>
+<span class="fc" id="L717">            listeners.get(i).cardRenamed(this, card);</span>
+        }
+<span class="fc" id="L719">        return true;</span>
+    }
+
+    /// Removes a card, as Delete on it does.
+    ///
+    /// #### Returns
+    ///
+    /// false when a listener or the model refused
+    public boolean removeCard(KanbanCard card) {
+<span class="fc" id="L728">        KanbanEdits.Place at = placeOf(card);</span>
+<span class="pc bpc" id="L729" title="1 of 2 branches missed.">        if (at == null) {</span>
+<span class="nc" id="L730">            return false;</span>
+        }
+<span class="fc bfc" id="L732" title="All 2 branches covered.">        for (int i = 0; i &lt; listeners.size(); i++) { // NOPMD ForLoopCanBeForeach - a listener may remove itself</span>
+<span class="pc bpc" id="L733" title="1 of 2 branches missed.">            if (!listeners.get(i).cardRemoving(this, card)) {</span>
+<span class="nc" id="L734">                return false;</span>
+            }
+        }
+<span class="pc bpc" id="L737" title="1 of 2 branches missed.">        if (!model.removeCard(card)) {</span>
+<span class="nc" id="L738">            return false;</span>
+        }
+<span class="fc" id="L740">        record(new KanbanEdits.Presence(model, card, at, true, removalName));</span>
+<span class="fc bfc" id="L741" title="All 2 branches covered.">        for (int i = 0; i &lt; listeners.size(); i++) { // NOPMD ForLoopCanBeForeach - a listener may remove itself</span>
+<span class="fc" id="L742">            listeners.get(i).cardRemoved(this, card);</span>
+        }
+<span class="fc" id="L744">        return true;</span>
+    }
+
+    /// Adds a copy of the selected card under it.
+    ///
+    /// #### Returns
+    ///
+    /// false when no card is selected or the copy was refused
+    public boolean duplicateSelection() {
+<span class="pc bpc" id="L753" title="2 of 4 branches missed.">        if (!editable || selected == null) {</span>
+<span class="nc" id="L754">            return false;</span>
+        }
+<span class="fc" id="L756">        KanbanEdits.Place at = placeOf(selected);</span>
+<span class="pc bpc" id="L757" title="2 of 4 branches missed.">        return at != null &amp;&amp; insert(selected.copy(freeCardId()), at.column, at.lane, at.index + 1, &quot;Duplicate card&quot;);</span>
+    }
+
+    /// Writes the user data of a copied card to the clipboard and reads it
+    /// back on paste; without one, a pasted card has no user data.
+    public void setUserDataCodec(KanbanJson.UserDataCodec codec) {
+<span class="nc" id="L763">        userDataCodec = codec;</span>
+<span class="nc" id="L764">    }</span>
+
+    /// Puts the selected card on the clipboard, as JSON.
+    ///
+    /// #### Returns
+    ///
+    /// false when no card is selected
+    public boolean copySelection() {
+<span class="pc bpc" id="L772" title="1 of 2 branches missed.">        if (selected == null) {</span>
+<span class="nc" id="L773">            return false;</span>
+        }
+<span class="fc" id="L775">        List&lt;KanbanCard&gt; one = new ArrayList&lt;KanbanCard&gt;();</span>
+<span class="fc" id="L776">        one.add(selected);</span>
+<span class="fc" id="L777">        Map&lt;String, Object&gt; m = KanbanJson.cardsToMap(one, userDataCodec);</span>
+<span class="fc" id="L778">        m.put(&quot;cn1kanban&quot;, Integer.valueOf(1));</span>
+<span class="fc" id="L779">        Display.getInstance().copyToClipboard(JSONParser.toJson(m));</span>
+<span class="fc" id="L780">        return true;</span>
+    }
+
+    /// Copies the selected card and removes it.
+    ///
+    /// #### Returns
+    ///
+    /// false when no card is selected or it could not be removed
+    public boolean cutSelection() {
+<span class="fc" id="L789">        KanbanCard card = selected;</span>
+<span class="pc bpc" id="L790" title="2 of 4 branches missed.">        if (!editable || !copySelection()) {</span>
+<span class="nc" id="L791">            return false;</span>
+        }
+<span class="fc" id="L793">        removalName = &quot;Cut&quot;;</span>
+        try {
+<span class="fc" id="L795">            return removeCard(card);</span>
+        } finally {
+<span class="fc" id="L797">            removalName = &quot;Remove card&quot;;</span>
+        }
+    }
+
+    // what undo calls the removal removeCard records
+<span class="fc" id="L802">    private String removalName = &quot;Remove card&quot;;</span>
+
+    /// Adds the card on the clipboard under the selected card, or at the
+    /// end of the first column when none is selected.
+    ///
+    /// #### Returns
+    ///
+    /// false when the clipboard holds no card or it was refused
+    public boolean paste() {
+<span class="pc bpc" id="L811" title="2 of 4 branches missed.">        if (!editable || model.getColumns().isEmpty()) {</span>
+<span class="nc" id="L812">            return false;</span>
+        }
+<span class="fc" id="L814">        Object o = Display.getInstance().getPasteDataFromClipboard();</span>
+<span class="pc bpc" id="L815" title="2 of 4 branches missed.">        if (!(o instanceof String) || ((String) o).indexOf(&quot;\&quot;cn1kanban\&quot;&quot;) &lt; 0) {</span>
+<span class="nc" id="L816">            return false;</span>
+        }
+        List&lt;KanbanCard&gt; read;
+        try {
+<span class="fc" id="L820">            read = KanbanJson.readCards(KanbanJson.parse((String) o), userDataCodec);</span>
+<span class="nc" id="L821">        } catch (IOException notCards) {</span>
+<span class="nc" id="L822">            return false;</span>
+<span class="fc" id="L823">        }</span>
+<span class="pc bpc" id="L824" title="1 of 2 branches missed.">        KanbanEdits.Place at = selected == null ? null : placeOf(selected);</span>
+<span class="pc bpc" id="L825" title="1 of 2 branches missed.">        KanbanColumn column = at == null ? model.getColumns().get(0) : at.column;</span>
+<span class="pc bpc" id="L826" title="3 of 4 branches missed.">        KanbanLane lane = at == null ? model.getLanes().isEmpty() ? null : model.getLanes().get(0) : at.lane;</span>
+<span class="pc bpc" id="L827" title="1 of 2 branches missed.">        int index = at == null ? Integer.MAX_VALUE : at.index + 1;</span>
+<span class="fc" id="L828">        boolean any = false;</span>
+<span class="fc bfc" id="L829" title="All 2 branches covered.">        for (KanbanCard source : read) {</span>
+<span class="fc" id="L830">            KanbanCard c = source.copy(freeCardId());</span>
+<span class="pc bpc" id="L831" title="1 of 2 branches missed.">            if (insert(c, column, lane, index, &quot;Paste card&quot;)) {</span>
+<span class="fc" id="L832">                any = true;</span>
+<span class="pc bpc" id="L833" title="1 of 2 branches missed.">                if (index != Integer.MAX_VALUE) {</span>
+<span class="fc" id="L834">                    index++;</span>
+                }
+            }
+<span class="fc" id="L837">        }</span>
+<span class="fc" id="L838">        return any;</span>
+    }
+
+    private void toggleColumn(KanbanColumn column) {
+<span class="fc bfc" id="L842" title="All 2 branches covered.">        boolean to = !column.isCollapsed();</span>
+<span class="fc" id="L843">        endEdit(true);</span>
+<span class="pc bpc" id="L844" title="1 of 2 branches missed.">        if (model.setCollapsed(column, to)) {</span>
+            // folding is open on a read-only board, where nothing is undone
+<span class="pc bpc" id="L846" title="1 of 2 branches missed.">            if (editable) {</span>
+<span class="fc" id="L847">                record(new KanbanEdits.Fold(model, column, null, to));</span>
+            }
+<span class="pc bpc" id="L849" title="1 of 2 branches missed.">            for (int i = 0; i &lt; listeners.size(); i++) { // NOPMD ForLoopCanBeForeach - a listener may remove itself</span>
+<span class="nc" id="L850">                listeners.get(i).columnToggled(this, column);</span>
+            }
+        }
+<span class="fc" id="L853">    }</span>
+
+    private void toggleLane(KanbanLane lane) {
+<span class="pc bpc" id="L856" title="1 of 2 branches missed.">        boolean to = !lane.isCollapsed();</span>
+<span class="fc" id="L857">        endEdit(true);</span>
+<span class="pc bpc" id="L858" title="1 of 2 branches missed.">        if (model.setLaneCollapsed(lane, to)) {</span>
+            // folding is open on a read-only board, where nothing is undone
+<span class="pc bpc" id="L860" title="1 of 2 branches missed.">            if (editable) {</span>
+<span class="fc" id="L861">                record(new KanbanEdits.Fold(model, null, lane, to));</span>
+            }
+<span class="pc bpc" id="L863" title="1 of 2 branches missed.">            for (int i = 0; i &lt; listeners.size(); i++) { // NOPMD ForLoopCanBeForeach - a listener may remove itself</span>
+<span class="nc" id="L864">                listeners.get(i).laneToggled(this, lane);</span>
+            }
+        }
+<span class="fc" id="L867">    }</span>
+
+    // ---------------------------------------------------------- typing titles
+
+    /// True while a title is being typed in place.
+    @Override
+    public boolean isEditing() {
+<span class="fc bfc" id="L874" title="All 2 branches covered.">        return editor != null;</span>
+    }
+
+    /// Renames a card in place, in a text field over it; the title goes to
+    /// `renameCard` when editing ends.
+    public void startCardEdit(KanbanCard card) {
+<span class="fc" id="L880">        endEdit(true);</span>
+<span class="pc bpc" id="L881" title="2 of 4 branches missed.">        if (!editable || placeOf(card) == null) {</span>
+<span class="nc" id="L882">            return;</span>
+        }
+<span class="fc" id="L884">        editCard = card;</span>
+<span class="fc" id="L885">        scrollToCard(card);</span>
+<span class="fc" id="L886">        showEditor(card.getTitle());</span>
+<span class="fc" id="L887">    }</span>
+
+    /// Opens the row that adds a card to a cell for typing; the card is
+    /// added by `addCard` when editing ends with a title in it.
+    public void startAddCard(KanbanColumn column, KanbanLane lane) {
+<span class="fc" id="L892">        endEdit(true);</span>
+<span class="pc bpc" id="L893" title="6 of 10 branches missed.">        if (!editable || column == null || column.isCollapsed() || lane != null &amp;&amp; lane.isCollapsed()) {</span>
+<span class="nc" id="L894">            return;</span>
+        }
+<span class="fc" id="L896">        editColumn = column;</span>
+<span class="fc" id="L897">        editLane = lane;</span>
+<span class="fc" id="L898">        showEditor(&quot;&quot;);</span>
+<span class="fc" id="L899">    }</span>
+
+    /// Ends the typing of a title and applies it.
+    public void finishEditing() {
+<span class="fc" id="L903">        endEdit(true);</span>
+<span class="fc" id="L904">    }</span>
+
+    // The field, for tests.
+    TextField editor() {
+<span class="fc" id="L908">        return editor;</span>
+    }
+
+    private void showEditor(String text) {
+<span class="fc" id="L912">        TopLevelContainer top = getTopLevelContainer();</span>
+<span class="pc bpc" id="L913" title="1 of 2 branches missed.">        if (top == null) {</span>
+            // not on a form: there is nowhere to type
+<span class="nc" id="L915">            editCard = null;</span>
+<span class="nc" id="L916">            editColumn = null;</span>
+<span class="nc" id="L917">            editLane = null;</span>
+<span class="nc" id="L918">            return;</span>
+        }
+<span class="fc" id="L920">        ensureLayout();</span>
+<span class="fc" id="L921">        stopFling();</span>
+<span class="pc bpc" id="L922" title="1 of 2 branches missed.">        final TextField tf = new TextField(text == null ? &quot;&quot; : text);</span>
+<span class="fc" id="L923">        editor = tf;</span>
+<span class="fc" id="L924">        ActionListener&lt;ActionEvent&gt; done = new ActionListener&lt;ActionEvent&gt;() {</span>
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+<span class="nc bnc" id="L927" title="All 2 branches missed.">                if (editor == tf) { // NOPMD CompareObjectsWithEquals - the field itself</span>
+<span class="nc" id="L928">                    endEdit(true);</span>
+                }
+<span class="nc" id="L930">            }</span>
+        };
+<span class="fc" id="L932">        tf.addActionListener(done);</span>
+<span class="fc" id="L933">        tf.setDoneListener(done);</span>
+<span class="fc" id="L934">        tf.addFocusListener(new FocusListener() {</span>
+            @Override
+            public void focusGained(Component cmp) {
+<span class="nc" id="L937">            }</span>
+
+            @Override
+            public void focusLost(Component cmp) {
+<span class="nc bnc" id="L941" title="All 2 branches missed.">                if (editor == tf) { // NOPMD CompareObjectsWithEquals - the field itself</span>
+<span class="nc" id="L942">                    endEdit(true);</span>
+                }
+<span class="nc" id="L944">            }</span>
+        });
+        // over the board, in the form's layered pane: the board has no children
+<span class="fc" id="L947">        Container pane = top.getFormLayeredPane(KanbanBoard.class, true);</span>
+<span class="fc" id="L948">        editorHolder = new EditorLayer(new Layout() {</span>
+            @Override
+            public void layoutContainer(Container parent) {
+<span class="pc bpc" id="L951" title="1 of 2 branches missed.">                if (editorRect(rectBuf)) {</span>
+<span class="fc" id="L952">                    tf.setX(getAbsoluteX() + rectBuf[0] - parent.getAbsoluteX());</span>
+<span class="fc" id="L953">                    tf.setY(getAbsoluteY() + rectBuf[1] - parent.getAbsoluteY());</span>
+<span class="fc" id="L954">                    tf.setWidth(rectBuf[2]);</span>
+<span class="fc" id="L955">                    tf.setHeight(rectBuf[3]);</span>
+                } else {
+<span class="nc" id="L957">                    tf.setWidth(0);</span>
+<span class="nc" id="L958">                    tf.setHeight(0);</span>
+                }
+<span class="fc" id="L960">            }</span>
+
+            @Override
+            public Dimension getPreferredSize(Container parent) {
+<span class="fc" id="L964">                return new Dimension(0, 0);</span>
+            }
+        }, tf);
+<span class="fc" id="L967">        editorHolder.add(tf);</span>
+<span class="fc" id="L968">        pane.add(editorHolder);</span>
+<span class="fc" id="L969">        pane.revalidate();</span>
+<span class="fc" id="L970">        repaint();</span>
+<span class="fc" id="L971">        tf.startEditingAsync();</span>
+<span class="fc" id="L972">    }</span>
+
+    private void endEdit(boolean apply) {
+<span class="fc" id="L975">        TextField tf = editor;</span>
+<span class="fc bfc" id="L976" title="All 2 branches covered.">        if (tf == null) {</span>
+<span class="fc" id="L977">            return;</span>
+        }
+<span class="fc" id="L979">        editor = null;</span>
+<span class="fc" id="L980">        KanbanCard card = editCard;</span>
+<span class="fc" id="L981">        KanbanColumn column = editColumn;</span>
+<span class="fc" id="L982">        KanbanLane lane = editLane;</span>
+<span class="fc" id="L983">        editCard = null;</span>
+<span class="fc" id="L984">        editColumn = null;</span>
+<span class="fc" id="L985">        editLane = null;</span>
+<span class="fc" id="L986">        String text = tf.getText();</span>
+<span class="fc" id="L987">        Container holder = editorHolder;</span>
+<span class="fc" id="L988">        editorHolder = null;</span>
+<span class="pc bpc" id="L989" title="1 of 2 branches missed.">        if (tf.isEditing()) {</span>
+<span class="nc" id="L990">            tf.stopEditing(null);</span>
+        }
+<span class="pc bpc" id="L992" title="1 of 2 branches missed.">        if (holder != null) {</span>
+<span class="fc" id="L993">            Container pane = holder.getParent();</span>
+<span class="fc" id="L994">            holder.remove();</span>
+<span class="pc bpc" id="L995" title="1 of 2 branches missed.">            if (pane != null) {</span>
+<span class="fc" id="L996">                pane.revalidate();</span>
+            }
+        }
+<span class="pc bpc" id="L999" title="1 of 2 branches missed.">        text = text == null ? &quot;&quot; : text.trim();</span>
+<span class="pc bpc" id="L1000" title="2 of 4 branches missed.">        if (apply &amp;&amp; text.length() &gt; 0) {</span>
+<span class="fc bfc" id="L1001" title="All 2 branches covered.">            if (card != null) {</span>
+<span class="pc bpc" id="L1002" title="2 of 4 branches missed.">                if (!text.equals(card.getTitle()) &amp;&amp; model.getCard(card.getId()) == card) { // NOPMD CompareObjectsWithEquals - the card of the model itself</span>
+<span class="fc" id="L1003">                    renameCard(card, text);</span>
+                }
+<span class="pc bpc" id="L1005" title="2 of 4 branches missed.">            } else if (column != null &amp;&amp; model.getColumns().contains(column)) {</span>
+<span class="fc" id="L1006">                addCard(column, lane, text);</span>
+            }
+        }
+<span class="fc" id="L1009">        repaint();</span>
+<span class="fc" id="L1010">    }</span>
+
+    // ----------------------------------------------------------------- layout
+
+    private void ensureLayout() {
+        // the width a column takes follows the board's: an answer laid out
+        // for another width is not one
+<span class="pc bpc" id="L1017" title="1 of 4 branches missed.">        if (dirty || getWidth() != laidWidth) {</span>
+<span class="fc" id="L1018">            refreshLayout();</span>
+        }
+<span class="fc" id="L1020">    }</span>
+
+    private void relayout(int width) {
+<span class="fc" id="L1023">        dirty = false;</span>
+<span class="fc" id="L1024">        laidWidth = width;</span>
+<span class="fc" id="L1025">        syncComponents();</span>
+<span class="fc" id="L1026">        cols = new ArrayList&lt;KanbanColumn&gt;(model.getColumns());</span>
+<span class="fc" id="L1027">        lanes = new ArrayList&lt;KanbanLane&gt;(model.getLanes());</span>
+<span class="fc" id="L1028">        pad = KanbanLook.mm(1.5f);</span>
+<span class="fc" id="L1029">        gap = KanbanLook.mm(1.5f);</span>
+<span class="fc" id="L1030">        headerH = KanbanLook.style(&quot;KanbanColumnHeader&quot;).getFont().getHeight() + KanbanLook.mm(3.5f);</span>
+<span class="fc bfc" id="L1031" title="All 2 branches covered.">        bandH = lanes.isEmpty() ? 0 : KanbanLook.style(&quot;KanbanLane&quot;).getFont().getHeight() + KanbanLook.mm(2);</span>
+<span class="pc bpc" id="L1032" title="2 of 4 branches missed.">        addH = inlineAdd &amp;&amp; editable ? KanbanLook.style(&quot;KanbanAddCard&quot;).getFont().getHeight() + KanbanLook.mm(2.5f) : 0;</span>
+<span class="fc" id="L1033">        int full = Math.max(KanbanLook.mm(15), Math.min(KanbanLook.mm(columnWidth), width - KanbanLook.mm(7)));</span>
+<span class="fc" id="L1034">        int folded = KanbanLook.mm(7);</span>
+<span class="fc" id="L1035">        int n = cols.size();</span>
+<span class="fc" id="L1036">        colX = new int[n];</span>
+<span class="fc" id="L1037">        colW = new int[n];</span>
+<span class="fc" id="L1038">        int x = gap;</span>
+<span class="fc bfc" id="L1039" title="All 2 branches covered.">        for (int c = 0; c &lt; n; c++) {</span>
+<span class="fc" id="L1040">            colX[c] = x;</span>
+<span class="fc bfc" id="L1041" title="All 2 branches covered.">            colW[c] = cols.get(c).isCollapsed() ? folded : full;</span>
+<span class="fc" id="L1042">            x += colW[c] + gap;</span>
+        }
+<span class="fc" id="L1044">        contentW = x;</span>
+<span class="fc" id="L1045">        int cardW = full - pad * 2;</span>
+<span class="fc" id="L1046">        int laneCount = Math.max(1, lanes.size());</span>
+<span class="fc" id="L1047">        laneTop = new int[laneCount];</span>
+<span class="fc" id="L1048">        laneBodyH = new int[laneCount];</span>
+<span class="fc" id="L1049">        cells = new Cell[laneCount][n];</span>
+<span class="fc" id="L1050">        int y = 0;</span>
+<span class="fc bfc" id="L1051" title="All 2 branches covered.">        for (int l = 0; l &lt; laneCount; l++) {</span>
+<span class="fc bfc" id="L1052" title="All 2 branches covered.">            KanbanLane lane = lanes.isEmpty() ? null : lanes.get(l);</span>
+<span class="fc bfc" id="L1053" title="All 4 branches covered.">            boolean foldedLane = lane != null &amp;&amp; lane.isCollapsed();</span>
+<span class="fc" id="L1054">            laneTop[l] = y;</span>
+<span class="fc" id="L1055">            y += bandH;</span>
+<span class="fc" id="L1056">            int bodyH = 0;</span>
+<span class="fc bfc" id="L1057" title="All 2 branches covered.">            for (int c = 0; c &lt; n; c++) {</span>
+<span class="fc" id="L1058">                KanbanColumn col = cols.get(c);</span>
+<span class="fc" id="L1059">                Cell cell = new Cell();</span>
+<span class="fc" id="L1060">                cell.cards = new ArrayList&lt;KanbanCard&gt;(model.getCards(col, lane));</span>
+<span class="fc" id="L1061">                int count = cell.cards.size();</span>
+<span class="fc" id="L1062">                cell.y = new int[count];</span>
+<span class="fc" id="L1063">                cell.h = new int[count];</span>
+<span class="fc" id="L1064">                int cy = pad;</span>
+<span class="fc bfc" id="L1065" title="All 4 branches covered.">                if (!foldedLane &amp;&amp; !col.isCollapsed()) {</span>
+<span class="fc bfc" id="L1066" title="All 2 branches covered.">                    for (int i = 0; i &lt; count; i++) {</span>
+<span class="fc" id="L1067">                        KanbanCard card = cell.cards.get(i);</span>
+<span class="fc" id="L1068">                        cell.y[i] = cy;</span>
+<span class="fc" id="L1069">                        cell.h[i] = renderer.getCardHeight(this, card, cardW) + getCardComponentHeight(card);</span>
+<span class="fc" id="L1070">                        cy += cell.h[i] + gap;</span>
+                    }
+                }
+<span class="fc" id="L1073">                cell.addY = cy;</span>
+<span class="fc" id="L1074">                cell.height = cy + addH + pad;</span>
+                // the gap a held card opens in another cell is part of that cell
+<span class="pc bpc" id="L1076" title="13 of 14 branches missed.">                if (dragCard != null &amp;&amp; l == dropLane &amp;&amp; c == dropCol &amp;&amp; dragFrom != null</span>
+<span class="nc bnc" id="L1077" title="All 2 branches missed.">                        &amp;&amp; (dragFrom[0] != l || dragFrom[1] != c) &amp;&amp; !foldedLane &amp;&amp; !col.isCollapsed()) {</span>
+<span class="nc" id="L1078">                    cell.height += dragH + gap;</span>
+                }
+<span class="fc" id="L1080">                bodyH = Math.max(bodyH, cell.height);</span>
+<span class="fc" id="L1081">                cells[l][c] = cell;</span>
+            }
+<span class="fc bfc" id="L1083" title="All 2 branches covered.">            laneBodyH[l] = foldedLane ? 0 : Math.max(bodyH, KanbanLook.mm(10));</span>
+<span class="fc" id="L1084">            y += laneBodyH[l];</span>
+        }
+<span class="fc" id="L1086">        contentH = y + gap;</span>
+<span class="fc" id="L1087">        placeEditor();</span>
+<span class="fc" id="L1088">    }</span>
+
+    // One component per card that has one, made once and kept while the
+    // card is in the model.
+    private void syncComponents() {
+<span class="fc bfc" id="L1093" title="All 2 branches covered.">        if (cardFactory == null) {</span>
+<span class="fc" id="L1094">            return;</span>
+        }
+<span class="fc" id="L1096">        Map&lt;String, Component&gt; next = new HashMap&lt;String, Component&gt;();</span>
+<span class="fc" id="L1097">        List&lt;KanbanColumn&gt; columns = model.getColumns();</span>
+<span class="fc" id="L1098">        List&lt;KanbanLane&gt; ls = model.getLanes();</span>
+<span class="fc bfc" id="L1099" title="All 2 branches covered.">        for (KanbanColumn col : columns) {</span>
+<span class="fc bfc" id="L1100" title="All 2 branches covered.">            for (int l = 0; l &lt; Math.max(1, ls.size()); l++) {</span>
+<span class="fc bfc" id="L1101" title="All 2 branches covered.">                List&lt;KanbanCard&gt; cards = model.getCards(col, ls.isEmpty() ? null : ls.get(l));</span>
+<span class="fc bfc" id="L1102" title="All 2 branches covered.">                for (KanbanCard card : cards) {</span>
+<span class="fc" id="L1103">                    String id = card.getId();</span>
+<span class="pc bpc" id="L1104" title="1 of 2 branches missed.">                    next.put(id, components.containsKey(id) ? components.get(id)</span>
+<span class="fc" id="L1105">                            : cardFactory.createComponent(this, card));</span>
+<span class="fc" id="L1106">                }</span>
+            }
+<span class="fc" id="L1108">        }</span>
+<span class="fc" id="L1109">        components.clear();</span>
+<span class="fc" id="L1110">        components.putAll(next);</span>
+<span class="fc" id="L1111">    }</span>
+
+    /// Where a card is in the layout: its lane, column and index, or null.
+    private int[] locate(KanbanCard card) {
+<span class="pc bpc" id="L1115" title="1 of 2 branches missed.">        for (int l = 0; l &lt; cells.length; l++) {</span>
+<span class="fc bfc" id="L1116" title="All 2 branches covered.">            for (int c = 0; c &lt; cells[l].length; c++) {</span>
+<span class="fc" id="L1117">                int i = cells[l][c].cards.indexOf(card);</span>
+<span class="fc bfc" id="L1118" title="All 2 branches covered.">                if (i &gt;= 0) {</span>
+<span class="fc" id="L1119">                    return new int[]{l, c, i};</span>
+                }
+            }
+        }
+<span class="nc" id="L1123">        return null;</span>
+    }
+
+    private boolean cellShown(int l, int c) {
+<span class="fc bfc" id="L1127" title="All 6 branches covered.">        return !cols.get(c).isCollapsed() &amp;&amp; (lanes.isEmpty() || !lanes.get(l).isCollapsed());</span>
+    }
+
+    /// The rectangle of a card in the content; false when its column or its
+    /// lane is folded.
+    private boolean cardRect(int l, int c, int i, int[] out) {
+<span class="fc bfc" id="L1133" title="All 2 branches covered.">        if (!cellShown(l, c)) {</span>
+<span class="fc" id="L1134">            return false;</span>
+        }
+<span class="fc" id="L1136">        Cell cell = cells[l][c];</span>
+<span class="fc" id="L1137">        out[0] = colX[c] + pad;</span>
+<span class="fc" id="L1138">        out[1] = laneTop[l] + bandH + cell.y[i];</span>
+<span class="fc" id="L1139">        out[2] = colW[c] - pad * 2;</span>
+<span class="fc" id="L1140">        out[3] = cell.h[i];</span>
+<span class="fc" id="L1141">        return true;</span>
+    }
+
+    /// The rectangle of a card in the board's own coordinates, as it is laid
+    /// out now, or null when it is not shown. For a popup placed by a card,
+    /// and for tests.
+    public int[] getCardBounds(KanbanCard card) {
+<span class="fc" id="L1148">        ensureLayout();</span>
+<span class="fc" id="L1149">        int[] at = locate(card);</span>
+<span class="fc" id="L1150">        int[] r = new int[4];</span>
+<span class="pc bpc" id="L1151" title="1 of 4 branches missed.">        if (at == null || !cardRect(at[0], at[1], at[2], r)) {</span>
+<span class="fc" id="L1152">            return null;</span>
+        }
+<span class="fc" id="L1154">        r[0] -= getOffsetX();</span>
+<span class="fc" id="L1155">        r[1] += headerH - getOffsetY();</span>
+<span class="fc" id="L1156">        return r;</span>
+    }
+
+    /// The rectangle of a column's title in the board's own coordinates, or
+    /// null for a column that is not in the model.
+    public int[] getColumnHeaderBounds(KanbanColumn column) {
+<span class="fc" id="L1162">        ensureLayout();</span>
+<span class="fc" id="L1163">        int c = cols.indexOf(column);</span>
+<span class="pc bpc" id="L1164" title="1 of 2 branches missed.">        return c &lt; 0 ? null : new int[]{colX[c] - getOffsetX(), 0, colW[c], headerH};</span>
+    }
+
+    private int columnAt(int cx) {
+<span class="pc bpc" id="L1168" title="1 of 2 branches missed.">        for (int c = 0; c &lt; colX.length; c++) {</span>
+<span class="pc bpc" id="L1169" title="2 of 4 branches missed.">            if (cx &gt;= colX[c] &amp;&amp; cx &lt; colX[c] + colW[c]) {</span>
+<span class="fc" id="L1170">                return c;</span>
+            }
+        }
+<span class="nc" id="L1173">        return -1;</span>
+    }
+
+    private int nearestColumn(int cx) {
+<span class="fc" id="L1177">        int best = -1;</span>
+<span class="fc" id="L1178">        int bestD = Integer.MAX_VALUE;</span>
+<span class="fc bfc" id="L1179" title="All 2 branches covered.">        for (int c = 0; c &lt; colX.length; c++) {</span>
+<span class="fc" id="L1180">            int d = Math.abs(colX[c] + colW[c] / 2 - cx);</span>
+<span class="fc bfc" id="L1181" title="All 2 branches covered.">            if (d &lt; bestD) {</span>
+<span class="fc" id="L1182">                bestD = d;</span>
+<span class="fc" id="L1183">                best = c;</span>
+            }
+        }
+<span class="fc" id="L1186">        return best;</span>
+    }
+
+    private int laneAt(int cy) {
+<span class="pc bpc" id="L1190" title="1 of 2 branches missed.">        for (int l = laneTop.length - 1; l &gt;= 0; l--) {</span>
+<span class="fc bfc" id="L1191" title="All 2 branches covered.">            if (cy &gt;= laneTop[l]) {</span>
+<span class="fc" id="L1192">                return l;</span>
+            }
+        }
+<span class="nc" id="L1195">        return 0;</span>
+    }
+
+    private KanbanCard cardAt(int cx, int cy) {
+<span class="fc" id="L1199">        int c = columnAt(cx);</span>
+<span class="pc bpc" id="L1200" title="3 of 6 branches missed.">        if (c &lt; 0 || cy &lt; 0 || cells.length == 0) {</span>
+<span class="nc" id="L1201">            return null;</span>
+        }
+<span class="fc" id="L1203">        int l = laneAt(cy);</span>
+<span class="pc bpc" id="L1204" title="1 of 2 branches missed.">        if (!cellShown(l, c)) {</span>
+<span class="nc" id="L1205">            return null;</span>
+        }
+<span class="fc" id="L1207">        Cell cell = cells[l][c];</span>
+<span class="fc" id="L1208">        int ry = cy - laneTop[l] - bandH;</span>
+<span class="pc bpc" id="L1209" title="2 of 4 branches missed.">        if (cx &lt; colX[c] + pad || cx &gt;= colX[c] + colW[c] - pad) {</span>
+<span class="nc" id="L1210">            return null;</span>
+        }
+<span class="pc bpc" id="L1212" title="1 of 2 branches missed.">        for (int i = 0; i &lt; cell.y.length; i++) {</span>
+<span class="pc bpc" id="L1213" title="1 of 4 branches missed.">            if (ry &gt;= cell.y[i] &amp;&amp; ry &lt; cell.y[i] + cell.h[i]) {</span>
+<span class="fc" id="L1214">                return cell.cards.get(i);</span>
+            }
+        }
+<span class="nc" id="L1217">        return null;</span>
+    }
+
+    // ----------------------------------------------------------------- gestures
+
+    private boolean beginDrag(int x, int y, ScrollSurface.EditTrigger trigger) {
+<span class="fc bfc" id="L1223" title="All 2 branches covered.">        if (trigger == ScrollSurface.EditTrigger.HANDLE_DRAG) {</span>
+            // a finger scrolls; it drags after a long press
+<span class="fc" id="L1225">            return false;</span>
+        }
+<span class="fc" id="L1227">        endEdit(true);</span>
+        // the title just taken may have added a card
+<span class="fc" id="L1229">        ensureLayout();</span>
+<span class="fc" id="L1230">        int cx = x + getOffsetX();</span>
+<span class="fc bfc" id="L1231" title="All 2 branches covered.">        if (y &lt; headerH) {</span>
+<span class="fc" id="L1232">            int c = columnAt(cx);</span>
+<span class="pc bpc" id="L1233" title="4 of 8 branches missed.">            if (c &lt; 0 || !columnReorder || !editable || cols.size() &lt; 2) {</span>
+<span class="nc" id="L1234">                return false;</span>
+            }
+<span class="fc" id="L1236">            dragColumn = cols.get(c);</span>
+<span class="fc" id="L1237">            dragColumnFrom = c;</span>
+<span class="fc" id="L1238">            dragColumnTo = c;</span>
+<span class="fc" id="L1239">            grabX = cx - colX[c];</span>
+<span class="fc" id="L1240">            dragX = x;</span>
+<span class="fc" id="L1241">            return true;</span>
+        }
+<span class="pc bpc" id="L1243" title="1 of 2 branches missed.">        if (!editable) {</span>
+<span class="nc" id="L1244">            return false;</span>
+        }
+<span class="fc" id="L1246">        int cy = y - headerH + getOffsetY();</span>
+<span class="fc" id="L1247">        KanbanCard card = cardAt(cx, cy);</span>
+<span class="pc bpc" id="L1248" title="1 of 2 branches missed.">        int[] at = card == null ? null : locate(card);</span>
+<span class="pc bpc" id="L1249" title="2 of 4 branches missed.">        if (at == null || !cardRect(at[0], at[1], at[2], rectBuf)) {</span>
+<span class="nc" id="L1250">            return false;</span>
+        }
+<span class="fc" id="L1252">        dragCard = card;</span>
+<span class="fc" id="L1253">        dragFrom = at;</span>
+<span class="fc" id="L1254">        grabX = cx - rectBuf[0];</span>
+<span class="fc" id="L1255">        grabY = cy - rectBuf[1];</span>
+<span class="fc" id="L1256">        dragW = rectBuf[2];</span>
+<span class="fc" id="L1257">        dragH = rectBuf[3];</span>
+<span class="fc" id="L1258">        dropLane = at[0];</span>
+<span class="fc" id="L1259">        dropCol = at[1];</span>
+<span class="fc" id="L1260">        dropIndex = at[2];</span>
+<span class="fc" id="L1261">        dropAllowed = true;</span>
+        // the gap is where the card was: nothing has to open
+<span class="fc" id="L1263">        slotSince = 0;</span>
+<span class="fc" id="L1264">        select(card);</span>
+<span class="fc" id="L1265">        placeEditor();</span>
+<span class="fc" id="L1266">        return true;</span>
+    }
+
+    private void dragTo(int x, int y) {
+        // hit tests below read the cells, which a model change may have left stale
+<span class="fc" id="L1271">        ensureLayout();</span>
+<span class="fc" id="L1272">        dragX = x;</span>
+<span class="fc" id="L1273">        dragY = y;</span>
+<span class="fc" id="L1274">        int cx = x + getOffsetX();</span>
+<span class="fc bfc" id="L1275" title="All 2 branches covered.">        if (dragColumn != null) {</span>
+<span class="fc" id="L1276">            int to = 0;</span>
+<span class="fc bfc" id="L1277" title="All 2 branches covered.">            for (int c = 0; c &lt; cols.size(); c++) {</span>
+<span class="fc bfc" id="L1278" title="All 4 branches covered.">                if (c != dragColumnFrom &amp;&amp; colX[c] + colW[c] / 2 &lt; cx) {</span>
+<span class="fc" id="L1279">                    to++;</span>
+                }
+            }
+<span class="fc" id="L1282">            dragColumnTo = to;</span>
+<span class="fc" id="L1283">            return;</span>
+        }
+<span class="pc bpc" id="L1285" title="2 of 4 branches missed.">        if (dragCard == null || cols.isEmpty()) {</span>
+<span class="nc" id="L1286">            return;</span>
+        }
+<span class="fc" id="L1288">        int cy = y - headerH + getOffsetY();</span>
+<span class="fc" id="L1289">        int midX = cx - grabX + dragW / 2;</span>
+<span class="fc" id="L1290">        int midY = cy - grabY + dragH / 2;</span>
+<span class="fc" id="L1291">        int c = nearestColumn(midX);</span>
+<span class="fc" id="L1292">        int l = laneAt(midY);</span>
+<span class="fc" id="L1293">        Cell cell = cells[l][c];</span>
+<span class="fc" id="L1294">        int index = 0;</span>
+<span class="pc bpc" id="L1295" title="1 of 2 branches missed.">        if (cols.get(c).isCollapsed()) {</span>
+<span class="nc bnc" id="L1296" title="All 2 branches missed.">            index = cell.cards.size() - (cell.cards.contains(dragCard) ? 1 : 0);</span>
+        } else {
+<span class="fc" id="L1298">            int ry = laneTop[l] + bandH + pad;</span>
+<span class="fc bfc" id="L1299" title="All 2 branches covered.">            for (int i = 0; i &lt; cell.cards.size(); i++) {</span>
+<span class="fc bfc" id="L1300" title="All 2 branches covered.">                if (cell.cards.get(i) == dragCard) { // NOPMD CompareObjectsWithEquals - the dragged card itself</span>
+<span class="fc" id="L1301">                    continue;</span>
+                }
+<span class="fc bfc" id="L1303" title="All 2 branches covered.">                if (midY &gt; ry + cell.h[i] / 2) {</span>
+<span class="fc" id="L1304">                    index++;</span>
+                }
+<span class="fc" id="L1306">                ry += cell.h[i] + gap;</span>
+            }
+        }
+<span class="fc bfc" id="L1309" title="All 6 branches covered.">        if (c != dropCol || l != dropLane || index != dropIndex) {</span>
+            // the cell it leaves gives the gap back, the one it enters takes it
+<span class="pc bpc" id="L1311" title="1 of 6 branches missed.">            dirty = dirty || c != dropCol || l != dropLane;</span>
+<span class="fc" id="L1312">            dropCol = c;</span>
+<span class="fc" id="L1313">            dropLane = l;</span>
+<span class="fc" id="L1314">            dropIndex = index;</span>
+<span class="fc" id="L1315">            slotSince = currentTime();</span>
+<span class="fc" id="L1316">            requestAnimation();</span>
+        }
+<span class="fc bfc" id="L1318" title="All 2 branches covered.">        KanbanLane lane = lanes.isEmpty() ? null : lanes.get(l);</span>
+<span class="pc bpc" id="L1319" title="1 of 6 branches missed.">        dropAllowed = (lane == null || !lane.isCollapsed()) &amp;&amp; model.canMoveCard(dragCard, cols.get(c), lane);</span>
+<span class="fc" id="L1320">    }</span>
+
+    private void endDrag(boolean committed) {
+<span class="fc bfc" id="L1323" title="All 2 branches covered.">        if (dragColumn != null) {</span>
+<span class="fc" id="L1324">            KanbanColumn column = dragColumn;</span>
+<span class="fc" id="L1325">            dragColumn = null;</span>
+<span class="pc bpc" id="L1326" title="2 of 4 branches missed.">            if (committed &amp;&amp; dragColumnTo != dragColumnFrom) {</span>
+<span class="fc" id="L1327">                moveColumn(column, dragColumnTo);</span>
+            }
+<span class="fc" id="L1329">            repaint();</span>
+<span class="fc" id="L1330">            return;</span>
+        }
+<span class="fc" id="L1332">        KanbanCard card = dragCard;</span>
+<span class="pc bpc" id="L1333" title="1 of 2 branches missed.">        if (card == null) {</span>
+<span class="nc" id="L1334">            return;</span>
+        }
+<span class="fc" id="L1336">        dragCard = null;</span>
+<span class="fc" id="L1337">        int[] from = dragFrom;</span>
+<span class="fc" id="L1338">        dragFrom = null;</span>
+        // a card added above the held one since the drag began moved its origin
+<span class="fc" id="L1340">        ensureLayout();</span>
+<span class="fc" id="L1341">        int[] now = locate(card);</span>
+<span class="pc bpc" id="L1342" title="1 of 2 branches missed.">        if (now != null) {</span>
+<span class="fc" id="L1343">            from = now;</span>
+        }
+<span class="fc" id="L1345">        int gx = dragX + getOffsetX() - grabX;</span>
+<span class="fc" id="L1346">        int gy = dragY - headerH + getOffsetY() - grabY;</span>
+<span class="pc bpc" id="L1347" title="1 of 6 branches missed.">        boolean elsewhere = dropCol != from[1] || dropLane != from[0] || dropIndex != from[2];</span>
+<span class="pc bpc" id="L1348" title="4 of 10 branches missed.">        if (committed &amp;&amp; dropAllowed &amp;&amp; elsewhere &amp;&amp; dropCol &gt;= 0 &amp;&amp; dropCol &lt; cols.size()</span>
+<span class="pc bpc" id="L1349" title="1 of 2 branches missed.">                &amp;&amp; dropLane &lt; Math.max(1, lanes.size())) {</span>
+<span class="fc bfc" id="L1350" title="All 2 branches covered.">            moveCard(card, cols.get(dropCol), lanes.isEmpty() ? null : lanes.get(dropLane), dropIndex);</span>
+        }
+<span class="fc" id="L1352">        dropCol = -1;</span>
+<span class="fc" id="L1353">        dropLane = -1;</span>
+<span class="fc" id="L1354">        dropIndex = -1;</span>
+        // from where it was let go, the card glides to where it now belongs
+<span class="fc" id="L1356">        startSettle(card.getId(), gx, gy, dragW, dragH);</span>
+<span class="fc" id="L1357">        dirty = true;</span>
+<span class="fc" id="L1358">        refreshLayout();</span>
+<span class="fc" id="L1359">        placeEditor();</span>
+<span class="fc" id="L1360">        repaint();</span>
+<span class="fc" id="L1361">    }</span>
+
+    private void tap(int x, int y, boolean twice) {
+<span class="fc" id="L1364">        int cx = x + getOffsetX();</span>
+<span class="fc bfc" id="L1365" title="All 2 branches covered.">        if (y &lt; headerH) {</span>
+<span class="fc" id="L1366">            int c = columnAt(cx);</span>
+<span class="pc bpc" id="L1367" title="2 of 6 branches missed.">            if (c &gt;= 0 &amp;&amp; (cols.get(c).isCollapsed() || cx &gt;= colX[c] + colW[c] - KanbanLook.mm(7))) {</span>
+<span class="fc" id="L1368">                toggleColumn(cols.get(c));</span>
+            }
+<span class="fc" id="L1370">            return;</span>
+        }
+<span class="fc" id="L1372">        int cy = y - headerH + getOffsetY();</span>
+<span class="pc bpc" id="L1373" title="3 of 6 branches missed.">        if (cy &lt; 0 || cy &gt;= contentH || cells.length == 0) {</span>
+<span class="nc" id="L1374">            select(null);</span>
+<span class="nc" id="L1375">            return;</span>
+        }
+<span class="fc" id="L1377">        int l = laneAt(cy);</span>
+<span class="pc bpc" id="L1378" title="1 of 4 branches missed.">        if (!lanes.isEmpty() &amp;&amp; cy &lt; laneTop[l] + bandH) {</span>
+<span class="fc" id="L1379">            toggleLane(lanes.get(l));</span>
+<span class="fc" id="L1380">            return;</span>
+        }
+<span class="fc" id="L1382">        int c = columnAt(cx);</span>
+<span class="pc bpc" id="L1383" title="2 of 4 branches missed.">        if (c &gt;= 0 &amp;&amp; cols.get(c).isCollapsed()) {</span>
+<span class="nc" id="L1384">            toggleColumn(cols.get(c));</span>
+<span class="nc" id="L1385">            return;</span>
+        }
+<span class="fc" id="L1387">        KanbanCard card = cardAt(cx, cy);</span>
+<span class="pc bpc" id="L1388" title="1 of 2 branches missed.">        if (card != null) {</span>
+<span class="fc" id="L1389">            select(card);</span>
+<span class="fc bfc" id="L1390" title="All 2 branches covered.">            if (tapComponent(card, x, y)) {</span>
+<span class="fc" id="L1391">                return;</span>
+            }
+<span class="pc bpc" id="L1393" title="1 of 2 branches missed.">            if (twice) {</span>
+<span class="nc bnc" id="L1394" title="All 4 branches missed.">                if (inlineEditing &amp;&amp; editable) {</span>
+<span class="nc" id="L1395">                    startCardEdit(card);</span>
+                } else {
+<span class="nc" id="L1397">                    fireOpened(card);</span>
+                }
+            }
+<span class="fc" id="L1400">            return;</span>
+        }
+<span class="nc bnc" id="L1402" title="All 6 branches missed.">        if (c &gt;= 0 &amp;&amp; addH &gt; 0 &amp;&amp; cellShown(l, c)) {</span>
+<span class="nc" id="L1403">            int ry = cy - laneTop[l] - bandH;</span>
+<span class="nc" id="L1404">            Cell cell = cells[l][c];</span>
+<span class="nc bnc" id="L1405" title="All 4 branches missed.">            if (ry &gt;= cell.addY &amp;&amp; ry &lt; cell.addY + addH) {</span>
+<span class="nc bnc" id="L1406" title="All 2 branches missed.">                startAddCard(cols.get(c), lanes.isEmpty() ? null : lanes.get(l));</span>
+<span class="nc" id="L1407">                return;</span>
+            }
+        }
+<span class="nc" id="L1410">        select(null);</span>
+<span class="nc" id="L1411">    }</span>
+
+    private void fireOpened(KanbanCard card) {
+<span class="fc bfc" id="L1414" title="All 2 branches covered.">        for (int i = 0; i &lt; listeners.size(); i++) { // NOPMD ForLoopCanBeForeach - a listener may remove itself</span>
+<span class="fc" id="L1415">            listeners.get(i).cardOpened(this, card);</span>
+        }
+<span class="fc" id="L1417">    }</span>
+
+    // A key reached the board; true when it was a command of it.
+    boolean keyTyped(int keyCode) {
+<span class="pc bpc" id="L1421" title="1 of 2 branches missed.">        if (editor != null) {</span>
+<span class="nc" id="L1422">            return false;</span>
+        }
+<span class="pc bpc" id="L1424" title="1 of 4 branches missed.">        if (keyCode == 127 || keyCode == 8) {</span>
+<span class="pc bpc" id="L1425" title="3 of 6 branches missed.">            return editable &amp;&amp; selected != null &amp;&amp; removeCard(selected);</span>
+        }
+<span class="pc bpc" id="L1427" title="3 of 4 branches missed.">        if (keyCode == 10 || keyCode == 13) {</span>
+<span class="pc bpc" id="L1428" title="1 of 2 branches missed.">            if (selected == null) {</span>
+<span class="nc" id="L1429">                return false;</span>
+            }
+<span class="fc" id="L1431">            fireOpened(selected);</span>
+<span class="fc" id="L1432">            return true;</span>
+        }
+<span class="nc" id="L1434">        Display d = Display.getInstance();</span>
+<span class="nc bnc" id="L1435" title="All 4 branches missed.">        if (!d.isControlKeyDown() &amp;&amp; !d.isMetaKeyDown()) {</span>
+<span class="nc" id="L1436">            return false;</span>
+        }
+<span class="nc bnc" id="L1438" title="All 7 branches missed.">        switch (keyCode) {</span>
+            case 'c':
+            case 'C':
+<span class="nc" id="L1441">                return copySelection();</span>
+            case 'x':
+            case 'X':
+<span class="nc" id="L1444">                return cutSelection();</span>
+            case 'v':
+            case 'V':
+<span class="nc" id="L1447">                return paste();</span>
+            case 'd':
+            case 'D':
+<span class="nc" id="L1450">                return duplicateSelection();</span>
+            case 'z':
+            case 'Z':
+<span class="nc bnc" id="L1453" title="All 2 branches missed.">                return d.isShiftKeyDown() ? redo() : undo();</span>
+            case 'y':
+            case 'Y':
+<span class="nc" id="L1456">                return redo();</span>
+            default:
+<span class="nc" id="L1458">                return false;</span>
+        }
+    }
+
+    // --------------------------------------------------------------- painting
+
+    private static int alpha(int base, int amount) {
+<span class="nc" id="L1465">        return base * amount / 255;</span>
+    }
+
+    private void paintBoard(Graphics g, int x, int y) {
+<span class="fc" id="L1469">        Style bs = KanbanLook.style(&quot;KanbanBoard&quot;);</span>
+<span class="fc" id="L1470">        Style cs = KanbanLook.style(&quot;KanbanColumn&quot;);</span>
+<span class="fc" id="L1471">        int clipX = g.getClipX();</span>
+<span class="fc" id="L1472">        int clipY = g.getClipY();</span>
+<span class="fc" id="L1473">        int clipW = g.getClipWidth();</span>
+<span class="fc" id="L1474">        int clipH = g.getClipHeight();</span>
+<span class="fc" id="L1475">        int boardBg = KanbanLook.bg(bs, 0xf7f7fa);</span>
+<span class="fc" id="L1476">        g.setColor(boardBg);</span>
+<span class="fc" id="L1477">        g.fillRect(clipX, clipY, clipW, clipH);</span>
+<span class="fc" id="L1478">        boolean aa = g.isAntiAliased();</span>
+<span class="fc" id="L1479">        g.setAntiAliased(true);</span>
+<span class="fc" id="L1480">        int arc = KanbanLook.mm(2);</span>
+<span class="fc" id="L1481">        int bottom = Math.max(y + contentH - gap, clipY + clipH - gap);</span>
+<span class="fc" id="L1482">        int colBg = KanbanLook.bg(cs, KanbanLook.mix(boardBg, bs.getFgColor(), 16));</span>
+<span class="fc" id="L1483">        int a = g.getAlpha();</span>
+<span class="fc bfc" id="L1484" title="All 2 branches covered.">        for (int c = 0; c &lt; colX.length; c++) {</span>
+<span class="fc" id="L1485">            int cx = x + colX[c];</span>
+<span class="pc bpc" id="L1486" title="1 of 4 branches missed.">            if (cx &gt; clipX + clipW || cx + colW[c] &lt; clipX) {</span>
+<span class="nc" id="L1487">                continue;</span>
+            }
+<span class="pc bpc" id="L1489" title="5 of 6 branches missed.">            boolean refused = dragCard != null &amp;&amp; !dropAllowed &amp;&amp; c == dropCol;</span>
+<span class="pc bpc" id="L1490" title="1 of 2 branches missed.">            g.setColor(refused ? KanbanLook.bg(KanbanLook.style(&quot;KanbanColumnOverLimit&quot;), colBg) : colBg);</span>
+<span class="pc bpc" id="L1491" title="1 of 2 branches missed.">            g.setAlpha(cols.get(c) == dragColumn ? alpha(a, 110) : a); // NOPMD CompareObjectsWithEquals - the dragged column itself</span>
+            // the title above is the rounded top
+<span class="fc" id="L1493">            g.fillRoundRect(cx, y - arc, colW[c], bottom - y + arc, arc, arc);</span>
+<span class="fc" id="L1494">            g.setAlpha(a);</span>
+<span class="pc bpc" id="L1495" title="1 of 2 branches missed.">            if (cols.get(c).isCollapsed()) {</span>
+                // a lane's title bar crosses the strip, so the title starts under the first one
+<span class="nc" id="L1497">                int titleTop = Math.max(y, clipY);</span>
+<span class="nc bnc" id="L1498" title="All 4 branches missed.">                if (!lanes.isEmpty() &amp;&amp; laneTop.length &gt; 0) {</span>
+<span class="nc" id="L1499">                    titleTop = Math.max(titleTop, y + laneTop[0] + bandH);</span>
+                }
+<span class="nc" id="L1501">                paintFoldedTitle(g, cols.get(c), cx, titleTop, colW[c]);</span>
+            }
+        }
+<span class="fc bfc" id="L1504" title="All 2 branches covered.">        for (int l = 0; l &lt; cells.length; l++) {</span>
+<span class="fc bfc" id="L1505" title="All 2 branches covered.">            KanbanLane lane = lanes.isEmpty() ? null : lanes.get(l);</span>
+<span class="fc" id="L1506">            int top = y + laneTop[l];</span>
+<span class="pc bpc" id="L1507" title="2 of 4 branches missed.">            if (top &gt; clipY + clipH || top + bandH + laneBodyH[l] &lt; clipY) {</span>
+<span class="nc" id="L1508">                continue;</span>
+            }
+<span class="fc bfc" id="L1510" title="All 2 branches covered.">            for (int c = 0; c &lt; colX.length; c++) {</span>
+<span class="fc" id="L1511">                int cx = x + colX[c];</span>
+<span class="pc bpc" id="L1512" title="1 of 6 branches missed.">                if (cellShown(l, c) &amp;&amp; cx &lt;= clipX + clipW &amp;&amp; cx + colW[c] &gt;= clipX) {</span>
+<span class="fc" id="L1513">                    paintCell(g, l, c, cx, top + bandH, clipY, clipY + clipH);</span>
+                }
+            }
+<span class="fc bfc" id="L1516" title="All 2 branches covered.">            if (lane != null) {</span>
+<span class="fc" id="L1517">                paintBand(g, lane, l, clipX, top, clipW);</span>
+            }
+        }
+<span class="fc" id="L1520">        g.setAntiAliased(aa);</span>
+<span class="fc" id="L1521">    }</span>
+
+    private void paintFoldedTitle(Graphics g, KanbanColumn column, int x, int y, int w) {
+<span class="nc" id="L1524">        String title = column.getTitle();</span>
+<span class="nc bnc" id="L1525" title="All 4 branches missed.">        if (title == null || !g.isAffineSupported()) {</span>
+<span class="nc" id="L1526">            return;</span>
+        }
+<span class="nc" id="L1528">        Style hs = KanbanLook.style(&quot;KanbanColumnHeader&quot;);</span>
+<span class="nc" id="L1529">        Font f = hs.getFont();</span>
+<span class="nc" id="L1530">        g.setFont(f);</span>
+<span class="nc" id="L1531">        g.setColor(hs.getFgColor());</span>
+        // reads down the strip
+<span class="nc" id="L1533">        int px = x + w / 2;</span>
+<span class="nc" id="L1534">        int py = y + pad;</span>
+<span class="nc" id="L1535">        g.rotateRadians((float) (Math.PI / 2), px, py);</span>
+<span class="nc" id="L1536">        g.drawString(title, px, py - f.getHeight() / 2);</span>
+<span class="nc" id="L1537">        g.rotateRadians((float) (-Math.PI / 2), px, py);</span>
+<span class="nc" id="L1538">    }</span>
+
+    private void paintBand(Graphics g, KanbanLane lane, int l, int x, int y, int w) {
+<span class="fc" id="L1541">        Style ls = KanbanLook.style(&quot;KanbanLane&quot;);</span>
+<span class="fc" id="L1542">        Font f = ls.getFont();</span>
+<span class="fc" id="L1543">        g.setColor(KanbanLook.bg(ls, 0xe1dce8));</span>
+<span class="fc" id="L1544">        g.fillRect(x, y, w, bandH);</span>
+<span class="fc" id="L1545">        g.setColor(ls.getFgColor());</span>
+<span class="fc" id="L1546">        int mark = Math.max(3, f.getHeight() / 4);</span>
+<span class="fc" id="L1547">        int mx = x + pad + mark;</span>
+<span class="fc" id="L1548">        int my = y + bandH / 2;</span>
+<span class="fc bfc" id="L1549" title="All 2 branches covered.">        if (lane.isCollapsed()) {</span>
+<span class="fc" id="L1550">            g.fillTriangle(mx - mark / 2, my - mark, mx - mark / 2, my + mark, mx + mark / 2 + 1, my);</span>
+        } else {
+<span class="fc" id="L1552">            g.fillTriangle(mx - mark, my - mark / 2, mx + mark, my - mark / 2, mx, my + mark / 2 + 1);</span>
+        }
+<span class="fc" id="L1554">        int count = 0;</span>
+<span class="fc bfc" id="L1555" title="All 2 branches covered.">        for (int c = 0; c &lt; cells[l].length; c++) {</span>
+<span class="fc" id="L1556">            count += cells[l][c].cards.size();</span>
+        }
+<span class="pc bpc" id="L1558" title="1 of 2 branches missed.">        String title = lane.getTitle() == null ? &quot;&quot; : lane.getTitle();</span>
+<span class="fc" id="L1559">        g.setFont(f);</span>
+<span class="fc" id="L1560">        String text = KanbanLook.fit(title + &quot;  &quot; + count, f, w - mark * 3 - pad * 3);</span>
+<span class="fc" id="L1561">        g.drawString(text, mx + mark + pad, y + (bandH - f.getHeight()) / 2);</span>
+<span class="fc" id="L1562">    }</span>
+
+    private void paintCell(Graphics g, int l, int c, int x, int top, int clipTop, int clipBottom) {
+<span class="fc" id="L1565">        Cell cell = cells[l][c];</span>
+<span class="fc" id="L1566">        int cx = x + pad;</span>
+<span class="fc" id="L1567">        int w = colW[c] - pad * 2;</span>
+<span class="pc bpc" id="L1568" title="5 of 6 branches missed.">        boolean dropHere = dragCard != null &amp;&amp; l == dropLane &amp;&amp; c == dropCol;</span>
+<span class="fc" id="L1569">        int slot = 0;</span>
+<span class="pc bpc" id="L1570" title="1 of 2 branches missed.">        if (dropHere) {</span>
+<span class="nc bnc" id="L1571" title="All 2 branches missed.">            long t = slotSince == 0 ? 120 : currentTime() - slotSince;</span>
+<span class="nc bnc" id="L1572" title="All 2 branches missed.">            float level = t &gt;= 120 ? 1f : Math.max(0f, t / 120f);</span>
+<span class="nc" id="L1573">            slot = Math.round((dragH + gap) * level);</span>
+        }
+<span class="fc" id="L1575">        int ry = top + pad;</span>
+<span class="fc" id="L1576">        int index = 0;</span>
+<span class="fc" id="L1577">        int count = cell.cards.size();</span>
+<span class="pc bpc" id="L1578" title="1 of 2 branches missed.">        for (int i = 0; i &lt;= count; i++) {</span>
+<span class="fc bfc" id="L1579" title="All 2 branches covered.">            KanbanCard card = i &lt; count ? cell.cards.get(i) : null;</span>
+<span class="pc bpc" id="L1580" title="1 of 4 branches missed.">            if (card != null &amp;&amp; card == dragCard) { // NOPMD CompareObjectsWithEquals - the dragged card itself</span>
+<span class="nc" id="L1581">                continue;</span>
+            }
+<span class="pc bpc" id="L1583" title="3 of 4 branches missed.">            if (dropHere &amp;&amp; index == dropIndex) {</span>
+<span class="nc" id="L1584">                paintSlot(g, cx, ry, w, slot - gap);</span>
+<span class="nc" id="L1585">                ry += slot;</span>
+            }
+<span class="fc bfc" id="L1587" title="All 2 branches covered.">            if (card == null) {</span>
+<span class="fc" id="L1588">                break;</span>
+            }
+<span class="fc" id="L1590">            int h = cell.h[i];</span>
+<span class="fc" id="L1591">            rectBuf[0] = cx;</span>
+<span class="fc" id="L1592">            rectBuf[1] = ry;</span>
+<span class="fc" id="L1593">            rectBuf[2] = w;</span>
+<span class="fc" id="L1594">            rectBuf[3] = h;</span>
+            // the settle works in the content's coordinates
+<span class="fc" id="L1596">            int ox = x - colX[c];</span>
+<span class="fc" id="L1597">            int oy = top - bandH - laneTop[l];</span>
+<span class="fc" id="L1598">            rectBuf[0] -= ox;</span>
+<span class="fc" id="L1599">            rectBuf[1] -= oy;</span>
+<span class="fc" id="L1600">            applySettle(card.getId(), rectBuf);</span>
+<span class="fc" id="L1601">            rectBuf[0] += ox;</span>
+<span class="fc" id="L1602">            rectBuf[1] += oy;</span>
+<span class="fc bfc" id="L1603" title="All 4 branches covered.">            if (rectBuf[1] &lt; clipBottom &amp;&amp; rectBuf[1] + rectBuf[3] &gt; clipTop) {</span>
+<span class="fc bfc" id="L1604" title="All 2 branches covered.">                renderer.paintCard(g, this, card, rectBuf[0], rectBuf[1], rectBuf[2], rectBuf[3],</span>
+                        card == selected, 0f); // NOPMD CompareObjectsWithEquals - the selected card itself
+<span class="fc" id="L1606">                paintCardComponent(g, card, rectBuf[0], rectBuf[1], rectBuf[2], rectBuf[3]);</span>
+            }
+<span class="fc" id="L1608">            ry += h + gap;</span>
+<span class="fc" id="L1609">            index++;</span>
+        }
+<span class="pc bpc" id="L1611" title="6 of 8 branches missed.">        if (addH &gt; 0 &amp;&amp; !(editor != null &amp;&amp; editCard == null &amp;&amp; cols.get(c) == editColumn // NOPMD CompareObjectsWithEquals - the cell being typed in</span>
+<span class="nc bnc" id="L1612" title="All 4 branches missed.">                &amp;&amp; (lanes.isEmpty() || lanes.get(l) == editLane))) { // NOPMD CompareObjectsWithEquals - the lane being typed in</span>
+<span class="fc" id="L1613">            Style as = KanbanLook.style(&quot;KanbanAddCard&quot;);</span>
+<span class="fc" id="L1614">            Font f = as.getFont();</span>
+<span class="fc" id="L1615">            g.setFont(f);</span>
+<span class="fc" id="L1616">            g.setColor(as.getFgColor());</span>
+<span class="fc" id="L1617">            g.drawString(KanbanLook.fit(addCardText, f, w - pad), cx + pad / 2, ry + (addH - f.getHeight()) / 2);</span>
+        }
+<span class="fc" id="L1619">    }</span>
+
+    private void paintSlot(Graphics g, int x, int y, int w, int h) {
+<span class="nc bnc" id="L1622" title="All 2 branches missed.">        if (h &lt;= 2) {</span>
+<span class="nc" id="L1623">            return;</span>
+        }
+<span class="nc bnc" id="L1625" title="All 2 branches missed.">        Style s = KanbanLook.style(dropAllowed ? &quot;KanbanDropSlot&quot; : &quot;KanbanColumnOverLimit&quot;);</span>
+<span class="nc" id="L1626">        int arc = KanbanLook.mm(1.6f);</span>
+<span class="nc" id="L1627">        g.setColor(KanbanLook.bg(s, 0xd3e3fd));</span>
+<span class="nc" id="L1628">        g.fillRoundRect(x, y, w, h, arc, arc);</span>
+<span class="nc" id="L1629">        g.setColor(s.getFgColor());</span>
+<span class="nc" id="L1630">        g.drawRoundRect(x, y, w - 1, h - 1, arc, arc);</span>
+<span class="nc" id="L1631">    }</span>
+
+    private void paintHeader(Graphics g, int x, int y) {
+<span class="fc" id="L1634">        Style bs = KanbanLook.style(&quot;KanbanBoard&quot;);</span>
+<span class="fc" id="L1635">        Style cs = KanbanLook.style(&quot;KanbanColumn&quot;);</span>
+<span class="fc" id="L1636">        Style hs = KanbanLook.style(&quot;KanbanColumnHeader&quot;);</span>
+<span class="fc" id="L1637">        Style os = KanbanLook.style(&quot;KanbanColumnOverLimit&quot;);</span>
+<span class="fc" id="L1638">        int boardBg = KanbanLook.bg(bs, 0xf7f7fa);</span>
+<span class="fc" id="L1639">        g.setColor(boardBg);</span>
+<span class="fc" id="L1640">        g.fillRect(g.getClipX(), g.getClipY(), g.getClipWidth(), g.getClipHeight());</span>
+<span class="fc" id="L1641">        boolean aa = g.isAntiAliased();</span>
+<span class="fc" id="L1642">        g.setAntiAliased(true);</span>
+<span class="fc" id="L1643">        int arc = KanbanLook.mm(2);</span>
+<span class="fc" id="L1644">        int colBg = KanbanLook.bg(cs, KanbanLook.mix(boardBg, bs.getFgColor(), 16));</span>
+<span class="fc" id="L1645">        int a = g.getAlpha();</span>
+<span class="fc bfc" id="L1646" title="All 2 branches covered.">        for (int c = 0; c &lt; colX.length; c++) {</span>
+<span class="fc" id="L1647">            int cx = x + colX[c];</span>
+<span class="pc bpc" id="L1648" title="1 of 4 branches missed.">            if (cx &gt; g.getClipX() + g.getClipWidth() || cx + colW[c] &lt; g.getClipX()) {</span>
+<span class="nc" id="L1649">                continue;</span>
+            }
+<span class="pc bpc" id="L1651" title="1 of 2 branches missed.">            g.setAlpha(cols.get(c) == dragColumn ? alpha(a, 110) : a); // NOPMD CompareObjectsWithEquals - the dragged column itself</span>
+<span class="fc" id="L1652">            paintColumnTitle(g, cols.get(c), cx, y, colW[c], colBg, arc, hs, os);</span>
+<span class="fc" id="L1653">            g.setAlpha(a);</span>
+        }
+<span class="fc" id="L1655">        g.setAntiAliased(aa);</span>
+<span class="fc" id="L1656">    }</span>
+
+    private void paintColumnTitle(Graphics g, KanbanColumn column, int x, int y, int w, int colBg, int arc,
+            Style hs, Style os) {
+<span class="fc" id="L1660">        int top = y + gap / 2;</span>
+<span class="fc" id="L1661">        g.setColor(colBg);</span>
+<span class="fc" id="L1662">        g.fillRoundRect(x, top, w, headerH + arc, arc, arc);</span>
+<span class="fc" id="L1663">        Font f = hs.getFont();</span>
+<span class="fc" id="L1664">        int count = model.getCardCount(column);</span>
+<span class="fc" id="L1665">        int limit = column.getWipLimit();</span>
+<span class="fc bfc" id="L1666" title="All 4 branches covered.">        boolean over = limit &gt; 0 &amp;&amp; count &gt; limit;</span>
+<span class="fc bfc" id="L1667" title="All 2 branches covered.">        String counted = limit &gt; 0 ? count + &quot;/&quot; + limit : String.valueOf(count);</span>
+<span class="fc" id="L1668">        int ty = top + (headerH - gap / 2 - f.getHeight()) / 2;</span>
+<span class="fc" id="L1669">        g.setFont(f);</span>
+<span class="fc" id="L1670">        int cw = f.stringWidth(counted);</span>
+<span class="pc bpc" id="L1671" title="1 of 2 branches missed.">        if (column.isCollapsed()) {</span>
+<span class="nc bnc" id="L1672" title="All 2 branches missed.">            g.setColor(over ? os.getFgColor() : hs.getFgColor());</span>
+<span class="nc" id="L1673">            g.drawString(String.valueOf(count), x + (w - f.stringWidth(String.valueOf(count))) / 2, ty);</span>
+<span class="nc" id="L1674">            return;</span>
+        }
+        // the mark that folds the column, then the count, from the trailing edge
+<span class="fc" id="L1677">        int mark = Math.max(3, f.getHeight() / 4);</span>
+<span class="fc" id="L1678">        int mx = x + w - pad - mark;</span>
+<span class="fc" id="L1679">        int my = top + (headerH - gap / 2) / 2;</span>
+<span class="fc" id="L1680">        g.setColor(KanbanLook.mix(colBg, hs.getFgColor(), 150));</span>
+<span class="fc" id="L1681">        g.fillTriangle(mx + mark / 2, my - mark, mx + mark / 2, my + mark, mx - mark / 2 - 1, my);</span>
+<span class="fc" id="L1682">        int right = mx - mark - pad;</span>
+<span class="fc bfc" id="L1683" title="All 2 branches covered.">        if (over) {</span>
+<span class="fc" id="L1684">            int pillPad = Math.max(2, pad / 2);</span>
+<span class="fc" id="L1685">            g.setColor(KanbanLook.bg(os, 0xf9dedc));</span>
+<span class="fc" id="L1686">            g.fillRoundRect(right - cw - pillPad * 2, ty, cw + pillPad * 2, f.getHeight(), f.getHeight(), f.getHeight());</span>
+<span class="fc" id="L1687">            g.setColor(os.getFgColor());</span>
+<span class="fc" id="L1688">            g.drawString(counted, right - cw - pillPad, ty);</span>
+<span class="fc" id="L1689">            right -= cw + pillPad * 2 + pad;</span>
+<span class="fc" id="L1690">        } else {</span>
+<span class="fc" id="L1691">            g.setColor(KanbanLook.mix(colBg, hs.getFgColor(), 150));</span>
+<span class="fc" id="L1692">            g.drawString(counted, right - cw, ty);</span>
+<span class="fc" id="L1693">            right -= cw + pad;</span>
+        }
+<span class="fc" id="L1695">        g.setColor(hs.getFgColor());</span>
+<span class="fc" id="L1696">        g.drawString(KanbanLook.fit(column.getTitle(), f, right - x - pad), x + pad, ty);</span>
+<span class="fc" id="L1697">    }</span>
+
+    private void paintDrag(Graphics g, int x, int y) {
+<span class="nc" id="L1700">        boolean aa = g.isAntiAliased();</span>
+<span class="nc" id="L1701">        g.setAntiAliased(true);</span>
+<span class="nc bnc" id="L1702" title="All 2 branches missed.">        if (dragCard != null) {</span>
+<span class="nc" id="L1703">            renderer.paintCard(g, this, dragCard, x + dragX - grabX, y + dragY - grabY, dragW, dragH, true,</span>
+<span class="nc" id="L1704">                    getLiftLevel());</span>
+<span class="nc" id="L1705">            paintCardComponent(g, dragCard, x + dragX - grabX, y + dragY - grabY, dragW, dragH);</span>
+<span class="nc bnc" id="L1706" title="All 2 branches missed.">        } else if (dragColumn != null) {</span>
+<span class="nc" id="L1707">            Style cs = KanbanLook.style(&quot;KanbanColumn&quot;);</span>
+<span class="nc" id="L1708">            Style hs = KanbanLook.style(&quot;KanbanColumnHeader&quot;);</span>
+<span class="nc" id="L1709">            int arc = KanbanLook.mm(2);</span>
+<span class="nc" id="L1710">            int w = colW[dragColumnFrom];</span>
+<span class="nc" id="L1711">            int gx = x + dragX - grabX;</span>
+<span class="nc" id="L1712">            KanbanLook.shadow(g, gx, y + gap / 2, w, headerH, arc, 1.5f);</span>
+<span class="nc" id="L1713">            int cx = g.getClipX();</span>
+<span class="nc" id="L1714">            int cy = g.getClipY();</span>
+<span class="nc" id="L1715">            int cw = g.getClipWidth();</span>
+<span class="nc" id="L1716">            int ch = g.getClipHeight();</span>
+<span class="nc" id="L1717">            g.clipRect(gx - arc * 2, y, w + arc * 4, headerH + gap);</span>
+<span class="nc" id="L1718">            paintColumnTitle(g, dragColumn, gx, y, w, KanbanLook.bg(cs, 0xece9f1), arc, hs,</span>
+<span class="nc" id="L1719">                    KanbanLook.style(&quot;KanbanColumnOverLimit&quot;));</span>
+<span class="nc" id="L1720">            g.setClip(cx, cy, cw, ch);</span>
+            // where it would land
+<span class="nc" id="L1722">            int at = 0;</span>
+<span class="nc" id="L1723">            int lineX = gap / 2;</span>
+<span class="nc bnc" id="L1724" title="All 2 branches missed.">            for (int c = 0; c &lt; cols.size(); c++) {</span>
+<span class="nc bnc" id="L1725" title="All 2 branches missed.">                if (c == dragColumnFrom) {</span>
+<span class="nc" id="L1726">                    continue;</span>
+                }
+<span class="nc bnc" id="L1728" title="All 2 branches missed.">                if (at == dragColumnTo) {</span>
+<span class="nc" id="L1729">                    break;</span>
+                }
+<span class="nc" id="L1731">                lineX = colX[c] + colW[c] + gap / 2;</span>
+<span class="nc" id="L1732">                at++;</span>
+            }
+<span class="nc" id="L1734">            g.setColor(KanbanLook.style(&quot;KanbanCardSelected&quot;).getFgColor());</span>
+<span class="nc" id="L1735">            int lw = Math.max(2, KanbanLook.mm(0.5f));</span>
+<span class="nc" id="L1736">            g.fillRect(x + lineX - getOffsetX() - lw / 2, y, lw, getHeight());</span>
+        }
+<span class="nc" id="L1738">        g.setAntiAliased(aa);</span>
+<span class="nc" id="L1739">    }</span>
+
+    /// Paints the whole board, every column and card of it, into a new
+    /// image no larger than the given size, without the selection. For a
+    /// thumbnail, a share sheet or a printout.
+    public Image toImage(int maxWidth, int maxHeight) {
+<span class="fc" id="L1745">        endEdit(true);</span>
+<span class="fc" id="L1746">        ensureLayout();</span>
+<span class="fc" id="L1747">        int w = Math.max(1, contentW);</span>
+<span class="fc" id="L1748">        int h = Math.max(1, headerH + contentH);</span>
+<span class="fc" id="L1749">        float ratio = Math.min(1, Math.min(maxWidth / (float) w, maxHeight / (float) h));</span>
+<span class="fc" id="L1750">        int tw = Math.max(1, Math.round(w * ratio));</span>
+<span class="fc" id="L1751">        int th = Math.max(1, Math.round(h * ratio));</span>
+<span class="fc" id="L1752">        KanbanCard sel = selected;</span>
+<span class="fc" id="L1753">        selected = null;</span>
+        try {
+<span class="fc bfc" id="L1755" title="All 2 branches covered.">            if (ratio &gt;= 1) {</span>
+<span class="fc" id="L1756">                Image img = Image.createImage(w, h, 0xffffffff);</span>
+<span class="fc" id="L1757">                paintBand(img.getGraphics(), w, 0, h);</span>
+<span class="fc" id="L1758">                return img;</span>
+            }
+            // a long board is painted a band at a time and each band scaled
+            // into the result, so memory follows the band's height and not
+            // the board's; a band is as wide as the whole board
+<span class="fc" id="L1763">            Image out = Image.createImage(tw, th, 0xffffffff);</span>
+<span class="fc" id="L1764">            Graphics og = out.getGraphics();</span>
+<span class="fc" id="L1765">            int band = Math.max(1, Math.min(h, 1024));</span>
+<span class="fc" id="L1766">            Image strip = Image.createImage(w, band, 0xffffffff);</span>
+<span class="fc" id="L1767">            Graphics sg = strip.getGraphics();</span>
+<span class="fc bfc" id="L1768" title="All 2 branches covered.">            for (int y0 = 0; y0 &lt; h; y0 += band) {</span>
+<span class="fc" id="L1769">                int bh = Math.min(band, h - y0);</span>
+<span class="fc" id="L1770">                sg.setClip(0, 0, w, band);</span>
+<span class="fc" id="L1771">                sg.setColor(0xffffff);</span>
+<span class="fc" id="L1772">                sg.fillRect(0, 0, w, band);</span>
+<span class="fc" id="L1773">                paintBand(sg, w, y0, bh);</span>
+<span class="fc" id="L1774">                int ty = Math.round(y0 * ratio);</span>
+<span class="fc" id="L1775">                int tb = Math.max(1, Math.round((y0 + bh) * ratio) - ty);</span>
+<span class="fc bfc" id="L1776" title="All 2 branches covered.">                og.drawImage(bh == band ? strip : strip.subImage(0, 0, w, bh, true), 0, ty, tw, tb);</span>
+            }
+<span class="fc" id="L1778">            return out;</span>
+        } finally {
+<span class="fc" id="L1780">            selected = sel;</span>
+        }
+    }
+
+    // Paints rows y0 to y0 + bh of the whole picture into g, at its top.
+    private void paintBand(Graphics g, int w, int y0, int bh) {
+<span class="fc bfc" id="L1786" title="All 2 branches covered.">        if (y0 &lt; headerH) {</span>
+<span class="fc" id="L1787">            g.setClip(0, 0, w, Math.min(bh, headerH - y0));</span>
+<span class="fc" id="L1788">            paintHeader(g, 0, -y0);</span>
+        }
+<span class="fc" id="L1790">        int top = Math.max(0, headerH - y0);</span>
+<span class="pc bpc" id="L1791" title="1 of 2 branches missed.">        if (top &lt; bh) {</span>
+<span class="fc" id="L1792">            g.setClip(0, top, w, bh - top);</span>
+<span class="fc" id="L1793">            paintBoard(g, 0, headerH - y0);</span>
+        }
+<span class="fc" id="L1795">    }</span>
+
+    /// Where the field a title is typed in goes, in the board's own
+    /// coordinates; false while its card or its cell is not shown.
+    private boolean editorRect(int[] out) {
+<span class="pc bpc" id="L1800" title="1 of 2 branches missed.">        if (editor == null) {</span>
+<span class="nc" id="L1801">            return false;</span>
+        }
+<span class="fc" id="L1803">        int ph = editor.getPreferredH();</span>
+<span class="fc" id="L1804">        int ox = getOffsetX();</span>
+<span class="fc" id="L1805">        int oy = getOffsetY() - headerH;</span>
+<span class="fc bfc" id="L1806" title="All 2 branches covered.">        if (editCard != null) {</span>
+<span class="fc" id="L1807">            int[] at = locate(editCard);</span>
+<span class="pc bpc" id="L1808" title="2 of 4 branches missed.">            if (at == null || !cardRect(at[0], at[1], at[2], out)) {</span>
+<span class="nc" id="L1809">                return false;</span>
+            }
+<span class="fc" id="L1811">            out[0] -= ox;</span>
+<span class="fc" id="L1812">            out[1] -= oy;</span>
+<span class="fc" id="L1813">            out[3] = Math.max(ph, Math.min(out[3], ph * 2));</span>
+<span class="fc" id="L1814">        } else {</span>
+<span class="fc" id="L1815">            int c = cols.indexOf(editColumn);</span>
+<span class="pc bpc" id="L1816" title="1 of 2 branches missed.">            int l = editLane == null ? 0 : lanes.indexOf(editLane);</span>
+<span class="pc bpc" id="L1817" title="4 of 8 branches missed.">            if (c &lt; 0 || l &lt; 0 || l &gt;= cells.length || !cellShown(l, c)) {</span>
+<span class="nc" id="L1818">                return false;</span>
+            }
+<span class="fc" id="L1820">            out[0] = colX[c] + pad - ox;</span>
+<span class="fc" id="L1821">            out[1] = laneTop[l] + bandH + cells[l][c].addY - oy;</span>
+<span class="fc" id="L1822">            out[2] = colW[c] - pad * 2;</span>
+<span class="fc" id="L1823">            out[3] = ph;</span>
+        }
+        // the pinned titles cannot clip a field: under them it hides
+<span class="pc bpc" id="L1826" title="2 of 4 branches missed.">        return out[1] &gt;= headerH &amp;&amp; out[1] &lt; getHeight();</span>
+    }
+
+    private void placeEditor() {
+<span class="pc bpc" id="L1830" title="1 of 2 branches missed.">        if (editorHolder != null) {</span>
+<span class="nc" id="L1831">            editorHolder.revalidate();</span>
+        }
+<span class="fc" id="L1833">    }</span>
+
+    /// Where the component of a card is drawn, given the card's rectangle:
+    /// along its bottom edge.
+    private boolean componentRect(Component cmp, int cardX, int cardY, int cardW, int cardH, int[] out) {
+<span class="fc" id="L1838">        int ph = cmp.getPreferredH();</span>
+<span class="fc" id="L1839">        out[0] = cardX + pad;</span>
+<span class="fc" id="L1840">        out[1] = cardY + cardH - ph - pad;</span>
+<span class="fc" id="L1841">        out[2] = Math.max(0, cardW - pad * 2);</span>
+<span class="fc" id="L1842">        out[3] = ph;</span>
+<span class="pc bpc" id="L1843" title="2 of 4 branches missed.">        return out[2] &gt; 0 &amp;&amp; ph &gt; 0;</span>
+    }
+
+    /// Draws the component of a card. It is never added to the form: like a
+    /// renderer's, it is given its bounds and painted.
+    private void paintCardComponent(Graphics g, KanbanCard card, int cardX, int cardY, int cardW, int cardH) {
+<span class="fc" id="L1849">        Component cmp = components.get(card.getId());</span>
+<span class="pc bpc" id="L1850" title="1 of 4 branches missed.">        if (cmp == null || !componentRect(cmp, cardX, cardY, cardW, cardH, cmpBuf)) {</span>
+<span class="fc" id="L1851">            return;</span>
+        }
+<span class="fc" id="L1853">        place(cmp, cmpBuf[0], cmpBuf[1], cmpBuf[2], cmpBuf[3]);</span>
+<span class="fc" id="L1854">        cmp.paintComponent(g);</span>
+<span class="fc" id="L1855">    }</span>
+
+    private static void place(Component cmp, int x, int y, int w, int h) {
+<span class="fc" id="L1858">        cmp.setX(x);</span>
+<span class="fc" id="L1859">        cmp.setY(y);</span>
+<span class="fc" id="L1860">        cmp.setWidth(w);</span>
+<span class="fc" id="L1861">        cmp.setHeight(h);</span>
+<span class="pc bpc" id="L1862" title="1 of 2 branches missed.">        if (cmp instanceof Container) {</span>
+<span class="nc" id="L1863">            ((Container) cmp).layoutContainer();</span>
+        }
+<span class="fc" id="L1865">    }</span>
+
+    /// Hands a tap to the component of a card when it lands on it: the
+    /// component is only drawn, so the board delivers the press and the
+    /// release itself.
+    private boolean tapComponent(KanbanCard card, int x, int y) {
+<span class="fc" id="L1871">        Component cmp = components.get(card.getId());</span>
+<span class="fc bfc" id="L1872" title="All 2 branches covered.">        int[] r = cmp == null ? null : getCardBounds(card);</span>
+<span class="pc bpc" id="L1873" title="1 of 4 branches missed.">        if (r == null || !componentRect(cmp, r[0], r[1], r[2], r[3], cmpBuf)) {</span>
+<span class="fc" id="L1874">            return false;</span>
+        }
+<span class="pc bpc" id="L1876" title="3 of 8 branches missed.">        if (x &lt; cmpBuf[0] || x &gt;= cmpBuf[0] + cmpBuf[2] || y &lt; cmpBuf[1] || y &gt;= cmpBuf[1] + cmpBuf[3]) {</span>
+<span class="fc" id="L1877">            return false;</span>
+        }
+<span class="fc" id="L1879">        int ax = getAbsoluteX() + x;</span>
+<span class="fc" id="L1880">        int ay = getAbsoluteY() + y;</span>
+<span class="fc" id="L1881">        place(cmp, getAbsoluteX() + cmpBuf[0], getAbsoluteY() + cmpBuf[1], cmpBuf[2], cmpBuf[3]);</span>
+<span class="fc" id="L1882">        Component target = cmp;</span>
+<span class="pc bpc" id="L1883" title="1 of 2 branches missed.">        if (cmp instanceof Container) {</span>
+<span class="nc" id="L1884">            target = ((Container) cmp).getComponentAt(ax, ay);</span>
+        }
+<span class="pc bpc" id="L1886" title="2 of 4 branches missed.">        if (target == null || !target.isEnabled()) {</span>
+<span class="nc" id="L1887">            return false;</span>
+        }
+<span class="fc" id="L1889">        target.pointerPressed(ax, ay);</span>
+<span class="fc" id="L1890">        target.pointerReleased(ax, ay);</span>
+<span class="fc" id="L1891">        repaint();</span>
+<span class="fc" id="L1892">        return true;</span>
+    }
+
+    // The layer the title field is laid in. It covers the form, so only the
+    // field itself takes the pointer: a tap anywhere else reaches what is
+    // under it.
+    private static final class EditorLayer extends Container {
+        private final Component field;
+
+        EditorLayer(Layout layout, Component field) {
+<span class="fc" id="L1902">            super(layout);</span>
+<span class="fc" id="L1903">            this.field = field;</span>
+<span class="fc" id="L1904">        }</span>
+
+        @Override
+        public boolean contains(int x, int y) {
+<span class="nc" id="L1908">            return field.contains(x, y);</span>
+        }
+    }
+
+    // ---------------------------------------------------------- the surface
+
+    @Override
+    protected void layoutSurface(int width, int height) {
+<span class="pc bpc" id="L1916" title="1 of 4 branches missed.">        if (dirty || width != laidWidth) {</span>
+<span class="fc" id="L1917">            relayout(width);</span>
+        }
+<span class="fc" id="L1919">        setHeaderSize(0, headerH);</span>
+<span class="fc" id="L1920">    }</span>
+
+    @Override
+    protected int getContentWidth() {
+        // asked before the next paint laid out what the model changed
+<span class="fc bfc" id="L1925" title="All 2 branches covered.">        if (dirty) {</span>
+<span class="fc" id="L1926">            layoutSurface(getWidth(), getHeight());</span>
+        }
+<span class="fc" id="L1928">        return contentW;</span>
+    }
+
+    @Override
+    protected int getContentHeight() {
+        // asked before the next paint laid out what the model changed
+<span class="pc bpc" id="L1934" title="1 of 2 branches missed.">        if (dirty) {</span>
+<span class="nc" id="L1935">            layoutSurface(getWidth(), getHeight());</span>
+        }
+<span class="fc" id="L1937">        return contentH;</span>
+    }
+
+    @Override
+    protected void paintContent(Graphics g, int x, int y) {
+<span class="fc" id="L1942">        paintBoard(g, x, y);</span>
+<span class="fc" id="L1943">    }</span>
+
+    @Override
+    protected void paintTopHeader(Graphics g, int x, int y) {
+<span class="fc" id="L1947">        paintHeader(g, x, y);</span>
+<span class="fc" id="L1948">    }</span>
+
+    @Override
+    protected void paintOverlay(Graphics g, int x, int y) {
+<span class="pc bpc" id="L1952" title="2 of 4 branches missed.">        if (dragCard != null || dragColumn != null) {</span>
+<span class="nc" id="L1953">            paintDrag(g, x, y);</span>
+        }
+<span class="fc" id="L1955">    }</span>
+
+    @Override
+    protected Dimension calcPreferredSize() {
+<span class="nc" id="L1959">        return new Dimension(KanbanLook.mm(60), KanbanLook.mm(60));</span>
+    }
+
+    @Override
+    protected void scrollChanged() {
+<span class="fc" id="L1964">        placeEditor();</span>
+<span class="fc" id="L1965">    }</span>
+
+    @Override
+    public void pointerReleased(int x, int y) {
+<span class="fc" id="L1969">        boolean edit = isEditInProgress();</span>
+<span class="fc" id="L1970">        super.pointerReleased(x, y);</span>
+<span class="pc bpc" id="L1971" title="2 of 6 branches missed.">        if (columnSnap &amp;&amp; !edit &amp;&amp; getMaxOffsetX() &gt; 0) {</span>
+<span class="fc" id="L1972">            snapPending = true;</span>
+<span class="fc" id="L1973">            snapMotion = null;</span>
+            // one frame off, so the first frame only watches the fling
+<span class="fc" id="L1975">            snapLastX = getOffsetX() - 1;</span>
+<span class="fc" id="L1976">            requestAnimation();</span>
+        }
+<span class="fc" id="L1978">    }</span>
+
+    @Override
+    protected void pressStarted(int x, int y) {
+<span class="fc" id="L1982">        ensureLayout();</span>
+<span class="fc" id="L1983">        snapPending = false;</span>
+<span class="fc" id="L1984">        snapMotion = null;</span>
+<span class="pc bpc" id="L1985" title="1 of 4 branches missed.">        if (!hasFocus() &amp;&amp; getComponentForm() != null) {</span>
+            // keys: Delete, and copy, paste and undo with Ctrl or Cmd
+<span class="fc" id="L1987">            requestFocus();</span>
+        }
+<span class="fc" id="L1989">    }</span>
+
+    @Override
+    protected boolean editStarted(int x, int y, EditTrigger trigger) {
+<span class="fc" id="L1993">        ensureLayout();</span>
+<span class="fc" id="L1994">        return beginDrag(x, y, trigger);</span>
+    }
+
+    @Override
+    protected void editMoved(int x, int y) {
+<span class="fc" id="L1999">        dragTo(x, y);</span>
+<span class="fc" id="L2000">    }</span>
+
+    @Override
+    protected void editEnded(boolean committed) {
+<span class="fc" id="L2004">        endDrag(committed);</span>
+<span class="fc" id="L2005">    }</span>
+
+    @Override
+    protected void tapped(int x, int y, boolean doubleTap) {
+<span class="fc" id="L2009">        ensureLayout();</span>
+<span class="fc" id="L2010">        tap(x, y, doubleTap);</span>
+<span class="fc" id="L2011">    }</span>
+
+    @Override
+    protected boolean animateSurface() {
+<span class="fc" id="L2015">        boolean snapping = animateSnap();</span>
+        // the gap a held card opens
+<span class="pc bpc" id="L2017" title="5 of 8 branches missed.">        return snapping || dragCard != null &amp;&amp; slotSince != 0 &amp;&amp; currentTime() - slotSince &lt; 120;</span>
+    }
+
+    @Override
+    protected void deinitialize() {
+<span class="fc" id="L2022">        endEdit(true);</span>
+<span class="fc" id="L2023">        super.deinitialize();</span>
+<span class="fc" id="L2024">    }</span>
+
+    @Override
+    public void keyPressed(int keyCode) {
+        // a port answers Enter as the fire key, not as a character
+<span class="pc bpc" id="L2029" title="4 of 8 branches missed.">        boolean fire = keyCode != 10 &amp;&amp; keyCode != 13 &amp;&amp; editor == null &amp;&amp; selected != null</span>
+<span class="pc bpc" id="L2030" title="1 of 2 branches missed.">                &amp;&amp; Display.getInstance().getGameAction(keyCode) == Display.GAME_FIRE;</span>
+<span class="pc bpc" id="L2031" title="2 of 4 branches missed.">        if (!keyTyped(fire ? 10 : keyCode)) {</span>
+<span class="nc" id="L2032">            super.keyPressed(keyCode);</span>
+        }
+<span class="fc" id="L2034">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

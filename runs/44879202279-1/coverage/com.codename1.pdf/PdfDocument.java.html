@@ -1,0 +1,391 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PdfDocument.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.pdf</a> &gt; <span class="el_source">PdfDocument.java</span></div><h1>PdfDocument.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.pdf;
+
+import com.codename1.impl.pdf.FontState;
+import com.codename1.impl.pdf.PdfFormat;
+import com.codename1.impl.pdf.PdfWriter;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/// Builds a PDF file. Works the same in an application and on a Codename
+/// One backend server: nothing here needs a display.
+///
+/// ```java
+/// PdfDocument doc = new PdfDocument();
+/// doc.setTitle(&quot;Invoice 2031&quot;);
+/// PdfPage page = doc.addPage(PdfPageSize.A4);
+/// PdfCanvas c = page.getCanvas();
+/// c.setFont(PdfFont.HELVETICA_BOLD, 20);
+/// c.drawText(&quot;Invoice 2031&quot;, 72, 96);
+/// byte[] pdf = doc.toByteArray();
+/// ```
+///
+/// For flowing text, tables and automatic page breaks use [PdfLayout] on
+/// top of a document. A document is not safe for use by several threads
+/// at once, but separate documents are independent.
+@com.codename1.impl.SharedWithBackend
+<span class="fc" id="L53">public final class PdfDocument {</span>
+<span class="fc" id="L54">    private final List&lt;PdfPage&gt; pages = new ArrayList&lt;PdfPage&gt;();</span>
+<span class="fc" id="L55">    private final Map&lt;PdfFont, FontState&gt; fonts = new HashMap&lt;PdfFont, FontState&gt;();</span>
+<span class="fc" id="L56">    private final List&lt;FontState&gt; fontOrder = new ArrayList&lt;FontState&gt;();</span>
+<span class="fc" id="L57">    private final Map&lt;PdfImage, String&gt; imageNames = new HashMap&lt;PdfImage, String&gt;();</span>
+<span class="fc" id="L58">    private final List&lt;PdfImage&gt; imageOrder = new ArrayList&lt;PdfImage&gt;();</span>
+<span class="fc" id="L59">    private final Map&lt;PdfImage, Integer&gt; imageObjects = new HashMap&lt;PdfImage, Integer&gt;();</span>
+<span class="fc" id="L60">    private final Map&lt;String, String&gt; extGStates = new HashMap&lt;String, String&gt;();</span>
+<span class="fc" id="L61">    private final List&lt;String&gt; extGStateOrder = new ArrayList&lt;String&gt;();</span>
+<span class="fc" id="L62">    private final List&lt;PdfBookmark&gt; bookmarks = new ArrayList&lt;PdfBookmark&gt;();</span>
+    private String title;
+    private String author;
+    private String subject;
+    private String keywords;
+    private String creator;
+<span class="fc" id="L68">    private long creationDate = System.currentTimeMillis();</span>
+<span class="fc" id="L69">    private boolean compress = true;</span>
+
+    /// Adds a page of `size` at the end of the document.
+    public PdfPage addPage(PdfPageSize size) {
+<span class="fc" id="L73">        PdfPage p = new PdfPage(this, size.getWidth(), size.getHeight());</span>
+<span class="fc" id="L74">        pages.add(p);</span>
+<span class="fc" id="L75">        return p;</span>
+    }
+
+    /// Adds a page of `width` by `height` points.
+    public PdfPage addPage(float width, float height) {
+<span class="nc" id="L80">        return addPage(new PdfPageSize(width, height));</span>
+    }
+
+    /// The number of pages so far.
+    public int getPageCount() {
+<span class="fc" id="L85">        return pages.size();</span>
+    }
+
+    /// Page `index`, from zero.
+    public PdfPage getPage(int index) {
+<span class="nc" id="L90">        return pages.get(index);</span>
+    }
+
+    int indexOf(PdfPage page) {
+<span class="nc" id="L94">        return pages.indexOf(page);</span>
+    }
+
+    /// Adds a top-level outline entry that jumps to `y` points from the
+    /// top of `page`.
+    public PdfBookmark addBookmark(String title, PdfPage page, float y) {
+<span class="nc bnc" id="L100" title="All 2 branches missed.">        if (page.document() != this) { // NOPMD CompareObjectsWithEquals - the same document object is required</span>
+<span class="nc" id="L101">            throw new IllegalArgumentException(&quot;The page belongs to another document&quot;);</span>
+        }
+<span class="nc" id="L103">        PdfBookmark b = new PdfBookmark(title, page, y);</span>
+<span class="nc" id="L104">        bookmarks.add(b);</span>
+<span class="nc" id="L105">        return b;</span>
+    }
+
+    /// Sets the document title readers show in place of the file name.
+    public PdfDocument setTitle(String title) {
+<span class="fc" id="L110">        this.title = title;</span>
+<span class="fc" id="L111">        return this;</span>
+    }
+
+    /// Sets the author metadata.
+    public PdfDocument setAuthor(String author) {
+<span class="fc" id="L116">        this.author = author;</span>
+<span class="fc" id="L117">        return this;</span>
+    }
+
+    /// Sets the subject metadata.
+    public PdfDocument setSubject(String subject) {
+<span class="nc" id="L122">        this.subject = subject;</span>
+<span class="nc" id="L123">        return this;</span>
+    }
+
+    /// Sets the keywords metadata.
+    public PdfDocument setKeywords(String keywords) {
+<span class="nc" id="L128">        this.keywords = keywords;</span>
+<span class="nc" id="L129">        return this;</span>
+    }
+
+    /// Sets the name of the application that created the content.
+    public PdfDocument setCreator(String creator) {
+<span class="nc" id="L134">        this.creator = creator;</span>
+<span class="nc" id="L135">        return this;</span>
+    }
+
+    /// Sets the creation date, in milliseconds since the epoch; defaults to
+    /// the time the document object was made.
+    public PdfDocument setCreationDate(long millis) {
+<span class="nc" id="L141">        this.creationDate = millis;</span>
+<span class="nc" id="L142">        return this;</span>
+    }
+
+    /// Turns stream compression off, for a file that can be read in a text
+    /// editor while debugging. On by default.
+    public PdfDocument setCompress(boolean compress) {
+<span class="fc" id="L148">        this.compress = compress;</span>
+<span class="fc" id="L149">        return this;</span>
+    }
+
+    FontState fontState(PdfFont font) {
+<span class="fc" id="L153">        FontState s = fonts.get(font);</span>
+<span class="fc bfc" id="L154" title="All 2 branches covered.">        if (s == null) {</span>
+<span class="fc" id="L155">            s = font.createState();</span>
+<span class="fc" id="L156">            s.resourceName = &quot;F&quot; + (fontOrder.size() + 1);</span>
+<span class="fc" id="L157">            fonts.put(font, s);</span>
+<span class="fc" id="L158">            fontOrder.add(s);</span>
+        }
+<span class="fc" id="L160">        return s;</span>
+    }
+
+    String imageName(PdfImage image) {
+<span class="nc" id="L164">        String n = imageNames.get(image);</span>
+<span class="nc bnc" id="L165" title="All 2 branches missed.">        if (n == null) {</span>
+<span class="nc" id="L166">            n = &quot;Im&quot; + (imageOrder.size() + 1);</span>
+<span class="nc" id="L167">            imageNames.put(image, n);</span>
+<span class="nc" id="L168">            imageOrder.add(image);</span>
+        }
+<span class="nc" id="L170">        return n;</span>
+    }
+
+    int imageObject(PdfImage image) {
+<span class="nc" id="L174">        return imageObjects.get(image).intValue();</span>
+    }
+
+    String extGState(String key, float value) {
+<span class="nc" id="L178">        StringBuilder sb = new StringBuilder(&quot;/&quot;).append(key).append(' ');</span>
+<span class="nc" id="L179">        PdfFormat.number(sb, value);</span>
+<span class="nc" id="L180">        String body = sb.toString();</span>
+<span class="nc" id="L181">        String name = extGStates.get(body);</span>
+<span class="nc bnc" id="L182" title="All 2 branches missed.">        if (name == null) {</span>
+<span class="nc" id="L183">            name = &quot;GS&quot; + (extGStateOrder.size() + 1);</span>
+<span class="nc" id="L184">            extGStates.put(body, name);</span>
+<span class="nc" id="L185">            extGStateOrder.add(body);</span>
+        }
+<span class="nc" id="L187">        return name;</span>
+    }
+
+    private int[] extGStateObjects;
+
+    String extGStateResources() {
+<span class="fc" id="L193">        StringBuilder sb = new StringBuilder();</span>
+<span class="pc bpc" id="L194" title="1 of 2 branches missed.">        for (int i = 0; i &lt; extGStateOrder.size(); i++) {</span>
+<span class="nc" id="L195">            sb.append('/').append(extGStates.get(extGStateOrder.get(i))).append(' ')</span>
+<span class="nc" id="L196">                    .append(extGStateObjects[i]).append(&quot; 0 R &quot;);</span>
+        }
+<span class="fc" id="L198">        return sb.toString();</span>
+    }
+
+    /// Writes the document to `out`. The stream is flushed, not closed.
+    /// A document with no pages gets one empty page, since a PDF must have
+    /// at least one.
+    public void save(OutputStream out) throws IOException {
+<span class="pc bpc" id="L205" title="1 of 2 branches missed.">        if (pages.isEmpty()) {</span>
+<span class="nc" id="L206">            addPage(PdfPageSize.A4);</span>
+        }
+<span class="fc" id="L208">        PdfWriter w = new PdfWriter(out);</span>
+<span class="fc" id="L209">        int catalog = w.reserve();</span>
+<span class="fc" id="L210">        int tree = w.reserve();</span>
+<span class="fc bfc" id="L211" title="All 2 branches covered.">        for (int i = 0; i &lt; pages.size(); i++) { // NOPMD ForLoopCanBeForeach - indexed like the surrounding decoder loops</span>
+<span class="fc" id="L212">            pages.get(i).objectNumber = w.reserve();</span>
+        }
+<span class="fc bfc" id="L214" title="All 2 branches covered.">        for (int i = 0; i &lt; fontOrder.size(); i++) { // NOPMD ForLoopCanBeForeach - indexed like the surrounding decoder loops</span>
+<span class="fc" id="L215">            fontOrder.get(i).objectNumber = w.reserve();</span>
+        }
+<span class="pc bpc" id="L217" title="1 of 2 branches missed.">        for (int i = 0; i &lt; imageOrder.size(); i++) { // NOPMD ForLoopCanBeForeach - indexed like the surrounding decoder loops</span>
+<span class="nc" id="L218">            imageObjects.put(imageOrder.get(i), Integer.valueOf(w.reserve()));</span>
+        }
+<span class="fc" id="L220">        extGStateObjects = new int[extGStateOrder.size()];</span>
+<span class="pc bpc" id="L221" title="1 of 2 branches missed.">        for (int i = 0; i &lt; extGStateObjects.length; i++) {</span>
+<span class="nc" id="L222">            extGStateObjects[i] = w.reserve();</span>
+<span class="nc" id="L223">            w.object(extGStateObjects[i], &quot;&lt;&lt;/Type /ExtGState &quot; + extGStateOrder.get(i) + &quot;&gt;&gt;&quot;);</span>
+        }
+<span class="fc" id="L225">        StringBuilder kids = new StringBuilder();</span>
+<span class="fc bfc" id="L226" title="All 2 branches covered.">        for (int i = 0; i &lt; pages.size(); i++) { // NOPMD ForLoopCanBeForeach - indexed like the surrounding decoder loops</span>
+<span class="fc" id="L227">            PdfPage p = pages.get(i);</span>
+<span class="fc" id="L228">            int content = w.reserve();</span>
+<span class="fc" id="L229">            w.stream(content, &quot;&quot;, PdfFormat.ascii(p.content()), compress);</span>
+<span class="fc" id="L230">            StringBuilder sb = new StringBuilder(&quot;&lt;&lt;/Type /Page /Parent &quot;).append(tree).append(&quot; 0 R /MediaBox [0 0 &quot;);</span>
+<span class="fc" id="L231">            PdfFormat.number(sb, p.getWidth());</span>
+<span class="fc" id="L232">            sb.append(' ');</span>
+<span class="fc" id="L233">            PdfFormat.number(sb, p.getHeight());</span>
+<span class="fc" id="L234">            sb.append(&quot;] /Resources &quot;).append(p.resources()).append(&quot; /Contents &quot;).append(content).append(&quot; 0 R&quot;)</span>
+<span class="fc" id="L235">                    .append(p.annotations()).append(&quot;&gt;&gt;&quot;);</span>
+<span class="fc" id="L236">            w.object(p.objectNumber, sb.toString());</span>
+<span class="fc" id="L237">            kids.append(p.objectNumber).append(&quot; 0 R &quot;);</span>
+        }
+<span class="fc" id="L239">        w.object(tree, &quot;&lt;&lt;/Type /Pages /Kids [&quot; + kids + &quot;] /Count &quot; + pages.size() + &quot;&gt;&gt;&quot;);</span>
+<span class="fc bfc" id="L240" title="All 2 branches covered.">        for (int i = 0; i &lt; fontOrder.size(); i++) { // NOPMD ForLoopCanBeForeach - indexed like the surrounding decoder loops</span>
+<span class="fc" id="L241">            fontOrder.get(i).write(w);</span>
+        }
+<span class="pc bpc" id="L243" title="1 of 2 branches missed.">        for (int i = 0; i &lt; imageOrder.size(); i++) { // NOPMD ForLoopCanBeForeach - indexed like the surrounding decoder loops</span>
+<span class="nc" id="L244">            PdfImage img = imageOrder.get(i);</span>
+<span class="nc" id="L245">            img.write(w, imageObject(img));</span>
+        }
+<span class="pc bpc" id="L247" title="1 of 2 branches missed.">        int outlines = bookmarks.isEmpty() ? 0 : writeOutlines(w);</span>
+<span class="fc" id="L248">        StringBuilder cat = new StringBuilder(&quot;&lt;&lt;/Type /Catalog /Pages &quot;).append(tree).append(&quot; 0 R&quot;);</span>
+<span class="pc bpc" id="L249" title="1 of 2 branches missed.">        if (outlines &gt; 0) {</span>
+<span class="nc" id="L250">            cat.append(&quot; /Outlines &quot;).append(outlines).append(&quot; 0 R /PageMode /UseOutlines&quot;);</span>
+        }
+<span class="fc" id="L252">        cat.append(&quot;&gt;&gt;&quot;);</span>
+<span class="fc" id="L253">        w.object(catalog, cat.toString());</span>
+<span class="fc" id="L254">        int info = w.reserve();</span>
+<span class="fc" id="L255">        w.object(info, info());</span>
+<span class="fc" id="L256">        w.finish(catalog, info, fileId());</span>
+<span class="fc" id="L257">    }</span>
+
+    /// Returns the document as the bytes of a PDF file.
+    public byte[] toByteArray() throws IOException {
+<span class="fc" id="L261">        ByteArrayOutputStream bo = new ByteArrayOutputStream();</span>
+<span class="fc" id="L262">        save(bo);</span>
+<span class="fc" id="L263">        return bo.toByteArray();</span>
+    }
+
+    private int writeOutlines(PdfWriter w) throws IOException {
+<span class="nc" id="L267">        int root = w.reserve();</span>
+<span class="nc" id="L268">        reserve(w, bookmarks);</span>
+<span class="nc" id="L269">        int total = writeLevel(w, bookmarks, root);</span>
+<span class="nc" id="L270">        w.object(root, &quot;&lt;&lt;/Type /Outlines /First &quot; + bookmarks.get(0).objectNumber + &quot; 0 R /Last &quot;</span>
+<span class="nc" id="L271">                + bookmarks.get(bookmarks.size() - 1).objectNumber + &quot; 0 R /Count &quot; + total + &quot;&gt;&gt;&quot;);</span>
+<span class="nc" id="L272">        return root;</span>
+    }
+
+    private static void reserve(PdfWriter w, List&lt;PdfBookmark&gt; level) {
+<span class="nc bnc" id="L276" title="All 2 branches missed.">        for (int i = 0; i &lt; level.size(); i++) { // NOPMD ForLoopCanBeForeach - indexed like the surrounding decoder loops</span>
+<span class="nc" id="L277">            PdfBookmark b = level.get(i);</span>
+<span class="nc" id="L278">            b.objectNumber = w.reserve();</span>
+<span class="nc" id="L279">            reserve(w, b.children);</span>
+        }
+<span class="nc" id="L281">    }</span>
+
+    private int writeLevel(PdfWriter w, List&lt;PdfBookmark&gt; level, int parent) throws IOException {
+<span class="nc" id="L284">        int count = 0;</span>
+<span class="nc bnc" id="L285" title="All 2 branches missed.">        for (int i = 0; i &lt; level.size(); i++) {</span>
+<span class="nc" id="L286">            PdfBookmark b = level.get(i);</span>
+<span class="nc bnc" id="L287" title="All 2 branches missed.">            int below = b.children.isEmpty() ? 0 : writeLevel(w, b.children, b.objectNumber);</span>
+<span class="nc" id="L288">            StringBuilder sb = new StringBuilder(&quot;&lt;&lt;/Title &quot;);</span>
+<span class="nc" id="L289">            PdfFormat.textString(sb, b.title);</span>
+<span class="nc" id="L290">            sb.append(&quot; /Parent &quot;).append(parent).append(&quot; 0 R&quot;);</span>
+<span class="nc bnc" id="L291" title="All 2 branches missed.">            if (i &gt; 0) {</span>
+<span class="nc" id="L292">                sb.append(&quot; /Prev &quot;).append(level.get(i - 1).objectNumber).append(&quot; 0 R&quot;);</span>
+            }
+<span class="nc bnc" id="L294" title="All 2 branches missed.">            if (i + 1 &lt; level.size()) {</span>
+<span class="nc" id="L295">                sb.append(&quot; /Next &quot;).append(level.get(i + 1).objectNumber).append(&quot; 0 R&quot;);</span>
+            }
+<span class="nc bnc" id="L297" title="All 2 branches missed.">            if (below &gt; 0) {</span>
+<span class="nc" id="L298">                sb.append(&quot; /First &quot;).append(b.children.get(0).objectNumber).append(&quot; 0 R /Last &quot;)</span>
+<span class="nc" id="L299">                        .append(b.children.get(b.children.size() - 1).objectNumber).append(&quot; 0 R /Count &quot;)</span>
+<span class="nc" id="L300">                        .append(-below);</span>
+            }
+<span class="nc" id="L302">            sb.append(&quot; /Dest [&quot;).append(b.page.objectNumber).append(&quot; 0 R /XYZ 0 &quot;);</span>
+<span class="nc" id="L303">            PdfFormat.number(sb, b.page.getHeight() - b.y);</span>
+<span class="nc" id="L304">            sb.append(&quot; null]&gt;&gt;&quot;);</span>
+<span class="nc" id="L305">            w.object(b.objectNumber, sb.toString());</span>
+<span class="nc" id="L306">            count += 1 + below;</span>
+        }
+<span class="nc" id="L308">        return count;</span>
+    }
+
+    private String info() {
+<span class="fc" id="L312">        StringBuilder sb = new StringBuilder(&quot;&lt;&lt;/Producer (Codename One)&quot;);</span>
+<span class="fc" id="L313">        entry(sb, &quot;Title&quot;, title);</span>
+<span class="fc" id="L314">        entry(sb, &quot;Author&quot;, author);</span>
+<span class="fc" id="L315">        entry(sb, &quot;Subject&quot;, subject);</span>
+<span class="fc" id="L316">        entry(sb, &quot;Keywords&quot;, keywords);</span>
+<span class="fc" id="L317">        entry(sb, &quot;Creator&quot;, creator);</span>
+<span class="fc" id="L318">        sb.append(&quot; /CreationDate &quot;);</span>
+<span class="fc" id="L319">        PdfFormat.literal(sb, pdfDate(creationDate));</span>
+<span class="fc" id="L320">        sb.append(&quot;&gt;&gt;&quot;);</span>
+<span class="fc" id="L321">        return sb.toString();</span>
+    }
+
+    private static void entry(StringBuilder sb, String key, String value) {
+<span class="fc bfc" id="L325" title="All 2 branches covered.">        if (value != null) {</span>
+<span class="fc" id="L326">            sb.append(&quot; /&quot;).append(key).append(' ');</span>
+<span class="fc" id="L327">            PdfFormat.textString(sb, value);</span>
+        }
+<span class="fc" id="L329">    }</span>
+
+    /// `D:YYYYMMDDHHmmSSZ` for `millis` in UTC, computed without a
+    /// calendar class (days-to-civil, Howard Hinnant's algorithm).
+    static String pdfDate(long millis) {
+<span class="fc" id="L334">        long secs = millis / 1000;</span>
+<span class="pc bpc" id="L335" title="3 of 4 branches missed.">        if (millis &lt; 0 &amp;&amp; secs * 1000 != millis) {</span>
+<span class="nc" id="L336">            secs--;</span>
+        }
+<span class="fc" id="L338">        long days = secs / 86400;</span>
+<span class="fc" id="L339">        long rem = secs - days * 86400;</span>
+<span class="pc bpc" id="L340" title="1 of 2 branches missed.">        if (rem &lt; 0) {</span>
+<span class="nc" id="L341">            rem += 86400;</span>
+<span class="nc" id="L342">            days--;</span>
+        }
+<span class="fc" id="L344">        long z = days + 719468;</span>
+<span class="pc bpc" id="L345" title="1 of 2 branches missed.">        long era = (z &gt;= 0 ? z : z - 146096) / 146097;</span>
+<span class="fc" id="L346">        long doe = z - era * 146097;</span>
+<span class="fc" id="L347">        long yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;</span>
+<span class="fc" id="L348">        long y = yoe + era * 400;</span>
+<span class="fc" id="L349">        long doy = doe - (365 * yoe + yoe / 4 - yoe / 100);</span>
+<span class="fc" id="L350">        long mp = (5 * doy + 2) / 153;</span>
+<span class="fc" id="L351">        long d = doy - (153 * mp + 2) / 5 + 1;</span>
+<span class="pc bpc" id="L352" title="1 of 2 branches missed.">        long m = mp &lt; 10 ? mp + 3 : mp - 9;</span>
+<span class="pc bpc" id="L353" title="1 of 2 branches missed.">        if (m &lt;= 2) {</span>
+<span class="nc" id="L354">            y++;</span>
+        }
+<span class="fc" id="L356">        StringBuilder sb = new StringBuilder(&quot;D:&quot;);</span>
+<span class="fc" id="L357">        pad(sb, y, 4);</span>
+<span class="fc" id="L358">        pad(sb, m, 2);</span>
+<span class="fc" id="L359">        pad(sb, d, 2);</span>
+<span class="fc" id="L360">        pad(sb, rem / 3600, 2);</span>
+<span class="fc" id="L361">        pad(sb, (rem / 60) % 60, 2);</span>
+<span class="fc" id="L362">        pad(sb, rem % 60, 2);</span>
+<span class="fc" id="L363">        sb.append('Z');</span>
+<span class="fc" id="L364">        return sb.toString();</span>
+    }
+
+    private static void pad(StringBuilder sb, long v, int width) {
+<span class="fc" id="L368">        String s = Long.toString(v);</span>
+<span class="pc bpc" id="L369" title="1 of 2 branches missed.">        for (int i = s.length(); i &lt; width; i++) {</span>
+<span class="nc" id="L370">            sb.append('0');</span>
+        }
+<span class="fc" id="L372">        sb.append(s);</span>
+<span class="fc" id="L373">    }</span>
+
+    private byte[] fileId() {
+<span class="fc" id="L376">        long h1 = 0x9e3779b97f4a7c15L ^ creationDate;</span>
+<span class="fc" id="L377">        long h2 = 0xc2b2ae3d27d4eb4fL + pages.size();</span>
+<span class="fc" id="L378">        String seed = String.valueOf(title) + String.valueOf(author) + System.currentTimeMillis();</span>
+<span class="fc bfc" id="L379" title="All 2 branches covered.">        for (int i = 0; i &lt; seed.length(); i++) {</span>
+<span class="fc" id="L380">            h1 = (h1 ^ seed.charAt(i)) * 0x100000001b3L;</span>
+<span class="fc" id="L381">            h2 = (h2 + seed.charAt(i)) * 0xff51afd7ed558ccdL;</span>
+        }
+<span class="fc" id="L383">        byte[] id = new byte[16];</span>
+<span class="fc bfc" id="L384" title="All 2 branches covered.">        for (int i = 0; i &lt; 8; i++) {</span>
+<span class="fc" id="L385">            id[i] = (byte) (h1 &gt;&gt;&gt; (i * 8));</span>
+<span class="fc" id="L386">            id[8 + i] = (byte) (h2 &gt;&gt;&gt; (i * 8));</span>
+        }
+<span class="fc" id="L388">        return id;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

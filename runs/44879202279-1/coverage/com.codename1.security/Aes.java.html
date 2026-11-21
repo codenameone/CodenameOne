@@ -1,0 +1,262 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Aes.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.security</a> &gt; <span class="el_source">Aes.java</span></div><h1>Aes.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.security;
+
+/// AES (FIPS 197) in CBC mode over whole 16 byte blocks, with no padding: the
+/// building block of formats that define their own padding or key handling,
+/// such as the PDF security handler. Runs on the client and on the backend.
+///
+/// The installed [CryptoEngine] does the work where the platform has a native
+/// cipher (the client ports and the backend); elsewhere, the JavaScript port
+/// among them, a portable Java implementation produces the same bytes. For
+/// authenticated encryption of application data on the client use `Cipher` instead.
+///
+/// ```java
+/// byte[] key = new byte[16];
+/// byte[] iv = new byte[16];
+/// byte[] sealed = Aes.cbcEncrypt(key, iv, new byte[32]);
+/// byte[] plain = Aes.cbcDecrypt(key, iv, sealed);
+/// ```
+@com.codename1.impl.SharedWithBackend
+public final class Aes {
+<span class="fc" id="L42">    private static final int[] SBOX = new int[256];</span>
+<span class="fc" id="L43">    private static final int[] INV = new int[256];</span>
+
+    static {
+<span class="fc" id="L46">        int p = 1;</span>
+<span class="fc" id="L47">        int q = 1;</span>
+        do {
+<span class="fc bfc" id="L49" title="All 2 branches covered.">            p = p ^ ((p &lt;&lt; 1) &amp; 0xff) ^ ((p &amp; 0x80) != 0 ? 0x1b : 0);</span>
+<span class="fc" id="L50">            q ^= q &lt;&lt; 1;</span>
+<span class="fc" id="L51">            q ^= q &lt;&lt; 2;</span>
+<span class="fc" id="L52">            q ^= q &lt;&lt; 4;</span>
+<span class="fc" id="L53">            q &amp;= 0xff;</span>
+<span class="fc bfc" id="L54" title="All 2 branches covered.">            if ((q &amp; 0x80) != 0) {</span>
+<span class="fc" id="L55">                q ^= 0x09;</span>
+            }
+<span class="fc" id="L57">            int x = q ^ rotl(q, 1) ^ rotl(q, 2) ^ rotl(q, 3) ^ rotl(q, 4);</span>
+<span class="fc" id="L58">            SBOX[p] = (x ^ 0x63) &amp; 0xff;</span>
+<span class="fc bfc" id="L59" title="All 2 branches covered.">        } while (p != 1);</span>
+<span class="fc" id="L60">        SBOX[0] = 0x63;</span>
+<span class="fc bfc" id="L61" title="All 2 branches covered.">        for (int i = 0; i &lt; 256; i++) {</span>
+<span class="fc" id="L62">            INV[SBOX[i]] = i;</span>
+        }
+<span class="fc" id="L64">    }</span>
+
+    private final int[] w;
+    private final int rounds;
+
+    private static int rotl(int x, int s) {
+<span class="fc" id="L70">        return ((x &lt;&lt; s) | (x &gt;&gt; (8 - s))) &amp; 0xff;</span>
+    }
+
+    /// Encrypts `data`, a whole number of blocks, with `key` (16, 24 or 32
+    /// bytes) chained from the 16 byte `iv`.
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: for a key, IV or data of the wrong length
+    public static byte[] cbcEncrypt(byte[] key, byte[] iv, byte[] data) {
+<span class="fc" id="L80">        check(key, iv, data);</span>
+<span class="fc" id="L81">        byte[] fast = CryptoEngine.get().aesCbc(true, key, iv, data);</span>
+<span class="pc bpc" id="L82" title="1 of 4 branches missed.">        return fast != null &amp;&amp; fast.length == data.length ? fast : new Aes(key).encryptCbc(iv, data);</span>
+    }
+
+    /// Decrypts `data`, a whole number of blocks, with `key` (16, 24 or 32
+    /// bytes) chained from the 16 byte `iv`. Padding, if the format has any,
+    /// is left for the caller to remove.
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: for a key, IV or data of the wrong length
+    public static byte[] cbcDecrypt(byte[] key, byte[] iv, byte[] data) {
+<span class="fc" id="L93">        check(key, iv, data);</span>
+<span class="fc" id="L94">        byte[] fast = CryptoEngine.get().aesCbc(false, key, iv, data);</span>
+<span class="pc bpc" id="L95" title="1 of 4 branches missed.">        return fast != null &amp;&amp; fast.length == data.length ? fast : new Aes(key).decryptCbc(iv, data);</span>
+    }
+
+    private static void check(byte[] key, byte[] iv, byte[] data) {
+<span class="pc bpc" id="L99" title="1 of 6 branches missed.">        if (key.length != 16 &amp;&amp; key.length != 24 &amp;&amp; key.length != 32) {</span>
+<span class="fc" id="L100">            throw new IllegalArgumentException(&quot;AES key of &quot; + key.length + &quot; bytes&quot;);</span>
+        }
+<span class="pc bpc" id="L102" title="1 of 4 branches missed.">        if (iv.length != 16 || data.length % 16 != 0) {</span>
+<span class="fc" id="L103">            throw new IllegalArgumentException(&quot;AES-CBC needs a 16 byte IV and whole blocks&quot;);</span>
+        }
+<span class="fc" id="L105">    }</span>
+
+<span class="fc" id="L107">    private Aes(byte[] key) {</span>
+<span class="fc" id="L108">        int nk = key.length / 4;</span>
+<span class="fc" id="L109">        rounds = nk + 6;</span>
+<span class="fc" id="L110">        w = new int[4 * (rounds + 1)];</span>
+<span class="fc bfc" id="L111" title="All 2 branches covered.">        for (int i = 0; i &lt; nk; i++) {</span>
+<span class="fc" id="L112">            w[i] = ((key[4 * i] &amp; 0xff) &lt;&lt; 24) | ((key[4 * i + 1] &amp; 0xff) &lt;&lt; 16) | ((key[4 * i + 2] &amp; 0xff) &lt;&lt; 8)</span>
+                    | (key[4 * i + 3] &amp; 0xff);
+        }
+<span class="fc" id="L115">        int rcon = 1;</span>
+<span class="fc bfc" id="L116" title="All 2 branches covered.">        for (int i = nk; i &lt; w.length; i++) {</span>
+<span class="fc" id="L117">            int t = w[i - 1];</span>
+<span class="fc bfc" id="L118" title="All 2 branches covered.">            if (i % nk == 0) {</span>
+<span class="fc" id="L119">                t = sub((t &lt;&lt; 8) | (t &gt;&gt;&gt; 24)) ^ (rcon &lt;&lt; 24);</span>
+<span class="fc" id="L120">                rcon = xtime(rcon);</span>
+<span class="fc bfc" id="L121" title="All 4 branches covered.">            } else if (nk &gt; 6 &amp;&amp; i % nk == 4) {</span>
+<span class="fc" id="L122">                t = sub(t);</span>
+            }
+<span class="fc" id="L124">            w[i] = w[i - nk] ^ t;</span>
+        }
+<span class="fc" id="L126">    }</span>
+
+    private static int sub(int t) {
+<span class="fc" id="L129">        return (SBOX[(t &gt;&gt;&gt; 24) &amp; 0xff] &lt;&lt; 24) | (SBOX[(t &gt;&gt;&gt; 16) &amp; 0xff] &lt;&lt; 16) | (SBOX[(t &gt;&gt;&gt; 8) &amp; 0xff] &lt;&lt; 8)</span>
+                | SBOX[t &amp; 0xff];
+    }
+
+    private static int xtime(int b) {
+<span class="fc bfc" id="L134" title="All 2 branches covered.">        return ((b &lt;&lt; 1) ^ ((b &amp; 0x80) != 0 ? 0x1b : 0)) &amp; 0xff;</span>
+    }
+
+    private static int mul(int a, int b) {
+<span class="fc" id="L138">        int r = 0;</span>
+<span class="fc bfc" id="L139" title="All 2 branches covered.">        while (b != 0) {</span>
+<span class="fc bfc" id="L140" title="All 2 branches covered.">            if ((b &amp; 1) != 0) {</span>
+<span class="fc" id="L141">                r ^= a;</span>
+            }
+<span class="fc" id="L143">            a = xtime(a);</span>
+<span class="fc" id="L144">            b &gt;&gt;= 1;</span>
+        }
+<span class="fc" id="L146">        return r;</span>
+    }
+
+    private void addKey(int[] s, int round) {
+<span class="fc bfc" id="L150" title="All 2 branches covered.">        for (int c = 0; c &lt; 4; c++) {</span>
+<span class="fc" id="L151">            int k = w[round * 4 + c];</span>
+<span class="fc" id="L152">            s[c * 4] ^= (k &gt;&gt;&gt; 24) &amp; 0xff;</span>
+<span class="fc" id="L153">            s[c * 4 + 1] ^= (k &gt;&gt;&gt; 16) &amp; 0xff;</span>
+<span class="fc" id="L154">            s[c * 4 + 2] ^= (k &gt;&gt;&gt; 8) &amp; 0xff;</span>
+<span class="fc" id="L155">            s[c * 4 + 3] ^= k &amp; 0xff;</span>
+        }
+<span class="fc" id="L157">    }</span>
+
+    private void encryptBlock(byte[] in, int inOff, byte[] out, int outOff) {
+<span class="fc" id="L160">        int[] s = new int[16];</span>
+<span class="fc bfc" id="L161" title="All 2 branches covered.">        for (int i = 0; i &lt; 16; i++) {</span>
+<span class="fc" id="L162">            s[i] = in[inOff + i] &amp; 0xff;</span>
+        }
+<span class="fc" id="L164">        addKey(s, 0);</span>
+<span class="fc bfc" id="L165" title="All 2 branches covered.">        for (int r = 1; r &lt;= rounds; r++) {</span>
+<span class="fc bfc" id="L166" title="All 2 branches covered.">            for (int i = 0; i &lt; 16; i++) {</span>
+<span class="fc" id="L167">                s[i] = SBOX[s[i]];</span>
+            }
+<span class="fc" id="L169">            int[] t = new int[16];</span>
+<span class="fc bfc" id="L170" title="All 2 branches covered.">            for (int c = 0; c &lt; 4; c++) {</span>
+<span class="fc bfc" id="L171" title="All 2 branches covered.">                for (int row = 0; row &lt; 4; row++) {</span>
+<span class="fc" id="L172">                    t[c * 4 + row] = s[((c + row) % 4) * 4 + row];</span>
+                }
+            }
+<span class="fc bfc" id="L175" title="All 2 branches covered.">            if (r != rounds) {</span>
+<span class="fc bfc" id="L176" title="All 2 branches covered.">                for (int c = 0; c &lt; 4; c++) {</span>
+<span class="fc" id="L177">                    int a0 = t[c * 4];</span>
+<span class="fc" id="L178">                    int a1 = t[c * 4 + 1];</span>
+<span class="fc" id="L179">                    int a2 = t[c * 4 + 2];</span>
+<span class="fc" id="L180">                    int a3 = t[c * 4 + 3];</span>
+<span class="fc" id="L181">                    s[c * 4] = mul(a0, 2) ^ mul(a1, 3) ^ a2 ^ a3;</span>
+<span class="fc" id="L182">                    s[c * 4 + 1] = a0 ^ mul(a1, 2) ^ mul(a2, 3) ^ a3;</span>
+<span class="fc" id="L183">                    s[c * 4 + 2] = a0 ^ a1 ^ mul(a2, 2) ^ mul(a3, 3);</span>
+<span class="fc" id="L184">                    s[c * 4 + 3] = mul(a0, 3) ^ a1 ^ a2 ^ mul(a3, 2);</span>
+                }
+            } else {
+<span class="fc" id="L187">                System.arraycopy(t, 0, s, 0, 16);</span>
+            }
+<span class="fc" id="L189">            addKey(s, r);</span>
+        }
+<span class="fc bfc" id="L191" title="All 2 branches covered.">        for (int i = 0; i &lt; 16; i++) {</span>
+<span class="fc" id="L192">            out[outOff + i] = (byte) s[i];</span>
+        }
+<span class="fc" id="L194">    }</span>
+
+    private void decryptBlock(byte[] in, int inOff, byte[] out, int outOff) {
+<span class="fc" id="L197">        int[] s = new int[16];</span>
+<span class="fc bfc" id="L198" title="All 2 branches covered.">        for (int i = 0; i &lt; 16; i++) {</span>
+<span class="fc" id="L199">            s[i] = in[inOff + i] &amp; 0xff;</span>
+        }
+<span class="fc" id="L201">        addKey(s, rounds);</span>
+<span class="fc bfc" id="L202" title="All 2 branches covered.">        for (int r = rounds - 1; r &gt;= 0; r--) {</span>
+<span class="fc" id="L203">            int[] t = new int[16];</span>
+<span class="fc bfc" id="L204" title="All 2 branches covered.">            for (int c = 0; c &lt; 4; c++) {</span>
+<span class="fc bfc" id="L205" title="All 2 branches covered.">                for (int row = 0; row &lt; 4; row++) {</span>
+<span class="fc" id="L206">                    t[((c + row) % 4) * 4 + row] = s[c * 4 + row];</span>
+                }
+            }
+<span class="fc bfc" id="L209" title="All 2 branches covered.">            for (int i = 0; i &lt; 16; i++) {</span>
+<span class="fc" id="L210">                s[i] = INV[t[i]];</span>
+            }
+<span class="fc" id="L212">            addKey(s, r);</span>
+<span class="fc bfc" id="L213" title="All 2 branches covered.">            if (r != 0) {</span>
+<span class="fc bfc" id="L214" title="All 2 branches covered.">                for (int c = 0; c &lt; 4; c++) {</span>
+<span class="fc" id="L215">                    int a0 = s[c * 4];</span>
+<span class="fc" id="L216">                    int a1 = s[c * 4 + 1];</span>
+<span class="fc" id="L217">                    int a2 = s[c * 4 + 2];</span>
+<span class="fc" id="L218">                    int a3 = s[c * 4 + 3];</span>
+<span class="fc" id="L219">                    s[c * 4] = mul(a0, 14) ^ mul(a1, 11) ^ mul(a2, 13) ^ mul(a3, 9);</span>
+<span class="fc" id="L220">                    s[c * 4 + 1] = mul(a0, 9) ^ mul(a1, 14) ^ mul(a2, 11) ^ mul(a3, 13);</span>
+<span class="fc" id="L221">                    s[c * 4 + 2] = mul(a0, 13) ^ mul(a1, 9) ^ mul(a2, 14) ^ mul(a3, 11);</span>
+<span class="fc" id="L222">                    s[c * 4 + 3] = mul(a0, 11) ^ mul(a1, 13) ^ mul(a2, 9) ^ mul(a3, 14);</span>
+                }
+            }
+        }
+<span class="fc bfc" id="L226" title="All 2 branches covered.">        for (int i = 0; i &lt; 16; i++) {</span>
+<span class="fc" id="L227">            out[outOff + i] = (byte) s[i];</span>
+        }
+<span class="fc" id="L229">    }</span>
+
+    private byte[] decryptCbc(byte[] iv, byte[] data) {
+<span class="fc" id="L232">        int off = 0;</span>
+<span class="fc" id="L233">        int blocks = data.length / 16;</span>
+<span class="fc" id="L234">        byte[] out = new byte[blocks * 16];</span>
+<span class="fc" id="L235">        byte[] prev = new byte[16];</span>
+<span class="fc" id="L236">        System.arraycopy(iv, 0, prev, 0, 16);</span>
+<span class="fc bfc" id="L237" title="All 2 branches covered.">        for (int b = 0; b &lt; blocks; b++) {</span>
+<span class="fc" id="L238">            decryptBlock(data, off + b * 16, out, b * 16);</span>
+<span class="fc bfc" id="L239" title="All 2 branches covered.">            for (int i = 0; i &lt; 16; i++) {</span>
+<span class="fc" id="L240">                out[b * 16 + i] ^= prev[i];</span>
+            }
+<span class="fc" id="L242">            System.arraycopy(data, off + b * 16, prev, 0, 16);</span>
+        }
+<span class="fc" id="L244">        return out;</span>
+    }
+
+    private byte[] encryptCbc(byte[] iv, byte[] data) {
+<span class="fc" id="L248">        byte[] out = new byte[data.length / 16 * 16];</span>
+<span class="fc" id="L249">        byte[] prev = new byte[16];</span>
+<span class="fc" id="L250">        System.arraycopy(iv, 0, prev, 0, 16);</span>
+<span class="fc" id="L251">        byte[] block = new byte[16];</span>
+<span class="fc bfc" id="L252" title="All 2 branches covered.">        for (int b = 0; b &lt; out.length; b += 16) {</span>
+<span class="fc bfc" id="L253" title="All 2 branches covered.">            for (int i = 0; i &lt; 16; i++) {</span>
+<span class="fc" id="L254">                block[i] = (byte) (data[b + i] ^ prev[i]);</span>
+            }
+<span class="fc" id="L256">            encryptBlock(block, 0, out, b);</span>
+<span class="fc" id="L257">            System.arraycopy(out, b, prev, 0, 16);</span>
+        }
+<span class="fc" id="L259">        return out;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

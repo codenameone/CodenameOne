@@ -1,0 +1,149 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Foliage.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.gpu.shaders</a> &gt; <span class="el_source">Foliage.java</span></div><h1>Foliage.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.gpu.shaders;
+
+import com.codename1.gpu.shader.ShaderMaterial;
+import com.codename1.gpu.shader.ShaderNode;
+import com.codename1.gpu.shader.ShaderType;
+
+import static com.codename1.gpu.shader.ShaderNode.*;
+
+/// Plants that move in the wind. The sway is a vertex offset that grows with
+/// height above the model's origin, so put each plant's origin at its root.
+/// Gusts roll across the scene in world space, so neighbours move together.
+public final class Foliage {
+    /// `VEC2` the direction the wind blows, in world `x`/`z`.
+    public static final String WIND = &quot;windDir&quot;;
+    /// `FLOAT` how far a point one unit above the root bends, world units.
+    public static final String STRENGTH = &quot;windStrength&quot;;
+    /// `FLOAT` sways per second.
+    public static final String SPEED = &quot;windSpeed&quot;;
+    /// `FLOAT` alpha below which a pixel of the texture is cut away.
+    public static final String CUTOFF = &quot;leafCutoff&quot;;
+    /// `VEC3` colour at the root of a blade of grass.
+    public static final String ROOT = &quot;grassRoot&quot;;
+    /// `VEC3` colour at its tip.
+    public static final String TIP = &quot;grassTip&quot;;
+
+    private Foliage() {
+    }
+
+    private static ShaderNode sway() {
+<span class="fc" id="L52">        ShaderNode dir = normalize(uniform(WIND, ShaderType.VEC2));</span>
+<span class="fc" id="L53">        ShaderNode wp = worldPos().xz();</span>
+<span class="fc" id="L54">        ShaderNode t = time().mul(uniform(SPEED, ShaderType.FLOAT));</span>
+<span class="fc" id="L55">        ShaderNode gust = Noise.value(wp.mul(0.08f).sub(dir.mul(time().mul(0.6f))));</span>
+<span class="fc" id="L56">        ShaderNode flutter = sin(t.mul((float) (2 * Math.PI)).add(wp.x().mul(0.9f)).add(wp.y().mul(0.7f)));</span>
+<span class="fc" id="L57">        ShaderNode h = max(position().y(), f(0f));</span>
+<span class="fc" id="L58">        ShaderNode bend = h.mul(h).mul(uniform(STRENGTH, ShaderType.FLOAT))</span>
+<span class="fc" id="L59">                .mul(gust.mul(1.4f).add(flutter.mul(0.35f)));</span>
+<span class="fc" id="L60">        return vec(dir.x().mul(bend), bend.mul(bend).mul(-0.2f), dir.y().mul(bend));</span>
+    }
+
+    private static ShaderMaterial base() {
+<span class="fc" id="L64">        return new ShaderMaterial().declareUniform(WIND, ShaderType.VEC2)</span>
+<span class="fc" id="L65">                .declareUniform(STRENGTH, ShaderType.FLOAT).declareUniform(SPEED, ShaderType.FLOAT);</span>
+    }
+
+    /// Wind sway alone; the surface keeps its own colour and texture.
+    ///
+    /// #### Returns
+    ///
+    /// a new shader material
+    public static ShaderMaterial wind() {
+<span class="fc" id="L74">        ShaderMaterial m = base();</span>
+<span class="fc" id="L75">        m.set(ShaderMaterial.Hook.VERTEX_OFFSET, sway());</span>
+<span class="fc" id="L76">        m.setUniform(WIND, 1f, 0.3f).setUniform(STRENGTH, 0.08f).setUniform(SPEED, 0.5f);</span>
+<span class="fc" id="L77">        return m;</span>
+    }
+
+    /// Leaf cards: wind sway, the texture's alpha cut out, and sunlight
+    /// glowing through leaves seen against the sun.
+    ///
+    /// #### Returns
+    ///
+    /// a new shader material
+    public static ShaderMaterial leaves() {
+<span class="fc" id="L87">        ShaderMaterial m = wind().declareUniform(CUTOFF, ShaderType.FLOAT);</span>
+<span class="fc" id="L88">        m.set(ShaderMaterial.Hook.DISCARD, step(baseColor().w(), uniform(CUTOFF, ShaderType.FLOAT)));</span>
+<span class="fc" id="L89">        m.set(ShaderMaterial.Hook.BASE_COLOR, vec(baseColor().rgb(), f(1f)));</span>
+<span class="fc" id="L90">        ShaderNode through = pow(saturate(dot(viewDir().negate(), sunDir())), 3f);</span>
+<span class="fc" id="L91">        m.set(ShaderMaterial.Hook.EMISSIVE, baseColor().rgb().mul(sunColor()).mul(through.mul(0.5f)));</span>
+<span class="fc" id="L92">        m.setUniform(CUTOFF, 0.5f);</span>
+<span class="fc" id="L93">        return m;</span>
+    }
+
+    /// A tree crown modelled as one solid shape (a ball or a block of
+    /// leaves): leaf clusters from cellular noise, each cluster lit as a
+    /// bump of its own, crevices between clusters darkened, the underside in
+    /// shade, sunlight glowing through the rim seen against the sun, and a
+    /// gentle sway. The instance colour is the foliage tint, so a creator's
+    /// green, autumn orange or blossom pink is kept.
+    ///
+    /// #### Returns
+    ///
+    /// a new shader material
+    public static ShaderMaterial canopy() {
+<span class="nc" id="L107">        ShaderMaterial m = wind();</span>
+<span class="nc" id="L108">        m.setUniform(STRENGTH, 0.012f);</span>
+<span class="nc" id="L109">        ShaderNode p = worldPos().mul(0.9f);</span>
+<span class="nc" id="L110">        ShaderNode clusters = Noise.cellular(p.xz().add(p.y().mul(0.7f)));</span>
+<span class="nc" id="L111">        ShaderNode fine = Noise.fbm(p.xy().add(p.xz()).mul(3.1f), 2);</span>
+        // 0 inside a cluster's heart, 1 in the gap between clusters
+<span class="nc" id="L113">        ShaderNode gap = smoothstep(0.25f, 0.75f, clusters);</span>
+<span class="nc" id="L114">        ShaderNode up = saturate(worldNormal().y().mul(0.5f).add(0.5f));</span>
+<span class="nc" id="L115">        ShaderNode base = instanceColor().rgb();</span>
+<span class="nc" id="L116">        ShaderNode shade = gap.mul(-0.45f).add(1f).mul(up.mul(0.45f).add(0.55f)).mul(fine.mul(0.3f).add(0.82f));</span>
+        // hue shift: sunlit tops yellow a touch, shaded hollows go blue-green
+<span class="nc" id="L118">        ShaderNode warm = mix(base.mul(vec3(0.75f, 0.9f, 1.05f)), base.mul(vec3(1.12f, 1.05f, 0.75f)), up);</span>
+<span class="nc" id="L119">        m.set(ShaderMaterial.Hook.BASE_COLOR, vec(warm.mul(shade), f(1f)));</span>
+<span class="nc" id="L120">        m.set(ShaderMaterial.Hook.ROUGHNESS, f(0.85f));</span>
+<span class="nc" id="L121">        m.set(ShaderMaterial.Hook.METALLIC, f(0f));</span>
+<span class="nc" id="L122">        m.set(ShaderMaterial.Hook.NORMAL, perturbNormal(Noise.bumpNormal(p.xz().add(p.y()).mul(1.4f), 2, 0.45f)));</span>
+<span class="nc" id="L123">        ShaderNode through = pow(saturate(dot(viewDir().negate(), sunDir())), 4f);</span>
+<span class="nc" id="L124">        ShaderNode rim = pow(f(1f).sub(saturate(dot(viewDir(), worldNormal()))), 2f);</span>
+<span class="nc" id="L125">        m.set(ShaderMaterial.Hook.EMISSIVE, base.mul(sunColor()).mul(through.mul(rim).mul(0.6f)));</span>
+<span class="nc" id="L126">        return m;</span>
+    }
+
+    /// Grass blades: a root to tip gradient along the texture's v (0 at the
+    /// root), wind, and a sheen toward the sun. Pair with instancing or a
+    /// field of crossed quads.
+    ///
+    /// #### Returns
+    ///
+    /// a new shader material
+    public static ShaderMaterial grass() {
+<span class="fc" id="L137">        ShaderMaterial m = wind().declareUniform(ROOT, ShaderType.VEC3).declareUniform(TIP, ShaderType.VEC3);</span>
+<span class="fc" id="L138">        ShaderNode tip = saturate(uv().y());</span>
+<span class="fc" id="L139">        ShaderNode variety = Noise.value(worldPos().xz().mul(0.3f)).mul(0.3f).add(0.85f);</span>
+<span class="fc" id="L140">        ShaderNode rgb = mix(uniform(ROOT, ShaderType.VEC3), uniform(TIP, ShaderType.VEC3), tip).mul(variety);</span>
+<span class="fc" id="L141">        m.set(ShaderMaterial.Hook.BASE_COLOR, vec(rgb, f(1f)));</span>
+<span class="fc" id="L142">        ShaderNode through = pow(saturate(dot(viewDir().negate(), sunDir())), 2f);</span>
+<span class="fc" id="L143">        m.set(ShaderMaterial.Hook.EMISSIVE, rgb.mul(sunColor()).mul(through.mul(tip).mul(0.4f)));</span>
+<span class="fc" id="L144">        m.setColorUniform(ROOT, 0x2f4a1c).setColorUniform(TIP, 0x9cbf5a).setUniform(STRENGTH, 0.25f)</span>
+<span class="fc" id="L145">                .setUniform(SPEED, 0.8f);</span>
+<span class="fc" id="L146">        return m;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

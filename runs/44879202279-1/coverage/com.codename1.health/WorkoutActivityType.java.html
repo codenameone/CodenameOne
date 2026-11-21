@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>WorkoutActivityType.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.health</a> &gt; <span class="el_source">WorkoutActivityType.java</span></div><h1>WorkoutActivityType.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.health;
+
+/// What kind of exercise a workout records.
+///
+/// #### A deliberate subset
+///
+/// HealthKit defines around eighty activity types and Health Connect
+/// around ninety, and the two lists do not line up. An exhaustive mapping
+/// table would be large, unverifiable, and wrong in ways nobody would
+/// notice until a user's yoga session showed up as pilates.
+///
+/// So this enum covers the common activities honestly and offers [#OTHER]
+/// plus [WorkoutSample#getPlatformCode()] as the escape hatch for apps
+/// that need exact platform fidelity. Reading `getPlatformCode()` gives
+/// you the raw `HKWorkoutActivityType` or `ExerciseSessionRecord` constant
+/// the platform actually recorded.
+<span class="fc" id="L39">public enum WorkoutActivityType {</span>
+
+    /// An activity this enum does not name. Check
+    /// [WorkoutSample#getPlatformCode()] for the platform's own value.
+<span class="fc" id="L43">    OTHER,</span>
+
+<span class="fc" id="L45">    WALKING,</span>
+<span class="fc" id="L46">    RUNNING,</span>
+<span class="fc" id="L47">    HIKING,</span>
+<span class="fc" id="L48">    CYCLING,</span>
+<span class="fc" id="L49">    MOUNTAIN_BIKING,</span>
+<span class="fc" id="L50">    SWIMMING,</span>
+<span class="fc" id="L51">    ROWING,</span>
+<span class="fc" id="L52">    ELLIPTICAL,</span>
+<span class="fc" id="L53">    STAIR_CLIMBING,</span>
+<span class="fc" id="L54">    HIGH_INTENSITY_INTERVAL_TRAINING,</span>
+<span class="fc" id="L55">    STRENGTH_TRAINING,</span>
+<span class="fc" id="L56">    CORE_TRAINING,</span>
+<span class="fc" id="L57">    FUNCTIONAL_TRAINING,</span>
+<span class="fc" id="L58">    YOGA,</span>
+<span class="fc" id="L59">    PILATES,</span>
+<span class="fc" id="L60">    DANCE,</span>
+<span class="fc" id="L61">    MARTIAL_ARTS,</span>
+<span class="fc" id="L62">    BOXING,</span>
+<span class="fc" id="L63">    CLIMBING,</span>
+<span class="fc" id="L64">    SKIING,</span>
+<span class="fc" id="L65">    SNOWBOARDING,</span>
+<span class="fc" id="L66">    SKATING,</span>
+<span class="fc" id="L67">    SURFING,</span>
+<span class="fc" id="L68">    PADDLING,</span>
+<span class="fc" id="L69">    GOLF,</span>
+<span class="fc" id="L70">    TENNIS,</span>
+<span class="fc" id="L71">    BADMINTON,</span>
+<span class="fc" id="L72">    SQUASH,</span>
+<span class="fc" id="L73">    TABLE_TENNIS,</span>
+<span class="fc" id="L74">    BASKETBALL,</span>
+<span class="fc" id="L75">    FOOTBALL,</span>
+<span class="fc" id="L76">    AMERICAN_FOOTBALL,</span>
+<span class="fc" id="L77">    BASEBALL,</span>
+<span class="fc" id="L78">    VOLLEYBALL,</span>
+<span class="fc" id="L79">    CRICKET,</span>
+<span class="fc" id="L80">    RUGBY,</span>
+<span class="fc" id="L81">    WHEELCHAIR,</span>
+<span class="fc" id="L82">    COOLDOWN,</span>
+<span class="fc" id="L83">    STRETCHING</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

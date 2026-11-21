@@ -1,0 +1,238 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>FormulaBar.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.spreadsheet</a> &gt; <span class="el_source">FormulaBar.java</span></div><h1>FormulaBar.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.spreadsheet;
+
+import com.codename1.ui.CodeEditor;
+import com.codename1.ui.Container;
+import com.codename1.ui.Label;
+import com.codename1.ui.events.DataChangedListener;
+import com.codename1.ui.events.SelectionListener;
+import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.table.DataGrid;
+import com.codename1.ui.table.GridColumn;
+
+/// The bar a spreadsheet application has over its cells: the address of the selected cell,
+/// and its formula, or its value, in an editor of one line. What is typed there is edited as
+/// in a cell -- references colored and outlined in the grid, functions completed, arguments
+/// hinted, a tap on a cell putting its address in -- and Enter writes it to the cell.
+///
+/// ```java
+/// Workbook book = new Workbook();
+/// // com.codename1.ui has a Sheet too, hence the full name
+/// com.codename1.spreadsheet.Sheet sheet = book.addSheet(&quot;Prices&quot;);
+/// sheet.setCellValue(&quot;A1&quot;, Double.valueOf(3.5));
+/// sheet.setCellValue(&quot;B1&quot;, &quot;=A1*2&quot;);
+/// DataGrid grid = new DataGrid(sheet);
+/// grid.setColumns(sheet.createColumns());
+/// Form form = new Form(&quot;Prices&quot;, new BorderLayout());
+/// form.add(BorderLayout.NORTH, new FormulaBar(sheet, grid));
+/// form.add(BorderLayout.CENTER, grid);
+/// form.show();
+/// ```
+///
+/// The bar follows the grid's selection and the sheet's changes. Escape puts back what the
+/// cell holds; a formula that cannot be read is not written, and the bar says why. The name
+/// box is a `Label` with the UIID `FormulaBarName`, the `fx` before the editor one with
+/// `FormulaBarFx`, and the bar itself has the UIID `FormulaBar`.
+public class FormulaBar extends Container {
+    private final Sheet sheet;
+    private final DataGrid grid;
+<span class="fc" id="L60">    private final Label name = new Label(&quot;&quot;, &quot;FormulaBarName&quot;);</span>
+<span class="fc" id="L61">    private final Editor editor = new Editor();</span>
+    private final FormulaEditing editing;
+<span class="fc" id="L63">    private final Listener listener = new Listener();</span>
+<span class="fc" id="L64">    private String shown = &quot;&quot;;</span>
+<span class="fc" id="L65">    private int row = -1;</span>
+<span class="fc" id="L66">    private int column = -1;</span>
+
+    /// Creates a bar for a sheet shown in a grid.
+    ///
+    /// #### Parameters
+    ///
+    /// - `sheet`: the sheet, which is the grid's model
+    ///
+    /// - `grid`: the grid that shows it
+    public FormulaBar(Sheet sheet, DataGrid grid) {
+<span class="fc" id="L76">        super(new BorderLayout(), &quot;FormulaBar&quot;);</span>
+<span class="fc" id="L77">        this.sheet = sheet;</span>
+<span class="fc" id="L78">        this.grid = grid;</span>
+<span class="fc" id="L79">        editing = new FormulaEditing(sheet, grid, editor, &quot;&quot;, new Enter(this, true), new Enter(this, false));</span>
+<span class="fc" id="L80">        editing.setOnlyWhileTyped(true);</span>
+<span class="fc" id="L81">        editor.bar = this;</span>
+<span class="fc" id="L82">        Container west = new Container(new BorderLayout());</span>
+<span class="fc" id="L83">        west.add(BorderLayout.CENTER, name);</span>
+<span class="fc" id="L84">        west.add(BorderLayout.EAST, new Label(&quot;fx&quot;, &quot;FormulaBarFx&quot;));</span>
+<span class="fc" id="L85">        add(BorderLayout.WEST, west);</span>
+<span class="fc" id="L86">        add(BorderLayout.CENTER, editor);</span>
+<span class="fc" id="L87">    }</span>
+
+    /// The address of the cell the bar shows, as `B4`, or an empty string when no cell is
+    /// selected.
+    ///
+    /// #### Returns
+    ///
+    /// the address
+    public String getAddress() {
+<span class="fc" id="L96">        return name.getText();</span>
+    }
+
+    /// The text in the bar now: what was typed, or what the selected cell holds.
+    ///
+    /// #### Returns
+    ///
+    /// the text
+    public String getText() {
+<span class="fc" id="L105">        return editing.text();</span>
+    }
+
+    /// Puts text into the bar as if it had been typed, so that it is edited as typing it
+    /// would be: Enter, or `#enter()`, writes it to the cell.
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: the text
+    public void setText(String text) {
+<span class="fc" id="L115">        editing.setText(text);</span>
+<span class="fc bfc" id="L116" title="All 2 branches covered.">        if (!editing.isActive()) {</span>
+<span class="fc" id="L117">            editing.textChangedByUser();</span>
+        }
+<span class="fc" id="L119">    }</span>
+
+    /// Writes what is in the bar to the selected cell, as Enter does. Text that is what the
+    /// cell holds writes nothing.
+    ///
+    /// #### Returns
+    ///
+    /// false when the text is a formula that cannot be read, which is then not written
+    public boolean enter() {
+<span class="fc" id="L128">        editing.press(CodeEditor.KEY_ENTER);</span>
+<span class="fc bfc" id="L129" title="All 2 branches covered.">        return editing.error() == null;</span>
+    }
+
+    /// The editing behind the bar, for the tests in this package.
+    FormulaEditing editing() {
+<span class="fc" id="L134">        return editing;</span>
+    }
+
+    void write() {
+<span class="fc" id="L138">        String text = editing.text();</span>
+<span class="pc bpc" id="L139" title="2 of 6 branches missed.">        if (row &gt;= 0 &amp;&amp; column &gt;= 0 &amp;&amp; !text.equals(shown)) {</span>
+<span class="fc" id="L140">            int modelRow = row - sheet.headerRows();</span>
+<span class="fc" id="L141">            sheet.setValueAt(modelRow, column, text);</span>
+        }
+<span class="fc" id="L143">        load();</span>
+<span class="fc" id="L144">    }</span>
+
+    /// Shows the selected cell again.
+    void load() {
+<span class="fc" id="L148">        int viewRow = grid.getSelectedRow();</span>
+<span class="fc" id="L149">        int visible = grid.getSelectedColumn();</span>
+<span class="fc" id="L150">        GridColumn[] columns = grid.getVisibleColumns();</span>
+<span class="fc bfc" id="L151" title="All 2 branches covered.">        row = viewRow &lt; 0 ? -1 : SheetCells.sheetRow(sheet, grid, viewRow);</span>
+<span class="pc bpc" id="L152" title="2 of 4 branches missed.">        column = visible &gt;= 0 &amp;&amp; visible &lt; columns.length ? columns[visible].getModelColumn() : -1;</span>
+<span class="pc bpc" id="L153" title="1 of 4 branches missed.">        if (row &lt; 0 || column &lt; 0) {</span>
+<span class="fc" id="L154">            row = -1;</span>
+<span class="fc" id="L155">            column = -1;</span>
+<span class="fc" id="L156">            name.setText(&quot;&quot;);</span>
+<span class="fc" id="L157">            shown = &quot;&quot;;</span>
+        } else {
+<span class="fc" id="L159">            StringBuilder sb = new StringBuilder();</span>
+<span class="fc" id="L160">            FormulaParser.appendColumn(sb, column);</span>
+<span class="fc" id="L161">            name.setText(sb.append(row + 1).toString());</span>
+<span class="fc" id="L162">            shown = sheet.editText(row, column);</span>
+        }
+<span class="fc" id="L164">        editing.deactivate();</span>
+<span class="fc" id="L165">        editing.setText(shown);</span>
+<span class="fc" id="L166">        revalidateLater();</span>
+<span class="fc" id="L167">    }</span>
+
+    @Override
+    protected void initComponent() {
+<span class="fc" id="L171">        super.initComponent();</span>
+<span class="fc" id="L172">        grid.addSelectionListener(listener);</span>
+<span class="fc" id="L173">        sheet.addDataChangeListener(listener);</span>
+<span class="fc" id="L174">        load();</span>
+<span class="fc" id="L175">    }</span>
+
+    @Override
+    protected void deinitialize() {
+<span class="fc" id="L179">        grid.removeSelectionListener(listener);</span>
+<span class="fc" id="L180">        sheet.removeDataChangeListener(listener);</span>
+<span class="fc" id="L181">        super.deinitialize();</span>
+<span class="fc" id="L182">    }</span>
+
+<span class="fc" id="L184">    private final class Listener implements SelectionListener, DataChangedListener {</span>
+        @Override
+        public void selectionChanged(int oldSelected, int newSelected) {
+<span class="fc bfc" id="L187" title="All 2 branches covered.">            if (editing.isActive()) {</span>
+                // moving to another cell enters what was typed into the one it was typed for
+<span class="fc" id="L189">                write();</span>
+<span class="fc" id="L190">                return;</span>
+            }
+<span class="fc" id="L192">            load();</span>
+<span class="fc" id="L193">        }</span>
+
+        @Override
+        public void dataChanged(int type, int index) {
+<span class="fc bfc" id="L197" title="All 2 branches covered.">            if (!editing.isActive()) {</span>
+<span class="fc" id="L198">                load();</span>
+            }
+<span class="fc" id="L200">        }</span>
+    }
+
+    private static final class Enter implements Runnable {
+        private final FormulaBar bar;
+        private final boolean write;
+
+<span class="fc" id="L207">        Enter(FormulaBar bar, boolean write) {</span>
+<span class="fc" id="L208">            this.bar = bar;</span>
+<span class="fc" id="L209">            this.write = write;</span>
+<span class="fc" id="L210">        }</span>
+
+        @Override
+        public void run() {
+<span class="pc bpc" id="L214" title="1 of 2 branches missed.">            if (write) {</span>
+<span class="fc" id="L215">                bar.write();</span>
+            } else {
+<span class="nc" id="L217">                bar.load();</span>
+            }
+<span class="fc" id="L219">        }</span>
+    }
+
+    private static final class Editor extends CodeEditor {
+        private FormulaBar bar;
+
+        @Override
+        protected void initComponent() {
+<span class="fc" id="L227">            super.initComponent();</span>
+<span class="fc" id="L228">            bar.editing.attach();</span>
+<span class="fc" id="L229">        }</span>
+
+        @Override
+        protected void deinitialize() {
+<span class="fc" id="L233">            bar.editing.detach();</span>
+<span class="fc" id="L234">            super.deinitialize();</span>
+<span class="fc" id="L235">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

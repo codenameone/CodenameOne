@@ -1,0 +1,144 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Slip10.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.crypto.hd</a> &gt; <span class="el_source">Slip10.java</span></div><h1>Slip10.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008-2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.crypto.hd;
+
+import com.codename1.security.Ed25519;
+import com.codename1.security.Hash;
+import com.codename1.security.Hmac;
+
+/// SLIP-10 key derivation for Ed25519, the scheme Solana, Stellar, Cardano-style and
+/// Aptos/Sui wallets use on a [Mnemonic] seed. Ed25519 has no public derivation, so every
+/// index is hardened: `m/44'/501'/0'/0'` is the usual Solana account.
+///
+/// (SLIP-10 over secp256k1 is BIP-32 itself; use [Bip32] for that curve.)
+@com.codename1.impl.SharedWithBackend
+public final class Slip10 {
+    private final byte[] privateKey;
+    private final byte[] chainCode;
+    private final int depth;
+    private final int parentFingerprint;
+    private final long childNumber;
+    private byte[] publicKey;
+
+<span class="fc" id="L43">    private Slip10(byte[] privateKey, byte[] chainCode, int depth, int parentFingerprint, long childNumber) {</span>
+<span class="fc" id="L44">        this.privateKey = privateKey;</span>
+<span class="fc" id="L45">        this.chainCode = chainCode;</span>
+<span class="fc" id="L46">        this.depth = depth;</span>
+<span class="fc" id="L47">        this.parentFingerprint = parentFingerprint;</span>
+<span class="fc" id="L48">        this.childNumber = childNumber;</span>
+<span class="fc" id="L49">    }</span>
+
+    /// The master node of a seed (16 to 64 bytes).
+    public static Slip10 master(byte[] seed) {
+<span class="pc bpc" id="L53" title="3 of 6 branches missed.">        if (seed == null || seed.length &lt; 16 || seed.length &gt; 64) {</span>
+<span class="nc" id="L54">            throw new IllegalArgumentException(&quot;a seed is 16 to 64 bytes&quot;);</span>
+        }
+<span class="fc" id="L56">        byte[] i = Hmac.sha512(Bip32.ascii(&quot;ed25519 seed&quot;), seed);</span>
+<span class="fc" id="L57">        Slip10 out = new Slip10(Bip32.slice(i, 0, 32), Bip32.slice(i, 32, 32), 0, 0, 0);</span>
+<span class="fc" id="L58">        Mnemonic.wipe(i);</span>
+<span class="fc" id="L59">        return out;</span>
+    }
+
+    /// The hardened child at `index`. An index below [DerivationPath#HARDENED] is hardened
+    /// for you, since Ed25519 has no other kind.
+    public Slip10 child(long index) {
+<span class="pc bpc" id="L65" title="2 of 4 branches missed.">        if (index &lt; 0 || index &gt; 0xffffffffL) {</span>
+<span class="nc" id="L66">            throw new IllegalArgumentException(&quot;index out of range&quot;);</span>
+        }
+<span class="pc bpc" id="L68" title="1 of 2 branches missed.">        long hardened = index &lt; DerivationPath.HARDENED ? index + DerivationPath.HARDENED : index;</span>
+<span class="fc" id="L69">        byte[] data = new byte[37];</span>
+<span class="fc" id="L70">        System.arraycopy(privateKey, 0, data, 1, 32);</span>
+<span class="fc" id="L71">        Bip32.writeInt(data, 33, (int) hardened);</span>
+<span class="fc" id="L72">        byte[] i = Hmac.sha512(chainCode, data);</span>
+<span class="fc" id="L73">        Mnemonic.wipe(data);</span>
+<span class="fc" id="L74">        Slip10 out = new Slip10(Bip32.slice(i, 0, 32), Bip32.slice(i, 32, 32), depth + 1, fingerprint(), hardened);</span>
+<span class="fc" id="L75">        Mnemonic.wipe(i);</span>
+<span class="fc" id="L76">        return out;</span>
+    }
+
+    /// Derives along a path such as `m/44'/501'/0'/0'`.
+    public Slip10 derive(String path) {
+<span class="fc" id="L81">        return derive(DerivationPath.parse(path));</span>
+    }
+
+    /// Derives along a path; every index is taken as hardened.
+    public Slip10 derive(DerivationPath path) {
+<span class="fc" id="L86">        Slip10 node = this;</span>
+<span class="fc bfc" id="L87" title="All 2 branches covered.">        for (int iter = 0; iter &lt; path.length(); iter++) {</span>
+<span class="fc" id="L88">            Slip10 next = node.child(path.get(iter));</span>
+<span class="fc bfc" id="L89" title="All 2 branches covered.">            if (node != this) { // NOPMD CompareObjectsWithEquals - identity: never destroy the receiver</span>
+<span class="fc" id="L90">                node.destroy();</span>
+            }
+<span class="fc" id="L92">            node = next;</span>
+        }
+<span class="fc" id="L94">        return node;</span>
+    }
+
+    /// A copy of the 32-byte Ed25519 private key (the RFC 8032 seed). Wipe it after use.
+    public byte[] privateKey() {
+<span class="fc" id="L99">        return Bip32.slice(privateKey, 0, 32);</span>
+    }
+
+    /// The 32-byte Ed25519 public key.
+    public byte[] publicKey() {
+<span class="pc bpc" id="L104" title="1 of 2 branches missed.">        if (publicKey == null) {</span>
+<span class="fc" id="L105">            publicKey = Ed25519.publicKey(privateKey);</span>
+        }
+<span class="fc" id="L107">        return Bip32.slice(publicKey, 0, 32);</span>
+    }
+
+    /// A copy of the 32-byte chain code.
+    public byte[] chainCode() {
+<span class="fc" id="L112">        return Bip32.slice(chainCode, 0, 32);</span>
+    }
+
+    /// The distance from the master node.
+    public int depth() {
+<span class="nc" id="L117">        return depth;</span>
+    }
+
+    /// The hardened index this node was derived with.
+    public long childNumber() {
+<span class="nc" id="L122">        return childNumber;</span>
+    }
+
+    /// The parent's fingerprint; 0 for the master node.
+    public int parentFingerprint() {
+<span class="fc" id="L127">        return parentFingerprint;</span>
+    }
+
+    /// The first four bytes of `HASH160(0x00 || publicKey)`, as SLIP-10 defines it.
+    public int fingerprint() {
+<span class="fc" id="L132">        byte[] pub = publicKey();</span>
+<span class="fc" id="L133">        byte[] data = new byte[33];</span>
+<span class="fc" id="L134">        System.arraycopy(pub, 0, data, 1, 32);</span>
+<span class="fc" id="L135">        return Bip32.readInt(Hash.hash160(data), 0);</span>
+    }
+
+    /// Wipes the private key and chain code.
+    public void destroy() {
+<span class="fc" id="L140">        Mnemonic.wipe(privateKey);</span>
+<span class="fc" id="L141">        Mnemonic.wipe(chainCode);</span>
+<span class="fc" id="L142">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

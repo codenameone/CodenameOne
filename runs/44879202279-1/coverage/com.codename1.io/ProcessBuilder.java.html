@@ -1,0 +1,157 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ProcessBuilder.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.io</a> &gt; <span class="el_source">ProcessBuilder.java</span></div><h1>ProcessBuilder.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.io;
+
+import com.codename1.impl.ImplementationFactory;
+import com.codename1.impl.process.ProcessSupport;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/// Creates desktop/backend subprocesses using JavaSE-style command lists and pipes.
+/// The working directory is an OS path String, not a Codename One file URL.
+/// Shell parsing is never implicit: invoke a shell explicitly if needed.
+/// Mobile/browser ports compile this API but start() throws
+/// UnsupportedOperationException. Support does not imply permission to run every
+/// executable. Builders are mutable and are not thread safe.
+///
+/// File redirection and inheritIO are not provided in this initial subset. Use
+/// the streams and drain stdout/stderr concurrently, or merge them first.
+@com.codename1.impl.SharedWithBackend
+public final class ProcessBuilder {
+    private List&lt;String&gt; command;
+    private String directory;
+    private Map&lt;String, String&gt; environment;
+    private boolean mergeError;
+
+<span class="fc" id="L49">    public ProcessBuilder(String... command) {</span>
+<span class="fc" id="L50">        command(command);</span>
+<span class="fc" id="L51">    }</span>
+<span class="nc" id="L52">    public ProcessBuilder(List&lt;String&gt; command) {</span>
+<span class="nc" id="L53">        command(command);</span>
+<span class="nc" id="L54">    }</span>
+
+    /// Whether this port implements subprocess creation (no Display init required).
+    public static boolean isSupported() {
+<span class="pc bpc" id="L58" title="1 of 2 branches missed.">        return support() != null;</span>
+    }
+    private static ProcessSupport support() {
+<span class="fc" id="L61">        return (ProcessSupport) ImplementationFactory.getInstance().createProcessSupport();</span>
+    }
+    /// Returns the live command list, as in JavaSE.
+    public List&lt;String&gt; command() {
+<span class="fc" id="L65">        return command;</span>
+    }
+    /// Keeps the supplied list, as in JavaSE. Validated again at start().
+    public ProcessBuilder command(List&lt;String&gt; command) {
+<span class="nc bnc" id="L69" title="All 2 branches missed.">        if (command == null) {</span>
+<span class="nc" id="L70">            throw new NullPointerException(&quot;command&quot;);</span>
+        }
+<span class="nc" id="L72">        this.command = command;</span>
+<span class="nc" id="L73">        return this;</span>
+    }
+    public ProcessBuilder command(String... command) {
+<span class="pc bpc" id="L76" title="1 of 2 branches missed.">        if (command == null) {</span>
+<span class="nc" id="L77">            throw new NullPointerException(&quot;command&quot;);</span>
+        }
+<span class="fc" id="L79">        this.command = new ArrayList&lt;String&gt;();</span>
+<span class="fc bfc" id="L80" title="All 2 branches covered.">        for (String arg : command) {</span>
+<span class="fc" id="L81">            this.command.add(arg);</span>
+        }
+<span class="fc" id="L83">        return this;</span>
+    }
+    /// Null inherits the parent's working directory. Paths are native OS paths.
+    public ProcessBuilder directory(String directory) {
+<span class="nc bnc" id="L87" title="All 2 branches missed.">        if (directory != null) {</span>
+<span class="nc" id="L88">            checkString(directory);</span>
+        }
+<span class="nc" id="L90">        this.directory = directory;</span>
+<span class="nc" id="L91">        return this;</span>
+    }
+    public String directory() {
+<span class="nc" id="L94">        return directory;</span>
+    }
+    /// A mutable copy of the inherited environment, initialized on first access.
+    /// Changes are validated at start(), including changes through entrySet().
+    /// Throws UnsupportedOperationException on unsupported ports.
+    public Map&lt;String, String&gt; environment() {
+<span class="fc bfc" id="L100" title="All 2 branches covered.">        if (environment == null) {</span>
+<span class="fc" id="L101">            ProcessSupport support = support();</span>
+<span class="fc bfc" id="L102" title="All 2 branches covered.">            if (support == null) {</span>
+<span class="fc" id="L103">                throw new UnsupportedOperationException(&quot;Processes are not supported on this port&quot;);</span>
+            }
+<span class="fc" id="L105">            environment = support.environment();</span>
+        }
+<span class="fc" id="L107">        return environment;</span>
+    }
+    public ProcessBuilder redirectErrorStream(boolean merge) {
+<span class="nc" id="L110">        mergeError = merge;</span>
+<span class="nc" id="L111">        return this;</span>
+    }
+    public boolean redirectErrorStream() {
+<span class="nc" id="L114">        return mergeError;</span>
+    }
+
+    /// Launches a child. Invalid arguments throw IllegalArgumentException (or
+    /// NullPointerException); launch/permission errors throw IOException or
+    /// SecurityException. An unsupported port throws UnsupportedOperationException.
+    public Process start() throws IOException {
+<span class="fc" id="L121">        ProcessSupport support = support();</span>
+<span class="fc bfc" id="L122" title="All 2 branches covered.">        if (support == null) {</span>
+<span class="fc" id="L123">            throw new UnsupportedOperationException(&quot;Processes are not supported on this port&quot;);</span>
+        }
+<span class="fc" id="L125">        String[] args = command.toArray(new String[command.size()]);</span>
+<span class="pc bpc" id="L126" title="1 of 2 branches missed.">        if (args.length == 0) {</span>
+<span class="nc" id="L127">            throw new IllegalArgumentException(&quot;Empty command&quot;);</span>
+        }
+<span class="fc bfc" id="L129" title="All 2 branches covered.">        for (String arg : args) {</span>
+<span class="fc" id="L130">            checkString(arg);</span>
+        }
+<span class="pc bpc" id="L132" title="1 of 2 branches missed.">        if (args[0].length() == 0) {</span>
+<span class="nc" id="L133">            throw new IllegalArgumentException(&quot;Empty executable&quot;);</span>
+        }
+<span class="fc" id="L135">        Map&lt;String, String&gt; env = null;</span>
+<span class="pc bpc" id="L136" title="1 of 2 branches missed.">        if (environment != null) {</span>
+<span class="fc" id="L137">            env = new HashMap&lt;String, String&gt;(environment);</span>
+<span class="fc bfc" id="L138" title="All 2 branches covered.">            for (Map.Entry&lt;String, String&gt; entry : env.entrySet()) {</span>
+<span class="fc" id="L139">                checkString(entry.getKey());</span>
+<span class="fc" id="L140">                checkString(entry.getValue());</span>
+<span class="pc bpc" id="L141" title="2 of 4 branches missed.">                if (entry.getKey().length() == 0 || entry.getKey().indexOf('=') &gt;= 0) {</span>
+<span class="fc" id="L142">                    throw new IllegalArgumentException(&quot;Invalid environment name&quot;);</span>
+                }
+<span class="nc" id="L144">            }</span>
+        }
+<span class="nc" id="L146">        return support.start(args, directory, env, mergeError);</span>
+    }
+    private static void checkString(String value) {
+<span class="fc bfc" id="L149" title="All 2 branches covered.">        if (value == null) {</span>
+<span class="fc" id="L150">            throw new NullPointerException();</span>
+        }
+<span class="fc bfc" id="L152" title="All 2 branches covered.">        if (value.indexOf('\0') &gt;= 0) {</span>
+<span class="fc" id="L153">            throw new IllegalArgumentException(&quot;Embedded NUL&quot;);</span>
+        }
+<span class="fc" id="L155">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

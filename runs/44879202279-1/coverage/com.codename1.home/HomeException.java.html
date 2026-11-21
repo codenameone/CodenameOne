@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>HomeException.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.home</a> &gt; <span class="el_source">HomeException.java</span></div><h1>HomeException.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.home;
+
+/// The failure delivered through an `AsyncResource` when a smart-home
+/// operation does not succeed. Branch on [#getError()] rather than on the
+/// message.
+///
+/// ```java
+/// SmartHome.getInstance().write(write).onResult((res, err) -&gt; {
+///     if (err instanceof HomeException) {
+///         HomeError e = ((HomeException) err).getError();
+///         if (e == HomeError.PIN_REQUIRED) {
+///             promptForLockPin();
+///         }
+///     }
+/// });
+/// ```
+public class HomeException extends Exception {
+
+    private final HomeError error;
+    private final String accessoryId;
+
+    /// Creates an exception carrying a typed reason.
+    ///
+    /// #### Parameters
+    ///
+    /// - `error`: the typed reason; `null` becomes [HomeError#UNKNOWN]
+    ///
+    /// - `message`: the platform's own text, or an explanation of a request
+    ///   this API rejected before it reached the platform
+    public HomeException(HomeError error, String message) {
+<span class="fc" id="L53">        this(error, message, null, null);</span>
+<span class="fc" id="L54">    }</span>
+
+    /// Creates an exception carrying a typed reason and the accessory it
+    /// applies to.
+    ///
+    /// #### Parameters
+    ///
+    /// - `error`: the typed reason; `null` becomes [HomeError#UNKNOWN]
+    ///
+    /// - `message`: the platform's own text
+    ///
+    /// - `accessoryId`: the accessory the failure is about, or `null` when it
+    ///   is not about one in particular
+    public HomeException(HomeError error, String message, String accessoryId) {
+<span class="nc" id="L68">        this(error, message, accessoryId, null);</span>
+<span class="nc" id="L69">    }</span>
+
+    /// Creates an exception carrying a typed reason, the accessory it applies
+    /// to and an underlying cause.
+    ///
+    /// #### Parameters
+    ///
+    /// - `error`: the typed reason; `null` becomes [HomeError#UNKNOWN]
+    ///
+    /// - `message`: the platform's own text
+    ///
+    /// - `accessoryId`: the accessory the failure is about, or `null`
+    ///
+    /// - `cause`: the underlying failure, or `null`
+    public HomeException(HomeError error, String message, String accessoryId,
+            Throwable cause) {
+<span class="fc" id="L85">        super(message, cause);</span>
+<span class="pc bpc" id="L86" title="1 of 2 branches missed.">        this.error = error == null ? HomeError.UNKNOWN : error;</span>
+<span class="fc" id="L87">        this.accessoryId = accessoryId;</span>
+<span class="fc" id="L88">    }</span>
+
+    /// The typed reason this operation failed.
+    ///
+    /// #### Returns
+    ///
+    /// the reason, never `null`
+    public HomeError getError() {
+<span class="fc" id="L96">        return error;</span>
+    }
+
+    /// The accessory this failure is about, when it is about one.
+    ///
+    /// A batch read or write that fails as a whole has no single accessory
+    /// and answers `null` here; per-item outcomes inside a batch that
+    /// partially succeeded are reported through [TraitWriteResult] and
+    /// [TraitReading] instead, not as exceptions.
+    ///
+    /// #### Returns
+    ///
+    /// the accessory id, or `null`
+    public String getAccessoryId() {
+<span class="nc" id="L110">        return accessoryId;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

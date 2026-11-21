@@ -1,0 +1,177 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RadialArrangement.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.graph.arrange</a> &gt; <span class="el_source">RadialArrangement.java</span></div><h1>RadialArrangement.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.graph.arrange;
+
+import com.codename1.graph.GraphModel;
+import com.codename1.graph.GraphNode;
+
+/// A tree on rings: the root at the centre and each level on a circle around
+/// it, every subtree in a wedge as wide as its share of the leaves. Suits a
+/// mind map, or the neighbourhood of one node in a large network.
+///
+/// The tree is found the way `TreeArrangement` finds it. Rings grow apart as far
+/// as the outermost needs to fit its nodes without overlapping.
+<span class="fc" id="L34">public class RadialArrangement implements GraphArrangement {</span>
+<span class="fc" id="L35">    private double ringGap = 140;</span>
+    private String rootId;
+
+    /// The least distance between rings in world units.
+    public double getRingGap() {
+<span class="nc" id="L40">        return ringGap;</span>
+    }
+
+    /// Sets the least distance between rings.
+    public void setRingGap(double ringGap) {
+<span class="nc" id="L45">        this.ringGap = ringGap;</span>
+<span class="nc" id="L46">    }</span>
+
+    /// The id of the node at the centre, or null for the first node no edge
+    /// enters.
+    public String getRootId() {
+<span class="nc" id="L51">        return rootId;</span>
+    }
+
+    /// Sets the node at the centre.
+    public void setRootId(String rootId) {
+<span class="fc" id="L56">        this.rootId = rootId;</span>
+<span class="fc" id="L57">    }</span>
+
+    @Override
+    public ArrangementResult arrange(GraphModel model) {
+<span class="fc" id="L61">        Forest f = new Forest(model, rootId);</span>
+<span class="fc" id="L62">        int n = f.graph.size();</span>
+<span class="fc" id="L63">        ArrangementResult r = new ArrangementResult();</span>
+<span class="fc bfc" id="L64" title="All 2 branches covered.">        if (n == 0) {</span>
+<span class="fc" id="L65">            return r;</span>
+        }
+        // several roots hang off an invisible centre
+<span class="fc" id="L68">        int[] leaves = new int[n];</span>
+<span class="fc" id="L69">        int[] order = postOrder(f);</span>
+<span class="fc" id="L70">        double maxSize = 0;</span>
+<span class="fc bfc" id="L71" title="All 2 branches covered.">        for (int oi = 0; oi &lt; order.length; oi++) { // NOPMD ForLoopCanBeForeach - indexed, like the rest of the pass</span>
+<span class="fc" id="L72">            int v = order[oi];</span>
+<span class="fc" id="L73">            int[] kids = f.children[v];</span>
+<span class="fc bfc" id="L74" title="All 2 branches covered.">            if (kids.length == 0) {</span>
+<span class="fc" id="L75">                leaves[v] = 1;</span>
+            } else {
+<span class="fc bfc" id="L77" title="All 2 branches covered.">                for (int i = 0; i &lt; kids.length; i++) { // NOPMD ForLoopCanBeForeach - indexed, like the rest of the pass</span>
+<span class="fc" id="L78">                    leaves[v] += leaves[kids[i]];</span>
+                }
+            }
+<span class="fc" id="L81">            GraphNode node = f.graph.nodes[v];</span>
+<span class="fc" id="L82">            maxSize = Math.max(maxSize, Math.max(node.getWidth(), node.getHeight()));</span>
+        }
+<span class="fc" id="L84">        int totalLeaves = 0;</span>
+<span class="fc bfc" id="L85" title="All 2 branches covered.">        for (int i = 0; i &lt; f.roots.length; i++) {</span>
+<span class="fc" id="L86">            totalLeaves += leaves[f.roots[i]];</span>
+        }
+<span class="pc bpc" id="L88" title="1 of 2 branches missed.">        boolean single = f.roots.length == 1;</span>
+<span class="pc bpc" id="L89" title="1 of 2 branches missed.">        int depthShift = single ? 0 : 1;</span>
+<span class="fc" id="L90">        double[] a0 = new double[n];</span>
+<span class="fc" id="L91">        double[] a1 = new double[n];</span>
+<span class="fc" id="L92">        double at = 0;</span>
+<span class="fc bfc" id="L93" title="All 2 branches covered.">        for (int i = 0; i &lt; f.roots.length; i++) {</span>
+<span class="fc" id="L94">            int root = f.roots[i];</span>
+<span class="fc" id="L95">            double span = 2 * Math.PI * leaves[root] / totalLeaves;</span>
+<span class="fc" id="L96">            a0[root] = at;</span>
+<span class="fc" id="L97">            a1[root] = at + span;</span>
+<span class="fc" id="L98">            at += span;</span>
+        }
+        // first pass: give out the wedges, and find the ring gap at which every
+        // node fits the arc of its own wedge; wedges never overlap, so neither do nodes
+<span class="fc" id="L102">        double gap = Math.max(ringGap, maxSize * 1.5);</span>
+<span class="fc bfc" id="L103" title="All 2 branches covered.">        for (int oi = order.length - 1; oi &gt;= 0; oi--) {</span>
+<span class="fc" id="L104">            int v = order[oi];</span>
+<span class="fc" id="L105">            int[] kids = f.children[v];</span>
+<span class="fc" id="L106">            double cur = a0[v];</span>
+<span class="fc bfc" id="L107" title="All 2 branches covered.">            for (int i = 0; i &lt; kids.length; i++) { // NOPMD ForLoopCanBeForeach - indexed, like the rest of the pass</span>
+<span class="fc" id="L108">                int c = kids[i];</span>
+<span class="fc" id="L109">                double span = (a1[v] - a0[v]) * leaves[c] / leaves[v];</span>
+<span class="fc" id="L110">                a0[c] = cur;</span>
+<span class="fc" id="L111">                a1[c] = cur + span;</span>
+<span class="fc" id="L112">                cur += span;</span>
+            }
+<span class="fc" id="L114">            int ring = f.depth[v] + depthShift;</span>
+<span class="fc" id="L115">            double wedge = a1[v] - a0[v];</span>
+<span class="fc bfc" id="L116" title="All 4 branches covered.">            if (ring &gt; 0 &amp;&amp; wedge &lt; Math.PI) {</span>
+<span class="fc" id="L117">                GraphNode node = f.graph.nodes[v];</span>
+<span class="fc" id="L118">                double diag = Math.sqrt(node.getWidth() * node.getWidth() + node.getHeight() * node.getHeight());</span>
+                // the chord of the wedge at radius R is 2 R sin(wedge / 2)
+<span class="fc" id="L120">                gap = Math.max(gap, diag * 1.1 / (2 * Math.sin(wedge / 2)) / ring);</span>
+            }
+        }
+<span class="fc bfc" id="L123" title="All 2 branches covered.">        for (int oi = order.length - 1; oi &gt;= 0; oi--) {</span>
+<span class="fc" id="L124">            int v = order[oi];</span>
+<span class="fc" id="L125">            int[] kids = f.children[v];</span>
+<span class="fc" id="L126">            double cur = a0[v];</span>
+<span class="fc bfc" id="L127" title="All 2 branches covered.">            for (int i = 0; i &lt; kids.length; i++) { // NOPMD ForLoopCanBeForeach - indexed, like the rest of the pass</span>
+<span class="fc" id="L128">                int c = kids[i];</span>
+<span class="fc" id="L129">                double span = (a1[v] - a0[v]) * leaves[c] / leaves[v];</span>
+<span class="fc" id="L130">                a0[c] = cur;</span>
+<span class="fc" id="L131">                a1[c] = cur + span;</span>
+<span class="fc" id="L132">                cur += span;</span>
+            }
+<span class="fc" id="L134">            GraphNode node = f.graph.nodes[v];</span>
+<span class="fc" id="L135">            int ring = f.depth[v] + depthShift;</span>
+            double cx;
+            double cy;
+<span class="fc bfc" id="L138" title="All 2 branches covered.">            if (ring == 0) {</span>
+<span class="fc" id="L139">                cx = 0;</span>
+<span class="fc" id="L140">                cy = 0;</span>
+            } else {
+<span class="fc" id="L142">                double a = (a0[v] + a1[v]) / 2 - Math.PI / 2;</span>
+<span class="fc" id="L143">                cx = Math.cos(a) * ring * gap;</span>
+<span class="fc" id="L144">                cy = Math.sin(a) * ring * gap;</span>
+            }
+<span class="fc" id="L146">            r.setPosition(node.getId(), cx - node.getWidth() / 2, cy - node.getHeight() / 2);</span>
+        }
+<span class="fc" id="L148">        return r;</span>
+    }
+
+    private static int[] postOrder(Forest f) {
+<span class="fc" id="L152">        int n = f.graph.size();</span>
+<span class="fc" id="L153">        int[] out = new int[n];</span>
+<span class="fc" id="L154">        int k = 0;</span>
+<span class="fc" id="L155">        int[] stack = new int[n];</span>
+<span class="fc" id="L156">        int[] next = new int[n];</span>
+<span class="fc bfc" id="L157" title="All 2 branches covered.">        for (int ri = 0; ri &lt; f.roots.length; ri++) {</span>
+<span class="fc" id="L158">            int top = 0;</span>
+<span class="fc" id="L159">            stack[0] = f.roots[ri];</span>
+<span class="fc" id="L160">            next[0] = 0;</span>
+<span class="fc bfc" id="L161" title="All 2 branches covered.">            while (top &gt;= 0) {</span>
+<span class="fc" id="L162">                int v = stack[top];</span>
+<span class="fc bfc" id="L163" title="All 2 branches covered.">                if (next[top] &lt; f.children[v].length) {</span>
+<span class="fc" id="L164">                    int c = f.children[v][next[top]++];</span>
+<span class="fc" id="L165">                    top++;</span>
+<span class="fc" id="L166">                    stack[top] = c;</span>
+<span class="fc" id="L167">                    next[top] = 0;</span>
+<span class="fc" id="L168">                } else {</span>
+<span class="fc" id="L169">                    out[k++] = v;</span>
+<span class="fc" id="L170">                    top--;</span>
+                }
+<span class="fc" id="L172">            }</span>
+        }
+<span class="fc" id="L174">        return out;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

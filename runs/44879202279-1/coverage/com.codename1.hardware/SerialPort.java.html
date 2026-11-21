@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SerialPort.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.hardware</a> &gt; <span class="el_source">SerialPort.java</span></div><h1>SerialPort.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.hardware;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+
+/// A serial port in raw mode, opened through
+/// [Hardware#openSerial(String, int, int, int, int)].
+///
+/// Reads block; call them off the event dispatch thread, or use
+/// [#read(byte[], int, int, int)] with a timeout.
+@com.codename1.impl.SharedWithBackend
+public final class SerialPort {
+
+    /// No parity bit.
+    public static final int PARITY_NONE = 0;
+    /// Odd parity.
+    public static final int PARITY_ODD = 1;
+    /// Even parity.
+    public static final int PARITY_EVEN = 2;
+
+    private final Hardware hw;
+    private final int handle;
+    private final String device;
+    private boolean closed;
+    private InputStream in;
+    private OutputStream out;
+
+<span class="nc" id="L51">    SerialPort(Hardware hw, int handle, String device) {</span>
+<span class="nc" id="L52">        this.hw = hw;</span>
+<span class="nc" id="L53">        this.handle = handle;</span>
+<span class="nc" id="L54">        this.device = device;</span>
+<span class="nc" id="L55">    }</span>
+
+    /// The device path this port was opened on.
+    public String getDevice() {
+<span class="nc" id="L59">        return device;</span>
+    }
+
+    /// Reads up to `len` bytes, waiting at most `timeoutMs` for the first
+    /// (negative waits indefinitely). Returns the number read, `0` on timeout.
+    ///
+    /// #### Throws
+    ///
+    /// - `HardwareException`: when the read fails or the port is closed
+    public int read(byte[] buf, int off, int len, int timeoutMs) throws HardwareException {
+<span class="nc" id="L69">        checkOpen();</span>
+<span class="nc" id="L70">        return hw.serialRead(handle, buf, off, len, timeoutMs);</span>
+    }
+
+    /// Writes all of `buf[off..off+len)`.
+    ///
+    /// #### Throws
+    ///
+    /// - `HardwareException`: when the write fails or the port is closed
+    public void write(byte[] buf, int off, int len) throws HardwareException {
+<span class="nc" id="L79">        checkOpen();</span>
+<span class="nc" id="L80">        hw.serialWrite(handle, buf, off, len);</span>
+<span class="nc" id="L81">    }</span>
+
+    /// A blocking stream over this port. Its `read` waits until data arrives
+    /// and returns `-1` only after [#close()].
+    public InputStream getInputStream() {
+<span class="nc bnc" id="L86" title="All 2 branches missed.">        if (in == null) {</span>
+<span class="nc" id="L87">            in = new InputStream() {</span>
+                @Override
+                public int read() throws IOException {
+<span class="nc" id="L90">                    byte[] one = new byte[1];</span>
+<span class="nc" id="L91">                    int n = read(one, 0, 1);</span>
+<span class="nc bnc" id="L92" title="All 2 branches missed.">                    return n &lt;= 0 ? -1 : one[0] &amp; 0xff;</span>
+                }
+
+                @Override
+                public int read(byte[] b, int off, int len) throws IOException {
+<span class="nc bnc" id="L97" title="All 2 branches missed.">                    if (len == 0) {</span>
+<span class="nc" id="L98">                        return 0;</span>
+                    }
+<span class="nc bnc" id="L100" title="All 2 branches missed.">                    while (!closed) {</span>
+<span class="nc" id="L101">                        int n = hw.serialRead(handle, b, off, len, 250);</span>
+<span class="nc bnc" id="L102" title="All 2 branches missed.">                        if (n &gt; 0) {</span>
+<span class="nc" id="L103">                            return n;</span>
+                        }
+<span class="nc" id="L105">                    }</span>
+<span class="nc" id="L106">                    return -1;</span>
+                }
+            };
+        }
+<span class="nc" id="L110">        return in;</span>
+    }
+
+    /// A stream that writes to this port.
+    public OutputStream getOutputStream() {
+<span class="nc bnc" id="L115" title="All 2 branches missed.">        if (out == null) {</span>
+<span class="nc" id="L116">            out = new OutputStream() {</span>
+                @Override
+                public void write(int b) throws IOException {
+<span class="nc" id="L119">                    write(new byte[] {(byte) b}, 0, 1);</span>
+<span class="nc" id="L120">                }</span>
+
+                @Override
+                public void write(byte[] b, int off, int len) throws IOException {
+<span class="nc" id="L124">                    SerialPort.this.write(b, off, len);</span>
+<span class="nc" id="L125">                }</span>
+            };
+        }
+<span class="nc" id="L128">        return out;</span>
+    }
+
+    /// Closes the port. Closing twice is harmless.
+    public void close() {
+<span class="nc bnc" id="L133" title="All 2 branches missed.">        if (!closed) {</span>
+<span class="nc" id="L134">            closed = true;</span>
+<span class="nc" id="L135">            hw.close(handle, false);</span>
+        }
+<span class="nc" id="L137">    }</span>
+
+    private void checkOpen() throws HardwareException {
+<span class="nc bnc" id="L140" title="All 2 branches missed.">        if (closed) {</span>
+<span class="nc" id="L141">            throw new HardwareException(&quot;Serial port &quot; + device + &quot; is closed&quot;);</span>
+        }
+<span class="nc" id="L143">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

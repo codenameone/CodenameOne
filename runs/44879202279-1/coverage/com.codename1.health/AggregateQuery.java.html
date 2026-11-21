@@ -1,0 +1,248 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AggregateQuery.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.health</a> &gt; <span class="el_source">AggregateQuery.java</span></div><h1>AggregateQuery.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.health;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
+/// Describes a bucketed summary read against [HealthStore].
+///
+/// ```java
+/// AggregateQuery q = new AggregateQuery()
+///         .addType(HealthDataType.STEPS)
+///         .addMetric(AggregateMetric.TOTAL)
+///         .setTimeRange(HealthTimeRange.calendarDays(7, ZoneId.systemDefault()))
+///         .setBucket(HealthInterval.calendarDays(1, ZoneId.systemDefault()));
+/// ```
+///
+/// #### Overlapping sources are counted twice, on every platform
+///
+/// When a phone and a watch both record steps for the same walk, the store
+/// holds two overlapping sets of samples, and a total over them counts the
+/// walk twice.
+///
+/// **This includes iOS.** HealthKit's statistics engine does de-duplicate
+/// overlapping sources -- but no port uses it in this release. Every
+/// metric here is computed by shared code from raw samples read back
+/// through an ordinary query, so that the bucket arithmetic has one
+/// implementation rather than one per platform that can drift. iOS
+/// therefore double-counts exactly as Android does. A port that grows a
+/// native aggregate path would change that, and this note with it.
+///
+/// This API does not paper over the overlap with a heuristic
+/// de-duplicator -- guessing which of two overlapping sources is
+/// authoritative is exactly the kind of silent wrongness health data
+/// cannot afford. Use [#addSource(String)] to pin the query to the source
+/// you trust, and tell the user which device a figure came from.
+<span class="fc" id="L58">public final class AggregateQuery {</span>
+
+<span class="fc" id="L60">    private final List&lt;HealthDataType&gt; types = new ArrayList&lt;HealthDataType&gt;();</span>
+<span class="fc" id="L61">    private final List&lt;AggregateMetric&gt; metrics =</span>
+            new ArrayList&lt;AggregateMetric&gt;();
+<span class="fc" id="L63">    private final List&lt;String&gt; sources = new ArrayList&lt;String&gt;();</span>
+    private HealthTimeRange timeRange;
+    private HealthInterval bucket;
+    private HealthUnit unit;
+
+    /// Adds a type to summarize. At least one is required.
+    public AggregateQuery addType(HealthDataType type) {
+<span class="pc bpc" id="L70" title="2 of 4 branches missed.">        if (type != null &amp;&amp; !types.contains(type)) {</span>
+<span class="fc" id="L71">            types.add(type);</span>
+        }
+<span class="fc" id="L73">        return this;</span>
+    }
+
+    /// The types this query summarizes.
+    public List&lt;HealthDataType&gt; getTypes() {
+<span class="fc" id="L78">        return Collections.unmodifiableList(types);</span>
+    }
+
+    /// Adds a metric to compute. At least one is required.
+    public AggregateQuery addMetric(AggregateMetric metric) {
+<span class="pc bpc" id="L83" title="2 of 4 branches missed.">        if (metric != null &amp;&amp; !metrics.contains(metric)) {</span>
+<span class="fc" id="L84">            metrics.add(metric);</span>
+        }
+<span class="fc" id="L86">        return this;</span>
+    }
+
+    /// The metrics this query computes.
+    public List&lt;AggregateMetric&gt; getMetrics() {
+<span class="fc" id="L91">        return Collections.unmodifiableList(metrics);</span>
+    }
+
+    /// Restricts the summary to one writing app -- see the double-counting
+    /// warning on this class.
+    /// Asks the platform to de-duplicate overlapping sources.
+    ///
+    /// Off by default, because the shared rollup cannot do it and most
+    /// stores therefore cannot honour it. Check
+    /// [HealthStore#isSourceDeduplicationSupported()] first: asking a store
+    /// that cannot fails the aggregate with [HealthError#NOT_SUPPORTED]
+    /// rather than silently returning the double-counted answer.
+    ///
+    /// Where it is honoured -- HealthKit, whose statistics engine does this
+    /// natively -- a walk recorded by both a phone and a watch is counted
+    /// once instead of twice.
+    public AggregateQuery setDeduplicateSources(boolean deduplicate) {
+<span class="fc" id="L108">        this.deduplicateSources = deduplicate;</span>
+<span class="fc" id="L109">        return this;</span>
+    }
+
+    /// Whether this query asked for source de-duplication.
+    public boolean isDeduplicateSources() {
+<span class="fc" id="L114">        return deduplicateSources;</span>
+    }
+
+    private boolean deduplicateSources;
+
+    public AggregateQuery addSource(String bundleId) {
+<span class="nc bnc" id="L120" title="All 4 branches missed.">        if (bundleId != null &amp;&amp; !sources.contains(bundleId)) {</span>
+<span class="nc" id="L121">            sources.add(bundleId);</span>
+        }
+<span class="nc" id="L123">        return this;</span>
+    }
+
+    /// The source filter, empty when unrestricted.
+    public List&lt;String&gt; getSources() {
+<span class="fc" id="L128">        return Collections.unmodifiableList(sources);</span>
+    }
+
+    /// The span to summarize. Required.
+    public AggregateQuery setTimeRange(HealthTimeRange timeRange) {
+<span class="fc" id="L133">        this.timeRange = timeRange;</span>
+<span class="fc" id="L134">        return this;</span>
+    }
+
+    /// The span this query summarizes.
+    public HealthTimeRange getTimeRange() {
+<span class="fc" id="L139">        return timeRange;</span>
+    }
+
+    /// Splits the range into buckets of this width. Leave unset for a
+    /// single bucket covering the whole range.
+    ///
+    /// Prefer [HealthInterval#calendarDays(int,java.time.ZoneId)] over a
+    /// fixed 24-hour width whenever the buckets are labelled with dates in
+    /// your UI -- see [HealthInterval].
+    public AggregateQuery setBucket(HealthInterval bucket) {
+<span class="fc" id="L149">        this.bucket = bucket;</span>
+<span class="fc" id="L150">        return this;</span>
+    }
+
+    /// The bucket width, or null for one bucket over the whole range.
+    public HealthInterval getBucket() {
+<span class="fc" id="L155">        return bucket;</span>
+    }
+
+    /// Returns aggregated values in `unit` rather than each type's
+    /// canonical unit.
+    public AggregateQuery setUnit(HealthUnit unit) {
+<span class="fc" id="L161">        this.unit = unit;</span>
+<span class="fc" id="L162">        return this;</span>
+    }
+
+    /// The requested unit, or null for canonical units.
+    public HealthUnit getUnit() {
+<span class="fc" id="L167">        return unit;</span>
+    }
+
+    /// Validates the query and throws if it cannot be run.
+    ///
+    /// #### Throws
+    ///
+    /// - `HealthException`: [HealthError#INVALID_ARGUMENT] for a missing
+    ///   type, metric or range, or for a metric that is meaningless for
+    ///   the requested type; [HealthError#UNIT_MISMATCH] for an
+    ///   incompatible unit.
+    public void validate() throws HealthException {
+<span class="pc bpc" id="L179" title="1 of 2 branches missed.">        if (types.isEmpty()) {</span>
+<span class="nc" id="L180">            throw new HealthException(HealthError.INVALID_ARGUMENT,</span>
+                    &quot;an aggregate query needs at least one data type&quot;);
+        }
+<span class="pc bpc" id="L183" title="1 of 2 branches missed.">        if (metrics.isEmpty()) {</span>
+<span class="nc" id="L184">            throw new HealthException(HealthError.INVALID_ARGUMENT,</span>
+                    &quot;an aggregate query needs at least one metric&quot;);
+        }
+<span class="pc bpc" id="L187" title="1 of 2 branches missed.">        if (timeRange == null) {</span>
+<span class="nc" id="L188">            throw new HealthException(HealthError.INVALID_ARGUMENT,</span>
+                    &quot;an aggregate query needs a time range&quot;);
+        }
+<span class="fc bfc" id="L191" title="All 2 branches covered.">        for (HealthDataType t : types) {</span>
+<span class="fc bfc" id="L192" title="All 2 branches covered.">            for (AggregateMetric m : metrics) {</span>
+<span class="fc bfc" id="L193" title="All 2 branches covered.">                if (!isMeaningful(t, m)) {</span>
+<span class="fc" id="L194">                    throw new HealthException(HealthError.INVALID_ARGUMENT,</span>
+<span class="fc" id="L195">                            m + &quot; is not meaningful for &quot; + t.getId()</span>
+                                    + &quot;, which aggregates as &quot;
+<span class="fc" id="L197">                                    + t.getAggregationStyle());</span>
+                }
+<span class="fc" id="L199">            }</span>
+<span class="pc bpc" id="L200" title="1 of 2 branches missed.">            if (unit != null) {</span>
+<span class="nc" id="L201">                HealthUnit canonical = t.getCanonicalUnit();</span>
+<span class="nc bnc" id="L202" title="All 4 branches missed.">                if (canonical == null || !canonical.isCompatibleWith(unit)) {</span>
+<span class="nc" id="L203">                    throw new HealthException(HealthError.UNIT_MISMATCH,</span>
+<span class="nc" id="L204">                            &quot;cannot express &quot; + t.getId() + &quot; in &quot;</span>
+<span class="nc" id="L205">                                    + unit.getSymbol());</span>
+                }
+            }
+<span class="fc" id="L208">        }</span>
+<span class="fc" id="L209">    }</span>
+
+    /// Whether `metric` says anything true about `type`.
+    ///
+    /// [AggregateMetric#COUNT] and [AggregateMetric#DURATION] apply to
+    /// everything. Summing a discrete series -- the total of every body
+    /// mass ever recorded -- and averaging a cumulative one -- the mean of
+    /// arbitrarily-chunked step totals -- are both meaningless, so they
+    /// are rejected rather than answered.
+    @SuppressWarnings(&quot;PMD.CompareObjectsWithEquals&quot;)
+    public static boolean isMeaningful(HealthDataType type,
+            AggregateMetric metric) {
+<span class="pc bpc" id="L221" title="2 of 4 branches missed.">        if (type == null || metric == null) {</span>
+<span class="nc" id="L222">            return false;</span>
+        }
+<span class="fc bfc" id="L224" title="All 4 branches covered.">        if (metric == AggregateMetric.COUNT</span>
+                || metric == AggregateMetric.DURATION) {
+<span class="fc" id="L226">            return true;</span>
+        }
+        // Composite types carry more than one number, so there is no single
+        // value to average or compare. Accepting the metric and returning
+        // null looked like &quot;no data&quot; for a bucket that genuinely had
+        // readings, which is the worse of the two answers.
+<span class="fc bfc" id="L232" title="All 2 branches covered.">        if (type.getKind() == HealthDataKind.COMPOSITE) {</span>
+<span class="fc" id="L233">            return false;</span>
+        }
+<span class="fc" id="L235">        HealthAggregationStyle style = type.getAggregationStyle();</span>
+<span class="fc bfc" id="L236" title="All 2 branches covered.">        if (style == HealthAggregationStyle.CUMULATIVE) {</span>
+<span class="fc bfc" id="L237" title="All 2 branches covered.">            return metric == AggregateMetric.TOTAL;</span>
+        }
+<span class="pc bpc" id="L239" title="1 of 2 branches missed.">        if (style == HealthAggregationStyle.DISCRETE) {</span>
+<span class="fc bfc" id="L240" title="All 8 branches covered.">            return metric == AggregateMetric.AVERAGE</span>
+                    || metric == AggregateMetric.MINIMUM
+                    || metric == AggregateMetric.MAXIMUM
+                    || metric == AggregateMetric.LATEST;
+        }
+<span class="nc" id="L245">        return false;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

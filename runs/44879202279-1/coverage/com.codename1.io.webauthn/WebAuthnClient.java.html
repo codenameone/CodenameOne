@@ -1,0 +1,230 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>WebAuthnClient.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.io.webauthn</a> &gt; <span class="el_source">WebAuthnClient.java</span></div><h1>WebAuthnClient.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012-2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation. Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.io.webauthn;
+
+import com.codename1.util.AsyncResource;
+
+/// Modern WebAuthn / passkey client. Wraps the OS public-key credential APIs
+/// (`ASAuthorizationPlatformPublicKeyCredentialProvider` on iOS 16+,
+/// `androidx.credentials.CredentialManager` on Android API 28+) behind a
+/// portable, JSON-friendly Java surface so you can talk to any relying-party
+/// server -- your own backend, Auth0, Firebase, or one of the WebAuthn server
+/// libraries -- with the same code.
+///
+/// ### When to reach for this class
+///
+/// - Your app talks to *your own* backend and you want to add passkeys for
+///   passwordless sign-in / step-up auth.
+/// - You are wiring up a passkey flow against Auth0 or Firebase that those
+///   providers' OIDC ceremonies don't already give you for free. (When the
+///   user signs into Google / Apple / Microsoft via [com.codename1.io.oidc.OidcClient],
+///   the IdP handles the passkey on its end -- you get the resulting tokens
+///   without ever calling this class.)
+///
+/// ### Typical registration flow
+///
+/// ```java
+/// // 1. Ask your server for the registration challenge JSON.
+/// AsyncResource&lt;String&gt; challenge = httpPost(&quot;/passkey/register/start&quot;, body);
+///
+/// // 2. Hand it to the OS for the actual passkey creation.
+/// PublicKeyCredentialCreationOptions opts =
+///         PublicKeyCredentialCreationOptions.fromJson(challenge.get());
+///
+/// WebAuthnClient.getInstance().create(opts)
+///         .ready(new SuccessCallback&lt;PublicKeyCredential&gt;() {
+///             public void onSucess(PublicKeyCredential cred) {
+///                 // 3. Forward the authenticator response back to the server.
+///                 httpPost(&quot;/passkey/register/verify&quot;, cred.toJson());
+///             }
+///         });
+/// ```
+///
+/// ### Typical sign-in flow
+///
+/// Symmetrical: ask the server for an assertion challenge, hand to
+/// [#get(PublicKeyCredentialRequestOptions)], POST the response back. The
+/// server verifies the signature and returns a session token.
+///
+/// ### What this class deliberately does NOT do
+///
+/// - **Verify the attestation / assertion.** That is the relying party's
+///   responsibility -- it requires the server-side credential record and a
+///   counter check that only the RP can do safely. Use a server library:
+///   `webauthn4j` (Java), `@simplewebauthn/server` (Node), `webauthn-rs`
+///   (Rust), or your IdP's built-in verifier.
+/// - **Conditional UI (autofill).** The W3C `mediation: &quot;conditional&quot;` UX
+///   is not currently exposed; pass a regular [#get] when the user clicks
+///   a sign-in button.
+/// - **Replace OIDC.** Most apps using [com.codename1.io.oidc.OidcClient]
+///   already get passkey-backed sign-in for free (the IdP handles the
+///   passkey ceremony). Use this class when you specifically have your own
+///   relying party.
+///
+public final class WebAuthnClient {
+
+<span class="fc" id="L87">    private static WebAuthnClient INSTANCE = new WebAuthnClient();</span>
+    private static WebAuthnNative provider;
+
+    private WebAuthnClient() {}
+
+    public static WebAuthnClient getInstance() {
+<span class="fc" id="L93">        return INSTANCE;</span>
+    }
+
+    /// `true` when a native, OS-level passkey implementation is available on
+    /// the current platform. When `false`, [#create] and [#get] fail with
+    /// [WebAuthnException#NOT_IMPLEMENTED] so the caller can present a
+    /// fallback UI.
+    public static boolean isSupported() {
+<span class="fc" id="L101">        WebAuthnNative n = getProvider();</span>
+<span class="pc bpc" id="L102" title="1 of 4 branches missed.">        return n != null &amp;&amp; n.isSupported();</span>
+    }
+
+    /// Registers a port-supplied [WebAuthnNative] implementation. Called at
+    /// app startup by the platform port (`WebAuthnNativeImpl.init()`).
+    /// Cn1lib authors can also call this to plug in a custom implementation
+    /// (e.g. a USB-HID security-key driver). Pass `null` to revert to &quot;no
+    /// platform support&quot;.
+    public static void setProvider(WebAuthnNative p) {
+<span class="fc" id="L111">        synchronized (WebAuthnClient.class) {</span>
+<span class="fc" id="L112">            provider = p;</span>
+<span class="fc" id="L113">        }</span>
+<span class="fc" id="L114">    }</span>
+
+    private static WebAuthnNative getProvider() {
+<span class="fc" id="L117">        synchronized (WebAuthnClient.class) {</span>
+<span class="fc" id="L118">            return provider;</span>
+        }
+    }
+
+    /// Drives the W3C `navigator.credentials.create()` ceremony with the
+    /// given options. The returned [AsyncResource] completes with the
+    /// authenticator's [PublicKeyCredential] response, or errors with
+    /// [WebAuthnException] (e.g. [WebAuthnException#NOT_ALLOWED] when the
+    /// user dismisses the OS sheet).
+    ///
+    /// **The work is done off the EDT** -- a background thread blocks on the
+    /// native call. Callers can attach `.ready()` and `.except()` listeners
+    /// without worrying about thread affinity; both fire on the EDT.
+    public AsyncResource&lt;PublicKeyCredential&gt; create(final PublicKeyCredentialCreationOptions options) {
+<span class="pc bpc" id="L132" title="1 of 2 branches missed.">        if (options == null) {</span>
+<span class="nc" id="L133">            throw new IllegalArgumentException(&quot;options must not be null&quot;);</span>
+        }
+<span class="fc" id="L135">        final AsyncResource&lt;PublicKeyCredential&gt; out = new AsyncResource&lt;PublicKeyCredential&gt;();</span>
+<span class="fc" id="L136">        final WebAuthnNative p = getProvider();</span>
+<span class="pc bpc" id="L137" title="1 of 4 branches missed.">        if (p == null || !p.isSupported()) {</span>
+<span class="fc" id="L138">            out.error(new WebAuthnException(WebAuthnException.NOT_IMPLEMENTED,</span>
+                    &quot;WebAuthn is not available on this platform&quot;));
+<span class="fc" id="L140">            return out;</span>
+        }
+<span class="fc" id="L142">        Runnable task = new CreateRunnable(p, options.toJson(), out);</span>
+<span class="fc" id="L143">        new Thread(task, &quot;WebAuthnCreate&quot;).start();</span>
+<span class="fc" id="L144">        return out;</span>
+    }
+
+    /// Drives the W3C `navigator.credentials.get()` ceremony with the given
+    /// options. Symmetrical to [#create(PublicKeyCredentialCreationOptions)].
+    public AsyncResource&lt;PublicKeyCredential&gt; get(final PublicKeyCredentialRequestOptions options) {
+<span class="pc bpc" id="L150" title="1 of 2 branches missed.">        if (options == null) {</span>
+<span class="nc" id="L151">            throw new IllegalArgumentException(&quot;options must not be null&quot;);</span>
+        }
+<span class="fc" id="L153">        final AsyncResource&lt;PublicKeyCredential&gt; out = new AsyncResource&lt;PublicKeyCredential&gt;();</span>
+<span class="fc" id="L154">        final WebAuthnNative p = getProvider();</span>
+<span class="pc bpc" id="L155" title="1 of 4 branches missed.">        if (p == null || !p.isSupported()) {</span>
+<span class="fc" id="L156">            out.error(new WebAuthnException(WebAuthnException.NOT_IMPLEMENTED,</span>
+                    &quot;WebAuthn is not available on this platform&quot;));
+<span class="fc" id="L158">            return out;</span>
+        }
+<span class="fc" id="L160">        Runnable task = new GetRunnable(p, options.toJson(), out);</span>
+<span class="fc" id="L161">        new Thread(task, &quot;WebAuthnGet&quot;).start();</span>
+<span class="fc" id="L162">        return out;</span>
+    }
+
+    /// Static-nested runnable wrappers (over anonymous inner classes) so
+    /// SpotBugs SIC_INNER_SHOULD_BE_STATIC_ANON stays quiet and so the
+    /// thread doesn't pin a [WebAuthnClient] reference.
+    private static final class CreateRunnable implements Runnable {
+        private final WebAuthnNative provider;
+        private final String optionsJson;
+        private final AsyncResource&lt;PublicKeyCredential&gt; out;
+
+        CreateRunnable(WebAuthnNative provider, String optionsJson,
+<span class="fc" id="L174">                       AsyncResource&lt;PublicKeyCredential&gt; out) {</span>
+<span class="fc" id="L175">            this.provider = provider;</span>
+<span class="fc" id="L176">            this.optionsJson = optionsJson;</span>
+<span class="fc" id="L177">            this.out = out;</span>
+<span class="fc" id="L178">        }</span>
+
+        @Override
+        public void run() {
+            try {
+<span class="fc" id="L183">                String responseJson = provider.createPasskey(optionsJson);</span>
+<span class="pc bpc" id="L184" title="1 of 2 branches missed.">                if (responseJson == null) {</span>
+<span class="nc" id="L185">                    out.error(new WebAuthnException(WebAuthnException.NOT_ALLOWED,</span>
+                            &quot;Passkey registration sheet was dismissed&quot;));
+<span class="nc" id="L187">                    return;</span>
+                }
+<span class="fc" id="L189">                out.complete(PublicKeyCredential.fromJson(responseJson));</span>
+<span class="fc" id="L190">            } catch (WebAuthnException wae) {</span>
+<span class="fc" id="L191">                out.error(wae);</span>
+<span class="nc" id="L192">            } catch (Throwable t) {</span>
+<span class="nc" id="L193">                out.error(new WebAuthnException(WebAuthnException.TRANSPORT_ERROR,</span>
+<span class="nc" id="L194">                        &quot;Native passkey create failed: &quot; + t.getMessage(), t));</span>
+<span class="fc" id="L195">            }</span>
+<span class="fc" id="L196">        }</span>
+    }
+
+    private static final class GetRunnable implements Runnable {
+        private final WebAuthnNative provider;
+        private final String optionsJson;
+        private final AsyncResource&lt;PublicKeyCredential&gt; out;
+
+        GetRunnable(WebAuthnNative provider, String optionsJson,
+<span class="fc" id="L205">                    AsyncResource&lt;PublicKeyCredential&gt; out) {</span>
+<span class="fc" id="L206">            this.provider = provider;</span>
+<span class="fc" id="L207">            this.optionsJson = optionsJson;</span>
+<span class="fc" id="L208">            this.out = out;</span>
+<span class="fc" id="L209">        }</span>
+
+        @Override
+        public void run() {
+            try {
+<span class="fc" id="L214">                String responseJson = provider.getPasskey(optionsJson);</span>
+<span class="fc bfc" id="L215" title="All 2 branches covered.">                if (responseJson == null) {</span>
+<span class="fc" id="L216">                    out.error(new WebAuthnException(WebAuthnException.NOT_ALLOWED,</span>
+                            &quot;Passkey sign-in sheet was dismissed&quot;));
+<span class="fc" id="L218">                    return;</span>
+                }
+<span class="fc" id="L220">                out.complete(PublicKeyCredential.fromJson(responseJson));</span>
+<span class="nc" id="L221">            } catch (WebAuthnException wae) {</span>
+<span class="nc" id="L222">                out.error(wae);</span>
+<span class="nc" id="L223">            } catch (Throwable t) {</span>
+<span class="nc" id="L224">                out.error(new WebAuthnException(WebAuthnException.TRANSPORT_ERROR,</span>
+<span class="nc" id="L225">                        &quot;Native passkey get failed: &quot; + t.getMessage(), t));</span>
+<span class="pc" id="L226">            }</span>
+<span class="fc" id="L227">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,310 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>KanbanJson.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.kanban</a> &gt; <span class="el_source">KanbanJson.java</span></div><h1>KanbanJson.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.kanban;
+
+import com.codename1.io.JSONParser;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+/// Saves a board as JSON and reads it back.
+///
+/// ```java
+/// DefaultKanbanModel model = new DefaultKanbanModel();
+/// model.addColumn(new KanbanColumn(&quot;todo&quot;, &quot;To do&quot;));
+/// KanbanBoard board = new KanbanBoard(model);
+///
+/// String json = KanbanJson.toJson(board.getModel());
+/// Storage.getInstance().writeObject(&quot;board&quot;, json);
+/// // later
+/// board.setModel(KanbanJson.fromJson(json));
+/// ```
+///
+/// The document holds the lanes, and the columns in order, each with its
+/// cards in order. A card's user data is the application's own object and is
+/// left out unless a `UserDataCodec` says how to write it.
+public final class KanbanJson {
+    /// Turns the user data of a card into something JSON can hold, and back.
+    public interface UserDataCodec {
+        /// What to write for a card's user data: a string, a number, a
+        /// boolean, a list or a map of those, or null to write nothing.
+        Object encode(Object userData);
+
+        /// The user data for what `encode` wrote, as the parser read it.
+        Object decode(Object json);
+    }
+
+    private KanbanJson() {
+    }
+
+    /// The whole board as a JSON document.
+    public static String toJson(KanbanModel model) {
+<span class="fc" id="L67">        return toJson(model, null);</span>
+    }
+
+    /// The whole board as a JSON document, with the cards' user data written
+    /// by a codec.
+    public static String toJson(KanbanModel model, UserDataCodec codec) {
+<span class="fc" id="L73">        return JSONParser.toJson(toMap(model, codec));</span>
+    }
+
+    /// The board as the tree a JSON writer takes: maps, lists, strings,
+    /// numbers and booleans.
+    public static Map&lt;String, Object&gt; toMap(KanbanModel model, UserDataCodec codec) {
+<span class="fc" id="L79">        Map&lt;String, Object&gt; root = new LinkedHashMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L80">        List&lt;KanbanLane&gt; lanes = model.getLanes();</span>
+<span class="fc" id="L81">        List&lt;Object&gt; laneList = new ArrayList&lt;Object&gt;();</span>
+<span class="fc bfc" id="L82" title="All 2 branches covered.">        for (KanbanLane l : lanes) {</span>
+<span class="fc" id="L83">            Map&lt;String, Object&gt; m = new LinkedHashMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L84">            m.put(&quot;id&quot;, l.getId());</span>
+<span class="fc" id="L85">            m.put(&quot;title&quot;, l.getTitle());</span>
+<span class="fc bfc" id="L86" title="All 2 branches covered.">            if (l.isCollapsed()) {</span>
+<span class="fc" id="L87">                m.put(&quot;collapsed&quot;, Boolean.TRUE);</span>
+            }
+<span class="fc" id="L89">            laneList.add(m);</span>
+<span class="fc" id="L90">        }</span>
+<span class="fc bfc" id="L91" title="All 2 branches covered.">        if (!laneList.isEmpty()) {</span>
+<span class="fc" id="L92">            root.put(&quot;lanes&quot;, laneList);</span>
+        }
+<span class="fc" id="L94">        List&lt;Object&gt; columnList = new ArrayList&lt;Object&gt;();</span>
+<span class="fc" id="L95">        List&lt;KanbanColumn&gt; columns = model.getColumns();</span>
+<span class="fc bfc" id="L96" title="All 2 branches covered.">        for (KanbanColumn c : columns) {</span>
+<span class="fc" id="L97">            Map&lt;String, Object&gt; m = new LinkedHashMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L98">            m.put(&quot;id&quot;, c.getId());</span>
+<span class="fc" id="L99">            m.put(&quot;title&quot;, c.getTitle());</span>
+<span class="fc bfc" id="L100" title="All 2 branches covered.">            if (c.getWipLimit() &gt; 0) {</span>
+<span class="fc" id="L101">                m.put(&quot;limit&quot;, Integer.valueOf(c.getWipLimit()));</span>
+            }
+<span class="fc bfc" id="L103" title="All 2 branches covered.">            if (c.isCollapsed()) {</span>
+<span class="fc" id="L104">                m.put(&quot;collapsed&quot;, Boolean.TRUE);</span>
+            }
+<span class="fc" id="L106">            m.put(&quot;style&quot;, c.getStyleKey());</span>
+<span class="fc" id="L107">            List&lt;Object&gt; cardList = new ArrayList&lt;Object&gt;();</span>
+<span class="fc bfc" id="L108" title="All 2 branches covered.">            for (int l = 0; l &lt; Math.max(1, lanes.size()); l++) {</span>
+<span class="fc bfc" id="L109" title="All 2 branches covered.">                KanbanLane lane = lanes.isEmpty() ? null : lanes.get(l);</span>
+<span class="fc" id="L110">                List&lt;KanbanCard&gt; cards = model.getCards(c, lane);</span>
+<span class="fc bfc" id="L111" title="All 2 branches covered.">                for (KanbanCard kc : cards) {</span>
+                    // the card's own lane id, not the lane it is shown in: a
+                    // card naming no lane is shown in the first and still names none
+<span class="fc" id="L114">                    cardList.add(cardToMap(kc, kc.getLaneId(), codec));</span>
+<span class="fc" id="L115">                }</span>
+            }
+<span class="fc" id="L117">            m.put(&quot;cards&quot;, cardList);</span>
+<span class="fc" id="L118">            columnList.add(m);</span>
+<span class="fc" id="L119">        }</span>
+<span class="fc" id="L120">        root.put(&quot;columns&quot;, columnList);</span>
+<span class="fc" id="L121">        return root;</span>
+    }
+
+    /// Cards alone, as a board puts them on the clipboard.
+    public static Map&lt;String, Object&gt; cardsToMap(Collection&lt;KanbanCard&gt; cards, UserDataCodec codec) {
+<span class="fc" id="L126">        Map&lt;String, Object&gt; root = new LinkedHashMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L127">        List&lt;Object&gt; list = new ArrayList&lt;Object&gt;();</span>
+<span class="fc bfc" id="L128" title="All 2 branches covered.">        for (KanbanCard c : cards) {</span>
+<span class="fc" id="L129">            list.add(cardToMap(c, c.getLaneId(), codec));</span>
+<span class="fc" id="L130">        }</span>
+<span class="fc" id="L131">        root.put(&quot;cards&quot;, list);</span>
+<span class="fc" id="L132">        return root;</span>
+    }
+
+    private static Map&lt;String, Object&gt; cardToMap(KanbanCard c, String laneId, UserDataCodec codec) {
+<span class="fc" id="L136">        Map&lt;String, Object&gt; m = new LinkedHashMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L137">        m.put(&quot;id&quot;, c.getId());</span>
+<span class="fc" id="L138">        m.put(&quot;title&quot;, c.getTitle());</span>
+<span class="fc" id="L139">        m.put(&quot;description&quot;, c.getDescription());</span>
+<span class="fc bfc" id="L140" title="All 2 branches covered.">        if (!c.getTags().isEmpty()) {</span>
+<span class="fc" id="L141">            m.put(&quot;tags&quot;, new ArrayList&lt;Object&gt;(c.getTags()));</span>
+        }
+<span class="fc" id="L143">        m.put(&quot;badge&quot;, c.getBadge());</span>
+<span class="fc" id="L144">        m.put(&quot;style&quot;, c.getStyleKey());</span>
+<span class="fc" id="L145">        m.put(&quot;lane&quot;, laneId);</span>
+<span class="pc bpc" id="L146" title="3 of 4 branches missed.">        if (codec != null &amp;&amp; c.getUserData() != null) {</span>
+<span class="nc" id="L147">            m.put(&quot;data&quot;, codec.encode(c.getUserData()));</span>
+        }
+<span class="fc" id="L149">        return m;</span>
+    }
+
+    /// Reads a board `toJson` wrote.
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: when the text is not a board document, or a column,
+    ///   a lane or a card in it has no id
+    public static DefaultKanbanModel fromJson(String json) throws IOException {
+<span class="fc" id="L159">        DefaultKanbanModel model = new DefaultKanbanModel();</span>
+<span class="fc" id="L160">        read(json, model, null);</span>
+<span class="fc" id="L161">        return model;</span>
+    }
+
+    /// Reads a board `toJson` wrote into a model, adding to what it holds.
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: when the text is not a board document, or a column,
+    ///   a lane or a card in it has no id or one that is taken; the model is
+    ///   then as it was
+    public static void read(String json, DefaultKanbanModel into, UserDataCodec codec) throws IOException {
+<span class="fc" id="L172">        Map&lt;String, Object&gt; root = parse(json);</span>
+<span class="fc bfc" id="L173" title="All 2 branches covered.">        if (!root.containsKey(&quot;columns&quot;)) {</span>
+<span class="fc" id="L174">            throw new IOException(&quot;Not a board document&quot;);</span>
+        }
+        // everything is read and checked before the model is touched
+<span class="fc" id="L177">        List&lt;KanbanLane&gt; newLanes = new ArrayList&lt;KanbanLane&gt;();</span>
+<span class="fc" id="L178">        List&lt;KanbanColumn&gt; newColumns = new ArrayList&lt;KanbanColumn&gt;();</span>
+<span class="fc" id="L179">        List&lt;List&lt;KanbanCard&gt;&gt; newCards = new ArrayList&lt;List&lt;KanbanCard&gt;&gt;();</span>
+<span class="fc" id="L180">        Map&lt;String, Object&gt; seen = new HashMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L181">        List&lt;Object&gt; lanes = list(root.get(&quot;lanes&quot;));</span>
+<span class="fc bfc" id="L182" title="All 2 branches covered.">        for (Object raw : lanes) {</span>
+<span class="fc" id="L183">            Map&lt;String, Object&gt; m = map(raw);</span>
+<span class="fc" id="L184">            KanbanLane lane = new KanbanLane(required(m, &quot;id&quot;), string(m, &quot;title&quot;))</span>
+<span class="fc" id="L185">                    .setCollapsed(bool(m.get(&quot;collapsed&quot;)));</span>
+<span class="pc bpc" id="L186" title="2 of 4 branches missed.">            if (into.getLane(lane.getId()) != null || seen.put(&quot;l&quot; + lane.getId(), lane) != null) {</span>
+<span class="nc" id="L187">                throw new IOException(&quot;Board document: duplicate lane &quot; + lane.getId());</span>
+            }
+<span class="fc" id="L189">            newLanes.add(lane);</span>
+<span class="fc" id="L190">        }</span>
+<span class="fc" id="L191">        List&lt;Object&gt; columns = list(root.get(&quot;columns&quot;));</span>
+<span class="fc bfc" id="L192" title="All 2 branches covered.">        for (Object raw : columns) {</span>
+<span class="fc" id="L193">            Map&lt;String, Object&gt; m = map(raw);</span>
+<span class="fc" id="L194">            KanbanColumn c = new KanbanColumn(required(m, &quot;id&quot;), string(m, &quot;title&quot;));</span>
+<span class="pc bpc" id="L195" title="1 of 4 branches missed.">            if (into.getColumn(c.getId()) != null || seen.put(&quot;c&quot; + c.getId(), c) != null) {</span>
+<span class="fc" id="L196">                throw new IOException(&quot;Board document: duplicate column &quot; + c.getId());</span>
+            }
+<span class="fc" id="L198">            Object limit = m.get(&quot;limit&quot;);</span>
+<span class="fc bfc" id="L199" title="All 2 branches covered.">            if (limit instanceof Number) {</span>
+<span class="fc" id="L200">                c.setWipLimit(((Number) limit).intValue());</span>
+            }
+<span class="fc" id="L202">            c.setCollapsed(bool(m.get(&quot;collapsed&quot;)));</span>
+<span class="fc" id="L203">            c.setStyleKey(string(m, &quot;style&quot;));</span>
+<span class="fc" id="L204">            List&lt;KanbanCard&gt; cards = readCards(m, codec);</span>
+<span class="fc bfc" id="L205" title="All 2 branches covered.">            for (KanbanCard kc : cards) {</span>
+<span class="pc bpc" id="L206" title="1 of 4 branches missed.">                if (into.getCard(kc.getId()) != null || seen.put(&quot;k&quot; + kc.getId(), kc) != null) {</span>
+<span class="fc" id="L207">                    throw new IOException(&quot;Board document: duplicate card &quot; + kc.getId());</span>
+                }
+<span class="fc" id="L209">            }</span>
+<span class="fc" id="L210">            newColumns.add(c);</span>
+<span class="fc" id="L211">            newCards.add(cards);</span>
+<span class="fc" id="L212">        }</span>
+<span class="fc bfc" id="L213" title="All 2 branches covered.">        for (KanbanLane lane : newLanes) {</span>
+<span class="fc" id="L214">            into.addLane(lane);</span>
+<span class="fc" id="L215">        }</span>
+<span class="fc bfc" id="L216" title="All 2 branches covered.">        for (int i = 0; i &lt; newColumns.size(); i++) {</span>
+<span class="fc" id="L217">            KanbanColumn c = into.addColumn(newColumns.get(i));</span>
+<span class="fc bfc" id="L218" title="All 2 branches covered.">            for (KanbanCard kc : newCards.get(i)) {</span>
+<span class="fc" id="L219">                into.addCard(c.getId(), kc);</span>
+<span class="fc" id="L220">            }</span>
+        }
+<span class="fc" id="L222">    }</span>
+
+    /// Parses the text of a document `toJson` or a board's clipboard wrote.
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: when the text is not a well-formed JSON object
+    public static Map&lt;String, Object&gt; parse(String json) throws IOException {
+        // the strict parser: what it answers does not depend on how the
+        // application configured the lenient one
+<span class="fc" id="L232">        Object parsed = JSONParser.parseStrict(json);</span>
+<span class="pc bpc" id="L233" title="1 of 2 branches missed.">        if (!(parsed instanceof Map)) {</span>
+<span class="nc" id="L234">            throw new IOException(&quot;Not a board document&quot;);</span>
+        }
+<span class="fc" id="L236">        return map(parsed);</span>
+    }
+
+    /// Reads the cards of a map `cardsToMap` built, or of one column of a
+    /// board document, as a JSON parser returns it.
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: when a card has no id
+    public static List&lt;KanbanCard&gt; readCards(Map&lt;String, Object&gt; holder, UserDataCodec codec) throws IOException {
+<span class="fc" id="L246">        List&lt;KanbanCard&gt; out = new ArrayList&lt;KanbanCard&gt;();</span>
+<span class="fc" id="L247">        List&lt;Object&gt; cards = list(holder.get(&quot;cards&quot;));</span>
+<span class="fc bfc" id="L248" title="All 2 branches covered.">        for (Object raw : cards) {</span>
+<span class="fc" id="L249">            Map&lt;String, Object&gt; m = map(raw);</span>
+<span class="fc" id="L250">            KanbanCard c = new KanbanCard(required(m, &quot;id&quot;), string(m, &quot;title&quot;));</span>
+<span class="fc" id="L251">            c.setDescription(string(m, &quot;description&quot;));</span>
+<span class="fc" id="L252">            List&lt;Object&gt; tags = list(m.get(&quot;tags&quot;));</span>
+<span class="fc bfc" id="L253" title="All 2 branches covered.">            for (Object tag : tags) {</span>
+<span class="pc bpc" id="L254" title="1 of 2 branches missed.">                if (tag instanceof String) {</span>
+<span class="fc" id="L255">                    c.addTag((String) tag);</span>
+                }
+<span class="fc" id="L257">            }</span>
+<span class="fc" id="L258">            c.setBadge(string(m, &quot;badge&quot;));</span>
+<span class="fc" id="L259">            c.setStyleKey(string(m, &quot;style&quot;));</span>
+<span class="fc" id="L260">            c.setLaneId(string(m, &quot;lane&quot;));</span>
+<span class="pc bpc" id="L261" title="3 of 4 branches missed.">            if (codec != null &amp;&amp; m.get(&quot;data&quot;) != null) {</span>
+<span class="nc" id="L262">                c.setUserData(codec.decode(m.get(&quot;data&quot;)));</span>
+            }
+<span class="fc" id="L264">            out.add(c);</span>
+<span class="fc" id="L265">        }</span>
+<span class="fc" id="L266">        return out;</span>
+    }
+
+    @SuppressWarnings(&quot;unchecked&quot;)
+    private static Map&lt;String, Object&gt; map(Object o) throws IOException {
+<span class="pc bpc" id="L271" title="1 of 2 branches missed.">        if (o instanceof Map) {</span>
+<span class="fc" id="L272">            return (Map&lt;String, Object&gt;) o;</span>
+        }
+<span class="nc" id="L274">        throw new IOException(&quot;Not a board document&quot;);</span>
+    }
+
+    @SuppressWarnings(&quot;unchecked&quot;)
+    private static List&lt;Object&gt; list(Object o) throws IOException {
+<span class="fc bfc" id="L279" title="All 2 branches covered.">        if (o instanceof List) {</span>
+<span class="fc" id="L280">            return (List&lt;Object&gt;) o;</span>
+        }
+<span class="fc bfc" id="L282" title="All 2 branches covered.">        if (o != null) {</span>
+<span class="fc" id="L283">            throw new IOException(&quot;Not a board: a list was expected&quot;);</span>
+        }
+<span class="fc" id="L285">        return new ArrayList&lt;Object&gt;();</span>
+    }
+
+    private static String string(Map&lt;String, Object&gt; m, String key) {
+<span class="fc" id="L289">        Object o = m.get(key);</span>
+<span class="fc bfc" id="L290" title="All 2 branches covered.">        return o instanceof String ? (String) o : null;</span>
+    }
+
+    private static String required(Map&lt;String, Object&gt; m, String key) throws IOException {
+<span class="fc" id="L294">        String s = string(m, key);</span>
+<span class="pc bpc" id="L295" title="1 of 2 branches missed.">        if (s == null) {</span>
+<span class="nc" id="L296">            throw new IOException(&quot;Board document: missing &quot; + key);</span>
+        }
+<span class="fc" id="L298">        return s;</span>
+    }
+
+    /// The parser hands back a Boolean or the word, depending on how the
+    /// application configured it.
+    private static boolean bool(Object o) {
+<span class="fc bfc" id="L304" title="All 2 branches covered.">        if (o instanceof Boolean) {</span>
+<span class="fc" id="L305">            return ((Boolean) o).booleanValue();</span>
+        }
+<span class="fc" id="L307">        return &quot;true&quot;.equals(o);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

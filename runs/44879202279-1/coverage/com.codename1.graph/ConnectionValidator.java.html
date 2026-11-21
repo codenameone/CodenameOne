@@ -1,0 +1,158 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ConnectionValidator.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.graph</a> &gt; <span class="el_source">ConnectionValidator.java</span></div><h1>ConnectionValidator.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.graph;
+
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+
+/// Decides whether an edge may be made. Extend it for rules of your own and
+/// call `super.canConnect` to keep these.
+///
+/// By default an edge is refused when it connects a node to itself, repeats
+/// an edge that exists, leaves an input port or enters an output port, joins
+/// two ports whose types are both set, differ and were not paired with
+/// `allowType`, or takes a port past its
+/// `GraphPort.getMaxConnections`. Cycles are allowed unless
+/// `setAllowCycles(false)` is called.
+<span class="fc" id="L38">public class ConnectionValidator {</span>
+<span class="fc" id="L39">    private boolean allowCycles = true;</span>
+    private boolean allowSelfLoops;
+<span class="fc" id="L41">    private final Set&lt;String&gt; allowedTypes = new HashSet&lt;String&gt;();</span>
+
+    /// True, the default, when an edge may close a cycle.
+    public boolean isAllowCycles() {
+<span class="nc" id="L45">        return allowCycles;</span>
+    }
+
+    /// Refuses edges that would close a cycle when false.
+    public void setAllowCycles(boolean allowCycles) {
+<span class="fc" id="L50">        this.allowCycles = allowCycles;</span>
+<span class="fc" id="L51">    }</span>
+
+    /// False, the default, when a node may not connect to itself.
+    public boolean isAllowSelfLoops() {
+<span class="nc" id="L55">        return allowSelfLoops;</span>
+    }
+
+    /// Allows a node to connect to itself.
+    public void setAllowSelfLoops(boolean allowSelfLoops) {
+<span class="fc" id="L60">        this.allowSelfLoops = allowSelfLoops;</span>
+<span class="fc" id="L61">    }</span>
+
+    /// Lets an output of one type feed an input of another, for instance
+    /// `allowType(&quot;int&quot;, &quot;number&quot;)`. Equal types always connect.
+    public void allowType(String outputType, String inputType) {
+<span class="nc" id="L66">        allowedTypes.add(outputType + &quot;\n&quot; + inputType);</span>
+<span class="nc" id="L67">    }</span>
+
+    /// True when an output of the first type may feed an input of the second:
+    /// either is null, they are equal, or `allowType` named the pair.
+    public boolean isTypeAllowed(String outputType, String inputType) {
+<span class="pc bpc" id="L72" title="2 of 6 branches missed.">        return outputType == null || inputType == null || outputType.equals(inputType)</span>
+<span class="pc bpc" id="L73" title="1 of 2 branches missed.">                || allowedTypes.contains(outputType + &quot;\n&quot; + inputType);</span>
+    }
+
+    /// True when the edge may be made.
+    public boolean canConnect(GraphModel model, GraphNode source, GraphPort sourcePort,
+                              GraphNode target, GraphPort targetPort) {
+<span class="pc bpc" id="L79" title="2 of 4 branches missed.">        if (source == null || target == null) {</span>
+<span class="nc" id="L80">            return false;</span>
+        }
+<span class="fc bfc" id="L82" title="All 4 branches covered.">        if (source == target &amp;&amp; !allowSelfLoops) { // NOPMD CompareObjectsWithEquals - the same object is meant</span>
+<span class="fc" id="L83">            return false;</span>
+        }
+<span class="fc bfc" id="L85" title="All 4 branches covered.">        if (sourcePort != null &amp;&amp; sourcePort.isInput()) {</span>
+<span class="fc" id="L86">            return false;</span>
+        }
+<span class="fc bfc" id="L88" title="All 4 branches covered.">        if (targetPort != null &amp;&amp; !targetPort.isInput()) {</span>
+<span class="fc" id="L89">            return false;</span>
+        }
+<span class="pc bpc" id="L91" title="1 of 4 branches missed.">        if (sourcePort != null &amp;&amp; targetPort != null</span>
+<span class="fc bfc" id="L92" title="All 2 branches covered.">                &amp;&amp; !isTypeAllowed(sourcePort.getType(), targetPort.getType())) {</span>
+<span class="fc" id="L93">            return false;</span>
+        }
+<span class="fc" id="L95">        List&lt;GraphEdge&gt; edges = model.getEdges();</span>
+<span class="fc" id="L96">        int n = edges.size();</span>
+<span class="fc" id="L97">        int fromCount = 0;</span>
+<span class="fc" id="L98">        int toCount = 0;</span>
+<span class="fc bfc" id="L99" title="All 2 branches covered.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc" id="L100">            GraphEdge e = edges.get(i);</span>
+<span class="pc bpc" id="L101" title="1 of 4 branches missed.">            boolean fromHere = source.getId().equals(e.getSourceId()) &amp;&amp; same(portId(sourcePort), e.getSourcePortId());</span>
+<span class="pc bpc" id="L102" title="1 of 4 branches missed.">            boolean toThere = target.getId().equals(e.getTargetId()) &amp;&amp; same(portId(targetPort), e.getTargetPortId());</span>
+<span class="fc bfc" id="L103" title="All 4 branches covered.">            if (fromHere &amp;&amp; toThere) {</span>
+<span class="fc" id="L104">                return false;</span>
+            }
+<span class="pc bpc" id="L106" title="1 of 4 branches missed.">            if (fromHere &amp;&amp; sourcePort != null) {</span>
+<span class="nc" id="L107">                fromCount++;</span>
+            }
+<span class="fc bfc" id="L109" title="All 4 branches covered.">            if (toThere &amp;&amp; targetPort != null) {</span>
+<span class="fc" id="L110">                toCount++;</span>
+            }
+        }
+<span class="pc bpc" id="L113" title="3 of 6 branches missed.">        if (sourcePort != null &amp;&amp; sourcePort.getMaxConnections() &gt;= 0 &amp;&amp; fromCount &gt;= sourcePort.getMaxConnections()) {</span>
+<span class="nc" id="L114">            return false;</span>
+        }
+<span class="fc bfc" id="L116" title="All 6 branches covered.">        if (targetPort != null &amp;&amp; targetPort.getMaxConnections() &gt;= 0 &amp;&amp; toCount &gt;= targetPort.getMaxConnections()) {</span>
+<span class="fc" id="L117">            return false;</span>
+        }
+<span class="fc bfc" id="L119" title="All 4 branches covered.">        return allowCycles || !reaches(edges, target.getId(), source.getId());</span>
+    }
+
+    private static String portId(GraphPort p) {
+<span class="fc bfc" id="L123" title="All 2 branches covered.">        return p == null ? null : p.getId();</span>
+    }
+
+    private static boolean same(String a, String b) {
+<span class="pc bpc" id="L127" title="1 of 4 branches missed.">        return a == null ? b == null : a.equals(b);</span>
+    }
+
+    /// True when a directed path leads from `from` to `to`.
+    static boolean reaches(List&lt;GraphEdge&gt; edges, String from, String to) {
+<span class="pc bpc" id="L132" title="1 of 2 branches missed.">        if (from.equals(to)) {</span>
+<span class="nc" id="L133">            return true;</span>
+        }
+<span class="fc" id="L135">        Set&lt;String&gt; seen = new HashSet&lt;String&gt;();</span>
+<span class="fc" id="L136">        java.util.ArrayList&lt;String&gt; stack = new java.util.ArrayList&lt;String&gt;();</span>
+<span class="fc" id="L137">        stack.add(from);</span>
+<span class="fc" id="L138">        seen.add(from);</span>
+<span class="fc" id="L139">        int n = edges.size();</span>
+<span class="fc bfc" id="L140" title="All 2 branches covered.">        while (!stack.isEmpty()) {</span>
+<span class="fc" id="L141">            String at = stack.remove(stack.size() - 1);</span>
+<span class="fc bfc" id="L142" title="All 2 branches covered.">            for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc" id="L143">                GraphEdge e = edges.get(i);</span>
+<span class="fc bfc" id="L144" title="All 2 branches covered.">                if (at.equals(e.getSourceId())) {</span>
+<span class="fc" id="L145">                    String next = e.getTargetId();</span>
+<span class="fc bfc" id="L146" title="All 2 branches covered.">                    if (next.equals(to)) {</span>
+<span class="fc" id="L147">                        return true;</span>
+                    }
+<span class="fc bfc" id="L149" title="All 2 branches covered.">                    if (seen.add(next)) {</span>
+<span class="fc" id="L150">                        stack.add(next);</span>
+                    }
+                }
+            }
+<span class="fc" id="L154">        }</span>
+<span class="fc" id="L155">        return false;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

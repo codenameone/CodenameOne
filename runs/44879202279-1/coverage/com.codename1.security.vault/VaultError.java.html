@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>VaultError.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.security.vault</a> &gt; <span class="el_source">VaultError.java</span></div><h1>VaultError.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.security.vault;
+
+/// Why a vault or protected-storage operation failed, as a code rather than a message.
+///
+/// Every distinction here exists because acting on the wrong one destroys data. The pair that
+/// matters most is [#KEY_MISSING] against [#TEMPORARILY_UNREADABLE]: a caller that treats &quot;I
+/// could not read the key&quot; as &quot;there is no key&quot; generates a replacement, and every record the
+/// old key protected becomes unopenable. The same shape recurs for [#CORRUPT] against
+/// [#AUTHENTICATION_FAILED] and for [#LOCKED] against [#CANCELLED].
+<span class="fc" id="L32">public enum VaultError {</span>
+
+    /// The platform has no store to write to, or the store could not be opened at all. On the
+    /// browser this covers private-browsing restrictions that refuse IndexedDB outright.
+<span class="fc" id="L36">    STORAGE_UNAVAILABLE,</span>
+
+    /// The cryptographic provider is missing or failed. On the browser, `crypto.subtle` absent --
+    /// which is what an insecure context looks like from inside the page -- or present and unable
+    /// to complete the operation.
+<span class="fc" id="L41">    CRYPTO_UNAVAILABLE,</span>
+
+    /// The caller required protections this platform does not provide. The refused protection is
+    /// available from [VaultException#getUnmetProtection()].
+    ///
+    /// Never downgraded silently: a request for encrypted storage on a platform that can only
+    /// offer plaintext fails here rather than writing plaintext.
+<span class="fc" id="L48">    POLICY_NOT_MET,</span>
+
+    /// Hardened storage was requested from an insecure context -- plain `http:` on anything but
+    /// `localhost`. Web Crypto is unavailable there by specification, and a vault that pretended
+    /// otherwise would be encrypting nothing.
+<span class="fc" id="L53">    INSECURE_CONTEXT,</span>
+
+    /// The vault exists but is locked. Unlock it and retry; nothing is wrong with the data.
+<span class="fc" id="L56">    LOCKED,</span>
+
+    /// The user dismissed a prompt, or the operation was aborted. Distinct from
+    /// [#AUTHENTICATION_FAILED]: nobody failed a check, the check did not happen.
+<span class="fc" id="L60">    CANCELLED,</span>
+
+    /// The store answered, and the key or entry is definitely not there. Only this code -- never
+    /// a null, never [#TEMPORARILY_UNREADABLE] -- justifies creating a replacement.
+<span class="fc" id="L64">    KEY_MISSING,</span>
+
+    /// The key or entry could not be read, and the store cannot say whether it exists. A
+    /// transient condition as far as any caller is concerned: retry, prompt, or give up, but do
+    /// not write.
+<span class="fc" id="L69">    TEMPORARILY_UNREADABLE,</span>
+
+    /// The stored bytes are not a well formed envelope: truncated, a bad magic, a length field
+    /// that does not fit. Structural, decided before any key is involved.
+<span class="fc" id="L73">    CORRUPT,</span>
+
+    /// The envelope parsed and the authentication tag did not verify. Either the ciphertext or
+    /// its associated data was altered, or the key is the wrong one -- a wrong password lands
+    /// here. No plaintext is ever returned alongside this.
+<span class="fc" id="L78">    AUTHENTICATION_FAILED,</span>
+
+    /// The envelope is well formed and declares a version, suite or KDF this build does not
+    /// implement. Deliberately not a downgrade: an old client refuses a newer envelope rather
+    /// than reading it with weaker rules.
+<span class="fc" id="L83">    UNSUPPORTED_FORMAT,</span>
+
+    /// The store refused the write for space, or evicted what was already there. On the browser
+    /// this is also what a cleared-site-data or evicted-origin looks like after the fact.
+<span class="fc" id="L87">    QUOTA_EXCEEDED,</span>
+
+    /// Two writers raced and this one lost, or the stored state moved under the operation. The
+    /// caller should re-read and retry rather than overwrite.
+<span class="fc" id="L91">    CONFLICT,</span>
+
+    /// The requested mechanism is not implemented on this port -- a passkey unlock where there is
+    /// no authenticator, a hardware-backed key where there is no hardware.
+<span class="fc" id="L95">    NOT_SUPPORTED,</span>
+
+    /// Sync import reached committed state, but policy setup failed and rollback was unsafe or
+    /// could not be confirmed. The session is locked. Re-read the persisted state and finish
+    /// policy setup; do not assume that the previous password or data-key version is current.
+<span class="fc" id="L100">    IMPORT_COMMITTED,</span>
+
+    /// Anything the codes above do not cover.
+<span class="fc" id="L103">    UNKNOWN</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,353 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PdfLayout.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.pdf</a> &gt; <span class="el_source">PdfLayout.java</span></div><h1>PdfLayout.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.pdf;
+
+import java.util.ArrayList;
+import java.util.List;
+
+/// Flows paragraphs, tables, images and spacing down the pages of a
+/// [PdfDocument], adding pages as they fill up.
+///
+/// ```java
+/// String longText = &quot;Revenue grew in every region this quarter.&quot;;
+/// PdfDocument doc = new PdfDocument();
+/// PdfLayout layout = new PdfLayout(doc, PdfPageSize.A4, 54);
+/// layout.setPageDecorator(new PdfLayout.PageDecorator() {
+///     public void decorate(PdfPage page, int number, int count) {
+///         page.getCanvas().setFont(PdfFont.HELVETICA, 9)
+///                 .drawText(&quot;Page &quot; + number + &quot; of &quot; + count, 54, page.getHeight() - 30);
+///     }
+/// });
+/// layout.add(new PdfParagraph(&quot;Quarterly report&quot;, PdfFont.HELVETICA_BOLD, 20));
+/// layout.add(new PdfParagraph(longText, PdfFont.TIMES_ROMAN, 11)
+///         .setAlignment(PdfParagraph.ALIGN_JUSTIFY));
+/// layout.finish();
+/// byte[] pdf = doc.toByteArray();
+/// ```
+///
+/// The layout draws through the pages' ordinary canvases, so free drawing
+/// can be mixed in: [#getCurrentPage()] and [#getY()] say where the flow
+/// stands.
+@com.codename1.impl.SharedWithBackend
+public final class PdfLayout {
+    /// Draws the parts of a page outside the flow: running headers,
+    /// footers, page numbers.
+    public interface PageDecorator {
+        /// Decorates `page`, number `number` (from 1) of the `count` pages
+        /// the layout produced. Called by [PdfLayout#finish()], when the
+        /// total is known.
+        void decorate(PdfPage page, int number, int count);
+    }
+
+    /// Images are placed against the left margin.
+    public static final int ALIGN_LEFT = 0;
+    /// Images are centered.
+    public static final int ALIGN_CENTER = 1;
+    /// Images are placed against the right margin.
+    public static final int ALIGN_RIGHT = 2;
+
+    private final PdfDocument document;
+    private final PdfPageSize size;
+    private float top;
+    private float right;
+    private float bottom;
+    private float left;
+    private PageDecorator decorator;
+<span class="fc" id="L76">    private final List&lt;PdfPage&gt; pages = new ArrayList&lt;PdfPage&gt;();</span>
+    private PdfPage page;
+    private float y;
+    private boolean finished;
+
+    /// A layout adding pages of `size` to `document`, with `margin` points
+    /// on every side.
+<span class="fc" id="L83">    public PdfLayout(PdfDocument document, PdfPageSize size, float margin) {</span>
+<span class="fc" id="L84">        this.document = document;</span>
+<span class="fc" id="L85">        this.size = size;</span>
+<span class="fc" id="L86">        top = right = bottom = left = margin;</span>
+<span class="fc" id="L87">    }</span>
+
+    /// Sets the four margins in points. Applies from the next page.
+    public PdfLayout setMargins(float top, float right, float bottom, float left) {
+<span class="nc" id="L91">        this.top = top;</span>
+<span class="nc" id="L92">        this.right = right;</span>
+<span class="nc" id="L93">        this.bottom = bottom;</span>
+<span class="nc" id="L94">        this.left = left;</span>
+<span class="nc" id="L95">        return this;</span>
+    }
+
+    /// Sets the decorator called for every page by [#finish()].
+    public PdfLayout setPageDecorator(PageDecorator decorator) {
+<span class="fc" id="L100">        this.decorator = decorator;</span>
+<span class="fc" id="L101">        return this;</span>
+    }
+
+    /// The page the flow is on, starting one if there is none yet.
+    public PdfPage getCurrentPage() {
+<span class="fc bfc" id="L106" title="All 2 branches covered.">        if (page == null) {</span>
+<span class="fc" id="L107">            newPage();</span>
+        }
+<span class="fc" id="L109">        return page;</span>
+    }
+
+    /// The distance from the top of the current page to where the next
+    /// element starts.
+    public float getY() {
+<span class="nc" id="L115">        getCurrentPage();</span>
+<span class="nc" id="L116">        return y;</span>
+    }
+
+    /// The width between the side margins.
+    public float getContentWidth() {
+<span class="fc" id="L121">        return size.getWidth() - left - right;</span>
+    }
+
+    private float limit() {
+<span class="fc" id="L125">        return size.getHeight() - bottom;</span>
+    }
+
+    private void newPage() {
+<span class="fc" id="L129">        page = document.addPage(size);</span>
+<span class="fc" id="L130">        pages.add(page);</span>
+<span class="fc" id="L131">        y = top;</span>
+<span class="fc" id="L132">    }</span>
+
+    private void ensure(float height) {
+<span class="fc" id="L135">        getCurrentPage();</span>
+<span class="pc bpc" id="L136" title="3 of 4 branches missed.">        if (y + height &gt; limit() &amp;&amp; y &gt; top) {</span>
+<span class="nc" id="L137">            newPage();</span>
+        }
+<span class="fc" id="L139">    }</span>
+
+    /// Adds vertical space. Space that runs past the bottom margin ends
+    /// the page and is not carried over.
+    public PdfLayout addSpace(float points) {
+<span class="nc" id="L144">        getCurrentPage();</span>
+<span class="nc" id="L145">        y += points;</span>
+<span class="nc bnc" id="L146" title="All 2 branches missed.">        if (y &gt; limit()) {</span>
+<span class="nc" id="L147">            newPage();</span>
+        }
+<span class="nc" id="L149">        return this;</span>
+    }
+
+    /// Continues the flow at the top of a new page.
+    public PdfLayout addPageBreak() {
+<span class="nc" id="L154">        newPage();</span>
+<span class="nc" id="L155">        return this;</span>
+    }
+
+    /// Adds a horizontal line across the content width.
+    public PdfLayout addRule(float lineWidth, int rgb) {
+<span class="nc" id="L160">        ensure(lineWidth + 8);</span>
+<span class="nc" id="L161">        y += 4;</span>
+<span class="nc" id="L162">        page.getCanvas().save().setStrokeColor(rgb).setLineWidth(lineWidth)</span>
+<span class="nc" id="L163">                .drawLine(left, y, left + getContentWidth(), y).restore();</span>
+<span class="nc" id="L164">        y += lineWidth + 4;</span>
+<span class="nc" id="L165">        return this;</span>
+    }
+
+    /// Adds `image` `width` points wide, keeping its aspect ratio; a width
+    /// wider than the content is reduced to fit, and so is an image taller
+    /// than a page.
+    public PdfLayout addImage(PdfImage image, float width, int alignment) {
+<span class="nc" id="L172">        float w = Math.min(width, getContentWidth());</span>
+<span class="nc" id="L173">        float h = w * image.getHeight() / image.getWidth();</span>
+<span class="nc" id="L174">        float maxH = limit() - top;</span>
+<span class="nc bnc" id="L175" title="All 2 branches missed.">        if (h &gt; maxH) {</span>
+<span class="nc" id="L176">            w = w * maxH / h;</span>
+<span class="nc" id="L177">            h = maxH;</span>
+        }
+<span class="nc" id="L179">        ensure(h);</span>
+<span class="nc" id="L180">        float x = left;</span>
+<span class="nc bnc" id="L181" title="All 2 branches missed.">        if (alignment == ALIGN_CENTER) {</span>
+<span class="nc" id="L182">            x += (getContentWidth() - w) / 2;</span>
+<span class="nc bnc" id="L183" title="All 2 branches missed.">        } else if (alignment == ALIGN_RIGHT) {</span>
+<span class="nc" id="L184">            x += getContentWidth() - w;</span>
+        }
+<span class="nc" id="L186">        page.getCanvas().drawImage(image, x, y, w, h);</span>
+<span class="nc" id="L187">        y += h + 6;</span>
+<span class="nc" id="L188">        return this;</span>
+    }
+
+    /// Adds a paragraph, continuing it on new pages as needed.
+    public PdfLayout add(PdfParagraph paragraph) {
+<span class="fc" id="L193">        getCurrentPage();</span>
+<span class="fc bfc" id="L194" title="All 2 branches covered.">        if (y &gt; top) {</span>
+<span class="fc" id="L195">            y += paragraph.spaceBefore;</span>
+        }
+<span class="fc" id="L197">        List&lt;PdfParagraph.Line&gt; lines = paragraph.lines(getContentWidth());</span>
+<span class="fc bfc" id="L198" title="All 2 branches covered.">        for (int i = 0; i &lt; lines.size(); i++) { // NOPMD ForLoopCanBeForeach - indexed like the surrounding decoder loops</span>
+<span class="fc" id="L199">            PdfParagraph.Line line = lines.get(i);</span>
+<span class="fc" id="L200">            ensure(line.height);</span>
+<span class="fc" id="L201">            page.getCanvas().save();</span>
+<span class="fc" id="L202">            paragraph.draw(page, line, left, y, getContentWidth());</span>
+<span class="fc" id="L203">            page.getCanvas().restore();</span>
+<span class="fc" id="L204">            y += line.height;</span>
+        }
+<span class="fc" id="L206">        y += paragraph.spaceAfter;</span>
+<span class="fc" id="L207">        return this;</span>
+    }
+
+    /// Adds a table, splitting it across pages as needed.
+    public PdfLayout add(PdfTable table) {
+<span class="fc" id="L212">        getCurrentPage();</span>
+<span class="fc" id="L213">        float total = 0;</span>
+<span class="fc bfc" id="L214" title="All 2 branches covered.">        for (int i = 0; i &lt; table.weights.length; i++) {</span>
+<span class="fc" id="L215">            total += table.weights[i];</span>
+        }
+<span class="fc" id="L217">        float width = getContentWidth();</span>
+<span class="fc" id="L218">        float[] colX = new float[table.weights.length + 1];</span>
+<span class="fc" id="L219">        colX[0] = left;</span>
+<span class="fc bfc" id="L220" title="All 2 branches covered.">        for (int i = 0; i &lt; table.weights.length; i++) {</span>
+<span class="fc" id="L221">            colX[i + 1] = colX[i] + width * table.weights[i] / total;</span>
+        }
+<span class="fc" id="L223">        List&lt;List&lt;PdfTable.Cell&gt;&gt; rows = table.rows();</span>
+<span class="fc" id="L224">        int headers = Math.min(table.headerRows, rows.size());</span>
+<span class="pc bpc" id="L225" title="1 of 2 branches missed.">        boolean repeat = headers &gt; 0;</span>
+<span class="fc" id="L226">        float headerHeight = 0;</span>
+<span class="fc bfc" id="L227" title="All 2 branches covered.">        for (int r = 0; r &lt; rows.size(); r++) {</span>
+<span class="pc bpc" id="L228" title="1 of 4 branches missed.">            if (r == headers &amp;&amp; repeat) {</span>
+                // A header that fills more than half a page would leave a
+                // line or two of body per continuation page; it is drawn
+                // once and not repeated. The rows' own heights are summed,
+                // since a header can itself cross a page break.
+<span class="pc bpc" id="L233" title="1 of 2 branches missed.">                repeat = headerHeight &lt;= (limit() - top) / 2;</span>
+            }
+<span class="pc bpc" id="L235" title="1 of 4 branches missed.">            float h = drawRow(table, rows.get(r), colX, r &gt;= headers &amp;&amp; repeat ? rows.subList(0, headers) : null);</span>
+<span class="fc bfc" id="L236" title="All 2 branches covered.">            if (r &lt; headers) {</span>
+<span class="fc" id="L237">                headerHeight += h;</span>
+            }
+        }
+<span class="fc" id="L240">        y += table.spaceAfter;</span>
+<span class="fc" id="L241">        return this;</span>
+    }
+
+    /// Draws one row, across pages as needed; answers the total height of
+    /// its fragments.
+    private float drawRow(PdfTable table, List&lt;PdfTable.Cell&gt; row, float[] colX,
+            List&lt;List&lt;PdfTable.Cell&gt;&gt; headerRows) {
+<span class="fc" id="L248">        float drawn = 0;</span>
+<span class="fc" id="L249">        int n = row.size();</span>
+<span class="fc" id="L250">        float pad = table.padding;</span>
+<span class="fc" id="L251">        float[] cx = new float[n];</span>
+<span class="fc" id="L252">        float[] cw = new float[n];</span>
+<span class="fc" id="L253">        List&lt;List&lt;PdfParagraph.Line&gt;&gt; lines = new ArrayList&lt;List&lt;PdfParagraph.Line&gt;&gt;();</span>
+<span class="fc" id="L254">        int col = 0;</span>
+<span class="fc bfc" id="L255" title="All 2 branches covered.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc" id="L256">            PdfTable.Cell c = row.get(i);</span>
+<span class="fc" id="L257">            cx[i] = colX[col];</span>
+<span class="fc" id="L258">            cw[i] = colX[col + c.colspan] - colX[col];</span>
+<span class="fc" id="L259">            col += c.colspan;</span>
+<span class="fc" id="L260">            lines.add(c.paragraph.lines(Math.max(1, cw[i] - 2 * pad)));</span>
+        }
+<span class="fc" id="L262">        int[] next = new int[n];</span>
+        while (true) {
+<span class="fc" id="L264">            float avail = limit() - y - 2 * pad;</span>
+<span class="fc" id="L265">            float firstLine = 0;</span>
+<span class="fc bfc" id="L266" title="All 2 branches covered.">            for (int i = 0; i &lt; n; i++) {</span>
+<span class="pc bpc" id="L267" title="1 of 2 branches missed.">                if (next[i] &lt; lines.get(i).size()) {</span>
+<span class="fc" id="L268">                    firstLine = Math.max(firstLine, lines.get(i).get(next[i]).height);</span>
+                }
+            }
+<span class="pc bpc" id="L271" title="1 of 4 branches missed.">            if (firstLine &gt; avail &amp;&amp; y &gt; top) {</span>
+<span class="fc" id="L272">                newPage();</span>
+<span class="pc bpc" id="L273" title="1 of 2 branches missed.">                if (headerRows != null) {</span>
+<span class="fc bfc" id="L274" title="All 2 branches covered.">                    for (int h = 0; h &lt; headerRows.size(); h++) { // NOPMD ForLoopCanBeForeach - indexed like the surrounding decoder loops</span>
+<span class="fc" id="L275">                        drawRow(table, headerRows.get(h), colX, null);</span>
+                    }
+                }
+<span class="fc" id="L278">                avail = limit() - y - 2 * pad;</span>
+            }
+<span class="fc" id="L280">            float rowHeight = 0;</span>
+<span class="fc" id="L281">            int[] end = new int[n];</span>
+<span class="fc bfc" id="L282" title="All 2 branches covered.">            for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc" id="L283">                List&lt;PdfParagraph.Line&gt; ls = lines.get(i);</span>
+<span class="fc" id="L284">                float h = 0;</span>
+<span class="fc" id="L285">                int k = next[i];</span>
+<span class="pc bpc" id="L286" title="3 of 6 branches missed.">                while (k &lt; ls.size() &amp;&amp; (h + ls.get(k).height &lt;= avail || k == next[i])) {</span>
+<span class="fc" id="L287">                    h += ls.get(k).height;</span>
+<span class="fc" id="L288">                    k++;</span>
+                }
+<span class="fc" id="L290">                end[i] = k;</span>
+<span class="fc" id="L291">                rowHeight = Math.max(rowHeight, h);</span>
+            }
+<span class="fc" id="L293">            float height = rowHeight + 2 * pad;</span>
+<span class="fc" id="L294">            PdfCanvas c = page.getCanvas();</span>
+<span class="fc" id="L295">            c.save();</span>
+<span class="fc bfc" id="L296" title="All 2 branches covered.">            for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc" id="L297">                PdfTable.Cell cell = row.get(i);</span>
+<span class="pc bpc" id="L298" title="1 of 2 branches missed.">                if (cell.background &gt;= 0) {</span>
+<span class="nc" id="L299">                    c.setFillColor(cell.background).fillRect(cx[i], y, cw[i], height);</span>
+                }
+<span class="fc" id="L301">                float ly = y + pad;</span>
+<span class="fc bfc" id="L302" title="All 2 branches covered.">                for (int k = next[i]; k &lt; end[i]; k++) {</span>
+<span class="fc" id="L303">                    PdfParagraph.Line line = lines.get(i).get(k);</span>
+<span class="fc" id="L304">                    c.save();</span>
+<span class="fc" id="L305">                    cell.paragraph.draw(page, line, cx[i] + pad, ly, cw[i] - 2 * pad);</span>
+<span class="fc" id="L306">                    c.restore();</span>
+<span class="fc" id="L307">                    ly += line.height;</span>
+                }
+<span class="pc bpc" id="L309" title="1 of 2 branches missed.">                if (table.borderWidth &gt; 0) {</span>
+<span class="fc" id="L310">                    c.setStrokeColor(table.borderColor).setLineWidth(table.borderWidth)</span>
+<span class="fc" id="L311">                            .strokeRect(cx[i], y, cw[i], height);</span>
+                }
+            }
+<span class="fc" id="L314">            c.restore();</span>
+<span class="fc" id="L315">            y += height;</span>
+<span class="fc" id="L316">            drawn += height;</span>
+<span class="fc" id="L317">            boolean done = true;</span>
+<span class="fc bfc" id="L318" title="All 2 branches covered.">            for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc" id="L319">                next[i] = end[i];</span>
+<span class="pc bpc" id="L320" title="1 of 2 branches missed.">                if (next[i] &lt; lines.get(i).size()) {</span>
+<span class="nc" id="L321">                    done = false;</span>
+                }
+            }
+<span class="pc bpc" id="L324" title="1 of 2 branches missed.">            if (done) {</span>
+<span class="fc" id="L325">                return drawn;</span>
+            }
+<span class="nc" id="L327">            newPage();</span>
+<span class="nc bnc" id="L328" title="All 2 branches missed.">            if (headerRows != null) {</span>
+<span class="nc bnc" id="L329" title="All 2 branches missed.">                for (int h = 0; h &lt; headerRows.size(); h++) { // NOPMD ForLoopCanBeForeach - indexed like the surrounding decoder loops</span>
+<span class="nc" id="L330">                    drawRow(table, headerRows.get(h), colX, null);</span>
+                }
+            }
+<span class="nc" id="L333">        }</span>
+    }
+
+    /// Runs the page decorator over every page this layout added. Call it
+    /// once, after the last element.
+    public void finish() {
+<span class="pc bpc" id="L339" title="1 of 2 branches missed.">        if (finished) {</span>
+<span class="nc" id="L340">            return;</span>
+        }
+<span class="fc" id="L342">        finished = true;</span>
+<span class="fc bfc" id="L343" title="All 2 branches covered.">        if (decorator == null) {</span>
+<span class="fc" id="L344">            return;</span>
+        }
+<span class="fc bfc" id="L346" title="All 2 branches covered.">        for (int i = 0; i &lt; pages.size(); i++) {</span>
+<span class="fc" id="L347">            PdfPage p = pages.get(i);</span>
+<span class="fc" id="L348">            p.getCanvas().beginOverlay();</span>
+<span class="fc" id="L349">            decorator.decorate(p, i + 1, pages.size());</span>
+        }
+<span class="fc" id="L351">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,284 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ConvolverNode.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.media.audio</a> &gt; <span class="el_source">ConvolverNode.java</span></div><h1>ConvolverNode.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.media.audio;
+
+/// Convolves its input with an impulse response, for reverb and cabinet or
+/// room simulation: the Web Audio `ConvolverNode`.
+///
+/// The response is a 1, 2 or 4 channel [AudioData] at the context's sample
+/// rate. One channel is applied to each input channel; two are a left and a
+/// right response; four are true stereo (left to left, left to right, right to
+/// left, right to right). The output is mono only for a mono response on a
+/// mono input, otherwise stereo.
+///
+/// ```java
+/// OfflineAudioContext audio = new OfflineAudioContext(2, 44100, 44100);
+/// OscillatorNode dry = audio.createOscillator();
+/// GainNode wetGain = audio.createGain();
+/// AudioData impulse = audio.createBuffer(2, 22050, 44100); // decoded or synthesised response
+/// ConvolverNode hall = audio.createConvolver();
+/// hall.setBuffer(impulse);
+/// dry.connect(hall).connect(wetGain).connect(audio.getDestination());
+/// ```
+///
+/// Convolution is uniformly partitioned in the frequency domain, one 128 frame
+/// block at a time, so there is no added latency. Work grows linearly with the
+/// response's length; a few seconds of stereo reverb is practical, a whole
+/// cathedral on a low-end phone may not be.
+public final class ConvolverNode extends AudioNode {
+    private static final int B = BaseAudioContext.RENDER_QUANTUM;
+    private static final int N = 2 * B;
+    private static final int BINS = B + 1;
+
+    private AudioData buffer;
+<span class="fc" id="L54">    private boolean normalize = true;</span>
+
+    private Kernel rKernel;
+<span class="fc" id="L57">    private final double[] re = new double[N]; // NOPMD SingularField - preallocated FFT scratch</span>
+<span class="fc" id="L58">    private final double[] im = new double[N]; // NOPMD SingularField - preallocated FFT scratch</span>
+<span class="fc" id="L59">    private final float[][] prevBlock = new float[2][B];</span>
+
+    /// The response, transformed once on the thread that sets it.
+    static final class Kernel {
+        final int partitions;
+        final int channels;
+        /// [irChannel][partition * BINS * 2 + bin * 2 + (0 re, 1 im)]
+        final float[][] spectra;
+        /// Input spectra, a ring of `partitions` per input channel.
+        final float[][] history;
+<span class="fc" id="L69">        final double[][] acc = new double[2][BINS * 2];</span>
+        int head;
+
+<span class="fc" id="L72">        Kernel(AudioData ir, double scale) {</span>
+<span class="fc" id="L73">            channels = ir.getNumberOfChannels();</span>
+<span class="fc" id="L74">            partitions = Math.max(1, (ir.getLength() + B - 1) / B);</span>
+<span class="fc" id="L75">            spectra = new float[channels][partitions * BINS * 2];</span>
+<span class="fc" id="L76">            history = new float[2][partitions * BINS * 2];</span>
+<span class="fc" id="L77">            double[] r = new double[N];</span>
+<span class="fc" id="L78">            double[] i = new double[N];</span>
+<span class="fc bfc" id="L79" title="All 2 branches covered.">            for (int c = 0; c &lt; channels; c++) {</span>
+<span class="fc" id="L80">                float[] h = ir.getChannelData(c);</span>
+<span class="fc bfc" id="L81" title="All 2 branches covered.">                for (int p = 0; p &lt; partitions; p++) {</span>
+<span class="fc bfc" id="L82" title="All 2 branches covered.">                    for (int k = 0; k &lt; N; k++) {</span>
+<span class="fc" id="L83">                        int s = p * B + k;</span>
+<span class="fc bfc" id="L84" title="All 4 branches covered.">                        r[k] = k &lt; B &amp;&amp; s &lt; h.length ? h[s] * scale : 0;</span>
+<span class="fc" id="L85">                        i[k] = 0;</span>
+                    }
+<span class="fc" id="L87">                    FFT.transform(r, i, false);</span>
+<span class="fc" id="L88">                    int o = p * BINS * 2;</span>
+<span class="fc bfc" id="L89" title="All 2 branches covered.">                    for (int k = 0; k &lt; BINS; k++) {</span>
+<span class="fc" id="L90">                        spectra[c][o + 2 * k] = (float) r[k];</span>
+<span class="fc" id="L91">                        spectra[c][o + 2 * k + 1] = (float) i[k];</span>
+                    }
+                }
+            }
+<span class="fc" id="L95">        }</span>
+    }
+
+    ConvolverNode(BaseAudioContext context) {
+<span class="fc" id="L99">        super(context, 1, 1, 2, ChannelCountMode.CLAMPED_MAX, ChannelInterpretation.SPEAKERS);</span>
+<span class="fc" id="L100">    }</span>
+
+    @Override
+    void checkChannelCount(int count) {
+<span class="nc bnc" id="L104" title="All 4 branches missed.">        if (count &lt; 1 || count &gt; 2) {</span>
+<span class="nc" id="L105">            throw new IllegalArgumentException(&quot;A convolver takes 1 or 2 channels: &quot; + count);</span>
+        }
+<span class="nc" id="L107">    }</span>
+
+    @Override
+    void checkChannelCountMode(ChannelCountMode mode) {
+<span class="nc bnc" id="L111" title="All 2 branches missed.">        if (mode == ChannelCountMode.MAX) {</span>
+<span class="nc" id="L112">            throw new IllegalArgumentException(&quot;A convolver cannot use ChannelCountMode.MAX&quot;);</span>
+        }
+<span class="nc" id="L114">    }</span>
+
+    /// The impulse response, or null.
+    ///
+    /// #### Returns
+    ///
+    /// the response
+    public AudioData getBuffer() {
+<span class="nc" id="L122">        return buffer;</span>
+    }
+
+    /// Sets the impulse response. It is read once, when set: later changes to
+    /// its samples do not reach the node. Null silences the node.
+    ///
+    /// #### Parameters
+    ///
+    /// - `buffer`: 1, 2 or 4 channels at the context's sample rate, or null
+    public void setBuffer(AudioData buffer) {
+<span class="fc" id="L132">        Kernel k = null;</span>
+<span class="pc bpc" id="L133" title="1 of 2 branches missed.">        if (buffer != null) {</span>
+<span class="fc" id="L134">            int ch = buffer.getNumberOfChannels();</span>
+<span class="pc bpc" id="L135" title="2 of 6 branches missed.">            if (ch != 1 &amp;&amp; ch != 2 &amp;&amp; ch != 4) {</span>
+<span class="nc" id="L136">                throw new IllegalArgumentException(&quot;A response needs 1, 2 or 4 channels: &quot; + ch);</span>
+            }
+<span class="pc bpc" id="L138" title="1 of 2 branches missed.">            if (buffer.getSampleRate() != context.getSampleRate()) {</span>
+<span class="nc" id="L139">                throw new IllegalArgumentException(&quot;The response's sample rate &quot; + buffer.getSampleRate()</span>
+<span class="nc" id="L140">                        + &quot; is not the context's &quot; + context.getSampleRate());</span>
+            }
+<span class="pc bpc" id="L142" title="1 of 2 branches missed.">            k = new Kernel(buffer, normalize ? normalizationScale(buffer) : 1);</span>
+        }
+<span class="fc" id="L144">        this.buffer = buffer;</span>
+<span class="fc" id="L145">        final Kernel kernel = k;</span>
+<span class="fc" id="L146">        context.post(new Runnable() {</span>
+            @Override
+            public void run() {
+<span class="fc" id="L149">                rKernel = kernel;</span>
+<span class="fc" id="L150">            }</span>
+        });
+<span class="fc" id="L152">    }</span>
+
+    /// Whether a response set from now on is scaled to a standard loudness;
+    /// true by default.
+    ///
+    /// #### Returns
+    ///
+    /// true to normalize
+    public boolean isNormalize() {
+<span class="nc" id="L161">        return normalize;</span>
+    }
+
+    /// Sets whether a response set from now on is scaled to a standard loudness.
+    /// As in the specification it applies at the next [#setBuffer(AudioData)].
+    ///
+    /// #### Parameters
+    ///
+    /// - `normalize`: true to normalize
+    public void setNormalize(boolean normalize) {
+<span class="fc" id="L171">        this.normalize = normalize;</span>
+<span class="fc" id="L172">    }</span>
+
+    /// The specification's normalization scale for a response.
+    static double normalizationScale(AudioData b) {
+<span class="fc" id="L176">        double power = 0;</span>
+<span class="fc" id="L177">        int ch = b.getNumberOfChannels();</span>
+<span class="fc" id="L178">        int len = b.getLength();</span>
+<span class="fc bfc" id="L179" title="All 2 branches covered.">        for (int c = 0; c &lt; ch; c++) {</span>
+<span class="fc" id="L180">            float[] d = b.getChannelData(c);</span>
+<span class="fc bfc" id="L181" title="All 2 branches covered.">            for (int i = 0; i &lt; len; i++) {</span>
+<span class="fc" id="L182">                power += d[i] * d[i];</span>
+            }
+        }
+<span class="fc" id="L185">        power = Math.sqrt(power / ((double) ch * len));</span>
+<span class="fc" id="L186">        double minPower = 0.000125;</span>
+<span class="pc bpc" id="L187" title="3 of 6 branches missed.">        if (Double.isNaN(power) || Double.isInfinite(power) || power &lt; minPower) {</span>
+<span class="nc" id="L188">            power = minPower;</span>
+        }
+<span class="fc" id="L190">        double scale = 1 / power * 0.00125 * (44100 / b.getSampleRate());</span>
+<span class="pc bpc" id="L191" title="1 of 2 branches missed.">        if (ch == 4) {</span>
+<span class="fc" id="L192">            scale *= 0.5;</span>
+        }
+<span class="fc" id="L194">        return scale;</span>
+    }
+
+    @Override
+    void process(long q) {
+<span class="fc" id="L199">        Kernel k = rKernel;</span>
+<span class="fc" id="L200">        AudioBus in = inBuses[0];</span>
+<span class="fc" id="L201">        AudioBus out = outBuses[0];</span>
+<span class="pc bpc" id="L202" title="1 of 2 branches missed.">        if (k == null) {</span>
+<span class="nc" id="L203">            out.setChannels(1);</span>
+<span class="nc" id="L204">            return;</span>
+        }
+<span class="fc bfc" id="L206" title="All 2 branches covered.">        boolean monoIn = in.channels == 1;</span>
+<span class="fc bfc" id="L207" title="All 4 branches covered.">        int outCh = monoIn &amp;&amp; k.channels == 1 ? 1 : 2;</span>
+<span class="fc" id="L208">        out.setChannels(outCh);</span>
+<span class="fc" id="L209">        int slot = k.head * BINS * 2;</span>
+<span class="fc bfc" id="L210" title="All 2 branches covered.">        int inputs = monoIn ? 1 : 2;</span>
+<span class="fc bfc" id="L211" title="All 2 branches covered.">        for (int c = 0; c &lt; inputs; c++) {</span>
+<span class="fc" id="L212">            float[] cur = in.data[c];</span>
+<span class="fc" id="L213">            float[] prev = prevBlock[c];</span>
+<span class="fc bfc" id="L214" title="All 2 branches covered.">            for (int i = 0; i &lt; B; i++) {</span>
+<span class="fc" id="L215">                re[i] = prev[i];</span>
+<span class="fc" id="L216">                re[B + i] = cur[i];</span>
+            }
+<span class="fc bfc" id="L218" title="All 2 branches covered.">            for (int i = 0; i &lt; N; i++) {</span>
+<span class="fc" id="L219">                im[i] = 0;</span>
+            }
+<span class="fc" id="L221">            System.arraycopy(cur, 0, prev, 0, B);</span>
+<span class="fc" id="L222">            FFT.transform(re, im, false);</span>
+<span class="fc" id="L223">            float[] h = k.history[c];</span>
+<span class="fc bfc" id="L224" title="All 2 branches covered.">            for (int b = 0; b &lt; BINS; b++) {</span>
+<span class="fc" id="L225">                h[slot + 2 * b] = (float) re[b];</span>
+<span class="fc" id="L226">                h[slot + 2 * b + 1] = (float) im[b];</span>
+            }
+        }
+<span class="fc bfc" id="L229" title="All 2 branches covered.">        if (monoIn) {</span>
+<span class="fc" id="L230">            System.arraycopy(k.history[0], slot, k.history[1], slot, BINS * 2);</span>
+<span class="fc" id="L231">            System.arraycopy(prevBlock[0], 0, prevBlock[1], 0, B);</span>
+        }
+<span class="fc bfc" id="L233" title="All 2 branches covered.">        for (int o = 0; o &lt; outCh; o++) {</span>
+<span class="fc" id="L234">            double[] acc = k.acc[o];</span>
+<span class="fc bfc" id="L235" title="All 2 branches covered.">            for (int i = 0; i &lt; acc.length; i++) {</span>
+<span class="fc" id="L236">                acc[i] = 0;</span>
+            }
+<span class="fc bfc" id="L238" title="All 2 branches covered.">            if (k.channels == 4) {</span>
+<span class="fc" id="L239">                accumulate(k, 0, o, acc);</span>
+<span class="fc" id="L240">                accumulate(k, 1, 2 + o, acc);</span>
+            } else {
+<span class="pc bpc" id="L242" title="1 of 2 branches missed.">                accumulate(k, o, k.channels == 1 ? 0 : o, acc);</span>
+            }
+<span class="fc bfc" id="L244" title="All 2 branches covered.">            for (int b = 0; b &lt; BINS; b++) {</span>
+<span class="fc" id="L245">                re[b] = acc[2 * b];</span>
+<span class="fc" id="L246">                im[b] = acc[2 * b + 1];</span>
+            }
+<span class="fc bfc" id="L248" title="All 2 branches covered.">            for (int b = BINS; b &lt; N; b++) {</span>
+<span class="fc" id="L249">                re[b] = re[N - b];</span>
+<span class="fc" id="L250">                im[b] = -im[N - b];</span>
+            }
+<span class="fc" id="L252">            FFT.transform(re, im, true);</span>
+<span class="fc" id="L253">            float[] d = out.data[o];</span>
+<span class="fc bfc" id="L254" title="All 2 branches covered.">            for (int i = 0; i &lt; B; i++) {</span>
+<span class="fc" id="L255">                d[i] = (float) (re[B + i] / N);</span>
+            }
+        }
+<span class="fc" id="L258">        k.head = (k.head + 1) % k.partitions;</span>
+<span class="fc" id="L259">    }</span>
+
+    /// Adds input channel `in`'s history times response channel `ir`.
+    private static void accumulate(Kernel k, int in, int ir, double[] acc) {
+<span class="fc" id="L263">        float[] x = k.history[in];</span>
+<span class="fc" id="L264">        float[] h = k.spectra[ir];</span>
+<span class="fc" id="L265">        int parts = k.partitions;</span>
+<span class="fc bfc" id="L266" title="All 2 branches covered.">        for (int p = 0; p &lt; parts; p++) {</span>
+<span class="fc" id="L267">            int idx = k.head - p;</span>
+<span class="fc bfc" id="L268" title="All 2 branches covered.">            if (idx &lt; 0) {</span>
+<span class="fc" id="L269">                idx += parts;</span>
+            }
+<span class="fc" id="L271">            int xs = idx * BINS * 2;</span>
+<span class="fc" id="L272">            int hs = p * BINS * 2;</span>
+<span class="fc bfc" id="L273" title="All 2 branches covered.">            for (int b = 0; b &lt; 2 * BINS; b += 2) {</span>
+<span class="fc" id="L274">                double xr = x[xs + b];</span>
+<span class="fc" id="L275">                double xi = x[xs + b + 1];</span>
+<span class="fc" id="L276">                double hr = h[hs + b];</span>
+<span class="fc" id="L277">                double hi = h[hs + b + 1];</span>
+<span class="fc" id="L278">                acc[b] += xr * hr - xi * hi;</span>
+<span class="fc" id="L279">                acc[b + 1] += xr * hi + xi * hr;</span>
+            }
+        }
+<span class="fc" id="L282">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

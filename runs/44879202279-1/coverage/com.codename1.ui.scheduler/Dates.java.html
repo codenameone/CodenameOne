@@ -1,0 +1,156 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Dates.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.scheduler</a> &gt; <span class="el_source">Dates.java</span></div><h1>Dates.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ui.scheduler;
+
+import com.codename1.l10n.DateFormatSymbols;
+import com.codename1.l10n.L10NManager;
+import com.codename1.ui.plaf.UIManager;
+
+import java.time.LocalDate;
+import java.util.Calendar;
+import java.util.Hashtable;
+import java.util.Map;
+
+/// Names and labels for dates that are held as epoch days.
+///
+/// The views work in a zone of their own choosing, which need not be the
+/// device's, so nothing here formats a `java.util.Date`: the day, month and
+/// minute are worked out first and only named here.
+final class Dates {
+    // The names are asked for with every header painted, so one set is kept
+    // for as long as the application's bundle stays the one it was made from.
+<span class="fc" id="L42">    private static final SymbolCache CACHE = new SymbolCache();</span>
+
+    private Dates() {
+    }
+
+    private static DateFormatSymbols symbols() {
+<span class="fc" id="L48">        return CACHE.get(UIManager.getInstance().getBundle());</span>
+    }
+
+    /// `isoDay` is 1 for Monday to 7 for Sunday.
+    static String weekdayShort(int isoDay) {
+<span class="fc" id="L53">        return symbols().getShortWeekdays()[isoDay % 7];</span>
+    }
+
+    static String weekdayLong(int isoDay) {
+<span class="nc" id="L57">        return symbols().getWeekdays()[isoDay % 7];</span>
+    }
+
+    /// `month` is 1 for January.
+    static String monthShort(int month) {
+<span class="fc" id="L62">        return symbols().getShortMonths()[month - 1];</span>
+    }
+
+    static String monthLong(int month) {
+<span class="fc" id="L66">        return symbols().getMonths()[month - 1];</span>
+    }
+
+    static int year(long epochDay) {
+<span class="fc" id="L70">        return LocalDate.ofEpochDay(epochDay).getYear();</span>
+    }
+
+    static int month(long epochDay) {
+<span class="fc" id="L74">        return LocalDate.ofEpochDay(epochDay).getMonthValue();</span>
+    }
+
+    static int dayOfMonth(long epochDay) {
+<span class="fc" id="L78">        return LocalDate.ofEpochDay(epochDay).getDayOfMonth();</span>
+    }
+
+    /// &quot;Mon, Jan 5&quot;.
+    static String dayTitle(long epochDay, int isoDay) {
+<span class="fc" id="L83">        LocalDate d = LocalDate.ofEpochDay(epochDay);</span>
+<span class="fc" id="L84">        return weekdayShort(isoDay) + &quot;, &quot; + monthShort(d.getMonthValue()) + &quot; &quot; + d.getDayOfMonth();</span>
+    }
+
+    /// &quot;Jan 5&quot;.
+    static String monthDay(long epochDay) {
+<span class="fc" id="L89">        LocalDate d = LocalDate.ofEpochDay(epochDay);</span>
+<span class="fc" id="L90">        return monthShort(d.getMonthValue()) + &quot; &quot; + d.getDayOfMonth();</span>
+    }
+
+    /// &quot;January 2026&quot;.
+    static String monthTitle(long epochDay) {
+<span class="fc" id="L95">        LocalDate d = LocalDate.ofEpochDay(epochDay);</span>
+<span class="fc" id="L96">        return monthLong(d.getMonthValue()) + &quot; &quot; + d.getYear();</span>
+    }
+
+    /// A time of day: &quot;09:30&quot; on a 24 hour clock, otherwise &quot;9:30 AM&quot;, and
+    /// &quot;9 AM&quot; on the hour when `brief`.
+    static String time(int minuteOfDay, boolean h24, boolean brief) {
+<span class="fc" id="L102">        int m = minuteOfDay % 1440;</span>
+<span class="fc" id="L103">        int h = m / 60;</span>
+<span class="fc" id="L104">        int mm = m % 60;</span>
+<span class="fc" id="L105">        StringBuilder sb = new StringBuilder();</span>
+<span class="fc bfc" id="L106" title="All 2 branches covered.">        if (h24) {</span>
+<span class="fc bfc" id="L107" title="All 2 branches covered.">            if (h &lt; 10) {</span>
+<span class="fc" id="L108">                sb.append('0');</span>
+            }
+<span class="fc" id="L110">            sb.append(h).append(':');</span>
+<span class="fc bfc" id="L111" title="All 2 branches covered.">            if (mm &lt; 10) {</span>
+<span class="fc" id="L112">                sb.append('0');</span>
+            }
+<span class="fc" id="L114">            sb.append(mm);</span>
+<span class="fc" id="L115">            return sb.toString();</span>
+        }
+<span class="pc bpc" id="L117" title="1 of 2 branches missed.">        int h12 = h % 12 == 0 ? 12 : h % 12;</span>
+<span class="fc" id="L118">        sb.append(h12);</span>
+<span class="pc bpc" id="L119" title="2 of 4 branches missed.">        if (mm != 0 || !brief) {</span>
+<span class="nc" id="L120">            sb.append(':');</span>
+<span class="nc bnc" id="L121" title="All 2 branches missed.">            if (mm &lt; 10) {</span>
+<span class="nc" id="L122">                sb.append('0');</span>
+            }
+<span class="nc" id="L124">            sb.append(mm);</span>
+        }
+<span class="fc" id="L126">        String[] ampm = symbols().getAmPmStrings();</span>
+<span class="pc bpc" id="L127" title="1 of 2 branches missed.">        sb.append(' ').append(ampm[h &lt; 12 ? 0 : 1]);</span>
+<span class="fc" id="L128">        return sb.toString();</span>
+    }
+
+    /// Whether the device's locale writes one in the afternoon as 13.
+    static boolean deviceUses24Hours() {
+<span class="fc" id="L133">        Calendar c = Calendar.getInstance();</span>
+<span class="fc" id="L134">        c.set(Calendar.HOUR_OF_DAY, 13);</span>
+<span class="fc" id="L135">        c.set(Calendar.MINUTE, 5);</span>
+<span class="pc bpc" id="L136" title="1 of 2 branches missed.">        return L10NManager.getInstance().formatTime(c.getTime()).indexOf(&quot;13&quot;) &gt;= 0;</span>
+    }
+
+    private static final class SymbolCache {
+        private DateFormatSymbols symbols;
+        private Map&lt;String, String&gt; bundle;
+
+        DateFormatSymbols get(Map&lt;String, String&gt; current) {
+<span class="pc bpc" id="L144" title="1 of 4 branches missed.">            if (symbols == null || current != bundle) { //NOPMD CompareObjectsWithEquals - the bundle's identity is the point</span>
+<span class="fc" id="L145">                DateFormatSymbols s = new DateFormatSymbols();</span>
+<span class="pc bpc" id="L146" title="1 of 2 branches missed.">                if (current instanceof Hashtable) {</span>
+<span class="nc" id="L147">                    s.setResourceBundle((Hashtable&lt;String, String&gt;) current);</span>
+                }
+<span class="fc" id="L149">                symbols = s;</span>
+<span class="fc" id="L150">                bundle = current;</span>
+            }
+<span class="fc" id="L152">            return symbols;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

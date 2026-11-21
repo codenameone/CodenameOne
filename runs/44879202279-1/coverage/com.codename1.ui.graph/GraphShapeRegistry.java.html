@@ -1,0 +1,323 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>GraphShapeRegistry.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.graph</a> &gt; <span class="el_source">GraphShapeRegistry.java</span></div><h1>GraphShapeRegistry.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ui.graph;
+
+import com.codename1.graph.GraphShapes;
+import com.codename1.ui.geom.GeneralPath;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/// The outlines behind the names of `GraphShapes`, and the place to add
+/// outlines of your own.
+///
+/// The registry is shared by every graph of the application, and like the
+/// components that read it, it belongs to the event dispatch thread.
+public final class GraphShapeRegistry {
+    private static final float KAPPA = 0.5523f;
+    private static final int KEPT_PER_SHAPE = 48;
+<span class="fc" id="L41">    private static final Map&lt;String, GraphShape&gt; SHAPES = new HashMap&lt;String, GraphShape&gt;();</span>
+    // per shape name, the outlines built so far at the origin, each with its size
+<span class="fc" id="L43">    private static final Map&lt;String, List&lt;Sized&gt;&gt; PATHS = new HashMap&lt;String, List&lt;Sized&gt;&gt;();</span>
+    // a size past those kept is built here: evicting one on every miss would
+    // rebuild an outline per edge end per frame once a diagram has more sizes
+<span class="fc" id="L46">    private static final GeneralPath SPARE = new GeneralPath();</span>
+    // counts lookups; an outline unused for STALE of them, such as a size a
+    // resize drag passed through, gives its place to the size now asked for
+    private static long tick;
+    private static final long STALE = 4096;
+    // the built-in rectangle, whose outline is its bounds and needs no path
+<span class="fc" id="L52">    private static final GraphShape PLAIN = new Builtin(0);</span>
+
+    static {
+<span class="fc" id="L55">        SHAPES.put(GraphShapes.RECT, PLAIN);</span>
+<span class="fc" id="L56">        SHAPES.put(GraphShapes.ROUNDED, new Builtin(1));</span>
+<span class="fc" id="L57">        SHAPES.put(GraphShapes.TERMINATOR, new Builtin(2));</span>
+<span class="fc" id="L58">        SHAPES.put(GraphShapes.DECISION, new Builtin(3));</span>
+<span class="fc" id="L59">        SHAPES.put(GraphShapes.DATA, new Builtin(4));</span>
+<span class="fc" id="L60">        SHAPES.put(GraphShapes.DOCUMENT, new Builtin(5));</span>
+<span class="fc" id="L61">        SHAPES.put(GraphShapes.PREPARATION, new Builtin(6));</span>
+<span class="fc" id="L62">        SHAPES.put(GraphShapes.DATABASE, new Builtin(7));</span>
+<span class="fc" id="L63">        SHAPES.put(GraphShapes.SUBPROCESS, new Builtin(8));</span>
+<span class="fc" id="L64">        SHAPES.put(GraphShapes.ELLIPSE, new Builtin(9));</span>
+<span class="fc" id="L65">        SHAPES.put(GraphShapes.NOTE, new Builtin(10));</span>
+<span class="fc" id="L66">    }</span>
+
+    private GraphShapeRegistry() {
+    }
+
+    /// Adds an outline under a name, or replaces the one that had it.
+    public static void register(String name, GraphShape shape) {
+<span class="nc bnc" id="L73" title="All 2 branches missed.">        if (name == null) {</span>
+<span class="nc" id="L74">            return;</span>
+        }
+<span class="nc bnc" id="L76" title="All 2 branches missed.">        if (shape == null) {</span>
+<span class="nc" id="L77">            SHAPES.remove(name);</span>
+        } else {
+<span class="nc" id="L79">            SHAPES.put(name, shape);</span>
+        }
+<span class="nc" id="L81">        PATHS.remove(name);</span>
+<span class="nc" id="L82">    }</span>
+
+    /// The outline registered under a name, or null. A node whose shape has
+    /// no outline is drawn as the ordinary box.
+    public static GraphShape get(String name) {
+<span class="fc bfc" id="L87" title="All 2 branches covered.">        return name == null ? null : SHAPES.get(name);</span>
+    }
+
+    /// The outline of a shape for a size, at the origin; kept, as hit tests
+    /// and edges ask for the same few sizes again and again.
+    private static GeneralPath path(String name, float w, float h) {
+<span class="fc" id="L93">        GraphShape shape = SHAPES.get(name);</span>
+<span class="fc bfc" id="L94" title="All 4 branches covered.">        if (shape == null || shape == PLAIN) { // NOPMD CompareObjectsWithEquals - the built-in instance is meant</span>
+<span class="fc" id="L95">            return null;</span>
+        }
+<span class="fc" id="L97">        List&lt;Sized&gt; kept = PATHS.get(name);</span>
+<span class="fc bfc" id="L98" title="All 2 branches covered.">        if (kept == null) {</span>
+<span class="fc" id="L99">            kept = new ArrayList&lt;Sized&gt;();</span>
+<span class="fc" id="L100">            PATHS.put(name, kept);</span>
+        }
+<span class="fc" id="L102">        tick++;</span>
+<span class="fc" id="L103">        int n = kept.size();</span>
+<span class="fc" id="L104">        int oldest = -1;</span>
+<span class="fc bfc" id="L105" title="All 2 branches covered.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc" id="L106">            Sized s = kept.get(i);</span>
+<span class="pc bpc" id="L107" title="1 of 4 branches missed.">            if (s.w == w &amp;&amp; s.h == h) {</span>
+<span class="fc" id="L108">                s.used = tick;</span>
+<span class="fc" id="L109">                return s.path;</span>
+            }
+<span class="pc bpc" id="L111" title="1 of 4 branches missed.">            if (oldest &lt; 0 || s.used &lt; kept.get(oldest).used) {</span>
+<span class="fc" id="L112">                oldest = i;</span>
+            }
+        }
+<span class="pc bpc" id="L115" title="1 of 2 branches missed.">        if (n &gt;= KEPT_PER_SHAPE) {</span>
+<span class="nc bnc" id="L116" title="All 2 branches missed.">            if (tick - kept.get(oldest).used &lt; STALE) {</span>
+                // every kept size is in use: this one is built and let go
+<span class="nc" id="L118">                SPARE.reset();</span>
+<span class="nc" id="L119">                shape.outline(SPARE, 0, 0, w, h);</span>
+<span class="nc" id="L120">                return SPARE;</span>
+            }
+<span class="nc" id="L122">            kept.remove(oldest);</span>
+        }
+<span class="fc" id="L124">        GeneralPath p = new GeneralPath();</span>
+<span class="fc" id="L125">        shape.outline(p, 0, 0, w, h);</span>
+<span class="fc" id="L126">        Sized added = new Sized(w, h, p);</span>
+<span class="fc" id="L127">        added.used = tick;</span>
+<span class="fc" id="L128">        kept.add(added);</span>
+<span class="fc" id="L129">        return p;</span>
+    }
+
+    /// True when a point lies inside a shape drawn in the given bounds. A
+    /// name with no outline is its bounds.
+    public static boolean contains(String name, double px, double py, double x, double y, double w, double h) {
+<span class="pc bpc" id="L135" title="4 of 8 branches missed.">        if (px &lt; x || py &lt; y || px &gt;= x + w || py &gt;= y + h) {</span>
+<span class="nc" id="L136">            return false;</span>
+        }
+<span class="pc bpc" id="L138" title="1 of 2 branches missed.">        GeneralPath p = name == null ? null : path(name, (float) w, (float) h);</span>
+<span class="fc bfc" id="L139" title="All 4 branches covered.">        return p == null || p.contains((float) (px - x), (float) (py - y));</span>
+    }
+
+    /// Pulls a point on the bounds of a shape back along the line to the
+    /// centre until it lies on the outline, so an edge ends on the diamond
+    /// and not on the box around it.
+    static void pullToOutline(String name, double[] rect, double[] ox, double[] oy, int i) {
+<span class="pc bpc" id="L146" title="1 of 2 branches missed.">        GeneralPath p = name == null ? null : path(name, (float) rect[2], (float) rect[3]);</span>
+<span class="fc bfc" id="L147" title="All 2 branches covered.">        if (p == null) {</span>
+<span class="fc" id="L148">            return;</span>
+        }
+<span class="fc" id="L150">        double cx = rect[2] / 2;</span>
+<span class="fc" id="L151">        double cy = rect[3] / 2;</span>
+<span class="pc bpc" id="L152" title="1 of 2 branches missed.">        if (!p.contains((float) cx, (float) cy)) {</span>
+<span class="nc" id="L153">            return;</span>
+        }
+<span class="fc" id="L155">        double tx = ox[i] - rect[0];</span>
+<span class="fc" id="L156">        double ty = oy[i] - rect[1];</span>
+<span class="fc" id="L157">        double in = 0;</span>
+<span class="fc" id="L158">        double out = 1;</span>
+<span class="fc bfc" id="L159" title="All 2 branches covered.">        for (int k = 0; k &lt; 14; k++) {</span>
+<span class="fc" id="L160">            double mid = (in + out) / 2;</span>
+<span class="fc bfc" id="L161" title="All 2 branches covered.">            if (p.contains((float) (cx + (tx - cx) * mid), (float) (cy + (ty - cy) * mid))) {</span>
+<span class="fc" id="L162">                in = mid;</span>
+            } else {
+<span class="fc" id="L164">                out = mid;</span>
+            }
+        }
+<span class="fc" id="L167">        ox[i] = rect[0] + cx + (tx - cx) * out;</span>
+<span class="fc" id="L168">        oy[i] = rect[1] + cy + (ty - cy) * out;</span>
+<span class="fc" id="L169">    }</span>
+
+    private static final class Sized {
+        final float w;
+        final float h;
+        final GeneralPath path;
+        long used;
+
+<span class="fc" id="L177">        Sized(float w, float h, GeneralPath path) {</span>
+<span class="fc" id="L178">            this.w = w;</span>
+<span class="fc" id="L179">            this.h = h;</span>
+<span class="fc" id="L180">            this.path = path;</span>
+<span class="fc" id="L181">        }</span>
+    }
+
+    private static void roundRect(GeneralPath p, float x, float y, float w, float h, float r) {
+<span class="fc" id="L185">        float k = r * (1 - KAPPA);</span>
+<span class="fc" id="L186">        p.moveTo(x + r, y);</span>
+<span class="fc" id="L187">        p.lineTo(x + w - r, y);</span>
+<span class="fc" id="L188">        p.curveTo(x + w - k, y, x + w, y + k, x + w, y + r);</span>
+<span class="fc" id="L189">        p.lineTo(x + w, y + h - r);</span>
+<span class="fc" id="L190">        p.curveTo(x + w, y + h - k, x + w - k, y + h, x + w - r, y + h);</span>
+<span class="fc" id="L191">        p.lineTo(x + r, y + h);</span>
+<span class="fc" id="L192">        p.curveTo(x + k, y + h, x, y + h - k, x, y + h - r);</span>
+<span class="fc" id="L193">        p.lineTo(x, y + r);</span>
+<span class="fc" id="L194">        p.curveTo(x, y + k, x + k, y, x + r, y);</span>
+<span class="fc" id="L195">        p.closePath();</span>
+<span class="fc" id="L196">    }</span>
+
+    /// The symbols of a flow chart.
+    private static final class Builtin implements GraphShape {
+        private final int kind;
+
+<span class="fc" id="L202">        Builtin(int kind) {</span>
+<span class="fc" id="L203">            this.kind = kind;</span>
+<span class="fc" id="L204">        }</span>
+
+        @Override
+        public void outline(GeneralPath p, float x, float y, float w, float h) {
+<span class="fc bfc" id="L208" title="All 10 branches covered.">            switch (kind) {</span>
+                case 1:
+<span class="fc" id="L210">                    roundRect(p, x, y, w, h, Math.min(w, h) * 0.18f);</span>
+<span class="fc" id="L211">                    break;</span>
+                case 2:
+<span class="fc" id="L213">                    roundRect(p, x, y, w, h, Math.min(w, h) / 2);</span>
+<span class="fc" id="L214">                    break;</span>
+                case 3:
+<span class="fc" id="L216">                    p.moveTo(x + w / 2, y);</span>
+<span class="fc" id="L217">                    p.lineTo(x + w, y + h / 2);</span>
+<span class="fc" id="L218">                    p.lineTo(x + w / 2, y + h);</span>
+<span class="fc" id="L219">                    p.lineTo(x, y + h / 2);</span>
+<span class="fc" id="L220">                    p.closePath();</span>
+<span class="fc" id="L221">                    break;</span>
+                case 4: {
+<span class="fc" id="L223">                    float skew = Math.min(w * 0.2f, h * 0.5f);</span>
+<span class="fc" id="L224">                    p.moveTo(x + skew, y);</span>
+<span class="fc" id="L225">                    p.lineTo(x + w, y);</span>
+<span class="fc" id="L226">                    p.lineTo(x + w - skew, y + h);</span>
+<span class="fc" id="L227">                    p.lineTo(x, y + h);</span>
+<span class="fc" id="L228">                    p.closePath();</span>
+<span class="fc" id="L229">                    break;</span>
+                }
+                case 5: {
+<span class="fc" id="L232">                    float base = y + h * 0.86f;</span>
+<span class="fc" id="L233">                    p.moveTo(x, y);</span>
+<span class="fc" id="L234">                    p.lineTo(x + w, y);</span>
+<span class="fc" id="L235">                    p.lineTo(x + w, base);</span>
+<span class="fc" id="L236">                    p.quadTo(x + w * 0.75f, y + h * 0.70f, x + w * 0.5f, base);</span>
+<span class="fc" id="L237">                    p.quadTo(x + w * 0.25f, y + h * 1.02f, x, base);</span>
+<span class="fc" id="L238">                    p.closePath();</span>
+<span class="fc" id="L239">                    break;</span>
+                }
+                case 6: {
+<span class="fc" id="L242">                    float inset = Math.min(w * 0.18f, h / 2);</span>
+<span class="fc" id="L243">                    p.moveTo(x + inset, y);</span>
+<span class="fc" id="L244">                    p.lineTo(x + w - inset, y);</span>
+<span class="fc" id="L245">                    p.lineTo(x + w, y + h / 2);</span>
+<span class="fc" id="L246">                    p.lineTo(x + w - inset, y + h);</span>
+<span class="fc" id="L247">                    p.lineTo(x + inset, y + h);</span>
+<span class="fc" id="L248">                    p.lineTo(x, y + h / 2);</span>
+<span class="fc" id="L249">                    p.closePath();</span>
+<span class="fc" id="L250">                    break;</span>
+                }
+                case 7: {
+<span class="fc" id="L253">                    float ry = Math.min(h * 0.14f, w * 0.25f);</span>
+<span class="fc" id="L254">                    float rx = w / 2;</span>
+<span class="fc" id="L255">                    float top = y + ry;</span>
+<span class="fc" id="L256">                    float bottom = y + h - ry;</span>
+<span class="fc" id="L257">                    p.moveTo(x, top);</span>
+<span class="fc" id="L258">                    p.curveTo(x, top - ry * KAPPA, x + rx - rx * KAPPA, y, x + rx, y);</span>
+<span class="fc" id="L259">                    p.curveTo(x + rx + rx * KAPPA, y, x + w, top - ry * KAPPA, x + w, top);</span>
+<span class="fc" id="L260">                    p.lineTo(x + w, bottom);</span>
+<span class="fc" id="L261">                    p.curveTo(x + w, bottom + ry * KAPPA, x + rx + rx * KAPPA, y + h, x + rx, y + h);</span>
+<span class="fc" id="L262">                    p.curveTo(x + rx - rx * KAPPA, y + h, x, bottom + ry * KAPPA, x, bottom);</span>
+<span class="fc" id="L263">                    p.closePath();</span>
+<span class="fc" id="L264">                    break;</span>
+                }
+                case 9: {
+<span class="fc" id="L267">                    float rx = w / 2;</span>
+<span class="fc" id="L268">                    float ry = h / 2;</span>
+<span class="fc" id="L269">                    float cx = x + rx;</span>
+<span class="fc" id="L270">                    float cy = y + ry;</span>
+<span class="fc" id="L271">                    p.moveTo(x, cy);</span>
+<span class="fc" id="L272">                    p.curveTo(x, cy - ry * KAPPA, cx - rx * KAPPA, y, cx, y);</span>
+<span class="fc" id="L273">                    p.curveTo(cx + rx * KAPPA, y, x + w, cy - ry * KAPPA, x + w, cy);</span>
+<span class="fc" id="L274">                    p.curveTo(x + w, cy + ry * KAPPA, cx + rx * KAPPA, y + h, cx, y + h);</span>
+<span class="fc" id="L275">                    p.curveTo(cx - rx * KAPPA, y + h, x, cy + ry * KAPPA, x, cy);</span>
+<span class="fc" id="L276">                    p.closePath();</span>
+<span class="fc" id="L277">                    break;</span>
+                }
+                case 10: {
+<span class="fc" id="L280">                    float fold = Math.min(w, h) * 0.25f;</span>
+<span class="fc" id="L281">                    p.moveTo(x, y);</span>
+<span class="fc" id="L282">                    p.lineTo(x + w - fold, y);</span>
+<span class="fc" id="L283">                    p.lineTo(x + w, y + fold);</span>
+<span class="fc" id="L284">                    p.lineTo(x + w, y + h);</span>
+<span class="fc" id="L285">                    p.lineTo(x, y + h);</span>
+<span class="fc" id="L286">                    p.closePath();</span>
+<span class="fc" id="L287">                    break;</span>
+                }
+                default:
+<span class="fc" id="L290">                    p.moveTo(x, y);</span>
+<span class="fc" id="L291">                    p.lineTo(x + w, y);</span>
+<span class="fc" id="L292">                    p.lineTo(x + w, y + h);</span>
+<span class="fc" id="L293">                    p.lineTo(x, y + h);</span>
+<span class="fc" id="L294">                    p.closePath();</span>
+                    break;
+            }
+<span class="fc" id="L297">        }</span>
+
+        @Override
+        public void detail(GeneralPath p, float x, float y, float w, float h) {
+<span class="nc bnc" id="L301" title="All 2 branches missed.">            if (kind == 7) {</span>
+<span class="nc" id="L302">                float ry = Math.min(h * 0.14f, w * 0.25f);</span>
+<span class="nc" id="L303">                float rx = w / 2;</span>
+<span class="nc" id="L304">                float top = y + ry;</span>
+<span class="nc" id="L305">                p.moveTo(x, top);</span>
+<span class="nc" id="L306">                p.curveTo(x, top + ry * KAPPA, x + rx - rx * KAPPA, top + ry, x + rx, top + ry);</span>
+<span class="nc" id="L307">                p.curveTo(x + rx + rx * KAPPA, top + ry, x + w, top + ry * KAPPA, x + w, top);</span>
+<span class="nc bnc" id="L308" title="All 2 branches missed.">            } else if (kind == 8) {</span>
+<span class="nc" id="L309">                float inset = Math.min(w * 0.1f, h * 0.25f);</span>
+<span class="nc" id="L310">                p.moveTo(x + inset, y);</span>
+<span class="nc" id="L311">                p.lineTo(x + inset, y + h);</span>
+<span class="nc" id="L312">                p.moveTo(x + w - inset, y);</span>
+<span class="nc" id="L313">                p.lineTo(x + w - inset, y + h);</span>
+<span class="nc bnc" id="L314" title="All 2 branches missed.">            } else if (kind == 10) {</span>
+<span class="nc" id="L315">                float fold = Math.min(w, h) * 0.25f;</span>
+<span class="nc" id="L316">                p.moveTo(x + w - fold, y);</span>
+<span class="nc" id="L317">                p.lineTo(x + w - fold, y + fold);</span>
+<span class="nc" id="L318">                p.lineTo(x + w, y + fold);</span>
+            }
+<span class="nc" id="L320">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

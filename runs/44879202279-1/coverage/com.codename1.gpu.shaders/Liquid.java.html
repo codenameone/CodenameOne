@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Liquid.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.gpu.shaders</a> &gt; <span class="el_source">Liquid.java</span></div><h1>Liquid.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.gpu.shaders;
+
+import com.codename1.gpu.shader.ShaderMaterial;
+import com.codename1.gpu.shader.ShaderNode;
+import com.codename1.gpu.shader.ShaderType;
+
+import static com.codename1.gpu.shader.ShaderNode.*;
+
+/// Glowing and moving liquids, and the light water throws on what lies
+/// under it. Use with `Material.Type.PBR`; the glow is emissive, so add
+/// bloom for the full effect.
+public final class Liquid {
+    /// `VEC3` the cool colour: lava crust, slime, the floor under water.
+    public static final String COLOR = &quot;liqColor&quot;;
+    /// `VEC3` the hot colour: molten cracks, glow, caustic light.
+    public static final String GLOW = &quot;liqGlow&quot;;
+    /// `FLOAT` how bright the glow is.
+    public static final String INTENSITY = &quot;liqIntensity&quot;;
+    /// `FLOAT` pattern repeats per world unit.
+    public static final String SCALE = &quot;liqScale&quot;;
+    /// `FLOAT` world height of the water surface, for `caustics`.
+    public static final String SURFACE = &quot;liqSurface&quot;;
+
+    private Liquid() {
+    }
+
+    private static ShaderMaterial base(int color, int glow, float intensity, float scale) {
+<span class="fc" id="L50">        return new ShaderMaterial().declareUniform(COLOR, ShaderType.VEC3).declareUniform(GLOW, ShaderType.VEC3)</span>
+<span class="fc" id="L51">                .declareUniform(INTENSITY, ShaderType.FLOAT).declareUniform(SCALE, ShaderType.FLOAT)</span>
+<span class="fc" id="L52">                .setColorUniform(COLOR, color).setColorUniform(GLOW, glow).setUniform(INTENSITY, intensity)</span>
+<span class="fc" id="L53">                .setUniform(SCALE, scale);</span>
+    }
+
+    /// Lava: dark cooling plates drifting over molten cracks that pulse.
+    ///
+    /// #### Returns
+    ///
+    /// a new shader material
+    public static ShaderMaterial lava() {
+<span class="fc" id="L62">        ShaderMaterial m = base(0x2a1610, 0xff5a10, 2.5f, 0.7f);</span>
+<span class="fc" id="L63">        ShaderNode p = Shading.worldUv(1f).mul(uniform(SCALE, ShaderType.FLOAT));</span>
+<span class="fc" id="L64">        ShaderNode warp = vec(Noise.fbm(p.add(time().mul(0.05f)), 3), Noise.fbm(p.add(vec2(4f, 1f)).sub(time().mul(0.04f)), 3));</span>
+<span class="fc" id="L65">        ShaderNode cells = Noise.cellular(p.add(warp.mul(0.8f)), time().mul(0.3f));</span>
+<span class="fc" id="L66">        ShaderNode crack = smoothstep(0.25f, 0.05f, cells);</span>
+<span class="fc" id="L67">        ShaderNode pulse = sin(time().mul(1.7f).add(p.x())).mul(0.2f).add(0.8f);</span>
+<span class="fc" id="L68">        m.set(ShaderMaterial.Hook.BASE_COLOR, vec(mix(uniform(COLOR, ShaderType.VEC3), vec3(0.1f, 0.03f, 0f), crack), f(1f)));</span>
+<span class="fc" id="L69">        m.set(ShaderMaterial.Hook.ROUGHNESS, mix(f(0.9f), f(0.4f), crack));</span>
+<span class="fc" id="L70">        m.set(ShaderMaterial.Hook.METALLIC, f(0f));</span>
+<span class="fc" id="L71">        m.set(ShaderMaterial.Hook.EMISSIVE, uniform(GLOW, ShaderType.VEC3)</span>
+<span class="fc" id="L72">                .mul(crack.mul(pulse).mul(uniform(INTENSITY, ShaderType.FLOAT))));</span>
+<span class="fc" id="L73">        m.set(ShaderMaterial.Hook.NORMAL, perturbNormal(mix(Noise.bumpNormal(p.mul(3f), 2, 0.5f), vec3(0f, 0f, 1f), crack)));</span>
+<span class="fc" id="L74">        return m;</span>
+    }
+
+    /// Toxic sludge: glossy, slowly churning, with glowing bubbles that swell
+    /// and pop.
+    ///
+    /// #### Returns
+    ///
+    /// a new shader material
+    public static ShaderMaterial toxic() {
+<span class="fc" id="L84">        ShaderMaterial m = base(0x2f5a12, 0x9cff3a, 1.4f, 1.2f);</span>
+<span class="fc" id="L85">        ShaderNode p = Shading.worldUv(1f).mul(uniform(SCALE, ShaderType.FLOAT));</span>
+<span class="fc" id="L86">        ShaderNode churn = Noise.fbm(p.add(vec2(0.1f, 0.07f).mul(time())), 4);</span>
+<span class="fc" id="L87">        ShaderNode bubble = smoothstep(0.22f, 0.12f, Noise.cellular(p.mul(2f), time().mul(1.3f)));</span>
+<span class="fc" id="L88">        ShaderNode rgb = mix(uniform(COLOR, ShaderType.VEC3).mul(churn.mul(0.6f).add(0.6f)),</span>
+<span class="fc" id="L89">                uniform(GLOW, ShaderType.VEC3), bubble.mul(0.5f));</span>
+<span class="fc" id="L90">        m.set(ShaderMaterial.Hook.BASE_COLOR, vec(rgb, f(1f)));</span>
+<span class="fc" id="L91">        m.set(ShaderMaterial.Hook.ROUGHNESS, f(0.12f));</span>
+<span class="fc" id="L92">        m.set(ShaderMaterial.Hook.METALLIC, f(0f));</span>
+<span class="fc" id="L93">        m.set(ShaderMaterial.Hook.EMISSIVE, uniform(GLOW, ShaderType.VEC3)</span>
+<span class="fc" id="L94">                .mul(bubble.add(churn.mul(0.15f)).mul(uniform(INTENSITY, ShaderType.FLOAT)).mul(0.5f)));</span>
+<span class="fc" id="L95">        m.set(ShaderMaterial.Hook.NORMAL, perturbNormal(Noise.bumpNormal(p.mul(1.5f).add(time().mul(0.1f)), 2, 0.3f)));</span>
+<span class="fc" id="L96">        return m;</span>
+    }
+
+    /// Caustics: the dancing net of light under a water surface, added to
+    /// whatever the mesh already looks like. Only below `SURFACE`, fading
+    /// with depth. Put it on the sea bed, pool walls and anything sunk.
+    ///
+    /// #### Returns
+    ///
+    /// a new shader material
+    public static ShaderMaterial caustics() {
+<span class="fc" id="L107">        ShaderMaterial m = base(0x000000, 0xcff4ff, 0.8f, 0.9f).declareUniform(SURFACE, ShaderType.FLOAT)</span>
+<span class="fc" id="L108">                .setUniform(SURFACE, 0f);</span>
+<span class="fc" id="L109">        ShaderNode p = Shading.worldUv(1f).mul(uniform(SCALE, ShaderType.FLOAT));</span>
+<span class="fc" id="L110">        ShaderNode c1 = Noise.cellular(p, time().mul(0.9f));</span>
+<span class="fc" id="L111">        ShaderNode c2 = Noise.cellular(p.mul(1.3f).add(vec2(2.7f, 1.1f)), time().mul(-0.7f));</span>
+<span class="fc" id="L112">        ShaderNode net = pow(saturate(f(1f).sub(min(c1, c2))), 6f);</span>
+<span class="fc" id="L113">        ShaderNode depth = uniform(SURFACE, ShaderType.FLOAT).sub(worldPos().y());</span>
+<span class="fc" id="L114">        ShaderNode under = step(f(0f), depth).mul(saturate(f(1f).sub(depth.mul(0.12f))));</span>
+<span class="fc" id="L115">        ShaderNode facingUp = saturate(normalize(worldNormal()).y());</span>
+<span class="fc" id="L116">        m.set(ShaderMaterial.Hook.EMISSIVE, uniform(GLOW, ShaderType.VEC3)</span>
+<span class="fc" id="L117">                .mul(net.mul(under).mul(facingUp).mul(uniform(INTENSITY, ShaderType.FLOAT))).mul(sunColor()));</span>
+<span class="fc" id="L118">        return m;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

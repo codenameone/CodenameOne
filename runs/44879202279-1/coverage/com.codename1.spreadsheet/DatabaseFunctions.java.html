@@ -1,0 +1,151 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DatabaseFunctions.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.spreadsheet</a> &gt; <span class="el_source">DatabaseFunctions.java</span></div><h1>DatabaseFunctions.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.spreadsheet;
+
+/// The database functions: a list with a header row, a field and a block of criteria whose
+/// rows are alternatives and whose columns must all hold.
+final class DatabaseFunctions {
+    static final String RANGE_NAMES = &quot;DAVERAGE DCOUNT DCOUNTA DGET DMAX DMIN DPRODUCT DSTDEV DSTDEVP DSUM DVAR DVARP&quot;;
+
+    private DatabaseFunctions() {
+    }
+
+    private static int field(Object[][] db, Object field) {
+<span class="fc bfc" id="L34" title="All 2 branches covered.">        if (field instanceof Double) {</span>
+<span class="fc" id="L35">            int n = (int) ((Double) field).doubleValue();</span>
+<span class="pc bpc" id="L36" title="2 of 4 branches missed.">            if (n &lt; 1 || n &gt; Evaluator.width(db)) {</span>
+<span class="nc" id="L37">                throw EvalError.VALUE;</span>
+            }
+<span class="fc" id="L39">            return n - 1;</span>
+        }
+<span class="fc bfc" id="L41" title="All 2 branches covered.">        if (field instanceof String) {</span>
+<span class="fc bfc" id="L42" title="All 2 branches covered.">            for (int c = 0; c &lt; db[0].length; c++) {</span>
+<span class="pc bpc" id="L43" title="1 of 4 branches missed.">                if (db[0][c] != null &amp;&amp; Values.text(db[0][c]).equalsIgnoreCase((String) field)) {</span>
+<span class="fc" id="L44">                    return c;</span>
+                }
+            }
+        }
+<span class="fc" id="L48">        throw EvalError.VALUE;</span>
+    }
+
+    static Object call(String name, Evaluator ev, Object[] a) {
+<span class="pc bpc" id="L52" title="1 of 2 branches missed.">        if (a.length &lt; 3) {</span>
+<span class="nc" id="L53">            throw EvalError.VALUE;</span>
+        }
+<span class="fc" id="L55">        Object[][] db = ev.matrix(a[0]);</span>
+<span class="fc" id="L56">        Object[][] criteria = ev.matrix(a[2]);</span>
+<span class="pc bpc" id="L57" title="1 of 4 branches missed.">        if (db.length == 0 || criteria.length &lt; 2) {</span>
+<span class="fc" id="L58">            throw EvalError.VALUE;</span>
+        }
+<span class="fc" id="L60">        Object fieldArg = ev.scalar(a[1]);</span>
+<span class="fc bfc" id="L61" title="All 6 branches covered.">        boolean anyField = fieldArg == null &amp;&amp; (&quot;DCOUNT&quot;.equals(name) || &quot;DCOUNTA&quot;.equals(name));</span>
+<span class="fc bfc" id="L62" title="All 2 branches covered.">        int column = anyField ? -1 : field(db, fieldArg);</span>
+        // each criteria column names a column of the list
+<span class="fc" id="L64">        int[] columns = new int[criteria[0].length];</span>
+<span class="fc bfc" id="L65" title="All 2 branches covered.">        for (int c = 0; c &lt; columns.length; c++) {</span>
+<span class="pc bpc" id="L66" title="1 of 2 branches missed.">            columns[c] = criteria[0][c] == null ? -1 : field(db, Values.text(criteria[0][c]));</span>
+        }
+<span class="fc" id="L68">        Criteria[][] tests = new Criteria[criteria.length - 1][columns.length];</span>
+<span class="fc bfc" id="L69" title="All 2 branches covered.">        for (int r = 1; r &lt; criteria.length; r++) {</span>
+<span class="fc bfc" id="L70" title="All 2 branches covered.">            for (int c = 0; c &lt; columns.length; c++) {</span>
+<span class="fc" id="L71">                Object v = criteria[r][c];</span>
+<span class="pc bpc" id="L72" title="2 of 4 branches missed.">                tests[r - 1][c] = v == null || columns[c] &lt; 0 ? null : new Criteria(v);</span>
+            }
+        }
+<span class="fc" id="L75">        DoubleList numbers = new DoubleList();</span>
+<span class="fc" id="L76">        int filled = 0;</span>
+<span class="fc" id="L77">        Object single = null;</span>
+<span class="fc" id="L78">        int matches = 0;</span>
+<span class="fc bfc" id="L79" title="All 2 branches covered.">        for (int r = 1; r &lt; db.length; r++) {</span>
+<span class="fc" id="L80">            boolean hit = false;</span>
+<span class="pc bpc" id="L81" title="1 of 4 branches missed.">            for (int t = 0; t &lt; tests.length &amp;&amp; !hit; t++) {</span>
+<span class="fc" id="L82">                boolean all = true;</span>
+<span class="fc bfc" id="L83" title="All 4 branches covered.">                for (int c = 0; c &lt; columns.length &amp;&amp; all; c++) {</span>
+<span class="pc bpc" id="L84" title="1 of 4 branches missed.">                    if (tests[t][c] != null &amp;&amp; !tests[t][c].matches(db[r][columns[c]])) {</span>
+<span class="fc" id="L85">                        all = false;</span>
+                    }
+                }
+<span class="fc" id="L88">                hit = all;</span>
+            }
+<span class="fc bfc" id="L90" title="All 2 branches covered.">            if (!hit) {</span>
+<span class="fc" id="L91">                continue;</span>
+            }
+<span class="fc" id="L93">            matches++;</span>
+<span class="pc bpc" id="L94" title="1 of 2 branches missed.">            if (anyField) {</span>
+<span class="nc" id="L95">                filled++;</span>
+<span class="nc" id="L96">                numbers.add(0);</span>
+<span class="nc" id="L97">                continue;</span>
+            }
+<span class="fc" id="L99">            Object v = db[r][column];</span>
+<span class="fc" id="L100">            single = v;</span>
+<span class="pc bpc" id="L101" title="1 of 2 branches missed.">            if (v instanceof CellError) {</span>
+<span class="nc" id="L102">                return v;</span>
+            }
+<span class="pc bpc" id="L104" title="1 of 2 branches missed.">            if (v != null) {</span>
+<span class="fc" id="L105">                filled++;</span>
+            }
+<span class="fc bfc" id="L107" title="All 2 branches covered.">            if (v instanceof Double) {</span>
+<span class="fc" id="L108">                numbers.add(((Double) v).doubleValue());</span>
+            }
+        }
+<span class="pc bpc" id="L111" title="5 of 13 branches missed.">        switch (Functions.index(SWITCH_1, name)) {</span>
+            case 0: // DSUM
+<span class="fc" id="L113">                return Double.valueOf(numbers.sum());</span>
+            case 1: // DAVERAGE
+<span class="fc" id="L115">                return Double.valueOf(numbers.mean());</span>
+            case 2: // DCOUNT
+<span class="fc" id="L117">                return Double.valueOf(numbers.size);</span>
+            case 3: // DCOUNTA
+<span class="fc" id="L119">                return Double.valueOf(filled);</span>
+            case 4: // DMAX
+<span class="fc" id="L121">                return Double.valueOf(StatFunctions.max(numbers));</span>
+            case 5: // DMIN
+<span class="fc" id="L123">                return Double.valueOf(StatFunctions.min(numbers));</span>
+            case 6: // DPRODUCT
+<span class="fc" id="L125">                return Double.valueOf(StatFunctions.aggregate(6, numbers, 0));</span>
+            case 7: // DSTDEV
+<span class="nc" id="L127">                return Double.valueOf(Math.sqrt(StatFunctions.variance(numbers, true)));</span>
+            case 8: // DSTDEVP
+<span class="nc" id="L129">                return Double.valueOf(Math.sqrt(StatFunctions.variance(numbers, false)));</span>
+            case 9: // DVAR
+<span class="nc" id="L131">                return Double.valueOf(StatFunctions.variance(numbers, true));</span>
+            case 10: // DVARP
+<span class="nc" id="L133">                return Double.valueOf(StatFunctions.variance(numbers, false));</span>
+            case 11: // DGET
+<span class="pc bpc" id="L135" title="1 of 2 branches missed.">                if (matches == 0) {</span>
+<span class="nc" id="L136">                    throw EvalError.VALUE;</span>
+                }
+<span class="pc bpc" id="L138" title="1 of 2 branches missed.">                if (matches &gt; 1) {</span>
+<span class="nc" id="L139">                    throw EvalError.NUM;</span>
+                }
+<span class="fc" id="L141">                return single;</span>
+            default:
+<span class="nc" id="L143">                return CellError.NAME;</span>
+        }
+    }
+
+<span class="fc" id="L147">    private static final java.util.HashMap&lt;String, Integer&gt; SWITCH_1 = Functions.switchTable(</span>
+            &quot;DSUM&quot;, &quot;DAVERAGE&quot;, &quot;DCOUNT&quot;, &quot;DCOUNTA&quot;, &quot;DMAX&quot;, &quot;DMIN&quot;, &quot;DPRODUCT&quot;, &quot;DSTDEV&quot;,
+            &quot;DSTDEVP&quot;, &quot;DVAR&quot;, &quot;DVARP&quot;, &quot;DGET&quot;);
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

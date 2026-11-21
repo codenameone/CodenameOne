@@ -1,0 +1,515 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>FormulaHelp.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.spreadsheet</a> &gt; <span class="el_source">FormulaHelp.java</span></div><h1>FormulaHelp.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.spreadsheet;
+
+import java.util.HashMap;
+
+/// What the formula editor shows about a function: its arguments, as Excel names them, and
+/// a sentence on what it does. A line per function, `NAME|arguments|description`, kept as
+/// code so that an application that never edits a formula strips it with the editor.
+final class FormulaHelp {
+
+    private FormulaHelp() {
+    }
+
+    // an array, not two constants, so the text is not copied into every class that reads it
+<span class="fc" id="L36">    private static final String[] PARTS = { &quot;&quot;</span>
+            + &quot;ABS|number|Returns the absolute value of a number.\n&quot;
+            + &quot;ACOS|number|Returns the arccosine of a number, in radians.\n&quot;
+            + &quot;ACOSH|number|Returns the inverse hyperbolic cosine of a number.\n&quot;
+            + &quot;ACOT|number|Returns the arccotangent of a number, in radians.\n&quot;
+            + &quot;ACOTH|number|Returns the inverse hyperbolic cotangent of a number.\n&quot;
+            + &quot;ADDRESS|row_num, column_num, [abs_num], [a1], [sheet_text]|Creates a cell reference as text from row and column numbers.\n&quot;
+            + &quot;AGGREGATE|function_num, options, ref1, [ref2], ...|Returns an aggregate such as SUM or LARGE over a list, optionally ignoring errors and hidden rows.\n&quot;
+            + &quot;AND|logical1, [logical2], ...|Returns TRUE if all of its arguments are TRUE.\n&quot;
+            + &quot;ARABIC|text|Converts a Roman numeral to an Arabic number.\n&quot;
+            + &quot;AREAS|reference|Returns the number of areas in a reference.\n&quot;
+            + &quot;ASIN|number|Returns the arcsine of a number, in radians.\n&quot;
+            + &quot;ASINH|number|Returns the inverse hyperbolic sine of a number.\n&quot;
+            + &quot;ATAN|number|Returns the arctangent of a number, in radians.\n&quot;
+            + &quot;ATAN2|x_num, y_num|Returns the arctangent from x and y coordinates, in radians.\n&quot;
+            + &quot;ATANH|number|Returns the inverse hyperbolic tangent of a number.\n&quot;
+            + &quot;AVEDEV|number1, [number2], ...|Returns the average of the absolute deviations of data points from their mean.\n&quot;
+            + &quot;AVERAGE|number1, [number2], ...|Returns the average of its arguments.\n&quot;
+            + &quot;AVERAGEA|value1, [value2], ...|Returns the average of its arguments, counting text as 0 and TRUE as 1.\n&quot;
+            + &quot;AVERAGEIF|range, criteria, [average_range]|Returns the average of the cells that meet a condition.\n&quot;
+            + &quot;AVERAGEIFS|average_range, criteria_range1, criteria1, [criteria_range2, criteria2], ...|Returns the average of the cells that meet all of several conditions.\n&quot;
+            + &quot;BASE|number, radix, [min_length]|Converts a number into text in the given base.\n&quot;
+            + &quot;BETA.DIST|x, alpha, beta, cumulative, [A], [B]|Returns the beta distribution.\n&quot;
+            + &quot;BETA.INV|probability, alpha, beta, [A], [B]|Returns the inverse of the cumulative beta distribution.\n&quot;
+            + &quot;BETADIST|x, alpha, beta, [A], [B]|Returns the cumulative beta distribution; the same as BETA.DIST with cumulative TRUE.\n&quot;
+            + &quot;BETAINV|probability, alpha, beta, [A], [B]|Returns the inverse of the cumulative beta distribution; the same as BETA.INV.\n&quot;
+            + &quot;BIN2DEC|number|Converts a binary number to decimal.\n&quot;
+            + &quot;BIN2HEX|number, [places]|Converts a binary number to hexadecimal.\n&quot;
+            + &quot;BIN2OCT|number, [places]|Converts a binary number to octal.\n&quot;
+            + &quot;BINOM.DIST|number_s, trials, probability_s, cumulative|Returns the binomial distribution probability.\n&quot;
+            + &quot;BINOM.DIST.RANGE|trials, probability_s, number_s, [number_s2]|Returns the probability of a trial result using a binomial distribution.\n&quot;
+            + &quot;BINOM.INV|trials, probability_s, alpha|Returns the smallest value for which the cumulative binomial distribution reaches a criterion.\n&quot;
+            + &quot;BINOMDIST|number_s, trials, probability_s, cumulative|Returns the binomial distribution probability; the same as BINOM.DIST.\n&quot;
+            + &quot;BITAND|number1, number2|Returns a bitwise AND of two numbers.\n&quot;
+            + &quot;BITLSHIFT|number, shift_amount|Returns a number shifted left by the given number of bits.\n&quot;
+            + &quot;BITOR|number1, number2|Returns a bitwise OR of two numbers.\n&quot;
+            + &quot;BITRSHIFT|number, shift_amount|Returns a number shifted right by the given number of bits.\n&quot;
+            + &quot;BITXOR|number1, number2|Returns a bitwise exclusive OR of two numbers.\n&quot;
+            + &quot;CEILING|number, significance|Rounds a number up to the nearest multiple of significance.\n&quot;
+            + &quot;CEILING.MATH|number, [significance], [mode]|Rounds a number up to the nearest integer or multiple of significance.\n&quot;
+            + &quot;CEILING.PRECISE|number, [significance]|Rounds a number up to the nearest integer or multiple of significance, regardless of sign.\n&quot;
+            + &quot;CHAR|number|Returns the character for a code number.\n&quot;
+            + &quot;CHIDIST|x, deg_freedom|Returns the right-tailed chi-squared distribution; the same as CHISQ.DIST.RT.\n&quot;
+            + &quot;CHIINV|probability, deg_freedom|Returns the inverse of the right-tailed chi-squared distribution; the same as CHISQ.INV.RT.\n&quot;
+            + &quot;CHISQ.DIST|x, deg_freedom, cumulative|Returns the left-tailed chi-squared distribution.\n&quot;
+            + &quot;CHISQ.DIST.RT|x, deg_freedom|Returns the right-tailed chi-squared distribution.\n&quot;
+            + &quot;CHISQ.INV|probability, deg_freedom|Returns the inverse of the left-tailed chi-squared distribution.\n&quot;
+            + &quot;CHISQ.INV.RT|probability, deg_freedom|Returns the inverse of the right-tailed chi-squared distribution.\n&quot;
+            + &quot;CHISQ.TEST|actual_range, expected_range|Returns the chi-squared test for independence.\n&quot;
+            + &quot;CHITEST|actual_range, expected_range|Returns the chi-squared test for independence; the same as CHISQ.TEST.\n&quot;
+            + &quot;CHOOSE|index_num, value1, [value2], ...|Chooses a value from a list of values by index number.\n&quot;
+            + &quot;CHOOSECOLS|array, col_num1, [col_num2], ...|Returns the specified columns from an array.\n&quot;
+            + &quot;CHOOSEROWS|array, row_num1, [row_num2], ...|Returns the specified rows from an array.\n&quot;
+            + &quot;CLEAN|text|Removes all nonprintable characters from text.\n&quot;
+            + &quot;CODE|text|Returns the numeric code of the first character in text.\n&quot;
+            + &quot;COLUMN|[reference]|Returns the column number of a reference.\n&quot;
+            + &quot;COLUMNS|array|Returns the number of columns in a reference or array.\n&quot;
+            + &quot;COMBIN|number, number_chosen|Returns the number of combinations for a given number of items.\n&quot;
+            + &quot;COMBINA|number, number_chosen|Returns the number of combinations with repetitions for a given number of items.\n&quot;
+            + &quot;CONCAT|text1, [text2], ...|Joins text from several ranges or strings.\n&quot;
+            + &quot;CONCATENATE|text1, [text2], ...|Joins several text strings into one string.\n&quot;
+            + &quot;CONFIDENCE|alpha, standard_dev, size|Returns the confidence interval for a population mean; the same as CONFIDENCE.NORM.\n&quot;
+            + &quot;CONFIDENCE.NORM|alpha, standard_dev, size|Returns the confidence interval for a population mean using a normal distribution.\n&quot;
+            + &quot;CONFIDENCE.T|alpha, standard_dev, size|Returns the confidence interval for a population mean using a Student's t distribution.\n&quot;
+            + &quot;CONVERT|number, from_unit, to_unit|Converts a number from one measurement system to another.\n&quot;
+            + &quot;CORREL|array1, array2|Returns the correlation coefficient between two data sets.\n&quot;
+            + &quot;COS|number|Returns the cosine of an angle given in radians.\n&quot;
+            + &quot;COSH|number|Returns the hyperbolic cosine of a number.\n&quot;
+            + &quot;COT|number|Returns the cotangent of an angle given in radians.\n&quot;
+            + &quot;COTH|number|Returns the hyperbolic cotangent of a number.\n&quot;
+            + &quot;COUNT|value1, [value2], ...|Counts the cells that contain numbers.\n&quot;
+            + &quot;COUNTA|value1, [value2], ...|Counts the cells that are not empty.\n&quot;
+            + &quot;COUNTBLANK|range|Counts the empty cells in a range.\n&quot;
+            + &quot;COUNTIF|range, criteria|Counts the cells that meet a condition.\n&quot;
+            + &quot;COUNTIFS|criteria_range1, criteria1, [criteria_range2, criteria2], ...|Counts the cells that meet all of several conditions.\n&quot;
+            + &quot;COVAR|array1, array2|Returns the population covariance; the same as COVARIANCE.P.\n&quot;
+            + &quot;COVARIANCE.P|array1, array2|Returns the population covariance, the average of the products of paired deviations.\n&quot;
+            + &quot;COVARIANCE.S|array1, array2|Returns the sample covariance, the average of the products of paired deviations.\n&quot;
+            + &quot;CRITBINOM|trials, probability_s, alpha|Returns the smallest value whose cumulative binomial distribution reaches a criterion; same as BINOM.INV.\n&quot;
+            + &quot;CSC|number|Returns the cosecant of an angle given in radians.\n&quot;
+            + &quot;CSCH|number|Returns the hyperbolic cosecant of an angle given in radians.\n&quot;
+            + &quot;CUMIPMT|rate, nper, pv, start_period, end_period, type|Returns the cumulative interest paid between two periods.\n&quot;
+            + &quot;CUMPRINC|rate, nper, pv, start_period, end_period, type|Returns the cumulative principal paid on a loan between two periods.\n&quot;
+            + &quot;DATE|year, month, day|Returns the serial number of a date from year, month and day.\n&quot;
+            + &quot;DATEDIF|start_date, end_date, unit|Returns the difference between two dates in days, months or years.\n&quot;
+            + &quot;DATEVALUE|date_text|Converts a date in text form to a serial number.\n&quot;
+            + &quot;DAVERAGE|database, field, criteria|Returns the average of the database entries that match the criteria.\n&quot;
+            + &quot;DAY|serial_number|Returns the day of the month of a date.\n&quot;
+            + &quot;DAYS|end_date, start_date|Returns the number of days between two dates.\n&quot;
+            + &quot;DAYS360|start_date, end_date, [method]|Returns the number of days between two dates based on a 360-day year.\n&quot;
+            + &quot;DB|cost, salvage, life, period, [month]|Returns the depreciation of an asset using the fixed-declining balance method.\n&quot;
+            + &quot;DCOUNT|database, field, criteria|Counts the cells with numbers in the database entries that match the criteria.\n&quot;
+            + &quot;DCOUNTA|database, field, criteria|Counts the nonblank cells in the database entries that match the criteria.\n&quot;
+            + &quot;DDB|cost, salvage, life, period, [factor]|Returns the depreciation of an asset using the double-declining balance method.\n&quot;
+            + &quot;DEC2BIN|number, [places]|Converts a decimal number to binary.\n&quot;
+            + &quot;DEC2HEX|number, [places]|Converts a decimal number to hexadecimal.\n&quot;
+            + &quot;DEC2OCT|number, [places]|Converts a decimal number to octal.\n&quot;
+            + &quot;DECIMAL|text, radix|Converts a text representation of a number in a given base into a decimal number.\n&quot;
+            + &quot;DEGREES|angle|Converts radians to degrees.\n&quot;
+            + &quot;DELTA|number1, [number2]|Tests whether two numbers are equal.\n&quot;
+            + &quot;DEVSQ|number1, [number2], ...|Returns the sum of squares of deviations from the sample mean.\n&quot;
+            + &quot;DGET|database, field, criteria|Extracts the single database entry that matches the criteria.\n&quot;
+            + &quot;DMAX|database, field, criteria|Returns the maximum value among the database entries that match the criteria.\n&quot;
+            + &quot;DMIN|database, field, criteria|Returns the minimum value among the database entries that match the criteria.\n&quot;
+            + &quot;DOLLAR|number, [decimals]|Converts a number to text in currency format.\n&quot;
+            + &quot;DOLLARDE|fractional_dollar, fraction|Converts a dollar price expressed as a fraction into a decimal number.\n&quot;
+            + &quot;DOLLARFR|decimal_dollar, fraction|Converts a dollar price expressed as a decimal number into a fraction.\n&quot;
+            + &quot;DPRODUCT|database, field, criteria|Multiplies the values in the database entries that match the criteria.\n&quot;
+            + &quot;DROP|array, rows, [columns]|Excludes a number of rows or columns from the start or end of an array.\n&quot;
+            + &quot;DSTDEV|database, field, criteria|Estimates the standard deviation of a sample from the matching database entries.\n&quot;
+            + &quot;DSTDEVP|database, field, criteria|Returns the population standard deviation of the matching database entries.\n&quot;
+            + &quot;DSUM|database, field, criteria|Adds the numbers in the database entries that match the criteria.\n&quot;
+            + &quot;DVAR|database, field, criteria|Estimates the variance of a sample from the matching database entries.\n&quot;
+            + &quot;DVARP|database, field, criteria|Returns the population variance of the matching database entries.\n&quot;
+            + &quot;EDATE|start_date, months|Returns the date a given number of months before or after a date.\n&quot;
+            + &quot;EFFECT|nominal_rate, npery|Returns the effective annual interest rate.\n&quot;
+            + &quot;EOMONTH|start_date, months|Returns the last day of the month a given number of months away.\n&quot;
+            + &quot;ERF|lower_limit, [upper_limit]|Returns the error function.\n&quot;
+            + &quot;ERF.PRECISE|x|Returns the error function integrated from 0 to x.\n&quot;
+            + &quot;ERFC|x|Returns the complementary error function.\n&quot;
+            + &quot;ERFC.PRECISE|x|Returns the complementary error function integrated from x to infinity.\n&quot;
+            + &quot;ERROR.TYPE|error_val|Returns a number matching an error type.\n&quot;
+            + &quot;EVEN|number|Rounds a number up to the nearest even integer.\n&quot;
+            + &quot;EXACT|text1, text2|Checks whether two text strings are exactly the same.\n&quot;
+            + &quot;EXP|number|Returns e raised to the power of a number.\n&quot;
+            + &quot;EXPAND|array, rows, [columns], [pad_with]|Expands an array to the given dimensions, padding with a value.\n&quot;
+            + &quot;EXPON.DIST|x, lambda, cumulative|Returns the exponential distribution.\n&quot;
+            + &quot;EXPONDIST|x, lambda, cumulative|Returns the exponential distribution; the same as EXPON.DIST.\n&quot;
+            + &quot;F.DIST|x, deg_freedom1, deg_freedom2, cumulative|Returns the left-tailed F probability distribution.\n&quot;
+            + &quot;F.DIST.RT|x, deg_freedom1, deg_freedom2|Returns the right-tailed F probability distribution.\n&quot;
+            + &quot;F.INV|probability, deg_freedom1, deg_freedom2|Returns the inverse of the left-tailed F probability distribution.\n&quot;
+            + &quot;F.INV.RT|probability, deg_freedom1, deg_freedom2|Returns the inverse of the right-tailed F probability distribution.\n&quot;
+            + &quot;F.TEST|array1, array2|Returns the result of an F-test, the two-tailed probability that the variances differ.\n&quot;
+            + &quot;FACT|number|Returns the factorial of a number.\n&quot;
+            + &quot;FACTDOUBLE|number|Returns the double factorial of a number.\n&quot;
+            + &quot;FALSE||Returns the logical value FALSE.\n&quot;
+            + &quot;FDIST|x, deg_freedom1, deg_freedom2|Returns the right-tailed F probability distribution; the same as F.DIST.RT.\n&quot;
+            + &quot;FILTER|array, include, [if_empty]|Filters a range or array based on a condition.\n&quot;
+            + &quot;FIND|find_text, within_text, [start_num]|Finds one text string inside another, case-sensitive.\n&quot;
+            + &quot;FINV|probability, deg_freedom1, deg_freedom2|Returns the inverse of the right-tailed F distribution; the same as F.INV.RT.\n&quot;
+            + &quot;FISHER|x|Returns the Fisher transformation.\n&quot;
+            + &quot;FISHERINV|y|Returns the inverse of the Fisher transformation.\n&quot;
+            + &quot;FIXED|number, [decimals], [no_commas]|Formats a number as text with a fixed number of decimals.\n&quot;
+            + &quot;FLOOR|number, significance|Rounds a number down to the nearest multiple of significance.\n&quot;
+            + &quot;FLOOR.MATH|number, [significance], [mode]|Rounds a number down to the nearest integer or multiple of significance.\n&quot;
+            + &quot;FLOOR.PRECISE|number, [significance]|Rounds a number down to the nearest integer or multiple of significance, regardless of sign.\n&quot;
+            + &quot;FORECAST|x, known_y's, known_x's|Predicts a value along a linear trend; the same as FORECAST.LINEAR.\n&quot;
+            + &quot;FORECAST.LINEAR|x, known_y's, known_x's|Predicts a future value along a linear trend from existing values.\n&quot;
+            + &quot;FORMULATEXT|reference|Returns the formula in a cell as text.\n&quot;
+            + &quot;FREQUENCY|data_array, bins_array|Returns a frequency distribution as a vertical array.\n&quot;
+            + &quot;FTEST|array1, array2|Returns the result of an F-test; the same as F.TEST.\n&quot;
+            + &quot;FV|rate, nper, pmt, [pv], [type]|Returns the future value of an investment.\n&quot;
+            + &quot;FVSCHEDULE|principal, schedule|Returns the future value of a principal after a series of compound interest rates.\n&quot;
+            + &quot;GAMMA|x|Returns the gamma function value.\n&quot;
+            + &quot;GAMMA.DIST|x, alpha, beta, cumulative|Returns the gamma distribution.\n&quot;
+            + &quot;GAMMA.INV|probability, alpha, beta|Returns the inverse of the gamma cumulative distribution.\n&quot;
+            + &quot;GAMMADIST|x, alpha, beta, cumulative|Returns the gamma distribution; the same as GAMMA.DIST.\n&quot;
+            + &quot;GAMMAINV|probability, alpha, beta|Returns the inverse of the gamma cumulative distribution; the same as GAMMA.INV.\n&quot;
+            + &quot;GAMMALN|x|Returns the natural logarithm of the gamma function.\n&quot;
+            + &quot;GAMMALN.PRECISE|x|Returns the natural logarithm of the gamma function.\n&quot;
+            + &quot;GAUSS|z|Returns 0.5 less than the standard normal cumulative distribution.\n&quot;
+            + &quot;GCD|number1, [number2], ...|Returns the greatest common divisor.\n&quot;
+            + &quot;GEOMEAN|number1, [number2], ...|Returns the geometric mean.\n&quot;
+            + &quot;GESTEP|number, [step]|Tests whether a number is greater than a threshold value.\n&quot;
+            + &quot;HARMEAN|number1, [number2], ...|Returns the harmonic mean.\n&quot;
+            + &quot;HEX2BIN|number, [places]|Converts a hexadecimal number to binary.\n&quot;
+            + &quot;HEX2DEC|number|Converts a hexadecimal number to decimal.\n&quot;
+            + &quot;HEX2OCT|number, [places]|Converts a hexadecimal number to octal.\n&quot;
+            + &quot;HLOOKUP|lookup_value, table_array, row_index_num, [range_lookup]|Looks for a value in the top row of a table and returns a value in the same column from another row.\n&quot;
+            + &quot;HOUR|serial_number|Returns the hour of a time value.\n&quot;
+            + &quot;HSTACK|array1, [array2], ...|Appends arrays horizontally and in sequence into one array.\n&quot;
+            + &quot;HYPGEOM.DIST|sample_s, number_sample, population_s, number_pop, cumulative|Returns the hypergeometric distribution.\n&quot;
+            + &quot;HYPGEOMDIST|sample_s, number_sample, population_s, number_pop|Returns the hypergeometric distribution; like HYPGEOM.DIST with cumulative FALSE.\n&quot;
+            + &quot;IF|logical_test, [value_if_true], [value_if_false]|Returns one value if a condition is TRUE and another if it is FALSE.\n&quot;
+            + &quot;IFERROR|value, value_if_error|Returns a given value if a formula results in an error, otherwise the formula result.\n&quot;
+            + &quot;IFNA|value, value_if_na|Returns a given value if a formula results in #N/A, otherwise the formula result.\n&quot;
+            + &quot;IFS|logical_test1, value_if_true1, [logical_test2, value_if_true2], ...|Returns the value for the first condition that is TRUE.\n&quot;
+            + &quot;INDEX|array, row_num, [column_num], [area_num]|Returns the value at a given position in a range or array.\n&quot;
+            + &quot;INDIRECT|ref_text, [a1]|Returns the reference specified by a text string.\n&quot;
+            + &quot;INT|number|Rounds a number down to the nearest integer.\n&quot;
+            + &quot;INTERCEPT|known_y's, known_x's|Returns the intercept of the linear regression line.\n&quot;
+            + &quot;IPMT|rate, per, nper, pv, [fv], [type]|Returns the interest payment for a given period of a loan.\n&quot;
+            + &quot;IRR|values, [guess]|Returns the internal rate of return for a series of cash flows.\n&quot;
+            + &quot;ISBLANK|value|Returns TRUE if the value is empty.\n&quot;
+            + &quot;ISERR|value|Returns TRUE if the value is any error except #N/A.\n&quot;
+            + &quot;ISERROR|value|Returns TRUE if the value is any error.\n&quot;
+            + &quot;ISEVEN|number|Returns TRUE if the number is even.\n&quot;
+            + &quot;ISFORMULA|reference|Returns TRUE if the reference is to a cell containing a formula.\n&quot;
+            + &quot;ISLOGICAL|value|Returns TRUE if the value is a logical value.\n&quot;
+            + &quot;ISNA|value|Returns TRUE if the value is the #N/A error.\n&quot;
+            + &quot;ISNONTEXT|value|Returns TRUE if the value is not text.\n&quot;
+            + &quot;ISNUMBER|value|Returns TRUE if the value is a number.\n&quot;
+            + &quot;ISO.CEILING|number, [significance]|Rounds a number up to the nearest integer or multiple of significance, regardless of sign.\n&quot;
+            + &quot;ISODD|number|Returns TRUE if the number is odd.\n&quot;
+            + &quot;ISOWEEKNUM|date|Returns the ISO week number of the year for a date.\n&quot;
+            + &quot;ISPMT|rate, per, nper, pv|Returns the interest paid during a specific period of an investment.\n&quot;
+            + &quot;ISREF|value|Returns TRUE if the value is a reference.\n&quot;
+            + &quot;ISTEXT|value|Returns TRUE if the value is text.\n&quot;
+            + &quot;KURT|number1, [number2], ...|Returns the kurtosis of a data set.\n&quot;
+            + &quot;LARGE|array, k|Returns the k-th largest value in a data set.\n&quot;
+            + &quot;LCM|number1, [number2], ...|Returns the least common multiple.\n&quot;
+            + &quot;LEFT|text, [num_chars]|Returns the leftmost characters of a text string.\n&quot;
+            + &quot;&quot;,
+            &quot;&quot;
+            + &quot;LEN|text|Returns the number of characters in a text string.\n&quot;
+            + &quot;LET|name1, name_value1, calculation_or_name2, ...|Assigns names to calculation results and returns the final calculation.\n&quot;
+            + &quot;LN|number|Returns the natural logarithm of a number.\n&quot;
+            + &quot;LOG|number, [base]|Returns the logarithm of a number to a specified base.\n&quot;
+            + &quot;LOG10|number|Returns the base-10 logarithm of a number.\n&quot;
+            + &quot;LOGINV|probability, mean, standard_dev|Returns the inverse of the lognormal distribution; the same as LOGNORM.INV.\n&quot;
+            + &quot;LOGNORM.DIST|x, mean, standard_dev, cumulative|Returns the lognormal distribution.\n&quot;
+            + &quot;LOGNORM.INV|probability, mean, standard_dev|Returns the inverse of the lognormal cumulative distribution.\n&quot;
+            + &quot;LOGNORMDIST|x, mean, standard_dev|Returns the cumulative lognormal distribution; like LOGNORM.DIST with cumulative TRUE.\n&quot;
+            + &quot;LOOKUP|lookup_value, lookup_vector, [result_vector]|Looks up a value in a one-row or one-column range and returns the matching value.\n&quot;
+            + &quot;LOWER|text|Converts text to lowercase.\n&quot;
+            + &quot;MATCH|lookup_value, lookup_array, [match_type]|Returns the relative position of an item in a range.\n&quot;
+            + &quot;MAX|number1, [number2], ...|Returns the largest value in a set of values.\n&quot;
+            + &quot;MAXA|value1, [value2], ...|Returns the largest value, counting text and logical values.\n&quot;
+            + &quot;MAXIFS|max_range, criteria_range1, criteria1, [criteria_range2, criteria2], ...|Returns the largest value among the cells that meet all conditions.\n&quot;
+            + &quot;MDETERM|array|Returns the matrix determinant of an array.\n&quot;
+            + &quot;MEDIAN|number1, [number2], ...|Returns the median of the given numbers.\n&quot;
+            + &quot;MID|text, start_num, num_chars|Returns characters from the middle of a text string.\n&quot;
+            + &quot;MIN|number1, [number2], ...|Returns the smallest value in a set of values.\n&quot;
+            + &quot;MINA|value1, [value2], ...|Returns the smallest value, counting text and logical values.\n&quot;
+            + &quot;MINIFS|min_range, criteria_range1, criteria1, [criteria_range2, criteria2], ...|Returns the smallest value among the cells that meet all conditions.\n&quot;
+            + &quot;MINUTE|serial_number|Returns the minute of a time value.\n&quot;
+            + &quot;MINVERSE|array|Returns the matrix inverse of an array.\n&quot;
+            + &quot;MIRR|values, finance_rate, reinvest_rate|Returns the modified internal rate of return for a series of cash flows.\n&quot;
+            + &quot;MMULT|array1, array2|Returns the matrix product of two arrays.\n&quot;
+            + &quot;MOD|number, divisor|Returns the remainder after division.\n&quot;
+            + &quot;MODE|number1, [number2], ...|Returns the most common value in a data set; the same as MODE.SNGL.\n&quot;
+            + &quot;MODE.MULT|number1, [number2], ...|Returns a vertical array of the most frequently occurring values.\n&quot;
+            + &quot;MODE.SNGL|number1, [number2], ...|Returns the most common value in a data set.\n&quot;
+            + &quot;MONTH|serial_number|Returns the month of a date.\n&quot;
+            + &quot;MROUND|number, multiple|Returns a number rounded to the desired multiple.\n&quot;
+            + &quot;MULTINOMIAL|number1, [number2], ...|Returns the multinomial of a set of numbers.\n&quot;
+            + &quot;MUNIT|dimension|Returns the unit matrix for the specified dimension.\n&quot;
+            + &quot;N|value|Converts a value to a number.\n&quot;
+            + &quot;NA||Returns the error value #N/A.\n&quot;
+            + &quot;NEGBINOM.DIST|number_f, number_s, probability_s, cumulative|Returns the negative binomial distribution.\n&quot;
+            + &quot;NEGBINOMDIST|number_f, number_s, probability_s|Returns the negative binomial distribution; like NEGBINOM.DIST with cumulative FALSE.\n&quot;
+            + &quot;NETWORKDAYS|start_date, end_date, [holidays]|Returns the number of whole working days between two dates.\n&quot;
+            + &quot;NETWORKDAYS.INTL|start_date, end_date, [weekend], [holidays]|Returns the number of whole working days between two dates with custom weekends.\n&quot;
+            + &quot;NOMINAL|effect_rate, npery|Returns the annual nominal interest rate.\n&quot;
+            + &quot;NORM.DIST|x, mean, standard_dev, cumulative|Returns the normal distribution.\n&quot;
+            + &quot;NORM.INV|probability, mean, standard_dev|Returns the inverse of the normal cumulative distribution.\n&quot;
+            + &quot;NORM.S.DIST|z, cumulative|Returns the standard normal distribution.\n&quot;
+            + &quot;NORM.S.INV|probability|Returns the inverse of the standard normal cumulative distribution.\n&quot;
+            + &quot;NORMDIST|x, mean, standard_dev, cumulative|Returns the normal distribution; the same as NORM.DIST.\n&quot;
+            + &quot;NORMINV|probability, mean, standard_dev|Returns the inverse of the normal cumulative distribution; the same as NORM.INV.\n&quot;
+            + &quot;NORMSDIST|z|Returns the standard normal cumulative distribution; like NORM.S.DIST with cumulative TRUE.\n&quot;
+            + &quot;NORMSINV|probability|Returns the inverse of the standard normal cumulative distribution; the same as NORM.S.INV.\n&quot;
+            + &quot;NOT|logical|Reverses the logic of its argument.\n&quot;
+            + &quot;NOW||Returns the current date and time.\n&quot;
+            + &quot;NPER|rate, pmt, pv, [fv], [type]|Returns the number of periods for an investment.\n&quot;
+            + &quot;NPV|rate, value1, [value2], ...|Returns the net present value of an investment from a discount rate and future cash flows.\n&quot;
+            + &quot;NUMBERVALUE|text, [decimal_separator], [group_separator]|Converts text to a number independently of locale.\n&quot;
+            + &quot;OCT2BIN|number, [places]|Converts an octal number to binary.\n&quot;
+            + &quot;OCT2DEC|number|Converts an octal number to decimal.\n&quot;
+            + &quot;OCT2HEX|number, [places]|Converts an octal number to hexadecimal.\n&quot;
+            + &quot;ODD|number|Rounds a number up to the nearest odd integer.\n&quot;
+            + &quot;OFFSET|reference, rows, cols, [height], [width]|Returns a reference offset from a given reference.\n&quot;
+            + &quot;OR|logical1, [logical2], ...|Returns TRUE if any argument is TRUE.\n&quot;
+            + &quot;PDURATION|rate, pv, fv|Returns the number of periods an investment needs to reach a value.\n&quot;
+            + &quot;PEARSON|array1, array2|Returns the Pearson product-moment correlation coefficient.\n&quot;
+            + &quot;PERCENTILE|array, k|Returns the k-th percentile of values in a range; the same as PERCENTILE.INC.\n&quot;
+            + &quot;PERCENTILE.EXC|array, k|Returns the k-th percentile of values in a range, exclusive of 0 and 1.\n&quot;
+            + &quot;PERCENTILE.INC|array, k|Returns the k-th percentile of values in a range, inclusive of 0 and 1.\n&quot;
+            + &quot;PERCENTRANK|array, x, [significance]|Returns the percentage rank of a value in a data set; the same as PERCENTRANK.INC.\n&quot;
+            + &quot;PERCENTRANK.EXC|array, x, [significance]|Returns the rank of a value in a data set as a percentage, exclusive of 0 and 1.\n&quot;
+            + &quot;PERCENTRANK.INC|array, x, [significance]|Returns the rank of a value in a data set as a percentage, inclusive of 0 and 1.\n&quot;
+            + &quot;PERMUT|number, number_chosen|Returns the number of permutations for a given number of objects.\n&quot;
+            + &quot;PERMUTATIONA|number, number_chosen|Returns the number of permutations with repetitions for a given number of objects.\n&quot;
+            + &quot;PHI|x|Returns the density function for the standard normal distribution.\n&quot;
+            + &quot;PI||Returns the value of pi.\n&quot;
+            + &quot;PMT|rate, nper, pv, [fv], [type]|Returns the periodic payment for a loan.\n&quot;
+            + &quot;POISSON|x, mean, cumulative|Returns the Poisson distribution; the same as POISSON.DIST.\n&quot;
+            + &quot;POISSON.DIST|x, mean, cumulative|Returns the Poisson distribution.\n&quot;
+            + &quot;POWER|number, power|Returns the result of a number raised to a power.\n&quot;
+            + &quot;PPMT|rate, per, nper, pv, [fv], [type]|Returns the principal payment for a given period of a loan.\n&quot;
+            + &quot;PRODUCT|number1, [number2], ...|Multiplies its arguments.\n&quot;
+            + &quot;PROPER|text|Capitalizes the first letter of each word in a text string.\n&quot;
+            + &quot;PV|rate, nper, pmt, [fv], [type]|Returns the present value of an investment.\n&quot;
+            + &quot;QUARTILE|array, quart|Returns the quartile of a data set; the same as QUARTILE.INC.\n&quot;
+            + &quot;QUARTILE.EXC|array, quart|Returns the quartile of a data set based on percentiles from 0 to 1, exclusive.\n&quot;
+            + &quot;QUARTILE.INC|array, quart|Returns the quartile of a data set based on percentiles from 0 to 1, inclusive.\n&quot;
+            + &quot;QUOTIENT|numerator, denominator|Returns the integer portion of a division.\n&quot;
+            + &quot;RADIANS|angle|Converts degrees to radians.\n&quot;
+            + &quot;RAND||Returns a random number greater than or equal to 0 and less than 1.\n&quot;
+            + &quot;RANDARRAY|[rows], [columns], [min], [max], [whole_number]|Returns an array of random numbers.\n&quot;
+            + &quot;RANDBETWEEN|bottom, top|Returns a random integer between the numbers you specify.\n&quot;
+            + &quot;RANK|number, ref, [order]|Returns the rank of a number in a list; the same as RANK.EQ.\n&quot;
+            + &quot;RANK.AVG|number, ref, [order]|Returns the rank of a number in a list, averaging the rank of ties.\n&quot;
+            + &quot;RANK.EQ|number, ref, [order]|Returns the rank of a number in a list, giving ties the top rank.\n&quot;
+            + &quot;RATE|nper, pmt, pv, [fv], [type], [guess]|Returns the interest rate per period of an annuity.\n&quot;
+            + &quot;REPLACE|old_text, start_num, num_chars, new_text|Replaces characters within text.\n&quot;
+            + &quot;REPT|text, number_times|Repeats text a given number of times.\n&quot;
+            + &quot;RIGHT|text, [num_chars]|Returns the rightmost characters of a text string.\n&quot;
+            + &quot;ROMAN|number, [form]|Converts an Arabic number to a Roman numeral as text.\n&quot;
+            + &quot;ROUND|number, num_digits|Rounds a number to a specified number of digits.\n&quot;
+            + &quot;ROUNDDOWN|number, num_digits|Rounds a number down, toward zero.\n&quot;
+            + &quot;ROUNDUP|number, num_digits|Rounds a number up, away from zero.\n&quot;
+            + &quot;ROW|[reference]|Returns the row number of a reference.\n&quot;
+            + &quot;ROWS|array|Returns the number of rows in a reference or array.\n&quot;
+            + &quot;RRI|nper, pv, fv|Returns the equivalent interest rate for the growth of an investment.\n&quot;
+            + &quot;RSQ|known_y's, known_x's|Returns the square of the Pearson correlation coefficient.\n&quot;
+            + &quot;SEARCH|find_text, within_text, [start_num]|Finds one text string inside another, case-insensitive.\n&quot;
+            + &quot;SEC|number|Returns the secant of an angle given in radians.\n&quot;
+            + &quot;SECH|number|Returns the hyperbolic secant of an angle given in radians.\n&quot;
+            + &quot;SECOND|serial_number|Returns the second of a time value.\n&quot;
+            + &quot;SEQUENCE|rows, [columns], [start], [step]|Returns an array of sequential numbers.\n&quot;
+            + &quot;SERIESSUM|x, n, m, coefficients|Returns the sum of a power series based on a formula.\n&quot;
+            + &quot;SHEET|[value]|Returns the sheet number of a referenced sheet.\n&quot;
+            + &quot;SHEETS|[reference]|Returns the number of sheets in a reference.\n&quot;
+            + &quot;SIGN|number|Returns the sign of a number.\n&quot;
+            + &quot;SIN|number|Returns the sine of an angle given in radians.\n&quot;
+            + &quot;SINH|number|Returns the hyperbolic sine of a number.\n&quot;
+            + &quot;SKEW|number1, [number2], ...|Returns the skewness of a distribution.\n&quot;
+            + &quot;SKEW.P|number1, [number2], ...|Returns the skewness of a distribution based on a population.\n&quot;
+            + &quot;SLN|cost, salvage, life|Returns the straight-line depreciation of an asset for one period.\n&quot;
+            + &quot;SLOPE|known_y's, known_x's|Returns the slope of the linear regression line.\n&quot;
+            + &quot;SMALL|array, k|Returns the k-th smallest value in a data set.\n&quot;
+            + &quot;SORT|array, [sort_index], [sort_order], [by_col]|Sorts the contents of a range or array.\n&quot;
+            + &quot;SORTBY|array, by_array1, [sort_order1], [by_array2, sort_order2], ...|Sorts a range or array based on the values in another range or array.\n&quot;
+            + &quot;SQRT|number|Returns the positive square root of a number.\n&quot;
+            + &quot;SQRTPI|number|Returns the square root of a number multiplied by pi.\n&quot;
+            + &quot;STANDARDIZE|x, mean, standard_dev|Returns a normalized value.\n&quot;
+            + &quot;STDEV|number1, [number2], ...|Estimates standard deviation from a sample; the same as STDEV.S.\n&quot;
+            + &quot;STDEV.P|number1, [number2], ...|Calculates standard deviation from an entire population.\n&quot;
+            + &quot;STDEV.S|number1, [number2], ...|Estimates standard deviation from a sample.\n&quot;
+            + &quot;STDEVA|value1, [value2], ...|Estimates standard deviation from a sample, counting text and logical values.\n&quot;
+            + &quot;STDEVP|number1, [number2], ...|Calculates standard deviation from an entire population; the same as STDEV.P.\n&quot;
+            + &quot;STDEVPA|value1, [value2], ...|Calculates standard deviation from a population, counting text and logical values.\n&quot;
+            + &quot;STEYX|known_y's, known_x's|Returns the standard error of the predicted y-value for each x in a regression.\n&quot;
+            + &quot;SUBSTITUTE|text, old_text, new_text, [instance_num]|Substitutes new text for old text in a string.\n&quot;
+            + &quot;SUBTOTAL|function_num, ref1, [ref2], ...|Returns a subtotal in a list or database.\n&quot;
+            + &quot;SUM|number1, [number2], ...|Adds its arguments.\n&quot;
+            + &quot;SUMIF|range, criteria, [sum_range]|Adds the cells that meet a condition.\n&quot;
+            + &quot;SUMIFS|sum_range, criteria_range1, criteria1, [criteria_range2, criteria2], ...|Adds the cells that meet all of several conditions.\n&quot;
+            + &quot;SUMPRODUCT|array1, [array2], ...|Returns the sum of the products of corresponding array components.\n&quot;
+            + &quot;SUMSQ|number1, [number2], ...|Returns the sum of the squares of the arguments.\n&quot;
+            + &quot;SUMX2MY2|array_x, array_y|Returns the sum of the difference of squares of corresponding values in two arrays.\n&quot;
+            + &quot;SUMX2PY2|array_x, array_y|Returns the sum of the sum of squares of corresponding values in two arrays.\n&quot;
+            + &quot;SUMXMY2|array_x, array_y|Returns the sum of squares of differences of corresponding values in two arrays.\n&quot;
+            + &quot;SWITCH|expression, value1, result1, [default_or_value2, result2], ...|Compares an expression to a list of values and returns the first matching result.\n&quot;
+            + &quot;SYD|cost, salvage, life, per|Returns the sum-of-years' digits depreciation of an asset for a period.\n&quot;
+            + &quot;T|value|Returns the text if the value is text, otherwise empty text.\n&quot;
+            + &quot;T.DIST|x, deg_freedom, cumulative|Returns the left-tailed Student's t-distribution.\n&quot;
+            + &quot;T.DIST.2T|x, deg_freedom|Returns the two-tailed Student's t-distribution.\n&quot;
+            + &quot;T.DIST.RT|x, deg_freedom|Returns the right-tailed Student's t-distribution.\n&quot;
+            + &quot;T.INV|probability, deg_freedom|Returns the left-tailed inverse of the Student's t-distribution.\n&quot;
+            + &quot;T.INV.2T|probability, deg_freedom|Returns the two-tailed inverse of the Student's t-distribution.\n&quot;
+            + &quot;T.TEST|array1, array2, tails, type|Returns the probability associated with a Student's t-test.\n&quot;
+            + &quot;TAKE|array, rows, [columns]|Returns a number of rows or columns from the start or end of an array.\n&quot;
+            + &quot;TAN|number|Returns the tangent of an angle given in radians.\n&quot;
+            + &quot;TANH|number|Returns the hyperbolic tangent of a number.\n&quot;
+            + &quot;TDIST|x, deg_freedom, tails|Returns the Student's t-distribution; like T.DIST.RT or T.DIST.2T by tails.\n&quot;
+            + &quot;TEXT|value, format_text|Formats a number and converts it to text.\n&quot;
+            + &quot;TEXTAFTER|text, delimiter, [instance_num], [match_mode], [match_end], [if_not_found]|Returns the text that occurs after a given delimiter.\n&quot;
+            + &quot;TEXTBEFORE|text, delimiter, [instance_num], [match_mode], [match_end], [if_not_found]|Returns the text that occurs before a given delimiter.\n&quot;
+            + &quot;TEXTJOIN|delimiter, ignore_empty, text1, [text2], ...|Joins text from several ranges or strings with a delimiter.\n&quot;
+            + &quot;TIME|hour, minute, second|Returns the serial number of a particular time.\n&quot;
+            + &quot;TIMEVALUE|time_text|Converts a time in text form to a serial number.\n&quot;
+            + &quot;TINV|probability, deg_freedom|Returns the two-tailed inverse of the Student's t-distribution; the same as T.INV.2T.\n&quot;
+            + &quot;TOCOL|array, [ignore], [scan_by_column]|Returns an array as a single column.\n&quot;
+            + &quot;TODAY||Returns the serial number of the current date.\n&quot;
+            + &quot;TOROW|array, [ignore], [scan_by_column]|Returns an array as a single row.\n&quot;
+            + &quot;TRANSPOSE|array|Returns the transpose of an array.\n&quot;
+            + &quot;TRIM|text|Removes extra spaces from text.\n&quot;
+            + &quot;TRIMMEAN|array, percent|Returns the mean of the interior of a data set.\n&quot;
+            + &quot;TRUE||Returns the logical value TRUE.\n&quot;
+            + &quot;TRUNC|number, [num_digits]|Truncates a number to an integer or to a given precision.\n&quot;
+            + &quot;TTEST|array1, array2, tails, type|Returns the probability associated with a Student's t-test; the same as T.TEST.\n&quot;
+            + &quot;TYPE|value|Returns a number indicating the data type of a value.\n&quot;
+            + &quot;UNICHAR|number|Returns the Unicode character for a given number.\n&quot;
+            + &quot;UNICODE|text|Returns the number for the first character of the text.\n&quot;
+            + &quot;UNIQUE|array, [by_col], [exactly_once]|Returns the unique values from a range or array.\n&quot;
+            + &quot;UPPER|text|Converts text to uppercase.\n&quot;
+            + &quot;VALUE|text|Converts a text argument to a number.\n&quot;
+            + &quot;VAR|number1, [number2], ...|Estimates variance based on a sample; the same as VAR.S.\n&quot;
+            + &quot;VAR.P|number1, [number2], ...|Calculates variance based on an entire population.\n&quot;
+            + &quot;VAR.S|number1, [number2], ...|Estimates variance based on a sample.\n&quot;
+            + &quot;VARA|value1, [value2], ...|Estimates variance based on a sample, counting text and logical values.\n&quot;
+            + &quot;VARP|number1, [number2], ...|Calculates variance based on an entire population; the same as VAR.P.\n&quot;
+            + &quot;VARPA|value1, [value2], ...|Calculates variance based on a population, counting text and logical values.\n&quot;
+            + &quot;VDB|cost, salvage, life, start_period, end_period, [factor], [no_switch]|Returns the depreciation over a period using the variable declining balance method.\n&quot;
+            + &quot;VLOOKUP|lookup_value, table_array, col_index_num, [range_lookup]|Looks for a value in the first column of a table and returns a value in the same row from another column.\n&quot;
+            + &quot;VSTACK|array1, [array2], ...|Appends arrays vertically and in sequence into one array.\n&quot;
+            + &quot;WEEKDAY|serial_number, [return_type]|Returns the day of the week of a date.\n&quot;
+            + &quot;WEEKNUM|serial_number, [return_type]|Returns the week number of the year for a date.\n&quot;
+            + &quot;WEIBULL|x, alpha, beta, cumulative|Returns the Weibull distribution; the same as WEIBULL.DIST.\n&quot;
+            + &quot;WEIBULL.DIST|x, alpha, beta, cumulative|Returns the Weibull distribution.\n&quot;
+            + &quot;WORKDAY|start_date, days, [holidays]|Returns the date a number of working days before or after a date.\n&quot;
+            + &quot;WORKDAY.INTL|start_date, days, [weekend], [holidays]|Returns the date a number of working days away, with custom weekends.\n&quot;
+            + &quot;WRAPCOLS|vector, wrap_count, [pad_with]|Wraps a row or column of values into columns after a given count.\n&quot;
+            + &quot;WRAPROWS|vector, wrap_count, [pad_with]|Wraps a row or column of values into rows after a given count.\n&quot;
+            + &quot;XIRR|values, dates, [guess]|Returns the internal rate of return for cash flows that are not periodic.\n&quot;
+            + &quot;XLOOKUP|lookup_value, lookup_array, return_array, [if_not_found], [match_mode], [search_mode]|Searches a range or array and returns the item for the first match.\n&quot;
+            + &quot;XMATCH|lookup_value, lookup_array, [match_mode], [search_mode]|Returns the relative position of an item in an array or range.\n&quot;
+            + &quot;XNPV|rate, values, dates|Returns the net present value for cash flows that are not periodic.\n&quot;
+            + &quot;XOR|logical1, [logical2], ...|Returns a logical exclusive OR of all arguments.\n&quot;
+            + &quot;YEAR|serial_number|Returns the year of a date.\n&quot;
+            + &quot;YEARFRAC|start_date, end_date, [basis]|Returns the year fraction between two dates.\n&quot;
+            + &quot;Z.TEST|array, x, [sigma]|Returns the one-tailed probability value of a z-test.\n&quot;
+            + &quot;ZTEST|array, x, [sigma]|Returns the one-tailed probability value of a z-test; the same as Z.TEST.\n&quot;
+            + &quot;&quot;};
+
+    /// The arguments and the description of a function, or null for a name it does not know.
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: the function name, in capitals
+    ///
+    /// #### Returns
+    ///
+    /// the arguments, as `number1, [number2], ...`, then the description
+    static String[] of(String name) {
+<span class="fc" id="L453">        return Table.TABLE.get(name);</span>
+    }
+
+    /// Every function name, in alphabetical order.
+    static String[] names() {
+<span class="fc" id="L458">        return Table.NAMES;</span>
+    }
+
+    /// The table, read the first time it is asked for: a class is initialized on first use.
+    private static final class Table {
+<span class="fc" id="L463">        static final HashMap&lt;String, String[]&gt; TABLE = new HashMap&lt;String, String[]&gt;();</span>
+        static final String[] NAMES;
+
+        static {
+<span class="fc" id="L467">            java.util.ArrayList&lt;String&gt; order = new java.util.ArrayList&lt;String&gt;();</span>
+<span class="fc bfc" id="L468" title="All 2 branches covered.">            for (String part : PARTS) {</span>
+<span class="fc" id="L469">                read(TABLE, order, part);</span>
+            }
+<span class="fc" id="L471">            NAMES = order.toArray(new String[order.size()]);</span>
+<span class="fc" id="L472">        }</span>
+    }
+
+    private static void read(HashMap&lt;String, String[]&gt; t, java.util.List&lt;String&gt; order, String text) {
+<span class="fc" id="L476">        int at = 0;</span>
+<span class="fc bfc" id="L477" title="All 2 branches covered.">        while (at &lt; text.length()) {</span>
+<span class="fc" id="L478">            int end = text.indexOf('\n', at);</span>
+<span class="pc bpc" id="L479" title="1 of 2 branches missed.">            if (end &lt; 0) {</span>
+<span class="nc" id="L480">                end = text.length();</span>
+            }
+<span class="fc" id="L482">            int a = text.indexOf('|', at);</span>
+<span class="pc bpc" id="L483" title="1 of 2 branches missed.">            int b = a &lt; 0 ? -1 : text.indexOf('|', a + 1);</span>
+<span class="pc bpc" id="L484" title="2 of 4 branches missed.">            if (b &gt; 0 &amp;&amp; b &lt; end) {</span>
+<span class="fc" id="L485">                order.add(text.substring(at, a));</span>
+<span class="fc" id="L486">                t.put(text.substring(at, a), new String[] {text.substring(a + 1, b), text.substring(b + 1, end)});</span>
+            }
+<span class="fc" id="L488">            at = end + 1;</span>
+<span class="fc" id="L489">        }</span>
+<span class="fc" id="L490">    }</span>
+
+    /// The arguments of a function split one by one: `[number2]` and `...` are entries too.
+    static String[] arguments(String args) {
+<span class="pc bpc" id="L494" title="2 of 4 branches missed.">        if (args == null || args.length() == 0) {</span>
+<span class="nc" id="L495">            return new String[0];</span>
+        }
+<span class="fc" id="L497">        java.util.ArrayList&lt;String&gt; out = new java.util.ArrayList&lt;String&gt;();</span>
+<span class="fc" id="L498">        int depth = 0;</span>
+<span class="fc" id="L499">        int start = 0;</span>
+<span class="fc bfc" id="L500" title="All 2 branches covered.">        for (int i = 0; i &lt; args.length(); i++) {</span>
+<span class="fc" id="L501">            char c = args.charAt(i);</span>
+<span class="fc bfc" id="L502" title="All 2 branches covered.">            if (c == '[') {</span>
+<span class="fc" id="L503">                depth++;</span>
+<span class="fc bfc" id="L504" title="All 2 branches covered.">            } else if (c == ']') {</span>
+<span class="fc" id="L505">                depth--;</span>
+<span class="fc bfc" id="L506" title="All 4 branches covered.">            } else if (c == ',' &amp;&amp; depth == 0) {</span>
+<span class="fc" id="L507">                out.add(args.substring(start, i).trim());</span>
+<span class="fc" id="L508">                start = i + 1;</span>
+            }
+        }
+<span class="fc" id="L511">        out.add(args.substring(start).trim());</span>
+<span class="fc" id="L512">        return out.toArray(new String[out.size()]);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

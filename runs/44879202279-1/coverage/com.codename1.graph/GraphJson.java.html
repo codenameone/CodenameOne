@@ -1,0 +1,438 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>GraphJson.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.graph</a> &gt; <span class="el_source">GraphJson.java</span></div><h1>GraphJson.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.graph;
+
+import com.codename1.io.JSONParser;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+/// Writes a graph as JSON and reads it back, to save a diagram or send it.
+///
+/// ```java
+/// DefaultGraphModel model = new DefaultGraphModel();
+/// model.addNode(new GraphNode(&quot;a&quot;, &quot;Start&quot;, 20, 20, 100, 50));
+/// NodeGraph graph = new NodeGraph(model);
+///
+/// String saved = GraphJson.toJson(model);
+/// Storage.getInstance().writeObject(&quot;diagram&quot;, saved);
+/// // later
+/// DefaultGraphModel loaded = GraphJson.fromJson(saved);
+/// graph.setModel(loaded);
+/// ```
+///
+/// Everything the model classes hold is written: nodes with their bounds,
+/// shape, ports and port values, edges with their line, arrows and route, and
+/// groups and lanes. Values left at their default are omitted, so a small
+/// graph is a small document.
+///
+/// `getUserData` is the application's, and is written only through a
+/// `UserDataCodec`. A port value is written when it is a string, a number or
+/// a boolean.
+public final class GraphJson {
+    /// Turns the application's `getUserData` objects into JSON values and
+    /// back.
+    public interface UserDataCodec {
+        /// The JSON form of a node's, edge's or group's user data: a `String`,
+        /// `Number`, `Boolean`, `Map` or `List` of those, or null to write
+        /// nothing.
+        Object encode(Object userData);
+
+        /// The user data for a value `encode` produced, as the parser returned
+        /// it.
+        Object decode(Object json);
+    }
+
+    private GraphJson() {
+    }
+
+    /// The whole graph as a JSON object, without user data.
+    public static String toJson(GraphModel model) {
+<span class="fc" id="L78">        return toJson(model, null, null);</span>
+    }
+
+    /// The graph, or part of it, as a JSON object.
+    ///
+    /// #### Parameters
+    ///
+    /// - `model`: the graph
+    /// - `nodes`: the nodes to write, with the edges that run between two of
+    ///   them and no groups; null writes everything
+    /// - `codec`: writes user data, or null to leave it out
+    public static String toJson(GraphModel model, Collection&lt;GraphNode&gt; nodes, UserDataCodec codec) {
+<span class="fc" id="L90">        return JSONParser.toJson(toMap(model, nodes, codec));</span>
+    }
+
+    /// The same tree `toJson` writes, to embed in a larger document.
+    public static Map&lt;String, Object&gt; toMap(GraphModel model, Collection&lt;GraphNode&gt; nodes, UserDataCodec codec) {
+<span class="fc" id="L95">        Map&lt;String, Object&gt; root = new LinkedHashMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L96">        Set&lt;String&gt; ids = null;</span>
+<span class="fc" id="L97">        List&lt;GraphNode&gt; source = model.getNodes();</span>
+<span class="fc bfc" id="L98" title="All 2 branches covered.">        if (nodes != null) {</span>
+<span class="fc" id="L99">            ids = new HashSet&lt;String&gt;();</span>
+<span class="fc bfc" id="L100" title="All 2 branches covered.">            for (GraphNode n : nodes) {</span>
+<span class="fc" id="L101">                ids.add(n.getId());</span>
+<span class="fc" id="L102">            }</span>
+        }
+<span class="fc" id="L104">        List&lt;Object&gt; nodeList = new ArrayList&lt;Object&gt;();</span>
+<span class="fc" id="L105">        int count = source.size();</span>
+<span class="fc bfc" id="L106" title="All 2 branches covered.">        for (int i = 0; i &lt; count; i++) {</span>
+<span class="fc" id="L107">            GraphNode n = source.get(i);</span>
+<span class="fc bfc" id="L108" title="All 4 branches covered.">            if (ids == null || ids.contains(n.getId())) {</span>
+<span class="fc" id="L109">                nodeList.add(nodeMap(n, codec));</span>
+            }
+        }
+<span class="fc" id="L112">        root.put(&quot;nodes&quot;, nodeList);</span>
+<span class="fc" id="L113">        List&lt;Object&gt; edgeList = new ArrayList&lt;Object&gt;();</span>
+<span class="fc" id="L114">        List&lt;GraphEdge&gt; edges = model.getEdges();</span>
+<span class="fc" id="L115">        count = edges.size();</span>
+<span class="fc bfc" id="L116" title="All 2 branches covered.">        for (int i = 0; i &lt; count; i++) {</span>
+<span class="fc" id="L117">            GraphEdge e = edges.get(i);</span>
+<span class="fc bfc" id="L118" title="All 6 branches covered.">            if (ids == null || ids.contains(e.getSourceId()) &amp;&amp; ids.contains(e.getTargetId())) {</span>
+<span class="fc" id="L119">                edgeList.add(edgeMap(e, codec));</span>
+            }
+        }
+<span class="fc" id="L122">        root.put(&quot;edges&quot;, edgeList);</span>
+<span class="fc bfc" id="L123" title="All 2 branches covered.">        if (ids == null) {</span>
+<span class="fc" id="L124">            List&lt;Object&gt; groupList = new ArrayList&lt;Object&gt;();</span>
+<span class="fc" id="L125">            List&lt;GraphGroup&gt; groups = model.getGroups();</span>
+<span class="fc" id="L126">            count = groups.size();</span>
+<span class="fc bfc" id="L127" title="All 2 branches covered.">            for (int i = 0; i &lt; count; i++) {</span>
+<span class="fc" id="L128">                groupList.add(groupMap(groups.get(i)));</span>
+            }
+<span class="fc bfc" id="L130" title="All 2 branches covered.">            if (!groupList.isEmpty()) {</span>
+<span class="fc" id="L131">                root.put(&quot;groups&quot;, groupList);</span>
+            }
+        }
+<span class="fc" id="L134">        return root;</span>
+    }
+
+    private static void putUserData(Map&lt;String, Object&gt; m, Object userData, UserDataCodec codec) {
+<span class="fc bfc" id="L138" title="All 4 branches covered.">        if (codec != null &amp;&amp; userData != null) {</span>
+<span class="fc" id="L139">            m.put(&quot;data&quot;, codec.encode(userData));</span>
+        }
+<span class="fc" id="L141">    }</span>
+
+    private static Map&lt;String, Object&gt; nodeMap(GraphNode n, UserDataCodec codec) {
+<span class="fc" id="L144">        Map&lt;String, Object&gt; m = new LinkedHashMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L145">        m.put(&quot;id&quot;, n.getId());</span>
+<span class="fc" id="L146">        m.put(&quot;label&quot;, n.getLabel());</span>
+<span class="fc" id="L147">        m.put(&quot;description&quot;, n.getDescription());</span>
+<span class="fc" id="L148">        m.put(&quot;x&quot;, Double.valueOf(n.getX()));</span>
+<span class="fc" id="L149">        m.put(&quot;y&quot;, Double.valueOf(n.getY()));</span>
+<span class="fc" id="L150">        m.put(&quot;w&quot;, Double.valueOf(n.getWidth()));</span>
+<span class="fc" id="L151">        m.put(&quot;h&quot;, Double.valueOf(n.getHeight()));</span>
+<span class="fc" id="L152">        m.put(&quot;shape&quot;, n.getShape());</span>
+<span class="fc" id="L153">        m.put(&quot;group&quot;, n.getGroupId());</span>
+<span class="fc" id="L154">        m.put(&quot;style&quot;, n.getStyleKey());</span>
+<span class="pc bpc" id="L155" title="1 of 2 branches missed.">        if (n.isPinned()) {</span>
+<span class="nc" id="L156">            m.put(&quot;pinned&quot;, Boolean.TRUE);</span>
+        }
+<span class="fc bfc" id="L158" title="All 2 branches covered.">        if (!n.getInputs().isEmpty()) {</span>
+<span class="fc" id="L159">            m.put(&quot;inputs&quot;, portList(n.getInputs()));</span>
+        }
+<span class="fc bfc" id="L161" title="All 2 branches covered.">        if (!n.getOutputs().isEmpty()) {</span>
+<span class="fc" id="L162">            m.put(&quot;outputs&quot;, portList(n.getOutputs()));</span>
+        }
+<span class="fc" id="L164">        putUserData(m, n.getUserData(), codec);</span>
+<span class="fc" id="L165">        return m;</span>
+    }
+
+    private static List&lt;Object&gt; portList(List&lt;GraphPort&gt; ports) {
+<span class="fc" id="L169">        List&lt;Object&gt; out = new ArrayList&lt;Object&gt;();</span>
+<span class="fc" id="L170">        int n = ports.size();</span>
+<span class="fc bfc" id="L171" title="All 2 branches covered.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc" id="L172">            GraphPort p = ports.get(i);</span>
+<span class="fc" id="L173">            Map&lt;String, Object&gt; m = new LinkedHashMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L174">            m.put(&quot;id&quot;, p.getId());</span>
+<span class="fc" id="L175">            m.put(&quot;label&quot;, p.getLabel());</span>
+<span class="fc" id="L176">            m.put(&quot;type&quot;, p.getType());</span>
+<span class="pc bpc" id="L177" title="1 of 2 branches missed.">            if (p.getMaxConnections() &gt;= 0) {</span>
+<span class="nc" id="L178">                m.put(&quot;max&quot;, Integer.valueOf(p.getMaxConnections()));</span>
+            }
+<span class="fc" id="L180">            Object v = p.getValue();</span>
+<span class="fc bfc" id="L181" title="All 6 branches covered.">            if (v instanceof String || v instanceof Number || v instanceof Boolean) {</span>
+<span class="fc" id="L182">                m.put(&quot;value&quot;, v);</span>
+            }
+<span class="fc" id="L184">            out.add(m);</span>
+        }
+<span class="fc" id="L186">        return out;</span>
+    }
+
+    private static Map&lt;String, Object&gt; edgeMap(GraphEdge e, UserDataCodec codec) {
+<span class="fc" id="L190">        Map&lt;String, Object&gt; m = new LinkedHashMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L191">        m.put(&quot;id&quot;, e.getId());</span>
+<span class="fc" id="L192">        m.put(&quot;from&quot;, e.getSourceId());</span>
+<span class="fc" id="L193">        m.put(&quot;fromPort&quot;, e.getSourcePortId());</span>
+<span class="fc" id="L194">        m.put(&quot;to&quot;, e.getTargetId());</span>
+<span class="fc" id="L195">        m.put(&quot;toPort&quot;, e.getTargetPortId());</span>
+<span class="fc" id="L196">        m.put(&quot;label&quot;, e.getLabel());</span>
+<span class="fc" id="L197">        m.put(&quot;style&quot;, e.getStyleKey());</span>
+<span class="fc bfc" id="L198" title="All 2 branches covered.">        if (!e.isDirected()) {</span>
+<span class="fc" id="L199">            m.put(&quot;directed&quot;, Boolean.FALSE);</span>
+        }
+<span class="fc bfc" id="L201" title="All 2 branches covered.">        if (e.getLineStyle() != GraphEdge.LINE_SOLID) {</span>
+<span class="fc" id="L202">            m.put(&quot;line&quot;, Integer.valueOf(e.getLineStyle()));</span>
+        }
+<span class="fc bfc" id="L204" title="All 2 branches covered.">        if (e.getSourceArrow() != GraphEdge.ARROW_NONE) {</span>
+<span class="fc" id="L205">            m.put(&quot;fromArrow&quot;, Integer.valueOf(e.getSourceArrow()));</span>
+        }
+<span class="fc bfc" id="L207" title="All 2 branches covered.">        if (e.isTargetArrowSet()) {</span>
+<span class="fc" id="L208">            m.put(&quot;toArrow&quot;, Integer.valueOf(e.getTargetArrow()));</span>
+        }
+<span class="fc" id="L210">        double[] route = e.getRoute();</span>
+<span class="pc bpc" id="L211" title="1 of 4 branches missed.">        if (route != null &amp;&amp; route.length &gt; 0) {</span>
+<span class="fc" id="L212">            List&lt;Object&gt; r = new ArrayList&lt;Object&gt;();</span>
+<span class="fc bfc" id="L213" title="All 2 branches covered.">            for (double coordinate : route) {</span>
+<span class="fc" id="L214">                r.add(Double.valueOf(coordinate));</span>
+            }
+<span class="fc" id="L216">            m.put(&quot;route&quot;, r);</span>
+        }
+<span class="fc" id="L218">        putUserData(m, e.getUserData(), codec);</span>
+<span class="fc" id="L219">        return m;</span>
+    }
+
+    private static Map&lt;String, Object&gt; groupMap(GraphGroup g) {
+<span class="fc" id="L223">        Map&lt;String, Object&gt; m = new LinkedHashMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L224">        m.put(&quot;id&quot;, g.getId());</span>
+<span class="fc" id="L225">        m.put(&quot;label&quot;, g.getLabel());</span>
+<span class="fc" id="L226">        m.put(&quot;style&quot;, g.getStyleKey());</span>
+<span class="fc bfc" id="L227" title="All 2 branches covered.">        if (g.isCollapsed()) {</span>
+<span class="fc" id="L228">            m.put(&quot;collapsed&quot;, Boolean.TRUE);</span>
+        }
+<span class="fc bfc" id="L230" title="All 2 branches covered.">        if (g.isLane()) {</span>
+<span class="fc" id="L231">            m.put(&quot;lane&quot;, Boolean.TRUE);</span>
+<span class="pc bpc" id="L232" title="1 of 2 branches missed.">            if (!g.isHorizontal()) {</span>
+<span class="nc" id="L233">                m.put(&quot;horizontal&quot;, Boolean.FALSE);</span>
+            }
+<span class="fc" id="L235">            m.put(&quot;x&quot;, Double.valueOf(g.getX()));</span>
+<span class="fc" id="L236">            m.put(&quot;y&quot;, Double.valueOf(g.getY()));</span>
+<span class="fc" id="L237">            m.put(&quot;w&quot;, Double.valueOf(g.getWidth()));</span>
+<span class="fc" id="L238">            m.put(&quot;h&quot;, Double.valueOf(g.getHeight()));</span>
+        }
+<span class="fc" id="L240">        return m;</span>
+    }
+
+    /// Reads a graph `toJson` wrote, without user data.
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: when the text is not a JSON object, or a node or an
+    ///   edge in it has no id
+    public static DefaultGraphModel fromJson(String json) throws IOException {
+<span class="fc" id="L250">        DefaultGraphModel model = new DefaultGraphModel();</span>
+<span class="fc" id="L251">        read(json, model, null);</span>
+<span class="fc" id="L252">        return model;</span>
+    }
+
+    /// Reads a graph `toJson` wrote into a model, adding to what it holds.
+    ///
+    /// #### Parameters
+    ///
+    /// - `json`: the document
+    /// - `into`: the model that receives the nodes, edges and groups
+    /// - `codec`: reads user data, or null to ignore it
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: when the text is not well-formed JSON or not a graph
+    ///   document, or `readMap` refuses it; the model is then as it was
+    public static void read(String json, DefaultGraphModel into, UserDataCodec codec) throws IOException {
+        // the strict parser: what it answers does not depend on how the
+        // application configured the lenient one
+<span class="fc" id="L270">        Object parsed = JSONParser.parseStrict(json);</span>
+<span class="fc bfc" id="L271" title="All 2 branches covered.">        if (!(parsed instanceof Map)) {</span>
+<span class="fc" id="L272">            throw new IOException(&quot;Not a graph document&quot;);</span>
+        }
+<span class="fc" id="L274">        Map&lt;String, Object&gt; root = map(parsed);</span>
+<span class="pc bpc" id="L275" title="5 of 6 branches missed.">        if (!root.containsKey(&quot;nodes&quot;) &amp;&amp; !root.containsKey(&quot;edges&quot;) &amp;&amp; !root.containsKey(&quot;groups&quot;)) {</span>
+<span class="nc" id="L276">            throw new IOException(&quot;Not a graph document&quot;);</span>
+        }
+<span class="fc" id="L278">        readMap(root, into, codec);</span>
+<span class="fc" id="L279">    }</span>
+
+    /// Reads the tree `toMap` built, as a JSON parser returns it. The whole
+    /// tree is checked before anything is added: an id taken twice, or an edge
+    /// between nodes that are nowhere, refuses all of it. Each addition then
+    /// tells the model's listeners as it is made. A node's group and an edge's
+    /// ports are taken as written, since a group or a port may be added later.
+    /// A port value comes back as JSON has it: a string, a boolean, a `Long`
+    /// for a whole number and a `Double` for any other.
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: when a node, an edge or a group has no id or one that
+    ///   is taken, or an edge names a node that is neither in the tree nor in
+    ///   the model
+    public static void readMap(Map&lt;String, Object&gt; root, DefaultGraphModel into, UserDataCodec codec)
+            throws IOException {
+<span class="fc" id="L296">        List&lt;GraphGroup&gt; newGroups = new ArrayList&lt;GraphGroup&gt;();</span>
+<span class="fc" id="L297">        List&lt;GraphNode&gt; newNodes = new ArrayList&lt;GraphNode&gt;();</span>
+<span class="fc" id="L298">        List&lt;GraphEdge&gt; newEdges = new ArrayList&lt;GraphEdge&gt;();</span>
+<span class="fc" id="L299">        Map&lt;String, Object&gt; seen = new HashMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L300">        List&lt;Object&gt; groups = list(root.get(&quot;groups&quot;));</span>
+<span class="fc bfc" id="L301" title="All 2 branches covered.">        for (Object raw : groups) {</span>
+<span class="fc" id="L302">            Map&lt;String, Object&gt; m = map(raw);</span>
+<span class="fc" id="L303">            GraphGroup g = new GraphGroup(required(m, &quot;id&quot;), string(m, &quot;label&quot;));</span>
+<span class="pc bpc" id="L304" title="1 of 4 branches missed.">            if (into.getGroup(g.getId()) != null || seen.put(&quot;g&quot; + g.getId(), g) != null) {</span>
+<span class="fc" id="L305">                throw new IOException(&quot;Graph document: duplicate group &quot; + g.getId());</span>
+            }
+<span class="fc" id="L307">            g.setStyleKey(string(m, &quot;style&quot;));</span>
+<span class="fc" id="L308">            g.setCollapsed(bool(m.get(&quot;collapsed&quot;), false));</span>
+<span class="fc bfc" id="L309" title="All 2 branches covered.">            if (bool(m.get(&quot;lane&quot;), false)) {</span>
+<span class="fc" id="L310">                g.setKind(GraphGroup.KIND_LANE);</span>
+<span class="fc" id="L311">                g.setHorizontal(bool(m.get(&quot;horizontal&quot;), true));</span>
+<span class="fc" id="L312">                g.setBounds(number(m, &quot;x&quot;, 0), number(m, &quot;y&quot;, 0), number(m, &quot;w&quot;, 0), number(m, &quot;h&quot;, 0));</span>
+            }
+<span class="fc" id="L314">            newGroups.add(g);</span>
+<span class="fc" id="L315">        }</span>
+<span class="fc" id="L316">        List&lt;Object&gt; nodes = list(root.get(&quot;nodes&quot;));</span>
+<span class="fc bfc" id="L317" title="All 2 branches covered.">        for (Object raw : nodes) {</span>
+<span class="fc" id="L318">            Map&lt;String, Object&gt; m = map(raw);</span>
+<span class="fc" id="L319">            GraphNode n = new GraphNode(required(m, &quot;id&quot;), string(m, &quot;label&quot;),</span>
+<span class="fc" id="L320">                    number(m, &quot;x&quot;, 0), number(m, &quot;y&quot;, 0), number(m, &quot;w&quot;, 160), number(m, &quot;h&quot;, 64));</span>
+<span class="pc bpc" id="L321" title="1 of 4 branches missed.">            if (into.getNode(n.getId()) != null || seen.put(&quot;n&quot; + n.getId(), n) != null) {</span>
+<span class="fc" id="L322">                throw new IOException(&quot;Graph document: duplicate node &quot; + n.getId());</span>
+            }
+<span class="fc" id="L324">            n.setDescription(string(m, &quot;description&quot;));</span>
+<span class="fc" id="L325">            n.setShape(string(m, &quot;shape&quot;));</span>
+<span class="fc" id="L326">            n.setGroupId(string(m, &quot;group&quot;));</span>
+<span class="fc" id="L327">            n.setStyleKey(string(m, &quot;style&quot;));</span>
+<span class="fc" id="L328">            n.setPinned(bool(m.get(&quot;pinned&quot;), false));</span>
+<span class="fc" id="L329">            readPorts(n, list(m.get(&quot;inputs&quot;)), GraphPort.INPUT);</span>
+<span class="fc" id="L330">            readPorts(n, list(m.get(&quot;outputs&quot;)), GraphPort.OUTPUT);</span>
+<span class="fc bfc" id="L331" title="All 4 branches covered.">            if (codec != null &amp;&amp; m.get(&quot;data&quot;) != null) {</span>
+<span class="fc" id="L332">                n.setUserData(codec.decode(m.get(&quot;data&quot;)));</span>
+            }
+<span class="fc" id="L334">            newNodes.add(n);</span>
+<span class="fc" id="L335">        }</span>
+<span class="fc" id="L336">        List&lt;Object&gt; edges = list(root.get(&quot;edges&quot;));</span>
+<span class="fc bfc" id="L337" title="All 2 branches covered.">        for (Object raw : edges) {</span>
+<span class="fc" id="L338">            Map&lt;String, Object&gt; m = map(raw);</span>
+<span class="fc" id="L339">            GraphEdge e = new GraphEdge(required(m, &quot;id&quot;), required(m, &quot;from&quot;), string(m, &quot;fromPort&quot;),</span>
+<span class="fc" id="L340">                    required(m, &quot;to&quot;), string(m, &quot;toPort&quot;));</span>
+<span class="pc bpc" id="L341" title="2 of 4 branches missed.">            if (into.getEdge(e.getId()) != null || seen.put(&quot;e&quot; + e.getId(), e) != null) {</span>
+<span class="nc" id="L342">                throw new IOException(&quot;Graph document: duplicate edge &quot; + e.getId());</span>
+            }
+<span class="pc bpc" id="L344" title="3 of 4 branches missed.">            if (!seen.containsKey(&quot;n&quot; + e.getSourceId()) &amp;&amp; into.getNode(e.getSourceId()) == null</span>
+<span class="fc bfc" id="L345" title="All 4 branches covered.">                    || !seen.containsKey(&quot;n&quot; + e.getTargetId()) &amp;&amp; into.getNode(e.getTargetId()) == null) {</span>
+<span class="fc" id="L346">                throw new IOException(&quot;Graph document: edge &quot; + e.getId() + &quot; names a node that is not there&quot;);</span>
+            }
+<span class="fc" id="L348">            e.setLabel(string(m, &quot;label&quot;));</span>
+<span class="fc" id="L349">            e.setStyleKey(string(m, &quot;style&quot;));</span>
+<span class="fc" id="L350">            e.setDirected(bool(m.get(&quot;directed&quot;), true));</span>
+<span class="fc" id="L351">            e.setLineStyle((int) number(m, &quot;line&quot;, GraphEdge.LINE_SOLID));</span>
+<span class="fc" id="L352">            e.setSourceArrow((int) number(m, &quot;fromArrow&quot;, GraphEdge.ARROW_NONE));</span>
+<span class="fc" id="L353">            e.setTargetArrow((int) number(m, &quot;toArrow&quot;, -1));</span>
+<span class="fc" id="L354">            List&lt;Object&gt; route = list(m.get(&quot;route&quot;));</span>
+<span class="fc bfc" id="L355" title="All 2 branches covered.">            if (!route.isEmpty()) {</span>
+<span class="fc" id="L356">                double[] r = new double[route.size()];</span>
+<span class="fc bfc" id="L357" title="All 2 branches covered.">                for (int k = 0; k &lt; r.length; k++) {</span>
+<span class="fc" id="L358">                    Object v = route.get(k);</span>
+<span class="pc bpc" id="L359" title="1 of 2 branches missed.">                    r[k] = v instanceof Number ? ((Number) v).doubleValue() : 0;</span>
+                }
+<span class="fc" id="L361">                e.setRoute(r);</span>
+            }
+<span class="pc bpc" id="L363" title="1 of 4 branches missed.">            if (codec != null &amp;&amp; m.get(&quot;data&quot;) != null) {</span>
+<span class="nc" id="L364">                e.setUserData(codec.decode(m.get(&quot;data&quot;)));</span>
+            }
+<span class="fc" id="L366">            newEdges.add(e);</span>
+<span class="fc" id="L367">        }</span>
+<span class="fc bfc" id="L368" title="All 2 branches covered.">        for (GraphGroup g : newGroups) {</span>
+<span class="fc" id="L369">            into.addGroup(g);</span>
+<span class="fc" id="L370">        }</span>
+<span class="fc bfc" id="L371" title="All 2 branches covered.">        for (GraphNode n : newNodes) {</span>
+<span class="fc" id="L372">            into.addNode(n);</span>
+<span class="fc" id="L373">        }</span>
+<span class="fc bfc" id="L374" title="All 2 branches covered.">        for (GraphEdge e : newEdges) {</span>
+<span class="fc" id="L375">            into.addEdge(e);</span>
+<span class="fc" id="L376">        }</span>
+<span class="fc" id="L377">    }</span>
+
+    private static void readPorts(GraphNode n, List&lt;Object&gt; ports, int direction) throws IOException {
+<span class="fc bfc" id="L380" title="All 2 branches covered.">        for (Object raw : ports) {</span>
+<span class="fc" id="L381">            Map&lt;String, Object&gt; m = map(raw);</span>
+<span class="fc" id="L382">            GraphPort p = new GraphPort(required(m, &quot;id&quot;), direction, string(m, &quot;label&quot;), string(m, &quot;type&quot;));</span>
+<span class="fc" id="L383">            p.setMaxConnections((int) number(m, &quot;max&quot;, -1));</span>
+<span class="fc" id="L384">            p.setValue(m.get(&quot;value&quot;));</span>
+<span class="fc" id="L385">            n.addPort(p);</span>
+<span class="fc" id="L386">        }</span>
+<span class="fc" id="L387">    }</span>
+
+    @SuppressWarnings(&quot;unchecked&quot;)
+    private static Map&lt;String, Object&gt; map(Object o) throws IOException {
+<span class="pc bpc" id="L391" title="1 of 2 branches missed.">        if (o instanceof Map) {</span>
+<span class="fc" id="L392">            return (Map&lt;String, Object&gt;) o;</span>
+        }
+<span class="nc" id="L394">        throw new IOException(&quot;Not a graph document&quot;);</span>
+    }
+
+    @SuppressWarnings(&quot;unchecked&quot;)
+    private static List&lt;Object&gt; list(Object o) throws IOException {
+<span class="fc bfc" id="L399" title="All 2 branches covered.">        if (o instanceof List) {</span>
+<span class="fc" id="L400">            return (List&lt;Object&gt;) o;</span>
+        }
+<span class="fc bfc" id="L402" title="All 2 branches covered.">        if (o != null) {</span>
+<span class="fc" id="L403">            throw new IOException(&quot;Not a graph: a list was expected&quot;);</span>
+        }
+<span class="fc" id="L405">        return new ArrayList&lt;Object&gt;();</span>
+    }
+
+    private static String string(Map&lt;String, Object&gt; m, String key) {
+<span class="fc" id="L409">        Object o = m.get(key);</span>
+<span class="fc bfc" id="L410" title="All 2 branches covered.">        return o instanceof String ? (String) o : null;</span>
+    }
+
+    private static String required(Map&lt;String, Object&gt; m, String key) throws IOException {
+<span class="fc" id="L414">        String s = string(m, key);</span>
+<span class="pc bpc" id="L415" title="1 of 2 branches missed.">        if (s == null) {</span>
+<span class="nc" id="L416">            throw new IOException(&quot;Graph document: missing &quot; + key);</span>
+        }
+<span class="fc" id="L418">        return s;</span>
+    }
+
+    private static double number(Map&lt;String, Object&gt; m, String key, double fallback) {
+<span class="fc" id="L422">        Object o = m.get(key);</span>
+<span class="fc bfc" id="L423" title="All 2 branches covered.">        return o instanceof Number ? ((Number) o).doubleValue() : fallback;</span>
+    }
+
+    /// The parser hands back a Boolean or the word, depending on how the
+    /// application configured it.
+    private static boolean bool(Object o, boolean fallback) {
+<span class="fc bfc" id="L429" title="All 2 branches covered.">        if (o instanceof Boolean) {</span>
+<span class="fc" id="L430">            return ((Boolean) o).booleanValue();</span>
+        }
+<span class="pc bpc" id="L432" title="1 of 2 branches missed.">        if (o instanceof String) {</span>
+<span class="nc" id="L433">            return &quot;true&quot;.equals(o);</span>
+        }
+<span class="fc" id="L435">        return fallback;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

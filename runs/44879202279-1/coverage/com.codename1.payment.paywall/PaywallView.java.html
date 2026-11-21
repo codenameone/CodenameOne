@@ -1,0 +1,1080 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PaywallView.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.payment.paywall</a> &gt; <span class="el_source">PaywallView.java</span></div><h1>PaywallView.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Codename One in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.payment.paywall;
+
+import com.codename1.components.SpanLabel;
+import com.codename1.io.Log;
+import com.codename1.payment.CommerceManager;
+import com.codename1.payment.CommercePackage;
+import com.codename1.payment.CustomerInfo;
+import com.codename1.payment.EntitlementInfo;
+import com.codename1.payment.Offering;
+import com.codename1.payment.Product;
+import com.codename1.ui.Button;
+import com.codename1.ui.Component;
+import com.codename1.ui.Container;
+import com.codename1.ui.Display;
+import com.codename1.ui.EncodedImage;
+import com.codename1.ui.FontImage;
+import com.codename1.ui.Form;
+import com.codename1.ui.Image;
+import com.codename1.ui.Label;
+import com.codename1.ui.Tabs;
+import com.codename1.ui.URLImage;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.geom.Dimension;
+import com.codename1.ui.layouts.BoxLayout;
+import com.codename1.ui.layouts.FlowLayout;
+import com.codename1.ui.layouts.GridLayout;
+import com.codename1.ui.plaf.Style;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/// A paywall built from a paywall document and the offering it sells.
+///
+/// The document is a tree of nodes, each a JSON object with a `type`:
+/// `stack`, `text`, `image`, `icon`, `features`, `packages`,
+/// `purchaseButton`, `restoreButton`, `closeButton`, `carousel`, `footer`
+/// and `spacer`. A node of any other type is skipped, so a document made for
+/// a newer client still shows. Sizes in the document are millimetres.
+///
+/// A text is first looked up in the document's `strings`, by the device's
+/// locale and then the document's default locale, and used as written when
+/// it is not a key there. Then `{{price}}`, `{{period}}`, `{{trialPeriod}}`,
+/// `{{introPrice}}`, `{{productName}}` and `{{packageId}}` are replaced from
+/// the selected package, again whenever the selection changes. The price is
+/// the store's localized one when the store listed the product.
+///
+/// #### Styling
+///
+/// Every element has a UIID, so a theme can restyle the paywall. The colors
+/// the document names -- its `dark` set when the device is in dark mode, its
+/// `light` set otherwise -- are applied on top of the theme.
+///
+/// - `Paywall`: the view itself
+/// - `PaywallStack`: a `stack` node
+/// - `PaywallTitle`, `PaywallHeadline`, `PaywallBody`, `PaywallCaption`: the
+///   text of a `text` node, by its style
+/// - `PaywallImage`, `PaywallIcon`: an `image` and an `icon` node
+/// - `PaywallFeatures`, `PaywallFeature`, `PaywallFeatureIcon`,
+///   `PaywallFeatureText`: a `features` node, one of its rows and the row's
+///   parts
+/// - `PaywallPackages`: a `packages` node
+/// - `PaywallPackage`, `PaywallPackageTitle`, `PaywallPackagePrice`: a
+///   package and its two lines
+/// - `PaywallPackageSelected`, `PaywallPackageTitleSelected`,
+///   `PaywallPackagePriceSelected`: the same for the selected package
+/// - `PaywallPurchaseButton`, `PaywallRestoreButton`, `PaywallCloseButton`
+/// - `PaywallCloseBar`: the row holding the close button
+/// - `PaywallCarousel`: a `carousel` node
+/// - `PaywallFooter`, `PaywallFooterLink`: a `footer` node and its links
+/// - `PaywallSpacer`: a `spacer` node, and the gap between a stack's children
+///
+/// #### Events
+///
+/// The view reports `IMPRESSION` when it is first shown, `PURCHASE_START`,
+/// `PURCHASE` and `CLOSE` through
+/// [CommerceManager#logEvent(String, String, String, String)].
+public class PaywallView extends Container {
+<span class="fc" id="L102">    private static final String[] ICON_NAMES = {</span>
+        &quot;check&quot;, &quot;check_circle&quot;, &quot;done&quot;, &quot;star&quot;, &quot;lock&quot;, &quot;favorite&quot;, &quot;cloud&quot;, &quot;bolt&quot;, &quot;sync&quot;,
+        &quot;security&quot;, &quot;block&quot;, &quot;speed&quot;, &quot;support&quot;, &quot;person&quot;, &quot;group&quot;, &quot;notifications&quot;, &quot;download&quot;,
+        &quot;info&quot;, &quot;verified&quot;, &quot;all_inclusive&quot;, &quot;close&quot;
+    };
+<span class="fc" id="L107">    private static final char[] ICON_CHARS = {</span>
+        FontImage.MATERIAL_CHECK, FontImage.MATERIAL_CHECK_CIRCLE, FontImage.MATERIAL_DONE,
+        FontImage.MATERIAL_STAR, FontImage.MATERIAL_LOCK, FontImage.MATERIAL_FAVORITE,
+        FontImage.MATERIAL_CLOUD, FontImage.MATERIAL_BOLT, FontImage.MATERIAL_SYNC,
+        FontImage.MATERIAL_SECURITY, FontImage.MATERIAL_BLOCK, FontImage.MATERIAL_SPEED,
+        FontImage.MATERIAL_SUPPORT, FontImage.MATERIAL_PERSON, FontImage.MATERIAL_GROUP,
+        FontImage.MATERIAL_NOTIFICATIONS, FontImage.MATERIAL_DOWNLOAD, FontImage.MATERIAL_INFO,
+        FontImage.MATERIAL_VERIFIED, FontImage.MATERIAL_ALL_INCLUSIVE, FontImage.MATERIAL_CLOSE
+    };
+
+    private final Offering offering;
+    private final Map document;
+    private final String paywallId;
+<span class="fc" id="L120">    private final List&lt;Map&gt; stringTables = new ArrayList&lt;Map&gt;();</span>
+    private final Map colors;
+<span class="fc" id="L122">    private final List&lt;Container&gt; packageRows = new ArrayList&lt;Container&gt;();</span>
+<span class="fc" id="L123">    private final List&lt;CommercePackage&gt; rowPackages = new ArrayList&lt;CommercePackage&gt;();</span>
+<span class="fc" id="L124">    private final List&lt;Component&gt; textComponents = new ArrayList&lt;Component&gt;();</span>
+<span class="fc" id="L125">    private final List&lt;String&gt; textSources = new ArrayList&lt;String&gt;();</span>
+    private CommercePackage selected;
+    private CommercePackage pending;
+    private boolean restoring;
+    private boolean impressionLogged;
+    private boolean closed;
+    private PaywallListener listener;
+    private Runnable closeHandler;
+    private boolean closeWhenDone;
+    private ActionListener customerListener;
+    private boolean webPurchaseStarted;
+    private Form shownForm;
+<span class="fc" id="L137">    private final ActionListener showListener = new ActionListener() {</span>
+        @Override
+        public void actionPerformed(ActionEvent evt) {
+<span class="fc" id="L140">            formShown();</span>
+<span class="fc" id="L141">        }</span>
+    };
+
+    /// Builds the paywall of an offering from the offering's own document,
+    /// or from [the built-in one][Paywall#createDefault(Offering)] when it
+    /// has none.
+    ///
+    /// #### Parameters
+    ///
+    /// - `offering`: the offering to sell
+    public PaywallView(Offering offering) {
+<span class="fc bfc" id="L152" title="All 2 branches covered.">        this(offering, offering == null ? null : offering.getPaywall());</span>
+<span class="fc" id="L153">    }</span>
+
+    /// Builds a paywall from a document.
+    ///
+    /// #### Parameters
+    ///
+    /// - `offering`: the offering to sell
+    ///
+    /// - `paywallDocument`: the parsed paywall document; null uses
+    ///   [the built-in one][Paywall#createDefault(Offering)]
+    public PaywallView(Offering offering, Map paywallDocument) {
+<span class="fc" id="L164">        super(BoxLayout.y());</span>
+<span class="fc" id="L165">        this.offering = offering;</span>
+<span class="fc bfc" id="L166" title="All 2 branches covered.">        document = paywallDocument == null ? Paywall.createDefault(offering) : paywallDocument;</span>
+<span class="fc" id="L167">        Object id = document.get(&quot;id&quot;);</span>
+<span class="pc bpc" id="L168" title="1 of 2 branches missed.">        paywallId = id == null ? null : id.toString();</span>
+<span class="fc" id="L169">        setUIID(&quot;Paywall&quot;);</span>
+<span class="fc" id="L170">        setScrollableY(true);</span>
+<span class="fc" id="L171">        loadStrings();</span>
+<span class="fc" id="L172">        colors = chooseColors();</span>
+<span class="fc" id="L173">        int bg = color(&quot;background&quot;);</span>
+<span class="fc bfc" id="L174" title="All 2 branches covered.">        if (bg &gt;= 0) {</span>
+<span class="fc" id="L175">            getAllStyles().setBgColor(bg);</span>
+<span class="fc" id="L176">            getAllStyles().setBgTransparency(255);</span>
+        }
+<span class="fc" id="L178">        Object root = document.get(&quot;root&quot;);</span>
+<span class="pc bpc" id="L179" title="1 of 2 branches missed.">        if (root instanceof Map) {</span>
+<span class="fc" id="L180">            Component c = build((Map) root);</span>
+<span class="pc bpc" id="L181" title="1 of 2 branches missed.">            if (c != null) {</span>
+<span class="fc" id="L182">                add(c);</span>
+            }
+        }
+<span class="pc bpc" id="L185" title="1 of 4 branches missed.">        if (selected == null &amp;&amp; !rowPackages.isEmpty()) {</span>
+<span class="nc" id="L186">            selected = rowPackages.get(0);</span>
+        }
+<span class="pc bpc" id="L188" title="3 of 6 branches missed.">        if (selected == null &amp;&amp; offering != null &amp;&amp; !offering.getPackages().isEmpty()) {</span>
+<span class="nc" id="L189">            selected = offering.getPackages().get(0);</span>
+        }
+<span class="fc" id="L191">        applySelection();</span>
+<span class="fc" id="L192">    }</span>
+
+    // ---- public surface ------------------------------------------------------
+
+    /// Sets the listener that is told what happens on this paywall.
+    ///
+    /// #### Parameters
+    ///
+    /// - `listener`: the listener, or null for none
+    public void setPaywallListener(PaywallListener listener) {
+<span class="fc" id="L202">        this.listener = listener;</span>
+<span class="fc" id="L203">    }</span>
+
+    /// The offering this paywall sells.
+    public Offering getOffering() {
+<span class="fc" id="L207">        return offering;</span>
+    }
+
+    /// The id of the paywall document, or null when it has none.
+    public String getPaywallId() {
+<span class="fc" id="L212">        return paywallId;</span>
+    }
+
+    /// The package that is selected, which the purchase button buys.
+    ///
+    /// #### Returns
+    ///
+    /// the package, or null when the offering has no package
+    public CommercePackage getSelectedPackage() {
+<span class="fc" id="L221">        return selected;</span>
+    }
+
+    /// Selects a package, as tapping it does.
+    ///
+    /// #### Parameters
+    ///
+    /// - `packageId`: the id of a package of the offering; any other value
+    ///   is ignored
+    public void selectPackage(String packageId) {
+<span class="pc bpc" id="L231" title="1 of 2 branches missed.">        CommercePackage pkg = offering == null ? null : offering.getPackage(packageId);</span>
+<span class="fc bfc" id="L232" title="All 2 branches covered.">        if (pkg == null) {</span>
+<span class="fc" id="L233">            return;</span>
+        }
+<span class="fc" id="L235">        selected = pkg;</span>
+<span class="fc" id="L236">        applySelection();</span>
+<span class="fc" id="L237">        track(&quot;paywall_package_selected&quot;, pkg);</span>
+<span class="fc bfc" id="L238" title="All 2 branches covered.">        if (getComponentForm() != null) {</span>
+<span class="fc" id="L239">            revalidate();</span>
+        }
+<span class="fc" id="L241">    }</span>
+
+    /// Buys the selected package, as the purchase button does. The listener
+    /// hears `purchaseStarted` now and `purchaseCompleted` once the cloud
+    /// reports the customer as owning the product.
+    public void purchase() {
+<span class="fc" id="L247">        CommercePackage pkg = selected;</span>
+<span class="fc bfc" id="L248" title="All 2 branches covered.">        if (pkg == null) {</span>
+<span class="fc" id="L249">            return;</span>
+        }
+<span class="fc" id="L251">        pending = pkg;</span>
+<span class="fc" id="L252">        log(&quot;PURCHASE_START&quot;, pkg.getId());</span>
+<span class="pc bpc" id="L253" title="1 of 2 branches missed.">        if (listener != null) {</span>
+<span class="fc" id="L254">            listener.purchaseStarted(pkg);</span>
+        }
+<span class="fc" id="L256">        watchCustomer();</span>
+<span class="fc" id="L257">        CommerceManager cm = CommerceManager.getInstance();</span>
+<span class="pc bpc" id="L258" title="1 of 2 branches missed.">        if (cm.isWebPurchase(pkg)) {</span>
+            // The customer pays in the browser and nothing reports back:
+            // the cloud is asked again when this form is next shown.
+<span class="nc bnc" id="L261" title="All 2 branches missed.">            if (cm.purchaseOnWeb(pkg)) {</span>
+<span class="nc" id="L262">                webPurchaseStarted = true;</span>
+            }
+<span class="nc" id="L264">            return;</span>
+        }
+<span class="fc" id="L266">        cm.purchase(pkg);</span>
+<span class="fc" id="L267">    }</span>
+
+    /// Restores the purchases of the store account, as the restore button
+    /// does. The listener hears `restoreCompleted` when the customer
+    /// information changes afterwards.
+    public void restore() {
+<span class="fc" id="L273">        restoring = true;</span>
+<span class="fc" id="L274">        track(&quot;paywall_restore&quot;, selected);</span>
+<span class="fc" id="L275">        watchCustomer();</span>
+<span class="fc" id="L276">        CommerceManager.getInstance().restore();</span>
+<span class="fc" id="L277">    }</span>
+
+    /// Closes the paywall, as the close button does. A purchase that was
+    /// started and not confirmed yet is reported as cancelled.
+    public void close() {
+<span class="fc bfc" id="L282" title="All 2 branches covered.">        if (closed) {</span>
+<span class="fc" id="L283">            return;</span>
+        }
+<span class="fc" id="L285">        closed = true;</span>
+<span class="fc bfc" id="L286" title="All 2 branches covered.">        boolean cancelled = pending != null;</span>
+<span class="fc" id="L287">        pending = null;</span>
+<span class="fc" id="L288">        restoring = false;</span>
+<span class="fc" id="L289">        stopWatchingCustomer();</span>
+<span class="fc" id="L290">        log(&quot;CLOSE&quot;, null);</span>
+<span class="fc bfc" id="L291" title="All 2 branches covered.">        if (listener != null) {</span>
+<span class="pc bpc" id="L292" title="1 of 2 branches missed.">            if (cancelled) {</span>
+<span class="fc" id="L293">                listener.purchaseCancelled();</span>
+            }
+<span class="fc" id="L295">            listener.closed();</span>
+        }
+<span class="fc bfc" id="L297" title="All 2 branches covered.">        if (closeHandler != null) {</span>
+<span class="fc" id="L298">            closeHandler.run();</span>
+        }
+<span class="fc" id="L300">    }</span>
+
+    /// Sets what closing the paywall does to the screen, after the listener
+    /// was told. [Paywall#show(Offering, PaywallListener)] sets it to return
+    /// to the previous form; an application that embeds the view in a form
+    /// of its own sets it to whatever removes the view.
+    ///
+    /// #### Parameters
+    ///
+    /// - `closeHandler`: run on the EDT when the paywall closes, or null
+    public void setCloseHandler(Runnable closeHandler) {
+<span class="fc" id="L311">        this.closeHandler = closeHandler;</span>
+<span class="fc" id="L312">    }</span>
+
+    @Override
+    protected void initComponent() {
+<span class="fc" id="L316">        super.initComponent();</span>
+<span class="pc bpc" id="L317" title="1 of 2 branches missed.">        if (!impressionLogged) {</span>
+<span class="fc" id="L318">            impressionLogged = true;</span>
+<span class="fc" id="L319">            log(&quot;IMPRESSION&quot;, null);</span>
+        }
+<span class="fc" id="L321">        Form form = getComponentForm();</span>
+<span class="pc bpc" id="L322" title="2 of 4 branches missed.">        if (form != null &amp;&amp; shownForm != form) { //NOPMD CompareObjectsWithEquals - the same form instance, not an equal one</span>
+<span class="pc bpc" id="L323" title="1 of 2 branches missed.">            if (shownForm != null) {</span>
+<span class="nc" id="L324">                shownForm.removeShowListener(showListener);</span>
+            }
+<span class="fc" id="L326">            shownForm = form;</span>
+<span class="fc" id="L327">            form.addShowListener(showListener);</span>
+        }
+<span class="fc" id="L329">    }</span>
+
+    /// Asks the cloud again once the form is back after a web checkout was
+    /// opened, which is how a purchase made in the browser is learned of.
+    /// The refresh blocks on the network, so it runs in the background; the
+    /// customer information listener hears the answer.
+    void formShown() {
+<span class="pc bpc" id="L336" title="3 of 4 branches missed.">        if (!webPurchaseStarted || closed) {</span>
+<span class="fc" id="L337">            return;</span>
+        }
+<span class="nc" id="L339">        Display.getInstance().scheduleBackgroundTask(new RefreshTask());</span>
+<span class="nc" id="L340">    }</span>
+
+    /// Asks the cloud for the customer again, off the EDT.
+    private static final class RefreshTask implements Runnable {
+        @Override
+        public void run() {
+<span class="nc" id="L346">            CommerceManager.getInstance().refresh();</span>
+<span class="nc" id="L347">        }</span>
+    }
+
+    // ---- purchase tracking ---------------------------------------------------
+
+    private void watchCustomer() {
+<span class="pc bpc" id="L353" title="1 of 2 branches missed.">        if (customerListener != null) {</span>
+<span class="nc" id="L354">            return;</span>
+        }
+<span class="fc" id="L356">        customerListener = new ActionListener() {</span>
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+<span class="fc" id="L359">                Object source = evt.getSource();</span>
+<span class="pc bpc" id="L360" title="1 of 2 branches missed.">                if (source instanceof CustomerInfo) {</span>
+<span class="fc" id="L361">                    customerChanged((CustomerInfo) source);</span>
+                }
+<span class="fc" id="L363">            }</span>
+        };
+<span class="fc" id="L365">        CommerceManager.getInstance().addCustomerInfoListener(customerListener);</span>
+<span class="fc" id="L366">    }</span>
+
+    private void stopWatchingCustomer() {
+<span class="pc bpc" id="L369" title="1 of 2 branches missed.">        if (customerListener != null) {</span>
+<span class="fc" id="L370">            CommerceManager.getInstance().removeCustomerInfoListener(customerListener);</span>
+<span class="fc" id="L371">            customerListener = null;</span>
+        }
+<span class="fc" id="L373">    }</span>
+
+    private void customerChanged(CustomerInfo info) {
+<span class="pc bpc" id="L376" title="2 of 4 branches missed.">        boolean bought = pending != null &amp;&amp; owns(info, pending.getProductId());</span>
+<span class="fc" id="L377">        boolean restored = restoring;</span>
+<span class="pc bpc" id="L378" title="3 of 4 branches missed.">        if (!bought &amp;&amp; !restored) {</span>
+<span class="nc bnc" id="L379" title="All 2 branches missed.">            if (pending == null) {</span>
+<span class="nc" id="L380">                stopWatchingCustomer();</span>
+            }
+<span class="nc" id="L382">            return;</span>
+        }
+<span class="pc bpc" id="L384" title="1 of 2 branches missed.">        if (bought) {</span>
+<span class="fc" id="L385">            log(&quot;PURCHASE&quot;, pending.getId());</span>
+<span class="fc" id="L386">            pending = null;</span>
+        }
+<span class="fc" id="L388">        restoring = false;</span>
+<span class="fc" id="L389">        boolean left = false;</span>
+<span class="pc bpc" id="L390" title="1 of 2 branches missed.">        if (pending == null) {</span>
+<span class="fc" id="L391">            stopWatchingCustomer();</span>
+<span class="fc" id="L392">            left = leaveWhenDone();</span>
+        }
+<span class="pc bpc" id="L394" title="1 of 2 branches missed.">        if (listener != null) {</span>
+<span class="pc bpc" id="L395" title="1 of 2 branches missed.">            if (bought) {</span>
+<span class="fc" id="L396">                listener.purchaseCompleted(info);</span>
+            }
+<span class="pc bpc" id="L398" title="1 of 2 branches missed.">            if (restored) {</span>
+<span class="nc" id="L399">                listener.restoreCompleted(info);</span>
+            }
+<span class="fc bfc" id="L401" title="All 2 branches covered.">            if (left) {</span>
+<span class="fc" id="L402">                listener.closed();</span>
+            }
+        }
+<span class="fc" id="L405">    }</span>
+
+    /// A paywall that is a screen of its own has nothing left to offer once
+    /// the purchase or the restore went through, so it leaves before the
+    /// listener hears of it: the listener then runs over the form the
+    /// customer came from and may show one of its own. A view the
+    /// application embedded stays where it is; only the application knows
+    /// what its form should show next.
+    private boolean leaveWhenDone() {
+<span class="pc bpc" id="L414" title="1 of 4 branches missed.">        if (!closeWhenDone || closed) {</span>
+<span class="fc" id="L415">            return false;</span>
+        }
+<span class="fc" id="L417">        closed = true;</span>
+<span class="fc" id="L418">        log(&quot;CLOSE&quot;, null);</span>
+<span class="pc bpc" id="L419" title="1 of 2 branches missed.">        if (closeHandler != null) {</span>
+<span class="fc" id="L420">            closeHandler.run();</span>
+        }
+<span class="fc" id="L422">        return true;</span>
+    }
+
+    /// Makes the view close itself, through its close handler, once a
+    /// purchase or a restore completes. [Paywall#show(Offering, PaywallListener)]
+    /// turns it on for the form it shows.
+    void setCloseWhenDone(boolean closeWhenDone) {
+<span class="fc" id="L429">        this.closeWhenDone = closeWhenDone;</span>
+<span class="fc" id="L430">    }</span>
+
+    private static boolean owns(CustomerInfo info, String productId) {
+<span class="pc bpc" id="L433" title="1 of 2 branches missed.">        if (productId == null) {</span>
+<span class="nc" id="L434">            return false;</span>
+        }
+<span class="pc bpc" id="L436" title="1 of 2 branches missed.">        if (info.getActiveSubscriptions().contains(productId)) {</span>
+<span class="fc" id="L437">            return true;</span>
+        }
+<span class="nc bnc" id="L439" title="All 2 branches missed.">        for (EntitlementInfo e : info.getActiveEntitlements()) {</span>
+<span class="nc bnc" id="L440" title="All 2 branches missed.">            if (productId.equals(e.getProductId())) {</span>
+<span class="nc" id="L441">                return true;</span>
+            }
+<span class="nc" id="L443">        }</span>
+<span class="nc" id="L444">        return false;</span>
+    }
+
+    private void log(String type, String packageId) {
+<span class="pc bpc" id="L448" title="1 of 2 branches missed.">        CommerceManager.getInstance().logEvent(type,</span>
+<span class="fc" id="L449">                offering == null ? null : offering.getId(), paywallId, packageId);</span>
+        // The same moments, through the application's analytics providers.
+        // A purchase is not repeated here: Purchase reports it.
+<span class="fc bfc" id="L452" title="All 2 branches covered.">        if (&quot;IMPRESSION&quot;.equals(type)) {</span>
+<span class="fc" id="L453">            track(&quot;paywall_view&quot;, null);</span>
+<span class="fc bfc" id="L454" title="All 2 branches covered.">        } else if (&quot;CLOSE&quot;.equals(type)) {</span>
+<span class="fc" id="L455">            track(&quot;paywall_close&quot;, null);</span>
+        }
+<span class="fc" id="L457">    }</span>
+
+    private void track(String name, CommercePackage pkg) {
+<span class="pc bpc" id="L460" title="1 of 2 branches missed.">        CommerceManager.getInstance().analyticsEvent(name,</span>
+<span class="fc bfc" id="L461" title="All 2 branches covered.">                offering == null ? null : offering.getId(),</span>
+<span class="fc bfc" id="L462" title="All 2 branches covered.">                pkg == null ? null : pkg.getId(),</span>
+<span class="fc" id="L463">                pkg == null ? null : pkg.getProductId(), null, null);</span>
+<span class="fc" id="L464">    }</span>
+
+    // ---- building ------------------------------------------------------------
+
+    /// Builds the component of one node, or null for a node to skip.
+    private Component build(Map node) {
+<span class="fc" id="L470">        String type = str(node.get(&quot;type&quot;));</span>
+<span class="pc bpc" id="L471" title="1 of 2 branches missed.">        if (type == null) {</span>
+<span class="nc" id="L472">            return null;</span>
+        }
+<span class="fc bfc" id="L474" title="All 2 branches covered.">        if (&quot;stack&quot;.equalsIgnoreCase(type)) {</span>
+<span class="fc" id="L475">            return buildStack(node);</span>
+        }
+<span class="fc bfc" id="L477" title="All 2 branches covered.">        if (&quot;text&quot;.equalsIgnoreCase(type)) {</span>
+<span class="fc" id="L478">            return buildText(node);</span>
+        }
+<span class="fc bfc" id="L480" title="All 2 branches covered.">        if (&quot;image&quot;.equalsIgnoreCase(type)) {</span>
+<span class="fc" id="L481">            return buildImage(node);</span>
+        }
+<span class="fc bfc" id="L483" title="All 2 branches covered.">        if (&quot;icon&quot;.equalsIgnoreCase(type)) {</span>
+<span class="fc" id="L484">            Label icon = new Label();</span>
+<span class="fc" id="L485">            icon.setUIID(&quot;PaywallIcon&quot;);</span>
+<span class="fc" id="L486">            setIcon(icon, str(node.get(&quot;name&quot;)));</span>
+<span class="fc" id="L487">            tint(icon.getAllStyles(), &quot;accent&quot;);</span>
+<span class="fc" id="L488">            return icon;</span>
+        }
+<span class="fc bfc" id="L490" title="All 2 branches covered.">        if (&quot;features&quot;.equalsIgnoreCase(type)) {</span>
+<span class="fc" id="L491">            return buildFeatures(node);</span>
+        }
+<span class="fc bfc" id="L493" title="All 2 branches covered.">        if (&quot;packages&quot;.equalsIgnoreCase(type)) {</span>
+<span class="fc" id="L494">            return buildPackages(node);</span>
+        }
+<span class="fc bfc" id="L496" title="All 2 branches covered.">        if (&quot;purchaseButton&quot;.equalsIgnoreCase(type)) {</span>
+<span class="fc" id="L497">            Button b = new Button();</span>
+<span class="fc" id="L498">            b.setUIID(&quot;PaywallPurchaseButton&quot;);</span>
+<span class="fc" id="L499">            int accent = color(&quot;accent&quot;);</span>
+<span class="fc bfc" id="L500" title="All 2 branches covered.">            if (accent &gt;= 0) {</span>
+<span class="fc" id="L501">                b.getAllStyles().setBgColor(accent);</span>
+<span class="fc" id="L502">                b.getAllStyles().setBgTransparency(255);</span>
+            }
+<span class="fc" id="L504">            tint(b.getAllStyles(), &quot;accentText&quot;);</span>
+<span class="fc" id="L505">            registerText(b, textOr(node, &quot;Continue&quot;));</span>
+<span class="fc" id="L506">            b.addActionListener(new ActionListener() {</span>
+                @Override
+                public void actionPerformed(ActionEvent evt) {
+<span class="nc" id="L509">                    purchase();</span>
+<span class="nc" id="L510">                }</span>
+            });
+<span class="fc" id="L512">            return b;</span>
+        }
+<span class="fc bfc" id="L514" title="All 2 branches covered.">        if (&quot;restoreButton&quot;.equalsIgnoreCase(type)) {</span>
+<span class="fc" id="L515">            Button b = new Button();</span>
+<span class="fc" id="L516">            b.setUIID(&quot;PaywallRestoreButton&quot;);</span>
+<span class="fc" id="L517">            tint(b.getAllStyles(), &quot;muted&quot;);</span>
+<span class="fc" id="L518">            registerText(b, textOr(node, &quot;Restore purchases&quot;));</span>
+<span class="fc" id="L519">            b.addActionListener(new ActionListener() {</span>
+                @Override
+                public void actionPerformed(ActionEvent evt) {
+<span class="nc" id="L522">                    restore();</span>
+<span class="nc" id="L523">                }</span>
+            });
+<span class="fc" id="L525">            return b;</span>
+        }
+<span class="fc bfc" id="L527" title="All 2 branches covered.">        if (&quot;closeButton&quot;.equalsIgnoreCase(type)) {</span>
+<span class="fc" id="L528">            Button b = new Button();</span>
+<span class="fc" id="L529">            b.setUIID(&quot;PaywallCloseButton&quot;);</span>
+<span class="fc" id="L530">            setIcon(b, &quot;close&quot;);</span>
+<span class="fc" id="L531">            tint(b.getAllStyles(), &quot;muted&quot;);</span>
+<span class="fc" id="L532">            b.addActionListener(new ActionListener() {</span>
+                @Override
+                public void actionPerformed(ActionEvent evt) {
+<span class="nc" id="L535">                    close();</span>
+<span class="nc" id="L536">                }</span>
+            });
+<span class="fc" id="L538">            Container bar = new Container(new FlowLayout(Component.RIGHT));</span>
+<span class="fc" id="L539">            bar.setUIID(&quot;PaywallCloseBar&quot;);</span>
+<span class="fc" id="L540">            bar.add(b);</span>
+<span class="fc" id="L541">            return bar;</span>
+        }
+<span class="fc bfc" id="L543" title="All 2 branches covered.">        if (&quot;carousel&quot;.equalsIgnoreCase(type)) {</span>
+<span class="fc" id="L544">            Tabs tabs = new Tabs();</span>
+<span class="fc" id="L545">            tabs.setUIID(&quot;PaywallCarousel&quot;);</span>
+<span class="fc" id="L546">            tabs.hideTabs();</span>
+<span class="fc" id="L547">            tabs.setSwipeActivated(true);</span>
+<span class="fc bfc" id="L548" title="All 2 branches covered.">            for (Component c : buildChildren(node)) {</span>
+<span class="fc" id="L549">                tabs.addTab(&quot;&quot;, (Image) null, c);</span>
+<span class="fc" id="L550">            }</span>
+<span class="fc" id="L551">            return tabs;</span>
+        }
+<span class="fc bfc" id="L553" title="All 2 branches covered.">        if (&quot;footer&quot;.equalsIgnoreCase(type)) {</span>
+<span class="fc" id="L554">            Container footer = new Container(new FlowLayout(Component.CENTER));</span>
+<span class="fc" id="L555">            footer.setUIID(&quot;PaywallFooter&quot;);</span>
+<span class="fc" id="L556">            addLink(footer, str(node.get(&quot;termsUrl&quot;)), &quot;footer.terms&quot;, &quot;Terms of Service&quot;);</span>
+<span class="fc" id="L557">            addLink(footer, str(node.get(&quot;privacyUrl&quot;)), &quot;footer.privacy&quot;, &quot;Privacy Policy&quot;);</span>
+<span class="fc" id="L558">            return footer;</span>
+        }
+<span class="fc bfc" id="L560" title="All 2 branches covered.">        if (&quot;spacer&quot;.equalsIgnoreCase(type)) {</span>
+<span class="fc" id="L561">            return gap(0, mm(node.get(&quot;size&quot;), 2));</span>
+        }
+<span class="fc" id="L563">        return null;</span>
+    }
+
+    private List&lt;Component&gt; buildChildren(Map node) {
+<span class="fc" id="L567">        List&lt;Component&gt; out = new ArrayList&lt;Component&gt;();</span>
+<span class="fc" id="L568">        Object children = node.get(&quot;children&quot;);</span>
+<span class="pc bpc" id="L569" title="1 of 2 branches missed.">        if (children instanceof List) {</span>
+<span class="fc bfc" id="L570" title="All 2 branches covered.">            for (Object o : (List) children) {</span>
+<span class="pc bpc" id="L571" title="1 of 2 branches missed.">                if (o instanceof Map) {</span>
+<span class="fc" id="L572">                    Component c = build((Map) o);</span>
+<span class="fc bfc" id="L573" title="All 2 branches covered.">                    if (c != null) {</span>
+<span class="fc" id="L574">                        out.add(c);</span>
+                    }
+                }
+<span class="fc" id="L577">            }</span>
+        }
+<span class="fc" id="L579">        return out;</span>
+    }
+
+    private Component buildStack(Map node) {
+<span class="fc" id="L583">        boolean horizontal = &quot;x&quot;.equalsIgnoreCase(str(node.get(&quot;axis&quot;)));</span>
+<span class="fc bfc" id="L584" title="All 2 branches covered.">        Container stack = new Container(horizontal ? BoxLayout.x() : BoxLayout.y());</span>
+<span class="fc" id="L585">        stack.setUIID(&quot;PaywallStack&quot;);</span>
+<span class="fc" id="L586">        int gap = mm(node.get(&quot;gap&quot;), 0);</span>
+<span class="fc" id="L587">        boolean first = true;</span>
+<span class="fc bfc" id="L588" title="All 2 branches covered.">        for (Component c : buildChildren(node)) {</span>
+<span class="pc bpc" id="L589" title="1 of 4 branches missed.">            if (!first &amp;&amp; gap &gt; 0) {</span>
+<span class="pc bpc" id="L590" title="1 of 2 branches missed.">                stack.add(horizontal ? gap(gap, 0) : gap(0, gap));</span>
+            }
+<span class="fc" id="L592">            first = false;</span>
+<span class="fc" id="L593">            stack.add(c);</span>
+<span class="fc" id="L594">        }</span>
+<span class="fc bfc" id="L595" title="All 2 branches covered.">        if (node.get(&quot;padding&quot;) != null) {</span>
+<span class="fc" id="L596">            int p = mm(node.get(&quot;padding&quot;), 0);</span>
+<span class="fc" id="L597">            Style s = stack.getAllStyles();</span>
+<span class="fc" id="L598">            s.setPaddingUnit(Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS,</span>
+                    Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS);
+<span class="fc" id="L600">            s.setPadding(p, p, p, p);</span>
+        }
+<span class="fc" id="L602">        int align = alignment(str(node.get(&quot;align&quot;)));</span>
+<span class="pc bpc" id="L603" title="1 of 4 branches missed.">        if (horizontal &amp;&amp; align != Component.LEFT) {</span>
+            // A box layout fills its axis; a flow layout places the row.
+<span class="fc" id="L605">            Container holder = new Container(new FlowLayout(align));</span>
+<span class="fc" id="L606">            holder.setUIID(&quot;PaywallStack&quot;);</span>
+<span class="fc" id="L607">            holder.add(stack);</span>
+<span class="fc" id="L608">            return holder;</span>
+        }
+<span class="fc" id="L610">        return stack;</span>
+    }
+
+    private Component buildText(Map node) {
+<span class="fc" id="L614">        String style = str(node.get(&quot;style&quot;));</span>
+<span class="fc" id="L615">        String uiid = &quot;PaywallBody&quot;;</span>
+<span class="fc" id="L616">        String colorKey = &quot;text&quot;;</span>
+<span class="fc bfc" id="L617" title="All 2 branches covered.">        if (&quot;title&quot;.equalsIgnoreCase(style)) {</span>
+<span class="fc" id="L618">            uiid = &quot;PaywallTitle&quot;;</span>
+<span class="fc bfc" id="L619" title="All 2 branches covered.">        } else if (&quot;headline&quot;.equalsIgnoreCase(style)) {</span>
+<span class="fc" id="L620">            uiid = &quot;PaywallHeadline&quot;;</span>
+<span class="fc bfc" id="L621" title="All 2 branches covered.">        } else if (&quot;caption&quot;.equalsIgnoreCase(style)) {</span>
+<span class="fc" id="L622">            uiid = &quot;PaywallCaption&quot;;</span>
+<span class="fc" id="L623">            colorKey = &quot;muted&quot;;</span>
+        }
+<span class="fc" id="L625">        SpanLabel label = new SpanLabel();</span>
+<span class="fc" id="L626">        label.setTextUIID(uiid);</span>
+<span class="fc" id="L627">        tint(label.getTextAllStyles(), colorKey);</span>
+<span class="fc bfc" id="L628" title="All 2 branches covered.">        if (node.get(&quot;align&quot;) != null) {</span>
+<span class="fc" id="L629">            int align = alignment(str(node.get(&quot;align&quot;)));</span>
+<span class="fc" id="L630">            label.getTextAllStyles().setAlignment(align);</span>
+<span class="fc" id="L631">            label.setTextBlockAlign(align);</span>
+        }
+<span class="fc" id="L633">        registerText(label, textOr(node, &quot;&quot;));</span>
+<span class="fc" id="L634">        return label;</span>
+    }
+
+    private Component buildImage(Map node) {
+<span class="fc" id="L638">        Label label = new Label();</span>
+<span class="fc" id="L639">        label.setUIID(&quot;PaywallImage&quot;);</span>
+<span class="fc" id="L640">        String url = str(node.get(&quot;url&quot;));</span>
+<span class="pc bpc" id="L641" title="2 of 4 branches missed.">        if (url == null || url.length() == 0) {</span>
+<span class="nc" id="L642">            return label;</span>
+        }
+<span class="fc" id="L644">        int height = mm(node.get(&quot;height&quot;), 40);</span>
+<span class="fc" id="L645">        int width = Math.max(1, Display.getInstance().getDisplayWidth());</span>
+        try {
+<span class="fc" id="L647">            EncodedImage placeholder = EncodedImage.createFromImage(</span>
+<span class="fc" id="L648">                    Image.createImage(width, Math.max(1, height), 0), false);</span>
+<span class="pc" id="L649">            label.setIcon(URLImage.createToStorage(placeholder,</span>
+<span class="fc" id="L650">                    &quot;CN1Paywall_&quot; + Integer.toHexString(url.hashCode()), url,</span>
+                    URLImage.RESIZE_SCALE_TO_FILL));
+<span class="fc" id="L652">        } catch (Throwable t) {</span>
+            // A paywall without its picture still sells.
+<span class="fc" id="L654">            Log.p(&quot;PaywallView: could not load &quot; + url + &quot;: &quot; + t);</span>
+<span class="nc" id="L655">        }</span>
+<span class="fc" id="L656">        return label;</span>
+    }
+
+    private Component buildFeatures(Map node) {
+<span class="fc" id="L660">        Container features = new Container(BoxLayout.y());</span>
+<span class="fc" id="L661">        features.setUIID(&quot;PaywallFeatures&quot;);</span>
+<span class="fc" id="L662">        Object items = node.get(&quot;items&quot;);</span>
+<span class="pc bpc" id="L663" title="1 of 2 branches missed.">        if (items instanceof List) {</span>
+<span class="fc bfc" id="L664" title="All 2 branches covered.">            for (Object o : (List) items) {</span>
+<span class="pc bpc" id="L665" title="1 of 2 branches missed.">                if (!(o instanceof Map)) {</span>
+<span class="nc" id="L666">                    continue;</span>
+                }
+<span class="fc" id="L668">                Map item = (Map) o;</span>
+<span class="fc" id="L669">                Container row = new Container(BoxLayout.x());</span>
+<span class="fc" id="L670">                row.setUIID(&quot;PaywallFeature&quot;);</span>
+<span class="fc" id="L671">                Label icon = new Label();</span>
+<span class="fc" id="L672">                icon.setUIID(&quot;PaywallFeatureIcon&quot;);</span>
+<span class="fc" id="L673">                setIcon(icon, str(item.get(&quot;icon&quot;)));</span>
+<span class="fc" id="L674">                tint(icon.getAllStyles(), &quot;accent&quot;);</span>
+<span class="fc" id="L675">                SpanLabel text = new SpanLabel();</span>
+<span class="fc" id="L676">                text.setTextUIID(&quot;PaywallFeatureText&quot;);</span>
+<span class="fc" id="L677">                tint(text.getTextAllStyles(), &quot;text&quot;);</span>
+<span class="fc" id="L678">                registerText(text, textOr(item, &quot;&quot;));</span>
+<span class="fc" id="L679">                row.add(icon);</span>
+<span class="fc" id="L680">                row.add(text);</span>
+<span class="fc" id="L681">                features.add(row);</span>
+<span class="fc" id="L682">            }</span>
+        }
+<span class="fc" id="L684">        return features;</span>
+    }
+
+    private Component buildPackages(Map node) {
+<span class="fc bfc" id="L688" title="All 2 branches covered.">        List&lt;CommercePackage&gt; all = offering == null</span>
+<span class="fc" id="L689">                ? new ArrayList&lt;CommercePackage&gt;() : offering.getPackages();</span>
+<span class="fc" id="L690">        boolean tiles = &quot;tiles&quot;.equalsIgnoreCase(str(node.get(&quot;style&quot;)));</span>
+<span class="pc bpc" id="L691" title="1 of 4 branches missed.">        Container holder = new Container(tiles &amp;&amp; !all.isEmpty()</span>
+<span class="fc" id="L692">                ? new GridLayout(1, all.size()) : BoxLayout.y());</span>
+<span class="fc" id="L693">        holder.setUIID(&quot;PaywallPackages&quot;);</span>
+<span class="fc" id="L694">        String preselected = str(node.get(&quot;selected&quot;));</span>
+<span class="fc bfc" id="L695" title="All 2 branches covered.">        for (final CommercePackage pkg : all) {</span>
+<span class="fc" id="L696">            Container row = new Container(BoxLayout.y());</span>
+<span class="fc" id="L697">            row.setName(&quot;PaywallPackage_&quot; + pkg.getId());</span>
+<span class="fc" id="L698">            Button title = new Button(packageTitle(pkg));</span>
+<span class="fc" id="L699">            Label price = new Label(packagePrice(pkg));</span>
+<span class="fc" id="L700">            title.addActionListener(new ActionListener() {</span>
+                @Override
+                public void actionPerformed(ActionEvent evt) {
+<span class="nc" id="L703">                    selectPackage(pkg.getId());</span>
+<span class="nc" id="L704">                }</span>
+            });
+<span class="fc" id="L706">            row.add(title);</span>
+<span class="fc" id="L707">            row.add(price);</span>
+            // The whole row acts as the one button inside it.
+<span class="fc" id="L709">            row.setLeadComponent(title);</span>
+<span class="fc" id="L710">            holder.add(row);</span>
+<span class="fc" id="L711">            packageRows.add(row);</span>
+<span class="fc" id="L712">            rowPackages.add(pkg);</span>
+<span class="pc bpc" id="L713" title="1 of 6 branches missed.">            if (selected == null &amp;&amp; preselected != null &amp;&amp; preselected.equals(pkg.getId())) {</span>
+<span class="fc" id="L714">                selected = pkg;</span>
+            }
+<span class="fc" id="L716">        }</span>
+<span class="fc" id="L717">        return holder;</span>
+    }
+
+    /// Gives every package row the UIIDs of its state, which also drops the
+    /// colors a previous state painted on it, then fills in the texts that
+    /// name the selected package.
+    private void applySelection() {
+<span class="fc bfc" id="L724" title="All 2 branches covered.">        for (int i = 0; i &lt; packageRows.size(); i++) {</span>
+<span class="fc" id="L725">            Container row = packageRows.get(i);</span>
+<span class="fc bfc" id="L726" title="All 2 branches covered.">            boolean on = rowPackages.get(i) == selected; //NOPMD CompareObjectsWithEquals - the selection is one of these instances</span>
+<span class="fc bfc" id="L727" title="All 2 branches covered.">            String suffix = on ? &quot;Selected&quot; : &quot;&quot;;</span>
+<span class="fc" id="L728">            row.setUIID(&quot;PaywallPackage&quot; + suffix);</span>
+<span class="fc" id="L729">            row.getComponentAt(0).setUIID(&quot;PaywallPackageTitle&quot; + suffix);</span>
+<span class="fc" id="L730">            row.getComponentAt(1).setUIID(&quot;PaywallPackagePrice&quot; + suffix);</span>
+<span class="fc bfc" id="L731" title="All 2 branches covered.">            if (on) {</span>
+<span class="fc" id="L732">                int accent = color(&quot;accent&quot;);</span>
+<span class="fc bfc" id="L733" title="All 2 branches covered.">                if (accent &gt;= 0) {</span>
+<span class="fc" id="L734">                    row.getAllStyles().setBgColor(accent);</span>
+<span class="fc" id="L735">                    row.getAllStyles().setBgTransparency(255);</span>
+                }
+<span class="fc" id="L737">                tint(row.getComponentAt(0).getAllStyles(), &quot;accentText&quot;);</span>
+<span class="fc" id="L738">                tint(row.getComponentAt(1).getAllStyles(), &quot;accentText&quot;);</span>
+<span class="fc" id="L739">            } else {</span>
+<span class="fc" id="L740">                tint(row.getComponentAt(0).getAllStyles(), &quot;text&quot;);</span>
+<span class="fc" id="L741">                tint(row.getComponentAt(1).getAllStyles(), &quot;muted&quot;);</span>
+            }
+        }
+<span class="fc bfc" id="L744" title="All 2 branches covered.">        for (int i = 0; i &lt; textComponents.size(); i++) {</span>
+<span class="fc" id="L745">            Component c = textComponents.get(i);</span>
+<span class="fc" id="L746">            String text = substitute(lookup(textSources.get(i)));</span>
+<span class="fc bfc" id="L747" title="All 2 branches covered.">            if (c instanceof SpanLabel) {</span>
+<span class="fc" id="L748">                ((SpanLabel) c).setText(text);</span>
+<span class="pc bpc" id="L749" title="1 of 2 branches missed.">            } else if (c instanceof Label) {</span>
+<span class="fc" id="L750">                ((Label) c).setText(text);</span>
+            }
+        }
+<span class="fc" id="L753">    }</span>
+
+    private void addLink(Container footer, String url, String key, String fallback) {
+<span class="pc bpc" id="L756" title="1 of 4 branches missed.">        if (url == null || url.length() == 0) {</span>
+<span class="fc" id="L757">            return;</span>
+        }
+<span class="fc" id="L759">        String text = lookup(key);</span>
+<span class="pc bpc" id="L760" title="1 of 2 branches missed.">        Button link = new Button(key.equals(text) ? fallback : text);</span>
+<span class="fc" id="L761">        link.setUIID(&quot;PaywallFooterLink&quot;);</span>
+<span class="fc" id="L762">        tint(link.getAllStyles(), &quot;muted&quot;);</span>
+<span class="fc" id="L763">        link.addActionListener(new OpenUrl(url));</span>
+<span class="fc" id="L764">        footer.add(link);</span>
+<span class="fc" id="L765">    }</span>
+
+    /// Opens a page of the footer in the platform's browser.
+    private static final class OpenUrl implements ActionListener {
+        private final String url;
+
+<span class="fc" id="L771">        OpenUrl(String url) {</span>
+<span class="fc" id="L772">            this.url = url;</span>
+<span class="fc" id="L773">        }</span>
+
+        @Override
+        public void actionPerformed(ActionEvent evt) {
+<span class="nc" id="L777">            Display.getInstance().execute(url);</span>
+<span class="nc" id="L778">        }</span>
+    }
+
+    private void registerText(Component c, String source) {
+<span class="fc" id="L782">        textComponents.add(c);</span>
+<span class="fc" id="L783">        textSources.add(source);</span>
+<span class="fc" id="L784">    }</span>
+
+    private static String textOr(Map node, String fallback) {
+<span class="fc" id="L787">        String t = str(node.get(&quot;text&quot;));</span>
+<span class="pc bpc" id="L788" title="1 of 2 branches missed.">        return t == null ? fallback : t;</span>
+    }
+
+    private static Component gap(int width, int height) {
+<span class="fc" id="L792">        Component c = new Gap(width, height);</span>
+<span class="fc" id="L793">        c.setUIID(&quot;PaywallSpacer&quot;);</span>
+<span class="fc" id="L794">        return c;</span>
+    }
+
+    /// An empty component of a fixed size.
+    private static final class Gap extends Component {
+        private final int width;
+        private final int height;
+
+<span class="fc" id="L802">        Gap(int width, int height) {</span>
+<span class="fc" id="L803">            this.width = width;</span>
+<span class="fc" id="L804">            this.height = height;</span>
+<span class="fc" id="L805">        }</span>
+
+        @Override
+        protected Dimension calcPreferredSize() {
+<span class="fc" id="L809">            return new Dimension(width, height);</span>
+        }
+    }
+
+    private static void setIcon(Label label, String name) {
+<span class="fc" id="L814">        char icon = FontImage.MATERIAL_CHECK;</span>
+<span class="pc bpc" id="L815" title="1 of 2 branches missed.">        if (name != null) {</span>
+<span class="fc bfc" id="L816" title="All 2 branches covered.">            for (int i = 0; i &lt; ICON_NAMES.length; i++) {</span>
+<span class="fc bfc" id="L817" title="All 2 branches covered.">                if (ICON_NAMES[i].equalsIgnoreCase(name)) {</span>
+<span class="fc" id="L818">                    icon = ICON_CHARS[i];</span>
+<span class="fc" id="L819">                    break;</span>
+                }
+            }
+        }
+        try {
+<span class="fc" id="L824">            FontImage.setMaterialIcon(label, icon);</span>
+<span class="nc" id="L825">        } catch (Throwable t) {</span>
+            // a port with no icon font shows the element without its icon
+<span class="nc" id="L827">            Log.p(&quot;PaywallView: no material icon font: &quot; + t);</span>
+<span class="fc" id="L828">        }</span>
+<span class="fc" id="L829">    }</span>
+
+    // ---- package texts -------------------------------------------------------
+
+    private String packageTitle(CommercePackage pkg) {
+<span class="fc" id="L834">        String key = &quot;package.&quot; + pkg.getId();</span>
+<span class="fc" id="L835">        String text = lookup(key);</span>
+<span class="pc bpc" id="L836" title="1 of 2 branches missed.">        if (!key.equals(text)) {</span>
+<span class="nc" id="L837">            return text;</span>
+        }
+<span class="fc" id="L839">        Product product = pkg.getProduct();</span>
+<span class="pc bpc" id="L840" title="2 of 6 branches missed.">        if (product != null &amp;&amp; product.getDisplayName() != null &amp;&amp; product.getDisplayName().length() &gt; 0) {</span>
+<span class="fc" id="L841">            return product.getDisplayName();</span>
+        }
+<span class="fc bfc" id="L843" title="All 2 branches covered.">        if (pkg.isType(CommercePackage.TYPE_LIFETIME)) {</span>
+<span class="fc" id="L844">            return &quot;Lifetime&quot;;</span>
+        }
+<span class="fc bfc" id="L846" title="All 2 branches covered.">        if (pkg.isType(CommercePackage.TYPE_ANNUAL)) {</span>
+<span class="fc" id="L847">            return &quot;Annual&quot;;</span>
+        }
+<span class="pc bpc" id="L849" title="1 of 2 branches missed.">        if (pkg.isType(CommercePackage.TYPE_SIX_MONTH)) {</span>
+<span class="nc" id="L850">            return &quot;6 months&quot;;</span>
+        }
+<span class="pc bpc" id="L852" title="1 of 2 branches missed.">        if (pkg.isType(CommercePackage.TYPE_THREE_MONTH)) {</span>
+<span class="nc" id="L853">            return &quot;3 months&quot;;</span>
+        }
+<span class="pc bpc" id="L855" title="1 of 2 branches missed.">        if (pkg.isType(CommercePackage.TYPE_TWO_MONTH)) {</span>
+<span class="nc" id="L856">            return &quot;2 months&quot;;</span>
+        }
+<span class="pc bpc" id="L858" title="1 of 2 branches missed.">        if (pkg.isType(CommercePackage.TYPE_MONTHLY)) {</span>
+<span class="fc" id="L859">            return &quot;Monthly&quot;;</span>
+        }
+<span class="nc bnc" id="L861" title="All 2 branches missed.">        if (pkg.isType(CommercePackage.TYPE_WEEKLY)) {</span>
+<span class="nc" id="L862">            return &quot;Weekly&quot;;</span>
+        }
+<span class="nc bnc" id="L864" title="All 2 branches missed.">        return pkg.getId() == null ? &quot;&quot; : pkg.getId();</span>
+    }
+
+    /// The second line of a package: the store's localized price and the
+    /// billing period, or whichever of them is known.
+    private static String packagePrice(CommercePackage pkg) {
+<span class="fc" id="L870">        String price = price(pkg);</span>
+<span class="fc" id="L871">        String period = periodText(pkg.getPeriod());</span>
+<span class="pc bpc" id="L872" title="1 of 4 branches missed.">        if (price.length() &gt; 0 &amp;&amp; period.length() &gt; 0) {</span>
+<span class="fc" id="L873">            return price + &quot; / &quot; + period;</span>
+        }
+<span class="pc bpc" id="L875" title="1 of 2 branches missed.">        return price.length() &gt; 0 ? price : period;</span>
+    }
+
+    private static String price(CommercePackage pkg) {
+<span class="fc" id="L879">        Product product = pkg.getProduct();</span>
+<span class="pc bpc" id="L880" title="1 of 4 branches missed.">        if (product != null &amp;&amp; product.getLocalizedPrice() != null) {</span>
+<span class="fc" id="L881">            return product.getLocalizedPrice();</span>
+        }
+<span class="fc" id="L883">        return &quot;&quot;;</span>
+    }
+
+    /// An ISO-8601 duration of one unit, such as `P1M` or `P7D`, in words.
+    /// Anything else is shown as it is written.
+    static String periodText(String iso) {
+<span class="pc bpc" id="L889" title="4 of 8 branches missed.">        if (iso == null || iso.length() &lt; 3 || (iso.charAt(0) != 'P' &amp;&amp; iso.charAt(0) != 'p')) {</span>
+<span class="pc bpc" id="L890" title="1 of 2 branches missed.">            return iso == null ? &quot;&quot; : iso;</span>
+        }
+<span class="fc" id="L892">        int count = 0;</span>
+<span class="fc bfc" id="L893" title="All 2 branches covered.">        for (int i = 1; i &lt; iso.length() - 1; i++) {</span>
+<span class="fc" id="L894">            char c = iso.charAt(i);</span>
+<span class="pc bpc" id="L895" title="3 of 6 branches missed.">            if (c &lt; '0' || c &gt; '9' || count &gt; 100000) {</span>
+<span class="nc" id="L896">                return iso;</span>
+            }
+<span class="fc" id="L898">            count = count * 10 + (c - '0');</span>
+        }
+        String unit;
+<span class="pc bpc" id="L901" title="2 of 5 branches missed.">        switch (iso.charAt(iso.length() - 1)) {</span>
+<span class="fc" id="L902">            case 'Y': case 'y': unit = &quot;year&quot;; break;</span>
+<span class="fc" id="L903">            case 'M': case 'm': unit = &quot;month&quot;; break;</span>
+<span class="nc" id="L904">            case 'W': case 'w': unit = &quot;week&quot;; break;</span>
+<span class="fc" id="L905">            case 'D': case 'd': unit = &quot;day&quot;; break;</span>
+<span class="nc" id="L906">            default: return iso;</span>
+        }
+<span class="fc bfc" id="L908" title="All 2 branches covered.">        return count == 1 ? unit : count + &quot; &quot; + unit + &quot;s&quot;;</span>
+    }
+
+    // ---- strings, variables, colors, sizes -----------------------------------
+
+    /// Collects the string tables to search, most specific first: the
+    /// device's language and country, its language, the document's default.
+    private void loadStrings() {
+<span class="fc" id="L916">        Object strings = document.get(&quot;strings&quot;);</span>
+<span class="fc bfc" id="L917" title="All 2 branches covered.">        if (!(strings instanceof Map)) {</span>
+<span class="fc" id="L918">            return;</span>
+        }
+<span class="fc" id="L920">        Map all = (Map) strings;</span>
+<span class="fc" id="L921">        String language = null;</span>
+<span class="fc" id="L922">        String country = null;</span>
+        try {
+<span class="fc" id="L924">            language = Display.getInstance().getLocalizationManager().getLanguage();</span>
+<span class="fc" id="L925">            country = Display.getInstance().getLocalizationManager().getLocale();</span>
+<span class="nc" id="L926">        } catch (Throwable t) {</span>
+            // no localization on this port: the default locale's strings
+<span class="nc" id="L928">            Log.p(&quot;PaywallView: no locale: &quot; + t);</span>
+<span class="fc" id="L929">        }</span>
+<span class="pc bpc" id="L930" title="2 of 4 branches missed.">        if (language != null &amp;&amp; country != null) {</span>
+<span class="fc" id="L931">            addTable(all.get(language + &quot;_&quot; + country));</span>
+<span class="fc" id="L932">            addTable(all.get(language + &quot;-&quot; + country));</span>
+        }
+<span class="pc bpc" id="L934" title="1 of 2 branches missed.">        if (language != null) {</span>
+<span class="fc" id="L935">            addTable(all.get(language));</span>
+        }
+<span class="fc" id="L937">        Object def = document.get(&quot;defaultLocale&quot;);</span>
+<span class="pc bpc" id="L938" title="1 of 2 branches missed.">        if (def != null) {</span>
+<span class="fc" id="L939">            addTable(all.get(def.toString()));</span>
+        }
+<span class="fc" id="L941">    }</span>
+
+    private void addTable(Object table) {
+<span class="fc bfc" id="L944" title="All 2 branches covered.">        if (table instanceof Map) {</span>
+<span class="fc" id="L945">            stringTables.add((Map) table);</span>
+        }
+<span class="fc" id="L947">    }</span>
+
+    /// The string a key names, or the key itself when no table has it.
+    private String lookup(String key) {
+<span class="pc bpc" id="L951" title="1 of 2 branches missed.">        if (key == null) {</span>
+<span class="nc" id="L952">            return &quot;&quot;;</span>
+        }
+<span class="fc bfc" id="L954" title="All 2 branches covered.">        for (Map table : stringTables) {</span>
+<span class="fc" id="L955">            Object v = table.get(key);</span>
+<span class="fc bfc" id="L956" title="All 2 branches covered.">            if (v != null) {</span>
+<span class="fc" id="L957">                return v.toString();</span>
+            }
+<span class="fc" id="L959">        }</span>
+<span class="fc" id="L960">        return key;</span>
+    }
+
+    /// Replaces the `{{variables}}` of a text from the selected package. A
+    /// variable with no value becomes empty, and an unknown one stays as it
+    /// is written.
+    private String substitute(String text) {
+<span class="fc bfc" id="L967" title="All 2 branches covered.">        if (text.indexOf(&quot;{{&quot;) &lt; 0) {</span>
+<span class="fc" id="L968">            return text;</span>
+        }
+<span class="fc" id="L970">        Map&lt;String, String&gt; vars = new HashMap&lt;String, String&gt;();</span>
+<span class="fc" id="L971">        CommercePackage p = selected;</span>
+<span class="pc bpc" id="L972" title="1 of 2 branches missed.">        vars.put(&quot;price&quot;, p == null ? &quot;&quot; : price(p));</span>
+<span class="pc bpc" id="L973" title="1 of 2 branches missed.">        vars.put(&quot;period&quot;, p == null ? &quot;&quot; : periodText(p.getPeriod()));</span>
+<span class="pc bpc" id="L974" title="1 of 2 branches missed.">        vars.put(&quot;trialPeriod&quot;, p == null ? &quot;&quot; : periodText(p.getTrialPeriod()));</span>
+<span class="pc bpc" id="L975" title="2 of 4 branches missed.">        vars.put(&quot;introPrice&quot;, p == null || p.getIntroPrice() == null ? &quot;&quot; : p.getIntroPrice());</span>
+<span class="pc bpc" id="L976" title="1 of 2 branches missed.">        vars.put(&quot;productName&quot;, p == null ? &quot;&quot; : packageTitle(p));</span>
+<span class="pc bpc" id="L977" title="2 of 4 branches missed.">        vars.put(&quot;packageId&quot;, p == null || p.getId() == null ? &quot;&quot; : p.getId());</span>
+<span class="fc" id="L978">        StringBuilder out = new StringBuilder();</span>
+<span class="fc" id="L979">        int pos = 0;</span>
+<span class="fc bfc" id="L980" title="All 2 branches covered.">        while (pos &lt; text.length()) {</span>
+<span class="fc" id="L981">            int open = text.indexOf(&quot;{{&quot;, pos);</span>
+<span class="pc bpc" id="L982" title="1 of 2 branches missed.">            int end = open &lt; 0 ? -1 : text.indexOf(&quot;}}&quot;, open + 2);</span>
+<span class="pc bpc" id="L983" title="1 of 2 branches missed.">            if (end &lt; 0) {</span>
+<span class="nc" id="L984">                out.append(text.substring(pos));</span>
+<span class="nc" id="L985">                break;</span>
+            }
+<span class="fc" id="L987">            out.append(text.substring(pos, open));</span>
+<span class="fc" id="L988">            String value = vars.get(text.substring(open + 2, end).trim());</span>
+<span class="fc bfc" id="L989" title="All 2 branches covered.">            if (value == null) {</span>
+<span class="fc" id="L990">                out.append(text.substring(open, end + 2));</span>
+            } else {
+<span class="fc" id="L992">                out.append(value);</span>
+            }
+<span class="fc" id="L994">            pos = end + 2;</span>
+<span class="fc" id="L995">        }</span>
+<span class="fc" id="L996">        return out.toString();</span>
+    }
+
+    private Map chooseColors() {
+<span class="fc" id="L1000">        Object all = document.get(&quot;colors&quot;);</span>
+<span class="fc bfc" id="L1001" title="All 2 branches covered.">        if (!(all instanceof Map)) {</span>
+<span class="fc" id="L1002">            return null;</span>
+        }
+<span class="fc" id="L1004">        Boolean dark = Display.getInstance().isDarkMode();</span>
+<span class="fc" id="L1005">        Object set = null;</span>
+<span class="pc bpc" id="L1006" title="2 of 4 branches missed.">        if (dark != null &amp;&amp; dark.booleanValue()) {</span>
+<span class="nc" id="L1007">            set = ((Map) all).get(&quot;dark&quot;);</span>
+        }
+<span class="pc bpc" id="L1009" title="1 of 2 branches missed.">        if (!(set instanceof Map)) {</span>
+<span class="fc" id="L1010">            set = ((Map) all).get(&quot;light&quot;);</span>
+        }
+<span class="pc bpc" id="L1012" title="1 of 2 branches missed.">        return set instanceof Map ? (Map) set : null;</span>
+    }
+
+    /// A color of the chosen set as RGB, or -1 when the document does not
+    /// name it or it is not `#rrggbb`.
+    private int color(String key) {
+<span class="fc bfc" id="L1018" title="All 2 branches covered.">        if (colors == null) {</span>
+<span class="fc" id="L1019">            return -1;</span>
+        }
+<span class="fc" id="L1021">        Object v = colors.get(key);</span>
+<span class="pc bpc" id="L1022" title="1 of 2 branches missed.">        if (v == null) {</span>
+<span class="nc" id="L1023">            return -1;</span>
+        }
+<span class="fc" id="L1025">        String s = v.toString();</span>
+<span class="pc bpc" id="L1026" title="2 of 4 branches missed.">        if (s.length() != 7 || s.charAt(0) != '#') {</span>
+<span class="nc" id="L1027">            return -1;</span>
+        }
+<span class="fc" id="L1029">        int rgb = 0;</span>
+<span class="fc bfc" id="L1030" title="All 2 branches covered.">        for (int i = 1; i &lt; 7; i++) {</span>
+<span class="fc" id="L1031">            char c = s.charAt(i);</span>
+            int digit;
+<span class="pc bpc" id="L1033" title="1 of 4 branches missed.">            if (c &gt;= '0' &amp;&amp; c &lt;= '9') {</span>
+<span class="fc" id="L1034">                digit = c - '0';</span>
+<span class="pc bpc" id="L1035" title="1 of 4 branches missed.">            } else if (c &gt;= 'a' &amp;&amp; c &lt;= 'f') {</span>
+<span class="fc" id="L1036">                digit = c - 'a' + 10;</span>
+<span class="pc bpc" id="L1037" title="2 of 4 branches missed.">            } else if (c &gt;= 'A' &amp;&amp; c &lt;= 'F') {</span>
+<span class="fc" id="L1038">                digit = c - 'A' + 10;</span>
+            } else {
+<span class="nc" id="L1040">                return -1;</span>
+            }
+<span class="fc" id="L1042">            rgb = (rgb &lt;&lt; 4) | digit;</span>
+        }
+<span class="fc" id="L1044">        return rgb;</span>
+    }
+
+    private void tint(Style style, String key) {
+<span class="fc" id="L1048">        int c = color(key);</span>
+<span class="fc bfc" id="L1049" title="All 2 branches covered.">        if (c &gt;= 0) {</span>
+<span class="fc" id="L1050">            style.setFgColor(c);</span>
+        }
+<span class="fc" id="L1052">    }</span>
+
+    private static int alignment(String align) {
+<span class="fc bfc" id="L1055" title="All 2 branches covered.">        if (&quot;center&quot;.equalsIgnoreCase(align)) {</span>
+<span class="fc" id="L1056">            return Component.CENTER;</span>
+        }
+<span class="pc bpc" id="L1058" title="2 of 4 branches missed.">        if (&quot;end&quot;.equalsIgnoreCase(align) || &quot;right&quot;.equalsIgnoreCase(align)) {</span>
+<span class="nc" id="L1059">            return Component.RIGHT;</span>
+        }
+<span class="fc" id="L1061">        return Component.LEFT;</span>
+    }
+
+    /// A size of the document, in millimetres, as pixels.
+    private static int mm(Object value, float fallback) {
+<span class="fc" id="L1066">        float v = fallback;</span>
+<span class="fc bfc" id="L1067" title="All 2 branches covered.">        if (value instanceof Number) {</span>
+<span class="fc" id="L1068">            v = ((Number) value).floatValue();</span>
+        }
+<span class="fc bfc" id="L1070" title="All 2 branches covered.">        if (v &lt;= 0) {</span>
+<span class="fc" id="L1071">            return 0;</span>
+        }
+<span class="fc" id="L1073">        return Display.getInstance().convertToPixels(v);</span>
+    }
+
+    private static String str(Object o) {
+<span class="fc bfc" id="L1077" title="All 2 branches covered.">        return o == null ? null : o.toString();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

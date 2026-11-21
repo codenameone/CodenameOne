@@ -1,0 +1,610 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MCPClientRegistrar.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.mcp</a> &gt; <span class="el_source">MCPClientRegistrar.java</span></div><h1>MCPClientRegistrar.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.mcp;
+
+import com.codename1.io.FileSystemStorage;
+import com.codename1.io.Log;
+import com.codename1.io.Util;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+/// Detects installed MCP hosts and registers a Codename One application's stdio MCP
+/// server with them, so an end user can point Claude Desktop, Claude Code, Codex and
+/// similar tools at the application without editing config by hand.
+///
+/// Two config shapes are written: the JSON `mcpServers` object the Claude hosts use, and
+/// the `[mcp_servers.&lt;name&gt;]` tables Codex keeps in `~/.codex/config.toml` (see
+/// [MCPToml]). Either way the user's other servers and settings are preserved, and a
+/// config that cannot be edited safely is reported and left alone.
+///
+/// This is a plain reusable API. It is meant to be driven by Codename One tooling (the
+/// certificate wizard, Game Builder, Settings, the simulator) and by applications
+/// themselves.
+///
+/// Registration is a desktop concern. File access goes through
+/// {@link com.codename1.io.FileSystemStorage} so the class links on every target, but
+/// {@link #isSupported()} is false where the platform provides no reachable home
+/// directory (mobile), and each detected host reports whether its config is writable.
+public final class MCPClientRegistrar {
+<span class="fc" id="L53">    private static final MCPClientRegistrar INSTANCE = new MCPClientRegistrar();</span>
+
+    /// A host whose config this class cannot write. The caller surfaces it as a manual step.
+    private static final int FORMAT_MANUAL = 0;
+    /// A JSON config with an `mcpServers` object at the root.
+    private static final int FORMAT_JSON = 1;
+    /// A TOML config with one `[mcp_servers.&lt;name&gt;]` table per server.
+    private static final int FORMAT_TOML = 2;
+
+    /// The Windows path is relative to the HOME directory, as a dotfile config is.
+    private static final boolean WIN_UNDER_HOME = false;
+    /// The Windows path is relative to %APPDATA%, as an installed application's own
+    /// per user directory is.
+    private static final boolean WIN_UNDER_APP_DATA = true;
+
+<span class="fc" id="L68">    private final List&lt;KnownClient&gt; knownClients = new ArrayList&lt;KnownClient&gt;();</span>
+
+<span class="fc" id="L70">    private MCPClientRegistrar() {</span>
+        // Table driven registry: adding a host whose config is one of the shapes below is
+        // a data change.
+        // The Windows column is relative to %APPDATA% for a host that keeps a per user
+        // application directory there, and to the HOME directory for one whose config is a
+        // dotfile. Getting that wrong is silent: the host is simply never detected, and the
+        // registrar has nothing to write to. Claude Desktop is an Electron app and really
+        // does live under %APPDATA%\Claude; the dotfile hosts do not.
+<span class="fc" id="L78">        knownClients.add(new KnownClient(&quot;claude-desktop&quot;, &quot;Claude Desktop&quot;,</span>
+                &quot;Library/Application Support/Claude/claude_desktop_config.json&quot;,
+                &quot;Claude/claude_desktop_config.json&quot;, WIN_UNDER_APP_DATA,
+                &quot;.config/Claude/claude_desktop_config.json&quot;, FORMAT_JSON));
+<span class="fc" id="L82">        knownClients.add(new KnownClient(&quot;claude-code&quot;, &quot;Claude Code&quot;,</span>
+                &quot;.claude.json&quot;, &quot;.claude.json&quot;, WIN_UNDER_HOME, &quot;.claude.json&quot;, FORMAT_JSON));
+        // Codex keeps its servers as [mcp_servers.&lt;name&gt;] tables in a TOML file that the
+        // ChatGPT desktop app, the Codex CLI and the Codex IDE extension all share, so one
+        // writer serves all three. CODEX_HOME names that directory and defaults to
+        // ~/.codex on every platform - which on Windows is %USERPROFILE%, not %APPDATA%.
+        //
+        // A machine that SETS CODEX_HOME is not followed, and cannot be from here: the
+        // Codename One runtime has no System.getenv. It is absent from both bootclasspaths
+        // core is compiled against - ../cn1-binaries/CLDC11.jar and the java-runtime jar
+        // the bytecode compliance check uses - so the call does not compile, whatever a
+        // desktop JVM would do at runtime. (Check that with javac, not javap: javap
+        // resolves java.lang.System from the JDK even when a jar is on the classpath, and
+        // reports a getenv that core cannot call.) Following it would mean a desktop port,
+        // which does have an environment, handing it to this class through new API. Until
+        // then such a machine either fails to detect Codex at all, or - if a stale
+        // ~/.codex survives the move - has that stale copy updated instead.
+<span class="fc" id="L99">        knownClients.add(new KnownClient(&quot;codex&quot;, &quot;Codex&quot;,</span>
+                &quot;.codex/config.toml&quot;, &quot;.codex/config.toml&quot;, WIN_UNDER_HOME,
+                &quot;.codex/config.toml&quot;, FORMAT_TOML));
+        // Detect only for now: opencode nests its servers in an &quot;mcp&quot; block whose entries
+        // have a different shape, so it needs a writer of its own. It is surfaced so the
+        // caller can guide the user manually.
+<span class="fc" id="L105">        knownClients.add(new KnownClient(&quot;opencode&quot;, &quot;opencode&quot;,</span>
+                &quot;.config/opencode/opencode.json&quot;,
+                &quot;opencode/opencode.json&quot;, WIN_UNDER_APP_DATA,
+                &quot;.config/opencode/opencode.json&quot;, FORMAT_MANUAL));
+<span class="fc" id="L109">    }</span>
+
+    public static MCPClientRegistrar getInstance() {
+<span class="fc" id="L112">        return INSTANCE;</span>
+    }
+
+    /// Returns true when this platform exposes a home directory the registrar can reach.
+    public boolean isSupported() {
+<span class="nc bnc" id="L117" title="All 2 branches missed.">        return homePath() != null;</span>
+    }
+
+    /// Detects installed MCP hosts by looking for their config file or its parent
+    /// directory under the user home.
+    public List&lt;MCPClient&gt; detectClients() {
+<span class="nc" id="L123">        List&lt;MCPClient&gt; found = new ArrayList&lt;MCPClient&gt;();</span>
+<span class="nc" id="L124">        String home = homePath();</span>
+<span class="nc bnc" id="L125" title="All 2 branches missed.">        if (home == null) {</span>
+<span class="nc" id="L126">            return found;</span>
+        }
+<span class="nc" id="L128">        FileSystemStorage fs = FileSystemStorage.getInstance();</span>
+<span class="nc bnc" id="L129" title="All 2 branches missed.">        for (KnownClient known : knownClients) {</span>
+<span class="nc" id="L130">            String path = known.absolutePath(home);</span>
+<span class="nc bnc" id="L131" title="All 2 branches missed.">            if (path == null) {</span>
+<span class="nc" id="L132">                continue;</span>
+            }
+<span class="nc" id="L134">            boolean present = safeExists(fs, fsPath(path));</span>
+<span class="nc bnc" id="L135" title="All 2 branches missed.">            if (!present) {</span>
+                // The config file itself is absent. A present parent directory can still
+                // signal the host is installed (e.g. .../Application Support/Claude/), but
+                // only when that parent is a dedicated subdirectory. A dotfile such as
+                // ~/.claude.json has the home directory as its parent, which exists on
+                // every desktop and would otherwise be a false positive.
+<span class="nc" id="L141">                String parent = parentOf(path);</span>
+<span class="nc bnc" id="L142" title="All 4 branches missed.">                if (parent != null &amp;&amp; !samePath(parent, home)) {</span>
+<span class="nc" id="L143">                    present = safeExists(fs, fsPath(parent));</span>
+                }
+            }
+<span class="nc bnc" id="L146" title="All 2 branches missed.">            if (present) {</span>
+<span class="nc" id="L147">                found.add(new MCPClient(known.id, known.displayName, path, known.format));</span>
+            }
+<span class="nc" id="L149">        }</span>
+<span class="nc" id="L150">        return found;</span>
+    }
+
+    /// Where the named host's config would live under the given home on THIS platform, or
+    /// null when the id is unknown. Package private: it exists so a test can pin each
+    /// host's per platform path convention without a filesystem, which is the only way a
+    /// wrong Windows base shows up - the failure is otherwise silent, the host simply
+    /// never being detected.
+    String configPathFor(String id, String home) {
+<span class="fc bfc" id="L159" title="All 2 branches covered.">        for (KnownClient known : knownClients) {</span>
+<span class="fc bfc" id="L160" title="All 2 branches covered.">            if (known.id.equals(id)) {</span>
+<span class="fc" id="L161">                return known.absolutePath(home);</span>
+            }
+<span class="fc" id="L163">        }</span>
+<span class="fc" id="L164">        return null;</span>
+    }
+
+    /// Registers the descriptor with every detected, writable host. Returns the list of
+    /// hosts that were updated.
+    public List&lt;MCPClient&gt; register(MCPClientDescriptor descriptor) {
+<span class="nc" id="L170">        return register(descriptor, detectClients());</span>
+    }
+
+    /// Registers the descriptor with the given hosts. Non writable hosts are skipped.
+    public List&lt;MCPClient&gt; register(MCPClientDescriptor descriptor, List&lt;MCPClient&gt; clients) {
+<span class="nc" id="L175">        List&lt;MCPClient&gt; updated = new ArrayList&lt;MCPClient&gt;();</span>
+<span class="nc bnc" id="L176" title="All 4 branches missed.">        if (descriptor == null || clients == null) {</span>
+<span class="nc" id="L177">            return updated;</span>
+        }
+<span class="nc bnc" id="L179" title="All 2 branches missed.">        for (MCPClient client : clients) {</span>
+<span class="nc bnc" id="L180" title="All 2 branches missed.">            if (!client.isWritable()) {</span>
+<span class="nc" id="L181">                continue;</span>
+            }
+<span class="nc bnc" id="L183" title="All 2 branches missed.">            if (writeEntry(client, descriptor.getServerName(), descriptor)) {</span>
+<span class="nc" id="L184">                updated.add(client);</span>
+            }
+<span class="nc" id="L186">        }</span>
+<span class="nc" id="L187">        return updated;</span>
+    }
+
+    /// Removes the named server entry from every detected, writable host. Returns the
+    /// list of hosts that were updated.
+    public List&lt;MCPClient&gt; unregister(String serverName) {
+<span class="nc" id="L193">        List&lt;MCPClient&gt; updated = new ArrayList&lt;MCPClient&gt;();</span>
+<span class="nc bnc" id="L194" title="All 2 branches missed.">        if (serverName == null) {</span>
+<span class="nc" id="L195">            return updated;</span>
+        }
+<span class="nc" id="L197">        List&lt;MCPClient&gt; clients = detectClients();</span>
+<span class="nc bnc" id="L198" title="All 2 branches missed.">        for (MCPClient client : clients) {</span>
+<span class="nc bnc" id="L199" title="All 4 branches missed.">            if (client.isWritable() &amp;&amp; writeEntry(client, serverName, null)) {</span>
+<span class="nc" id="L200">                updated.add(client);</span>
+            }
+<span class="nc" id="L202">        }</span>
+<span class="nc" id="L203">        return updated;</span>
+    }
+
+    /// Writes or removes one server entry in a host config, in whichever format that host
+    /// uses. A null descriptor removes the entry.
+    private boolean writeEntry(MCPClient client, String serverName, MCPClientDescriptor descriptor) {
+<span class="nc bnc" id="L209" title="All 2 branches missed.">        if (client.format == FORMAT_TOML) {</span>
+<span class="nc" id="L210">            return writeTomlEntry(client, serverName, descriptor);</span>
+        }
+<span class="nc" id="L212">        return writeJsonEntry(client, serverName, descriptor);</span>
+    }
+
+    private boolean writeJsonEntry(MCPClient client, String serverName, MCPClientDescriptor descriptor) {
+        try {
+<span class="nc" id="L217">            FileSystemStorage fs = FileSystemStorage.getInstance();</span>
+<span class="nc" id="L218">            String path = client.getConfigPath();</span>
+<span class="nc" id="L219">            String storagePath = fsPath(path);</span>
+            Map&lt;String, Object&gt; root;
+<span class="nc bnc" id="L221" title="All 2 branches missed.">            if (safeExists(fs, storagePath)) {</span>
+<span class="nc" id="L222">                root = readExistingConfig(fs, storagePath);</span>
+<span class="nc bnc" id="L223" title="All 2 branches missed.">                if (root == null) {</span>
+                    // The file is there but could not be read, or is not a complete JSON
+                    // object (a truncated or corrupt config). Codename One's parser is
+                    // lenient and would hand back a partial map, so rewriting would drop
+                    // the user's other settings. Leave the file untouched instead.
+<span class="nc" id="L228">                    Log.p(&quot;MCP: leaving &quot; + path + &quot; unchanged; it could not be safely parsed&quot;);</span>
+<span class="nc" id="L229">                    return false;</span>
+                }
+            } else {
+<span class="nc bnc" id="L232" title="All 2 branches missed.">                if (descriptor == null) {</span>
+                    // Nothing to remove from a config that does not exist.
+<span class="nc" id="L234">                    return false;</span>
+                }
+<span class="nc" id="L236">                root = new LinkedHashMap&lt;String, Object&gt;();</span>
+            }
+<span class="nc" id="L238">            Object serversObj = root.get(&quot;mcpServers&quot;);</span>
+            Map&lt;String, Object&gt; servers;
+<span class="nc bnc" id="L240" title="All 2 branches missed.">            if (serversObj instanceof Map) {</span>
+<span class="nc" id="L241">                servers = asStringMap((Map) serversObj);</span>
+            } else {
+<span class="nc" id="L243">                servers = new LinkedHashMap&lt;String, Object&gt;();</span>
+            }
+<span class="nc bnc" id="L245" title="All 2 branches missed.">            if (descriptor == null) {</span>
+<span class="nc" id="L246">                servers.remove(serverName);</span>
+            } else {
+<span class="nc" id="L248">                servers.put(serverName, descriptor.toServerEntry());</span>
+            }
+<span class="nc" id="L250">            root.put(&quot;mcpServers&quot;, servers);</span>
+            // mapToJson preserves booleans, integers and null values, so the user's other
+            // settings survive the round trip; toJson would drop null-valued entries.
+<span class="nc" id="L253">            return writeConfig(fs, path, storagePath, MCPJson.toJson(root));</span>
+<span class="nc" id="L254">        } catch (Throwable ex) {</span>
+<span class="nc" id="L255">            Log.e(ex);</span>
+<span class="nc" id="L256">            return false;</span>
+        }
+    }
+
+    /// Edits a Codex style TOML config. The document is rewritten as text with only the
+    /// one `[mcp_servers.&lt;name&gt;]` table replaced, so the user's other servers, settings,
+    /// comments and formatting are left exactly as they were. A document the editor
+    /// cannot make sense of is reported and left untouched.
+    private boolean writeTomlEntry(MCPClient client, String serverName, MCPClientDescriptor descriptor) {
+        try {
+<span class="nc" id="L266">            FileSystemStorage fs = FileSystemStorage.getInstance();</span>
+<span class="nc" id="L267">            String path = client.getConfigPath();</span>
+<span class="nc" id="L268">            String storagePath = fsPath(path);</span>
+            String existing;
+<span class="nc bnc" id="L270" title="All 2 branches missed.">            if (safeExists(fs, storagePath)) {</span>
+<span class="nc" id="L271">                existing = readExistingText(fs, storagePath);</span>
+<span class="nc bnc" id="L272" title="All 2 branches missed.">                if (existing == null) {</span>
+<span class="nc" id="L273">                    Log.p(&quot;MCP: leaving &quot; + path + &quot; unchanged; it could not be read&quot;);</span>
+<span class="nc" id="L274">                    return false;</span>
+                }
+            } else {
+<span class="nc bnc" id="L277" title="All 2 branches missed.">                if (descriptor == null) {</span>
+                    // Nothing to remove from a config that does not exist.
+<span class="nc" id="L279">                    return false;</span>
+                }
+<span class="nc" id="L281">                existing = &quot;&quot;;</span>
+            }
+<span class="nc" id="L283">            MCPToml.Result result = MCPToml.applyServerEntry(existing, serverName, descriptor);</span>
+<span class="nc bnc" id="L284" title="All 2 branches missed.">            if (!result.isApplied()) {</span>
+<span class="nc" id="L285">                Log.p(&quot;MCP: leaving &quot; + path + &quot; unchanged; &quot; + result.getProblem());</span>
+<span class="nc" id="L286">                return false;</span>
+            }
+<span class="nc bnc" id="L288" title="All 2 branches missed.">            if (result.getText().equals(existing)) {</span>
+                // Nothing to write either way, but the two cases mean opposite things.
+                // Registering: the entry is already exactly what would be written, so the
+                // host IS registered and reporting a failure would list it as &quot;not
+                // updated&quot; with nothing in the log to explain why. Removing: there was no
+                // entry to take out, so nothing was updated.
+<span class="nc bnc" id="L294" title="All 2 branches missed.">                return descriptor != null;</span>
+            }
+<span class="nc" id="L296">            return writeConfig(fs, path, storagePath, result.getText());</span>
+<span class="nc" id="L297">        } catch (Throwable ex) {</span>
+<span class="nc" id="L298">            Log.e(ex);</span>
+<span class="nc" id="L299">            return false;</span>
+        }
+    }
+
+    /// Reads an existing host config, returning null when it cannot be trusted so the
+    /// caller refuses to overwrite it. An empty file is treated as a fresh, empty config.
+    private Map&lt;String, Object&gt; readExistingConfig(FileSystemStorage fs, String storagePath) {
+        try {
+<span class="nc" id="L307">            String json = Util.readToString(fs.openInputStream(storagePath), &quot;UTF-8&quot;);</span>
+<span class="nc" id="L308">            String trimmed = json.trim();</span>
+<span class="nc bnc" id="L309" title="All 2 branches missed.">            if (trimmed.length() == 0) {</span>
+<span class="nc" id="L310">                return new LinkedHashMap&lt;String, Object&gt;();</span>
+            }
+<span class="nc bnc" id="L312" title="All 2 branches missed.">            if (!isCompleteJsonObject(trimmed)) {</span>
+<span class="nc" id="L313">                return null;</span>
+            }
+            // Parse faithfully so rewriting keeps booleans, integers and nulls intact.
+<span class="nc" id="L316">            return MCPJson.parse(json);</span>
+<span class="nc" id="L317">        } catch (Throwable ex) {</span>
+<span class="nc" id="L318">            Log.e(ex);</span>
+<span class="nc" id="L319">            return null;</span>
+        }
+    }
+
+    /// Reads a host config as text, returning null when it cannot be read so the caller
+    /// refuses to overwrite it.
+    private String readExistingText(FileSystemStorage fs, String storagePath) {
+        try {
+<span class="nc" id="L327">            return Util.readToString(fs.openInputStream(storagePath), &quot;UTF-8&quot;);</span>
+<span class="nc" id="L328">        } catch (Throwable ex) {</span>
+<span class="nc" id="L329">            Log.e(ex);</span>
+<span class="nc" id="L330">            return null;</span>
+        }
+    }
+
+    /// Lightweight structural check that the text is a single, complete JSON object with
+    /// balanced braces, brackets and quotes. Codename One's JSON parser does not throw on
+    /// malformed input (it returns a partial map), so this guards against silently writing
+    /// over a truncated or corrupt config.
+    static boolean isCompleteJsonObject(String s) {
+<span class="fc" id="L339">        int n = s.length();</span>
+<span class="fc bfc" id="L340" title="All 6 branches covered.">        if (n &lt; 2 || s.charAt(0) != '{' || s.charAt(n - 1) != '}') {</span>
+<span class="fc" id="L341">            return false;</span>
+        }
+<span class="fc" id="L343">        int depth = 0;</span>
+<span class="fc" id="L344">        boolean inString = false;</span>
+<span class="fc" id="L345">        boolean escaped = false;</span>
+<span class="fc bfc" id="L346" title="All 2 branches covered.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc" id="L347">            char c = s.charAt(i);</span>
+<span class="fc bfc" id="L348" title="All 2 branches covered.">            if (inString) {</span>
+<span class="fc bfc" id="L349" title="All 2 branches covered.">                if (escaped) {</span>
+<span class="fc" id="L350">                    escaped = false;</span>
+<span class="fc bfc" id="L351" title="All 2 branches covered.">                } else if (c == '\\') {</span>
+<span class="fc" id="L352">                    escaped = true;</span>
+<span class="fc bfc" id="L353" title="All 2 branches covered.">                } else if (c == '&quot;') {</span>
+<span class="fc" id="L354">                    inString = false;</span>
+                }
+                continue;
+            }
+<span class="fc bfc" id="L358" title="All 2 branches covered.">            if (c == '&quot;') {</span>
+<span class="fc" id="L359">                inString = true;</span>
+<span class="fc bfc" id="L360" title="All 4 branches covered.">            } else if (c == '{' || c == '[') {</span>
+<span class="fc" id="L361">                depth++;</span>
+<span class="fc bfc" id="L362" title="All 4 branches covered.">            } else if (c == '}' || c == ']') {</span>
+<span class="fc" id="L363">                depth--;</span>
+<span class="pc bpc" id="L364" title="1 of 2 branches missed.">                if (depth &lt; 0) {</span>
+<span class="nc" id="L365">                    return false;</span>
+                }
+            }
+        }
+<span class="pc bpc" id="L369" title="1 of 4 branches missed.">        return depth == 0 &amp;&amp; !inString;</span>
+    }
+
+    /// Writes the config, staging the complete new content in a sibling file first so an
+    /// interrupted write never leaves the user with half a config and no copy of the rest.
+    ///
+    /// An EXISTING config is then written through rather than replaced. Deleting it and
+    /// renaming the staged file over it would turn a symlinked config - a common dotfiles
+    /// arrangement - into a regular file, and would reset the file's mode to whatever the
+    /// process umask says. These files carry other tools' API keys in their `env` blocks,
+    /// so widening a hand-set 600 to 644 is not cosmetic. {@link FileSystemStorage} cannot
+    /// read a link or copy a mode, so keeping the original file is the only portable way
+    /// to keep either.
+    ///
+    /// Writing through is not atomic - nothing available here is, since rename cannot
+    /// overwrite on every platform and delete-then-rename has a window of its own where
+    /// the config is missing entirely. The staged file is the recovery path: if the write
+    /// through fails, it still holds the complete content that should have landed.
+    private boolean writeConfig(FileSystemStorage fs, String path, String storagePath,
+                                String content) {
+        try {
+<span class="nc" id="L390">            String parent = parentOf(path);</span>
+<span class="nc bnc" id="L391" title="All 2 branches missed.">            if (parent != null) {</span>
+                try {
+<span class="nc" id="L393">                    fs.mkdir(fsPath(parent));</span>
+<span class="nc" id="L394">                } catch (Throwable ignored) {</span>
+                    // parent likely already exists
+<span class="nc" id="L396">                }</span>
+            }
+<span class="nc" id="L398">            String fileName = fileNameOf(path);</span>
+<span class="nc" id="L399">            String tmpName = fileName + &quot;.cn1mcp-tmp&quot;;</span>
+<span class="nc bnc" id="L400" title="All 2 branches missed.">            String tmpPath = parent == null ? fsPath(tmpName) : fsPath(parent + &quot;/&quot; + tmpName);</span>
+<span class="nc" id="L401">            byte[] data = content.getBytes(&quot;UTF-8&quot;);</span>
+<span class="nc" id="L402">            writeAll(fs, tmpPath, data);</span>
+<span class="nc bnc" id="L403" title="All 2 branches missed.">            if (safeExists(fs, storagePath)) {</span>
+<span class="nc" id="L404">                writeAll(fs, storagePath, data);</span>
+                try {
+<span class="nc" id="L406">                    fs.delete(tmpPath);</span>
+<span class="nc" id="L407">                } catch (Throwable ignored) {</span>
+                    // the config is already correct; a leftover staging file is harmless
+<span class="nc" id="L409">                }</span>
+            } else {
+                // Nothing to preserve: rename() takes a bare name and moves the staged
+                // file into place within the same directory.
+<span class="nc" id="L413">                fs.rename(tmpPath, fileName);</span>
+            }
+<span class="nc" id="L415">            return true;</span>
+<span class="nc" id="L416">        } catch (Throwable ex) {</span>
+<span class="nc" id="L417">            Log.e(ex);</span>
+<span class="nc" id="L418">            return false;</span>
+        }
+    }
+
+    private static void writeAll(FileSystemStorage fs, String storagePath, byte[] data)
+            throws IOException {
+<span class="nc" id="L424">        OutputStream os = fs.openOutputStream(storagePath);</span>
+        try {
+<span class="nc" id="L426">            os.write(data);</span>
+        } finally {
+<span class="nc" id="L428">            os.close();</span>
+        }
+<span class="nc" id="L430">    }</span>
+
+    @SuppressWarnings(&quot;unchecked&quot;)
+    private static Map&lt;String, Object&gt; asStringMap(Map raw) {
+<span class="nc" id="L434">        Map&lt;String, Object&gt; out = new LinkedHashMap&lt;String, Object&gt;();</span>
+<span class="nc bnc" id="L435" title="All 2 branches missed.">        for (Object entryObj : raw.entrySet()) {</span>
+<span class="nc" id="L436">            Map.Entry entry = (Map.Entry) entryObj;</span>
+<span class="nc" id="L437">            out.put(String.valueOf(entry.getKey()), entry.getValue());</span>
+<span class="nc" id="L438">        }</span>
+<span class="nc" id="L439">        return out;</span>
+    }
+
+    private static boolean safeExists(FileSystemStorage fs, String storagePath) {
+        try {
+<span class="nc bnc" id="L444" title="All 4 branches missed.">            return storagePath != null &amp;&amp; fs.exists(storagePath);</span>
+<span class="nc" id="L445">        } catch (Throwable ex) {</span>
+<span class="nc" id="L446">            return false;</span>
+        }
+    }
+
+    /// Converts an absolute OS path to the form {@link FileSystemStorage} expects. On a
+    /// unix style absolute path this yields a `file://` URI that round trips through the
+    /// JavaSE port; other paths are passed through for the exposed filesystem case.
+    private static String fsPath(String absolute) {
+<span class="nc bnc" id="L454" title="All 2 branches missed.">        if (absolute == null) {</span>
+<span class="nc" id="L455">            return null;</span>
+        }
+<span class="nc" id="L457">        String forward = absolute.replace('\\', '/');</span>
+<span class="nc bnc" id="L458" title="All 2 branches missed.">        if (forward.startsWith(&quot;/&quot;)) {</span>
+<span class="nc" id="L459">            return &quot;file://&quot; + forward;</span>
+        }
+<span class="nc bnc" id="L461" title="All 4 branches missed.">        if (forward.length() &gt; 1 &amp;&amp; forward.charAt(1) == ':') {</span>
+            // Windows drive path such as C:/Users/...
+<span class="nc" id="L463">            return &quot;file:///&quot; + forward;</span>
+        }
+<span class="nc" id="L465">        return forward;</span>
+    }
+
+    private static String parentOf(String path) {
+<span class="nc bnc" id="L469" title="All 2 branches missed.">        if (path == null) {</span>
+<span class="nc" id="L470">            return null;</span>
+        }
+<span class="nc" id="L472">        String forward = path.replace('\\', '/');</span>
+<span class="nc" id="L473">        int slash = forward.lastIndexOf('/');</span>
+<span class="nc bnc" id="L474" title="All 2 branches missed.">        if (slash &lt;= 0) {</span>
+<span class="nc" id="L475">            return null;</span>
+        }
+<span class="nc" id="L477">        return path.substring(0, slash);</span>
+    }
+
+    private static String fileNameOf(String path) {
+<span class="nc bnc" id="L481" title="All 2 branches missed.">        if (path == null) {</span>
+<span class="nc" id="L482">            return null;</span>
+        }
+<span class="nc" id="L484">        String forward = path.replace('\\', '/');</span>
+<span class="nc" id="L485">        int slash = forward.lastIndexOf('/');</span>
+<span class="nc bnc" id="L486" title="All 2 branches missed.">        return slash &lt; 0 ? path : path.substring(slash + 1);</span>
+    }
+
+    /// True when two paths refer to the same location, ignoring separator style and
+    /// trailing separators.
+    private static boolean samePath(String a, String b) {
+<span class="nc bnc" id="L492" title="All 4 branches missed.">        if (a == null || b == null) {</span>
+<span class="nc" id="L493">            return false;</span>
+        }
+<span class="nc" id="L495">        return normalizePath(a).equals(normalizePath(b));</span>
+    }
+
+    private static String normalizePath(String p) {
+<span class="nc" id="L499">        String forward = p.replace('\\', '/');</span>
+<span class="nc bnc" id="L500" title="All 4 branches missed.">        while (forward.length() &gt; 1 &amp;&amp; forward.charAt(forward.length() - 1) == '/') {</span>
+<span class="nc" id="L501">            forward = forward.substring(0, forward.length() - 1);</span>
+        }
+<span class="nc" id="L503">        return forward;</span>
+    }
+
+    private static String homePath() {
+        try {
+<span class="nc" id="L508">            String home = System.getProperty(&quot;user.home&quot;);</span>
+<span class="nc bnc" id="L509" title="All 4 branches missed.">            if (home != null &amp;&amp; home.length() &gt; 0) {</span>
+<span class="nc" id="L510">                return home;</span>
+            }
+<span class="nc" id="L512">        } catch (Throwable ignored) {</span>
+            // property access unavailable on this platform
+<span class="nc" id="L514">        }</span>
+<span class="nc" id="L515">        return null;</span>
+    }
+
+    /// %APPDATA% for the given home, derived from the home directory rather than read from
+    /// the APPDATA environment variable: System.getenv is not available on every Codename
+    /// One target, and this class lives in the portable core, so it must link everywhere.
+    ///
+    /// Takes the home as an argument rather than reading it back, so a path is a pure
+    /// function of the home it is resolved against and cannot half-follow one home and
+    /// half-follow another.
+    private static String appDataPath(String home) {
+<span class="pc bpc" id="L526" title="1 of 2 branches missed.">        return home == null ? null : home + &quot;/AppData/Roaming&quot;;</span>
+    }
+
+    private static boolean isWindows() {
+<span class="fc" id="L530">        String os = System.getProperty(&quot;os.name&quot;);</span>
+<span class="pc bpc" id="L531" title="1 of 4 branches missed.">        return os != null &amp;&amp; os.toLowerCase().indexOf(&quot;win&quot;) &gt;= 0;</span>
+    }
+
+    private static boolean isMac() {
+<span class="fc" id="L535">        String os = System.getProperty(&quot;os.name&quot;);</span>
+<span class="pc bpc" id="L536" title="1 of 4 branches missed.">        return os != null &amp;&amp; os.toLowerCase().indexOf(&quot;mac&quot;) &gt;= 0;</span>
+    }
+
+    /// A detected MCP host and where its config lives.
+    public static final class MCPClient {
+        private final String id;
+        private final String displayName;
+        private final String configPath;
+        /// One of the FORMAT_ constants. Kept package private: which writer a host needs
+        /// is the registrar's business, and callers only ever ask whether it is writable.
+        final int format;
+
+<span class="nc" id="L548">        MCPClient(String id, String displayName, String configPath, int format) {</span>
+<span class="nc" id="L549">            this.id = id;</span>
+<span class="nc" id="L550">            this.displayName = displayName;</span>
+<span class="nc" id="L551">            this.configPath = configPath;</span>
+<span class="nc" id="L552">            this.format = format;</span>
+<span class="nc" id="L553">        }</span>
+
+        public String getId() {
+<span class="nc" id="L556">            return id;</span>
+        }
+
+        public String getDisplayName() {
+<span class="nc" id="L560">            return displayName;</span>
+        }
+
+        public String getConfigPath() {
+<span class="nc" id="L564">            return configPath;</span>
+        }
+
+        /// True when the registrar can write this host's config automatically. False
+        /// for hosts whose config format is not yet supported, which the caller should
+        /// surface as a manual step.
+        public boolean isWritable() {
+<span class="nc bnc" id="L571" title="All 2 branches missed.">            return format != FORMAT_MANUAL;</span>
+        }
+    }
+
+    private static final class KnownClient {
+        private final String id;
+        private final String displayName;
+        private final String macRelative;
+        private final String winRelative;
+        private final boolean winUnderAppData;
+        private final String linuxRelative;
+        private final int format;
+
+        KnownClient(String id, String displayName, String macRelative, String winRelative,
+<span class="fc" id="L585">                    boolean winUnderAppData, String linuxRelative, int format) {</span>
+<span class="fc" id="L586">            this.id = id;</span>
+<span class="fc" id="L587">            this.displayName = displayName;</span>
+<span class="fc" id="L588">            this.macRelative = macRelative;</span>
+<span class="fc" id="L589">            this.winRelative = winRelative;</span>
+<span class="fc" id="L590">            this.winUnderAppData = winUnderAppData;</span>
+<span class="fc" id="L591">            this.linuxRelative = linuxRelative;</span>
+<span class="fc" id="L592">            this.format = format;</span>
+<span class="fc" id="L593">        }</span>
+
+        String absolutePath(String home) {
+<span class="fc bfc" id="L596" title="All 2 branches covered.">            if (isWindows()) {</span>
+<span class="fc bfc" id="L597" title="All 2 branches covered.">                if (!winUnderAppData) {</span>
+<span class="fc" id="L598">                    return home + &quot;/&quot; + winRelative;</span>
+                }
+<span class="fc" id="L600">                String base = appDataPath(home);</span>
+<span class="pc bpc" id="L601" title="1 of 2 branches missed.">                return base == null ? null : base + &quot;/&quot; + winRelative;</span>
+            }
+<span class="fc bfc" id="L603" title="All 2 branches covered.">            if (isMac()) {</span>
+<span class="fc" id="L604">                return home + &quot;/&quot; + macRelative;</span>
+            }
+<span class="fc" id="L606">            return home + &quot;/&quot; + linuxRelative;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

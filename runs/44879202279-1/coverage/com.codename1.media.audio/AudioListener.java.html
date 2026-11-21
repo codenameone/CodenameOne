@@ -1,0 +1,211 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AudioListener.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.media.audio</a> &gt; <span class="el_source">AudioListener.java</span></div><h1>AudioListener.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.media.audio;
+
+/// The position and orientation of the listener every [PannerNode] of a
+/// context is heard from, the Web Audio `AudioListener`. Get it with
+/// [BaseAudioContext#getListener()].
+///
+/// The coordinate system is right-handed: by default the listener is at the
+/// origin facing -Z, with +Y up and +X to the right. Every coordinate is an
+/// audio rate [AudioParam], so a moving listener can be automated.
+public final class AudioListener {
+    private final AudioParam positionX;
+    private final AudioParam positionY;
+    private final AudioParam positionZ;
+    private final AudioParam forwardX;
+    private final AudioParam forwardY;
+    private final AudioParam forwardZ;
+    private final AudioParam upX;
+    private final AudioParam upY;
+    private final AudioParam upZ;
+
+<span class="fc" id="L43">    AudioListener(BaseAudioContext c) {</span>
+<span class="fc" id="L44">        positionX = param(c, &quot;positionX&quot;, 0);</span>
+<span class="fc" id="L45">        positionY = param(c, &quot;positionY&quot;, 0);</span>
+<span class="fc" id="L46">        positionZ = param(c, &quot;positionZ&quot;, 0);</span>
+<span class="fc" id="L47">        forwardX = param(c, &quot;forwardX&quot;, 0);</span>
+<span class="fc" id="L48">        forwardY = param(c, &quot;forwardY&quot;, 0);</span>
+<span class="fc" id="L49">        forwardZ = param(c, &quot;forwardZ&quot;, -1);</span>
+<span class="fc" id="L50">        upX = param(c, &quot;upX&quot;, 0);</span>
+<span class="fc" id="L51">        upY = param(c, &quot;upY&quot;, 1);</span>
+<span class="fc" id="L52">        upZ = param(c, &quot;upZ&quot;, 0);</span>
+<span class="fc" id="L53">    }</span>
+
+    static AudioParam param(BaseAudioContext c, String name, float def) {
+<span class="fc" id="L56">        return new AudioParam(c, name, def, -Float.MAX_VALUE, Float.MAX_VALUE, AutomationRate.A_RATE, false);</span>
+    }
+
+    /// Moves the listener now.
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: position on X
+    ///
+    /// - `y`: position on Y
+    ///
+    /// - `z`: position on Z
+    public void setPosition(float x, float y, float z) {
+<span class="nc" id="L69">        positionX.setValue(x);</span>
+<span class="nc" id="L70">        positionY.setValue(y);</span>
+<span class="nc" id="L71">        positionZ.setValue(z);</span>
+<span class="nc" id="L72">    }</span>
+
+    /// Turns the listener now.
+    ///
+    /// #### Parameters
+    ///
+    /// - `fx`: forward X
+    ///
+    /// - `fy`: forward Y
+    ///
+    /// - `fz`: forward Z
+    ///
+    /// - `ux`: up X
+    ///
+    /// - `uy`: up Y
+    ///
+    /// - `uz`: up Z
+    public void setOrientation(float fx, float fy, float fz, float ux, float uy, float uz) {
+<span class="fc" id="L90">        forwardX.setValue(fx);</span>
+<span class="fc" id="L91">        forwardY.setValue(fy);</span>
+<span class="fc" id="L92">        forwardZ.setValue(fz);</span>
+<span class="fc" id="L93">        upX.setValue(ux);</span>
+<span class="fc" id="L94">        upY.setValue(uy);</span>
+<span class="fc" id="L95">        upZ.setValue(uz);</span>
+<span class="fc" id="L96">    }</span>
+
+    /// Position on X, 0 by default.
+    ///
+    /// #### Returns
+    ///
+    /// the parameter
+    public AudioParam getPositionX() {
+<span class="nc" id="L104">        return positionX;</span>
+    }
+
+    /// Position on Y, 0 by default.
+    ///
+    /// #### Returns
+    ///
+    /// the parameter
+    public AudioParam getPositionY() {
+<span class="nc" id="L113">        return positionY;</span>
+    }
+
+    /// Position on Z, 0 by default.
+    ///
+    /// #### Returns
+    ///
+    /// the parameter
+    public AudioParam getPositionZ() {
+<span class="nc" id="L122">        return positionZ;</span>
+    }
+
+    /// X of the direction faced, 0 by default.
+    ///
+    /// #### Returns
+    ///
+    /// the parameter
+    public AudioParam getForwardX() {
+<span class="nc" id="L131">        return forwardX;</span>
+    }
+
+    /// Y of the direction faced, 0 by default.
+    ///
+    /// #### Returns
+    ///
+    /// the parameter
+    public AudioParam getForwardY() {
+<span class="nc" id="L140">        return forwardY;</span>
+    }
+
+    /// Z of the direction faced, -1 by default.
+    ///
+    /// #### Returns
+    ///
+    /// the parameter
+    public AudioParam getForwardZ() {
+<span class="nc" id="L149">        return forwardZ;</span>
+    }
+
+    /// X of the top of the head, 0 by default.
+    ///
+    /// #### Returns
+    ///
+    /// the parameter
+    public AudioParam getUpX() {
+<span class="nc" id="L158">        return upX;</span>
+    }
+
+    /// Y of the top of the head, 1 by default.
+    ///
+    /// #### Returns
+    ///
+    /// the parameter
+    public AudioParam getUpY() {
+<span class="nc" id="L167">        return upY;</span>
+    }
+
+    /// Z of the top of the head, 0 by default.
+    ///
+    /// #### Returns
+    ///
+    /// the parameter
+    public AudioParam getUpZ() {
+<span class="nc" id="L176">        return upZ;</span>
+    }
+
+    // ---- render side: values for one quantum, shared by every panner ----
+    float[] px;
+    float[] py;
+    float[] pz;
+    float[] fx;
+    float[] fy;
+    float[] fz;
+    float[] ux;
+    float[] uy;
+    float[] uz;
+    boolean constant;
+<span class="fc" id="L190">    private long rQuantum = -1;</span>
+
+    void compute(long q) {
+<span class="fc bfc" id="L193" title="All 2 branches covered.">        if (rQuantum == q) {</span>
+<span class="fc" id="L194">            return;</span>
+        }
+<span class="fc" id="L196">        rQuantum = q;</span>
+<span class="fc" id="L197">        px = positionX.compute(q);</span>
+<span class="fc" id="L198">        py = positionY.compute(q);</span>
+<span class="fc" id="L199">        pz = positionZ.compute(q);</span>
+<span class="fc" id="L200">        fx = forwardX.compute(q);</span>
+<span class="fc" id="L201">        fy = forwardY.compute(q);</span>
+<span class="fc" id="L202">        fz = forwardZ.compute(q);</span>
+<span class="fc" id="L203">        ux = upX.compute(q);</span>
+<span class="fc" id="L204">        uy = upY.compute(q);</span>
+<span class="fc" id="L205">        uz = upZ.compute(q);</span>
+<span class="pc bpc" id="L206" title="3 of 6 branches missed.">        constant = positionX.isConstant() &amp;&amp; positionY.isConstant() &amp;&amp; positionZ.isConstant()</span>
+<span class="pc bpc" id="L207" title="3 of 6 branches missed.">                &amp;&amp; forwardX.isConstant() &amp;&amp; forwardY.isConstant() &amp;&amp; forwardZ.isConstant()</span>
+<span class="pc bpc" id="L208" title="3 of 6 branches missed.">                &amp;&amp; upX.isConstant() &amp;&amp; upY.isConstant() &amp;&amp; upZ.isConstant();</span>
+<span class="fc" id="L209">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

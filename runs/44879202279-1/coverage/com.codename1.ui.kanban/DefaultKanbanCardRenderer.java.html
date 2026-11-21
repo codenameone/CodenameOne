@@ -1,0 +1,226 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DefaultKanbanCardRenderer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.kanban</a> &gt; <span class="el_source">DefaultKanbanCardRenderer.java</span></div><h1>DefaultKanbanCardRenderer.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ui.kanban;
+
+import com.codename1.kanban.KanbanCard;
+import com.codename1.ui.Font;
+import com.codename1.ui.Graphics;
+import com.codename1.ui.plaf.Style;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/// The renderer a board starts with: a card with its title, up to two lines
+/// of description, its tags as small labels and its badge, and a strip of
+/// colour down its leading edge when its style key has one.
+///
+/// Colours and fonts come from the UIIDs `KanbanCard`, `KanbanCardSelected`
+/// and `KanbanCardTag`.
+<span class="fc" id="L40">public class DefaultKanbanCardRenderer implements KanbanCardRenderer {</span>
+<span class="fc" id="L41">    private final Map&lt;String, Integer&gt; accents = new HashMap&lt;String, Integer&gt;();</span>
+<span class="fc" id="L42">    private final Map&lt;String, Integer&gt; tagColors = new HashMap&lt;String, Integer&gt;();</span>
+<span class="fc" id="L43">    private int titleLines = 2;</span>
+<span class="fc" id="L44">    private int descriptionLines = 2;</span>
+    // the wrapped lines of the cards painted lately, by card id
+<span class="fc" id="L46">    private final Map&lt;String, Wrapped&gt; wrapped = new HashMap&lt;String, Wrapped&gt;();</span>
+
+    private static final class Wrapped {
+        String title;
+        String description;
+        int width;
+        Font font;
+        Font small;
+        List&lt;String&gt; titleRows;
+        List&lt;String&gt; descriptionRows;
+    }
+
+    /// Gives the cards with a style key a colour, drawn down their leading
+    /// edge.
+    public void setAccent(String styleKey, int rgb) {
+<span class="nc" id="L61">        accents.put(styleKey, Integer.valueOf(rgb));</span>
+<span class="nc" id="L62">    }</span>
+
+    /// Gives a tag a background colour of its own.
+    public void setTagColor(String tag, int rgb) {
+<span class="nc" id="L66">        tagColors.put(tag, Integer.valueOf(rgb));</span>
+<span class="nc" id="L67">    }</span>
+
+    /// The most lines a title takes before it is cut short; 2 by default.
+    public int getTitleLines() {
+<span class="nc" id="L71">        return titleLines;</span>
+    }
+
+    /// Sets the most lines a title takes.
+    public void setTitleLines(int titleLines) {
+<span class="nc" id="L76">        this.titleLines = Math.max(1, titleLines);</span>
+<span class="nc" id="L77">        wrapped.clear();</span>
+<span class="nc" id="L78">    }</span>
+
+    /// The most lines a description takes; 2 by default, 0 to hide it.
+    public int getDescriptionLines() {
+<span class="nc" id="L82">        return descriptionLines;</span>
+    }
+
+    /// Sets the most lines a description takes.
+    public void setDescriptionLines(int descriptionLines) {
+<span class="nc" id="L87">        this.descriptionLines = Math.max(0, descriptionLines);</span>
+<span class="nc" id="L88">        wrapped.clear();</span>
+<span class="nc" id="L89">    }</span>
+
+    private static int pad() {
+<span class="fc" id="L92">        return KanbanLook.mm(1.5f);</span>
+    }
+
+    private Wrapped rows(KanbanCard card, int width) {
+<span class="fc" id="L96">        Font f = KanbanLook.style(&quot;KanbanCard&quot;).getFont();</span>
+<span class="fc" id="L97">        Font small = KanbanLook.style(&quot;KanbanCardTag&quot;).getFont();</span>
+<span class="fc" id="L98">        Wrapped w = wrapped.get(card.getId());</span>
+<span class="fc" id="L99">        String title = card.getTitle();</span>
+<span class="fc" id="L100">        String desc = card.getDescription();</span>
+<span class="pc bpc" id="L101" title="5 of 12 branches missed.">        if (w != null &amp;&amp; w.width == width &amp;&amp; w.font == f &amp;&amp; w.small == small // NOPMD CompareObjectsWithEquals - the theme's fonts themselves</span>
+<span class="pc bpc" id="L102" title="2 of 6 branches missed.">                &amp;&amp; (title == null ? w.title == null : title.equals(w.title))</span>
+<span class="nc bnc" id="L103" title="All 2 branches missed.">                &amp;&amp; (desc == null ? w.description == null : desc.equals(w.description))) {</span>
+<span class="fc" id="L104">            return w;</span>
+        }
+        // a bound only against cards that come and go: a board's own cards
+        // fit, as clearing on every layout of a large board would re-wrap
+        // every card it measures
+<span class="pc bpc" id="L109" title="1 of 2 branches missed.">        if (wrapped.size() &gt; 4096) {</span>
+<span class="nc" id="L110">            wrapped.clear();</span>
+        }
+<span class="fc" id="L112">        w = new Wrapped();</span>
+<span class="fc" id="L113">        w.title = title;</span>
+<span class="fc" id="L114">        w.description = desc;</span>
+<span class="fc" id="L115">        w.width = width;</span>
+<span class="fc" id="L116">        w.font = f;</span>
+<span class="fc" id="L117">        w.small = small;</span>
+<span class="fc" id="L118">        w.titleRows = KanbanLook.wrap(title, f, width, titleLines);</span>
+<span class="fc" id="L119">        w.descriptionRows = KanbanLook.wrap(desc, small, width,</span>
+                descriptionLines);
+<span class="fc" id="L121">        wrapped.put(card.getId(), w);</span>
+<span class="fc" id="L122">        return w;</span>
+    }
+
+    @Override
+    public int getCardHeight(KanbanBoard board, KanbanCard card, int width) {
+<span class="fc" id="L127">        Font f = KanbanLook.style(&quot;KanbanCard&quot;).getFont();</span>
+<span class="fc" id="L128">        Font small = KanbanLook.style(&quot;KanbanCardTag&quot;).getFont();</span>
+<span class="fc" id="L129">        int pad = pad();</span>
+<span class="fc" id="L130">        Wrapped w = rows(card, width - pad * 2 - strip(card));</span>
+<span class="fc" id="L131">        int h = pad * 2 + Math.max(1, w.titleRows.size()) * f.getHeight();</span>
+<span class="fc" id="L132">        h += w.descriptionRows.size() * small.getHeight();</span>
+<span class="pc bpc" id="L133" title="1 of 4 branches missed.">        if (!card.getTags().isEmpty() || card.getBadge() != null) {</span>
+<span class="fc" id="L134">            h += small.getHeight() + pad;</span>
+        }
+<span class="fc" id="L136">        return h;</span>
+    }
+
+    private int strip(KanbanCard card) {
+<span class="pc bpc" id="L140" title="3 of 4 branches missed.">        return card.getStyleKey() != null &amp;&amp; accents.containsKey(card.getStyleKey()) ? KanbanLook.mm(1f) : 0;</span>
+    }
+
+    @Override
+    public void paintCard(Graphics g, KanbanBoard board, KanbanCard card, int x, int y, int w, int h,
+            boolean selected, float lift) {
+<span class="fc" id="L146">        Style s = KanbanLook.style(&quot;KanbanCard&quot;);</span>
+<span class="fc" id="L147">        Style sel = KanbanLook.style(&quot;KanbanCardSelected&quot;);</span>
+<span class="fc" id="L148">        Style ts = KanbanLook.style(&quot;KanbanCardTag&quot;);</span>
+<span class="fc" id="L149">        int bg = KanbanLook.bg(s, 0xffffff);</span>
+<span class="fc" id="L150">        int fg = s.getFgColor();</span>
+<span class="fc" id="L151">        int arc = KanbanLook.mm(1.6f);</span>
+<span class="fc" id="L152">        int pad = pad();</span>
+<span class="fc" id="L153">        KanbanLook.shadow(g, x, y, w, h, arc, 0.5f + lift * 1.5f);</span>
+<span class="fc" id="L154">        g.setColor(bg);</span>
+<span class="fc" id="L155">        g.fillRoundRect(x, y, w, h, arc, arc);</span>
+<span class="fc" id="L156">        int strip = strip(card);</span>
+<span class="pc bpc" id="L157" title="1 of 2 branches missed.">        if (strip &gt; 0) {</span>
+<span class="nc" id="L158">            g.setColor(accents.get(card.getStyleKey()).intValue());</span>
+<span class="nc" id="L159">            g.fillRoundRect(x, y, strip * 2, h, arc, arc);</span>
+<span class="nc" id="L160">            g.setColor(bg);</span>
+<span class="nc" id="L161">            g.fillRect(x + strip, y, strip, h);</span>
+        }
+<span class="fc bfc" id="L163" title="All 2 branches covered.">        g.setColor(selected ? sel.getFgColor() : KanbanLook.mix(bg, fg, 40));</span>
+<span class="fc" id="L164">        g.drawRoundRect(x, y, w - 1, h - 1, arc, arc);</span>
+<span class="fc bfc" id="L165" title="All 2 branches covered.">        if (selected) {</span>
+<span class="fc" id="L166">            g.drawRoundRect(x + 1, y + 1, w - 3, h - 3, arc, arc);</span>
+        }
+<span class="fc" id="L168">        Font f = s.getFont();</span>
+<span class="fc" id="L169">        Font small = ts.getFont();</span>
+<span class="fc" id="L170">        int tx = x + pad + strip;</span>
+<span class="fc" id="L171">        int room = w - pad * 2 - strip;</span>
+<span class="fc" id="L172">        Wrapped rows = rows(card, room);</span>
+<span class="fc" id="L173">        int ty = y + pad;</span>
+<span class="fc" id="L174">        g.setFont(f);</span>
+<span class="fc" id="L175">        g.setColor(fg);</span>
+<span class="fc bfc" id="L176" title="All 2 branches covered.">        for (int i = 0; i &lt; rows.titleRows.size(); i++) { // NOPMD ForLoopCanBeForeach - indexed: painted every frame, no iterator</span>
+<span class="fc" id="L177">            g.drawString(rows.titleRows.get(i), tx, ty);</span>
+<span class="fc" id="L178">            ty += f.getHeight();</span>
+        }
+<span class="pc bpc" id="L180" title="1 of 2 branches missed.">        if (rows.titleRows.isEmpty()) {</span>
+<span class="nc" id="L181">            ty += f.getHeight();</span>
+        }
+<span class="fc" id="L183">        g.setFont(small);</span>
+<span class="fc" id="L184">        g.setColor(KanbanLook.mix(bg, fg, 160));</span>
+<span class="pc bpc" id="L185" title="1 of 2 branches missed.">        for (int i = 0; i &lt; rows.descriptionRows.size(); i++) { // NOPMD ForLoopCanBeForeach - indexed: painted every frame, no iterator</span>
+<span class="nc" id="L186">            g.drawString(rows.descriptionRows.get(i), tx, ty);</span>
+<span class="nc" id="L187">            ty += small.getHeight();</span>
+        }
+<span class="fc" id="L189">        List&lt;String&gt; tags = card.getTags();</span>
+<span class="fc" id="L190">        String badge = card.getBadge();</span>
+<span class="pc bpc" id="L191" title="1 of 4 branches missed.">        if (tags.isEmpty() &amp;&amp; badge == null) {</span>
+<span class="fc" id="L192">            return;</span>
+        }
+<span class="fc" id="L194">        ty += pad / 2;</span>
+<span class="fc" id="L195">        int right = x + w - pad;</span>
+<span class="pc bpc" id="L196" title="1 of 2 branches missed.">        if (badge != null) {</span>
+<span class="nc" id="L197">            int bw = small.stringWidth(badge);</span>
+<span class="nc" id="L198">            g.setColor(KanbanLook.mix(bg, fg, 160));</span>
+<span class="nc" id="L199">            g.drawString(badge, right - bw, ty);</span>
+<span class="nc" id="L200">            right -= bw + pad;</span>
+        }
+<span class="fc" id="L202">        int px = tx;</span>
+<span class="fc" id="L203">        int pillPad = Math.max(2, pad / 2);</span>
+<span class="fc" id="L204">        int pillH = small.getHeight();</span>
+<span class="pc bpc" id="L205" title="1 of 2 branches missed.">        for (int i = 0; i &lt; tags.size(); i++) { // NOPMD ForLoopCanBeForeach - indexed: painted every frame, no iterator</span>
+<span class="fc" id="L206">            String tag = tags.get(i);</span>
+<span class="fc" id="L207">            int pw = small.stringWidth(tag) + pillPad * 2;</span>
+<span class="pc bpc" id="L208" title="1 of 2 branches missed.">            if (px + pw &gt; right) {</span>
+<span class="fc" id="L209">                break;</span>
+            }
+<span class="nc" id="L211">            Integer own = tagColors.get(tag);</span>
+<span class="nc bnc" id="L212" title="All 2 branches missed.">            int pillBg = own == null ? KanbanLook.bg(ts, KanbanLook.mix(bg, fg, 30)) : own.intValue();</span>
+<span class="nc" id="L213">            g.setColor(pillBg);</span>
+<span class="nc" id="L214">            g.fillRoundRect(px, ty, pw, pillH, pillH, pillH);</span>
+<span class="nc bnc" id="L215" title="All 2 branches missed.">            g.setColor(own == null ? ts.getFgColor() : contrast(pillBg));</span>
+<span class="nc" id="L216">            g.drawString(tag, px + pillPad, ty);</span>
+<span class="nc" id="L217">            px += pw + pillPad;</span>
+        }
+<span class="fc" id="L219">    }</span>
+
+    private static int contrast(int rgb) {
+<span class="nc" id="L222">        int luma = (((rgb &gt;&gt; 16) &amp; 0xff) * 299 + ((rgb &gt;&gt; 8) &amp; 0xff) * 587 + (rgb &amp; 0xff) * 114) / 1000;</span>
+<span class="nc bnc" id="L223" title="All 2 branches missed.">        return luma &lt; 140 ? 0xffffff : 0x1d1b20;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

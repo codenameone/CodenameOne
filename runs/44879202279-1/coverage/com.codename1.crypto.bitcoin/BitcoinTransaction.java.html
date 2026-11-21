@@ -1,0 +1,605 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>BitcoinTransaction.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.crypto.bitcoin</a> &gt; <span class="el_source">BitcoinTransaction.java</span></div><h1>BitcoinTransaction.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008-2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.crypto.bitcoin;
+
+import com.codename1.security.Hash;
+import com.codename1.security.Schnorr;
+import com.codename1.security.Secp256k1;
+import java.util.ArrayList;
+import java.util.List;
+
+/// A Bitcoin transaction: inputs spending previous outputs, new outputs, and the witness
+/// data SegWit inputs carry.
+///
+/// Mutable while it is built and signed; [#serialize] writes the network form (with the
+/// witness when any input has one) and [#parse] reads it back. The three signature hash
+/// algorithms are here -- legacy ([#legacySighash]), SegWit v0 BIP-143
+/// ([#segwitV0Sighash]) and Taproot BIP-341 ([#taprootSighash]) -- together with
+/// one-call signers for the common single-key inputs:
+///
+/// ```java
+/// String prevTxid = &quot;4a5e1e4baab89f3a32518a88c31bc87f618f76673e2cc77ab2127b7afdeda33b&quot;;
+/// byte[] privateKey = SecureRandom.bytes(32);
+/// BitcoinTransaction tx = new BitcoinTransaction();
+/// tx.addInput(prevTxid, 0);
+/// tx.addOutput(50000, BitcoinAddress.parse(&quot;bc1q...&quot;, BitcoinNetwork.MAINNET).getScriptPubKey());
+/// tx.signP2wpkh(0, privateKey, 60000);
+/// String hex = tx.toHex();   // broadcast
+/// ```
+@com.codename1.impl.SharedWithBackend
+<span class="fc" id="L50">public final class BitcoinTransaction {</span>
+    /// Sign every input and output.
+    public static final int SIGHASH_ALL = 0x01;
+    /// Sign every input and no output.
+    public static final int SIGHASH_NONE = 0x02;
+    /// Sign every input and the output with the same index.
+    public static final int SIGHASH_SINGLE = 0x03;
+    /// Combined with another type: sign only this input.
+    public static final int SIGHASH_ANYONECANPAY = 0x80;
+    /// Taproot's default, which commits like `SIGHASH_ALL` and adds no byte to the signature.
+    public static final int SIGHASH_DEFAULT = 0x00;
+
+    /// The sequence that disables relative lock time and replace-by-fee signalling.
+    public static final long SEQUENCE_FINAL = 0xffffffffL;
+    /// The sequence an input signals BIP-125 replace-by-fee with.
+    public static final long SEQUENCE_RBF = 0xfffffffdL;
+
+<span class="fc" id="L67">    private long version = 2;</span>
+    private long lockTime;
+<span class="fc" id="L69">    private final List&lt;Input&gt; inputs = new ArrayList&lt;Input&gt;();</span>
+<span class="fc" id="L70">    private final List&lt;Output&gt; outputs = new ArrayList&lt;Output&gt;();</span>
+
+    /// One input: the outpoint it spends, its unlocking script, sequence and witness.
+    public static final class Input {
+        private final byte[] prevTxidInternal;
+        private final long prevIndex;
+<span class="fc" id="L76">        private Script scriptSig = Script.empty();</span>
+        private long sequence;
+<span class="fc" id="L78">        private List&lt;byte[]&gt; witness = new ArrayList&lt;byte[]&gt;();</span>
+
+<span class="fc" id="L80">        Input(byte[] prevTxidInternal, long prevIndex, long sequence) {</span>
+<span class="fc" id="L81">            this.prevTxidInternal = prevTxidInternal;</span>
+<span class="fc" id="L82">            this.prevIndex = prevIndex;</span>
+<span class="fc" id="L83">            this.sequence = sequence;</span>
+<span class="fc" id="L84">        }</span>
+
+        /// The spent transaction's id in display (big-endian) hex, as explorers show it.
+        public String getPrevTxid() {
+<span class="nc" id="L88">            return Hash.toHex(Wire.reverse(prevTxidInternal));</span>
+        }
+
+        /// The output index spent.
+        public long getPrevIndex() {
+<span class="nc" id="L93">            return prevIndex;</span>
+        }
+
+        /// The unlocking script.
+        public Script getScriptSig() {
+<span class="fc" id="L98">            return scriptSig;</span>
+        }
+
+        /// Replaces the unlocking script.
+        public void setScriptSig(Script scriptSig) {
+<span class="pc bpc" id="L103" title="1 of 2 branches missed.">            this.scriptSig = scriptSig == null ? Script.empty() : scriptSig;</span>
+<span class="fc" id="L104">        }</span>
+
+        /// The sequence number.
+        public long getSequence() {
+<span class="nc" id="L108">            return sequence;</span>
+        }
+
+        /// Replaces the sequence number.
+        public void setSequence(long sequence) {
+<span class="nc" id="L113">            this.sequence = sequence;</span>
+<span class="nc" id="L114">        }</span>
+
+        /// The witness stack items, in order.
+        public List&lt;byte[]&gt; getWitness() {
+<span class="fc" id="L118">            List&lt;byte[]&gt; out = new ArrayList&lt;byte[]&gt;();</span>
+<span class="fc bfc" id="L119" title="All 2 branches covered.">            for (byte[] witnessItem : witness) {</span>
+<span class="fc" id="L120">                out.add(Wire.copy(witnessItem));</span>
+<span class="fc" id="L121">            }</span>
+<span class="fc" id="L122">            return out;</span>
+        }
+
+        /// Replaces the witness stack.
+        public void setWitness(List&lt;byte[]&gt; items) {
+<span class="fc" id="L127">            witness = new ArrayList&lt;byte[]&gt;();</span>
+<span class="fc bfc" id="L128" title="All 2 branches covered.">            if (items != null) {</span>
+<span class="fc bfc" id="L129" title="All 2 branches covered.">                for (byte[] item : items) {</span>
+<span class="fc" id="L130">                    witness.add(Wire.copy(item));</span>
+<span class="fc" id="L131">                }</span>
+            }
+<span class="fc" id="L133">        }</span>
+
+        byte[] outpoint() {
+<span class="fc" id="L136">            return new Wire().bytes(prevTxidInternal).u32(prevIndex).toBytes();</span>
+        }
+    }
+
+    /// One output: an amount in satoshis and the script that locks it.
+    public static final class Output {
+        private final long value;
+        private final Script scriptPubKey;
+
+        /// An output of `value` satoshis to `scriptPubKey`.
+<span class="fc" id="L146">        public Output(long value, Script scriptPubKey) {</span>
+<span class="pc bpc" id="L147" title="2 of 4 branches missed.">            if (value &lt; 0 || value &gt; 2100000000000000L) {</span>
+<span class="nc" id="L148">                throw new IllegalArgumentException(&quot;output value out of range&quot;);</span>
+            }
+<span class="fc" id="L150">            this.value = value;</span>
+<span class="fc" id="L151">            this.scriptPubKey = scriptPubKey;</span>
+<span class="fc" id="L152">        }</span>
+
+        /// The amount in satoshis.
+        public long getValue() {
+<span class="fc" id="L156">            return value;</span>
+        }
+
+        /// The locking script.
+        public Script getScriptPubKey() {
+<span class="fc" id="L161">            return scriptPubKey;</span>
+        }
+
+        byte[] serialize() {
+<span class="fc" id="L165">            return new Wire().u64(value).varBytes(scriptPubKey.raw()).toBytes();</span>
+        }
+    }
+
+    /// Adds an input spending output `index` of the transaction `prevTxid` (display hex), with
+    /// [#SEQUENCE_RBF]. Returns its index.
+    public int addInput(String prevTxid, long index) {
+<span class="fc" id="L172">        return addInput(prevTxid, index, SEQUENCE_RBF);</span>
+    }
+
+    /// Adds an input with an explicit sequence. Returns its index.
+    public int addInput(String prevTxid, long index, long sequence) {
+<span class="fc" id="L177">        byte[] txid = Hash.fromHex(prevTxid);</span>
+<span class="pc bpc" id="L178" title="1 of 2 branches missed.">        if (txid.length != 32) {</span>
+<span class="nc" id="L179">            throw new IllegalArgumentException(&quot;a txid is 32 bytes&quot;);</span>
+        }
+<span class="fc" id="L181">        inputs.add(new Input(Wire.reverse(txid), index, sequence));</span>
+<span class="fc" id="L182">        return inputs.size() - 1;</span>
+    }
+
+    /// Adds an output. Returns its index.
+    public int addOutput(long value, Script scriptPubKey) {
+<span class="fc" id="L187">        outputs.add(new Output(value, scriptPubKey));</span>
+<span class="fc" id="L188">        return outputs.size() - 1;</span>
+    }
+
+    /// Adds an output paying an address. Returns its index.
+    public int addOutput(long value, BitcoinAddress address) {
+<span class="fc" id="L193">        return addOutput(value, address.getScriptPubKey());</span>
+    }
+
+    /// The inputs, live: changes to an `Input` change the transaction.
+    public List&lt;Input&gt; getInputs() {
+<span class="fc" id="L198">        return inputs;</span>
+    }
+
+    /// The outputs.
+    public List&lt;Output&gt; getOutputs() {
+<span class="fc" id="L203">        return new ArrayList&lt;Output&gt;(outputs);</span>
+    }
+
+    /// The version, 2 by default.
+    public long getVersion() {
+<span class="nc" id="L208">        return version;</span>
+    }
+
+    /// Sets the version.
+    public void setVersion(long version) {
+<span class="nc" id="L213">        this.version = version;</span>
+<span class="nc" id="L214">    }</span>
+
+    /// The lock time.
+    public long getLockTime() {
+<span class="nc" id="L218">        return lockTime;</span>
+    }
+
+    /// Sets the lock time (a block height below 500000000, a Unix time above).
+    public void setLockTime(long lockTime) {
+<span class="nc" id="L223">        this.lockTime = lockTime;</span>
+<span class="nc" id="L224">    }</span>
+
+    // ---------------------------------------------------------------- wire form
+
+    /// Tells whether any input carries witness data.
+    public boolean hasWitness() {
+<span class="fc bfc" id="L230" title="All 2 branches covered.">        for (Input inputsElem : inputs) {</span>
+<span class="fc bfc" id="L231" title="All 2 branches covered.">            if (!inputsElem.witness.isEmpty()) {</span>
+<span class="fc" id="L232">                return true;</span>
+            }
+<span class="fc" id="L234">        }</span>
+<span class="fc" id="L235">        return false;</span>
+    }
+
+    /// The network serialization, with the witness when any input has one.
+    public byte[] serialize() {
+<span class="fc" id="L240">        return serialize(hasWitness());</span>
+    }
+
+    byte[] serialize(boolean withWitness) {
+<span class="fc" id="L244">        Wire w = new Wire().u32(version);</span>
+<span class="fc bfc" id="L245" title="All 2 branches covered.">        if (withWitness) {</span>
+<span class="fc" id="L246">            w.u8(0).u8(1);</span>
+        }
+<span class="fc" id="L248">        w.varInt(inputs.size());</span>
+<span class="fc bfc" id="L249" title="All 2 branches covered.">        for (Input inputsElem : inputs) {</span>
+<span class="fc" id="L250">            Input in = inputsElem;</span>
+<span class="fc" id="L251">            w.bytes(in.outpoint()).varBytes(in.scriptSig.raw()).u32(in.sequence);</span>
+<span class="fc" id="L252">        }</span>
+<span class="fc" id="L253">        w.varInt(outputs.size());</span>
+<span class="fc bfc" id="L254" title="All 2 branches covered.">        for (Output output : outputs) {</span>
+<span class="fc" id="L255">            w.bytes(output.serialize());</span>
+<span class="fc" id="L256">        }</span>
+<span class="fc bfc" id="L257" title="All 2 branches covered.">        if (withWitness) {</span>
+<span class="fc bfc" id="L258" title="All 2 branches covered.">            for (Input inputsElem : inputs) {</span>
+<span class="fc" id="L259">                List&lt;byte[]&gt; items = inputsElem.witness;</span>
+<span class="fc" id="L260">                w.varInt(items.size());</span>
+<span class="fc bfc" id="L261" title="All 2 branches covered.">                for (byte[] item : items) {</span>
+<span class="fc" id="L262">                    w.varBytes(item);</span>
+<span class="fc" id="L263">                }</span>
+<span class="fc" id="L264">            }</span>
+        }
+<span class="fc" id="L266">        return w.u32(lockTime).toBytes();</span>
+    }
+
+    /// [#serialize] in hex, the form `sendrawtransaction` and every broadcast API take.
+    public String toHex() {
+<span class="fc" id="L271">        return Hash.toHex(serialize());</span>
+    }
+
+    /// The transaction id in display hex: the reversed double SHA-256 of the form without
+    /// witness.
+    public String getTxid() {
+<span class="fc" id="L277">        return Hash.toHex(Wire.reverse(Hash.sha256(Hash.sha256(serialize(false)))));</span>
+    }
+
+    /// The witness transaction id in display hex.
+    public String getWtxid() {
+<span class="nc" id="L282">        return Hash.toHex(Wire.reverse(Hash.sha256(Hash.sha256(serialize(true)))));</span>
+    }
+
+    /// The virtual size in vbytes, which fees are priced in.
+    public long getVirtualSize() {
+<span class="nc" id="L287">        long base = serialize(false).length;</span>
+<span class="nc" id="L288">        long total = serialize().length;</span>
+<span class="nc" id="L289">        return (base * 3 + total + 3) / 4;</span>
+    }
+
+    /// Reads a serialized transaction, with or without witness.
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: for truncated or trailing data
+    public static BitcoinTransaction parse(byte[] raw) {
+<span class="fc" id="L298">        return parse(raw, true);</span>
+    }
+
+    /// Reads a serialized transaction. With `allowWitness` false the SegWit marker is not
+    /// recognized, which is how a PSBT's unsigned transaction is read: a transaction with
+    /// no inputs would otherwise begin with the marker byte.
+    ///
+    /// #### Throws
+    ///
+    /// - : for truncated or trailing data
+    public static BitcoinTransaction parse(byte[] raw, boolean allowWitness) {
+<span class="fc" id="L309">        Wire r = new Wire(raw);</span>
+<span class="fc" id="L310">        BitcoinTransaction tx = new BitcoinTransaction();</span>
+<span class="fc" id="L311">        tx.version = r.readU32();</span>
+<span class="fc" id="L312">        boolean witness = false;</span>
+<span class="pc bpc" id="L313" title="1 of 6 branches missed.">        if (allowWitness &amp;&amp; r.remaining() &gt;= 2 &amp;&amp; r.peek() == 0) {</span>
+<span class="fc" id="L314">            r.readU8();</span>
+<span class="pc bpc" id="L315" title="1 of 2 branches missed.">            if (r.readU8() != 1) {</span>
+<span class="nc" id="L316">                throw new IllegalArgumentException(&quot;bad SegWit flag&quot;);</span>
+            }
+<span class="fc" id="L318">            witness = true;</span>
+        }
+<span class="fc" id="L320">        long nIn = r.readVarInt();</span>
+<span class="fc" id="L321">        checkCount(nIn, r);</span>
+<span class="fc bfc" id="L322" title="All 2 branches covered.">        for (long iter = 0; iter &lt; nIn; iter++) {</span>
+<span class="fc" id="L323">            byte[] txid = r.read(32);</span>
+<span class="fc" id="L324">            long index = r.readU32();</span>
+<span class="fc" id="L325">            Script sig = Script.of(r.readVarBytes());</span>
+<span class="fc" id="L326">            Input in = new Input(txid, index, r.readU32());</span>
+<span class="fc" id="L327">            in.scriptSig = sig;</span>
+<span class="fc" id="L328">            tx.inputs.add(in);</span>
+        }
+<span class="fc" id="L330">        long nOut = r.readVarInt();</span>
+<span class="fc" id="L331">        checkCount(nOut, r);</span>
+<span class="fc bfc" id="L332" title="All 2 branches covered.">        for (long iter = 0; iter &lt; nOut; iter++) {</span>
+<span class="fc" id="L333">            long value = r.readU64();</span>
+<span class="fc" id="L334">            tx.outputs.add(new Output(value, Script.of(r.readVarBytes())));</span>
+        }
+<span class="fc bfc" id="L336" title="All 2 branches covered.">        if (witness) {</span>
+<span class="fc bfc" id="L337" title="All 2 branches covered.">            for (Input inputsElem : tx.inputs) {</span>
+<span class="fc" id="L338">                long items = r.readVarInt();</span>
+<span class="fc" id="L339">                checkCount(items, r);</span>
+<span class="fc" id="L340">                List&lt;byte[]&gt; stack = new ArrayList&lt;byte[]&gt;();</span>
+<span class="fc bfc" id="L341" title="All 2 branches covered.">                for (long k = 0; k &lt; items; k++) {</span>
+<span class="fc" id="L342">                    stack.add(r.readVarBytes());</span>
+                }
+<span class="fc" id="L344">                inputsElem.witness = stack;</span>
+<span class="fc" id="L345">            }</span>
+<span class="pc bpc" id="L346" title="1 of 2 branches missed.">            if (!tx.hasWitness()) {</span>
+<span class="nc" id="L347">                throw new IllegalArgumentException(&quot;SegWit flag with an empty witness&quot;);</span>
+            }
+        }
+<span class="fc" id="L350">        tx.lockTime = r.readU32();</span>
+<span class="fc bfc" id="L351" title="All 2 branches covered.">        if (r.hasMore()) {</span>
+<span class="fc" id="L352">            throw new IllegalArgumentException(&quot;trailing data after the transaction&quot;);</span>
+        }
+<span class="fc" id="L354">        return tx;</span>
+    }
+
+    /// [#parse] from hex.
+    public static BitcoinTransaction fromHex(String hex) {
+<span class="fc" id="L359">        return parse(Hash.fromHex(hex));</span>
+    }
+
+    private static void checkCount(long n, Wire r) {
+<span class="pc bpc" id="L363" title="2 of 4 branches missed.">        if (n &lt; 0 || n &gt; r.remaining()) {</span>
+<span class="nc" id="L364">            throw new IllegalArgumentException(&quot;count past the end of the data&quot;);</span>
+        }
+<span class="fc" id="L366">    }</span>
+
+    // ---------------------------------------------------------------- signature hashes
+
+    /// The legacy signature hash of input `index` against `scriptCode` (the spent output
+    /// script, or the redeem script of P2SH).
+    public byte[] legacySighash(int index, Script scriptCode, int sighashType) {
+<span class="fc" id="L373">        int base = sighashType &amp; 0x1f;</span>
+<span class="pc bpc" id="L374" title="3 of 4 branches missed.">        if (base == SIGHASH_SINGLE &amp;&amp; index &gt;= outputs.size()) {</span>
+            // the consensus quirk: hash of the number 1
+<span class="nc" id="L376">            byte[] one = new byte[32];</span>
+<span class="nc" id="L377">            one[0] = 1;</span>
+<span class="nc" id="L378">            return one;</span>
+        }
+<span class="pc bpc" id="L380" title="1 of 2 branches missed.">        boolean anyone = (sighashType &amp; SIGHASH_ANYONECANPAY) != 0;</span>
+<span class="fc" id="L381">        Wire w = new Wire().u32(version);</span>
+<span class="pc bpc" id="L382" title="1 of 2 branches missed.">        if (anyone) {</span>
+<span class="nc" id="L383">            w.varInt(1);</span>
+<span class="nc" id="L384">            Input in = inputs.get(index);</span>
+<span class="nc" id="L385">            w.bytes(in.outpoint()).varBytes(scriptCode.raw()).u32(in.sequence);</span>
+<span class="nc" id="L386">        } else {</span>
+<span class="fc" id="L387">            w.varInt(inputs.size());</span>
+<span class="fc bfc" id="L388" title="All 2 branches covered.">            for (int iter = 0; iter &lt; inputs.size(); iter++) {</span>
+<span class="fc" id="L389">                Input in = inputs.get(iter);</span>
+<span class="fc" id="L390">                w.bytes(in.outpoint());</span>
+<span class="fc bfc" id="L391" title="All 2 branches covered.">                w.varBytes(iter == index ? scriptCode.raw() : new byte[0]);</span>
+<span class="pc bpc" id="L392" title="2 of 6 branches missed.">                boolean zeroSeq = iter != index &amp;&amp; (base == SIGHASH_NONE || base == SIGHASH_SINGLE);</span>
+<span class="pc bpc" id="L393" title="1 of 2 branches missed.">                w.u32(zeroSeq ? 0 : in.sequence);</span>
+            }
+        }
+<span class="pc bpc" id="L396" title="1 of 2 branches missed.">        if (base == SIGHASH_NONE) {</span>
+<span class="nc" id="L397">            w.varInt(0);</span>
+<span class="pc bpc" id="L398" title="1 of 2 branches missed.">        } else if (base == SIGHASH_SINGLE) {</span>
+<span class="nc" id="L399">            w.varInt(index + 1);</span>
+<span class="nc bnc" id="L400" title="All 2 branches missed.">            for (int iter = 0; iter &lt; index; iter++) {</span>
+<span class="nc" id="L401">                w.u64(-1L).varInt(0);</span>
+            }
+<span class="nc" id="L403">            w.bytes(outputs.get(index).serialize());</span>
+        } else {
+<span class="fc" id="L405">            w.varInt(outputs.size());</span>
+<span class="fc bfc" id="L406" title="All 2 branches covered.">            for (Output output : outputs) {</span>
+<span class="fc" id="L407">                w.bytes(output.serialize());</span>
+<span class="fc" id="L408">            }</span>
+        }
+<span class="fc" id="L410">        w.u32(lockTime).u32(sighashType &amp; 0xffffffffL);</span>
+<span class="fc" id="L411">        return Hash.sha256(Hash.sha256(w.toBytes()));</span>
+    }
+
+    /// The BIP-143 signature hash of a SegWit v0 input.
+    ///
+    /// #### Parameters
+    ///
+    /// - `scriptCode`: for P2WPKH the P2PKH script of the key hash; for P2WSH the witness
+    ///   script
+    ///
+    /// - `amount`: the value of the spent output in satoshis, which the signature commits to
+    public byte[] segwitV0Sighash(int index, Script scriptCode, long amount, int sighashType) {
+<span class="fc" id="L423">        int base = sighashType &amp; 0x1f;</span>
+<span class="pc bpc" id="L424" title="1 of 2 branches missed.">        boolean anyone = (sighashType &amp; SIGHASH_ANYONECANPAY) != 0;</span>
+<span class="fc" id="L425">        byte[] zero = new byte[32];</span>
+<span class="fc" id="L426">        byte[] hashPrevouts = zero;</span>
+<span class="fc" id="L427">        byte[] hashSequence = zero;</span>
+<span class="fc" id="L428">        byte[] hashOutputs = zero;</span>
+<span class="pc bpc" id="L429" title="1 of 2 branches missed.">        if (!anyone) {</span>
+<span class="fc" id="L430">            hashPrevouts = dsha(prevouts());</span>
+        }
+<span class="pc bpc" id="L432" title="3 of 6 branches missed.">        if (!anyone &amp;&amp; base != SIGHASH_SINGLE &amp;&amp; base != SIGHASH_NONE) {</span>
+<span class="fc" id="L433">            hashSequence = dsha(sequences());</span>
+        }
+<span class="pc bpc" id="L435" title="2 of 4 branches missed.">        if (base != SIGHASH_SINGLE &amp;&amp; base != SIGHASH_NONE) {</span>
+<span class="fc" id="L436">            hashOutputs = dsha(allOutputs());</span>
+<span class="nc bnc" id="L437" title="All 4 branches missed.">        } else if (base == SIGHASH_SINGLE &amp;&amp; index &lt; outputs.size()) {</span>
+<span class="nc" id="L438">            hashOutputs = dsha(outputs.get(index).serialize());</span>
+        }
+<span class="fc" id="L440">        Input in = inputs.get(index);</span>
+<span class="fc" id="L441">        Wire w = new Wire().u32(version).bytes(hashPrevouts).bytes(hashSequence).bytes(in.outpoint())</span>
+<span class="fc" id="L442">                .varBytes(scriptCode.raw()).u64(amount).u32(in.sequence).bytes(hashOutputs).u32(lockTime)</span>
+<span class="fc" id="L443">                .u32(sighashType &amp; 0xffffffffL);</span>
+<span class="fc" id="L444">        return dsha(w.toBytes());</span>
+    }
+
+    /// The BIP-341 signature hash of a Taproot input, key path, no annex.
+    ///
+    /// #### Parameters
+    ///
+    /// - `spent`: the output every input spends, in input order -- Taproot signatures commit
+    ///   to all their amounts and scripts
+    public byte[] taprootSighash(int index, List&lt;Output&gt; spent, int sighashType) {
+<span class="fc" id="L454">        return taprootSighash(index, spent, sighashType, null);</span>
+    }
+
+    /// The BIP-341 signature hash of a Taproot script-path spend of `leafHash` (BIP-342
+    /// extension, no annex, code separator position none); `null` for the key path.
+    public byte[] taprootSighash(int index, List&lt;Output&gt; spent, int sighashType, byte[] leafHash) {
+<span class="pc bpc" id="L460" title="2 of 4 branches missed.">        if (spent == null || spent.size() != inputs.size()) {</span>
+<span class="nc" id="L461">            throw new IllegalArgumentException(&quot;Taproot needs the spent output of every input&quot;);</span>
+        }
+<span class="fc" id="L463">        int base = sighashType &amp; 0x03;</span>
+<span class="fc bfc" id="L464" title="All 2 branches covered.">        boolean anyone = (sighashType &amp; SIGHASH_ANYONECANPAY) != 0;</span>
+<span class="pc bpc" id="L465" title="2 of 6 branches missed.">        if (sighashType != SIGHASH_DEFAULT &amp;&amp; (base == 0 || (sighashType &amp; ~0x83) != 0)) {</span>
+<span class="nc" id="L466">            throw new IllegalArgumentException(&quot;bad Taproot sighash type&quot;);</span>
+        }
+<span class="fc" id="L468">        Wire w = new Wire().u8(0).u8(sighashType).u32(version).u32(lockTime);</span>
+<span class="fc bfc" id="L469" title="All 2 branches covered.">        if (!anyone) {</span>
+<span class="fc" id="L470">            w.bytes(Hash.sha256(prevouts()));</span>
+<span class="fc" id="L471">            Wire amounts = new Wire();</span>
+<span class="fc" id="L472">            Wire scripts = new Wire();</span>
+<span class="fc bfc" id="L473" title="All 2 branches covered.">            for (Output spentItem : spent) {</span>
+<span class="fc" id="L474">                amounts.u64(spentItem.value);</span>
+<span class="fc" id="L475">                scripts.varBytes(spentItem.scriptPubKey.raw());</span>
+<span class="fc" id="L476">            }</span>
+<span class="fc" id="L477">            w.bytes(Hash.sha256(amounts.toBytes()));</span>
+<span class="fc" id="L478">            w.bytes(Hash.sha256(scripts.toBytes()));</span>
+<span class="fc" id="L479">            w.bytes(Hash.sha256(sequences()));</span>
+        }
+<span class="fc bfc" id="L481" title="All 4 branches covered.">        if (base != SIGHASH_NONE &amp;&amp; base != SIGHASH_SINGLE) {</span>
+<span class="fc" id="L482">            w.bytes(Hash.sha256(allOutputs()));</span>
+        }
+<span class="pc bpc" id="L484" title="1 of 2 branches missed.">        int spendType = leafHash == null ? 0 : 2;</span>
+<span class="fc" id="L485">        w.u8(spendType);</span>
+<span class="fc" id="L486">        Input in = inputs.get(index);</span>
+<span class="fc bfc" id="L487" title="All 2 branches covered.">        if (anyone) {</span>
+<span class="fc" id="L488">            w.bytes(in.outpoint()).u64(spent.get(index).value).varBytes(spent.get(index).scriptPubKey.raw())</span>
+<span class="fc" id="L489">                    .u32(in.sequence);</span>
+        } else {
+<span class="fc" id="L491">            w.u32(index);</span>
+        }
+<span class="fc bfc" id="L493" title="All 2 branches covered.">        if (base == SIGHASH_SINGLE) {</span>
+<span class="pc bpc" id="L494" title="1 of 2 branches missed.">            if (index &gt;= outputs.size()) {</span>
+<span class="nc" id="L495">                throw new IllegalArgumentException(&quot;SIGHASH_SINGLE without a matching output&quot;);</span>
+            }
+<span class="fc" id="L497">            w.bytes(Hash.sha256(outputs.get(index).serialize()));</span>
+        }
+<span class="pc bpc" id="L499" title="1 of 2 branches missed.">        if (leafHash != null) {</span>
+<span class="nc" id="L500">            w.bytes(leafHash).u8(0).u32(0xffffffffL);</span>
+        }
+<span class="fc" id="L502">        return Taproot.taggedHash(&quot;TapSighash&quot;, w.toBytes());</span>
+    }
+
+    private byte[] prevouts() {
+<span class="fc" id="L506">        Wire w = new Wire();</span>
+<span class="fc bfc" id="L507" title="All 2 branches covered.">        for (Input inputsElem : inputs) {</span>
+<span class="fc" id="L508">            w.bytes(inputsElem.outpoint());</span>
+<span class="fc" id="L509">        }</span>
+<span class="fc" id="L510">        return w.toBytes();</span>
+    }
+
+    private byte[] sequences() {
+<span class="fc" id="L514">        Wire w = new Wire();</span>
+<span class="fc bfc" id="L515" title="All 2 branches covered.">        for (Input inputsItem : inputs) {</span>
+<span class="fc" id="L516">            w.u32(inputsItem.sequence);</span>
+<span class="fc" id="L517">        }</span>
+<span class="fc" id="L518">        return w.toBytes();</span>
+    }
+
+    private byte[] allOutputs() {
+<span class="fc" id="L522">        Wire w = new Wire();</span>
+<span class="fc bfc" id="L523" title="All 2 branches covered.">        for (Output output : outputs) {</span>
+<span class="fc" id="L524">            w.bytes(output.serialize());</span>
+<span class="fc" id="L525">        }</span>
+<span class="fc" id="L526">        return w.toBytes();</span>
+    }
+
+    private static byte[] dsha(byte[] b) {
+<span class="fc" id="L530">        return Hash.sha256(Hash.sha256(b));</span>
+    }
+
+    // ---------------------------------------------------------------- signing
+
+    /// Signs a P2PKH input with `SIGHASH_ALL` and sets its `scriptSig`.
+    public void signP2pkh(int index, byte[] privateKey, boolean compressed) {
+<span class="nc" id="L537">        byte[] pub = Secp256k1.publicKey(privateKey, compressed);</span>
+<span class="nc" id="L538">        Script code = Script.p2pkh(Hash.hash160(pub));</span>
+<span class="nc" id="L539">        byte[] sig = ecdsa(legacySighash(index, code, SIGHASH_ALL), privateKey, SIGHASH_ALL);</span>
+<span class="nc" id="L540">        inputs.get(index).setScriptSig(Script.builder().push(sig).push(pub).build());</span>
+<span class="nc" id="L541">    }</span>
+
+    /// Signs a P2WPKH input with `SIGHASH_ALL` and sets its witness.
+    public void signP2wpkh(int index, byte[] privateKey, long amount) {
+<span class="fc" id="L545">        byte[] pub = Secp256k1.publicKey(privateKey, true);</span>
+<span class="fc" id="L546">        byte[] sig = ecdsa(segwitV0Sighash(index, Script.p2pkh(Hash.hash160(pub)), amount, SIGHASH_ALL), privateKey,</span>
+                SIGHASH_ALL);
+<span class="fc" id="L548">        Input in = inputs.get(index);</span>
+<span class="fc" id="L549">        in.witness = new ArrayList&lt;byte[]&gt;();</span>
+<span class="fc" id="L550">        in.witness.add(sig);</span>
+<span class="fc" id="L551">        in.witness.add(pub);</span>
+<span class="fc" id="L552">        in.setScriptSig(Script.empty());</span>
+<span class="fc" id="L553">    }</span>
+
+    /// Signs a BIP-49 P2SH-P2WPKH input with `SIGHASH_ALL`.
+    public void signP2shP2wpkh(int index, byte[] privateKey, long amount) {
+<span class="nc" id="L557">        signP2wpkh(index, privateKey, amount);</span>
+<span class="nc" id="L558">        byte[] pub = Secp256k1.publicKey(privateKey, true);</span>
+<span class="nc" id="L559">        inputs.get(index).setScriptSig(Script.builder().push(Script.p2wpkh(Hash.hash160(pub)).raw()).build());</span>
+<span class="nc" id="L560">    }</span>
+
+    /// Signs a BIP-86 Taproot key-path input with `SIGHASH_DEFAULT` and sets its witness.
+    ///
+    /// #### Parameters
+    ///
+    /// - `privateKey`: the untweaked internal private key
+    ///
+    /// - `spent`: the output every input spends, in input order
+    public void signP2trKeyPath(int index, byte[] privateKey, List&lt;Output&gt; spent) {
+<span class="nc" id="L570">        signP2trKeyPath(index, privateKey, null, spent, SIGHASH_DEFAULT);</span>
+<span class="nc" id="L571">    }</span>
+
+    /// Signs a Taproot key-path input, committing to a script tree's Merkle root.
+    public void signP2trKeyPath(int index, byte[] privateKey, byte[] merkleRoot, List&lt;Output&gt; spent,
+            int sighashType) {
+<span class="fc" id="L576">        byte[] tweaked = Taproot.tweakPrivateKey(privateKey, merkleRoot);</span>
+        try {
+<span class="fc" id="L578">            byte[] sig = Schnorr.sign(taprootSighash(index, spent, sighashType), tweaked, com.codename1.security.CryptoEngine.random(32));</span>
+<span class="fc bfc" id="L579" title="All 2 branches covered.">            if (sighashType != SIGHASH_DEFAULT) {</span>
+<span class="fc" id="L580">                byte[] withType = new byte[65];</span>
+<span class="fc" id="L581">                System.arraycopy(sig, 0, withType, 0, 64);</span>
+<span class="fc" id="L582">                withType[64] = (byte) sighashType;</span>
+<span class="fc" id="L583">                sig = withType;</span>
+            }
+<span class="fc" id="L585">            Input in = inputs.get(index);</span>
+<span class="fc" id="L586">            in.witness = new ArrayList&lt;byte[]&gt;();</span>
+<span class="fc" id="L587">            in.witness.add(sig);</span>
+<span class="fc" id="L588">            in.setScriptSig(Script.empty());</span>
+        } finally {
+<span class="fc" id="L590">            Wif.wipe(tweaked);</span>
+        }
+<span class="fc" id="L592">    }</span>
+
+    /// A DER ECDSA signature with the sighash byte appended, as legacy and SegWit v0 inputs
+    /// carry it.
+    public static byte[] ecdsa(byte[] sighash, byte[] privateKey, int sighashType) {
+<span class="fc" id="L597">        Secp256k1.EcdsaSignature sig = Secp256k1.sign(sighash, privateKey);</span>
+<span class="fc" id="L598">        byte[] der = Der.encode(sig.r(), sig.s());</span>
+<span class="fc" id="L599">        byte[] out = new byte[der.length + 1];</span>
+<span class="fc" id="L600">        System.arraycopy(der, 0, out, 0, der.length);</span>
+<span class="fc" id="L601">        out[der.length] = (byte) sighashType;</span>
+<span class="fc" id="L602">        return out;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

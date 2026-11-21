@@ -1,0 +1,245 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Biometrics.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.security</a> &gt; <span class="el_source">Biometrics.java</span></div><h1>Biometrics.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.security;
+
+import com.codename1.ui.Display;
+import com.codename1.util.AsyncResource;
+
+import java.util.Collections;
+import java.util.List;
+
+/// Entry point for biometric authentication (Touch ID, Face ID, fingerprint,
+/// Android `BiometricPrompt`). Obtain the platform implementation via
+/// [#getInstance()]; the returned subclass is owned by the active port.
+///
+/// A typical unlock flow:
+///
+/// ```java
+/// Biometrics b = Biometrics.getInstance();
+/// if (!b.canAuthenticate()) {
+///     // Fall back to password
+///     return;
+/// }
+/// b.authenticate(&quot;Unlock your account&quot;).onResult((success, err) -&gt; {
+///     if (err != null) {
+///         BiometricError code = ((BiometricException) err).getError();
+///         // branch on code
+///     } else {
+///         // success
+///     }
+/// });
+/// ```
+///
+/// [#authenticate(AuthenticationOptions)] returns an `AsyncResource` whose
+/// failure path completes with a [BiometricException] so callers can branch
+/// on the typed [BiometricError].
+///
+/// #### Platform support
+///
+/// - **iOS** -- uses `LocalAuthentication.framework` (`LAContext`). Touch ID
+///   and Face ID on supported devices. Add the `ios.NSFaceIDUsageDescription`
+///   build hint when targeting Face ID hardware.
+/// - **Android** -- uses `BiometricPrompt` on API 29+ (Android 10) and
+///   `FingerprintManagerCompat` on API 23-28. Fingerprint, face, and iris
+///   modalities are reported per `PackageManager` features. The legacy path
+///   goes through the support library rather than
+///   `android.hardware.fingerprint` directly, which Android removed in API 37,
+///   so an app compiled against any platform still authenticates on an API
+///   23-28 device.
+/// - **JavaSE simulator** -- behaves as a real device with no enrolled
+///   biometrics by default. The `Simulate -&gt; Biometric Simulation` submenu
+///   in the simulator lets you toggle hardware availability, enrolled
+///   modalities, and the outcome of the next [#authenticate(String)] call.
+/// - **All other platforms (desktop deploy, JavaScript, ...)** -- this base
+///   class is returned as-is and acts as a non-supporting fallback:
+///   [#isSupported()] / [#canAuthenticate()] return `false` and
+///   [#authenticate(String)] completes with [BiometricError#NOT_AVAILABLE].
+///   Application code does not need platform `if` statements -- always
+///   gate biometrics on [#canAuthenticate()] before invoking the prompt.
+public class Biometrics {
+
+    /// Subclasses are constructed by the port. Application code obtains the
+    /// active instance via [#getInstance()].
+<span class="fc" id="L83">    protected Biometrics() {</span>
+<span class="fc" id="L84">    }</span>
+
+    /// Returns the platform-specific singleton owned by the current port.
+    /// On ports that do not implement biometrics this returns a base
+    /// [Biometrics] instance whose methods report the device as
+    /// unsupported, so calling code never needs a `null` check or a
+    /// platform-specific `if`.
+    public static Biometrics getInstance() {
+<span class="nc" id="L92">        Biometrics b = Display.getInstance().getBiometrics();</span>
+<span class="nc bnc" id="L93" title="All 2 branches missed.">        return b != null ? b : DEFAULT;</span>
+    }
+
+<span class="fc" id="L96">    private static final Biometrics DEFAULT = new Biometrics();</span>
+
+    /// Returns `true` when biometric hardware exists on the device,
+    /// regardless of whether the user has enrolled biometrics. Combine with
+    /// [#canAuthenticate()] to gate UI affordances: show the &quot;Use
+    /// biometrics&quot; toggle when `isSupported()` is true, but only invoke
+    /// [#authenticate(AuthenticationOptions)] when `canAuthenticate()` is
+    /// also true. Returns `false` on the fallback base class.
+    public boolean isSupported() {
+<span class="nc" id="L105">        return false;</span>
+    }
+
+    /// Returns `true` when the device is ready to authenticate right now:
+    /// hardware present, at least one biometric enrolled, and not in a
+    /// locked-out state. Returns `false` on the fallback base class.
+    public boolean canAuthenticate() {
+<span class="fc" id="L112">        return false;</span>
+    }
+
+    /// Lists the biometric modalities the device can authenticate with. On
+    /// iOS this is the enrolled one, [BiometricType#FINGERPRINT] or
+    /// [BiometricType#FACE]. On Android 10 and later it is every modality
+    /// the device has hardware for, once any biometric is enrolled: Android
+    /// does not report which one the user enrolled, and the list may
+    /// contain [BiometricType#IRIS] there. Windows and Linux do not learn
+    /// the modality and report [BiometricType#STRONG] alone.
+    ///
+    /// To choose the wording of the application's own UI use
+    /// [#getPromptType()], which reduces this list to one answer.
+    ///
+    /// #### Returns
+    ///
+    /// an empty list when nothing is enrolled or the device is unsupported
+    public List&lt;BiometricType&gt; getAvailableBiometrics() {
+<span class="nc" id="L130">        return Collections.emptyList();</span>
+    }
+
+    /// Answers what the application should call biometric authentication on
+    /// this device: a fingerprint, the face, or biometrics in general when
+    /// the device cannot say which. Use it to choose the wording and icon of
+    /// the application's own UI; it needs no platform or OS version check.
+    ///
+    /// ```java
+    /// String label;
+    /// switch (Biometrics.getInstance().getPromptType()) {
+    ///     case FINGERPRINT: label = &quot;Sign in with fingerprint&quot;; break;
+    ///     case FACE: label = &quot;Sign in with face&quot;; break;
+    ///     case BIOMETRICS: label = &quot;Sign in with biometrics&quot;; break;
+    ///     default: label = null; // NONE: offer the password only
+    /// }
+    /// ```
+    ///
+    /// A single modality is named, and anything else that can authenticate
+    /// is [BiometricPromptType#BIOMETRICS]:
+    ///
+    /// - **iOS** names Touch ID or Face ID; any other sensor is generic.
+    /// - **Android** reports that some biometric is enrolled and not which,
+    ///   so a device with more than one kind of biometric hardware is
+    ///   generic. A device with one kind is named.
+    /// - **Windows and Linux** are always generic: Windows Hello does not
+    ///   say what it verifies with, and that may be a PIN.
+    ///
+    /// This asks the platform each time it is called, which on some ports
+    /// waits for another thread or process; on Android, [#canAuthenticate()]
+    /// and [#getAvailableBiometrics()] wait for the UI thread as well. Call
+    /// it when building a screen and keep the answer, not once per paint.
+    ///
+    /// #### Returns
+    ///
+    /// [BiometricPromptType#NONE] when [#canAuthenticate()] is `false`
+    public BiometricPromptType getPromptType() {
+<span class="fc bfc" id="L167" title="All 2 branches covered.">        if (!canAuthenticate()) {</span>
+<span class="fc" id="L168">            return BiometricPromptType.NONE;</span>
+        }
+<span class="fc" id="L170">        return promptTypeOf(getAvailableBiometrics());</span>
+    }
+
+    /// The answer of [#getPromptType()] for a device that can authenticate
+    /// with the given modalities. A port that learns both facts from one
+    /// platform query overrides [#getPromptType()] and calls this, so the
+    /// rule stays in one place.
+    ///
+    /// #### Parameters
+    ///
+    /// - `types`: what [#getAvailableBiometrics()] reported, may be `null`
+    ///
+    /// #### Returns
+    ///
+    /// never [BiometricPromptType#NONE]
+    protected static BiometricPromptType promptTypeOf(List&lt;BiometricType&gt; types) {
+        // STRONG and WEAK are authenticator classes, not modalities, so they
+        // do not count. An iris has no wording of its own and is generic.
+<span class="fc" id="L188">        BiometricPromptType found = null;</span>
+<span class="fc bfc" id="L189" title="All 2 branches covered.">        int size = types == null ? 0 : types.size();</span>
+<span class="fc bfc" id="L190" title="All 2 branches covered.">        for (int i = 0; i &lt; size; i++) {</span>
+<span class="fc" id="L191">            BiometricType t = types.get(i);</span>
+<span class="fc" id="L192">            BiometricPromptType p = null;</span>
+<span class="fc bfc" id="L193" title="All 2 branches covered.">            if (t == BiometricType.FINGERPRINT) {</span>
+<span class="fc" id="L194">                p = BiometricPromptType.FINGERPRINT;</span>
+<span class="fc bfc" id="L195" title="All 2 branches covered.">            } else if (t == BiometricType.FACE) {</span>
+<span class="fc" id="L196">                p = BiometricPromptType.FACE;</span>
+<span class="fc bfc" id="L197" title="All 2 branches covered.">            } else if (t == BiometricType.IRIS) {</span>
+<span class="fc" id="L198">                p = BiometricPromptType.BIOMETRICS;</span>
+            }
+<span class="fc bfc" id="L200" title="All 2 branches covered.">            if (p != null) {</span>
+<span class="pc bpc" id="L201" title="1 of 4 branches missed.">                if (found != null &amp;&amp; found != p) {</span>
+<span class="fc" id="L202">                    return BiometricPromptType.BIOMETRICS;</span>
+                }
+<span class="fc" id="L204">                found = p;</span>
+            }
+        }
+<span class="fc bfc" id="L207" title="All 2 branches covered.">        return found == null ? BiometricPromptType.BIOMETRICS : found;</span>
+    }
+
+    /// Prompts the user to authenticate. The returned `AsyncResource`
+    /// completes with `true` on success, or with a [BiometricException] on
+    /// failure (consult [BiometricException#getError()] for the typed code).
+    /// On the fallback base class this completes immediately with
+    /// [BiometricError#NOT_AVAILABLE] so callers don't need to platform-
+    /// check before invoking.
+    ///
+    /// #### Parameters
+    ///
+    /// - `opts`: non-null configuration; [AuthenticationOptions#setReason(String)]
+    ///   should be set
+    public AsyncResource&lt;Boolean&gt; authenticate(AuthenticationOptions opts) {
+<span class="nc" id="L222">        AsyncResource&lt;Boolean&gt; r = new AsyncResource&lt;Boolean&gt;();</span>
+<span class="nc" id="L223">        r.error(new BiometricException(BiometricError.NOT_AVAILABLE,</span>
+                &quot;Biometric authentication is not available on this platform&quot;));
+<span class="nc" id="L225">        return r;</span>
+    }
+
+    /// Convenience for `authenticate(new AuthenticationOptions().setReason(reason))`.
+    public AsyncResource&lt;Boolean&gt; authenticate(String reason) {
+<span class="nc" id="L230">        return authenticate(new AuthenticationOptions().setReason(reason));</span>
+    }
+
+    /// Cancels an in-flight [#authenticate(AuthenticationOptions)] call if
+    /// one is running. The pending `AsyncResource` completes with
+    /// [BiometricError#USER_CANCELED].
+    ///
+    /// #### Returns
+    ///
+    /// `true` when a call was cancelled; `false` when no authentication was
+    /// pending. Always `false` on the fallback base class.
+    public boolean stopAuthentication() {
+<span class="nc" id="L242">        return false;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

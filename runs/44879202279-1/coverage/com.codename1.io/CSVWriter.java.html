@@ -1,0 +1,415 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CSVWriter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.io</a> &gt; <span class="el_source">CSVWriter.java</span></div><h1>CSVWriter.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.io;
+
+import java.io.IOException;
+import java.io.OutputStream;
+import java.io.OutputStreamWriter;
+import java.io.StringWriter;
+import java.io.Writer;
+
+/// Writes rows of values as CSV, the counterpart of `CSVParser`.
+///
+/// A value is quoted when it has to be: when it contains the separator or any other common
+/// one (comma, semicolon, tab, bar), so a reader that detects the separator can't split it,
+/// the quote character or a line break, or begins or ends with a space. The quote character inside a quoted value
+/// is written twice.
+///
+/// ```java
+/// CSVWriter csv = new CSVWriter();
+/// String text = csv.toString(new String[][] {
+///     {&quot;Name&quot;, &quot;Notes&quot;},
+///     {&quot;Doe, John&quot;, &quot;said \&quot;hello\&quot;&quot;}
+/// });
+/// Log.p(text);
+/// ```
+///
+/// Spreadsheets open a `.csv` file with the separator of the machine's locale and, without a
+/// byte order mark, in a legacy code page. `setWriteByteOrderMark(boolean)` makes them read
+/// UTF-8, and `setWriteSeparatorHint(boolean)` writes the `sep=` first line that names the
+/// separator. Other consumers of CSV read both as data, which is why neither is on by default.
+public class CSVWriter {
+    private final char separatorChar;
+<span class="fc" id="L53">    private char quoteChar = '&quot;';</span>
+<span class="fc" id="L54">    private String lineEnding = &quot;\r\n&quot;;</span>
+    private boolean quoteAll;
+    private boolean escapeFormulas;
+    private boolean writeByteOrderMark;
+    private boolean writeSeparatorHint;
+
+    /// Creates a writer with the comma separator.
+    public CSVWriter() {
+<span class="fc" id="L62">        this(',');</span>
+<span class="fc" id="L63">    }</span>
+
+    /// Creates a writer with a custom separator.
+    ///
+    /// #### Parameters
+    ///
+    /// - `separatorChar`: the separator, a tab for tab separated values
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: for a line break or a double quote, which no reader could tell from a row end or a quote
+<span class="fc" id="L74">    public CSVWriter(char separatorChar) {</span>
+<span class="pc bpc" id="L75" title="1 of 6 branches missed.">        if (separatorChar == '\n' || separatorChar == '\r' || separatorChar == '&quot;') {</span>
+<span class="fc" id="L76">            throw new IllegalArgumentException(&quot;A separator no reader could tell from a line ending or a quote&quot;);</span>
+        }
+<span class="fc" id="L78">        this.separatorChar = separatorChar;</span>
+<span class="fc" id="L79">    }</span>
+
+    /// The separator written between the values of a row.
+    ///
+    /// #### Returns
+    ///
+    /// the separator character
+    public char getSeparatorChar() {
+<span class="nc" id="L87">        return separatorChar;</span>
+    }
+
+    /// The character that encloses a quoted value.
+    ///
+    /// #### Returns
+    ///
+    /// the quote character
+    public char getQuoteChar() {
+<span class="nc" id="L96">        return quoteChar;</span>
+    }
+
+    /// Changes the character that encloses a quoted value.
+    ///
+    /// #### Parameters
+    ///
+    /// - `quoteChar`: the quote character, a double quote by default
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: for the separator or a line break
+    public void setQuoteChar(char quoteChar) {
+<span class="pc bpc" id="L109" title="5 of 6 branches missed.">        if (quoteChar == separatorChar || quoteChar == '\n' || quoteChar == '\r') {</span>
+<span class="fc" id="L110">            throw new IllegalArgumentException(&quot;A quote no reader could tell from the separator or a line ending&quot;);</span>
+        }
+<span class="nc" id="L112">        this.quoteChar = quoteChar;</span>
+<span class="nc" id="L113">    }</span>
+
+    /// The text written after every row.
+    ///
+    /// #### Returns
+    ///
+    /// the line ending
+    public String getLineEnding() {
+<span class="nc" id="L121">        return lineEnding;</span>
+    }
+
+    /// Changes the text written after every row. The default is CR LF, which is what the CSV
+    /// specification (RFC 4180) asks for and what every reader accepts.
+    ///
+    /// #### Parameters
+    ///
+    /// - `lineEnding`: the line ending
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: for anything but CR LF, LF or CR
+    public void setLineEnding(String lineEnding) {
+<span class="pc bpc" id="L135" title="2 of 6 branches missed.">        if (!&quot;\r\n&quot;.equals(lineEnding) &amp;&amp; !&quot;\n&quot;.equals(lineEnding) &amp;&amp; !&quot;\r&quot;.equals(lineEnding)) {</span>
+<span class="fc" id="L136">            throw new IllegalArgumentException(&quot;A line ending is needed; \&quot;\\n\&quot; and \&quot;\\r\\n\&quot; are the usual ones&quot;);</span>
+        }
+<span class="fc" id="L138">        this.lineEnding = lineEnding;</span>
+<span class="fc" id="L139">    }</span>
+
+    /// Whether every value is quoted.
+    ///
+    /// #### Returns
+    ///
+    /// true if every value is quoted
+    public boolean isQuoteAll() {
+<span class="nc" id="L147">        return quoteAll;</span>
+    }
+
+    /// Quotes every value, including those that do not need it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `quoteAll`: true to quote every value
+    public void setQuoteAll(boolean quoteAll) {
+<span class="fc" id="L156">        this.quoteAll = quoteAll;</span>
+<span class="fc" id="L157">    }</span>
+
+    /// Whether values a spreadsheet would run as a formula are neutralized.
+    ///
+    /// #### Returns
+    ///
+    /// true if such values are prefixed
+    public boolean isEscapeFormulas() {
+<span class="nc" id="L165">        return escapeFormulas;</span>
+    }
+
+    /// Neutralizes values a spreadsheet would run as a formula. A spreadsheet that opens a CSV
+    /// file treats a value starting with `=`, `+`, `-` or `@` as a formula, and a formula can
+    /// send the rest of the sheet to a web address. When the values come from people other than
+    /// the one who opens the file, turn this on: such a value is written with a leading
+    /// apostrophe, which a spreadsheet shows as plain text. A value that is a number, such as
+    /// `-12.5`, is left as it is.
+    ///
+    /// #### Parameters
+    ///
+    /// - `escapeFormulas`: true to prefix such values
+    public void setEscapeFormulas(boolean escapeFormulas) {
+<span class="fc" id="L179">        this.escapeFormulas = escapeFormulas;</span>
+<span class="fc" id="L180">    }</span>
+
+    /// Whether `write(OutputStream, String[][])` starts the file with a byte order mark.
+    ///
+    /// #### Returns
+    ///
+    /// true if the mark is written
+    public boolean isWriteByteOrderMark() {
+<span class="nc" id="L188">        return writeByteOrderMark;</span>
+    }
+
+    /// Starts a file written by `write(OutputStream, String[][])` with the UTF-8 byte order
+    /// mark. Spreadsheets need it to read anything outside ASCII correctly.
+    ///
+    /// #### Parameters
+    ///
+    /// - `writeByteOrderMark`: true to write the mark
+    public void setWriteByteOrderMark(boolean writeByteOrderMark) {
+<span class="fc" id="L198">        this.writeByteOrderMark = writeByteOrderMark;</span>
+<span class="fc" id="L199">    }</span>
+
+    /// Whether a `sep=` line is written before the rows.
+    ///
+    /// #### Returns
+    ///
+    /// true if the line is written
+    public boolean isWriteSeparatorHint() {
+<span class="nc" id="L207">        return writeSeparatorHint;</span>
+    }
+
+    /// Writes a first line of the form `sep=,` that tells a spreadsheet which separator the
+    /// file uses, whatever the locale of the machine. `CSVParser` reads that line when
+    /// separator detection is on.
+    ///
+    /// #### Parameters
+    ///
+    /// - `writeSeparatorHint`: true to write the line
+    public void setWriteSeparatorHint(boolean writeSeparatorHint) {
+<span class="fc" id="L218">        this.writeSeparatorHint = writeSeparatorHint;</span>
+<span class="fc" id="L219">    }</span>
+
+    /// Writes rows as UTF-8. The stream is flushed and left open.
+    ///
+    /// #### Parameters
+    ///
+    /// - `out`: the destination
+    ///
+    /// - `rows`: the rows, each an array of values; a null value is written as an empty one
+    ///
+    /// #### Throws
+    ///
+    /// - `java.io.IOException`: if the stream cannot be written
+    public void write(OutputStream out, String[][] rows) throws IOException {
+<span class="fc bfc" id="L233" title="All 2 branches covered.">        if (writeByteOrderMark) {</span>
+<span class="fc" id="L234">            out.write(0xEF);</span>
+<span class="fc" id="L235">            out.write(0xBB);</span>
+<span class="fc" id="L236">            out.write(0xBF);</span>
+        }
+<span class="fc" id="L238">        Writer w = new OutputStreamWriter(out, &quot;UTF-8&quot;);</span>
+<span class="fc" id="L239">        write(w, rows);</span>
+<span class="fc" id="L240">        w.flush();</span>
+<span class="fc" id="L241">    }</span>
+
+    /// Writes rows. The writer is left open.
+    ///
+    /// #### Parameters
+    ///
+    /// - `out`: the destination
+    ///
+    /// - `rows`: the rows, each an array of values; a null value is written as an empty one
+    ///
+    /// #### Throws
+    ///
+    /// - `java.io.IOException`: if the writer fails
+    public void write(Writer out, String[][] rows) throws IOException {
+<span class="fc" id="L255">        writeHeader(out);</span>
+<span class="fc" id="L256">        int count = rows.length;</span>
+        // CSVParser.parse answers a last row with no cells for a file that ends in a line
+        // ending, as most do. Written back it would be a blank line more on every round.
+<span class="pc bpc" id="L259" title="1 of 6 branches missed.">        if (count &gt; 0 &amp;&amp; (rows[count - 1] == null || rows[count - 1].length == 0)) {</span>
+<span class="fc" id="L260">            count--;</span>
+        }
+<span class="fc bfc" id="L262" title="All 2 branches covered.">        for (int i = 0; i &lt; count; i++) {</span>
+<span class="fc" id="L263">            writeRow(out, rows[i]);</span>
+        }
+<span class="fc" id="L265">    }</span>
+
+    /// Writes the `sep=` line if `setWriteSeparatorHint(boolean)` asked for one. Call it once,
+    /// before the first `writeRow(Writer, String...)`, when writing row by row;
+    /// `write(Writer, String[][])` calls it itself.
+    ///
+    /// #### Parameters
+    ///
+    /// - `out`: the destination
+    ///
+    /// #### Throws
+    ///
+    /// - `java.io.IOException`: if the writer fails
+    public void writeHeader(Writer out) throws IOException {
+<span class="fc bfc" id="L279" title="All 2 branches covered.">        if (writeSeparatorHint) {</span>
+<span class="fc" id="L280">            out.write(&quot;sep=&quot;);</span>
+<span class="fc" id="L281">            out.write(separatorChar);</span>
+<span class="fc" id="L282">            out.write(lineEnding);</span>
+        }
+<span class="fc" id="L284">    }</span>
+
+    /// Writes one row followed by the line ending, for output that is produced row by row.
+    ///
+    /// #### Parameters
+    ///
+    /// - `out`: the destination
+    ///
+    /// - `cells`: the values of the row; a null value is written as an empty one
+    ///
+    /// #### Throws
+    ///
+    /// - `java.io.IOException`: if the writer fails
+    public void writeRow(Writer out, String... cells) throws IOException {
+<span class="fc" id="L298">        StringBuilder line = new StringBuilder();</span>
+<span class="fc bfc" id="L299" title="All 2 branches covered.">        for (int i = 0; i &lt; cells.length; i++) {</span>
+<span class="fc bfc" id="L300" title="All 2 branches covered.">            if (i &gt; 0) {</span>
+<span class="fc" id="L301">                line.append(separatorChar);</span>
+            }
+<span class="fc" id="L303">            appendValue(line, cells[i]);</span>
+        }
+        // a row holding one empty value would otherwise be an empty line, which reads back
+        // as a row with no values at all
+<span class="fc bfc" id="L307" title="All 4 branches covered.">        if (cells.length == 1 &amp;&amp; line.length() == 0) {</span>
+<span class="fc" id="L308">            line.append(quoteChar).append(quoteChar);</span>
+        }
+<span class="fc" id="L310">        line.append(lineEnding);</span>
+<span class="fc" id="L311">        out.write(line.toString());</span>
+<span class="fc" id="L312">    }</span>
+
+    /// Returns rows as CSV text.
+    ///
+    /// #### Parameters
+    ///
+    /// - `rows`: the rows, each an array of values
+    ///
+    /// #### Returns
+    ///
+    /// the text
+    public String toString(String[][] rows) {
+<span class="fc" id="L324">        StringWriter w = new StringWriter();</span>
+        try {
+<span class="fc" id="L326">            write(w, rows);</span>
+<span class="nc" id="L327">        } catch (IOException err) {</span>
+            // a StringWriter does not fail
+<span class="nc" id="L329">            throw new IllegalStateException(err.toString(), err);</span>
+<span class="fc" id="L330">        }</span>
+<span class="fc" id="L331">        return w.toString();</span>
+    }
+
+    private void appendValue(StringBuilder line, String cell) {
+<span class="fc bfc" id="L335" title="All 2 branches covered.">        if (cell == null) {</span>
+<span class="fc" id="L336">            return;</span>
+        }
+<span class="fc" id="L338">        String value = cell;</span>
+<span class="fc bfc" id="L339" title="All 4 branches covered.">        if (escapeFormulas &amp;&amp; isFormulaLike(value)) {</span>
+<span class="fc" id="L340">            value = &quot;'&quot; + value;</span>
+        }
+<span class="fc bfc" id="L342" title="All 4 branches covered.">        if (!quoteAll &amp;&amp; !needsQuotes(value)) {</span>
+<span class="fc" id="L343">            line.append(value);</span>
+<span class="fc" id="L344">            return;</span>
+        }
+<span class="fc" id="L346">        line.append(quoteChar);</span>
+<span class="fc" id="L347">        int len = value.length();</span>
+<span class="fc bfc" id="L348" title="All 2 branches covered.">        for (int i = 0; i &lt; len; i++) {</span>
+<span class="fc" id="L349">            char c = value.charAt(i);</span>
+<span class="fc bfc" id="L350" title="All 2 branches covered.">            if (c == quoteChar) {</span>
+<span class="fc" id="L351">                line.append(quoteChar);</span>
+            }
+<span class="fc" id="L353">            line.append(c);</span>
+        }
+<span class="fc" id="L355">        line.append(quoteChar);</span>
+<span class="fc" id="L356">    }</span>
+
+    private boolean needsQuotes(String value) {
+<span class="fc" id="L359">        int len = value.length();</span>
+<span class="fc bfc" id="L360" title="All 2 branches covered.">        if (len == 0) {</span>
+<span class="fc" id="L361">            return false;</span>
+        }
+<span class="fc bfc" id="L363" title="All 4 branches covered.">        if (value.charAt(0) == ' ' || value.charAt(len - 1) == ' ') {</span>
+<span class="fc" id="L364">            return true;</span>
+        }
+<span class="fc bfc" id="L366" title="All 2 branches covered.">        for (int i = 0; i &lt; len; i++) {</span>
+<span class="fc" id="L367">            char c = value.charAt(i);</span>
+            // every character a reader might take for the separator is quoted, not only this
+            // writer's: a reader that detects the separator would otherwise split the cell
+<span class="fc bfc" id="L370" title="All 16 branches covered.">            if (c == separatorChar || c == quoteChar || c == '\n' || c == '\r'</span>
+                    || c == ',' || c == ';' || c == '\t' || c == '|') {
+<span class="fc" id="L372">                return true;</span>
+            }
+        }
+<span class="fc" id="L375">        return false;</span>
+    }
+
+    private static boolean isFormulaLike(String value) {
+<span class="pc bpc" id="L379" title="1 of 2 branches missed.">        if (value.length() == 0) {</span>
+<span class="nc" id="L380">            return false;</span>
+        }
+<span class="fc" id="L382">        char first = value.charAt(0);</span>
+<span class="pc bpc" id="L383" title="2 of 8 branches missed.">        if (first == '=' || first == '@' || first == '\t' || first == '\r') {</span>
+<span class="fc" id="L384">            return true;</span>
+        }
+<span class="fc bfc" id="L386" title="All 4 branches covered.">        if (first != '+' &amp;&amp; first != '-') {</span>
+<span class="fc" id="L387">            return false;</span>
+        }
+        // A sign followed by nothing but what a number is written with -- digits, the
+        // separators of thousands and decimals, spaces, a percent sign -- is a negative
+        // amount, a phone number or a dash, and has nothing to run. Anything else after a
+        // sign could be an expression.
+<span class="fc" id="L393">        int len = value.length();</span>
+<span class="fc bfc" id="L394" title="All 2 branches covered.">        for (int i = 1; i &lt; len; i++) {</span>
+<span class="fc" id="L395">            char c = value.charAt(i);</span>
+<span class="pc bpc" id="L396" title="1 of 6 branches missed.">            if ((c == 'e' || c == 'E') &amp;&amp; isDigit(value, i - 1)) {</span>
+                // the exponent of a number written in scientific notation, -1.5e3 or 2E+10
+<span class="pc bpc" id="L398" title="1 of 6 branches missed.">                int next = i + 1 &lt; len &amp;&amp; (value.charAt(i + 1) == '+' || value.charAt(i + 1) == '-') ? i + 2 : i + 1;</span>
+<span class="fc bfc" id="L399" title="All 2 branches covered.">                if (isDigit(value, next)) {</span>
+<span class="fc" id="L400">                    i = next;</span>
+<span class="fc" id="L401">                    continue;</span>
+                }
+            }
+<span class="pc bpc" id="L404" title="3 of 12 branches missed.">            if ((c &lt; '0' || c &gt; '9') &amp;&amp; c != '.' &amp;&amp; c != ',' &amp;&amp; c != ' ' &amp;&amp; c != '%') {</span>
+<span class="fc" id="L405">                return true;</span>
+            }
+        }
+<span class="fc" id="L408">        return false;</span>
+    }
+
+    private static boolean isDigit(String s, int i) {
+<span class="pc bpc" id="L412" title="3 of 8 branches missed.">        return i &gt;= 0 &amp;&amp; i &lt; s.length() &amp;&amp; s.charAt(i) &gt;= '0' &amp;&amp; s.charAt(i) &lt;= '9';</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

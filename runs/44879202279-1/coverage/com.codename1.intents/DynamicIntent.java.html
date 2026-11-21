@@ -1,0 +1,186 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DynamicIntent.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.intents</a> &gt; <span class="el_source">DynamicIntent.java</span></div><h1>DynamicIntent.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.intents;
+
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
+
+/// A named parameterization of an intent your application already declares --
+/// &quot;reorder my usual&quot;, &quot;call Mum&quot; -- built from data only known at runtime.
+///
+/// ```java
+/// Map&lt;String, Object&gt; usual = new HashMap&lt;String, Object&gt;();
+/// usual.put(&quot;shop&quot;, &quot;shop-7&quot;);
+/// usual.put(&quot;size&quot;, &quot;large&quot;);
+/// Intents.registerDynamicIntent(new DynamicIntent(&quot;usual_coffee&quot;, &quot;order_coffee&quot;,
+///         &quot;Order my usual&quot;).bind(usual));
+/// ```
+///
+/// #### Why it must name a base intent
+///
+/// It runs by running the intent it names, with the bound values filled in. It
+/// cannot introduce a new capability: the native catalogue is compiled into the
+/// app, so a genuinely new verb could never reach the platform, and a runtime
+/// API that appeared to add one would work in the simulator and silently do
+/// nothing on a device.
+///
+/// Binding to a base intent is also what makes it invokable at all -- there is a
+/// handler to run, which is the whole point of registering it.
+public final class DynamicIntent {
+
+    private final String id;
+    private final String baseIntentId;
+    private final String title;
+<span class="fc" id="L55">    private final Map&lt;String, Object&gt; bound = new HashMap&lt;String, Object&gt;();</span>
+
+    /// Creates a parameterization.
+    ///
+    /// #### Parameters
+    ///
+    /// - `id`: the id this parameterization is known by; must not collide with a
+    ///   declared intent
+    /// - `baseIntentId`: the declared intent that actually runs
+    /// - `title`: the name shown to the user
+<span class="fc" id="L65">    public DynamicIntent(String id, String baseIntentId, String title) {</span>
+<span class="pc bpc" id="L66" title="1 of 4 branches missed.">        if (id == null || !isValidId(id)) {</span>
+<span class="fc" id="L67">            throw new IllegalArgumentException(&quot;id must match [a-z][a-z0-9_]{2,63}: \&quot;&quot; + id</span>
+                    + &quot;\&quot;. The same shape the build enforces for a declared intent -- in &quot;
+                    + &quot;particular no colon, which the platforms use to separate an indexed &quot;
+                    + &quot;entity's type from its id.&quot;);
+        }
+<span class="pc bpc" id="L72" title="1 of 4 branches missed.">        if (baseIntentId == null || baseIntentId.length() == 0) {</span>
+<span class="fc" id="L73">            throw new IllegalArgumentException(&quot;baseIntentId is required: a parameterization &quot;</span>
+                    + &quot;runs by running an intent that was declared at build time&quot;);
+        }
+<span class="fc" id="L76">        this.id = id;</span>
+<span class="fc" id="L77">        this.baseIntentId = baseIntentId;</span>
+        // Blank, not merely null: spaces would become the Android shortcut label and the iOS
+        // NSUserActivity.title, publishing a launcher entry with no visible name.
+<span class="fc" id="L80">        this.title = IntentText.orFallback(title, id);</span>
+<span class="fc" id="L81">    }</span>
+
+    /// Binds values for the base intent's parameters. Anything supplied at
+    /// invocation time wins, so a bound value is a default rather than a lock.
+    ///
+    /// #### Parameters
+    ///
+    /// - `params`: the values to bind
+    ///
+    /// #### Returns
+    ///
+    /// this parameterization, for chaining
+    public DynamicIntent bind(Map&lt;String, Object&gt; params) {
+<span class="pc bpc" id="L94" title="1 of 2 branches missed.">        if (params != null) {</span>
+            // Entry by entry rather than putAll: a map assembled from optional application data
+            // carries nulls, and each of those means the same as never having been bound.
+<span class="fc bfc" id="L97" title="All 2 branches covered.">            for (Map.Entry&lt;String, Object&gt; e : params.entrySet()) {</span>
+<span class="fc" id="L98">                bind(e.getKey(), e.getValue());</span>
+<span class="fc" id="L99">            }</span>
+        }
+<span class="fc" id="L101">        return this;</span>
+    }
+
+    /// Binds one value.
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: the parameter name
+    /// - `value`: the value to bind
+    ///
+    /// #### Returns
+    ///
+    /// this parameterization, for chaining
+    public DynamicIntent bind(String name, Object value) {
+<span class="pc bpc" id="L115" title="1 of 2 branches missed.">        if (name == null) {</span>
+<span class="nc" id="L116">            return this;</span>
+        }
+<span class="fc bfc" id="L118" title="All 2 branches covered.">        if (value == null) {</span>
+            // A null is not a value, so it is not a binding. Recording it would hide the
+            // parameter from this parameterization's declaration -- telling a model or the
+            // simulator that nothing is needed -- while dispatch still failed its required
+            // check and donation dropped it on the way out. Clearing is what &quot;I have no value
+            // for this&quot; has to mean, and it leaves the parameter visible and suppliable.
+<span class="fc" id="L124">            bound.remove(name);</span>
+<span class="fc" id="L125">            return this;</span>
+        }
+<span class="fc bfc" id="L127" title="All 2 branches covered.">        if (IntentSerializer.toWire(value) == null) {</span>
+            // The same reasoning as the null branch, for a value that is not null but cannot
+            // cross: recording it would show the parameter as supplied while donation dropped
+            // it on the way out, so the shortcut would run on the default. Refusing here keeps
+            // the parameter visible and suppliable, which is what &quot;I have no usable value for
+            // this&quot; has to mean.
+<span class="fc" id="L133">            bound.remove(name);</span>
+<span class="fc" id="L134">            return this;</span>
+        }
+<span class="fc" id="L136">        bound.put(name, value);</span>
+<span class="fc" id="L137">        return this;</span>
+    }
+
+    /// The id shape the build enforces for a declared intent, applied here too.
+    ///
+    /// A colon is the specific character that matters: an indexed entity is published under
+    /// `type:id`, and Android identifies those entries by exactly that separator. A dynamic id
+    /// containing one would be swept up by `clearIndex` and disabled along with real content.
+    private static boolean isValidId(String s) {
+<span class="pc bpc" id="L146" title="2 of 4 branches missed.">        if (s.length() &lt; 3 || s.length() &gt; 64) {</span>
+<span class="nc" id="L147">            return false;</span>
+        }
+<span class="fc" id="L149">        char first = s.charAt(0);</span>
+<span class="pc bpc" id="L150" title="2 of 4 branches missed.">        if (first &lt; 'a' || first &gt; 'z') {</span>
+<span class="nc" id="L151">            return false;</span>
+        }
+<span class="fc bfc" id="L153" title="All 2 branches covered.">        for (int i = 1; i &lt; s.length(); i++) {</span>
+<span class="fc" id="L154">            char c = s.charAt(i);</span>
+<span class="pc bpc" id="L155" title="2 of 10 branches missed.">            boolean ok = (c &gt;= 'a' &amp;&amp; c &lt;= 'z') || (c &gt;= '0' &amp;&amp; c &lt;= '9') || c == '_';</span>
+<span class="fc bfc" id="L156" title="All 2 branches covered.">            if (!ok) {</span>
+<span class="fc" id="L157">                return false;</span>
+            }
+        }
+<span class="fc" id="L160">        return true;</span>
+    }
+
+    public String getId() {
+<span class="fc" id="L164">        return id;</span>
+    }
+
+    /// The declared intent this runs.
+    public String getBaseIntentId() {
+<span class="fc" id="L169">        return baseIntentId;</span>
+    }
+
+    public String getTitle() {
+<span class="fc" id="L173">        return title;</span>
+    }
+
+    /// The bound values, never null.
+    public Map&lt;String, Object&gt; getBoundParameters() {
+<span class="fc" id="L178">        return Collections.unmodifiableMap(bound);</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="nc" id="L183">        return id + &quot; -&gt; &quot; + baseIntentId;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

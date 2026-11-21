@@ -1,0 +1,182 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>LogicFunctions.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.spreadsheet</a> &gt; <span class="el_source">LogicFunctions.java</span></div><h1>LogicFunctions.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.spreadsheet;
+
+/// The logical and information functions. The ones that choose which argument to evaluate
+/// -- IF, IFERROR and their kin -- are the evaluator's own.
+final class LogicFunctions {
+    static final String SCALAR_NAMES = &quot;FALSE ISEVEN ISODD NA NOT TRUE&quot;;
+
+    static final String RANGE_NAMES = &quot;AND ERROR.TYPE ISBLANK ISERR ISERROR ISLOGICAL ISNA ISNONTEXT ISNUMBER ISREF&quot;
+            + &quot; ISTEXT N OR T TYPE XOR&quot;;
+
+    private LogicFunctions() {
+    }
+
+    static Object call(String name, Evaluator ev, Object[] a) {
+<span class="fc bfc" id="L37" title="All 9 branches covered.">        switch (Functions.index(SWITCH_1, name)) {</span>
+            case 0: // TRUE
+<span class="fc" id="L39">                return Boolean.TRUE;</span>
+            case 1: // FALSE
+<span class="fc" id="L41">                return Boolean.FALSE;</span>
+            case 2: // NA
+<span class="fc" id="L43">                return CellError.NA;</span>
+            case 3: // NOT
+<span class="pc bpc" id="L45" title="1 of 4 branches missed.">                return Boolean.valueOf(!Values.bool(Evaluator.arg(a, 0) == Evaluator.MISSING ? null : a[0])); //NOPMD CompareObjectsWithEquals - the marker of an omitted argument is one object</span>
+            case 4: // ISEVEN
+            case 5: { // ISODD
+<span class="fc" id="L48">                double x = Math.floor(Math.abs(Evaluator.num(a, 0)));</span>
+<span class="fc bfc" id="L49" title="All 2 branches covered.">                boolean even = x - 2 * Math.floor(x / 2) == 0;</span>
+<span class="fc bfc" id="L50" title="All 2 branches covered.">                return Boolean.valueOf(&quot;ISEVEN&quot;.equals(name) == even);</span>
+            }
+            case 6: // AND
+            case 7: // OR
+            case 8: // XOR
+<span class="fc" id="L55">                return combine(name, ev, a);</span>
+            case 9: // ISREF
+<span class="fc" id="L57">                return Boolean.valueOf(Evaluator.arg(a, 0) instanceof Ref);</span>
+            case 10: { // TYPE
+<span class="fc" id="L59">                Object arg = Evaluator.arg(a, 0);</span>
+<span class="fc bfc" id="L60" title="All 6 branches covered.">                if (arg instanceof Object[][] || arg instanceof Ref &amp;&amp; !((Ref) arg).isSingleCell()) {</span>
+<span class="fc" id="L61">                    return Double.valueOf(64);</span>
+                }
+<span class="fc" id="L63">                Object v = ev.scalar(arg);</span>
+<span class="fc bfc" id="L64" title="All 2 branches covered.">                if (v instanceof String) {</span>
+<span class="fc" id="L65">                    return Double.valueOf(2);</span>
+                }
+<span class="fc bfc" id="L67" title="All 2 branches covered.">                if (v instanceof Boolean) {</span>
+<span class="fc" id="L68">                    return Double.valueOf(4);</span>
+                }
+<span class="pc bpc" id="L70" title="1 of 2 branches missed.">                return Double.valueOf(v instanceof CellError ? 16 : 1);</span>
+            }
+            default:
+                break;
+        }
+        // The rest answer for one value, and for every value of an array or a range.
+<span class="fc" id="L76">        Object arg = Evaluator.arg(a, 0);</span>
+<span class="fc bfc" id="L77" title="All 6 branches covered.">        if (arg instanceof Ref &amp;&amp; (((Ref) arg).next != null || ((Ref) arg).lastSheet != null)) {</span>
+            // a union or a span of sheets has no single value: the IS functions answer for
+            // #VALUE!, never return it, so a guard such as IF(ISERROR(x), ...) keeps working
+<span class="fc" id="L80">            return one(name, CellError.VALUE);</span>
+        }
+<span class="fc bfc" id="L82" title="All 6 branches covered.">        if (arg instanceof Object[][] || arg instanceof Ref &amp;&amp; !((Ref) arg).isSingleCell()) {</span>
+<span class="fc" id="L83">            ev.spreads();</span>
+<span class="fc" id="L84">            Object[][] m = ev.matrix(arg);</span>
+<span class="fc" id="L85">            Object[][] out = new Object[m.length][Evaluator.width(m)];</span>
+<span class="fc bfc" id="L86" title="All 2 branches covered.">            for (int r = 0; r &lt; m.length; r++) {</span>
+<span class="fc bfc" id="L87" title="All 2 branches covered.">                for (int c = 0; c &lt; out[r].length; c++) {</span>
+<span class="fc" id="L88">                    out[r][c] = one(name, m[r][c]);</span>
+                }
+            }
+<span class="fc" id="L91">            return out;</span>
+        }
+<span class="fc" id="L93">        return one(name, ev.scalar(arg));</span>
+    }
+
+    private static Object one(String name, Object v) {
+<span class="pc bpc" id="L97" title="1 of 12 branches missed.">        switch (Functions.index(SWITCH_2, name)) {</span>
+            case 0: // ISBLANK
+<span class="fc bfc" id="L99" title="All 2 branches covered.">                return Boolean.valueOf(v == null);</span>
+            case 1: // ISERR
+<span class="pc bpc" id="L101" title="1 of 4 branches missed.">                return Boolean.valueOf(v instanceof CellError &amp;&amp; v != CellError.NA); //NOPMD CompareObjectsWithEquals - an error value is a constant</span>
+            case 2: // ISERROR
+<span class="fc" id="L103">                return Boolean.valueOf(v instanceof CellError);</span>
+            case 3: // ISNA
+<span class="fc bfc" id="L105" title="All 2 branches covered.">                return Boolean.valueOf(v == CellError.NA); //NOPMD CompareObjectsWithEquals - an error value is a constant</span>
+            case 4: // ISLOGICAL
+<span class="fc" id="L107">                return Boolean.valueOf(v instanceof Boolean);</span>
+            case 5: // ISNUMBER
+<span class="fc" id="L109">                return Boolean.valueOf(v instanceof Double);</span>
+            case 6: // ISTEXT
+<span class="fc" id="L111">                return Boolean.valueOf(v instanceof String);</span>
+            case 7: // ISNONTEXT
+<span class="fc bfc" id="L113" title="All 2 branches covered.">                return Boolean.valueOf(!(v instanceof String));</span>
+            case 8: // ERROR.TYPE
+<span class="fc bfc" id="L115" title="All 2 branches covered.">                return v instanceof CellError ? (Object) Double.valueOf(((CellError) v).getType()) : CellError.NA;</span>
+            case 9: // N
+<span class="fc bfc" id="L117" title="All 4 branches covered.">                if (v instanceof Double || v instanceof CellError) {</span>
+<span class="fc" id="L118">                    return v;</span>
+                }
+<span class="pc bpc" id="L120" title="1 of 4 branches missed.">                return Double.valueOf(v instanceof Boolean &amp;&amp; ((Boolean) v).booleanValue() ? 1 : 0);</span>
+            case 10: // T
+<span class="pc bpc" id="L122" title="1 of 2 branches missed.">                if (v instanceof CellError) {</span>
+<span class="nc" id="L123">                    return v;</span>
+                }
+<span class="fc bfc" id="L125" title="All 2 branches covered.">                return v instanceof String ? v : &quot;&quot;;</span>
+            default:
+<span class="nc" id="L127">                return CellError.NAME;</span>
+        }
+    }
+
+    /// AND, OR and XOR. Text and empty cells inside a range are passed over; text typed as
+    /// an argument has to read as a logical value.
+    private static Object combine(String name, Evaluator ev, Object[] a) {
+<span class="fc" id="L134">        int trues = 0;</span>
+<span class="fc" id="L135">        int total = 0;</span>
+<span class="fc bfc" id="L136" title="All 2 branches covered.">        for (Object arg : a) {</span>
+<span class="fc bfc" id="L137" title="All 4 branches covered.">            if (arg instanceof Ref || arg instanceof Object[][]) {</span>
+<span class="fc bfc" id="L138" title="All 2 branches covered.">                for (Object[][] m : ev.areas(arg)) {</span>
+<span class="fc bfc" id="L139" title="All 2 branches covered.">                    for (Object[] line : m) {</span>
+<span class="fc bfc" id="L140" title="All 2 branches covered.">                        for (Object v : line) {</span>
+<span class="pc bpc" id="L141" title="1 of 2 branches missed.">                            if (v instanceof CellError) {</span>
+<span class="nc" id="L142">                                return v;</span>
+                            }
+<span class="pc bpc" id="L144" title="1 of 4 branches missed.">                            if (v instanceof Boolean || v instanceof Double) {</span>
+<span class="fc" id="L145">                                total++;</span>
+<span class="pc bpc" id="L146" title="1 of 2 branches missed.">                                if (Values.bool(v)) {</span>
+<span class="fc" id="L147">                                    trues++;</span>
+                                }
+                            }
+                        }
+                    }
+<span class="fc" id="L152">                }</span>
+<span class="pc bpc" id="L153" title="2 of 4 branches missed.">            } else if (arg != Evaluator.MISSING &amp;&amp; arg != null) { //NOPMD CompareObjectsWithEquals - the marker of an omitted argument is one object</span>
+<span class="pc bpc" id="L154" title="1 of 2 branches missed.">                if (arg instanceof CellError) {</span>
+<span class="nc" id="L155">                    return arg;</span>
+                }
+<span class="fc" id="L157">                total++;</span>
+<span class="fc bfc" id="L158" title="All 2 branches covered.">                if (Values.bool(arg)) {</span>
+<span class="fc" id="L159">                    trues++;</span>
+                }
+            }
+        }
+<span class="pc bpc" id="L163" title="1 of 2 branches missed.">        if (total == 0) {</span>
+<span class="nc" id="L164">            return CellError.VALUE;</span>
+        }
+<span class="fc bfc" id="L166" title="All 2 branches covered.">        if (&quot;AND&quot;.equals(name)) {</span>
+<span class="pc bpc" id="L167" title="1 of 2 branches missed.">            return Boolean.valueOf(trues == total);</span>
+        }
+<span class="fc bfc" id="L169" title="All 2 branches covered.">        if (&quot;OR&quot;.equals(name)) {</span>
+<span class="fc bfc" id="L170" title="All 2 branches covered.">            return Boolean.valueOf(trues &gt; 0);</span>
+        }
+<span class="fc bfc" id="L172" title="All 2 branches covered.">        return Boolean.valueOf((trues &amp; 1) == 1);</span>
+    }
+
+<span class="fc" id="L175">    private static final java.util.HashMap&lt;String, Integer&gt; SWITCH_1 = Functions.switchTable(</span>
+            &quot;TRUE&quot;, &quot;FALSE&quot;, &quot;NA&quot;, &quot;NOT&quot;, &quot;ISEVEN&quot;, &quot;ISODD&quot;, &quot;AND&quot;, &quot;OR&quot;, &quot;XOR&quot;, &quot;ISREF&quot;, &quot;TYPE&quot;);
+
+<span class="fc" id="L178">    private static final java.util.HashMap&lt;String, Integer&gt; SWITCH_2 = Functions.switchTable(</span>
+            &quot;ISBLANK&quot;, &quot;ISERR&quot;, &quot;ISERROR&quot;, &quot;ISNA&quot;, &quot;ISLOGICAL&quot;, &quot;ISNUMBER&quot;, &quot;ISTEXT&quot;, &quot;ISNONTEXT&quot;,
+            &quot;ERROR.TYPE&quot;, &quot;N&quot;, &quot;T&quot;);
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

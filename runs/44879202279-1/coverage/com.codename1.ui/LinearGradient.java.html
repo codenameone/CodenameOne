@@ -1,0 +1,152 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>LinearGradient.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui</a> &gt; <span class="el_source">LinearGradient.java</span></div><h1>LinearGradient.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ui;
+
+/// Multi-stop linear gradient at an arbitrary angle. Mirrors CSS
+/// `linear-gradient(&lt;angle&gt;, &lt;stops&gt;)`. Angle is in CSS degrees: 0 points
+/// up (toward the top edge), 90 right, 180 down, 270 left.
+public final class LinearGradient extends Gradient {
+    private float angleDegrees;
+
+    /// Creates a linear gradient at the given angle with the given stops.
+    public LinearGradient(float angleDegrees, int[] colors, float[] positions) {
+<span class="fc" id="L33">        super(colors, positions);</span>
+<span class="fc" id="L34">        this.angleDegrees = angleDegrees;</span>
+<span class="fc" id="L35">    }</span>
+
+    @Override
+    public byte getKind() {
+<span class="fc" id="L39">        return KIND_LINEAR;</span>
+    }
+
+    public float getAngleDegrees() {
+<span class="fc" id="L43">        return angleDegrees;</span>
+    }
+
+    public LinearGradient setAngleDegrees(float angleDegrees) {
+<span class="nc" id="L47">        this.angleDegrees = angleDegrees;</span>
+<span class="nc" id="L48">        invalidateRasterCache();</span>
+<span class="nc" id="L49">        return this;</span>
+    }
+
+    /// Computes the endpoints of the gradient line for a rectangle of the
+    /// given width / height (rect origin at (0,0)). Output is x0,y0,x1,y1.
+    /// These endpoints span the full bounding box; stop positions are
+    /// interpreted relative to them.
+    public void computeEndpoints(int width, int height, float[] out) {
+<span class="nc" id="L57">        double rad = Math.toRadians(angleDegrees);</span>
+<span class="nc" id="L58">        double sinA = Math.sin(rad);</span>
+<span class="nc" id="L59">        double cosA = Math.cos(rad);</span>
+<span class="nc" id="L60">        double cx = width * 0.5;</span>
+<span class="nc" id="L61">        double cy = height * 0.5;</span>
+<span class="nc" id="L62">        double half = Math.abs(width * 0.5 * sinA) + Math.abs(height * 0.5 * cosA);</span>
+<span class="nc" id="L63">        out[0] = (float) (cx - sinA * half);</span>
+<span class="nc" id="L64">        out[1] = (float) (cy + cosA * half);</span>
+<span class="nc" id="L65">        out[2] = (float) (cx + sinA * half);</span>
+<span class="nc" id="L66">        out[3] = (float) (cy - cosA * half);</span>
+<span class="nc" id="L67">    }</span>
+
+    /// Computes shader-ready endpoints for native APIs like Android's
+    /// `LinearGradient` and Java2D's `LinearGradientPaint`. For NO_CYCLE
+    /// this is the same as `computeEndpoints`. For REPEAT / REFLECT it
+    /// clips the endpoint range to span exactly one stop-list period
+    /// (from `getPositions()[0]` to `getPositions()[N-1]` of the original
+    /// line) so the native shader's tile mode wraps the period across
+    /// the rest of the bounding box - matching the CSS
+    /// `repeating-linear-gradient` semantic.
+    ///
+    /// Use `getNormalizedPositions()` for the matching stop array when
+    /// using these endpoints with REPEAT/REFLECT.
+    public void computeShaderEndpoints(int width, int height, float[] out) {
+<span class="nc" id="L81">        computeEndpoints(width, height, out);</span>
+<span class="nc" id="L82">        byte cycle = getCycleMethod();</span>
+<span class="nc bnc" id="L83" title="All 2 branches missed.">        if (cycle == CYCLE_NONE) {</span>
+<span class="nc" id="L84">            return;</span>
+        }
+<span class="nc" id="L86">        float[] positions = getPositions();</span>
+<span class="nc" id="L87">        float p0 = positions[0];</span>
+<span class="nc" id="L88">        float pN = positions[positions.length - 1];</span>
+<span class="nc bnc" id="L89" title="All 2 branches missed.">        if (pN - p0 &lt; 1e-4f) {</span>
+<span class="nc" id="L90">            return;</span>
+        }
+<span class="nc" id="L92">        float x0 = out[0];</span>
+<span class="nc" id="L93">        float y0 = out[1];</span>
+<span class="nc" id="L94">        float x1 = out[2];</span>
+<span class="nc" id="L95">        float y1 = out[3];</span>
+<span class="nc" id="L96">        out[0] = x0 + p0 * (x1 - x0);</span>
+<span class="nc" id="L97">        out[1] = y0 + p0 * (y1 - y0);</span>
+<span class="nc" id="L98">        out[2] = x0 + pN * (x1 - x0);</span>
+<span class="nc" id="L99">        out[3] = y0 + pN * (y1 - y0);</span>
+<span class="nc" id="L100">    }</span>
+
+    /// Returns stop positions rescaled to `[0, 1]` within the
+    /// `[first_stop, last_stop]` range of the original positions. For
+    /// NO_CYCLE this is the same as `getPositions()`; for REPEAT/REFLECT
+    /// it is the array to pass alongside `computeShaderEndpoints`.
+    public float[] getNormalizedPositions() {
+<span class="nc" id="L107">        float[] positions = getPositions();</span>
+<span class="nc bnc" id="L108" title="All 2 branches missed.">        if (getCycleMethod() == CYCLE_NONE) {</span>
+<span class="nc" id="L109">            return positions;</span>
+        }
+<span class="nc" id="L111">        float p0 = positions[0];</span>
+<span class="nc" id="L112">        float pN = positions[positions.length - 1];</span>
+<span class="nc" id="L113">        float span = pN - p0;</span>
+<span class="nc bnc" id="L114" title="All 2 branches missed.">        if (span &lt; 1e-4f) {</span>
+<span class="nc" id="L115">            return positions;</span>
+        }
+<span class="nc" id="L117">        float[] out = new float[positions.length];</span>
+<span class="nc bnc" id="L118" title="All 2 branches missed.">        for (int i = 0; i &lt; positions.length; i++) {</span>
+<span class="nc" id="L119">            out[i] = (positions[i] - p0) / span;</span>
+        }
+<span class="nc" id="L121">        return out;</span>
+    }
+
+    @Override
+    public int sampleArgb(int px, int py, int width, int height) {
+<span class="fc" id="L126">        double rad = Math.toRadians(angleDegrees);</span>
+<span class="fc" id="L127">        double sinA = Math.sin(rad);</span>
+<span class="fc" id="L128">        double cosA = Math.cos(rad);</span>
+<span class="fc" id="L129">        double cx = width * 0.5;</span>
+<span class="fc" id="L130">        double cy = height * 0.5;</span>
+<span class="fc" id="L131">        double half = Math.abs(width * 0.5 * sinA) + Math.abs(height * 0.5 * cosA);</span>
+<span class="fc" id="L132">        double len = Math.max(1.0, 2.0 * half);</span>
+<span class="fc" id="L133">        double dx = px + 0.5 - cx;</span>
+<span class="fc" id="L134">        double dy = py + 0.5 - cy;</span>
+<span class="fc" id="L135">        double proj = dx * sinA - dy * cosA;</span>
+<span class="fc" id="L136">        return sampleStops((float) ((proj + half) / len));</span>
+    }
+
+    @Override
+    public LinearGradient copy() {
+<span class="nc" id="L141">        int[] c = getColors();</span>
+<span class="nc" id="L142">        float[] p = getPositions();</span>
+<span class="nc" id="L143">        int[] cc = new int[c.length];</span>
+<span class="nc" id="L144">        float[] pp = new float[p.length];</span>
+<span class="nc" id="L145">        System.arraycopy(c, 0, cc, 0, c.length);</span>
+<span class="nc" id="L146">        System.arraycopy(p, 0, pp, 0, p.length);</span>
+<span class="nc" id="L147">        LinearGradient g = new LinearGradient(angleDegrees, cc, pp);</span>
+<span class="nc" id="L148">        g.setCycleMethod(getCycleMethod());</span>
+<span class="nc" id="L149">        return g;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

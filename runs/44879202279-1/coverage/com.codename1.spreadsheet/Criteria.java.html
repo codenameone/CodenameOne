@@ -1,0 +1,272 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Criteria.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.spreadsheet</a> &gt; <span class="el_source">Criteria.java</span></div><h1>Criteria.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.spreadsheet;
+
+/// A condition as COUNTIF, SUMIFS and the database functions take it: a value to equal, or
+/// text that starts with a comparison (`&quot;&gt;=10&quot;`, `&quot;&lt;&gt;done&quot;`), where `*` and `?` in text are
+/// wildcards and `~` takes the special meaning off the character after it.
+final class Criteria {
+    private static final int EQ = 0;
+    private static final int NE = 1;
+    private static final int LT = 2;
+    private static final int GT = 3;
+    private static final int LE = 4;
+    private static final int GE = 5;
+
+    private final int op;
+    /// A Double, a Boolean, a String pattern, or null to match empty cells.
+    private final Object target;
+
+    private boolean explicitEquals;
+
+<span class="fc" id="L42">    Criteria(Object criterion) {</span>
+<span class="pc bpc" id="L43" title="1 of 2 branches missed.">        if (criterion instanceof CellError) {</span>
+<span class="nc" id="L44">            throw EvalError.of((CellError) criterion);</span>
+        }
+<span class="pc bpc" id="L46" title="1 of 4 branches missed.">        if (criterion == null || criterion == Evaluator.MISSING) { //NOPMD CompareObjectsWithEquals - the marker of an omitted argument is one object</span>
+<span class="fc" id="L47">            op = EQ;</span>
+<span class="fc" id="L48">            target = Double.valueOf(0);</span>
+<span class="fc" id="L49">            return;</span>
+        }
+<span class="fc bfc" id="L51" title="All 2 branches covered.">        if (!(criterion instanceof String)) {</span>
+<span class="fc" id="L52">            op = EQ;</span>
+<span class="fc" id="L53">            target = criterion;</span>
+<span class="fc" id="L54">            return;</span>
+        }
+<span class="fc" id="L56">        String s = (String) criterion;</span>
+<span class="fc" id="L57">        int o = EQ;</span>
+<span class="fc" id="L58">        int skip = 0;</span>
+<span class="fc bfc" id="L59" title="All 2 branches covered.">        if (s.startsWith(&quot;&gt;=&quot;)) {</span>
+<span class="fc" id="L60">            o = GE;</span>
+<span class="fc" id="L61">            skip = 2;</span>
+<span class="pc bpc" id="L62" title="1 of 2 branches missed.">        } else if (s.startsWith(&quot;&lt;=&quot;)) {</span>
+<span class="nc" id="L63">            o = LE;</span>
+<span class="nc" id="L64">            skip = 2;</span>
+<span class="fc bfc" id="L65" title="All 2 branches covered.">        } else if (s.startsWith(&quot;&lt;&gt;&quot;)) {</span>
+<span class="fc" id="L66">            o = NE;</span>
+<span class="fc" id="L67">            skip = 2;</span>
+<span class="fc bfc" id="L68" title="All 2 branches covered.">        } else if (s.startsWith(&quot;&gt;&quot;)) {</span>
+<span class="fc" id="L69">            o = GT;</span>
+<span class="fc" id="L70">            skip = 1;</span>
+<span class="fc bfc" id="L71" title="All 2 branches covered.">        } else if (s.startsWith(&quot;&lt;&quot;)) {</span>
+<span class="fc" id="L72">            o = LT;</span>
+<span class="fc" id="L73">            skip = 1;</span>
+<span class="fc bfc" id="L74" title="All 2 branches covered.">        } else if (s.startsWith(&quot;=&quot;)) {</span>
+<span class="fc" id="L75">            skip = 1;</span>
+        }
+<span class="fc" id="L77">        op = o;</span>
+<span class="fc bfc" id="L78" title="All 4 branches covered.">        explicitEquals = o == EQ &amp;&amp; skip == 1;</span>
+<span class="fc" id="L79">        String rest = s.substring(skip);</span>
+<span class="fc bfc" id="L80" title="All 2 branches covered.">        if (rest.length() == 0) {</span>
+            // &quot;&quot; and &quot;=&quot; match empty cells, &quot;&lt;&gt;&quot; the cells that hold something
+<span class="fc" id="L82">            target = null;</span>
+<span class="fc" id="L83">            return;</span>
+        }
+<span class="fc" id="L85">        Double number = Values.parseNumber(rest);</span>
+<span class="fc bfc" id="L86" title="All 2 branches covered.">        CellError error = rest.charAt(0) == '#' ? CellError.valueOf(rest) : null;</span>
+<span class="fc bfc" id="L87" title="All 2 branches covered.">        if (error != null) {</span>
+            // &quot;#N/A&quot; as a condition counts the cells that hold that error
+<span class="fc" id="L89">            target = error;</span>
+<span class="fc bfc" id="L90" title="All 2 branches covered.">        } else if (number != null) {</span>
+<span class="fc" id="L91">            target = number;</span>
+<span class="pc bpc" id="L92" title="1 of 2 branches missed.">        } else if (&quot;TRUE&quot;.equalsIgnoreCase(rest)) {</span>
+<span class="nc" id="L93">            target = Boolean.TRUE;</span>
+<span class="pc bpc" id="L94" title="1 of 2 branches missed.">        } else if (&quot;FALSE&quot;.equalsIgnoreCase(rest)) {</span>
+<span class="nc" id="L95">            target = Boolean.FALSE;</span>
+        } else {
+<span class="fc" id="L97">            target = rest;</span>
+        }
+<span class="fc" id="L99">    }</span>
+
+    boolean matches(Object v) {
+<span class="fc bfc" id="L102" title="All 2 branches covered.">        if (target instanceof CellError) {</span>
+<span class="fc bfc" id="L103" title="All 6 branches covered.">            return target.equals(v) ? op == EQ : op == NE;</span>
+        }
+<span class="fc bfc" id="L105" title="All 2 branches covered.">        if (v instanceof CellError) {</span>
+<span class="fc" id="L106">            return false;</span>
+        }
+<span class="fc bfc" id="L108" title="All 2 branches covered.">        if (target == null) {</span>
+            // &quot;=&quot; is a cell with nothing in it, &quot;&lt;&gt;&quot; one with anything, the empty text of
+            // =&quot;&quot; included; &quot;&quot; alone takes both kinds of empty
+<span class="fc bfc" id="L111" title="All 2 branches covered.">            if (op == NE) {</span>
+<span class="fc bfc" id="L112" title="All 2 branches covered.">                return v != null;</span>
+            }
+<span class="fc bfc" id="L114" title="All 8 branches covered.">            return explicitEquals ? v == null : v == null || &quot;&quot;.equals(v);</span>
+        }
+<span class="fc bfc" id="L116" title="All 2 branches covered.">        if (target instanceof Double) {</span>
+<span class="fc" id="L117">            double t = ((Double) target).doubleValue();</span>
+            double x;
+<span class="fc bfc" id="L119" title="All 2 branches covered.">            if (v instanceof Double) {</span>
+<span class="fc" id="L120">                x = ((Double) v).doubleValue();</span>
+<span class="pc bpc" id="L121" title="1 of 6 branches missed.">            } else if (v instanceof String &amp;&amp; (op == EQ || op == NE)) {</span>
+                // text that reads as the number is equal to it, and so is not unequal to it:
+                // the two tests are each other's opposite
+<span class="fc" id="L124">                Double parsed = Values.parseNumber((String) v);</span>
+<span class="fc bfc" id="L125" title="All 2 branches covered.">                if (parsed == null) {</span>
+<span class="fc bfc" id="L126" title="All 2 branches covered.">                    return op == NE;</span>
+                }
+<span class="fc" id="L128">                x = parsed.doubleValue();</span>
+<span class="fc" id="L129">            } else {</span>
+<span class="fc bfc" id="L130" title="All 2 branches covered.">                return op == NE;</span>
+            }
+<span class="fc bfc" id="L132" title="All 4 branches covered.">            return test(x &lt; t ? -1 : x &gt; t ? 1 : 0);</span>
+        }
+<span class="fc bfc" id="L134" title="All 2 branches covered.">        if (target instanceof Boolean) {</span>
+<span class="pc bpc" id="L135" title="1 of 2 branches missed.">            if (!(v instanceof Boolean)) {</span>
+<span class="pc bpc" id="L136" title="1 of 2 branches missed.">                return op == NE;</span>
+            }
+<span class="nc" id="L138">            return test(Values.compare(v, target));</span>
+        }
+<span class="fc bfc" id="L140" title="All 2 branches covered.">        if (!(v instanceof String)) {</span>
+            // an empty cell is not text, and neither is a number
+<span class="pc bpc" id="L142" title="1 of 2 branches missed.">            return op == NE;</span>
+        }
+<span class="fc" id="L144">        String text = (String) v;</span>
+<span class="fc" id="L145">        String pattern = (String) target;</span>
+<span class="pc bpc" id="L146" title="3 of 4 branches missed.">        if (op == EQ || op == NE) {</span>
+<span class="fc" id="L147">            boolean hit = wildcardMatch(pattern, 0, text, 0);</span>
+<span class="pc bpc" id="L148" title="3 of 4 branches missed.">            return op == EQ ? hit : !hit;</span>
+        }
+<span class="nc" id="L150">        return test(Values.compareText(text, pattern));</span>
+    }
+
+    private boolean test(int cmp) {
+<span class="pc bpc" id="L154" title="1 of 6 branches missed.">        switch (op) {</span>
+            case EQ:
+<span class="fc bfc" id="L156" title="All 2 branches covered.">                return cmp == 0;</span>
+            case NE:
+<span class="pc bpc" id="L158" title="1 of 2 branches missed.">                return cmp != 0;</span>
+            case LT:
+<span class="fc bfc" id="L160" title="All 2 branches covered.">                return cmp &lt; 0;</span>
+            case GT:
+<span class="fc bfc" id="L162" title="All 2 branches covered.">                return cmp &gt; 0;</span>
+            case LE:
+<span class="nc bnc" id="L164" title="All 2 branches missed.">                return cmp &lt;= 0;</span>
+            default:
+<span class="fc bfc" id="L166" title="All 2 branches covered.">                return cmp &gt;= 0;</span>
+        }
+    }
+
+    static boolean hasWildcards(String pattern) {
+<span class="pc bpc" id="L171" title="2 of 6 branches missed.">        return pattern.indexOf('*') &gt;= 0 || pattern.indexOf('?') &gt;= 0 || pattern.indexOf('~') &gt;= 0;</span>
+    }
+
+    /// Matches text against a pattern with `*`, `?` and `~`, ignoring case.
+    static boolean wildcardMatch(String pattern, int p, String text, int t) {
+<span class="fc" id="L176">        int pn = pattern.length();</span>
+<span class="fc" id="L177">        int tn = text.length();</span>
+<span class="fc" id="L178">        int starP = -1;</span>
+<span class="fc" id="L179">        int starT = -1;</span>
+<span class="fc bfc" id="L180" title="All 2 branches covered.">        while (t &lt; tn) {</span>
+<span class="fc bfc" id="L181" title="All 2 branches covered.">            if (p &lt; pn) {</span>
+<span class="fc" id="L182">                char c = pattern.charAt(p);</span>
+<span class="fc bfc" id="L183" title="All 2 branches covered.">                if (c == '*') {</span>
+<span class="fc" id="L184">                    starP = p++;</span>
+<span class="fc" id="L185">                    starT = t;</span>
+<span class="fc" id="L186">                    continue;</span>
+                }
+<span class="fc" id="L188">                boolean literal = false;</span>
+<span class="pc bpc" id="L189" title="3 of 4 branches missed.">                if (c == '~' &amp;&amp; p + 1 &lt; pn) {</span>
+<span class="nc" id="L190">                    c = pattern.charAt(++p);</span>
+<span class="nc" id="L191">                    literal = true;</span>
+                }
+<span class="pc bpc" id="L193" title="1 of 4 branches missed.">                if (!literal &amp;&amp; c == '?'</span>
+<span class="fc bfc" id="L194" title="All 2 branches covered.">                        || Character.toUpperCase(c) == Character.toUpperCase(text.charAt(t))) {</span>
+<span class="fc" id="L195">                    p++;</span>
+<span class="fc" id="L196">                    t++;</span>
+<span class="fc" id="L197">                    continue;</span>
+                }
+<span class="pc bpc" id="L199" title="1 of 2 branches missed.">                if (literal) {</span>
+<span class="nc" id="L200">                    p--;</span>
+                }
+            }
+<span class="fc bfc" id="L203" title="All 2 branches covered.">            if (starP &lt; 0) {</span>
+<span class="fc" id="L204">                return false;</span>
+            }
+<span class="fc" id="L206">            p = starP + 1;</span>
+<span class="fc" id="L207">            t = ++starT;</span>
+        }
+<span class="fc bfc" id="L209" title="All 4 branches covered.">        while (p &lt; pn &amp;&amp; pattern.charAt(p) == '*') {</span>
+<span class="fc" id="L210">            p++;</span>
+        }
+<span class="fc bfc" id="L212" title="All 2 branches covered.">        return p == pn;</span>
+    }
+
+    /// The cells of the ranges past the rows and columns that hold data, when an empty cell
+    /// passes every condition: `COUNTIF(A:A, &quot;&quot;)` counts the empty cells of the whole column,
+    /// as Excel does, though the mask covers only the cells that hold data. 0 otherwise.
+    static double blanksBeyondData(Evaluator ev, Object[] args, int from, int to) {
+<span class="fc" id="L219">        long full = -1;</span>
+<span class="fc" id="L220">        long filled = -1;</span>
+<span class="fc bfc" id="L221" title="All 2 branches covered.">        for (int i = from; i + 1 &lt; to; i += 2) {</span>
+<span class="fc bfc" id="L222" title="All 4 branches covered.">            if (!(args[i] instanceof Ref) || !new Criteria(ev.scalar(args[i + 1])).matches(null)) {</span>
+<span class="fc" id="L223">                return 0;</span>
+            }
+<span class="fc" id="L225">            Ref whole = (Ref) args[i];</span>
+<span class="fc" id="L226">            Ref data = whole.clip();</span>
+<span class="fc" id="L227">            long w = (long) whole.rows() * whole.cols();</span>
+<span class="fc" id="L228">            long d = (long) data.rows() * data.cols();</span>
+<span class="pc bpc" id="L229" title="2 of 6 branches missed.">            if (full &gt;= 0 &amp;&amp; (w != full || d != filled)) {</span>
+<span class="nc" id="L230">                return 0;</span>
+            }
+<span class="fc" id="L232">            full = w;</span>
+<span class="fc" id="L233">            filled = d;</span>
+        }
+<span class="pc bpc" id="L235" title="1 of 2 branches missed.">        return full &lt; 0 ? 0 : full - filled;</span>
+    }
+
+    /// The cells that pass every condition of a list of range and criterion pairs, as rows
+    /// and columns of the first range. Throws `#VALUE!` when the ranges differ in shape.
+    static boolean[][] mask(Evaluator ev, Object[] args, int from, int to) {
+<span class="pc bpc" id="L241" title="2 of 4 branches missed.">        if (to &gt; args.length || to - from &lt; 2) {</span>
+<span class="nc" id="L242">            throw EvalError.VALUE;</span>
+        }
+<span class="fc" id="L244">        boolean[][] mask = null;</span>
+<span class="fc bfc" id="L245" title="All 2 branches covered.">        for (int i = from; i + 1 &lt; to; i += 2) {</span>
+<span class="fc" id="L246">            Object[][] m = ev.matrix(args[i]);</span>
+<span class="fc" id="L247">            Criteria criteria = new Criteria(ev.scalar(args[i + 1]));</span>
+<span class="fc bfc" id="L248" title="All 2 branches covered.">            if (mask == null) {</span>
+<span class="fc" id="L249">                mask = new boolean[m.length][Evaluator.width(m)];</span>
+<span class="fc bfc" id="L250" title="All 2 branches covered.">                for (int r = 0; r &lt; mask.length; r++) {</span>
+<span class="fc bfc" id="L251" title="All 2 branches covered.">                    for (int c = 0; c &lt; mask[r].length; c++) {</span>
+<span class="fc" id="L252">                        mask[r][c] = true;</span>
+                    }
+                }
+<span class="pc bpc" id="L255" title="1 of 4 branches missed.">            } else if (m.length != mask.length || Evaluator.width(m) != Evaluator.width2(mask)) {</span>
+<span class="fc" id="L256">                throw EvalError.VALUE;</span>
+            }
+<span class="fc bfc" id="L258" title="All 2 branches covered.">            for (int r = 0; r &lt; mask.length; r++) {</span>
+<span class="fc bfc" id="L259" title="All 2 branches covered.">                for (int c = 0; c &lt; mask[r].length; c++) {</span>
+<span class="fc bfc" id="L260" title="All 4 branches covered.">                    if (mask[r][c] &amp;&amp; !criteria.matches(m[r][c])) {</span>
+<span class="fc" id="L261">                        mask[r][c] = false;</span>
+                    }
+                }
+            }
+        }
+<span class="pc bpc" id="L266" title="1 of 2 branches missed.">        if (mask == null) {</span>
+<span class="nc" id="L267">            throw EvalError.VALUE;</span>
+        }
+<span class="fc" id="L269">        return mask;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

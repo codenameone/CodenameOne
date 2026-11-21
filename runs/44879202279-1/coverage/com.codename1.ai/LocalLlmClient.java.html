@@ -1,0 +1,483 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>LocalLlmClient.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ai</a> &gt; <span class="el_source">LocalLlmClient.java</span></div><h1>LocalLlmClient.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ai;
+
+import com.codename1.impl.LocalLlmImpl;
+import com.codename1.ui.Display;
+import com.codename1.util.AsyncResource;
+import com.codename1.util.EasyThread;
+
+import java.util.ArrayList;
+import java.util.List;
+
+/// An [LlmClient] that runs a GGUF model on the device with llama.cpp. Create
+/// one with [LlmClient#local(String)].
+///
+/// Nothing leaves the device and no network is needed. The model file is
+/// loaded on the first request, which can take several seconds for a large
+/// model, and stays in memory until [#close()].
+///
+/// ```java
+/// LocalLlmClient llm = LlmClient.local(FileSystemStorage.getInstance()
+///         .getAppHomePath() + &quot;qwen2.5-0.5b-instruct-q4_k_m.gguf&quot;);
+/// llm.chat(ChatRequest.builder()
+///         .addMessage(ChatMessage.user(&quot;Name three primes&quot;))
+///         .build()).ready(r -&gt; Log.p(r.getText()));
+/// ```
+///
+/// The prompt is rendered by the chat template the model file carries, so any
+/// instruction-tuned GGUF works without configuration.
+/// [ResponseFormat#JSON_OBJECT] is enforced with a grammar, so the output is
+/// always valid JSON. Tools and image parts are not supported and fail the
+/// request with [LlmException.ErrorType#INVALID_REQUEST].
+///
+/// #### Availability
+///
+/// Android and iOS. The builders link llama.cpp only into applications that
+/// call [LlmClient#local(String)]. Elsewhere, the simulator included, every
+/// request fails with [LlmException.ErrorType#INVALID_REQUEST]; use
+/// [LlmClient#ollama()] to develop against the same model on the desktop.
+///
+/// Requests run one at a time on a background thread, in the order they were
+/// made. Results and streaming callbacks arrive on the EDT.
+public final class LocalLlmClient extends LlmClient {
+    /// Grammar for any JSON object, used for [ResponseFormat#JSON_OBJECT].
+    static final String JSON_GRAMMAR =
+            &quot;root ::= object\n&quot;
+            + &quot;value ::= object | array | string | number | (\&quot;true\&quot; | \&quot;false\&quot; | \&quot;null\&quot;) ws\n&quot;
+            + &quot;object ::= \&quot;{\&quot; ws ( string \&quot;:\&quot; ws value (\&quot;,\&quot; ws string \&quot;:\&quot; ws value)* )? \&quot;}\&quot; ws\n&quot;
+            + &quot;array ::= \&quot;[\&quot; ws ( value (\&quot;,\&quot; ws value)* )? \&quot;]\&quot; ws\n&quot;
+            + &quot;string ::= \&quot;\\\&quot;\&quot; ( [^\&quot;\\\\\\x7F\\x00-\\x1F] | \&quot;\\\\\&quot; ([\&quot;\\\\/bfnrt] | \&quot;u\&quot; [0-9a-fA-F]{4}) )* \&quot;\\\&quot;\&quot; ws\n&quot;
+            + &quot;number ::= (\&quot;-\&quot;? ([0-9] | [1-9] [0-9]*)) (\&quot;.\&quot; [0-9]+)? ([eE] [-+]? [0-9]+)? ws\n&quot;
+            + &quot;ws ::= [ \\t\\n]*\n&quot;;
+
+    private static final int DEFAULT_MAX_TOKENS = 512;
+
+    private final String modelPath;
+    private int contextSize;
+<span class="nc" id="L78">    private int gpuLayers = -1;</span>
+    private int threads;
+    private EasyThread worker;
+    private LocalLlmImpl impl;
+    /// The error text cn1_llama.cpp sets when generation ran out of context
+    /// before `maxTokens`; a &quot;length&quot; finish, not a failure.
+    static final String CONTEXT_FULL = &quot;The context window is full&quot;;
+
+    private int handle;
+
+    LocalLlmClient(String modelPath) {
+<span class="nc" id="L89">        super(&quot;&quot;);</span>
+<span class="nc bnc" id="L90" title="All 4 branches missed.">        if (modelPath == null || modelPath.length() == 0) {</span>
+<span class="nc" id="L91">            throw new IllegalArgumentException(&quot;modelPath is required&quot;);</span>
+        }
+<span class="nc" id="L93">        this.modelPath = modelPath;</span>
+<span class="nc" id="L94">    }</span>
+
+    /// @return the model file this client loads
+    public String getModelPath() {
+<span class="nc" id="L98">        return modelPath;</span>
+    }
+
+    /// Sets the context window. Takes effect when the model is next loaded.
+    ///
+    /// @param tokens context size in tokens, `0` for the model's default
+    /// @return this client
+    public LocalLlmClient setContextSize(int tokens) {
+<span class="nc" id="L106">        this.contextSize = tokens;</span>
+<span class="nc" id="L107">        return this;</span>
+    }
+
+    /// Sets how many layers run on the GPU (Metal on iOS). Takes effect when
+    /// the model is next loaded.
+    ///
+    /// @param layers layer count, `0` for CPU only, `-1` (the default) for all
+    /// @return this client
+    public LocalLlmClient setGpuLayers(int layers) {
+<span class="nc" id="L116">        this.gpuLayers = layers;</span>
+<span class="nc" id="L117">        return this;</span>
+    }
+
+    /// Sets the CPU threads used for generation. Takes effect when the model
+    /// is next loaded.
+    ///
+    /// @param threads thread count, `0` (the default) to let the port choose
+    /// @return this client
+    public LocalLlmClient setThreads(int threads) {
+<span class="nc" id="L126">        this.threads = threads;</span>
+<span class="nc" id="L127">        return this;</span>
+    }
+
+    /// Whether this platform can run local models at all. `false` in the
+    /// simulator and on any target the builder did not link llama.cpp into.
+    ///
+    /// @return `true` when requests can succeed
+    public static boolean isSupported() {
+<span class="nc bnc" id="L135" title="All 2 branches missed.">        return Display.getInstance().getLocalLlmBackend() != null;</span>
+    }
+
+    @Override
+    public String getProvider() {
+<span class="nc" id="L140">        return &quot;llama.cpp&quot;;</span>
+    }
+
+    @Override
+    public AsyncResource&lt;ChatResponse&gt; chat(ChatRequest req) {
+<span class="nc" id="L145">        return chatStream(req, null);</span>
+    }
+
+    @Override
+    public AsyncResource&lt;ChatResponse&gt; chatStream(final ChatRequest req,
+            final StreamingListener listener) {
+<span class="nc" id="L151">        final AsyncResource&lt;ChatResponse&gt; result = new AsyncResource&lt;ChatResponse&gt;();</span>
+<span class="nc" id="L152">        String reject = runSafetyFilter(req);</span>
+<span class="nc bnc" id="L153" title="All 2 branches missed.">        if (reject != null) {</span>
+<span class="nc" id="L154">            result.error(new LlmException(&quot;Blocked by safety filter: &quot; + reject,</span>
+                    400, &quot;safety_filter&quot;, null, null, LlmException.ErrorType.INVALID_REQUEST));
+<span class="nc" id="L156">            return result;</span>
+        }
+<span class="nc" id="L158">        String unsupported = unsupportedFeature(req);</span>
+<span class="nc bnc" id="L159" title="All 2 branches missed.">        if (unsupported != null) {</span>
+<span class="nc" id="L160">            result.error(invalid(unsupported));</span>
+<span class="nc" id="L161">            return result;</span>
+        }
+<span class="nc" id="L163">        submit(new Runnable() {</span>
+            @Override
+            public void run() {
+                try {
+<span class="nc" id="L167">                    deliver(result, generate(req, listener), null, listener);</span>
+<span class="nc" id="L168">                } catch (LlmException ex) {</span>
+<span class="nc" id="L169">                    deliver(result, null, ex, listener);</span>
+<span class="nc" id="L170">                } catch (RuntimeException ex) {</span>
+<span class="nc" id="L171">                    deliver(result, null, failure(String.valueOf(ex)), listener);</span>
+<span class="nc" id="L172">                }</span>
+<span class="nc" id="L173">            }</span>
+        }, result, listener);
+<span class="nc" id="L175">        return result;</span>
+    }
+
+    @Override
+    public AsyncResource&lt;EmbeddingResponse&gt; embed(final EmbeddingRequest req) {
+<span class="nc" id="L180">        final AsyncResource&lt;EmbeddingResponse&gt; result = new AsyncResource&lt;EmbeddingResponse&gt;();</span>
+<span class="nc" id="L181">        submit(new Runnable() {</span>
+            @Override
+            public void run() {
+                // Read outside the try: the generic get() is a cast, and a
+                // cast under a RuntimeException handler is one ParparVM never
+                // fails (scripts/check-cast-semantics.sh).
+<span class="nc" id="L187">                List&lt;String&gt; inputs = req.getInputs();</span>
+<span class="nc" id="L188">                String[] texts = new String[inputs.size()];</span>
+<span class="nc bnc" id="L189" title="All 2 branches missed.">                for (int i = 0; i &lt; texts.length; i++) {</span>
+<span class="nc" id="L190">                    texts[i] = inputs.get(i);</span>
+                }
+                try {
+<span class="nc" id="L193">                    LocalLlmImpl llm = ensureOpen();</span>
+<span class="nc" id="L194">                    List&lt;Embedding&gt; data = new ArrayList&lt;Embedding&gt;(texts.length);</span>
+<span class="nc bnc" id="L195" title="All 2 branches missed.">                    for (int i = 0; i &lt; texts.length; i++) {</span>
+<span class="nc" id="L196">                        float[] v = llm.embed(handle, texts[i]);</span>
+<span class="nc bnc" id="L197" title="All 2 branches missed.">                        if (v == null) {</span>
+<span class="nc" id="L198">                            throw failure(&quot;Embedding failed&quot;);</span>
+                        }
+<span class="nc" id="L200">                        data.add(new Embedding(v, i));</span>
+                    }
+<span class="nc" id="L202">                    final EmbeddingResponse r = new EmbeddingResponse(data, null, modelName());</span>
+<span class="nc" id="L203">                    Display.getInstance().callSerially(new Runnable() {</span>
+                        @Override
+                        public void run() {
+<span class="nc" id="L206">                            result.complete(r);</span>
+<span class="nc" id="L207">                        }</span>
+                    });
+<span class="nc" id="L209">                } catch (LlmException ex) {</span>
+<span class="nc" id="L210">                    fail(result, ex);</span>
+<span class="nc" id="L211">                } catch (RuntimeException ex) {</span>
+<span class="nc" id="L212">                    fail(result, failure(String.valueOf(ex)));</span>
+<span class="nc" id="L213">                }</span>
+<span class="nc" id="L214">            }</span>
+        }, result, null);
+<span class="nc" id="L216">        return result;</span>
+    }
+
+    /// Unloads the model. Requests already queued still run first; a later
+    /// request loads the model again. The worker thread is kept, idle, so a
+    /// request after `close()` can never reach the native session on a second
+    /// thread while the first is still using or closing it.
+    public void close() {
+<span class="nc bnc" id="L224" title="All 2 branches missed.">        if (worker == null) {</span>
+<span class="nc" id="L225">            return;</span>
+        }
+<span class="nc" id="L227">        worker.run(new Runnable() {</span>
+            @Override
+            public void run() {
+<span class="nc bnc" id="L230" title="All 4 branches missed.">                if (impl != null &amp;&amp; handle != 0) {</span>
+<span class="nc" id="L231">                    impl.close(handle);</span>
+                }
+<span class="nc" id="L233">                handle = 0;</span>
+<span class="nc" id="L234">            }</span>
+        });
+<span class="nc" id="L236">    }</span>
+
+    private static void fail(final AsyncResource&lt;EmbeddingResponse&gt; result,
+            final LlmException ex) {
+<span class="nc" id="L240">        Display.getInstance().callSerially(new Runnable() {</span>
+            @Override
+            public void run() {
+<span class="nc" id="L243">                result.error(ex);</span>
+<span class="nc" id="L244">            }</span>
+        });
+<span class="nc" id="L246">    }</span>
+
+    private void submit(Runnable task, AsyncResource&lt;?&gt; result, StreamingListener listener) {
+<span class="nc bnc" id="L249" title="All 2 branches missed.">        if (Display.getInstance().getLocalLlmBackend() == null) {</span>
+<span class="nc" id="L250">            LlmException ex = invalid(&quot;Local models are not available on this platform; &quot;</span>
+                    + &quot;they run on Android and iOS devices. Use LlmClient.ollama() &quot;
+                    + &quot;on the desktop.&quot;);
+<span class="nc bnc" id="L253" title="All 2 branches missed.">            if (listener != null) {</span>
+<span class="nc" id="L254">                listener.onError(ex);</span>
+            }
+<span class="nc" id="L256">            result.error(ex);</span>
+<span class="nc" id="L257">            return;</span>
+        }
+<span class="nc bnc" id="L259" title="All 2 branches missed.">        if (worker == null) {</span>
+<span class="nc" id="L260">            worker = EasyThread.start(&quot;llama.cpp&quot;);</span>
+        }
+<span class="nc" id="L262">        worker.run(task);</span>
+<span class="nc" id="L263">    }</span>
+
+    /// Runs on the worker thread.
+    private ChatResponse generate(ChatRequest req, final StreamingListener listener)
+            throws LlmException {
+<span class="nc" id="L268">        LocalLlmImpl llm = ensureOpen();</span>
+<span class="nc" id="L269">        List&lt;ChatMessage&gt; messages = req.getMessages();</span>
+<span class="nc" id="L270">        String[] roles = new String[messages.size()];</span>
+<span class="nc" id="L271">        String[] contents = new String[messages.size()];</span>
+<span class="nc bnc" id="L272" title="All 2 branches missed.">        for (int i = 0; i &lt; roles.length; i++) {</span>
+<span class="nc" id="L273">            ChatMessage m = messages.get(i);</span>
+<span class="nc" id="L274">            roles[i] = roleName(m.getRole());</span>
+<span class="nc" id="L275">            contents[i] = m.getText();</span>
+        }
+<span class="nc bnc" id="L277" title="All 2 branches missed.">        int maxTokens = req.getMaxTokens() == null ? DEFAULT_MAX_TOKENS</span>
+<span class="nc" id="L278">                : req.getMaxTokens().intValue();</span>
+<span class="nc bnc" id="L279" title="All 2 branches missed.">        float temperature = req.getTemperature() == null ? 0.8f</span>
+<span class="nc" id="L280">                : req.getTemperature().floatValue();</span>
+<span class="nc bnc" id="L281" title="All 2 branches missed.">        float topP = req.getTopP() == null ? 0.95f : req.getTopP().floatValue();</span>
+<span class="nc bnc" id="L282" title="All 2 branches missed.">        int seed = req.getSeed() == null ? -1 : (int) req.getSeed().longValue();</span>
+<span class="nc bnc" id="L283" title="All 2 branches missed.">        String grammar = req.getResponseFormat() == ResponseFormat.JSON_OBJECT</span>
+                ? JSON_GRAMMAR : null;
+<span class="nc bnc" id="L285" title="All 2 branches missed.">        if (!llm.start(handle, roles, contents, maxTokens, temperature, topP, seed, grammar)) {</span>
+<span class="nc" id="L286">            String err = llm.getLastError(handle);</span>
+<span class="nc bnc" id="L287" title="All 2 branches missed.">            throw new LlmException(err == null ? &quot;The prompt could not be evaluated&quot; : err,</span>
+                    -1, null, null, null, LlmException.ErrorType.CONTEXT_LENGTH);
+        }
+<span class="nc" id="L290">        StopScanner stops = new StopScanner(req.getStopSequences());</span>
+<span class="nc" id="L291">        String finish = &quot;length&quot;;</span>
+<span class="nc" id="L292">        String piece = llm.next(handle);</span>
+<span class="nc bnc" id="L293" title="All 2 branches missed.">        while (piece != null) {</span>
+<span class="nc" id="L294">            String delta = stops.append(piece);</span>
+<span class="nc" id="L295">            emit(listener, delta);</span>
+<span class="nc bnc" id="L296" title="All 2 branches missed.">            if (stops.isStopped()) {</span>
+<span class="nc" id="L297">                finish = &quot;stop&quot;;</span>
+<span class="nc" id="L298">                break;</span>
+            }
+<span class="nc" id="L300">            piece = llm.next(handle);</span>
+<span class="nc" id="L301">        }</span>
+<span class="nc bnc" id="L302" title="All 2 branches missed.">        if (piece == null) {</span>
+<span class="nc" id="L303">            emit(listener, stops.flush());</span>
+<span class="nc" id="L304">            String err = llm.getLastError(handle);</span>
+<span class="nc bnc" id="L305" title="All 2 branches missed.">            if (CONTEXT_FULL.equals(err)) {</span>
+<span class="nc" id="L306">                finish = &quot;length&quot;;</span>
+<span class="nc bnc" id="L307" title="All 2 branches missed.">            } else if (err != null) {</span>
+                // A decode failure ends the stream early; reporting &quot;stop&quot;
+                // would pass a truncated answer off as a complete one.
+<span class="nc" id="L310">                throw failure(err);</span>
+<span class="nc bnc" id="L311" title="All 2 branches missed.">            } else if (llm.getCompletionTokens(handle) &lt; maxTokens) {</span>
+<span class="nc" id="L312">                finish = &quot;stop&quot;;</span>
+            }
+        }
+<span class="nc" id="L315">        int prompt = llm.getPromptTokens(handle);</span>
+<span class="nc" id="L316">        int completion = llm.getCompletionTokens(handle);</span>
+<span class="nc" id="L317">        final Usage usage = new Usage(prompt, completion, prompt + completion);</span>
+<span class="nc bnc" id="L318" title="All 2 branches missed.">        if (listener != null) {</span>
+<span class="nc" id="L319">            Display.getInstance().callSerially(new Runnable() {</span>
+                @Override
+                public void run() {
+<span class="nc" id="L322">                    listener.onUsage(usage);</span>
+<span class="nc" id="L323">                }</span>
+            });
+        }
+<span class="nc" id="L326">        return new ChatResponse(ChatMessage.assistant(stops.text()), null, finish, usage,</span>
+<span class="nc" id="L327">                modelName());</span>
+    }
+
+    private static void emit(final StreamingListener listener, final String delta) {
+<span class="nc bnc" id="L331" title="All 4 branches missed.">        if (listener == null || delta.length() == 0) {</span>
+<span class="nc" id="L332">            return;</span>
+        }
+<span class="nc" id="L334">        Display.getInstance().callSerially(new Runnable() {</span>
+            @Override
+            public void run() {
+<span class="nc" id="L337">                listener.onContentDelta(delta);</span>
+<span class="nc" id="L338">            }</span>
+        });
+<span class="nc" id="L340">    }</span>
+
+    private static void deliver(final AsyncResource&lt;ChatResponse&gt; result,
+            final ChatResponse response, final LlmException error,
+            final StreamingListener listener) {
+<span class="nc" id="L345">        Display.getInstance().callSerially(new Runnable() {</span>
+            @Override
+            public void run() {
+<span class="nc bnc" id="L348" title="All 2 branches missed.">                if (error != null) {</span>
+<span class="nc bnc" id="L349" title="All 2 branches missed.">                    if (listener != null) {</span>
+<span class="nc" id="L350">                        listener.onError(error);</span>
+                    }
+<span class="nc" id="L352">                    result.error(error);</span>
+                } else {
+<span class="nc" id="L354">                    result.complete(response);</span>
+                }
+<span class="nc" id="L356">            }</span>
+        });
+<span class="nc" id="L358">    }</span>
+
+    /// Runs on the worker thread.
+    private LocalLlmImpl ensureOpen() throws LlmException {
+<span class="nc bnc" id="L362" title="All 2 branches missed.">        if (impl == null) {</span>
+<span class="nc" id="L363">            impl = Display.getInstance().getLocalLlmBackend();</span>
+        }
+<span class="nc bnc" id="L365" title="All 2 branches missed.">        if (handle == 0) {</span>
+<span class="nc bnc" id="L366" title="All 2 branches missed.">            String path = modelPath.startsWith(&quot;file://&quot;) ? modelPath.substring(7) : modelPath;</span>
+<span class="nc" id="L367">            handle = impl.open(path, contextSize, gpuLayers, threads);</span>
+<span class="nc bnc" id="L368" title="All 2 branches missed.">            if (handle == 0) {</span>
+<span class="nc" id="L369">                String err = impl.getLastError(0);</span>
+<span class="nc bnc" id="L370" title="All 2 branches missed.">                throw failure(&quot;Could not load &quot; + modelPath</span>
+                        + (err == null ? &quot;&quot; : &quot;: &quot; + err));
+            }
+        }
+<span class="nc" id="L374">        return impl;</span>
+    }
+
+    private String modelName() {
+<span class="nc" id="L378">        int slash = modelPath.lastIndexOf('/');</span>
+<span class="nc bnc" id="L379" title="All 2 branches missed.">        return slash &lt; 0 ? modelPath : modelPath.substring(slash + 1);</span>
+    }
+
+    static String unsupportedFeature(ChatRequest req) {
+<span class="nc bnc" id="L383" title="All 4 branches missed.">        if (req.getTools() != null &amp;&amp; !req.getTools().isEmpty()) {</span>
+<span class="nc" id="L384">            return &quot;Tools are not supported by local models&quot;;</span>
+        }
+<span class="nc" id="L386">        List&lt;ChatMessage&gt; messages = req.getMessages();</span>
+<span class="nc bnc" id="L387" title="All 2 branches missed.">        for (ChatMessage m : messages) {</span>
+<span class="nc bnc" id="L388" title="All 2 branches missed.">            if (m.getRole() == Role.TOOL) {</span>
+<span class="nc" id="L389">                return &quot;Tool results are not supported by local models&quot;;</span>
+            }
+<span class="nc" id="L391">            List&lt;MessagePart&gt; parts = m.getParts();</span>
+<span class="nc bnc" id="L392" title="All 2 branches missed.">            for (MessagePart part : parts) {</span>
+<span class="nc bnc" id="L393" title="All 2 branches missed.">                if (!(part instanceof TextPart)) {</span>
+<span class="nc" id="L394">                    return &quot;Only text parts are supported by local models&quot;;</span>
+                }
+<span class="nc" id="L396">            }</span>
+<span class="nc" id="L397">        }</span>
+<span class="nc" id="L398">        return null;</span>
+    }
+
+    private static String roleName(Role r) {
+<span class="nc bnc" id="L402" title="All 2 branches missed.">        if (r == Role.SYSTEM) {</span>
+<span class="nc" id="L403">            return &quot;system&quot;;</span>
+        }
+<span class="nc bnc" id="L405" title="All 2 branches missed.">        if (r == Role.ASSISTANT) {</span>
+<span class="nc" id="L406">            return &quot;assistant&quot;;</span>
+        }
+<span class="nc" id="L408">        return &quot;user&quot;;</span>
+    }
+
+    private static LlmException invalid(String message) {
+<span class="nc" id="L412">        return new LlmException(message, -1, null, null, null,</span>
+                LlmException.ErrorType.INVALID_REQUEST);
+    }
+
+    private static LlmException failure(String message) {
+<span class="nc" id="L417">        return new LlmException(message, -1, null, null, null, LlmException.ErrorType.UNKNOWN);</span>
+    }
+
+    /// Accumulates generated text, ends it at the first stop sequence, and
+    /// holds back any tail that could still turn out to begin one, so a
+    /// stream never shows text the final response does not contain.
+    static final class StopScanner {
+        private final List&lt;String&gt; stops;
+        private final int holdBack;
+<span class="nc" id="L426">        private final StringBuilder text = new StringBuilder(); //NOPMD AvoidStringBufferField - the scanner exists to accumulate one response</span>
+        private int emitted;
+        private boolean stopped;
+
+<span class="nc" id="L430">        StopScanner(List&lt;String&gt; stops) {</span>
+<span class="nc bnc" id="L431" title="All 2 branches missed.">            this.stops = stops == null ? new ArrayList&lt;String&gt;() : stops;</span>
+<span class="nc" id="L432">            int longest = 0;</span>
+<span class="nc bnc" id="L433" title="All 2 branches missed.">            for (int i = 0; i &lt; this.stops.size(); i++) {</span>
+<span class="nc" id="L434">                longest = Math.max(longest, this.stops.get(i).length());</span>
+            }
+<span class="nc bnc" id="L436" title="All 2 branches missed.">            holdBack = longest == 0 ? 0 : longest - 1;</span>
+<span class="nc" id="L437">        }</span>
+
+        /// @return the text that may now be shown
+        String append(String piece) {
+<span class="nc" id="L441">            int from = Math.max(0, text.length() - holdBack);</span>
+<span class="nc" id="L442">            text.append(piece);</span>
+<span class="nc" id="L443">            int cut = -1;</span>
+<span class="nc bnc" id="L444" title="All 2 branches missed.">            for (String s : stops) {</span>
+<span class="nc bnc" id="L445" title="All 2 branches missed.">                if (s.length() == 0) {</span>
+<span class="nc" id="L446">                    continue;</span>
+                }
+<span class="nc" id="L448">                int at = text.indexOf(s, from);</span>
+<span class="nc bnc" id="L449" title="All 6 branches missed.">                if (at &gt;= 0 &amp;&amp; (cut &lt; 0 || at &lt; cut)) {</span>
+<span class="nc" id="L450">                    cut = at;</span>
+                }
+<span class="nc" id="L452">            }</span>
+<span class="nc bnc" id="L453" title="All 2 branches missed.">            if (cut &gt;= 0) {</span>
+<span class="nc" id="L454">                text.setLength(cut);</span>
+<span class="nc" id="L455">                stopped = true;</span>
+<span class="nc" id="L456">                return flush();</span>
+            }
+<span class="nc" id="L458">            int safe = text.length() - holdBack;</span>
+<span class="nc bnc" id="L459" title="All 2 branches missed.">            if (safe &lt;= emitted) {</span>
+<span class="nc" id="L460">                return &quot;&quot;;</span>
+            }
+<span class="nc" id="L462">            String out = text.substring(emitted, safe);</span>
+<span class="nc" id="L463">            emitted = safe;</span>
+<span class="nc" id="L464">            return out;</span>
+        }
+
+        /// @return whatever has not been shown yet
+        String flush() {
+<span class="nc" id="L469">            String out = text.substring(Math.min(emitted, text.length()));</span>
+<span class="nc" id="L470">            emitted = text.length();</span>
+<span class="nc" id="L471">            return out;</span>
+        }
+
+        boolean isStopped() {
+<span class="nc" id="L475">            return stopped;</span>
+        }
+
+        String text() {
+<span class="nc" id="L479">            return text.toString();</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>HealthWriteResult.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.health</a> &gt; <span class="el_source">HealthWriteResult.java</span></div><h1>HealthWriteResult.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.health;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
+/// The outcome of a write. A write can partially succeed -- a batch of a
+/// thousand samples with three bad timestamps writes 997 -- so this
+/// reports per-sample results rather than a single boolean.
+<span class="fc" id="L32">public final class HealthWriteResult {</span>
+
+<span class="fc" id="L34">    private final List&lt;String&gt; sampleIds = new ArrayList&lt;String&gt;();</span>
+<span class="fc" id="L35">    private final List&lt;String&gt; rejections = new ArrayList&lt;String&gt;();</span>
+
+    /// How many samples were stored.
+    public int getWrittenCount() {
+<span class="fc" id="L39">        return sampleIds.size();</span>
+    }
+
+    /// The platform identifiers assigned to the stored samples, in write
+    /// order. Read the warning on [HealthSample#getId()] before persisting
+    /// any of them.
+    public List&lt;String&gt; getSampleIds() {
+<span class="fc" id="L46">        return Collections.unmodifiableList(sampleIds);</span>
+    }
+
+    /// One human-readable message per rejected sample, empty when
+    /// everything was stored. Surface these rather than discarding them --
+    /// a silently dropped sample is the hardest kind of health bug to
+    /// track down later.
+    public List&lt;String&gt; getRejections() {
+<span class="fc" id="L54">        return Collections.unmodifiableList(rejections);</span>
+    }
+
+    /// `true` when at least one sample was rejected.
+    public boolean hasRejections() {
+<span class="nc bnc" id="L59" title="All 2 branches missed.">        return !rejections.isEmpty();</span>
+    }
+
+    /// Records a stored sample. Called by [HealthStore] and ports.
+    public void addSampleId(String id) {
+<span class="fc" id="L64">        sampleIds.add(id);</span>
+<span class="fc" id="L65">    }</span>
+
+    /// Records a rejected sample. Called by [HealthStore] and ports.
+    public void addRejection(String reason) {
+<span class="nc bnc" id="L69" title="All 2 branches missed.">        if (reason != null) {</span>
+<span class="nc" id="L70">            rejections.add(reason);</span>
+        }
+<span class="nc" id="L72">    }</span>
+
+    @Override
+    public String toString() {
+<span class="nc" id="L76">        return &quot;HealthWriteResult[&quot; + sampleIds.size() + &quot; written, &quot;</span>
+<span class="nc" id="L77">                + rejections.size() + &quot; rejected]&quot;;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,181 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PdfImage.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.pdf</a> &gt; <span class="el_source">PdfImage.java</span></div><h1>PdfImage.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.pdf;
+
+import com.codename1.impl.pdf.PdfWriter;
+import com.codename1.impl.pdf.PngDecoder;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+
+/// An image to draw on a PDF page, built from encoded JPEG or PNG bytes or
+/// from ARGB pixels. Works without the UI layer, so a server can use it.
+///
+/// A JPEG is embedded as it is, without decoding. A PNG is decoded and its
+/// transparency kept as a soft mask.
+///
+/// ```java
+/// PdfDocument doc = new PdfDocument();
+/// PdfCanvas canvas = doc.addPage(PdfPageSize.A4).getCanvas();
+/// PdfImage logo = PdfImage.create(Util.readInputStream(CN.getResourceAsStream(&quot;/logo.png&quot;)));
+/// canvas.drawImage(logo, 36, 36, 120, 120 * logo.getHeight() / logo.getWidth());
+/// ```
+@com.codename1.impl.SharedWithBackend
+public final class PdfImage {
+    private final int width;
+    private final int height;
+    private final byte[] jpeg;
+    private final int jpegComponents;
+    private final boolean adobeInverted;
+    private final int[] argb;
+    private final boolean alpha;
+
+    private PdfImage(int width, int height, byte[] jpeg, int components, boolean inverted, int[] argb,
+<span class="nc" id="L53">            boolean alpha) {</span>
+<span class="nc" id="L54">        this.width = width;</span>
+<span class="nc" id="L55">        this.height = height;</span>
+<span class="nc" id="L56">        this.jpeg = jpeg;</span>
+<span class="nc" id="L57">        this.jpegComponents = components;</span>
+<span class="nc" id="L58">        this.adobeInverted = inverted;</span>
+<span class="nc" id="L59">        this.argb = argb;</span>
+<span class="nc" id="L60">        this.alpha = alpha;</span>
+<span class="nc" id="L61">    }</span>
+
+    /// An image from the bytes of a JPEG or PNG file, told apart by their
+    /// signatures. Throws [IOException] for any other format.
+    public static PdfImage create(byte[] encoded) throws IOException {
+<span class="nc bnc" id="L66" title="All 2 branches missed.">        if (PngDecoder.isPng(encoded)) {</span>
+<span class="nc" id="L67">            PngDecoder png = PngDecoder.decode(encoded);</span>
+<span class="nc" id="L68">            return new PdfImage(png.width, png.height, null, 0, false, png.argb, png.hasAlpha);</span>
+        }
+<span class="nc bnc" id="L70" title="All 6 branches missed.">        if (encoded.length &gt; 3 &amp;&amp; (encoded[0] &amp; 0xff) == 0xff &amp;&amp; (encoded[1] &amp; 0xff) == 0xd8) {</span>
+<span class="nc" id="L71">            return jpeg(encoded);</span>
+        }
+<span class="nc" id="L73">        throw new IOException(&quot;Only JPEG and PNG images are supported&quot;);</span>
+    }
+
+    /// An image from pixels `0xAARRGGBB`, row by row from the top.
+    public static PdfImage create(int[] argb, int width, int height) {
+<span class="nc bnc" id="L78" title="All 6 branches missed.">        if (width &lt;= 0 || height &lt;= 0 || (long) width * height &gt; argb.length) {</span>
+<span class="nc" id="L79">            throw new IllegalArgumentException(&quot;Pixel array does not match &quot; + width + &quot;x&quot; + height);</span>
+        }
+<span class="nc" id="L81">        int[] copy = new int[width * height];</span>
+<span class="nc" id="L82">        System.arraycopy(argb, 0, copy, 0, copy.length);</span>
+<span class="nc" id="L83">        boolean alpha = false;</span>
+<span class="nc bnc" id="L84" title="All 2 branches missed.">        for (int i = 0; i &lt; copy.length; i++) { // NOPMD ForLoopCanBeForeach - indexed like the surrounding decoder loops</span>
+<span class="nc bnc" id="L85" title="All 2 branches missed.">            if ((copy[i] &gt;&gt;&gt; 24) != 0xff) {</span>
+<span class="nc" id="L86">                alpha = true;</span>
+<span class="nc" id="L87">                break;</span>
+            }
+        }
+<span class="nc" id="L90">        return new PdfImage(width, height, null, 0, false, copy, alpha);</span>
+    }
+
+    private static PdfImage jpeg(byte[] d) throws IOException {
+<span class="nc" id="L94">        int p = 2;</span>
+<span class="nc" id="L95">        boolean adobe = false;</span>
+<span class="nc bnc" id="L96" title="All 2 branches missed.">        while (p + 4 &lt;= d.length) {</span>
+<span class="nc bnc" id="L97" title="All 2 branches missed.">            if ((d[p] &amp; 0xff) != 0xff) {</span>
+<span class="nc" id="L98">                p++;</span>
+<span class="nc" id="L99">                continue;</span>
+            }
+<span class="nc" id="L101">            int marker = d[p + 1] &amp; 0xff;</span>
+<span class="nc bnc" id="L102" title="All 2 branches missed.">            if (marker == 0xff) {</span>
+<span class="nc" id="L103">                p++;</span>
+<span class="nc" id="L104">                continue;</span>
+            }
+<span class="nc bnc" id="L106" title="All 8 branches missed.">            if (marker == 0xd8 || marker &gt;= 0xd0 &amp;&amp; marker &lt;= 0xd7 || marker == 0x01) {</span>
+<span class="nc" id="L107">                p += 2;</span>
+<span class="nc" id="L108">                continue;</span>
+            }
+<span class="nc" id="L110">            int len = ((d[p + 2] &amp; 0xff) &lt;&lt; 8) | (d[p + 3] &amp; 0xff);</span>
+<span class="nc bnc" id="L111" title="All 10 branches missed.">            if (marker == 0xee &amp;&amp; len &gt;= 7 &amp;&amp; p + 9 &lt;= d.length &amp;&amp; d[p + 4] == 'A' &amp;&amp; d[p + 5] == 'd') {</span>
+<span class="nc" id="L112">                adobe = true;</span>
+            }
+            // Baseline, extended and progressive frames only: PDF's DCTDecode
+            // does not cover lossless or arithmetic-coded JPEG.
+<span class="nc bnc" id="L116" title="All 10 branches missed.">            if (marker == 0xc3 || marker &gt;= 0xc5 &amp;&amp; marker &lt;= 0xcf &amp;&amp; marker != 0xc8 &amp;&amp; marker != 0xcc) {</span>
+<span class="nc" id="L117">                throw new IOException(&quot;JPEG coding not supported in PDF&quot;);</span>
+            }
+<span class="nc bnc" id="L119" title="All 4 branches missed.">            boolean sof = marker &gt;= 0xc0 &amp;&amp; marker &lt;= 0xc2;</span>
+<span class="nc bnc" id="L120" title="All 4 branches missed.">            if (sof &amp;&amp; p + 10 &lt;= d.length) {</span>
+<span class="nc" id="L121">                int h = ((d[p + 5] &amp; 0xff) &lt;&lt; 8) | (d[p + 6] &amp; 0xff);</span>
+<span class="nc" id="L122">                int w = ((d[p + 7] &amp; 0xff) &lt;&lt; 8) | (d[p + 8] &amp; 0xff);</span>
+<span class="nc" id="L123">                int comps = d[p + 9] &amp; 0xff;</span>
+<span class="nc bnc" id="L124" title="All 10 branches missed.">                if (w &lt;= 0 || h &lt;= 0 || comps != 1 &amp;&amp; comps != 3 &amp;&amp; comps != 4) {</span>
+<span class="nc" id="L125">                    break;</span>
+                }
+<span class="nc" id="L127">                byte[] copy = new byte[d.length];</span>
+<span class="nc" id="L128">                System.arraycopy(d, 0, copy, 0, d.length);</span>
+<span class="nc bnc" id="L129" title="All 4 branches missed.">                return new PdfImage(w, h, copy, comps, adobe &amp;&amp; comps == 4, null, false);</span>
+            }
+<span class="nc" id="L131">            p += 2 + len;</span>
+<span class="nc" id="L132">        }</span>
+<span class="nc" id="L133">        throw new IOException(&quot;JPEG has no readable frame header&quot;);</span>
+    }
+
+    /// The width in pixels.
+    public int getWidth() {
+<span class="nc" id="L138">        return width;</span>
+    }
+
+    /// The height in pixels.
+    public int getHeight() {
+<span class="nc" id="L143">        return height;</span>
+    }
+
+    /// Writes the image XObject as `number`.
+    void write(PdfWriter w, int number) throws IOException {
+<span class="nc" id="L148">        String size = &quot;/Type /XObject /Subtype /Image /Width &quot; + width + &quot; /Height &quot; + height</span>
+                + &quot; /BitsPerComponent 8&quot;;
+<span class="nc bnc" id="L150" title="All 2 branches missed.">        if (jpeg != null) {</span>
+<span class="nc bnc" id="L151" title="All 4 branches missed.">            String cs = jpegComponents == 1 ? &quot;/DeviceGray&quot; : jpegComponents == 3 ? &quot;/DeviceRGB&quot; : &quot;/DeviceCMYK&quot;;</span>
+<span class="nc bnc" id="L152" title="All 2 branches missed.">            String decode = adobeInverted ? &quot; /Decode [1 0 1 0 1 0 1 0]&quot; : &quot;&quot;;</span>
+<span class="nc" id="L153">            w.stream(number, size + &quot; /ColorSpace &quot; + cs + decode + &quot; /Filter /DCTDecode&quot;, jpeg, false);</span>
+<span class="nc" id="L154">            return;</span>
+        }
+<span class="nc" id="L156">        String smask = &quot;&quot;;</span>
+<span class="nc bnc" id="L157" title="All 2 branches missed.">        if (alpha) {</span>
+<span class="nc" id="L158">            int mask = w.reserve();</span>
+<span class="nc" id="L159">            byte[] a = new byte[width * height];</span>
+<span class="nc bnc" id="L160" title="All 2 branches missed.">            for (int i = 0; i &lt; a.length; i++) {</span>
+<span class="nc" id="L161">                a[i] = (byte) (argb[i] &gt;&gt;&gt; 24);</span>
+            }
+<span class="nc" id="L163">            w.stream(mask, &quot;/Type /XObject /Subtype /Image /Width &quot; + width + &quot; /Height &quot; + height</span>
+                    + &quot; /BitsPerComponent 8 /ColorSpace /DeviceGray&quot;, a, true);
+<span class="nc" id="L165">            smask = &quot; /SMask &quot; + mask + &quot; 0 R&quot;;</span>
+        }
+<span class="nc" id="L167">        ByteArrayOutputStream rgb = new ByteArrayOutputStream(width * height * 3);</span>
+<span class="nc" id="L168">        byte[] row = new byte[width * 3];</span>
+<span class="nc bnc" id="L169" title="All 2 branches missed.">        for (int y = 0; y &lt; height; y++) {</span>
+<span class="nc bnc" id="L170" title="All 2 branches missed.">            for (int x = 0; x &lt; width; x++) {</span>
+<span class="nc" id="L171">                int px = argb[y * width + x];</span>
+<span class="nc" id="L172">                row[x * 3] = (byte) (px &gt;&gt; 16);</span>
+<span class="nc" id="L173">                row[x * 3 + 1] = (byte) (px &gt;&gt; 8);</span>
+<span class="nc" id="L174">                row[x * 3 + 2] = (byte) px;</span>
+            }
+<span class="nc" id="L176">            rgb.write(row, 0, row.length);</span>
+        }
+<span class="nc" id="L178">        w.stream(number, size + &quot; /ColorSpace /DeviceRGB&quot; + smask, rgb.toByteArray(), true);</span>
+<span class="nc" id="L179">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

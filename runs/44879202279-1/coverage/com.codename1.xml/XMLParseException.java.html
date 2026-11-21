@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>XMLParseException.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.xml</a> &gt; <span class="el_source">XMLParseException.java</span></div><h1>XMLParseException.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.xml;
+
+/// Thrown by an [XMLParser] refusing malformed input (see
+/// [XMLParser#setRejectMalformed(boolean)])
+/// when the document is not well formed, nests deeper than
+/// [XMLParser#setMaxDepth(int)], or references an entity the parser does not
+/// define.
+///
+/// It extends `IllegalArgumentException`, which is what the parser has always
+/// thrown when a [ParserCallback] asks it to stop, so code that catches that
+/// keeps working.
+@com.codename1.impl.SharedWithBackend
+public class XMLParseException extends IllegalArgumentException {
+    private final int line;
+    private final int column;
+
+    /// Creates an exception with no position.
+    ///
+    /// #### Parameters
+    ///
+    /// - `message`: what is wrong
+    public XMLParseException(String message) {
+<span class="nc" id="L45">        super(message);</span>
+<span class="nc" id="L46">        line = -1;</span>
+<span class="nc" id="L47">        column = -1;</span>
+<span class="nc" id="L48">    }</span>
+
+    /// Creates an exception at a position, which the message names as
+    /// &quot;line 3, column 7: ...&quot;.
+    ///
+    /// #### Parameters
+    ///
+    /// - `message`: what is wrong
+    ///
+    /// - `line`: the line of the offending character, from 1
+    ///
+    /// - `column`: its column, from 1 (0 before the first character of a line)
+    public XMLParseException(String message, int line, int column) {
+<span class="fc" id="L61">        super(&quot;line &quot; + line + &quot;, column &quot; + column + &quot;: &quot; + message);</span>
+<span class="fc" id="L62">        this.line = line;</span>
+<span class="fc" id="L63">        this.column = column;</span>
+<span class="fc" id="L64">    }</span>
+
+    /// The line of the error, from 1, or -1 when it has no position.
+    ///
+    /// #### Returns
+    ///
+    /// the line
+    public int getLine() {
+<span class="fc" id="L72">        return line;</span>
+    }
+
+    /// The column of the error, from 1, or -1 when it has no position.
+    ///
+    /// #### Returns
+    ///
+    /// the column
+    public int getColumn() {
+<span class="fc" id="L81">        return column;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

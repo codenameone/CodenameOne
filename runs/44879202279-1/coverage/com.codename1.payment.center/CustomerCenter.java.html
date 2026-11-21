@@ -1,0 +1,389 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CustomerCenter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.payment.center</a> &gt; <span class="el_source">CustomerCenter.java</span></div><h1>CustomerCenter.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Codename One in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.payment.center;
+
+import com.codename1.io.Log;
+import com.codename1.payment.CommerceManager;
+import com.codename1.payment.CustomerInfo;
+import com.codename1.payment.Purchase;
+import com.codename1.ui.Button;
+import com.codename1.ui.Command;
+import com.codename1.ui.Dialog;
+import com.codename1.ui.Display;
+import com.codename1.ui.Form;
+import com.codename1.ui.Label;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.layouts.BoxLayout;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/// The customer center: a form listing the customer's active subscriptions
+/// and what can be done about them.
+///
+/// The console configures which paths the form offers:
+///
+/// - `MANAGE` opens the store's own subscription management, or the
+///   customer's management page where the platform has none
+/// - `RESTORE` restores the purchases of the store account
+/// - `REFUND` asks the store for a refund, one row per subscription the
+///   store can refund
+/// - `CANCEL` asks why, reports the answer, shows the retention offer
+///   configured for that reason if there is one, and otherwise continues to
+///   the store's subscription management. Offered while a subscription is
+///   active.
+/// - `SUPPORT` opens the support page, or an email to the support address.
+///   Offered when one of the two is configured.
+///
+/// When the configuration cannot be fetched the form offers `MANAGE` and
+/// `RESTORE`.
+///
+/// #### Styling
+///
+/// - `CustomerCenterForm`: the form
+/// - `CustomerCenterHeader`: the heading above the subscriptions
+/// - `CustomerCenterSubscription`: one active subscription
+/// - `CustomerCenterEmpty`: the line shown when no subscription is active
+/// - `CustomerCenterRow`: the button of one path
+/// - `CustomerCenterReason`: one cancel reason
+public final class CustomerCenter {
+    /// The path that opens subscription management.
+    public static final String PATH_MANAGE = &quot;MANAGE&quot;;
+    /// The path that restores purchases.
+    public static final String PATH_RESTORE = &quot;RESTORE&quot;;
+    /// The path that asks for a refund.
+    public static final String PATH_REFUND = &quot;REFUND&quot;;
+    /// The path that cancels a subscription.
+    public static final String PATH_CANCEL = &quot;CANCEL&quot;;
+    /// The path that reaches support.
+    public static final String PATH_SUPPORT = &quot;SUPPORT&quot;;
+
+    private CustomerCenter() {
+    }
+
+    /// One thing the customer center offers to do.
+    static final class Row {
+        final String path;
+        final String label;
+        final String sku;
+
+<span class="fc" id="L92">        Row(String path, String label, String sku) {</span>
+<span class="fc" id="L93">            this.path = path;</span>
+<span class="fc" id="L94">            this.label = label;</span>
+<span class="fc" id="L95">            this.sku = sku;</span>
+<span class="fc" id="L96">        }</span>
+    }
+
+    /// Fetches the customer center configuration and shows the form over
+    /// the current one; going back returns there. May be called on any
+    /// thread: the form is shown on the EDT, which is not blocked while the
+    /// configuration is fetched.
+    public static void show() {
+<span class="fc" id="L104">        Display d = Display.getInstance();</span>
+<span class="pc bpc" id="L105" title="1 of 2 branches missed.">        if (!d.isEdt()) {</span>
+<span class="nc" id="L106">            d.callSerially(new Runnable() {</span>
+                @Override
+                public void run() {
+<span class="nc" id="L109">                    show();</span>
+<span class="nc" id="L110">                }</span>
+            });
+<span class="nc" id="L112">            return;</span>
+        }
+<span class="fc" id="L114">        final Map[] fetched = new Map[1];</span>
+<span class="fc" id="L115">        d.invokeAndBlock(new Runnable() {</span>
+            @Override
+            public void run() {
+                try {
+<span class="fc" id="L119">                    fetched[0] = CommerceManager.getInstance().getCustomerCenterConfiguration();</span>
+<span class="nc" id="L120">                } catch (Throwable t) {</span>
+<span class="nc" id="L121">                    Log.p(&quot;CustomerCenter: no configuration: &quot; + t);</span>
+<span class="fc" id="L122">                }</span>
+<span class="fc" id="L123">            }</span>
+        });
+<span class="pc bpc" id="L125" title="1 of 2 branches missed.">        Map config = fetched[0] == null ? defaultConfiguration() : fetched[0];</span>
+<span class="fc" id="L126">        CommerceManager.getInstance().analyticsEvent(&quot;customer_center_view&quot;, null, null, null, null, null);</span>
+<span class="fc" id="L127">        createForm(config, CommerceManager.getInstance().getCustomerInfo(),</span>
+<span class="fc" id="L128">                Purchase.getInAppPurchase(), d.getCurrent()).show();</span>
+<span class="fc" id="L129">    }</span>
+
+    /// The configuration used when the cloud's cannot be fetched.
+    static Map defaultConfiguration() {
+<span class="fc" id="L133">        Map&lt;String, Object&gt; config = new HashMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L134">        List&lt;Object&gt; paths = new ArrayList&lt;Object&gt;();</span>
+<span class="fc" id="L135">        paths.add(PATH_MANAGE);</span>
+<span class="fc" id="L136">        paths.add(PATH_RESTORE);</span>
+<span class="fc" id="L137">        config.put(&quot;paths&quot;, paths);</span>
+<span class="fc" id="L138">        return config;</span>
+    }
+
+    /// The rows of a configuration for a customer, in the configured order.
+    /// A path the client does not know is skipped.
+    static List&lt;Row&gt; buildRows(Map config, CustomerInfo info, Purchase store) {
+<span class="fc" id="L144">        List&lt;Row&gt; rows = new ArrayList&lt;Row&gt;();</span>
+<span class="fc bfc" id="L145" title="All 2 branches covered.">        List&lt;String&gt; active = info == null ? new ArrayList&lt;String&gt;() : info.getActiveSubscriptions();</span>
+<span class="fc bfc" id="L146" title="All 2 branches covered.">        String firstSku = active.isEmpty() ? null : active.get(0);</span>
+<span class="fc bfc" id="L147" title="All 2 branches covered.">        Object paths = config == null ? null : config.get(&quot;paths&quot;);</span>
+<span class="fc bfc" id="L148" title="All 2 branches covered.">        if (!(paths instanceof List)) {</span>
+<span class="fc" id="L149">            return rows;</span>
+        }
+<span class="fc bfc" id="L151" title="All 2 branches covered.">        for (Object o : (List) paths) {</span>
+<span class="pc bpc" id="L152" title="1 of 2 branches missed.">            String path = o == null ? &quot;&quot; : o.toString();</span>
+<span class="fc bfc" id="L153" title="All 2 branches covered.">            if (PATH_MANAGE.equalsIgnoreCase(path)) {</span>
+<span class="fc" id="L154">                rows.add(new Row(PATH_MANAGE, string(config, &quot;path.MANAGE&quot;, &quot;Manage subscription&quot;), firstSku));</span>
+<span class="fc bfc" id="L155" title="All 2 branches covered.">            } else if (PATH_RESTORE.equalsIgnoreCase(path)) {</span>
+<span class="fc" id="L156">                rows.add(new Row(PATH_RESTORE, string(config, &quot;path.RESTORE&quot;, &quot;Restore purchases&quot;), null));</span>
+<span class="fc bfc" id="L157" title="All 2 branches covered.">            } else if (PATH_REFUND.equalsIgnoreCase(path)) {</span>
+<span class="fc" id="L158">                String label = string(config, &quot;path.REFUND&quot;, &quot;Request a refund&quot;);</span>
+<span class="fc bfc" id="L159" title="All 2 branches covered.">                for (String sku : active) {</span>
+<span class="pc bpc" id="L160" title="1 of 4 branches missed.">                    if (store != null &amp;&amp; store.isRefundable(sku)) {</span>
+<span class="pc bpc" id="L161" title="1 of 2 branches missed.">                        rows.add(new Row(PATH_REFUND, active.size() &gt; 1 ? label + &quot; (&quot; + sku + &quot;)&quot; : label, sku));</span>
+                    }
+<span class="fc" id="L163">                }</span>
+<span class="fc bfc" id="L164" title="All 2 branches covered.">            } else if (PATH_CANCEL.equalsIgnoreCase(path)) {</span>
+<span class="fc bfc" id="L165" title="All 2 branches covered.">                if (firstSku != null) {</span>
+<span class="fc" id="L166">                    rows.add(new Row(PATH_CANCEL, string(config, &quot;path.CANCEL&quot;, &quot;Cancel subscription&quot;), firstSku));</span>
+                }
+<span class="fc bfc" id="L168" title="All 2 branches covered.">            } else if (PATH_SUPPORT.equalsIgnoreCase(path)) {</span>
+<span class="pc bpc" id="L169" title="1 of 2 branches missed.">                if (supportAddress(config) != null) {</span>
+<span class="fc" id="L170">                    rows.add(new Row(PATH_SUPPORT, string(config, &quot;path.SUPPORT&quot;, &quot;Contact support&quot;), null));</span>
+                }
+            }
+<span class="fc" id="L173">        }</span>
+<span class="fc" id="L174">        return rows;</span>
+    }
+
+    /// What the support row opens: the support page, else an email to the
+    /// support address, else null.
+    static String supportAddress(Map config) {
+<span class="fc" id="L180">        String url = text(config.get(&quot;supportUrl&quot;));</span>
+<span class="fc bfc" id="L181" title="All 2 branches covered.">        if (url != null) {</span>
+<span class="fc" id="L182">            return url;</span>
+        }
+<span class="fc" id="L184">        String email = text(config.get(&quot;supportEmail&quot;));</span>
+<span class="fc bfc" id="L185" title="All 2 branches covered.">        return email == null ? null : &quot;mailto:&quot; + email;</span>
+    }
+
+    /// Builds the form of a configuration without showing it.
+    static Form createForm(final Map config, CustomerInfo info, final Purchase store, final Form previous) {
+<span class="fc" id="L190">        final Form form = new Form(string(config, &quot;title&quot;, &quot;Subscriptions&quot;), BoxLayout.y());</span>
+<span class="fc" id="L191">        form.setUIID(&quot;CustomerCenterForm&quot;);</span>
+<span class="fc bfc" id="L192" title="All 2 branches covered.">        if (previous != null) {</span>
+<span class="fc" id="L193">            form.setBackCommand(new Command(&quot;&quot;) {</span>
+                @Override
+                public void actionPerformed(ActionEvent evt) {
+<span class="nc" id="L196">                    previous.showBack();</span>
+<span class="nc" id="L197">                }</span>
+            });
+        }
+<span class="fc" id="L200">        Label header = new Label(string(config, &quot;subscriptions&quot;, &quot;Active subscriptions&quot;));</span>
+<span class="fc" id="L201">        header.setUIID(&quot;CustomerCenterHeader&quot;);</span>
+<span class="fc" id="L202">        form.add(header);</span>
+<span class="fc bfc" id="L203" title="All 2 branches covered.">        List&lt;String&gt; active = info == null ? new ArrayList&lt;String&gt;() : info.getActiveSubscriptions();</span>
+<span class="fc bfc" id="L204" title="All 2 branches covered.">        for (String sku : active) {</span>
+<span class="fc" id="L205">            Label l = new Label(sku);</span>
+<span class="fc" id="L206">            l.setUIID(&quot;CustomerCenterSubscription&quot;);</span>
+<span class="fc" id="L207">            form.add(l);</span>
+<span class="fc" id="L208">        }</span>
+<span class="fc bfc" id="L209" title="All 2 branches covered.">        if (active.isEmpty()) {</span>
+<span class="fc" id="L210">            Label none = new Label(string(config, &quot;none&quot;, &quot;No active subscription&quot;));</span>
+<span class="fc" id="L211">            none.setUIID(&quot;CustomerCenterEmpty&quot;);</span>
+<span class="fc" id="L212">            form.add(none);</span>
+        }
+<span class="fc bfc" id="L214" title="All 2 branches covered.">        for (final Row row : buildRows(config, info, store)) {</span>
+<span class="fc" id="L215">            Button b = new Button(row.label);</span>
+<span class="fc" id="L216">            b.setUIID(&quot;CustomerCenterRow&quot;);</span>
+<span class="fc" id="L217">            b.setName(&quot;CustomerCenterRow_&quot; + row.path);</span>
+<span class="fc" id="L218">            b.addActionListener(new ActionListener() {</span>
+                @Override
+                public void actionPerformed(ActionEvent evt) {
+<span class="nc" id="L221">                    perform(row, config, store, form);</span>
+<span class="nc" id="L222">                }</span>
+            });
+<span class="fc" id="L224">            form.add(b);</span>
+<span class="fc" id="L225">        }</span>
+<span class="fc" id="L226">        return form;</span>
+    }
+
+    static void perform(Row row, Map config, Purchase store, Form form) {
+<span class="fc" id="L230">        CommerceManager.getInstance().analyticsEvent(&quot;customer_center_action&quot;, null, null, row.sku,</span>
+                &quot;action&quot;, row.path);
+<span class="pc bpc" id="L232" title="1 of 2 branches missed.">        if (PATH_MANAGE.equals(row.path)) {</span>
+<span class="nc" id="L233">            manage(store, row.sku);</span>
+<span class="pc bpc" id="L234" title="1 of 2 branches missed.">        } else if (PATH_RESTORE.equals(row.path)) {</span>
+<span class="nc" id="L235">            CommerceManager.getInstance().restore();</span>
+<span class="pc bpc" id="L236" title="1 of 2 branches missed.">        } else if (PATH_REFUND.equals(row.path)) {</span>
+<span class="nc bnc" id="L237" title="All 2 branches missed.">            if (store != null) {</span>
+<span class="nc" id="L238">                store.refund(row.sku);</span>
+            }
+<span class="pc bpc" id="L240" title="1 of 2 branches missed.">        } else if (PATH_CANCEL.equals(row.path)) {</span>
+<span class="nc" id="L241">            cancel(config, store, row.sku, form);</span>
+<span class="pc bpc" id="L242" title="1 of 2 branches missed.">        } else if (PATH_SUPPORT.equals(row.path)) {</span>
+<span class="fc" id="L243">            String address = supportAddress(config);</span>
+<span class="pc bpc" id="L244" title="1 of 2 branches missed.">            if (address != null) {</span>
+<span class="nc" id="L245">                Display.getInstance().execute(address);</span>
+            }
+        }
+<span class="fc" id="L248">    }</span>
+
+    /// Opens the store's subscription management, or the customer's
+    /// management page on a platform with none.
+    private static void manage(Purchase store, String sku) {
+<span class="pc bpc" id="L253" title="3 of 4 branches missed.">        if (store != null &amp;&amp; store.isManageSubscriptionsSupported()) {</span>
+<span class="nc" id="L254">            store.manageSubscriptions(sku);</span>
+<span class="nc" id="L255">            return;</span>
+        }
+        // A web subscription is managed in a billing portal the cloud has
+        // to be asked for, which must not happen on the EDT.
+<span class="fc" id="L259">        final String[] url = new String[1];</span>
+<span class="fc" id="L260">        Display.getInstance().invokeAndBlock(new Runnable() {</span>
+            @Override
+            public void run() {
+<span class="fc" id="L263">                url[0] = CommerceManager.getInstance().fetchManagementUrl();</span>
+<span class="fc" id="L264">            }</span>
+        });
+<span class="pc bpc" id="L266" title="3 of 4 branches missed.">        if (url[0] != null &amp;&amp; url[0].length() &gt; 0) {</span>
+<span class="nc" id="L267">            Display.getInstance().execute(url[0]);</span>
+        }
+<span class="fc" id="L269">    }</span>
+
+    /// The cancel reasons of a configuration that have an id, each as its
+    /// parsed JSON object.
+    static List&lt;Map&gt; cancelReasons(Map config) {
+<span class="fc" id="L274">        List&lt;Map&gt; out = new ArrayList&lt;Map&gt;();</span>
+<span class="fc" id="L275">        Object reasons = config.get(&quot;cancelReasons&quot;);</span>
+<span class="fc bfc" id="L276" title="All 2 branches covered.">        if (reasons instanceof List) {</span>
+<span class="fc bfc" id="L277" title="All 2 branches covered.">            for (Object o : (List) reasons) {</span>
+<span class="pc bpc" id="L278" title="1 of 4 branches missed.">                if (o instanceof Map &amp;&amp; text(((Map) o).get(&quot;id&quot;)) != null) {</span>
+<span class="fc" id="L279">                    out.add((Map) o);</span>
+                }
+<span class="fc" id="L281">            }</span>
+        }
+<span class="fc" id="L283">        return out;</span>
+    }
+
+    private static void cancel(final Map config, final Purchase store, final String sku, final Form center) {
+<span class="nc" id="L287">        List&lt;Map&gt; reasons = cancelReasons(config);</span>
+<span class="nc bnc" id="L288" title="All 2 branches missed.">        if (reasons.isEmpty()) {</span>
+<span class="nc" id="L289">            manage(store, sku);</span>
+<span class="nc" id="L290">            return;</span>
+        }
+<span class="nc" id="L292">        Form picker = new Form(string(config, &quot;cancel.title&quot;, &quot;Why are you leaving?&quot;), BoxLayout.y());</span>
+<span class="nc" id="L293">        picker.setUIID(&quot;CustomerCenterForm&quot;);</span>
+<span class="nc" id="L294">        picker.setBackCommand(new Command(&quot;&quot;) {</span>
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+<span class="nc" id="L297">                center.showBack();</span>
+<span class="nc" id="L298">            }</span>
+        });
+<span class="nc bnc" id="L300" title="All 2 branches missed.">        for (final Map reason : reasons) {</span>
+<span class="nc" id="L301">            String id = text(reason.get(&quot;id&quot;));</span>
+<span class="nc" id="L302">            String label = text(reason.get(&quot;label&quot;));</span>
+<span class="nc bnc" id="L303" title="All 2 branches missed.">            Button b = new Button(string(config, &quot;reason.&quot; + id, label == null ? id : label));</span>
+<span class="nc" id="L304">            b.setUIID(&quot;CustomerCenterReason&quot;);</span>
+<span class="nc" id="L305">            b.addActionListener(new ActionListener() {</span>
+                @Override
+                public void actionPerformed(ActionEvent evt) {
+<span class="nc" id="L308">                    reasonChosen(config, reason, store, sku);</span>
+<span class="nc" id="L309">                    center.showBack();</span>
+<span class="nc" id="L310">                }</span>
+            });
+<span class="nc" id="L312">            picker.add(b);</span>
+<span class="nc" id="L313">        }</span>
+<span class="nc" id="L314">        picker.show();</span>
+<span class="nc" id="L315">    }</span>
+
+    static void reasonChosen(Map config, Map reason, Purchase store, String sku) {
+<span class="fc" id="L318">        CommerceManager cm = CommerceManager.getInstance();</span>
+<span class="fc" id="L319">        cm.logEvent(&quot;CANCEL_REASON&quot;, null, null, null, text(reason.get(&quot;id&quot;)));</span>
+<span class="fc" id="L320">        cm.analyticsEvent(&quot;subscription_cancel_reason&quot;, null, null, sku, &quot;reason&quot;, text(reason.get(&quot;id&quot;)));</span>
+<span class="fc" id="L321">        Object offer = reason.get(&quot;offer&quot;);</span>
+<span class="pc bpc" id="L322" title="1 of 2 branches missed.">        if (offer instanceof Map) {</span>
+<span class="nc" id="L323">            String productId = text(((Map) offer).get(&quot;productId&quot;));</span>
+<span class="nc" id="L324">            String offerText = text(((Map) offer).get(&quot;text&quot;));</span>
+<span class="nc bnc" id="L325" title="All 4 branches missed.">            if (productId != null &amp;&amp; offerText != null) {</span>
+<span class="nc" id="L326">                boolean accepted = Dialog.show(string(config, &quot;offer.title&quot;, &quot;Before you go&quot;), offerText,</span>
+<span class="nc" id="L327">                        string(config, &quot;offer.accept&quot;, &quot;Accept offer&quot;),</span>
+<span class="nc" id="L328">                        string(config, &quot;offer.decline&quot;, &quot;No thanks&quot;));</span>
+<span class="nc bnc" id="L329" title="All 2 branches missed.">                if (accepted) {</span>
+                    // An offer that names a promotional offer is sold under
+                    // it where the store has such offers and the cloud signs
+                    // it; anywhere else the product is sold as it is.
+<span class="nc" id="L333">                    String offerId = text(((Map) offer).get(&quot;offerId&quot;));</span>
+<span class="nc bnc" id="L334" title="All 4 branches missed.">                    if (offerId == null || !cm.purchaseWithPromotionalOffer(productId, offerId)) {</span>
+<span class="nc" id="L335">                        cm.subscribe(productId);</span>
+                    }
+<span class="nc" id="L337">                    return;</span>
+                }
+            }
+        }
+<span class="fc" id="L341">        manage(store, sku);</span>
+<span class="fc" id="L342">    }</span>
+
+    /// A string of the configuration by key: the device's language and
+    /// country, then its language, then English, then the fallback.
+    static String string(Map config, String key, String fallback) {
+<span class="pc bpc" id="L347" title="1 of 2 branches missed.">        Object strings = config == null ? null : config.get(&quot;strings&quot;);</span>
+<span class="fc bfc" id="L348" title="All 2 branches covered.">        if (!(strings instanceof Map)) {</span>
+<span class="fc" id="L349">            return fallback;</span>
+        }
+<span class="fc" id="L351">        Map all = (Map) strings;</span>
+<span class="fc" id="L352">        String language = null;</span>
+<span class="fc" id="L353">        String country = null;</span>
+        try {
+<span class="fc" id="L355">            language = Display.getInstance().getLocalizationManager().getLanguage();</span>
+<span class="fc" id="L356">            country = Display.getInstance().getLocalizationManager().getLocale();</span>
+<span class="nc" id="L357">        } catch (Throwable t) {</span>
+            // no localization on this port: English
+<span class="nc" id="L359">            Log.p(&quot;CustomerCenter: no locale: &quot; + t);</span>
+<span class="fc" id="L360">        }</span>
+<span class="fc" id="L361">        String found = null;</span>
+<span class="pc bpc" id="L362" title="2 of 4 branches missed.">        if (language != null &amp;&amp; country != null) {</span>
+<span class="fc" id="L363">            found = entry(all.get(language + &quot;_&quot; + country), key);</span>
+        }
+<span class="pc bpc" id="L365" title="2 of 4 branches missed.">        if (found == null &amp;&amp; language != null) {</span>
+<span class="fc" id="L366">            found = entry(all.get(language), key);</span>
+        }
+<span class="fc bfc" id="L368" title="All 2 branches covered.">        if (found == null) {</span>
+<span class="fc" id="L369">            found = entry(all.get(&quot;en&quot;), key);</span>
+        }
+<span class="fc bfc" id="L371" title="All 2 branches covered.">        return found == null ? fallback : found;</span>
+    }
+
+    private static String entry(Object table, String key) {
+<span class="fc bfc" id="L375" title="All 2 branches covered.">        if (!(table instanceof Map)) {</span>
+<span class="fc" id="L376">            return null;</span>
+        }
+<span class="fc" id="L378">        return text(((Map) table).get(key));</span>
+    }
+
+    private static String text(Object o) {
+<span class="fc bfc" id="L382" title="All 2 branches covered.">        if (o == null) {</span>
+<span class="fc" id="L383">            return null;</span>
+        }
+<span class="fc" id="L385">        String s = o.toString();</span>
+<span class="pc bpc" id="L386" title="1 of 2 branches missed.">        return s.length() == 0 ? null : s;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,257 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Wallet.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.crypto.wallet</a> &gt; <span class="el_source">Wallet.java</span></div><h1>Wallet.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008-2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.crypto.wallet;
+
+import com.codename1.crypto.bitcoin.BitcoinAddress;
+import com.codename1.crypto.bitcoin.BitcoinKey;
+import com.codename1.crypto.bitcoin.BitcoinNetwork;
+import com.codename1.crypto.bitcoin.Psbt;
+import com.codename1.crypto.evm.EvmAddress;
+import com.codename1.crypto.evm.EvmTransaction;
+import com.codename1.crypto.evm.PersonalSign;
+import com.codename1.crypto.evm.TypedData;
+import com.codename1.crypto.hd.DerivationPath;
+import com.codename1.crypto.solana.SolanaAddress;
+import com.codename1.crypto.solana.SolanaTransaction;
+import com.codename1.security.Secp256k1;
+import java.util.Arrays;
+import java.util.List;
+
+/// One wallet across chains, over a [Signer]. It knows the standard derivation paths, so the
+/// addresses it answers are the ones other wallets restore from the same mnemonic:
+///
+/// - EVM: `m/44'/60'/account'/0/index`, as MetaMask and Ledger derive
+/// - Bitcoin: `m/purpose'/coin'/account'/change/index` with purpose 44 (P2PKH), 49
+///   (P2SH-P2WPKH), 84 (P2WPKH) or 86 (P2TR), and the coin type of the network
+/// - Solana: `m/44'/501'/account'/0'`, as Phantom and Solflare derive
+///
+/// ```java
+/// String words = Mnemonic.generate(128);
+/// Wallet w = Wallet.fromMnemonic(words, &quot;&quot;);
+/// EvmAddress eth = w.getEvmAddress(0, 0);
+/// BitcoinAddress btc = w.getBitcoinAddress(BitcoinNetwork.MAINNET, Wallet.BIP84, 0, 0, 0);
+/// SolanaAddress sol = w.getSolanaAddress(0);
+/// EvmTransaction tx = EvmTransaction.eip1559(1, 0, UInt256.parseUnits(&quot;1&quot;, 9),
+///         UInt256.parseUnits(&quot;30&quot;, 9), 21000, eth, UInt256.ZERO, null);
+/// EvmTransaction signed = w.signEvmTransaction(tx, Wallet.evmPath(0, 0));
+/// ```
+@com.codename1.impl.SharedWithBackend
+public final class Wallet {
+    /// BIP-44 legacy P2PKH accounts.
+    public static final int BIP44 = 44;
+    /// BIP-49 P2SH-wrapped SegWit accounts.
+    public static final int BIP49 = 49;
+    /// BIP-84 native SegWit accounts.
+    public static final int BIP84 = 84;
+    /// BIP-86 Taproot accounts.
+    public static final int BIP86 = 86;
+
+    private static final long H = DerivationPath.HARDENED;
+
+    private final Signer signer;
+
+    /// A wallet over a signer.
+<span class="fc" id="L74">    public Wallet(Signer signer) {</span>
+<span class="pc bpc" id="L75" title="1 of 2 branches missed.">        if (signer == null) {</span>
+<span class="nc" id="L76">            throw new IllegalArgumentException(&quot;signer&quot;);</span>
+        }
+<span class="fc" id="L78">        this.signer = signer;</span>
+<span class="fc" id="L79">    }</span>
+
+    /// A wallet over an in-memory [SeedSigner] for a mnemonic.
+    public static Wallet fromMnemonic(String mnemonic, String passphrase) {
+<span class="fc" id="L83">        return new Wallet(SeedSigner.fromMnemonic(mnemonic, passphrase));</span>
+    }
+
+    /// The signer.
+    public Signer getSigner() {
+<span class="fc" id="L88">        return signer;</span>
+    }
+
+    // ------------------------------------------------------------------ EVM
+
+    /// `m/44'/60'/account'/0/index`.
+    public static DerivationPath evmPath(int account, int index) {
+<span class="fc" id="L95">        return DerivationPath.of(new long[] {44 | H, 60 | H, account | H, 0, index &amp; 0xffffffffL});</span>
+    }
+
+    /// The EVM address at an account and index.
+    public EvmAddress getEvmAddress(int account, int index) {
+<span class="fc" id="L100">        return getEvmAddress(evmPath(account, index));</span>
+    }
+
+    /// The EVM address at a path.
+    public EvmAddress getEvmAddress(DerivationPath path) {
+<span class="fc" id="L105">        return EvmAddress.fromPublicKey(signer.getSecp256k1PublicKey(path));</span>
+    }
+
+    /// Signs a transaction with the key at a path, answering the signed transaction.
+    public EvmTransaction signEvmTransaction(EvmTransaction tx, DerivationPath path) {
+<span class="fc" id="L110">        return tx.withSignature(sig65(signer.signSecp256k1(path, tx.signingHash()), 0));</span>
+    }
+
+    /// An EIP-191 `personal_sign` signature, `r || s || v` with v 27 or 28.
+    public byte[] personalSign(byte[] message, DerivationPath path) {
+<span class="nc" id="L115">        return sig65(signer.signSecp256k1(path, PersonalSign.hash(message)), 27);</span>
+    }
+
+    /// An EIP-191 signature of UTF-8 text.
+    public byte[] personalSign(String message, DerivationPath path) {
+<span class="fc" id="L120">        return sig65(signer.signSecp256k1(path, PersonalSign.hash(message)), 27);</span>
+    }
+
+    /// An EIP-712 signature, `r || s || v` with v 27 or 28.
+    public byte[] signTypedData(TypedData data, DerivationPath path) {
+<span class="nc" id="L125">        return sig65(signer.signSecp256k1(path, data.hash()), 27);</span>
+    }
+
+    private static byte[] sig65(Secp256k1.EcdsaSignature s, int vBase) {
+<span class="fc" id="L129">        byte[] out = new byte[65];</span>
+<span class="fc" id="L130">        System.arraycopy(s.r(), 0, out, 0, 32);</span>
+<span class="fc" id="L131">        System.arraycopy(s.s(), 0, out, 32, 32);</span>
+<span class="fc" id="L132">        out[64] = (byte) (vBase + s.recoveryId());</span>
+<span class="fc" id="L133">        return out;</span>
+    }
+
+    // -------------------------------------------------------------- Bitcoin
+
+    /// `m/purpose'/coin'/account'/change/index` for a network.
+    public static DerivationPath bitcoinPath(BitcoinNetwork network, int purpose, int account, int change,
+            int index) {
+<span class="fc" id="L141">        return DerivationPath.of(new long[] {purpose | H, network.getCoinType() | H, account | H, change,</span>
+            index &amp; 0xffffffffL});
+    }
+
+    /// The address of the output type a purpose implies, at a path under it.
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: for a purpose other than 44, 49, 84 or 86
+    public BitcoinAddress getBitcoinAddress(BitcoinNetwork network, int purpose, int account, int change,
+            int index) {
+<span class="fc" id="L152">        byte[] pub = signer.getSecp256k1PublicKey(bitcoinPath(network, purpose, account, change, index));</span>
+<span class="pc bpc" id="L153" title="1 of 5 branches missed.">        switch (purpose) {</span>
+            case BIP44:
+<span class="fc" id="L155">                return BitcoinAddress.p2pkh(pub, network);</span>
+            case BIP49:
+<span class="fc" id="L157">                return BitcoinAddress.p2shP2wpkh(pub, network);</span>
+            case BIP84:
+<span class="fc" id="L159">                return BitcoinAddress.p2wpkh(pub, network);</span>
+            case BIP86:
+<span class="fc" id="L161">                byte[] x = new byte[32];</span>
+<span class="fc" id="L162">                System.arraycopy(pub, 1, x, 0, 32);</span>
+<span class="fc" id="L163">                return BitcoinAddress.p2tr(x, network);</span>
+            default:
+<span class="nc" id="L165">                throw new IllegalArgumentException(&quot;unknown purpose &quot; + purpose);</span>
+        }
+    }
+
+    /// The key at a path, for [Psbt#sign(int, BitcoinKey)]; it signs through the signer.
+    public BitcoinKey getBitcoinKey(DerivationPath path) {
+<span class="fc" id="L171">        return new PathKey(signer, path);</span>
+    }
+
+    /// Signs every PSBT input whose recorded BIP-32 origin is this wallet's master, answering
+    /// how many inputs were signed. The PSBT's creator records the origins
+    /// ([Psbt#addBip32Derivation], [Psbt#addTapBip32Derivation]), as every wallet does.
+    public int signPsbt(Psbt psbt) {
+<span class="fc" id="L178">        int fp = signer.getMasterFingerprint();</span>
+<span class="fc" id="L179">        int signed = 0;</span>
+<span class="fc" id="L180">        int inputs = psbt.getTransaction().getInputs().size();</span>
+<span class="fc bfc" id="L181" title="All 2 branches covered.">        for (int i = 0; i &lt; inputs; i++) {</span>
+<span class="fc" id="L182">            List&lt;Psbt.Derivation&gt; origins = psbt.getBip32Derivations(i);</span>
+<span class="fc bfc" id="L183" title="All 2 branches covered.">            for (Psbt.Derivation d : origins) {</span>
+<span class="fc bfc" id="L184" title="All 2 branches covered.">                if (d.getMasterFingerprint() != fp) {</span>
+<span class="fc" id="L185">                    continue;</span>
+                }
+<span class="fc" id="L187">                BitcoinKey key = getBitcoinKey(d.getPath());</span>
+<span class="fc" id="L188">                byte[] want = d.getPublicKey();</span>
+<span class="fc bfc" id="L189" title="All 2 branches covered.">                byte[] have = want.length == 32 ? key.getInternalKey() : key.getPublicKey();</span>
+<span class="pc bpc" id="L190" title="2 of 4 branches missed.">                if (Arrays.equals(want, have) &amp;&amp; psbt.sign(i, key)) {</span>
+<span class="fc" id="L191">                    signed++;</span>
+<span class="fc" id="L192">                    break;</span>
+                }
+<span class="nc" id="L194">            }</span>
+        }
+<span class="fc" id="L196">        return signed;</span>
+    }
+
+    private static final class PathKey extends BitcoinKey {
+        private final Signer signer;
+        private final DerivationPath path;
+        private byte[] pub;
+
+<span class="fc" id="L204">        PathKey(Signer signer, DerivationPath path) {</span>
+<span class="fc" id="L205">            this.signer = signer;</span>
+<span class="fc" id="L206">            this.path = path;</span>
+<span class="fc" id="L207">        }</span>
+
+        @Override
+        public byte[] getPublicKey() {
+<span class="fc bfc" id="L211" title="All 2 branches covered.">            if (pub == null) {</span>
+<span class="fc" id="L212">                pub = signer.getSecp256k1PublicKey(path);</span>
+            }
+<span class="fc" id="L214">            byte[] copy = new byte[pub.length];</span>
+<span class="fc" id="L215">            System.arraycopy(pub, 0, copy, 0, pub.length);</span>
+<span class="fc" id="L216">            return copy;</span>
+        }
+
+        @Override
+        public Secp256k1.EcdsaSignature signEcdsa(byte[] sighash) {
+<span class="fc" id="L221">            return signer.signSecp256k1(path, sighash);</span>
+        }
+
+        @Override
+        public byte[] signTaproot(byte[] sighash, byte[] merkleRoot) {
+<span class="fc" id="L226">            return signer.signTaproot(path, sighash, merkleRoot);</span>
+        }
+    }
+
+    // --------------------------------------------------------------- Solana
+
+    /// `m/44'/501'/account'/0'`.
+    public static DerivationPath solanaPath(int account) {
+<span class="fc" id="L234">        return DerivationPath.of(new long[] {44 | H, 501 | H, account | H, H});</span>
+    }
+
+    /// The Solana address of an account.
+    public SolanaAddress getSolanaAddress(int account) {
+<span class="fc" id="L239">        return getSolanaAddress(solanaPath(account));</span>
+    }
+
+    /// The Solana address at a path.
+    public SolanaAddress getSolanaAddress(DerivationPath path) {
+<span class="fc" id="L244">        return SolanaAddress.fromBytes(signer.getEd25519PublicKey(path));</span>
+    }
+
+    /// Adds the signature of the key at a path to a transaction it must sign.
+    public void signSolanaTransaction(SolanaTransaction tx, DerivationPath path) {
+<span class="fc" id="L249">        tx.addSignature(getSolanaAddress(path), signer.signEd25519(path, tx.getMessageBytes()));</span>
+<span class="fc" id="L250">    }</span>
+
+    /// Adds the signature of an account's key.
+    public void signSolanaTransaction(SolanaTransaction tx, int account) {
+<span class="fc" id="L254">        signSolanaTransaction(tx, solanaPath(account));</span>
+<span class="fc" id="L255">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

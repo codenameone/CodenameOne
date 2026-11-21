@@ -1,0 +1,250 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SolanaAddress.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.crypto.solana</a> &gt; <span class="el_source">SolanaAddress.java</span></div><h1>SolanaAddress.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008-2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.crypto.solana;
+
+import java.nio.charset.StandardCharsets;
+import com.codename1.crypto.encoding.Base58;
+import com.codename1.security.Ed25519;
+import com.codename1.security.Hash;
+
+/// A Solana account address: 32 bytes, written in Base58. An address is either an Ed25519
+/// public key or a program-derived address (PDA), which by construction is not on the curve
+/// and so has no private key.
+@com.codename1.impl.SharedWithBackend
+public final class SolanaAddress implements Comparable&lt;SolanaAddress&gt; {
+    /// The address length in bytes.
+    public static final int LENGTH = 32;
+
+    /// The System Program, which creates accounts and moves lamports.
+<span class="fc" id="L39">    public static final SolanaAddress SYSTEM_PROGRAM = parse(&quot;11111111111111111111111111111111&quot;);</span>
+    /// The SPL Token program.
+<span class="fc" id="L41">    public static final SolanaAddress TOKEN_PROGRAM = parse(&quot;TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA&quot;);</span>
+    /// The SPL Token-2022 program.
+<span class="fc" id="L43">    public static final SolanaAddress TOKEN_2022_PROGRAM = parse(&quot;TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb&quot;);</span>
+    /// The Associated Token Account program.
+<span class="fc" id="L45">    public static final SolanaAddress ASSOCIATED_TOKEN_PROGRAM =</span>
+<span class="fc" id="L46">            parse(&quot;ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL&quot;);</span>
+    /// The Compute Budget program.
+<span class="fc" id="L48">    public static final SolanaAddress COMPUTE_BUDGET_PROGRAM = parse(&quot;ComputeBudget111111111111111111111111111111&quot;);</span>
+    /// The Memo program.
+<span class="fc" id="L50">    public static final SolanaAddress MEMO_PROGRAM = parse(&quot;MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr&quot;);</span>
+
+<span class="fc" id="L52">    private static final byte[] PDA_MARKER = {</span>
+        'P', 'r', 'o', 'g', 'r', 'a', 'm', 'D', 'e', 'r', 'i', 'v', 'e', 'd', 'A', 'd', 'd', 'r', 'e', 's', 's'
+    };
+    private static final int MAX_SEED_LENGTH = 32;
+    private static final int MAX_SEEDS = 16;
+
+    private final byte[] bytes;
+
+<span class="fc" id="L60">    private SolanaAddress(byte[] bytes) {</span>
+<span class="fc" id="L61">        this.bytes = bytes;</span>
+<span class="fc" id="L62">    }</span>
+
+    /// The address of 32 bytes, an Ed25519 public key or a PDA.
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: unless there are exactly 32 bytes
+    public static SolanaAddress fromBytes(byte[] bytes) {
+<span class="pc bpc" id="L70" title="2 of 4 branches missed.">        if (bytes == null || bytes.length != LENGTH) {</span>
+<span class="nc" id="L71">            throw new IllegalArgumentException(&quot;a Solana address is 32 bytes&quot;);</span>
+        }
+<span class="fc" id="L73">        byte[] copy = new byte[LENGTH];</span>
+<span class="fc" id="L74">        System.arraycopy(bytes, 0, copy, 0, LENGTH);</span>
+<span class="fc" id="L75">        return new SolanaAddress(copy);</span>
+    }
+
+    /// The address of an Ed25519 private key (its 32-byte seed).
+    public static SolanaAddress fromPrivateKey(byte[] seed) {
+<span class="fc" id="L80">        return new SolanaAddress(Ed25519.publicKey(seed));</span>
+    }
+
+    /// Reads a Base58 address.
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: for text that is not Base58 or not 32 bytes
+    public static SolanaAddress parse(String base58) {
+<span class="fc" id="L89">        byte[] b = Base58.decode(base58);</span>
+<span class="pc bpc" id="L90" title="1 of 2 branches missed.">        if (b.length != LENGTH) {</span>
+<span class="nc" id="L91">            throw new IllegalArgumentException(&quot;a Solana address is 32 bytes: &quot; + base58);</span>
+        }
+<span class="fc" id="L93">        return new SolanaAddress(b);</span>
+    }
+
+    /// Whether text is a Base58 Solana address.
+    public static boolean isValid(String base58) {
+        try {
+<span class="nc" id="L99">            parse(base58);</span>
+<span class="nc" id="L100">            return true;</span>
+<span class="fc" id="L101">        } catch (IllegalArgumentException e) {</span>
+<span class="fc" id="L102">            return false;</span>
+        }
+    }
+
+    /// The address bytes, a copy.
+    public byte[] toBytes() {
+<span class="fc" id="L108">        byte[] copy = new byte[LENGTH];</span>
+<span class="fc" id="L109">        System.arraycopy(bytes, 0, copy, 0, LENGTH);</span>
+<span class="fc" id="L110">        return copy;</span>
+    }
+
+    byte[] raw() {
+<span class="fc" id="L114">        return bytes;</span>
+    }
+
+    /// Whether the address is on the Ed25519 curve, which is to say it could have a private key.
+    /// A program-derived address answers `false`.
+    public boolean isOnCurve() {
+<span class="fc" id="L120">        return Ed25519.isOnCurve(bytes);</span>
+    }
+
+    /// `createProgramAddress`: the address of seeds under a program, with no bump search.
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: for more than 16 seeds, a seed over 32 bytes, or seeds
+    ///   whose hash falls on the curve
+    public static SolanaAddress createProgramAddress(byte[][] seeds, SolanaAddress programId) {
+<span class="fc" id="L130">        SolanaAddress a = programAddress(seeds, null, programId);</span>
+<span class="pc bpc" id="L131" title="1 of 2 branches missed.">        if (a == null) {</span>
+<span class="nc" id="L132">            throw new IllegalArgumentException(&quot;the seeds give an address on the curve&quot;);</span>
+        }
+<span class="fc" id="L134">        return a;</span>
+    }
+
+    /// `findProgramAddress`: the canonical PDA, searching the bump seed from 255 down.
+    public static ProgramAddress findProgramAddress(byte[][] seeds, SolanaAddress programId) {
+<span class="fc" id="L139">        byte[] bump = new byte[1];</span>
+<span class="pc bpc" id="L140" title="1 of 2 branches missed.">        for (int b = 255; b &gt;= 0; b--) {</span>
+<span class="fc" id="L141">            bump[0] = (byte) b;</span>
+<span class="fc" id="L142">            SolanaAddress a = programAddress(seeds, bump, programId);</span>
+<span class="fc bfc" id="L143" title="All 2 branches covered.">            if (a != null) {</span>
+<span class="fc" id="L144">                return new ProgramAddress(a, b);</span>
+            }
+        }
+<span class="nc" id="L147">        throw new IllegalArgumentException(&quot;no viable bump seed&quot;);</span>
+    }
+
+    private static SolanaAddress programAddress(byte[][] seeds, byte[] bump, SolanaAddress programId) {
+<span class="pc bpc" id="L151" title="1 of 4 branches missed.">        if (seeds.length + (bump == null ? 0 : 1) &gt; MAX_SEEDS) {</span>
+<span class="nc" id="L152">            throw new IllegalArgumentException(&quot;at most 16 seeds&quot;);</span>
+        }
+<span class="fc" id="L154">        Hash h = Hash.create(Hash.SHA256);</span>
+<span class="fc bfc" id="L155" title="All 2 branches covered.">        for (byte[] seed : seeds) {</span>
+<span class="pc bpc" id="L156" title="1 of 2 branches missed.">            if (seed.length &gt; MAX_SEED_LENGTH) {</span>
+<span class="nc" id="L157">                throw new IllegalArgumentException(&quot;a seed is at most 32 bytes&quot;);</span>
+            }
+<span class="fc" id="L159">            h.update(seed);</span>
+        }
+<span class="fc bfc" id="L161" title="All 2 branches covered.">        if (bump != null) {</span>
+<span class="fc" id="L162">            h.update(bump);</span>
+        }
+<span class="fc" id="L164">        h.update(programId.bytes);</span>
+<span class="fc" id="L165">        h.update(PDA_MARKER);</span>
+<span class="fc" id="L166">        byte[] out = h.digest();</span>
+<span class="fc bfc" id="L167" title="All 2 branches covered.">        return Ed25519.isOnCurve(out) ? null : new SolanaAddress(out);</span>
+    }
+
+    /// `createWithSeed`: the address `SHA-256(base || seed || owner)` that the System
+    /// Program's `*WithSeed` instructions use.
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: for a seed over 32 bytes
+    public static SolanaAddress createWithSeed(SolanaAddress base, String seed, SolanaAddress owner) {
+<span class="fc" id="L177">        byte[] s = seed.getBytes(StandardCharsets.UTF_8);</span>
+<span class="pc bpc" id="L178" title="1 of 2 branches missed.">        if (s.length &gt; MAX_SEED_LENGTH) {</span>
+<span class="nc" id="L179">            throw new IllegalArgumentException(&quot;a seed is at most 32 bytes&quot;);</span>
+        }
+<span class="fc" id="L181">        Hash h = Hash.create(Hash.SHA256);</span>
+<span class="fc" id="L182">        h.update(base.bytes);</span>
+<span class="fc" id="L183">        h.update(s);</span>
+<span class="fc" id="L184">        h.update(owner.bytes);</span>
+<span class="fc" id="L185">        return new SolanaAddress(h.digest());</span>
+    }
+
+    /// The associated token account of a wallet for a mint under the SPL Token program.
+    public static SolanaAddress associatedTokenAddress(SolanaAddress wallet, SolanaAddress mint) {
+<span class="fc" id="L190">        return associatedTokenAddress(wallet, mint, TOKEN_PROGRAM);</span>
+    }
+
+    /// The associated token account of a wallet for a mint under a given token program, such as
+    /// [#TOKEN_2022_PROGRAM].
+    public static SolanaAddress associatedTokenAddress(SolanaAddress wallet, SolanaAddress mint,
+            SolanaAddress tokenProgram) {
+<span class="fc" id="L197">        return findProgramAddress(new byte[][] {wallet.bytes, tokenProgram.bytes, mint.bytes},</span>
+<span class="fc" id="L198">                ASSOCIATED_TOKEN_PROGRAM).getAddress();</span>
+    }
+
+
+    /// The Base58 form.
+    @Override
+    public String toString() {
+<span class="fc" id="L205">        return Base58.encode(bytes);</span>
+    }
+
+    @Override
+    public boolean equals(Object o) {
+<span class="pc bpc" id="L210" title="1 of 4 branches missed.">        return o instanceof SolanaAddress &amp;&amp; java.util.Arrays.equals(bytes, ((SolanaAddress) o).bytes);</span>
+    }
+
+    @Override
+    public int hashCode() {
+<span class="nc" id="L215">        return java.util.Arrays.hashCode(bytes);</span>
+    }
+
+    /// Orders addresses by their bytes, unsigned.
+    public int compareTo(SolanaAddress o) { // NOPMD MissingOverride - Comparable implementation; @Override on it needs Java 6 source
+<span class="nc bnc" id="L220" title="All 2 branches missed.">        for (int i = 0; i &lt; LENGTH; i++) {</span>
+<span class="nc" id="L221">            int d = (bytes[i] &amp; 0xff) - (o.bytes[i] &amp; 0xff);</span>
+<span class="nc bnc" id="L222" title="All 2 branches missed.">            if (d != 0) {</span>
+<span class="nc" id="L223">                return d;</span>
+            }
+        }
+<span class="nc" id="L226">        return 0;</span>
+    }
+
+    /// A program-derived address with the bump seed that produced it.
+    public static final class ProgramAddress {
+        private final SolanaAddress address;
+        private final int bump;
+
+<span class="fc" id="L234">        ProgramAddress(SolanaAddress address, int bump) {</span>
+<span class="fc" id="L235">            this.address = address;</span>
+<span class="fc" id="L236">            this.bump = bump;</span>
+<span class="fc" id="L237">        }</span>
+
+        /// The address.
+        public SolanaAddress getAddress() {
+<span class="fc" id="L241">            return address;</span>
+        }
+
+        /// The bump seed, 0 to 255, that a program passes back to sign for the address.
+        public int getBump() {
+<span class="fc" id="L246">            return bump;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

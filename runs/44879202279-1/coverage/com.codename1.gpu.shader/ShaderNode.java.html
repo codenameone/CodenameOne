@@ -1,0 +1,1214 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ShaderNode.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.gpu.shader</a> &gt; <span class="el_source">ShaderNode.java</span></div><h1>ShaderNode.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.gpu.shader;
+
+/// One value in a portable shader: a constant, a uniform, a built-in input
+/// such as the world position, a texture sample, or an operation on other
+/// nodes. Nodes are immutable and can be shared; a node used twice is
+/// computed once in the generated program.
+///
+/// A graph is plain Java, so it is checked by the compiler, needs no parser
+/// on the device and prints as GLSL, Metal or HLSL depending on the backend.
+/// The types follow the shading languages' own rules: two operands of an
+/// arithmetic operation have the same type, or one of them is a `FLOAT` that
+/// is applied to every component of the other.
+///
+/// ```java
+/// ShaderNode uv = ShaderNode.uv().mul(4f).add(ShaderNode.time().mul(0.05f));
+/// ShaderNode wave = ShaderNode.sin(uv.x().mul(6.2831f)).mul(0.5f).add(0.5f);
+/// ShaderNode color = ShaderNode.mix(ShaderNode.vec3(0.1f, 0.3f, 0.5f),
+///         ShaderNode.vec3(0.6f, 0.8f, 0.9f), wave);
+/// ```
+///
+/// The built-in inputs that a stage can read are listed on each factory.
+/// Reading a fragment input from the `VERTEX_OFFSET` hook, or the reverse,
+/// fails when the material is compiled.
+public final class ShaderNode {
+    /// What a node is. Package visible for the emitters.
+    static final int CONST = 0;
+    static final int UNIFORM = 1;
+    static final int BUILTIN = 2;
+    static final int SAMPLE = 3;
+    static final int BINARY = 4;
+    static final int CALL = 5;
+    static final int SWIZZLE = 6;
+    static final int CONSTRUCT = 7;
+    static final int NEGATE = 8;
+    static final int SELECT = 9;
+
+    private final int kind;
+    private final ShaderType type;
+    private final String name;
+    private final float[] values;
+    private final ShaderNode[] args;
+
+<span class="fc" id="L65">    private ShaderNode(int kind, ShaderType type, String name, float[] values, ShaderNode[] args) {</span>
+<span class="fc" id="L66">        this.kind = kind;</span>
+<span class="fc" id="L67">        this.type = type;</span>
+<span class="fc" id="L68">        this.name = name;</span>
+<span class="fc" id="L69">        this.values = values;</span>
+<span class="fc" id="L70">        this.args = args;</span>
+<span class="fc" id="L71">    }</span>
+
+    // ---------------------------------------------------------------- inputs
+
+    /// A float constant.
+    ///
+    /// #### Parameters
+    ///
+    /// - `v`: the value
+    ///
+    /// #### Returns
+    ///
+    /// a `FLOAT` node
+    public static ShaderNode f(float v) {
+<span class="fc" id="L85">        return new ShaderNode(CONST, ShaderType.FLOAT, null, new float[]{v}, null);</span>
+    }
+
+    /// A two component constant.
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: the first component
+    ///
+    /// - `y`: the second component
+    ///
+    /// #### Returns
+    ///
+    /// a `VEC2` node
+    public static ShaderNode vec2(float x, float y) {
+<span class="fc" id="L100">        return new ShaderNode(CONST, ShaderType.VEC2, null, new float[]{x, y}, null);</span>
+    }
+
+    /// A three component constant.
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: the first component
+    ///
+    /// - `y`: the second component
+    ///
+    /// - `z`: the third component
+    ///
+    /// #### Returns
+    ///
+    /// a `VEC3` node
+    public static ShaderNode vec3(float x, float y, float z) {
+<span class="fc" id="L117">        return new ShaderNode(CONST, ShaderType.VEC3, null, new float[]{x, y, z}, null);</span>
+    }
+
+    /// A four component constant.
+    ///
+    /// #### Parameters
+    ///
+    /// - `x`: the first component
+    ///
+    /// - `y`: the second component
+    ///
+    /// - `z`: the third component
+    ///
+    /// - `w`: the fourth component
+    ///
+    /// #### Returns
+    ///
+    /// a `VEC4` node
+    public static ShaderNode vec4(float x, float y, float z, float w) {
+<span class="fc" id="L136">        return new ShaderNode(CONST, ShaderType.VEC4, null, new float[]{x, y, z, w}, null);</span>
+    }
+
+    /// An RGB colour constant from a packed `0xRRGGBB` (the alpha byte is
+    /// ignored), in the 0 to 1 range.
+    ///
+    /// #### Parameters
+    ///
+    /// - `rgb`: the colour
+    ///
+    /// #### Returns
+    ///
+    /// a `VEC3` node
+    public static ShaderNode color(int rgb) {
+<span class="nc" id="L150">        return vec3(((rgb &gt;&gt; 16) &amp; 0xff) / 255f, ((rgb &gt;&gt; 8) &amp; 0xff) / 255f, (rgb &amp; 0xff) / 255f);</span>
+    }
+
+    /// Builds a vector from nodes whose components add up to 2, 3 or 4, as
+    /// `vec3(v.xy, 1.0)` does in GLSL.
+    ///
+    /// #### Parameters
+    ///
+    /// - `parts`: the nodes, in order
+    ///
+    /// #### Returns
+    ///
+    /// a vector node
+    public static ShaderNode vec(ShaderNode... parts) {
+<span class="fc" id="L164">        int n = 0;</span>
+<span class="fc bfc" id="L165" title="All 2 branches covered.">        for (ShaderNode part : parts) {</span>
+<span class="fc" id="L166">            n += part.type.getComponents();</span>
+        }
+<span class="pc bpc" id="L168" title="2 of 4 branches missed.">        if (n &lt; 2 || n &gt; 4) {</span>
+<span class="nc" id="L169">            throw new IllegalArgumentException(&quot;vec() needs 2 to 4 components, got &quot; + n);</span>
+        }
+<span class="fc" id="L171">        ShaderNode[] copy = new ShaderNode[parts.length];</span>
+<span class="fc" id="L172">        System.arraycopy(parts, 0, copy, 0, parts.length);</span>
+<span class="fc" id="L173">        return new ShaderNode(CONSTRUCT, ShaderType.ofComponents(n), null, null, copy);</span>
+    }
+
+    /// A value the application sets per draw with
+    /// `ShaderMaterial.setUniform`. It must be declared on the material with
+    /// `ShaderMaterial.declareUniform` (the library shaders do that for
+    /// you).
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: a name made of letters, digits and underscores
+    ///
+    /// - `type`: its type
+    ///
+    /// #### Returns
+    ///
+    /// a node of that type
+    public static ShaderNode uniform(String name, ShaderType type) {
+<span class="fc" id="L191">        checkName(name);</span>
+<span class="fc" id="L192">        return new ShaderNode(UNIFORM, type, name, null, null);</span>
+    }
+
+    /// Samples a texture declared on the material with
+    /// `ShaderMaterial.declareTexture`. Works in the fragment stage only.
+    ///
+    /// #### Parameters
+    ///
+    /// - `textureName`: the declared name
+    ///
+    /// - `uv`: the `VEC2` coordinate
+    ///
+    /// #### Returns
+    ///
+    /// a `VEC4` texel
+    public static ShaderNode sample(String textureName, ShaderNode uv) {
+<span class="fc" id="L208">        checkName(textureName);</span>
+<span class="fc" id="L209">        requireType(uv, ShaderType.VEC2, &quot;sample uv&quot;);</span>
+<span class="fc" id="L210">        return new ShaderNode(SAMPLE, ShaderType.VEC4, textureName, null, new ShaderNode[]{uv});</span>
+    }
+
+    /// Reads the frame in a custom full screen pass
+    /// (`com.codename1.gpu.PostProcess.addPass`): the scene, or the output
+    /// of the pass before. Means nothing on an ordinary material.
+    ///
+    /// #### Parameters
+    ///
+    /// - `uv`: the `VEC2` place on screen, 0,0 top left; usually
+    ///   `screenUv()` or an offset from it
+    ///
+    /// #### Returns
+    ///
+    /// a `VEC4` colour
+    public static ShaderNode sceneColor(ShaderNode uv) {
+<span class="fc" id="L226">        return sample(com.codename1.gpu.PostProcess.SCENE_COLOR, uv);</span>
+    }
+
+    /// The place of the pixel on screen in a custom full screen pass, from
+    /// 0,0 top left to 1,1 bottom right. In a pass it is the same as `uv()`.
+    ///
+    /// #### Returns
+    ///
+    /// a `VEC2` node
+    public static ShaderNode screenUv() {
+<span class="fc" id="L236">        return uv();</span>
+    }
+
+    private static ShaderNode builtin(String name, ShaderType type) {
+<span class="fc" id="L240">        return new ShaderNode(BUILTIN, type, name, null, null);</span>
+    }
+
+    /// The vertex position in model space. Vertex stage.
+    ///
+    /// #### Returns
+    ///
+    /// a `VEC3` node
+    public static ShaderNode position() {
+<span class="fc" id="L249">        return builtin(&quot;position&quot;, ShaderType.VEC3);</span>
+    }
+
+    /// The vertex normal in model space, or up when the mesh has none.
+    /// Vertex stage.
+    ///
+    /// #### Returns
+    ///
+    /// a `VEC3` node
+    public static ShaderNode normal() {
+<span class="fc" id="L259">        return builtin(&quot;normal&quot;, ShaderType.VEC3);</span>
+    }
+
+    /// The first texture coordinate, or zero when the mesh has none. Both
+    /// stages.
+    ///
+    /// #### Returns
+    ///
+    /// a `VEC2` node
+    public static ShaderNode uv() {
+<span class="fc" id="L269">        return builtin(&quot;uv&quot;, ShaderType.VEC2);</span>
+    }
+
+    /// The position in world space: in the vertex stage before the
+    /// `VERTEX_OFFSET` hook moves it, in the fragment stage after. Both
+    /// stages.
+    ///
+    /// #### Returns
+    ///
+    /// a `VEC3` node
+    public static ShaderNode worldPos() {
+<span class="fc" id="L280">        return builtin(&quot;worldPos&quot;, ShaderType.VEC3);</span>
+    }
+
+    /// The interpolated surface normal in world space, normalized, before the
+    /// `NORMAL` hook replaces it. Fragment stage.
+    ///
+    /// #### Returns
+    ///
+    /// a `VEC3` node
+    public static ShaderNode worldNormal() {
+<span class="fc" id="L290">        return builtin(&quot;worldNormal&quot;, ShaderType.VEC3);</span>
+    }
+
+    /// The unit direction from the surface toward the camera. Fragment stage.
+    ///
+    /// #### Returns
+    ///
+    /// a `VEC3` node
+    public static ShaderNode viewDir() {
+<span class="fc" id="L299">        return builtin(&quot;viewDir&quot;, ShaderType.VEC3);</span>
+    }
+
+    /// The camera position in world space. Both stages.
+    ///
+    /// #### Returns
+    ///
+    /// a `VEC3` node
+    public static ShaderNode cameraPos() {
+<span class="fc" id="L308">        return builtin(&quot;cameraPos&quot;, ShaderType.VEC3);</span>
+    }
+
+    /// The unit direction toward the light (the sun). Both stages.
+    ///
+    /// #### Returns
+    ///
+    /// a `VEC3` node
+    public static ShaderNode sunDir() {
+<span class="fc" id="L317">        return builtin(&quot;sunDir&quot;, ShaderType.VEC3);</span>
+    }
+
+    /// The light colour. Both stages.
+    ///
+    /// #### Returns
+    ///
+    /// a `VEC3` node
+    public static ShaderNode sunColor() {
+<span class="fc" id="L326">        return builtin(&quot;sunColor&quot;, ShaderType.VEC3);</span>
+    }
+
+    /// The index of the copy `GraphicsDevice.drawInstanced` is drawing, 0
+    /// for an ordinary draw. Both stages. Reading it (or `instanceRandom`,
+    /// `instanceColor`) declares the uniform it needs on the material.
+    ///
+    /// #### Returns
+    ///
+    /// a `FLOAT` node
+    public static ShaderNode instanceId() {
+<span class="fc" id="L337">        return uniform(ShaderMaterial.INSTANCE, ShaderType.VEC4).x();</span>
+    }
+
+    /// A random number in 0 to 1 that stays the same for each copy drawn by
+    /// `GraphicsDevice.drawInstanced` (and 0 otherwise): vary the size, tint
+    /// or sway phase of a field of grass or a crowd with it. Both stages.
+    ///
+    /// #### Returns
+    ///
+    /// a `FLOAT` node
+    public static ShaderNode instanceRandom() {
+<span class="fc" id="L348">        return uniform(ShaderMaterial.INSTANCE, ShaderType.VEC4).y();</span>
+    }
+
+    /// The colour `GraphicsDevice.drawInstanced` gives the copy being drawn,
+    /// white when it gives none. Both stages.
+    ///
+    /// #### Returns
+    ///
+    /// a `VEC4` node
+    public static ShaderNode instanceColor() {
+<span class="fc" id="L358">        return uniform(ShaderMaterial.INSTANCE_COLOR, ShaderType.VEC4);</span>
+    }
+
+    /// The clock in seconds that `GraphicsDevice.setTime` sets; the scene
+    /// renderer advances it every frame. Both stages.
+    ///
+    /// #### Returns
+    ///
+    /// a `FLOAT` node
+    public static ShaderNode time() {
+<span class="fc" id="L368">        return builtin(&quot;time&quot;, ShaderType.FLOAT);</span>
+    }
+
+    /// The material colour times its texture, before the `BASE_COLOR` hook
+    /// replaces it. Fragment stage.
+    ///
+    /// #### Returns
+    ///
+    /// a `VEC4` node
+    public static ShaderNode baseColor() {
+<span class="fc" id="L378">        return builtin(&quot;baseColor&quot;, ShaderType.VEC4);</span>
+    }
+
+    // ------------------------------------------------------------ arithmetic
+
+    private static ShaderType arithmetic(ShaderNode a, ShaderNode b, String op) {
+<span class="fc bfc" id="L384" title="All 2 branches covered.">        if (a.type == b.type) {</span>
+<span class="fc" id="L385">            return a.type;</span>
+        }
+<span class="fc bfc" id="L387" title="All 2 branches covered.">        if (a.type == ShaderType.FLOAT) {</span>
+<span class="fc" id="L388">            return b.type;</span>
+        }
+<span class="fc bfc" id="L390" title="All 2 branches covered.">        if (b.type == ShaderType.FLOAT) {</span>
+<span class="fc" id="L391">            return a.type;</span>
+        }
+<span class="fc" id="L393">        throw new IllegalArgumentException(&quot;Cannot &quot; + op + &quot; &quot; + a.type + &quot; and &quot; + b.type);</span>
+    }
+
+    private static ShaderNode binary(String op, ShaderNode a, ShaderNode b) {
+<span class="fc" id="L397">        return new ShaderNode(BINARY, arithmetic(a, b, op), op, null, new ShaderNode[]{a, b});</span>
+    }
+
+    /// Returns this plus `o`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `o`: the other operand
+    ///
+    /// #### Returns
+    ///
+    /// the sum
+    public ShaderNode add(ShaderNode o) {
+<span class="fc" id="L410">        return binary(&quot;+&quot;, this, o);</span>
+    }
+
+    /// Returns this plus a constant.
+    ///
+    /// #### Parameters
+    ///
+    /// - `o`: the constant
+    ///
+    /// #### Returns
+    ///
+    /// the sum
+    public ShaderNode add(float o) {
+<span class="fc" id="L423">        return binary(&quot;+&quot;, this, f(o));</span>
+    }
+
+    /// Returns this minus `o`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `o`: the other operand
+    ///
+    /// #### Returns
+    ///
+    /// the difference
+    public ShaderNode sub(ShaderNode o) {
+<span class="fc" id="L436">        return binary(&quot;-&quot;, this, o);</span>
+    }
+
+    /// Returns this minus a constant.
+    ///
+    /// #### Parameters
+    ///
+    /// - `o`: the constant
+    ///
+    /// #### Returns
+    ///
+    /// the difference
+    public ShaderNode sub(float o) {
+<span class="fc" id="L449">        return binary(&quot;-&quot;, this, f(o));</span>
+    }
+
+    /// Returns this times `o`, component by component.
+    ///
+    /// #### Parameters
+    ///
+    /// - `o`: the other operand
+    ///
+    /// #### Returns
+    ///
+    /// the product
+    public ShaderNode mul(ShaderNode o) {
+<span class="fc" id="L462">        return binary(&quot;*&quot;, this, o);</span>
+    }
+
+    /// Returns this times a constant.
+    ///
+    /// #### Parameters
+    ///
+    /// - `o`: the constant
+    ///
+    /// #### Returns
+    ///
+    /// the product
+    public ShaderNode mul(float o) {
+<span class="fc" id="L475">        return binary(&quot;*&quot;, this, f(o));</span>
+    }
+
+    /// Returns this divided by `o`, component by component.
+    ///
+    /// #### Parameters
+    ///
+    /// - `o`: the divisor
+    ///
+    /// #### Returns
+    ///
+    /// the quotient
+    public ShaderNode div(ShaderNode o) {
+<span class="fc" id="L488">        return binary(&quot;/&quot;, this, o);</span>
+    }
+
+    /// Returns this divided by a constant.
+    ///
+    /// #### Parameters
+    ///
+    /// - `o`: the divisor
+    ///
+    /// #### Returns
+    ///
+    /// the quotient
+    public ShaderNode div(float o) {
+<span class="fc" id="L501">        return binary(&quot;/&quot;, this, f(o));</span>
+    }
+
+    /// Returns minus this.
+    ///
+    /// #### Returns
+    ///
+    /// the negation
+    public ShaderNode negate() {
+<span class="fc" id="L510">        return new ShaderNode(NEGATE, type, null, null, new ShaderNode[]{this});</span>
+    }
+
+    /// Returns `1 - this`, the usual way to invert a mask.
+    ///
+    /// #### Returns
+    ///
+    /// the complement
+    public ShaderNode oneMinus() {
+<span class="fc" id="L519">        return binary(&quot;-&quot;, f(1f), this);</span>
+    }
+
+    // -------------------------------------------------------------- swizzles
+
+    /// Picks components by name, as GLSL's `v.xz` does: one to four of
+    /// `x`, `y`, `z`, `w` (or `r`, `g`, `b`, `a`).
+    ///
+    /// #### Parameters
+    ///
+    /// - `components`: the component names
+    ///
+    /// #### Returns
+    ///
+    /// a node with as many components as named
+    public ShaderNode swizzle(String components) {
+<span class="fc" id="L535">        int n = components.length();</span>
+<span class="pc bpc" id="L536" title="2 of 4 branches missed.">        if (n &lt; 1 || n &gt; 4) {</span>
+<span class="nc" id="L537">            throw new IllegalArgumentException(&quot;A swizzle names 1 to 4 components: &quot; + components);</span>
+        }
+<span class="fc bfc" id="L539" title="All 2 branches covered.">        if (type == ShaderType.FLOAT) {</span>
+            // GLSL ES 1.00 and Metal have no swizzle on a scalar: x is the
+            // value itself and xx.. a splat, printed as a constructor
+<span class="fc bfc" id="L542" title="All 2 branches covered.">            for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc bfc" id="L543" title="All 2 branches covered.">                if (componentIndex(components.charAt(i)) != 0) {</span>
+<span class="fc" id="L544">                    throw new IllegalArgumentException(&quot;Component &quot; + components.charAt(i) + &quot; is not in a &quot; + type);</span>
+                }
+            }
+<span class="fc bfc" id="L547" title="All 2 branches covered.">            return n == 1 ? this : widen(this, ShaderType.ofComponents(n));</span>
+        }
+<span class="fc" id="L549">        StringBuilder canon = new StringBuilder(n);</span>
+<span class="fc bfc" id="L550" title="All 2 branches covered.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc" id="L551">            int idx = componentIndex(components.charAt(i));</span>
+<span class="pc bpc" id="L552" title="1 of 2 branches missed.">            if (idx &gt;= type.getComponents()) {</span>
+<span class="nc" id="L553">                throw new IllegalArgumentException(&quot;Component &quot; + components.charAt(i) + &quot; is not in a &quot; + type);</span>
+            }
+<span class="fc" id="L555">            canon.append(&quot;xyzw&quot;.charAt(idx));</span>
+        }
+<span class="fc" id="L557">        return new ShaderNode(SWIZZLE, ShaderType.ofComponents(n), canon.toString(), null, new ShaderNode[]{this});</span>
+    }
+
+    private static int componentIndex(char c) {
+<span class="pc bpc" id="L561" title="1 of 5 branches missed.">        switch (c) {</span>
+            case 'x':
+            case 'r':
+<span class="fc" id="L564">                return 0;</span>
+            case 'y':
+            case 'g':
+<span class="fc" id="L567">                return 1;</span>
+            case 'z':
+            case 'b':
+<span class="fc" id="L570">                return 2;</span>
+            case 'w':
+            case 'a':
+<span class="fc" id="L573">                return 3;</span>
+            default:
+<span class="nc" id="L575">                throw new IllegalArgumentException(&quot;Not a component name: &quot; + c);</span>
+        }
+    }
+
+    /// Returns the first component.
+    ///
+    /// #### Returns
+    ///
+    /// a `FLOAT` node
+    public ShaderNode x() {
+<span class="fc" id="L585">        return swizzle(&quot;x&quot;);</span>
+    }
+
+    /// Returns the second component.
+    ///
+    /// #### Returns
+    ///
+    /// a `FLOAT` node
+    public ShaderNode y() {
+<span class="fc" id="L594">        return swizzle(&quot;y&quot;);</span>
+    }
+
+    /// Returns the third component.
+    ///
+    /// #### Returns
+    ///
+    /// a `FLOAT` node
+    public ShaderNode z() {
+<span class="fc" id="L603">        return swizzle(&quot;z&quot;);</span>
+    }
+
+    /// Returns the fourth component.
+    ///
+    /// #### Returns
+    ///
+    /// a `FLOAT` node
+    public ShaderNode w() {
+<span class="fc" id="L612">        return swizzle(&quot;w&quot;);</span>
+    }
+
+    /// Returns the first three components, the colour of a texel.
+    ///
+    /// #### Returns
+    ///
+    /// a `VEC3` node
+    public ShaderNode rgb() {
+<span class="fc" id="L621">        return swizzle(&quot;xyz&quot;);</span>
+    }
+
+    /// Returns the first two components.
+    ///
+    /// #### Returns
+    ///
+    /// a `VEC2` node
+    public ShaderNode xy() {
+<span class="fc" id="L630">        return swizzle(&quot;xy&quot;);</span>
+    }
+
+    /// Returns the first and third components, the ground plane of a world
+    /// position.
+    ///
+    /// #### Returns
+    ///
+    /// a `VEC2` node
+    public ShaderNode xz() {
+<span class="fc" id="L640">        return swizzle(&quot;xz&quot;);</span>
+    }
+
+    // ------------------------------------------------------------- functions
+
+    private static ShaderNode call(String fn, ShaderType type, ShaderNode... a) {
+<span class="fc" id="L646">        return new ShaderNode(CALL, type, fn, null, a);</span>
+    }
+
+    private static ShaderNode same(String fn, ShaderNode a) {
+<span class="fc" id="L650">        return call(fn, a.type, a);</span>
+    }
+
+    /// Returns `sin(a)`, per component.
+    ///
+    /// #### Parameters
+    ///
+    /// - `a`: radians
+    ///
+    /// #### Returns
+    ///
+    /// the sine
+    public static ShaderNode sin(ShaderNode a) {
+<span class="fc" id="L663">        return same(&quot;sin&quot;, a);</span>
+    }
+
+    /// Returns `cos(a)`, per component.
+    ///
+    /// #### Parameters
+    ///
+    /// - `a`: radians
+    ///
+    /// #### Returns
+    ///
+    /// the cosine
+    public static ShaderNode cos(ShaderNode a) {
+<span class="fc" id="L676">        return same(&quot;cos&quot;, a);</span>
+    }
+
+    /// Returns the absolute value, per component.
+    ///
+    /// #### Parameters
+    ///
+    /// - `a`: the value
+    ///
+    /// #### Returns
+    ///
+    /// the absolute value
+    public static ShaderNode abs(ShaderNode a) {
+<span class="fc" id="L689">        return same(&quot;abs&quot;, a);</span>
+    }
+
+    /// Returns the largest integer not greater than `a`, per component.
+    ///
+    /// #### Parameters
+    ///
+    /// - `a`: the value
+    ///
+    /// #### Returns
+    ///
+    /// the floor
+    public static ShaderNode floor(ShaderNode a) {
+<span class="fc" id="L702">        return same(&quot;floor&quot;, a);</span>
+    }
+
+    /// Returns `a - floor(a)`, per component.
+    ///
+    /// #### Parameters
+    ///
+    /// - `a`: the value
+    ///
+    /// #### Returns
+    ///
+    /// the fractional part
+    public static ShaderNode fract(ShaderNode a) {
+<span class="fc" id="L715">        return same(&quot;fract&quot;, a);</span>
+    }
+
+    /// Returns the square root, per component.
+    ///
+    /// #### Parameters
+    ///
+    /// - `a`: a non negative value
+    ///
+    /// #### Returns
+    ///
+    /// the square root
+    public static ShaderNode sqrt(ShaderNode a) {
+<span class="fc" id="L728">        return same(&quot;sqrt&quot;, a);</span>
+    }
+
+    /// Returns `e` raised to `a`, per component.
+    ///
+    /// #### Parameters
+    ///
+    /// - `a`: the exponent
+    ///
+    /// #### Returns
+    ///
+    /// the exponential
+    public static ShaderNode exp(ShaderNode a) {
+<span class="nc" id="L741">        return same(&quot;exp&quot;, a);</span>
+    }
+
+    /// Returns the unit vector in the direction of `a`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `a`: a non zero vector
+    ///
+    /// #### Returns
+    ///
+    /// the normalized vector
+    public static ShaderNode normalize(ShaderNode a) {
+<span class="fc bfc" id="L754" title="All 2 branches covered.">        if (a.type == ShaderType.FLOAT) {</span>
+            // Metal's geometric functions take vectors only
+<span class="fc" id="L756">            return a.div(abs(a));</span>
+        }
+<span class="fc" id="L758">        return same(&quot;normalize&quot;, a);</span>
+    }
+
+    /// Returns `a` clamped to 0 to 1, per component.
+    ///
+    /// #### Parameters
+    ///
+    /// - `a`: the value
+    ///
+    /// #### Returns
+    ///
+    /// the saturated value
+    public static ShaderNode saturate(ShaderNode a) {
+<span class="fc" id="L771">        return clamp(a, 0f, 1f);</span>
+    }
+
+    /// Returns the length of a vector.
+    ///
+    /// #### Parameters
+    ///
+    /// - `a`: the vector
+    ///
+    /// #### Returns
+    ///
+    /// a `FLOAT` node
+    public static ShaderNode length(ShaderNode a) {
+<span class="fc bfc" id="L784" title="All 2 branches covered.">        if (a.type == ShaderType.FLOAT) {</span>
+<span class="fc" id="L785">            return abs(a);</span>
+        }
+<span class="fc" id="L787">        return call(&quot;length&quot;, ShaderType.FLOAT, a);</span>
+    }
+
+    /// Returns the distance between two points.
+    ///
+    /// #### Parameters
+    ///
+    /// - `a`: a point
+    ///
+    /// - `b`: another point of the same type
+    ///
+    /// #### Returns
+    ///
+    /// a `FLOAT` node
+    public static ShaderNode distance(ShaderNode a, ShaderNode b) {
+<span class="fc" id="L802">        requireSame(a, b, &quot;distance&quot;);</span>
+<span class="fc bfc" id="L803" title="All 2 branches covered.">        if (a.type == ShaderType.FLOAT) {</span>
+<span class="fc" id="L804">            return abs(a.sub(b));</span>
+        }
+<span class="fc" id="L806">        return call(&quot;distance&quot;, ShaderType.FLOAT, a, b);</span>
+    }
+
+    /// Returns the dot product.
+    ///
+    /// #### Parameters
+    ///
+    /// - `a`: a vector
+    ///
+    /// - `b`: another vector of the same type
+    ///
+    /// #### Returns
+    ///
+    /// a `FLOAT` node
+    public static ShaderNode dot(ShaderNode a, ShaderNode b) {
+<span class="fc" id="L821">        requireSame(a, b, &quot;dot&quot;);</span>
+<span class="fc bfc" id="L822" title="All 2 branches covered.">        if (a.type == ShaderType.FLOAT) {</span>
+<span class="fc" id="L823">            return a.mul(b);</span>
+        }
+<span class="fc" id="L825">        return call(&quot;dot&quot;, ShaderType.FLOAT, a, b);</span>
+    }
+
+    /// Returns the cross product of two `VEC3` nodes.
+    ///
+    /// #### Parameters
+    ///
+    /// - `a`: a vector
+    ///
+    /// - `b`: another vector
+    ///
+    /// #### Returns
+    ///
+    /// a `VEC3` node
+    public static ShaderNode cross(ShaderNode a, ShaderNode b) {
+<span class="fc" id="L840">        requireType(a, ShaderType.VEC3, &quot;cross&quot;);</span>
+<span class="fc" id="L841">        requireType(b, ShaderType.VEC3, &quot;cross&quot;);</span>
+<span class="fc" id="L842">        return call(&quot;cross&quot;, ShaderType.VEC3, a, b);</span>
+    }
+
+    /// Returns the reflection of incident direction `i` about normal `n`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `i`: the incident direction
+    ///
+    /// - `n`: the unit normal
+    ///
+    /// #### Returns
+    ///
+    /// a node of the type of `i`
+    public static ShaderNode reflect(ShaderNode i, ShaderNode n) {
+<span class="fc" id="L857">        requireSame(i, n, &quot;reflect&quot;);</span>
+<span class="fc bfc" id="L858" title="All 2 branches covered.">        if (i.type == ShaderType.FLOAT) {</span>
+<span class="fc" id="L859">            return i.sub(n.mul(i).mul(n).mul(2f));</span>
+        }
+<span class="fc" id="L861">        return call(&quot;reflect&quot;, i.type, i, n);</span>
+    }
+
+    /// Returns the smaller of two values, per component.
+    ///
+    /// #### Parameters
+    ///
+    /// - `a`: a value
+    ///
+    /// - `b`: another value
+    ///
+    /// #### Returns
+    ///
+    /// the minimum
+    public static ShaderNode min(ShaderNode a, ShaderNode b) {
+        // Metal has no mixed vector/scalar overloads, so the scalar is widened
+<span class="fc" id="L877">        ShaderType t = arithmetic(a, b, &quot;min&quot;);</span>
+<span class="fc" id="L878">        return call(&quot;min&quot;, t, widen(a, t), widen(b, t));</span>
+    }
+
+    /// Returns the larger of two values, per component.
+    ///
+    /// #### Parameters
+    ///
+    /// - `a`: a value
+    ///
+    /// - `b`: another value
+    ///
+    /// #### Returns
+    ///
+    /// the maximum
+    public static ShaderNode max(ShaderNode a, ShaderNode b) {
+        // Metal has no mixed vector/scalar overloads, so the scalar is widened
+<span class="fc" id="L894">        ShaderType t = arithmetic(a, b, &quot;max&quot;);</span>
+<span class="fc" id="L895">        return call(&quot;max&quot;, t, widen(a, t), widen(b, t));</span>
+    }
+
+    /// Returns `a` raised to `b`, per component. `a` must not be negative.
+    ///
+    /// #### Parameters
+    ///
+    /// - `a`: the base
+    ///
+    /// - `b`: the exponent, of the type of `a` or a `FLOAT`
+    ///
+    /// #### Returns
+    ///
+    /// the power
+    public static ShaderNode pow(ShaderNode a, ShaderNode b) {
+<span class="fc" id="L910">        return call(&quot;pow&quot;, a.type, a, widen(b, a.type));</span>
+    }
+
+    /// Returns `a` raised to a constant.
+    ///
+    /// #### Parameters
+    ///
+    /// - `a`: the base, not negative
+    ///
+    /// - `b`: the exponent
+    ///
+    /// #### Returns
+    ///
+    /// the power
+    public static ShaderNode pow(ShaderNode a, float b) {
+<span class="fc" id="L925">        return pow(a, f(b));</span>
+    }
+
+    /// Returns `a` modulo `b` with the sign of `b`, as GLSL's `mod` does
+    /// (HLSL's `fmod` differs for negative values, so this is printed as
+    /// `a - b * floor(a / b)` everywhere).
+    ///
+    /// #### Parameters
+    ///
+    /// - `a`: the dividend
+    ///
+    /// - `b`: the divisor
+    ///
+    /// #### Returns
+    ///
+    /// the remainder
+    public static ShaderNode mod(ShaderNode a, ShaderNode b) {
+<span class="fc" id="L942">        return a.sub(b.mul(floor(a.div(b))));</span>
+    }
+
+    /// Returns the angle of the vector (x, y) in radians, -pi to pi.
+    ///
+    /// #### Parameters
+    ///
+    /// - `y`: the second coordinate
+    ///
+    /// - `x`: the first coordinate
+    ///
+    /// #### Returns
+    ///
+    /// the angle
+    public static ShaderNode atan2(ShaderNode y, ShaderNode x) {
+<span class="fc" id="L957">        ShaderType t = arithmetic(y, x, &quot;atan2&quot;);</span>
+<span class="fc" id="L958">        return call(&quot;atan2&quot;, t, widen(y, t), widen(x, t));</span>
+    }
+
+    /// Returns `a` clamped between `lo` and `hi`, per component.
+    ///
+    /// #### Parameters
+    ///
+    /// - `a`: the value
+    ///
+    /// - `lo`: the lower bound
+    ///
+    /// - `hi`: the upper bound
+    ///
+    /// #### Returns
+    ///
+    /// the clamped value
+    public static ShaderNode clamp(ShaderNode a, float lo, float hi) {
+<span class="fc" id="L975">        return call(&quot;clamp&quot;, a.type, a, widen(f(lo), a.type), widen(f(hi), a.type));</span>
+    }
+
+    /// Linear interpolation from `a` to `b` by `t`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `a`: the value at 0
+    ///
+    /// - `b`: the value at 1, of the type of `a`
+    ///
+    /// - `t`: the weight, of the type of `a` or a `FLOAT`
+    ///
+    /// #### Returns
+    ///
+    /// the blend
+    public static ShaderNode mix(ShaderNode a, ShaderNode b, ShaderNode t) {
+<span class="fc" id="L992">        requireSame(a, b, &quot;mix&quot;);</span>
+<span class="fc" id="L993">        return call(&quot;mix&quot;, a.type, a, b, widen(t, a.type));</span>
+    }
+
+    /// Hermite step from 0 at `e0` to 1 at `e1`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `e0`: the lower edge
+    ///
+    /// - `e1`: the upper edge
+    ///
+    /// - `x`: the value
+    ///
+    /// #### Returns
+    ///
+    /// a node of the type of `x`
+    public static ShaderNode smoothstep(float e0, float e1, ShaderNode x) {
+<span class="fc" id="L1010">        return smoothstep(f(e0), f(e1), x);</span>
+    }
+
+    /// Hermite step from 0 at `e0` to 1 at `e1`, with node edges.
+    ///
+    /// #### Parameters
+    ///
+    /// - `e0`: the lower edge
+    ///
+    /// - `e1`: the upper edge
+    ///
+    /// - `x`: the value
+    ///
+    /// #### Returns
+    ///
+    /// a node of the type of `x`
+    public static ShaderNode smoothstep(ShaderNode e0, ShaderNode e1, ShaderNode x) {
+<span class="fc" id="L1027">        return call(&quot;smoothstep&quot;, x.type, widen(e0, x.type), widen(e1, x.type), x);</span>
+    }
+
+    /// Returns 0 where `x` is below `edge` and 1 elsewhere.
+    ///
+    /// #### Parameters
+    ///
+    /// - `edge`: the edge
+    ///
+    /// - `x`: the value
+    ///
+    /// #### Returns
+    ///
+    /// a node of the type of `x`
+    public static ShaderNode step(ShaderNode edge, ShaderNode x) {
+<span class="fc" id="L1042">        return call(&quot;step&quot;, x.type, widen(edge, x.type), x);</span>
+    }
+
+    /// Returns `a` where `condition` is above 0.5, otherwise `b`. Both
+    /// branches are computed; this is a select, not a branch.
+    ///
+    /// #### Parameters
+    ///
+    /// - `condition`: a `FLOAT`, usually a `step`
+    ///
+    /// - `a`: the value when true
+    ///
+    /// - `b`: the value when false, of the type of `a`
+    ///
+    /// #### Returns
+    ///
+    /// the selected value
+    public static ShaderNode select(ShaderNode condition, ShaderNode a, ShaderNode b) {
+<span class="fc" id="L1060">        requireType(condition, ShaderType.FLOAT, &quot;select condition&quot;);</span>
+<span class="fc" id="L1061">        requireSame(a, b, &quot;select&quot;);</span>
+<span class="fc" id="L1062">        return new ShaderNode(SELECT, a.type, null, null, new ShaderNode[]{condition, a, b});</span>
+    }
+
+    // ---------------------------------------------------------- normal maps
+
+    /// Decodes a texel of a tangent space normal map (the usual blue-ish
+    /// image) into a direction, scaling its slope by `strength`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `texel`: a `VEC4` read with `sample`
+    ///
+    /// - `strength`: 1 for the map as authored, 0 for flat
+    ///
+    /// #### Returns
+    ///
+    /// a `VEC3` tangent space normal, not normalized
+    public static ShaderNode unpackNormal(ShaderNode texel, float strength) {
+<span class="fc" id="L1080">        requireType(texel, ShaderType.VEC4, &quot;unpackNormal&quot;);</span>
+<span class="fc" id="L1081">        ShaderNode xy = texel.xy().mul(2f).sub(1f).mul(strength);</span>
+<span class="fc" id="L1082">        return vec(xy, texel.z().mul(2f).sub(1f));</span>
+    }
+
+    /// Bends the world space surface normal by a tangent space normal, for
+    /// the `NORMAL` hook. The tangent frame is derived from the surface
+    /// normal and the world axes, so it needs no tangents in the mesh and is
+    /// the same on every backend: on ground and water, tangent `x` runs
+    /// along world `x` and `y` along world `z`; on walls it runs around the
+    /// vertical. That suits tiling detail, noise and terrain maps. A map
+    /// painted for one model's UV layout reads correctly where that layout
+    /// follows the world axes.
+    ///
+    /// #### Parameters
+    ///
+    /// - `tangentNormal`: a `VEC3`, such as `unpackNormal`'s
+    ///
+    /// #### Returns
+    ///
+    /// the unit world space normal
+    public static ShaderNode perturbNormal(ShaderNode tangentNormal) {
+<span class="fc" id="L1102">        requireType(tangentNormal, ShaderType.VEC3, &quot;perturbNormal&quot;);</span>
+<span class="fc" id="L1103">        ShaderNode n = normalize(worldNormal());</span>
+        // Up is a poor reference on a level face; fall back to +z there
+<span class="fc" id="L1105">        ShaderNode flat = step(f(0.999f), abs(n.y()));</span>
+<span class="fc" id="L1106">        ShaderNode ref = select(flat, vec3(0f, 0f, 1f), vec3(0f, 1f, 0f));</span>
+<span class="fc" id="L1107">        ShaderNode t = normalize(cross(ref, n));</span>
+<span class="fc" id="L1108">        ShaderNode b = cross(n, t);</span>
+<span class="fc" id="L1109">        return normalize(t.mul(tangentNormal.x()).add(b.mul(tangentNormal.y()))</span>
+<span class="fc" id="L1110">                .add(n.mul(tangentNormal.z())));</span>
+    }
+
+    /// Blends two tangent space normals so the detail rides on the base
+    /// rather than averaging it flat (&quot;whiteout&quot; blend).
+    ///
+    /// #### Parameters
+    ///
+    /// - `base`: a `VEC3` tangent space normal
+    ///
+    /// - `detail`: another
+    ///
+    /// #### Returns
+    ///
+    /// the combined `VEC3`, not normalized
+    public static ShaderNode blendNormals(ShaderNode base, ShaderNode detail) {
+<span class="nc" id="L1126">        requireType(base, ShaderType.VEC3, &quot;blendNormals&quot;);</span>
+<span class="nc" id="L1127">        requireType(detail, ShaderType.VEC3, &quot;blendNormals&quot;);</span>
+<span class="nc" id="L1128">        return vec(base.xy().add(detail.xy()), base.z().mul(detail.z()));</span>
+    }
+
+    // ------------------------------------------------------------- utilities
+
+    /// Repeats a `FLOAT` into a vector of `t`, or returns the node itself
+    /// when it already has that type.
+    ///
+    /// #### Parameters
+    ///
+    /// - `n`: the node
+    ///
+    /// - `t`: the target type
+    ///
+    /// #### Returns
+    ///
+    /// a node of type `t`
+    public static ShaderNode widen(ShaderNode n, ShaderType t) {
+<span class="fc bfc" id="L1146" title="All 2 branches covered.">        if (n.type == t) {</span>
+<span class="fc" id="L1147">            return n;</span>
+        }
+<span class="pc bpc" id="L1149" title="1 of 2 branches missed.">        if (n.type != ShaderType.FLOAT) {</span>
+<span class="nc" id="L1150">            throw new IllegalArgumentException(&quot;Cannot use a &quot; + n.type + &quot; as a &quot; + t);</span>
+        }
+<span class="fc" id="L1152">        ShaderNode[] parts = new ShaderNode[t.getComponents()];</span>
+<span class="fc bfc" id="L1153" title="All 2 branches covered.">        for (int i = 0; i &lt; parts.length; i++) {</span>
+<span class="fc" id="L1154">            parts[i] = n;</span>
+        }
+<span class="fc" id="L1156">        return new ShaderNode(CONSTRUCT, t, null, null, parts);</span>
+    }
+
+    private static void requireSame(ShaderNode a, ShaderNode b, String what) {
+<span class="pc bpc" id="L1160" title="1 of 2 branches missed.">        if (a.type != b.type) {</span>
+<span class="nc" id="L1161">            throw new IllegalArgumentException(what + &quot; needs two &quot; + a.type + &quot; values, got &quot; + b.type);</span>
+        }
+<span class="fc" id="L1163">    }</span>
+
+    static void requireType(ShaderNode a, ShaderType t, String what) {
+<span class="pc bpc" id="L1166" title="1 of 2 branches missed.">        if (a.type != t) {</span>
+<span class="nc" id="L1167">            throw new IllegalArgumentException(what + &quot; must be a &quot; + t + &quot;, not a &quot; + a.type);</span>
+        }
+<span class="fc" id="L1169">    }</span>
+
+    static void checkName(String name) {
+<span class="pc bpc" id="L1172" title="3 of 6 branches missed.">        if (name == null || name.length() == 0 || name.length() &gt; 32) {</span>
+<span class="nc" id="L1173">            throw new IllegalArgumentException(&quot;A shader name has 1 to 32 characters&quot;);</span>
+        }
+<span class="fc bfc" id="L1175" title="All 2 branches covered.">        for (int i = 0; i &lt; name.length(); i++) {</span>
+<span class="fc" id="L1176">            char c = name.charAt(i);</span>
+<span class="pc bpc" id="L1177" title="5 of 16 branches missed.">            boolean ok = (c &gt;= 'a' &amp;&amp; c &lt;= 'z') || (c &gt;= 'A' &amp;&amp; c &lt;= 'Z') || c == '_'</span>
+                    || (i &gt; 0 &amp;&amp; c &gt;= '0' &amp;&amp; c &lt;= '9');
+<span class="fc bfc" id="L1179" title="All 2 branches covered.">            if (!ok) {</span>
+<span class="fc" id="L1180">                throw new IllegalArgumentException(&quot;Not a valid shader name: &quot; + name);</span>
+            }
+        }
+<span class="fc" id="L1183">    }</span>
+
+    /// Returns the type of the value.
+    ///
+    /// #### Returns
+    ///
+    /// the type
+    public ShaderType getType() {
+<span class="fc" id="L1191">        return type;</span>
+    }
+
+    int getKind() {
+<span class="fc" id="L1195">        return kind;</span>
+    }
+
+    String getName() {
+<span class="fc" id="L1199">        return name;</span>
+    }
+
+    float[] getValues() {
+<span class="fc" id="L1203">        return values;</span>
+    }
+
+    int getArgCount() {
+<span class="fc bfc" id="L1207" title="All 2 branches covered.">        return args == null ? 0 : args.length;</span>
+    }
+
+    ShaderNode getArg(int i) {
+<span class="fc" id="L1211">        return args[i];</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>GestureEvent.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.sensors</a> &gt; <span class="el_source">GestureEvent.java</span></div><h1>GestureEvent.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.sensors;
+
+/// A high level gesture detected by the framework from the motion sensor
+/// stream and delivered to a [GestureListener]. The gesture detection runs in
+/// the core so the same gestures are available on every platform that exposes
+/// an accelerometer.
+///
+/// The available gestures are identified by the `TYPE_*` constants on this
+/// class; register interest in one of them through
+/// [MotionSensorManager#addGestureListener(int, GestureListener)].
+public final class GestureEvent {
+
+    /// The device was shaken back and forth.
+    public static final int TYPE_SHAKE = 1;
+
+    /// The device was turned face down (screen towards the ground).
+    public static final int TYPE_FLIP_FACE_DOWN = 2;
+
+    /// The device was turned face up (screen towards the sky).
+    public static final int TYPE_FLIP_FACE_UP = 3;
+
+    /// The device was tilted to the left (top edge rotating towards the user's
+    /// left hand).
+    public static final int TYPE_TILT_LEFT = 4;
+
+    /// The device was tilted to the right.
+    public static final int TYPE_TILT_RIGHT = 5;
+
+    /// The top of the device was tilted away from the user (pitched forward).
+    public static final int TYPE_TILT_FORWARD = 6;
+
+    /// The top of the device was tilted towards the user (pitched backward).
+    public static final int TYPE_TILT_BACKWARD = 7;
+
+    /// The device was picked up from a resting position.
+    public static final int TYPE_PICK_UP = 8;
+
+    /// The device is in free fall (near weightlessness was detected).
+    public static final int TYPE_FREE_FALL = 9;
+
+    private final int type;
+    private final double value;
+    private final long timestamp;
+
+    /// Creates a new gesture event. Application code does not normally
+    /// construct these; they are delivered by the framework.
+    ///
+    /// #### Parameters
+    ///
+    /// - `type`: one of the `TYPE_*` constants
+    /// - `value`: a magnitude describing the gesture; the peak acceleration in
+    ///   meters per second squared for `TYPE_SHAKE`, `TYPE_PICK_UP` and
+    ///   `TYPE_FREE_FALL`, or the tilt angle in radians for the tilt and flip
+    ///   gestures
+    /// - `timestamp`: the event time in milliseconds
+<span class="fc" id="L78">    public GestureEvent(int type, double value, long timestamp) {</span>
+<span class="fc" id="L79">        this.type = type;</span>
+<span class="fc" id="L80">        this.value = value;</span>
+<span class="fc" id="L81">        this.timestamp = timestamp;</span>
+<span class="fc" id="L82">    }</span>
+
+    /// The gesture that occurred, one of the `TYPE_*` constants.
+    public int getType() {
+<span class="fc" id="L86">        return type;</span>
+    }
+
+    /// A magnitude describing the strength of the gesture. See the constructor
+    /// documentation for the meaning per gesture type.
+    public double getValue() {
+<span class="nc" id="L92">        return value;</span>
+    }
+
+    /// The time at which the gesture was detected, in milliseconds, compatible
+    /// with `System.currentTimeMillis()`.
+    public long getTimestamp() {
+<span class="nc" id="L98">        return timestamp;</span>
+    }
+
+    /// A human readable name for the gesture type, useful for logging.
+    public String getName() {
+<span class="nc bnc" id="L103" title="All 10 branches missed.">        switch (type) {</span>
+            case TYPE_SHAKE:
+<span class="nc" id="L105">                return &quot;shake&quot;;</span>
+            case TYPE_FLIP_FACE_DOWN:
+<span class="nc" id="L107">                return &quot;flipFaceDown&quot;;</span>
+            case TYPE_FLIP_FACE_UP:
+<span class="nc" id="L109">                return &quot;flipFaceUp&quot;;</span>
+            case TYPE_TILT_LEFT:
+<span class="nc" id="L111">                return &quot;tiltLeft&quot;;</span>
+            case TYPE_TILT_RIGHT:
+<span class="nc" id="L113">                return &quot;tiltRight&quot;;</span>
+            case TYPE_TILT_FORWARD:
+<span class="nc" id="L115">                return &quot;tiltForward&quot;;</span>
+            case TYPE_TILT_BACKWARD:
+<span class="nc" id="L117">                return &quot;tiltBackward&quot;;</span>
+            case TYPE_PICK_UP:
+<span class="nc" id="L119">                return &quot;pickUp&quot;;</span>
+            case TYPE_FREE_FALL:
+<span class="nc" id="L121">                return &quot;freeFall&quot;;</span>
+            default:
+<span class="nc" id="L123">                return &quot;unknown&quot;;</span>
+        }
+    }
+
+    @Override
+    public String toString() {
+<span class="nc" id="L129">        return &quot;GestureEvent[&quot; + getName() + &quot;, value=&quot; + value + &quot;]&quot;;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

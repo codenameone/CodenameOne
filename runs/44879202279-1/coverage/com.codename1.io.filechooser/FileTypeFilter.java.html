@@ -1,0 +1,185 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>FileTypeFilter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.io.filechooser</a> &gt; <span class="el_source">FileTypeFilter.java</span></div><h1>FileTypeFilter.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+
+package com.codename1.io.filechooser;
+
+import java.util.ArrayList;
+import java.util.List;
+
+/// A named group of file types a file dialog offers, such as &quot;PNG Image&quot; or
+/// &quot;Text Documents&quot;.
+///
+/// A filter can name the same types three ways, and each platform reads the
+/// one it understands: desktop dialogs and the fallback chooser use the
+/// extensions, Android and the browser use the MIME types, and iOS and macOS
+/// use the Uniform Type Identifiers when given, deriving them from the
+/// extensions otherwise. Supplying extensions alone works everywhere.
+///
+/// ```java
+/// FileTypeFilter png = new FileTypeFilter(&quot;PNG Image&quot;)
+///         .extensions(&quot;png&quot;).mimeTypes(&quot;image/png&quot;).utTypes(&quot;public.png&quot;);
+/// ```
+public class FileTypeFilter {
+    private final String label;
+<span class="fc" id="L44">    private final List&lt;String&gt; extensions = new ArrayList&lt;String&gt;();</span>
+<span class="fc" id="L45">    private final List&lt;String&gt; mimeTypes = new ArrayList&lt;String&gt;();</span>
+<span class="fc" id="L46">    private final List&lt;String&gt; utTypes = new ArrayList&lt;String&gt;();</span>
+
+    /// Creates a filter with the label the dialog shows for it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `label`: the human readable name of the filter
+<span class="fc" id="L53">    public FileTypeFilter(String label) {</span>
+<span class="fc" id="L54">        this.label = label;</span>
+<span class="fc" id="L55">    }</span>
+
+    /// Adds file extensions, with or without the leading dot.
+    ///
+    /// #### Parameters
+    ///
+    /// - `ext`: extensions such as `&quot;png&quot;` or `&quot;.jpg&quot;`
+    ///
+    /// #### Returns
+    ///
+    /// this filter
+    public FileTypeFilter extensions(String... ext) {
+<span class="fc bfc" id="L67" title="All 2 branches covered.">        for (String e : ext) {</span>
+<span class="fc bfc" id="L68" title="All 2 branches covered.">            if (e != null) {</span>
+<span class="fc" id="L69">                e = e.trim();</span>
+<span class="fc bfc" id="L70" title="All 2 branches covered.">                if (e.startsWith(&quot;.&quot;)) {</span>
+<span class="fc" id="L71">                    e = e.substring(1);</span>
+                }
+<span class="fc bfc" id="L73" title="All 2 branches covered.">                if (e.length() &gt; 0) {</span>
+<span class="fc" id="L74">                    extensions.add(e);</span>
+                }
+            }
+        }
+<span class="fc" id="L78">        return this;</span>
+    }
+
+    /// Adds MIME types such as `&quot;image/png&quot;` or `&quot;image/*&quot;`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `types`: the MIME types
+    ///
+    /// #### Returns
+    ///
+    /// this filter
+    public FileTypeFilter mimeTypes(String... types) {
+<span class="fc bfc" id="L91" title="All 2 branches covered.">        for (String t : types) {</span>
+<span class="pc bpc" id="L92" title="2 of 4 branches missed.">            if (t != null &amp;&amp; t.trim().length() &gt; 0) {</span>
+<span class="fc" id="L93">                mimeTypes.add(t.trim());</span>
+            }
+        }
+<span class="fc" id="L96">        return this;</span>
+    }
+
+    /// Adds Apple Uniform Type Identifiers such as `&quot;public.png&quot;`. Ignored
+    /// outside iOS and macOS.
+    ///
+    /// #### Parameters
+    ///
+    /// - `types`: the type identifiers
+    ///
+    /// #### Returns
+    ///
+    /// this filter
+    public FileTypeFilter utTypes(String... types) {
+<span class="nc bnc" id="L110" title="All 2 branches missed.">        for (String t : types) {</span>
+<span class="nc bnc" id="L111" title="All 4 branches missed.">            if (t != null &amp;&amp; t.trim().length() &gt; 0) {</span>
+<span class="nc" id="L112">                utTypes.add(t.trim());</span>
+            }
+        }
+<span class="nc" id="L115">        return this;</span>
+    }
+
+    /// The label the dialog shows.
+    ///
+    /// #### Returns
+    ///
+    /// the label
+    public String getLabel() {
+<span class="fc" id="L124">        return label;</span>
+    }
+
+    /// The extensions, without leading dots.
+    ///
+    /// #### Returns
+    ///
+    /// a copy of the extension list
+    public String[] getExtensions() {
+<span class="fc" id="L133">        return extensions.toArray(new String[extensions.size()]);</span>
+    }
+
+    /// The MIME types.
+    ///
+    /// #### Returns
+    ///
+    /// a copy of the MIME type list
+    public String[] getMimeTypes() {
+<span class="fc" id="L142">        return mimeTypes.toArray(new String[mimeTypes.size()]);</span>
+    }
+
+    /// The Uniform Type Identifiers.
+    ///
+    /// #### Returns
+    ///
+    /// a copy of the identifier list
+    public String[] getUtTypes() {
+<span class="nc" id="L151">        return utTypes.toArray(new String[utTypes.size()]);</span>
+    }
+
+    /// Checks whether a file name ends with one of this filter's extensions.
+    /// A filter without extensions accepts every name.
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: the file name or path
+    ///
+    /// #### Returns
+    ///
+    /// true if the name matches
+    public boolean acceptsName(String name) {
+<span class="fc bfc" id="L165" title="All 2 branches covered.">        if (extensions.isEmpty()) {</span>
+<span class="fc" id="L166">            return true;</span>
+        }
+<span class="pc bpc" id="L168" title="1 of 2 branches missed.">        if (name == null) {</span>
+<span class="nc" id="L169">            return false;</span>
+        }
+<span class="fc bfc" id="L171" title="All 2 branches covered.">        for (String e : extensions) {</span>
+            // &quot;*&quot; is the all-files extension the native ports recognize too.
+<span class="pc bpc" id="L173" title="1 of 2 branches missed.">            if (&quot;*&quot;.equals(e)) {</span>
+<span class="nc" id="L174">                return true;</span>
+            }
+<span class="fc" id="L176">            int start = name.length() - e.length() - 1;</span>
+<span class="fc bfc" id="L177" title="All 4 branches covered.">            if (start &gt;= 0 &amp;&amp; name.charAt(start) == '.'</span>
+<span class="fc bfc" id="L178" title="All 2 branches covered.">                    &amp;&amp; name.regionMatches(true, start + 1, e, 0, e.length())) {</span>
+<span class="fc" id="L179">                return true;</span>
+            }
+<span class="fc" id="L181">        }</span>
+<span class="fc" id="L182">        return false;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

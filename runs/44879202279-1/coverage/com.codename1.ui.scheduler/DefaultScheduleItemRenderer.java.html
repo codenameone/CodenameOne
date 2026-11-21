@@ -1,0 +1,164 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DefaultScheduleItemRenderer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.scheduler</a> &gt; <span class="el_source">DefaultScheduleItemRenderer.java</span></div><h1>DefaultScheduleItemRenderer.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ui.scheduler;
+
+import com.codename1.scheduling.ScheduleItem;
+import com.codename1.ui.Font;
+import com.codename1.ui.Graphics;
+import com.codename1.ui.plaf.Style;
+
+/// The renderer a `Scheduler` starts with: a rounded block in the item's
+/// colour with its title, and its time and detail where they fit.
+///
+/// The colours and the font come from a UIID: the item's own when it has
+/// one, otherwise `SchedulerItem`, `SchedulerBackgroundItem` or
+/// `SchedulerBlocked` by its kind. An item or a resource with a colour of
+/// its own overrides the background, and the text turns black or white to
+/// stay readable on it.
+<span class="fc" id="L38">public class DefaultScheduleItemRenderer implements ScheduleItemRenderer {</span>
+    @Override
+    public void paintItem(Graphics g, Scheduler scheduler, ScheduleItem item, int x, int y, int width, int height,
+            int state) {
+<span class="pc bpc" id="L42" title="2 of 4 branches missed.">        if (width &lt;= 0 || height &lt;= 0) {</span>
+<span class="nc" id="L43">            return;</span>
+        }
+<span class="fc" id="L45">        String uiid = uiidOf(item);</span>
+<span class="fc bfc" id="L46" title="All 2 branches covered.">        Style st = (state &amp; SELECTED) != 0 ? Look.selected(uiid) : Look.style(uiid);</span>
+<span class="pc bpc" id="L47" title="1 of 2 branches missed.">        int own = item.getColor() &gt;= 0 ? item.getColor() : scheduler.resourceColor(item.getResourceId());</span>
+<span class="pc bpc" id="L48" title="1 of 2 branches missed.">        int bg = own &gt;= 0 ? own : st.getBgColor();</span>
+<span class="pc bpc" id="L49" title="1 of 2 branches missed.">        int fg = own &gt;= 0 ? Look.textOn(bg) : st.getFgColor();</span>
+<span class="fc" id="L50">        int opacity = st.getBgTransparency() &amp; 0xff;</span>
+<span class="pc bpc" id="L51" title="3 of 4 branches missed.">        if (own &gt;= 0 &amp;&amp; opacity == 0) {</span>
+<span class="nc" id="L52">            opacity = 255;</span>
+        }
+<span class="pc bpc" id="L54" title="3 of 4 branches missed.">        if (own &gt;= 0 &amp;&amp; item.getKind() == ScheduleItem.Kind.BACKGROUND) {</span>
+            // A band behind a day's items is a tint of the colour, not the
+            // colour: at full strength a person's working hours were the
+            // loudest thing in the view and hid the items over them.
+<span class="nc" id="L58">            opacity = Math.min(opacity, 48);</span>
+<span class="nc" id="L59">            fg = st.getFgColor();</span>
+        }
+<span class="pc bpc" id="L61" title="1 of 4 branches missed.">        if ((state &amp; SELECTED) != 0 &amp;&amp; own &gt;= 0) {</span>
+<span class="nc" id="L62">            bg = Look.mix(bg, 0, 50);</span>
+        }
+<span class="fc" id="L64">        int alpha = g.getAlpha();</span>
+<span class="fc" id="L65">        boolean aa = g.isAntiAliased();</span>
+<span class="pc bpc" id="L66" title="1 of 2 branches missed.">        if ((state &amp; DRAGGED) != 0) {</span>
+<span class="nc" id="L67">            opacity = opacity * 190 / 255;</span>
+        }
+<span class="fc bfc" id="L69" title="All 2 branches covered.">        boolean compact = (state &amp; COMPACT) != 0;</span>
+<span class="fc bfc" id="L70" title="All 2 branches covered.">        int arc = Math.min(Math.min(width, height), Look.mm(compact ? 1f : 1.6f));</span>
+<span class="fc" id="L71">        g.setAntiAliased(true);</span>
+<span class="fc" id="L72">        g.setColor(bg);</span>
+<span class="fc" id="L73">        g.setAlpha(alpha * opacity / 255);</span>
+<span class="fc" id="L74">        g.fillRoundRect(x, y, width, height, arc, arc);</span>
+<span class="pc bpc" id="L75" title="1 of 2 branches missed.">        if (item.getKind() == ScheduleItem.Kind.BLOCKED) {</span>
+<span class="nc" id="L76">            hatch(g, fg, alpha, x, y, width, height);</span>
+        }
+<span class="fc" id="L78">        g.setAlpha(alpha);</span>
+<span class="fc bfc" id="L79" title="All 2 branches covered.">        if ((state &amp; SELECTED) != 0) {</span>
+<span class="fc" id="L80">            g.setColor(fg);</span>
+<span class="fc" id="L81">            g.drawRoundRect(x, y, width - 1, height - 1, arc, arc);</span>
+        }
+<span class="fc" id="L83">        g.setAntiAliased(aa);</span>
+<span class="fc" id="L84">        paintText(g, scheduler, item, st.getFont(), fg, x, y, width, height, state);</span>
+<span class="fc" id="L85">    }</span>
+
+    /// The UIID an item is painted with.
+    protected String uiidOf(ScheduleItem item) {
+<span class="pc bpc" id="L89" title="1 of 2 branches missed.">        if (item.getUIID() != null) {</span>
+<span class="nc" id="L90">            return item.getUIID();</span>
+        }
+<span class="pc bpc" id="L92" title="1 of 2 branches missed.">        if (item.getKind() == ScheduleItem.Kind.BACKGROUND) {</span>
+<span class="nc" id="L93">            return &quot;SchedulerBackgroundItem&quot;;</span>
+        }
+<span class="pc bpc" id="L95" title="1 of 2 branches missed.">        if (item.getKind() == ScheduleItem.Kind.BLOCKED) {</span>
+<span class="nc" id="L96">            return &quot;SchedulerBlocked&quot;;</span>
+        }
+<span class="fc" id="L98">        return &quot;SchedulerItem&quot;;</span>
+    }
+
+    /// Draws the title, and under it the time and the detail when the
+    /// rectangle is tall enough.
+    protected void paintText(Graphics g, Scheduler scheduler, ScheduleItem item, Font font, int color, int x, int y,
+            int width, int height, int state) {
+<span class="fc bfc" id="L105" title="All 2 branches covered.">        boolean compact = (state &amp; COMPACT) != 0;</span>
+<span class="fc bfc" id="L106" title="All 2 branches covered.">        int pad = Look.mm(compact ? 0.7f : 1f);</span>
+<span class="fc" id="L107">        int fh = font.getHeight();</span>
+<span class="fc" id="L108">        int tw = width - 2 * pad;</span>
+<span class="pc bpc" id="L109" title="2 of 4 branches missed.">        if (tw &lt;= 0 || height &lt; fh * 2 / 3) {</span>
+<span class="nc" id="L110">            return;</span>
+        }
+<span class="fc" id="L112">        int cx = g.getClipX();</span>
+<span class="fc" id="L113">        int cy = g.getClipY();</span>
+<span class="fc" id="L114">        int cw = g.getClipWidth();</span>
+<span class="fc" id="L115">        int ch = g.getClipHeight();</span>
+<span class="fc" id="L116">        g.clipRect(x, y, width, height);</span>
+<span class="fc" id="L117">        g.setFont(font);</span>
+<span class="fc" id="L118">        g.setColor(color);</span>
+<span class="fc bfc" id="L119" title="All 2 branches covered.">        int ty = height &lt; fh + 2 * pad ? y + (height - fh) / 2 : y + pad;</span>
+<span class="fc" id="L120">        String title = item.getTitle();</span>
+<span class="pc bpc" id="L121" title="1 of 8 branches missed.">        if (compact &amp;&amp; !item.isAllDay() &amp;&amp; item.getKind() == ScheduleItem.Kind.EVENT</span>
+                &amp;&amp; (state &amp; HORIZONTAL) == 0) {
+            // The time goes first where there is room for both. In a
+            // narrow cell it would be all that fits, and a month of chips
+            // that say &quot;09:00&quot; tells nobody what is on.
+<span class="fc" id="L126">            String timed = scheduler.formatTime(item.getStart()) + &quot; &quot; + title;</span>
+<span class="pc bpc" id="L127" title="1 of 2 branches missed.">            if (font.stringWidth(timed) &lt;= tw) {</span>
+<span class="fc" id="L128">                title = timed;</span>
+            }
+        }
+<span class="fc" id="L131">        g.drawString(Look.fit(title, font, tw), x + pad, ty);</span>
+<span class="pc bpc" id="L132" title="1 of 4 branches missed.">        if (!compact &amp;&amp; item.getKind() == ScheduleItem.Kind.EVENT) {</span>
+<span class="fc" id="L133">            int ly = ty + fh;</span>
+<span class="fc" id="L134">            int alpha = g.getAlpha();</span>
+<span class="fc" id="L135">            g.setAlpha(alpha * 200 / 255);</span>
+<span class="pc bpc" id="L136" title="2 of 4 branches missed.">            if (ly + fh &lt;= y + height - pad / 2 &amp;&amp; !item.isAllDay()) {</span>
+<span class="fc" id="L137">                g.drawString(Look.fit(scheduler.formatRange(item.getStart(), item.getEnd()), font, tw), x + pad, ly);</span>
+<span class="fc" id="L138">                ly += fh;</span>
+            }
+<span class="fc" id="L140">            String detail = item.getDetail();</span>
+<span class="pc bpc" id="L141" title="5 of 6 branches missed.">            if (detail != null &amp;&amp; detail.length() &gt; 0 &amp;&amp; ly + fh &lt;= y + height - pad / 2) {</span>
+<span class="nc" id="L142">                g.drawString(Look.fit(detail, font, tw), x + pad, ly);</span>
+            }
+<span class="fc" id="L144">            g.setAlpha(alpha);</span>
+        }
+<span class="fc" id="L146">        g.setClip(cx, cy, cw, ch);</span>
+<span class="fc" id="L147">    }</span>
+
+    private static void hatch(Graphics g, int color, int alpha, int x, int y, int w, int h) {
+<span class="nc" id="L150">        int cx = g.getClipX();</span>
+<span class="nc" id="L151">        int cy = g.getClipY();</span>
+<span class="nc" id="L152">        int cw = g.getClipWidth();</span>
+<span class="nc" id="L153">        int ch = g.getClipHeight();</span>
+<span class="nc" id="L154">        g.clipRect(x, y, w, h);</span>
+<span class="nc" id="L155">        g.setColor(color);</span>
+<span class="nc" id="L156">        g.setAlpha(alpha * 40 / 255);</span>
+<span class="nc" id="L157">        int step = Look.mm(1.6f);</span>
+<span class="nc bnc" id="L158" title="All 2 branches missed.">        for (int i = -h; i &lt; w; i += step) {</span>
+<span class="nc" id="L159">            g.drawLine(x + i, y + h, x + i + h, y);</span>
+        }
+<span class="nc" id="L161">        g.setClip(cx, cy, cw, ch);</span>
+<span class="nc" id="L162">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

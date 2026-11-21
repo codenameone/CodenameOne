@@ -1,0 +1,539 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>QrCode.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.qrcode</a> &gt; <span class="el_source">QrCode.java</span></div><h1>QrCode.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.qrcode;
+
+import com.codename1.impl.SharedWithBackend;
+import java.io.UnsupportedEncodingException;
+
+/// A QR code, generated from text or bytes: the module grid, and SVG for a
+/// page. The class is shared with the backend, which has no images: a client
+/// draws one with `QrCodeImage`, a server serves [#toSvg()].
+///
+/// A device shows one so a phone can pair with it -- the address and a
+/// one-time token in a URL -- and a server puts one on an enrolment page:
+///
+/// ```java
+/// QrCode code = QrCode.encode(&quot;https://10.0.0.5:8443/pair?t=4F9A2C&quot;, QrCode.ECC_MEDIUM);
+/// Image image = QrCodeImage.create(code, 8);
+/// ```
+///
+/// Byte mode with UTF-8 text, versions 1 to 40, the four standard error
+/// correction levels and the mask with the lowest penalty (ISO/IEC 18004). The
+/// smallest version that holds the data is chosen.
+@SharedWithBackend
+public final class QrCode {
+    /// Recovers about 7% of the code.
+    public static final int ECC_LOW = 0;
+    /// Recovers about 15%; the usual choice.
+    public static final int ECC_MEDIUM = 1;
+    /// Recovers about 25%.
+    public static final int ECC_QUARTILE = 2;
+    /// Recovers about 30%, for a code printed where it gets scuffed.
+    public static final int ECC_HIGH = 3;
+
+    // Per level (L, M, Q, H) and version: error correction codewords per
+    // block, and the number of blocks. ISO/IEC 18004 table 9.
+<span class="fc" id="L56">    private static final byte[][] ECC_PER_BLOCK = {</span>
+        {-1, 7, 10, 15, 20, 26, 18, 20, 24, 30, 18, 20, 24, 26, 30, 22, 24, 28, 30, 28, 28, 28, 28, 30, 30, 26, 28, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30},
+        {-1, 10, 16, 26, 18, 24, 16, 18, 22, 22, 26, 30, 22, 22, 24, 24, 28, 28, 26, 26, 26, 26, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28},
+        {-1, 13, 22, 18, 26, 18, 24, 18, 22, 20, 24, 28, 26, 24, 20, 30, 24, 28, 28, 26, 30, 28, 30, 30, 30, 30, 28, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30},
+        {-1, 17, 28, 22, 16, 22, 28, 26, 26, 24, 28, 24, 28, 22, 24, 24, 30, 28, 28, 26, 28, 30, 24, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30},
+    };
+<span class="fc" id="L62">    private static final byte[][] BLOCKS = {</span>
+        {-1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 4, 4, 4, 4, 4, 6, 6, 6, 6, 7, 8, 8, 9, 9, 10, 12, 12, 12, 13, 14, 15, 16, 17, 18, 19, 19, 20, 21, 22, 24, 25},
+        {-1, 1, 1, 1, 2, 2, 4, 4, 4, 5, 5, 5, 8, 9, 9, 10, 10, 11, 13, 14, 16, 17, 17, 18, 20, 21, 23, 25, 26, 28, 29, 31, 33, 35, 37, 38, 40, 43, 45, 47, 49},
+        {-1, 1, 1, 2, 2, 4, 4, 6, 6, 8, 8, 8, 10, 12, 16, 12, 17, 16, 18, 21, 20, 23, 23, 25, 27, 29, 34, 34, 35, 38, 40, 43, 45, 48, 51, 53, 56, 59, 62, 65, 68},
+        {-1, 1, 1, 2, 4, 4, 4, 5, 6, 8, 8, 11, 11, 16, 16, 18, 16, 19, 21, 25, 25, 25, 34, 30, 32, 35, 37, 40, 42, 45, 48, 51, 54, 57, 60, 63, 66, 70, 74, 77, 81},
+    };
+    // The two format bits of each level, which are not in level order.
+<span class="fc" id="L69">    private static final int[] FORMAT_BITS = {1, 0, 3, 2};</span>
+
+    private final int version;
+    private final int size;
+    private final int ecc;
+    private final int mask;
+    private final boolean[][] modules;
+    private final boolean[][] function;
+
+<span class="fc" id="L78">    private QrCode(int version, int ecc) {</span>
+<span class="fc" id="L79">        this.version = version;</span>
+<span class="fc" id="L80">        this.ecc = ecc;</span>
+<span class="fc" id="L81">        this.size = version * 4 + 17;</span>
+<span class="fc" id="L82">        this.modules = new boolean[size][size];</span>
+<span class="fc" id="L83">        this.function = new boolean[size][size];</span>
+<span class="fc" id="L84">        this.mask = 0;</span>
+<span class="fc" id="L85">    }</span>
+
+<span class="fc" id="L87">    private QrCode(QrCode base, int mask) {</span>
+<span class="fc" id="L88">        this.version = base.version;</span>
+<span class="fc" id="L89">        this.ecc = base.ecc;</span>
+<span class="fc" id="L90">        this.size = base.size;</span>
+<span class="fc" id="L91">        this.modules = base.modules;</span>
+<span class="fc" id="L92">        this.function = base.function;</span>
+<span class="fc" id="L93">        this.mask = mask;</span>
+<span class="fc" id="L94">    }</span>
+
+    /// Encodes text as UTF-8.
+    public static QrCode encode(String text, int ecc) {
+<span class="fc bfc" id="L98" title="All 2 branches covered.">        if (text == null) {</span>
+<span class="fc" id="L99">            throw new IllegalArgumentException(&quot;text&quot;);</span>
+        }
+        try {
+<span class="fc" id="L102">            return encode(text.getBytes(&quot;UTF-8&quot;), ecc);</span>
+<span class="nc" id="L103">        } catch (UnsupportedEncodingException e) {</span>
+<span class="nc" id="L104">            throw new IllegalStateException(&quot;UTF-8&quot;, e);</span>
+        }
+    }
+
+    /// Encodes bytes. Throws `IllegalArgumentException` when they do not fit
+    /// a version 40 code at this level (2953 bytes at [#ECC_LOW]).
+    public static QrCode encode(byte[] data, int ecc) {
+<span class="pc bpc" id="L111" title="2 of 6 branches missed.">        if (data == null || ecc &lt; ECC_LOW || ecc &gt; ECC_HIGH) {</span>
+<span class="fc" id="L112">            throw new IllegalArgumentException(&quot;data and a level from ECC_LOW to ECC_HIGH&quot;);</span>
+        }
+<span class="fc" id="L114">        int version = 1;</span>
+        while (true) {
+<span class="fc bfc" id="L116" title="All 2 branches covered.">            int countBits = version &lt; 10 ? 8 : 16;</span>
+<span class="fc" id="L117">            int capacityBits = dataCodewords(version, ecc) * 8;</span>
+<span class="fc bfc" id="L118" title="All 2 branches covered.">            if (4 + countBits + data.length * 8 &lt;= capacityBits) {</span>
+<span class="fc" id="L119">                break;</span>
+            }
+<span class="fc" id="L121">            version++;</span>
+<span class="fc bfc" id="L122" title="All 2 branches covered.">            if (version &gt; 40) {</span>
+<span class="fc" id="L123">                throw new IllegalArgumentException(&quot;Too much data for a QR code: &quot; + data.length + &quot; bytes&quot;);</span>
+            }
+<span class="fc" id="L125">        }</span>
+<span class="fc" id="L126">        QrCode qr = new QrCode(version, ecc);</span>
+<span class="fc" id="L127">        byte[] codewords = qr.addEccAndInterleave(qr.dataBits(data));</span>
+<span class="fc" id="L128">        qr.drawFunctionPatterns();</span>
+<span class="fc" id="L129">        qr.drawCodewords(codewords);</span>
+<span class="fc" id="L130">        int best = 0;</span>
+<span class="fc" id="L131">        int bestPenalty = Integer.MAX_VALUE;</span>
+<span class="fc bfc" id="L132" title="All 2 branches covered.">        for (int m = 0; m &lt; 8; m++) {</span>
+<span class="fc" id="L133">            qr.applyMask(m);</span>
+<span class="fc" id="L134">            qr.drawFormat(m);</span>
+<span class="fc" id="L135">            int p = qr.penalty();</span>
+<span class="fc bfc" id="L136" title="All 2 branches covered.">            if (p &lt; bestPenalty) {</span>
+<span class="fc" id="L137">                best = m;</span>
+<span class="fc" id="L138">                bestPenalty = p;</span>
+            }
+            // Masking is its own inverse.
+<span class="fc" id="L141">            qr.applyMask(m);</span>
+        }
+<span class="fc" id="L143">        qr.applyMask(best);</span>
+<span class="fc" id="L144">        qr.drawFormat(best);</span>
+<span class="fc" id="L145">        return new QrCode(qr, best);</span>
+    }
+
+    /// Modules per side, `17 + 4 * version`, without the quiet zone.
+    public int getSize() {
+<span class="fc" id="L150">        return size;</span>
+    }
+
+    /// The version, 1 to 40.
+    public int getVersion() {
+<span class="fc" id="L155">        return version;</span>
+    }
+
+    /// The error correction level, [#ECC_LOW] to [#ECC_HIGH].
+    public int getErrorCorrection() {
+<span class="nc" id="L160">        return ecc;</span>
+    }
+
+    /// The mask pattern chosen, 0 to 7.
+    public int getMask() {
+<span class="fc" id="L165">        return mask;</span>
+    }
+
+    /// True for a dark module; false outside the grid, which is the quiet zone.
+    public boolean isDark(int x, int y) {
+<span class="pc bpc" id="L170" title="2 of 10 branches missed.">        return x &gt;= 0 &amp;&amp; y &gt;= 0 &amp;&amp; x &lt; size &amp;&amp; y &lt; size &amp;&amp; modules[y][x];</span>
+    }
+
+    /// The code as an SVG document, one unit per module with a four module
+    /// quiet zone, for a web page or a printed label.
+    public String toSvg() {
+<span class="fc" id="L176">        int full = size + 8;</span>
+<span class="fc" id="L177">        StringBuilder sb = new StringBuilder();</span>
+<span class="fc" id="L178">        sb.append(&quot;&lt;svg xmlns=\&quot;http://www.w3.org/2000/svg\&quot; viewBox=\&quot;0 0 &quot;).append(full).append(' ').append(full)</span>
+<span class="fc" id="L179">                .append(&quot;\&quot; shape-rendering=\&quot;crispEdges\&quot;&gt;&lt;rect width=\&quot;100%\&quot; height=\&quot;100%\&quot; fill=\&quot;#fff\&quot;/&gt;&lt;path d=\&quot;&quot;);</span>
+<span class="fc bfc" id="L180" title="All 2 branches covered.">        for (int y = 0; y &lt; size; y++) {</span>
+<span class="fc bfc" id="L181" title="All 2 branches covered.">            for (int x = 0; x &lt; size; x++) {</span>
+<span class="fc bfc" id="L182" title="All 2 branches covered.">                if (modules[y][x]) {</span>
+<span class="fc" id="L183">                    sb.append('M').append(x + 4).append(',').append(y + 4).append(&quot;h1v1h-1z&quot;);</span>
+                }
+            }
+        }
+<span class="fc" id="L187">        sb.append(&quot;\&quot; fill=\&quot;#000\&quot;/&gt;&lt;/svg&gt;&quot;);</span>
+<span class="fc" id="L188">        return sb.toString();</span>
+    }
+
+    // ------------------------------------------------------------- capacity
+
+    /// Modules left for data and error correction once every function
+    /// pattern is placed.
+    static int rawDataModules(int ver) {
+<span class="fc" id="L196">        int result = (16 * ver + 128) * ver + 64;</span>
+<span class="fc bfc" id="L197" title="All 2 branches covered.">        if (ver &gt;= 2) {</span>
+<span class="fc" id="L198">            int align = ver / 7 + 2;</span>
+<span class="fc" id="L199">            result -= (25 * align - 10) * align - 55;</span>
+<span class="fc bfc" id="L200" title="All 2 branches covered.">            if (ver &gt;= 7) {</span>
+<span class="fc" id="L201">                result -= 36;</span>
+            }
+        }
+<span class="fc" id="L204">        return result;</span>
+    }
+
+    static int dataCodewords(int ver, int ecc) {
+<span class="fc" id="L208">        return rawDataModules(ver) / 8 - ECC_PER_BLOCK[ecc][ver] * BLOCKS[ecc][ver];</span>
+    }
+
+    // ---------------------------------------------------------------- data
+
+    private byte[] dataBits(byte[] data) {
+<span class="fc" id="L214">        int capacity = dataCodewords(version, ecc);</span>
+<span class="fc" id="L215">        byte[] out = new byte[capacity];</span>
+<span class="fc" id="L216">        int[] bit = {0};</span>
+<span class="fc" id="L217">        put(out, bit, 4, 4);</span>
+<span class="fc bfc" id="L218" title="All 2 branches covered.">        put(out, bit, data.length, version &lt; 10 ? 8 : 16);</span>
+<span class="fc bfc" id="L219" title="All 2 branches covered.">        for (byte b : data) {</span>
+<span class="fc" id="L220">            put(out, bit, b &amp; 0xff, 8);</span>
+        }
+        // Terminator, at most four zero bits, then to a byte boundary; the
+        // array is already zero, so only the position moves.
+<span class="fc" id="L224">        bit[0] = Math.min(capacity * 8, bit[0] + 4);</span>
+<span class="fc" id="L225">        bit[0] = (bit[0] + 7) / 8 * 8;</span>
+<span class="fc bfc" id="L226" title="All 2 branches covered.">        for (int i = bit[0] / 8, pad = 0; i &lt; capacity; i++, pad++) {</span>
+<span class="fc bfc" id="L227" title="All 2 branches covered.">            out[i] = (byte) ((pad &amp; 1) == 0 ? 0xec : 0x11);</span>
+        }
+<span class="fc" id="L229">        return out;</span>
+    }
+
+    private static void put(byte[] out, int[] bit, int value, int count) {
+<span class="fc bfc" id="L233" title="All 2 branches covered.">        for (int i = count - 1; i &gt;= 0; i--) {</span>
+<span class="fc bfc" id="L234" title="All 2 branches covered.">            if (((value &gt;&gt;&gt; i) &amp; 1) != 0) {</span>
+<span class="fc" id="L235">                out[bit[0] &gt;&gt;&gt; 3] |= (byte) (0x80 &gt;&gt;&gt; (bit[0] &amp; 7));</span>
+            }
+<span class="fc" id="L237">            bit[0]++;</span>
+        }
+<span class="fc" id="L239">    }</span>
+
+    private byte[] addEccAndInterleave(byte[] data) {
+<span class="fc" id="L242">        int blocks = BLOCKS[ecc][version];</span>
+<span class="fc" id="L243">        int eccLen = ECC_PER_BLOCK[ecc][version];</span>
+<span class="fc" id="L244">        int raw = rawDataModules(version) / 8;</span>
+<span class="fc" id="L245">        int shortBlocks = blocks - raw % blocks;</span>
+<span class="fc" id="L246">        int shortLen = raw / blocks;</span>
+<span class="fc" id="L247">        byte[] divisor = rsDivisor(eccLen);</span>
+<span class="fc" id="L248">        byte[][] dataBlocks = new byte[blocks][];</span>
+<span class="fc" id="L249">        byte[][] eccBlocks = new byte[blocks][];</span>
+<span class="fc bfc" id="L250" title="All 2 branches covered.">        for (int i = 0, k = 0; i &lt; blocks; i++) {</span>
+<span class="fc bfc" id="L251" title="All 2 branches covered.">            int len = shortLen - eccLen + (i &lt; shortBlocks ? 0 : 1);</span>
+<span class="fc" id="L252">            byte[] d = new byte[len];</span>
+<span class="fc" id="L253">            System.arraycopy(data, k, d, 0, len);</span>
+<span class="fc" id="L254">            k += len;</span>
+<span class="fc" id="L255">            dataBlocks[i] = d;</span>
+<span class="fc" id="L256">            eccBlocks[i] = rsRemainder(d, divisor);</span>
+        }
+<span class="fc" id="L258">        byte[] out = new byte[raw];</span>
+<span class="fc" id="L259">        int n = 0;</span>
+<span class="fc bfc" id="L260" title="All 2 branches covered.">        for (int i = 0; i &lt;= shortLen - eccLen; i++) {</span>
+<span class="fc bfc" id="L261" title="All 2 branches covered.">            for (int j = 0; j &lt; blocks; j++) {</span>
+<span class="fc bfc" id="L262" title="All 2 branches covered.">                if (i &lt; dataBlocks[j].length) {</span>
+<span class="fc" id="L263">                    out[n++] = dataBlocks[j][i];</span>
+                }
+            }
+        }
+<span class="fc bfc" id="L267" title="All 2 branches covered.">        for (int i = 0; i &lt; eccLen; i++) {</span>
+<span class="fc bfc" id="L268" title="All 2 branches covered.">            for (int j = 0; j &lt; blocks; j++) {</span>
+<span class="fc" id="L269">                out[n++] = eccBlocks[j][i];</span>
+            }
+        }
+<span class="fc" id="L272">        return out;</span>
+    }
+
+    // Reed-Solomon over GF(2^8) with the polynomial 0x11d. The divisor is
+    // stored highest power first, without its leading 1.
+    private static byte[] rsDivisor(int degree) {
+<span class="fc" id="L278">        byte[] result = new byte[degree];</span>
+<span class="fc" id="L279">        result[degree - 1] = 1;</span>
+<span class="fc" id="L280">        int root = 1;</span>
+<span class="fc bfc" id="L281" title="All 2 branches covered.">        for (int i = 0; i &lt; degree; i++) {</span>
+<span class="fc bfc" id="L282" title="All 2 branches covered.">            for (int j = 0; j &lt; degree; j++) {</span>
+<span class="fc" id="L283">                result[j] = (byte) gfMultiply(result[j] &amp; 0xff, root);</span>
+<span class="fc bfc" id="L284" title="All 2 branches covered.">                if (j + 1 &lt; degree) {</span>
+<span class="fc" id="L285">                    result[j] ^= result[j + 1];</span>
+                }
+            }
+<span class="fc" id="L288">            root = gfMultiply(root, 2);</span>
+        }
+<span class="fc" id="L290">        return result;</span>
+    }
+
+    private static byte[] rsRemainder(byte[] data, byte[] divisor) {
+<span class="fc" id="L294">        byte[] result = new byte[divisor.length];</span>
+<span class="fc bfc" id="L295" title="All 2 branches covered.">        for (byte b : data) {</span>
+<span class="fc" id="L296">            int factor = (b ^ result[0]) &amp; 0xff;</span>
+<span class="fc" id="L297">            System.arraycopy(result, 1, result, 0, result.length - 1);</span>
+<span class="fc" id="L298">            result[result.length - 1] = 0;</span>
+<span class="fc bfc" id="L299" title="All 2 branches covered.">            for (int j = 0; j &lt; result.length; j++) {</span>
+<span class="fc" id="L300">                result[j] ^= (byte) gfMultiply(divisor[j] &amp; 0xff, factor);</span>
+            }
+        }
+<span class="fc" id="L303">        return result;</span>
+    }
+
+    private static int gfMultiply(int x, int y) {
+<span class="fc" id="L307">        int z = 0;</span>
+<span class="fc bfc" id="L308" title="All 2 branches covered.">        for (int i = 7; i &gt;= 0; i--) {</span>
+<span class="fc" id="L309">            z = (z &lt;&lt; 1) ^ ((z &gt;&gt;&gt; 7) * 0x11d);</span>
+<span class="fc" id="L310">            z ^= ((y &gt;&gt;&gt; i) &amp; 1) * x;</span>
+        }
+<span class="fc" id="L312">        return z;</span>
+    }
+
+    // ------------------------------------------------------------ patterns
+
+    private void set(int x, int y, boolean dark) {
+<span class="fc" id="L318">        modules[y][x] = dark;</span>
+<span class="fc" id="L319">        function[y][x] = true;</span>
+<span class="fc" id="L320">    }</span>
+
+    private void drawFunctionPatterns() {
+<span class="fc bfc" id="L323" title="All 2 branches covered.">        for (int i = 0; i &lt; size; i++) {</span>
+<span class="fc bfc" id="L324" title="All 2 branches covered.">            set(6, i, i % 2 == 0);</span>
+<span class="fc bfc" id="L325" title="All 2 branches covered.">            set(i, 6, i % 2 == 0);</span>
+        }
+<span class="fc" id="L327">        finder(3, 3);</span>
+<span class="fc" id="L328">        finder(size - 4, 3);</span>
+<span class="fc" id="L329">        finder(3, size - 4);</span>
+<span class="fc" id="L330">        int[] align = alignmentPositions();</span>
+<span class="fc bfc" id="L331" title="All 2 branches covered.">        for (int i = 0; i &lt; align.length; i++) {</span>
+<span class="fc bfc" id="L332" title="All 2 branches covered.">            for (int j = 0; j &lt; align.length; j++) {</span>
+<span class="fc bfc" id="L333" title="All 12 branches covered.">                boolean nearFinder = (i == 0 &amp;&amp; j == 0) || (i == 0 &amp;&amp; j == align.length - 1)</span>
+                        || (i == align.length - 1 &amp;&amp; j == 0);
+<span class="fc bfc" id="L335" title="All 2 branches covered.">                if (!nearFinder) {</span>
+<span class="fc" id="L336">                    alignment(align[i], align[j]);</span>
+                }
+            }
+        }
+        // Reserve the format areas now; drawFormat fills them per mask.
+<span class="fc" id="L341">        drawFormat(0);</span>
+<span class="fc bfc" id="L342" title="All 2 branches covered.">        if (version &gt;= 7) {</span>
+<span class="fc" id="L343">            int rem = version;</span>
+<span class="fc bfc" id="L344" title="All 2 branches covered.">            for (int i = 0; i &lt; 12; i++) {</span>
+<span class="fc" id="L345">                rem = (rem &lt;&lt; 1) ^ ((rem &gt;&gt;&gt; 11) * 0x1f25);</span>
+            }
+<span class="fc" id="L347">            int bits = version &lt;&lt; 12 | rem;</span>
+<span class="fc bfc" id="L348" title="All 2 branches covered.">            for (int i = 0; i &lt; 18; i++) {</span>
+<span class="fc bfc" id="L349" title="All 2 branches covered.">                boolean dark = ((bits &gt;&gt;&gt; i) &amp; 1) != 0;</span>
+<span class="fc" id="L350">                int a = size - 11 + i % 3;</span>
+<span class="fc" id="L351">                int b = i / 3;</span>
+<span class="fc" id="L352">                set(a, b, dark);</span>
+<span class="fc" id="L353">                set(b, a, dark);</span>
+            }
+        }
+<span class="fc" id="L356">    }</span>
+
+    private void finder(int cx, int cy) {
+<span class="fc bfc" id="L359" title="All 2 branches covered.">        for (int dy = -4; dy &lt;= 4; dy++) {</span>
+<span class="fc bfc" id="L360" title="All 2 branches covered.">            for (int dx = -4; dx &lt;= 4; dx++) {</span>
+<span class="fc" id="L361">                int x = cx + dx;</span>
+<span class="fc" id="L362">                int y = cy + dy;</span>
+<span class="fc bfc" id="L363" title="All 8 branches covered.">                if (x &gt;= 0 &amp;&amp; y &gt;= 0 &amp;&amp; x &lt; size &amp;&amp; y &lt; size) {</span>
+<span class="fc" id="L364">                    int d = Math.max(Math.abs(dx), Math.abs(dy));</span>
+<span class="fc bfc" id="L365" title="All 4 branches covered.">                    set(x, y, d != 2 &amp;&amp; d != 4);</span>
+                }
+            }
+        }
+<span class="fc" id="L369">    }</span>
+
+    private void alignment(int cx, int cy) {
+<span class="fc bfc" id="L372" title="All 2 branches covered.">        for (int dy = -2; dy &lt;= 2; dy++) {</span>
+<span class="fc bfc" id="L373" title="All 2 branches covered.">            for (int dx = -2; dx &lt;= 2; dx++) {</span>
+<span class="fc bfc" id="L374" title="All 2 branches covered.">                set(cx + dx, cy + dy, Math.max(Math.abs(dx), Math.abs(dy)) != 1);</span>
+            }
+        }
+<span class="fc" id="L377">    }</span>
+
+    private int[] alignmentPositions() {
+<span class="fc bfc" id="L380" title="All 2 branches covered.">        if (version == 1) {</span>
+<span class="fc" id="L381">            return new int[0];</span>
+        }
+<span class="fc" id="L383">        int count = version / 7 + 2;</span>
+<span class="pc bpc" id="L384" title="1 of 2 branches missed.">        int step = version == 32 ? 26 : (version * 4 + count * 2 + 1) / (count * 2 - 2) * 2;</span>
+<span class="fc" id="L385">        int[] result = new int[count];</span>
+<span class="fc" id="L386">        result[0] = 6;</span>
+<span class="fc bfc" id="L387" title="All 2 branches covered.">        for (int i = count - 1, pos = size - 7; i &gt;= 1; i--, pos -= step) {</span>
+<span class="fc" id="L388">            result[i] = pos;</span>
+        }
+<span class="fc" id="L390">        return result;</span>
+    }
+
+    private void drawFormat(int m) {
+<span class="fc" id="L394">        int data = FORMAT_BITS[ecc] &lt;&lt; 3 | m;</span>
+<span class="fc" id="L395">        int rem = data;</span>
+<span class="fc bfc" id="L396" title="All 2 branches covered.">        for (int i = 0; i &lt; 10; i++) {</span>
+<span class="fc" id="L397">            rem = (rem &lt;&lt; 1) ^ ((rem &gt;&gt;&gt; 9) * 0x537);</span>
+        }
+<span class="fc" id="L399">        int bits = (data &lt;&lt; 10 | rem) ^ 0x5412;</span>
+<span class="fc bfc" id="L400" title="All 2 branches covered.">        for (int i = 0; i &lt;= 5; i++) {</span>
+<span class="fc" id="L401">            set(8, i, bit(bits, i));</span>
+        }
+<span class="fc" id="L403">        set(8, 7, bit(bits, 6));</span>
+<span class="fc" id="L404">        set(8, 8, bit(bits, 7));</span>
+<span class="fc" id="L405">        set(7, 8, bit(bits, 8));</span>
+<span class="fc bfc" id="L406" title="All 2 branches covered.">        for (int i = 9; i &lt; 15; i++) {</span>
+<span class="fc" id="L407">            set(14 - i, 8, bit(bits, i));</span>
+        }
+<span class="fc bfc" id="L409" title="All 2 branches covered.">        for (int i = 0; i &lt; 8; i++) {</span>
+<span class="fc" id="L410">            set(size - 1 - i, 8, bit(bits, i));</span>
+        }
+<span class="fc bfc" id="L412" title="All 2 branches covered.">        for (int i = 8; i &lt; 15; i++) {</span>
+<span class="fc" id="L413">            set(8, size - 15 + i, bit(bits, i));</span>
+        }
+<span class="fc" id="L415">        set(8, size - 8, true);</span>
+<span class="fc" id="L416">    }</span>
+
+    private static boolean bit(int value, int i) {
+<span class="fc bfc" id="L419" title="All 2 branches covered.">        return ((value &gt;&gt;&gt; i) &amp; 1) != 0;</span>
+    }
+
+    private void drawCodewords(byte[] data) {
+<span class="fc" id="L423">        int i = 0;</span>
+<span class="fc" id="L424">        int total = data.length * 8;</span>
+<span class="fc bfc" id="L425" title="All 2 branches covered.">        for (int right = size - 1; right &gt;= 1; right -= 2) {</span>
+<span class="fc bfc" id="L426" title="All 2 branches covered.">            if (right == 6) {</span>
+<span class="fc" id="L427">                right = 5;</span>
+            }
+<span class="fc bfc" id="L429" title="All 2 branches covered.">            boolean upward = ((right + 1) &amp; 2) == 0;</span>
+<span class="fc bfc" id="L430" title="All 2 branches covered.">            for (int vert = 0; vert &lt; size; vert++) {</span>
+<span class="fc bfc" id="L431" title="All 2 branches covered.">                int y = upward ? size - 1 - vert : vert;</span>
+<span class="fc bfc" id="L432" title="All 2 branches covered.">                for (int j = 0; j &lt; 2; j++) {</span>
+<span class="fc" id="L433">                    int x = right - j;</span>
+<span class="fc bfc" id="L434" title="All 4 branches covered.">                    if (!function[y][x] &amp;&amp; i &lt; total) {</span>
+<span class="fc" id="L435">                        modules[y][x] = bit(data[i &gt;&gt;&gt; 3], 7 - (i &amp; 7));</span>
+<span class="fc" id="L436">                        i++;</span>
+                    }
+                }
+            }
+        }
+<span class="fc" id="L441">    }</span>
+
+    private void applyMask(int m) {
+<span class="fc bfc" id="L444" title="All 2 branches covered.">        for (int y = 0; y &lt; size; y++) {</span>
+<span class="fc bfc" id="L445" title="All 2 branches covered.">            for (int x = 0; x &lt; size; x++) {</span>
+<span class="fc bfc" id="L446" title="All 4 branches covered.">                if (!function[y][x] &amp;&amp; masked(m, x, y)) {</span>
+<span class="fc bfc" id="L447" title="All 2 branches covered.">                    modules[y][x] = !modules[y][x];</span>
+                }
+            }
+        }
+<span class="fc" id="L451">    }</span>
+
+    private static boolean masked(int m, int x, int y) {
+<span class="fc bfc" id="L454" title="All 8 branches covered.">        switch (m) {</span>
+            case 0:
+<span class="fc bfc" id="L456" title="All 2 branches covered.">                return (x + y) % 2 == 0;</span>
+            case 1:
+<span class="fc bfc" id="L458" title="All 2 branches covered.">                return y % 2 == 0;</span>
+            case 2:
+<span class="fc bfc" id="L460" title="All 2 branches covered.">                return x % 3 == 0;</span>
+            case 3:
+<span class="fc bfc" id="L462" title="All 2 branches covered.">                return (x + y) % 3 == 0;</span>
+            case 4:
+<span class="fc bfc" id="L464" title="All 2 branches covered.">                return (x / 3 + y / 2) % 2 == 0;</span>
+            case 5:
+<span class="fc bfc" id="L466" title="All 2 branches covered.">                return x * y % 2 + x * y % 3 == 0;</span>
+            case 6:
+<span class="fc bfc" id="L468" title="All 2 branches covered.">                return (x * y % 2 + x * y % 3) % 2 == 0;</span>
+            default:
+<span class="fc bfc" id="L470" title="All 2 branches covered.">                return ((x + y) % 2 + x * y % 3) % 2 == 0;</span>
+        }
+    }
+
+    // ------------------------------------------------------------- penalty
+
+    private int penalty() {
+<span class="fc" id="L477">        int result = 0;</span>
+<span class="fc bfc" id="L478" title="All 2 branches covered.">        for (int a = 0; a &lt; size; a++) {</span>
+<span class="fc" id="L479">            result += linePenalty(a, true) + linePenalty(a, false);</span>
+        }
+<span class="fc" id="L481">        int dark = 0;</span>
+<span class="fc bfc" id="L482" title="All 2 branches covered.">        for (int y = 0; y &lt; size; y++) {</span>
+<span class="fc bfc" id="L483" title="All 2 branches covered.">            for (int x = 0; x &lt; size; x++) {</span>
+<span class="fc" id="L484">                boolean c = modules[y][x];</span>
+<span class="fc bfc" id="L485" title="All 2 branches covered.">                if (c) {</span>
+<span class="fc" id="L486">                    dark++;</span>
+                }
+<span class="fc bfc" id="L488" title="All 10 branches covered.">                if (x + 1 &lt; size &amp;&amp; y + 1 &lt; size &amp;&amp; c == modules[y][x + 1] &amp;&amp; c == modules[y + 1][x]</span>
+                        &amp;&amp; c == modules[y + 1][x + 1]) {
+<span class="fc" id="L490">                    result += 3;</span>
+                }
+            }
+        }
+<span class="fc" id="L494">        int total = size * size;</span>
+<span class="fc" id="L495">        int k = (Math.abs(dark * 20 - total * 10) + total - 1) / total - 1;</span>
+<span class="fc" id="L496">        return result + Math.max(0, k) * 10;</span>
+    }
+
+    private boolean at(int a, int b, boolean row) {
+<span class="fc bfc" id="L500" title="All 2 branches covered.">        return row ? modules[a][b] : modules[b][a];</span>
+    }
+
+    // Runs of five or more, and the 1:1:3:1:1 finder look-alike with four
+    // light modules on either side (the quiet zone counts as light).
+    private int linePenalty(int a, boolean row) {
+<span class="fc" id="L506">        int result = 0;</span>
+<span class="fc" id="L507">        int run = 1;</span>
+<span class="fc bfc" id="L508" title="All 2 branches covered.">        for (int b = 1; b &lt;= size; b++) {</span>
+<span class="fc bfc" id="L509" title="All 4 branches covered.">            if (b &lt; size &amp;&amp; at(a, b, row) == at(a, b - 1, row)) {</span>
+<span class="fc" id="L510">                run++;</span>
+            } else {
+<span class="fc bfc" id="L512" title="All 2 branches covered.">                if (run &gt;= 5) {</span>
+<span class="fc" id="L513">                    result += run - 2;</span>
+                }
+<span class="fc" id="L515">                run = 1;</span>
+            }
+        }
+<span class="fc bfc" id="L518" title="All 2 branches covered.">        for (int b = -4; b &lt; size; b++) {</span>
+<span class="fc bfc" id="L519" title="All 4 branches covered.">            if (matches(a, b, row, 0x5d0) || matches(a, b, row, 0x05d)) {</span>
+<span class="fc" id="L520">                result += 40;</span>
+            }
+        }
+<span class="fc" id="L523">        return result;</span>
+    }
+
+    // An 11 module pattern, most significant bit first: 0x5d0 is
+    // dark-light-dark-dark-dark-light-dark then four light.
+    private boolean matches(int a, int start, boolean row, int pattern) {
+<span class="fc bfc" id="L529" title="All 2 branches covered.">        for (int i = 0; i &lt; 11; i++) {</span>
+<span class="fc" id="L530">            int b = start + i;</span>
+<span class="fc bfc" id="L531" title="All 6 branches covered.">            boolean dark = b &gt;= 0 &amp;&amp; b &lt; size &amp;&amp; at(a, b, row);</span>
+<span class="fc bfc" id="L532" title="All 2 branches covered.">            if (dark != bit(pattern, 10 - i)) {</span>
+<span class="fc" id="L533">                return false;</span>
+            }
+        }
+<span class="fc" id="L536">        return true;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

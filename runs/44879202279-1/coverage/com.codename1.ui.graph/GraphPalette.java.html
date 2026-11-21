@@ -1,0 +1,325 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>GraphPalette.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.graph</a> &gt; <span class="el_source">GraphPalette.java</span></div><h1>GraphPalette.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ui.graph;
+
+import com.codename1.graph.GraphNode;
+import com.codename1.graph.GraphNodeTemplate;
+import com.codename1.ui.Component;
+import com.codename1.ui.Font;
+import com.codename1.ui.Graphics;
+import com.codename1.ui.geom.Dimension;
+import com.codename1.ui.geom.GeneralPath;
+import com.codename1.ui.plaf.Style;
+
+import java.util.ArrayList;
+import java.util.List;
+
+/// The kinds of node a `NodeGraph` can be given, as a strip of items to drag
+/// onto it: the shapes of a flow chart, or the node types of a node editor.
+///
+/// ```java
+/// Form form = new Form(&quot;Diagram&quot;, new BorderLayout());
+/// NodeGraph graph = new NodeGraph();
+/// form.add(BorderLayout.CENTER, graph);
+/// GraphPalette palette = new GraphPalette(graph);
+/// palette.add(new GraphNodeTemplate(&quot;Step&quot;).setShape(GraphShapes.RECT));
+/// palette.add(new GraphNodeTemplate(&quot;Decision&quot;).setShape(GraphShapes.DECISION));
+/// form.add(BorderLayout.WEST, palette);
+/// form.show();
+/// ```
+///
+/// Dragging an item over the graph and letting go adds a node there. Tapping
+/// an item arms it instead, and the next tap on the graph's background adds
+/// the node, which is the way without a drag. Either way the node is offered
+/// to the graph's listeners and its model, as `NodeGraph.createNode` does.
+///
+/// The palette does not scroll; give it the items that fit, or several
+/// palettes.
+public class GraphPalette extends Component {
+    private final NodeGraph graph;
+<span class="fc" id="L60">    private final List&lt;GraphNodeTemplate&gt; templates = new ArrayList&lt;GraphNodeTemplate&gt;();</span>
+    private boolean horizontal;
+<span class="fc" id="L62">    private int pressed = -1;</span>
+    private int pressX;
+    private int pressY;
+    private boolean dragging;
+<span class="fc" id="L66">    private final GeneralPath path = new GeneralPath();</span>
+
+    /// A vertical palette for a graph.
+<span class="fc" id="L69">    public GraphPalette(NodeGraph graph) {</span>
+<span class="fc" id="L70">        this.graph = graph;</span>
+<span class="fc" id="L71">        setUIID(&quot;NodeGraphPalette&quot;);</span>
+<span class="fc" id="L72">        setFocusable(false);</span>
+<span class="fc" id="L73">    }</span>
+
+    // the armed item was used: listened to only while the palette is shown,
+    // so a palette that is thrown away is not kept alive by the graph
+<span class="fc" id="L77">    private final GraphAdapter used = new GraphAdapter() {</span>
+        @Override
+        public void nodeCreated(NodeGraph g, GraphNode node) {
+<span class="fc" id="L80">            repaint();</span>
+<span class="fc" id="L81">        }</span>
+    };
+
+    @Override
+    protected void initComponent() {
+<span class="fc" id="L86">        super.initComponent();</span>
+<span class="fc" id="L87">        graph.addGraphListener(used);</span>
+<span class="fc" id="L88">    }</span>
+
+    @Override
+    protected void deinitialize() {
+<span class="fc" id="L92">        graph.removeGraphListener(used);</span>
+        // a drag the form took away mid-gesture is let go of
+<span class="pc bpc" id="L94" title="1 of 2 branches missed.">        if (pressed &gt;= 0) {</span>
+<span class="nc" id="L95">            pressed = -1;</span>
+<span class="nc" id="L96">            dragging = false;</span>
+<span class="nc" id="L97">            graph.clearDropPreview();</span>
+        }
+<span class="fc" id="L99">        super.deinitialize();</span>
+<span class="fc" id="L100">    }</span>
+
+    /// The graph the items are added to.
+    public NodeGraph getGraph() {
+<span class="nc" id="L104">        return graph;</span>
+    }
+
+    /// Adds an item.
+    public GraphPalette add(GraphNodeTemplate template) {
+<span class="pc bpc" id="L109" title="1 of 2 branches missed.">        if (template != null) {</span>
+<span class="fc" id="L110">            templates.add(template);</span>
+<span class="fc" id="L111">            setShouldCalcPreferredSize(true);</span>
+<span class="fc" id="L112">            repaint();</span>
+        }
+<span class="fc" id="L114">        return this;</span>
+    }
+
+    /// Removes an item.
+    public void remove(GraphNodeTemplate template) {
+<span class="fc" id="L119">        int at = templates.indexOf(template);</span>
+<span class="pc bpc" id="L120" title="1 of 2 branches missed.">        if (at &gt;= 0) {</span>
+<span class="fc" id="L121">            templates.remove(at);</span>
+<span class="pc bpc" id="L122" title="1 of 2 branches missed.">            if (at == pressed) {</span>
+                // the item held is let go of
+<span class="nc" id="L124">                pressed = -1;</span>
+<span class="nc" id="L125">                dragging = false;</span>
+<span class="nc" id="L126">                graph.clearDropPreview();</span>
+<span class="pc bpc" id="L127" title="1 of 2 branches missed.">            } else if (at &lt; pressed) {</span>
+<span class="fc" id="L128">                pressed--;</span>
+            }
+<span class="pc bpc" id="L130" title="1 of 2 branches missed.">            if (graph.getPendingTemplate() == template) { // NOPMD CompareObjectsWithEquals - the armed item itself</span>
+<span class="nc" id="L131">                graph.setPendingTemplate(null);</span>
+            }
+<span class="fc" id="L133">            setShouldCalcPreferredSize(true);</span>
+<span class="fc" id="L134">            repaint();</span>
+        }
+<span class="fc" id="L136">    }</span>
+
+    /// The items, in order. Do not modify the list.
+    public List&lt;GraphNodeTemplate&gt; getTemplates() {
+<span class="nc" id="L140">        return templates;</span>
+    }
+
+    /// True when the items are laid in a row.
+    public boolean isHorizontal() {
+<span class="nc" id="L145">        return horizontal;</span>
+    }
+
+    /// Lays the items in a row, for a palette above or below the graph, or
+    /// in a column, the default.
+    public void setHorizontal(boolean horizontal) {
+<span class="nc" id="L151">        this.horizontal = horizontal;</span>
+<span class="nc" id="L152">        setShouldCalcPreferredSize(true);</span>
+<span class="nc" id="L153">    }</span>
+
+    private int itemW() {
+<span class="fc" id="L156">        return GraphLook.mm(15);</span>
+    }
+
+    private int itemH() {
+<span class="fc" id="L160">        return GraphLook.mm(8) + GraphLook.style(&quot;NodeGraphPaletteItem&quot;).getFont().getHeight() + GraphLook.mm(2);</span>
+    }
+
+    @Override
+    protected Dimension calcPreferredSize() {
+<span class="fc" id="L165">        Style s = getStyle();</span>
+<span class="fc" id="L166">        int n = Math.max(1, templates.size());</span>
+<span class="pc bpc" id="L167" title="1 of 2 branches missed.">        int w = horizontal ? n * itemW() : itemW();</span>
+<span class="pc bpc" id="L168" title="1 of 2 branches missed.">        int h = horizontal ? itemH() : n * itemH();</span>
+<span class="fc" id="L169">        return new Dimension(w + s.getHorizontalPadding(), h + s.getVerticalPadding());</span>
+    }
+
+    private int originX() {
+<span class="fc" id="L173">        return getX() + getStyle().getPaddingLeftNoRTL();</span>
+    }
+
+    private int originY() {
+<span class="fc" id="L177">        return getY() + getStyle().getPaddingTop();</span>
+    }
+
+    /// The item at a point of the palette's parent, or -1.
+    private int itemAt(int x, int y) {
+<span class="fc" id="L182">        int rx = x - originX();</span>
+<span class="fc" id="L183">        int ry = y - originY();</span>
+<span class="pc bpc" id="L184" title="2 of 4 branches missed.">        if (rx &lt; 0 || ry &lt; 0) {</span>
+<span class="nc" id="L185">            return -1;</span>
+        }
+        int i;
+<span class="pc bpc" id="L188" title="1 of 2 branches missed.">        if (horizontal) {</span>
+<span class="nc bnc" id="L189" title="All 2 branches missed.">            if (ry &gt;= itemH()) {</span>
+<span class="nc" id="L190">                return -1;</span>
+            }
+<span class="nc" id="L192">            i = rx / itemW();</span>
+        } else {
+<span class="pc bpc" id="L194" title="1 of 2 branches missed.">            if (rx &gt;= itemW()) {</span>
+<span class="nc" id="L195">                return -1;</span>
+            }
+<span class="fc" id="L197">            i = ry / itemH();</span>
+        }
+<span class="pc bpc" id="L199" title="1 of 2 branches missed.">        return i &lt; templates.size() ? i : -1;</span>
+    }
+
+    @Override
+    public void paint(Graphics g) {
+<span class="fc" id="L204">        Style is = GraphLook.style(&quot;NodeGraphPaletteItem&quot;);</span>
+<span class="fc" id="L205">        Font f = is.getFont();</span>
+<span class="fc" id="L206">        int iw = itemW();</span>
+<span class="fc" id="L207">        int ih = itemH();</span>
+<span class="fc" id="L208">        int gap = GraphLook.mm(1);</span>
+<span class="fc" id="L209">        int primary = GraphLook.style(&quot;NodeGraphNodeSelected&quot;).getFgColor();</span>
+<span class="fc" id="L210">        int bg = GraphLook.bg(is, 0xffffff);</span>
+<span class="fc" id="L211">        int fg = is.getFgColor();</span>
+<span class="fc" id="L212">        boolean aa = g.isAntiAliased();</span>
+<span class="fc" id="L213">        g.setAntiAliased(true);</span>
+<span class="fc" id="L214">        GraphNodeTemplate armed = graph.getPendingTemplate();</span>
+<span class="fc" id="L215">        int n = templates.size();</span>
+<span class="fc bfc" id="L216" title="All 2 branches covered.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc" id="L217">            GraphNodeTemplate t = templates.get(i);</span>
+<span class="pc bpc" id="L218" title="1 of 2 branches missed.">            int x = originX() + (horizontal ? i * iw : 0);</span>
+<span class="pc bpc" id="L219" title="1 of 2 branches missed.">            int y = originY() + (horizontal ? 0 : i * ih);</span>
+<span class="pc bpc" id="L220" title="2 of 4 branches missed.">            boolean on = t == armed || i == pressed; // NOPMD CompareObjectsWithEquals - the armed item itself</span>
+<span class="fc" id="L221">            int arc = GraphLook.mm(1.2f);</span>
+<span class="pc bpc" id="L222" title="1 of 2 branches missed.">            if (on) {</span>
+<span class="nc" id="L223">                g.setColor(GraphLook.mix(bg, primary, 50));</span>
+<span class="nc" id="L224">                g.fillRoundRect(x + gap / 2, y + gap / 2, iw - gap, ih - gap, arc, arc);</span>
+            }
+            // the outline, in the proportions of the node it makes
+<span class="fc" id="L227">            int boxW = iw - gap * 4;</span>
+<span class="fc" id="L228">            int boxH = ih - f.getHeight() - gap * 3;</span>
+<span class="fc" id="L229">            double ratio = t.getWidth() / Math.max(1, t.getHeight());</span>
+<span class="fc" id="L230">            int pw = boxW;</span>
+<span class="fc" id="L231">            int ph = (int) Math.round(pw / Math.max(0.2, ratio));</span>
+<span class="pc bpc" id="L232" title="1 of 2 branches missed.">            if (ph &gt; boxH) {</span>
+<span class="nc" id="L233">                ph = boxH;</span>
+<span class="nc" id="L234">                pw = (int) Math.round(ph * ratio);</span>
+            }
+<span class="fc" id="L236">            int px = x + (iw - pw) / 2;</span>
+<span class="fc" id="L237">            int py = y + gap + (boxH - ph) / 2;</span>
+<span class="fc" id="L238">            GraphShape shape = GraphShapeRegistry.get(t.getShape());</span>
+<span class="pc bpc" id="L239" title="2 of 4 branches missed.">            if (shape != null &amp;&amp; g.isShapeSupported()) {</span>
+<span class="nc" id="L240">                path.reset();</span>
+<span class="nc" id="L241">                shape.outline(path, px, py, pw - 1, ph - 1);</span>
+<span class="nc" id="L242">                g.setColor(bg);</span>
+<span class="nc" id="L243">                g.fillShape(path);</span>
+<span class="nc bnc" id="L244" title="All 2 branches missed.">                g.setColor(on ? primary : GraphLook.mix(bg, fg, 150));</span>
+<span class="nc" id="L245">                g.drawShape(path, GraphLook.stroke(Math.max(1f, GraphLook.mm(0.25f))));</span>
+<span class="nc" id="L246">                path.reset();</span>
+<span class="nc" id="L247">                shape.detail(path, px, py, pw - 1, ph - 1);</span>
+<span class="nc bnc" id="L248" title="All 2 branches missed.">                if (path.getPointsSize() &gt; 0) {</span>
+<span class="nc" id="L249">                    g.drawShape(path, GraphLook.stroke(1f));</span>
+                }
+            } else {
+<span class="fc" id="L252">                g.setColor(bg);</span>
+<span class="fc" id="L253">                g.fillRoundRect(px, py, pw, ph, arc, arc);</span>
+<span class="pc bpc" id="L254" title="1 of 2 branches missed.">                g.setColor(on ? primary : GraphLook.mix(bg, fg, 150));</span>
+<span class="fc" id="L255">                g.drawRoundRect(px, py, pw - 1, ph - 1, arc, arc);</span>
+<span class="fc" id="L256">                int r = Math.max(1, GraphLook.mm(0.5f));</span>
+<span class="pc bpc" id="L257" title="1 of 2 branches missed.">                if (t.hasPorts()) {</span>
+<span class="nc" id="L258">                    g.fillArc(px - r, py + ph / 2 - r, r * 2, r * 2, 0, 360);</span>
+<span class="nc" id="L259">                    g.fillArc(px + pw - r - 1, py + ph / 2 - r, r * 2, r * 2, 0, 360);</span>
+                }
+            }
+<span class="fc" id="L262">            String name = t.getName();</span>
+<span class="pc bpc" id="L263" title="1 of 2 branches missed.">            if (name != null) {</span>
+<span class="fc" id="L264">                String text = GraphLook.fit(name, f, iw - gap * 2);</span>
+<span class="fc" id="L265">                g.setFont(f);</span>
+<span class="fc" id="L266">                g.setColor(fg);</span>
+<span class="fc" id="L267">                g.drawString(text, x + (iw - f.stringWidth(text)) / 2, y + ih - f.getHeight() - gap);</span>
+            }
+        }
+<span class="fc" id="L270">        g.setAntiAliased(aa);</span>
+<span class="fc" id="L271">    }</span>
+
+    @Override
+    protected boolean isStickyDrag() {
+        // the drag leaves the palette for the graph
+<span class="nc" id="L276">        return true;</span>
+    }
+
+    @Override
+    public void pointerPressed(int x, int y) {
+<span class="fc" id="L281">        pressX = x;</span>
+<span class="fc" id="L282">        pressY = y;</span>
+<span class="fc" id="L283">        dragging = false;</span>
+<span class="fc" id="L284">        pressed = itemAt(x - getAbsoluteX() + getX(), y - getAbsoluteY() + getY());</span>
+<span class="fc" id="L285">        repaint();</span>
+<span class="fc" id="L286">    }</span>
+
+    @Override
+    public void pointerDragged(int x, int y) {
+<span class="pc bpc" id="L290" title="1 of 2 branches missed.">        if (pressed &lt; 0) {</span>
+<span class="nc" id="L291">            return;</span>
+        }
+<span class="fc bfc" id="L293" title="All 2 branches covered.">        if (!dragging) {</span>
+<span class="fc" id="L294">            int slop = GraphLook.mm(1.5f);</span>
+<span class="pc bpc" id="L295" title="3 of 4 branches missed.">            if (Math.abs(x - pressX) &lt; slop &amp;&amp; Math.abs(y - pressY) &lt; slop) {</span>
+<span class="nc" id="L296">                return;</span>
+            }
+<span class="fc" id="L298">            dragging = true;</span>
+        }
+<span class="pc bpc" id="L300" title="1 of 2 branches missed.">        if (pressed &gt;= templates.size()) {</span>
+<span class="nc" id="L301">            return;</span>
+        }
+<span class="fc" id="L303">        graph.showDropPreview(templates.get(pressed), x, y);</span>
+<span class="fc" id="L304">    }</span>
+
+    @Override
+    public void pointerReleased(int x, int y) {
+<span class="fc" id="L308">        int item = pressed;</span>
+<span class="fc" id="L309">        pressed = -1;</span>
+<span class="pc bpc" id="L310" title="2 of 4 branches missed.">        if (item &gt;= 0 &amp;&amp; item &lt; templates.size()) {</span>
+<span class="fc" id="L311">            GraphNodeTemplate t = templates.get(item);</span>
+<span class="fc bfc" id="L312" title="All 2 branches covered.">            if (dragging) {</span>
+<span class="fc" id="L313">                graph.setPendingTemplate(null);</span>
+<span class="fc" id="L314">                graph.dropTemplate(t, x, y);</span>
+            } else {
+                // tapping the armed item lets go of it
+<span class="fc bfc" id="L317" title="All 2 branches covered.">                graph.setPendingTemplate(graph.getPendingTemplate() == t ? null : t); // NOPMD CompareObjectsWithEquals - the armed item itself</span>
+            }
+        }
+<span class="fc" id="L320">        dragging = false;</span>
+<span class="fc" id="L321">        graph.clearDropPreview();</span>
+<span class="fc" id="L322">        repaint();</span>
+<span class="fc" id="L323">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

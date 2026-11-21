@@ -1,0 +1,666 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>LayeredArrangement.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.graph.arrange</a> &gt; <span class="el_source">LayeredArrangement.java</span></div><h1>LayeredArrangement.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.graph.arrange;
+
+import com.codename1.graph.GraphEdge;
+import com.codename1.graph.GraphGroup;
+import com.codename1.graph.GraphModel;
+import com.codename1.graph.GraphNode;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/// An arrangement for flows: every edge points the same way, from one layer to the
+/// next, with as few crossings as it can find.
+///
+/// This is the method of Sugiyama, Tagawa and Toda in four passes. Cycles are
+/// broken by reversing the edges a depth first search finds going back;
+/// nodes are put on layers by their longest path from a source; an edge that
+/// spans several layers gets a hidden point on each so it bends around the
+/// nodes between; the order inside each layer is improved by sweeping down
+/// and up, moving each node to the median of its neighbours; and each node is
+/// then pulled towards its neighbours without overlapping the next one.
+///
+/// The edges get routes through their hidden points. Pinned nodes are placed
+/// like any other: a layered picture has no room for a node that stays put.
+<span class="fc" id="L48">public class LayeredArrangement implements GraphArrangement {</span>
+    /// Layers run down the screen and edges point down.
+    public static final int TOP_TO_BOTTOM = 0;
+
+    /// Layers run across the screen and edges point right.
+    public static final int LEFT_TO_RIGHT = 1;
+
+<span class="fc" id="L55">    private int direction = TOP_TO_BOTTOM;</span>
+<span class="fc" id="L56">    private double layerGap = 80;</span>
+<span class="fc" id="L57">    private double nodeGap = 40;</span>
+<span class="fc" id="L58">    private int sweeps = 12;</span>
+    private boolean respectLanes;
+
+    /// `TOP_TO_BOTTOM`, the default, or `LEFT_TO_RIGHT`.
+    public int getDirection() {
+<span class="nc" id="L63">        return direction;</span>
+    }
+
+    /// Sets the direction edges point.
+    public void setDirection(int direction) {
+<span class="fc" id="L68">        this.direction = direction;</span>
+<span class="fc" id="L69">    }</span>
+
+    /// The space between layers in world units.
+    public double getLayerGap() {
+<span class="nc" id="L73">        return layerGap;</span>
+    }
+
+    /// Sets the space between layers.
+    public void setLayerGap(double layerGap) {
+<span class="nc" id="L78">        this.layerGap = layerGap;</span>
+<span class="nc" id="L79">    }</span>
+
+    /// The space between nodes on one layer in world units.
+    public double getNodeGap() {
+<span class="nc" id="L83">        return nodeGap;</span>
+    }
+
+    /// Sets the space between nodes on one layer.
+    public void setNodeGap(double nodeGap) {
+<span class="nc" id="L88">        this.nodeGap = nodeGap;</span>
+<span class="nc" id="L89">    }</span>
+
+    /// True when a node stays inside the band of its lane.
+    public boolean isRespectLanes() {
+<span class="fc" id="L93">        return respectLanes;</span>
+    }
+
+    /// Keeps each node inside the band of the lane it belongs to. The layers
+    /// still say how far along the lanes a node goes; across them, the nodes
+    /// of one lane on one layer are spread over that lane's band in the order
+    /// the arrangement gave them, and the picture starts where the lanes do.
+    ///
+    /// It applies to lanes that run along the direction: horizontal lanes
+    /// with `LEFT_TO_RIGHT`, vertical ones with `TOP_TO_BOTTOM`. A lane lying
+    /// the other way is treated as no lane. The nodes in no lane keep the
+    /// arrangement they had among themselves, placed past the last lane. An
+    /// edge gets no route through hidden points then, since a node moved
+    /// into its band is no longer where the route went around it. Off by
+    /// default.
+    ///
+    /// The lanes are taken as they are, and none is resized: make a lane as
+    /// wide as the nodes it has to hold side by side, or they spill over its
+    /// edge. The first layer starts `getNodeGap` from the start of the
+    /// lanes, which is the room a lane's title needs.
+    public void setRespectLanes(boolean respectLanes) {
+<span class="fc" id="L114">        this.respectLanes = respectLanes;</span>
+<span class="fc" id="L115">    }</span>
+
+    // Moves the nodes of each lane into its band. `along` and `center` are
+    // the layer axis and the cross axis of each node; true when a lane took
+    // part.
+    private boolean intoLanes(GraphModel model, Graphs g, int[] layer, double[] along, double[] center,
+                              double[] breadth) {
+<span class="fc bfc" id="L122" title="All 2 branches covered.">        boolean tb = direction == TOP_TO_BOTTOM;</span>
+<span class="fc" id="L123">        int n = g.size();</span>
+<span class="fc" id="L124">        GraphGroup[] laneOf = new GraphGroup[n];</span>
+<span class="fc" id="L125">        double start = 0;</span>
+<span class="fc" id="L126">        boolean any = false;</span>
+<span class="fc bfc" id="L127" title="All 2 branches covered.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc" id="L128">            String gid = g.nodes[i].getGroupId();</span>
+<span class="fc bfc" id="L129" title="All 2 branches covered.">            GraphGroup lane = gid == null ? null : model.getGroup(gid);</span>
+            // a horizontal lane is a band across the screen: layers must run across too
+<span class="pc bpc" id="L131" title="1 of 6 branches missed.">            if (lane != null &amp;&amp; lane.isLane() &amp;&amp; lane.isHorizontal() != tb) {</span>
+<span class="fc" id="L132">                laneOf[i] = lane;</span>
+<span class="pc bpc" id="L133" title="1 of 2 branches missed.">                double s = tb ? lane.getY() : lane.getX();</span>
+<span class="fc bfc" id="L134" title="All 2 branches covered.">                start = any ? Math.min(start, s) : s;</span>
+<span class="fc" id="L135">                any = true;</span>
+            }
+        }
+<span class="fc bfc" id="L138" title="All 2 branches covered.">        if (!any) {</span>
+<span class="fc" id="L139">            return false;</span>
+        }
+<span class="fc bfc" id="L141" title="All 2 branches covered.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc" id="L142">            along[i] += start + nodeGap;</span>
+        }
+        // the nodes in no lane keep their own arrangement, moved past the
+        // last lane so that none of them lands in a lane's band
+        // from the lanes themselves, which may lie at negative coordinates
+<span class="fc" id="L147">        double laneEnd = -Double.MAX_VALUE;</span>
+<span class="fc" id="L148">        double freeStart = 0;</span>
+<span class="fc" id="L149">        boolean anyFree = false;</span>
+<span class="fc bfc" id="L150" title="All 2 branches covered.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc bfc" id="L151" title="All 2 branches covered.">            if (laneOf[i] != null) {</span>
+<span class="fc" id="L152">                GraphGroup lane = laneOf[i];</span>
+<span class="pc bpc" id="L153" title="1 of 2 branches missed.">                laneEnd = Math.max(laneEnd, tb ? lane.getX() + lane.getWidth() : lane.getY() + lane.getHeight());</span>
+<span class="fc" id="L154">            } else {</span>
+<span class="fc" id="L155">                double s = center[i] - breadth[i] / 2;</span>
+<span class="pc bpc" id="L156" title="1 of 2 branches missed.">                freeStart = anyFree ? Math.min(freeStart, s) : s;</span>
+<span class="fc" id="L157">                anyFree = true;</span>
+            }
+        }
+<span class="fc bfc" id="L160" title="All 2 branches covered.">        if (anyFree) {</span>
+<span class="fc" id="L161">            double shift = laneEnd + nodeGap - freeStart;</span>
+<span class="fc bfc" id="L162" title="All 2 branches covered.">            for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc bfc" id="L163" title="All 2 branches covered.">                if (laneOf[i] == null) {</span>
+<span class="fc" id="L164">                    center[i] += shift;</span>
+                }
+            }
+        }
+<span class="fc" id="L168">        boolean[] done = new boolean[n];</span>
+<span class="fc bfc" id="L169" title="All 2 branches covered.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc bfc" id="L170" title="All 4 branches covered.">            if (laneOf[i] == null || done[i]) {</span>
+<span class="fc" id="L171">                continue;</span>
+            }
+            // the nodes of this lane on this layer, in the order they were given
+<span class="fc" id="L174">            List&lt;Integer&gt; row = new ArrayList&lt;Integer&gt;();</span>
+<span class="fc bfc" id="L175" title="All 2 branches covered.">            for (int j = i; j &lt; n; j++) {</span>
+<span class="fc bfc" id="L176" title="All 6 branches covered.">                if (!done[j] &amp;&amp; laneOf[j] == laneOf[i] &amp;&amp; layer[j] == layer[i]) { // NOPMD CompareObjectsWithEquals - the lane itself</span>
+<span class="fc" id="L177">                    int at = 0;</span>
+<span class="pc bpc" id="L178" title="1 of 4 branches missed.">                    while (at &lt; row.size() &amp;&amp; center[row.get(at).intValue()] &lt;= center[j]) {</span>
+<span class="fc" id="L179">                        at++;</span>
+                    }
+<span class="fc" id="L181">                    row.add(at, Integer.valueOf(j));</span>
+<span class="fc" id="L182">                    done[j] = true;</span>
+                }
+            }
+<span class="fc" id="L185">            GraphGroup lane = laneOf[i];</span>
+<span class="pc bpc" id="L186" title="1 of 2 branches missed.">            double bandStart = tb ? lane.getX() : lane.getY();</span>
+<span class="pc bpc" id="L187" title="1 of 2 branches missed.">            double bandSize = tb ? lane.getWidth() : lane.getHeight();</span>
+<span class="fc" id="L188">            double total = 0;</span>
+<span class="fc bfc" id="L189" title="All 2 branches covered.">            for (int k = 0; k &lt; row.size(); k++) { // NOPMD ForLoopCanBeForeach - indexed, like the rest of the pass</span>
+<span class="fc" id="L190">                total += breadth[row.get(k).intValue()];</span>
+            }
+            // the gap shrinks before a row leaves its band, and never below nothing
+<span class="fc bfc" id="L193" title="All 2 branches covered.">            double gap = row.size() &lt; 2 ? 0 : Math.max(0, Math.min(nodeGap, (bandSize - total) / (row.size() - 1)));</span>
+<span class="fc" id="L194">            double at = bandStart + Math.max(0, (bandSize - total - gap * (row.size() - 1)) / 2);</span>
+<span class="fc bfc" id="L195" title="All 2 branches covered.">            for (int k = 0; k &lt; row.size(); k++) { // NOPMD ForLoopCanBeForeach - indexed, like the rest of the pass</span>
+<span class="fc" id="L196">                int v = row.get(k).intValue();</span>
+<span class="fc" id="L197">                center[v] = at + breadth[v] / 2;</span>
+<span class="fc" id="L198">                at += breadth[v] + gap;</span>
+            }
+        }
+<span class="fc" id="L201">        return true;</span>
+    }
+
+    @Override
+    public ArrangementResult arrange(GraphModel model) {
+<span class="fc" id="L206">        Graphs g = new Graphs(model);</span>
+<span class="fc" id="L207">        int n = g.size();</span>
+<span class="fc" id="L208">        ArrangementResult result = new ArrangementResult();</span>
+<span class="fc bfc" id="L209" title="All 2 branches covered.">        if (n == 0) {</span>
+<span class="fc" id="L210">            return result;</span>
+        }
+<span class="fc" id="L212">        boolean[][] reversed = breakCycles(g);</span>
+        // forward successor lists after reversal
+<span class="fc" id="L214">        List&lt;List&lt;Integer&gt;&gt; succ = new ArrayList&lt;List&lt;Integer&gt;&gt;();</span>
+<span class="fc bfc" id="L215" title="All 2 branches covered.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc" id="L216">            succ.add(new ArrayList&lt;Integer&gt;());</span>
+        }
+<span class="fc bfc" id="L218" title="All 2 branches covered.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc bfc" id="L219" title="All 2 branches covered.">            for (int j = 0; j &lt; g.out[i].length; j++) {</span>
+<span class="fc" id="L220">                int t = g.out[i][j];</span>
+<span class="fc bfc" id="L221" title="All 2 branches covered.">                if (reversed[i][j]) {</span>
+<span class="fc" id="L222">                    succ.get(t).add(Integer.valueOf(i));</span>
+                } else {
+<span class="fc" id="L224">                    succ.get(i).add(Integer.valueOf(t));</span>
+                }
+            }
+        }
+<span class="fc" id="L228">        int[] layer = longestPath(n, succ);</span>
+
+        // vertices: real nodes then hidden points; chains record each edge's points
+<span class="fc" id="L231">        List&lt;Integer&gt; vLayer = new ArrayList&lt;Integer&gt;();</span>
+<span class="fc bfc" id="L232" title="All 2 branches covered.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc" id="L233">            vLayer.add(Integer.valueOf(layer[i]));</span>
+        }
+<span class="fc" id="L235">        List&lt;List&lt;Integer&gt;&gt; vSucc = new ArrayList&lt;List&lt;Integer&gt;&gt;();</span>
+<span class="fc" id="L236">        List&lt;List&lt;Integer&gt;&gt; vPred = new ArrayList&lt;List&lt;Integer&gt;&gt;();</span>
+<span class="fc bfc" id="L237" title="All 2 branches covered.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc" id="L238">            vSucc.add(new ArrayList&lt;Integer&gt;());</span>
+<span class="fc" id="L239">            vPred.add(new ArrayList&lt;Integer&gt;());</span>
+        }
+<span class="fc" id="L241">        Map&lt;Long, int[]&gt; chains = new HashMap&lt;Long, int[]&gt;();</span>
+<span class="fc bfc" id="L242" title="All 2 branches covered.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc" id="L243">            List&lt;Integer&gt; s = succ.get(i);</span>
+<span class="fc bfc" id="L244" title="All 2 branches covered.">            for (int j = 0; j &lt; s.size(); j++) { // NOPMD ForLoopCanBeForeach - indexed, like the rest of the pass</span>
+<span class="fc" id="L245">                int t = s.get(j).intValue();</span>
+<span class="fc" id="L246">                int span = layer[t] - layer[i];</span>
+<span class="fc" id="L247">                int prev = i;</span>
+<span class="fc" id="L248">                int[] chain = new int[Math.max(0, span - 1)];</span>
+<span class="fc bfc" id="L249" title="All 2 branches covered.">                for (int l = 1; l &lt; span; l++) {</span>
+<span class="fc" id="L250">                    int v = vLayer.size();</span>
+<span class="fc" id="L251">                    vLayer.add(Integer.valueOf(layer[i] + l));</span>
+<span class="fc" id="L252">                    vSucc.add(new ArrayList&lt;Integer&gt;());</span>
+<span class="fc" id="L253">                    vPred.add(new ArrayList&lt;Integer&gt;());</span>
+<span class="fc" id="L254">                    vSucc.get(prev).add(Integer.valueOf(v));</span>
+<span class="fc" id="L255">                    vPred.get(v).add(Integer.valueOf(prev));</span>
+<span class="fc" id="L256">                    chain[l - 1] = v;</span>
+<span class="fc" id="L257">                    prev = v;</span>
+                }
+<span class="fc" id="L259">                vSucc.get(prev).add(Integer.valueOf(t));</span>
+<span class="fc" id="L260">                vPred.get(t).add(Integer.valueOf(prev));</span>
+<span class="fc" id="L261">                chains.put(key(i, t), chain);</span>
+            }
+        }
+<span class="fc" id="L264">        int vn = vLayer.size();</span>
+<span class="fc" id="L265">        int layers = 0;</span>
+<span class="fc bfc" id="L266" title="All 2 branches covered.">        for (int v = 0; v &lt; vn; v++) {</span>
+<span class="fc" id="L267">            layers = Math.max(layers, vLayer.get(v).intValue() + 1);</span>
+        }
+<span class="fc" id="L269">        int[][] order = initialOrder(vn, layers, vLayer, vSucc, vPred);</span>
+<span class="fc" id="L270">        int[] pos = new int[vn];</span>
+<span class="fc" id="L271">        reduceCrossings(order, pos, vSucc, vPred);</span>
+
+<span class="fc bfc" id="L273" title="All 2 branches covered.">        boolean tb = direction == TOP_TO_BOTTOM;</span>
+<span class="fc" id="L274">        double[] breadth = new double[vn];</span>
+<span class="fc" id="L275">        double[] depth = new double[layers];</span>
+<span class="fc bfc" id="L276" title="All 2 branches covered.">        for (int v = 0; v &lt; vn; v++) {</span>
+<span class="fc bfc" id="L277" title="All 2 branches covered.">            if (v &lt; n) {</span>
+<span class="fc" id="L278">                GraphNode node = g.nodes[v];</span>
+<span class="fc bfc" id="L279" title="All 2 branches covered.">                breadth[v] = tb ? node.getWidth() : node.getHeight();</span>
+<span class="fc bfc" id="L280" title="All 2 branches covered.">                double d = tb ? node.getHeight() : node.getWidth();</span>
+<span class="fc" id="L281">                int l = vLayer.get(v).intValue();</span>
+<span class="fc" id="L282">                depth[l] = Math.max(depth[l], d);</span>
+<span class="fc" id="L283">            } else {</span>
+<span class="fc" id="L284">                breadth[v] = 0;</span>
+            }
+        }
+<span class="fc" id="L287">        double[] center = assignCoordinates(order, breadth, vSucc, vPred);</span>
+<span class="fc" id="L288">        double[] layerStart = new double[layers];</span>
+<span class="fc" id="L289">        double at = 0;</span>
+<span class="fc bfc" id="L290" title="All 2 branches covered.">        for (int l = 0; l &lt; layers; l++) {</span>
+<span class="fc" id="L291">            layerStart[l] = at;</span>
+<span class="fc" id="L292">            at += depth[l] + layerGap;</span>
+        }
+<span class="fc" id="L294">        double[] alongOf = new double[n];</span>
+<span class="fc bfc" id="L295" title="All 2 branches covered.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc" id="L296">            GraphNode node = g.nodes[i];</span>
+<span class="fc bfc" id="L297" title="All 2 branches covered.">            alongOf[i] = layerStart[layer[i]] + (depth[layer[i]] - (tb ? node.getHeight() : node.getWidth())) / 2;</span>
+        }
+<span class="fc bfc" id="L299" title="All 4 branches covered.">        boolean inLanes = respectLanes &amp;&amp; intoLanes(model, g, layer, alongOf, center, breadth);</span>
+<span class="fc bfc" id="L300" title="All 2 branches covered.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc" id="L301">            GraphNode node = g.nodes[i];</span>
+<span class="fc" id="L302">            double c = center[i];</span>
+<span class="fc" id="L303">            double along = alongOf[i];</span>
+<span class="fc bfc" id="L304" title="All 2 branches covered.">            if (tb) {</span>
+<span class="fc" id="L305">                result.setPosition(node.getId(), c - node.getWidth() / 2, along);</span>
+            } else {
+<span class="fc" id="L307">                result.setPosition(node.getId(), along, c - node.getHeight() / 2);</span>
+            }
+        }
+<span class="fc bfc" id="L310" title="All 2 branches covered.">        if (inLanes) {</span>
+<span class="fc" id="L311">            return result;</span>
+        }
+<span class="fc" id="L313">        Map&lt;String, Integer&gt; index = new HashMap&lt;String, Integer&gt;();</span>
+<span class="fc bfc" id="L314" title="All 2 branches covered.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc" id="L315">            index.put(g.nodes[i].getId(), Integer.valueOf(i));</span>
+        }
+<span class="fc bfc" id="L317" title="All 2 branches covered.">        for (GraphEdge e : model.getEdges()) {</span>
+<span class="fc" id="L318">            Integer s = index.get(e.getSourceId());</span>
+<span class="fc" id="L319">            Integer t = index.get(e.getTargetId());</span>
+<span class="pc bpc" id="L320" title="2 of 4 branches missed.">            if (s == null || t == null) {</span>
+<span class="nc" id="L321">                continue;</span>
+            }
+<span class="fc" id="L323">            int[] chain = chains.get(key(s.intValue(), t.intValue()));</span>
+<span class="fc" id="L324">            boolean back = false;</span>
+<span class="fc bfc" id="L325" title="All 2 branches covered.">            if (chain == null) {</span>
+<span class="fc" id="L326">                chain = chains.get(key(t.intValue(), s.intValue()));</span>
+<span class="fc" id="L327">                back = true;</span>
+            }
+<span class="fc bfc" id="L329" title="All 4 branches covered.">            if (chain == null || chain.length == 0) {</span>
+<span class="fc" id="L330">                continue;</span>
+            }
+<span class="fc" id="L332">            double[] route = new double[chain.length * 2];</span>
+<span class="fc bfc" id="L333" title="All 2 branches covered.">            for (int c = 0; c &lt; chain.length; c++) {</span>
+<span class="fc bfc" id="L334" title="All 2 branches covered.">                int v = chain[back ? chain.length - 1 - c : c];</span>
+<span class="fc" id="L335">                int l = vLayer.get(v).intValue();</span>
+<span class="fc" id="L336">                double along = layerStart[l] + depth[l] / 2;</span>
+<span class="fc bfc" id="L337" title="All 2 branches covered.">                route[c * 2] = tb ? center[v] : along;</span>
+<span class="fc bfc" id="L338" title="All 2 branches covered.">                route[c * 2 + 1] = tb ? along : center[v];</span>
+            }
+<span class="fc" id="L340">            result.setRoute(e.getId(), route);</span>
+<span class="fc" id="L341">        }</span>
+<span class="fc" id="L342">        return result;</span>
+    }
+
+    private static Long key(int a, int b) {
+<span class="fc" id="L346">        return Long.valueOf(((long) a &lt;&lt; 32) | (b &amp; 0xffffffffL));</span>
+    }
+
+    /// Marks the edges an iterative depth first search meets going back to a
+    /// node still on its stack.
+    private static boolean[][] breakCycles(Graphs g) {
+<span class="fc" id="L352">        int n = g.size();</span>
+<span class="fc" id="L353">        boolean[][] rev = new boolean[n][];</span>
+<span class="fc bfc" id="L354" title="All 2 branches covered.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc" id="L355">            rev[i] = new boolean[g.out[i].length];</span>
+        }
+<span class="fc" id="L357">        int[] state = new int[n];</span>
+<span class="fc" id="L358">        int[] stack = new int[n];</span>
+<span class="fc" id="L359">        int[] edgeAt = new int[n];</span>
+        // start from sources first so the natural direction wins
+<span class="fc" id="L361">        int[] starts = new int[n];</span>
+<span class="fc" id="L362">        int k = 0;</span>
+<span class="fc bfc" id="L363" title="All 2 branches covered.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc bfc" id="L364" title="All 2 branches covered.">            if (g.in[i].length == 0) {</span>
+<span class="fc" id="L365">                starts[k++] = i;</span>
+            }
+        }
+<span class="fc bfc" id="L368" title="All 2 branches covered.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc bfc" id="L369" title="All 2 branches covered.">            if (g.in[i].length != 0) {</span>
+<span class="fc" id="L370">                starts[k++] = i;</span>
+            }
+        }
+<span class="fc bfc" id="L373" title="All 2 branches covered.">        for (int si = 0; si &lt; n; si++) {</span>
+<span class="fc" id="L374">            int s = starts[si];</span>
+<span class="fc bfc" id="L375" title="All 2 branches covered.">            if (state[s] != 0) {</span>
+<span class="fc" id="L376">                continue;</span>
+            }
+<span class="fc" id="L378">            int top = 0;</span>
+<span class="fc" id="L379">            stack[0] = s;</span>
+<span class="fc" id="L380">            edgeAt[0] = 0;</span>
+<span class="fc" id="L381">            state[s] = 1;</span>
+<span class="fc bfc" id="L382" title="All 2 branches covered.">            while (top &gt;= 0) {</span>
+<span class="fc" id="L383">                int v = stack[top];</span>
+<span class="fc bfc" id="L384" title="All 2 branches covered.">                if (edgeAt[top] &lt; g.out[v].length) {</span>
+<span class="fc" id="L385">                    int j = edgeAt[top]++;</span>
+<span class="fc" id="L386">                    int t = g.out[v][j];</span>
+<span class="fc bfc" id="L387" title="All 2 branches covered.">                    if (state[t] == 1) {</span>
+<span class="fc" id="L388">                        rev[v][j] = true;</span>
+<span class="fc bfc" id="L389" title="All 2 branches covered.">                    } else if (state[t] == 0) {</span>
+<span class="fc" id="L390">                        state[t] = 1;</span>
+<span class="fc" id="L391">                        top++;</span>
+<span class="fc" id="L392">                        stack[top] = t;</span>
+<span class="fc" id="L393">                        edgeAt[top] = 0;</span>
+                    }
+<span class="fc" id="L395">                } else {</span>
+<span class="fc" id="L396">                    state[v] = 2;</span>
+<span class="fc" id="L397">                    top--;</span>
+                }
+<span class="fc" id="L399">            }</span>
+        }
+<span class="fc" id="L401">        return rev;</span>
+    }
+
+    private static int[] longestPath(int n, List&lt;List&lt;Integer&gt;&gt; succ) {
+<span class="fc" id="L405">        int[] indeg = new int[n];</span>
+<span class="fc bfc" id="L406" title="All 2 branches covered.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc bfc" id="L407" title="All 2 branches covered.">            for (Integer t : succ.get(i)) {</span>
+<span class="fc" id="L408">                indeg[t.intValue()]++;</span>
+<span class="fc" id="L409">            }</span>
+        }
+<span class="fc" id="L411">        int[] queue = new int[n];</span>
+<span class="fc" id="L412">        int head = 0;</span>
+<span class="fc" id="L413">        int tail = 0;</span>
+<span class="fc bfc" id="L414" title="All 2 branches covered.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc bfc" id="L415" title="All 2 branches covered.">            if (indeg[i] == 0) {</span>
+<span class="fc" id="L416">                queue[tail++] = i;</span>
+            }
+        }
+<span class="fc" id="L419">        int[] layer = new int[n];</span>
+<span class="fc bfc" id="L420" title="All 2 branches covered.">        while (head &lt; tail) {</span>
+<span class="fc" id="L421">            int v = queue[head++];</span>
+<span class="fc bfc" id="L422" title="All 2 branches covered.">            for (Integer t : succ.get(v)) {</span>
+<span class="fc" id="L423">                int ti = t.intValue();</span>
+<span class="fc" id="L424">                layer[ti] = Math.max(layer[ti], layer[v] + 1);</span>
+<span class="fc" id="L425">                indeg[ti]--;</span>
+<span class="fc bfc" id="L426" title="All 2 branches covered.">                if (indeg[ti] == 0) {</span>
+<span class="fc" id="L427">                    queue[tail++] = ti;</span>
+                }
+<span class="fc" id="L429">            }</span>
+<span class="fc" id="L430">        }</span>
+<span class="fc" id="L431">        return layer;</span>
+    }
+
+    /// Orders each layer by a breadth first walk, which keeps the children of
+    /// one node together before any sweep runs.
+    private static int[][] initialOrder(int vn, int layers, List&lt;Integer&gt; vLayer, List&lt;List&lt;Integer&gt;&gt; vSucc,
+                                        List&lt;List&lt;Integer&gt;&gt; vPred) {
+<span class="fc" id="L438">        int[] count = new int[layers];</span>
+<span class="fc" id="L439">        int[][] order = new int[layers][];</span>
+<span class="fc bfc" id="L440" title="All 2 branches covered.">        for (int v = 0; v &lt; vn; v++) {</span>
+<span class="fc" id="L441">            count[vLayer.get(v).intValue()]++;</span>
+        }
+<span class="fc bfc" id="L443" title="All 2 branches covered.">        for (int l = 0; l &lt; layers; l++) {</span>
+<span class="fc" id="L444">            order[l] = new int[count[l]];</span>
+<span class="fc" id="L445">            count[l] = 0;</span>
+        }
+<span class="fc" id="L447">        boolean[] seen = new boolean[vn];</span>
+<span class="fc" id="L448">        int[] queue = new int[vn];</span>
+<span class="fc bfc" id="L449" title="All 2 branches covered.">        for (int s = 0; s &lt; vn; s++) {</span>
+<span class="pc bpc" id="L450" title="1 of 4 branches missed.">            if (seen[s] || !vPred.get(s).isEmpty()) {</span>
+<span class="nc" id="L451">                continue;</span>
+            }
+<span class="fc" id="L453">            int head = 0;</span>
+<span class="fc" id="L454">            int tail = 0;</span>
+<span class="fc" id="L455">            queue[tail++] = s;</span>
+<span class="fc" id="L456">            seen[s] = true;</span>
+<span class="fc bfc" id="L457" title="All 2 branches covered.">            while (head &lt; tail) {</span>
+<span class="fc" id="L458">                int v = queue[head++];</span>
+<span class="fc" id="L459">                int l = vLayer.get(v).intValue();</span>
+<span class="fc" id="L460">                order[l][count[l]++] = v;</span>
+<span class="fc bfc" id="L461" title="All 2 branches covered.">                for (Integer t : vSucc.get(v)) {</span>
+<span class="fc bfc" id="L462" title="All 2 branches covered.">                    if (!seen[t.intValue()]) {</span>
+<span class="fc" id="L463">                        seen[t.intValue()] = true;</span>
+<span class="fc" id="L464">                        queue[tail++] = t.intValue();</span>
+                    }
+<span class="fc" id="L466">                }</span>
+<span class="fc" id="L467">            }</span>
+        }
+<span class="fc bfc" id="L469" title="All 2 branches covered.">        for (int v = 0; v &lt; vn; v++) {</span>
+<span class="pc bpc" id="L470" title="1 of 2 branches missed.">            if (!seen[v]) {</span>
+<span class="nc" id="L471">                int l = vLayer.get(v).intValue();</span>
+<span class="nc" id="L472">                order[l][count[l]++] = v;</span>
+            }
+        }
+<span class="fc" id="L475">        return order;</span>
+    }
+
+    private void reduceCrossings(int[][] order, int[] pos, List&lt;List&lt;Integer&gt;&gt; vSucc, List&lt;List&lt;Integer&gt;&gt; vPred) {
+<span class="fc" id="L479">        updatePos(order, pos);</span>
+<span class="fc" id="L480">        int best = crossings(order, pos, vSucc);</span>
+<span class="fc" id="L481">        int[][] bestOrder = copy(order);</span>
+<span class="fc bfc" id="L482" title="All 4 branches covered.">        for (int s = 0; s &lt; sweeps &amp;&amp; best &gt; 0; s++) {</span>
+<span class="fc bfc" id="L483" title="All 2 branches covered.">            boolean down = s % 2 == 0;</span>
+<span class="fc bfc" id="L484" title="All 2 branches covered.">            if (down) {</span>
+<span class="fc bfc" id="L485" title="All 2 branches covered.">                for (int l = 1; l &lt; order.length; l++) {</span>
+<span class="fc" id="L486">                    sortByMedian(order[l], pos, vPred);</span>
+<span class="fc" id="L487">                    updatePos(order, pos);</span>
+                }
+            } else {
+<span class="fc bfc" id="L490" title="All 2 branches covered.">                for (int l = order.length - 2; l &gt;= 0; l--) {</span>
+<span class="fc" id="L491">                    sortByMedian(order[l], pos, vSucc);</span>
+<span class="fc" id="L492">                    updatePos(order, pos);</span>
+                }
+            }
+<span class="fc" id="L495">            int c = crossings(order, pos, vSucc);</span>
+<span class="fc bfc" id="L496" title="All 2 branches covered.">            if (c &lt; best) {</span>
+<span class="fc" id="L497">                best = c;</span>
+<span class="fc" id="L498">                bestOrder = copy(order);</span>
+            }
+        }
+<span class="fc bfc" id="L501" title="All 2 branches covered.">        for (int l = 0; l &lt; order.length; l++) {</span>
+<span class="fc" id="L502">            order[l] = bestOrder[l];</span>
+        }
+<span class="fc" id="L504">        updatePos(order, pos);</span>
+<span class="fc" id="L505">    }</span>
+
+    private static int[][] copy(int[][] a) {
+<span class="fc" id="L508">        int[][] c = new int[a.length][];</span>
+<span class="fc bfc" id="L509" title="All 2 branches covered.">        for (int i = 0; i &lt; a.length; i++) {</span>
+<span class="fc" id="L510">            c[i] = new int[a[i].length];</span>
+<span class="fc" id="L511">            System.arraycopy(a[i], 0, c[i], 0, a[i].length);</span>
+        }
+<span class="fc" id="L513">        return c;</span>
+    }
+
+    private static void updatePos(int[][] order, int[] pos) {
+<span class="fc bfc" id="L517" title="All 2 branches covered.">        for (int l = 0; l &lt; order.length; l++) { // NOPMD ForLoopCanBeForeach - indexed, like the rest of the pass</span>
+<span class="fc bfc" id="L518" title="All 2 branches covered.">            for (int i = 0; i &lt; order[l].length; i++) {</span>
+<span class="fc" id="L519">                pos[order[l][i]] = i;</span>
+            }
+        }
+<span class="fc" id="L522">    }</span>
+
+    /// A stable insertion sort of one layer by the median position of each
+    /// vertex's neighbours on the fixed layer; a vertex with none keeps its
+    /// place.
+    private static void sortByMedian(int[] row, int[] pos, List&lt;List&lt;Integer&gt;&gt; adj) {
+<span class="fc" id="L528">        int len = row.length;</span>
+<span class="fc" id="L529">        double[] m = new double[len];</span>
+<span class="fc bfc" id="L530" title="All 2 branches covered.">        for (int i = 0; i &lt; len; i++) {</span>
+<span class="fc" id="L531">            List&lt;Integer&gt; nb = adj.get(row[i]);</span>
+<span class="fc bfc" id="L532" title="All 2 branches covered.">            if (nb.isEmpty()) {</span>
+<span class="fc" id="L533">                m[i] = i;</span>
+<span class="fc" id="L534">                continue;</span>
+            }
+<span class="fc" id="L536">            int[] p = new int[nb.size()];</span>
+<span class="fc bfc" id="L537" title="All 2 branches covered.">            for (int j = 0; j &lt; p.length; j++) {</span>
+<span class="fc" id="L538">                p[j] = pos[nb.get(j).intValue()];</span>
+            }
+<span class="fc" id="L540">            java.util.Arrays.sort(p);</span>
+<span class="fc" id="L541">            int h = p.length / 2;</span>
+<span class="fc bfc" id="L542" title="All 2 branches covered.">            m[i] = p.length % 2 == 1 ? p[h] : (p[h - 1] + p[h]) / 2.0;</span>
+        }
+<span class="fc bfc" id="L544" title="All 2 branches covered.">        for (int i = 1; i &lt; len; i++) {</span>
+<span class="fc" id="L545">            int v = row[i];</span>
+<span class="fc" id="L546">            double mv = m[i];</span>
+<span class="fc" id="L547">            int j = i - 1;</span>
+<span class="fc bfc" id="L548" title="All 4 branches covered.">            while (j &gt;= 0 &amp;&amp; m[j] &gt; mv) {</span>
+<span class="fc" id="L549">                row[j + 1] = row[j];</span>
+<span class="fc" id="L550">                m[j + 1] = m[j];</span>
+<span class="fc" id="L551">                j--;</span>
+            }
+<span class="fc" id="L553">            row[j + 1] = v;</span>
+<span class="fc" id="L554">            m[j + 1] = mv;</span>
+        }
+<span class="fc" id="L556">    }</span>
+
+    /// Counts crossings between consecutive layers by comparing every pair of
+    /// edges, which is quadratic per layer pair but trivial at diagram sizes.
+    static int crossings(int[][] order, int[] pos, List&lt;List&lt;Integer&gt;&gt; vSucc) {
+<span class="fc" id="L561">        int total = 0;</span>
+<span class="fc bfc" id="L562" title="All 2 branches covered.">        for (int l = 0; l + 1 &lt; order.length; l++) {</span>
+<span class="fc" id="L563">            List&lt;int[]&gt; edges = new ArrayList&lt;int[]&gt;();</span>
+<span class="fc bfc" id="L564" title="All 2 branches covered.">            for (int i = 0; i &lt; order[l].length; i++) {</span>
+<span class="fc" id="L565">                int v = order[l][i];</span>
+<span class="fc bfc" id="L566" title="All 2 branches covered.">                for (Integer t : vSucc.get(v)) {</span>
+<span class="fc" id="L567">                    edges.add(new int[]{pos[v], pos[t.intValue()]});</span>
+<span class="fc" id="L568">                }</span>
+            }
+<span class="fc" id="L570">            int m = edges.size();</span>
+<span class="fc bfc" id="L571" title="All 2 branches covered.">            for (int a = 0; a &lt; m; a++) {</span>
+<span class="fc" id="L572">                int[] ea = edges.get(a);</span>
+<span class="fc bfc" id="L573" title="All 2 branches covered.">                for (int b = a + 1; b &lt; m; b++) {</span>
+<span class="fc" id="L574">                    int[] eb = edges.get(b);</span>
+<span class="fc bfc" id="L575" title="All 2 branches covered.">                    if ((ea[0] - eb[0]) * (ea[1] - eb[1]) &lt; 0) {</span>
+<span class="fc" id="L576">                        total++;</span>
+                    }
+                }
+            }
+        }
+<span class="fc" id="L581">        return total;</span>
+    }
+
+    /// Places vertices on their layer axis: packed in order first, then a few
+    /// rounds pulling each towards the mean of its neighbours, each round
+    /// followed by a sweep that pushes overlapping vertices apart.
+    private double[] assignCoordinates(int[][] order, double[] breadth, List&lt;List&lt;Integer&gt;&gt; vSucc,
+                                       List&lt;List&lt;Integer&gt;&gt; vPred) {
+<span class="fc" id="L589">        int vn = breadth.length;</span>
+<span class="fc" id="L590">        double[] c = new double[vn];</span>
+<span class="fc bfc" id="L591" title="All 2 branches covered.">        for (int l = 0; l &lt; order.length; l++) { // NOPMD ForLoopCanBeForeach - indexed, like the rest of the pass</span>
+<span class="fc" id="L592">            double at = 0;</span>
+<span class="fc bfc" id="L593" title="All 2 branches covered.">            for (int i = 0; i &lt; order[l].length; i++) {</span>
+<span class="fc" id="L594">                int v = order[l][i];</span>
+<span class="fc" id="L595">                c[v] = at + breadth[v] / 2;</span>
+<span class="fc" id="L596">                at += breadth[v] + gapFor(breadth[v]);</span>
+            }
+        }
+<span class="fc bfc" id="L599" title="All 2 branches covered.">        for (int round = 0; round &lt; 8; round++) {</span>
+<span class="fc bfc" id="L600" title="All 2 branches covered.">            boolean down = round % 2 == 0;</span>
+<span class="fc bfc" id="L601" title="All 2 branches covered.">            for (int li = 0; li &lt; order.length; li++) {</span>
+<span class="fc bfc" id="L602" title="All 2 branches covered.">                int l = down ? li : order.length - 1 - li;</span>
+<span class="fc" id="L603">                int[] row = order[l];</span>
+<span class="fc" id="L604">                double[] want = new double[row.length];</span>
+<span class="fc bfc" id="L605" title="All 2 branches covered.">                for (int i = 0; i &lt; row.length; i++) {</span>
+<span class="fc" id="L606">                    int v = row[i];</span>
+<span class="fc bfc" id="L607" title="All 2 branches covered.">                    List&lt;Integer&gt; nb = down ? vPred.get(v) : vSucc.get(v);</span>
+<span class="fc bfc" id="L608" title="All 2 branches covered.">                    if (nb.isEmpty()) {</span>
+<span class="fc" id="L609">                        want[i] = c[v];</span>
+                    } else {
+<span class="fc" id="L611">                        double sum = 0;</span>
+<span class="fc bfc" id="L612" title="All 2 branches covered.">                        for (Integer u : nb) {</span>
+<span class="fc" id="L613">                            sum += c[u.intValue()];</span>
+<span class="fc" id="L614">                        }</span>
+<span class="fc" id="L615">                        want[i] = sum / nb.size();</span>
+                    }
+                }
+                // push apart left to right, then right to left, and average
+<span class="fc" id="L619">                double[] left = new double[row.length];</span>
+<span class="fc" id="L620">                double[] right = new double[row.length];</span>
+<span class="fc bfc" id="L621" title="All 2 branches covered.">                for (int i = 0; i &lt; row.length; i++) {</span>
+<span class="fc" id="L622">                    left[i] = want[i];</span>
+<span class="fc bfc" id="L623" title="All 2 branches covered.">                    if (i &gt; 0) {</span>
+<span class="fc" id="L624">                        double min = left[i - 1] + (breadth[row[i - 1]] + breadth[row[i]]) / 2 + gapFor(breadth[row[i]]);</span>
+<span class="fc bfc" id="L625" title="All 2 branches covered.">                        if (left[i] &lt; min) {</span>
+<span class="fc" id="L626">                            left[i] = min;</span>
+                        }
+                    }
+                }
+<span class="fc bfc" id="L630" title="All 2 branches covered.">                for (int i = row.length - 1; i &gt;= 0; i--) {</span>
+<span class="fc" id="L631">                    right[i] = want[i];</span>
+<span class="fc bfc" id="L632" title="All 2 branches covered.">                    if (i &lt; row.length - 1) {</span>
+<span class="fc" id="L633">                        double max = right[i + 1] - (breadth[row[i + 1]] + breadth[row[i]]) / 2 - gapFor(breadth[row[i]]);</span>
+<span class="fc bfc" id="L634" title="All 2 branches covered.">                        if (right[i] &gt; max) {</span>
+<span class="fc" id="L635">                            right[i] = max;</span>
+                        }
+                    }
+                }
+<span class="fc bfc" id="L639" title="All 2 branches covered.">                for (int i = 0; i &lt; row.length; i++) {</span>
+<span class="fc" id="L640">                    c[row[i]] = (left[i] + right[i]) / 2;</span>
+                }
+                // averaging can leave overlaps; one more left to right pass removes them
+<span class="fc bfc" id="L643" title="All 2 branches covered.">                for (int i = 1; i &lt; row.length; i++) {</span>
+<span class="fc" id="L644">                    double min = c[row[i - 1]] + (breadth[row[i - 1]] + breadth[row[i]]) / 2 + gapFor(breadth[row[i]]);</span>
+<span class="fc bfc" id="L645" title="All 2 branches covered.">                    if (c[row[i]] &lt; min) {</span>
+<span class="fc" id="L646">                        c[row[i]] = min;</span>
+                    }
+                }
+            }
+        }
+<span class="fc" id="L651">        double minC = Double.MAX_VALUE;</span>
+<span class="fc bfc" id="L652" title="All 2 branches covered.">        for (int v = 0; v &lt; vn; v++) {</span>
+<span class="fc" id="L653">            minC = Math.min(minC, c[v] - breadth[v] / 2);</span>
+        }
+<span class="fc bfc" id="L655" title="All 2 branches covered.">        for (int v = 0; v &lt; vn; v++) {</span>
+<span class="fc" id="L656">            c[v] -= minC;</span>
+        }
+<span class="fc" id="L658">        return c;</span>
+    }
+
+    private double gapFor(double breadth) {
+        // hidden points need far less room than nodes
+<span class="fc bfc" id="L663" title="All 2 branches covered.">        return breadth == 0 ? nodeGap / 4 : nodeGap;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

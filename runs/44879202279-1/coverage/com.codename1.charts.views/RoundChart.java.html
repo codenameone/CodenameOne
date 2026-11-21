@@ -1,0 +1,177 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RoundChart.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.charts.views</a> &gt; <span class="el_source">RoundChart.java</span></div><h1>RoundChart.java</h1><pre class="source lang-java linenums">/// Copyright (C) 2009 - 2013 SC 4ViewSoft SRL
+///
+/// Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+/// you may not use this file except in compliance with the License.
+/// You may obtain a copy of the License at
+///
+/// http://www.apache.org/licenses/LICENSE-2.0
+///
+/// Unless required by applicable law or agreed to in writing, software
+/// distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+/// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+/// See the License for the specific language governing permissions and
+/// limitations under the License.
+package com.codename1.charts.views;
+
+import com.codename1.charts.compat.Canvas;
+import com.codename1.charts.compat.GradientDrawable;
+import com.codename1.charts.compat.GradientDrawable.Orientation;
+import com.codename1.charts.compat.Paint;
+import com.codename1.charts.models.CategorySeries;
+import com.codename1.charts.renderers.DefaultRenderer;
+import com.codename1.charts.renderers.SimpleSeriesRenderer;
+import com.codename1.ui.Component;
+
+/// Base class for charts that render circular data representations such as pie
+/// charts, doughnut charts or gauges.
+///
+/// Subclasses operate on `CategorySeries` data and share common
+/// functionality for drawing the chart title, legend entries and handling
+/// layout. Developers typically work with concrete subclasses such as
+/// `PieChart` or `DoughnutChart` directly.
+public abstract class RoundChart extends AbstractChart {
+    /// The legend shape width.
+    protected static final int SHAPE_WIDTH = 10;
+    /// A no value constant.
+    protected static final int NO_VALUE = Integer.MAX_VALUE;
+    /// The series dataset.
+    protected CategorySeries mDataset;
+    /// The series renderer.
+    protected DefaultRenderer mRenderer;
+    /// The chart center X axis.
+<span class="fc" id="L42">    protected int mCenterX = NO_VALUE;</span>
+    /// The chart center y axis.
+<span class="fc" id="L44">    protected int mCenterY = NO_VALUE;</span>
+<span class="fc" id="L45">    protected boolean autoCalculateCenter = true;</span>
+
+    /// Round chart.
+    ///
+    /// #### Parameters
+    ///
+    /// - `dataset`: the series dataset
+    ///
+    /// - `renderer`: the series renderer
+<span class="fc" id="L54">    public RoundChart(CategorySeries dataset, DefaultRenderer renderer) {</span>
+<span class="fc" id="L55">        mDataset = dataset;</span>
+<span class="fc" id="L56">        mRenderer = renderer;</span>
+<span class="fc" id="L57">    }</span>
+
+    /// The graphical representation of the round chart title.
+    ///
+    /// #### Parameters
+    ///
+    /// - `canvas`: the canvas to paint to
+    ///
+    /// - `x`: the top left x value of the view to draw to
+    ///
+    /// - `y`: the top left y value of the view to draw to
+    ///
+    /// - `width`: the width of the view to draw to
+    ///
+    /// - `paint`: the paint
+    public void drawTitle(Canvas canvas, int x, int y, int width, Paint paint) {
+<span class="pc bpc" id="L73" title="1 of 2 branches missed.">        if (mRenderer.isShowLabels()) {</span>
+<span class="fc" id="L74">            paint.setColor(mRenderer.getLabelsColor());</span>
+<span class="fc" id="L75">            paint.setTextAlign(Component.CENTER);</span>
+<span class="fc" id="L76">            paint.setTextSize(mRenderer.getChartTitleTextSize());</span>
+<span class="fc" id="L77">            drawString(canvas, mRenderer.getChartTitle(), x + width / 2,</span>
+<span class="fc" id="L78">                    y + mRenderer.getChartTitleTextSize(), paint);</span>
+        }
+<span class="fc" id="L80">    }</span>
+
+    /// Returns the legend shape width.
+    ///
+    /// #### Parameters
+    ///
+    /// - `seriesIndex`: the series index
+    ///
+    /// #### Returns
+    ///
+    /// the legend shape width
+    @Override
+    public int getLegendShapeWidth(int seriesIndex) {
+<span class="nc" id="L93">        return SHAPE_WIDTH;</span>
+    }
+
+    /// The graphical representation of the legend shape.
+    ///
+    /// #### Parameters
+    ///
+    /// - `canvas`: the canvas to paint to
+    ///
+    /// - `renderer`: the series renderer
+    ///
+    /// - `x`: the x value of the point the shape should be drawn at
+    ///
+    /// - `y`: the y value of the point the shape should be drawn at
+    ///
+    /// - `seriesIndex`: the series index
+    ///
+    /// - `paint`: the paint to be used for drawing
+    @Override
+    public void drawLegendShape(Canvas canvas, SimpleSeriesRenderer renderer, float x, float y,
+                                int seriesIndex, Paint paint) {
+<span class="nc bnc" id="L114" title="All 4 branches missed.">        if (renderer.isGradientEnabled() &amp;&amp; canvas.isShapeClipSupported()) {</span>
+<span class="nc" id="L115">            GradientDrawable gr = new GradientDrawable(Orientation.TOP_BOTTOM, new int[]{renderer.getGradientStartColor(), renderer.getGradientStopColor()});</span>
+<span class="nc" id="L116">            gr.setBounds((int) x, (int) (y - SHAPE_WIDTH / 2), (int) (x + SHAPE_WIDTH), (int) (y + SHAPE_WIDTH / 2));</span>
+<span class="nc" id="L117">            gr.draw(canvas);</span>
+<span class="nc" id="L118">        } else {</span>
+<span class="nc" id="L119">            canvas.drawRect(x, y - SHAPE_WIDTH / 2, x + SHAPE_WIDTH, y + SHAPE_WIDTH / 2, paint);</span>
+        }
+<span class="nc" id="L121">    }</span>
+
+    /// Returns the renderer.
+    ///
+    /// #### Returns
+    ///
+    /// the renderer
+    public DefaultRenderer getRenderer() {
+<span class="fc" id="L129">        return mRenderer;</span>
+    }
+
+    /// Returns the center on X axis.
+    ///
+    /// #### Returns
+    ///
+    /// the center on X axis
+    public int getCenterX() {
+<span class="fc" id="L138">        return mCenterX;</span>
+    }
+
+    /// Sets a new center on X axis.
+    ///
+    /// #### Parameters
+    ///
+    /// - `centerX`: center on X axis
+    public void setCenterX(int centerX) {
+<span class="fc" id="L147">        mCenterX = centerX;</span>
+<span class="fc" id="L148">    }</span>
+
+    /// Returns the center on Y axis.
+    ///
+    /// #### Returns
+    ///
+    /// the center on Y axis
+    public int getCenterY() {
+<span class="fc" id="L156">        return mCenterY;</span>
+    }
+
+    /// Sets a new center on Y axis.
+    ///
+    /// #### Parameters
+    ///
+    /// - `centerY`: center on Y axis
+    public void setCenterY(int centerY) {
+<span class="fc" id="L165">        mCenterY = centerY;</span>
+<span class="fc" id="L166">    }</span>
+
+    public boolean isAutocalculateCenter() {
+<span class="nc" id="L169">        return autoCalculateCenter;</span>
+    }
+
+    public void setAutocalculateCenter(boolean a) {
+<span class="nc" id="L173">        autoCalculateCenter = a;</span>
+<span class="nc" id="L174">    }</span>
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

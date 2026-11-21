@@ -1,0 +1,205 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RunnableWrapper.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui</a> &gt; <span class="el_source">RunnableWrapper.java</span></div><h1>RunnableWrapper.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores
+ * CA 94065 USA or visit www.oracle.com if you need additional information or
+ * have any questions.
+ */
+package com.codename1.ui;
+
+import java.util.ArrayList;
+
+/// Class used by callSeriallyAndWait and invokeAndBlock and form to save code size
+class RunnableWrapper implements Runnable {
+<span class="fc" id="L30">    private static final Object THREADPOOL_LOCK = new Object();</span>
+<span class="fc" id="L31">    private static final ArrayList&lt;Runnable&gt; threadPool = new ArrayList&lt;Runnable&gt;();</span>
+
+<span class="fc" id="L33">    private static int threadCount = 0;</span>
+<span class="fc" id="L34">    private static int maxThreadCount = 5;</span>
+<span class="fc" id="L35">    private static int availableThreads = 0;</span>
+
+    /// Counts the calls to `#retireThreadPool()`. A pool thread remembers the count it
+    /// started under and leaves once it is idle and the count has moved on. Read and written
+    /// under `THREADPOOL_LOCK` only.
+<span class="fc" id="L40">    private static int retirements = 0;</span>
+
+    /// For a pool thread, the `#retirements` count it was created under. Taken when the
+    /// thread is made, under the lock, and not when it first runs: a thread made just
+    /// before a retirement but scheduled after it would otherwise read the new count, take
+    /// itself for the next generation and wait for work forever.
+    private int generation;
+
+<span class="fc" id="L48">    private boolean done = false;</span>
+    private Runnable internal;
+    private int type;
+    private RuntimeException err;
+    private Form parentForm;
+    private Painter paint;
+    private boolean reverse;
+
+<span class="fc" id="L56">    public RunnableWrapper(Form parentForm, Painter paint, boolean reverse) {</span>
+<span class="fc" id="L57">        this.parentForm = parentForm;</span>
+<span class="fc" id="L58">        this.paint = paint;</span>
+<span class="fc" id="L59">        this.reverse = reverse;</span>
+<span class="fc" id="L60">    }</span>
+
+<span class="fc" id="L62">    public RunnableWrapper(Runnable internal, int type) {</span>
+<span class="fc" id="L63">        this.internal = internal;</span>
+<span class="fc" id="L64">        this.type = type;</span>
+<span class="fc" id="L65">    }</span>
+
+    static void pushToThreadPool(Runnable r) {
+        // Under the lock since a retiring thread gives its place back under it: counted here
+        // without it, the two could lose each other's update and leave the pool one thread
+        // short for good.
+<span class="fc" id="L71">        synchronized (THREADPOOL_LOCK) {</span>
+<span class="pc bpc" id="L72" title="1 of 4 branches missed.">            if (availableThreads == 0 &amp;&amp; threadCount &lt; maxThreadCount) {</span>
+<span class="fc" id="L73">                threadCount++;</span>
+<span class="fc" id="L74">                RunnableWrapper worker = new RunnableWrapper(null, 4);</span>
+<span class="fc" id="L75">                worker.generation = retirements;</span>
+<span class="fc" id="L76">                Thread poolThread = Display.getInstance().startThread(worker, &quot;invokeAndBlock&quot; + threadCount);</span>
+<span class="fc" id="L77">                poolThread.start();</span>
+            }
+<span class="fc" id="L79">            threadPool.add(r);</span>
+<span class="fc" id="L80">            THREADPOOL_LOCK.notifyAll();</span>
+<span class="fc" id="L81">        }</span>
+<span class="fc" id="L82">    }</span>
+
+    /// Lets the pool's threads end: each one leaves as soon as it has nothing to run, and
+    /// the next `invokeAndBlock` starts the threads it needs.
+    ///
+    /// A pool thread otherwise waits for work for as long as the process lives. That is what
+    /// an application wants, and it is why nothing in the framework calls this. A host that
+    /// runs several generations of Codename One in one process, each in a class loader of
+    /// its own -- the simulator's test runner gives every test one -- needs the opposite: a
+    /// thread still waiting is a live reference to every class and every static of a
+    /// generation that is over, so none of it can be collected.
+    static void retireThreadPool() {
+<span class="nc" id="L94">        synchronized (THREADPOOL_LOCK) {</span>
+<span class="nc" id="L95">            retirements++;</span>
+<span class="nc" id="L96">            THREADPOOL_LOCK.notifyAll();</span>
+<span class="nc" id="L97">        }</span>
+<span class="nc" id="L98">    }</span>
+
+    static void setMaxThreadCount(int maxThreadCount) {
+<span class="fc" id="L101">        RunnableWrapper.maxThreadCount = maxThreadCount;</span>
+<span class="fc" id="L102">    }</span>
+
+    public RuntimeException getErr() {
+<span class="fc" id="L105">        return err;</span>
+    }
+
+    public boolean isDone() {
+<span class="fc" id="L109">        return done;</span>
+    }
+
+    public void setDone(boolean done) {
+<span class="nc" id="L113">        this.done = done;</span>
+<span class="nc" id="L114">    }</span>
+
+    @Override
+    @SuppressWarnings(&quot;PMD.SwitchStmtsShouldHaveDefault&quot;)
+    public void run() {
+<span class="fc bfc" id="L119" title="All 2 branches covered.">        if (parentForm != null) {</span>
+            // set current form uses this portion to make sure all set current operations
+            // occur on the EDT
+<span class="fc bfc" id="L122" title="All 2 branches covered.">            if (paint == null) {</span>
+<span class="fc" id="L123">                Display.getInstance().setCurrent(parentForm, reverse);</span>
+<span class="fc" id="L124">                return;</span>
+            }
+
+<span class="fc" id="L127">            Dialog dlg = (Dialog) parentForm;</span>
+<span class="fc bfc" id="L128" title="All 2 branches covered.">            while (!dlg.isDisposed()) {</span>
+                try {
+<span class="fc" id="L130">                    synchronized (Display.lock) {</span>
+<span class="pc bpc" id="L131" title="1 of 2 branches missed.">                        if (!dlg.isDisposed()) {</span>
+<span class="fc" id="L132">                            Display.lock.wait(40);</span>
+                        }
+<span class="fc" id="L134">                    }</span>
+<span class="nc" id="L135">                } catch (InterruptedException ex) {</span>
+<span class="pc" id="L136">                }</span>
+            }
+<span class="fc" id="L138">            parentForm.getStyle().setBgPainter(paint);</span>
+<span class="fc" id="L139">        } else {</span>
+<span class="pc bpc" id="L140" title="2 of 6 branches missed.">            switch (type) {</span>
+                case 0:
+<span class="fc" id="L142">                    internal.run();</span>
+<span class="fc" id="L143">                    synchronized (Display.lock) {</span>
+<span class="fc" id="L144">                        done = true;</span>
+<span class="fc" id="L145">                        Display.lock.notifyAll();</span>
+<span class="fc" id="L146">                    }</span>
+<span class="fc" id="L147">                    break;</span>
+                case 1:
+                    try {
+<span class="fc" id="L150">                        internal.run();</span>
+<span class="nc" id="L151">                    } catch (RuntimeException ex) {</span>
+<span class="nc" id="L152">                        this.err = ex;</span>
+<span class="fc" id="L153">                    }</span>
+<span class="nc" id="L154">                    break;</span>
+                case 2:
+<span class="nc bnc" id="L156" title="All 2 branches missed.">                    while (!done) {</span>
+<span class="nc" id="L157">                        synchronized (Display.lock) {</span>
+                            try {
+<span class="nc bnc" id="L159" title="All 2 branches missed.">                                if (!done) {</span>
+<span class="nc" id="L160">                                    Display.lock.wait(10);</span>
+                                }
+<span class="nc" id="L162">                            } catch (InterruptedException ex) {</span>
+<span class="nc" id="L163">                                ex.printStackTrace();</span>
+<span class="nc" id="L164">                            }</span>
+<span class="nc" id="L165">                        }</span>
+                    }
+                    break;
+                case 3:
+<span class="fc" id="L169">                    Display.getInstance().mainEDTLoop();</span>
+<span class="fc" id="L170">                    break;</span>
+                case 4:
+                    // Written before the thread was started, so it is seen here.
+<span class="fc" id="L173">                    int startedUnder = generation;</span>
+<span class="pc bpc" id="L174" title="1 of 2 branches missed.">                    while (!Display.getInstance().codenameOneExited) {</span>
+<span class="fc" id="L175">                        Runnable r = null;</span>
+<span class="fc" id="L176">                        synchronized (THREADPOOL_LOCK) {</span>
+<span class="fc bfc" id="L177" title="All 2 branches covered.">                            if (!threadPool.isEmpty()) {</span>
+<span class="fc" id="L178">                                r = threadPool.get(0);</span>
+<span class="fc" id="L179">                                threadPool.remove(0);</span>
+<span class="pc bpc" id="L180" title="1 of 2 branches missed.">                            } else if (startedUnder != retirements) {</span>
+                                // Retired, and idle. The place is given back under the lock
+                                // the next request counts under, so that request starts a
+                                // thread of its own and is not left waiting for this one.
+<span class="nc" id="L184">                                threadCount--;</span>
+<span class="nc" id="L185">                                break;</span>
+                            } else {
+                                try {
+<span class="fc" id="L188">                                    availableThreads++;</span>
+<span class="fc" id="L189">                                    THREADPOOL_LOCK.wait();</span>
+<span class="fc" id="L190">                                    availableThreads--;</span>
+<span class="nc" id="L191">                                } catch (InterruptedException ex) {</span>
+<span class="nc" id="L192">                                    ex.printStackTrace();</span>
+<span class="fc" id="L193">                                }</span>
+                            }
+<span class="fc" id="L195">                        }</span>
+<span class="fc bfc" id="L196" title="All 2 branches covered.">                        if (r != null) {</span>
+<span class="fc" id="L197">                            r.run();</span>
+                        }
+<span class="fc" id="L199">                    }</span>
+            }
+        }
+<span class="fc" id="L202">        done = true;</span>
+<span class="fc" id="L203">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

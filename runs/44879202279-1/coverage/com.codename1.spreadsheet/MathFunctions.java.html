@@ -1,0 +1,886 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MathFunctions.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.spreadsheet</a> &gt; <span class="el_source">MathFunctions.java</span></div><h1>MathFunctions.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.spreadsheet;
+
+import com.codename1.util.MathUtil;
+
+/// The math and trigonometry functions.
+final class MathFunctions {
+    static final String SCALAR_NAMES = &quot;ABS ACOS ACOSH ACOT ACOTH ARABIC ASIN ASINH ATAN ATAN2 ATANH BASE CEILING&quot;
+            + &quot; CEILING.MATH CEILING.PRECISE COMBIN COMBINA COS COSH COT COTH CSC CSCH DECIMAL DEGREES EVEN EXP FACT&quot;
+            + &quot; FACTDOUBLE FLOOR FLOOR.MATH FLOOR.PRECISE INT ISO.CEILING LN LOG LOG10 MOD MROUND ODD PERMUT&quot;
+            + &quot; PERMUTATIONA PI POWER QUOTIENT RADIANS RAND RANDBETWEEN ROMAN ROUND ROUNDDOWN ROUNDUP SEC SECH SIGN SIN&quot;
+            + &quot; SINH SQRT SQRTPI TAN TANH TRUNC&quot;;
+
+    static final String RANGE_NAMES = &quot;GCD LCM MDETERM MINVERSE MMULT MULTINOMIAL MUNIT PRODUCT SERIESSUM SUM SUMIF&quot;
+            + &quot; SUMIFS SUMPRODUCT SUMSQ SUMX2MY2 SUMX2PY2 SUMXMY2&quot;;
+
+<span class="fc" id="L38">    private static final String[] ROMAN_SYMBOLS = {&quot;M&quot;, &quot;CM&quot;, &quot;D&quot;, &quot;CD&quot;, &quot;C&quot;, &quot;XC&quot;, &quot;L&quot;, &quot;XL&quot;, &quot;X&quot;, &quot;IX&quot;, &quot;V&quot;, &quot;IV&quot;, &quot;I&quot;};</span>
+<span class="fc" id="L39">    private static final int[] ROMAN_VALUES = {1000, 900, 500, 400, 100, 90, 50, 40, 10, 9, 5, 4, 1};</span>
+
+    private MathFunctions() {
+    }
+
+    private static Double d(double v) {
+<span class="fc" id="L45">        return Double.valueOf(v);</span>
+    }
+
+    /// A quotient that is a whole number but for the last bits is that whole number: 0.15 /
+    /// 0.05 is 3.0000000000000004 in binary, and CEILING(0.15, 0.05) is still 0.15.
+    static double snap(double q) {
+<span class="fc" id="L51">        double r = Math.floor(q + 0.5);</span>
+<span class="fc bfc" id="L52" title="All 2 branches covered.">        if (Math.abs(q - r) &lt;= 1e-9 * Math.max(1, Math.abs(q))) {</span>
+<span class="fc" id="L53">            return r;</span>
+        }
+<span class="fc" id="L55">        return q;</span>
+    }
+
+    static double atan2(double y, double x) {
+<span class="fc bfc" id="L59" title="All 2 branches covered.">        if (x &gt; 0) {</span>
+<span class="fc" id="L60">            return MathUtil.atan(y / x);</span>
+        }
+<span class="fc bfc" id="L62" title="All 2 branches covered.">        if (x &lt; 0) {</span>
+<span class="pc bpc" id="L63" title="1 of 2 branches missed.">            return y &gt;= 0 ? MathUtil.atan(y / x) + Math.PI : MathUtil.atan(y / x) - Math.PI;</span>
+        }
+<span class="pc bpc" id="L65" title="1 of 2 branches missed.">        if (y &gt; 0) {</span>
+<span class="fc" id="L66">            return Math.PI / 2;</span>
+        }
+<span class="nc bnc" id="L68" title="All 2 branches missed.">        if (y &lt; 0) {</span>
+<span class="nc" id="L69">            return -Math.PI / 2;</span>
+        }
+<span class="nc" id="L71">        throw EvalError.DIV0;</span>
+    }
+
+    static double ln(double x) {
+<span class="fc bfc" id="L75" title="All 2 branches covered.">        if (x &lt;= 0) {</span>
+<span class="fc" id="L76">            throw EvalError.NUM;</span>
+        }
+<span class="fc" id="L78">        return MathUtil.log(x);</span>
+    }
+
+    static double fact(double x) {
+<span class="fc bfc" id="L82" title="All 2 branches covered.">        if (x &lt; 0) {</span>
+<span class="fc" id="L83">            throw EvalError.NUM;</span>
+        }
+<span class="fc" id="L85">        int n = (int) Math.floor(x);</span>
+<span class="pc bpc" id="L86" title="1 of 2 branches missed.">        if (n &gt; 170) {</span>
+<span class="nc" id="L87">            throw EvalError.NUM;</span>
+        }
+<span class="fc" id="L89">        double r = 1;</span>
+<span class="fc bfc" id="L90" title="All 2 branches covered.">        for (int i = 2; i &lt;= n; i++) {</span>
+<span class="fc" id="L91">            r *= i;</span>
+        }
+<span class="fc" id="L93">        return r;</span>
+    }
+
+    static double combin(double nn, double kk) {
+<span class="fc" id="L97">        double n = Math.floor(nn);</span>
+<span class="fc" id="L98">        double k = Math.floor(kk);</span>
+<span class="fc bfc" id="L99" title="All 6 branches covered.">        if (n &lt; 0 || k &lt; 0 || k &gt; n) {</span>
+<span class="fc" id="L100">            throw EvalError.NUM;</span>
+        }
+<span class="fc bfc" id="L102" title="All 2 branches covered.">        if (k &gt; n - k) {</span>
+<span class="fc" id="L103">            k = n - k;</span>
+        }
+<span class="fc" id="L105">        double r = 1;</span>
+        // past what a double holds the answer is #NUM!, and the loop is not left to count
+        // to a bound given by the file
+<span class="fc bfc" id="L108" title="All 2 branches covered.">        for (double i = 1; i &lt;= k; i++) {</span>
+<span class="fc" id="L109">            r = r * (n - k + i) / i;</span>
+<span class="fc bfc" id="L110" title="All 2 branches covered.">            if (Double.isInfinite(r)) {</span>
+<span class="fc" id="L111">                throw EvalError.NUM;</span>
+            }
+        }
+<span class="fc" id="L114">        return Math.floor(r + 0.5);</span>
+    }
+
+    private static double ceiling(double x, double sig) {
+<span class="pc bpc" id="L118" title="1 of 4 branches missed.">        if (sig == 0 || x == 0) {</span>
+<span class="fc" id="L119">            return 0;</span>
+        }
+<span class="fc bfc" id="L121" title="All 4 branches covered.">        if (x &gt; 0 &amp;&amp; sig &lt; 0) {</span>
+<span class="fc" id="L122">            throw EvalError.NUM;</span>
+        }
+<span class="fc" id="L124">        return Math.ceil(snap(x / sig)) * sig;</span>
+    }
+
+    private static double floor(double x, double sig) {
+<span class="fc bfc" id="L128" title="All 2 branches covered.">        if (x == 0) {</span>
+<span class="fc" id="L129">            return 0;</span>
+        }
+<span class="pc bpc" id="L131" title="1 of 2 branches missed.">        if (sig == 0) {</span>
+<span class="nc" id="L132">            throw EvalError.DIV0;</span>
+        }
+<span class="fc bfc" id="L134" title="All 4 branches covered.">        if (x &gt; 0 &amp;&amp; sig &lt; 0) {</span>
+<span class="fc" id="L135">            throw EvalError.NUM;</span>
+        }
+<span class="fc" id="L137">        return Math.floor(snap(x / sig)) * sig;</span>
+    }
+
+    /// Rounds towards or away from zero at a decimal place.
+    static double roundDirected(double x, int places, boolean up) {
+<span class="pc bpc" id="L142" title="1 of 4 branches missed.">        if (x == 0 || places &gt; 15) {</span>
+<span class="fc" id="L143">            return x;</span>
+        }
+<span class="fc" id="L145">        double abs = Math.abs(x);</span>
+<span class="fc" id="L146">        double scale = Values.pow10(Math.abs(places));</span>
+<span class="fc bfc" id="L147" title="All 2 branches covered.">        double scaled = snap(places &gt;= 0 ? abs * scale : abs / scale);</span>
+<span class="fc bfc" id="L148" title="All 2 branches covered.">        double r = up ? Math.ceil(scaled) : Math.floor(scaled);</span>
+<span class="fc bfc" id="L149" title="All 2 branches covered.">        double result = places &gt;= 0 ? r / scale : r * scale;</span>
+<span class="fc bfc" id="L150" title="All 2 branches covered.">        return x &lt; 0 ? -result : result;</span>
+    }
+
+    static Object call(String name, Evaluator ev, Object[] a) {
+<span class="fc bfc" id="L154" title="All 61 branches covered.">        switch (Functions.index(SWITCH_1, name)) {</span>
+            case 0: // ABS
+<span class="fc" id="L156">                return d(Math.abs(Evaluator.num(a, 0)));</span>
+            case 1: { // ACOS
+<span class="fc" id="L158">                double x = Evaluator.num(a, 0);</span>
+<span class="pc bpc" id="L159" title="1 of 4 branches missed.">                if (x &lt; -1 || x &gt; 1) {</span>
+<span class="fc" id="L160">                    throw EvalError.NUM;</span>
+                }
+<span class="fc" id="L162">                return d(MathUtil.acos(x));</span>
+            }
+            case 2: { // ACOSH
+<span class="fc" id="L165">                double x = Evaluator.num(a, 0);</span>
+<span class="fc bfc" id="L166" title="All 2 branches covered.">                if (x &lt; 1) {</span>
+<span class="fc" id="L167">                    throw EvalError.NUM;</span>
+                }
+<span class="fc" id="L169">                return d(MathUtil.log(x + Math.sqrt(x * x - 1)));</span>
+            }
+            case 3: { // ACOT
+<span class="fc" id="L172">                double x = Evaluator.num(a, 0);</span>
+<span class="fc bfc" id="L173" title="All 4 branches covered.">                return d(x == 0 ? Math.PI / 2 : x &gt; 0 ? MathUtil.atan(1 / x) : MathUtil.atan(1 / x) + Math.PI);</span>
+            }
+            case 4: { // ACOTH
+<span class="fc" id="L176">                double x = Evaluator.num(a, 0);</span>
+<span class="fc bfc" id="L177" title="All 2 branches covered.">                if (Math.abs(x) &lt;= 1) {</span>
+<span class="fc" id="L178">                    throw EvalError.NUM;</span>
+                }
+<span class="fc" id="L180">                return d(0.5 * MathUtil.log((x + 1) / (x - 1)));</span>
+            }
+            case 5: { // ASIN
+<span class="fc" id="L183">                double x = Evaluator.num(a, 0);</span>
+<span class="pc bpc" id="L184" title="1 of 4 branches missed.">                if (x &lt; -1 || x &gt; 1) {</span>
+<span class="fc" id="L185">                    throw EvalError.NUM;</span>
+                }
+<span class="fc" id="L187">                return d(MathUtil.asin(x));</span>
+            }
+            case 6: { // ASINH
+<span class="fc" id="L190">                double x = Evaluator.num(a, 0);</span>
+<span class="fc" id="L191">                double r = MathUtil.log(Math.abs(x) + Math.sqrt(x * x + 1));</span>
+<span class="fc bfc" id="L192" title="All 2 branches covered.">                return d(x &lt; 0 ? -r : r);</span>
+            }
+            case 7: // ATAN
+<span class="fc" id="L195">                return d(MathUtil.atan(Evaluator.num(a, 0)));</span>
+            case 8: // ATAN2
+<span class="fc" id="L197">                return d(atan2(Evaluator.num(a, 1), Evaluator.num(a, 0)));</span>
+            case 9: { // ATANH
+<span class="fc" id="L199">                double x = Evaluator.num(a, 0);</span>
+<span class="fc bfc" id="L200" title="All 2 branches covered.">                if (Math.abs(x) &gt;= 1) {</span>
+<span class="fc" id="L201">                    throw EvalError.NUM;</span>
+                }
+<span class="fc" id="L203">                return d(0.5 * MathUtil.log((1 + x) / (1 - x)));</span>
+            }
+            case 10: // CEILING
+<span class="fc" id="L206">                return d(ceiling(Evaluator.num(a, 0), Evaluator.num(a, 1, 1)));</span>
+            case 11: { // CEILING.MATH
+<span class="fc" id="L208">                double x = Evaluator.num(a, 0);</span>
+<span class="fc" id="L209">                double sig = Math.abs(Evaluator.num(a, 1, 1));</span>
+<span class="pc bpc" id="L210" title="1 of 2 branches missed.">                if (sig == 0) {</span>
+<span class="nc" id="L211">                    return d(0);</span>
+                }
+<span class="pc bpc" id="L213" title="1 of 4 branches missed.">                if (x &lt; 0 &amp;&amp; Evaluator.num(a, 2, 0) != 0) {</span>
+<span class="nc" id="L214">                    return d(-Math.ceil(snap(-x / sig)) * sig);</span>
+                }
+<span class="fc" id="L216">                return d(Math.ceil(snap(x / sig)) * sig);</span>
+            }
+            case 12: // CEILING.PRECISE
+            case 13: { // ISO.CEILING
+<span class="fc" id="L220">                double sig = Math.abs(Evaluator.num(a, 1, 1));</span>
+<span class="fc bfc" id="L221" title="All 2 branches covered.">                return d(sig == 0 ? 0 : Math.ceil(snap(Evaluator.num(a, 0) / sig)) * sig);</span>
+            }
+            case 14: // COMBIN
+<span class="fc" id="L224">                return d(combin(Evaluator.num(a, 0), Evaluator.num(a, 1)));</span>
+            case 15: { // COMBINA
+<span class="fc" id="L226">                double n = Math.floor(Evaluator.num(a, 0));</span>
+<span class="fc" id="L227">                double k = Math.floor(Evaluator.num(a, 1));</span>
+<span class="fc bfc" id="L228" title="All 4 branches covered.">                if (n &lt; 0 || k &lt; 0) {</span>
+<span class="fc" id="L229">                    throw EvalError.NUM;</span>
+                }
+<span class="pc bpc" id="L231" title="1 of 4 branches missed.">                return d(n == 0 &amp;&amp; k == 0 ? 1 : combin(n + k - 1, k));</span>
+            }
+            case 16: // COS
+<span class="fc" id="L234">                return d(Math.cos(Evaluator.num(a, 0)));</span>
+            case 17: // COSH
+<span class="fc" id="L236">                return d(Math.cosh(Evaluator.num(a, 0)));</span>
+            case 18: { // COT
+<span class="fc" id="L238">                double t = Math.tan(Evaluator.num(a, 0));</span>
+<span class="fc bfc" id="L239" title="All 2 branches covered.">                if (t == 0) {</span>
+<span class="fc" id="L240">                    throw EvalError.DIV0;</span>
+                }
+<span class="fc" id="L242">                return d(1 / t);</span>
+            }
+            case 19: { // COTH
+<span class="fc" id="L245">                double t = Math.tanh(Evaluator.num(a, 0));</span>
+<span class="fc bfc" id="L246" title="All 2 branches covered.">                if (t == 0) {</span>
+<span class="fc" id="L247">                    throw EvalError.DIV0;</span>
+                }
+<span class="fc" id="L249">                return d(1 / t);</span>
+            }
+            case 20: { // CSC
+<span class="fc" id="L252">                double t = Math.sin(Evaluator.num(a, 0));</span>
+<span class="fc bfc" id="L253" title="All 2 branches covered.">                if (t == 0) {</span>
+<span class="fc" id="L254">                    throw EvalError.DIV0;</span>
+                }
+<span class="fc" id="L256">                return d(1 / t);</span>
+            }
+            case 21: { // CSCH
+<span class="fc" id="L259">                double t = Math.sinh(Evaluator.num(a, 0));</span>
+<span class="fc bfc" id="L260" title="All 2 branches covered.">                if (t == 0) {</span>
+<span class="fc" id="L261">                    throw EvalError.DIV0;</span>
+                }
+<span class="fc" id="L263">                return d(1 / t);</span>
+            }
+            case 22: // DEGREES
+<span class="fc" id="L266">                return d(Evaluator.num(a, 0) * 180 / Math.PI);</span>
+            case 23: { // EVEN
+<span class="fc" id="L268">                double x = Evaluator.num(a, 0);</span>
+<span class="fc" id="L269">                double r = Math.ceil(snap(Math.abs(x) / 2)) * 2;</span>
+<span class="fc bfc" id="L270" title="All 2 branches covered.">                return d(x &lt; 0 ? -r : r);</span>
+            }
+            case 24: // EXP
+<span class="fc" id="L273">                return d(MathUtil.exp(Evaluator.num(a, 0)));</span>
+            case 25: // FACT
+<span class="fc" id="L275">                return d(fact(Evaluator.num(a, 0)));</span>
+            case 26: { // FACTDOUBLE
+<span class="fc" id="L277">                double x = Math.floor(Evaluator.num(a, 0));</span>
+<span class="pc bpc" id="L278" title="2 of 4 branches missed.">                if (x &lt; -1 || x &gt; 300) {</span>
+<span class="nc" id="L279">                    throw EvalError.NUM;</span>
+                }
+<span class="fc" id="L281">                double r = 1;</span>
+<span class="fc bfc" id="L282" title="All 2 branches covered.">                for (int i = (int) x; i &gt; 1; i -= 2) {</span>
+<span class="fc" id="L283">                    r *= i;</span>
+                }
+<span class="fc" id="L285">                return d(r);</span>
+            }
+            case 27: // FLOOR
+<span class="fc" id="L288">                return d(floor(Evaluator.num(a, 0), Evaluator.num(a, 1, 1)));</span>
+            case 28: { // FLOOR.MATH
+<span class="fc" id="L290">                double x = Evaluator.num(a, 0);</span>
+<span class="fc" id="L291">                double sig = Math.abs(Evaluator.num(a, 1, 1));</span>
+<span class="pc bpc" id="L292" title="1 of 2 branches missed.">                if (sig == 0) {</span>
+<span class="nc" id="L293">                    return d(0);</span>
+                }
+<span class="pc bpc" id="L295" title="1 of 4 branches missed.">                if (x &lt; 0 &amp;&amp; Evaluator.num(a, 2, 0) != 0) {</span>
+<span class="nc" id="L296">                    return d(-Math.floor(snap(-x / sig)) * sig);</span>
+                }
+<span class="fc" id="L298">                return d(Math.floor(snap(x / sig)) * sig);</span>
+            }
+            case 29: { // FLOOR.PRECISE
+<span class="fc" id="L301">                double sig = Math.abs(Evaluator.num(a, 1, 1));</span>
+<span class="fc bfc" id="L302" title="All 2 branches covered.">                return d(sig == 0 ? 0 : Math.floor(snap(Evaluator.num(a, 0) / sig)) * sig);</span>
+            }
+            case 30: // INT
+<span class="fc" id="L305">                return d(Math.floor(Evaluator.num(a, 0)));</span>
+            case 31: // LN
+<span class="fc" id="L307">                return d(ln(Evaluator.num(a, 0)));</span>
+            case 32: { // LOG
+<span class="fc" id="L309">                double base = Evaluator.num(a, 1, 10);</span>
+<span class="fc bfc" id="L310" title="All 4 branches covered.">                if (base &lt;= 0 || base == 1) {</span>
+<span class="fc bfc" id="L311" title="All 2 branches covered.">                    throw base == 1 ? EvalError.DIV0 : EvalError.NUM;</span>
+                }
+<span class="fc" id="L313">                double x = Evaluator.num(a, 0);</span>
+<span class="fc bfc" id="L314" title="All 2 branches covered.">                if (base == 10) {</span>
+<span class="fc bfc" id="L315" title="All 2 branches covered.">                    if (x &lt;= 0) {</span>
+<span class="fc" id="L316">                        throw EvalError.NUM;</span>
+                    }
+<span class="fc" id="L318">                    return d(MathUtil.log10(x));</span>
+                }
+<span class="fc" id="L320">                return d(ln(x) / MathUtil.log(base));</span>
+            }
+            case 33: { // LOG10
+<span class="fc" id="L323">                double x = Evaluator.num(a, 0);</span>
+<span class="fc bfc" id="L324" title="All 2 branches covered.">                if (x &lt;= 0) {</span>
+<span class="fc" id="L325">                    throw EvalError.NUM;</span>
+                }
+<span class="fc" id="L327">                return d(MathUtil.log10(x));</span>
+            }
+            case 34: { // MOD
+<span class="fc" id="L330">                double x = Evaluator.num(a, 0);</span>
+<span class="fc" id="L331">                double y = Evaluator.num(a, 1);</span>
+<span class="fc bfc" id="L332" title="All 2 branches covered.">                if (y == 0) {</span>
+<span class="fc" id="L333">                    throw EvalError.DIV0;</span>
+                }
+<span class="fc" id="L335">                double r = x - y * Math.floor(x / y);</span>
+                // the remainder of an exact multiple can come out as the divisor itself
+<span class="pc bpc" id="L337" title="1 of 2 branches missed.">                return d(Math.abs(r) &gt;= Math.abs(y) ? 0 : r);</span>
+            }
+            case 35: { // MROUND
+<span class="fc" id="L340">                double x = Evaluator.num(a, 0);</span>
+<span class="fc" id="L341">                double m = Evaluator.num(a, 1);</span>
+<span class="pc bpc" id="L342" title="1 of 4 branches missed.">                if (m == 0 || x == 0) {</span>
+<span class="fc" id="L343">                    return d(0);</span>
+                }
+<span class="fc bfc" id="L345" title="All 6 branches covered.">                if (x &lt; 0 != m &lt; 0) {</span>
+<span class="fc" id="L346">                    throw EvalError.NUM;</span>
+                }
+<span class="fc" id="L348">                return d(Math.floor(snap(x / m) + 0.5) * m);</span>
+            }
+            case 36: { // ODD
+<span class="fc" id="L351">                double x = Evaluator.num(a, 0);</span>
+<span class="fc" id="L352">                double abs = Math.ceil(snap(Math.abs(x)));</span>
+<span class="fc bfc" id="L353" title="All 2 branches covered.">                if (abs % 2 == 0) {</span>
+<span class="fc" id="L354">                    abs++;</span>
+                }
+<span class="fc bfc" id="L356" title="All 2 branches covered.">                return d(x &lt; 0 ? -abs : abs);</span>
+            }
+            case 37: { // PERMUT
+<span class="fc" id="L359">                double n = Math.floor(Evaluator.num(a, 0));</span>
+<span class="fc" id="L360">                double k = Math.floor(Evaluator.num(a, 1));</span>
+<span class="fc bfc" id="L361" title="All 6 branches covered.">                if (n &lt; 0 || k &lt; 0 || k &gt; n) {</span>
+<span class="fc" id="L362">                    throw EvalError.NUM;</span>
+                }
+<span class="fc" id="L364">                double r = 1;</span>
+<span class="fc bfc" id="L365" title="All 2 branches covered.">                for (double i = n - k + 1; i &lt;= n; i++) {</span>
+<span class="fc" id="L366">                    r *= i;</span>
+<span class="fc bfc" id="L367" title="All 2 branches covered.">                    if (Double.isInfinite(r)) {</span>
+<span class="fc" id="L368">                        throw EvalError.NUM;</span>
+                    }
+                }
+<span class="fc" id="L371">                return d(r);</span>
+            }
+            case 38: { // PERMUTATIONA
+<span class="fc" id="L374">                double n = Math.floor(Evaluator.num(a, 0));</span>
+<span class="fc" id="L375">                double k = Math.floor(Evaluator.num(a, 1));</span>
+<span class="fc bfc" id="L376" title="All 4 branches covered.">                if (n &lt; 0 || k &lt; 0) {</span>
+<span class="fc" id="L377">                    throw EvalError.NUM;</span>
+                }
+<span class="pc bpc" id="L379" title="1 of 4 branches missed.">                return d(n == 0 &amp;&amp; k == 0 ? 1 : Evaluator.power(n, k));</span>
+            }
+            case 39: // PI
+<span class="fc" id="L382">                return d(Math.PI);</span>
+            case 40: // POWER
+<span class="fc" id="L384">                return d(Evaluator.power(Evaluator.num(a, 0), Evaluator.num(a, 1)));</span>
+            case 41: { // QUOTIENT
+<span class="fc" id="L386">                double y = Evaluator.num(a, 1);</span>
+<span class="fc bfc" id="L387" title="All 2 branches covered.">                if (y == 0) {</span>
+<span class="fc" id="L388">                    throw EvalError.DIV0;</span>
+                }
+<span class="fc" id="L390">                double q = Evaluator.num(a, 0) / y;</span>
+<span class="fc bfc" id="L391" title="All 2 branches covered.">                return d(q &lt; 0 ? Math.ceil(q) : Math.floor(q));</span>
+            }
+            case 42: // RADIANS
+<span class="fc" id="L394">                return d(Evaluator.num(a, 0) * Math.PI / 180);</span>
+            case 43: // RAND
+<span class="fc" id="L396">                return d(Math.random());</span>
+            case 44: { // RANDBETWEEN
+<span class="fc" id="L398">                double lo = Math.ceil(Evaluator.num(a, 0));</span>
+<span class="fc" id="L399">                double hi = Math.floor(Evaluator.num(a, 1));</span>
+<span class="fc bfc" id="L400" title="All 2 branches covered.">                if (lo &gt; hi) {</span>
+<span class="fc" id="L401">                    throw EvalError.NUM;</span>
+                }
+<span class="fc" id="L403">                return d(lo + Math.floor(Math.random() * (hi - lo + 1)));</span>
+            }
+            case 45: // ROUND
+<span class="fc" id="L406">                return d(Values.round(Evaluator.num(a, 0), Evaluator.integer(a, 1, 0)));</span>
+            case 46: // ROUNDDOWN
+            case 47: // TRUNC
+<span class="fc" id="L409">                return d(roundDirected(Evaluator.num(a, 0), Evaluator.integer(a, 1, 0), false));</span>
+            case 48: // ROUNDUP
+<span class="fc" id="L411">                return d(roundDirected(Evaluator.num(a, 0), Evaluator.integer(a, 1, 0), true));</span>
+            case 49: { // SEC
+<span class="fc" id="L413">                double t = Math.cos(Evaluator.num(a, 0));</span>
+<span class="pc bpc" id="L414" title="1 of 2 branches missed.">                if (t == 0) {</span>
+<span class="nc" id="L415">                    throw EvalError.DIV0;</span>
+                }
+<span class="fc" id="L417">                return d(1 / t);</span>
+            }
+            case 50: // SECH
+<span class="fc" id="L420">                return d(1 / Math.cosh(Evaluator.num(a, 0)));</span>
+            case 51: { // SIGN
+<span class="fc" id="L422">                double x = Evaluator.num(a, 0);</span>
+<span class="fc bfc" id="L423" title="All 4 branches covered.">                return d(x &gt; 0 ? 1 : x &lt; 0 ? -1 : 0);</span>
+            }
+            case 52: // SIN
+<span class="fc" id="L426">                return d(Math.sin(Evaluator.num(a, 0)));</span>
+            case 53: // SINH
+<span class="fc" id="L428">                return d(Math.sinh(Evaluator.num(a, 0)));</span>
+            case 54: { // SQRT
+<span class="fc" id="L430">                double x = Evaluator.num(a, 0);</span>
+<span class="fc bfc" id="L431" title="All 2 branches covered.">                if (x &lt; 0) {</span>
+<span class="fc" id="L432">                    throw EvalError.NUM;</span>
+                }
+<span class="fc" id="L434">                return d(Math.sqrt(x));</span>
+            }
+            case 55: { // SQRTPI
+<span class="fc" id="L437">                double x = Evaluator.num(a, 0);</span>
+<span class="fc bfc" id="L438" title="All 2 branches covered.">                if (x &lt; 0) {</span>
+<span class="fc" id="L439">                    throw EvalError.NUM;</span>
+                }
+<span class="fc" id="L441">                return d(Math.sqrt(x * Math.PI));</span>
+            }
+            case 56: // TAN
+<span class="fc" id="L444">                return d(Math.tan(Evaluator.num(a, 0)));</span>
+            case 57: // TANH
+<span class="fc" id="L446">                return d(Math.tanh(Evaluator.num(a, 0)));</span>
+            case 58: // BASE
+<span class="fc" id="L448">                return base(a);</span>
+            case 59: // DECIMAL
+<span class="fc" id="L450">                return decimal(Evaluator.text(a, 0), Evaluator.integer(a, 1));</span>
+            case 60: // ROMAN
+<span class="fc" id="L452">                return roman(Evaluator.integer(a, 0));</span>
+            case 61: // ARABIC
+<span class="fc" id="L454">                return arabic(Evaluator.text(a, 0));</span>
+            default:
+<span class="fc" id="L456">                return range(name, ev, a);</span>
+        }
+    }
+
+    private static Object range(String name, Evaluator ev, Object[] a) {
+<span class="pc bpc" id="L461" title="1 of 15 branches missed.">        switch (Functions.index(SWITCH_2, name)) {</span>
+            case 0: // SUM
+<span class="fc" id="L463">                return d(ev.numbers(a, 0).sum());</span>
+            case 1: { // SUMSQ
+<span class="fc" id="L465">                DoubleList list = ev.numbers(a, 0);</span>
+<span class="fc" id="L466">                double total = 0;</span>
+<span class="fc bfc" id="L467" title="All 2 branches covered.">                for (int i = 0; i &lt; list.size; i++) {</span>
+<span class="fc" id="L468">                    total += list.data[i] * list.data[i];</span>
+                }
+<span class="fc" id="L470">                return d(total);</span>
+            }
+            case 2: { // PRODUCT
+<span class="fc" id="L473">                DoubleList list = ev.numbers(a, 0);</span>
+<span class="fc" id="L474">                double product = 1;</span>
+<span class="fc bfc" id="L475" title="All 2 branches covered.">                for (int i = 0; i &lt; list.size; i++) {</span>
+<span class="fc" id="L476">                    product *= list.data[i];</span>
+                }
+<span class="pc bpc" id="L478" title="1 of 2 branches missed.">                return d(list.size == 0 ? 0 : product);</span>
+            }
+            case 3: // SUMPRODUCT
+<span class="fc" id="L481">                return sumProduct(ev, a);</span>
+            case 4: { // SUMIF
+<span class="pc bpc" id="L483" title="1 of 2 branches missed.">                if (a.length &lt; 2) {</span>
+<span class="nc" id="L484">                    throw EvalError.VALUE;</span>
+                }
+<span class="fc" id="L486">                boolean[][] mask = Criteria.mask(ev, a, 0, 2);</span>
+<span class="fc bfc" id="L487" title="All 2 branches covered.">                Object[][] values = ev.shaped(Evaluator.has(a, 2) ? a[2] : a[0], mask.length, Evaluator.width2(mask));</span>
+<span class="fc" id="L488">                return d(maskedSum(mask, values));</span>
+            }
+            case 5: { // SUMIFS
+<span class="pc bpc" id="L491" title="1 of 2 branches missed.">                if (a.length &lt; 3) {</span>
+<span class="nc" id="L492">                    throw EvalError.VALUE;</span>
+                }
+<span class="fc" id="L494">                boolean[][] mask = Criteria.mask(ev, a, 1, a.length);</span>
+<span class="fc" id="L495">                Object[][] values = ev.matrix(a[0]);</span>
+                // unlike SUMIF, which stretches what it sums to the size of what it tests
+<span class="pc bpc" id="L497" title="1 of 4 branches missed.">                if (values.length != mask.length || Evaluator.width(values) != Evaluator.width2(mask)) {</span>
+<span class="fc" id="L498">                    throw EvalError.VALUE;</span>
+                }
+<span class="fc" id="L500">                return d(maskedSum(mask, values));</span>
+            }
+            case 6: // GCD
+            case 7: { // LCM
+<span class="fc" id="L504">                DoubleList list = ev.numbers(a, 0);</span>
+<span class="fc" id="L505">                boolean gcd = &quot;GCD&quot;.equals(name);</span>
+<span class="fc bfc" id="L506" title="All 2 branches covered.">                double acc = gcd ? 0 : 1;</span>
+<span class="fc bfc" id="L507" title="All 2 branches covered.">                for (int i = 0; i &lt; list.size; i++) {</span>
+<span class="fc" id="L508">                    double v = Math.floor(list.data[i]);</span>
+<span class="pc bpc" id="L509" title="1 of 4 branches missed.">                    if (v &lt; 0 || v &gt; 9.007199254740992E15) {</span>
+<span class="fc" id="L510">                        throw EvalError.NUM;</span>
+                    }
+<span class="fc bfc" id="L512" title="All 2 branches covered.">                    if (gcd) {</span>
+<span class="fc" id="L513">                        acc = gcd(acc, v);</span>
+                    } else {
+<span class="pc bpc" id="L515" title="2 of 4 branches missed.">                        acc = v == 0 || acc == 0 ? 0 : acc / gcd(acc, v) * v;</span>
+                    }
+                }
+<span class="fc" id="L518">                return d(acc);</span>
+            }
+            case 8: { // MULTINOMIAL
+<span class="fc" id="L521">                DoubleList list = ev.numbers(a, 0);</span>
+<span class="fc" id="L522">                double sum = 0;</span>
+<span class="fc" id="L523">                double denominator = 1;</span>
+<span class="fc bfc" id="L524" title="All 2 branches covered.">                for (int i = 0; i &lt; list.size; i++) {</span>
+<span class="fc" id="L525">                    double v = Math.floor(list.data[i]);</span>
+<span class="fc" id="L526">                    sum += v;</span>
+<span class="fc" id="L527">                    denominator *= fact(v);</span>
+                }
+<span class="fc" id="L529">                return d(fact(sum) / denominator);</span>
+            }
+            case 9: // SUMX2MY2
+            case 10: // SUMX2PY2
+            case 11: { // SUMXMY2
+<span class="pc bpc" id="L534" title="1 of 2 branches missed.">                if (a.length &lt; 2) {</span>
+<span class="nc" id="L535">                    throw EvalError.VALUE;</span>
+                }
+<span class="fc" id="L537">                Object[][] x = ev.matrix(a[0]);</span>
+<span class="fc" id="L538">                Object[][] y = ev.matrix(a[1]);</span>
+<span class="pc bpc" id="L539" title="1 of 4 branches missed.">                if (x.length != y.length || Evaluator.width(x) != Evaluator.width(y)) {</span>
+<span class="fc" id="L540">                    throw EvalError.NA;</span>
+                }
+<span class="fc" id="L542">                double total = 0;</span>
+<span class="fc bfc" id="L543" title="All 2 branches covered.">                for (int r = 0; r &lt; x.length; r++) {</span>
+<span class="fc bfc" id="L544" title="All 2 branches covered.">                    for (int c = 0; c &lt; x[r].length; c++) {</span>
+<span class="fc bfc" id="L545" title="All 4 branches covered.">                        if (x[r][c] instanceof Double &amp;&amp; y[r][c] instanceof Double) {</span>
+<span class="fc" id="L546">                            double p = ((Double) x[r][c]).doubleValue();</span>
+<span class="fc" id="L547">                            double q = ((Double) y[r][c]).doubleValue();</span>
+<span class="fc bfc" id="L548" title="All 2 branches covered.">                            if (&quot;SUMX2MY2&quot;.equals(name)) {</span>
+<span class="fc" id="L549">                                total += p * p - q * q;</span>
+<span class="fc bfc" id="L550" title="All 2 branches covered.">                            } else if (&quot;SUMX2PY2&quot;.equals(name)) {</span>
+<span class="fc" id="L551">                                total += p * p + q * q;</span>
+                            } else {
+<span class="fc" id="L553">                                total += (p - q) * (p - q);</span>
+                            }
+                        }
+                    }
+                }
+<span class="fc" id="L558">                return d(total);</span>
+            }
+            case 12: { // SERIESSUM
+<span class="fc" id="L561">                double x = ev.scalarNum(a, 0);</span>
+<span class="fc" id="L562">                double n = ev.scalarNum(a, 1);</span>
+<span class="fc" id="L563">                double m = ev.scalarNum(a, 2);</span>
+<span class="fc" id="L564">                DoubleList coefficients = new DoubleList();</span>
+<span class="fc" id="L565">                ev.numbers(Evaluator.arg(a, 3), coefficients, false);</span>
+<span class="fc" id="L566">                double total = 0;</span>
+<span class="fc bfc" id="L567" title="All 2 branches covered.">                for (int i = 0; i &lt; coefficients.size; i++) {</span>
+<span class="fc" id="L568">                    total += coefficients.data[i] * MathUtil.pow(x, n + i * m);</span>
+                }
+<span class="fc" id="L570">                return d(total);</span>
+            }
+            case 13: { // MMULT
+<span class="pc bpc" id="L573" title="1 of 2 branches missed.">                if (a.length &lt; 2) {</span>
+<span class="nc" id="L574">                    throw EvalError.VALUE;</span>
+                }
+<span class="fc" id="L576">                double[][] x = numeric(ev.matrix(a[0]));</span>
+<span class="fc" id="L577">                double[][] y = numeric(ev.matrix(a[1]));</span>
+<span class="pc bpc" id="L578" title="2 of 6 branches missed.">                if (x.length == 0 || y.length == 0 || x[0].length != y.length) {</span>
+<span class="fc" id="L579">                    throw EvalError.VALUE;</span>
+                }
+<span class="fc" id="L581">                Object[][] out = new Object[x.length][y[0].length];</span>
+<span class="fc bfc" id="L582" title="All 2 branches covered.">                for (int i = 0; i &lt; x.length; i++) {</span>
+<span class="fc bfc" id="L583" title="All 2 branches covered.">                    for (int j = 0; j &lt; y[0].length; j++) {</span>
+<span class="fc" id="L584">                        double total = 0;</span>
+<span class="fc bfc" id="L585" title="All 2 branches covered.">                        for (int k = 0; k &lt; y.length; k++) {</span>
+<span class="fc" id="L586">                            total += x[i][k] * y[k][j];</span>
+                        }
+<span class="fc" id="L588">                        out[i][j] = d(total);</span>
+                    }
+                }
+<span class="fc" id="L591">                return out;</span>
+            }
+            case 14: { // MDETERM
+<span class="fc" id="L594">                double[][] m = numeric(ev.matrix(Evaluator.arg(a, 0)));</span>
+<span class="pc bpc" id="L595" title="2 of 4 branches missed.">                if (m.length == 0 || m.length != m[0].length) {</span>
+<span class="nc" id="L596">                    throw EvalError.VALUE;</span>
+                }
+<span class="fc" id="L598">                return d(invert(m, null));</span>
+            }
+            case 15: { // MINVERSE
+<span class="fc" id="L601">                double[][] m = numeric(ev.matrix(Evaluator.arg(a, 0)));</span>
+<span class="pc bpc" id="L602" title="2 of 4 branches missed.">                if (m.length == 0 || m.length != m[0].length) {</span>
+<span class="nc" id="L603">                    throw EvalError.VALUE;</span>
+                }
+<span class="fc" id="L605">                double[][] inverse = new double[m.length][m.length];</span>
+<span class="pc bpc" id="L606" title="1 of 2 branches missed.">                if (invert(m, inverse) == 0) {</span>
+<span class="nc" id="L607">                    throw EvalError.NUM;</span>
+                }
+<span class="fc" id="L609">                Object[][] out = new Object[m.length][m.length];</span>
+<span class="fc bfc" id="L610" title="All 2 branches covered.">                for (int i = 0; i &lt; m.length; i++) {</span>
+<span class="fc bfc" id="L611" title="All 2 branches covered.">                    for (int j = 0; j &lt; m.length; j++) {</span>
+<span class="fc" id="L612">                        out[i][j] = d(inverse[i][j]);</span>
+                    }
+                }
+<span class="fc" id="L615">                return out;</span>
+            }
+            case 16: { // MUNIT
+<span class="fc" id="L618">                int n = (int) ev.scalarNum(a, 0);</span>
+<span class="pc bpc" id="L619" title="1 of 4 branches missed.">                if (n &lt; 1 || n &gt; 4096) {</span>
+<span class="fc" id="L620">                    throw EvalError.VALUE;</span>
+                }
+<span class="fc" id="L622">                Object[][] out = new Object[n][n];</span>
+<span class="fc bfc" id="L623" title="All 2 branches covered.">                for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc bfc" id="L624" title="All 2 branches covered.">                    for (int j = 0; j &lt; n; j++) {</span>
+<span class="fc bfc" id="L625" title="All 2 branches covered.">                        out[i][j] = d(i == j ? 1 : 0);</span>
+                    }
+                }
+<span class="fc" id="L628">                return out;</span>
+            }
+            default:
+<span class="nc" id="L631">                return CellError.NAME;</span>
+        }
+    }
+
+    private static double maskedSum(boolean[][] mask, Object[][] values) {
+<span class="fc" id="L636">        DoubleList list = new DoubleList();</span>
+<span class="fc bfc" id="L637" title="All 2 branches covered.">        for (int r = 0; r &lt; mask.length; r++) {</span>
+<span class="fc bfc" id="L638" title="All 2 branches covered.">            for (int c = 0; c &lt; mask[r].length; c++) {</span>
+<span class="fc bfc" id="L639" title="All 4 branches covered.">                if (mask[r][c] &amp;&amp; values[r][c] instanceof Double) {</span>
+<span class="fc" id="L640">                    list.add(((Double) values[r][c]).doubleValue());</span>
+                }
+            }
+        }
+<span class="fc" id="L644">        return list.sum();</span>
+    }
+
+    private static Object sumProduct(Evaluator ev, Object[] a) {
+<span class="pc bpc" id="L648" title="1 of 2 branches missed.">        if (a.length == 0) {</span>
+<span class="nc" id="L649">            throw EvalError.VALUE;</span>
+        }
+<span class="fc" id="L651">        Object[][] first = ev.matrix(a[0]);</span>
+<span class="fc" id="L652">        int rows = first.length;</span>
+<span class="fc" id="L653">        int cols = Evaluator.width(first);</span>
+<span class="fc" id="L654">        double[][] product = new double[rows][cols];</span>
+<span class="fc bfc" id="L655" title="All 2 branches covered.">        for (int r = 0; r &lt; rows; r++) {</span>
+<span class="fc bfc" id="L656" title="All 2 branches covered.">            for (int c = 0; c &lt; cols; c++) {</span>
+<span class="fc" id="L657">                product[r][c] = 1;</span>
+            }
+        }
+<span class="fc bfc" id="L660" title="All 2 branches covered.">        for (int i = 0; i &lt; a.length; i++) {</span>
+<span class="fc bfc" id="L661" title="All 2 branches covered.">            Object[][] m = i == 0 ? first : ev.matrix(a[i]);</span>
+<span class="pc bpc" id="L662" title="1 of 4 branches missed.">            if (m.length != rows || Evaluator.width(m) != cols) {</span>
+<span class="fc" id="L663">                throw EvalError.VALUE;</span>
+            }
+<span class="fc bfc" id="L665" title="All 2 branches covered.">            for (int r = 0; r &lt; rows; r++) {</span>
+<span class="fc bfc" id="L666" title="All 2 branches covered.">                for (int c = 0; c &lt; cols; c++) {</span>
+<span class="fc" id="L667">                    Object v = m[r][c];</span>
+<span class="pc bpc" id="L668" title="1 of 2 branches missed.">                    if (v instanceof CellError) {</span>
+<span class="nc" id="L669">                        throw EvalError.of((CellError) v);</span>
+                    }
+                    // text and logical values count as zero here, unlike in SUM
+<span class="fc bfc" id="L672" title="All 2 branches covered.">                    product[r][c] *= v instanceof Double ? ((Double) v).doubleValue() : 0;</span>
+                }
+            }
+        }
+<span class="fc" id="L676">        DoubleList list = new DoubleList();</span>
+<span class="fc bfc" id="L677" title="All 2 branches covered.">        for (int r = 0; r &lt; rows; r++) {</span>
+<span class="fc bfc" id="L678" title="All 2 branches covered.">            for (int c = 0; c &lt; cols; c++) {</span>
+<span class="fc" id="L679">                list.add(product[r][c]);</span>
+            }
+        }
+<span class="fc" id="L682">        return d(list.sum());</span>
+    }
+
+    static double gcd(double x, double y) {
+<span class="fc bfc" id="L686" title="All 2 branches covered.">        while (y != 0) {</span>
+<span class="fc" id="L687">            double t = x - y * Math.floor(x / y);</span>
+<span class="fc" id="L688">            x = y;</span>
+<span class="fc" id="L689">            y = t;</span>
+<span class="fc" id="L690">        }</span>
+<span class="fc" id="L691">        return x;</span>
+    }
+
+    static double[][] numeric(Object[][] m) {
+<span class="fc" id="L695">        double[][] out = new double[m.length][Evaluator.width(m)];</span>
+<span class="fc bfc" id="L696" title="All 2 branches covered.">        for (int r = 0; r &lt; m.length; r++) {</span>
+<span class="fc bfc" id="L697" title="All 2 branches covered.">            for (int c = 0; c &lt; out[r].length; c++) {</span>
+<span class="fc" id="L698">                Object v = m[r][c];</span>
+<span class="pc bpc" id="L699" title="1 of 2 branches missed.">                if (v instanceof CellError) {</span>
+<span class="nc" id="L700">                    throw EvalError.of((CellError) v);</span>
+                }
+<span class="fc bfc" id="L702" title="All 2 branches covered.">                if (!(v instanceof Double)) {</span>
+<span class="fc" id="L703">                    throw EvalError.VALUE;</span>
+                }
+<span class="fc" id="L705">                out[r][c] = ((Double) v).doubleValue();</span>
+            }
+        }
+<span class="fc" id="L708">        return out;</span>
+    }
+
+    /// Gauss-Jordan elimination with partial pivoting. Answers the determinant and, when
+    /// `inverse` is given and the determinant is not zero, fills it in.
+    static double invert(double[][] source, double[][] inverse) {
+<span class="fc" id="L714">        int n = source.length;</span>
+<span class="fc" id="L715">        double[][] m = new double[n][n];</span>
+<span class="fc bfc" id="L716" title="All 2 branches covered.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc" id="L717">            System.arraycopy(source[i], 0, m[i], 0, n);</span>
+<span class="fc bfc" id="L718" title="All 2 branches covered.">            if (inverse != null) {</span>
+<span class="fc bfc" id="L719" title="All 2 branches covered.">                for (int j = 0; j &lt; n; j++) {</span>
+<span class="fc bfc" id="L720" title="All 2 branches covered.">                    inverse[i][j] = i == j ? 1 : 0;</span>
+                }
+            }
+        }
+<span class="fc" id="L724">        double det = 1;</span>
+<span class="fc bfc" id="L725" title="All 2 branches covered.">        for (int col = 0; col &lt; n; col++) {</span>
+<span class="fc" id="L726">            int pivot = col;</span>
+<span class="fc bfc" id="L727" title="All 2 branches covered.">            for (int r = col + 1; r &lt; n; r++) {</span>
+<span class="pc bpc" id="L728" title="1 of 2 branches missed.">                if (Math.abs(m[r][col]) &gt; Math.abs(m[pivot][col])) {</span>
+<span class="fc" id="L729">                    pivot = r;</span>
+                }
+            }
+<span class="pc bpc" id="L732" title="1 of 2 branches missed.">            if (Math.abs(m[pivot][col]) &lt; 1e-14) {</span>
+<span class="nc" id="L733">                return 0;</span>
+            }
+<span class="fc bfc" id="L735" title="All 2 branches covered.">            if (pivot != col) {</span>
+<span class="fc" id="L736">                double[] t = m[pivot];</span>
+<span class="fc" id="L737">                m[pivot] = m[col];</span>
+<span class="fc" id="L738">                m[col] = t;</span>
+<span class="fc bfc" id="L739" title="All 2 branches covered.">                if (inverse != null) {</span>
+<span class="fc" id="L740">                    t = inverse[pivot];</span>
+<span class="fc" id="L741">                    inverse[pivot] = inverse[col];</span>
+<span class="fc" id="L742">                    inverse[col] = t;</span>
+                }
+<span class="fc" id="L744">                det = -det;</span>
+            }
+<span class="fc" id="L746">            double p = m[col][col];</span>
+<span class="fc" id="L747">            det *= p;</span>
+<span class="fc bfc" id="L748" title="All 2 branches covered.">            for (int j = 0; j &lt; n; j++) {</span>
+<span class="fc" id="L749">                m[col][j] /= p;</span>
+<span class="fc bfc" id="L750" title="All 2 branches covered.">                if (inverse != null) {</span>
+<span class="fc" id="L751">                    inverse[col][j] /= p;</span>
+                }
+            }
+<span class="fc bfc" id="L754" title="All 2 branches covered.">            for (int r = 0; r &lt; n; r++) {</span>
+<span class="fc bfc" id="L755" title="All 2 branches covered.">                if (r != col) {</span>
+<span class="fc" id="L756">                    double f = m[r][col];</span>
+<span class="pc bpc" id="L757" title="1 of 2 branches missed.">                    if (f != 0) {</span>
+<span class="fc bfc" id="L758" title="All 2 branches covered.">                        for (int j = 0; j &lt; n; j++) {</span>
+<span class="fc" id="L759">                            m[r][j] -= f * m[col][j];</span>
+<span class="fc bfc" id="L760" title="All 2 branches covered.">                            if (inverse != null) {</span>
+<span class="fc" id="L761">                                inverse[r][j] -= f * inverse[col][j];</span>
+                            }
+                        }
+                    }
+                }
+            }
+        }
+<span class="fc" id="L768">        return det;</span>
+    }
+
+    private static Object base(Object[] a) {
+<span class="fc" id="L772">        double value = Math.floor(Evaluator.num(a, 0));</span>
+<span class="fc" id="L773">        int radix = Evaluator.integer(a, 1);</span>
+<span class="fc" id="L774">        int min = Evaluator.integer(a, 2, 0);</span>
+<span class="pc bpc" id="L775" title="4 of 12 branches missed.">        if (value &lt; 0 || value &gt;= 9.007199254740992E15 || radix &lt; 2 || radix &gt; 36 || min &lt; 0 || min &gt; 255) {</span>
+<span class="fc" id="L776">            throw EvalError.NUM;</span>
+        }
+<span class="fc" id="L778">        long v = (long) value;</span>
+<span class="fc" id="L779">        StringBuilder sb = new StringBuilder();</span>
+        do {
+<span class="fc" id="L781">            int digit = (int) (v % radix);</span>
+<span class="fc bfc" id="L782" title="All 2 branches covered.">            sb.insert(0, (char) (digit &lt; 10 ? '0' + digit : 'A' + digit - 10));</span>
+<span class="fc" id="L783">            v /= radix;</span>
+<span class="fc bfc" id="L784" title="All 2 branches covered.">        } while (v &gt; 0);</span>
+<span class="pc bpc" id="L785" title="1 of 2 branches missed.">        while (sb.length() &lt; min) {</span>
+<span class="nc" id="L786">            sb.insert(0, '0');</span>
+        }
+<span class="fc" id="L788">        return sb.toString();</span>
+    }
+
+    private static Object decimal(String text, int radix) {
+<span class="pc bpc" id="L792" title="1 of 4 branches missed.">        if (radix &lt; 2 || radix &gt; 36) {</span>
+<span class="fc" id="L793">            throw EvalError.NUM;</span>
+        }
+<span class="fc" id="L795">        double v = 0;</span>
+<span class="fc" id="L796">        String s = text.trim();</span>
+<span class="fc bfc" id="L797" title="All 2 branches covered.">        for (int i = 0; i &lt; s.length(); i++) {</span>
+<span class="fc" id="L798">            char c = s.charAt(i);</span>
+            int digit;
+<span class="pc bpc" id="L800" title="1 of 4 branches missed.">            if (c &gt;= '0' &amp;&amp; c &lt;= '9') {</span>
+<span class="fc" id="L801">                digit = c - '0';</span>
+<span class="pc bpc" id="L802" title="3 of 4 branches missed.">            } else if (c &gt;= 'a' &amp;&amp; c &lt;= 'z') {</span>
+<span class="nc" id="L803">                digit = c - 'a' + 10;</span>
+<span class="pc bpc" id="L804" title="2 of 4 branches missed.">            } else if (c &gt;= 'A' &amp;&amp; c &lt;= 'Z') {</span>
+<span class="fc" id="L805">                digit = c - 'A' + 10;</span>
+            } else {
+<span class="nc" id="L807">                throw EvalError.NUM;</span>
+            }
+<span class="pc bpc" id="L809" title="1 of 2 branches missed.">            if (digit &gt;= radix) {</span>
+<span class="nc" id="L810">                throw EvalError.NUM;</span>
+            }
+<span class="fc" id="L812">            v = v * radix + digit;</span>
+        }
+<span class="fc" id="L814">        return d(v);</span>
+    }
+
+    private static Object roman(int n) {
+<span class="pc bpc" id="L818" title="1 of 4 branches missed.">        if (n &lt; 0 || n &gt; 3999) {</span>
+<span class="fc" id="L819">            throw EvalError.VALUE;</span>
+        }
+<span class="fc" id="L821">        StringBuilder sb = new StringBuilder();</span>
+<span class="fc bfc" id="L822" title="All 2 branches covered.">        for (int i = 0; i &lt; ROMAN_VALUES.length; i++) {</span>
+<span class="fc bfc" id="L823" title="All 2 branches covered.">            while (n &gt;= ROMAN_VALUES[i]) {</span>
+<span class="fc" id="L824">                sb.append(ROMAN_SYMBOLS[i]);</span>
+<span class="fc" id="L825">                n -= ROMAN_VALUES[i];</span>
+            }
+        }
+<span class="fc" id="L828">        return sb.toString();</span>
+    }
+
+    private static Object arabic(String text) {
+<span class="fc" id="L832">        String s = FormulaParser.asciiUpper(text.trim());</span>
+<span class="fc" id="L833">        boolean negative = s.startsWith(&quot;-&quot;);</span>
+<span class="fc" id="L834">        int total = 0;</span>
+<span class="fc" id="L835">        int previous = 0;</span>
+<span class="fc bfc" id="L836" title="All 4 branches covered.">        for (int i = s.length() - 1; i &gt;= (negative ? 1 : 0); i--) {</span>
+            int v;
+<span class="pc bpc" id="L838" title="2 of 8 branches missed.">            switch (s.charAt(i)) {</span>
+                case 'I':
+<span class="fc" id="L840">                    v = 1;</span>
+<span class="fc" id="L841">                    break;</span>
+                case 'V':
+<span class="fc" id="L843">                    v = 5;</span>
+<span class="fc" id="L844">                    break;</span>
+                case 'X':
+<span class="fc" id="L846">                    v = 10;</span>
+<span class="fc" id="L847">                    break;</span>
+                case 'L':
+<span class="nc" id="L849">                    v = 50;</span>
+<span class="nc" id="L850">                    break;</span>
+                case 'C':
+<span class="fc" id="L852">                    v = 100;</span>
+<span class="fc" id="L853">                    break;</span>
+                case 'D':
+<span class="nc" id="L855">                    v = 500;</span>
+<span class="nc" id="L856">                    break;</span>
+                case 'M':
+<span class="fc" id="L858">                    v = 1000;</span>
+<span class="fc" id="L859">                    break;</span>
+                default:
+<span class="fc" id="L861">                    throw EvalError.VALUE;</span>
+            }
+<span class="fc bfc" id="L863" title="All 2 branches covered.">            if (v &lt; previous) {</span>
+<span class="fc" id="L864">                total -= v;</span>
+            } else {
+<span class="fc" id="L866">                total += v;</span>
+<span class="fc" id="L867">                previous = v;</span>
+            }
+        }
+<span class="pc bpc" id="L870" title="1 of 2 branches missed.">        return d(negative ? -total : total);</span>
+    }
+
+<span class="fc" id="L873">    private static final java.util.HashMap&lt;String, Integer&gt; SWITCH_1 = Functions.switchTable(</span>
+            &quot;ABS&quot;, &quot;ACOS&quot;, &quot;ACOSH&quot;, &quot;ACOT&quot;, &quot;ACOTH&quot;, &quot;ASIN&quot;, &quot;ASINH&quot;, &quot;ATAN&quot;, &quot;ATAN2&quot;, &quot;ATANH&quot;,
+            &quot;CEILING&quot;, &quot;CEILING.MATH&quot;, &quot;CEILING.PRECISE&quot;, &quot;ISO.CEILING&quot;, &quot;COMBIN&quot;, &quot;COMBINA&quot;, &quot;COS&quot;,
+            &quot;COSH&quot;, &quot;COT&quot;, &quot;COTH&quot;, &quot;CSC&quot;, &quot;CSCH&quot;, &quot;DEGREES&quot;, &quot;EVEN&quot;, &quot;EXP&quot;, &quot;FACT&quot;, &quot;FACTDOUBLE&quot;,
+            &quot;FLOOR&quot;, &quot;FLOOR.MATH&quot;, &quot;FLOOR.PRECISE&quot;, &quot;INT&quot;, &quot;LN&quot;, &quot;LOG&quot;, &quot;LOG10&quot;, &quot;MOD&quot;, &quot;MROUND&quot;,
+            &quot;ODD&quot;, &quot;PERMUT&quot;, &quot;PERMUTATIONA&quot;, &quot;PI&quot;, &quot;POWER&quot;, &quot;QUOTIENT&quot;, &quot;RADIANS&quot;, &quot;RAND&quot;,
+            &quot;RANDBETWEEN&quot;, &quot;ROUND&quot;, &quot;ROUNDDOWN&quot;, &quot;TRUNC&quot;, &quot;ROUNDUP&quot;, &quot;SEC&quot;, &quot;SECH&quot;, &quot;SIGN&quot;, &quot;SIN&quot;,
+            &quot;SINH&quot;, &quot;SQRT&quot;, &quot;SQRTPI&quot;, &quot;TAN&quot;, &quot;TANH&quot;, &quot;BASE&quot;, &quot;DECIMAL&quot;, &quot;ROMAN&quot;, &quot;ARABIC&quot;);
+
+<span class="fc" id="L882">    private static final java.util.HashMap&lt;String, Integer&gt; SWITCH_2 = Functions.switchTable(</span>
+            &quot;SUM&quot;, &quot;SUMSQ&quot;, &quot;PRODUCT&quot;, &quot;SUMPRODUCT&quot;, &quot;SUMIF&quot;, &quot;SUMIFS&quot;, &quot;GCD&quot;, &quot;LCM&quot;, &quot;MULTINOMIAL&quot;,
+            &quot;SUMX2MY2&quot;, &quot;SUMX2PY2&quot;, &quot;SUMXMY2&quot;, &quot;SERIESSUM&quot;, &quot;MMULT&quot;, &quot;MDETERM&quot;, &quot;MINVERSE&quot;, &quot;MUNIT&quot;);
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,1571 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CellFormat.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.spreadsheet</a> &gt; <span class="el_source">CellFormat.java</span></div><h1>CellFormat.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.spreadsheet;
+
+import java.util.ArrayList;
+
+/// A number format as spreadsheets write it -- `#,##0.00`, `0%`, `yyyy-mm-dd`,
+/// `[Red]-0.0;&quot;none&quot;` -- compiled once and applied to values.
+///
+/// These codes are not the patterns of a Java formatter: a section per sign, digit
+/// placeholders that differ in what they show for a missing digit, a comma that divides by
+/// a thousand, and an `m` that means month or minute by what stands next to it.
+final class CellFormat {
+    static final String GENERAL = &quot;General&quot;;
+
+<span class="fc" id="L36">    private static final String[] MONTHS = {&quot;January&quot;, &quot;February&quot;, &quot;March&quot;, &quot;April&quot;, &quot;May&quot;, &quot;June&quot;, &quot;July&quot;,</span>
+        &quot;August&quot;, &quot;September&quot;, &quot;October&quot;, &quot;November&quot;, &quot;December&quot;};
+<span class="fc" id="L38">    private static final String[] DAYS = {&quot;Sunday&quot;, &quot;Monday&quot;, &quot;Tuesday&quot;, &quot;Wednesday&quot;, &quot;Thursday&quot;, &quot;Friday&quot;,</span>
+        &quot;Saturday&quot;};
+
+    // token kinds
+    private static final int LITERAL = 0;
+    private static final int DIGIT = 1;
+    private static final int POINT = 2;
+    private static final int PERCENT = 3;
+    private static final int EXPONENT = 4;
+    private static final int TEXT = 5;
+    private static final int DATE = 6;
+    private static final int AMPM = 7;
+    private static final int GENERAL_TOKEN = 8;
+    private static final int ELAPSED = 9;
+    private static final int SLASH = 10;
+    private static final int SECOND_FRACTION = 11;
+
+    private static final class Token {
+        final int kind;
+        final String text;
+
+<span class="fc" id="L59">        Token(int kind, String text) {</span>
+<span class="fc" id="L60">            this.kind = kind;</span>
+<span class="fc" id="L61">            this.text = text;</span>
+<span class="fc" id="L62">        }</span>
+    }
+
+<span class="fc" id="L65">    private static final class Section {</span>
+<span class="fc" id="L66">        final ArrayList&lt;Token&gt; tokens = new ArrayList&lt;Token&gt;();</span>
+        boolean date;
+        boolean general;
+        boolean hasText;
+        boolean grouping;
+        boolean exponent;
+        boolean fraction;
+        boolean twelveHour;
+        int percents;
+        int thousands;
+        int decimals;
+        int integerDigits;
+        // a condition in brackets: 0 none, then the operator
+        char condition;
+        boolean conditionOrEqual;
+        double conditionValue;
+    }
+
+    static final int MAX_CODE = 1024;
+    private final String code;
+    /// Refuses a format code no file can hold: more than four sections, or a quote, a
+    /// bracket or an escape left open.
+    static void check(String code) {
+<span class="pc bpc" id="L89" title="1 of 2 branches missed.">        if (code == null) {</span>
+<span class="nc" id="L90">            return;</span>
+        }
+<span class="fc" id="L92">        int sections = 1;</span>
+<span class="fc" id="L93">        int i = 0;</span>
+<span class="fc bfc" id="L94" title="All 2 branches covered.">        while (i &lt; code.length()) {</span>
+<span class="fc" id="L95">            char ch = code.charAt(i);</span>
+<span class="fc bfc" id="L96" title="All 4 branches covered.">            if (ch == '&quot;' || ch == '[') {</span>
+<span class="fc bfc" id="L97" title="All 2 branches covered.">                int end = code.indexOf(ch == '&quot;' ? '&quot;' : ']', i + 1);</span>
+<span class="fc bfc" id="L98" title="All 2 branches covered.">                if (end &lt; 0) {</span>
+<span class="fc" id="L99">                    throw new IllegalArgumentException(&quot;A format code with &quot; + ch + &quot; left open: &quot; + code);</span>
+                }
+<span class="fc" id="L101">                i = end + 1;</span>
+<span class="fc" id="L102">                continue;</span>
+            }
+<span class="fc bfc" id="L104" title="All 6 branches covered.">            if (ch == '\\' || ch == '_' || ch == '*') {</span>
+<span class="fc bfc" id="L105" title="All 2 branches covered.">                if (i + 1 &gt;= code.length()) {</span>
+<span class="fc" id="L106">                    throw new IllegalArgumentException(&quot;A format code ending in &quot; + ch + &quot;: &quot; + code);</span>
+                }
+<span class="fc" id="L108">                i += 2;</span>
+<span class="fc" id="L109">                continue;</span>
+            }
+<span class="fc bfc" id="L111" title="All 2 branches covered.">            if (ch == ';') {</span>
+<span class="fc" id="L112">                sections++;</span>
+            }
+<span class="fc" id="L114">            i++;</span>
+<span class="fc" id="L115">        }</span>
+<span class="fc bfc" id="L116" title="All 2 branches covered.">        if (sections &gt; 4) {</span>
+<span class="fc" id="L117">            throw new IllegalArgumentException(&quot;A format code of more than four sections: &quot; + code);</span>
+        }
+<span class="fc" id="L119">    }</span>
+
+    private final Section[] sections;
+
+<span class="fc" id="L123">    CellFormat(String code) {</span>
+        // a format code is 255 characters at most in the programs that write them; one far
+        // longer is not a format, and is not given the work of being read as one
+<span class="pc bpc" id="L126" title="1 of 6 branches missed.">        this.code = code == null || code.length() == 0 || code.length() &gt; MAX_CODE ? GENERAL : code;</span>
+<span class="fc" id="L127">        ArrayList&lt;Section&gt; list = new ArrayList&lt;Section&gt;();</span>
+<span class="fc" id="L128">        int start = 0;</span>
+<span class="fc" id="L129">        boolean quoted = false;</span>
+<span class="fc" id="L130">        boolean bracket = false;</span>
+<span class="fc" id="L131">        String c = this.code;</span>
+<span class="fc bfc" id="L132" title="All 2 branches covered.">        for (int i = 0; i &lt;= c.length(); i++) {</span>
+<span class="fc bfc" id="L133" title="All 2 branches covered.">            char ch = i &lt; c.length() ? c.charAt(i) : ';';</span>
+<span class="fc bfc" id="L134" title="All 2 branches covered.">            if (i &lt; c.length()) {</span>
+<span class="fc bfc" id="L135" title="All 2 branches covered.">                if (quoted) {</span>
+<span class="fc bfc" id="L136" title="All 2 branches covered.">                    quoted = ch != '&quot;';</span>
+<span class="fc" id="L137">                    continue;</span>
+                }
+<span class="fc bfc" id="L139" title="All 2 branches covered.">                if (ch == '&quot;') {</span>
+<span class="fc" id="L140">                    quoted = true;</span>
+<span class="fc" id="L141">                    continue;</span>
+                }
+<span class="fc bfc" id="L143" title="All 6 branches covered.">                if (ch == '\\' || ch == '_' || ch == '*') {</span>
+                    // the character it applies to is skipped, and at the end of the code
+                    // there is none: the section still has to be closed
+<span class="fc bfc" id="L146" title="All 2 branches covered.">                    if (i + 1 &lt; c.length()) {</span>
+<span class="fc" id="L147">                        i++;</span>
+                    }
+                    continue;
+                }
+<span class="fc bfc" id="L151" title="All 2 branches covered.">                if (ch == '[') {</span>
+<span class="fc" id="L152">                    bracket = true;</span>
+<span class="fc bfc" id="L153" title="All 2 branches covered.">                } else if (ch == ']') {</span>
+<span class="fc" id="L154">                    bracket = false;</span>
+                }
+<span class="fc bfc" id="L156" title="All 4 branches covered.">                if (bracket || ch != ';') {</span>
+<span class="fc" id="L157">                    continue;</span>
+                }
+            }
+<span class="fc" id="L160">            list.add(compile(c.substring(start, Math.min(i, c.length()))));</span>
+<span class="fc" id="L161">            start = i + 1;</span>
+        }
+<span class="fc" id="L163">        sections = new Section[list.size()];</span>
+<span class="fc" id="L164">        list.toArray(sections);</span>
+<span class="fc" id="L165">    }</span>
+
+    String code() {
+<span class="fc" id="L168">        return code;</span>
+    }
+
+    /// The format code of one of the numbered formats every spreadsheet file knows without
+    /// being told, null for a number that is not one.
+    static String builtin(int id) {
+<span class="fc bfc" id="L174" title="All 29 branches covered.">        switch (id) {</span>
+            case 0:
+<span class="fc" id="L176">                return GENERAL;</span>
+            case 1:
+<span class="fc" id="L178">                return &quot;0&quot;;</span>
+            case 2:
+<span class="fc" id="L180">                return &quot;0.00&quot;;</span>
+            case 3:
+<span class="fc" id="L182">                return &quot;#,##0&quot;;</span>
+            case 4:
+<span class="fc" id="L184">                return &quot;#,##0.00&quot;;</span>
+            case 5:
+            case 37:
+<span class="fc" id="L187">                return &quot;#,##0;-#,##0&quot;;</span>
+            case 6:
+            case 38:
+<span class="fc" id="L190">                return &quot;#,##0;[Red]-#,##0&quot;;</span>
+            case 7:
+            case 39:
+<span class="fc" id="L193">                return &quot;#,##0.00;-#,##0.00&quot;;</span>
+            case 8:
+            case 40:
+<span class="fc" id="L196">                return &quot;#,##0.00;[Red]-#,##0.00&quot;;</span>
+            case 9:
+<span class="fc" id="L198">                return &quot;0%&quot;;</span>
+            case 10:
+<span class="fc" id="L200">                return &quot;0.00%&quot;;</span>
+            case 11:
+<span class="fc" id="L202">                return &quot;0.00E+00&quot;;</span>
+            case 12:
+<span class="fc" id="L204">                return &quot;# ?/?&quot;;</span>
+            case 13:
+<span class="fc" id="L206">                return &quot;# ??/??&quot;;</span>
+            case 14:
+<span class="fc" id="L208">                return &quot;m/d/yyyy&quot;;</span>
+            case 15:
+<span class="fc" id="L210">                return &quot;d-mmm-yy&quot;;</span>
+            case 16:
+<span class="fc" id="L212">                return &quot;d-mmm&quot;;</span>
+            case 17:
+<span class="fc" id="L214">                return &quot;mmm-yy&quot;;</span>
+            case 18:
+<span class="fc" id="L216">                return &quot;h:mm AM/PM&quot;;</span>
+            case 19:
+<span class="fc" id="L218">                return &quot;h:mm:ss AM/PM&quot;;</span>
+            case 20:
+<span class="fc" id="L220">                return &quot;h:mm&quot;;</span>
+            case 21:
+<span class="fc" id="L222">                return &quot;h:mm:ss&quot;;</span>
+            case 22:
+<span class="fc" id="L224">                return &quot;m/d/yyyy h:mm&quot;;</span>
+            case 45:
+<span class="fc" id="L226">                return &quot;mm:ss&quot;;</span>
+            case 46:
+<span class="fc" id="L228">                return &quot;[h]:mm:ss&quot;;</span>
+            case 47:
+<span class="fc" id="L230">                return &quot;mm:ss.0&quot;;</span>
+            case 48:
+<span class="fc" id="L232">                return &quot;##0.0E+0&quot;;</span>
+            case 49:
+<span class="fc" id="L234">                return &quot;@&quot;;</span>
+            default:
+<span class="fc" id="L236">                return null;</span>
+        }
+    }
+
+    /// The number of the built-in format with a code, -1 when the code is not one of them.
+    static int builtinId(String code) {
+<span class="fc bfc" id="L242" title="All 2 branches covered.">        for (int i = 0; i &lt; 50; i++) {</span>
+<span class="fc" id="L243">            String b = builtin(i);</span>
+            // 5 to 8 and 37 to 40 are the locale's: in en-US 5 to 8 are currency, so the codes
+            // they are read as here are written out in full and keep their meaning
+<span class="fc bfc" id="L246" title="All 12 branches covered.">            if (b != null &amp;&amp; b.equals(code) &amp;&amp; (i &lt; 5 || i &gt; 8) &amp;&amp; (i &lt; 37 || i &gt; 40)) {</span>
+<span class="fc" id="L247">                return i;</span>
+            }
+        }
+<span class="fc" id="L250">        return -1;</span>
+    }
+
+    /// Whether numbers shown with this format are dates or times.
+    boolean isDate() {
+<span class="pc bpc" id="L255" title="1 of 4 branches missed.">        return sections.length &gt; 0 &amp;&amp; sections[0].date;</span>
+    }
+
+    /// Whether the format shows a time of day and no date.
+    boolean isTimeOnly() {
+<span class="fc bfc" id="L260" title="All 2 branches covered.">        if (!isDate()) {</span>
+<span class="fc" id="L261">            return false;</span>
+        }
+<span class="fc" id="L263">        ArrayList&lt;Token&gt; tokens = sections[0].tokens;</span>
+<span class="fc bfc" id="L264" title="All 2 branches covered.">        for (Token t : tokens) {</span>
+<span class="fc bfc" id="L265" title="All 2 branches covered.">            if (t.kind == DATE) {</span>
+<span class="fc" id="L266">                char c = t.text.charAt(0);</span>
+<span class="fc bfc" id="L267" title="All 6 branches covered.">                if (c == 'y' || c == 'd' || c == 'M') {</span>
+<span class="fc" id="L268">                    return false;</span>
+                }
+            }
+<span class="fc" id="L271">        }</span>
+<span class="fc" id="L272">        return true;</span>
+    }
+
+    boolean isPercent() {
+<span class="pc bpc" id="L276" title="1 of 4 branches missed.">        return sections.length &gt; 0 &amp;&amp; sections[0].percents &gt; 0;</span>
+    }
+
+    boolean isText() {
+<span class="pc bpc" id="L280" title="2 of 6 branches missed.">        return sections.length == 1 &amp;&amp; sections[0].hasText &amp;&amp; sections[0].tokens.size() == 1;</span>
+    }
+
+    boolean isGeneral() {
+<span class="pc bpc" id="L284" title="1 of 6 branches missed.">        return sections.length == 1 &amp;&amp; sections[0].general &amp;&amp; sections[0].tokens.size() == 1;</span>
+    }
+
+    /// The count of decimals the format shows, for a column that has to pick an alignment.
+    int decimals() {
+<span class="nc bnc" id="L289" title="All 2 branches missed.">        return sections.length == 0 ? 0 : sections[0].decimals;</span>
+    }
+
+    static String format(String code, Object value, boolean date1904) {
+<span class="fc" id="L293">        return new CellFormat(code).format(value, date1904);</span>
+    }
+
+    private static Section compile(String s) {
+<span class="fc" id="L297">        Section sec = new Section();</span>
+<span class="fc" id="L298">        ArrayList&lt;Token&gt; out = sec.tokens;</span>
+<span class="fc" id="L299">        int n = s.length();</span>
+<span class="fc" id="L300">        boolean afterPoint = false;</span>
+<span class="fc" id="L301">        boolean afterSlash = false;</span>
+<span class="fc" id="L302">        int i = 0;</span>
+<span class="fc bfc" id="L303" title="All 2 branches covered.">        while (i &lt; n) {</span>
+<span class="fc" id="L304">            char c = s.charAt(i);</span>
+<span class="fc bfc" id="L305" title="All 2 branches covered.">            if (c == '&quot;') {</span>
+<span class="fc" id="L306">                int end = s.indexOf('&quot;', i + 1);</span>
+<span class="fc bfc" id="L307" title="All 2 branches covered.">                if (end &lt; 0) {</span>
+<span class="fc" id="L308">                    end = n;</span>
+                }
+<span class="fc" id="L310">                out.add(new Token(LITERAL, s.substring(i + 1, end)));</span>
+<span class="fc" id="L311">                i = end + 1;</span>
+<span class="fc" id="L312">                continue;</span>
+            }
+<span class="fc bfc" id="L314" title="All 2 branches covered.">            if (c == '\\') {</span>
+<span class="fc bfc" id="L315" title="All 2 branches covered.">                if (i + 1 &lt; n) {</span>
+<span class="fc" id="L316">                    out.add(new Token(LITERAL, s.substring(i + 1, i + 2)));</span>
+                }
+<span class="fc" id="L318">                i += 2;</span>
+<span class="fc" id="L319">                continue;</span>
+            }
+<span class="fc bfc" id="L321" title="All 2 branches covered.">            if (c == '_') {</span>
+                // a space as wide as the next character
+<span class="fc" id="L323">                out.add(new Token(LITERAL, &quot; &quot;));</span>
+<span class="fc" id="L324">                i += 2;</span>
+<span class="fc" id="L325">                continue;</span>
+            }
+<span class="fc bfc" id="L327" title="All 2 branches covered.">            if (c == '*') {</span>
+                // repeats the next character to fill the cell: there is no width to fill here
+<span class="fc" id="L329">                i += 2;</span>
+<span class="fc" id="L330">                continue;</span>
+            }
+<span class="fc bfc" id="L332" title="All 2 branches covered.">            if (c == '[') {</span>
+<span class="fc" id="L333">                int end = s.indexOf(']', i);</span>
+<span class="fc bfc" id="L334" title="All 2 branches covered.">                if (end &lt; 0) {</span>
+<span class="fc" id="L335">                    end = n;</span>
+                }
+<span class="fc" id="L337">                bracket(sec, s.substring(i + 1, end));</span>
+<span class="fc" id="L338">                i = end + 1;</span>
+<span class="fc" id="L339">                continue;</span>
+            }
+<span class="pc bpc" id="L341" title="1 of 4 branches missed.">            if (c == 'G' || c == 'g') {</span>
+<span class="fc bfc" id="L342" title="All 2 branches covered.">                if (s.regionMatches(true, i, GENERAL, 0, 7)) {</span>
+<span class="fc" id="L343">                    out.add(new Token(GENERAL_TOKEN, &quot;&quot;));</span>
+<span class="fc" id="L344">                    sec.general = true;</span>
+<span class="fc" id="L345">                    i += 7;</span>
+<span class="fc" id="L346">                    continue;</span>
+                }
+            }
+<span class="fc bfc" id="L349" title="All 2 branches covered.">            if (c == '@') {</span>
+<span class="fc" id="L350">                out.add(new Token(TEXT, &quot;&quot;));</span>
+<span class="fc" id="L351">                sec.hasText = true;</span>
+<span class="fc" id="L352">                i++;</span>
+<span class="fc" id="L353">                continue;</span>
+            }
+<span class="fc bfc" id="L355" title="All 6 branches covered.">            if (c == '0' || c == '#' || c == '?') {</span>
+<span class="fc bfc" id="L356" title="All 6 branches covered.">                if (sec.date &amp;&amp; c == '0' &amp;&amp; afterPoint) {</span>
+                    // fractions of a second
+<span class="fc" id="L358">                    int end = i;</span>
+<span class="fc bfc" id="L359" title="All 4 branches covered.">                    while (end &lt; n &amp;&amp; s.charAt(end) == '0') {</span>
+<span class="fc" id="L360">                        end++;</span>
+                    }
+<span class="fc" id="L362">                    out.remove(out.size() - 1);</span>
+<span class="fc" id="L363">                    out.add(new Token(SECOND_FRACTION, s.substring(i, end)));</span>
+<span class="fc" id="L364">                    i = end;</span>
+<span class="fc" id="L365">                    continue;</span>
+                }
+<span class="fc bfc" id="L367" title="All 4 branches covered.">                out.add(new Token(DIGIT, afterSlash ? &quot;/&quot; + c : afterPoint ? &quot;.&quot; + c : String.valueOf(c)));</span>
+<span class="fc bfc" id="L368" title="All 2 branches covered.">                if (afterPoint) {</span>
+<span class="fc" id="L369">                    sec.decimals++;</span>
+<span class="fc bfc" id="L370" title="All 4 branches covered.">                } else if (!afterSlash &amp;&amp; !sec.exponent) {</span>
+<span class="fc" id="L371">                    sec.integerDigits++;</span>
+                }
+<span class="fc" id="L373">                i++;</span>
+<span class="fc" id="L374">                continue;</span>
+            }
+<span class="fc bfc" id="L376" title="All 2 branches covered.">            if (c == '.') {</span>
+<span class="fc" id="L377">                out.add(new Token(POINT, &quot;.&quot;));</span>
+<span class="fc" id="L378">                afterPoint = true;</span>
+<span class="fc" id="L379">                i++;</span>
+<span class="fc" id="L380">                continue;</span>
+            }
+<span class="fc bfc" id="L382" title="All 2 branches covered.">            if (c == ',') {</span>
+                // between digits a comma groups them; after the last digit it divides by 1000
+<span class="fc" id="L384">                boolean digitsAfter = false;</span>
+<span class="fc bfc" id="L385" title="All 2 branches covered.">                for (int k = i + 1; k &lt; n; k++) {</span>
+<span class="fc" id="L386">                    char d = s.charAt(k);</span>
+<span class="fc bfc" id="L387" title="All 6 branches covered.">                    if (d == '0' || d == '#' || d == '?') {</span>
+<span class="fc" id="L388">                        digitsAfter = true;</span>
+<span class="fc" id="L389">                        break;</span>
+                    }
+<span class="fc bfc" id="L391" title="All 2 branches covered.">                    if (d != ',') {</span>
+<span class="fc" id="L392">                        break;</span>
+                    }
+                }
+<span class="fc bfc" id="L395" title="All 4 branches covered.">                boolean digitBefore = !out.isEmpty() &amp;&amp; out.get(out.size() - 1).kind == DIGIT;</span>
+<span class="pc bpc" id="L396" title="1 of 6 branches missed.">                if (digitBefore &amp;&amp; digitsAfter &amp;&amp; !afterPoint) {</span>
+<span class="fc" id="L397">                    sec.grouping = true;</span>
+<span class="fc bfc" id="L398" title="All 6 branches covered.">                } else if (digitBefore || !out.isEmpty() &amp;&amp; out.get(out.size() - 1).kind == POINT) {</span>
+<span class="fc" id="L399">                    sec.thousands++;</span>
+                } else {
+<span class="fc" id="L401">                    out.add(new Token(LITERAL, &quot;,&quot;));</span>
+                }
+<span class="fc" id="L403">                i++;</span>
+<span class="fc" id="L404">                continue;</span>
+            }
+<span class="fc bfc" id="L406" title="All 2 branches covered.">            if (c == '%') {</span>
+<span class="fc" id="L407">                out.add(new Token(PERCENT, &quot;%&quot;));</span>
+<span class="fc" id="L408">                sec.percents++;</span>
+<span class="fc" id="L409">                i++;</span>
+<span class="fc" id="L410">                continue;</span>
+            }
+<span class="fc bfc" id="L412" title="All 12 branches covered.">            if ((c == 'E' || c == 'e') &amp;&amp; i + 1 &lt; n &amp;&amp; (s.charAt(i + 1) == '+' || s.charAt(i + 1) == '-')</span>
+                    &amp;&amp; !sec.date) {
+<span class="fc" id="L414">                out.add(new Token(EXPONENT, s.substring(i, i + 2)));</span>
+<span class="fc" id="L415">                sec.exponent = true;</span>
+<span class="fc" id="L416">                afterPoint = false;</span>
+<span class="fc" id="L417">                i += 2;</span>
+<span class="fc" id="L418">                continue;</span>
+            }
+<span class="fc bfc" id="L420" title="All 6 branches covered.">            if (c == '/' &amp;&amp; !sec.date &amp;&amp; sec.integerDigits &gt; 0) {</span>
+<span class="fc" id="L421">                out.add(new Token(SLASH, &quot;/&quot;));</span>
+<span class="fc" id="L422">                sec.fraction = true;</span>
+<span class="fc" id="L423">                afterSlash = true;</span>
+<span class="fc" id="L424">                i++;</span>
+<span class="fc" id="L425">                continue;</span>
+            }
+<span class="fc bfc" id="L427" title="All 2 branches covered.">            if (s.regionMatches(true, i, &quot;AM/PM&quot;, 0, 5)) {</span>
+<span class="fc" id="L428">                out.add(new Token(AMPM, s.substring(i, i + 5)));</span>
+<span class="fc" id="L429">                sec.twelveHour = true;</span>
+<span class="fc" id="L430">                sec.date = true;</span>
+<span class="fc" id="L431">                i += 5;</span>
+<span class="fc" id="L432">                continue;</span>
+            }
+<span class="fc bfc" id="L434" title="All 2 branches covered.">            if (s.regionMatches(true, i, &quot;A/P&quot;, 0, 3)) {</span>
+<span class="fc" id="L435">                out.add(new Token(AMPM, s.substring(i, i + 3)));</span>
+<span class="fc" id="L436">                sec.twelveHour = true;</span>
+<span class="fc" id="L437">                sec.date = true;</span>
+<span class="fc" id="L438">                i += 3;</span>
+<span class="fc" id="L439">                continue;</span>
+            }
+<span class="fc bfc" id="L441" title="All 4 branches covered.">            char lower = c &gt;= 'A' &amp;&amp; c &lt;= 'Z' ? (char) (c + 32) : c;</span>
+<span class="fc bfc" id="L442" title="All 10 branches covered.">            if (lower == 'y' || lower == 'm' || lower == 'd' || lower == 'h' || lower == 's') {</span>
+<span class="fc" id="L443">                int end = i;</span>
+<span class="fc bfc" id="L444" title="All 6 branches covered.">                while (end &lt; n &amp;&amp; (s.charAt(end) == c || s.charAt(end) == lower</span>
+<span class="fc bfc" id="L445" title="All 2 branches covered.">                        || s.charAt(end) == (char) (lower - 32))) {</span>
+<span class="fc" id="L446">                    end++;</span>
+                }
+<span class="fc" id="L448">                StringBuilder run = new StringBuilder();</span>
+<span class="fc bfc" id="L449" title="All 2 branches covered.">                for (int k = i; k &lt; end; k++) {</span>
+<span class="fc" id="L450">                    run.append(lower);</span>
+                }
+<span class="fc" id="L452">                out.add(new Token(DATE, run.toString()));</span>
+<span class="fc" id="L453">                sec.date = true;</span>
+<span class="fc" id="L454">                afterPoint = false;</span>
+<span class="fc" id="L455">                i = end;</span>
+<span class="fc" id="L456">                continue;</span>
+            }
+<span class="fc" id="L458">            out.add(new Token(LITERAL, String.valueOf(c)));</span>
+<span class="fc" id="L459">            i++;</span>
+<span class="fc" id="L460">        }</span>
+<span class="fc bfc" id="L461" title="All 2 branches covered.">        if (sec.date) {</span>
+<span class="fc" id="L462">            resolveMinutes(out);</span>
+        }
+<span class="fc" id="L464">        return sec;</span>
+    }
+
+    /// An `m` run is minutes when it follows hours or comes before seconds, months otherwise.
+    /// Months are renamed to `M` so that the formatter need not look around again.
+    private static void resolveMinutes(ArrayList&lt;Token&gt; tokens) {
+<span class="fc bfc" id="L470" title="All 2 branches covered.">        for (int i = 0; i &lt; tokens.size(); i++) {</span>
+<span class="fc" id="L471">            Token t = tokens.get(i);</span>
+<span class="fc bfc" id="L472" title="All 4 branches covered.">            if (t.kind != DATE || t.text.charAt(0) != 'm') {</span>
+<span class="fc" id="L473">                continue;</span>
+            }
+<span class="fc" id="L475">            boolean minutes = false;</span>
+<span class="fc bfc" id="L476" title="All 2 branches covered.">            if (t.text.length() &lt;= 2) {</span>
+<span class="fc bfc" id="L477" title="All 2 branches covered.">                for (int k = i - 1; k &gt;= 0; k--) {</span>
+<span class="fc" id="L478">                    Token p = tokens.get(k);</span>
+<span class="fc bfc" id="L479" title="All 4 branches covered.">                    if (p.kind == DATE || p.kind == ELAPSED) {</span>
+<span class="fc bfc" id="L480" title="All 2 branches covered.">                        minutes = p.text.charAt(0) == 'h';</span>
+<span class="fc" id="L481">                        break;</span>
+                    }
+                }
+<span class="fc bfc" id="L484" title="All 2 branches covered.">                if (!minutes) {</span>
+<span class="fc bfc" id="L485" title="All 2 branches covered.">                    for (int k = i + 1; k &lt; tokens.size(); k++) {</span>
+<span class="fc" id="L486">                        Token p = tokens.get(k);</span>
+<span class="fc bfc" id="L487" title="All 4 branches covered.">                        if (p.kind == DATE || p.kind == ELAPSED) {</span>
+<span class="fc bfc" id="L488" title="All 2 branches covered.">                            minutes = p.text.charAt(0) == 's';</span>
+<span class="fc" id="L489">                            break;</span>
+                        }
+                    }
+                }
+            }
+<span class="fc bfc" id="L494" title="All 2 branches covered.">            if (!minutes) {</span>
+<span class="fc" id="L495">                StringBuilder sb = new StringBuilder();</span>
+<span class="fc bfc" id="L496" title="All 2 branches covered.">                for (int k = 0; k &lt; t.text.length(); k++) {</span>
+<span class="fc" id="L497">                    sb.append('M');</span>
+                }
+<span class="fc" id="L499">                tokens.set(i, new Token(DATE, sb.toString()));</span>
+            }
+        }
+<span class="fc" id="L502">    }</span>
+
+    private static void bracket(Section sec, String body) {
+<span class="fc bfc" id="L505" title="All 2 branches covered.">        if (body.length() == 0) {</span>
+<span class="fc" id="L506">            return;</span>
+        }
+<span class="fc" id="L508">        char c = body.charAt(0);</span>
+<span class="fc bfc" id="L509" title="All 6 branches covered.">        if (c == '&lt;' || c == '&gt;' || c == '=') {</span>
+<span class="fc" id="L510">            int skip = 1;</span>
+<span class="fc" id="L511">            sec.condition = c;</span>
+<span class="fc bfc" id="L512" title="All 4 branches covered.">            if (body.length() &gt; 1 &amp;&amp; body.charAt(1) == '=') {</span>
+<span class="fc" id="L513">                sec.conditionOrEqual = true;</span>
+<span class="fc" id="L514">                skip = 2;</span>
+<span class="fc bfc" id="L515" title="All 6 branches covered.">            } else if (c == '&lt;' &amp;&amp; body.length() &gt; 1 &amp;&amp; body.charAt(1) == '&gt;') {</span>
+<span class="fc" id="L516">                sec.condition = '!';</span>
+<span class="fc" id="L517">                skip = 2;</span>
+            }
+            try {
+<span class="fc" id="L520">                sec.conditionValue = Double.parseDouble(body.substring(skip));</span>
+<span class="fc" id="L521">            } catch (NumberFormatException e) {</span>
+<span class="fc" id="L522">                sec.condition = 0;</span>
+<span class="fc" id="L523">            }</span>
+<span class="fc" id="L524">            return;</span>
+        }
+<span class="fc bfc" id="L526" title="All 2 branches covered.">        if (c == '$') {</span>
+            // a currency symbol and a locale: [$EUR-407] shows EUR
+<span class="fc" id="L528">            int dash = body.indexOf('-');</span>
+<span class="fc bfc" id="L529" title="All 2 branches covered.">            String symbol = body.substring(1, dash &lt; 0 ? body.length() : dash);</span>
+<span class="fc bfc" id="L530" title="All 2 branches covered.">            if (symbol.length() &gt; 0) {</span>
+<span class="fc" id="L531">                sec.tokens.add(new Token(LITERAL, symbol));</span>
+            }
+<span class="fc" id="L533">            return;</span>
+        }
+        // folded by hand: the tokens are ASCII, and a Turkish device would fold an I elsewhere
+<span class="fc" id="L536">        StringBuilder folded = new StringBuilder(body.length());</span>
+<span class="fc bfc" id="L537" title="All 2 branches covered.">        for (int i = 0; i &lt; body.length(); i++) {</span>
+<span class="fc" id="L538">            char ch = body.charAt(i);</span>
+<span class="fc bfc" id="L539" title="All 4 branches covered.">            folded.append(ch &gt;= 'A' &amp;&amp; ch &lt;= 'Z' ? (char) (ch + 32) : ch);</span>
+        }
+<span class="fc" id="L541">        String lower = folded.toString();</span>
+<span class="pc bpc" id="L542" title="1 of 8 branches missed.">        if (lower.length() &gt; 0 &amp;&amp; (lower.charAt(0) == 'h' || lower.charAt(0) == 'm' || lower.charAt(0) == 's')) {</span>
+<span class="fc" id="L543">            boolean run = true;</span>
+<span class="fc bfc" id="L544" title="All 2 branches covered.">            for (int i = 1; i &lt; lower.length(); i++) {</span>
+<span class="fc bfc" id="L545" title="All 2 branches covered.">                run &amp;= lower.charAt(i) == lower.charAt(0);</span>
+            }
+<span class="fc bfc" id="L547" title="All 2 branches covered.">            if (run) {</span>
+<span class="fc" id="L548">                sec.tokens.add(new Token(ELAPSED, lower));</span>
+<span class="fc" id="L549">                sec.date = true;</span>
+            }
+        }
+        // anything else is a colour or a locale, which change nothing in the text
+<span class="fc" id="L553">    }</span>
+
+    private static boolean isDigits(String s) {
+<span class="fc bfc" id="L556" title="All 2 branches covered.">        for (int i = 0; i &lt; s.length(); i++) {</span>
+<span class="fc bfc" id="L557" title="All 4 branches covered.">            if (s.charAt(i) &lt; '0' || s.charAt(i) &gt; '9') {</span>
+<span class="fc" id="L558">                return false;</span>
+            }
+        }
+<span class="pc bpc" id="L561" title="1 of 2 branches missed.">        return s.length() &gt; 0;</span>
+    }
+
+    /// Writes the format as an OpenDocument data style, which describes in elements what a
+    /// format code spells. A code of several sections is one style per section, and the
+    /// last of them maps a value to the others by the condition of each, which is how
+    /// OpenDocument spells sections. Answers false, and writes nothing, for a format that
+    /// needs no style.
+    boolean writeOds(XmlOut x, String name) throws java.io.IOException {
+        // an empty first section with others after it is a format (;;; hides everything)
+<span class="fc bfc" id="L571" title="All 6 branches covered.">        if (isGeneral() || sections[0].tokens.isEmpty() &amp;&amp; sections.length == 1) {</span>
+<span class="fc" id="L572">            return false;</span>
+        }
+        // the number sections; a fourth is for text. A section may be empty (the &quot;hide&quot;
+        // idiom, 0;;;) or a date; OpenDocument maps a value to any data style.
+<span class="fc" id="L576">        int count = Math.min(sections.length, 3);</span>
+<span class="fc bfc" id="L577" title="All 2 branches covered.">        boolean explicit = sections[0].condition != 0;</span>
+<span class="fc bfc" id="L578" title="All 2 branches covered.">        if (sections.length == 4) {</span>
+            // A fourth section is for text. OpenDocument spells that as a text style whose
+            // conditions send a number to the number styles, as LibreOffice writes it. The
+            // third section takes every number the first two did not, which two maps say.
+<span class="fc" id="L582">            StringBuilder textMaps = new StringBuilder();</span>
+<span class="fc bfc" id="L583" title="All 2 branches covered.">            for (int i = 0; i &lt; 3; i++) {</span>
+<span class="fc" id="L584">                String sub = name + &quot;P&quot; + i;</span>
+<span class="fc" id="L585">                writeOds(x, sub, sections[i], &quot;&quot;);</span>
+                String[] conditions;
+<span class="fc bfc" id="L587" title="All 2 branches covered.">                if (i == 2) {</span>
+<span class="fc bfc" id="L588" title="All 2 branches covered.">                    conditions = explicit ? new String[] {&quot;value()&gt;=0&quot;, &quot;value()&lt;0&quot;} : new String[] {&quot;value()=0&quot;};</span>
+<span class="fc bfc" id="L589" title="All 2 branches covered.">                } else if (sections[i].condition != 0) {</span>
+<span class="fc" id="L590">                    conditions = new String[] {conditionText(sections[i])};</span>
+<span class="pc bpc" id="L591" title="1 of 2 branches missed.">                } else if (explicit) {</span>
+<span class="nc" id="L592">                    conditions = new String[] {&quot;value()&lt;0&quot;};</span>
+                } else {
+<span class="fc bfc" id="L594" title="All 2 branches covered.">                    conditions = new String[] {i == 0 ? &quot;value()&gt;0&quot; : &quot;value()&lt;0&quot;};</span>
+                }
+<span class="fc bfc" id="L596" title="All 2 branches covered.">                for (String condition : conditions) {</span>
+<span class="fc" id="L597">                    textMaps.append(&quot;&lt;style:map style:condition=\&quot;&quot;).append(xmlAttr(condition))</span>
+<span class="fc" id="L598">                            .append(&quot;\&quot; style:apply-style-name=\&quot;&quot;).append(sub).append(&quot;\&quot;/&gt;&quot;);</span>
+                }
+            }
+<span class="fc" id="L601">            writeOdsText(x, name, sections[3], textMaps.toString());</span>
+<span class="fc" id="L602">            return true;</span>
+        }
+<span class="fc bfc" id="L604" title="All 2 branches covered.">        if (count &lt; 2) {</span>
+<span class="fc" id="L605">            return writeOds(x, name, sections[0], &quot;&quot;);</span>
+        }
+<span class="fc" id="L607">        StringBuilder maps = new StringBuilder();</span>
+<span class="fc bfc" id="L608" title="All 2 branches covered.">        for (int i = 0; i &lt; count - 1; i++) {</span>
+<span class="fc" id="L609">            String sub = name + &quot;P&quot; + i;</span>
+<span class="fc" id="L610">            writeOds(x, sub, sections[i], &quot;&quot;);</span>
+            String condition;
+<span class="fc bfc" id="L612" title="All 2 branches covered.">            if (sections[i].condition != 0) {</span>
+<span class="fc" id="L613">                condition = conditionText(sections[i]);</span>
+<span class="pc bpc" id="L614" title="1 of 2 branches missed.">            } else if (explicit) {</span>
+                // after a condition of its own, the second section takes what is left
+                // below; the last takes everything else
+<span class="nc" id="L617">                condition = &quot;value()&lt;0&quot;;</span>
+<span class="fc bfc" id="L618" title="All 2 branches covered.">            } else if (count == 2) {</span>
+<span class="fc" id="L619">                condition = &quot;value()&gt;=0&quot;;</span>
+            } else {
+<span class="fc bfc" id="L621" title="All 2 branches covered.">                condition = i == 0 ? &quot;value()&gt;0&quot; : &quot;value()&lt;0&quot;;</span>
+            }
+<span class="fc" id="L623">            maps.append(&quot;&lt;style:map style:condition=\&quot;&quot;).append(xmlAttr(condition))</span>
+<span class="fc" id="L624">                    .append(&quot;\&quot; style:apply-style-name=\&quot;&quot;).append(sub).append(&quot;\&quot;/&gt;&quot;);</span>
+        }
+<span class="fc" id="L626">        return writeOds(x, name, sections[count - 1], maps.toString());</span>
+    }
+
+    private static void writeOdsText(XmlOut x, String name, Section s, String maps) throws java.io.IOException {
+<span class="fc" id="L630">        x.raw(&quot;&lt;number:text-style&quot;).attr(&quot;style:name&quot;, name).raw(&quot;&gt;&quot;);</span>
+<span class="fc bfc" id="L631" title="All 2 branches covered.">        for (int i = 0; i &lt; s.tokens.size(); i++) {</span>
+<span class="fc" id="L632">            Token t = s.tokens.get(i);</span>
+<span class="fc bfc" id="L633" title="All 2 branches covered.">            if (t.kind == TEXT) {</span>
+<span class="fc" id="L634">                x.raw(&quot;&lt;number:text-content/&gt;&quot;);</span>
+<span class="fc bfc" id="L635" title="All 2 branches covered.">            } else if (t.kind == LITERAL) {</span>
+<span class="fc" id="L636">                x.raw(&quot;&lt;number:text&gt;&quot;).text(t.text, false).raw(&quot;&lt;/number:text&gt;&quot;);</span>
+            }
+        }
+<span class="fc" id="L639">        x.raw(maps).raw(&quot;&lt;/number:text-style&gt;&quot;);</span>
+<span class="fc" id="L640">    }</span>
+
+    private static String conditionText(Section s) {
+        String op;
+<span class="pc bpc" id="L644" title="2 of 4 branches missed.">        switch (s.condition) {</span>
+            case '&lt;':
+<span class="pc bpc" id="L646" title="1 of 2 branches missed.">                op = s.conditionOrEqual ? &quot;&lt;=&quot; : &quot;&lt;&quot;;</span>
+<span class="fc" id="L647">                break;</span>
+            case '&gt;':
+<span class="pc bpc" id="L649" title="1 of 2 branches missed.">                op = s.conditionOrEqual ? &quot;&gt;=&quot; : &quot;&gt;&quot;;</span>
+<span class="fc" id="L650">                break;</span>
+            case '!':
+<span class="nc" id="L652">                op = &quot;!=&quot;;</span>
+<span class="nc" id="L653">                break;</span>
+            default:
+<span class="nc" id="L655">                op = &quot;=&quot;;</span>
+                break;
+        }
+<span class="fc" id="L658">        return &quot;value()&quot; + op + FormulaParser.numberText(s.conditionValue);</span>
+    }
+
+    private static String xmlAttr(String s) {
+<span class="fc" id="L662">        StringBuilder sb = new StringBuilder();</span>
+<span class="fc bfc" id="L663" title="All 2 branches covered.">        for (int i = 0; i &lt; s.length(); i++) {</span>
+<span class="fc" id="L664">            char c = s.charAt(i);</span>
+<span class="fc bfc" id="L665" title="All 2 branches covered.">            if (c == '&lt;') {</span>
+<span class="fc" id="L666">                sb.append(&quot;&amp;lt;&quot;);</span>
+<span class="fc bfc" id="L667" title="All 2 branches covered.">            } else if (c == '&gt;') {</span>
+<span class="fc" id="L668">                sb.append(&quot;&amp;gt;&quot;);</span>
+            } else {
+<span class="fc" id="L670">                sb.append(c);</span>
+            }
+        }
+<span class="fc" id="L673">        return sb.toString();</span>
+    }
+
+    private boolean writeOds(XmlOut x, String name, Section s, String maps) throws java.io.IOException {
+<span class="pc bpc" id="L677" title="1 of 8 branches missed.">        if (s.hasText &amp;&amp; !s.date &amp;&amp; s.integerDigits == 0 &amp;&amp; s.decimals == 0) {</span>
+<span class="fc" id="L678">            writeOdsText(x, name, s, maps);</span>
+<span class="fc" id="L679">            return true;</span>
+        }
+<span class="fc bfc" id="L681" title="All 2 branches covered.">        if (s.date) {</span>
+<span class="fc" id="L682">            writeOdsDate(x, name, s, maps);</span>
+<span class="fc" id="L683">            return true;</span>
+        }
+<span class="fc bfc" id="L685" title="All 2 branches covered.">        String tag = s.percents &gt; 0 ? &quot;number:percentage-style&quot; : &quot;number:number-style&quot;;</span>
+<span class="fc" id="L686">        x.raw(&quot;&lt;&quot;).raw(tag).attr(&quot;style:name&quot;, name).raw(&quot;&gt;&quot;);</span>
+<span class="fc" id="L687">        boolean numberWritten = false;</span>
+<span class="fc" id="L688">        boolean pastExponent = false;</span>
+<span class="fc" id="L689">        int minInteger = 0;</span>
+<span class="fc" id="L690">        int minDecimals = 0;</span>
+<span class="fc" id="L691">        int exponentDigits = 0;</span>
+<span class="fc" id="L692">        int denominatorDigits = 0;</span>
+        // What a fraction is made of: the digits of a whole number and a space when it has
+        // one, the numerator, the slash, and a denominator of digits or written out.
+<span class="fc" id="L695">        int slash = -1;</span>
+<span class="fc" id="L696">        int wholeEnd = -1;</span>
+<span class="fc" id="L697">        int fractionEnd = -1;</span>
+<span class="fc" id="L698">        String fixedDenominator = null;</span>
+<span class="fc bfc" id="L699" title="All 4 branches covered.">        for (int i = 0; i &lt; s.tokens.size() &amp;&amp; s.fraction; i++) {</span>
+<span class="fc" id="L700">            Token t = s.tokens.get(i);</span>
+<span class="fc bfc" id="L701" title="All 2 branches covered.">            if (t.kind == SLASH) {</span>
+<span class="fc" id="L702">                slash = i;</span>
+<span class="fc" id="L703">                fractionEnd = i;</span>
+<span class="fc" id="L704">                int[] fixed = fixedDenominator(s.tokens, i);</span>
+<span class="fc bfc" id="L705" title="All 2 branches covered.">                if (fixed != null) {</span>
+<span class="fc" id="L706">                    fixedDenominator = String.valueOf(fixed[0]);</span>
+<span class="fc" id="L707">                    fractionEnd = fixed[1];</span>
+<span class="fc" id="L708">                    i = fixed[1];</span>
+                }
+<span class="fc bfc" id="L710" title="All 4 branches covered.">            } else if (t.kind == DIGIT &amp;&amp; slash &gt;= 0) {</span>
+<span class="fc" id="L711">                fractionEnd = i;</span>
+<span class="pc bpc" id="L712" title="2 of 10 branches missed.">            } else if (t.kind == LITERAL &amp;&amp; slash &lt; 0 &amp;&amp; &quot; &quot;.equals(t.text) &amp;&amp; i &gt; 0 &amp;&amp; s.tokens.get(i - 1).kind == DIGIT) {</span>
+<span class="fc" id="L713">                wholeEnd = i;</span>
+            }
+        }
+<span class="fc bfc" id="L716" title="All 2 branches covered.">        for (int i = 0; i &lt; s.tokens.size(); i++) {</span>
+<span class="fc" id="L717">            Token t = s.tokens.get(i);</span>
+<span class="fc bfc" id="L718" title="All 2 branches covered.">            if (t.kind == EXPONENT) {</span>
+<span class="fc" id="L719">                pastExponent = true;</span>
+<span class="fc bfc" id="L720" title="All 2 branches covered.">            } else if (t.kind == DIGIT) {</span>
+<span class="fc bfc" id="L721" title="All 2 branches covered.">                if (pastExponent) {</span>
+<span class="fc" id="L722">                    exponentDigits++;</span>
+<span class="fc bfc" id="L723" title="All 4 branches covered.">                } else if (slash &gt;= 0 &amp;&amp; i &gt; slash) {</span>
+<span class="fc" id="L724">                    denominatorDigits++;</span>
+<span class="fc bfc" id="L725" title="All 2 branches covered.">                } else if (&quot;.0&quot;.equals(t.text)) {</span>
+<span class="fc" id="L726">                    minDecimals++;</span>
+<span class="fc bfc" id="L727" title="All 2 branches covered.">                } else if (&quot;0&quot;.equals(t.text)) {</span>
+<span class="fc" id="L728">                    minInteger++;</span>
+                }
+            }
+        }
+        // Text between the digits of the whole part, 000-00-0000, is text embedded in the
+        // number, placed by how many digits follow it.
+<span class="fc" id="L734">        int firstInteger = -1;</span>
+<span class="fc" id="L735">        int lastInteger = -1;</span>
+<span class="fc bfc" id="L736" title="All 6 branches covered.">        for (int i = 0; i &lt; s.tokens.size() &amp;&amp; !s.exponent &amp;&amp; !s.fraction; i++) {</span>
+<span class="fc" id="L737">            Token t = s.tokens.get(i);</span>
+<span class="fc bfc" id="L738" title="All 2 branches covered.">            if (t.kind == POINT) {</span>
+<span class="fc" id="L739">                break;</span>
+            }
+<span class="pc bpc" id="L741" title="1 of 4 branches missed.">            if (t.kind == DIGIT &amp;&amp; t.text.length() == 1) {</span>
+<span class="fc bfc" id="L742" title="All 2 branches covered.">                if (firstInteger &lt; 0) {</span>
+<span class="fc" id="L743">                    firstInteger = i;</span>
+                }
+<span class="fc" id="L745">                lastInteger = i;</span>
+            }
+        }
+<span class="fc" id="L748">        ArrayList&lt;String&gt; embedded = new ArrayList&lt;String&gt;();</span>
+<span class="fc bfc" id="L749" title="All 4 branches covered.">        for (int i = firstInteger + 1; firstInteger &gt;= 0 &amp;&amp; i &lt; lastInteger; i++) {</span>
+<span class="fc" id="L750">            Token t = s.tokens.get(i);</span>
+<span class="fc bfc" id="L751" title="All 2 branches covered.">            if (t.kind == LITERAL) {</span>
+<span class="fc" id="L752">                int after = 0;</span>
+<span class="fc bfc" id="L753" title="All 2 branches covered.">                for (int k = i + 1; k &lt;= lastInteger; k++) {</span>
+<span class="fc" id="L754">                    Token d = s.tokens.get(k);</span>
+<span class="pc bpc" id="L755" title="1 of 4 branches missed.">                    after += d.kind == DIGIT &amp;&amp; d.text.length() == 1 ? 1 : 0;</span>
+                }
+<span class="fc" id="L757">                embedded.add(String.valueOf(after));</span>
+<span class="fc" id="L758">                embedded.add(t.text);</span>
+            }
+        }
+<span class="fc bfc" id="L761" title="All 2 branches covered.">        for (int i = 0; i &lt; s.tokens.size(); i++) {</span>
+<span class="fc" id="L762">            Token t = s.tokens.get(i);</span>
+<span class="fc bfc" id="L763" title="All 4 branches covered.">            if (numberWritten &amp;&amp; i &lt;= fractionEnd) {</span>
+                // the space, the slash and the denominator are the fraction element's own
+<span class="fc" id="L765">                continue;</span>
+            }
+<span class="pc bpc" id="L767" title="1 of 8 branches missed.">            if (t.kind == LITERAL &amp;&amp; i &gt; firstInteger &amp;&amp; i &lt; lastInteger &amp;&amp; firstInteger &gt;= 0) {</span>
+                // written inside the number element
+<span class="fc" id="L769">                continue;</span>
+            }
+<span class="fc bfc" id="L771" title="All 4 branches covered.">            if (t.kind == LITERAL || t.kind == PERCENT) {</span>
+<span class="fc" id="L772">                x.raw(&quot;&lt;number:text&gt;&quot;).text(t.text, false).raw(&quot;&lt;/number:text&gt;&quot;);</span>
+<span class="pc bpc" id="L773" title="1 of 4 branches missed.">            } else if (t.kind == GENERAL_TOKEN &amp;&amp; !numberWritten) {</span>
+<span class="fc" id="L774">                numberWritten = true;</span>
+<span class="fc" id="L775">                x.raw(&quot;&lt;number:number number:min-integer-digits=\&quot;1\&quot;/&gt;&quot;);</span>
+<span class="fc bfc" id="L776" title="All 4 branches covered.">            } else if (t.kind == DIGIT &amp;&amp; !numberWritten) {</span>
+<span class="fc" id="L777">                numberWritten = true;</span>
+<span class="fc bfc" id="L778" title="All 2 branches covered.">                if (s.exponent) {</span>
+<span class="fc" id="L779">                    x.raw(&quot;&lt;number:scientific-number&quot;).attr(&quot;number:decimal-places&quot;, s.decimals)</span>
+<span class="fc" id="L780">                            .attr(&quot;number:min-integer-digits&quot;, Math.max(1, minInteger))</span>
+<span class="fc" id="L781">                            .attr(&quot;number:min-exponent-digits&quot;, Math.max(1, exponentDigits));</span>
+<span class="fc bfc" id="L782" title="All 2 branches covered.">                    if (s.integerDigits &gt; 1) {</span>
+                        // ##0.0E+0: the exponent moves in steps of the integer places, which
+                        // OpenDocument says as an interval
+<span class="fc" id="L785">                        x.attr(&quot;number:exponent-interval&quot;, s.integerDigits);</span>
+                    }
+<span class="fc" id="L787">                    x.raw(&quot;/&gt;&quot;);</span>
+<span class="fc bfc" id="L788" title="All 2 branches covered.">                } else if (s.fraction) {</span>
+<span class="fc" id="L789">                    x.raw(&quot;&lt;number:fraction&quot;);</span>
+<span class="fc bfc" id="L790" title="All 2 branches covered.">                    if (wholeEnd &gt;= 0) {</span>
+                        // there, even at zero, it says a whole number is written first
+<span class="fc" id="L792">                        x.attr(&quot;number:min-integer-digits&quot;, 0);</span>
+                    }
+<span class="fc" id="L794">                    x.attr(&quot;number:min-numerator-digits&quot;, 1);</span>
+<span class="fc bfc" id="L795" title="All 2 branches covered.">                    if (fixedDenominator != null) {</span>
+<span class="fc" id="L796">                        x.attr(&quot;number:denominator-value&quot;, fixedDenominator);</span>
+                    } else {
+<span class="fc" id="L798">                        x.attr(&quot;number:min-denominator-digits&quot;, Math.max(1, denominatorDigits));</span>
+                    }
+<span class="fc" id="L800">                    x.raw(&quot;/&gt;&quot;);</span>
+                } else {
+<span class="fc" id="L802">                    x.raw(&quot;&lt;number:number&quot;).attr(&quot;number:decimal-places&quot;, s.decimals)</span>
+<span class="fc" id="L803">                            .attr(&quot;number:min-decimal-places&quot;, minDecimals)</span>
+<span class="fc" id="L804">                            .attr(&quot;number:min-integer-digits&quot;, minInteger);</span>
+<span class="fc bfc" id="L805" title="All 2 branches covered.">                    if (s.grouping) {</span>
+<span class="fc" id="L806">                        x.raw(&quot; number:grouping=\&quot;true\&quot;&quot;);</span>
+                    }
+<span class="fc bfc" id="L808" title="All 2 branches covered.">                    if (s.thousands &gt; 0) {</span>
+<span class="fc" id="L809">                        x.attr(&quot;number:display-factor&quot;, FormulaParser.numberText(Values.pow10(3 * s.thousands)));</span>
+                    }
+<span class="fc bfc" id="L811" title="All 2 branches covered.">                    if (!embedded.isEmpty()) {</span>
+<span class="fc" id="L812">                        x.raw(&quot;&gt;&quot;);</span>
+<span class="fc bfc" id="L813" title="All 2 branches covered.">                        for (int k = 0; k &lt; embedded.size(); k += 2) {</span>
+<span class="fc" id="L814">                            x.raw(&quot;&lt;number:embedded-text&quot;).attr(&quot;number:position&quot;, embedded.get(k)).raw(&quot;&gt;&quot;)</span>
+<span class="fc" id="L815">                                    .text(embedded.get(k + 1), false).raw(&quot;&lt;/number:embedded-text&gt;&quot;);</span>
+                        }
+<span class="fc" id="L817">                        x.raw(&quot;&lt;/number:number&gt;&quot;);</span>
+                    } else {
+<span class="fc" id="L819">                        x.raw(&quot;/&gt;&quot;);</span>
+                    }
+                }
+            }
+        }
+<span class="fc" id="L824">        x.raw(maps).raw(&quot;&lt;/&quot;).raw(tag).raw(&quot;&gt;&quot;);</span>
+<span class="fc" id="L825">        return true;</span>
+    }
+
+    private void writeOdsDate(XmlOut x, String name, Section s, String maps) throws java.io.IOException {
+<span class="fc" id="L829">        boolean elapsed = false;</span>
+<span class="fc bfc" id="L830" title="All 2 branches covered.">        for (int i = 0; i &lt; s.tokens.size(); i++) {</span>
+<span class="fc bfc" id="L831" title="All 2 branches covered.">            elapsed |= s.tokens.get(i).kind == ELAPSED;</span>
+        }
+<span class="fc bfc" id="L833" title="All 2 branches covered.">        String tag = isTimeOnly() ? &quot;number:time-style&quot; : &quot;number:date-style&quot;;</span>
+<span class="fc" id="L834">        x.raw(&quot;&lt;&quot;).raw(tag).attr(&quot;style:name&quot;, name);</span>
+<span class="fc bfc" id="L835" title="All 2 branches covered.">        if (elapsed) {</span>
+<span class="fc" id="L836">            x.raw(&quot; number:truncate-on-overflow=\&quot;false\&quot;&quot;);</span>
+        }
+<span class="fc" id="L838">        x.raw(&quot;&gt;&quot;);</span>
+<span class="fc bfc" id="L839" title="All 2 branches covered.">        for (int i = 0; i &lt; s.tokens.size(); i++) {</span>
+<span class="fc" id="L840">            Token t = s.tokens.get(i);</span>
+<span class="fc" id="L841">            int len = t.text.length();</span>
+<span class="fc" id="L842">            String part = null;</span>
+<span class="fc" id="L843">            boolean textual = false;</span>
+<span class="fc bfc" id="L844" title="All 4 branches covered.">            if (t.kind == DATE || t.kind == ELAPSED) {</span>
+<span class="fc bfc" id="L845" title="All 6 branches covered.">                switch (t.text.charAt(0)) {</span>
+                    case 'y':
+<span class="fc" id="L847">                        part = &quot;number:year&quot;;</span>
+<span class="fc bfc" id="L848" title="All 2 branches covered.">                        len = len &gt; 2 ? 2 : 1;</span>
+<span class="fc" id="L849">                        break;</span>
+                    case 'M':
+<span class="fc" id="L851">                        part = &quot;number:month&quot;;</span>
+                        // OpenDocument has no month initial: mmmmm is written as the month's
+                        // whole name, the nearest the format holds, and reads back as mmmm
+<span class="fc bfc" id="L854" title="All 2 branches covered.">                        textual = len &gt; 2;</span>
+<span class="fc bfc" id="L855" title="All 2 branches covered.">                        len = len &gt; 2 ? len - 2 : len;</span>
+<span class="fc" id="L856">                        break;</span>
+                    case 'd':
+<span class="fc bfc" id="L858" title="All 2 branches covered.">                        part = len &gt; 2 ? &quot;number:day-of-week&quot; : &quot;number:day&quot;;</span>
+<span class="fc bfc" id="L859" title="All 2 branches covered.">                        len = len &gt; 2 ? len - 2 : len;</span>
+<span class="fc" id="L860">                        break;</span>
+                    case 'h':
+<span class="fc" id="L862">                        part = &quot;number:hours&quot;;</span>
+<span class="fc" id="L863">                        break;</span>
+                    case 'm':
+<span class="fc" id="L865">                        part = &quot;number:minutes&quot;;</span>
+<span class="fc" id="L866">                        break;</span>
+                    default:
+<span class="fc" id="L868">                        part = &quot;number:seconds&quot;;</span>
+                        break;
+                }
+<span class="fc" id="L871">                x.raw(&quot;&lt;&quot;).raw(part);</span>
+<span class="fc bfc" id="L872" title="All 2 branches covered.">                if (len &gt; 1) {</span>
+<span class="fc" id="L873">                    x.raw(&quot; number:style=\&quot;long\&quot;&quot;);</span>
+                }
+<span class="fc bfc" id="L875" title="All 2 branches covered.">                if (textual) {</span>
+<span class="fc" id="L876">                    x.raw(&quot; number:textual=\&quot;true\&quot;&quot;);</span>
+                }
+<span class="fc bfc" id="L878" title="All 4 branches covered.">                if (i + 1 &lt; s.tokens.size() &amp;&amp; s.tokens.get(i + 1).kind == SECOND_FRACTION) {</span>
+<span class="fc" id="L879">                    x.attr(&quot;number:decimal-places&quot;, s.tokens.get(i + 1).text.length());</span>
+                }
+<span class="fc" id="L881">                x.raw(&quot;/&gt;&quot;);</span>
+<span class="fc bfc" id="L882" title="All 2 branches covered.">            } else if (t.kind == AMPM) {</span>
+<span class="fc" id="L883">                x.raw(&quot;&lt;number:am-pm/&gt;&quot;);</span>
+<span class="fc bfc" id="L884" title="All 4 branches covered.">            } else if (t.kind == LITERAL || t.kind == POINT) {</span>
+<span class="fc bfc" id="L885" title="All 2 branches covered.">                x.raw(&quot;&lt;number:text&gt;&quot;).text(t.kind == POINT ? &quot;.&quot; : t.text, false).raw(&quot;&lt;/number:text&gt;&quot;);</span>
+            }
+        }
+<span class="fc" id="L888">        x.raw(maps).raw(&quot;&lt;/&quot;).raw(tag).raw(&quot;&gt;&quot;);</span>
+<span class="fc" id="L889">    }</span>
+
+    private Section pick(double v) {
+<span class="fc" id="L892">        boolean conditional = false;</span>
+<span class="fc bfc" id="L893" title="All 4 branches covered.">        for (int i = 0; i &lt; sections.length &amp;&amp; i &lt; 2; i++) {</span>
+<span class="fc" id="L894">            Section s = sections[i];</span>
+<span class="fc bfc" id="L895" title="All 2 branches covered.">            if (s.condition != 0) {</span>
+<span class="fc" id="L896">                conditional = true;</span>
+                boolean hit;
+<span class="fc bfc" id="L898" title="All 4 branches covered.">                switch (s.condition) {</span>
+                    case '&lt;':
+<span class="fc bfc" id="L900" title="All 6 branches covered.">                        hit = s.conditionOrEqual ? v &lt;= s.conditionValue : v &lt; s.conditionValue;</span>
+<span class="fc" id="L901">                        break;</span>
+                    case '&gt;':
+<span class="fc bfc" id="L903" title="All 6 branches covered.">                        hit = s.conditionOrEqual ? v &gt;= s.conditionValue : v &gt; s.conditionValue;</span>
+<span class="fc" id="L904">                        break;</span>
+                    case '=':
+<span class="pc bpc" id="L906" title="1 of 4 branches missed.">                        hit = v &lt;= s.conditionValue &amp;&amp; v &gt;= s.conditionValue;</span>
+<span class="fc" id="L907">                        break;</span>
+                    default:
+<span class="pc bpc" id="L909" title="1 of 4 branches missed.">                        hit = v &lt; s.conditionValue || v &gt; s.conditionValue;</span>
+                        break;
+                }
+<span class="fc bfc" id="L912" title="All 2 branches covered.">                if (hit) {</span>
+<span class="fc" id="L913">                    return s;</span>
+                }
+            }
+        }
+<span class="fc bfc" id="L917" title="All 2 branches covered.">        if (conditional) {</span>
+<span class="pc bpc" id="L918" title="1 of 4 branches missed.">            for (int i = 0; i &lt; sections.length &amp;&amp; i &lt; 3; i++) {</span>
+<span class="fc bfc" id="L919" title="All 2 branches covered.">                if (sections[i].condition == 0) {</span>
+<span class="fc" id="L920">                    return sections[i];</span>
+                }
+            }
+<span class="fc" id="L923">            return sections[sections.length - 1];</span>
+        }
+<span class="fc bfc" id="L925" title="All 4 branches covered.">        if (sections.length &gt;= 3 &amp;&amp; v == 0) {</span>
+<span class="fc" id="L926">            return sections[2];</span>
+        }
+<span class="fc bfc" id="L928" title="All 4 branches covered.">        if (sections.length &gt;= 2 &amp;&amp; v &lt; 0) {</span>
+<span class="fc" id="L929">            return sections[1];</span>
+        }
+<span class="fc" id="L931">        return sections[0];</span>
+    }
+
+    /// The text a value is shown as.
+    String format(Object value, boolean date1904) {
+        try {
+<span class="fc" id="L937">            return formatValue(value, date1904);</span>
+<span class="nc" id="L938">        } catch (EvalError e) {</span>
+            // The text of a cell is never an exception: whatever a code cannot write a number
+            // in, the number is shown as General shows it.
+<span class="nc bnc" id="L941" title="All 2 branches missed.">            return value instanceof Double ? Values.general(((Double) value).doubleValue()) : String.valueOf(value);</span>
+        }
+    }
+
+    private String formatValue(Object value, boolean date1904) {
+<span class="fc bfc" id="L946" title="All 2 branches covered.">        if (value == null) {</span>
+<span class="fc" id="L947">            return &quot;&quot;;</span>
+        }
+<span class="fc bfc" id="L949" title="All 2 branches covered.">        if (value instanceof CellError) {</span>
+<span class="fc" id="L950">            return value.toString();</span>
+        }
+<span class="fc bfc" id="L952" title="All 2 branches covered.">        if (value instanceof Boolean) {</span>
+<span class="fc bfc" id="L953" title="All 2 branches covered.">            return ((Boolean) value).booleanValue() ? &quot;TRUE&quot; : &quot;FALSE&quot;;</span>
+        }
+<span class="fc bfc" id="L955" title="All 2 branches covered.">        if (value instanceof String) {</span>
+<span class="fc" id="L956">            Section text = null;</span>
+<span class="fc bfc" id="L957" title="All 2 branches covered.">            if (sections.length &gt;= 4) {</span>
+<span class="fc" id="L958">                text = sections[3];</span>
+<span class="fc bfc" id="L959" title="All 2 branches covered.">            } else if (sections[sections.length - 1].hasText) {</span>
+<span class="fc" id="L960">                text = sections[sections.length - 1];</span>
+            }
+<span class="fc bfc" id="L962" title="All 2 branches covered.">            if (text == null) {</span>
+<span class="fc" id="L963">                return (String) value;</span>
+            }
+<span class="fc" id="L965">            StringBuilder sb = new StringBuilder();</span>
+<span class="fc bfc" id="L966" title="All 2 branches covered.">            for (int i = 0; i &lt; text.tokens.size(); i++) {</span>
+<span class="fc" id="L967">                Token t = text.tokens.get(i);</span>
+<span class="fc bfc" id="L968" title="All 2 branches covered.">                if (t.kind == TEXT) {</span>
+<span class="fc" id="L969">                    sb.append((String) value);</span>
+<span class="fc bfc" id="L970" title="All 2 branches covered.">                } else if (t.kind == LITERAL) {</span>
+<span class="fc" id="L971">                    sb.append(t.text);</span>
+                }
+            }
+<span class="fc" id="L974">            return sb.toString();</span>
+        }
+<span class="pc bpc" id="L976" title="1 of 2 branches missed.">        if (!(value instanceof Double)) {</span>
+<span class="nc" id="L977">            return value.toString();</span>
+        }
+<span class="fc" id="L979">        double v = ((Double) value).doubleValue();</span>
+<span class="pc bpc" id="L980" title="2 of 4 branches missed.">        if (Double.isNaN(v) || Double.isInfinite(v)) {</span>
+<span class="nc" id="L981">            return CellError.NUM.toString();</span>
+        }
+<span class="fc" id="L983">        Section s = pick(v);</span>
+<span class="fc bfc" id="L984" title="All 2 branches covered.">        if (s.date) {</span>
+<span class="fc bfc" id="L985" title="All 6 branches covered.">            if (v &lt; 0 || v &gt;= DateFunctions.LAST_DAY + 1 - (date1904 ? 1462 : 0)) {</span>
+                // what a column too narrow for its date shows, and a date before the first
+                // day or after 9999-12-31 always
+<span class="fc" id="L988">                return &quot;########&quot;;</span>
+            }
+<span class="fc" id="L990">            return formatDate(s, v, date1904);</span>
+        }
+        // a section of its own for negatives shows the sign itself, or leaves it out
+<span class="fc bfc" id="L993" title="All 4 branches covered.">        boolean ownSign = s != sections[0] || s.condition != 0; //NOPMD CompareObjectsWithEquals - the same object is meant, not an equal one</span>
+<span class="fc bfc" id="L994" title="All 2 branches covered.">        if (s.tokens.isEmpty()) {</span>
+<span class="fc" id="L995">            return &quot;&quot;;</span>
+        }
+<span class="fc bfc" id="L997" title="All 2 branches covered.">        return formatNumber(s, ownSign ? Math.abs(v) : v);</span>
+    }
+
+    private static String formatNumber(Section s, double v) {
+<span class="fc bfc" id="L1001" title="All 2 branches covered.">        boolean negative = v &lt; 0;</span>
+<span class="fc" id="L1002">        double abs = Math.abs(v);</span>
+<span class="fc bfc" id="L1003" title="All 2 branches covered.">        for (int i = 0; i &lt; s.percents; i++) {</span>
+<span class="fc" id="L1004">            abs *= 100;</span>
+        }
+<span class="fc bfc" id="L1006" title="All 2 branches covered.">        for (int i = 0; i &lt; s.thousands; i++) {</span>
+<span class="fc" id="L1007">            abs /= 1000;</span>
+        }
+<span class="fc bfc" id="L1009" title="All 4 branches covered.">        boolean hasDigits = s.integerDigits &gt; 0 || s.decimals &gt; 0;</span>
+<span class="fc bfc" id="L1010" title="All 4 branches covered.">        if (s.general || !hasDigits) {</span>
+<span class="fc" id="L1011">            StringBuilder sb = new StringBuilder();</span>
+<span class="fc bfc" id="L1012" title="All 2 branches covered.">            for (int i = 0; i &lt; s.tokens.size(); i++) {</span>
+<span class="fc" id="L1013">                Token t = s.tokens.get(i);</span>
+<span class="fc bfc" id="L1014" title="All 4 branches covered.">                if (t.kind == GENERAL_TOKEN || t.kind == TEXT) {</span>
+                    // &quot;@&quot; is the place of whatever the cell holds, a number included
+<span class="fc" id="L1016">                    sb.append(Values.general(abs));</span>
+<span class="fc bfc" id="L1017" title="All 4 branches covered.">                } else if (t.kind == LITERAL || t.kind == PERCENT) {</span>
+<span class="fc" id="L1018">                    sb.append(t.text);</span>
+                }
+            }
+<span class="pc bpc" id="L1021" title="1 of 4 branches missed.">            return negative &amp;&amp; abs != 0 ? &quot;-&quot; + sb : sb.toString();</span>
+        }
+<span class="fc bfc" id="L1023" title="All 2 branches covered.">        if (s.fraction) {</span>
+<span class="fc" id="L1024">            return formatFraction(s, abs, negative);</span>
+        }
+<span class="fc" id="L1026">        int exponent = 0;</span>
+<span class="fc bfc" id="L1027" title="All 4 branches covered.">        if (s.exponent &amp;&amp; abs != 0) {</span>
+            // the exponent is a multiple of the count of integer placeholders
+<span class="fc" id="L1029">            int step = Math.max(1, s.integerDigits);</span>
+<span class="fc" id="L1030">            exponent = (int) Math.floor(com.codename1.util.MathUtil.log10(abs));</span>
+<span class="fc" id="L1031">            exponent = (int) (Math.floor((double) exponent / step) * step);</span>
+            // a subnormal number's power of ten is not a double, so it is divided out in two
+<span class="fc bfc" id="L1033" title="All 2 branches covered.">            if (exponent &lt; -300) {</span>
+<span class="fc" id="L1034">                abs = abs * 1e300 / Values.pow10signed(exponent + 300);</span>
+            } else {
+<span class="fc" id="L1036">                abs = abs / Values.pow10signed(exponent);</span>
+            }
+<span class="pc bpc" id="L1038" title="2 of 4 branches missed.">            if (Double.isNaN(abs) || Double.isInfinite(abs)) {</span>
+<span class="nc bnc" id="L1039" title="All 2 branches missed.">                return Values.general(negative ? -abs : abs);</span>
+            }
+<span class="fc bfc" id="L1041" title="All 2 branches covered.">            if (Values.round(abs, s.decimals) &gt;= Values.pow10(step)) {</span>
+<span class="fc" id="L1042">                exponent += step;</span>
+<span class="fc" id="L1043">                abs /= Values.pow10(step);</span>
+            }
+        }
+        // more decimal places than a number has digits are zeros, written by the placeholders
+<span class="fc" id="L1047">        String digits = TextFunctions.fixed(abs, Math.min(s.decimals, 30), false);</span>
+<span class="fc" id="L1048">        int point = digits.indexOf('.');</span>
+<span class="fc bfc" id="L1049" title="All 2 branches covered.">        String whole = point &lt; 0 ? digits : digits.substring(0, point);</span>
+<span class="fc bfc" id="L1050" title="All 2 branches covered.">        String frac = point &lt; 0 ? &quot;&quot; : digits.substring(point + 1);</span>
+<span class="fc bfc" id="L1051" title="All 2 branches covered.">        if (&quot;0&quot;.equals(whole)) {</span>
+<span class="fc" id="L1052">            whole = &quot;&quot;;</span>
+        }
+<span class="fc bfc" id="L1054" title="All 4 branches covered.">        boolean zero = whole.length() == 0 &amp;&amp; isZeros(frac);</span>
+<span class="fc" id="L1055">        StringBuilder sb = new StringBuilder();</span>
+<span class="fc bfc" id="L1056" title="All 4 branches covered.">        if (negative &amp;&amp; !zero) {</span>
+<span class="fc" id="L1057">            sb.append('-');</span>
+        }
+        // integer placeholders take the digits right to left; the first one takes any surplus
+<span class="fc" id="L1060">        int placeholders = s.integerDigits;</span>
+<span class="fc" id="L1061">        int seen = 0;</span>
+<span class="fc" id="L1062">        int fracAt = 0;</span>
+<span class="fc" id="L1063">        boolean inExponent = false;</span>
+<span class="fc" id="L1064">        int lastFraction = frac.length();</span>
+<span class="fc bfc" id="L1065" title="All 4 branches covered.">        while (lastFraction &gt; 0 &amp;&amp; frac.charAt(lastFraction - 1) == '0') {</span>
+<span class="fc" id="L1066">            lastFraction--;</span>
+        }
+<span class="fc bfc" id="L1068" title="All 2 branches covered.">        for (int i = 0; i &lt; s.tokens.size(); i++) {</span>
+<span class="fc" id="L1069">            Token t = s.tokens.get(i);</span>
+<span class="fc bfc" id="L1070" title="All 5 branches covered.">            switch (t.kind) {</span>
+                case DIGIT: {
+<span class="fc" id="L1072">                    char p = t.text.charAt(t.text.length() - 1);</span>
+<span class="fc bfc" id="L1073" title="All 2 branches covered.">                    if (inExponent) {</span>
+                        // every placeholder of the exponent was written with the exponent
+<span class="fc" id="L1075">                        break;</span>
+                    }
+<span class="fc bfc" id="L1077" title="All 2 branches covered.">                    if (t.text.length() == 2) {</span>
+<span class="fc bfc" id="L1078" title="All 2 branches covered.">                        char digit = fracAt &lt; frac.length() ? frac.charAt(fracAt) : '0';</span>
+<span class="fc bfc" id="L1079" title="All 4 branches covered.">                        if (fracAt &lt; lastFraction || p == '0') {</span>
+<span class="fc" id="L1080">                            sb.append(digit);</span>
+<span class="fc bfc" id="L1081" title="All 2 branches covered.">                        } else if (p == '?') {</span>
+<span class="fc" id="L1082">                            sb.append(' ');</span>
+                        }
+<span class="fc" id="L1084">                        fracAt++;</span>
+<span class="fc" id="L1085">                        break;</span>
+                    }
+                    // the digits this placeholder shows: those left of the later placeholders
+<span class="fc" id="L1088">                    int remaining = placeholders - seen - 1;</span>
+<span class="fc" id="L1089">                    int end = whole.length() - remaining;</span>
+<span class="fc bfc" id="L1090" title="All 2 branches covered.">                    int from = seen == 0 ? 0 : end - 1;</span>
+<span class="fc bfc" id="L1091" title="All 2 branches covered.">                    if (seen == 0) {</span>
+<span class="fc bfc" id="L1092" title="All 2 branches covered.">                        for (int k = 0; k &lt; end; k++) {</span>
+<span class="fc" id="L1093">                            appendDigit(sb, whole, k, s.grouping);</span>
+                        }
+                    }
+<span class="pc bpc" id="L1096" title="1 of 6 branches missed.">                    if (end &lt;= 0 || seen &gt; 0 &amp;&amp; from &lt; 0) {</span>
+<span class="pc bpc" id="L1097" title="1 of 2 branches missed.">                        if (end &lt;= 0) {</span>
+<span class="fc bfc" id="L1098" title="All 2 branches covered.">                            if (p == '0') {</span>
+<span class="fc" id="L1099">                                sb.append('0');</span>
+<span class="pc bpc" id="L1100" title="3 of 6 branches missed.">                                if (s.grouping &amp;&amp; remaining &gt; 0 &amp;&amp; remaining % 3 == 0) {</span>
+<span class="nc" id="L1101">                                    sb.append(',');</span>
+                                }
+<span class="fc bfc" id="L1103" title="All 2 branches covered.">                            } else if (p == '?') {</span>
+<span class="fc" id="L1104">                                sb.append(' ');</span>
+                            }
+                        }
+<span class="fc bfc" id="L1107" title="All 2 branches covered.">                    } else if (seen &gt; 0) {</span>
+<span class="fc" id="L1108">                        appendDigit(sb, whole, from, s.grouping);</span>
+                    }
+<span class="fc" id="L1110">                    seen++;</span>
+<span class="fc" id="L1111">                    break;</span>
+                }
+                case POINT:
+<span class="fc" id="L1114">                    sb.append('.');</span>
+<span class="fc" id="L1115">                    break;</span>
+                case EXPONENT: {
+<span class="fc" id="L1117">                    sb.append(t.text.charAt(0));</span>
+<span class="fc bfc" id="L1118" title="All 2 branches covered.">                    if (exponent &lt; 0) {</span>
+<span class="fc" id="L1119">                        sb.append('-');</span>
+<span class="fc bfc" id="L1120" title="All 2 branches covered.">                    } else if (t.text.charAt(1) == '+') {</span>
+<span class="fc" id="L1121">                        sb.append('+');</span>
+                    }
+<span class="fc" id="L1123">                    int width = 0;</span>
+<span class="fc bfc" id="L1124" title="All 4 branches covered.">                    for (int k = i + 1; k &lt; s.tokens.size() &amp;&amp; s.tokens.get(k).kind == DIGIT; k++) {</span>
+<span class="fc" id="L1125">                        width++;</span>
+                    }
+<span class="fc" id="L1127">                    String e = Integer.toString(Math.abs(exponent));</span>
+<span class="fc bfc" id="L1128" title="All 2 branches covered.">                    for (int k = e.length(); k &lt; width; k++) {</span>
+<span class="fc" id="L1129">                        sb.append('0');</span>
+                    }
+<span class="fc" id="L1131">                    sb.append(e);</span>
+<span class="fc" id="L1132">                    inExponent = true;</span>
+<span class="fc" id="L1133">                    break;</span>
+                }
+                case LITERAL:
+                case PERCENT:
+<span class="fc" id="L1137">                    sb.append(t.text);</span>
+<span class="fc" id="L1138">                    inExponent = false;</span>
+<span class="fc" id="L1139">                    break;</span>
+                default:
+                    break;
+            }
+        }
+<span class="fc" id="L1144">        return sb.toString();</span>
+    }
+
+    private static void appendDigit(StringBuilder sb, String whole, int index, boolean grouping) {
+<span class="pc bpc" id="L1148" title="1 of 4 branches missed.">        if (index &lt; 0 || index &gt;= whole.length()) {</span>
+            // a placeholder where no format has one, after the exponent: it has no digit
+<span class="fc" id="L1150">            return;</span>
+        }
+<span class="fc" id="L1152">        sb.append(whole.charAt(index));</span>
+<span class="fc" id="L1153">        int after = whole.length() - index - 1;</span>
+<span class="fc bfc" id="L1154" title="All 6 branches covered.">        if (grouping &amp;&amp; after &gt; 0 &amp;&amp; after % 3 == 0) {</span>
+<span class="fc" id="L1155">            sb.append(',');</span>
+        }
+<span class="fc" id="L1157">    }</span>
+
+    private static boolean isZeros(String s) {
+<span class="fc bfc" id="L1160" title="All 2 branches covered.">        for (int i = 0; i &lt; s.length(); i++) {</span>
+<span class="fc bfc" id="L1161" title="All 2 branches covered.">            if (s.charAt(i) != '0') {</span>
+<span class="fc" id="L1162">                return false;</span>
+            }
+        }
+<span class="fc" id="L1165">        return true;</span>
+    }
+
+    /// Writes `n/d`, padding each part to its placeholders the way Excel lines fractions up:
+    /// a `?` with no digit is a space, a `0` a zero and a `#` nothing. The numerator pads on
+    /// the left, the denominator on the right.
+    private static void appendFraction(StringBuilder sb, long n, long d, CharSequence numeratorMarks,
+            CharSequence denominatorMarks) {
+<span class="fc" id="L1173">        String num = String.valueOf(n);</span>
+<span class="fc bfc" id="L1174" title="All 2 branches covered.">        for (int i = 0; i &lt; numeratorMarks.length() - num.length(); i++) {</span>
+<span class="fc" id="L1175">            pad(sb, numeratorMarks.charAt(i));</span>
+        }
+<span class="fc" id="L1177">        sb.append(num).append('/');</span>
+<span class="fc" id="L1178">        String den = String.valueOf(d);</span>
+<span class="fc" id="L1179">        sb.append(den);</span>
+<span class="fc bfc" id="L1180" title="All 2 branches covered.">        if (denominatorMarks != null) {</span>
+            // a zero written after the digits would read as another digit, so only ? pads here
+<span class="fc bfc" id="L1182" title="All 2 branches covered.">            for (int i = den.length(); i &lt; denominatorMarks.length(); i++) {</span>
+<span class="pc bpc" id="L1183" title="1 of 2 branches missed.">                if (denominatorMarks.charAt(i) == '?') {</span>
+<span class="fc" id="L1184">                    sb.append(' ');</span>
+                }
+            }
+        }
+<span class="fc" id="L1188">    }</span>
+
+    /// The digits of a whole number, written out however large it is: 1E20 is a 1 and twenty
+    /// zeros. Past the 17 digits a double holds, the rest are zeros, as Excel shows them.
+    private static String wholeDigits(double whole) {
+<span class="fc bfc" id="L1193" title="All 2 branches covered.">        if (whole &lt; 9.2E18) {</span>
+<span class="fc" id="L1194">            return Long.toString((long) whole);</span>
+        }
+<span class="fc" id="L1196">        String s = Double.toString(whole);</span>
+<span class="fc" id="L1197">        int e = s.indexOf('E');</span>
+<span class="pc bpc" id="L1198" title="1 of 2 branches missed.">        if (e &lt; 0) {</span>
+<span class="nc" id="L1199">            return s;</span>
+        }
+<span class="fc" id="L1201">        int exponent = Integer.parseInt(s.substring(e + 1));</span>
+<span class="fc" id="L1202">        StringBuilder sb = new StringBuilder();</span>
+<span class="fc bfc" id="L1203" title="All 2 branches covered.">        for (int i = 0; i &lt; e; i++) {</span>
+<span class="fc" id="L1204">            char c = s.charAt(i);</span>
+<span class="fc bfc" id="L1205" title="All 2 branches covered.">            if (c != '.') {</span>
+<span class="fc" id="L1206">                sb.append(c);</span>
+            }
+        }
+        // the mantissa is one digit before the point, the rest after it
+<span class="fc bfc" id="L1210" title="All 2 branches covered.">        while (sb.length() &lt; exponent + 1) {</span>
+<span class="fc" id="L1211">            sb.append('0');</span>
+        }
+<span class="pc bpc" id="L1213" title="1 of 2 branches missed.">        if (sb.length() &gt; exponent + 1) {</span>
+<span class="nc" id="L1214">            sb.setLength(exponent + 1);</span>
+        }
+<span class="fc" id="L1216">        return sb.toString();</span>
+    }
+
+    /// Digits with a thousands separator every three, when the format asks for one.
+    private static String grouped(String digits, boolean grouping) {
+<span class="pc bpc" id="L1221" title="1 of 4 branches missed.">        if (!grouping || digits.length() &lt;= 3) {</span>
+<span class="fc" id="L1222">            return digits;</span>
+        }
+<span class="fc" id="L1224">        StringBuilder sb = new StringBuilder();</span>
+<span class="fc bfc" id="L1225" title="All 2 branches covered.">        for (int i = 0; i &lt; digits.length(); i++) {</span>
+<span class="fc bfc" id="L1226" title="All 4 branches covered.">            if (i &gt; 0 &amp;&amp; (digits.length() - i) % 3 == 0) {</span>
+<span class="fc" id="L1227">                sb.append(',');</span>
+            }
+<span class="fc" id="L1229">            sb.append(digits.charAt(i));</span>
+        }
+<span class="fc" id="L1231">        return sb.toString();</span>
+    }
+
+    private static void pad(StringBuilder sb, char mark) {
+<span class="fc bfc" id="L1235" title="All 2 branches covered.">        if (mark == '?') {</span>
+<span class="fc" id="L1236">            sb.append(' ');</span>
+<span class="fc bfc" id="L1237" title="All 2 branches covered.">        } else if (mark == '0') {</span>
+<span class="fc" id="L1238">            sb.append('0');</span>
+        }
+<span class="fc" id="L1240">    }</span>
+
+    /// `# ?/?`: a whole part and the closest fraction whose denominator fits the placeholders.
+    /// A fraction with the text its format writes around it: `$# ?/2` shows 2.5 as
+    /// `$2 1/2`, and a section for negatives such as `-# ?/2` brings its own sign.
+    private static String formatFraction(Section s, double abs, boolean negative) {
+<span class="fc" id="L1246">        int first = -1;</span>
+<span class="fc" id="L1247">        int last = -1;</span>
+<span class="fc bfc" id="L1248" title="All 2 branches covered.">        for (int i = 0; i &lt; s.tokens.size(); i++) {</span>
+<span class="fc" id="L1249">            Token t = s.tokens.get(i);</span>
+<span class="fc bfc" id="L1250" title="All 4 branches covered.">            if (t.kind == DIGIT || t.kind == SLASH) {</span>
+<span class="fc bfc" id="L1251" title="All 2 branches covered.">                if (first &lt; 0) {</span>
+<span class="fc" id="L1252">                    first = i;</span>
+                }
+<span class="fc" id="L1254">                last = i;</span>
+<span class="fc bfc" id="L1255" title="All 2 branches covered.">                if (t.kind == SLASH) {</span>
+<span class="fc" id="L1256">                    int[] fixed = fixedDenominator(s.tokens, i);</span>
+<span class="fc bfc" id="L1257" title="All 2 branches covered.">                    if (fixed != null) {</span>
+<span class="fc" id="L1258">                        last = fixed[1];</span>
+<span class="fc" id="L1259">                        i = fixed[1];</span>
+                    }
+                }
+            }
+        }
+<span class="fc" id="L1264">        StringBuilder prefix = new StringBuilder();</span>
+<span class="fc" id="L1265">        StringBuilder suffix = new StringBuilder();</span>
+<span class="fc bfc" id="L1266" title="All 2 branches covered.">        for (int i = 0; i &lt; s.tokens.size(); i++) {</span>
+<span class="fc" id="L1267">            Token t = s.tokens.get(i);</span>
+<span class="fc bfc" id="L1268" title="All 6 branches covered.">            if (t.kind == LITERAL &amp;&amp; (i &lt; first || i &gt; last)) {</span>
+<span class="fc bfc" id="L1269" title="All 2 branches covered.">                (i &lt; first ? prefix : suffix).append(t.text);</span>
+            }
+        }
+<span class="fc" id="L1272">        String body = fractionBody(s, abs, negative);</span>
+<span class="fc bfc" id="L1273" title="All 4 branches covered.">        if (prefix.length() == 0 &amp;&amp; suffix.length() == 0) {</span>
+<span class="fc" id="L1274">            return body;</span>
+        }
+<span class="fc" id="L1276">        boolean signed = body.startsWith(&quot;-&quot;);</span>
+<span class="fc bfc" id="L1277" title="All 4 branches covered.">        return (signed ? &quot;-&quot; : &quot;&quot;) + prefix + (signed ? body.substring(1) : body) + suffix;</span>
+    }
+
+    private static String fractionBody(Section s, double abs, boolean negative) {
+<span class="fc" id="L1281">        int denominatorDigits = 0;</span>
+<span class="fc" id="L1282">        int numeratorDigits = 0;</span>
+<span class="fc" id="L1283">        int wholeDigits = 0;</span>
+<span class="fc" id="L1284">        boolean pastSlash = false;</span>
+<span class="fc" id="L1285">        boolean spaceSeen = false;</span>
+<span class="fc" id="L1286">        int fixedDenominator = 0;</span>
+<span class="fc" id="L1287">        StringBuilder wholeMarks = new StringBuilder();</span>
+<span class="fc" id="L1288">        StringBuilder numeratorMarks = new StringBuilder();</span>
+<span class="fc" id="L1289">        StringBuilder denominatorMarks = new StringBuilder();</span>
+<span class="fc bfc" id="L1290" title="All 2 branches covered.">        for (int i = 0; i &lt; s.tokens.size(); i++) {</span>
+<span class="fc" id="L1291">            Token t = s.tokens.get(i);</span>
+<span class="fc bfc" id="L1292" title="All 2 branches covered.">            if (t.kind == SLASH) {</span>
+<span class="fc" id="L1293">                pastSlash = true;</span>
+<span class="fc" id="L1294">                int[] fixed = fixedDenominator(s.tokens, i);</span>
+<span class="fc bfc" id="L1295" title="All 2 branches covered.">                if (fixed != null) {</span>
+<span class="fc" id="L1296">                    fixedDenominator = fixed[0];</span>
+<span class="fc" id="L1297">                    i = fixed[1];</span>
+                }
+<span class="fc bfc" id="L1299" title="All 2 branches covered.">            } else if (t.kind == DIGIT) {</span>
+<span class="fc" id="L1300">                char mark = t.text.charAt(t.text.length() - 1);</span>
+<span class="fc bfc" id="L1301" title="All 2 branches covered.">                if (pastSlash) {</span>
+<span class="fc" id="L1302">                    denominatorDigits++;</span>
+<span class="fc" id="L1303">                    denominatorMarks.append(mark);</span>
+<span class="fc bfc" id="L1304" title="All 2 branches covered.">                } else if (spaceSeen) {</span>
+<span class="fc" id="L1305">                    numeratorDigits++;</span>
+<span class="fc" id="L1306">                    numeratorMarks.append(mark);</span>
+                } else {
+<span class="fc" id="L1308">                    wholeDigits++;</span>
+<span class="fc" id="L1309">                    wholeMarks.append(mark);</span>
+                }
+<span class="fc bfc" id="L1311" title="All 4 branches covered.">            } else if (t.kind == LITERAL &amp;&amp; !pastSlash) {</span>
+<span class="fc bfc" id="L1312" title="All 4 branches covered.">                if (&quot; &quot;.equals(t.text) &amp;&amp; wholeDigits &gt; 0) {</span>
+<span class="fc" id="L1313">                    spaceSeen = true;</span>
+                }
+            }
+        }
+<span class="fc bfc" id="L1317" title="All 4 branches covered.">        boolean mixed = spaceSeen &amp;&amp; numeratorDigits &gt; 0;</span>
+<span class="fc bfc" id="L1318" title="All 2 branches covered.">        double whole = mixed ? Math.floor(abs) : 0;</span>
+<span class="fc" id="L1319">        double rest = abs - whole;</span>
+<span class="fc" id="L1320">        long bestN = 0;</span>
+<span class="fc" id="L1321">        long bestD = 1;</span>
+<span class="fc bfc" id="L1322" title="All 2 branches covered.">        if (fixedDenominator &gt; 0) {</span>
+<span class="fc" id="L1323">            bestD = fixedDenominator;</span>
+<span class="fc" id="L1324">            bestN = (long) Math.floor(rest * bestD + 0.5);</span>
+        } else {
+<span class="fc" id="L1326">            long max = (long) Values.pow10(Math.max(1, Math.min(denominatorDigits, 7))) - 1;</span>
+<span class="fc" id="L1327">            double bestError = Double.MAX_VALUE;</span>
+<span class="fc bfc" id="L1328" title="All 2 branches covered.">            for (long den = 1; den &lt;= max; den++) {</span>
+<span class="fc" id="L1329">                long num = (long) Math.floor(rest * den + 0.5);</span>
+<span class="fc" id="L1330">                double error = Math.abs(rest - (double) num / den);</span>
+<span class="fc bfc" id="L1331" title="All 2 branches covered.">                if (error &lt; bestError - 1e-15) {</span>
+<span class="fc" id="L1332">                    bestError = error;</span>
+<span class="fc" id="L1333">                    bestN = num;</span>
+<span class="fc" id="L1334">                    bestD = den;</span>
+<span class="fc bfc" id="L1335" title="All 2 branches covered.">                    if (error == 0) {</span>
+<span class="fc" id="L1336">                        break;</span>
+                    }
+                }
+            }
+        }
+<span class="pc bpc" id="L1341" title="1 of 4 branches missed.">        if (mixed &amp;&amp; bestN &gt;= bestD) {</span>
+<span class="nc" id="L1342">            whole += 1;</span>
+<span class="nc" id="L1343">            bestN = 0;</span>
+        }
+<span class="fc" id="L1345">        StringBuilder sb = new StringBuilder();</span>
+<span class="fc bfc" id="L1346" title="All 4 branches covered.">        if (!mixed &amp;&amp; abs * bestD &gt;= 9.0E15) {</span>
+            // past the integers a double holds exactly there is no fraction left, and a long
+            // cannot hold the numerator: every digit of it, over the denominator
+<span class="pc bpc" id="L1349" title="1 of 2 branches missed.">            if (negative) {</span>
+<span class="nc" id="L1350">                sb.append('-');</span>
+            }
+<span class="fc" id="L1352">            sb.append(wholeDigits(Math.floor(abs * bestD + 0.5))).append('/').append(bestD);</span>
+<span class="fc bfc" id="L1353" title="All 4 branches covered.">            for (int i = 1; fixedDenominator &lt;= 0 &amp;&amp; i &lt; denominatorMarks.length(); i++) {</span>
+<span class="pc bpc" id="L1354" title="1 of 2 branches missed.">                if (denominatorMarks.charAt(i) == '?') {</span>
+<span class="fc" id="L1355">                    sb.append(' ');</span>
+                }
+            }
+<span class="fc" id="L1358">            return sb.toString();</span>
+        }
+<span class="pc bpc" id="L1360" title="1 of 6 branches missed.">        if (negative &amp;&amp; (whole != 0 || bestN != 0)) {</span>
+<span class="fc" id="L1361">            sb.append('-');</span>
+        }
+<span class="fc bfc" id="L1363" title="All 4 branches covered.">        boolean zeroShown = bestN == 0 &amp;&amp; numeratorMarks.indexOf(&quot;0&quot;) &gt;= 0;</span>
+<span class="fc bfc" id="L1364" title="All 2 branches covered.">        if (mixed) {</span>
+<span class="fc bfc" id="L1365" title="All 4 branches covered.">            boolean marked = wholeMarks.indexOf(&quot;0&quot;) &gt;= 0 || wholeMarks.indexOf(&quot;?&quot;) &gt;= 0;</span>
+<span class="fc bfc" id="L1366" title="All 6 branches covered.">            if (whole != 0 || bestN == 0 || marked) {</span>
+                // the whole part pads to its placeholders too: 00 shows 2 as 02, and 0 shows a
+                // whole part of nothing as 0
+                // every digit of the whole part, never an exponent: a fraction format shows 1E15
+                // in full, as Excel does
+<span class="fc bfc" id="L1371" title="All 6 branches covered.">                String digits = whole == 0 &amp;&amp; bestN != 0 &amp;&amp; wholeMarks.indexOf(&quot;0&quot;) &lt; 0 ? &quot;&quot;</span>
+<span class="fc" id="L1372">                        : wholeDigits(whole);</span>
+<span class="fc" id="L1373">                StringBuilder padded = new StringBuilder();</span>
+<span class="fc" id="L1374">                int blanks = 0;</span>
+<span class="fc bfc" id="L1375" title="All 2 branches covered.">                for (int i = 0; i &lt; wholeMarks.length() - digits.length(); i++) {</span>
+<span class="fc" id="L1376">                    char mark = wholeMarks.charAt(i);</span>
+<span class="fc bfc" id="L1377" title="All 2 branches covered.">                    if (mark == '0') {</span>
+<span class="fc" id="L1378">                        padded.append('0');</span>
+<span class="pc bpc" id="L1379" title="1 of 2 branches missed.">                    } else if (mark == '?') {</span>
+<span class="fc" id="L1380">                        blanks++;</span>
+                    }
+                }
+<span class="fc" id="L1383">                padded.append(digits);</span>
+<span class="fc bfc" id="L1384" title="All 2 branches covered.">                for (int i = 0; i &lt; blanks; i++) {</span>
+<span class="fc" id="L1385">                    sb.append(' ');</span>
+                }
+                // the zeros the placeholders add are grouped with the digits: 0,000 shows 5 as 0,005
+<span class="fc" id="L1388">                sb.append(grouped(padded.toString(), s.grouping));</span>
+            }
+<span class="fc bfc" id="L1390" title="All 4 branches covered.">            if (bestN == 0 &amp;&amp; !zeroShown) {</span>
+                // no fraction to show: blanks where it would be keep the column lined up
+<span class="fc bfc" id="L1392" title="All 2 branches covered.">                int width = 1 + numeratorMarks.length() + 1 + (fixedDenominator &gt; 0 ? 0 : denominatorMarks.length());</span>
+<span class="fc bfc" id="L1393" title="All 2 branches covered.">                for (int i = 0; i &lt; width; i++) {</span>
+<span class="fc" id="L1394">                    sb.append(' ');</span>
+                }
+            }
+<span class="fc bfc" id="L1397" title="All 4 branches covered.">            if (bestN != 0 || zeroShown) {</span>
+                // the space between the parts stays when the whole part shows nothing, as in
+                // LibreOffice and Excel: # ?/10 shows 0.37 as &quot; 4/10&quot;
+<span class="fc" id="L1400">                sb.append(' ');</span>
+<span class="fc bfc" id="L1401" title="All 2 branches covered.">                appendFraction(sb, bestN, bestD, numeratorMarks, fixedDenominator &gt; 0 ? null : denominatorMarks);</span>
+            }
+<span class="fc" id="L1403">        } else {</span>
+<span class="fc bfc" id="L1404" title="All 2 branches covered.">            appendFraction(sb, bestN, bestD, wholeMarks, fixedDenominator &gt; 0 ? null : denominatorMarks);</span>
+        }
+<span class="fc bfc" id="L1406" title="All 2 branches covered.">        for (int i = 0; i &lt; s.tokens.size(); i++) {</span>
+<span class="fc" id="L1407">            Token t = s.tokens.get(i);</span>
+<span class="fc bfc" id="L1408" title="All 2 branches covered.">            if (t.kind == PERCENT) {</span>
+<span class="fc" id="L1409">                sb.append('%');</span>
+            }
+        }
+<span class="fc" id="L1412">        return sb.toString();</span>
+    }
+
+    /// The denominator a fraction writes out, as the 16 of `# ??/16` or the 100 of
+    /// `# ??/100`, and the index of its last token; null when the denominator is made of
+    /// placeholders. A written denominator starts with a digit 1 to 9, and every digit after
+    /// it, a 0 included, belongs to it.
+    private static int[] fixedDenominator(ArrayList&lt;Token&gt; tokens, int slash) {
+<span class="fc" id="L1420">        StringBuilder digits = new StringBuilder();</span>
+<span class="fc" id="L1421">        int last = slash;</span>
+<span class="fc bfc" id="L1422" title="All 2 branches covered.">        for (int i = slash + 1; i &lt; tokens.size(); i++) {</span>
+<span class="fc" id="L1423">            Token t = tokens.get(i);</span>
+            // a placeholder's text carries the slash or point before it: its digit is the last
+<span class="fc bfc" id="L1425" title="All 4 branches covered.">            String text = t.kind == LITERAL ? t.text.trim()</span>
+<span class="fc" id="L1426">                    : t.kind == DIGIT ? t.text.substring(t.text.length() - 1) : null;</span>
+<span class="fc bfc" id="L1427" title="All 10 branches covered.">            if (text == null || text.length() == 0 || !isDigits(text) || digits.length() == 0 &amp;&amp; t.kind != LITERAL) {</span>
+<span class="fc" id="L1428">                break;</span>
+            }
+<span class="pc bpc" id="L1430" title="1 of 4 branches missed.">            if (digits.length() == 0 &amp;&amp; text.charAt(0) == '0') {</span>
+<span class="nc" id="L1431">                break;</span>
+            }
+<span class="fc" id="L1433">            digits.append(text);</span>
+<span class="fc" id="L1434">            last = i;</span>
+        }
+<span class="pc bpc" id="L1436" title="1 of 4 branches missed.">        if (digits.length() == 0 || digits.length() &gt; 9) {</span>
+<span class="fc" id="L1437">            return null;</span>
+        }
+<span class="fc" id="L1439">        return new int[] {Integer.parseInt(digits.toString()), last};</span>
+    }
+
+    private static void pad(StringBuilder sb, long v, int width) {
+<span class="fc" id="L1443">        String t = Long.toString(v);</span>
+<span class="fc bfc" id="L1444" title="All 2 branches covered.">        for (int i = t.length(); i &lt; width; i++) {</span>
+<span class="fc" id="L1445">            sb.append('0');</span>
+        }
+<span class="fc" id="L1447">        sb.append(t);</span>
+<span class="fc" id="L1448">    }</span>
+
+    private static String formatDate(Section s, double serial, boolean date1904) {
+        // the smallest unit shown decides what the value is rounded to
+<span class="fc" id="L1452">        int fractionDigits = 0;</span>
+<span class="fc" id="L1453">        boolean showsSeconds = false;</span>
+<span class="fc bfc" id="L1454" title="All 2 branches covered.">        for (int i = 0; i &lt; s.tokens.size(); i++) {</span>
+<span class="fc" id="L1455">            Token t = s.tokens.get(i);</span>
+<span class="fc bfc" id="L1456" title="All 2 branches covered.">            if (t.kind == SECOND_FRACTION) {</span>
+<span class="fc" id="L1457">                fractionDigits = Math.min(3, t.text.length());</span>
+<span class="fc bfc" id="L1458" title="All 6 branches covered.">            } else if ((t.kind == DATE || t.kind == ELAPSED) &amp;&amp; t.text.charAt(0) == 's') {</span>
+<span class="fc" id="L1459">                showsSeconds = true;</span>
+            }
+        }
+<span class="fc" id="L1462">        double unit = Values.pow10(fractionDigits);</span>
+<span class="fc" id="L1463">        double totalUnits = Math.floor(serial * 86400 * unit + 0.5);</span>
+<span class="fc bfc" id="L1464" title="All 4 branches covered.">        if (!showsSeconds &amp;&amp; fractionDigits == 0) {</span>
+            // minutes are not rounded up by the seconds that are not shown
+<span class="fc" id="L1466">            totalUnits = Math.floor(serial * 86400 + 1e-6);</span>
+        }
+<span class="fc" id="L1468">        double totalSeconds = Math.floor(totalUnits / unit);</span>
+<span class="fc" id="L1469">        long fraction = (long) (totalUnits - totalSeconds * unit);</span>
+<span class="fc" id="L1470">        double day = Math.floor(totalSeconds / 86400);</span>
+<span class="fc" id="L1471">        long secondOfDay = (long) (totalSeconds - day * 86400);</span>
+<span class="fc" id="L1472">        int[] f = DateUtil.fields(day, date1904);</span>
+<span class="fc" id="L1473">        int hour = (int) (secondOfDay / 3600);</span>
+<span class="fc" id="L1474">        int minute = (int) (secondOfDay / 60 % 60);</span>
+<span class="fc" id="L1475">        int second = (int) (secondOfDay % 60);</span>
+<span class="fc" id="L1476">        StringBuilder sb = new StringBuilder();</span>
+<span class="fc bfc" id="L1477" title="All 2 branches covered.">        for (int i = 0; i &lt; s.tokens.size(); i++) {</span>
+<span class="fc" id="L1478">            Token t = s.tokens.get(i);</span>
+<span class="fc bfc" id="L1479" title="All 7 branches covered.">            switch (t.kind) {</span>
+                case LITERAL:
+                case PERCENT:
+<span class="fc" id="L1482">                    sb.append(t.text);</span>
+<span class="fc" id="L1483">                    break;</span>
+                case POINT:
+<span class="fc" id="L1485">                    sb.append('.');</span>
+<span class="fc" id="L1486">                    break;</span>
+                case SECOND_FRACTION: {
+<span class="fc" id="L1488">                    sb.append('.');</span>
+<span class="fc" id="L1489">                    pad(sb, fraction, fractionDigits);</span>
+<span class="fc" id="L1490">                    break;</span>
+                }
+                case ELAPSED: {
+<span class="fc" id="L1493">                    char c = t.text.charAt(0);</span>
+<span class="fc bfc" id="L1494" title="All 4 branches covered.">                    double total = c == 'h' ? Math.floor(totalSeconds / 3600)</span>
+<span class="fc" id="L1495">                            : c == 'm' ? Math.floor(totalSeconds / 60) : totalSeconds;</span>
+<span class="fc" id="L1496">                    pad(sb, (long) total, t.text.length());</span>
+<span class="fc" id="L1497">                    break;</span>
+                }
+                case AMPM: {
+<span class="fc bfc" id="L1500" title="All 2 branches covered.">                    boolean pm = hour &gt;= 12;</span>
+<span class="fc bfc" id="L1501" title="All 2 branches covered.">                    if (t.text.length() == 3) {</span>
+<span class="fc" id="L1502">                        char a = t.text.charAt(0);</span>
+<span class="fc" id="L1503">                        char p = t.text.charAt(2);</span>
+<span class="fc bfc" id="L1504" title="All 2 branches covered.">                        sb.append(pm ? p : a);</span>
+<span class="fc" id="L1505">                    } else {</span>
+<span class="fc bfc" id="L1506" title="All 2 branches covered.">                        sb.append(pm ? &quot;PM&quot; : &quot;AM&quot;);</span>
+                    }
+<span class="fc" id="L1508">                    break;</span>
+                }
+                case DATE: {
+<span class="fc" id="L1511">                    char c = t.text.charAt(0);</span>
+<span class="fc" id="L1512">                    int len = t.text.length();</span>
+<span class="fc bfc" id="L1513" title="All 6 branches covered.">                    switch (c) {</span>
+                        case 'y':
+<span class="fc bfc" id="L1515" title="All 2 branches covered.">                            if (len &lt;= 2) {</span>
+<span class="fc" id="L1516">                                pad(sb, f[0] % 100, 2);</span>
+                            } else {
+<span class="fc" id="L1518">                                pad(sb, f[0], 4);</span>
+                            }
+<span class="fc" id="L1520">                            break;</span>
+                        case 'M':
+<span class="fc bfc" id="L1522" title="All 2 branches covered.">                            if (len &lt;= 2) {</span>
+<span class="fc" id="L1523">                                pad(sb, f[1], len);</span>
+<span class="fc bfc" id="L1524" title="All 2 branches covered.">                            } else if (len == 3) {</span>
+<span class="fc" id="L1525">                                sb.append(MONTHS[f[1] - 1].substring(0, 3));</span>
+<span class="fc bfc" id="L1526" title="All 2 branches covered.">                            } else if (len == 5) {</span>
+<span class="fc" id="L1527">                                sb.append(MONTHS[f[1] - 1].charAt(0));</span>
+                            } else {
+<span class="fc" id="L1529">                                sb.append(MONTHS[f[1] - 1]);</span>
+                            }
+<span class="fc" id="L1531">                            break;</span>
+                        case 'd':
+<span class="fc bfc" id="L1533" title="All 2 branches covered.">                            if (len &lt;= 2) {</span>
+<span class="fc" id="L1534">                                pad(sb, f[2], len);</span>
+                            } else {
+<span class="fc" id="L1536">                                String name = DAYS[DateUtil.weekday(day, date1904) - 1];</span>
+<span class="fc bfc" id="L1537" title="All 2 branches covered.">                                if (len == 3) {</span>
+<span class="fc" id="L1538">                                    sb.append(name.substring(0, 3));</span>
+                                } else {
+<span class="fc" id="L1540">                                    sb.append(name);</span>
+                                }
+                            }
+<span class="fc" id="L1543">                            break;</span>
+                        case 'h': {
+<span class="fc" id="L1545">                            int h = hour;</span>
+<span class="fc bfc" id="L1546" title="All 2 branches covered.">                            if (s.twelveHour) {</span>
+<span class="fc" id="L1547">                                h = h % 12;</span>
+<span class="fc bfc" id="L1548" title="All 2 branches covered.">                                if (h == 0) {</span>
+<span class="fc" id="L1549">                                    h = 12;</span>
+                                }
+                            }
+<span class="fc" id="L1552">                            pad(sb, h, Math.min(len, 2));</span>
+<span class="fc" id="L1553">                            break;</span>
+                        }
+                        case 'm':
+<span class="fc" id="L1556">                            pad(sb, minute, Math.min(len, 2));</span>
+<span class="fc" id="L1557">                            break;</span>
+                        default:
+<span class="fc" id="L1559">                            pad(sb, second, Math.min(len, 2));</span>
+<span class="fc" id="L1560">                            break;</span>
+                    }
+                    break;
+                }
+                default:
+                    break;
+            }
+        }
+<span class="fc" id="L1568">        return sb.toString();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

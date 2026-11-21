@@ -1,0 +1,650 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CSVParser.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.io</a> &gt; <span class="el_source">CSVParser.java</span></div><h1>CSVParser.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.io;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.Reader;
+import java.util.ArrayList;
+import java.util.Vector;
+
+/// The `CSVParser` allows importing data into applications quickly from a CSV source.  CSV
+/// is a [file format](https://en.wikipedia.org/wiki/Comma-separated_values)
+/// that is supported by all spreadsheets and most databases for data exchange.
+///
+/// The sample below lists a simple hardcoded CSV within the table:
+///
+/// ```java
+/// Form hi = new Form(&quot;CSV Parsing&quot;, new BorderLayout());
+/// CSVParser parser = new CSVParser();
+/// try(Reader r = new com.codename1.io.CharArrayReader(&quot;1997,Ford,E350,\&quot;Super, \&quot;\&quot;luxurious\&quot;\&quot; truck\&quot;&quot;.toCharArray())) {
+///     String[][] data = parser.parse(r);
+///     String[] columnNames = new String[data[0].length];
+///     for(int iter=  0 ; iter &lt; columnNames.length ; iter++) {
+///         columnNames[iter] = &quot;Col &quot; + (iter + 1);
+///     }
+///     TableModel tm = new DefaultTableModel(columnNames, data);
+///     hi.add(BorderLayout.CENTER, new Table(tm));
+/// } catch(IOException err) {
+///     Log.e(err);
+/// }
+/// hi.show();
+/// ```
+///
+/// A large file does not have to be held in memory as a whole: `parse(Reader, RowHandler)`
+/// hands over one row at a time. That method is also the stricter of the two. It keeps
+/// empty lines as empty rows and keeps a trailing empty value, where the array returning
+/// methods skip both, as they always have.
+///
+/// Files that spreadsheets save differ in ways a file name does not tell: the separator
+/// follows the locale of the machine (a semicolon where the comma is the decimal mark) and
+/// &quot;Unicode text&quot; is tab separated UTF-16. `setDetectSeparator(boolean)` picks the separator
+/// from the content, and the `InputStream` methods read a UTF-16 byte order mark. A UTF-8 byte
+/// order mark is dropped by every method.
+public class CSVParser {
+    private static final int BOM = 0xFEFF;
+    private static final String SEPARATOR_CANDIDATES = &quot;,;\t|&quot;;
+    private char separatorChar;
+<span class="fc" id="L69">    private char quoteChar = '&quot;';</span>
+    private boolean detectSeparator;
+<span class="fc" id="L71">    private final char[] buffer = new char[8192];</span>
+    private Reader currentReader;
+<span class="fc" id="L73">    private int bufferSize = -1;</span>
+    private int bufferOffset;
+
+    /// Initializes a parser with the default comma (',') separator char
+    public CSVParser() {
+<span class="fc" id="L78">        this(',');</span>
+<span class="fc" id="L79">    }</span>
+
+    /// Allows creating a parser with a custom separator char
+    ///
+    /// #### Parameters
+    ///
+    /// - `separatorChar`: custom separator character such as semi-colon (';') etc.
+<span class="fc" id="L86">    public CSVParser(char separatorChar) {</span>
+<span class="fc" id="L87">        this.separatorChar = separatorChar;</span>
+<span class="fc" id="L88">    }</span>
+
+    /// The separator in use. After a parse with `setDetectSeparator(boolean)` on, this is the
+    /// separator that was detected.
+    ///
+    /// #### Returns
+    ///
+    /// the separator character
+    public char getSeparatorChar() {
+<span class="fc" id="L97">        return separatorChar;</span>
+    }
+
+    /// The character that encloses a value containing a separator or a line break, a double
+    /// quote unless changed.
+    ///
+    /// #### Returns
+    ///
+    /// the quote character
+    public char getQuoteChar() {
+<span class="nc" id="L107">        return quoteChar;</span>
+    }
+
+    /// Changes the character that encloses a value containing a separator or a line break.
+    /// Within such a value the character is written twice to stand for itself.
+    ///
+    /// #### Parameters
+    ///
+    /// - `quoteChar`: the quote character, a double quote by default
+    public void setQuoteChar(char quoteChar) {
+<span class="fc" id="L117">        this.quoteChar = quoteChar;</span>
+<span class="fc" id="L118">    }</span>
+
+    /// Whether the separator is picked from the content of each file.
+    ///
+    /// #### Returns
+    ///
+    /// true if the separator is detected
+    public boolean isDetectSeparator() {
+<span class="nc" id="L126">        return detectSeparator;</span>
+    }
+
+    /// Picks the separator from the content of each file instead of using the one this parser
+    /// was created with. A first line of the form `sep=;`, which spreadsheets write and read,
+    /// names the separator outright and is not returned as a row. Otherwise the comma, the
+    /// semicolon, the tab and the vertical bar are counted outside quoted values in the first
+    /// lines, and the one that splits every line into the same number of values wins. A file
+    /// where none of them appears keeps the separator this parser was created with.
+    ///
+    /// #### Parameters
+    ///
+    /// - `detectSeparator`: true to detect the separator
+    public void setDetectSeparator(boolean detectSeparator) {
+<span class="fc" id="L140">        this.detectSeparator = detectSeparator;</span>
+<span class="fc" id="L141">    }</span>
+
+    /// Picks the separator of a piece of separated text: the comma, the semicolon, the tab or
+    /// the vertical bar, whichever splits its lines most consistently. Quoted values are skipped,
+    /// so a comma inside a quoted address does not count.
+    ///
+    /// #### Parameters
+    ///
+    /// - `sample`: the beginning of the text, a few lines are enough
+    ///
+    /// - `fallback`: the answer when none of the candidates appears
+    ///
+    /// #### Returns
+    ///
+    /// the separator
+    public static char detectSeparator(String sample, char fallback) {
+<span class="fc" id="L157">        return detectSeparator(sample, '&quot;', fallback);</span>
+    }
+
+    private static char detectSeparator(String sample, char quote, char fallback) {
+<span class="fc" id="L161">        int candidates = SEPARATOR_CANDIDATES.length();</span>
+<span class="fc" id="L162">        char best = fallback;</span>
+<span class="fc" id="L163">        int bestScore = 0;</span>
+<span class="fc bfc" id="L164" title="All 2 branches covered.">        for (int c = 0; c &lt; candidates; c++) {</span>
+<span class="fc" id="L165">            char candidate = SEPARATOR_CANDIDATES.charAt(c);</span>
+<span class="fc" id="L166">            int score = separatorScore(sample, candidate, quote);</span>
+<span class="fc bfc" id="L167" title="All 2 branches covered.">            if (score &gt; bestScore) {</span>
+<span class="fc" id="L168">                bestScore = score;</span>
+<span class="fc" id="L169">                best = candidate;</span>
+            }
+        }
+<span class="fc" id="L172">        return best;</span>
+    }
+
+    /// A consistent candidate (the same count on every line) always beats an inconsistent
+    /// one, whatever the totals: free text is full of commas, and they are never the same
+    /// number on two lines.
+    private static int separatorScore(String sample, char candidate, char quote) {
+<span class="fc" id="L179">        int len = sample.length();</span>
+<span class="fc" id="L180">        int total = 0;</span>
+<span class="fc" id="L181">        int lines = 0;</span>
+<span class="fc" id="L182">        int lineCount = 0;</span>
+<span class="fc" id="L183">        int firstLineCount = -1;</span>
+<span class="fc" id="L184">        boolean consistent = true;</span>
+<span class="fc" id="L185">        boolean quoted = false;</span>
+<span class="fc" id="L186">        boolean lineHasText = false;</span>
+<span class="fc bfc" id="L187" title="All 4 branches covered.">        for (int i = 0; i &lt; len &amp;&amp; lines &lt; 20; i++) {</span>
+<span class="fc" id="L188">            char ch = sample.charAt(i);</span>
+<span class="fc bfc" id="L189" title="All 2 branches covered.">            if (ch == quote) {</span>
+<span class="fc bfc" id="L190" title="All 2 branches covered.">                quoted = !quoted;</span>
+<span class="fc" id="L191">                lineHasText = true;</span>
+<span class="fc bfc" id="L192" title="All 2 branches covered.">            } else if (quoted) {</span>
+<span class="fc" id="L193">                continue;</span>
+<span class="fc bfc" id="L194" title="All 4 branches covered.">            } else if (ch == '\n' || ch == '\r') {</span>
+<span class="fc bfc" id="L195" title="All 2 branches covered.">                if (lineHasText) {</span>
+<span class="fc" id="L196">                    lines++;</span>
+<span class="fc bfc" id="L197" title="All 2 branches covered.">                    if (firstLineCount &lt; 0) {</span>
+<span class="fc" id="L198">                        firstLineCount = lineCount;</span>
+<span class="fc bfc" id="L199" title="All 2 branches covered.">                    } else if (firstLineCount != lineCount) {</span>
+<span class="fc" id="L200">                        consistent = false;</span>
+                    }
+                }
+<span class="fc" id="L203">                lineCount = 0;</span>
+<span class="fc" id="L204">                lineHasText = false;</span>
+            } else {
+<span class="fc" id="L206">                lineHasText = true;</span>
+<span class="fc bfc" id="L207" title="All 2 branches covered.">                if (ch == candidate) {</span>
+<span class="fc" id="L208">                    lineCount++;</span>
+<span class="fc" id="L209">                    total++;</span>
+                }
+            }
+        }
+<span class="fc bfc" id="L213" title="All 2 branches covered.">        if (total == 0) {</span>
+<span class="fc" id="L214">            return 0;</span>
+        }
+        // the last line may be cut short by the end of the sample, so it is not held to the count
+<span class="fc bfc" id="L217" title="All 2 branches covered.">        if (firstLineCount &lt; 0) {</span>
+<span class="fc" id="L218">            firstLineCount = lineCount;</span>
+        }
+<span class="pc bpc" id="L220" title="1 of 4 branches missed.">        if (consistent &amp;&amp; firstLineCount &gt; 0) {</span>
+<span class="fc" id="L221">            return 1000000 + total;</span>
+        }
+<span class="fc" id="L223">        return total;</span>
+    }
+
+    /// Parses input from the given stream and returns the tokens broken into rows and columns.
+    /// The stream is read as UTF-8, without the byte order mark a file may start with, and as
+    /// UTF-16 when it starts with that encoding's byte order mark, as Excel's &quot;Unicode text&quot;
+    /// does. The mark is therefore never part of the first cell.
+    ///
+    /// #### Parameters
+    ///
+    /// - `r`: the input stream
+    ///
+    /// #### Returns
+    ///
+    /// array of rows and columns
+    public String[][] parse(InputStream r) throws IOException {
+<span class="fc" id="L239">        return parse(openReader(r));</span>
+    }
+
+    /// Parses input from the given stream one row at a time, see `parse(Reader, RowHandler)`.
+    /// The stream is read as UTF-8 unless it starts with a UTF-16 byte order mark.
+    ///
+    /// #### Parameters
+    ///
+    /// - `r`: the input stream, closed when the method returns
+    ///
+    /// - `handler`: receives the rows
+    ///
+    /// #### Throws
+    ///
+    /// - `java.io.IOException`: if the stream cannot be read
+    public void parse(InputStream r, RowHandler handler) throws IOException {
+<span class="fc" id="L255">        parse(openReader(r), handler);</span>
+<span class="fc" id="L256">    }</span>
+
+    /// Opens a stream as text. Spreadsheets save &quot;Unicode text&quot; as UTF-16 with a byte order
+    /// mark, and no encoding name passed by the caller could say which of the two orders a
+    /// file has, so the mark is read here. UTF-16 is decoded in this class: the encodings a
+    /// platform decodes by name are not the same everywhere.
+    private static Reader openReader(InputStream in) throws IOException {
+<span class="fc" id="L263">        int first = in.read();</span>
+<span class="fc bfc" id="L264" title="All 2 branches covered.">        if (first &lt; 0) {</span>
+<span class="fc" id="L265">            return Util.getReader(in);</span>
+        }
+<span class="fc" id="L267">        int second = in.read();</span>
+<span class="fc bfc" id="L268" title="All 2 branches covered.">        if (second &lt; 0) {</span>
+<span class="fc" id="L269">            return Util.getReader(new PrefixedInputStream(first, -1, in));</span>
+        }
+<span class="pc bpc" id="L271" title="1 of 4 branches missed.">        if (first == 0xFF &amp;&amp; second == 0xFE) {</span>
+<span class="fc" id="L272">            return new Utf16Reader(in, true);</span>
+        }
+<span class="pc bpc" id="L274" title="1 of 4 branches missed.">        if (first == 0xFE &amp;&amp; second == 0xFF) {</span>
+<span class="fc" id="L275">            return new Utf16Reader(in, false);</span>
+        }
+<span class="fc" id="L277">        return Util.getReader(new PrefixedInputStream(first, second, in));</span>
+    }
+
+    /// Parses input from the given stream and returns the tokens broken into rows and columns.
+    /// The stream is read as UTF-8, without the byte order mark a file may start with, and as
+    /// UTF-16 when it starts with that encoding's byte order mark, as Excel's &quot;Unicode text&quot;
+    /// does. The mark is therefore never part of the first cell.
+    ///
+    /// #### Parameters
+    ///
+    /// - `r`: the input stream
+    ///
+    /// - `encoding`: the encoding of the stream
+    ///
+    /// #### Returns
+    ///
+    /// array of rows and columns
+    public String[][] parse(InputStream r, String encoding) throws IOException {
+<span class="nc" id="L295">        return parse(new InputStreamReader(r, encoding));</span>
+    }
+
+    private int nextChar() throws IOException {
+<span class="fc" id="L299">        int response = peekNextChar();</span>
+<span class="fc" id="L300">        bufferOffset++;</span>
+<span class="fc" id="L301">        return response;</span>
+    }
+
+    private int peekNextChar() throws IOException {
+<span class="fc bfc" id="L305" title="All 2 branches covered.">        if (bufferOffset &gt;= bufferSize) {</span>
+<span class="fc" id="L306">            bufferSize = currentReader.read(buffer);</span>
+<span class="fc bfc" id="L307" title="All 2 branches covered.">            if (bufferSize == -1) {</span>
+<span class="fc" id="L308">                return -1;</span>
+            }
+<span class="fc" id="L310">            bufferOffset = 0;</span>
+        }
+<span class="fc" id="L312">        return buffer[bufferOffset];</span>
+    }
+
+    /// Parses input from the given reader and returns the tokens broken into rows and columns
+    ///
+    /// #### Parameters
+    ///
+    /// - `r`: the reader stream
+    ///
+    /// #### Returns
+    ///
+    /// array of rows and columns
+    public String[][] parse(Reader r) throws IOException {
+<span class="fc" id="L325">        currentReader = r;</span>
+<span class="fc" id="L326">        StringBuilder stringBuf = new StringBuilder();</span>
+<span class="fc" id="L327">        boolean isQuoteMode = false;</span>
+<span class="fc" id="L328">        Vector returnValue = new Vector();</span>
+<span class="fc" id="L329">        Vector currentVector = new Vector();</span>
+<span class="fc" id="L330">        returnValue.addElement(currentVector);</span>
+<span class="fc bfc" id="L331" title="All 2 branches covered.">        if (detectSeparator) {</span>
+<span class="fc" id="L332">            prefill();</span>
+        }
+<span class="fc" id="L334">        int currentChar = nextChar();</span>
+<span class="fc bfc" id="L335" title="All 2 branches covered.">        if (currentChar == BOM) {</span>
+<span class="fc" id="L336">            currentChar = nextChar();</span>
+        }
+<span class="pc bpc" id="L338" title="1 of 4 branches missed.">        if (detectSeparator &amp;&amp; currentChar &gt; -1) {</span>
+            // nextChar() already consumed the first character, the detection reads the buffer
+<span class="fc" id="L340">            bufferOffset--;</span>
+<span class="fc" id="L341">            detectFromBuffer();</span>
+<span class="fc" id="L342">            currentChar = nextChar();</span>
+        }
+<span class="fc bfc" id="L344" title="All 2 branches covered.">        while (currentChar &gt; -1) {</span>
+<span class="fc bfc" id="L345" title="All 2 branches covered.">            if (isQuoteMode) {</span>
+<span class="fc bfc" id="L346" title="All 2 branches covered.">                if (currentChar == quoteChar) {</span>
+<span class="fc" id="L347">                    int next = peekNextChar();</span>
+<span class="fc bfc" id="L348" title="All 2 branches covered.">                    if (next == quoteChar) {</span>
+<span class="fc" id="L349">                        stringBuf.append(quoteChar);</span>
+<span class="fc" id="L350">                        nextChar();</span>
+                    } else {
+<span class="fc" id="L352">                        isQuoteMode = false;</span>
+                    }
+<span class="fc" id="L354">                } else {</span>
+<span class="fc" id="L355">                    stringBuf.append((char) currentChar);</span>
+                }
+            } else {
+<span class="fc bfc" id="L358" title="All 2 branches covered.">                if (stringBuf.length() == 0) {</span>
+<span class="fc bfc" id="L359" title="All 2 branches covered.">                    if (currentChar == quoteChar) {</span>
+<span class="fc" id="L360">                        isQuoteMode = true;</span>
+<span class="fc" id="L361">                        currentChar = nextChar();</span>
+<span class="fc" id="L362">                        continue;</span>
+                    }
+                }
+<span class="fc bfc" id="L365" title="All 2 branches covered.">                if (currentChar == separatorChar) {</span>
+<span class="fc" id="L366">                    currentVector.addElement(stringBuf.toString());</span>
+<span class="fc" id="L367">                    stringBuf.setLength(0);</span>
+<span class="fc" id="L368">                    currentChar = nextChar();</span>
+<span class="fc" id="L369">                    continue;</span>
+                }
+<span class="fc bfc" id="L371" title="All 4 branches covered.">                if (currentChar == 10 || currentChar == 13) {</span>
+<span class="fc bfc" id="L372" title="All 4 branches covered.">                    while (currentChar == 10 || currentChar == 13) {</span>
+<span class="fc" id="L373">                        currentChar = nextChar();</span>
+                    }
+<span class="fc" id="L375">                    currentVector.addElement(stringBuf.toString());</span>
+<span class="fc" id="L376">                    stringBuf.setLength(0);</span>
+<span class="fc" id="L377">                    currentVector = new Vector();</span>
+<span class="fc" id="L378">                    returnValue.addElement(currentVector);</span>
+<span class="fc" id="L379">                    continue;</span>
+                }
+<span class="fc" id="L381">                stringBuf.append((char) currentChar);</span>
+            }
+<span class="fc" id="L383">            currentChar = nextChar();</span>
+        }
+<span class="fc bfc" id="L385" title="All 2 branches covered.">        if (stringBuf.length() &gt; 0) {</span>
+<span class="fc" id="L386">            currentVector.addElement(stringBuf.toString());</span>
+        }
+<span class="fc" id="L388">        String[][] actualReturnValue = new String[returnValue.size()][];</span>
+<span class="fc" id="L389">        int arlen = actualReturnValue.length;</span>
+<span class="fc bfc" id="L390" title="All 2 branches covered.">        for (int iter = 0; iter &lt; arlen; iter++) {</span>
+<span class="fc" id="L391">            Vector e = (Vector) returnValue.elementAt(iter);</span>
+<span class="fc" id="L392">            actualReturnValue[iter] = new String[e.size()];</span>
+<span class="fc" id="L393">            int arlen2 = actualReturnValue[iter].length;</span>
+<span class="fc bfc" id="L394" title="All 2 branches covered.">            for (int i = 0; i &lt; arlen2; i++) {</span>
+<span class="fc" id="L395">                actualReturnValue[iter][i] = (String) e.elementAt(i);</span>
+            }
+        }
+<span class="fc" id="L398">        currentReader.close();</span>
+<span class="fc" id="L399">        currentReader = null;</span>
+<span class="fc" id="L400">        return actualReturnValue;</span>
+    }
+
+    /// Parses input from the given reader one row at a time, without holding the file in
+    /// memory.
+    ///
+    /// This method reads the way a spreadsheet does, which differs from the array returning
+    /// methods in three places: an empty line is a row with no values, where they skip it; a
+    /// separator at the very end of the file is followed by an empty value, where they drop
+    /// it; and a line ending in CR LF ends one row. A quoted value may contain separators and
+    /// line breaks, and the quote character written twice inside it stands for itself.
+    ///
+    /// #### Parameters
+    ///
+    /// - `r`: the reader, closed when the method returns
+    ///
+    /// - `handler`: receives the rows
+    ///
+    /// #### Throws
+    ///
+    /// - `java.io.IOException`: if an exception is thrown by the reader
+    public void parse(Reader r, RowHandler handler) throws IOException {
+<span class="fc" id="L422">        currentReader = r;</span>
+        try {
+<span class="fc" id="L424">            prefill();</span>
+<span class="pc bpc" id="L425" title="1 of 2 branches missed.">            if (peekNextChar() == BOM) {</span>
+<span class="nc" id="L426">                nextChar();</span>
+            }
+<span class="fc bfc" id="L428" title="All 2 branches covered.">            if (detectSeparator) {</span>
+<span class="fc" id="L429">                detectFromBuffer();</span>
+            }
+<span class="fc" id="L431">            ArrayList&lt;String&gt; row = new ArrayList&lt;String&gt;();</span>
+<span class="fc" id="L432">            StringBuilder value = new StringBuilder();</span>
+<span class="fc" id="L433">            boolean quoted = false;</span>
+            // a quoted empty value (&quot;&quot;) has no characters, yet it is a value
+<span class="fc" id="L435">            boolean valueStarted = false;</span>
+<span class="fc" id="L436">            boolean rowStarted = false;</span>
+<span class="fc" id="L437">            int index = 0;</span>
+<span class="fc" id="L438">            int c = nextChar();</span>
+<span class="fc bfc" id="L439" title="All 2 branches covered.">            while (c &gt; -1) {</span>
+<span class="fc bfc" id="L440" title="All 2 branches covered.">                if (quoted) {</span>
+<span class="fc bfc" id="L441" title="All 2 branches covered.">                    if (c == quoteChar) {</span>
+<span class="fc bfc" id="L442" title="All 2 branches covered.">                        if (peekNextChar() == quoteChar) {</span>
+<span class="fc" id="L443">                            value.append(quoteChar);</span>
+<span class="fc" id="L444">                            nextChar();</span>
+                        } else {
+<span class="fc" id="L446">                            quoted = false;</span>
+                        }
+                    } else {
+<span class="fc" id="L449">                        value.append((char) c);</span>
+                    }
+<span class="pc bpc" id="L451" title="1 of 4 branches missed.">                } else if (c == quoteChar &amp;&amp; !valueStarted) {</span>
+<span class="fc" id="L452">                    quoted = true;</span>
+<span class="fc" id="L453">                    valueStarted = true;</span>
+<span class="fc bfc" id="L454" title="All 2 branches covered.">                } else if (c == separatorChar) {</span>
+<span class="fc" id="L455">                    row.add(value.toString());</span>
+<span class="fc" id="L456">                    value.setLength(0);</span>
+<span class="fc" id="L457">                    valueStarted = false;</span>
+<span class="fc" id="L458">                    rowStarted = true;</span>
+<span class="fc bfc" id="L459" title="All 4 branches covered.">                } else if (c == '\n' || c == '\r') {</span>
+<span class="pc bpc" id="L460" title="1 of 4 branches missed.">                    if (c == '\r' &amp;&amp; peekNextChar() == '\n') {</span>
+<span class="fc" id="L461">                        nextChar();</span>
+                    }
+<span class="fc bfc" id="L463" title="All 4 branches covered.">                    if (rowStarted || valueStarted) {</span>
+<span class="fc" id="L464">                        row.add(value.toString());</span>
+                    }
+<span class="fc" id="L466">                    value.setLength(0);</span>
+<span class="fc" id="L467">                    valueStarted = false;</span>
+<span class="fc" id="L468">                    rowStarted = false;</span>
+<span class="fc" id="L469">                    String[] cells = new String[row.size()];</span>
+<span class="fc" id="L470">                    row.toArray(cells);</span>
+<span class="fc" id="L471">                    row.clear();</span>
+<span class="fc bfc" id="L472" title="All 2 branches covered.">                    if (!handler.row(index, cells)) {</span>
+<span class="fc" id="L473">                        return;</span>
+                    }
+<span class="fc" id="L475">                    index++;</span>
+<span class="fc" id="L476">                } else {</span>
+<span class="fc" id="L477">                    value.append((char) c);</span>
+<span class="fc" id="L478">                    valueStarted = true;</span>
+                }
+<span class="fc" id="L480">                c = nextChar();</span>
+            }
+<span class="pc bpc" id="L482" title="1 of 4 branches missed.">            if (rowStarted || valueStarted) {</span>
+<span class="fc" id="L483">                row.add(value.toString());</span>
+<span class="fc" id="L484">                String[] cells = new String[row.size()];</span>
+<span class="fc" id="L485">                row.toArray(cells);</span>
+<span class="fc" id="L486">                handler.row(index, cells);</span>
+            }
+        } finally {
+<span class="fc" id="L489">            currentReader = null;</span>
+<span class="fc" id="L490">            bufferSize = -1;</span>
+<span class="fc" id="L491">            bufferOffset = 0;</span>
+<span class="fc" id="L492">            r.close();</span>
+        }
+<span class="fc" id="L494">    }</span>
+
+    /// Fills the buffer as far as the reader allows, so that separator detection has more than
+    /// the few characters a single read may return.
+    private void prefill() throws IOException {
+<span class="fc" id="L499">        int total = 0;</span>
+<span class="fc bfc" id="L500" title="All 2 branches covered.">        while (total &lt; buffer.length) {</span>
+<span class="fc" id="L501">            int n = currentReader.read(buffer, total, buffer.length - total);</span>
+<span class="fc bfc" id="L502" title="All 2 branches covered.">            if (n &lt;= 0) {</span>
+<span class="fc" id="L503">                break;</span>
+            }
+<span class="fc" id="L505">            total += n;</span>
+<span class="fc" id="L506">        }</span>
+<span class="fc" id="L507">        bufferSize = total;</span>
+<span class="fc" id="L508">        bufferOffset = 0;</span>
+<span class="fc" id="L509">    }</span>
+
+    /// Sets the separator from what the buffer holds, starting at the current offset.
+    private void detectFromBuffer() {
+<span class="fc" id="L513">        int available = bufferSize - bufferOffset;</span>
+<span class="fc bfc" id="L514" title="All 2 branches covered.">        if (available &lt;= 0) {</span>
+<span class="fc" id="L515">            return;</span>
+        }
+<span class="fc" id="L517">        StringBuilder sample = new StringBuilder(available);</span>
+<span class="fc" id="L518">        sample.append(buffer, bufferOffset, available);</span>
+<span class="fc" id="L519">        String text = sample.toString();</span>
+<span class="pc bpc" id="L520" title="1 of 4 branches missed.">        if (text.length() &gt; 5 &amp;&amp; text.regionMatches(true, 0, &quot;sep=&quot;, 0, 4)) {</span>
+<span class="fc" id="L521">            char after = text.charAt(5);</span>
+            // &quot;sep=&quot; and an empty line is not a separator: a line ending separates nothing
+<span class="pc bpc" id="L523" title="3 of 8 branches missed.">            if ((after == '\n' || after == '\r') &amp;&amp; text.charAt(4) != '\n' &amp;&amp; text.charAt(4) != '\r') {</span>
+<span class="fc" id="L524">                separatorChar = text.charAt(4);</span>
+<span class="fc" id="L525">                int skip = 6;</span>
+<span class="pc bpc" id="L526" title="2 of 6 branches missed.">                if (after == '\r' &amp;&amp; text.length() &gt; 6 &amp;&amp; text.charAt(6) == '\n') {</span>
+<span class="fc" id="L527">                    skip = 7;</span>
+                }
+<span class="fc" id="L529">                bufferOffset += skip;</span>
+<span class="fc" id="L530">                return;</span>
+            }
+        }
+<span class="fc" id="L533">        separatorChar = detectSeparator(text, quoteChar, separatorChar);</span>
+<span class="fc" id="L534">    }</span>
+
+    /// Receives the rows of `parse(Reader, RowHandler)` as they are read.
+    public interface RowHandler {
+        /// Invoked for every row of the file, in order.
+        ///
+        /// #### Parameters
+        ///
+        /// - `index`: the zero based index of the row
+        ///
+        /// - `cells`: the values of the row, an empty array for an empty line
+        ///
+        /// #### Returns
+        ///
+        /// true to go on reading, false to stop
+        boolean row(int index, String[] cells);
+    }
+
+    /// Replays the bytes that were read to look for a byte order mark and were not one.
+    private static final class PrefixedInputStream extends InputStream {
+        private final InputStream in;
+        private int first;
+        private int second;
+
+<span class="fc" id="L558">        PrefixedInputStream(int first, int second, InputStream in) {</span>
+<span class="fc" id="L559">            this.first = first;</span>
+<span class="fc" id="L560">            this.second = second;</span>
+<span class="fc" id="L561">            this.in = in;</span>
+<span class="fc" id="L562">        }</span>
+
+        @Override
+        public int read() throws IOException {
+<span class="pc bpc" id="L566" title="1 of 2 branches missed.">            if (first &gt;= 0) {</span>
+<span class="fc" id="L567">                int b = first;</span>
+<span class="fc" id="L568">                first = second;</span>
+<span class="fc" id="L569">                second = -1;</span>
+<span class="fc" id="L570">                return b;</span>
+            }
+<span class="nc" id="L572">            return in.read();</span>
+        }
+
+        @Override
+        public int read(byte[] b, int off, int len) throws IOException {
+<span class="pc bpc" id="L577" title="1 of 2 branches missed.">            if (len == 0) {</span>
+<span class="nc" id="L578">                return 0;</span>
+            }
+<span class="fc bfc" id="L580" title="All 2 branches covered.">            if (first &gt;= 0) {</span>
+<span class="fc" id="L581">                int count = 0;</span>
+<span class="pc bpc" id="L582" title="1 of 4 branches missed.">                while (first &gt;= 0 &amp;&amp; count &lt; len) {</span>
+<span class="fc" id="L583">                    b[off + count] = (byte) read();</span>
+<span class="fc" id="L584">                    count++;</span>
+                }
+<span class="fc" id="L586">                return count;</span>
+            }
+<span class="fc" id="L588">            return in.read(b, off, len);</span>
+        }
+
+        @Override
+        public void close() throws IOException {
+<span class="fc" id="L593">            in.close();</span>
+<span class="fc" id="L594">        }</span>
+    }
+
+    /// Decodes UTF-16, two bytes to a character. Surrogate pairs need nothing more: each half
+    /// is a character of its own in a Java string as well.
+    private static final class Utf16Reader extends Reader {
+        private final InputStream in;
+        private final boolean littleEndian;
+<span class="fc" id="L602">        private final byte[] bytes = new byte[4096];</span>
+<span class="fc" id="L603">        private int pending = -1;</span>
+
+<span class="fc" id="L605">        Utf16Reader(InputStream in, boolean littleEndian) {</span>
+<span class="fc" id="L606">            this.in = in;</span>
+<span class="fc" id="L607">            this.littleEndian = littleEndian;</span>
+<span class="fc" id="L608">        }</span>
+
+        @Override
+        public int read(char[] cbuf, int off, int len) throws IOException {
+<span class="pc bpc" id="L612" title="1 of 2 branches missed.">            if (len == 0) {</span>
+<span class="nc" id="L613">                return 0;</span>
+            }
+<span class="fc" id="L615">            int count = 0;</span>
+<span class="fc bfc" id="L616" title="All 2 branches covered.">            while (count == 0) {</span>
+<span class="fc" id="L617">                int want = Math.min(bytes.length, len * 2);</span>
+<span class="fc" id="L618">                int start = 0;</span>
+<span class="pc bpc" id="L619" title="1 of 2 branches missed.">                if (pending &gt;= 0) {</span>
+<span class="nc" id="L620">                    bytes[0] = (byte) pending;</span>
+<span class="nc" id="L621">                    pending = -1;</span>
+<span class="nc" id="L622">                    start = 1;</span>
+                }
+<span class="fc" id="L624">                int n = in.read(bytes, start, want - start);</span>
+<span class="fc bfc" id="L625" title="All 2 branches covered.">                if (n &lt; 0) {</span>
+                    // a single byte left over at the end of the file is not a character
+<span class="fc" id="L627">                    return -1;</span>
+                }
+<span class="fc" id="L629">                int total = start + n;</span>
+<span class="fc" id="L630">                int pairs = total / 2;</span>
+<span class="fc bfc" id="L631" title="All 2 branches covered.">                for (int i = 0; i &lt; pairs; i++) {</span>
+<span class="fc" id="L632">                    int a = bytes[i * 2] &amp; 0xFF;</span>
+<span class="fc" id="L633">                    int b = bytes[i * 2 + 1] &amp; 0xFF;</span>
+<span class="fc bfc" id="L634" title="All 2 branches covered.">                    cbuf[off + count] = (char) (littleEndian ? (b &lt;&lt; 8) | a : (a &lt;&lt; 8) | b);</span>
+<span class="fc" id="L635">                    count++;</span>
+                }
+<span class="pc bpc" id="L637" title="1 of 2 branches missed.">                if ((total &amp; 1) == 1) {</span>
+<span class="nc" id="L638">                    pending = bytes[total - 1] &amp; 0xFF;</span>
+                }
+<span class="fc" id="L640">            }</span>
+<span class="fc" id="L641">            return count;</span>
+        }
+
+        @Override
+        public void close() throws IOException {
+<span class="fc" id="L646">            in.close();</span>
+<span class="fc" id="L647">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

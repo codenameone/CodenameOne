@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>GridCell.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.table</a> &gt; <span class="el_source">GridCell.java</span></div><h1>GridCell.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ui.table;
+
+import com.codename1.ui.plaf.Style;
+
+/// One cell of a `DataGrid` as a renderer or an editor sees it.
+///
+/// The grid hands the same object out for every cell it paints, so a cell is
+/// read where it is given and never kept.
+public final class GridCell {
+    DataGrid grid;
+    int row;
+    GridColumn column;
+    Object value;
+    boolean rowSelected;
+    boolean lead;
+    boolean group;
+    boolean editable;
+    int depth;
+    Style style;
+
+<span class="fc" id="L43">    GridCell() {</span>
+<span class="fc" id="L44">    }</span>
+
+    /// The grid the cell is in.
+    public DataGrid getGrid() {
+<span class="fc" id="L48">        return grid;</span>
+    }
+
+    /// The view row: an index into what the grid shows, not into the model.
+    public int getRow() {
+<span class="fc" id="L53">        return row;</span>
+    }
+
+    /// The column the cell is in.
+    public GridColumn getColumn() {
+<span class="fc" id="L58">        return column;</span>
+    }
+
+    /// The value the cell shows; for a group row, the group's key in the
+    /// grouped column, an aggregate in a column with one, and null elsewhere.
+    public Object getValue() {
+<span class="fc" id="L64">        return value;</span>
+    }
+
+    /// Whether the cell's row is selected.
+    public boolean isRowSelected() {
+<span class="nc" id="L69">        return rowSelected;</span>
+    }
+
+    /// Whether this is the cell the keyboard is on.
+    public boolean isLead() {
+<span class="nc" id="L74">        return lead;</span>
+    }
+
+    /// Whether the cell is on a group row.
+    public boolean isGroupRow() {
+<span class="fc" id="L79">        return group;</span>
+    }
+
+    /// Whether the cell may be edited.
+    public boolean isEditable() {
+<span class="fc" id="L84">        return editable;</span>
+    }
+
+    /// How deep the row is in a tree, or 1 for a row under a group.
+    public int getDepth() {
+<span class="nc" id="L89">        return depth;</span>
+    }
+
+    /// The style the row is painted with: its colours, font and padding.
+    public Style getStyle() {
+<span class="fc" id="L94">        return style;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

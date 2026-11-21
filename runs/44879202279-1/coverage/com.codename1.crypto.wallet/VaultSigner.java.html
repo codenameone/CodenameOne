@@ -1,0 +1,167 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>VaultSigner.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.crypto.wallet</a> &gt; <span class="el_source">VaultSigner.java</span></div><h1>VaultSigner.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008-2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.crypto.wallet;
+
+import com.codename1.crypto.hd.DerivationPath;
+import com.codename1.crypto.hd.Mnemonic;
+import com.codename1.security.Secp256k1;
+import com.codename1.security.vault.Vault;
+import com.codename1.util.AsyncResource;
+
+/// A [Signer] whose mnemonic is sealed in a [Vault], so it is at rest only as ciphertext under
+/// the user's password, and on a remembered device under the platform key store (which on iOS
+/// and Android can require biometrics to release). It signs only while the vault is unlocked:
+/// the first signature after an unlock reads the mnemonic and derives the seed, and the seed is
+/// wiped as soon as a call finds the vault locked again.
+///
+/// ```java
+/// Vault vault = Vault.named(&quot;wallet&quot;);
+/// char[] password = &quot;what the user typed&quot;.toCharArray();
+/// vault.unlockWithPassword(password).get();
+/// VaultSigner.store(vault, &quot;main&quot;, Mnemonic.generate(256), &quot;&quot;).get();
+/// Wallet wallet = new Wallet(new VaultSigner(vault, &quot;main&quot;));
+/// ```
+///
+/// Client only: the backend keeps keys in a key service, not a user vault. A mnemonic passes
+/// through a `String` on its way to the seed derivation, which the garbage collector, not this
+/// class, eventually clears.
+public final class VaultSigner implements Signer {
+    private static final String MNEMONIC = &quot;.mnemonic&quot;;
+    private static final String PASSPHRASE = &quot;.passphrase&quot;;
+
+    private final Vault vault;
+    private final String name;
+    private SeedSigner seed;
+
+    /// A signer over the mnemonic stored in a vault under a name by [#store].
+<span class="fc" id="L57">    public VaultSigner(Vault vault, String name) {</span>
+<span class="pc bpc" id="L58" title="2 of 4 branches missed.">        if (vault == null || name == null) {</span>
+<span class="nc" id="L59">            throw new IllegalArgumentException(&quot;vault and name are required&quot;);</span>
+        }
+<span class="fc" id="L61">        this.vault = vault;</span>
+<span class="fc" id="L62">        this.name = name;</span>
+<span class="fc" id="L63">    }</span>
+
+    /// Seals a mnemonic and its BIP-39 passphrase into an unlocked vault under a name.
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: for a mnemonic whose words or checksum are wrong
+    public static AsyncResource&lt;Boolean&gt; store(final Vault vault, final String name, String mnemonic,
+            String passphrase) {
+<span class="pc bpc" id="L72" title="1 of 2 branches missed.">        if (!Mnemonic.isValid(mnemonic)) {</span>
+<span class="nc" id="L73">            throw new IllegalArgumentException(&quot;not a valid BIP-39 mnemonic&quot;);</span>
+        }
+<span class="pc bpc" id="L75" title="1 of 2 branches missed.">        final char[] pass = (passphrase == null ? &quot;&quot; : passphrase).toCharArray();</span>
+<span class="fc" id="L76">        final AsyncResource&lt;Boolean&gt; out = new AsyncResource&lt;Boolean&gt;();</span>
+<span class="fc" id="L77">        vault.putSecret(name + MNEMONIC, mnemonic.toCharArray()).ready(new com.codename1.util.SuccessCallback&lt;Boolean&gt;() {</span>
+            @Override
+            public void onSucess(Boolean ok) {
+<span class="fc" id="L80">                vault.putSecret(name + PASSPHRASE, pass).onResult(new com.codename1.util.AsyncResult&lt;Boolean&gt;() {</span>
+                    @Override
+                    public void onReady(Boolean value, Throwable error) {
+<span class="pc bpc" id="L83" title="1 of 2 branches missed.">                        if (error != null) {</span>
+<span class="nc" id="L84">                            out.error(error);</span>
+                        } else {
+<span class="fc" id="L86">                            out.complete(value);</span>
+                        }
+<span class="fc" id="L88">                    }</span>
+                });
+<span class="fc" id="L90">            }</span>
+<span class="fc" id="L91">        }).except(new com.codename1.util.SuccessCallback&lt;Throwable&gt;() {</span>
+            @Override
+            public void onSucess(Throwable t) {
+<span class="nc" id="L94">                out.error(t);</span>
+<span class="nc" id="L95">            }</span>
+        });
+<span class="fc" id="L97">        return out;</span>
+    }
+
+    /// The stored mnemonic, for the user to write down. The caller should clear the array.
+    public AsyncResource&lt;char[]&gt; revealMnemonic() {
+<span class="fc" id="L102">        return vault.getSecret(name + MNEMONIC);</span>
+    }
+
+    /// Wipes the derived seed now; the next signature reads it from the vault again.
+    public void forget() {
+<span class="pc bpc" id="L107" title="1 of 2 branches missed.">        if (seed != null) {</span>
+<span class="fc" id="L108">            seed.destroy();</span>
+<span class="fc" id="L109">            seed = null;</span>
+        }
+<span class="fc" id="L111">    }</span>
+
+    private SeedSigner seed() {
+<span class="fc bfc" id="L114" title="All 2 branches covered.">        if (!vault.isUnlocked()) {</span>
+<span class="fc" id="L115">            forget();</span>
+<span class="fc" id="L116">            throw new IllegalStateException(&quot;the vault is locked&quot;);</span>
+        }
+<span class="pc bpc" id="L118" title="1 of 2 branches missed.">        if (seed == null) {</span>
+<span class="fc" id="L119">            char[] words = vault.getSecret(name + MNEMONIC).get();</span>
+<span class="fc" id="L120">            char[] pass = vault.getSecret(name + PASSPHRASE).get();</span>
+            try {
+<span class="fc" id="L122">                seed = SeedSigner.fromMnemonic(new String(words), new String(pass));</span>
+            } finally {
+<span class="fc" id="L124">                clear(words);</span>
+<span class="fc" id="L125">                clear(pass);</span>
+            }
+        }
+<span class="fc" id="L128">        return seed;</span>
+    }
+
+    private static void clear(char[] c) {
+<span class="fc bfc" id="L132" title="All 2 branches covered.">        for (int i = 0; i &lt; c.length; i++) {</span>
+<span class="fc" id="L133">            c[i] = ' ';</span>
+        }
+<span class="fc" id="L135">    }</span>
+
+    @Override
+    public int getMasterFingerprint() {
+<span class="nc" id="L139">        return seed().getMasterFingerprint();</span>
+    }
+
+    @Override
+    public byte[] getSecp256k1PublicKey(DerivationPath path) {
+<span class="fc" id="L144">        return seed().getSecp256k1PublicKey(path);</span>
+    }
+
+    @Override
+    public Secp256k1.EcdsaSignature signSecp256k1(DerivationPath path, byte[] hash32) {
+<span class="nc" id="L149">        return seed().signSecp256k1(path, hash32);</span>
+    }
+
+    @Override
+    public byte[] signTaproot(DerivationPath path, byte[] sighash, byte[] merkleRoot) {
+<span class="nc" id="L154">        return seed().signTaproot(path, sighash, merkleRoot);</span>
+    }
+
+    @Override
+    public byte[] getEd25519PublicKey(DerivationPath path) {
+<span class="fc" id="L159">        return seed().getEd25519PublicKey(path);</span>
+    }
+
+    @Override
+    public byte[] signEd25519(DerivationPath path, byte[] message) {
+<span class="nc" id="L164">        return seed().signEd25519(path, message);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

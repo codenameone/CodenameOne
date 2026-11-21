@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>GridAggregate.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.table</a> &gt; <span class="el_source">GridAggregate.java</span></div><h1>GridAggregate.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ui.table;
+
+/// What a group row of a `DataGrid` shows in a column: the values of the
+/// group's rows folded into one.
+///
+/// `fold` is called once per row of the group, in order, with what it
+/// returned for the rows before; the first call gets null. `finish` turns
+/// the last result into what is shown. An aggregate keeps no state of its
+/// own, so one instance serves every group and every column.
+<span class="fc" id="L32">public abstract class GridAggregate {</span>
+
+    /// The sum of the numbers; other values are skipped.
+<span class="fc" id="L35">    public static final GridAggregate SUM = new Numeric(Numeric.SUM);</span>
+
+    /// The mean of the numbers; other values are skipped.
+<span class="fc" id="L38">    public static final GridAggregate AVERAGE = new Numeric(Numeric.AVERAGE);</span>
+
+    /// The smallest value in the column's order.
+<span class="fc" id="L41">    public static final GridAggregate MIN = new Extreme(false);</span>
+
+    /// The largest value in the column's order.
+<span class="fc" id="L44">    public static final GridAggregate MAX = new Extreme(true);</span>
+
+    /// How many rows have a value that is not null.
+<span class="fc" id="L47">    public static final GridAggregate COUNT = new Numeric(Numeric.COUNT);</span>
+
+    /// Folds one more value into the result so far.
+    ///
+    /// #### Parameters
+    ///
+    /// - `column`: the column, for its order
+    /// - `soFar`: what the previous call returned, null on the first
+    /// - `value`: the row's value
+    public abstract Object fold(GridColumn column, Object soFar, Object value);
+
+    /// What is shown for the folded result; by default the result itself.
+    public Object finish(Object soFar) {
+<span class="fc" id="L60">        return soFar;</span>
+    }
+
+    private static final class Numeric extends GridAggregate {
+        static final int SUM = 0;
+        static final int AVERAGE = 1;
+        static final int COUNT = 2;
+        private final int op;
+
+<span class="fc" id="L69">        Numeric(int op) {</span>
+<span class="fc" id="L70">            this.op = op;</span>
+<span class="fc" id="L71">        }</span>
+
+        @Override
+        public Object fold(GridColumn column, Object soFar, Object value) {
+<span class="fc bfc" id="L75" title="All 2 branches covered.">            double[] acc = soFar instanceof double[] ? (double[]) soFar : new double[3];</span>
+<span class="fc bfc" id="L76" title="All 2 branches covered.">            if (op == COUNT) {</span>
+<span class="fc bfc" id="L77" title="All 2 branches covered.">                if (value != null) {</span>
+<span class="fc" id="L78">                    acc[1]++;</span>
+                }
+<span class="fc bfc" id="L80" title="All 2 branches covered.">            } else if (value instanceof Number) {</span>
+<span class="fc" id="L81">                acc[0] += ((Number) value).doubleValue();</span>
+<span class="fc" id="L82">                acc[1]++;</span>
+<span class="pc bpc" id="L83" title="2 of 4 branches missed.">                if (!(value instanceof Double || value instanceof Float)) {</span>
+<span class="fc" id="L84">                    acc[2] = 1;</span>
+                }
+            }
+<span class="fc" id="L87">            return acc;</span>
+        }
+
+        @Override
+        public Object finish(Object soFar) {
+<span class="pc bpc" id="L92" title="1 of 2 branches missed.">            if (!(soFar instanceof double[])) {</span>
+<span class="nc bnc" id="L93" title="All 2 branches missed.">                return op == COUNT ? Integer.valueOf(0) : null;</span>
+            }
+<span class="fc" id="L95">            double[] acc = (double[]) soFar;</span>
+<span class="fc bfc" id="L96" title="All 2 branches covered.">            if (op == COUNT) {</span>
+<span class="fc" id="L97">                return Integer.valueOf((int) acc[1]);</span>
+            }
+<span class="pc bpc" id="L99" title="1 of 2 branches missed.">            if (acc[1] == 0) {</span>
+<span class="nc" id="L100">                return null;</span>
+            }
+<span class="fc bfc" id="L102" title="All 2 branches covered.">            if (op == AVERAGE) {</span>
+<span class="fc" id="L103">                return Double.valueOf(acc[0] / acc[1]);</span>
+            }
+            // A sum of whole numbers stays whole.
+<span class="pc bpc" id="L106" title="2 of 4 branches missed.">            if (acc[2] != 0 &amp;&amp; Math.abs(acc[0]) &lt; 9.0e15) {</span>
+<span class="fc" id="L107">                return Long.valueOf((long) acc[0]);</span>
+            }
+<span class="nc" id="L109">            return Double.valueOf(acc[0]);</span>
+        }
+    }
+
+    private static final class Extreme extends GridAggregate {
+        private final boolean max;
+
+<span class="fc" id="L116">        Extreme(boolean max) {</span>
+<span class="fc" id="L117">            this.max = max;</span>
+<span class="fc" id="L118">        }</span>
+
+        @Override
+        public Object fold(GridColumn column, Object soFar, Object value) {
+<span class="fc bfc" id="L122" title="All 2 branches covered.">            if (value == null) {</span>
+<span class="fc" id="L123">                return soFar;</span>
+            }
+<span class="fc bfc" id="L125" title="All 2 branches covered.">            if (soFar == null) {</span>
+<span class="fc" id="L126">                return value;</span>
+            }
+<span class="fc" id="L128">            int c = column.compare(value, soFar);</span>
+<span class="fc bfc" id="L129" title="All 6 branches covered.">            return (max ? c &gt; 0 : c &lt; 0) ? value : soFar;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

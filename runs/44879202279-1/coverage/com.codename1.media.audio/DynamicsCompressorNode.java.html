@@ -1,0 +1,216 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DynamicsCompressorNode.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.media.audio</a> &gt; <span class="el_source">DynamicsCompressorNode.java</span></div><h1>DynamicsCompressorNode.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.media.audio;
+
+import com.codename1.util.MathUtil;
+
+import java.util.concurrent.atomic.AtomicInteger;
+
+/// Lowers the volume of loud passages so the mix stays clear of clipping: the
+/// Web Audio `DynamicsCompressorNode`.
+///
+/// Every parameter is k-rate. The detector follows the loudest channel, the
+/// gain curve has a soft knee [#getKnee()] decibels wide centred on
+/// [#getThreshold()], and gain changes are smoothed by [#getAttack()] and
+/// [#getRelease()]. As in browsers the signal is delayed by a 6 ms look-ahead
+/// and a make-up gain raises the result so that a full-scale signal comes out
+/// near full scale. The specification leaves the exact curve to the
+/// implementation, so values match browsers in shape, not to the sample.
+///
+/// ```java
+/// OfflineAudioContext audio = new OfflineAudioContext(2, 44100, 44100);
+/// GainNode mix = audio.createGain();
+/// DynamicsCompressorNode comp = audio.createDynamicsCompressor();
+/// comp.getThreshold().setValue(-18);
+/// comp.getRatio().setValue(4);
+/// mix.connect(comp).connect(audio.getDestination());
+/// ```
+public final class DynamicsCompressorNode extends AudioNode {
+    private static final double LOOKAHEAD_SECONDS = 0.006;
+    private static final double MAKEUP_EXPONENT = 0.6;
+
+    private final AudioParam threshold;
+    private final AudioParam knee;
+    private final AudioParam ratio;
+    private final AudioParam attack;
+    private final AudioParam release;
+    /// The current gain reduction in decibels, as float bits.
+<span class="fc" id="L58">    private final AtomicInteger reduction = new AtomicInteger(Float.floatToIntBits(0f));</span>
+
+<span class="fc" id="L60">    private final float[][] delay = new float[2][];</span>
+    private final int lookahead;
+    private int delayPos;
+    private double envelopeDb;
+
+    DynamicsCompressorNode(BaseAudioContext context) {
+<span class="fc" id="L66">        super(context, 1, 1, 2, ChannelCountMode.CLAMPED_MAX, ChannelInterpretation.SPEAKERS);</span>
+<span class="fc" id="L67">        threshold = new AudioParam(context, &quot;threshold&quot;, -24, -100, 0, AutomationRate.K_RATE, true);</span>
+<span class="fc" id="L68">        knee = new AudioParam(context, &quot;knee&quot;, 30, 0, 40, AutomationRate.K_RATE, true);</span>
+<span class="fc" id="L69">        ratio = new AudioParam(context, &quot;ratio&quot;, 12, 1, 20, AutomationRate.K_RATE, true);</span>
+<span class="fc" id="L70">        attack = new AudioParam(context, &quot;attack&quot;, 0.003f, 0, 1, AutomationRate.K_RATE, true);</span>
+<span class="fc" id="L71">        release = new AudioParam(context, &quot;release&quot;, 0.25f, 0, 1, AutomationRate.K_RATE, true);</span>
+<span class="fc" id="L72">        lookahead = Math.max(1, (int) Math.round(LOOKAHEAD_SECONDS * context.getSampleRate()));</span>
+<span class="fc bfc" id="L73" title="All 2 branches covered.">        for (int c = 0; c &lt; 2; c++) {</span>
+<span class="fc" id="L74">            delay[c] = new float[lookahead];</span>
+        }
+<span class="fc" id="L76">    }</span>
+
+    @Override
+    void checkChannelCount(int count) {
+<span class="nc bnc" id="L80" title="All 4 branches missed.">        if (count &lt; 1 || count &gt; 2) {</span>
+<span class="nc" id="L81">            throw new IllegalArgumentException(&quot;A compressor takes 1 or 2 channels: &quot; + count);</span>
+        }
+<span class="nc" id="L83">    }</span>
+
+    @Override
+    void checkChannelCountMode(ChannelCountMode mode) {
+<span class="nc bnc" id="L87" title="All 2 branches missed.">        if (mode == ChannelCountMode.MAX) {</span>
+<span class="nc" id="L88">            throw new IllegalArgumentException(&quot;A compressor cannot use ChannelCountMode.MAX&quot;);</span>
+        }
+<span class="nc" id="L90">    }</span>
+
+    /// The level, in dB, above which the signal is compressed; -24 by default.
+    ///
+    /// #### Returns
+    ///
+    /// the parameter
+    public AudioParam getThreshold() {
+<span class="fc" id="L98">        return threshold;</span>
+    }
+
+    /// The width of the soft knee in dB, 30 by default.
+    ///
+    /// #### Returns
+    ///
+    /// the parameter
+    public AudioParam getKnee() {
+<span class="fc" id="L107">        return knee;</span>
+    }
+
+    /// How many dB of input above the threshold make one dB of output, 12 by default.
+    ///
+    /// #### Returns
+    ///
+    /// the parameter
+    public AudioParam getRatio() {
+<span class="fc" id="L116">        return ratio;</span>
+    }
+
+    /// How fast the gain falls when the signal gets louder: the time constant in
+    /// seconds, 0.003 by default.
+    ///
+    /// #### Returns
+    ///
+    /// the parameter
+    public AudioParam getAttack() {
+<span class="nc" id="L126">        return attack;</span>
+    }
+
+    /// How fast the gain recovers when the signal gets quieter: the time constant
+    /// in seconds, 0.25 by default.
+    ///
+    /// #### Returns
+    ///
+    /// the parameter
+    public AudioParam getRelease() {
+<span class="nc" id="L136">        return release;</span>
+    }
+
+    /// The gain reduction currently applied, in dB: 0 or negative.
+    ///
+    /// #### Returns
+    ///
+    /// decibels
+    public float getReduction() {
+<span class="fc" id="L145">        return Float.intBitsToFloat(reduction.get());</span>
+    }
+
+    /// The static curve in dB: output level for input level `x`.
+    static double curve(double x, double t, double w, double r) {
+<span class="fc" id="L150">        double over = x - t;</span>
+<span class="fc bfc" id="L151" title="All 2 branches covered.">        if (2 * over &lt; -w) {</span>
+<span class="fc" id="L152">            return x;</span>
+        }
+<span class="pc bpc" id="L154" title="3 of 4 branches missed.">        if (w &gt; 0 &amp;&amp; 2 * Math.abs(over) &lt;= w) {</span>
+<span class="nc" id="L155">            double a = over + w / 2;</span>
+<span class="nc" id="L156">            return x + (1 / r - 1) * a * a / (2 * w);</span>
+        }
+<span class="fc" id="L158">        return t + over / r;</span>
+    }
+
+    private static double toDb(double v) {
+<span class="pc bpc" id="L162" title="1 of 2 branches missed.">        return v &lt;= 1e-10 ? -200 : 20 * MathUtil.log10(v);</span>
+    }
+
+    private static double fromDb(double db) {
+<span class="fc" id="L166">        return MathUtil.pow(10, db / 20);</span>
+    }
+
+    @Override
+    void process(long q) {
+<span class="fc" id="L171">        double t = threshold.compute(q)[0];</span>
+<span class="fc" id="L172">        double w = knee.compute(q)[0];</span>
+<span class="fc" id="L173">        double r = ratio.compute(q)[0];</span>
+<span class="fc" id="L174">        double a = attack.compute(q)[0];</span>
+<span class="fc" id="L175">        double rel = release.compute(q)[0];</span>
+<span class="fc" id="L176">        double sr = context.getSampleRate();</span>
+        // time to move 10 dB -&gt; per-sample coefficient of a one-pole smoother
+<span class="pc bpc" id="L178" title="1 of 2 branches missed.">        double attackCoef = a &lt;= 0 ? 0 : MathUtil.exp(-1 / (a * sr));</span>
+<span class="pc bpc" id="L179" title="1 of 2 branches missed.">        double releaseCoef = rel &lt;= 0 ? 0 : MathUtil.exp(-1 / (rel * sr));</span>
+<span class="fc" id="L180">        double makeup = MathUtil.pow(1 / fromDb(curve(0, t, w, r)), MAKEUP_EXPONENT);</span>
+<span class="fc" id="L181">        AudioBus in = inBuses[0];</span>
+<span class="fc" id="L182">        AudioBus out = outBuses[0];</span>
+<span class="fc" id="L183">        int ch = Math.min(2, in.channels);</span>
+<span class="fc" id="L184">        out.setChannels(ch);</span>
+<span class="fc" id="L185">        double env = envelopeDb;</span>
+<span class="fc" id="L186">        int pos = delayPos;</span>
+<span class="fc bfc" id="L187" title="All 2 branches covered.">        for (int i = 0; i &lt; BaseAudioContext.RENDER_QUANTUM; i++) {</span>
+<span class="fc" id="L188">            double peak = 0;</span>
+<span class="fc bfc" id="L189" title="All 2 branches covered.">            for (int c = 0; c &lt; ch; c++) {</span>
+<span class="fc" id="L190">                double v = Math.abs(in.data[c][i]);</span>
+<span class="pc bpc" id="L191" title="1 of 2 branches missed.">                if (v &gt; peak) {</span>
+<span class="fc" id="L192">                    peak = v;</span>
+                }
+            }
+<span class="fc" id="L195">            double xDb = toDb(peak);</span>
+<span class="fc" id="L196">            double target = curve(xDb, t, w, r) - xDb;</span>
+<span class="pc bpc" id="L197" title="1 of 2 branches missed.">            double coef = target &lt; env ? attackCoef : releaseCoef;</span>
+<span class="fc" id="L198">            env = target + coef * (env - target);</span>
+<span class="fc" id="L199">            double g = fromDb(env) * makeup;</span>
+<span class="fc bfc" id="L200" title="All 2 branches covered.">            for (int c = 0; c &lt; ch; c++) {</span>
+<span class="fc" id="L201">                float[] line = delay[c];</span>
+<span class="fc" id="L202">                float delayed = line[pos];</span>
+<span class="fc" id="L203">                line[pos] = in.data[c][i];</span>
+<span class="fc" id="L204">                out.data[c][i] = (float) (delayed * g);</span>
+            }
+<span class="fc" id="L206">            pos++;</span>
+<span class="fc bfc" id="L207" title="All 2 branches covered.">            if (pos == lookahead) {</span>
+<span class="fc" id="L208">                pos = 0;</span>
+            }
+        }
+<span class="fc" id="L211">        envelopeDb = env;</span>
+<span class="fc" id="L212">        delayPos = pos;</span>
+<span class="fc" id="L213">        reduction.set(Float.floatToIntBits((float) Math.min(0, env)));</span>
+<span class="fc" id="L214">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

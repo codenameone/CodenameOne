@@ -1,0 +1,209 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Offering.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.payment</a> &gt; <span class="el_source">Offering.java</span></div><h1>Offering.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Codename One in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.payment;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/// A set of packages the application offers a customer together, and
+/// optionally the paywall that presents them. Which offering a customer sees
+/// is decided by the Codename One Commerce service, so it can be changed, or
+/// tested against another, without a new build of the application.
+///
+/// Instances are immutable.
+public final class Offering {
+    private final String id;
+    private final String description;
+<span class="fc" id="L39">    private final Map&lt;String, Object&gt; metadata = new HashMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L40">    private final List&lt;CommercePackage&gt; packages = new ArrayList&lt;CommercePackage&gt;();</span>
+    private final Map paywall;
+
+    /// Builds an offering from the parsed JSON object of the service's
+    /// offerings payload.
+<span class="fc" id="L45">    Offering(Map json) {</span>
+<span class="pc bpc" id="L46" title="1 of 2 branches missed.">        Map m = json == null ? new HashMap() : json;</span>
+<span class="fc" id="L47">        id = CustomerInfo.asString(m.get(&quot;id&quot;));</span>
+<span class="fc" id="L48">        description = CustomerInfo.asString(m.get(&quot;description&quot;));</span>
+<span class="fc" id="L49">        Object meta = m.get(&quot;metadata&quot;);</span>
+<span class="fc bfc" id="L50" title="All 2 branches covered.">        if (meta instanceof Map) {</span>
+<span class="fc bfc" id="L51" title="All 2 branches covered.">            for (Object o : ((Map) meta).entrySet()) {</span>
+<span class="fc" id="L52">                Map.Entry e = (Map.Entry) o;</span>
+<span class="pc bpc" id="L53" title="1 of 2 branches missed.">                if (e.getKey() != null) {</span>
+<span class="fc" id="L54">                    metadata.put(String.valueOf(e.getKey()), copy(e.getValue()));</span>
+                }
+<span class="fc" id="L56">            }</span>
+        }
+<span class="fc" id="L58">        Object pkgs = m.get(&quot;packages&quot;);</span>
+<span class="pc bpc" id="L59" title="1 of 2 branches missed.">        if (pkgs instanceof List) {</span>
+<span class="fc bfc" id="L60" title="All 2 branches covered.">            for (Object o : (List) pkgs) {</span>
+<span class="pc bpc" id="L61" title="1 of 2 branches missed.">                if (o instanceof Map) {</span>
+<span class="fc" id="L62">                    CommercePackage pkg = new CommercePackage((Map) o);</span>
+<span class="fc" id="L63">                    pkg.setOfferingId(CustomerInfo.asString(m.get(&quot;id&quot;)));</span>
+<span class="fc" id="L64">                    packages.add(pkg);</span>
+                }
+<span class="fc" id="L66">            }</span>
+        }
+<span class="fc" id="L68">        Object pw = m.get(&quot;paywall&quot;);</span>
+<span class="fc bfc" id="L69" title="All 2 branches covered.">        Object pwCopy = pw instanceof Map ? copy(pw) : null;</span>
+<span class="fc bfc" id="L70" title="All 2 branches covered.">        paywall = pwCopy instanceof Map ? (Map) pwCopy : null;</span>
+<span class="fc" id="L71">    }</span>
+
+    /// The id of the offering.
+    public String getId() {
+<span class="fc" id="L75">        return id;</span>
+    }
+
+    /// The description given to the offering in the console, or null.
+    public String getDescription() {
+<span class="fc" id="L80">        return description;</span>
+    }
+
+    /// The free form metadata attached to the offering in the console.
+    ///
+    /// #### Returns
+    ///
+    /// a new map, which the caller may change
+    public Map&lt;String, Object&gt; getMetadata() {
+<span class="fc" id="L89">        Map&lt;String, Object&gt; out = new HashMap&lt;String, Object&gt;();</span>
+<span class="fc bfc" id="L90" title="All 2 branches covered.">        for (Map.Entry&lt;String, Object&gt; e : metadata.entrySet()) {</span>
+<span class="fc" id="L91">            out.put(e.getKey(), copy(e.getValue()));</span>
+<span class="fc" id="L92">        }</span>
+<span class="fc" id="L93">        return out;</span>
+    }
+
+    /// The packages of the offering, in the order the service listed them.
+    ///
+    /// #### Returns
+    ///
+    /// a new list, which the caller may change
+    public List&lt;CommercePackage&gt; getPackages() {
+<span class="fc" id="L102">        return new ArrayList&lt;CommercePackage&gt;(packages);</span>
+    }
+
+    /// The paywall document designed for this offering, as parsed JSON.
+    ///
+    /// #### Returns
+    ///
+    /// a new map, which the caller may change, or null when the offering
+    /// has no paywall
+    public Map getPaywall() {
+<span class="fc bfc" id="L112" title="All 2 branches covered.">        if (paywall == null) {</span>
+<span class="fc" id="L113">            return null;</span>
+        }
+<span class="fc" id="L115">        Object c = copy(paywall);</span>
+<span class="pc bpc" id="L116" title="1 of 2 branches missed.">        return c instanceof Map ? (Map) c : null;</span>
+    }
+
+    /// The package with the given id.
+    ///
+    /// #### Returns
+    ///
+    /// the package, or null when the offering has none by that id
+    public CommercePackage getPackage(String packageId) {
+<span class="pc bpc" id="L125" title="1 of 2 branches missed.">        if (packageId == null) {</span>
+<span class="nc" id="L126">            return null;</span>
+        }
+<span class="fc bfc" id="L128" title="All 2 branches covered.">        for (CommercePackage p : packages) {</span>
+<span class="fc bfc" id="L129" title="All 2 branches covered.">            if (packageId.equals(p.getId())) {</span>
+<span class="fc" id="L130">                return p;</span>
+            }
+<span class="fc" id="L132">        }</span>
+<span class="fc" id="L133">        return null;</span>
+    }
+
+    /// The first package billed monthly, or null.
+    public CommercePackage getMonthly() {
+<span class="fc" id="L138">        return firstOfType(CommercePackage.TYPE_MONTHLY);</span>
+    }
+
+    /// The first package billed annually, or null.
+    public CommercePackage getAnnual() {
+<span class="fc" id="L143">        return firstOfType(CommercePackage.TYPE_ANNUAL);</span>
+    }
+
+    /// The first lifetime package, or null.
+    public CommercePackage getLifetime() {
+<span class="fc" id="L148">        return firstOfType(CommercePackage.TYPE_LIFETIME);</span>
+    }
+
+    /// The first package billed weekly, or null.
+    public CommercePackage getWeekly() {
+<span class="fc" id="L153">        return firstOfType(CommercePackage.TYPE_WEEKLY);</span>
+    }
+
+    private CommercePackage firstOfType(String type) {
+<span class="fc bfc" id="L157" title="All 2 branches covered.">        for (CommercePackage p : packages) {</span>
+<span class="fc bfc" id="L158" title="All 2 branches covered.">            if (p.isType(type)) {</span>
+<span class="fc" id="L159">                return p;</span>
+            }
+<span class="fc" id="L161">        }</span>
+<span class="fc" id="L162">        return null;</span>
+    }
+
+    /// This offering as the JSON object it was built from, for storage.
+    Map&lt;String, Object&gt; toMap() {
+<span class="nc" id="L167">        Map&lt;String, Object&gt; out = new HashMap&lt;String, Object&gt;();</span>
+<span class="nc" id="L168">        CustomerInfo.putIfSet(out, &quot;id&quot;, id);</span>
+<span class="nc" id="L169">        CustomerInfo.putIfSet(out, &quot;description&quot;, description);</span>
+<span class="nc" id="L170">        out.put(&quot;metadata&quot;, getMetadata());</span>
+<span class="nc" id="L171">        List&lt;Object&gt; pkgs = new ArrayList&lt;Object&gt;();</span>
+<span class="nc bnc" id="L172" title="All 2 branches missed.">        for (CommercePackage p : packages) {</span>
+<span class="nc" id="L173">            pkgs.add(p.toMap());</span>
+<span class="nc" id="L174">        }</span>
+<span class="nc" id="L175">        out.put(&quot;packages&quot;, pkgs);</span>
+<span class="nc bnc" id="L176" title="All 2 branches missed.">        if (paywall != null) {</span>
+<span class="nc" id="L177">            out.put(&quot;paywall&quot;, copy(paywall));</span>
+        }
+<span class="nc" id="L179">        return out;</span>
+    }
+
+    /// A deep copy of a parsed JSON value. Maps and lists are copied, and
+    /// everything else in parsed JSON is immutable. `Object.clone()` is not
+    /// used: it answers null on a device.
+    static Object copy(Object value) {
+<span class="fc bfc" id="L186" title="All 2 branches covered.">        if (value instanceof Map) {</span>
+<span class="fc" id="L187">            Map&lt;Object, Object&gt; out = new HashMap&lt;Object, Object&gt;();</span>
+<span class="fc bfc" id="L188" title="All 2 branches covered.">            for (Object o : ((Map) value).entrySet()) {</span>
+<span class="fc" id="L189">                Map.Entry e = (Map.Entry) o;</span>
+<span class="fc" id="L190">                out.put(e.getKey(), copy(e.getValue()));</span>
+<span class="fc" id="L191">            }</span>
+<span class="fc" id="L192">            return out;</span>
+        }
+<span class="fc bfc" id="L194" title="All 2 branches covered.">        if (value instanceof List) {</span>
+<span class="fc" id="L195">            List&lt;Object&gt; out = new ArrayList&lt;Object&gt;();</span>
+<span class="fc bfc" id="L196" title="All 2 branches covered.">            for (Object o : (List) value) {</span>
+<span class="fc" id="L197">                out.add(copy(o));</span>
+<span class="fc" id="L198">            }</span>
+<span class="fc" id="L199">            return out;</span>
+        }
+<span class="fc" id="L201">        return value;</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="nc" id="L206">        return &quot;Offering{&quot; + id + &quot;, packages=&quot; + packages + &quot;}&quot;;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,191 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DefaultGridCellEditor.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.table</a> &gt; <span class="el_source">DefaultGridCellEditor.java</span></div><h1>DefaultGridCellEditor.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ui.table;
+
+import com.codename1.ui.Component;
+import com.codename1.ui.Display;
+import com.codename1.ui.TextArea;
+import com.codename1.ui.TextField;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.events.FocusListener;
+import com.codename1.ui.spinner.Picker;
+
+import java.util.Date;
+
+/// The editor a `DataGrid` uses for a column that has none: a text field
+/// for text and numbers, a date picker for dates and a picker of the
+/// column's choices.
+<span class="fc" id="L39">public class DefaultGridCellEditor implements GridCellEditor {</span>
+
+    @Override
+    public Component createEditor(final DataGrid grid, GridCell cell) {
+<span class="fc" id="L43">        GridColumn c = cell.getColumn();</span>
+<span class="fc" id="L44">        Object v = cell.getValue();</span>
+<span class="fc" id="L45">        GridColumn.Kind kind = c.resolveKind(v);</span>
+<span class="pc bpc" id="L46" title="1 of 2 branches missed.">        if (kind == GridColumn.Kind.DATE) {</span>
+<span class="nc" id="L47">            Picker p = new Picker();</span>
+<span class="nc" id="L48">            p.setUIID(&quot;DataGridEditor&quot;);</span>
+<span class="nc" id="L49">            p.setType(Display.PICKER_TYPE_DATE);</span>
+<span class="nc bnc" id="L50" title="All 2 branches missed.">            p.setDate(v instanceof Date ? (Date) v : new Date());</span>
+<span class="nc" id="L51">            commitOnResult(grid, p);</span>
+<span class="nc" id="L52">            return p;</span>
+        }
+<span class="pc bpc" id="L54" title="3 of 4 branches missed.">        if (kind == GridColumn.Kind.CHOICE &amp;&amp; c.getChoices() != null) {</span>
+<span class="nc" id="L55">            Object[] choices = c.getChoices();</span>
+<span class="nc" id="L56">            String[] labels = new String[choices.length];</span>
+<span class="nc" id="L57">            int sel = -1;</span>
+<span class="nc bnc" id="L58" title="All 2 branches missed.">            for (int i = 0; i &lt; choices.length; i++) {</span>
+<span class="nc" id="L59">                labels[i] = c.format(choices[i]);</span>
+<span class="nc bnc" id="L60" title="All 6 branches missed.">                if (choices[i] == null ? v == null : choices[i].equals(v)) {</span>
+<span class="nc" id="L61">                    sel = i;</span>
+                }
+            }
+<span class="nc" id="L64">            Picker p = new Picker();</span>
+<span class="nc" id="L65">            p.setUIID(&quot;DataGridEditor&quot;);</span>
+<span class="nc" id="L66">            p.setType(Display.PICKER_TYPE_STRINGS);</span>
+<span class="nc" id="L67">            p.setStrings(labels);</span>
+<span class="nc bnc" id="L68" title="All 2 branches missed.">            if (sel &gt;= 0) {</span>
+<span class="nc" id="L69">                p.setSelectedStringIndex(sel);</span>
+            }
+<span class="nc" id="L71">            commitOnResult(grid, p);</span>
+<span class="nc" id="L72">            return p;</span>
+        }
+<span class="fc" id="L74">        int constraint = TextArea.ANY;</span>
+<span class="fc bfc" id="L75" title="All 2 branches covered.">        if (kind == GridColumn.Kind.NUMBER) {</span>
+<span class="pc bpc" id="L76" title="1 of 2 branches missed.">            constraint = isIntegral(v) ? TextArea.NUMERIC : TextArea.DECIMAL;</span>
+        }
+<span class="pc bpc" id="L78" title="1 of 2 branches missed.">        String text = v == null ? &quot;&quot; : c.format(v);</span>
+<span class="fc" id="L79">        TextField tf = new TextField(text, &quot;&quot;, 20, constraint);</span>
+<span class="fc" id="L80">        tf.setUIID(&quot;DataGridEditor&quot;);</span>
+<span class="fc" id="L81">        Commit commit = new Commit(grid);</span>
+<span class="fc" id="L82">        tf.setDoneListener(commit);</span>
+<span class="fc" id="L83">        tf.addFocusListener(commit);</span>
+<span class="fc" id="L84">        return tf;</span>
+    }
+
+    // Done, or leaving the field, ends the edit.
+    private static final class Commit implements ActionListener, FocusListener {
+        private final DataGrid grid;
+
+<span class="fc" id="L91">        Commit(DataGrid grid) {</span>
+<span class="fc" id="L92">            this.grid = grid;</span>
+<span class="fc" id="L93">        }</span>
+
+        @Override
+        public void actionPerformed(ActionEvent evt) {
+<span class="nc" id="L97">            grid.commitEdit();</span>
+<span class="nc" id="L98">        }</span>
+
+        @Override
+        public void focusGained(Component cmp) {
+<span class="nc" id="L102">        }</span>
+
+        @Override
+        public void focusLost(Component cmp) {
+<span class="nc" id="L106">            grid.commitEdit();</span>
+<span class="nc" id="L107">        }</span>
+    }
+
+    // A picker fires once when it is opened and again with the answer; the
+    // second is the one that commits. A picker closed without an answer
+    // fires nothing and stays over the cell, showing the old value, until the
+    // grid is touched or scrolled -- which commits that unchanged value.
+    private static void commitOnResult(final DataGrid grid, Picker p) {
+<span class="nc" id="L115">        p.addActionListener(new ActionListener() {</span>
+            private boolean opened;
+
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+<span class="nc bnc" id="L120" title="All 2 branches missed.">                if (!opened) {</span>
+<span class="nc" id="L121">                    opened = true;</span>
+<span class="nc" id="L122">                    return;</span>
+                }
+<span class="nc" id="L124">                grid.commitEdit();</span>
+<span class="nc" id="L125">            }</span>
+        });
+<span class="nc" id="L127">    }</span>
+
+    @Override
+    public Object getEditorValue(Component editor, GridCell cell) {
+<span class="fc" id="L131">        GridColumn c = cell.getColumn();</span>
+<span class="fc" id="L132">        Object before = cell.getValue();</span>
+<span class="pc bpc" id="L133" title="1 of 2 branches missed.">        if (editor instanceof Picker) {</span>
+<span class="nc" id="L134">            Picker p = (Picker) editor;</span>
+<span class="nc bnc" id="L135" title="All 4 branches missed.">            if (c.resolveKind(before) == GridColumn.Kind.CHOICE &amp;&amp; c.getChoices() != null) {</span>
+<span class="nc" id="L136">                int i = p.getSelectedStringIndex();</span>
+<span class="nc" id="L137">                Object[] choices = c.getChoices();</span>
+<span class="nc bnc" id="L138" title="All 4 branches missed.">                return i &gt;= 0 &amp;&amp; i &lt; choices.length ? choices[i] : before;</span>
+            }
+<span class="nc" id="L140">            Date d = p.getDate();</span>
+<span class="nc bnc" id="L141" title="All 2 branches missed.">            return d == null ? before : d;</span>
+        }
+<span class="pc bpc" id="L143" title="1 of 2 branches missed.">        if (!(editor instanceof TextArea)) {</span>
+<span class="nc" id="L144">            return before;</span>
+        }
+<span class="fc" id="L146">        String text = ((TextArea) editor).getText();</span>
+<span class="fc" id="L147">        GridFormatter f = c.getFormatter();</span>
+<span class="pc bpc" id="L148" title="1 of 2 branches missed.">        if (f != null) {</span>
+<span class="nc" id="L149">            return f.parse(text, before);</span>
+        }
+<span class="fc bfc" id="L151" title="All 2 branches covered.">        if (c.resolveKind(before) == GridColumn.Kind.NUMBER) {</span>
+<span class="fc" id="L152">            return parseNumber(text, before);</span>
+        }
+<span class="fc" id="L154">        return text;</span>
+    }
+
+    private static boolean isIntegral(Object v) {
+<span class="pc bpc" id="L158" title="7 of 8 branches missed.">        return v instanceof Integer || v instanceof Long || v instanceof Short || v instanceof Byte;</span>
+    }
+
+    /// Reads a number back as the type the cell held, or the cell's old value
+    /// when the text is not one. An empty field clears the cell.
+    static Object parseNumber(String text, Object before) {
+<span class="pc bpc" id="L164" title="1 of 2 branches missed.">        String t = text == null ? &quot;&quot; : text.trim();</span>
+<span class="pc bpc" id="L165" title="1 of 2 branches missed.">        if (t.length() == 0) {</span>
+<span class="nc" id="L166">            return null;</span>
+        }
+        try {
+<span class="pc bpc" id="L169" title="1 of 2 branches missed.">            if (before instanceof Integer) {</span>
+<span class="fc" id="L170">                return Integer.valueOf(Integer.parseInt(t));</span>
+            }
+<span class="nc bnc" id="L172" title="All 2 branches missed.">            if (before instanceof Long) {</span>
+<span class="nc" id="L173">                return Long.valueOf(Long.parseLong(t));</span>
+            }
+<span class="nc bnc" id="L175" title="All 2 branches missed.">            if (before instanceof Short) {</span>
+<span class="nc" id="L176">                return Short.valueOf(Short.parseShort(t));</span>
+            }
+<span class="nc bnc" id="L178" title="All 2 branches missed.">            if (before instanceof Byte) {</span>
+<span class="nc" id="L179">                return Byte.valueOf(Byte.parseByte(t));</span>
+            }
+<span class="nc bnc" id="L181" title="All 2 branches missed.">            if (before instanceof Float) {</span>
+<span class="nc" id="L182">                return Float.valueOf(Float.parseFloat(t));</span>
+            }
+<span class="nc" id="L184">            return Double.valueOf(Double.parseDouble(t));</span>
+<span class="fc" id="L185">        } catch (NumberFormatException err) {</span>
+            // not a number: the cell keeps what it had
+<span class="fc" id="L187">            return before;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

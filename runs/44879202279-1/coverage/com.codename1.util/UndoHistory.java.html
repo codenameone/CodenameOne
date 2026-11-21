@@ -1,0 +1,421 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>UndoHistory.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.util</a> &gt; <span class="el_source">UndoHistory.java</span></div><h1>UndoHistory.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.util;
+
+import java.util.ArrayList;
+import java.util.List;
+
+/// The edits a user made, in order, so they can be undone and redone.
+///
+/// A history knows nothing about what is edited. A component that supports
+/// undo records an `UndoableEdit` for every change the user makes through it.
+/// Every such component records into the application's history,
+/// `getGlobal()`, unless it is given another one, so a single &quot;Undo&quot; takes
+/// back the last change wherever it was made:
+///
+/// ```java
+/// Button undoButton = new Button(&quot;Undo&quot;);
+/// UndoHistory history = UndoHistory.getGlobal();
+/// undoButton.addActionListener(e -&gt; history.undo());
+/// history.addListener(h -&gt; undoButton.setEnabled(h.canUndo()));
+/// ```
+///
+/// A component given its own history, or null to record nothing, keeps its
+/// edits out of the application's.
+///
+/// Edits recorded between `beginCompound` and `endCompound` are one step:
+/// dragging five selected nodes is a single &quot;Move&quot;.
+///
+/// Recording a new edit drops everything that could have been redone. An edit
+/// recorded while the history is itself undoing or redoing is ignored, so an
+/// edit may freely call the same code a user's action does.
+///
+/// Like the components that use it, a history belongs to the event dispatch
+/// thread.
+<span class="fc" id="L55">public class UndoHistory {</span>
+<span class="fc" id="L56">    private final List&lt;UndoableEdit&gt; undone = new ArrayList&lt;UndoableEdit&gt;();</span>
+<span class="fc" id="L57">    private final List&lt;UndoableEdit&gt; done = new ArrayList&lt;UndoableEdit&gt;();</span>
+<span class="fc" id="L58">    private final List&lt;UndoHistoryListener&gt; listeners = new ArrayList&lt;UndoHistoryListener&gt;();</span>
+<span class="fc" id="L59">    private int limit = 100;</span>
+    private Compound open;
+    private int depth;
+    private boolean replaying;
+<span class="fc" id="L63">    private static final UndoHistory GLOBAL = new UndoHistory();</span>
+
+    /// The application's history, which every component that supports undo
+    /// records into unless it is given another.
+    public static UndoHistory getGlobal() {
+<span class="fc" id="L68">        return GLOBAL;</span>
+    }
+
+    /// Records an edit that was just made.
+    ///
+    /// Inside a compound the edit joins it. Otherwise it becomes the next
+    /// thing `undo` takes back, and nothing can be redone any more.
+    public void record(UndoableEdit edit) {
+<span class="pc bpc" id="L76" title="1 of 4 branches missed.">        if (edit == null || replaying) {</span>
+<span class="fc" id="L77">            return;</span>
+        }
+<span class="fc bfc" id="L79" title="All 2 branches covered.">        if (open != null) {</span>
+<span class="fc" id="L80">            open.edits.add(edit);</span>
+<span class="fc" id="L81">            return;</span>
+        }
+<span class="fc" id="L83">        push(edit);</span>
+<span class="fc" id="L84">    }</span>
+
+    private void push(UndoableEdit edit) {
+<span class="fc" id="L87">        done.add(edit);</span>
+<span class="fc" id="L88">        undone.clear();</span>
+<span class="fc bfc" id="L89" title="All 2 branches covered.">        while (done.size() &gt; limit) {</span>
+<span class="fc" id="L90">            done.remove(0);</span>
+        }
+<span class="fc" id="L92">        fireChanged();</span>
+<span class="fc" id="L93">    }</span>
+
+    /// Starts a group of edits that undo and redo as one step. Calls nest:
+    /// only the outermost pair makes a step, named by the outermost call.
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: the step's name, or null
+    public void beginCompound(String name) {
+<span class="pc bpc" id="L102" title="1 of 2 branches missed.">        if (replaying) {</span>
+<span class="nc" id="L103">            return;</span>
+        }
+<span class="fc bfc" id="L105" title="All 2 branches covered.">        if (depth == 0) {</span>
+<span class="fc" id="L106">            open = new Compound(name);</span>
+        }
+<span class="fc" id="L108">        depth++;</span>
+<span class="fc" id="L109">    }</span>
+
+    /// Ends the group `beginCompound` started. A group in which nothing was
+    /// recorded leaves no step behind.
+    public void endCompound() {
+<span class="pc bpc" id="L114" title="1 of 4 branches missed.">        if (replaying || depth == 0) {</span>
+<span class="fc" id="L115">            return;</span>
+        }
+<span class="fc" id="L117">        depth--;</span>
+<span class="fc bfc" id="L118" title="All 2 branches covered.">        if (depth &gt; 0) {</span>
+<span class="fc" id="L119">            return;</span>
+        }
+<span class="fc" id="L121">        Compound c = open;</span>
+<span class="fc" id="L122">        open = null;</span>
+<span class="pc bpc" id="L123" title="1 of 4 branches missed.">        if (c.edits.size() == 1 &amp;&amp; c.name == null) {</span>
+<span class="nc" id="L124">            push(c.edits.get(0));</span>
+<span class="fc bfc" id="L125" title="All 2 branches covered.">        } else if (!c.edits.isEmpty()) {</span>
+<span class="fc" id="L126">            push(c);</span>
+        }
+<span class="fc" id="L128">    }</span>
+
+    /// True between `beginCompound` and its `endCompound`.
+    public boolean isCompoundOpen() {
+<span class="fc bfc" id="L132" title="All 2 branches covered.">        return depth &gt; 0;</span>
+    }
+
+    /// True when there is an edit to take back.
+    public boolean canUndo() {
+<span class="fc bfc" id="L137" title="All 2 branches covered.">        return top(done) != null;</span>
+    }
+
+    /// True when an undone edit can be made again.
+    public boolean canRedo() {
+<span class="fc bfc" id="L142" title="All 2 branches covered.">        return top(undone) != null;</span>
+    }
+
+    /// The name of the edit `undo` would take back, or null.
+    public String getUndoName() {
+<span class="fc" id="L147">        UndoableEdit e = top(done);</span>
+<span class="fc bfc" id="L148" title="All 2 branches covered.">        return e == null ? null : e.getName();</span>
+    }
+
+    /// The name of the edit `redo` would make again, or null.
+    public String getRedoName() {
+<span class="fc" id="L153">        UndoableEdit e = top(undone);</span>
+<span class="pc bpc" id="L154" title="1 of 2 branches missed.">        return e == null ? null : e.getName();</span>
+    }
+
+    /// Takes back the last edit.
+    ///
+    /// #### Returns
+    ///
+    /// false when there was nothing to undo
+    public boolean undo() {
+<span class="pc bpc" id="L163" title="2 of 4 branches missed.">        if (replaying || depth &gt; 0) {</span>
+<span class="nc" id="L164">            return false;</span>
+        }
+<span class="pc bpc" id="L166" title="1 of 4 branches missed.">        if (dropDeadTop(done) &amp;&amp; done.isEmpty()) {</span>
+<span class="nc" id="L167">            fireChanged();</span>
+        }
+<span class="fc bfc" id="L169" title="All 2 branches covered.">        if (done.isEmpty()) {</span>
+<span class="fc" id="L170">            return false;</span>
+        }
+<span class="fc" id="L172">        UndoableEdit e = done.remove(done.size() - 1);</span>
+<span class="fc" id="L173">        replaying = true;</span>
+<span class="fc" id="L174">        boolean ok = false;</span>
+        try {
+<span class="fc" id="L176">            e.undo();</span>
+<span class="fc" id="L177">            ok = true;</span>
+        } finally {
+<span class="fc" id="L179">            replaying = false;</span>
+            // an edit that threw stays where it was, so it is not lost
+<span class="fc bfc" id="L181" title="All 2 branches covered.">            if (ok) {</span>
+<span class="fc" id="L182">                undone.add(e);</span>
+            } else {
+<span class="fc" id="L184">                done.add(e);</span>
+            }
+        }
+        // only after success: a failed edit left both stacks as they were
+<span class="fc" id="L188">        fireChanged();</span>
+<span class="fc" id="L189">        return true;</span>
+    }
+
+    /// Makes the last undone edit again.
+    ///
+    /// #### Returns
+    ///
+    /// false when there was nothing to redo
+    public boolean redo() {
+<span class="pc bpc" id="L198" title="2 of 4 branches missed.">        if (replaying || depth &gt; 0) {</span>
+<span class="nc" id="L199">            return false;</span>
+        }
+<span class="pc bpc" id="L201" title="1 of 4 branches missed.">        if (dropDeadTop(undone) &amp;&amp; undone.isEmpty()) {</span>
+<span class="fc" id="L202">            fireChanged();</span>
+        }
+<span class="fc bfc" id="L204" title="All 2 branches covered.">        if (undone.isEmpty()) {</span>
+<span class="fc" id="L205">            return false;</span>
+        }
+<span class="fc" id="L207">        UndoableEdit e = undone.remove(undone.size() - 1);</span>
+<span class="fc" id="L208">        replaying = true;</span>
+<span class="fc" id="L209">        boolean ok = false;</span>
+        try {
+<span class="fc" id="L211">            e.redo();</span>
+<span class="fc" id="L212">            ok = true;</span>
+        } finally {
+<span class="fc" id="L214">            replaying = false;</span>
+<span class="pc bpc" id="L215" title="1 of 2 branches missed.">            if (ok) {</span>
+<span class="fc" id="L216">                done.add(e);</span>
+            } else {
+<span class="nc" id="L218">                undone.add(e);</span>
+            }
+        }
+<span class="fc" id="L221">        fireChanged();</span>
+<span class="fc" id="L222">        return true;</span>
+    }
+
+    /// True while `undo` or `redo` is running an edit. A component checks it
+    /// to tell a replayed change from one the user is making.
+    public boolean isReplaying() {
+<span class="fc" id="L228">        return replaying;</span>
+    }
+
+    /// Forgets every edit, for instance after loading another document.
+    public void clear() {
+<span class="fc" id="L233">        done.clear();</span>
+<span class="fc" id="L234">        undone.clear();</span>
+<span class="fc" id="L235">        open = null;</span>
+<span class="fc" id="L236">        depth = 0;</span>
+<span class="fc" id="L237">        fireChanged();</span>
+<span class="fc" id="L238">    }</span>
+
+    /// Forgets every edit that is no longer alive (`UndoableEdit.isAlive`). A
+    /// component calls this when it drops what its edits change, such as on
+    /// being given another document, so the rest of the history stays.
+    public void discardDead() {
+<span class="fc" id="L244">        boolean dropped = false;</span>
+<span class="fc bfc" id="L245" title="All 2 branches covered.">        for (int i = done.size() - 1; i &gt;= 0; i--) {</span>
+<span class="fc bfc" id="L246" title="All 2 branches covered.">            if (!done.get(i).isAlive()) {</span>
+<span class="fc" id="L247">                done.remove(i);</span>
+<span class="fc" id="L248">                dropped = true;</span>
+            }
+        }
+<span class="fc bfc" id="L251" title="All 2 branches covered.">        for (int i = undone.size() - 1; i &gt;= 0; i--) {</span>
+<span class="pc bpc" id="L252" title="1 of 2 branches missed.">            if (!undone.get(i).isAlive()) {</span>
+<span class="nc" id="L253">                undone.remove(i);</span>
+<span class="nc" id="L254">                dropped = true;</span>
+            }
+        }
+<span class="fc bfc" id="L257" title="All 2 branches covered.">        if (dropped) {</span>
+<span class="fc" id="L258">            fireChanged();</span>
+        }
+<span class="fc" id="L260">    }</span>
+
+    /// True when `edit` is the step `undo` would take back next, and no
+    /// compound is open. A component uses it to extend its own last edit, such
+    /// as a run of typing, only while nothing was recorded after it.
+    public boolean isLastEdit(UndoableEdit edit) {
+<span class="pc bpc" id="L266" title="1 of 8 branches missed.">        return edit != null &amp;&amp; open == null &amp;&amp; !done.isEmpty() &amp;&amp; done.get(done.size() - 1) == edit; //NOPMD CompareObjectsWithEquals - that very edit</span>
+    }
+
+    private static UndoableEdit top(List&lt;UndoableEdit&gt; stack) {
+<span class="fc bfc" id="L270" title="All 2 branches covered.">        for (int i = stack.size() - 1; i &gt;= 0; i--) {</span>
+<span class="fc" id="L271">            UndoableEdit e = stack.get(i);</span>
+<span class="fc bfc" id="L272" title="All 2 branches covered.">            if (e.isAlive()) {</span>
+<span class="fc" id="L273">                return e;</span>
+            }
+        }
+<span class="fc" id="L276">        return null;</span>
+    }
+
+    private static boolean dropDeadTop(List&lt;UndoableEdit&gt; stack) {
+<span class="fc" id="L280">        boolean dropped = false;</span>
+<span class="fc bfc" id="L281" title="All 4 branches covered.">        while (!stack.isEmpty() &amp;&amp; !stack.get(stack.size() - 1).isAlive()) {</span>
+<span class="fc" id="L282">            stack.remove(stack.size() - 1);</span>
+<span class="fc" id="L283">            dropped = true;</span>
+        }
+<span class="fc" id="L285">        return dropped;</span>
+    }
+
+    /// How many steps are kept; older ones are dropped. 100 by default.
+    public int getLimit() {
+<span class="nc" id="L290">        return limit;</span>
+    }
+
+    /// Sets how many steps are kept, at least one.
+    public void setLimit(int limit) {
+<span class="fc" id="L295">        this.limit = Math.max(1, limit);</span>
+<span class="fc" id="L296">        boolean dropped = false;</span>
+<span class="pc bpc" id="L297" title="1 of 2 branches missed.">        while (done.size() &gt; this.limit) {</span>
+<span class="nc" id="L298">            done.remove(0);</span>
+<span class="nc" id="L299">            dropped = true;</span>
+        }
+<span class="pc bpc" id="L301" title="1 of 2 branches missed.">        if (dropped) {</span>
+<span class="nc" id="L302">            fireChanged();</span>
+        }
+<span class="fc" id="L304">    }</span>
+
+    /// The number of steps that can be undone.
+    public int getUndoCount() {
+<span class="fc" id="L308">        return countAlive(done);</span>
+    }
+
+    /// The number of steps that can be redone.
+    public int getRedoCount() {
+<span class="fc" id="L313">        return countAlive(undone);</span>
+    }
+
+    private static int countAlive(List&lt;UndoableEdit&gt; stack) {
+<span class="fc" id="L317">        int n = 0;</span>
+<span class="fc bfc" id="L318" title="All 2 branches covered.">        for (UndoableEdit e : stack) {</span>
+<span class="fc bfc" id="L319" title="All 2 branches covered.">            if (e.isAlive()) {</span>
+<span class="fc" id="L320">                n++;</span>
+            }
+<span class="fc" id="L322">        }</span>
+<span class="fc" id="L323">        return n;</span>
+    }
+
+    /// Adds a listener told whenever what can be undone or redone changes.
+    public void addListener(UndoHistoryListener l) {
+<span class="pc bpc" id="L328" title="2 of 4 branches missed.">        if (l != null &amp;&amp; !listeners.contains(l)) {</span>
+<span class="fc" id="L329">            listeners.add(l);</span>
+        }
+<span class="fc" id="L331">    }</span>
+
+    /// Removes a listener.
+    public void removeListener(UndoHistoryListener l) {
+<span class="nc" id="L335">        listeners.remove(l);</span>
+<span class="nc" id="L336">    }</span>
+
+    private void fireChanged() {
+        // a copy: a listener may add or remove listeners while it is told
+<span class="fc" id="L340">        UndoHistoryListener[] all = listeners.toArray(new UndoHistoryListener[listeners.size()]);</span>
+<span class="fc bfc" id="L341" title="All 2 branches covered.">        for (UndoHistoryListener l : all) {</span>
+<span class="fc" id="L342">            l.historyChanged(this);</span>
+        }
+<span class="fc" id="L344">    }</span>
+
+    /// Several edits that undo in reverse and redo in order.
+    private static final class Compound extends UndoableEdit {
+        private final String name;
+<span class="fc" id="L349">        private final List&lt;UndoableEdit&gt; edits = new ArrayList&lt;UndoableEdit&gt;();</span>
+
+<span class="fc" id="L351">        Compound(String name) {</span>
+<span class="fc" id="L352">            this.name = name;</span>
+<span class="fc" id="L353">        }</span>
+
+        // the list's cast kept out of the try blocks below: ParparVM does
+        // not check a cast, so none may sit where a catch could take it
+        private UndoableEdit at(int i) {
+<span class="fc" id="L358">            return edits.get(i);</span>
+        }
+
+        @Override
+        public void undo() {
+<span class="fc" id="L363">            int i = edits.size() - 1;</span>
+            try {
+<span class="fc bfc" id="L365" title="All 2 branches covered.">                for (; i &gt;= 0; i--) {</span>
+                    // a part whose target is gone is passed over, as a step is
+<span class="fc bfc" id="L367" title="All 2 branches covered.">                    if (at(i).isAlive()) {</span>
+<span class="fc" id="L368">                        at(i).undo();</span>
+                    }
+                }
+<span class="nc" id="L371">            } catch (RuntimeException err) {</span>
+                // the step stays in the history whole: what was taken back of
+                // it is made again, so a later undo starts from all of it
+<span class="nc bnc" id="L374" title="All 2 branches missed.">                for (int k = i + 1; k &lt; edits.size(); k++) {</span>
+<span class="nc bnc" id="L375" title="All 2 branches missed.">                    if (at(k).isAlive()) {</span>
+<span class="nc" id="L376">                        at(k).redo();</span>
+                    }
+                }
+<span class="nc" id="L379">                throw err;</span>
+<span class="fc" id="L380">            }</span>
+<span class="fc" id="L381">        }</span>
+
+        @Override
+        public void redo() {
+<span class="fc" id="L385">            int i = 0;</span>
+            try {
+<span class="fc bfc" id="L387" title="All 2 branches covered.">                for (; i &lt; edits.size(); i++) {</span>
+<span class="pc bpc" id="L388" title="1 of 2 branches missed.">                    if (at(i).isAlive()) {</span>
+<span class="fc" id="L389">                        at(i).redo();</span>
+                    }
+                }
+<span class="nc" id="L392">            } catch (RuntimeException err) {</span>
+<span class="nc bnc" id="L393" title="All 2 branches missed.">                for (int k = i - 1; k &gt;= 0; k--) {</span>
+<span class="nc bnc" id="L394" title="All 2 branches missed.">                    if (at(k).isAlive()) {</span>
+<span class="nc" id="L395">                        at(k).undo();</span>
+                    }
+                }
+<span class="nc" id="L398">                throw err;</span>
+<span class="fc" id="L399">            }</span>
+<span class="fc" id="L400">        }</span>
+
+        @Override
+        public String getName() {
+<span class="pc bpc" id="L404" title="1 of 2 branches missed.">            if (name != null) {</span>
+<span class="fc" id="L405">                return name;</span>
+            }
+<span class="nc bnc" id="L407" title="All 2 branches missed.">            return edits.isEmpty() ? null : edits.get(0).getName();</span>
+        }
+
+        @Override
+        public boolean isAlive() {
+<span class="fc bfc" id="L412" title="All 2 branches covered.">            for (UndoableEdit e : edits) {</span>
+<span class="fc bfc" id="L413" title="All 2 branches covered.">                if (e.isAlive()) {</span>
+<span class="fc" id="L414">                    return true;</span>
+                }
+<span class="fc" id="L416">            }</span>
+<span class="fc" id="L417">            return false;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

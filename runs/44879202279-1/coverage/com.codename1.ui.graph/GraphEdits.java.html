@@ -1,0 +1,445 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>GraphEdits.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.graph</a> &gt; <span class="el_source">GraphEdits.java</span></div><h1>GraphEdits.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ui.graph;
+
+import com.codename1.graph.GraphEdge;
+import com.codename1.graph.GraphGroup;
+import com.codename1.graph.GraphModel;
+import com.codename1.graph.GraphNode;
+import com.codename1.graph.GraphPort;
+import com.codename1.util.UndoableEdit;
+
+import java.util.ArrayList;
+import java.util.List;
+
+/// The steps a `NodeGraph` records in an `UndoHistory`. Each replays through
+/// the model, the way the user's own edit went, so a listening view repaints.
+final class GraphEdits { // NOPMD MissingStaticMethodInNonInstantiatableClass - a holder of the edit classes
+    private GraphEdits() {
+    }
+
+    /// A node went from one place to another.
+    static final class Move extends UndoableEdit {
+        private final GraphModel model;
+        private final GraphNode node;
+        private final double fromX;
+        private final double fromY;
+        private final double toX;
+        private final double toY;
+
+<span class="fc" id="L50">        Move(GraphModel model, GraphNode node, double fromX, double fromY, double toX, double toY) {</span>
+<span class="fc" id="L51">            this.model = model;</span>
+<span class="fc" id="L52">            this.node = node;</span>
+<span class="fc" id="L53">            this.fromX = fromX;</span>
+<span class="fc" id="L54">            this.fromY = fromY;</span>
+<span class="fc" id="L55">            this.toX = toX;</span>
+<span class="fc" id="L56">            this.toY = toY;</span>
+<span class="fc" id="L57">        }</span>
+
+        @Override
+        public void undo() {
+<span class="fc" id="L61">            model.moveNode(node, fromX, fromY);</span>
+<span class="fc" id="L62">        }</span>
+
+        @Override
+        public void redo() {
+<span class="fc" id="L66">            model.moveNode(node, toX, toY);</span>
+<span class="fc" id="L67">        }</span>
+
+        @Override
+        public String getName() {
+<span class="nc" id="L71">            return &quot;Move&quot;;</span>
+        }
+    }
+
+    /// Edges lost the routes an arrangement gave them when a node moved.
+    static final class Routes extends UndoableEdit {
+        private final NodeGraph graph;
+        private final List&lt;GraphEdge&gt; edges;
+        private final List&lt;double[]&gt; before;
+        private final List&lt;double[]&gt; after;
+
+<span class="nc" id="L82">        Routes(NodeGraph graph, List&lt;GraphEdge&gt; edges, List&lt;double[]&gt; before, List&lt;double[]&gt; after) {</span>
+<span class="nc" id="L83">            this.graph = graph;</span>
+<span class="nc" id="L84">            this.edges = edges;</span>
+<span class="nc" id="L85">            this.before = before;</span>
+<span class="nc" id="L86">            this.after = after;</span>
+<span class="nc" id="L87">        }</span>
+
+        private void apply(List&lt;double[]&gt; routes) {
+<span class="nc" id="L90">            int n = edges.size();</span>
+<span class="nc bnc" id="L91" title="All 2 branches missed.">            for (int i = 0; i &lt; n; i++) {</span>
+<span class="nc bnc" id="L92" title="All 2 branches missed.">                edges.get(i).setRoute(routes == null ? null : routes.get(i));</span>
+            }
+            // a route is not an edit of the model, so no listener hears of it
+<span class="nc" id="L95">            graph.repaint();</span>
+<span class="nc" id="L96">        }</span>
+
+        @Override
+        public void undo() {
+<span class="nc" id="L100">            apply(before);</span>
+<span class="nc" id="L101">        }</span>
+
+        @Override
+        public void redo() {
+<span class="nc" id="L105">            apply(after);</span>
+<span class="nc" id="L106">        }</span>
+
+        @Override
+        public String getName() {
+<span class="nc" id="L110">            return &quot;Move&quot;;</span>
+        }
+    }
+
+    /// A node took a new size, and with a leading or top corner a new place.
+    static final class Resize extends UndoableEdit {
+        private final GraphModel model;
+        private final GraphNode node;
+        private final double[] from;
+        private final double[] to;
+
+<span class="fc" id="L121">        Resize(GraphModel model, GraphNode node, double[] from, double[] to) {</span>
+<span class="fc" id="L122">            this.model = model;</span>
+<span class="fc" id="L123">            this.node = node;</span>
+<span class="fc" id="L124">            this.from = from;</span>
+<span class="fc" id="L125">            this.to = to;</span>
+<span class="fc" id="L126">        }</span>
+
+        private void apply(double[] b) {
+<span class="fc" id="L129">            model.moveNode(node, b[0], b[1]);</span>
+<span class="fc" id="L130">            model.resizeNode(node, b[2], b[3]);</span>
+<span class="fc" id="L131">        }</span>
+
+        @Override
+        public void undo() {
+<span class="fc" id="L135">            apply(from);</span>
+<span class="fc" id="L136">        }</span>
+
+        @Override
+        public void redo() {
+<span class="fc" id="L140">            apply(to);</span>
+<span class="fc" id="L141">        }</span>
+
+        @Override
+        public String getName() {
+<span class="nc" id="L145">            return &quot;Resize&quot;;</span>
+        }
+    }
+
+    /// Nodes and edges were added, or with `removal` taken out.
+    static final class Presence extends UndoableEdit {
+        private final GraphModel model;
+        private final List&lt;GraphNode&gt; nodes;
+        private final List&lt;GraphEdge&gt; edges;
+        private final boolean removal;
+        private final String name;
+        // where each was in the model before a removal, or null: at the end
+        private final int[] nodeAt;
+        private final int[] edgeAt;
+
+        Presence(GraphModel model, List&lt;GraphNode&gt; nodes, List&lt;GraphEdge&gt; edges, boolean removal, String name) {
+<span class="fc" id="L161">            this(model, nodes, edges, removal, name, null, null);</span>
+<span class="fc" id="L162">        }</span>
+
+        /// A removal, with the model's nodes and edges as they were before
+        /// it: undo puts each back where it was, so what was drawn under
+        /// another node is under it again.
+        Presence(GraphModel model, List&lt;GraphNode&gt; nodes, List&lt;GraphEdge&gt; edges, boolean removal, String name,
+<span class="fc" id="L168">                 List&lt;GraphNode&gt; nodesBefore, List&lt;GraphEdge&gt; edgesBefore) {</span>
+<span class="fc" id="L169">            this.model = model;</span>
+<span class="fc" id="L170">            this.removal = removal;</span>
+<span class="fc" id="L171">            this.name = name;</span>
+<span class="fc bfc" id="L172" title="All 2 branches covered.">            if (nodesBefore == null) {</span>
+<span class="fc" id="L173">                this.nodes = nodes;</span>
+<span class="fc" id="L174">                this.edges = edges;</span>
+<span class="fc" id="L175">                nodeAt = null;</span>
+<span class="fc" id="L176">                edgeAt = null;</span>
+<span class="fc" id="L177">                return;</span>
+            }
+            // in the order they had, so that each index is right when it is used
+<span class="fc" id="L180">            this.nodes = new ArrayList&lt;GraphNode&gt;();</span>
+<span class="fc" id="L181">            this.edges = new ArrayList&lt;GraphEdge&gt;();</span>
+<span class="fc" id="L182">            nodeAt = new int[nodes.size()];</span>
+<span class="fc" id="L183">            edgeAt = new int[edges.size()];</span>
+<span class="fc" id="L184">            int k = 0;</span>
+<span class="fc bfc" id="L185" title="All 4 branches covered.">            for (int i = 0; i &lt; nodesBefore.size() &amp;&amp; k &lt; nodeAt.length; i++) {</span>
+<span class="fc bfc" id="L186" title="All 2 branches covered.">                if (nodes.contains(nodesBefore.get(i))) {</span>
+<span class="fc" id="L187">                    this.nodes.add(nodesBefore.get(i));</span>
+<span class="fc" id="L188">                    nodeAt[k++] = i;</span>
+                }
+            }
+<span class="fc" id="L191">            k = 0;</span>
+<span class="fc bfc" id="L192" title="All 4 branches covered.">            for (int i = 0; i &lt; edgesBefore.size() &amp;&amp; k &lt; edgeAt.length; i++) {</span>
+<span class="pc bpc" id="L193" title="1 of 2 branches missed.">                if (edges.contains(edgesBefore.get(i))) {</span>
+<span class="fc" id="L194">                    this.edges.add(edgesBefore.get(i));</span>
+<span class="fc" id="L195">                    edgeAt[k++] = i;</span>
+                }
+            }
+<span class="fc" id="L198">        }</span>
+
+        private void put() {
+<span class="fc" id="L201">            int n = nodes.size();</span>
+<span class="fc bfc" id="L202" title="All 2 branches covered.">            for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc bfc" id="L203" title="All 2 branches covered.">                model.insertNode(nodes.get(i), nodeAt == null ? -1 : nodeAt[i]);</span>
+            }
+<span class="fc" id="L205">            n = edges.size();</span>
+<span class="fc bfc" id="L206" title="All 2 branches covered.">            for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc bfc" id="L207" title="All 2 branches covered.">                model.insertEdge(edges.get(i), edgeAt == null ? -1 : edgeAt[i]);</span>
+            }
+<span class="fc" id="L209">        }</span>
+
+        private void take() {
+<span class="fc bfc" id="L212" title="All 2 branches covered.">            for (int i = edges.size() - 1; i &gt;= 0; i--) {</span>
+<span class="fc" id="L213">                model.removeEdge(edges.get(i));</span>
+            }
+<span class="fc bfc" id="L215" title="All 2 branches covered.">            for (int i = nodes.size() - 1; i &gt;= 0; i--) {</span>
+<span class="fc" id="L216">                model.removeNode(nodes.get(i));</span>
+            }
+<span class="fc" id="L218">        }</span>
+
+        @Override
+        public void undo() {
+<span class="fc bfc" id="L222" title="All 2 branches covered.">            if (removal) {</span>
+<span class="fc" id="L223">                put();</span>
+            } else {
+<span class="fc" id="L225">                take();</span>
+            }
+<span class="fc" id="L227">        }</span>
+
+        @Override
+        public void redo() {
+<span class="fc bfc" id="L231" title="All 2 branches covered.">            if (removal) {</span>
+<span class="fc" id="L232">                take();</span>
+            } else {
+<span class="fc" id="L234">                put();</span>
+            }
+<span class="fc" id="L236">        }</span>
+
+        @Override
+        public String getName() {
+<span class="fc" id="L240">            return name;</span>
+        }
+    }
+
+    /// A node was given another label.
+    static final class Rename extends UndoableEdit {
+        private final GraphModel model;
+        private final GraphNode node;
+        private final String from;
+        private final String to;
+
+<span class="nc" id="L251">        Rename(GraphModel model, GraphNode node, String from, String to) {</span>
+<span class="nc" id="L252">            this.model = model;</span>
+<span class="nc" id="L253">            this.node = node;</span>
+<span class="nc" id="L254">            this.from = from;</span>
+<span class="nc" id="L255">            this.to = to;</span>
+<span class="nc" id="L256">        }</span>
+
+        @Override
+        public void undo() {
+<span class="nc" id="L260">            model.renameNode(node, from);</span>
+<span class="nc" id="L261">        }</span>
+
+        @Override
+        public void redo() {
+<span class="nc" id="L265">            model.renameNode(node, to);</span>
+<span class="nc" id="L266">        }</span>
+
+        @Override
+        public String getName() {
+<span class="nc" id="L270">            return &quot;Rename&quot;;</span>
+        }
+    }
+
+    /// A group was collapsed or expanded.
+    static final class Collapse extends UndoableEdit {
+        private final GraphModel model;
+        private final GraphGroup group;
+        private final boolean to;
+
+<span class="fc" id="L280">        Collapse(GraphModel model, GraphGroup group, boolean to) {</span>
+<span class="fc" id="L281">            this.model = model;</span>
+<span class="fc" id="L282">            this.group = group;</span>
+<span class="fc" id="L283">            this.to = to;</span>
+<span class="fc" id="L284">        }</span>
+
+        @Override
+        public void undo() {
+<span class="nc bnc" id="L288" title="All 2 branches missed.">            model.setCollapsed(group, !to);</span>
+<span class="nc" id="L289">        }</span>
+
+        @Override
+        public void redo() {
+<span class="nc" id="L293">            model.setCollapsed(group, to);</span>
+<span class="nc" id="L294">        }</span>
+
+        @Override
+        public String getName() {
+<span class="nc bnc" id="L298" title="All 2 branches missed.">            return to ? &quot;Collapse&quot; : &quot;Expand&quot;;</span>
+        }
+    }
+
+    /// A node went into another lane or group.
+    static final class Membership extends UndoableEdit {
+        private final GraphModel model;
+        private final GraphNode node;
+        private final String from;
+        private final String to;
+
+<span class="fc" id="L309">        Membership(GraphModel model, GraphNode node, String from, String to) {</span>
+<span class="fc" id="L310">            this.model = model;</span>
+<span class="fc" id="L311">            this.node = node;</span>
+<span class="fc" id="L312">            this.from = from;</span>
+<span class="fc" id="L313">            this.to = to;</span>
+<span class="fc" id="L314">        }</span>
+
+        @Override
+        public void undo() {
+<span class="fc" id="L318">            model.setNodeGroup(node, from);</span>
+<span class="fc" id="L319">        }</span>
+
+        @Override
+        public void redo() {
+<span class="nc" id="L323">            model.setNodeGroup(node, to);</span>
+<span class="nc" id="L324">        }</span>
+
+        @Override
+        public String getName() {
+<span class="nc" id="L328">            return &quot;Move&quot;;</span>
+        }
+    }
+
+    /// A lane was moved or resized.
+    static final class LaneBounds extends UndoableEdit {
+        private final GraphModel model;
+        private final GraphGroup lane;
+        private final double[] from;
+        private final double[] to;
+
+<span class="fc" id="L339">        LaneBounds(GraphModel model, GraphGroup lane, double[] from, double[] to) {</span>
+<span class="fc" id="L340">            this.model = model;</span>
+<span class="fc" id="L341">            this.lane = lane;</span>
+<span class="fc" id="L342">            this.from = from;</span>
+<span class="fc" id="L343">            this.to = to;</span>
+<span class="fc" id="L344">        }</span>
+
+        @Override
+        public void undo() {
+<span class="fc" id="L348">            model.resizeGroup(lane, from[0], from[1], from[2], from[3]);</span>
+<span class="fc" id="L349">        }</span>
+
+        @Override
+        public void redo() {
+<span class="nc" id="L353">            model.resizeGroup(lane, to[0], to[1], to[2], to[3]);</span>
+<span class="nc" id="L354">        }</span>
+
+        @Override
+        public String getName() {
+<span class="nc" id="L358">            return &quot;Resize lane&quot;;</span>
+        }
+    }
+
+    /// An input port's own value changed.
+    static final class PortValue extends UndoableEdit {
+        private final GraphModel model;
+        private final GraphPort port;
+        private final Object from;
+        private final Object to;
+
+<span class="fc" id="L369">        PortValue(GraphModel model, GraphPort port, Object from, Object to) {</span>
+<span class="fc" id="L370">            this.model = model;</span>
+<span class="fc" id="L371">            this.port = port;</span>
+<span class="fc" id="L372">            this.from = from;</span>
+<span class="fc" id="L373">            this.to = to;</span>
+<span class="fc" id="L374">        }</span>
+
+        @Override
+        public void undo() {
+<span class="fc" id="L378">            model.setPortValue(port, from);</span>
+<span class="fc" id="L379">        }</span>
+
+        @Override
+        public void redo() {
+<span class="nc" id="L383">            model.setPortValue(port, to);</span>
+<span class="nc" id="L384">        }</span>
+
+        @Override
+        public String getName() {
+<span class="nc" id="L388">            return &quot;Change value&quot;;</span>
+        }
+    }
+
+    /// An arrangement placed every node. Like the arrangement itself, this
+    /// is not offered to the model as a user's move: nodes a model refuses to
+    /// move are placed directly.
+    static final class Arrange extends UndoableEdit {
+        private final GraphModel model;
+        private final List&lt;GraphNode&gt; nodes;
+        private final double[] from;
+        private final double[] to;
+        private final List&lt;GraphEdge&gt; edges;
+        private final List&lt;double[]&gt; routesFrom;
+        private final List&lt;double[]&gt; routesTo;
+
+        Arrange(GraphModel model, List&lt;GraphNode&gt; nodes, double[] from, double[] to,
+<span class="fc" id="L405">                List&lt;GraphEdge&gt; edges, List&lt;double[]&gt; routesFrom, List&lt;double[]&gt; routesTo) {</span>
+<span class="fc" id="L406">            this.model = model;</span>
+<span class="fc" id="L407">            this.nodes = nodes;</span>
+<span class="fc" id="L408">            this.from = from;</span>
+<span class="fc" id="L409">            this.to = to;</span>
+<span class="fc" id="L410">            this.edges = edges;</span>
+<span class="fc" id="L411">            this.routesFrom = routesFrom;</span>
+<span class="fc" id="L412">            this.routesTo = routesTo;</span>
+<span class="fc" id="L413">        }</span>
+
+        private void apply(double[] at, List&lt;double[]&gt; routes) {
+<span class="fc" id="L416">            int n = edges.size();</span>
+<span class="fc bfc" id="L417" title="All 2 branches covered.">            for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc" id="L418">                edges.get(i).setRoute(routes.get(i));</span>
+            }
+<span class="fc" id="L420">            n = nodes.size();</span>
+<span class="fc bfc" id="L421" title="All 2 branches covered.">            for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc" id="L422">                GraphNode node = nodes.get(i);</span>
+<span class="pc bpc" id="L423" title="1 of 2 branches missed.">                if (!model.moveNode(node, at[i * 2], at[i * 2 + 1])) {</span>
+<span class="nc" id="L424">                    node.setPosition(at[i * 2], at[i * 2 + 1]);</span>
+                }
+            }
+<span class="fc" id="L427">        }</span>
+
+        @Override
+        public void undo() {
+<span class="fc" id="L431">            apply(from, routesFrom);</span>
+<span class="fc" id="L432">        }</span>
+
+        @Override
+        public void redo() {
+<span class="fc" id="L436">            apply(to, routesTo);</span>
+<span class="fc" id="L437">        }</span>
+
+        @Override
+        public String getName() {
+<span class="fc" id="L441">            return &quot;Arrange&quot;;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

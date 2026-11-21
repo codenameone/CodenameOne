@@ -1,0 +1,483 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ShaderMaterial.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.gpu.shader</a> &gt; <span class="el_source">ShaderMaterial.java</span></div><h1>ShaderMaterial.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.gpu.shader;
+
+import com.codename1.gpu.Texture;
+
+/// Custom shading for a `com.codename1.gpu.Material`: a set of `ShaderNode`
+/// graphs, each replacing one input of the engine's own shader. What a hook
+/// does not replace keeps working as before, so a custom surface is still lit,
+/// shadowed, fogged and tone mapped like every other.
+///
+/// ```java
+/// import com.codename1.gpu.Material;
+/// import com.codename1.gpu.shader.*;
+///
+/// Material material = new Material(Material.Type.PBR);
+/// ShaderMaterial waves = new ShaderMaterial()
+///         .declareUniform(&quot;amp&quot;, ShaderType.FLOAT)
+///         .set(ShaderMaterial.Hook.VERTEX_OFFSET, ShaderNode.vec(ShaderNode.f(0f),
+///                 ShaderNode.sin(ShaderNode.position().x().add(ShaderNode.time()))
+///                         .mul(ShaderNode.uniform(&quot;amp&quot;, ShaderType.FLOAT)), ShaderNode.f(0f)))
+///         .setUniform(&quot;amp&quot;, 0.3f);
+/// material.setShader(waves);
+/// ```
+///
+/// Uniform values and textures are per material and may change every frame
+/// without recompiling anything. Changing a graph, or declaring a uniform or
+/// texture, makes the backend build a new program the next time the material
+/// is drawn, so do that once, not per frame.
+///
+/// Limits, the same on every backend: 16 uniforms and 4 textures per material.
+<span class="fc" id="L52">public final class ShaderMaterial {</span>
+    /// The most uniforms one material can declare.
+    public static final int MAX_UNIFORMS = 16;
+    /// The most textures one material can declare.
+    public static final int MAX_TEXTURES = 4;
+
+    /// An input of the engine's shader that a graph can replace.
+<span class="fc" id="L59">    public enum Hook {</span>
+        /// A `VEC3` added to the model space vertex position. Vertex stage.
+<span class="fc" id="L61">        VERTEX_OFFSET(ShaderType.VEC3, false),</span>
+        /// The `VEC4` surface colour and alpha, in place of the material
+        /// colour times its texture.
+<span class="fc" id="L64">        BASE_COLOR(ShaderType.VEC4, true),</span>
+        /// The `VEC3` world space surface normal used for lighting; it is
+        /// normalized for you.
+<span class="fc" id="L67">        NORMAL(ShaderType.VEC3, true),</span>
+        /// The `FLOAT` metallic factor of a PBR material.
+<span class="fc" id="L69">        METALLIC(ShaderType.FLOAT, true),</span>
+        /// The `FLOAT` roughness of a PBR material.
+<span class="fc" id="L71">        ROUGHNESS(ShaderType.FLOAT, true),</span>
+        /// A `VEC3` colour added after lighting, before fog and tone mapping.
+<span class="fc" id="L73">        EMISSIVE(ShaderType.VEC3, true),</span>
+        /// A `FLOAT`; the pixel is dropped where it is above 0.5. For cut
+        /// outs such as leaves, or a dissolve.
+<span class="fc" id="L76">        DISCARD(ShaderType.FLOAT, true);</span>
+
+        private final ShaderType type;
+        private final boolean fragment;
+
+<span class="fc" id="L81">        Hook(ShaderType type, boolean fragment) {</span>
+<span class="fc" id="L82">            this.type = type;</span>
+<span class="fc" id="L83">            this.fragment = fragment;</span>
+<span class="fc" id="L84">        }</span>
+
+        /// Returns the type a graph for this hook must have.
+        ///
+        /// #### Returns
+        ///
+        /// the type
+        public ShaderType getType() {
+<span class="fc" id="L92">            return type;</span>
+        }
+
+        /// Returns true for the fragment stage, false for the vertex stage.
+        ///
+        /// #### Returns
+        ///
+        /// the stage
+        public boolean isFragment() {
+<span class="fc" id="L101">            return fragment;</span>
+        }
+    }
+
+<span class="fc" id="L105">    private final ShaderNode[] hooks = new ShaderNode[Hook.values().length];</span>
+<span class="fc" id="L106">    private final String[] uniformNames = new String[MAX_UNIFORMS];</span>
+<span class="fc" id="L107">    private final ShaderType[] uniformTypes = new ShaderType[MAX_UNIFORMS];</span>
+    private int uniformCount;
+<span class="fc" id="L109">    private final float[] uniformValues = new float[MAX_UNIFORMS * 4];</span>
+<span class="fc" id="L110">    private final String[] textureNames = new String[MAX_TEXTURES];</span>
+<span class="fc" id="L111">    private final Texture[] textures = new Texture[MAX_TEXTURES];</span>
+    private int textureCount;
+    private int version;
+    private String key;
+
+    /// Sets the graph for a hook, or null to use the engine's own input.
+    ///
+    /// #### Parameters
+    ///
+    /// - `hook`: the input to replace
+    ///
+    /// - `graph`: a node of the hook's type, or null
+    ///
+    /// #### Returns
+    ///
+    /// this material
+    public ShaderMaterial set(Hook hook, ShaderNode graph) {
+<span class="fc bfc" id="L128" title="All 4 branches covered.">        if (graph != null &amp;&amp; graph.getType() != hook.getType()) {</span>
+<span class="fc" id="L129">            throw new IllegalArgumentException(hook + &quot; takes a &quot; + hook.getType() + &quot;, not a &quot; + graph.getType());</span>
+        }
+<span class="fc bfc" id="L131" title="All 2 branches covered.">        if (graph != null) {</span>
+<span class="fc" id="L132">            declareInstanceInputs(graph, new java.util.HashMap&lt;ShaderNode, Boolean&gt;());</span>
+        }
+<span class="fc" id="L134">        hooks[hook.ordinal()] = graph;</span>
+<span class="fc" id="L135">        changed();</span>
+<span class="fc" id="L136">        return this;</span>
+    }
+
+    /// Returns the graph set for a hook.
+    ///
+    /// #### Parameters
+    ///
+    /// - `hook`: the input
+    ///
+    /// #### Returns
+    ///
+    /// the graph, or null
+    public ShaderNode get(Hook hook) {
+<span class="fc" id="L149">        return hooks[hook.ordinal()];</span>
+    }
+
+    /// Declares a uniform the graphs read with `ShaderNode.uniform`.
+    /// Declaring a name twice with the same type does nothing.
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: the uniform name
+    ///
+    /// - `type`: its type
+    ///
+    /// #### Returns
+    ///
+    /// this material
+    public ShaderMaterial declareUniform(String name, ShaderType type) {
+<span class="fc" id="L165">        ShaderNode.checkName(name);</span>
+<span class="fc" id="L166">        int i = uniformIndex(name);</span>
+<span class="pc bpc" id="L167" title="1 of 2 branches missed.">        if (i &gt;= 0) {</span>
+<span class="nc bnc" id="L168" title="All 2 branches missed.">            if (uniformTypes[i] != type) {</span>
+<span class="nc" id="L169">                throw new IllegalArgumentException(&quot;Uniform &quot; + name + &quot; is already a &quot; + uniformTypes[i]);</span>
+            }
+<span class="nc" id="L171">            return this;</span>
+        }
+<span class="pc bpc" id="L173" title="1 of 2 branches missed.">        if (uniformCount == MAX_UNIFORMS) {</span>
+<span class="nc" id="L174">            throw new IllegalStateException(&quot;A material has at most &quot; + MAX_UNIFORMS + &quot; uniforms&quot;);</span>
+        }
+<span class="fc" id="L176">        uniformNames[uniformCount] = name;</span>
+<span class="fc" id="L177">        uniformTypes[uniformCount] = type;</span>
+<span class="fc" id="L178">        uniformCount++;</span>
+<span class="fc" id="L179">        changed();</span>
+<span class="fc" id="L180">        return this;</span>
+    }
+
+    /// Sets a uniform's value. Pass as many floats as its type has
+    /// components; missing ones are zero.
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: a declared uniform
+    ///
+    /// - `values`: its components
+    ///
+    /// #### Returns
+    ///
+    /// this material
+    public ShaderMaterial setUniform(String name, float... values) {
+<span class="fc" id="L196">        int i = uniformIndex(name);</span>
+<span class="pc bpc" id="L197" title="1 of 2 branches missed.">        if (i &lt; 0) {</span>
+<span class="nc" id="L198">            throw new IllegalArgumentException(&quot;Undeclared uniform: &quot; + name);</span>
+        }
+<span class="fc" id="L200">        int n = uniformTypes[i].getComponents();</span>
+<span class="fc bfc" id="L201" title="All 2 branches covered.">        for (int c = 0; c &lt; 4; c++) {</span>
+<span class="pc bpc" id="L202" title="1 of 4 branches missed.">            uniformValues[i * 4 + c] = c &lt; n &amp;&amp; c &lt; values.length ? values[c] : 0f;</span>
+        }
+<span class="fc" id="L204">        return this;</span>
+    }
+
+    /// Sets a `VEC3` uniform from a packed `0xRRGGBB` colour.
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: a declared uniform
+    ///
+    /// - `rgb`: the colour
+    ///
+    /// #### Returns
+    ///
+    /// this material
+    public ShaderMaterial setColorUniform(String name, int rgb) {
+<span class="fc" id="L219">        return setUniform(name, ((rgb &gt;&gt; 16) &amp; 0xff) / 255f, ((rgb &gt;&gt; 8) &amp; 0xff) / 255f, (rgb &amp; 0xff) / 255f);</span>
+    }
+
+    /// Declares a texture the graphs read with `ShaderNode.sample`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: the texture name
+    ///
+    /// - `texture`: the texture, or null to bind it later with `setTexture`
+    ///
+    /// #### Returns
+    ///
+    /// this material
+    public ShaderMaterial declareTexture(String name, Texture texture) {
+<span class="fc" id="L234">        ShaderNode.checkName(name);</span>
+<span class="fc" id="L235">        int i = textureIndex(name);</span>
+<span class="pc bpc" id="L236" title="1 of 2 branches missed.">        if (i &lt; 0) {</span>
+<span class="pc bpc" id="L237" title="1 of 2 branches missed.">            if (textureCount == MAX_TEXTURES) {</span>
+<span class="nc" id="L238">                throw new IllegalStateException(&quot;A material has at most &quot; + MAX_TEXTURES + &quot; textures&quot;);</span>
+            }
+<span class="fc" id="L240">            i = textureCount++;</span>
+<span class="fc" id="L241">            textureNames[i] = name;</span>
+<span class="fc" id="L242">            changed();</span>
+        }
+<span class="fc" id="L244">        textures[i] = texture;</span>
+<span class="fc" id="L245">        return this;</span>
+    }
+
+    /// Binds a declared texture.
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: the declared name
+    ///
+    /// - `texture`: the texture
+    ///
+    /// #### Returns
+    ///
+    /// this material
+    public ShaderMaterial setTexture(String name, Texture texture) {
+<span class="fc" id="L260">        int i = textureIndex(name);</span>
+<span class="pc bpc" id="L261" title="1 of 2 branches missed.">        if (i &lt; 0) {</span>
+<span class="nc" id="L262">            throw new IllegalArgumentException(&quot;Undeclared texture: &quot; + name);</span>
+        }
+<span class="fc" id="L264">        textures[i] = texture;</span>
+<span class="fc" id="L265">        return this;</span>
+    }
+
+    private int uniformIndex(String name) {
+<span class="fc bfc" id="L269" title="All 2 branches covered.">        for (int i = 0; i &lt; uniformCount; i++) {</span>
+<span class="fc bfc" id="L270" title="All 2 branches covered.">            if (uniformNames[i].equals(name)) {</span>
+<span class="fc" id="L271">                return i;</span>
+            }
+        }
+<span class="fc" id="L274">        return -1;</span>
+    }
+
+    private int textureIndex(String name) {
+<span class="fc bfc" id="L278" title="All 2 branches covered.">        for (int i = 0; i &lt; textureCount; i++) {</span>
+<span class="fc bfc" id="L279" title="All 2 branches covered.">            if (textureNames[i].equals(name)) {</span>
+<span class="fc" id="L280">                return i;</span>
+            }
+        }
+<span class="fc" id="L283">        return -1;</span>
+    }
+
+    /// Returns the slot of a uniform: its four floats start at `slot * 4` in
+    /// `getUniformValues`. For backends.
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: the uniform name
+    ///
+    /// #### Returns
+    ///
+    /// the slot, or -1 if it is not declared
+    public int getUniformSlot(String name) {
+<span class="fc" id="L297">        return uniformIndex(name);</span>
+    }
+
+    /// Returns the type of a declared uniform.
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: the uniform name
+    ///
+    /// #### Returns
+    ///
+    /// its type, or null if it is not declared
+    public ShaderType getUniformType(String name) {
+<span class="fc" id="L310">        int i = uniformIndex(name);</span>
+<span class="pc bpc" id="L311" title="1 of 2 branches missed.">        return i &lt; 0 ? null : uniformTypes[i];</span>
+    }
+
+    /// Returns the number of declared uniforms.
+    ///
+    /// #### Returns
+    ///
+    /// the count
+    public int getUniformCount() {
+<span class="fc" id="L320">        return uniformCount;</span>
+    }
+
+    /// Returns the uniform values packed four floats per slot, in
+    /// declaration order. For backends, which upload `getUniformCount() * 4`
+    /// floats of it as one vec4 array. Do not modify it.
+    ///
+    /// #### Returns
+    ///
+    /// the shared value array
+    public float[] getUniformValues() {
+<span class="fc" id="L331">        return uniformValues;</span>
+    }
+
+    /// Returns the name of the uniform in a slot.
+    ///
+    /// #### Parameters
+    ///
+    /// - `slot`: 0 to `getUniformCount() - 1`
+    ///
+    /// #### Returns
+    ///
+    /// the name
+    public String getUniformName(int slot) {
+<span class="fc" id="L344">        return uniformNames[slot];</span>
+    }
+
+    /// Returns the type of the uniform in a slot.
+    ///
+    /// #### Parameters
+    ///
+    /// - `slot`: 0 to `getUniformCount() - 1`
+    ///
+    /// #### Returns
+    ///
+    /// the type
+    public ShaderType getUniformType(int slot) {
+<span class="fc" id="L357">        return uniformTypes[slot];</span>
+    }
+
+    /// Returns the name of the texture in a slot.
+    ///
+    /// #### Parameters
+    ///
+    /// - `slot`: 0 to `getTextureCount() - 1`
+    ///
+    /// #### Returns
+    ///
+    /// the name
+    public String getTextureName(int slot) {
+<span class="nc" id="L370">        return textureNames[slot];</span>
+    }
+
+    /// Returns the slot of a texture, its index among the material's custom
+    /// textures. For backends.
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: the texture name
+    ///
+    /// #### Returns
+    ///
+    /// the slot, or -1 if it is not declared
+    public int getTextureSlot(String name) {
+<span class="fc" id="L384">        return textureIndex(name);</span>
+    }
+
+    /// Returns the number of declared textures.
+    ///
+    /// #### Returns
+    ///
+    /// the count
+    public int getTextureCount() {
+<span class="fc" id="L393">        return textureCount;</span>
+    }
+
+    /// Returns the texture bound to a slot.
+    ///
+    /// #### Parameters
+    ///
+    /// - `slot`: 0 to `getTextureCount() - 1`
+    ///
+    /// #### Returns
+    ///
+    /// the texture, or null when none is bound
+    public Texture getTexture(int slot) {
+<span class="fc" id="L406">        return textures[slot];</span>
+    }
+
+    /// Returns a number that changes whenever the generated program would.
+    ///
+    /// #### Returns
+    ///
+    /// the version
+    public int getVersion() {
+<span class="fc" id="L415">        return version;</span>
+    }
+
+    /// Returns a string identifying the generated program: equal for two
+    /// materials whose graphs, uniforms and textures produce the same source.
+    /// Backends add it to their program cache key.
+    ///
+    /// #### Returns
+    ///
+    /// the key
+    public String getShaderKey() {
+<span class="fc bfc" id="L426" title="All 2 branches covered.">        if (key == null) {</span>
+<span class="fc" id="L427">            StringBuilder sb = new StringBuilder();</span>
+<span class="fc bfc" id="L428" title="All 2 branches covered.">            for (int i = 0; i &lt; uniformCount; i++) {</span>
+<span class="fc" id="L429">                sb.append('u').append(uniformNames[i]).append(':').append(uniformTypes[i].getComponents());</span>
+            }
+<span class="fc bfc" id="L431" title="All 2 branches covered.">            for (int i = 0; i &lt; textureCount; i++) {</span>
+<span class="fc" id="L432">                sb.append('t').append(textureNames[i]);</span>
+            }
+<span class="fc" id="L434">            Hook[] all = Hook.values();</span>
+<span class="fc bfc" id="L435" title="All 2 branches covered.">            for (int i = 0; i &lt; all.length; i++) {</span>
+<span class="fc bfc" id="L436" title="All 2 branches covered.">                if (hooks[i] != null) {</span>
+<span class="fc" id="L437">                    sb.append('|').append(all[i].ordinal()).append('=');</span>
+<span class="fc" id="L438">                    ShaderEmitter.describe(hooks[i], sb);</span>
+                }
+            }
+<span class="fc" id="L441">            key = sb.toString();</span>
+        }
+<span class="fc" id="L443">        return key;</span>
+    }
+
+    /// The uniform `GraphicsDevice.drawInstanced` writes before each copy:
+    /// x is the copy's index, y a stable random number in 0 to 1 for it.
+    public static final String INSTANCE = &quot;cn1Instance&quot;;
+
+    /// The uniform holding the colour `GraphicsDevice.drawInstanced` gives
+    /// each copy, white when it gives none.
+    public static final String INSTANCE_COLOR = &quot;cn1InstanceColor&quot;;
+
+    // ShaderNode.instanceId() and friends read these uniforms; declaring them
+    // here keeps the graph the only thing an author writes
+    private void declareInstanceInputs(ShaderNode n, java.util.Map&lt;ShaderNode, Boolean&gt; seen) {
+<span class="fc bfc" id="L457" title="All 2 branches covered.">        if (seen.containsKey(n)) {</span>
+<span class="fc" id="L458">            return;</span>
+        }
+<span class="fc" id="L460">        seen.put(n, Boolean.TRUE);</span>
+<span class="fc bfc" id="L461" title="All 6 branches covered.">        if (n.getKind() == ShaderNode.UNIFORM &amp;&amp; (INSTANCE.equals(n.getName()) || INSTANCE_COLOR.equals(n.getName()))) {</span>
+<span class="fc bfc" id="L462" title="All 2 branches covered.">            if (uniformIndex(n.getName()) &lt; 0) {</span>
+<span class="fc" id="L463">                declareUniform(n.getName(), ShaderType.VEC4);</span>
+<span class="fc" id="L464">                int i = uniformIndex(n.getName());</span>
+<span class="fc bfc" id="L465" title="All 2 branches covered.">                if (INSTANCE_COLOR.equals(n.getName())) {</span>
+<span class="fc bfc" id="L466" title="All 2 branches covered.">                    for (int c = 0; c &lt; 4; c++) {</span>
+<span class="fc" id="L467">                        uniformValues[i * 4 + c] = 1f;</span>
+                    }
+                }
+            }
+<span class="fc" id="L471">            return;</span>
+        }
+<span class="fc bfc" id="L473" title="All 2 branches covered.">        for (int i = 0; i &lt; n.getArgCount(); i++) {</span>
+<span class="fc" id="L474">            declareInstanceInputs(n.getArg(i), seen);</span>
+        }
+<span class="fc" id="L476">    }</span>
+
+    private void changed() {
+<span class="fc" id="L479">        version++;</span>
+<span class="fc" id="L480">        key = null;</span>
+<span class="fc" id="L481">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

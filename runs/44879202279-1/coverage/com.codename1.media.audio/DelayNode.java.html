@@ -1,0 +1,164 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DelayNode.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.media.audio</a> &gt; <span class="el_source">DelayNode.java</span></div><h1>DelayNode.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.media.audio;
+
+/// Delays its input by [#getDelayTime()], the Web Audio `DelayNode`. Fractional
+/// delays are linearly interpolated.
+///
+/// A delay is the only node that may close a cycle, as in a feedback echo:
+///
+/// ```java
+/// OfflineAudioContext audio = new OfflineAudioContext(2, 44100, 44100);
+/// OscillatorNode source = audio.createOscillator();
+/// DelayNode echo = audio.createDelay(1);
+/// echo.getDelayTime().setValue(0.3f);
+/// GainNode feedback = audio.createGain();
+/// feedback.getGain().setValue(0.4f);
+/// source.connect(echo).connect(feedback).connect(echo);
+/// echo.connect(audio.getDestination());
+/// ```
+///
+/// Inside a cycle the delay cannot be shorter than one render quantum (128
+/// frames), as the specification requires.
+public final class DelayNode extends AudioNode {
+    private final AudioParam delayTime;
+    private final double maxDelayTime;
+
+    // ---- render side ----
+    private final int ringSize;
+<span class="fc" id="L49">    private final float[][] ring = new float[AudioBus.MAX_CHANNELS][];</span>
+<span class="fc" id="L50">    private int ringChannels = 1;</span>
+    private long writeFrame;
+<span class="fc" id="L52">    private long cycleQuantum = -1;</span>
+
+    DelayNode(BaseAudioContext context, double maxDelayTime) {
+<span class="fc" id="L55">        super(context, 1, 1, 2, ChannelCountMode.MAX, ChannelInterpretation.SPEAKERS);</span>
+<span class="pc bpc" id="L56" title="2 of 4 branches missed.">        if (!(maxDelayTime &gt; 0 &amp;&amp; maxDelayTime &lt; 180)) {</span>
+<span class="nc" id="L57">            throw new IllegalArgumentException(&quot;maxDelayTime must be more than 0 and less than 180: &quot;</span>
+                    + maxDelayTime);
+        }
+<span class="fc" id="L60">        this.maxDelayTime = maxDelayTime;</span>
+<span class="fc" id="L61">        delayTime = new AudioParam(context, &quot;delayTime&quot;, 0f, 0f, (float) maxDelayTime,</span>
+                AutomationRate.A_RATE, false);
+<span class="fc" id="L63">        ringSize = (int) Math.ceil(maxDelayTime * context.getSampleRate()) + 2 * BaseAudioContext.RENDER_QUANTUM + 2;</span>
+        // Mono and stereo rings are made here, on the caller's thread, so the
+        // renderer never allocates one for the usual layouts; a delay fed
+        // more than two channels allocates the rest on first use.
+<span class="fc" id="L67">        ring[0] = new float[ringSize];</span>
+<span class="fc" id="L68">        ring[1] = new float[ringSize];</span>
+<span class="fc" id="L69">    }</span>
+
+    /// The delay in seconds, 0 by default, up to the maximum; an audio rate
+    /// parameter.
+    ///
+    /// #### Returns
+    ///
+    /// the parameter
+    public AudioParam getDelayTime() {
+<span class="fc" id="L78">        return delayTime;</span>
+    }
+
+    /// The longest delay this node supports.
+    ///
+    /// #### Returns
+    ///
+    /// seconds
+    public double getMaxDelayTime() {
+<span class="nc" id="L87">        return maxDelayTime;</span>
+    }
+
+    private float[] ringChannel(int c) {
+<span class="fc" id="L91">        float[] r = ring[c];</span>
+<span class="pc bpc" id="L92" title="1 of 2 branches missed.">        if (r == null) {</span>
+<span class="nc" id="L93">            r = new float[ringSize];</span>
+<span class="nc" id="L94">            ring[c] = r;</span>
+        }
+<span class="fc" id="L96">        return r;</span>
+    }
+
+    /// Reached through a cycle: answer from what is already in the ring, with
+    /// the delay held to at least one quantum so no current input is needed.
+    @Override
+    AudioBus reentered(int output, long q) {
+<span class="fc" id="L103">        AudioBus out = outBuses[0];</span>
+<span class="fc bfc" id="L104" title="All 2 branches covered.">        if (cycleQuantum != q) {</span>
+<span class="fc" id="L105">            cycleQuantum = q;</span>
+<span class="fc" id="L106">            float[] d = delayTime.compute(q);</span>
+<span class="fc" id="L107">            out.setChannels(ringChannels);</span>
+<span class="fc" id="L108">            float sr = context.getSampleRate();</span>
+<span class="fc bfc" id="L109" title="All 2 branches covered.">            for (int c = 0; c &lt; ringChannels; c++) {</span>
+<span class="fc" id="L110">                float[] r = ringChannel(c);</span>
+<span class="fc" id="L111">                float[] o = out.data[c];</span>
+<span class="fc bfc" id="L112" title="All 2 branches covered.">                for (int i = 0; i &lt; BaseAudioContext.RENDER_QUANTUM; i++) {</span>
+<span class="fc" id="L113">                    double frames = Math.max(BaseAudioContext.snapFrames(d[i] * (double) sr),</span>
+                            BaseAudioContext.RENDER_QUANTUM);
+<span class="fc" id="L115">                    o[i] = read(r, writeFrame + i - frames);</span>
+                }
+            }
+        }
+<span class="fc" id="L119">        return out;</span>
+    }
+
+    @Override
+    void process(long q) {
+<span class="fc" id="L124">        AudioBus in = inBuses[0];</span>
+<span class="pc bpc" id="L125" title="1 of 2 branches missed.">        boolean cycled = cycleQuantum == q;</span>
+<span class="fc" id="L126">        float[] d = delayTime.compute(q);</span>
+<span class="pc bpc" id="L127" title="1 of 2 branches missed.">        if (in.channels &gt; ringChannels) {</span>
+<span class="nc" id="L128">            ringChannels = in.channels;</span>
+        }
+<span class="fc" id="L130">        float sr = context.getSampleRate();</span>
+<span class="fc" id="L131">        AudioBus out = outBuses[0];</span>
+<span class="pc bpc" id="L132" title="1 of 2 branches missed.">        if (!cycled) {</span>
+<span class="nc" id="L133">            out.setChannels(ringChannels);</span>
+        }
+<span class="fc bfc" id="L135" title="All 2 branches covered.">        for (int c = 0; c &lt; ringChannels; c++) {</span>
+<span class="fc" id="L136">            float[] r = ringChannel(c);</span>
+<span class="pc bpc" id="L137" title="1 of 2 branches missed.">            float[] s = c &lt; in.channels ? in.data[c] : null;</span>
+<span class="pc bpc" id="L138" title="1 of 2 branches missed.">            float[] o = cycled ? null : out.data[c];</span>
+<span class="fc bfc" id="L139" title="All 2 branches covered.">            for (int i = 0; i &lt; BaseAudioContext.RENDER_QUANTUM; i++) {</span>
+<span class="fc" id="L140">                long w = writeFrame + i;</span>
+<span class="pc bpc" id="L141" title="1 of 2 branches missed.">                r[(int) (w % ringSize)] = s == null ? 0f : s[i];</span>
+<span class="pc bpc" id="L142" title="1 of 2 branches missed.">                if (o != null) {</span>
+<span class="nc" id="L143">                    o[i] = read(r, w - BaseAudioContext.snapFrames(d[i] * (double) sr));</span>
+                }
+            }
+        }
+<span class="fc" id="L147">        writeFrame += BaseAudioContext.RENDER_QUANTUM;</span>
+<span class="fc" id="L148">    }</span>
+
+    private float read(float[] r, double pos) {
+<span class="fc bfc" id="L151" title="All 2 branches covered.">        if (pos &lt; 0) {</span>
+<span class="fc" id="L152">            return 0f;</span>
+        }
+<span class="fc" id="L154">        long i0 = (long) Math.floor(pos);</span>
+<span class="fc" id="L155">        double frac = pos - i0;</span>
+<span class="fc" id="L156">        float a = r[(int) (i0 % ringSize)];</span>
+<span class="pc bpc" id="L157" title="1 of 2 branches missed.">        if (frac == 0) {</span>
+<span class="fc" id="L158">            return a;</span>
+        }
+<span class="nc" id="L160">        float b = r[(int) ((i0 + 1) % ringSize)];</span>
+<span class="nc" id="L161">        return (float) (a + (b - a) * frac);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

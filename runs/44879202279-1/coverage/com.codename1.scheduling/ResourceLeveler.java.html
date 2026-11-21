@@ -1,0 +1,301 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ResourceLeveler.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.scheduling</a> &gt; <span class="el_source">ResourceLeveler.java</span></div><h1>ResourceLeveler.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.scheduling;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+
+/// Finds where a project asks more of a resource than there is, and proposes
+/// delays that take the excess away.
+///
+/// Leveling never shortens or splits a task and never changes a link. It
+/// takes the earliest moment a resource is overbooked, keeps the tasks that
+/// can least afford to wait and holds one of the others back until a place is
+/// free: the one with the most slack first, so the project's finish moves
+/// only when no slack is left, then the one with the lowest priority. A task
+/// that is scheduled manually, has a &quot;must&quot; constraint or has priority 1000
+/// is never moved.
+///
+/// This is a heuristic, as it is in every planning tool: the best order is
+/// not something that can be computed for a project of any size.
+public final class ResourceLeveler {
+    private static final float EPSILON = 0.0001f;
+
+    private ResourceLeveler() {
+    }
+
+    /// Every stretch in which a resource is overbooked, ordered by resource
+    /// and then by time.
+    public static List&lt;ResourceOverallocation&gt; findOverallocations(ProjectModel model) {
+<span class="fc" id="L51">        List&lt;ResourceOverallocation&gt; out = new ArrayList&lt;ResourceOverallocation&gt;();</span>
+<span class="fc" id="L52">        List&lt;ScheduleResource&gt; resources = model.getResources();</span>
+<span class="fc" id="L53">        List&lt;GanttTask&gt; leaves = leaves(model);</span>
+<span class="fc bfc" id="L54" title="All 2 branches covered.">        for (ScheduleResource resource : resources) {</span>
+<span class="fc" id="L55">            scan(resource, leaves, out, null);</span>
+<span class="fc" id="L56">        }</span>
+<span class="fc" id="L57">        return out;</span>
+    }
+
+    /// How much of a resource is asked for over time: the most units in use
+    /// at once in each of the `buckets` equal slices of `[from, to)`. Divide
+    /// by the resource's capacity for a load.
+    public static float[] loadProfile(ProjectModel model, String resourceId, long from, long to, int buckets) {
+<span class="fc" id="L64">        float[] out = new float[Math.max(0, buckets)];</span>
+<span class="pc bpc" id="L65" title="1 of 4 branches missed.">        if (buckets &lt;= 0 || to &lt;= from) {</span>
+<span class="fc" id="L66">            return out;</span>
+        }
+<span class="fc" id="L68">        List&lt;GanttTask&gt; leaves = leaves(model);</span>
+<span class="fc" id="L69">        double width = (to - from) / (double) buckets;</span>
+<span class="fc bfc" id="L70" title="All 2 branches covered.">        for (GanttTask t : leaves) {</span>
+<span class="fc" id="L71">            float units = t.getUnits(resourceId);</span>
+<span class="pc bpc" id="L72" title="4 of 8 branches missed.">            if (units &lt;= 0 || t.getEnd() &lt;= from || t.getStart() &gt;= to || t.getEnd() &lt;= t.getStart()) {</span>
+<span class="nc" id="L73">                continue;</span>
+            }
+            // Tasks that overlap in a bucket add up only where they overlap in
+            // time, so the peak is taken per boundary inside the bucket below.
+<span class="fc" id="L77">            int first = (int) Math.max(0, Math.floor((t.getStart() - from) / width));</span>
+<span class="fc" id="L78">            int last = (int) Math.min(buckets - 1, Math.floor((t.getEnd() - 1 - from) / width));</span>
+<span class="fc bfc" id="L79" title="All 2 branches covered.">            for (int b = first; b &lt;= last; b++) {</span>
+<span class="fc" id="L80">                out[b] = -1f;</span>
+            }
+<span class="fc" id="L82">        }</span>
+<span class="fc bfc" id="L83" title="All 2 branches covered.">        for (int b = 0; b &lt; buckets; b++) {</span>
+<span class="fc bfc" id="L84" title="All 2 branches covered.">            if (out[b] &lt; 0) {</span>
+<span class="fc" id="L85">                long bs = from + (long) (b * width);</span>
+<span class="fc" id="L86">                long be = from + (long) ((b + 1) * width);</span>
+<span class="fc" id="L87">                out[b] = peak(leaves, resourceId, bs, be);</span>
+            }
+        }
+<span class="fc" id="L90">        return out;</span>
+    }
+
+    private static float peak(List&lt;GanttTask&gt; leaves, String resourceId, long from, long to) {
+<span class="fc" id="L94">        float best = 0;</span>
+        // The sum only changes where a task starts, so those are the only
+        // instants worth measuring, with the start of the range itself.
+<span class="fc bfc" id="L97" title="All 2 branches covered.">        for (int i = -1; i &lt; leaves.size(); i++) {</span>
+<span class="fc" id="L98">            long at = from;</span>
+<span class="fc bfc" id="L99" title="All 2 branches covered.">            if (i &gt;= 0) {</span>
+<span class="fc" id="L100">                GanttTask t = leaves.get(i);</span>
+<span class="pc bpc" id="L101" title="2 of 6 branches missed.">                if (t.getUnits(resourceId) &lt;= 0 || t.getStart() &lt;= from || t.getStart() &gt;= to) {</span>
+<span class="nc" id="L102">                    continue;</span>
+                }
+<span class="fc" id="L104">                at = t.getStart();</span>
+            }
+<span class="fc" id="L106">            float sum = 0;</span>
+<span class="fc bfc" id="L107" title="All 2 branches covered.">            for (GanttTask o : leaves) {</span>
+<span class="pc bpc" id="L108" title="1 of 4 branches missed.">                if (o.getStart() &lt;= at &amp;&amp; o.getEnd() &gt; at) {</span>
+<span class="fc" id="L109">                    sum += o.getUnits(resourceId);</span>
+                }
+<span class="fc" id="L111">            }</span>
+<span class="fc" id="L112">            best = Math.max(best, sum);</span>
+        }
+<span class="fc" id="L114">        return best;</span>
+    }
+
+    /// Proposes leveling delays for the whole project, starting from none.
+    /// The project is left exactly as it was; see `LevelingResult.apply`.
+    public static LevelingResult level(ProjectModel model) {
+<span class="fc" id="L120">        List&lt;GanttTask&gt; all = model.getTasks();</span>
+<span class="fc" id="L121">        int n = all.size();</span>
+<span class="fc" id="L122">        long[] before = new long[n];</span>
+<span class="fc bfc" id="L123" title="All 2 branches covered.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc" id="L124">            before[i] = all.get(i).getLevelingDelay();</span>
+        }
+<span class="fc" id="L126">        ProjectScheduler.schedule(model);</span>
+<span class="fc" id="L127">        long finishBefore = model.getFinish();</span>
+<span class="fc bfc" id="L128" title="All 2 branches covered.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc" id="L129">            all.get(i).setLevelingDelay(0);</span>
+        }
+<span class="fc" id="L131">        ProjectScheduler.schedule(model);</span>
+
+<span class="fc" id="L133">        WorkCalendar cal = model.getCalendar();</span>
+<span class="fc" id="L134">        List&lt;GanttTask&gt; leaves = leaves(model);</span>
+<span class="fc" id="L135">        List&lt;ScheduleResource&gt; resources = model.getResources();</span>
+<span class="fc" id="L136">        List&lt;GanttTask&gt; stuck = new ArrayList&lt;GanttTask&gt;();</span>
+<span class="fc" id="L137">        List&lt;ResourceOverallocation&gt; found = new ArrayList&lt;ResourceOverallocation&gt;();</span>
+<span class="fc" id="L138">        List&lt;GanttTask&gt; conflict = new ArrayList&lt;GanttTask&gt;();</span>
+        // Every step moves one task later, so this ends by itself; the limit
+        // is for a calendar or a set of constraints that makes it crawl.
+<span class="fc" id="L141">        long steps = 200L + 4L * leaves.size() * leaves.size();</span>
+<span class="pc bpc" id="L142" title="1 of 2 branches missed.">        int limit = steps &gt; Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) steps;</span>
+<span class="pc bpc" id="L143" title="1 of 2 branches missed.">        for (int step = 0; step &lt; limit; step++) {</span>
+<span class="fc" id="L144">            ResourceOverallocation first = null;</span>
+<span class="fc bfc" id="L145" title="All 2 branches covered.">            for (ScheduleResource resource : resources) {</span>
+<span class="fc" id="L146">                found.clear();</span>
+<span class="fc" id="L147">                scan(resource, leaves, found, stuck);</span>
+<span class="pc bpc" id="L148" title="3 of 6 branches missed.">                if (!found.isEmpty() &amp;&amp; (first == null || found.get(0).getStart() &lt; first.getStart())) {</span>
+<span class="fc" id="L149">                    first = found.get(0);</span>
+                }
+<span class="fc" id="L151">            }</span>
+<span class="fc bfc" id="L152" title="All 2 branches covered.">            if (first == null) {</span>
+<span class="fc" id="L153">                break;</span>
+            }
+<span class="fc" id="L155">            conflict.clear();</span>
+<span class="fc bfc" id="L156" title="All 2 branches covered.">            for (GanttTask t : leaves) {</span>
+<span class="pc bpc" id="L157" title="1 of 6 branches missed.">                if (t.getUnits(first.getResourceId()) &gt; 0 &amp;&amp; t.getStart() &lt;= first.getStart() &amp;&amp; t.getEnd() &gt; first.getStart()) {</span>
+<span class="fc" id="L158">                    conflict.add(t);</span>
+                }
+<span class="fc" id="L160">            }</span>
+<span class="fc bfc" id="L161" title="All 2 branches covered.">            GanttTask victim = conflict.size() &lt; 2 ? null : pick(conflict, stuck);</span>
+<span class="fc bfc" id="L162" title="All 2 branches covered.">            if (victim == null) {</span>
+<span class="fc" id="L163">                addAllOnce(stuck, conflict);</span>
+<span class="fc" id="L164">                continue;</span>
+            }
+<span class="fc" id="L166">            long until = Long.MAX_VALUE;</span>
+<span class="fc bfc" id="L167" title="All 2 branches covered.">            for (GanttTask o : conflict) {</span>
+<span class="fc bfc" id="L168" title="All 2 branches covered.">                if (o != victim) { //NOPMD CompareObjectsWithEquals</span>
+<span class="fc" id="L169">                    until = Math.min(until, o.getEnd());</span>
+                }
+<span class="fc" id="L171">            }</span>
+<span class="fc" id="L172">            long add = cal.workingTimeBetween(victim.getStart(), cal.nextWorkingTime(until));</span>
+<span class="pc bpc" id="L173" title="1 of 2 branches missed.">            if (add &lt;= 0) {</span>
+<span class="nc" id="L174">                stuck.add(victim);</span>
+<span class="nc" id="L175">                continue;</span>
+            }
+<span class="fc" id="L177">            victim.setLevelingDelay(victim.getLevelingDelay() + add);</span>
+<span class="fc" id="L178">            ProjectScheduler.schedule(model);</span>
+        }
+<span class="fc" id="L180">        List&lt;ResourceOverallocation&gt; unresolved = findOverallocations(model);</span>
+<span class="fc" id="L181">        LevelingResult result = new LevelingResult(model, all, unresolved, finishBefore, model.getFinish(), before);</span>
+<span class="fc bfc" id="L182" title="All 2 branches covered.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc" id="L183">            all.get(i).setLevelingDelay(before[i]);</span>
+        }
+<span class="fc" id="L185">        ProjectScheduler.schedule(model);</span>
+<span class="fc" id="L186">        return result;</span>
+    }
+
+    // The task to hold back: most slack, then lowest priority, then the one
+    // that starts last, then the one furthest down the outline.
+    private static GanttTask pick(List&lt;GanttTask&gt; conflict, List&lt;GanttTask&gt; stuck) {
+<span class="fc" id="L192">        GanttTask best = null;</span>
+<span class="fc bfc" id="L193" title="All 2 branches covered.">        for (GanttTask t : conflict) {</span>
+<span class="pc bpc" id="L194" title="2 of 6 branches missed.">            if (t.isManuallyScheduled() || t.getPriority() &gt;= 1000 || stuck.contains(t)</span>
+<span class="fc bfc" id="L195" title="All 2 branches covered.">                    || t.getConstraint() == GanttTask.Constraint.MUST_START_ON</span>
+<span class="pc bpc" id="L196" title="1 of 2 branches missed.">                    || t.getConstraint() == GanttTask.Constraint.MUST_FINISH_ON) {</span>
+<span class="nc" id="L197">                continue;</span>
+            }
+<span class="fc bfc" id="L199" title="All 4 branches covered.">            if (best == null || later(t, best)) {</span>
+<span class="fc" id="L200">                best = t;</span>
+            }
+<span class="fc" id="L202">        }</span>
+<span class="fc" id="L203">        return best;</span>
+    }
+
+    private static boolean later(GanttTask a, GanttTask b) {
+<span class="fc" id="L207">        long sa = Math.max(0, a.getTotalSlack());</span>
+<span class="fc" id="L208">        long sb = Math.max(0, b.getTotalSlack());</span>
+<span class="fc bfc" id="L209" title="All 2 branches covered.">        if (sa != sb) {</span>
+<span class="pc bpc" id="L210" title="1 of 2 branches missed.">            return sa &gt; sb;</span>
+        }
+<span class="fc bfc" id="L212" title="All 2 branches covered.">        if (a.getPriority() != b.getPriority()) {</span>
+<span class="pc bpc" id="L213" title="1 of 2 branches missed.">            return a.getPriority() &lt; b.getPriority();</span>
+        }
+<span class="pc bpc" id="L215" title="1 of 2 branches missed.">        if (a.getStart() != b.getStart()) {</span>
+<span class="nc bnc" id="L216" title="All 2 branches missed.">            return a.getStart() &gt; b.getStart();</span>
+        }
+<span class="pc bpc" id="L218" title="1 of 2 branches missed.">        return a.index &gt; b.index;</span>
+    }
+
+    private static void addAllOnce(List&lt;GanttTask&gt; into, List&lt;GanttTask&gt; from) {
+<span class="fc bfc" id="L222" title="All 2 branches covered.">        for (GanttTask task : from) {</span>
+<span class="pc bpc" id="L223" title="1 of 2 branches missed.">            if (!into.contains(task)) {</span>
+<span class="fc" id="L224">                into.add(task);</span>
+            }
+<span class="fc" id="L226">        }</span>
+<span class="fc" id="L227">    }</span>
+
+    private static List&lt;GanttTask&gt; leaves(ProjectModel model) {
+<span class="fc" id="L230">        List&lt;GanttTask&gt; all = model.getTasks();</span>
+<span class="fc" id="L231">        List&lt;GanttTask&gt; out = new ArrayList&lt;GanttTask&gt;();</span>
+<span class="fc bfc" id="L232" title="All 2 branches covered.">        for (GanttTask t : all) {</span>
+<span class="pc bpc" id="L233" title="1 of 4 branches missed.">            if (!t.isSummary() &amp;&amp; !t.getAssignments().isEmpty()) {</span>
+<span class="fc" id="L234">                out.add(t);</span>
+            }
+<span class="fc" id="L236">        }</span>
+<span class="fc" id="L237">        return out;</span>
+    }
+
+    // Adds the overbooked stretches of one resource to `out`, in time order.
+    // A stretch made only of tasks in `ignore` is left out.
+    private static void scan(ScheduleResource res, List&lt;GanttTask&gt; leaves, List&lt;ResourceOverallocation&gt; out,
+                             List&lt;GanttTask&gt; ignore) {
+<span class="fc" id="L244">        String id = res.getId();</span>
+<span class="fc" id="L245">        int count = 0;</span>
+<span class="fc bfc" id="L246" title="All 2 branches covered.">        for (GanttTask t : leaves) {</span>
+<span class="pc bpc" id="L247" title="2 of 4 branches missed.">            if (t.getUnits(id) &gt; 0 &amp;&amp; t.getEnd() &gt; t.getStart()) {</span>
+<span class="fc" id="L248">                count++;</span>
+            }
+<span class="fc" id="L250">        }</span>
+<span class="pc bpc" id="L251" title="1 of 2 branches missed.">        if (count == 0) {</span>
+<span class="nc" id="L252">            return;</span>
+        }
+<span class="fc" id="L254">        long[] bounds = new long[count * 2];</span>
+<span class="fc" id="L255">        int b = 0;</span>
+<span class="fc bfc" id="L256" title="All 2 branches covered.">        for (GanttTask t : leaves) {</span>
+<span class="pc bpc" id="L257" title="2 of 4 branches missed.">            if (t.getUnits(id) &gt; 0 &amp;&amp; t.getEnd() &gt; t.getStart()) {</span>
+<span class="fc" id="L258">                bounds[b++] = t.getStart();</span>
+<span class="fc" id="L259">                bounds[b++] = t.getEnd();</span>
+            }
+<span class="fc" id="L261">        }</span>
+<span class="fc" id="L262">        Arrays.sort(bounds);</span>
+<span class="fc" id="L263">        long runStart = 0;</span>
+<span class="fc" id="L264">        long runEnd = 0;</span>
+<span class="fc" id="L265">        float runPeak = 0;</span>
+<span class="fc" id="L266">        boolean open = false;</span>
+<span class="fc bfc" id="L267" title="All 2 branches covered.">        for (int s = 0; s + 1 &lt; bounds.length; s++) {</span>
+<span class="fc" id="L268">            long from = bounds[s];</span>
+<span class="fc" id="L269">            long to = bounds[s + 1];</span>
+<span class="fc bfc" id="L270" title="All 2 branches covered.">            if (to == from) {</span>
+<span class="fc" id="L271">                continue;</span>
+            }
+<span class="fc" id="L273">            float sum = 0;</span>
+<span class="fc" id="L274">            boolean movable = false;</span>
+<span class="fc bfc" id="L275" title="All 2 branches covered.">            for (GanttTask t : leaves) {</span>
+<span class="fc" id="L276">                float u = t.getUnits(id);</span>
+<span class="pc bpc" id="L277" title="2 of 8 branches missed.">                if (u &gt; 0 &amp;&amp; t.getStart() &lt;= from &amp;&amp; t.getEnd() &gt;= to &amp;&amp; t.getEnd() &gt; t.getStart()) {</span>
+<span class="fc" id="L278">                    sum += u;</span>
+<span class="fc bfc" id="L279" title="All 4 branches covered.">                    movable |= ignore == null || !ignore.contains(t);</span>
+                }
+<span class="fc" id="L281">            }</span>
+<span class="fc bfc" id="L282" title="All 4 branches covered.">            boolean over = sum &gt; res.getCapacity() + EPSILON &amp;&amp; movable;</span>
+<span class="pc bpc" id="L283" title="3 of 6 branches missed.">            if (over &amp;&amp; open &amp;&amp; from == runEnd) {</span>
+<span class="nc" id="L284">                runEnd = to;</span>
+<span class="nc" id="L285">                runPeak = Math.max(runPeak, sum);</span>
+            } else {
+<span class="fc bfc" id="L287" title="All 2 branches covered.">                if (open) {</span>
+<span class="fc" id="L288">                    out.add(new ResourceOverallocation(id, runStart, runEnd, runPeak, res.getCapacity()));</span>
+                }
+<span class="fc" id="L290">                open = over;</span>
+<span class="fc" id="L291">                runStart = from;</span>
+<span class="fc" id="L292">                runEnd = to;</span>
+<span class="fc" id="L293">                runPeak = sum;</span>
+            }
+        }
+<span class="fc bfc" id="L296" title="All 2 branches covered.">        if (open) {</span>
+<span class="fc" id="L297">            out.add(new ResourceOverallocation(id, runStart, runEnd, runPeak, res.getCapacity()));</span>
+        }
+<span class="fc" id="L299">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

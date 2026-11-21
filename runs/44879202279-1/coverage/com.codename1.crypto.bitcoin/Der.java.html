@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Der.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.crypto.bitcoin</a> &gt; <span class="el_source">Der.java</span></div><h1>Der.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008-2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.crypto.bitcoin;
+
+/// Strict DER (BIP-66) encoding of an ECDSA signature.
+@com.codename1.impl.SharedWithBackend
+public final class Der {
+    private Der() {
+    }
+
+    /// `30 len 02 len r 02 len s` of two 32-byte big-endian integers.
+    public static byte[] encode(byte[] r, byte[] s) {
+<span class="fc" id="L33">        byte[] ri = integer(r);</span>
+<span class="fc" id="L34">        byte[] si = integer(s);</span>
+<span class="fc" id="L35">        byte[] out = new byte[6 + ri.length + si.length];</span>
+<span class="fc" id="L36">        out[0] = 0x30;</span>
+<span class="fc" id="L37">        out[1] = (byte) (4 + ri.length + si.length);</span>
+<span class="fc" id="L38">        out[2] = 0x02;</span>
+<span class="fc" id="L39">        out[3] = (byte) ri.length;</span>
+<span class="fc" id="L40">        System.arraycopy(ri, 0, out, 4, ri.length);</span>
+<span class="fc" id="L41">        out[4 + ri.length] = 0x02;</span>
+<span class="fc" id="L42">        out[5 + ri.length] = (byte) si.length;</span>
+<span class="fc" id="L43">        System.arraycopy(si, 0, out, 6 + ri.length, si.length);</span>
+<span class="fc" id="L44">        return out;</span>
+    }
+
+    /// The `r || s` 64 bytes of a strict DER signature (without the sighash byte).
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: for anything BIP-66 rejects
+    public static byte[] decode(byte[] der) {
+<span class="pc bpc" id="L53" title="4 of 8 branches missed.">        if (der.length &lt; 8 || der.length &gt; 72 || der[0] != 0x30 || (der[1] &amp; 0xff) != der.length - 2) {</span>
+<span class="nc" id="L54">            throw new IllegalArgumentException(&quot;not a DER signature&quot;);</span>
+        }
+<span class="fc" id="L56">        int rLen = der[3] &amp; 0xff;</span>
+<span class="pc bpc" id="L57" title="2 of 4 branches missed.">        if (der[2] != 0x02 || 5 + rLen &gt;= der.length) {</span>
+<span class="nc" id="L58">            throw new IllegalArgumentException(&quot;not a DER signature&quot;);</span>
+        }
+<span class="fc" id="L60">        int sLen = der[5 + rLen] &amp; 0xff;</span>
+<span class="pc bpc" id="L61" title="2 of 4 branches missed.">        if (der[4 + rLen] != 0x02 || 6 + rLen + sLen != der.length) {</span>
+<span class="nc" id="L62">            throw new IllegalArgumentException(&quot;not a DER signature&quot;);</span>
+        }
+<span class="fc" id="L64">        byte[] out = new byte[64];</span>
+<span class="fc" id="L65">        copyInteger(der, 4, rLen, out, 0);</span>
+<span class="fc" id="L66">        copyInteger(der, 6 + rLen, sLen, out, 32);</span>
+<span class="fc" id="L67">        return out;</span>
+    }
+
+    private static void copyInteger(byte[] der, int at, int len, byte[] out, int to) {
+<span class="pc bpc" id="L71" title="4 of 10 branches missed.">        if (len == 0 || (der[at] &amp; 0x80) != 0 || (len &gt; 1 &amp;&amp; der[at] == 0 &amp;&amp; (der[at + 1] &amp; 0x80) == 0)) {</span>
+<span class="nc" id="L72">            throw new IllegalArgumentException(&quot;non-canonical DER integer&quot;);</span>
+        }
+<span class="fc" id="L74">        int start = at;</span>
+<span class="fc" id="L75">        int n = len;</span>
+<span class="fc bfc" id="L76" title="All 2 branches covered.">        if (der[at] == 0) {</span>
+<span class="fc" id="L77">            start++;</span>
+<span class="fc" id="L78">            n--;</span>
+        }
+<span class="pc bpc" id="L80" title="1 of 2 branches missed.">        if (n &gt; 32) {</span>
+<span class="nc" id="L81">            throw new IllegalArgumentException(&quot;DER integer over 256 bits&quot;);</span>
+        }
+<span class="fc" id="L83">        System.arraycopy(der, start, out, to + 32 - n, n);</span>
+<span class="fc" id="L84">    }</span>
+
+    private static byte[] integer(byte[] v) {
+<span class="fc" id="L87">        int start = 0;</span>
+<span class="fc bfc" id="L88" title="All 4 branches covered.">        while (start &lt; v.length - 1 &amp;&amp; v[start] == 0) {</span>
+<span class="fc" id="L89">            start++;</span>
+        }
+<span class="fc bfc" id="L91" title="All 2 branches covered.">        boolean pad = (v[start] &amp; 0x80) != 0;</span>
+<span class="fc bfc" id="L92" title="All 2 branches covered.">        byte[] out = new byte[v.length - start + (pad ? 1 : 0)];</span>
+<span class="fc bfc" id="L93" title="All 2 branches covered.">        System.arraycopy(v, start, out, pad ? 1 : 0, v.length - start);</span>
+<span class="fc" id="L94">        return out;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

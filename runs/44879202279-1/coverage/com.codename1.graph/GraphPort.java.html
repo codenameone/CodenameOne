@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>GraphPort.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.graph</a> &gt; <span class="el_source">GraphPort.java</span></div><h1>GraphPort.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.graph;
+
+/// A place on a `GraphNode` where edges attach, as in a node editor.
+///
+/// A node with no ports is connected node to node, as in a system diagram.
+/// Ports are ordered on their side of the node in the order they were added.
+public class GraphPort {
+    /// The port takes incoming edges and sits on the leading side of the node.
+    public static final int INPUT = 0;
+
+    /// The port starts outgoing edges and sits on the trailing side.
+    public static final int OUTPUT = 1;
+
+    private final String id;
+    private final int direction;
+    private String label;
+    private String type;
+<span class="fc" id="L40">    private int maxConnections = -1;</span>
+    private Object value;
+    GraphNode node;
+
+    /// A port.
+    ///
+    /// #### Parameters
+    ///
+    /// - `id`: unique within its node
+    /// - `direction`: `INPUT` or `OUTPUT`
+    /// - `label`: painted beside the port, may be null
+    /// - `type`: compared by `ConnectionValidator`; null accepts any type
+<span class="fc" id="L52">    public GraphPort(String id, int direction, String label, String type) {</span>
+<span class="fc" id="L53">        this.id = id;</span>
+<span class="fc" id="L54">        this.direction = direction;</span>
+<span class="fc" id="L55">        this.label = label;</span>
+<span class="fc" id="L56">        this.type = type;</span>
+<span class="fc" id="L57">    }</span>
+
+    /// The id, unique within the node.
+    public String getId() {
+<span class="fc" id="L61">        return id;</span>
+    }
+
+    /// `INPUT` or `OUTPUT`.
+    public int getDirection() {
+<span class="nc" id="L66">        return direction;</span>
+    }
+
+    /// True for an `INPUT` port.
+    public boolean isInput() {
+<span class="fc bfc" id="L71" title="All 2 branches covered.">        return direction == INPUT;</span>
+    }
+
+    /// The label, or null.
+    public String getLabel() {
+<span class="fc" id="L76">        return label;</span>
+    }
+
+    /// Sets the label.
+    public void setLabel(String label) {
+<span class="nc" id="L81">        this.label = label;</span>
+<span class="nc" id="L82">    }</span>
+
+    /// The data type edges must agree on, or null for any.
+    public String getType() {
+<span class="fc" id="L86">        return type;</span>
+    }
+
+    /// Sets the data type.
+    public void setType(String type) {
+<span class="nc" id="L91">        this.type = type;</span>
+<span class="nc" id="L92">    }</span>
+
+    /// How many edges may attach, or -1 for any number.
+    public int getMaxConnections() {
+<span class="fc" id="L96">        return maxConnections;</span>
+    }
+
+    /// Limits the edges that may attach; -1 for any number.
+    public void setMaxConnections(int maxConnections) {
+<span class="fc" id="L101">        this.maxConnections = maxConnections;</span>
+<span class="fc" id="L102">    }</span>
+
+    /// The value an input uses while nothing is connected to it, such as the
+    /// number typed beside it in a node editor. Null by default.
+    public Object getValue() {
+<span class="fc" id="L107">        return value;</span>
+    }
+
+    /// Sets the value. A model shown by a component is told through
+    /// `GraphModel.setPortValue`.
+    ///
+    /// `GraphJson` saves a value that is a string, a number or a boolean, and
+    /// so does the clipboard. Read back, a whole number is a `Long` and any
+    /// other number a `Double`, whatever class it was: compare a value as a
+    /// `Number`, not as the class it was set with.
+    public void setValue(Object value) {
+<span class="fc" id="L118">        this.value = value;</span>
+<span class="fc" id="L119">    }</span>
+
+    /// The node the port belongs to, or null before it is added to one.
+    public GraphNode getNode() {
+<span class="fc" id="L123">        return node;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,275 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Tunnels.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.vpn.tunnel</a> &gt; <span class="el_source">Tunnels.java</span></div><h1>Tunnels.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.vpn.tunnel;
+
+import com.codename1.impl.vpn.TunnelWire;
+import com.codename1.impl.vpn.VpnRequests;
+import com.codename1.impl.vpn.VpnWire;
+import com.codename1.impl.async.EdtResult;
+import com.codename1.util.AsyncResource;
+import com.codename1.vpn.VpnError;
+import com.codename1.vpn.VpnException;
+import com.codename1.vpn.spi.VpnBridge;
+
+/// Starts and stops a packet tunnel this application implements.
+///
+/// ```java
+/// if (Tunnels.isSupported()) {
+///     Tunnels.start(new MyTunnel(), new TunnelSetup()
+///             .address(&quot;10.0.0.2/32&quot;)
+///             .route(&quot;0.0.0.0/0&quot;)
+///             .dnsServer(&quot;10.0.0.1&quot;)
+///             .data(sessionToken));
+/// }
+/// ```
+///
+/// #### Ask whether it is supported
+///
+/// [#isSupported] answers true on Android, and on an iOS build that
+/// generated the packet tunnel extension -- which is one that set
+/// `ios.vpn.tunnel=true`, named its tunnel in `ios.vpn.tunnel.class`, and
+/// holds the Network Extension entitlement Apple grants case by case. It
+/// answers false on every other iOS build, which is most of them, and
+/// everywhere else. Ask it and keep a path for the answer being no --
+/// [#start] refuses with `NOT_SUPPORTED` rather than pretending.
+///
+/// #### Do not assume the instance you pass is the one that runs
+///
+/// On Android it is: the tunnel runs in this process, inside the port's
+/// `VpnService`, so everything it closed over is still there. That is a
+/// property of one platform rather than of this API -- a tunnel hosted in
+/// another process would be CONSTRUCTED there, with none of the app's
+/// statics, which is what [TunnelSetup#data] is for.
+///
+/// The rule that follows costs nothing on Android and is the only thing
+/// that stays portable: a tunnel takes everything it needs from
+/// [VpnTunnel#onStart]'s configuration.
+public final class Tunnels {
+
+    /// The tunnel each pending start belongs to, keyed by request.
+    ///
+    /// A map rather than one field, because a field is a race the port
+    /// cannot close: the already-authorized path releases its reservation
+    /// and calls startService, which returns before the service has read
+    /// anything -- so a second start overwrote the field in between and the
+    /// service ran the WRONG tunnel object under the first setup, then
+    /// acknowledged the wrong request. The intent already carries the
+    /// request id; claiming by that id is what makes the two agree.
+<span class="fc" id="L78">    private static final java.util.Map&lt;Integer, VpnTunnel&gt; PENDING =</span>
+            new java.util.HashMap&lt;Integer, VpnTunnel&gt;();
+
+    /// The tunnel the platform is currently running, once it claimed one.
+    private static VpnTunnel current;
+
+    /// The request that claimed [#current], or -1.
+    ///
+    /// A claim is not a start. A port claims the tunnel when it takes the
+    /// request and can still fail afterwards -- Android's service claims in
+    /// onStartCommand and refuses in establish(), the simulation refuses a
+    /// block it cannot read -- and a refusal left `current` naming a tunnel
+    /// nothing was running, holding the application's object and everything
+    /// it closed over until the next start or stop. Recording which request
+    /// owns the registration is what lets deliverAck undo the claim it is
+    /// answering, rather than every port remembering to.
+<span class="fc" id="L94">    private static int currentRequest = -1;</span>
+
+    private Tunnels() {
+    }
+
+    /// Whether this platform can run a tunnel the application implements.
+    ///
+    /// False is the ordinary answer on most ports, and it is the query to
+    /// branch on -- not a platform test, which would go stale the moment a
+    /// port gained the capability.
+    public static boolean isSupported() {
+<span class="fc" id="L105">        VpnBridge b = VpnRequests.bridge();</span>
+<span class="pc bpc" id="L106" title="3 of 4 branches missed.">        return b != null &amp;&amp; b.isCustomTunnelSupported();</span>
+    }
+
+    /// Brings the tunnel up, resolving true once the platform has it.
+    ///
+    /// Shows the system's VPN consent prompt where one is needed, so the
+    /// result can be a [com.codename1.vpn.VpnError#USER_DECLINED] failure.
+    ///
+    /// @param tunnel the application's packet loop
+    /// @param setup  what the platform should establish
+    /// @return true once the tunnel is up
+    public static AsyncResource&lt;Boolean&gt; start(VpnTunnel tunnel,
+            TunnelSetup setup) {
+<span class="pc bpc" id="L119" title="2 of 4 branches missed.">        if (tunnel == null || setup == null) {</span>
+<span class="nc" id="L120">            return failed(VpnError.INVALID_CONFIGURATION,</span>
+                    &quot;A tunnel and a setup are both required&quot;);
+        }
+<span class="fc" id="L123">        VpnBridge b = VpnRequests.bridge();</span>
+<span class="pc bpc" id="L124" title="1 of 4 branches missed.">        if (b == null || !b.isCustomTunnelSupported()) {</span>
+<span class="fc" id="L125">            return failed(VpnError.NOT_SUPPORTED, null);</span>
+        }
+        // BEFORE a request exists, because a setup the platform cannot read
+        // is not a failure of the platform. Here rather than in each bridge:
+        // the check used to sit in LocalVpnBridge alone, so route(&quot;0/o&quot;) was
+        // refused in the simulator, threw out of Android's VpnService, and on
+        // iOS reached a separate extension process that read the unreadable
+        // prefix as zero and installed a DEFAULT route -- the app asked for
+        // one subnet and got all traffic.
+<span class="fc" id="L134">        String wire = TunnelWire.encodeSetup(setup);</span>
+        try {
+<span class="fc" id="L136">            TunnelWire.validateSetup(wire);</span>
+<span class="fc" id="L137">        } catch (IllegalArgumentException malformed) {</span>
+<span class="fc" id="L138">            return failed(VpnError.INVALID_CONFIGURATION,</span>
+<span class="fc" id="L139">                    malformed.getMessage());</span>
+<span class="fc" id="L140">        }</span>
+<span class="fc" id="L141">        int id = VpnRequests.nextId();</span>
+        // Registered BEFORE the bridge is asked, and against THIS request.
+        // On Android the service can be running and reading it back before
+        // startCustomTunnel returns, so a tunnel registered afterwards left
+        // the platform holding a live link with nothing to hand packets to.
+<span class="fc" id="L146">        synchronized (Tunnels.class) {</span>
+<span class="fc" id="L147">            PENDING.put(Integer.valueOf(id), tunnel);</span>
+<span class="fc" id="L148">        }</span>
+<span class="fc" id="L149">        EdtResult&lt;Boolean&gt; r = VpnRequests.openAck(id);</span>
+<span class="fc" id="L150">        b.startCustomTunnel(id, wire);</span>
+<span class="fc" id="L151">        return r;</span>
+    }
+
+    /// Takes the tunnel down.
+    ///
+    /// Answers even where no tunnel is running, because an app that has lost
+    /// track of its own state must be able to ask for the stopped one.
+    public static AsyncResource&lt;Boolean&gt; stop() {
+<span class="fc" id="L159">        VpnBridge b = VpnRequests.bridge();</span>
+<span class="pc bpc" id="L160" title="2 of 4 branches missed.">        if (b == null || !b.isCustomTunnelSupported()) {</span>
+<span class="nc" id="L161">            return failed(VpnError.NOT_SUPPORTED, null);</span>
+        }
+<span class="fc" id="L163">        int id = VpnRequests.nextId();</span>
+<span class="fc" id="L164">        EdtResult&lt;Boolean&gt; r = VpnRequests.openAck(id);</span>
+<span class="fc" id="L165">        b.stopCustomTunnel(id);</span>
+<span class="fc" id="L166">        return r;</span>
+    }
+
+    /// Takes the tunnel a particular start belongs to.
+    ///
+    /// Removes it, so two service commands carrying the same request cannot
+    /// both run it, and records it as the running one.
+    ///
+    /// @param requestId the id the start intent carried
+    /// @return the tunnel, or null when that start is not pending
+    ///
+    /// @hidden not part of the public API; called by the ports.
+    public static VpnTunnel claim(int requestId) {
+<span class="fc" id="L179">        synchronized (Tunnels.class) {</span>
+<span class="fc" id="L180">            VpnTunnel t = PENDING.remove(Integer.valueOf(requestId));</span>
+<span class="pc bpc" id="L181" title="1 of 2 branches missed.">            if (t != null) {</span>
+<span class="fc" id="L182">                current = t;</span>
+<span class="fc" id="L183">                currentRequest = requestId;</span>
+            }
+<span class="fc" id="L185">            return t;</span>
+        }
+    }
+
+    /// The tunnel the platform is running, or null.
+    ///
+    /// @hidden not part of the public API; called by the ports.
+    public static VpnTunnel getRegistered() {
+<span class="fc" id="L193">        synchronized (Tunnels.class) {</span>
+<span class="fc" id="L194">            return current;</span>
+        }
+    }
+
+    /// Forgets the registered tunnel once the platform has let it go.
+    ///
+    /// @hidden not part of the public API; called by the ports.
+    public static void clearRegistered() {
+<span class="fc" id="L202">        synchronized (Tunnels.class) {</span>
+<span class="fc" id="L203">            current = null;</span>
+<span class="fc" id="L204">            currentRequest = -1;</span>
+<span class="fc" id="L205">        }</span>
+<span class="fc" id="L206">    }</span>
+
+    /// Forgets every tunnel, running or pending.
+    ///
+    /// Reached from VpnRequests.resetForTest, so a tunnel does not outlive
+    /// the bridge that was running it -- in a test, or across a Display
+    /// re-init where the platform holding it has gone.
+    ///
+    /// @hidden not part of the public API; test support.
+    public static void resetForTest() {
+<span class="fc" id="L216">        synchronized (Tunnels.class) {</span>
+<span class="fc" id="L217">            PENDING.clear();</span>
+<span class="fc" id="L218">            current = null;</span>
+<span class="fc" id="L219">            currentRequest = -1;</span>
+<span class="fc" id="L220">        }</span>
+<span class="fc" id="L221">    }</span>
+
+    /// Drops a start that never reached the platform.
+    ///
+    /// @hidden not part of the public API; called by the ports.
+    public static void abandon(int requestId) {
+<span class="nc" id="L227">        synchronized (Tunnels.class) {</span>
+<span class="nc" id="L228">            PENDING.remove(Integer.valueOf(requestId));</span>
+<span class="nc" id="L229">        }</span>
+<span class="nc" id="L230">    }</span>
+
+    /// Answers a start or stop request.
+    ///
+    /// @hidden not part of the public API; called by the ports.
+    public static void deliverAck(int requestId, boolean ok, int errorOrdinal,
+            String message) {
+        // The pending entry goes HERE, because this is the one point every
+        // platform passes through. claim() covers a port that runs the
+        // tunnel in this process, which is the only kind there is today; a
+        // port that ran it elsewhere would never call claim, and its starts
+        // would accumulate a tunnel object -- and everything the application
+        // had closed over -- once per reconnect for the life of the process.
+        // Removing here is a no-op where claim already did it, and is what
+        // keeps that from being the next port's bug to find.
+<span class="fc" id="L245">        synchronized (Tunnels.class) {</span>
+<span class="fc" id="L246">            PENDING.remove(Integer.valueOf(requestId));</span>
+<span class="pc bpc" id="L247" title="1 of 4 branches missed.">            if (!ok &amp;&amp; currentRequest == requestId) {</span>
+                // A FAILED start unregisters what it claimed. See
+                // currentRequest: the claim happens when the port takes the
+                // request and the refusal can come later, so without this
+                // the tunnel the platform is &quot;running&quot; is one that never
+                // ran.
+<span class="nc" id="L253">                current = null;</span>
+<span class="nc" id="L254">                currentRequest = -1;</span>
+            }
+<span class="fc" id="L256">        }</span>
+<span class="fc" id="L257">        EdtResult&lt;Boolean&gt; r = VpnRequests.takeAck(requestId);</span>
+<span class="pc bpc" id="L258" title="1 of 2 branches missed.">        if (r == null) {</span>
+<span class="nc" id="L259">            return;</span>
+        }
+<span class="fc bfc" id="L261" title="All 2 branches covered.">        if (ok) {</span>
+<span class="fc" id="L262">            r.complete(Boolean.TRUE);</span>
+        } else {
+<span class="fc" id="L264">            r.error(VpnWire.decodeError(errorOrdinal, message));</span>
+        }
+<span class="fc" id="L266">    }</span>
+
+    private static AsyncResource&lt;Boolean&gt; failed(VpnError e, String message) {
+<span class="fc" id="L269">        EdtResult&lt;Boolean&gt; r = new EdtResult&lt;Boolean&gt;();</span>
+<span class="fc bfc" id="L270" title="All 2 branches covered.">        r.error(message == null ? new VpnException(e)</span>
+                : new VpnException(e, message));
+<span class="fc" id="L272">        return r;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,151 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Hrtf.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.media.audio</a> &gt; <span class="el_source">Hrtf.java</span></div><h1>Hrtf.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.media.audio;
+
+import com.codename1.util.MathUtil;
+
+/// Binaural rendering of one mono source from a structural model of the head,
+/// after C. P. Brown and R. O. Duda, &quot;A Structural Model for Binaural Sound
+/// Synthesis&quot;, IEEE Transactions on Speech and Audio Processing 6(5), 1998:
+///
+/// - an interaural time difference from a spherical head (Woodworth's formula
+///   as the paper gives it),
+/// - a one-pole, one-zero head shadow filter per ear whose high frequency gain
+///   follows the angle of incidence,
+/// - five pinna reflections whose delays follow azimuth and elevation, the
+///   cue for elevation and front/back.
+///
+/// The model needs no measured data, so the output is identical everywhere.
+/// Delays are interpolated across each quantum and filter coefficients change
+/// once per quantum, so a moving source does not click. Render thread only.
+final class Hrtf {
+    private static final double HEAD_RADIUS = 0.0875;
+    private static final double SPEED_OF_SOUND = 343;
+    private static final double BETA = 2 * SPEED_OF_SOUND / HEAD_RADIUS;
+    private static final double ALPHA_MIN = 0.1;
+    private static final double THETA_MIN = Math.PI * 150 / 180;
+    /// Pinna reflection coefficients and delay constants (in frames at 44.1 kHz).
+<span class="fc" id="L48">    private static final double[] RHO = {0.5, -1, 0.5, -0.25, 0.25};</span>
+<span class="fc" id="L49">    private static final double[] A = {1, 5, 5, 5, 5};</span>
+<span class="fc" id="L50">    private static final double[] B = {2, 4, 7, 11, 13};</span>
+<span class="fc" id="L51">    private static final double[] D = {1, 0.5, 0.5, 0.5, 0.5};</span>
+    private static final int RING = 1024;
+    private static final int MASK = RING - 1;
+
+    private final double sampleRate;
+<span class="fc" id="L56">    private final float[] ring = new float[RING];</span>
+    private long written;
+    private boolean primed;
+<span class="fc" id="L59">    private final double[] itd = new double[2];</span>
+<span class="fc" id="L60">    private final double[][] tau = new double[2][RHO.length];</span>
+<span class="fc" id="L61">    private final double[] nextItd = new double[2]; // NOPMD SingularField - preallocated scratch, no per-quantum allocation</span>
+<span class="fc" id="L62">    private final double[][] nextTau = new double[2][RHO.length]; // NOPMD SingularField - preallocated scratch, no per-quantum allocation</span>
+<span class="fc" id="L63">    private final double[] x1 = new double[2];</span>
+<span class="fc" id="L64">    private final double[] y1 = new double[2];</span>
+
+<span class="fc" id="L66">    Hrtf(double sampleRate) {</span>
+<span class="fc" id="L67">        this.sampleRate = sampleRate;</span>
+<span class="fc" id="L68">    }</span>
+
+    /// Renders one quantum of `mono` into `left`/`right`, multiplied by `gain`,
+    /// for a source at `azimuth` and `elevation` degrees (azimuth 0 is ahead,
+    /// positive to the right; elevation positive is up).
+    void process(float[] mono, float[] left, float[] right, double azimuth, double elevation, float[] gain) {
+<span class="fc" id="L74">        double az = Math.toRadians(azimuth);</span>
+<span class="fc" id="L75">        double el = Math.toRadians(elevation);</span>
+<span class="fc" id="L76">        double lateral = Math.sin(az) * Math.cos(el);</span>
+<span class="fc bfc" id="L77" title="All 2 branches covered.">        for (int ear = 0; ear &lt; 2; ear++) {</span>
+<span class="fc bfc" id="L78" title="All 2 branches covered.">            double cosPsi = ear == 1 ? lateral : -lateral;</span>
+<span class="fc" id="L79">            double psi = MathUtil.acos(Math.max(-1, Math.min(1, cosPsi)));</span>
+<span class="fc bfc" id="L80" title="All 2 branches covered.">            double t = psi &lt; Math.PI / 2 ? 1 - Math.cos(psi) : psi - Math.PI / 2 + 1;</span>
+<span class="fc" id="L81">            nextItd[ear] = t * HEAD_RADIUS / SPEED_OF_SOUND * sampleRate;</span>
+<span class="fc bfc" id="L82" title="All 2 branches covered.">            double earAz = ear == 1 ? azimuth : -azimuth;</span>
+<span class="fc" id="L83">            earAz = Math.toRadians(Math.max(-90, Math.min(90, earAz)));</span>
+<span class="fc" id="L84">            double scale = sampleRate / 44100.0;</span>
+<span class="fc bfc" id="L85" title="All 2 branches covered.">            for (int n = 0; n &lt; RHO.length; n++) {</span>
+<span class="fc" id="L86">                nextTau[ear][n] = (A[n] * Math.cos(earAz / 2) * Math.sin(D[n] * (Math.PI / 2 - el)) + B[n]) * scale;</span>
+            }
+        }
+<span class="fc bfc" id="L89" title="All 2 branches covered.">        if (!primed) {</span>
+<span class="fc" id="L90">            primed = true;</span>
+<span class="fc bfc" id="L91" title="All 2 branches covered.">            for (int ear = 0; ear &lt; 2; ear++) {</span>
+<span class="fc" id="L92">                itd[ear] = nextItd[ear];</span>
+<span class="fc" id="L93">                System.arraycopy(nextTau[ear], 0, tau[ear], 0, RHO.length);</span>
+            }
+        }
+<span class="fc" id="L96">        double k = 2 * sampleRate;</span>
+<span class="fc bfc" id="L97" title="All 2 branches covered.">        for (int ear = 0; ear &lt; 2; ear++) {</span>
+<span class="fc bfc" id="L98" title="All 2 branches covered.">            double cosPsi = ear == 1 ? lateral : -lateral;</span>
+<span class="fc" id="L99">            double psi = MathUtil.acos(Math.max(-1, Math.min(1, cosPsi)));</span>
+<span class="fc" id="L100">            double alpha = (1 + ALPHA_MIN / 2) + (1 - ALPHA_MIN / 2) * Math.cos(psi / THETA_MIN * Math.PI);</span>
+<span class="fc" id="L101">            double norm = k + BETA;</span>
+<span class="fc" id="L102">            double b0 = (alpha * k + BETA) / norm;</span>
+<span class="fc" id="L103">            double b1 = (BETA - alpha * k) / norm;</span>
+<span class="fc" id="L104">            double a1 = (BETA - k) / norm;</span>
+<span class="fc bfc" id="L105" title="All 2 branches covered.">            float[] out = ear == 0 ? left : right;</span>
+<span class="fc" id="L106">            double d0 = itd[ear];</span>
+<span class="fc" id="L107">            double dStep = (nextItd[ear] - d0) / BaseAudioContext.RENDER_QUANTUM;</span>
+<span class="fc" id="L108">            double[] t0 = tau[ear];</span>
+<span class="fc" id="L109">            double[] t1 = nextTau[ear];</span>
+<span class="fc" id="L110">            double sx = x1[ear];</span>
+<span class="fc" id="L111">            double sy = y1[ear];</span>
+<span class="fc bfc" id="L112" title="All 2 branches covered.">            for (int i = 0; i &lt; BaseAudioContext.RENDER_QUANTUM; i++) {</span>
+<span class="fc" id="L113">                long w = written + i;</span>
+<span class="fc bfc" id="L114" title="All 2 branches covered.">                if (ear == 0) {</span>
+<span class="fc" id="L115">                    ring[(int) (w &amp; MASK)] = mono[i];</span>
+                }
+<span class="fc" id="L117">                double f = (i + 1) / (double) BaseAudioContext.RENDER_QUANTUM;</span>
+<span class="fc" id="L118">                double delay = d0 + dStep * (i + 1);</span>
+<span class="fc" id="L119">                double x = read(w - delay);</span>
+<span class="fc bfc" id="L120" title="All 2 branches covered.">                for (int n = 0; n &lt; RHO.length; n++) {</span>
+<span class="fc" id="L121">                    double tn = t0[n] + (t1[n] - t0[n]) * f;</span>
+<span class="fc" id="L122">                    x += RHO[n] * read(w - delay - tn);</span>
+                }
+<span class="fc" id="L124">                double y = b0 * x + b1 * sx - a1 * sy;</span>
+<span class="fc bfc" id="L125" title="All 2 branches covered.">                if (Math.abs(y) &lt; 1e-30) {</span>
+<span class="fc" id="L126">                    y = 0;</span>
+                }
+<span class="fc" id="L128">                sx = x;</span>
+<span class="fc" id="L129">                sy = y;</span>
+<span class="fc" id="L130">                out[i] = (float) (y * gain[i]);</span>
+            }
+<span class="fc" id="L132">            x1[ear] = sx;</span>
+<span class="fc" id="L133">            y1[ear] = sy;</span>
+<span class="fc" id="L134">            itd[ear] = nextItd[ear];</span>
+<span class="fc" id="L135">            System.arraycopy(t1, 0, t0, 0, RHO.length);</span>
+        }
+<span class="fc" id="L137">        written += BaseAudioContext.RENDER_QUANTUM;</span>
+<span class="fc" id="L138">    }</span>
+
+    private double read(double pos) {
+<span class="fc bfc" id="L141" title="All 2 branches covered.">        if (pos &lt; 0) {</span>
+<span class="fc" id="L142">            return 0;</span>
+        }
+<span class="fc" id="L144">        long i0 = (long) pos;</span>
+<span class="fc" id="L145">        double frac = pos - i0;</span>
+<span class="fc" id="L146">        float a = ring[(int) (i0 &amp; MASK)];</span>
+<span class="fc" id="L147">        float b = ring[(int) ((i0 + 1) &amp; MASK)];</span>
+<span class="fc" id="L148">        return a + (b - a) * frac;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

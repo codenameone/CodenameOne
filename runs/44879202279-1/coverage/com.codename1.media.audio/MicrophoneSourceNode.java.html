@@ -1,0 +1,156 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MicrophoneSourceNode.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.media.audio</a> &gt; <span class="el_source">MicrophoneSourceNode.java</span></div><h1>MicrophoneSourceNode.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.media.audio;
+
+import com.codename1.media.AudioBuffer;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
+
+/// Live captured audio as a graph source, the Codename One counterpart of the
+/// Web Audio `MediaStreamAudioSourceNode` for a microphone. Created by
+/// [BaseAudioContext#createMicrophoneSource(AudioBuffer)] over the
+/// [AudioBuffer] a recorder fills when it is built with
+/// `MediaRecorderBuilder.redirectToAudioBuffer(true)`.
+///
+/// The node outputs one or two channels, as the capture delivers them (a
+/// capture with more keeps the first two), resampled to the context's rate.
+/// It keeps its delay short: when the graph falls behind it drops the oldest
+/// captured audio rather than fall further behind, and when capture stalls it
+/// outputs silence. Call [#close()] to detach it from the buffer.
+public final class MicrophoneSourceNode extends AudioNode {
+    private static final int CAPACITY = 16384;
+    private static final int MASK = CAPACITY - 1;
+
+    private final AudioBuffer source;
+<span class="fc" id="L45">    private final float[] ring = new float[CAPACITY * 2];</span>
+<span class="fc" id="L46">    private final AtomicLong written = new AtomicLong();</span>
+<span class="fc" id="L47">    private final AtomicLong read = new AtomicLong();</span>
+<span class="fc" id="L48">    private final AtomicInteger sourceRate = new AtomicInteger();</span>
+<span class="fc" id="L49">    private final AtomicInteger sourceChannels = new AtomicInteger(1);</span>
+<span class="fc" id="L50">    private final AtomicInteger lastBlock = new AtomicInteger();</span>
+<span class="fc" id="L51">    private float[] scratch = new float[0];</span>
+<span class="fc" id="L52">    private final AudioBuffer.AudioBufferCallback callback = new AudioBuffer.AudioBufferCallback() {</span>
+        @Override
+        public void frameReceived(AudioBuffer buffer) {
+<span class="fc" id="L55">            receive(buffer);</span>
+<span class="fc" id="L56">        }</span>
+    };
+
+    // ---- render side ----
+    private double rFrac;
+
+    MicrophoneSourceNode(BaseAudioContext context, AudioBuffer source) {
+<span class="fc" id="L63">        super(context, 0, 1, 2, ChannelCountMode.MAX, ChannelInterpretation.SPEAKERS);</span>
+<span class="pc bpc" id="L64" title="1 of 2 branches missed.">        if (source == null) {</span>
+<span class="nc" id="L65">            throw new IllegalArgumentException(&quot;source&quot;);</span>
+        }
+<span class="fc" id="L67">        this.source = source;</span>
+<span class="fc" id="L68">        source.addCallback(callback);</span>
+<span class="fc" id="L69">    }</span>
+
+    /// The buffer this node reads.
+    ///
+    /// #### Returns
+    ///
+    /// the capture buffer
+    public AudioBuffer getSource() {
+<span class="nc" id="L77">        return source;</span>
+    }
+
+    /// Stops listening to the capture buffer; the node outputs silence after
+    /// what it already received. Recording itself is the recorder's to stop.
+    public void close() {
+<span class="fc" id="L83">        source.removeCallback(callback);</span>
+<span class="fc" id="L84">    }</span>
+
+    /// Capture thread: appends a block to the ring, dropping what does not fit.
+    void receive(AudioBuffer buffer) {
+<span class="fc" id="L88">        int n = buffer.getSize();</span>
+<span class="fc" id="L89">        int ch = buffer.getNumChannels();</span>
+<span class="pc bpc" id="L90" title="2 of 4 branches missed.">        if (n &lt;= 0 || ch &lt;= 0) {</span>
+<span class="nc" id="L91">            return;</span>
+        }
+<span class="pc bpc" id="L93" title="1 of 2 branches missed.">        if (scratch.length &lt; n) {</span>
+<span class="fc" id="L94">            scratch = new float[n];</span>
+        }
+<span class="fc" id="L96">        buffer.copyTo(scratch);</span>
+<span class="fc" id="L97">        int frames = n / ch;</span>
+<span class="fc" id="L98">        long w = written.get();</span>
+<span class="fc" id="L99">        long free = CAPACITY - (w - read.get());</span>
+<span class="pc bpc" id="L100" title="1 of 2 branches missed.">        if (frames &gt; free) {</span>
+<span class="nc" id="L101">            frames = (int) free;</span>
+        }
+<span class="fc bfc" id="L103" title="All 2 branches covered.">        for (int f = 0; f &lt; frames; f++) {</span>
+<span class="fc" id="L104">            int at = (int) ((w + f) &amp; MASK) * 2;</span>
+<span class="fc" id="L105">            float l = scratch[f * ch];</span>
+<span class="fc" id="L106">            ring[at] = l;</span>
+<span class="pc bpc" id="L107" title="1 of 2 branches missed.">            ring[at + 1] = ch &gt; 1 ? scratch[f * ch + 1] : l;</span>
+        }
+<span class="fc" id="L109">        sourceRate.set(buffer.getSampleRate());</span>
+<span class="pc bpc" id="L110" title="1 of 2 branches missed.">        sourceChannels.set(ch &gt; 1 ? 2 : 1);</span>
+<span class="fc" id="L111">        lastBlock.set(n / ch);</span>
+<span class="fc" id="L112">        written.set(w + frames);</span>
+<span class="fc" id="L113">    }</span>
+
+    @Override
+    void process(long q) {
+<span class="fc" id="L117">        AudioBus out = outBuses[0];</span>
+<span class="fc" id="L118">        int ch = sourceChannels.get();</span>
+<span class="fc" id="L119">        out.setChannels(ch);</span>
+<span class="fc" id="L120">        int rate = sourceRate.get();</span>
+<span class="pc bpc" id="L121" title="1 of 2 branches missed.">        if (rate &lt;= 0) {</span>
+<span class="nc" id="L122">            return;</span>
+        }
+<span class="fc" id="L124">        long w = written.get();</span>
+<span class="fc" id="L125">        long r = read.get();</span>
+<span class="fc" id="L126">        int block = lastBlock.get();</span>
+<span class="pc bpc" id="L127" title="1 of 2 branches missed.">        if (w - r &gt; 2L * block + 512) {</span>
+<span class="nc" id="L128">            r = w - block - 256;</span>
+<span class="nc" id="L129">            rFrac = 0;</span>
+        }
+<span class="fc" id="L131">        double step = rate / (double) context.getSampleRate();</span>
+<span class="fc" id="L132">        float[] left = out.data[0];</span>
+<span class="pc bpc" id="L133" title="1 of 2 branches missed.">        float[] right = ch &gt; 1 ? out.data[1] : null;</span>
+<span class="fc" id="L134">        double frac = rFrac;</span>
+<span class="fc bfc" id="L135" title="All 2 branches covered.">        for (int i = 0; i &lt; BaseAudioContext.RENDER_QUANTUM; i++) {</span>
+<span class="fc" id="L136">            int advance = (int) frac;</span>
+<span class="fc" id="L137">            r += advance;</span>
+<span class="fc" id="L138">            frac -= advance;</span>
+<span class="fc bfc" id="L139" title="All 2 branches covered.">            if (r + 1 &gt;= w) {</span>
+<span class="fc" id="L140">                frac = 0;</span>
+<span class="fc" id="L141">                break;</span>
+            }
+<span class="fc" id="L143">            int a = (int) (r &amp; MASK) * 2;</span>
+<span class="fc" id="L144">            int b = (int) ((r + 1) &amp; MASK) * 2;</span>
+<span class="fc" id="L145">            float t = (float) frac;</span>
+<span class="fc" id="L146">            left[i] = ring[a] + (ring[b] - ring[a]) * t;</span>
+<span class="pc bpc" id="L147" title="1 of 2 branches missed.">            if (right != null) {</span>
+<span class="fc" id="L148">                right[i] = ring[a + 1] + (ring[b + 1] - ring[a + 1]) * t;</span>
+            }
+<span class="fc" id="L150">            frac += step;</span>
+        }
+<span class="fc" id="L152">        rFrac = frac;</span>
+<span class="fc" id="L153">        read.set(r);</span>
+<span class="fc" id="L154">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

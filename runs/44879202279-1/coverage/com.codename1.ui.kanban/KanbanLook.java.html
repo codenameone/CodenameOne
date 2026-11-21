@@ -1,0 +1,223 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>KanbanLook.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.kanban</a> &gt; <span class="el_source">KanbanLook.java</span></div><h1>KanbanLook.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ui.kanban;
+
+import com.codename1.ui.Display;
+import com.codename1.ui.Font;
+import com.codename1.ui.Graphics;
+import com.codename1.ui.plaf.Style;
+import com.codename1.ui.plaf.UIManager;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+
+/// The styles a `KanbanBoard` paints with, looked up by UIID once per theme
+/// and given a default when the theme does not define them, so a board looks
+/// right in a theme that has never heard of it.
+final class KanbanLook {
+    // uiid, light fg, light bg, dark fg, dark bg, bg opacity, font: 0 plain, 1 small, 2 bold
+<span class="fc" id="L40">    private static final Object[][] DEFAULTS = {</span>
+<span class="fc" id="L41">        {&quot;KanbanBoard&quot;, 0x1d1b20, 0xf7f7fa, 0xe6e1e5, 0x141317, 255, 0},</span>
+<span class="fc" id="L42">        {&quot;KanbanColumn&quot;, 0x49454f, 0xece9f1, 0xcac4d0, 0x1f1d23, 255, 0},</span>
+<span class="fc" id="L43">        {&quot;KanbanColumnHeader&quot;, 0x1d1b20, 0xece9f1, 0xe6e1e5, 0x1f1d23, 0, 2},</span>
+<span class="fc" id="L44">        {&quot;KanbanColumnOverLimit&quot;, 0xb3261e, 0xf9dedc, 0xf2b8b5, 0x601410, 255, 2},</span>
+<span class="fc" id="L45">        {&quot;KanbanCard&quot;, 0x1d1b20, 0xffffff, 0xe6e1e5, 0x2b2930, 255, 0},</span>
+<span class="fc" id="L46">        {&quot;KanbanCardSelected&quot;, 0x1a73e8, 0xffffff, 0x8ab4f8, 0x2b2930, 255, 0},</span>
+<span class="fc" id="L47">        {&quot;KanbanCardTag&quot;, 0x1d1b20, 0xe8def8, 0xe6e1e5, 0x4a4458, 255, 1},</span>
+<span class="fc" id="L48">        {&quot;KanbanLane&quot;, 0x49454f, 0xe1dce8, 0xcac4d0, 0x2f2c36, 255, 2},</span>
+<span class="fc" id="L49">        {&quot;KanbanAddCard&quot;, 0x79747e, 0xffffff, 0x938f99, 0x1c1b1f, 0, 1},</span>
+<span class="fc" id="L50">        {&quot;KanbanDropSlot&quot;, 0x1a73e8, 0xd3e3fd, 0x8ab4f8, 0x263238, 255, 0},</span>
+    };
+
+<span class="fc" id="L53">    private static final HashMap&lt;String, Style&gt; STYLES = new HashMap&lt;String, Style&gt;();</span>
+<span class="fc" id="L54">    private static int generation = -1;</span>
+    private static Boolean darkSeen;
+
+    private KanbanLook() {
+    }
+
+    private static void check() {
+<span class="fc" id="L61">        int now = UIManager.getThemeGeneration();</span>
+        // dark mode can switch without a new theme generation
+<span class="fc" id="L63">        Boolean dark = Display.getInstance().isDarkMode();</span>
+<span class="pc bpc" id="L64" title="1 of 4 branches missed.">        boolean same = darkSeen == null ? dark == null : darkSeen.equals(dark);</span>
+<span class="pc bpc" id="L65" title="1 of 4 branches missed.">        if (now != generation || !same) {</span>
+<span class="fc" id="L66">            generation = now;</span>
+<span class="fc" id="L67">            darkSeen = dark;</span>
+<span class="fc" id="L68">            STYLES.clear();</span>
+        }
+<span class="fc" id="L70">    }</span>
+
+    static Style style(String uiid) {
+<span class="fc" id="L73">        check();</span>
+<span class="fc" id="L74">        Style s = STYLES.get(uiid);</span>
+<span class="fc bfc" id="L75" title="All 2 branches covered.">        if (s == null) {</span>
+<span class="fc" id="L76">            UIManager m = UIManager.getInstance();</span>
+<span class="pc bpc" id="L77" title="1 of 2 branches missed.">            s = m.isThemeStyleDefined(uiid) ? m.getComponentStyle(uiid) : fallback(uiid);</span>
+<span class="fc" id="L78">            STYLES.put(uiid, s);</span>
+        }
+<span class="fc" id="L80">        return s;</span>
+    }
+
+    private static Style fallback(String uiid) {
+<span class="fc" id="L84">        UIManager m = UIManager.getInstance();</span>
+<span class="fc" id="L85">        Object[] row = null;</span>
+<span class="pc bpc" id="L86" title="1 of 2 branches missed.">        for (int i = 0; i &lt; DEFAULTS.length; i++) { // NOPMD ForLoopCanBeForeach - indexed, as the rest of the class</span>
+<span class="fc bfc" id="L87" title="All 2 branches covered.">            if (DEFAULTS[i][0].equals(uiid)) {</span>
+<span class="fc" id="L88">                row = DEFAULTS[i];</span>
+<span class="fc" id="L89">                break;</span>
+            }
+        }
+<span class="fc" id="L92">        Style s = m.getComponentStyle(uiid);</span>
+<span class="pc bpc" id="L93" title="1 of 2 branches missed.">        if (row == null) {</span>
+<span class="nc" id="L94">            return s;</span>
+        }
+<span class="fc" id="L96">        boolean dark = isDark(m);</span>
+<span class="pc bpc" id="L97" title="1 of 2 branches missed.">        s.setFgColor(((Integer) row[dark ? 3 : 1]).intValue());</span>
+<span class="pc bpc" id="L98" title="1 of 2 branches missed.">        s.setBgColor(((Integer) row[dark ? 4 : 2]).intValue());</span>
+<span class="fc" id="L99">        s.setBgTransparency(((Integer) row[5]).intValue());</span>
+<span class="fc" id="L100">        int kind = ((Integer) row[6]).intValue();</span>
+<span class="fc" id="L101">        Font base = Font.getDefaultFont();</span>
+<span class="fc bfc" id="L102" title="All 2 branches covered.">        if (kind == 2) {</span>
+<span class="pc bpc" id="L103" title="1 of 2 branches missed.">            s.setFont(base.isTTFNativeFont() ? base.derive(base.getHeight(), Font.STYLE_BOLD)</span>
+<span class="fc" id="L104">                    : Font.createSystemFont(Font.FACE_SYSTEM, Font.STYLE_BOLD, Font.SIZE_MEDIUM));</span>
+<span class="fc bfc" id="L105" title="All 2 branches covered.">        } else if (kind == 1) {</span>
+<span class="pc bpc" id="L106" title="1 of 2 branches missed.">            s.setFont(base.isTTFNativeFont() ? base.derive(Display.getInstance().convertToPixels(2f), Font.STYLE_PLAIN)</span>
+<span class="fc" id="L107">                    : Font.createSystemFont(Font.FACE_SYSTEM, Font.STYLE_PLAIN, Font.SIZE_SMALL));</span>
+        } else {
+<span class="fc" id="L109">            s.setFont(base);</span>
+        }
+<span class="fc" id="L111">        return s;</span>
+    }
+
+    // Dark when the device says so or the theme's forms are dark: a theme
+    // can be dark without the dark mode switch.
+    private static boolean isDark(UIManager m) {
+<span class="fc" id="L117">        Style form = m.getComponentStyle(&quot;Form&quot;);</span>
+<span class="pc bpc" id="L118" title="1 of 2 branches missed.">        if ((form.getBgTransparency() &amp; 0xff) != 0) {</span>
+<span class="fc" id="L119">            int rgb = form.getBgColor();</span>
+<span class="fc" id="L120">            int luma = (((rgb &gt;&gt; 16) &amp; 0xff) * 299 + ((rgb &gt;&gt; 8) &amp; 0xff) * 587 + (rgb &amp; 0xff) * 114) / 1000;</span>
+<span class="pc bpc" id="L121" title="1 of 2 branches missed.">            return luma &lt; 96;</span>
+        }
+<span class="nc" id="L123">        Boolean d = Display.getInstance().isDarkMode();</span>
+<span class="nc bnc" id="L124" title="All 4 branches missed.">        return d != null &amp;&amp; d.booleanValue();</span>
+    }
+
+    static int mm(float mm) {
+<span class="fc" id="L128">        return Math.max(1, Display.getInstance().convertToPixels(mm));</span>
+    }
+
+    static int mix(int a, int b, int amount) {
+<span class="fc" id="L132">        int inv = 255 - amount;</span>
+<span class="fc" id="L133">        int r = (((a &gt;&gt; 16) &amp; 0xff) * inv + ((b &gt;&gt; 16) &amp; 0xff) * amount) / 255;</span>
+<span class="fc" id="L134">        int g = (((a &gt;&gt; 8) &amp; 0xff) * inv + ((b &gt;&gt; 8) &amp; 0xff) * amount) / 255;</span>
+<span class="fc" id="L135">        int bl = ((a &amp; 0xff) * inv + (b &amp; 0xff) * amount) / 255;</span>
+<span class="fc" id="L136">        return (r &lt;&lt; 16) | (g &lt;&lt; 8) | bl;</span>
+    }
+
+    static int bg(Style s, int fallback) {
+<span class="pc bpc" id="L140" title="1 of 2 branches missed.">        return (s.getBgTransparency() &amp; 0xff) == 0 ? fallback : s.getBgColor();</span>
+    }
+
+    /// The text, cut short with an ellipsis when it is wider than `width`.
+    static String fit(String text, Font f, int width) {
+<span class="pc bpc" id="L145" title="2 of 6 branches missed.">        if (text == null || text.length() == 0 || width &lt;= 0) {</span>
+<span class="fc" id="L146">            return &quot;&quot;;</span>
+        }
+<span class="fc bfc" id="L148" title="All 2 branches covered.">        if (f.stringWidth(text) &lt;= width) {</span>
+<span class="fc" id="L149">            return text;</span>
+        }
+<span class="fc" id="L151">        int dots = f.stringWidth(&quot;...&quot;);</span>
+<span class="pc bpc" id="L152" title="1 of 2 branches missed.">        if (dots &gt; width) {</span>
+<span class="fc" id="L153">            return &quot;&quot;;</span>
+        }
+<span class="nc" id="L155">        int lo = 0;</span>
+<span class="nc" id="L156">        int hi = text.length();</span>
+<span class="nc bnc" id="L157" title="All 2 branches missed.">        while (lo &lt; hi) {</span>
+<span class="nc" id="L158">            int mid = (lo + hi + 1) / 2;</span>
+<span class="nc bnc" id="L159" title="All 2 branches missed.">            if (f.stringWidth(text.substring(0, mid)) + dots &lt;= width) {</span>
+<span class="nc" id="L160">                lo = mid;</span>
+            } else {
+<span class="nc" id="L162">                hi = mid - 1;</span>
+            }
+<span class="nc" id="L164">        }</span>
+<span class="nc" id="L165">        return text.substring(0, lo).trim() + &quot;...&quot;;</span>
+    }
+
+    /// The text broken at spaces into at most `maxLines` lines of `width`;
+    /// the last is cut short when the text is longer.
+    static List&lt;String&gt; wrap(String text, Font f, int width, int maxLines) {
+<span class="fc" id="L171">        List&lt;String&gt; out = new ArrayList&lt;String&gt;();</span>
+<span class="pc bpc" id="L172" title="2 of 6 branches missed.">        if (text == null || text.length() == 0 || width &lt;= 0) {</span>
+<span class="fc" id="L173">            return out;</span>
+        }
+<span class="fc" id="L175">        String rest = text.trim();</span>
+<span class="pc bpc" id="L176" title="2 of 4 branches missed.">        while (rest.length() &gt; 0 &amp;&amp; out.size() &lt; maxLines) {</span>
+<span class="fc bfc" id="L177" title="All 4 branches covered.">            if (out.size() == maxLines - 1 || f.stringWidth(rest) &lt;= width) {</span>
+<span class="fc" id="L178">                out.add(fit(rest, f, width));</span>
+<span class="fc" id="L179">                break;</span>
+            }
+            // the longest run of whole words that fits
+<span class="fc" id="L182">            int cut = -1;</span>
+<span class="fc" id="L183">            int from = 0;</span>
+            while (true) {
+<span class="fc" id="L185">                int sp = rest.indexOf(' ', from);</span>
+<span class="pc bpc" id="L186" title="1 of 4 branches missed.">                if (sp &lt; 0 || f.stringWidth(rest.substring(0, sp)) &gt; width) {</span>
+<span class="fc" id="L187">                    break;</span>
+                }
+<span class="nc" id="L189">                cut = sp;</span>
+<span class="nc" id="L190">                from = sp + 1;</span>
+<span class="nc" id="L191">            }</span>
+<span class="pc bpc" id="L192" title="1 of 2 branches missed.">            if (cut &lt;= 0) {</span>
+                // one word wider than the card: break inside it
+<span class="fc" id="L194">                int n = 1;</span>
+<span class="pc bpc" id="L195" title="2 of 4 branches missed.">                while (n &lt; rest.length() &amp;&amp; f.stringWidth(rest.substring(0, n + 1)) &lt;= width) {</span>
+<span class="nc" id="L196">                    n++;</span>
+                }
+<span class="fc" id="L198">                out.add(rest.substring(0, n));</span>
+<span class="fc" id="L199">                rest = rest.substring(n).trim();</span>
+<span class="fc" id="L200">            } else {</span>
+<span class="nc" id="L201">                out.add(rest.substring(0, cut));</span>
+<span class="nc" id="L202">                rest = rest.substring(cut + 1).trim();</span>
+            }
+<span class="fc" id="L204">        }</span>
+<span class="fc" id="L205">        return out;</span>
+    }
+
+    static void shadow(Graphics g, int x, int y, int w, int h, int arc, float level) {
+<span class="pc bpc" id="L209" title="3 of 6 branches missed.">        if (level &lt;= 0 || w &lt;= 0 || h &lt;= 0) {</span>
+<span class="nc" id="L210">            return;</span>
+        }
+<span class="fc" id="L212">        int a = g.getAlpha();</span>
+<span class="fc" id="L213">        int reach = Math.max(2, Math.round(mm(0.8f) * Math.max(1f, level)));</span>
+<span class="fc" id="L214">        int drop = Math.round(mm(0.5f) * level);</span>
+<span class="fc" id="L215">        g.setColor(0);</span>
+<span class="fc" id="L216">        g.setAlpha(Math.max(1, Math.round(a * 0.18f * Math.min(1.6f, level) / reach)));</span>
+<span class="fc bfc" id="L217" title="All 2 branches covered.">        for (int i = reach; i &gt;= 1; i--) {</span>
+<span class="fc" id="L218">            g.fillRoundRect(x - i, y - i + drop, w + 2 * i, h + 2 * i, arc + 2 * i, arc + 2 * i);</span>
+        }
+<span class="fc" id="L220">        g.setAlpha(a);</span>
+<span class="fc" id="L221">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

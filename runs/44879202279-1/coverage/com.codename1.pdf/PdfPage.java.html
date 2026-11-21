@@ -1,0 +1,169 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PdfPage.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.pdf</a> &gt; <span class="el_source">PdfPage.java</span></div><h1>PdfPage.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.pdf;
+
+import com.codename1.impl.pdf.FontState;
+import com.codename1.impl.pdf.PdfFormat;
+import java.util.ArrayList;
+import java.util.List;
+
+/// One page of a [PdfDocument], created by [PdfDocument#addPage(PdfPageSize)].
+/// Draw on it through [#getCanvas()]; add clickable areas with
+/// [#addLink(float, float, float, float, String)].
+@com.codename1.impl.SharedWithBackend
+public final class PdfPage {
+    private final PdfDocument document;
+    private final float width;
+    private final float height;
+    private PdfCanvas canvas;
+<span class="fc" id="L39">    private final List&lt;FontState&gt; fonts = new ArrayList&lt;FontState&gt;();</span>
+<span class="fc" id="L40">    private final List&lt;String&gt; imageNames = new ArrayList&lt;String&gt;();</span>
+<span class="fc" id="L41">    private final List&lt;PdfImage&gt; images = new ArrayList&lt;PdfImage&gt;();</span>
+<span class="fc" id="L42">    private final List&lt;Object[]&gt; links = new ArrayList&lt;Object[]&gt;();</span>
+    int objectNumber;
+
+<span class="fc" id="L45">    PdfPage(PdfDocument document, float width, float height) {</span>
+<span class="fc" id="L46">        this.document = document;</span>
+<span class="fc" id="L47">        this.width = width;</span>
+<span class="fc" id="L48">        this.height = height;</span>
+<span class="fc" id="L49">    }</span>
+
+    PdfDocument document() {
+<span class="fc" id="L52">        return document;</span>
+    }
+
+    /// The width in points.
+    public float getWidth() {
+<span class="fc" id="L57">        return width;</span>
+    }
+
+    /// The height in points.
+    public float getHeight() {
+<span class="fc" id="L62">        return height;</span>
+    }
+
+    /// The zero-based position of this page in its document.
+    public int getIndex() {
+<span class="nc" id="L67">        return document.indexOf(this);</span>
+    }
+
+    /// The canvas that draws this page's content.
+    public PdfCanvas getCanvas() {
+<span class="fc bfc" id="L72" title="All 2 branches covered.">        if (canvas == null) {</span>
+<span class="fc" id="L73">            canvas = new PdfCanvas(this);</span>
+        }
+<span class="fc" id="L75">        return canvas;</span>
+    }
+
+    /// Makes the rectangle `(x, y, w, h)` open `uri` when clicked.
+    public PdfPage addLink(float x, float y, float w, float h, String uri) {
+<span class="nc" id="L80">        links.add(new Object[] {new float[] {x, y, w, h}, uri});</span>
+<span class="nc" id="L81">        return this;</span>
+    }
+
+    /// Makes the rectangle `(x, y, w, h)` jump to the top of `target`, a
+    /// page of the same document, when clicked.
+    public PdfPage addLink(float x, float y, float w, float h, PdfPage target) {
+<span class="nc bnc" id="L87" title="All 2 branches missed.">        if (target.document != document) { // NOPMD CompareObjectsWithEquals - the same document object is required</span>
+<span class="nc" id="L88">            throw new IllegalArgumentException(&quot;The page belongs to another document&quot;);</span>
+        }
+<span class="nc" id="L90">        links.add(new Object[] {new float[] {x, y, w, h}, target});</span>
+<span class="nc" id="L91">        return this;</span>
+    }
+
+    void useFont(FontState state) {
+<span class="fc bfc" id="L95" title="All 2 branches covered.">        if (!fonts.contains(state)) {</span>
+<span class="fc" id="L96">            fonts.add(state);</span>
+        }
+<span class="fc" id="L98">    }</span>
+
+    String useImage(PdfImage image) {
+<span class="nc" id="L101">        String name = document.imageName(image);</span>
+<span class="nc bnc" id="L102" title="All 2 branches missed.">        if (!images.contains(image)) {</span>
+<span class="nc" id="L103">            images.add(image);</span>
+<span class="nc" id="L104">            imageNames.add(name);</span>
+        }
+<span class="nc" id="L106">        return name;</span>
+    }
+
+    String content() {
+<span class="pc bpc" id="L110" title="1 of 2 branches missed.">        return canvas == null ? &quot;&quot; : canvas.content();</span>
+    }
+
+    String resources() {
+<span class="fc" id="L114">        StringBuilder sb = new StringBuilder(&quot;&lt;&lt;&quot;);</span>
+<span class="pc bpc" id="L115" title="1 of 2 branches missed.">        if (!fonts.isEmpty()) {</span>
+<span class="fc" id="L116">            sb.append(&quot;/Font &lt;&lt;&quot;);</span>
+<span class="fc bfc" id="L117" title="All 2 branches covered.">            for (int i = 0; i &lt; fonts.size(); i++) { // NOPMD ForLoopCanBeForeach - indexed like the surrounding decoder loops</span>
+<span class="fc" id="L118">                FontState f = fonts.get(i);</span>
+<span class="fc" id="L119">                sb.append('/').append(f.resourceName).append(' ').append(f.objectNumber).append(&quot; 0 R &quot;);</span>
+            }
+<span class="fc" id="L121">            sb.append(&quot;&gt;&gt; &quot;);</span>
+        }
+<span class="pc bpc" id="L123" title="1 of 2 branches missed.">        if (!images.isEmpty()) {</span>
+<span class="nc" id="L124">            sb.append(&quot;/XObject &lt;&lt;&quot;);</span>
+<span class="nc bnc" id="L125" title="All 2 branches missed.">            for (int i = 0; i &lt; images.size(); i++) {</span>
+<span class="nc" id="L126">                sb.append('/').append(imageNames.get(i)).append(' ')</span>
+<span class="nc" id="L127">                        .append(document.imageObject(images.get(i))).append(&quot; 0 R &quot;);</span>
+            }
+<span class="nc" id="L129">            sb.append(&quot;&gt;&gt; &quot;);</span>
+        }
+<span class="fc" id="L131">        String gs = document.extGStateResources();</span>
+<span class="pc bpc" id="L132" title="1 of 2 branches missed.">        if (gs.length() &gt; 0) {</span>
+<span class="nc" id="L133">            sb.append(&quot;/ExtGState &lt;&lt;&quot;).append(gs).append(&quot;&gt;&gt; &quot;);</span>
+        }
+<span class="fc" id="L135">        sb.append(&quot;&gt;&gt;&quot;);</span>
+<span class="fc" id="L136">        return sb.toString();</span>
+    }
+
+    String annotations() {
+<span class="pc bpc" id="L140" title="1 of 2 branches missed.">        if (links.isEmpty()) {</span>
+<span class="fc" id="L141">            return &quot;&quot;;</span>
+        }
+<span class="nc" id="L143">        StringBuilder sb = new StringBuilder(&quot; /Annots [&quot;);</span>
+<span class="nc bnc" id="L144" title="All 2 branches missed.">        for (int i = 0; i &lt; links.size(); i++) { // NOPMD ForLoopCanBeForeach - indexed like the surrounding decoder loops</span>
+<span class="nc" id="L145">            Object[] link = links.get(i);</span>
+<span class="nc" id="L146">            float[] r = (float[]) link[0];</span>
+<span class="nc" id="L147">            sb.append(&quot;&lt;&lt;/Type /Annot /Subtype /Link /Border [0 0 0] /Rect [&quot;);</span>
+<span class="nc" id="L148">            PdfFormat.number(sb, r[0]);</span>
+<span class="nc" id="L149">            sb.append(' ');</span>
+<span class="nc" id="L150">            PdfFormat.number(sb, height - r[1] - r[3]);</span>
+<span class="nc" id="L151">            sb.append(' ');</span>
+<span class="nc" id="L152">            PdfFormat.number(sb, r[0] + r[2]);</span>
+<span class="nc" id="L153">            sb.append(' ');</span>
+<span class="nc" id="L154">            PdfFormat.number(sb, height - r[1]);</span>
+<span class="nc" id="L155">            sb.append(']');</span>
+<span class="nc bnc" id="L156" title="All 2 branches missed.">            if (link[1] instanceof PdfPage) {</span>
+<span class="nc" id="L157">                sb.append(&quot; /Dest [&quot;).append(((PdfPage) link[1]).objectNumber).append(&quot; 0 R /XYZ null null null]&quot;);</span>
+            } else {
+<span class="nc" id="L159">                sb.append(&quot; /A &lt;&lt;/S /URI /URI &quot;);</span>
+<span class="nc" id="L160">                PdfFormat.literal(sb, PdfFormat.uri(String.valueOf(link[1])));</span>
+<span class="nc" id="L161">                sb.append(&quot;&gt;&gt;&quot;);</span>
+            }
+<span class="nc" id="L163">            sb.append(&quot;&gt;&gt; &quot;);</span>
+        }
+<span class="nc" id="L165">        sb.append(']');</span>
+<span class="nc" id="L166">        return sb.toString();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

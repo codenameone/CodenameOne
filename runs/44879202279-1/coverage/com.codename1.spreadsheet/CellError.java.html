@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CellError.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.spreadsheet</a> &gt; <span class="el_source">CellError.java</span></div><h1>CellError.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.spreadsheet;
+
+/// An error a cell holds instead of a value, such as `#DIV/0!`. A formula that reads a cell
+/// in error answers that error, which is how errors travel through a sheet; nothing is thrown.
+///
+/// There is one instance per error, so two errors can be compared with `==`.
+public final class CellError {
+    /// Division by zero.
+<span class="fc" id="L31">    public static final CellError DIV0 = new CellError(&quot;#DIV/0!&quot;, 2);</span>
+    /// A value that is not available, what a failed lookup answers.
+<span class="fc" id="L33">    public static final CellError NA = new CellError(&quot;#N/A&quot;, 7);</span>
+    /// A name or a function that is not known.
+<span class="fc" id="L35">    public static final CellError NAME = new CellError(&quot;#NAME?&quot;, 5);</span>
+    /// Two ranges that were expected to intersect and do not.
+<span class="fc" id="L37">    public static final CellError NULL = new CellError(&quot;#NULL!&quot;, 1);</span>
+    /// A number that is out of the range a function accepts or can answer.
+<span class="fc" id="L39">    public static final CellError NUM = new CellError(&quot;#NUM!&quot;, 6);</span>
+    /// A reference to cells that no longer exist.
+<span class="fc" id="L41">    public static final CellError REF = new CellError(&quot;#REF!&quot;, 4);</span>
+    /// A value of the wrong type, such as text where a number is needed.
+<span class="fc" id="L43">    public static final CellError VALUE = new CellError(&quot;#VALUE!&quot;, 3);</span>
+    /// A formula that depends on its own result. Spreadsheet files have no such value: XLSX
+    /// writes it as `#REF!`, OpenDocument as LibreOffice's `Err:522`, and CSV as `#CIRC!`.
+<span class="fc" id="L46">    public static final CellError CIRCULAR = new CellError(&quot;#CIRC!&quot;, 4);</span>
+
+<span class="fc" id="L48">    private static final CellError[] ALL = {DIV0, NA, NAME, NULL, NUM, REF, VALUE, CIRCULAR};</span>
+
+    private final String text;
+    private final int type;
+
+<span class="fc" id="L53">    private CellError(String text, int type) {</span>
+<span class="fc" id="L54">        this.text = text;</span>
+<span class="fc" id="L55">        this.type = type;</span>
+<span class="fc" id="L56">    }</span>
+
+    /// The error for the text a spreadsheet shows, ignoring case.
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: text such as `#N/A`
+    ///
+    /// #### Returns
+    ///
+    /// the error, or null when the text is not one
+    public static CellError valueOf(String text) {
+<span class="pc bpc" id="L68" title="1 of 2 branches missed.">        if (text == null) {</span>
+<span class="nc" id="L69">            return null;</span>
+        }
+<span class="fc bfc" id="L71" title="All 2 branches covered.">        for (CellError known : ALL) {</span>
+<span class="fc bfc" id="L72" title="All 2 branches covered.">            if (known.text.equalsIgnoreCase(text)) {</span>
+<span class="fc" id="L73">                return known;</span>
+            }
+        }
+<span class="fc" id="L76">        return null;</span>
+    }
+
+    /// The number the `ERROR.TYPE` function answers for this error.
+    ///
+    /// #### Returns
+    ///
+    /// a number from 1 to 7
+    public int getType() {
+<span class="fc" id="L85">        return type;</span>
+    }
+
+    /// The text a spreadsheet shows for this error.
+    ///
+    /// #### Returns
+    ///
+    /// text such as `#DIV/0!`
+    @Override
+    public String toString() {
+<span class="fc" id="L95">        return text;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

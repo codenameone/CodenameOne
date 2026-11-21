@@ -1,0 +1,567 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CrashProtection.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.crash</a> &gt; <span class="el_source">CrashProtection.java</span></div><h1>CrashProtection.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.crash;
+
+import com.codename1.crash.CrashReportPayload.Frame;
+import com.codename1.io.ConnectionRequest;
+import com.codename1.io.NetworkManager;
+import com.codename1.io.Preferences;
+import com.codename1.io.Storage;
+import com.codename1.io.Util;
+import com.codename1.system.CrashReport;
+import com.codename1.ui.Display;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.util.ArrayList;
+import java.util.List;
+
+/// Crash protection: captures unhandled exceptions, scrubs PII, persists
+/// each crash to {@link Storage} immediately, and uploads to the
+/// Codename One cloud crash service when enabled.
+///
+/// Quick start -- call from your `Lifecycle.init` (NOT from `start`,
+/// which runs on every resume):
+///
+/// ```java
+/// CrashProtection.install();
+/// CrashProtection.setEnabled(true);
+/// ```
+///
+/// `install()` is idempotent and wires the EDT error handler, the
+/// platform native crash handler, and the native log capture. It also
+/// replays any crash data persisted by the previous run (Java-side
+/// failures buffered in {@link Storage}, plus native-layer crash
+/// records written by the platform crash handler before the process
+/// died).
+///
+/// `setEnabled` defaults to `false`, so no data leaves the device
+/// until the developer explicitly enables uploads.
+///
+/// Pluggable PII scrubbing: override {@link PiiScrubber} and register
+/// your subclass via {@link #setScrubber(PiiScrubber)} to extend the
+/// default redaction rules. The default scrubber masks the local part
+/// of email addresses (keeping the first three characters and the full
+/// domain) and replaces runs of six or more digits with `[num]`.
+///
+/// The endpoint URL is fixed and cannot be modified by the application.
+/// Crash uploads are accepted only for Pro-tier (or higher) accounts
+/// for builds produced by the Codename One cloud build server within
+/// the last 30 days; out-of-tier or stale builds are silently dropped
+/// by the server.
+public final class CrashProtection {
+
+    /// Production crash-upload endpoint. Fixed; not configurable from
+    /// application code by design (use {@link #setEndpointForTesting}
+    /// from the framework's own unit tests).
+    static final String DEFAULT_ENDPOINT =
+            &quot;https://cloud.codenameone.com/api/v2/crash/reports&quot;;
+
+    static final String STORAGE_PREFIX = &quot;CN1Crash__$&quot;;
+    static final String PREF_ENABLED = &quot;crashProtectionEnabled&quot;;
+    /// Hard cap on locally-buffered crashes. Crashes are rare events
+    /// and the server dedups by fingerprint anyway, so the buffer is
+    /// just protection against a runaway-throw loop offline. 5 is
+    /// plenty; beyond that we evict the oldest to keep disk footprint
+    /// negligible.
+    static final int MAX_STORED = 5;
+
+<span class="nc" id="L90">    private static String endpoint = DEFAULT_ENDPOINT;</span>
+<span class="nc" id="L91">    private static PiiScrubber scrubber = new PiiScrubber();</span>
+    private static boolean installed;
+    private static boolean draining;
+
+    private CrashProtection() {
+    }
+
+    /// Installs the crash protection hooks. Idempotent: calling more
+    /// than once has no effect. Does nothing on the simulator (matches
+    /// the legacy `Log.bindCrashProtection` behaviour) or when crash
+    /// protection has been disabled for the current platform via the
+    /// `codename1.crashProtection.&lt;platform&gt;.enabled` build property
+    /// (see [#isPlatformDisabled]).
+    ///
+    /// Side effect: any crashes previously persisted to storage but not
+    /// yet uploaded will be drained in the background if uploads are
+    /// currently enabled.
+    public static void install() {
+<span class="nc bnc" id="L109" title="All 2 branches missed.">        if (installed) {</span>
+<span class="nc" id="L110">            return;</span>
+        }
+<span class="nc bnc" id="L112" title="All 2 branches missed.">        if (Display.getInstance().isSimulator()) {</span>
+<span class="nc" id="L113">            installed = true;</span>
+<span class="nc" id="L114">            return;</span>
+        }
+<span class="nc bnc" id="L116" title="All 2 branches missed.">        if (isPlatformDisabled()) {</span>
+            // Developer has explicitly opted this platform out via the
+            // build property. We mark `installed` so subsequent calls
+            // also short-circuit; the rest of the crash machinery
+            // stays inert (no error handler, no drain).
+<span class="nc" id="L121">            installed = true;</span>
+<span class="nc" id="L122">            return;</span>
+        }
+        // setCrashReporter is the right hook -- it fires unconditionally
+        // in Display's EDT catch block before impl.handleEDTException
+        // gets a chance to short-circuit (the legacy
+        // AndroidImplementation.handleEDTException returns true after
+        // showing its own AlertDialog and would otherwise eat the
+        // exception). addEdtErrorHandler runs only when the impl
+        // returns false, which leaves Android uncovered.
+<span class="nc" id="L131">        Display.getInstance().setCrashReporter(new CrashReport() {</span>
+            @Override
+            public void exception(Throwable t) {
+<span class="nc" id="L134">                capture(t);</span>
+<span class="nc" id="L135">            }</span>
+        });
+        // Wire the platform native crash handler so signals / Mach
+        // exceptions / Objective-C NSException / JNI segfaults that
+        // never reach the JVM error path still produce a record.
+<span class="nc" id="L140">        Display.getInstance().installNativeCrashHandler();</span>
+        // Replay any native crash record the platform handler wrote
+        // before the process died on a prior launch. The impl deletes
+        // the record as it's read so we don't re-upload it.
+<span class="nc" id="L144">        String pendingNative = Display.getInstance().consumePendingNativeCrash();</span>
+<span class="nc bnc" id="L145" title="All 4 branches missed.">        if (pendingNative != null &amp;&amp; pendingNative.length() &gt; 0) {</span>
+<span class="nc" id="L146">            CrashReportPayload synthetic = new CrashReportPayload(</span>
+<span class="nc" id="L147">                    newEventId(),</span>
+                    &quot;NativeCrash&quot;,
+                    &quot;Process terminated by native fault&quot;,
+                    new ArrayList&lt;Frame&gt;(0),
+                    null,
+                    pendingNative,
+                    null);
+<span class="nc" id="L154">            persistJson(synthetic.toJson());</span>
+        }
+<span class="nc" id="L156">        installed = true;</span>
+<span class="nc bnc" id="L157" title="All 2 branches missed.">        if (isEnabled()) {</span>
+<span class="nc" id="L158">            drainAsync();</span>
+        }
+<span class="nc" id="L160">    }</span>
+
+    /// Returns `true` when the developer has explicitly opted out of
+    /// crash protection for the current platform via
+    /// `codename1.crashProtection.&lt;platform&gt;.enabled=false` in
+    /// `codenameone_settings.properties`. The property is read at
+    /// runtime via [com.codename1.ui.Display#getProperty(String,String)],
+    /// which on each platform consumes the build-time settings file
+    /// baked into the deliverable. Returns `false` when the property
+    /// is unset or `true` (the default-on behaviour).
+    ///
+    /// Recognised platform names match {@link Display#getPlatformName()}:
+    /// `and`, `ios`, `mac`, `linux`, `win`, `javascript`, `javase`.
+    static boolean isPlatformDisabled() {
+<span class="nc" id="L174">        String platform = Display.getInstance().getPlatformName();</span>
+<span class="nc bnc" id="L175" title="All 4 branches missed.">        if (platform == null || platform.isEmpty()) {</span>
+<span class="nc" id="L176">            return false;</span>
+        }
+<span class="nc" id="L178">        String key = &quot;codename1.crashProtection.&quot; + platform.toLowerCase() + &quot;.enabled&quot;;</span>
+<span class="nc" id="L179">        String v = Display.getInstance().getProperty(key, &quot;&quot;);</span>
+<span class="nc bnc" id="L180" title="All 4 branches missed.">        if (v == null || v.isEmpty()) {</span>
+<span class="nc" id="L181">            return false;</span>
+        }
+        // Only an explicit `false` disables. Anything else (true / typo
+        // / unrecognised) leaves the platform enabled -- safer to
+        // upload than to silently swallow crashes.
+<span class="nc" id="L186">        return &quot;false&quot;.equalsIgnoreCase(v.trim());</span>
+    }
+
+    /// @return `true` if crash uploads are enabled. Default is `false`.
+    public static boolean isEnabled() {
+<span class="nc" id="L191">        return Preferences.get(PREF_ENABLED, false);</span>
+    }
+
+    /// Enables or disables crash uploads. When transitioning from off
+    /// to on, any crashes buffered in storage are drained in the
+    /// background. The toggle persists across launches.
+    public static void setEnabled(boolean enabled) {
+<span class="nc" id="L198">        boolean was = isEnabled();</span>
+<span class="nc" id="L199">        Preferences.set(PREF_ENABLED, enabled);</span>
+<span class="nc bnc" id="L200" title="All 4 branches missed.">        if (enabled &amp;&amp; !was) {</span>
+<span class="nc" id="L201">            drainAsync();</span>
+        }
+<span class="nc" id="L203">    }</span>
+
+    /// Replaces the active PII scrubber. Subclass {@link PiiScrubber}
+    /// to extend or replace the default redaction rules.
+    public static void setScrubber(PiiScrubber s) {
+<span class="nc bnc" id="L208" title="All 2 branches missed.">        if (s == null) {</span>
+<span class="nc" id="L209">            throw new IllegalArgumentException(&quot;scrubber&quot;);</span>
+        }
+<span class="nc" id="L211">        scrubber = s;</span>
+<span class="nc" id="L212">    }</span>
+
+    public static PiiScrubber getScrubber() {
+<span class="nc" id="L215">        return scrubber;</span>
+    }
+
+    /// Manually report an exception. The crash is persisted to storage
+    /// first and then uploaded if uploads are enabled. Stack frames
+    /// are captured from the throwable.
+    public static void capture(Throwable t) {
+<span class="nc bnc" id="L222" title="All 2 branches missed.">        if (t == null) {</span>
+<span class="nc" id="L223">            return;</span>
+        }
+<span class="nc bnc" id="L225" title="All 2 branches missed.">        if (Display.getInstance().isSimulator()) {</span>
+<span class="nc" id="L226">            return;</span>
+        }
+        try {
+<span class="nc" id="L229">            CrashReportPayload payload = build(t);</span>
+<span class="nc" id="L230">            String name = persist(payload);</span>
+<span class="nc bnc" id="L231" title="All 4 branches missed.">            if (name != null &amp;&amp; isEnabled()) {</span>
+<span class="nc" id="L232">                sendAsync(name, payload.toJson());</span>
+            }
+<span class="nc" id="L234">        } catch (Throwable inner) {</span>
+<span class="nc" id="L235">            inner.printStackTrace();</span>
+<span class="nc" id="L236">        }</span>
+<span class="nc" id="L237">    }</span>
+
+    static CrashReportPayload build(Throwable t) {
+<span class="nc" id="L240">        String exClass = t.getClass().getName();</span>
+<span class="nc" id="L241">        String message = scrubber.scrubMessage(t.getMessage());</span>
+<span class="nc" id="L242">        List&lt;Frame&gt; frames = extractFrames(t);</span>
+<span class="nc" id="L243">        String nativeLog = safeNativeLog();</span>
+<span class="nc" id="L244">        String rawStack = scrubber.scrubRawStack(safeRawStack(t));</span>
+<span class="nc" id="L245">        return new CrashReportPayload(newEventId(), exClass, message,</span>
+                frames, nativeLog, null, rawStack);
+    }
+
+    /// Renders the throwable (and its cause chain) as a pre-rendered stack
+    /// string via `printStackTrace`. This is the one trace API that behaves
+    /// identically on every port, and on the ParparVM C targets -- where
+    /// `getStackTrace()` may return the trace only as a formatted string --
+    /// it is what keeps a Java crash readable, especially once obfuscated.
+    /// Swallows any failure: capturing a crash report must never itself crash.
+    private static String safeRawStack(Throwable t) {
+        try {
+            // Capture the platform's own rendering via printStackTrace(PrintStream) -- PrintStream
+            // (unlike PrintWriter) is in the restricted CLDC core API. This is what preserves the
+            // real trace on the ParparVM ports: the pre-rendered C shadow-call-stack text, or the
+            // JavaScript engine's Error().stack on the JS port (where getStackTrace() has no
+            // structured frames to offer). On the JVM ports it is the standard full trace.
+            //
+            // Render into a BOUNDED buffer that discards bytes past the cap, rather than an unbounded
+            // ByteArrayOutputStream truncated afterwards: a throwable with a huge message or a deep
+            // cause chain could otherwise allocate many times the 16 KiB cap during crash handling and
+            // trigger a second OutOfMemoryError, losing the report. The cap sits a little above
+            // MAX_RAW_STACK_LEN so scrubbing (which only shrinks -- digit runs and emails collapse) and
+            // the final trim still yield a full-length raw stack.
+<span class="nc" id="L269">            BoundedOutputStream bout = new BoundedOutputStream(</span>
+                    CrashReportPayload.MAX_RAW_STACK_LEN + 8192);
+            try {
+                // Encode explicitly as UTF-8 on both ends rather than relying on the platform default
+                // (which SpotBugs flags and which would garble a non-ASCII exception message differently
+                // per device); the PrintStream and the readback share the charset.
+<span class="nc" id="L275">                java.io.PrintStream ps = new java.io.PrintStream(bout, true, &quot;UTF-8&quot;);</span>
+                try {
+<span class="nc" id="L277">                    t.printStackTrace(ps);</span>
+<span class="nc" id="L278">                    ps.flush();</span>
+                } finally {
+<span class="nc" id="L280">                    ps.close();</span>
+                }
+<span class="nc" id="L282">                String s = bout.toUtf8();</span>
+<span class="nc bnc" id="L283" title="All 2 branches missed.">                return s.length() == 0 ? null : s;</span>
+            } finally {
+<span class="nc" id="L285">                bout.close();</span>
+            }
+<span class="nc" id="L287">        } catch (Throwable ignored) {</span>
+<span class="nc" id="L288">            return null;</span>
+        }
+    }
+
+    /// A fixed-capacity {@link java.io.OutputStream} that keeps the first {@code cap} bytes and
+    /// silently discards the rest, so rendering a pathologically large stack cannot grow the buffer
+    /// without bound (and cannot itself OOM during crash handling). Not thread-safe; used by a single
+    /// capturing thread.
+    static final class BoundedOutputStream extends OutputStream {
+        private final byte[] buf;
+        private int count;
+
+<span class="fc" id="L300">        BoundedOutputStream(int cap) {</span>
+<span class="fc" id="L301">            buf = new byte[cap];</span>
+<span class="fc" id="L302">        }</span>
+
+        @Override
+        public void write(int b) {
+<span class="pc bpc" id="L306" title="1 of 2 branches missed.">            if (count &lt; buf.length) {</span>
+<span class="nc" id="L307">                buf[count++] = (byte) b;</span>
+            }
+<span class="fc" id="L309">        }</span>
+
+        @Override
+        public void write(byte[] b, int off, int len) {
+<span class="fc" id="L313">            int room = buf.length - count;</span>
+<span class="fc bfc" id="L314" title="All 2 branches covered.">            if (room &lt;= 0) {</span>
+<span class="fc" id="L315">                return;</span>
+            }
+<span class="fc bfc" id="L317" title="All 2 branches covered.">            int n = len &lt; room ? len : room;</span>
+<span class="fc" id="L318">            System.arraycopy(b, off, buf, count, n);</span>
+<span class="fc" id="L319">            count += n;</span>
+<span class="fc" id="L320">        }</span>
+
+        String toUtf8() throws java.io.UnsupportedEncodingException {
+            // Explicit UTF-8 (never the platform default, which SpotBugs flags and which would garble a
+            // non-ASCII message per device). UTF-8 is always available, so this never actually throws;
+            // the checked exception is handled by the single caller's catch-all rather than swallowed
+            // here into a default-encoding String.
+<span class="fc" id="L327">            return new String(buf, 0, count, &quot;UTF-8&quot;);</span>
+        }
+    }
+
+    /// Pulls the platform log snapshot, swallowing any exception the
+    /// platform implementation throws -- crash protection must never
+    /// itself crash the host. Returns `null` on platforms without a
+    /// readable process log or when the snapshot fails.
+    private static String safeNativeLog() {
+        try {
+<span class="nc" id="L337">            return Display.getInstance().getNativeLogSnapshot();</span>
+<span class="nc" id="L338">        } catch (Throwable ignored) {</span>
+<span class="nc" id="L339">            return null;</span>
+        }
+    }
+
+    /// Persists a JSON payload directly into the same drain queue
+    /// used by Java-side captures. Used for synthetic native-crash
+    /// records replayed at install time.
+    private static void persistJson(String json) {
+<span class="nc bnc" id="L347" title="All 4 branches missed.">        if (json == null || json.length() == 0) {</span>
+<span class="nc" id="L348">            return;</span>
+        }
+<span class="nc bnc" id="L350" title="All 2 branches missed.">        if (countStored() &gt;= MAX_STORED) {</span>
+<span class="nc" id="L351">            evictOldest();</span>
+        }
+<span class="nc" id="L353">        String name = STORAGE_PREFIX + newEventId();</span>
+        // Manual close-in-finally rather than try-with-resources --
+        // codenameone-core compiles with -source 1.5 for backward
+        // compatibility, and try-with-resources is Java 7+. Calling
+        // close() directly (rather than via Util.cleanup) lets PMD's
+        // CloseResource analyser see the close path.
+<span class="nc" id="L359">        OutputStream os = null;</span>
+        try {
+<span class="nc" id="L361">            os = Storage.getInstance().createOutputStream(name);</span>
+<span class="nc" id="L362">            os.write(json.getBytes(&quot;UTF-8&quot;));</span>
+<span class="nc" id="L363">            os.flush();</span>
+<span class="nc" id="L364">        } catch (IOException ex) {</span>
+<span class="nc" id="L365">            ex.printStackTrace();</span>
+        } finally {
+<span class="nc bnc" id="L367" title="All 2 branches missed.">            if (os != null) {</span>
+                try {
+<span class="nc" id="L369">                    os.close();</span>
+<span class="nc" id="L370">                } catch (IOException ignored) {</span>
+                    /* best-effort */
+<span class="nc" id="L372">                }</span>
+            }
+        }
+<span class="nc" id="L375">    }</span>
+
+    static List&lt;Frame&gt; extractFrames(Throwable t) {
+<span class="nc" id="L378">        List&lt;Frame&gt; out = new ArrayList&lt;Frame&gt;();</span>
+<span class="nc" id="L379">        StackTraceElement[] elements = t.getStackTrace();</span>
+        // Throwable.getStackTrace contractually returns a non-null array
+        // (empty when stack trace info is unavailable). SpotBugs flags
+        // the redundant null check; trust the contract.
+<span class="nc bnc" id="L383" title="All 2 branches missed.">        int limit = elements.length &lt; CrashReportPayload.MAX_FRAMES</span>
+                ? elements.length : CrashReportPayload.MAX_FRAMES;
+<span class="nc bnc" id="L385" title="All 2 branches missed.">        for (int i = 0; i &lt; limit; i++) {</span>
+<span class="nc" id="L386">            StackTraceElement e = elements[i];</span>
+<span class="nc" id="L387">            String cls = e.getClassName();</span>
+<span class="nc" id="L388">            String method = scrubber.scrubFrame(cls, e.getMethodName());</span>
+<span class="nc" id="L389">            out.add(new Frame(cls, method, e.getFileName(),</span>
+<span class="nc" id="L390">                    e.getLineNumber(), e.isNativeMethod()));</span>
+        }
+<span class="nc" id="L392">        return out;</span>
+    }
+
+    private static String persist(CrashReportPayload payload) {
+<span class="nc bnc" id="L396" title="All 2 branches missed.">        if (countStored() &gt;= MAX_STORED) {</span>
+<span class="nc" id="L397">            evictOldest();</span>
+        }
+<span class="nc" id="L399">        String name = STORAGE_PREFIX + payload.eventId;</span>
+<span class="nc" id="L400">        OutputStream os = null;</span>
+        try {
+<span class="nc" id="L402">            os = Storage.getInstance().createOutputStream(name);</span>
+<span class="nc" id="L403">            os.write(payload.toJson().getBytes(&quot;UTF-8&quot;));</span>
+<span class="nc" id="L404">            os.flush();</span>
+<span class="nc" id="L405">            return name;</span>
+<span class="nc" id="L406">        } catch (IOException ex) {</span>
+<span class="nc" id="L407">            ex.printStackTrace();</span>
+<span class="nc" id="L408">            return null;</span>
+        } finally {
+<span class="nc bnc" id="L410" title="All 2 branches missed.">            if (os != null) {</span>
+                try {
+<span class="nc" id="L412">                    os.close();</span>
+<span class="nc" id="L413">                } catch (IOException ignored) {</span>
+                    /* best-effort */
+<span class="nc" id="L415">                }</span>
+            }
+        }
+    }
+
+    private static int countStored() {
+<span class="nc" id="L421">        String[] all = Storage.getInstance().listEntries();</span>
+<span class="nc bnc" id="L422" title="All 2 branches missed.">        if (all == null) {</span>
+<span class="nc" id="L423">            return 0;</span>
+        }
+<span class="nc" id="L425">        int c = 0;</span>
+<span class="nc bnc" id="L426" title="All 2 branches missed.">        for (String entry : all) {</span>
+<span class="nc bnc" id="L427" title="All 4 branches missed.">            if (entry != null &amp;&amp; entry.startsWith(STORAGE_PREFIX)) {</span>
+<span class="nc" id="L428">                c++;</span>
+            }
+        }
+<span class="nc" id="L431">        return c;</span>
+    }
+
+    private static void evictOldest() {
+<span class="nc" id="L435">        String[] all = Storage.getInstance().listEntries();</span>
+<span class="nc bnc" id="L436" title="All 2 branches missed.">        if (all == null) {</span>
+<span class="nc" id="L437">            return;</span>
+        }
+<span class="nc" id="L439">        String oldest = null;</span>
+<span class="nc bnc" id="L440" title="All 2 branches missed.">        for (String n : all) {</span>
+<span class="nc bnc" id="L441" title="All 4 branches missed.">            if (n == null || !n.startsWith(STORAGE_PREFIX)) {</span>
+<span class="nc" id="L442">                continue;</span>
+            }
+<span class="nc bnc" id="L444" title="All 4 branches missed.">            if (oldest == null || n.compareTo(oldest) &lt; 0) {</span>
+<span class="nc" id="L445">                oldest = n;</span>
+            }
+        }
+<span class="nc bnc" id="L448" title="All 2 branches missed.">        if (oldest != null) {</span>
+<span class="nc" id="L449">            Storage.getInstance().deleteStorageFile(oldest);</span>
+        }
+<span class="nc" id="L451">    }</span>
+
+    private static void drainAsync() {
+<span class="nc bnc" id="L454" title="All 2 branches missed.">        if (draining) {</span>
+<span class="nc" id="L455">            return;</span>
+        }
+<span class="nc" id="L457">        draining = true;</span>
+<span class="nc" id="L458">        new Thread(new Runnable() {</span>
+            @Override
+            public void run() {
+                try {
+<span class="nc" id="L462">                    drain();</span>
+                } finally {
+<span class="nc" id="L464">                    draining = false;</span>
+                }
+<span class="nc" id="L466">            }</span>
+<span class="nc" id="L467">        }, &quot;CrashProtectionDrain&quot;).start();</span>
+<span class="nc" id="L468">    }</span>
+
+    static void drain() {
+<span class="nc bnc" id="L471" title="All 2 branches missed.">        if (!isEnabled()) {</span>
+<span class="nc" id="L472">            return;</span>
+        }
+<span class="nc" id="L474">        String[] all = Storage.getInstance().listEntries();</span>
+<span class="nc bnc" id="L475" title="All 2 branches missed.">        if (all == null) {</span>
+<span class="nc" id="L476">            return;</span>
+        }
+<span class="nc bnc" id="L478" title="All 2 branches missed.">        for (String name : all) {</span>
+<span class="nc bnc" id="L479" title="All 4 branches missed.">            if (name == null || !name.startsWith(STORAGE_PREFIX)) {</span>
+<span class="nc" id="L480">                continue;</span>
+            }
+<span class="nc" id="L482">            String json = readStored(name);</span>
+<span class="nc bnc" id="L483" title="All 2 branches missed.">            if (json == null) {</span>
+<span class="nc" id="L484">                Storage.getInstance().deleteStorageFile(name);</span>
+<span class="nc" id="L485">                continue;</span>
+            }
+<span class="nc" id="L487">            sendBlocking(name, json);</span>
+        }
+<span class="nc" id="L489">    }</span>
+
+    private static String readStored(String name) {
+<span class="nc" id="L492">        InputStream is = null;</span>
+        try {
+<span class="nc" id="L494">            is = Storage.getInstance().createInputStream(name);</span>
+<span class="nc bnc" id="L495" title="All 2 branches missed.">            if (is == null) {</span>
+<span class="nc" id="L496">                return null;</span>
+            }
+<span class="nc" id="L498">            byte[] data = Util.readInputStream(is);</span>
+<span class="nc" id="L499">            return new String(data, &quot;UTF-8&quot;);</span>
+<span class="nc" id="L500">        } catch (IOException ex) {</span>
+<span class="nc" id="L501">            ex.printStackTrace();</span>
+<span class="nc" id="L502">            return null;</span>
+        } finally {
+<span class="nc bnc" id="L504" title="All 2 branches missed.">            if (is != null) {</span>
+                try {
+<span class="nc" id="L506">                    is.close();</span>
+<span class="nc" id="L507">                } catch (IOException ignored) {</span>
+                    /* best-effort */
+<span class="nc" id="L509">                }</span>
+            }
+        }
+    }
+
+    private static void sendAsync(final String storageName, final String json) {
+<span class="nc" id="L515">        NetworkManager.getInstance().addToQueue(buildRequest(storageName, json));</span>
+<span class="nc" id="L516">    }</span>
+
+    private static void sendBlocking(String storageName, String json) {
+        try {
+<span class="nc" id="L520">            NetworkManager.getInstance().addToQueueAndWait(buildRequest(storageName, json));</span>
+<span class="nc" id="L521">        } catch (Throwable t) {</span>
+<span class="nc" id="L522">            t.printStackTrace();</span>
+<span class="nc" id="L523">        }</span>
+<span class="nc" id="L524">    }</span>
+
+    private static ConnectionRequest buildRequest(final String storageName, String json) {
+<span class="nc" id="L527">        ConnectionRequest req = new ConnectionRequest() {</span>
+            @Override
+            protected void postResponse() {
+<span class="nc" id="L530">                int code = getResponseCode();</span>
+<span class="nc bnc" id="L531" title="All 4 branches missed.">                if (code &gt;= 200 &amp;&amp; code &lt; 300) {</span>
+<span class="nc" id="L532">                    Storage.getInstance().deleteStorageFile(storageName);</span>
+                }
+<span class="nc" id="L534">            }</span>
+        };
+<span class="nc" id="L536">        req.setUrl(endpoint);</span>
+<span class="nc" id="L537">        req.setPost(true);</span>
+<span class="nc" id="L538">        req.setHttpMethod(&quot;POST&quot;);</span>
+<span class="nc" id="L539">        req.setContentType(&quot;application/json&quot;);</span>
+<span class="nc" id="L540">        req.setRequestBody(json);</span>
+<span class="nc" id="L541">        req.setFailSilently(true);</span>
+<span class="nc" id="L542">        return req;</span>
+    }
+
+<span class="nc" id="L545">    private static final java.util.Random EVENT_ID_RNG = new java.util.Random();</span>
+
+    private static String newEventId() {
+<span class="nc" id="L548">        char[] out = new char[32];</span>
+<span class="nc bnc" id="L549" title="All 2 branches missed.">        for (int i = 0; i &lt; 32; i++) {</span>
+            // Random.nextInt(16) avoids the float -&gt; int dance that
+            // Math.random() does and that SpotBugs flags as wasteful
+            // (DM_NEXTINT_VIA_NEXTDOUBLE). Crypto-quality randomness
+            // isn't needed -- the eventId is a dedup token, not a
+            // secret. (The server also de-dups by fingerprint, so a
+            // collision is recoverable.)
+<span class="nc" id="L556">            int v = EVENT_ID_RNG.nextInt(16);</span>
+<span class="nc bnc" id="L557" title="All 2 branches missed.">            out[i] = (char) (v &lt; 10 ? '0' + v : 'a' + (v - 10));</span>
+        }
+<span class="nc" id="L559">        return new String(out);</span>
+    }
+
+    /// Framework-internal hook for unit tests; never call from app code.
+    static void setEndpointForTesting(String url) {
+<span class="nc" id="L564">        endpoint = url;</span>
+<span class="nc" id="L565">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

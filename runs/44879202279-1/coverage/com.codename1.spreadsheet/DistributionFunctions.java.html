@@ -1,0 +1,869 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DistributionFunctions.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.spreadsheet</a> &gt; <span class="el_source">DistributionFunctions.java</span></div><h1>DistributionFunctions.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.spreadsheet;
+
+import com.codename1.util.MathUtil;
+
+/// The probability distributions and the tests built on them.
+///
+/// Everything here rests on three special functions: the logarithm of the gamma function,
+/// the regularized incomplete gamma function and the regularized incomplete beta function.
+/// An inverse is found by bisection on the distribution itself, which is slow next to a
+/// closed form and never disagrees with the function it inverts.
+final class DistributionFunctions {
+    static final String SCALAR_NAMES = &quot;BETA.DIST BETA.INV BETADIST BETAINV BINOM.DIST BINOM.DIST.RANGE BINOM.INV&quot;
+            + &quot; BINOMDIST CHIDIST CHIINV CHISQ.DIST CHISQ.DIST.RT CHISQ.INV CHISQ.INV.RT CONFIDENCE CONFIDENCE.NORM&quot;
+            + &quot; CONFIDENCE.T CRITBINOM EXPON.DIST EXPONDIST F.DIST F.DIST.RT F.INV F.INV.RT FDIST FINV GAMMA GAMMA.DIST&quot;
+            + &quot; GAMMA.INV GAMMADIST GAMMAINV GAMMALN GAMMALN.PRECISE GAUSS HYPGEOM.DIST HYPGEOMDIST LOGINV LOGNORM.DIST&quot;
+            + &quot; LOGNORM.INV LOGNORMDIST NEGBINOM.DIST NEGBINOMDIST NORM.DIST NORM.INV NORM.S.DIST NORM.S.INV NORMDIST&quot;
+            + &quot; NORMINV NORMSDIST NORMSINV PHI POISSON POISSON.DIST T.DIST T.DIST.2T T.DIST.RT T.INV T.INV.2T TDIST TINV&quot;
+            + &quot; WEIBULL WEIBULL.DIST&quot;;
+
+    static final String RANGE_NAMES = &quot;CHISQ.TEST CHITEST F.TEST FTEST T.TEST TTEST Z.TEST ZTEST&quot;;
+
+<span class="fc" id="L44">    private static final double[] LANCZOS = {0.99999999999980993, 676.5203681218851, -1259.1392167224028,</span>
+        771.32342877765313, -176.61502916214059, 12.507343278686905, -0.13857109526572012, 9.9843695780195716e-6,
+        1.5056327351493116e-7};
+
+    private DistributionFunctions() {
+    }
+
+    private static Double d(double v) {
+<span class="fc" id="L52">        return Double.valueOf(v);</span>
+    }
+
+    private static double exp(double x) {
+<span class="fc" id="L56">        return MathUtil.exp(x);</span>
+    }
+
+    private static double log(double x) {
+<span class="fc" id="L60">        return MathUtil.log(x);</span>
+    }
+
+    static double lgamma(double x) {
+<span class="pc bpc" id="L64" title="1 of 2 branches missed.">        if (x &lt; 0.5) {</span>
+            // reflection
+<span class="nc" id="L66">            return log(Math.PI / Math.abs(Math.sin(Math.PI * x))) - lgamma(1 - x);</span>
+        }
+<span class="fc" id="L68">        x -= 1;</span>
+<span class="fc" id="L69">        double sum = LANCZOS[0];</span>
+<span class="fc" id="L70">        double t = x + 7.5;</span>
+<span class="fc bfc" id="L71" title="All 2 branches covered.">        for (int i = 1; i &lt; 9; i++) {</span>
+<span class="fc" id="L72">            sum += LANCZOS[i] / (x + i);</span>
+        }
+<span class="fc" id="L74">        return 0.5 * log(2 * Math.PI) + (x + 0.5) * log(t) - t + log(sum);</span>
+    }
+
+    static double gamma(double x) {
+<span class="fc bfc" id="L78" title="All 2 branches covered.">        if (x == Math.floor(x)) {</span>
+<span class="fc bfc" id="L79" title="All 2 branches covered.">            if (x &lt;= 0) {</span>
+<span class="fc" id="L80">                throw EvalError.NUM;</span>
+            }
+<span class="pc bpc" id="L82" title="1 of 2 branches missed.">            if (x &lt;= 171) {</span>
+<span class="fc" id="L83">                return MathFunctions.fact(x - 1);</span>
+            }
+        }
+<span class="fc bfc" id="L86" title="All 2 branches covered.">        if (x &lt; 0.5) {</span>
+<span class="fc" id="L87">            return Math.PI / (Math.sin(Math.PI * x) * gamma(1 - x));</span>
+        }
+<span class="pc bpc" id="L89" title="1 of 2 branches missed.">        if (x &gt; 171.7) {</span>
+<span class="nc" id="L90">            throw EvalError.NUM;</span>
+        }
+<span class="fc" id="L92">        return exp(lgamma(x));</span>
+    }
+
+    /// The regularized lower incomplete gamma function P(a, x).
+    static double gammaP(double a, double x) {
+<span class="fc bfc" id="L97" title="All 2 branches covered.">        if (x &lt;= 0) {</span>
+<span class="fc" id="L98">            return 0;</span>
+        }
+<span class="fc bfc" id="L100" title="All 2 branches covered.">        if (x &lt; a + 1) {</span>
+<span class="fc" id="L101">            double term = 1 / a;</span>
+<span class="fc" id="L102">            double sum = term;</span>
+<span class="pc bpc" id="L103" title="1 of 2 branches missed.">            for (int n = 1; n &lt; 1000; n++) {</span>
+<span class="fc" id="L104">                term *= x / (a + n);</span>
+<span class="fc" id="L105">                sum += term;</span>
+<span class="fc bfc" id="L106" title="All 2 branches covered.">                if (Math.abs(term) &lt; Math.abs(sum) * 1e-16) {</span>
+<span class="fc" id="L107">                    break;</span>
+                }
+            }
+<span class="fc" id="L110">            return sum * exp(-x + a * log(x) - lgamma(a));</span>
+        }
+<span class="fc" id="L112">        return 1 - gammaQ(a, x);</span>
+    }
+
+    /// The regularized upper incomplete gamma function Q(a, x).
+    static double gammaQ(double a, double x) {
+<span class="fc bfc" id="L117" title="All 2 branches covered.">        if (x &lt;= 0) {</span>
+<span class="fc" id="L118">            return 1;</span>
+        }
+<span class="fc bfc" id="L120" title="All 2 branches covered.">        if (x &lt; a + 1) {</span>
+<span class="fc" id="L121">            return 1 - gammaP(a, x);</span>
+        }
+<span class="fc" id="L123">        double tiny = 1e-300;</span>
+<span class="fc" id="L124">        double b = x + 1 - a;</span>
+<span class="fc" id="L125">        double c = 1 / tiny;</span>
+<span class="fc" id="L126">        double dd = 1 / b;</span>
+<span class="fc" id="L127">        double h = dd;</span>
+<span class="pc bpc" id="L128" title="1 of 2 branches missed.">        for (int i = 1; i &lt; 1000; i++) {</span>
+<span class="fc" id="L129">            double an = -i * (i - a);</span>
+<span class="fc" id="L130">            b += 2;</span>
+<span class="fc" id="L131">            dd = an * dd + b;</span>
+<span class="pc bpc" id="L132" title="1 of 2 branches missed.">            if (Math.abs(dd) &lt; tiny) {</span>
+<span class="nc" id="L133">                dd = tiny;</span>
+            }
+<span class="fc" id="L135">            c = b + an / c;</span>
+<span class="pc bpc" id="L136" title="1 of 2 branches missed.">            if (Math.abs(c) &lt; tiny) {</span>
+<span class="nc" id="L137">                c = tiny;</span>
+            }
+<span class="fc" id="L139">            dd = 1 / dd;</span>
+<span class="fc" id="L140">            double delta = dd * c;</span>
+<span class="fc" id="L141">            h *= delta;</span>
+<span class="fc bfc" id="L142" title="All 2 branches covered.">            if (Math.abs(delta - 1) &lt; 1e-16) {</span>
+<span class="fc" id="L143">                break;</span>
+            }
+        }
+<span class="fc" id="L146">        return exp(-x + a * log(x) - lgamma(a)) * h;</span>
+    }
+
+    /// The regularized incomplete beta function I(x; a, b).
+    static double betaI(double x, double a, double b) {
+<span class="fc bfc" id="L151" title="All 2 branches covered.">        if (x &lt;= 0) {</span>
+<span class="fc" id="L152">            return 0;</span>
+        }
+<span class="fc bfc" id="L154" title="All 2 branches covered.">        if (x &gt;= 1) {</span>
+<span class="fc" id="L155">            return 1;</span>
+        }
+<span class="fc" id="L157">        double front = exp(lgamma(a + b) - lgamma(a) - lgamma(b) + a * log(x) + b * log(1 - x));</span>
+<span class="fc bfc" id="L158" title="All 2 branches covered.">        if (x &lt; (a + 1) / (a + b + 2)) {</span>
+<span class="fc" id="L159">            return front * betaFraction(x, a, b) / a;</span>
+        }
+<span class="fc" id="L161">        return 1 - front * betaFraction(1 - x, b, a) / b;</span>
+    }
+
+    private static double betaFraction(double x, double a, double b) {
+<span class="fc" id="L165">        double tiny = 1e-300;</span>
+<span class="fc" id="L166">        double c = 1;</span>
+<span class="fc" id="L167">        double dd = 1 - (a + b) * x / (a + 1);</span>
+<span class="pc bpc" id="L168" title="1 of 2 branches missed.">        if (Math.abs(dd) &lt; tiny) {</span>
+<span class="nc" id="L169">            dd = tiny;</span>
+        }
+<span class="fc" id="L171">        dd = 1 / dd;</span>
+<span class="fc" id="L172">        double h = dd;</span>
+<span class="pc bpc" id="L173" title="1 of 2 branches missed.">        for (int m = 1; m &lt; 1000; m++) {</span>
+<span class="fc" id="L174">            int m2 = 2 * m;</span>
+<span class="fc" id="L175">            double aa = m * (b - m) * x / ((a + m2 - 1) * (a + m2));</span>
+<span class="fc" id="L176">            dd = 1 + aa * dd;</span>
+<span class="pc bpc" id="L177" title="1 of 2 branches missed.">            if (Math.abs(dd) &lt; tiny) {</span>
+<span class="nc" id="L178">                dd = tiny;</span>
+            }
+<span class="fc" id="L180">            c = 1 + aa / c;</span>
+<span class="pc bpc" id="L181" title="1 of 2 branches missed.">            if (Math.abs(c) &lt; tiny) {</span>
+<span class="nc" id="L182">                c = tiny;</span>
+            }
+<span class="fc" id="L184">            dd = 1 / dd;</span>
+<span class="fc" id="L185">            h *= dd * c;</span>
+<span class="fc" id="L186">            aa = -(a + m) * (a + b + m) * x / ((a + m2) * (a + m2 + 1));</span>
+<span class="fc" id="L187">            dd = 1 + aa * dd;</span>
+<span class="pc bpc" id="L188" title="1 of 2 branches missed.">            if (Math.abs(dd) &lt; tiny) {</span>
+<span class="nc" id="L189">                dd = tiny;</span>
+            }
+<span class="fc" id="L191">            c = 1 + aa / c;</span>
+<span class="pc bpc" id="L192" title="1 of 2 branches missed.">            if (Math.abs(c) &lt; tiny) {</span>
+<span class="nc" id="L193">                c = tiny;</span>
+            }
+<span class="fc" id="L195">            dd = 1 / dd;</span>
+<span class="fc" id="L196">            double delta = dd * c;</span>
+<span class="fc" id="L197">            h *= delta;</span>
+<span class="fc bfc" id="L198" title="All 2 branches covered.">            if (Math.abs(delta - 1) &lt; 1e-16) {</span>
+<span class="fc" id="L199">                break;</span>
+            }
+        }
+<span class="fc" id="L202">        return h;</span>
+    }
+
+    static double erf(double x) {
+<span class="fc bfc" id="L206" title="All 2 branches covered.">        if (x &lt; 0) {</span>
+<span class="fc" id="L207">            return -erf(-x);</span>
+        }
+<span class="fc" id="L209">        return gammaP(0.5, x * x);</span>
+    }
+
+    static double erfc(double x) {
+<span class="fc bfc" id="L213" title="All 2 branches covered.">        if (x &lt; 0) {</span>
+<span class="fc" id="L214">            return 2 - erfc(-x);</span>
+        }
+<span class="fc" id="L216">        return gammaQ(0.5, x * x);</span>
+    }
+
+    static double normCdf(double z) {
+<span class="fc" id="L220">        return 0.5 * erfc(-z / Math.sqrt(2));</span>
+    }
+
+    static double normPdf(double z) {
+<span class="fc" id="L224">        return exp(-z * z / 2) / Math.sqrt(2 * Math.PI);</span>
+    }
+
+    /// The inverse of the standard normal distribution: Acklam's rational approximation and
+    /// one step of Halley's method on top of it.
+    static double normInv(double p) {
+<span class="fc bfc" id="L230" title="All 4 branches covered.">        if (p &lt;= 0 || p &gt;= 1) {</span>
+<span class="fc" id="L231">            throw EvalError.NUM;</span>
+        }
+<span class="fc" id="L233">        double[] a = {-3.969683028665376e+01, 2.209460984245205e+02, -2.759285104469687e+02, 1.383577518672690e+02,</span>
+            -3.066479806614716e+01, 2.506628277459239e+00};
+<span class="fc" id="L235">        double[] b = {-5.447609879822406e+01, 1.615858368580409e+02, -1.556989798598866e+02, 6.680131188771972e+01,</span>
+            -1.328068155288572e+01};
+<span class="fc" id="L237">        double[] c = {-7.784894002430293e-03, -3.223964580411365e-01, -2.400758277161838e+00, -2.549732539343734e+00,</span>
+            4.374664141464968e+00, 2.938163982698783e+00};
+<span class="fc" id="L239">        double[] dd = {7.784695709041462e-03, 3.224671290700398e-01, 2.445134137142996e+00, 3.754408661907416e+00};</span>
+        double x;
+<span class="pc bpc" id="L241" title="1 of 2 branches missed.">        if (p &lt; 0.02425) {</span>
+<span class="nc" id="L242">            double q = Math.sqrt(-2 * log(p));</span>
+<span class="nc" id="L243">            x = (((((c[0] * q + c[1]) * q + c[2]) * q + c[3]) * q + c[4]) * q + c[5])</span>
+                    / ((((dd[0] * q + dd[1]) * q + dd[2]) * q + dd[3]) * q + 1);
+<span class="pc bpc" id="L245" title="1 of 2 branches missed.">        } else if (p &gt; 1 - 0.02425) {</span>
+<span class="nc" id="L246">            double q = Math.sqrt(-2 * log(1 - p));</span>
+<span class="nc" id="L247">            x = -(((((c[0] * q + c[1]) * q + c[2]) * q + c[3]) * q + c[4]) * q + c[5])</span>
+                    / ((((dd[0] * q + dd[1]) * q + dd[2]) * q + dd[3]) * q + 1);
+<span class="nc" id="L249">        } else {</span>
+<span class="fc" id="L250">            double q = p - 0.5;</span>
+<span class="fc" id="L251">            double r = q * q;</span>
+<span class="fc" id="L252">            x = (((((a[0] * r + a[1]) * r + a[2]) * r + a[3]) * r + a[4]) * r + a[5]) * q</span>
+                    / (((((b[0] * r + b[1]) * r + b[2]) * r + b[3]) * r + b[4]) * r + 1);
+        }
+<span class="fc bfc" id="L255" title="All 2 branches covered.">        for (int i = 0; i &lt; 2; i++) {</span>
+<span class="fc" id="L256">            double e = normCdf(x) - p;</span>
+<span class="fc" id="L257">            double u = e / normPdf(x);</span>
+<span class="fc" id="L258">            x -= u / (1 + x * u / 2);</span>
+        }
+<span class="fc" id="L260">        return x;</span>
+    }
+
+    static double tCdf(double t, double df) {
+<span class="fc" id="L264">        double x = df / (df + t * t);</span>
+<span class="fc" id="L265">        double tail = 0.5 * betaI(x, df / 2, 0.5);</span>
+<span class="fc bfc" id="L266" title="All 2 branches covered.">        return t &gt; 0 ? 1 - tail : tail;</span>
+    }
+
+    static double fCdf(double x, double d1, double d2) {
+<span class="fc bfc" id="L270" title="All 2 branches covered.">        if (x &lt;= 0) {</span>
+<span class="fc" id="L271">            return 0;</span>
+        }
+<span class="fc" id="L273">        return betaI(d1 * x / (d1 * x + d2), d1 / 2, d2 / 2);</span>
+    }
+
+    private static final int F_GAMMA = 0;
+    private static final int F_BETA = 1;
+    private static final int F_T = 2;
+    private static final int F_F = 3;
+
+    private static double cdf(int which, double x, double p1, double p2) {
+<span class="fc bfc" id="L282" title="All 4 branches covered.">        switch (which) {</span>
+            case F_GAMMA:
+<span class="fc" id="L284">                return gammaP(p1, x / p2);</span>
+            case F_BETA:
+<span class="fc" id="L286">                return betaI(x, p1, p2);</span>
+            case F_T:
+<span class="fc" id="L288">                return tCdf(x, p1);</span>
+            default:
+<span class="fc" id="L290">                return fCdf(x, p1, p2);</span>
+        }
+    }
+
+    /// The x at which an increasing distribution reaches p.
+    private static double inverse(int which, double p, double p1, double p2, double lo, double hi) {
+<span class="pc bpc" id="L296" title="2 of 4 branches missed.">        if (p &lt; 0 || p &gt; 1) {</span>
+<span class="nc" id="L297">            throw EvalError.NUM;</span>
+        }
+<span class="fc bfc" id="L299" title="All 2 branches covered.">        if (Double.isInfinite(hi)) {</span>
+<span class="fc" id="L300">            hi = Math.max(1, lo + 1);</span>
+<span class="pc bpc" id="L301" title="1 of 4 branches missed.">            for (int i = 0; i &lt; 1100 &amp;&amp; cdf(which, hi, p1, p2) &lt; p; i++) {</span>
+<span class="fc" id="L302">                hi *= 2;</span>
+            }
+        }
+<span class="fc bfc" id="L305" title="All 2 branches covered.">        if (Double.isInfinite(lo)) {</span>
+<span class="fc" id="L306">            lo = -1;</span>
+<span class="pc bpc" id="L307" title="2 of 4 branches missed.">            for (int i = 0; i &lt; 1100 &amp;&amp; cdf(which, lo, p1, p2) &gt; p; i++) {</span>
+<span class="nc" id="L308">                lo *= 2;</span>
+            }
+        }
+<span class="fc bfc" id="L311" title="All 2 branches covered.">        for (int i = 0; i &lt; 200; i++) {</span>
+<span class="fc" id="L312">            double mid = (lo + hi) / 2;</span>
+<span class="fc bfc" id="L313" title="All 4 branches covered.">            if (mid == lo || mid == hi) {</span>
+<span class="fc" id="L314">                break;</span>
+            }
+<span class="fc bfc" id="L316" title="All 2 branches covered.">            if (cdf(which, mid, p1, p2) &lt; p) {</span>
+<span class="fc" id="L317">                lo = mid;</span>
+            } else {
+<span class="fc" id="L319">                hi = mid;</span>
+            }
+        }
+<span class="fc" id="L322">        return (lo + hi) / 2;</span>
+    }
+
+    private static double binomPmf(double k, double n, double p) {
+<span class="pc bpc" id="L326" title="2 of 4 branches missed.">        if (k &lt; 0 || k &gt; n) {</span>
+<span class="nc" id="L327">            return 0;</span>
+        }
+<span class="pc bpc" id="L329" title="1 of 2 branches missed.">        if (p == 0) {</span>
+<span class="nc bnc" id="L330" title="All 2 branches missed.">            return k == 0 ? 1 : 0;</span>
+        }
+<span class="fc bfc" id="L332" title="All 2 branches covered.">        if (p == 1) {</span>
+<span class="fc bfc" id="L333" title="All 2 branches covered.">            return k == n ? 1 : 0;</span>
+        }
+<span class="fc" id="L335">        return exp(lgamma(n + 1) - lgamma(k + 1) - lgamma(n - k + 1) + k * log(p) + (n - k) * log(1 - p));</span>
+    }
+
+    private static double binomCdf(double k, double n, double p) {
+<span class="pc bpc" id="L339" title="1 of 2 branches missed.">        if (k &lt; 0) {</span>
+<span class="nc" id="L340">            return 0;</span>
+        }
+<span class="fc bfc" id="L342" title="All 2 branches covered.">        if (k &gt;= n) {</span>
+<span class="fc" id="L343">            return 1;</span>
+        }
+<span class="fc" id="L345">        return 1 - betaI(p, k + 1, n - k);</span>
+    }
+
+    private static void probability(double p) {
+<span class="fc bfc" id="L349" title="All 4 branches covered.">        if (p &lt; 0 || p &gt; 1) {</span>
+<span class="fc" id="L350">            throw EvalError.NUM;</span>
+        }
+<span class="fc" id="L352">    }</span>
+
+    private static void positive(double v) {
+<span class="fc bfc" id="L355" title="All 2 branches covered.">        if (v &lt;= 0) {</span>
+<span class="fc" id="L356">            throw EvalError.NUM;</span>
+        }
+<span class="fc" id="L358">    }</span>
+
+    static Object call(String name, Evaluator ev, Object[] a) {
+<span class="fc bfc" id="L361" title="All 34 branches covered.">        switch (Functions.index(SWITCH_1, name)) {</span>
+            case 0: // NORM.DIST
+            case 1: { // NORMDIST
+<span class="fc" id="L364">                double sd = Evaluator.num(a, 2);</span>
+<span class="fc" id="L365">                positive(sd);</span>
+<span class="fc" id="L366">                double z = (Evaluator.num(a, 0) - Evaluator.num(a, 1)) / sd;</span>
+<span class="fc bfc" id="L367" title="All 2 branches covered.">                return d(Evaluator.bool(a, 3, true) ? normCdf(z) : normPdf(z) / sd);</span>
+            }
+            case 2: // NORM.S.DIST
+<span class="fc bfc" id="L370" title="All 2 branches covered.">                return d(Evaluator.bool(a, 1, true) ? normCdf(Evaluator.num(a, 0)) : normPdf(Evaluator.num(a, 0)));</span>
+            case 3: // NORMSDIST
+<span class="fc" id="L372">                return d(normCdf(Evaluator.num(a, 0)));</span>
+            case 4: // GAUSS
+<span class="fc" id="L374">                return d(normCdf(Evaluator.num(a, 0)) - 0.5);</span>
+            case 5: // PHI
+<span class="fc" id="L376">                return d(normPdf(Evaluator.num(a, 0)));</span>
+            case 6: // NORM.INV
+            case 7: { // NORMINV
+<span class="fc" id="L379">                double sd = Evaluator.num(a, 2);</span>
+<span class="fc" id="L380">                positive(sd);</span>
+<span class="fc" id="L381">                return d(Evaluator.num(a, 1) + sd * normInv(Evaluator.num(a, 0)));</span>
+            }
+            case 8: // NORM.S.INV
+            case 9: // NORMSINV
+<span class="fc" id="L385">                return d(normInv(Evaluator.num(a, 0)));</span>
+            case 10: // LOGNORM.DIST
+            case 11: { // LOGNORMDIST
+<span class="fc" id="L388">                double x = Evaluator.num(a, 0);</span>
+<span class="fc" id="L389">                double sd = Evaluator.num(a, 2);</span>
+<span class="fc" id="L390">                positive(x);</span>
+<span class="fc" id="L391">                positive(sd);</span>
+<span class="fc" id="L392">                double z = (log(x) - Evaluator.num(a, 1)) / sd;</span>
+<span class="fc bfc" id="L393" title="All 4 branches covered.">                boolean cumulative = &quot;LOGNORMDIST&quot;.equals(name) || Evaluator.bool(a, 3, true);</span>
+<span class="fc bfc" id="L394" title="All 2 branches covered.">                return d(cumulative ? normCdf(z) : normPdf(z) / (x * sd));</span>
+            }
+            case 12: // LOGNORM.INV
+            case 13: { // LOGINV
+<span class="fc" id="L398">                double sd = Evaluator.num(a, 2);</span>
+<span class="fc" id="L399">                positive(sd);</span>
+<span class="fc" id="L400">                return d(exp(Evaluator.num(a, 1) + sd * normInv(Evaluator.num(a, 0))));</span>
+            }
+            case 14: // EXPON.DIST
+            case 15: { // EXPONDIST
+<span class="fc" id="L404">                double x = Evaluator.num(a, 0);</span>
+<span class="fc" id="L405">                double lambda = Evaluator.num(a, 1);</span>
+<span class="fc" id="L406">                positive(lambda);</span>
+<span class="fc bfc" id="L407" title="All 2 branches covered.">                if (x &lt; 0) {</span>
+<span class="fc" id="L408">                    throw EvalError.NUM;</span>
+                }
+<span class="fc bfc" id="L410" title="All 2 branches covered.">                return d(Evaluator.bool(a, 2, true) ? 1 - exp(-lambda * x) : lambda * exp(-lambda * x));</span>
+            }
+            case 16: // POISSON
+            case 17: { // POISSON.DIST
+<span class="fc" id="L414">                double k = Math.floor(Evaluator.num(a, 0));</span>
+<span class="fc" id="L415">                double mean = Evaluator.num(a, 1);</span>
+<span class="fc bfc" id="L416" title="All 4 branches covered.">                if (k &lt; 0 || mean &lt; 0) {</span>
+<span class="fc" id="L417">                    throw EvalError.NUM;</span>
+                }
+<span class="fc bfc" id="L419" title="All 2 branches covered.">                if (Evaluator.bool(a, 2, true)) {</span>
+<span class="fc" id="L420">                    return d(gammaQ(k + 1, mean));</span>
+                }
+<span class="pc bpc" id="L422" title="3 of 4 branches missed.">                return d(mean == 0 ? k == 0 ? 1 : 0 : exp(k * log(mean) - mean - lgamma(k + 1)));</span>
+            }
+            case 18: // WEIBULL
+            case 19: { // WEIBULL.DIST
+<span class="fc" id="L426">                double x = Evaluator.num(a, 0);</span>
+<span class="fc" id="L427">                double alpha = Evaluator.num(a, 1);</span>
+<span class="fc" id="L428">                double beta = Evaluator.num(a, 2);</span>
+<span class="fc" id="L429">                positive(alpha);</span>
+<span class="fc" id="L430">                positive(beta);</span>
+<span class="pc bpc" id="L431" title="1 of 2 branches missed.">                if (x &lt; 0) {</span>
+<span class="nc" id="L432">                    throw EvalError.NUM;</span>
+                }
+<span class="fc" id="L434">                double e = exp(-MathUtil.pow(x / beta, alpha));</span>
+<span class="fc bfc" id="L435" title="All 2 branches covered.">                if (Evaluator.bool(a, 3, true)) {</span>
+<span class="fc" id="L436">                    return d(1 - e);</span>
+                }
+<span class="fc" id="L438">                return d(alpha / beta * MathUtil.pow(x / beta, alpha - 1) * e);</span>
+            }
+            case 20: // GAMMA
+<span class="fc" id="L441">                return d(gamma(Evaluator.num(a, 0)));</span>
+            case 21: // GAMMALN
+            case 22: { // GAMMALN.PRECISE
+<span class="fc" id="L444">                double x = Evaluator.num(a, 0);</span>
+<span class="fc" id="L445">                positive(x);</span>
+<span class="fc" id="L446">                return d(lgamma(x));</span>
+            }
+            case 23: // GAMMA.DIST
+            case 24: { // GAMMADIST
+<span class="fc" id="L450">                double x = Evaluator.num(a, 0);</span>
+<span class="fc" id="L451">                double alpha = Evaluator.num(a, 1);</span>
+<span class="fc" id="L452">                double beta = Evaluator.num(a, 2);</span>
+<span class="fc" id="L453">                positive(alpha);</span>
+<span class="fc" id="L454">                positive(beta);</span>
+<span class="pc bpc" id="L455" title="1 of 2 branches missed.">                if (x &lt; 0) {</span>
+<span class="nc" id="L456">                    throw EvalError.NUM;</span>
+                }
+<span class="fc bfc" id="L458" title="All 2 branches covered.">                if (Evaluator.bool(a, 3, true)) {</span>
+<span class="fc" id="L459">                    return d(gammaP(alpha, x / beta));</span>
+                }
+<span class="pc bpc" id="L461" title="1 of 2 branches missed.">                if (x == 0) {</span>
+<span class="nc bnc" id="L462" title="All 2 branches missed.">                    return d(alpha == 1 ? 1 / beta : 0);</span>
+                }
+<span class="fc" id="L464">                return d(exp((alpha - 1) * log(x) - x / beta - lgamma(alpha) - alpha * log(beta)));</span>
+            }
+            case 25: // GAMMA.INV
+            case 26: { // GAMMAINV
+<span class="fc" id="L468">                double p = Evaluator.num(a, 0);</span>
+<span class="fc" id="L469">                double alpha = Evaluator.num(a, 1);</span>
+<span class="fc" id="L470">                double beta = Evaluator.num(a, 2);</span>
+<span class="fc" id="L471">                positive(alpha);</span>
+<span class="fc" id="L472">                positive(beta);</span>
+<span class="fc bfc" id="L473" title="All 2 branches covered.">                if (p &gt;= 1) {</span>
+<span class="fc" id="L474">                    throw EvalError.NUM;</span>
+                }
+<span class="fc" id="L476">                return d(inverse(F_GAMMA, p, alpha, beta, 0, Double.POSITIVE_INFINITY));</span>
+            }
+            case 27: // BETA.DIST
+            case 28: { // BETADIST
+<span class="fc" id="L480">                boolean modern = &quot;BETA.DIST&quot;.equals(name);</span>
+<span class="fc" id="L481">                double x = Evaluator.num(a, 0);</span>
+<span class="fc" id="L482">                double alpha = Evaluator.num(a, 1);</span>
+<span class="fc" id="L483">                double beta = Evaluator.num(a, 2);</span>
+<span class="fc bfc" id="L484" title="All 4 branches covered.">                boolean cumulative = !modern || Evaluator.bool(a, 3, true);</span>
+<span class="fc bfc" id="L485" title="All 2 branches covered.">                double lo = Evaluator.num(a, modern ? 4 : 3, 0);</span>
+<span class="fc bfc" id="L486" title="All 2 branches covered.">                double hi = Evaluator.num(a, modern ? 5 : 4, 1);</span>
+<span class="fc" id="L487">                positive(alpha);</span>
+<span class="fc" id="L488">                positive(beta);</span>
+<span class="pc bpc" id="L489" title="1 of 6 branches missed.">                if (x &lt; lo || x &gt; hi || lo == hi) {</span>
+<span class="fc" id="L490">                    throw EvalError.NUM;</span>
+                }
+<span class="fc" id="L492">                double u = (x - lo) / (hi - lo);</span>
+<span class="fc bfc" id="L493" title="All 2 branches covered.">                if (cumulative) {</span>
+<span class="fc" id="L494">                    return d(betaI(u, alpha, beta));</span>
+                }
+<span class="pc bpc" id="L496" title="2 of 4 branches missed.">                if (u &lt;= 0 || u &gt;= 1) {</span>
+<span class="nc" id="L497">                    return d(0);</span>
+                }
+<span class="fc" id="L499">                return d(exp(lgamma(alpha + beta) - lgamma(alpha) - lgamma(beta) + (alpha - 1) * log(u)</span>
+<span class="fc" id="L500">                        + (beta - 1) * log(1 - u)) / (hi - lo));</span>
+            }
+            case 29: // BETA.INV
+            case 30: { // BETAINV
+<span class="fc" id="L504">                double p = Evaluator.num(a, 0);</span>
+<span class="fc" id="L505">                double alpha = Evaluator.num(a, 1);</span>
+<span class="fc" id="L506">                double beta = Evaluator.num(a, 2);</span>
+<span class="fc" id="L507">                double lo = Evaluator.num(a, 3, 0);</span>
+<span class="fc" id="L508">                double hi = Evaluator.num(a, 4, 1);</span>
+<span class="fc" id="L509">                positive(alpha);</span>
+<span class="fc" id="L510">                positive(beta);</span>
+<span class="fc" id="L511">                return d(lo + (hi - lo) * inverse(F_BETA, p, alpha, beta, 0, 1));</span>
+            }
+            case 31: { // CHISQ.DIST
+<span class="fc" id="L514">                double x = Evaluator.num(a, 0);</span>
+<span class="fc" id="L515">                double df = Math.floor(Evaluator.num(a, 1));</span>
+<span class="fc bfc" id="L516" title="All 4 branches covered.">                if (x &lt; 0 || df &lt; 1) {</span>
+<span class="fc" id="L517">                    throw EvalError.NUM;</span>
+                }
+<span class="fc bfc" id="L519" title="All 2 branches covered.">                if (Evaluator.bool(a, 2, true)) {</span>
+<span class="fc" id="L520">                    return d(gammaP(df / 2, x / 2));</span>
+                }
+<span class="pc bpc" id="L522" title="1 of 2 branches missed.">                if (x == 0) {</span>
+<span class="nc bnc" id="L523" title="All 2 branches missed.">                    return d(df == 2 ? 0.5 : 0);</span>
+                }
+<span class="fc" id="L525">                return d(exp((df / 2 - 1) * log(x) - x / 2 - lgamma(df / 2) - df / 2 * log(2)));</span>
+            }
+            case 32: // CHISQ.DIST.RT
+            case 33: { // CHIDIST
+<span class="fc" id="L529">                double x = Evaluator.num(a, 0);</span>
+<span class="fc" id="L530">                double df = Math.floor(Evaluator.num(a, 1));</span>
+<span class="fc bfc" id="L531" title="All 4 branches covered.">                if (x &lt; 0 || df &lt; 1) {</span>
+<span class="fc" id="L532">                    throw EvalError.NUM;</span>
+                }
+<span class="fc" id="L534">                return d(gammaQ(df / 2, x / 2));</span>
+            }
+            case 34: // CHISQ.INV
+            case 35: // CHISQ.INV.RT
+            case 36: { // CHIINV
+<span class="fc" id="L539">                double p = Evaluator.num(a, 0);</span>
+<span class="fc" id="L540">                double df = Math.floor(Evaluator.num(a, 1));</span>
+<span class="fc" id="L541">                probability(p);</span>
+<span class="fc bfc" id="L542" title="All 2 branches covered.">                if (df &lt; 1) {</span>
+<span class="fc" id="L543">                    throw EvalError.NUM;</span>
+                }
+<span class="fc bfc" id="L545" title="All 2 branches covered.">                if (!&quot;CHISQ.INV&quot;.equals(name)) {</span>
+<span class="fc" id="L546">                    p = 1 - p;</span>
+                }
+<span class="fc bfc" id="L548" title="All 2 branches covered.">                if (p &gt;= 1) {</span>
+<span class="fc" id="L549">                    throw EvalError.NUM;</span>
+                }
+<span class="fc" id="L551">                return d(inverse(F_GAMMA, p, df / 2, 2, 0, Double.POSITIVE_INFINITY));</span>
+            }
+            case 37: { // T.DIST
+<span class="fc" id="L554">                double t = Evaluator.num(a, 0);</span>
+<span class="fc" id="L555">                double df = Math.floor(Evaluator.num(a, 1));</span>
+<span class="fc bfc" id="L556" title="All 2 branches covered.">                if (df &lt; 1) {</span>
+<span class="fc" id="L557">                    throw EvalError.NUM;</span>
+                }
+<span class="fc bfc" id="L559" title="All 2 branches covered.">                if (Evaluator.bool(a, 2, true)) {</span>
+<span class="fc" id="L560">                    return d(tCdf(t, df));</span>
+                }
+<span class="fc" id="L562">                return d(exp(lgamma((df + 1) / 2) - lgamma(df / 2)) / Math.sqrt(df * Math.PI)</span>
+<span class="fc" id="L563">                        * MathUtil.pow(1 + t * t / df, -(df + 1) / 2));</span>
+            }
+            case 38: // T.DIST.RT
+            case 39: // T.DIST.2T
+            case 40: { // TDIST
+<span class="fc" id="L568">                double t = Evaluator.num(a, 0);</span>
+<span class="fc" id="L569">                double df = Math.floor(Evaluator.num(a, 1));</span>
+<span class="fc bfc" id="L570" title="All 2 branches covered.">                if (df &lt; 1) {</span>
+<span class="fc" id="L571">                    throw EvalError.NUM;</span>
+                }
+<span class="fc bfc" id="L573" title="All 2 branches covered.">                if (&quot;T.DIST.RT&quot;.equals(name)) {</span>
+<span class="fc" id="L574">                    return d(1 - tCdf(t, df));</span>
+                }
+<span class="fc bfc" id="L576" title="All 2 branches covered.">                if (t &lt; 0) {</span>
+<span class="fc" id="L577">                    throw EvalError.NUM;</span>
+                }
+<span class="fc bfc" id="L579" title="All 2 branches covered.">                double tails = &quot;TDIST&quot;.equals(name) ? Evaluator.num(a, 2) : 2;</span>
+<span class="fc bfc" id="L580" title="All 4 branches covered.">                if (tails != 1 &amp;&amp; tails != 2) {</span>
+<span class="fc" id="L581">                    throw EvalError.NUM;</span>
+                }
+<span class="fc" id="L583">                return d(tails * (1 - tCdf(t, df)));</span>
+            }
+            case 41: // T.INV
+            case 42: // T.INV.2T
+            case 43: { // TINV
+<span class="fc" id="L588">                double p = Evaluator.num(a, 0);</span>
+<span class="fc" id="L589">                double df = Math.floor(Evaluator.num(a, 1));</span>
+<span class="fc bfc" id="L590" title="All 6 branches covered.">                if (p &lt;= 0 || p &gt; 1 || df &lt; 1) {</span>
+<span class="fc" id="L591">                    throw EvalError.NUM;</span>
+                }
+<span class="fc bfc" id="L593" title="All 2 branches covered.">                if (&quot;T.INV&quot;.equals(name)) {</span>
+<span class="fc bfc" id="L594" title="All 2 branches covered.">                    if (p &gt;= 1) {</span>
+<span class="fc" id="L595">                        throw EvalError.NUM;</span>
+                    }
+<span class="fc" id="L597">                    return d(inverse(F_T, p, df, 0, Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY));</span>
+                }
+<span class="fc" id="L599">                return d(inverse(F_T, 1 - p / 2, df, 0, 0, Double.POSITIVE_INFINITY));</span>
+            }
+            case 44: { // F.DIST
+<span class="fc" id="L602">                double x = Evaluator.num(a, 0);</span>
+<span class="fc" id="L603">                double d1 = Math.floor(Evaluator.num(a, 1));</span>
+<span class="fc" id="L604">                double d2 = Math.floor(Evaluator.num(a, 2));</span>
+<span class="pc bpc" id="L605" title="1 of 6 branches missed.">                if (x &lt; 0 || d1 &lt; 1 || d2 &lt; 1) {</span>
+<span class="fc" id="L606">                    throw EvalError.NUM;</span>
+                }
+<span class="fc bfc" id="L608" title="All 2 branches covered.">                if (Evaluator.bool(a, 3, true)) {</span>
+<span class="fc" id="L609">                    return d(fCdf(x, d1, d2));</span>
+                }
+<span class="pc bpc" id="L611" title="1 of 2 branches missed.">                if (x == 0) {</span>
+<span class="nc bnc" id="L612" title="All 2 branches missed.">                    return d(d1 == 2 ? 1 : 0);</span>
+                }
+<span class="fc" id="L614">                return d(exp(lgamma((d1 + d2) / 2) - lgamma(d1 / 2) - lgamma(d2 / 2) + d1 / 2 * log(d1 / d2)</span>
+<span class="fc" id="L615">                        + (d1 / 2 - 1) * log(x) - (d1 + d2) / 2 * log(1 + d1 * x / d2)));</span>
+            }
+            case 45: // F.DIST.RT
+            case 46: { // FDIST
+<span class="fc" id="L619">                double x = Evaluator.num(a, 0);</span>
+<span class="fc" id="L620">                double d1 = Math.floor(Evaluator.num(a, 1));</span>
+<span class="fc" id="L621">                double d2 = Math.floor(Evaluator.num(a, 2));</span>
+<span class="pc bpc" id="L622" title="1 of 6 branches missed.">                if (x &lt; 0 || d1 &lt; 1 || d2 &lt; 1) {</span>
+<span class="fc" id="L623">                    throw EvalError.NUM;</span>
+                }
+<span class="fc" id="L625">                return d(1 - fCdf(x, d1, d2));</span>
+            }
+            case 47: // F.INV
+            case 48: // F.INV.RT
+            case 49: { // FINV
+<span class="fc" id="L630">                double p = Evaluator.num(a, 0);</span>
+<span class="fc" id="L631">                double d1 = Math.floor(Evaluator.num(a, 1));</span>
+<span class="fc" id="L632">                double d2 = Math.floor(Evaluator.num(a, 2));</span>
+<span class="fc" id="L633">                probability(p);</span>
+<span class="fc bfc" id="L634" title="All 4 branches covered.">                if (d1 &lt; 1 || d2 &lt; 1) {</span>
+<span class="fc" id="L635">                    throw EvalError.NUM;</span>
+                }
+<span class="fc bfc" id="L637" title="All 2 branches covered.">                if (!&quot;F.INV&quot;.equals(name)) {</span>
+<span class="fc" id="L638">                    p = 1 - p;</span>
+                }
+<span class="fc bfc" id="L640" title="All 2 branches covered.">                if (p &gt;= 1) {</span>
+<span class="fc" id="L641">                    throw EvalError.NUM;</span>
+                }
+<span class="fc" id="L643">                return d(inverse(F_F, p, d1, d2, 0, Double.POSITIVE_INFINITY));</span>
+            }
+            case 50: // BINOM.DIST
+            case 51: { // BINOMDIST
+<span class="fc" id="L647">                double k = Math.floor(Evaluator.num(a, 0));</span>
+<span class="fc" id="L648">                double n = Math.floor(Evaluator.num(a, 1));</span>
+<span class="fc" id="L649">                double p = Evaluator.num(a, 2);</span>
+<span class="fc" id="L650">                probability(p);</span>
+<span class="pc bpc" id="L651" title="1 of 4 branches missed.">                if (k &lt; 0 || k &gt; n) {</span>
+<span class="fc" id="L652">                    throw EvalError.NUM;</span>
+                }
+<span class="fc bfc" id="L654" title="All 2 branches covered.">                return d(Evaluator.bool(a, 3, false) ? binomCdf(k, n, p) : binomPmf(k, n, p));</span>
+            }
+            case 52: { // BINOM.DIST.RANGE
+<span class="fc" id="L657">                double n = Math.floor(Evaluator.num(a, 0));</span>
+<span class="fc" id="L658">                double p = Evaluator.num(a, 1);</span>
+<span class="fc" id="L659">                double lo = Math.floor(Evaluator.num(a, 2));</span>
+<span class="fc bfc" id="L660" title="All 2 branches covered.">                double hi = Evaluator.has(a, 3) ? Math.floor(Evaluator.num(a, 3)) : lo;</span>
+<span class="fc" id="L661">                probability(p);</span>
+<span class="pc bpc" id="L662" title="1 of 6 branches missed.">                if (lo &lt; 0 || lo &gt; hi || hi &gt; n) {</span>
+<span class="fc" id="L663">                    throw EvalError.NUM;</span>
+                }
+<span class="fc" id="L665">                return d(binomCdf(hi, n, p) - binomCdf(lo - 1, n, p));</span>
+            }
+            case 53: // BINOM.INV
+            case 54: { // CRITBINOM
+<span class="fc" id="L669">                double n = Math.floor(Evaluator.num(a, 0));</span>
+<span class="fc" id="L670">                double p = Evaluator.num(a, 1);</span>
+<span class="fc" id="L671">                double alpha = Evaluator.num(a, 2);</span>
+<span class="fc" id="L672">                probability(p);</span>
+<span class="fc" id="L673">                probability(alpha);</span>
+<span class="pc bpc" id="L674" title="2 of 4 branches missed.">                if (n &lt; 0 || n &gt; 1e7) {</span>
+<span class="nc" id="L675">                    throw EvalError.NUM;</span>
+                }
+<span class="fc" id="L677">                double total = 0;</span>
+<span class="pc bpc" id="L678" title="1 of 2 branches missed.">                for (double k = 0; k &lt;= n; k++) {</span>
+<span class="fc" id="L679">                    total += binomPmf(k, n, p);</span>
+<span class="fc bfc" id="L680" title="All 2 branches covered.">                    if (total &gt;= alpha - 1e-15) {</span>
+<span class="fc" id="L681">                        return d(k);</span>
+                    }
+                }
+<span class="nc" id="L684">                return d(n);</span>
+            }
+            case 55: // NEGBINOM.DIST
+            case 56: { // NEGBINOMDIST
+<span class="fc" id="L688">                double f = Math.floor(Evaluator.num(a, 0));</span>
+<span class="fc" id="L689">                double s = Math.floor(Evaluator.num(a, 1));</span>
+<span class="fc" id="L690">                double p = Evaluator.num(a, 2);</span>
+<span class="fc" id="L691">                probability(p);</span>
+<span class="pc bpc" id="L692" title="1 of 4 branches missed.">                if (f &lt; 0 || s &lt; 1) {</span>
+<span class="fc" id="L693">                    throw EvalError.NUM;</span>
+                }
+<span class="fc bfc" id="L695" title="All 4 branches covered.">                if (&quot;NEGBINOM.DIST&quot;.equals(name) &amp;&amp; Evaluator.bool(a, 3, false)) {</span>
+<span class="fc" id="L696">                    return d(betaI(p, s, f + 1));</span>
+                }
+<span class="fc bfc" id="L698" title="All 2 branches covered.">                return d(exp(lgamma(f + s) - lgamma(f + 1) - lgamma(s) + s * log(p) + (p == 1 ? 0 : f * log(1 - p))));</span>
+            }
+            case 57: // HYPGEOM.DIST
+            case 58: { // HYPGEOMDIST
+<span class="fc" id="L702">                double k = Math.floor(Evaluator.num(a, 0));</span>
+<span class="fc" id="L703">                double n = Math.floor(Evaluator.num(a, 1));</span>
+<span class="fc" id="L704">                double m = Math.floor(Evaluator.num(a, 2));</span>
+<span class="fc" id="L705">                double pop = Math.floor(Evaluator.num(a, 3));</span>
+<span class="pc bpc" id="L706" title="5 of 16 branches missed.">                if (k &lt; 0 || n &lt;= 0 || m &lt; 0 || pop &lt;= 0 || n &gt; pop || m &gt; pop || k &gt; n || k &gt; m) {</span>
+<span class="fc" id="L707">                    throw EvalError.NUM;</span>
+                }
+<span class="fc bfc" id="L709" title="All 4 branches covered.">                if (&quot;HYPGEOM.DIST&quot;.equals(name) &amp;&amp; Evaluator.bool(a, 4, false)) {</span>
+<span class="fc" id="L710">                    double total = 0;</span>
+<span class="fc bfc" id="L711" title="All 2 branches covered.">                    for (double i = 0; i &lt;= k; i++) {</span>
+<span class="fc" id="L712">                        total += hypergeometric(i, n, m, pop);</span>
+                    }
+<span class="fc" id="L714">                    return d(total);</span>
+                }
+<span class="fc" id="L716">                return d(hypergeometric(k, n, m, pop));</span>
+            }
+            case 59: // CONFIDENCE
+            case 60: // CONFIDENCE.NORM
+            case 61: { // CONFIDENCE.T
+<span class="fc" id="L721">                double alpha = Evaluator.num(a, 0);</span>
+<span class="fc" id="L722">                double sd = Evaluator.num(a, 1);</span>
+<span class="fc" id="L723">                double n = Math.floor(Evaluator.num(a, 2));</span>
+<span class="pc bpc" id="L724" title="2 of 8 branches missed.">                if (alpha &lt;= 0 || alpha &gt;= 1 || sd &lt;= 0 || n &lt; 1) {</span>
+<span class="fc" id="L725">                    throw EvalError.NUM;</span>
+                }
+<span class="fc bfc" id="L727" title="All 2 branches covered.">                if (&quot;CONFIDENCE.T&quot;.equals(name)) {</span>
+<span class="pc bpc" id="L728" title="1 of 2 branches missed.">                    if (n &lt; 2) {</span>
+<span class="nc" id="L729">                        throw EvalError.DIV0;</span>
+                    }
+<span class="fc" id="L731">                    return d(inverse(F_T, 1 - alpha / 2, n - 1, 0, 0, Double.POSITIVE_INFINITY) * sd / Math.sqrt(n));</span>
+                }
+<span class="fc" id="L733">                return d(normInv(1 - alpha / 2) * sd / Math.sqrt(n));</span>
+            }
+            default:
+<span class="fc" id="L736">                return tests(name, ev, a);</span>
+        }
+    }
+
+    private static double hypergeometric(double k, double n, double m, double pop) {
+<span class="pc bpc" id="L741" title="2 of 4 branches missed.">        if (k &lt; Math.max(0, n + m - pop) || k &gt; Math.min(n, m)) {</span>
+<span class="nc" id="L742">            return 0;</span>
+        }
+<span class="fc" id="L744">        return exp(lchoose(m, k) + lchoose(pop - m, n - k) - lchoose(pop, n));</span>
+    }
+
+    private static double lchoose(double n, double k) {
+<span class="fc" id="L748">        return lgamma(n + 1) - lgamma(k + 1) - lgamma(n - k + 1);</span>
+    }
+
+    private static Object tests(String name, Evaluator ev, Object[] a) {
+<span class="pc bpc" id="L752" title="1 of 5 branches missed.">        switch (Functions.index(SWITCH_2, name)) {</span>
+            case 0: // Z.TEST
+            case 1: { // ZTEST
+<span class="fc" id="L755">                DoubleList list = new DoubleList();</span>
+<span class="fc" id="L756">                ev.numbers(Evaluator.arg(a, 0), list, false);</span>
+<span class="fc" id="L757">                double x = ev.scalarNum(a, 1);</span>
+<span class="fc bfc" id="L758" title="All 2 branches covered.">                double sd = Evaluator.has(a, 2) ? ev.scalarNum(a, 2) : Math.sqrt(StatFunctions.variance(list, true));</span>
+<span class="fc bfc" id="L759" title="All 2 branches covered.">                if (sd &lt;= 0) {</span>
+<span class="fc" id="L760">                    throw EvalError.DIV0;</span>
+                }
+<span class="fc" id="L762">                return d(1 - normCdf((list.mean() - x) / (sd / Math.sqrt(list.size))));</span>
+            }
+            case 2: // F.TEST
+            case 3: { // FTEST
+<span class="fc" id="L766">                DoubleList x = new DoubleList();</span>
+<span class="fc" id="L767">                DoubleList y = new DoubleList();</span>
+<span class="fc" id="L768">                ev.numbers(Evaluator.arg(a, 0), x, false);</span>
+<span class="fc" id="L769">                ev.numbers(Evaluator.arg(a, 1), y, false);</span>
+<span class="fc" id="L770">                double vx = StatFunctions.variance(x, true);</span>
+<span class="nc" id="L771">                double vy = StatFunctions.variance(y, true);</span>
+<span class="nc bnc" id="L772" title="All 4 branches missed.">                if (vx == 0 || vy == 0) {</span>
+<span class="nc" id="L773">                    throw EvalError.DIV0;</span>
+                }
+<span class="nc" id="L775">                double p = fCdf(vx / vy, x.size - 1, y.size - 1);</span>
+<span class="nc" id="L776">                return d(2 * Math.min(p, 1 - p));</span>
+            }
+            case 4: // T.TEST
+            case 5: { // TTEST
+<span class="fc" id="L780">                int tails = (int) ev.scalarNum(a, 2);</span>
+<span class="fc" id="L781">                int type = (int) ev.scalarNum(a, 3);</span>
+<span class="fc bfc" id="L782" title="All 8 branches covered.">                if (tails != 1 &amp;&amp; tails != 2 || type &lt; 1 || type &gt; 3) {</span>
+<span class="fc" id="L783">                    throw EvalError.NUM;</span>
+                }
+                double t;
+                double df;
+<span class="fc bfc" id="L787" title="All 2 branches covered.">                if (type == 1) {</span>
+<span class="fc" id="L788">                    double[][] pairs = StatFunctions.pairs(ev, a[0], a[1]);</span>
+<span class="fc" id="L789">                    DoubleList diff = new DoubleList();</span>
+<span class="pc bnc" id="L790" title="All 2 branches missed.">                    for (int i = 0; i &lt; pairs[0].length; i++) {</span>
+<span class="nc" id="L791">                        diff.add(pairs[0][i] - pairs[1][i]);</span>
+                    }
+<span class="nc" id="L793">                    double sd = Math.sqrt(StatFunctions.variance(diff, true));</span>
+<span class="nc bnc" id="L794" title="All 2 branches missed.">                    if (sd == 0) {</span>
+<span class="nc" id="L795">                        throw EvalError.DIV0;</span>
+                    }
+<span class="nc" id="L797">                    t = diff.mean() / (sd / Math.sqrt(diff.size));</span>
+<span class="nc" id="L798">                    df = diff.size - 1;</span>
+<span class="nc" id="L799">                } else {</span>
+<span class="fc" id="L800">                    DoubleList x = new DoubleList();</span>
+<span class="fc" id="L801">                    DoubleList y = new DoubleList();</span>
+<span class="fc" id="L802">                    ev.numbers(a[0], x, false);</span>
+<span class="nc" id="L803">                    ev.numbers(a[1], y, false);</span>
+<span class="nc" id="L804">                    double vx = StatFunctions.variance(x, true);</span>
+<span class="nc" id="L805">                    double vy = StatFunctions.variance(y, true);</span>
+<span class="nc" id="L806">                    double nx = x.size;</span>
+<span class="nc" id="L807">                    double ny = y.size;</span>
+<span class="nc bnc" id="L808" title="All 2 branches missed.">                    if (type == 2) {</span>
+<span class="nc" id="L809">                        df = nx + ny - 2;</span>
+<span class="nc" id="L810">                        double pooled = ((nx - 1) * vx + (ny - 1) * vy) / df;</span>
+<span class="nc" id="L811">                        t = (x.mean() - y.mean()) / Math.sqrt(pooled * (1 / nx + 1 / ny));</span>
+<span class="nc" id="L812">                    } else {</span>
+<span class="nc" id="L813">                        double sx = vx / nx;</span>
+<span class="nc" id="L814">                        double sy = vy / ny;</span>
+<span class="nc" id="L815">                        t = (x.mean() - y.mean()) / Math.sqrt(sx + sy);</span>
+<span class="nc" id="L816">                        df = (sx + sy) * (sx + sy) / (sx * sx / (nx - 1) + sy * sy / (ny - 1));</span>
+                    }
+                }
+<span class="nc" id="L819">                return d(tails * (1 - tCdf(Math.abs(t), df)));</span>
+            }
+            case 6: // CHISQ.TEST
+            case 7: { // CHITEST
+<span class="fc" id="L823">                Object[][] actual = ev.matrix(Evaluator.arg(a, 0));</span>
+<span class="fc" id="L824">                Object[][] expected = ev.matrix(Evaluator.arg(a, 1));</span>
+<span class="fc" id="L825">                int rows = actual.length;</span>
+<span class="fc" id="L826">                int cols = Evaluator.width(actual);</span>
+<span class="pc bpc" id="L827" title="1 of 4 branches missed.">                if (rows != expected.length || cols != Evaluator.width(expected)) {</span>
+<span class="fc" id="L828">                    throw EvalError.NA;</span>
+                }
+<span class="fc" id="L830">                double chi = 0;</span>
+<span class="fc bfc" id="L831" title="All 2 branches covered.">                for (int r = 0; r &lt; rows; r++) {</span>
+<span class="fc bfc" id="L832" title="All 2 branches covered.">                    for (int c = 0; c &lt; cols; c++) {</span>
+<span class="fc bfc" id="L833" title="All 4 branches covered.">                        if (actual[r][c] instanceof Double &amp;&amp; expected[r][c] instanceof Double) {</span>
+<span class="fc" id="L834">                            double e = ((Double) expected[r][c]).doubleValue();</span>
+<span class="fc" id="L835">                            double o = ((Double) actual[r][c]).doubleValue();</span>
+<span class="pc bpc" id="L836" title="1 of 2 branches missed.">                            if (e == 0) {</span>
+<span class="nc" id="L837">                                throw EvalError.DIV0;</span>
+                            }
+<span class="fc" id="L839">                            chi += (o - e) * (o - e) / e;</span>
+                        }
+                    }
+                }
+<span class="pc bpc" id="L843" title="1 of 4 branches missed.">                double df = rows &gt; 1 &amp;&amp; cols &gt; 1 ? (rows - 1) * (cols - 1) : rows * cols - 1;</span>
+<span class="fc bfc" id="L844" title="All 2 branches covered.">                if (df &lt; 1) {</span>
+<span class="fc" id="L845">                    throw EvalError.NA;</span>
+                }
+<span class="fc" id="L847">                return d(gammaQ(df / 2, chi / 2));</span>
+            }
+            default:
+<span class="nc" id="L850">                return CellError.NAME;</span>
+        }
+    }
+
+<span class="fc" id="L854">    private static final java.util.HashMap&lt;String, Integer&gt; SWITCH_1 = Functions.switchTable(</span>
+            &quot;NORM.DIST&quot;, &quot;NORMDIST&quot;, &quot;NORM.S.DIST&quot;, &quot;NORMSDIST&quot;, &quot;GAUSS&quot;, &quot;PHI&quot;, &quot;NORM.INV&quot;,
+            &quot;NORMINV&quot;, &quot;NORM.S.INV&quot;, &quot;NORMSINV&quot;, &quot;LOGNORM.DIST&quot;, &quot;LOGNORMDIST&quot;, &quot;LOGNORM.INV&quot;,
+            &quot;LOGINV&quot;, &quot;EXPON.DIST&quot;, &quot;EXPONDIST&quot;, &quot;POISSON&quot;, &quot;POISSON.DIST&quot;, &quot;WEIBULL&quot;,
+            &quot;WEIBULL.DIST&quot;, &quot;GAMMA&quot;, &quot;GAMMALN&quot;, &quot;GAMMALN.PRECISE&quot;, &quot;GAMMA.DIST&quot;, &quot;GAMMADIST&quot;,
+            &quot;GAMMA.INV&quot;, &quot;GAMMAINV&quot;, &quot;BETA.DIST&quot;, &quot;BETADIST&quot;, &quot;BETA.INV&quot;, &quot;BETAINV&quot;, &quot;CHISQ.DIST&quot;,
+            &quot;CHISQ.DIST.RT&quot;, &quot;CHIDIST&quot;, &quot;CHISQ.INV&quot;, &quot;CHISQ.INV.RT&quot;, &quot;CHIINV&quot;, &quot;T.DIST&quot;,
+            &quot;T.DIST.RT&quot;, &quot;T.DIST.2T&quot;, &quot;TDIST&quot;, &quot;T.INV&quot;, &quot;T.INV.2T&quot;, &quot;TINV&quot;, &quot;F.DIST&quot;, &quot;F.DIST.RT&quot;,
+            &quot;FDIST&quot;, &quot;F.INV&quot;, &quot;F.INV.RT&quot;, &quot;FINV&quot;, &quot;BINOM.DIST&quot;, &quot;BINOMDIST&quot;, &quot;BINOM.DIST.RANGE&quot;,
+            &quot;BINOM.INV&quot;, &quot;CRITBINOM&quot;, &quot;NEGBINOM.DIST&quot;, &quot;NEGBINOMDIST&quot;, &quot;HYPGEOM.DIST&quot;,
+            &quot;HYPGEOMDIST&quot;, &quot;CONFIDENCE&quot;, &quot;CONFIDENCE.NORM&quot;, &quot;CONFIDENCE.T&quot;);
+
+<span class="fc" id="L866">    private static final java.util.HashMap&lt;String, Integer&gt; SWITCH_2 = Functions.switchTable(</span>
+            &quot;Z.TEST&quot;, &quot;ZTEST&quot;, &quot;F.TEST&quot;, &quot;FTEST&quot;, &quot;T.TEST&quot;, &quot;TTEST&quot;, &quot;CHISQ.TEST&quot;, &quot;CHITEST&quot;);
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

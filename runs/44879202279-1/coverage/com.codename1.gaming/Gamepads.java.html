@@ -1,0 +1,311 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Gamepads.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.gaming</a> &gt; <span class="el_source">Gamepads.java</span></div><h1>Gamepads.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.gaming;
+
+import com.codename1.ui.Command;
+import com.codename1.ui.Display;
+import com.codename1.ui.Form;
+import com.codename1.ui.events.ActionEvent;
+import java.util.ArrayList;
+
+/// The connected game controllers.
+///
+/// Ports that read controllers report them here; applications ask for them with
+/// `#getGamepads()` / `#getGamepad(int)` and listen with
+/// `#addListener(GamepadListener)`. Where no port reports any controller the
+/// list is simply empty.
+///
+/// **Focus navigation.** Unless turned off with `#setFocusNavigation(boolean)`, a
+/// button no listener consumed drives the user interface the way the keyboard
+/// does: the D-pad and the left stick move focus, A presses the focused
+/// component and B goes back. An ordinary form is therefore usable from a couch
+/// with no code written for it.
+///
+/// Everything here runs on the EDT. Ports call the `report*` methods from it.
+public final class Gamepads {
+<span class="fc" id="L46">    private static final ArrayList PADS = new ArrayList();</span>
+<span class="fc" id="L47">    private static final ArrayList LISTENERS = new ArrayList();</span>
+<span class="fc" id="L48">    private static boolean focusNavigation = true;</span>
+
+    // Stick-as-D-pad hysteresis: press past PRESS, release under RELEASE, so a
+    // stick resting near the threshold does not chatter.
+    static final float STICK_PRESS = 0.6f;
+    static final float STICK_RELEASE = 0.4f;
+
+    // Which direction each pad's left stick currently holds, as a D-pad button
+    // or -1, one entry per axis (x, y), indexed by pad slot.
+<span class="fc" id="L57">    private static int[] stickX = new int[0];</span>
+<span class="fc" id="L58">    private static int[] stickY = new int[0];</span>
+
+    private Gamepads() {
+    }
+
+    /// The connected controllers, in slot order. A new array every call.
+    public static Gamepad[] getGamepads() {
+<span class="fc" id="L65">        ArrayList out = new ArrayList();</span>
+<span class="fc bfc" id="L66" title="All 2 branches covered.">        for (Object p : PADS) {</span>
+<span class="fc bfc" id="L67" title="All 2 branches covered.">            if (p != null) {</span>
+<span class="fc" id="L68">                out.add(p);</span>
+            }
+<span class="fc" id="L70">        }</span>
+<span class="fc" id="L71">        Gamepad[] r = new Gamepad[out.size()];</span>
+<span class="fc bfc" id="L72" title="All 2 branches covered.">        for (int i = 0; i &lt; r.length; i++) {</span>
+<span class="fc" id="L73">            r[i] = (Gamepad) out.get(i);</span>
+        }
+<span class="fc" id="L75">        return r;</span>
+    }
+
+    /// The controller in the given slot, or null when that slot is empty.
+    public static Gamepad getGamepad(int index) {
+<span class="pc bpc" id="L80" title="1 of 4 branches missed.">        if (index &lt; 0 || index &gt;= PADS.size()) {</span>
+<span class="fc" id="L81">            return null;</span>
+        }
+<span class="fc" id="L83">        return (Gamepad) PADS.get(index);</span>
+    }
+
+    /// True when at least one controller is connected.
+    public static boolean isAnyConnected() {
+<span class="fc bfc" id="L88" title="All 2 branches covered.">        for (Object p : PADS) {</span>
+<span class="fc bfc" id="L89" title="All 2 branches covered.">            if (p != null) {</span>
+<span class="fc" id="L90">                return true;</span>
+            }
+<span class="fc" id="L92">        }</span>
+<span class="fc" id="L93">        return false;</span>
+    }
+
+    /// Registers a listener.
+    public static void addListener(GamepadListener l) {
+<span class="pc bpc" id="L98" title="2 of 4 branches missed.">        if (l != null &amp;&amp; !LISTENERS.contains(l)) {</span>
+<span class="fc" id="L99">            LISTENERS.add(l);</span>
+        }
+<span class="fc" id="L101">    }</span>
+
+    /// Unregisters a listener.
+    public static void removeListener(GamepadListener l) {
+<span class="fc" id="L105">        LISTENERS.remove(l);</span>
+<span class="fc" id="L106">    }</span>
+
+    /// Whether unconsumed buttons drive focus navigation; on by default.
+    public static boolean isFocusNavigation() {
+<span class="nc" id="L110">        return focusNavigation;</span>
+    }
+
+    /// Turns focus navigation from controller buttons on or off. A game that reads
+    /// the controller itself and has no focusable components may turn it off.
+    public static void setFocusNavigation(boolean b) {
+<span class="fc" id="L116">        focusNavigation = b;</span>
+<span class="fc" id="L117">    }</span>
+
+    /// Called by a port when a controller connects; `index` is the slot it chose.
+    /// Returns the controller object.
+    public static Gamepad reportConnected(int index, String name) {
+<span class="pc bpc" id="L122" title="1 of 2 branches missed.">        if (index &lt; 0) {</span>
+<span class="nc" id="L123">            return null;</span>
+        }
+<span class="fc bfc" id="L125" title="All 2 branches covered.">        while (PADS.size() &lt;= index) {</span>
+<span class="fc" id="L126">            PADS.add(null);</span>
+        }
+<span class="fc" id="L128">        Gamepad existing = (Gamepad) PADS.get(index);</span>
+<span class="fc bfc" id="L129" title="All 2 branches covered.">        if (existing != null) {</span>
+<span class="fc" id="L130">            return existing;</span>
+        }
+<span class="fc" id="L132">        Gamepad pad = new Gamepad(index, name);</span>
+<span class="fc" id="L133">        PADS.set(index, pad);</span>
+<span class="fc" id="L134">        ensureStickSlots(index);</span>
+<span class="fc" id="L135">        stickX[index] = -1;</span>
+<span class="fc" id="L136">        stickY[index] = -1;</span>
+<span class="fc" id="L137">        Object[] ls = LISTENERS.toArray();</span>
+<span class="fc bfc" id="L138" title="All 2 branches covered.">        for (Object l : ls) {</span>
+<span class="fc" id="L139">            ((GamepadListener) l).gamepadConnected(pad);</span>
+        }
+<span class="fc" id="L141">        return pad;</span>
+    }
+
+    /// Called by a port when a controller disconnects. Releases every button it
+    /// still held first, so nothing is left stuck down.
+    public static void reportDisconnected(int index) {
+<span class="fc" id="L147">        Gamepad pad = getGamepad(index);</span>
+<span class="fc bfc" id="L148" title="All 2 branches covered.">        if (pad == null) {</span>
+<span class="fc" id="L149">            return;</span>
+        }
+<span class="fc bfc" id="L151" title="All 2 branches covered.">        for (int b = 0; b &lt; Gamepad.BUTTON_COUNT; b++) {</span>
+<span class="fc bfc" id="L152" title="All 2 branches covered.">            if (pad.isButtonDown(b)) {</span>
+<span class="fc" id="L153">                reportButton(index, b, false);</span>
+            }
+        }
+<span class="fc bfc" id="L156" title="All 2 branches covered.">        for (int a = 0; a &lt; Gamepad.AXIS_COUNT; a++) {</span>
+<span class="fc" id="L157">            reportAxis(index, a, 0);</span>
+        }
+<span class="fc" id="L159">        pad.setConnected(false);</span>
+<span class="fc" id="L160">        PADS.set(index, null);</span>
+<span class="fc" id="L161">        Object[] ls = LISTENERS.toArray();</span>
+<span class="pc bpc" id="L162" title="1 of 2 branches missed.">        for (Object l : ls) {</span>
+<span class="nc" id="L163">            ((GamepadListener) l).gamepadDisconnected(pad);</span>
+        }
+<span class="fc" id="L165">    }</span>
+
+    /// Called by a port when a button changes.
+    public static void reportButton(int index, int button, boolean down) {
+<span class="fc" id="L169">        reportButton(index, button, down, true);</span>
+<span class="fc" id="L170">    }</span>
+
+    /// Called by a port when a button changes. A port that already delivers the
+    /// controller to the user interface as keys (the Xbox build of the Windows
+    /// port does) passes `navigate` false, so the press is not delivered twice.
+    public static void reportButton(int index, int button, boolean down, boolean navigate) {
+<span class="fc" id="L176">        Gamepad pad = getGamepad(index);</span>
+<span class="pc bpc" id="L177" title="1 of 4 branches missed.">        if (pad == null || !pad.setButton(button, down)) {</span>
+<span class="fc" id="L178">            return;</span>
+        }
+<span class="fc" id="L180">        boolean consumed = false;</span>
+<span class="fc" id="L181">        Object[] ls = LISTENERS.toArray();</span>
+<span class="fc bfc" id="L182" title="All 2 branches covered.">        for (Object l : ls) {</span>
+<span class="pc bpc" id="L183" title="1 of 2 branches missed.">            if (((GamepadListener) l).gamepadButton(pad, button, down)) {</span>
+<span class="fc" id="L184">                consumed = true;</span>
+            }
+        }
+<span class="fc bfc" id="L187" title="All 6 branches covered.">        if (navigate &amp;&amp; !consumed &amp;&amp; focusNavigation) {</span>
+<span class="fc" id="L188">            navigate(button, down);</span>
+        }
+<span class="fc" id="L190">    }</span>
+
+    /// Called by a port when an axis changes: sticks -1 .. 1, triggers 0 .. 1.
+    /// The triggers are also reported as `Gamepad#BUTTON_LEFT_TRIGGER` and
+    /// `Gamepad#BUTTON_RIGHT_TRIGGER` past halfway, and the left stick as the
+    /// D-pad for focus navigation.
+    public static void reportAxis(int index, int axis, float value) {
+<span class="fc" id="L197">        Gamepad pad = getGamepad(index);</span>
+<span class="pc bpc" id="L198" title="1 of 2 branches missed.">        if (pad == null) {</span>
+<span class="nc" id="L199">            return;</span>
+        }
+<span class="fc" id="L201">        pad.setAxis(axis, value);</span>
+<span class="fc" id="L202">        float v = pad.getRawAxis(axis);</span>
+<span class="fc bfc" id="L203" title="All 2 branches covered.">        if (axis == Gamepad.AXIS_LEFT_TRIGGER) {</span>
+<span class="pc bpc" id="L204" title="1 of 2 branches missed.">            reportButton(index, Gamepad.BUTTON_LEFT_TRIGGER, v &gt; 0.5f);</span>
+<span class="fc bfc" id="L205" title="All 2 branches covered.">        } else if (axis == Gamepad.AXIS_RIGHT_TRIGGER) {</span>
+<span class="fc bfc" id="L206" title="All 2 branches covered.">            reportButton(index, Gamepad.BUTTON_RIGHT_TRIGGER, v &gt; 0.5f);</span>
+<span class="fc bfc" id="L207" title="All 2 branches covered.">        } else if (axis == Gamepad.AXIS_LEFT_X) {</span>
+<span class="fc" id="L208">            stickX[index] = stickDirection(stickX[index], v,</span>
+                    Gamepad.BUTTON_DPAD_LEFT, Gamepad.BUTTON_DPAD_RIGHT);
+<span class="fc bfc" id="L210" title="All 2 branches covered.">        } else if (axis == Gamepad.AXIS_LEFT_Y) {</span>
+<span class="fc" id="L211">            stickY[index] = stickDirection(stickY[index], v,</span>
+                    Gamepad.BUTTON_DPAD_UP, Gamepad.BUTTON_DPAD_DOWN);
+        }
+<span class="fc" id="L214">    }</span>
+
+    /// The stick held as a D-pad direction, with hysteresis. Only drives focus
+    /// navigation: it never sets the pad's D-pad buttons, which stay what the
+    /// device reports.
+    private static int stickDirection(int current, float v, int negative, int positive) {
+<span class="fc" id="L220">        int next = current;</span>
+<span class="fc bfc" id="L221" title="All 2 branches covered.">        if (current == -1) {</span>
+<span class="fc bfc" id="L222" title="All 2 branches covered.">            if (v &lt;= -STICK_PRESS) {</span>
+<span class="fc" id="L223">                next = negative;</span>
+<span class="fc bfc" id="L224" title="All 2 branches covered.">            } else if (v &gt;= STICK_PRESS) {</span>
+<span class="fc" id="L225">                next = positive;</span>
+            }
+        } else {
+<span class="fc bfc" id="L228" title="All 2 branches covered.">            float along = current == negative ? -v : v;</span>
+<span class="fc bfc" id="L229" title="All 2 branches covered.">            if (along &lt; STICK_RELEASE) {</span>
+<span class="fc" id="L230">                next = -1;</span>
+<span class="pc bpc" id="L231" title="1 of 2 branches missed.">                if (v &lt;= -STICK_PRESS) {</span>
+<span class="nc" id="L232">                    next = negative;</span>
+<span class="pc bpc" id="L233" title="1 of 2 branches missed.">                } else if (v &gt;= STICK_PRESS) {</span>
+<span class="nc" id="L234">                    next = positive;</span>
+                }
+            }
+        }
+<span class="fc bfc" id="L238" title="All 4 branches covered.">        if (next != current &amp;&amp; focusNavigation) {</span>
+<span class="fc bfc" id="L239" title="All 2 branches covered.">            if (current != -1) {</span>
+<span class="fc" id="L240">                navigate(current, false);</span>
+            }
+<span class="fc bfc" id="L242" title="All 2 branches covered.">            if (next != -1) {</span>
+<span class="fc" id="L243">                navigate(next, true);</span>
+            }
+        }
+<span class="fc" id="L246">        return next;</span>
+    }
+
+    private static void ensureStickSlots(int index) {
+<span class="fc bfc" id="L250" title="All 2 branches covered.">        if (stickX.length &lt;= index) {</span>
+<span class="fc" id="L251">            int[] nx = new int[index + 1];</span>
+<span class="fc" id="L252">            int[] ny = new int[index + 1];</span>
+<span class="fc" id="L253">            System.arraycopy(stickX, 0, nx, 0, stickX.length);</span>
+<span class="fc" id="L254">            System.arraycopy(stickY, 0, ny, 0, stickY.length);</span>
+<span class="fc" id="L255">            stickX = nx;</span>
+<span class="fc" id="L256">            stickY = ny;</span>
+        }
+<span class="fc" id="L258">    }</span>
+
+    /// The Codename One key code a button navigates with, or 0 for none.
+    static int navigationKeyCode(int button) {
+<span class="fc" id="L262">        Display d = Display.getInstance();</span>
+<span class="pc bpc" id="L263" title="1 of 6 branches missed.">        switch (button) {</span>
+            case Gamepad.BUTTON_DPAD_UP:
+<span class="nc" id="L265">                return d.getKeyCode(Display.GAME_UP);</span>
+            case Gamepad.BUTTON_DPAD_DOWN:
+<span class="fc" id="L267">                return d.getKeyCode(Display.GAME_DOWN);</span>
+            case Gamepad.BUTTON_DPAD_LEFT:
+<span class="fc" id="L269">                return d.getKeyCode(Display.GAME_LEFT);</span>
+            case Gamepad.BUTTON_DPAD_RIGHT:
+<span class="fc" id="L271">                return d.getKeyCode(Display.GAME_RIGHT);</span>
+            case Gamepad.BUTTON_A:
+<span class="fc" id="L273">                return d.getKeyCode(Display.GAME_FIRE);</span>
+            default:
+<span class="fc" id="L275">                return 0;</span>
+        }
+    }
+
+    private static void navigate(int button, boolean down) {
+<span class="pc bpc" id="L280" title="1 of 2 branches missed.">        if (button == Gamepad.BUTTON_B) {</span>
+<span class="nc bnc" id="L281" title="All 2 branches missed.">            if (!down) {</span>
+<span class="nc" id="L282">                goBack();</span>
+            }
+<span class="nc" id="L284">            return;</span>
+        }
+<span class="fc" id="L286">        int code = navigationKeyCode(button);</span>
+        // 0 and -1 are what getKeyCode answers for a game action the port has
+        // no key for.
+<span class="pc bpc" id="L289" title="1 of 4 branches missed.">        if (code == 0 || code == -1) {</span>
+<span class="fc" id="L290">            return;</span>
+        }
+<span class="fc" id="L292">        Display d = Display.getInstance();</span>
+<span class="fc bfc" id="L293" title="All 2 branches covered.">        if (down) {</span>
+<span class="fc" id="L294">            d.keyPressed(code);</span>
+        } else {
+<span class="fc" id="L296">            d.keyReleased(code);</span>
+        }
+<span class="fc" id="L298">    }</span>
+
+    private static void goBack() {
+<span class="nc" id="L301">        Form f = Display.getInstance().getCurrent();</span>
+<span class="nc bnc" id="L302" title="All 2 branches missed.">        if (f == null) {</span>
+<span class="nc" id="L303">            return;</span>
+        }
+<span class="nc" id="L305">        Command back = f.getBackCommand();</span>
+<span class="nc bnc" id="L306" title="All 2 branches missed.">        if (back != null) {</span>
+<span class="nc" id="L307">            f.dispatchCommand(back, new ActionEvent(back, ActionEvent.Type.Command));</span>
+        }
+<span class="nc" id="L309">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

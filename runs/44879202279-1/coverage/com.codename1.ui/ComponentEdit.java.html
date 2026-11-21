@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ComponentEdit.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui</a> &gt; <span class="el_source">ComponentEdit.java</span></div><h1>ComponentEdit.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ui;
+
+import com.codename1.util.UndoableEdit;
+
+/// An edit made through a component, which brings that component back into
+/// view when it is undone or redone.
+///
+/// The history (`com.codename1.util.UndoHistory`) knows nothing about
+/// components; this wrapper is what ties a step to one. When the step is
+/// replayed and the component is on the form being shown, the component takes
+/// the focus, if it can, and is scrolled into view, so the user sees what
+/// changed. An edit made on another form is still replayed, without switching
+/// forms.
+///
+/// Components that support undo wrap their own edits this way. An application
+/// recording its own edits wraps them the same way:
+///
+/// ```java
+/// TextField field = new TextField(&quot;Draft&quot;);
+/// field.setText(&quot;Final&quot;);
+/// UndoHistory.getGlobal().record(new ComponentEdit(field, new UndoableEdit() {
+///     public void undo() {
+///         field.setText(&quot;Draft&quot;);
+///     }
+///
+///     public void redo() {
+///         field.setText(&quot;Final&quot;);
+///     }
+/// }));
+/// ```
+public class ComponentEdit extends UndoableEdit {
+    private final Component component;
+    private final UndoableEdit edit;
+
+    /// Wraps an edit made through a component.
+    ///
+    /// #### Parameters
+    ///
+    /// - `component`: the component the edit was made in
+    ///
+    /// - `edit`: the edit itself
+<span class="fc" id="L64">    public ComponentEdit(Component component, UndoableEdit edit) {</span>
+<span class="pc bpc" id="L65" title="2 of 4 branches missed.">        if (component == null || edit == null) {</span>
+<span class="nc" id="L66">            throw new IllegalArgumentException(&quot;component and edit are required&quot;);</span>
+        }
+<span class="fc" id="L68">        this.component = component;</span>
+<span class="fc" id="L69">        this.edit = edit;</span>
+<span class="fc" id="L70">    }</span>
+
+    /// The component the edit was made in.
+    public Component getComponent() {
+<span class="nc" id="L74">        return component;</span>
+    }
+
+    /// The wrapped edit.
+    public UndoableEdit getEdit() {
+<span class="nc" id="L79">        return edit;</span>
+    }
+
+    @Override
+    public void undo() {
+<span class="fc" id="L84">        edit.undo();</span>
+<span class="fc" id="L85">        reveal();</span>
+<span class="fc" id="L86">    }</span>
+
+    @Override
+    public void redo() {
+<span class="fc" id="L90">        edit.redo();</span>
+<span class="fc" id="L91">        reveal();</span>
+<span class="fc" id="L92">    }</span>
+
+    @Override
+    public String getName() {
+<span class="fc" id="L96">        return edit.getName();</span>
+    }
+
+    @Override
+    public boolean isAlive() {
+<span class="fc" id="L101">        return edit.isAlive();</span>
+    }
+
+    /// Brings the component into view when it is on the form being shown:
+    /// gives it the focus if it can take it and scrolls it into view.
+    protected void reveal() {
+<span class="fc" id="L107">        Form f = component.getComponentForm();</span>
+<span class="pc bpc" id="L108" title="2 of 4 branches missed.">        if (f == null || f != Display.getInstance().getCurrent()) { //NOPMD CompareObjectsWithEquals - the form shown, not an equal one</span>
+<span class="nc" id="L109">            return;</span>
+        }
+<span class="fc bfc" id="L111" title="All 2 branches covered.">        if (component.isFocusable()) {</span>
+<span class="fc" id="L112">            component.requestFocus();</span>
+        }
+<span class="fc" id="L114">        f.scrollComponentToVisible(component);</span>
+<span class="fc" id="L115">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

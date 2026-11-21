@@ -1,0 +1,1044 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Motion.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.animations</a> &gt; <span class="el_source">Motion.java</span></div><h1>Motion.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores
+ * CA 94065 USA or visit www.oracle.com if you need additional information or
+ * have any questions.
+ */
+package com.codename1.ui.animations;
+
+import com.codename1.ui.plaf.UIManager;
+import com.codename1.util.MathUtil;
+
+/// Abstracts the notion of physical motion over time from a numeric location to
+/// another. This class can be subclassed to implement any motion equation for
+/// appropriate physics effects.
+///
+/// This class relies on [AnimationTime.now()][AnimationTime#now()] to provide
+/// transitions between coordinates, allowing the underlying clock to be
+/// overridden for deterministic playback or custom animation pacing. The motion can be subclassed to provide every
+/// type of motion feel from parabolic motion to spline and linear motion. The default
+/// implementation provides a simple algorithm giving the feel of acceleration and
+/// deceleration.
+public class Motion {
+    // package protected for the resource editor
+    static final int LINEAR = 0;
+    static final int SPLINE = 1;
+    private static final int FRICTION = 2;
+    private static final int DECELERATION = 3;
+    private static final int CUBIC = 4;
+    private static final int COLOR_LINEAR = 5;
+    private static final int EXPONENTIAL_DECAY = 6;
+    private static final int CRITICAL_DAMPED_SPRING = 7;
+    private static final int THREE_POINT_CUBIC = 8;
+    private static boolean slowMotion;
+<span class="pc" id="L51">    private final int[] previousLastReturnedValue = new int[3];</span>
+<span class="pc" id="L52">    private final long[] previousLastReturnedValueTime = new long[3];</span>
+    int motionType;
+    private int sourceValue;
+    private int destinationValue;
+    private int targetPosition;
+    private int duration;
+    private long startTime;
+    private double initVelocity;
+    private double friction;
+    private int lastReturnedValue;
+<span class="pc" id="L62">    private long currentMotionTime = -1;</span>
+<span class="pc" id="L63">    private long previousCurrentMotionTime = -1;</span>
+    /// The joint and the second segment's control points of a three-point cubic.
+    private float midX;
+    private float midY;
+    private float q0;
+    private float q1;
+    private float q2;
+    private float q3;
+
+    private float p0;
+    private float p1;
+    private float p2;
+    private float p3;
+
+    /// Construct a point/destination motion
+    ///
+    /// #### Parameters
+    ///
+    /// - `sourceValue`: starting value
+    ///
+    /// - `destinationValue`: destination value
+    ///
+    /// - `duration`: motion duration
+<span class="fc" id="L86">    protected Motion(int sourceValue, int destinationValue, int duration) {</span>
+<span class="fc" id="L87">        this.sourceValue = sourceValue;</span>
+<span class="fc" id="L88">        this.destinationValue = destinationValue;</span>
+<span class="fc" id="L89">        this.duration = duration;</span>
+<span class="fc" id="L90">        lastReturnedValue = sourceValue;</span>
+<span class="pc bpc" id="L91" title="1 of 2 branches missed.">        if (slowMotion) {</span>
+<span class="nc" id="L92">            this.duration *= 50;</span>
+        }
+<span class="fc" id="L94">        previousLastReturnedValue[0] = -1;</span>
+<span class="fc" id="L95">        previousLastReturnedValueTime[0] = -1;</span>
+<span class="fc" id="L96">    }</span>
+
+    /// Construct a velocity motion
+    ///
+    /// #### Parameters
+    ///
+    /// - `sourceValue`: starting value
+    ///
+    /// - `initVelocity`: initial velocity
+    ///
+    /// - `friction`: degree of friction
+<span class="nc" id="L107">    protected Motion(int sourceValue, float initVelocity, float friction) {</span>
+<span class="nc" id="L108">        this.sourceValue = sourceValue;</span>
+<span class="nc" id="L109">        this.initVelocity = initVelocity;</span>
+<span class="nc" id="L110">        this.friction = friction;</span>
+<span class="nc" id="L111">        duration = (int) ((Math.abs(initVelocity)) / friction);</span>
+<span class="nc" id="L112">        previousLastReturnedValue[0] = -1;</span>
+<span class="nc" id="L113">        previousLastReturnedValueTime[0] = -1;</span>
+<span class="nc" id="L114">    }</span>
+
+<span class="fc" id="L116">    protected Motion(int sourceValue, double initVelocity, double friction) {</span>
+<span class="fc" id="L117">        this.sourceValue = sourceValue;</span>
+<span class="fc" id="L118">        this.initVelocity = initVelocity;</span>
+<span class="fc" id="L119">        this.friction = friction;</span>
+<span class="fc" id="L120">        duration = (int) ((Math.abs(initVelocity)) / friction);</span>
+<span class="fc" id="L121">        previousLastReturnedValue[0] = -1;</span>
+<span class="fc" id="L122">        previousLastReturnedValueTime[0] = -1;</span>
+<span class="fc" id="L123">    }</span>
+
+    /// Allows debugging motion behavior by slowing motions down 50 fold, doesn't apply to friction motion
+    ///
+    /// #### Returns
+    ///
+    /// the slowMotion
+    public static boolean isSlowMotion() {
+<span class="fc" id="L131">        return slowMotion;</span>
+    }
+
+    /// Allows debugging motion behavior by slowing motions down 50 fold, doesn't apply to friction motion
+    ///
+    /// #### Parameters
+    ///
+    /// - `aSlowMotion`: the slowMotion to set
+    public static void setSlowMotion(boolean aSlowMotion) {
+<span class="nc" id="L140">        slowMotion = aSlowMotion;</span>
+<span class="nc" id="L141">    }</span>
+
+    /// Creates a standard Cubic Bezier motion to implement functions such as ease-in/out etc.
+    ///
+    /// #### Parameters
+    ///
+    /// - `sourceValue`: starting value
+    ///
+    /// - `destinationValue`: destination value
+    ///
+    /// - `duration`: motion duration
+    ///
+    /// - `p0`: argument to the bezier function
+    ///
+    /// - `p1`: argument to the bezier function
+    ///
+    /// - `p2`: argument to the bezier function
+    ///
+    /// - `p3`: argument to the bezier function
+    ///
+    /// #### Returns
+    ///
+    /// Motion instance
+    public static Motion createCubicBezierMotion(int sourceValue, int destinationValue, int duration,
+                                                 float p0, float p1, float p2, float p3) {
+<span class="fc" id="L166">        Motion m = new Motion(sourceValue, destinationValue, duration);</span>
+<span class="fc" id="L167">        m.motionType = CUBIC;</span>
+<span class="fc" id="L168">        m.p0 = p0;</span>
+<span class="fc" id="L169">        m.p1 = p1;</span>
+<span class="fc" id="L170">        m.p2 = p2;</span>
+<span class="fc" id="L171">        m.p3 = p3;</span>
+<span class="fc" id="L172">        return m;</span>
+    }
+
+    /// A curve made of TWO cubic beziers joined at a point, which a single cubic cannot
+    /// express.
+    ///
+    /// A plain `cubic-bezier` is monotonic in a way some motion is not: it cannot
+    /// accelerate hard, ease, and then ease out again, because it has only two control
+    /// points to spend. Curves that do this are specified as a pair of beziers meeting at
+    /// a midpoint, each with its own controls, and the joint is where the character of
+    /// the motion changes.
+    ///
+    /// The segments are evaluated in their own normalized space and rescaled, so each
+    /// half is an ordinary CSS cubic-bezier and the two meet exactly at the midpoint.
+    ///
+    /// #### Parameters
+    ///
+    /// - `sourceValue`: the initial value
+    ///
+    /// - `destinationValue`: the value at the end of the motion
+    ///
+    /// - `duration`: the motion duration in milliseconds
+    ///
+    /// - `a1X`, `a1Y`, `b1X`, `b1Y`: control points of the first segment
+    ///
+    /// - `midX`, `midY`: the point the two segments meet at
+    ///
+    /// - `a2X`, `a2Y`, `b2X`, `b2Y`: control points of the second segment
+    ///
+    /// #### Returns
+    ///
+    /// Motion instance
+    public static Motion createThreePointCubicMotion(int sourceValue, int destinationValue,
+            int duration, float a1X, float a1Y, float b1X, float b1Y,
+            float midX, float midY, float a2X, float a2Y, float b2X, float b2Y) {
+<span class="fc" id="L207">        Motion m = new Motion(sourceValue, destinationValue, duration);</span>
+<span class="fc" id="L208">        m.motionType = THREE_POINT_CUBIC;</span>
+<span class="fc" id="L209">        m.p0 = a1X;</span>
+<span class="fc" id="L210">        m.p1 = a1Y;</span>
+<span class="fc" id="L211">        m.p2 = b1X;</span>
+<span class="fc" id="L212">        m.p3 = b1Y;</span>
+<span class="fc" id="L213">        m.midX = midX;</span>
+<span class="fc" id="L214">        m.midY = midY;</span>
+<span class="fc" id="L215">        m.q0 = a2X;</span>
+<span class="fc" id="L216">        m.q1 = a2Y;</span>
+<span class="fc" id="L217">        m.q2 = b2X;</span>
+<span class="fc" id="L218">        m.q3 = b2Y;</span>
+<span class="fc" id="L219">        return m;</span>
+    }
+
+    /// Equivalent to createCubicBezierMotion with 0, 0.42, 0.58, 1.0 as arguments.
+    ///
+    /// #### Parameters
+    ///
+    /// - `sourceValue`: starting value
+    ///
+    /// - `destinationValue`: destination value
+    ///
+    /// - `duration`: motion duration
+    ///
+    /// #### Returns
+    ///
+    /// Motion instance
+    public static Motion createEaseInOutMotion(int sourceValue, int destinationValue, int duration) {
+<span class="fc" id="L236">        return createCubicBezierMotion(sourceValue, destinationValue, duration, 0, 0.42f, 0.58f, 1);</span>
+    }
+
+    /// Equivalent to createCubicBezierMotion with 0f, 0.25f, 0.25f, 1 as arguments.
+    ///
+    /// #### Parameters
+    ///
+    /// - `sourceValue`: starting value
+    ///
+    /// - `destinationValue`: destination value
+    ///
+    /// - `duration`: motion duration
+    ///
+    /// #### Returns
+    ///
+    /// Motion instance
+    public static Motion createEaseMotion(int sourceValue, int destinationValue, int duration) {
+<span class="nc" id="L253">        return createCubicBezierMotion(sourceValue, destinationValue, duration, 0f, 0.25f, 0.25f, 1.0f);</span>
+    }
+
+    /// Equivalent to createCubicBezierMotion with 0f, 0.42f, 1f, 1f as arguments.
+    ///
+    /// #### Parameters
+    ///
+    /// - `sourceValue`: starting value
+    ///
+    /// - `destinationValue`: destination value
+    ///
+    /// - `duration`: motion duration
+    ///
+    /// #### Returns
+    ///
+    /// Motion instance
+    public static Motion createEaseInMotion(int sourceValue, int destinationValue, int duration) {
+<span class="fc" id="L270">        return createCubicBezierMotion(sourceValue, destinationValue, duration, 0f, 0.42f, 1f, 1f);</span>
+    }
+
+    /// Equivalent to createCubicBezierMotion with 0f, 0f, 0.58f, 1.0f as arguments.
+    ///
+    /// #### Parameters
+    ///
+    /// - `sourceValue`: starting value
+    ///
+    /// - `destinationValue`: destination value
+    ///
+    /// - `duration`: motion duration
+    ///
+    /// #### Returns
+    ///
+    /// Motion instance
+    public static Motion createEaseOutMotion(int sourceValue, int destinationValue, int duration) {
+<span class="fc" id="L287">        return createCubicBezierMotion(sourceValue, destinationValue, duration, 0f, 0f, 0.58f, 1.0f);</span>
+    }
+
+    /// Creates a linear motion starting from source value all the way to destination value
+    ///
+    /// #### Parameters
+    ///
+    /// - `sourceValue`: the number from which we are starting (usually indicating animation start position)
+    ///
+    /// - `destinationValue`: the number to which we are heading (usually indicating animation destination)
+    ///
+    /// - `duration`: @param duration         the length in milliseconds of the motion (time it takes to get from sourceValue to
+    /// destinationValue)
+    ///
+    /// #### Returns
+    ///
+    /// new motion object
+    public static Motion createLinearMotion(int sourceValue, int destinationValue, int duration) {
+<span class="fc" id="L305">        Motion l = new Motion(sourceValue, destinationValue, duration);</span>
+<span class="fc" id="L306">        l.motionType = LINEAR;</span>
+<span class="fc" id="L307">        return l;</span>
+    }
+
+    /// Creates a linear motion starting from source value all the way to destination value for a color value.
+    /// Unlike a regular linear motion a color linear motion is shifted based on channels where red, green &amp; blue
+    /// get shifted separately.
+    ///
+    /// #### Parameters
+    ///
+    /// - `sourceValue`: the color from which we are starting
+    ///
+    /// - `destinationValue`: the destination color
+    ///
+    /// - `duration`: @param duration         the length in milliseconds of the motion (time it takes to get from sourceValue to
+    /// destinationValue)
+    ///
+    /// #### Returns
+    ///
+    /// new motion object
+    public static Motion createLinearColorMotion(int sourceValue, int destinationValue, int duration) {
+<span class="fc" id="L327">        Motion l = new Motion(sourceValue, destinationValue, duration);</span>
+<span class="fc" id="L328">        l.motionType = COLOR_LINEAR;</span>
+<span class="fc" id="L329">        return l;</span>
+    }
+
+    /// Creates a spline motion starting from source value all the way to destination value
+    ///
+    /// #### Parameters
+    ///
+    /// - `sourceValue`: the number from which we are starting (usually indicating animation start position)
+    ///
+    /// - `destinationValue`: the number to which we are heading (usually indicating animation destination)
+    ///
+    /// - `duration`: @param duration         the length in milliseconds of the motion (time it takes to get from sourceValue to
+    /// destinationValue)
+    ///
+    /// #### Returns
+    ///
+    /// new motion object
+    public static Motion createSplineMotion(int sourceValue, int destinationValue, int duration) {
+<span class="fc" id="L347">        Motion spline = new Motion(sourceValue, destinationValue, duration);</span>
+<span class="fc" id="L348">        spline.motionType = SPLINE;</span>
+<span class="fc" id="L349">        return spline;</span>
+    }
+
+    /// Creates a deceleration motion starting from source value all the way to destination value
+    ///
+    /// #### Parameters
+    ///
+    /// - `sourceValue`: the number from which we are starting (usually indicating animation start position)
+    ///
+    /// - `destinationValue`: the number to which we are heading (usually indicating animation destination)
+    ///
+    /// - `duration`: @param duration         the length in milliseconds of the motion (time it takes to get from sourceValue to
+    /// destinationValue)
+    ///
+    /// #### Returns
+    ///
+    /// new motion object
+    public static Motion createDecelerationMotion(int sourceValue, int destinationValue, int duration) {
+<span class="nc" id="L367">        Motion deceleration = new Motion(sourceValue, destinationValue, duration);</span>
+<span class="nc" id="L368">        deceleration.motionType = DECELERATION;</span>
+<span class="nc" id="L369">        return deceleration;</span>
+    }
+
+    /// Creates a critically-damped spring motion from source to destination. This is the
+    /// envelope of a second-order critically damped system step response:
+    /// `x(t) = dst - (dst - src) * (1 + w*t) * e^(-w*t)` where w is chosen so the residual
+    /// at t=duration is about 2%. Produces a quick initial approach with a soft settling
+    /// tail, closer in feel to the iOS rubber-band snap-back than the quadratic
+    /// `createDecelerationMotion` curve.
+    ///
+    /// #### Parameters
+    ///
+    /// - `sourceValue`: the number from which we are starting
+    ///
+    /// - `destinationValue`: the number to which we are heading
+    ///
+    /// - `duration`: the length in milliseconds of the motion
+    ///
+    /// #### Returns
+    ///
+    /// new motion object
+    public static Motion createCriticalDampedSpringMotion(int sourceValue, int destinationValue, int duration) {
+<span class="nc" id="L391">        Motion m = new Motion(sourceValue, destinationValue, duration);</span>
+<span class="nc" id="L392">        m.motionType = CRITICAL_DAMPED_SPRING;</span>
+<span class="nc" id="L393">        return m;</span>
+    }
+
+    /// Creates a deceleration motion starting from the current position of another motion.
+    ///
+    /// #### Parameters
+    ///
+    /// - `motion`: the number from which we are starting (usually indicating animation start position)
+    ///
+    /// - `maxDestinationValue`: The farthest position to allow motion to go.
+    ///
+    /// - `maxDuration`: The longest that the duration is allowed to proceed for.
+    ///
+    /// #### Returns
+    ///
+    /// new motion object
+    public static Motion createDecelerationMotionFrom(Motion motion, int maxDestinationValue, int maxDuration) {
+<span class="nc bnc" id="L410" title="All 2 branches missed.">        return createDecelerationMotion(</span>
+                motion.lastReturnedValue,
+                motion.destinationValue &lt; motion.sourceValue
+<span class="nc" id="L413">                        ? Math.min(motion.destinationValue, maxDestinationValue)</span>
+<span class="nc" id="L414">                        : Math.max(motion.destinationValue, maxDestinationValue),</span>
+<span class="nc" id="L415">                (int) Math.min(maxDuration, motion.duration - (AnimationTime.now() - motion.startTime))</span>
+        );
+    }
+
+    /// Creates a friction motion starting from source with initial speed and the friction
+    ///
+    /// #### Parameters
+    ///
+    /// - `sourceValue`: the number from which we are starting (usually indicating animation start position)
+    ///
+    /// - `maxValue`: the maximum value for the friction
+    ///
+    /// - `initVelocity`: the starting velocity
+    ///
+    /// - `friction`: the motion friction
+    ///
+    /// #### Returns
+    ///
+    /// new motion object
+    public static Motion createFrictionMotion(int sourceValue, int maxValue, float initVelocity, float friction) {
+<span class="nc" id="L435">        Motion frictionMotion = new Motion(sourceValue, initVelocity, friction);</span>
+<span class="nc" id="L436">        frictionMotion.destinationValue = maxValue;</span>
+<span class="nc" id="L437">        frictionMotion.motionType = FRICTION;</span>
+<span class="nc" id="L438">        return frictionMotion;</span>
+    }
+
+    public static Motion createExponentialDecayMotion(int sourceValue, int maxValue, double initVelocity, double timeConstant) {
+<span class="fc" id="L442">        Motion decayMotion = new Motion(sourceValue, initVelocity, timeConstant);</span>
+<span class="fc" id="L443">        decayMotion.destinationValue = maxValue;</span>
+<span class="fc" id="L444">        decayMotion.targetPosition = sourceValue + (int) (initVelocity * (double) UIManager.getInstance().getThemeConstant(&quot;DecayMotionScaleFactorInt&quot;, 950));</span>
+<span class="fc" id="L445">        decayMotion.motionType = EXPONENTIAL_DECAY;</span>
+<span class="fc" id="L446">        decayMotion.duration = (int) (6 * timeConstant);</span>
+<span class="fc" id="L447">        return decayMotion;</span>
+
+    }
+
+    /// Sends the motion to the end time instantly which is useful for flushing an animation
+    public void finish() {
+<span class="fc bfc" id="L453" title="All 2 branches covered.">        if (!isFinished()) {</span>
+<span class="fc" id="L454">            startTime = AnimationTime.now() - duration;</span>
+<span class="fc" id="L455">            currentMotionTime = -1;</span>
+<span class="fc" id="L456">            previousCurrentMotionTime = -1;</span>
+        }
+<span class="fc" id="L458">    }</span>
+
+    /// Sets the start time to the current time
+    public void start() {
+<span class="fc" id="L462">        startTime = AnimationTime.now();</span>
+<span class="fc" id="L463">    }</span>
+
+    /// Clears what a finished run left behind -- the last returned value, the decay
+    /// history and a pinned motion time -- so the same instance can run again from its
+    /// source. start() alone only moves the start time, and isFinished() kept answering
+    /// true for an instance that had already reached its destination.
+    void resetForReuse() {
+<span class="fc" id="L470">        lastReturnedValue = sourceValue;</span>
+<span class="fc bfc" id="L471" title="All 2 branches covered.">        for (int i = 0; i &lt; previousLastReturnedValue.length; i++) {</span>
+<span class="fc" id="L472">            previousLastReturnedValue[i] = -1;</span>
+<span class="fc" id="L473">            previousLastReturnedValueTime[i] = -1;</span>
+        }
+<span class="fc" id="L475">        currentMotionTime = -1;</span>
+<span class="fc" id="L476">        previousCurrentMotionTime = -1;</span>
+<span class="fc" id="L477">    }</span>
+
+    /// Returns the current time within the motion relative to start time
+    ///
+    /// #### Returns
+    ///
+    /// long value representing AnimationTime.now() - startTime
+    public long getCurrentMotionTime() {
+<span class="fc bfc" id="L485" title="All 2 branches covered.">        if (currentMotionTime &lt; 0) {</span>
+<span class="fc" id="L486">            return AnimationTime.now() - startTime;</span>
+        }
+<span class="fc" id="L488">        return currentMotionTime;</span>
+    }
+
+    /// Allows overriding the getCurrentMotionTime method value with a manual value
+    /// to provide full developer control over animation speed/position.
+    ///
+    /// #### Parameters
+    ///
+    /// - `currentMotionTime`: the time in milliseconds for the motion.
+    public void setCurrentMotionTime(long currentMotionTime) {
+<span class="fc" id="L498">        this.previousCurrentMotionTime = this.currentMotionTime;</span>
+<span class="fc" id="L499">        this.currentMotionTime = currentMotionTime;</span>
+
+        // workaround allowing the motion to be restarted when manually setting the current time
+<span class="fc bfc" id="L502" title="All 2 branches covered.">        if (lastReturnedValue == destinationValue) {</span>
+<span class="fc" id="L503">            lastReturnedValue = sourceValue;</span>
+        }
+<span class="fc" id="L505">    }</span>
+
+    public boolean isDecayMotion() {
+<span class="pc bpc" id="L508" title="1 of 2 branches missed.">        return motionType == EXPONENTIAL_DECAY;</span>
+    }
+
+    /// Returns true if the motion has run its course and has finished meaning the current
+    /// time is greater than startTime + duration.
+    ///
+    /// #### Returns
+    ///
+    /// true if AnimationTime.now() &gt; duration + startTime or the last returned value is the destination value
+    public boolean isFinished() {
+<span class="fc bfc" id="L518" title="All 8 branches covered.">        return getCurrentMotionTime() &gt; duration || destinationValue == lastReturnedValue || (EXPONENTIAL_DECAY == motionType &amp;&amp; previousLastReturnedValue[0] == lastReturnedValue);</span>
+    }
+
+    private int getSplineValue() {
+        //make sure we reach the destination value.
+<span class="fc bfc" id="L523" title="All 2 branches covered.">        if (isFinished()) {</span>
+<span class="fc" id="L524">            return destinationValue;</span>
+        }
+<span class="fc" id="L526">        float totalTime = duration;</span>
+<span class="fc" id="L527">        float currentTime = (int) getCurrentMotionTime();</span>
+<span class="pc bpc" id="L528" title="1 of 2 branches missed.">        if (currentMotionTime &gt; -1) {</span>
+<span class="nc" id="L529">            currentTime -= startTime;</span>
+<span class="nc" id="L530">            totalTime -= startTime;</span>
+        }
+<span class="fc" id="L532">        currentTime = Math.min(currentTime, totalTime);</span>
+<span class="fc" id="L533">        int p = Math.abs(destinationValue - sourceValue);</span>
+<span class="fc" id="L534">        float centerTime = totalTime / 2;</span>
+<span class="fc" id="L535">        float l = p / (centerTime * centerTime);</span>
+        int x;
+<span class="fc bfc" id="L537" title="All 2 branches covered.">        if (sourceValue &lt; destinationValue) {</span>
+<span class="pc bpc" id="L538" title="1 of 2 branches missed.">            if (currentTime &gt; centerTime) {</span>
+<span class="nc" id="L539">                x = sourceValue + (int) (l * (-centerTime * centerTime + 2 * centerTime * currentTime -</span>
+                        currentTime * currentTime / 2));
+            } else {
+<span class="fc" id="L542">                x = sourceValue + (int) (l * currentTime * currentTime / 2);</span>
+            }
+        } else {
+<span class="fc" id="L545">            currentTime = totalTime - currentTime;</span>
+<span class="pc bpc" id="L546" title="1 of 2 branches missed.">            if (currentTime &gt; centerTime) {</span>
+<span class="fc" id="L547">                x = destinationValue + (int) (l * (-centerTime * centerTime + 2 * centerTime * currentTime -</span>
+                        currentTime * currentTime / 2));
+            } else {
+<span class="nc" id="L550">                x = destinationValue + (int) (l * currentTime * currentTime / 2);</span>
+            }
+        }
+<span class="fc" id="L553">        return x;</span>
+    }
+
+    private int getThreePointCubicValue() {
+<span class="pc bpc" id="L557" title="1 of 2 branches missed.">        if (isFinished()) {</span>
+<span class="nc" id="L558">            return destinationValue;</span>
+        }
+<span class="fc" id="L560">        float totalTime = duration;</span>
+<span class="fc" id="L561">        float currentTime = Math.min((int) getCurrentMotionTime(), (int) totalTime);</span>
+<span class="pc bpc" id="L562" title="1 of 2 branches missed.">        if (currentTime &lt; 0f) {</span>
+<span class="nc" id="L563">            currentTime = 0f;</span>
+        }
+<span class="fc" id="L565">        float t = currentTime / totalTime;</span>
+
+        // Each segment is solved in its OWN normalized space: the controls are expressed
+        // relative to the segment's start and divided by its extent, so the solver below
+        // sees an ordinary cubic-bezier from (0,0) to (1,1). The result is then scaled
+        // back, which is what makes the two halves meet exactly at the midpoint instead
+        // of stepping there.
+<span class="fc bfc" id="L572" title="All 2 branches covered.">        boolean first = t &lt; midX;</span>
+<span class="fc bfc" id="L573" title="All 2 branches covered.">        float scaleX = first ? midX : 1f - midX;</span>
+<span class="fc bfc" id="L574" title="All 2 branches covered.">        float scaleY = first ? midY : 1f - midY;</span>
+        float value;
+<span class="pc bpc" id="L576" title="1 of 2 branches missed.">        if (scaleX &lt;= 0f) {</span>
+            // A segment with no duration is only ever reached at its end.
+<span class="nc bnc" id="L578" title="All 2 branches missed.">            value = first ? midY : 1f;</span>
+<span class="fc bfc" id="L579" title="All 2 branches covered.">        } else if (scaleY &lt;= 0f) {</span>
+            // No vertical extent -- the midpoint lies on the top or bottom edge -- so the
+            // Y axis cannot be normalized. Substituting linear progress here made the
+            // value run toward t and then jump back at the join. X still normalizes, so
+            // solve for the curve parameter as usual and evaluate this segment's Y cubic
+            // from its real endpoints and controls.
+<span class="pc bpc" id="L585" title="1 of 2 branches missed.">            float scaledT = (t - (first ? 0f : midX)) / scaleX;</span>
+<span class="pc bpc" id="L586" title="1 of 2 branches missed.">            float x1 = first ? p0 / scaleX : (q0 - midX) / scaleX;</span>
+<span class="pc bpc" id="L587" title="1 of 2 branches missed.">            float x2 = first ? p2 / scaleX : (q2 - midX) / scaleX;</span>
+<span class="fc" id="L588">            float u = solveBezierForT(scaledT, x1, x2);</span>
+<span class="pc bpc" id="L589" title="1 of 2 branches missed.">            float y0 = first ? 0f : midY;</span>
+<span class="pc bpc" id="L590" title="1 of 2 branches missed.">            float y3 = first ? midY : 1f;</span>
+<span class="pc bpc" id="L591" title="1 of 2 branches missed.">            float c1 = first ? p1 : q1;</span>
+<span class="pc bpc" id="L592" title="1 of 2 branches missed.">            float c2 = first ? p3 : q3;</span>
+<span class="fc" id="L593">            float inv = 1f - u;</span>
+<span class="fc" id="L594">            value = inv * inv * inv * y0 + 3f * inv * inv * u * c1 + 3f * inv * u * u * c2 + u * u * u * y3;</span>
+<span class="fc" id="L595">        } else {</span>
+<span class="pc bpc" id="L596" title="1 of 2 branches missed.">            float scaledT = (t - (first ? 0f : midX)) / scaleX;</span>
+            float x1;
+            float y1;
+            float x2;
+            float y2;
+<span class="pc bpc" id="L601" title="1 of 2 branches missed.">            if (first) {</span>
+<span class="nc" id="L602">                x1 = p0 / scaleX;</span>
+<span class="nc" id="L603">                y1 = p1 / scaleY;</span>
+<span class="nc" id="L604">                x2 = p2 / scaleX;</span>
+<span class="nc" id="L605">                y2 = p3 / scaleY;</span>
+            } else {
+<span class="fc" id="L607">                x1 = (q0 - midX) / scaleX;</span>
+<span class="fc" id="L608">                y1 = (q1 - midY) / scaleY;</span>
+<span class="fc" id="L609">                x2 = (q2 - midX) / scaleX;</span>
+<span class="fc" id="L610">                y2 = (q3 - midY) / scaleY;</span>
+            }
+<span class="fc" id="L612">            float u = solveBezierForT(scaledT, x1, x2);</span>
+<span class="pc bpc" id="L613" title="1 of 2 branches missed.">            value = bezierAxis(u, y1, y2) * scaleY + (first ? 0f : midY);</span>
+        }
+
+<span class="fc" id="L616">        float dis = Math.abs(destinationValue - sourceValue);</span>
+<span class="pc bpc" id="L617" title="1 of 2 branches missed.">        if (destinationValue &gt; sourceValue) {</span>
+<span class="fc" id="L618">            return sourceValue + (int) (value * dis);</span>
+        }
+<span class="nc" id="L620">        return sourceValue - (int) (value * dis);</span>
+    }
+
+    private int getCubicValue() {
+        //make sure we reach the destination value.
+<span class="fc bfc" id="L625" title="All 2 branches covered.">        if (isFinished()) {</span>
+<span class="fc" id="L626">            return destinationValue;</span>
+        }
+        // getCurrentMotionTime() is already motion-relative -- it returns
+        // currentMotionTime when set or (AnimationTime.now() - startTime)
+        // otherwise. The previous implementation then subtracted startTime
+        // twice in two duplicated `if (currentMotionTime &gt; -1)` blocks,
+        // which produced nonsense for any motion driven by
+        // setCurrentMotionTime(). Just clamp to [0, duration]. See #1524.
+<span class="fc" id="L634">        float totalTime = duration;</span>
+<span class="fc" id="L635">        float currentTime = Math.min((int) getCurrentMotionTime(), (int) totalTime);</span>
+<span class="pc bpc" id="L636" title="1 of 2 branches missed.">        if (currentTime &lt; 0f) {</span>
+<span class="nc" id="L637">            currentTime = 0f;</span>
+        }
+<span class="fc" id="L639">        float dis = Math.abs(destinationValue - sourceValue);</span>
+<span class="fc" id="L640">        float t = currentTime / totalTime;</span>
+
+        // CSS-style cubic-bezier(x1, y1, x2, y2): the four parameters are the
+        // X and Y coordinates of the two control points. P0=(0,0) and
+        // P3=(1,1) are implicit. The previous implementation just plugged
+        // the four floats into a 1D Bernstein basis polynomial directly,
+        // which is not the same curve -- e.g. cubic-bezier(0, 0, 0.75, 1)
+        // returned 0.41 at t=0.5 instead of the CSS-correct ~0.62. See
+        // #1524. Implement the standard solver: find u such that Bx(u) = t,
+        // then evaluate By(u).
+<span class="fc" id="L650">        float x1 = p0;</span>
+<span class="fc" id="L651">        float y1 = p1;</span>
+<span class="fc" id="L652">        float x2 = p2;</span>
+<span class="fc" id="L653">        float y2 = p3;</span>
+<span class="fc" id="L654">        float u = solveBezierForT(t, x1, x2);</span>
+<span class="fc" id="L655">        float value = bezierAxis(u, y1, y2);</span>
+
+        int current;
+<span class="fc bfc" id="L658" title="All 2 branches covered.">        if (destinationValue &gt; sourceValue) {</span>
+<span class="fc" id="L659">            current = sourceValue + (int) (value * dis);</span>
+        } else {
+<span class="fc" id="L661">            current = sourceValue - (int) (value * dis);</span>
+        }
+<span class="fc" id="L663">        return current;</span>
+    }
+
+    /// Evaluates one coordinate of the implicit CSS cubic-bezier curve
+    /// (P0=0, P3=1, with control coordinates {@code c1} and {@code c2}) at
+    /// parameter {@code u} in [0,1]. The Bernstein-basis expansion of
+    /// {@code (1-u)^3*0 + 3*(1-u)^2*u*c1 + 3*(1-u)*u^2*c2 + u^3*1}.
+    private static float bezierAxis(float u, float c1, float c2) {
+<span class="fc" id="L671">        float omu = 1f - u;</span>
+<span class="fc" id="L672">        return 3f * omu * omu * u * c1</span>
+                + 3f * omu * u * u * c2
+                + u * u * u;
+    }
+
+    /// Derivative dBx/du of {@link #bezierAxis(float, float, float)}.
+    private static float bezierAxisDerivative(float u, float c1, float c2) {
+<span class="fc" id="L679">        float omu = 1f - u;</span>
+<span class="fc" id="L680">        return 3f * omu * omu * c1</span>
+                + 6f * omu * u * (c2 - c1)
+                + 3f * u * u * (1f - c2);
+    }
+
+    /// Solves {@code Bx(u) = t} for {@code u} using a few Newton-Raphson
+    /// iterations and falls back to bisection if Newton-Raphson stalls
+    /// (e.g. for nearly-degenerate control points whose derivative is 0).
+    /// Same general technique CSS engines use for cubic-bezier timing
+    /// functions.
+    private static float solveBezierForT(float t, float x1, float x2) {
+<span class="fc bfc" id="L691" title="All 2 branches covered.">        if (t &lt;= 0f) {</span>
+<span class="fc" id="L692">            return 0f;</span>
+        }
+<span class="fc bfc" id="L694" title="All 2 branches covered.">        if (t &gt;= 1f) {</span>
+<span class="fc" id="L695">            return 1f;</span>
+        }
+        // The CSS cubic-bezier domain requires x1 and x2 in [0,1] for a
+        // monotonic x(u); guard so a caller passing values outside that
+        // range still gets a sane curve by clamping.
+<span class="fc" id="L700">        float cx1 = Math.max(0f, Math.min(1f, x1));</span>
+<span class="fc" id="L701">        float cx2 = Math.max(0f, Math.min(1f, x2));</span>
+
+<span class="fc" id="L703">        float u = t;</span>
+<span class="fc bfc" id="L704" title="All 2 branches covered.">        for (int i = 0; i &lt; 8; i++) {</span>
+<span class="fc" id="L705">            float bxAtU = bezierAxis(u, cx1, cx2);</span>
+<span class="fc" id="L706">            float diff = bxAtU - t;</span>
+<span class="fc bfc" id="L707" title="All 2 branches covered.">            if (Math.abs(diff) &lt; 1e-6f) {</span>
+<span class="fc" id="L708">                return u;</span>
+            }
+<span class="fc" id="L710">            float deriv = bezierAxisDerivative(u, cx1, cx2);</span>
+<span class="pc bpc" id="L711" title="1 of 2 branches missed.">            if (deriv == 0f) {</span>
+<span class="nc" id="L712">                break;</span>
+            }
+<span class="fc" id="L714">            u -= diff / deriv;</span>
+<span class="pc bpc" id="L715" title="1 of 2 branches missed.">            if (u &lt; 0f) {</span>
+<span class="nc" id="L716">                u = 0f;</span>
+<span class="pc bpc" id="L717" title="1 of 2 branches missed.">            } else if (u &gt; 1f) {</span>
+<span class="nc" id="L718">                u = 1f;</span>
+            }
+        }
+
+        // Bisection fallback - guaranteed to converge given Bx is
+        // monotonically non-decreasing on [0,1] when 0 &lt;= cx1, cx2 &lt;= 1.
+<span class="fc" id="L724">        float lo = 0f;</span>
+<span class="fc" id="L725">        float hi = 1f;</span>
+<span class="fc" id="L726">        u = t;</span>
+<span class="fc bfc" id="L727" title="All 2 branches covered.">        for (int i = 0; i &lt; 16; i++) {</span>
+<span class="fc" id="L728">            float bxAtU = bezierAxis(u, cx1, cx2);</span>
+<span class="pc bpc" id="L729" title="1 of 2 branches missed.">            if (Math.abs(bxAtU - t) &lt; 1e-5f) {</span>
+<span class="nc" id="L730">                return u;</span>
+            }
+<span class="pc bpc" id="L732" title="1 of 2 branches missed.">            if (bxAtU &lt; t) {</span>
+<span class="nc" id="L733">                lo = u;</span>
+            } else {
+<span class="fc" id="L735">                hi = u;</span>
+            }
+<span class="fc" id="L737">            u = 0.5f * (lo + hi);</span>
+        }
+<span class="fc" id="L739">        return u;</span>
+    }
+
+    /// Returns the value for the motion for the current clock time.
+    /// The value is dependent on the Motion type.
+    ///
+    /// #### Returns
+    ///
+    /// a value that is relative to the source value
+    public int getValue() {
+<span class="fc bfc" id="L749" title="All 4 branches covered.">        if (currentMotionTime &gt; -1 &amp;&amp; startTime &gt; getCurrentMotionTime()) {</span>
+<span class="fc" id="L750">            return sourceValue;</span>
+        }
+
+<span class="fc" id="L753">        previousLastReturnedValue[0] = previousLastReturnedValue[1];</span>
+<span class="fc" id="L754">        previousLastReturnedValueTime[0] = previousLastReturnedValueTime[1];</span>
+<span class="fc" id="L755">        previousLastReturnedValue[1] = previousLastReturnedValue[2];</span>
+<span class="fc" id="L756">        previousLastReturnedValueTime[1] = previousLastReturnedValueTime[2];</span>
+<span class="fc" id="L757">        previousLastReturnedValue[2] = lastReturnedValue;</span>
+<span class="fc" id="L758">        previousLastReturnedValueTime[2] = previousCurrentMotionTime;</span>
+<span class="fc bfc" id="L759" title="All 2 branches covered.">        if (previousCurrentMotionTime &lt; 0) {</span>
+<span class="fc" id="L760">            previousCurrentMotionTime = getCurrentMotionTime();</span>
+        }
+<span class="pc bpc" id="L762" title="3 of 9 branches missed.">        switch (motionType) {</span>
+            case SPLINE:
+<span class="fc" id="L764">                lastReturnedValue = getSplineValue();</span>
+<span class="fc" id="L765">                break;</span>
+            case CUBIC:
+<span class="fc" id="L767">                lastReturnedValue = getCubicValue();</span>
+<span class="fc" id="L768">                break;</span>
+            case THREE_POINT_CUBIC:
+<span class="fc" id="L770">                lastReturnedValue = getThreePointCubicValue();</span>
+<span class="fc" id="L771">                break;</span>
+            case FRICTION:
+<span class="nc" id="L773">                lastReturnedValue = getFriction();</span>
+<span class="nc" id="L774">                break;</span>
+            case DECELERATION:
+<span class="nc" id="L776">                lastReturnedValue = getRubber();</span>
+<span class="nc" id="L777">                break;</span>
+            case COLOR_LINEAR:
+<span class="fc" id="L779">                lastReturnedValue = getColorLinear();</span>
+<span class="fc" id="L780">                break;</span>
+            case EXPONENTIAL_DECAY:
+<span class="fc" id="L782">                lastReturnedValue = getExponentialDecay();</span>
+<span class="fc" id="L783">                break;</span>
+            case CRITICAL_DAMPED_SPRING:
+<span class="nc" id="L785">                lastReturnedValue = getCriticalDampedSpring();</span>
+<span class="nc" id="L786">                break;</span>
+            default:
+<span class="fc" id="L788">                lastReturnedValue = getLinear();</span>
+                break;
+        }
+<span class="fc" id="L791">        return lastReturnedValue;</span>
+    }
+
+    /// Gets an approximation of the current velocity in pixels per millisecond.
+    ///
+    /// NOTE: If `#countAvailableVelocitySamplingPoints()`  0
+    ///
+    /// #### Returns
+    ///
+    /// Current velocity in pixels per millisecond.
+    ///
+    public double getVelocity() {
+<span class="nc" id="L803">        final long localCurrentMotionTime = getCurrentMotionTime();</span>
+<span class="nc" id="L804">        final int lastReturnedValueLocal = lastReturnedValue;</span>
+<span class="nc" id="L805">        double velocity = 0;</span>
+<span class="nc" id="L806">        boolean firstIteration = true;</span>
+<span class="nc bnc" id="L807" title="All 2 branches missed.">        for (int i = 2; i &gt;= 0; i--) {</span>
+<span class="nc" id="L808">            final long t = previousLastReturnedValueTime[i];</span>
+<span class="nc bnc" id="L809" title="All 4 branches missed.">            if (t &lt;= 0 || localCurrentMotionTime == t) {</span>
+<span class="nc" id="L810">                break;</span>
+            }
+<span class="nc" id="L812">            final int valueAtT = previousLastReturnedValue[i];</span>
+<span class="nc" id="L813">            final double spotVelocity = (lastReturnedValueLocal - valueAtT) / (double) (localCurrentMotionTime - t);</span>
+<span class="nc bnc" id="L814" title="All 2 branches missed.">            velocity = firstIteration ? spotVelocity : (velocity + spotVelocity) / 2.0;</span>
+<span class="nc" id="L815">            firstIteration = false;</span>
+        }
+
+<span class="nc" id="L818">        return velocity;</span>
+    }
+
+    /// Gets the number of sampling points that can be used by `#getVelocity()`.  A minimum of 2 sampling
+    /// points are required for the result of `#getVelocity()` to have any meaning.
+    ///
+    /// #### Returns
+    ///
+    /// The number of sampling points that can be used by `#getVelocity()`.
+    ///
+    public int countAvailableVelocitySamplingPoints() {
+<span class="fc" id="L829">        int count = 1;</span>
+<span class="fc" id="L830">        final long localCurrentMotionTime = getCurrentMotionTime();</span>
+<span class="pc bpc" id="L831" title="1 of 2 branches missed.">        for (int i = 2; i &gt;= 0; i--) {</span>
+<span class="fc" id="L832">            final long t = previousLastReturnedValueTime[i];</span>
+<span class="pc bpc" id="L833" title="3 of 4 branches missed.">            if (t &lt;= 0 || localCurrentMotionTime == t) {</span>
+<span class="nc" id="L834">                break;</span>
+            }
+<span class="nc" id="L836">            count++;</span>
+        }
+
+<span class="fc" id="L839">        return count;</span>
+    }
+
+    private int getLinear() {
+        //make sure we reach the destination value.
+<span class="fc bfc" id="L844" title="All 2 branches covered.">        if (isFinished()) {</span>
+<span class="fc" id="L845">            return destinationValue;</span>
+        }
+<span class="fc" id="L847">        float totalTime = duration;</span>
+<span class="fc" id="L848">        float currentTime = (int) getCurrentMotionTime();</span>
+<span class="fc bfc" id="L849" title="All 2 branches covered.">        if (currentMotionTime &gt; -1) {</span>
+<span class="fc" id="L850">            currentTime -= startTime;</span>
+<span class="fc" id="L851">            totalTime -= startTime;</span>
+        }
+<span class="fc" id="L853">        int dis = destinationValue - sourceValue;</span>
+<span class="fc" id="L854">        int val = (int) (sourceValue + (currentTime / totalTime * dis));</span>
+
+<span class="fc bfc" id="L856" title="All 2 branches covered.">        if (destinationValue &lt; sourceValue) {</span>
+<span class="fc" id="L857">            return Math.max(destinationValue, val);</span>
+        } else {
+<span class="fc" id="L859">            return Math.min(destinationValue, val);</span>
+        }
+    }
+
+    private int getColorLinear() {
+<span class="pc bpc" id="L864" title="1 of 2 branches missed.">        if (isFinished()) {</span>
+<span class="nc" id="L865">            return destinationValue;</span>
+        }
+<span class="fc" id="L867">        float totalTime = duration;</span>
+<span class="fc" id="L868">        float currentTime = (int) getCurrentMotionTime();</span>
+<span class="pc bpc" id="L869" title="1 of 2 branches missed.">        if (currentMotionTime &gt; -1) {</span>
+<span class="nc" id="L870">            currentTime -= startTime;</span>
+<span class="nc" id="L871">            totalTime -= startTime;</span>
+        }
+
+<span class="fc" id="L874">        int sourceR = (sourceValue &gt;&gt; 16) &amp; 0xff;</span>
+<span class="fc" id="L875">        int destR = (destinationValue &gt;&gt; 16) &amp; 0xff;</span>
+<span class="fc" id="L876">        int sourceG = (sourceValue &gt;&gt; 8) &amp; 0xff;</span>
+<span class="fc" id="L877">        int destG = (destinationValue &gt;&gt; 8) &amp; 0xff;</span>
+<span class="fc" id="L878">        int sourceB = sourceValue &amp; 0xff;</span>
+<span class="fc" id="L879">        int destB = destinationValue &amp; 0xff;</span>
+
+<span class="fc" id="L881">        int disR = destR - sourceR;</span>
+<span class="fc" id="L882">        int disG = destG - sourceG;</span>
+<span class="fc" id="L883">        int disB = destB - sourceB;</span>
+<span class="fc" id="L884">        int valR = (int) (sourceR + (currentTime / totalTime * disR));</span>
+<span class="fc" id="L885">        int valG = (int) (sourceG + (currentTime / totalTime * disG));</span>
+<span class="fc" id="L886">        int valB = (int) (sourceB + (currentTime / totalTime * disB));</span>
+
+<span class="fc bfc" id="L888" title="All 2 branches covered.">        if (destR &lt; sourceR) {</span>
+<span class="fc" id="L889">            valR = Math.max(destR, valR);</span>
+        } else {
+<span class="fc" id="L891">            valR = Math.min(destR, valR);</span>
+        }
+
+<span class="fc bfc" id="L894" title="All 2 branches covered.">        if (destG &lt; sourceG) {</span>
+<span class="fc" id="L895">            valG = Math.max(destG, valG);</span>
+        } else {
+<span class="fc" id="L897">            valG = Math.min(destG, valG);</span>
+        }
+
+<span class="fc bfc" id="L900" title="All 2 branches covered.">        if (destB &lt; sourceB) {</span>
+<span class="fc" id="L901">            valB = Math.max(destB, valB);</span>
+        } else {
+<span class="fc" id="L903">            valB = Math.min(destB, valB);</span>
+        }
+<span class="fc" id="L905">        return (((valR) &lt;&lt; 16) &amp; 0xff0000) | (((valG) &lt;&lt; 8) &amp; 0xff00) | (valB &amp; 0xff);</span>
+    }
+
+    private int getFriction() {
+<span class="nc" id="L909">        int time = (int) getCurrentMotionTime();</span>
+<span class="nc" id="L910">        int retVal = 0;</span>
+
+<span class="nc" id="L912">        retVal = (int) ((Math.abs(initVelocity) * time) - (friction * (((double) time * time) / 2)));</span>
+<span class="nc bnc" id="L913" title="All 2 branches missed.">        if (initVelocity &lt; 0) {</span>
+<span class="nc" id="L914">            retVal *= -1;</span>
+        }
+<span class="nc" id="L916">        retVal += sourceValue;</span>
+<span class="nc bnc" id="L917" title="All 2 branches missed.">        if (destinationValue &gt; sourceValue) {</span>
+<span class="nc" id="L918">            return Math.min(retVal, destinationValue);</span>
+        } else {
+<span class="nc" id="L920">            return Math.max(retVal, destinationValue);</span>
+        }
+    }
+
+    private int getExponentialDecay() {
+<span class="fc" id="L925">        double elapsed = getCurrentMotionTime();</span>
+<span class="fc" id="L926">        double timeConstant = friction;</span>
+<span class="fc" id="L927">        double amplitude = targetPosition - sourceValue;</span>
+<span class="fc" id="L928">        int position = (int) Math.round(targetPosition - amplitude * MathUtil.exp(-elapsed / timeConstant));</span>
+<span class="pc bpc" id="L929" title="1 of 2 branches missed.">        if (destinationValue &gt; sourceValue) {</span>
+<span class="fc" id="L930">            return Math.min(position, destinationValue);</span>
+        } else {
+<span class="nc" id="L932">            return Math.max(position, destinationValue);</span>
+        }
+    }
+
+    private int getRubber() {
+<span class="nc bnc" id="L937" title="All 2 branches missed.">        if (isFinished()) {</span>
+<span class="nc" id="L938">            return destinationValue;</span>
+        }
+<span class="nc" id="L940">        float totalTime = duration;</span>
+<span class="nc" id="L941">        float currentTime = (int) getCurrentMotionTime();</span>
+<span class="nc bnc" id="L942" title="All 2 branches missed.">        if (currentMotionTime &gt; -1) {</span>
+<span class="nc" id="L943">            currentTime -= startTime;</span>
+<span class="nc" id="L944">            totalTime -= startTime;</span>
+        }
+<span class="nc" id="L946">        currentTime = Math.min(currentTime, totalTime);</span>
+<span class="nc" id="L947">        int p = Math.abs(destinationValue - sourceValue);</span>
+<span class="nc" id="L948">        float centerTime = totalTime / 2;</span>
+<span class="nc" id="L949">        float l = p / (centerTime * centerTime);</span>
+        int x;
+<span class="nc" id="L951">        int dis = (int) (l * (-centerTime * centerTime + 2 * centerTime * currentTime -</span>
+                currentTime * currentTime / 2));
+
+<span class="nc bnc" id="L954" title="All 2 branches missed.">        if (sourceValue &lt; destinationValue) {</span>
+<span class="nc" id="L955">            x = Math.max(sourceValue, sourceValue + dis);</span>
+<span class="nc" id="L956">            x = Math.min(destinationValue, x);</span>
+
+        } else {
+<span class="nc" id="L959">            x = Math.min(sourceValue, sourceValue - dis);</span>
+<span class="nc" id="L960">            x = Math.max(destinationValue, x);</span>
+        }
+<span class="nc" id="L962">        return x;</span>
+    }
+
+    // Critically damped second-order step response: produces a fast initial approach
+    // with a soft tail, no overshoot. Omega*duration = 5.83 so residual is ~2% at t=duration.
+    private static final double CRITICAL_DAMPED_OMEGA_T = 5.83d;
+
+    private int getCriticalDampedSpring() {
+<span class="nc bnc" id="L970" title="All 2 branches missed.">        if (isFinished()) {</span>
+<span class="nc" id="L971">            return destinationValue;</span>
+        }
+<span class="nc" id="L973">        float totalTime = duration;</span>
+<span class="nc" id="L974">        float currentTime = (int) getCurrentMotionTime();</span>
+<span class="nc bnc" id="L975" title="All 2 branches missed.">        if (currentMotionTime &gt; -1) {</span>
+<span class="nc" id="L976">            currentTime -= startTime;</span>
+<span class="nc" id="L977">            totalTime -= startTime;</span>
+        }
+<span class="nc bnc" id="L979" title="All 2 branches missed.">        if (totalTime &lt;= 0) {</span>
+<span class="nc" id="L980">            return destinationValue;</span>
+        }
+<span class="nc bnc" id="L982" title="All 2 branches missed.">        if (currentTime &gt; totalTime) {</span>
+<span class="nc" id="L983">            currentTime = totalTime;</span>
+        }
+<span class="nc" id="L985">        double omegaT = CRITICAL_DAMPED_OMEGA_T * (currentTime / (double) totalTime);</span>
+<span class="nc" id="L986">        double residual = (1.0d + omegaT) * MathUtil.exp(-omegaT);</span>
+<span class="nc" id="L987">        return (int) Math.round(destinationValue - (destinationValue - sourceValue) * residual);</span>
+    }
+
+    /// The number from which we are starting (usually indicating animation start position)
+    ///
+    /// #### Returns
+    ///
+    /// the source value
+    public int getSourceValue() {
+<span class="fc" id="L996">        return sourceValue;</span>
+    }
+
+    /// The number from which we are starting (usually indicating animation start position)
+    ///
+    /// #### Parameters
+    ///
+    /// - `sourceValue`: the source value
+    public void setSourceValue(int sourceValue) {
+<span class="nc" id="L1005">        this.sourceValue = sourceValue;</span>
+<span class="nc" id="L1006">    }</span>
+
+    /// The number to which we will reach when the motion is finished
+    ///
+    /// #### Returns
+    ///
+    /// the source value
+    public int getDestinationValue() {
+<span class="fc" id="L1014">        return destinationValue;</span>
+    }
+
+    /// The value of System.currentTimemillis() when motion was started
+    ///
+    /// #### Returns
+    ///
+    /// the start time
+    protected long getStartTime() {
+<span class="nc" id="L1023">        return startTime;</span>
+    }
+
+    /// Sets the start time of the motion
+    ///
+    /// #### Parameters
+    ///
+    /// - `startTime`: the starting time
+    public void setStartTime(long startTime) {
+<span class="fc" id="L1032">        this.startTime = startTime;</span>
+<span class="fc" id="L1033">    }</span>
+
+    /// Returns the animation duration
+    ///
+    /// #### Returns
+    ///
+    /// animation duration in milliseconds
+    public int getDuration() {
+<span class="fc" id="L1041">        return duration;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

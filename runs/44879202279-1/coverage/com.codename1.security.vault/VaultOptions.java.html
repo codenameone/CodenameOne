@@ -1,0 +1,221 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>VaultOptions.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.security.vault</a> &gt; <span class="el_source">VaultOptions.java</span></div><h1>VaultOptions.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.security.vault;
+
+/// What a caller insists on when opening or enrolling a vault.
+///
+/// The reason this exists rather than a set of arguments: the important option is the one that
+/// says **fail instead of doing something weaker**. A vault asked for encrypted, non-extractable
+/// storage on a platform that can only offer a plaintext string has exactly two honest
+/// behaviours, and silently taking the second is how an application ends up believing it is
+/// protecting something it is not. Listing a protection in [#require(Protection)] turns that into
+/// a [VaultError#POLICY_NOT_MET] naming the protection that was missing.
+///
+/// Nothing here is required. A `new VaultOptions()` carries the defaults an application that has
+/// not thought about it should get: today's KDF profile, session-only access, no auto lock, and
+/// no required protections -- which means the vault reports what it managed rather than
+/// refusing.
+<span class="fc" id="L38">public final class VaultOptions {</span>
+
+<span class="fc" id="L40">    private Protection[] required = new Protection[0];</span>
+<span class="fc" id="L41">    private KdfProfile kdf = KdfProfile.current();</span>
+<span class="fc" id="L42">    private UnlockPolicy policy = UnlockPolicy.SESSION_ONLY;</span>
+    private long autoLockMillis;
+    private boolean opaqueKeysOnly;
+    private com.codename1.security.vault.spi.DeviceProtection deviceProtection;
+    private boolean deviceBoundPasskeyRequired;
+
+    /// Adds a protection the vault must provide, or the operation fails.
+    ///
+    /// [ProtectionReport#UNKNOWN] does not satisfy a requirement. A platform that cannot say
+    /// whether a key is hardware backed has not provided hardware backing as far as a policy is
+    /// concerned, and an application that needs the guarantee needs the refusal.
+    /// A private copy of these options.
+    ///
+    /// `Vault.configure` takes one, because this class is MUTABLE and the vault mutates it:
+    /// `setPolicy` writes the new policy through `options.policy(...)` and restores it in a
+    /// finally. Retaining the caller's instance meant one options object configuring two vaults
+    /// tied them together -- changing one vault's policy silently changed what the other would
+    /// enrol or import under next, so a vault could start persisting a device key without anyone
+    /// having called setPolicy on it.
+    ///
+    /// The Protection array is copied too, since an array is as shared as the object holding it.
+    /// The DeviceProtection is not: it is an SPI implementation, deliberately shared, and copying
+    /// it is neither possible nor wanted.
+    VaultOptions copy() {
+<span class="fc" id="L66">        VaultOptions out = new VaultOptions();</span>
+<span class="fc" id="L67">        out.required = new Protection[required.length];</span>
+<span class="fc" id="L68">        System.arraycopy(required, 0, out.required, 0, required.length);</span>
+<span class="fc" id="L69">        out.kdf = kdf;</span>
+<span class="fc" id="L70">        out.policy = policy;</span>
+<span class="fc" id="L71">        out.autoLockMillis = autoLockMillis;</span>
+<span class="fc" id="L72">        out.opaqueKeysOnly = opaqueKeysOnly;</span>
+<span class="fc" id="L73">        out.deviceProtection = deviceProtection;</span>
+<span class="fc" id="L74">        out.deviceBoundPasskeyRequired = deviceBoundPasskeyRequired;</span>
+<span class="fc" id="L75">        return out;</span>
+    }
+
+    public VaultOptions require(Protection protection) {
+<span class="pc bpc" id="L79" title="1 of 2 branches missed.">        if (protection == null) {</span>
+<span class="nc" id="L80">            return this;</span>
+        }
+<span class="fc" id="L82">        Protection[] grown = new Protection[required.length + 1];</span>
+<span class="fc" id="L83">        System.arraycopy(required, 0, grown, 0, required.length);</span>
+<span class="fc" id="L84">        grown[required.length] = protection;</span>
+<span class="fc" id="L85">        required = grown;</span>
+<span class="fc" id="L86">        return this;</span>
+    }
+
+    /// The protections required so far.
+    public Protection[] getRequired() {
+<span class="fc" id="L91">        Protection[] copy = new Protection[required.length];</span>
+<span class="fc" id="L92">        System.arraycopy(required, 0, copy, 0, required.length);</span>
+<span class="fc" id="L93">        return copy;</span>
+    }
+
+    /// Overrides the password derivation profile. Rarely useful: the default is
+    /// [KdfProfile#current()], and lowering it weakens every password wrap the vault writes.
+    public VaultOptions kdf(KdfProfile profile) {
+<span class="pc bpc" id="L99" title="1 of 2 branches missed.">        if (profile != null) {</span>
+<span class="fc" id="L100">            kdf = profile;</span>
+        }
+<span class="fc" id="L102">        return this;</span>
+    }
+
+    /// The derivation profile new wraps will use.
+    public KdfProfile getKdf() {
+<span class="fc" id="L107">        return kdf;</span>
+    }
+
+    /// How this vault may be reopened. See [UnlockPolicy].
+    public VaultOptions policy(UnlockPolicy newPolicy) {
+<span class="pc bpc" id="L112" title="1 of 2 branches missed.">        if (newPolicy != null) {</span>
+<span class="fc" id="L113">            policy = newPolicy;</span>
+        }
+<span class="fc" id="L115">        return this;</span>
+    }
+
+    /// The unlock policy.
+    public UnlockPolicy getPolicy() {
+<span class="fc" id="L120">        return policy;</span>
+    }
+
+    /// Locks the vault after this many milliseconds without a vault operation. Zero, the default,
+    /// never auto locks.
+    ///
+    /// Enforced when the vault is next used rather than by a timer, so a vault that is idle stays
+    /// nominally unlocked until something asks -- at which point it locks and the call fails with
+    /// [VaultError#LOCKED]. A timer would be tidier and would also keep a reference alive and
+    /// wake a sleeping device; the check-on-use form cannot be late in any way a caller can
+    /// observe, because nothing observes the vault except through a call.
+    public VaultOptions autoLockAfter(long millis) {
+<span class="pc bpc" id="L132" title="1 of 2 branches missed.">        autoLockMillis = millis &gt; 0 ? millis : 0;</span>
+<span class="fc" id="L133">        return this;</span>
+    }
+
+    /// The auto-lock idle timeout in milliseconds, or zero for none.
+    public long getAutoLockMillis() {
+<span class="fc" id="L138">        return autoLockMillis;</span>
+    }
+
+    /// Refuses any operation that would produce raw key bytes, at the cost of the encrypted
+    /// database.
+    ///
+    /// The one place this package hands out key material is [Vault#databaseKey(String)], because
+    /// SQLCipher -- on the device and in the browser's WASM build alike -- takes a key as bytes
+    /// and there is no arrangement of opaque handles that changes that. A caller that cannot
+    /// accept the exposure sets this, and that call then fails with
+    /// [VaultError#POLICY_NOT_MET] rather than quietly doing the thing the policy forbade.
+    ///
+    /// The consequence is real and is the point: a vault configured this way cannot key a managed
+    /// encrypted database. An application that needs both has to seal its records through
+    /// [Vault#seal] and store the ciphertext in a plain database, which is a different design
+    /// rather than a setting.
+    public VaultOptions requireOpaqueKeysOnly() {
+<span class="fc" id="L155">        opaqueKeysOnly = true;</span>
+<span class="fc" id="L156">        return this;</span>
+    }
+
+    /// Whether raw key material may be produced at all. See [#requireOpaqueKeysOnly()].
+    public boolean isOpaqueKeysOnly() {
+<span class="fc" id="L161">        return opaqueKeysOnly;</span>
+    }
+
+    /// Supplies the device key store rather than using the port's.
+    ///
+    /// The port's is right for almost everything, and this exists for the cases where it is not:
+    /// a library wrapping a hardware token, an application whose key belongs to a management
+    /// agent rather than to the device, and a test that needs the remembered-device paths without
+    /// a platform key store behind them.
+    ///
+    /// Supplying one does not relax any check. A protection required through
+    /// [#require(Protection)] is still checked against what this reports, so an implementation
+    /// that claims more than it provides fails the same way the port would.
+    ///
+    /// #### Parameters
+    ///
+    /// - `protection`: the device key store, or null to use the port's
+    public VaultOptions deviceProtection(com.codename1.security.vault.spi.DeviceProtection protection) {
+<span class="fc" id="L179">        deviceProtection = protection;</span>
+<span class="fc" id="L180">        return this;</span>
+    }
+
+    /// Requires that a passkey used for [UnlockPolicy#REQUIRE_USER_VERIFICATION] cannot leave
+    /// this device.
+    ///
+    /// #### Why this is a choice and not a default
+    ///
+    /// Most passkeys sync. An iCloud Keychain credential reaches every device on the Apple
+    /// account, and a Google-account one every device signed into it -- so the ordinary
+    /// &quot;remember this device&quot; is closer to &quot;remember this account&quot;. For a note-taking
+    /// application that is what the user wants: a new laptop unlocks with a face scan and no
+    /// password. For something holding a second factor it is the opposite of what was asked for.
+    ///
+    /// Requiring this narrows the ceremony to an authenticator built into the machine **and**
+    /// checks the credential's backup-eligibility flag, which is the part that actually decides.
+    /// `authenticatorAttachment: &quot;platform&quot;` alone does not: an iCloud Keychain passkey is
+    /// platform-attached and syncs anyway.
+    ///
+    /// #### What it costs
+    ///
+    /// Hardware security keys are excluded, and so is every authenticator whose browser will not
+    /// report the flag -- an unknown answer is treated as &quot;may leave this device&quot; rather than
+    /// rounded up. A user whose only authenticator syncs cannot enrol, and enrolment fails with
+    /// [VaultError#POLICY_NOT_MET] rather than quietly keeping a credential that does not meet
+    /// the requirement. Offer the weaker policy as a fallback, or do not require this.
+    public VaultOptions requireDeviceBoundPasskey() {
+<span class="nc" id="L207">        deviceBoundPasskeyRequired = true;</span>
+<span class="nc" id="L208">        return this;</span>
+    }
+
+    /// Whether a passkey must be bound to this device. See [#requireDeviceBoundPasskey()].
+    public boolean isDeviceBoundPasskeyRequired() {
+<span class="fc" id="L213">        return deviceBoundPasskeyRequired;</span>
+    }
+
+    /// The device key store supplied through [#deviceProtection], or null for the port's.
+    public com.codename1.security.vault.spi.DeviceProtection getDeviceProtection() {
+<span class="fc" id="L218">        return deviceProtection;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

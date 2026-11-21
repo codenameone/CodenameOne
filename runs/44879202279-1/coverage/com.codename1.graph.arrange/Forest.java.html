@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Forest.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.graph.arrange</a> &gt; <span class="el_source">Forest.java</span></div><h1>Forest.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.graph.arrange;
+
+import com.codename1.graph.GraphModel;
+
+/// A spanning forest of a graph: the tree and radial arrangements place nodes by
+/// it and draw the edges it leaves out wherever their ends land.
+final class Forest {
+    final Graphs graph;
+    final int[] parent;
+    final int[][] children;
+    final int[] depth;
+    final int[] roots;
+
+    /// Builds the forest breadth first from `rootId` when given and present,
+    /// then from every node no edge enters, then from whatever is left, so
+    /// cycles and unreachable parts still get a place.
+<span class="fc" id="L39">    Forest(GraphModel model, String rootId) {</span>
+<span class="fc" id="L40">        graph = new Graphs(model);</span>
+<span class="fc" id="L41">        int n = graph.size();</span>
+<span class="fc" id="L42">        parent = new int[n];</span>
+<span class="fc" id="L43">        depth = new int[n];</span>
+<span class="fc" id="L44">        int[] childCount = new int[n];</span>
+<span class="fc" id="L45">        boolean[] seen = new boolean[n];</span>
+<span class="fc" id="L46">        int[] queue = new int[n];</span>
+<span class="fc" id="L47">        int[] rootTmp = new int[n];</span>
+<span class="fc" id="L48">        int rootCount = 0;</span>
+<span class="fc bfc" id="L49" title="All 2 branches covered.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc" id="L50">            parent[i] = -1;</span>
+        }
+<span class="fc" id="L52">        int[] starts = new int[n];</span>
+<span class="fc" id="L53">        int k = 0;</span>
+<span class="fc bfc" id="L54" title="All 2 branches covered.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc bfc" id="L55" title="All 4 branches covered.">            if (rootId != null &amp;&amp; rootId.equals(graph.nodes[i].getId())) {</span>
+<span class="fc" id="L56">                starts[k++] = i;</span>
+            }
+        }
+<span class="fc bfc" id="L59" title="All 2 branches covered.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="pc bpc" id="L60" title="1 of 6 branches missed.">            if (graph.in[i].length == 0 &amp;&amp; (k == 0 || starts[0] != i)) {</span>
+<span class="fc" id="L61">                starts[k++] = i;</span>
+            }
+        }
+<span class="fc bfc" id="L64" title="All 2 branches covered.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="pc bpc" id="L65" title="1 of 6 branches missed.">            if (graph.in[i].length != 0 &amp;&amp; (rootId == null || !rootId.equals(graph.nodes[i].getId()))) {</span>
+<span class="fc" id="L66">                starts[k++] = i;</span>
+            }
+        }
+<span class="fc bfc" id="L69" title="All 2 branches covered.">        for (int si = 0; si &lt; k; si++) {</span>
+<span class="fc" id="L70">            int s = starts[si];</span>
+<span class="fc bfc" id="L71" title="All 2 branches covered.">            if (seen[s]) {</span>
+<span class="fc" id="L72">                continue;</span>
+            }
+<span class="fc" id="L74">            seen[s] = true;</span>
+<span class="fc" id="L75">            rootTmp[rootCount++] = s;</span>
+<span class="fc" id="L76">            int head = 0;</span>
+<span class="fc" id="L77">            int tail = 0;</span>
+<span class="fc" id="L78">            queue[tail++] = s;</span>
+<span class="fc bfc" id="L79" title="All 2 branches covered.">            while (head &lt; tail) {</span>
+<span class="fc" id="L80">                int v = queue[head++];</span>
+<span class="fc" id="L81">                int[] out = graph.out[v];</span>
+<span class="fc bfc" id="L82" title="All 2 branches covered.">                for (int j = 0; j &lt; out.length; j++) { // NOPMD ForLoopCanBeForeach - indexed, like the rest of the pass</span>
+<span class="fc" id="L83">                    int t = out[j];</span>
+<span class="fc bfc" id="L84" title="All 2 branches covered.">                    if (!seen[t]) {</span>
+<span class="fc" id="L85">                        seen[t] = true;</span>
+<span class="fc" id="L86">                        parent[t] = v;</span>
+<span class="fc" id="L87">                        depth[t] = depth[v] + 1;</span>
+<span class="fc" id="L88">                        childCount[v]++;</span>
+<span class="fc" id="L89">                        queue[tail++] = t;</span>
+                    }
+                }
+<span class="fc" id="L92">            }</span>
+        }
+<span class="fc" id="L94">        children = new int[n][];</span>
+<span class="fc bfc" id="L95" title="All 2 branches covered.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc" id="L96">            children[i] = new int[childCount[i]];</span>
+<span class="fc" id="L97">            childCount[i] = 0;</span>
+        }
+        // children in model order keeps the picture stable as nodes are added
+<span class="fc bfc" id="L100" title="All 2 branches covered.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc bfc" id="L101" title="All 2 branches covered.">            if (parent[i] &gt;= 0) {</span>
+<span class="fc" id="L102">                children[parent[i]][childCount[parent[i]]++] = i;</span>
+            }
+        }
+<span class="fc" id="L105">        roots = new int[rootCount];</span>
+<span class="fc" id="L106">        System.arraycopy(rootTmp, 0, roots, 0, rootCount);</span>
+<span class="fc" id="L107">    }</span>
+
+    int maxDepth() {
+<span class="fc" id="L110">        int m = 0;</span>
+<span class="fc bfc" id="L111" title="All 2 branches covered.">        for (int i = 0; i &lt; depth.length; i++) { // NOPMD ForLoopCanBeForeach - indexed, like the rest of the pass</span>
+<span class="fc" id="L112">            m = Math.max(m, depth[i]);</span>
+        }
+<span class="fc" id="L114">        return m;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

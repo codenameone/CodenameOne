@@ -1,0 +1,515 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>FormulaLexer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.spreadsheet</a> &gt; <span class="el_source">FormulaLexer.java</span></div><h1>FormulaLexer.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.spreadsheet;
+
+import com.codename1.io.Util;
+
+import java.util.ArrayList;
+import java.util.List;
+
+/// Reads formula text the way the editor needs it while it is typed: half a formula is the
+/// normal case, so nothing here throws. It splits the text into the pieces the editor colors,
+/// finds the references the grid outlines, the function and argument the caret is in, and
+/// the name being typed.
+final class FormulaLexer {
+    static final int OPERATOR = 1;
+    static final int STRING = 2;
+    static final int NUMBER = 3;
+    static final int ERROR = 4;
+    static final int BOOLEAN = 5;
+    static final int FUNCTION = 6;
+    static final int NAME = 7;
+    static final int REFERENCE = 8;
+    static final int OPEN = 9;
+    static final int CLOSE = 10;
+    static final int SEPARATOR = 11;
+    static final int SPACE = 12;
+    static final int OTHER = 13;
+
+<span class="fc" id="L49">    private static final String[] ERRORS = {</span>
+        &quot;#DIV/0!&quot;, &quot;#N/A&quot;, &quot;#NAME?&quot;, &quot;#NULL!&quot;, &quot;#NUM!&quot;, &quot;#REF!&quot;, &quot;#VALUE!&quot;, &quot;#SPILL!&quot;, &quot;#CALC!&quot;, &quot;#GETTING_DATA&quot;
+    };
+
+    /// A piece of formula text.
+    static final class Token {
+        final int start;
+        final int end;
+        final int kind;
+        /// For a reference: the sheet it names, or null for the formula's own sheet.
+        String sheet;
+        int r1;
+        int c1;
+        int r2;
+        int c2;
+        /// For a reference: which color it is shown in, the same for the same reference.
+<span class="fc" id="L65">        int color = -1;</span>
+
+<span class="fc" id="L67">        Token(int start, int end, int kind) {</span>
+<span class="fc" id="L68">            this.start = start;</span>
+<span class="fc" id="L69">            this.end = end;</span>
+<span class="fc" id="L70">            this.kind = kind;</span>
+<span class="fc" id="L71">        }</span>
+    }
+
+    private FormulaLexer() {
+    }
+
+    // The colors references take, in the editor's text and as outlines in the grid, one after
+    // another as a spreadsheet application gives them: on a light background, then a dark one.
+<span class="fc" id="L79">    private static final int[] LIGHT = {0x1f5fbf, 0xc4302b, 0x7b3fc4, 0x13803d, 0xc25e00, 0x007f99, 0xb0279d, 0x5c6b10};</span>
+<span class="fc" id="L80">    private static final int[] DARK = {0x6ea8ff, 0xff7b72, 0xc39bff, 0x56d38a, 0xffa657, 0x4fd1e8, 0xf28ce0, 0xc8d65c};</span>
+
+    /// The color of the reference given color index `index`.
+    static int referenceColor(int index, boolean dark) {
+<span class="fc bfc" id="L84" title="All 2 branches covered.">        int[] colors = dark ? DARK : LIGHT;</span>
+<span class="fc" id="L85">        return colors[(index % colors.length + colors.length) % colors.length];</span>
+    }
+
+    /// The pieces of a formula. Text that does not start with `=` is a value, and has none.
+    static List&lt;Token&gt; lex(String text) {
+<span class="fc" id="L90">        List&lt;Token&gt; out = new ArrayList&lt;Token&gt;();</span>
+<span class="pc bpc" id="L91" title="1 of 6 branches missed.">        if (text == null || text.length() == 0 || text.charAt(0) != '=') {</span>
+<span class="fc" id="L92">            return out;</span>
+        }
+<span class="fc" id="L94">        out.add(new Token(0, 1, OPERATOR));</span>
+<span class="fc" id="L95">        int n = text.length();</span>
+<span class="fc" id="L96">        int i = 1;</span>
+<span class="fc bfc" id="L97" title="All 2 branches covered.">        while (i &lt; n) {</span>
+<span class="fc" id="L98">            char c = text.charAt(i);</span>
+<span class="fc" id="L99">            int start = i;</span>
+<span class="pc bpc" id="L100" title="3 of 8 branches missed.">            if (c == ' ' || c == '\t' || c == '\n' || c == '\r') {</span>
+<span class="fc bfc" id="L101" title="All 4 branches covered.">                while (i &lt; n &amp;&amp; text.charAt(i) &lt;= ' ') {</span>
+<span class="fc" id="L102">                    i++;</span>
+                }
+<span class="fc" id="L104">                out.add(new Token(start, i, SPACE));</span>
+<span class="fc bfc" id="L105" title="All 2 branches covered.">            } else if (c == '&quot;') {</span>
+<span class="fc" id="L106">                i++;</span>
+<span class="pc bpc" id="L107" title="1 of 2 branches missed.">                while (i &lt; n) {</span>
+<span class="fc bfc" id="L108" title="All 2 branches covered.">                    if (text.charAt(i) == '&quot;') {</span>
+<span class="pc bpc" id="L109" title="2 of 4 branches missed.">                        if (i + 1 &lt; n &amp;&amp; text.charAt(i + 1) == '&quot;') {</span>
+<span class="nc" id="L110">                            i += 2;</span>
+<span class="nc" id="L111">                            continue;</span>
+                        }
+<span class="fc" id="L113">                        i++;</span>
+<span class="fc" id="L114">                        break;</span>
+                    }
+<span class="fc" id="L116">                    i++;</span>
+                }
+<span class="fc" id="L118">                out.add(new Token(start, i, STRING));</span>
+<span class="fc bfc" id="L119" title="All 2 branches covered.">            } else if (c == '#') {</span>
+<span class="fc" id="L120">                int end = start + 1;</span>
+<span class="pc bpc" id="L121" title="1 of 2 branches missed.">                for (String e : ERRORS) {</span>
+<span class="fc bfc" id="L122" title="All 2 branches covered.">                    if (text.regionMatches(true, start, e, 0, e.length())) {</span>
+<span class="fc" id="L123">                        end = start + e.length();</span>
+<span class="fc" id="L124">                        break;</span>
+                    }
+                }
+<span class="fc" id="L127">                i = end;</span>
+<span class="pc bpc" id="L128" title="1 of 2 branches missed.">                out.add(new Token(start, i, end &gt; start + 1 ? ERROR : OTHER));</span>
+<span class="fc bfc" id="L129" title="All 2 branches covered.">            } else if (c == '\'') {</span>
+                // a quoted sheet name, then the reference after it
+<span class="fc" id="L131">                i++;</span>
+<span class="pc bpc" id="L132" title="1 of 2 branches missed.">                while (i &lt; n) {</span>
+<span class="fc bfc" id="L133" title="All 2 branches covered.">                    if (text.charAt(i) == '\'') {</span>
+<span class="pc bpc" id="L134" title="2 of 4 branches missed.">                        if (i + 1 &lt; n &amp;&amp; text.charAt(i + 1) == '\'') {</span>
+<span class="nc" id="L135">                            i += 2;</span>
+<span class="nc" id="L136">                            continue;</span>
+                        }
+<span class="fc" id="L138">                        i++;</span>
+<span class="fc" id="L139">                        break;</span>
+                    }
+<span class="fc" id="L141">                    i++;</span>
+                }
+<span class="fc" id="L143">                Token t = null;</span>
+<span class="pc bpc" id="L144" title="2 of 4 branches missed.">                if (i &lt; n &amp;&amp; text.charAt(i) == '!') {</span>
+<span class="fc" id="L145">                    String sheet = text.substring(start + 1, i - 1).replace(&quot;''&quot;, &quot;'&quot;);</span>
+<span class="fc" id="L146">                    t = reference(text, i + 1, start, sheet);</span>
+                }
+<span class="pc bpc" id="L148" title="1 of 2 branches missed.">                if (t == null) {</span>
+<span class="nc" id="L149">                    out.add(new Token(start, i, OTHER));</span>
+                } else {
+<span class="fc" id="L151">                    out.add(t);</span>
+<span class="fc" id="L152">                    i = t.end;</span>
+                }
+<span class="pc bpc" id="L154" title="5 of 8 branches missed.">            } else if (FormulaParser.isDigit(c) || c == '.' &amp;&amp; i + 1 &lt; n &amp;&amp; FormulaParser.isDigit(text.charAt(i + 1))) {</span>
+<span class="fc" id="L155">                Token t = reference(text, i, i, null);</span>
+<span class="fc bfc" id="L156" title="All 2 branches covered.">                if (t != null) {</span>
+<span class="fc" id="L157">                    out.add(t);</span>
+<span class="fc" id="L158">                    i = t.end;</span>
+                } else {
+<span class="fc" id="L160">                    i = number(text, i);</span>
+<span class="fc" id="L161">                    out.add(new Token(start, i, NUMBER));</span>
+                }
+<span class="fc bfc" id="L163" title="All 2 branches covered.">            } else if (isWord(c)) {</span>
+<span class="fc bfc" id="L164" title="All 4 branches covered.">                while (i &lt; n &amp;&amp; isWord(text.charAt(i))) {</span>
+<span class="fc" id="L165">                    i++;</span>
+                }
+<span class="pc bpc" id="L167" title="1 of 4 branches missed.">                if (i &lt; n &amp;&amp; text.charAt(i) == '!') {</span>
+<span class="nc" id="L168">                    Token t = reference(text, i + 1, start, text.substring(start, i));</span>
+<span class="nc bnc" id="L169" title="All 2 branches missed.">                    if (t != null) {</span>
+<span class="nc" id="L170">                        out.add(t);</span>
+<span class="nc" id="L171">                        i = t.end;</span>
+<span class="nc" id="L172">                        continue;</span>
+                    }
+                }
+<span class="fc" id="L175">                int after = i;</span>
+<span class="fc bfc" id="L176" title="All 4 branches covered.">                while (after &lt; n &amp;&amp; text.charAt(after) == ' ') {</span>
+<span class="fc" id="L177">                    after++;</span>
+                }
+<span class="fc bfc" id="L179" title="All 4 branches covered.">                if (after &lt; n &amp;&amp; text.charAt(after) == '(') {</span>
+<span class="fc" id="L180">                    out.add(new Token(start, i, FUNCTION));</span>
+<span class="fc" id="L181">                    continue;</span>
+                }
+<span class="fc" id="L183">                Token t = reference(text, start, start, null);</span>
+<span class="pc bpc" id="L184" title="1 of 4 branches missed.">                if (t != null &amp;&amp; t.end &gt;= i) {</span>
+<span class="fc" id="L185">                    out.add(t);</span>
+<span class="fc" id="L186">                    i = t.end;</span>
+<span class="fc" id="L187">                    continue;</span>
+                }
+<span class="fc" id="L189">                String word = text.substring(start, i);</span>
+<span class="pc bpc" id="L190" title="1 of 4 branches missed.">                out.add(new Token(start, i, &quot;TRUE&quot;.equalsIgnoreCase(word) || &quot;FALSE&quot;.equalsIgnoreCase(word) ? BOOLEAN : NAME));</span>
+<span class="fc bfc" id="L191" title="All 4 branches covered.">            } else if (c == '(' || c == '{') {</span>
+<span class="fc" id="L192">                i++;</span>
+<span class="fc" id="L193">                out.add(new Token(start, i, OPEN));</span>
+<span class="pc bpc" id="L194" title="1 of 4 branches missed.">            } else if (c == ')' || c == '}') {</span>
+<span class="fc" id="L195">                i++;</span>
+<span class="fc" id="L196">                out.add(new Token(start, i, CLOSE));</span>
+<span class="pc bpc" id="L197" title="1 of 4 branches missed.">            } else if (c == ',' || c == ';') {</span>
+<span class="fc" id="L198">                i++;</span>
+<span class="fc" id="L199">                out.add(new Token(start, i, SEPARATOR));</span>
+<span class="pc bpc" id="L200" title="1 of 2 branches missed.">            } else if (&quot;+-*/^&amp;=&lt;&gt;%:@&quot;.indexOf(c) &gt;= 0) {</span>
+<span class="fc" id="L201">                i++;</span>
+<span class="pc bpc" id="L202" title="6 of 12 branches missed.">                if (i &lt; n &amp;&amp; (c == '&lt;' &amp;&amp; (text.charAt(i) == '=' || text.charAt(i) == '&gt;') || c == '&gt;' &amp;&amp; text.charAt(i) == '=')) {</span>
+<span class="nc" id="L203">                    i++;</span>
+                }
+<span class="fc" id="L205">                out.add(new Token(start, i, OPERATOR));</span>
+            } else {
+<span class="nc" id="L207">                i++;</span>
+<span class="nc" id="L208">                out.add(new Token(start, i, OTHER));</span>
+            }
+<span class="fc" id="L210">        }</span>
+<span class="fc" id="L211">        color(out);</span>
+<span class="fc" id="L212">        return out;</span>
+    }
+
+    private static boolean isWord(char c) {
+<span class="pc bpc" id="L216" title="4 of 14 branches missed.">        return FormulaParser.isLetter(c) || FormulaParser.isDigit(c) || c == '_' || c == '.' || c == '$' || c == '\\'</span>
+                || c &gt; 127;
+    }
+
+    private static int number(String text, int i) {
+<span class="fc" id="L221">        int n = text.length();</span>
+<span class="fc bfc" id="L222" title="All 6 branches covered.">        while (i &lt; n &amp;&amp; (FormulaParser.isDigit(text.charAt(i)) || text.charAt(i) == '.')) {</span>
+<span class="fc" id="L223">            i++;</span>
+        }
+<span class="pc bpc" id="L225" title="1 of 6 branches missed.">        if (i &lt; n &amp;&amp; (text.charAt(i) == 'e' || text.charAt(i) == 'E')) {</span>
+<span class="fc" id="L226">            int j = i + 1;</span>
+<span class="pc bpc" id="L227" title="3 of 6 branches missed.">            if (j &lt; n &amp;&amp; (text.charAt(j) == '+' || text.charAt(j) == '-')) {</span>
+<span class="nc" id="L228">                j++;</span>
+            }
+<span class="pc bpc" id="L230" title="2 of 4 branches missed.">            if (j &lt; n &amp;&amp; FormulaParser.isDigit(text.charAt(j))) {</span>
+<span class="fc" id="L231">                i = j;</span>
+<span class="pc bpc" id="L232" title="1 of 4 branches missed.">                while (i &lt; n &amp;&amp; FormulaParser.isDigit(text.charAt(i))) {</span>
+<span class="fc" id="L233">                    i++;</span>
+                }
+            }
+        }
+<span class="fc" id="L237">        return i;</span>
+    }
+
+    /// A reference at `at`: a cell, a range of cells, whole columns or whole rows. The token
+    /// starts at `start`, before any sheet name. Null when the text there is none.
+    private static Token reference(String text, int at, int start, String sheet) {
+<span class="fc" id="L243">        int[] a = new int[3];</span>
+<span class="fc" id="L244">        int end = corner(text, at, a);</span>
+<span class="fc bfc" id="L245" title="All 2 branches covered.">        if (end &lt; 0) {</span>
+<span class="fc" id="L246">            return null;</span>
+        }
+<span class="fc" id="L248">        int[] b = null;</span>
+<span class="fc bfc" id="L249" title="All 4 branches covered.">        if (end &lt; text.length() &amp;&amp; text.charAt(end) == ':') {</span>
+<span class="fc" id="L250">            int[] other = new int[3];</span>
+<span class="fc" id="L251">            int end2 = corner(text, end + 1, other);</span>
+            // A1:B2, A:B and 1:2, never a cell with a column
+<span class="pc bpc" id="L253" title="2 of 4 branches missed.">            if (end2 &gt; 0 &amp;&amp; kindOf(a) == kindOf(other)) {</span>
+<span class="fc" id="L254">                b = other;</span>
+<span class="fc" id="L255">                end = end2;</span>
+            }
+        }
+<span class="fc bfc" id="L258" title="All 4 branches covered.">        if (kindOf(a) != 0 &amp;&amp; b == null) {</span>
+            // a lone column or row is a name or a number, not a reference
+<span class="fc" id="L260">            return null;</span>
+        }
+<span class="pc bpc" id="L262" title="2 of 6 branches missed.">        if (end &lt; text.length() &amp;&amp; (isWord(text.charAt(end)) || text.charAt(end) == '(')) {</span>
+<span class="nc" id="L263">            return null;</span>
+        }
+<span class="fc" id="L265">        Token t = new Token(start, end, REFERENCE);</span>
+<span class="fc" id="L266">        t.sheet = sheet;</span>
+<span class="fc bfc" id="L267" title="All 2 branches covered.">        int[] last = b == null ? a : b;</span>
+<span class="fc" id="L268">        t.r1 = Math.min(a[0], last[0]);</span>
+<span class="fc" id="L269">        t.r2 = Math.max(a[0], last[0]);</span>
+<span class="fc" id="L270">        t.c1 = Math.min(a[1], last[1]);</span>
+<span class="fc" id="L271">        t.c2 = Math.max(a[1], last[1]);</span>
+<span class="fc bfc" id="L272" title="All 2 branches covered.">        if (kindOf(a) == 1) {</span>
+<span class="fc" id="L273">            t.r1 = 0;</span>
+<span class="fc" id="L274">            t.r2 = Node.MAX_ROW;</span>
+<span class="fc bfc" id="L275" title="All 2 branches covered.">        } else if (kindOf(a) == 2) {</span>
+<span class="fc" id="L276">            t.c1 = 0;</span>
+<span class="fc" id="L277">            t.c2 = Node.MAX_COL;</span>
+        }
+<span class="fc" id="L279">        return t;</span>
+    }
+
+    // 0 for a cell, 1 for a whole column, 2 for a whole row
+    private static int kindOf(int[] corner) {
+<span class="fc" id="L284">        return corner[2];</span>
+    }
+
+    /// Reads `$A$1`, `$A` or `$1` into row, column and what it was; the end, or -1.
+    private static int corner(String text, int at, int[] out) {
+<span class="fc" id="L289">        int n = text.length();</span>
+<span class="fc" id="L290">        int i = at;</span>
+<span class="pc bpc" id="L291" title="1 of 4 branches missed.">        if (i &lt; n &amp;&amp; text.charAt(i) == '$') {</span>
+<span class="fc" id="L292">            i++;</span>
+        }
+<span class="fc" id="L294">        int letters = i;</span>
+<span class="fc bfc" id="L295" title="All 6 branches covered.">        while (i &lt; n &amp;&amp; FormulaParser.isLetter(text.charAt(i)) &amp;&amp; i - letters &lt; 3) {</span>
+<span class="fc" id="L296">            i++;</span>
+        }
+<span class="fc" id="L298">        int col = -1;</span>
+<span class="fc bfc" id="L299" title="All 2 branches covered.">        if (i &gt; letters) {</span>
+<span class="fc" id="L300">            col = FormulaParser.column(text, letters, i);</span>
+<span class="pc bpc" id="L301" title="1 of 8 branches missed.">            if (col &lt; 0 || col &gt; Node.MAX_COL || i &lt; n &amp;&amp; FormulaParser.isLetter(text.charAt(i))) {</span>
+<span class="fc" id="L302">                return -1;</span>
+            }
+<span class="fc bfc" id="L304" title="All 4 branches covered.">            if (i &lt; n &amp;&amp; text.charAt(i) == '$') {</span>
+<span class="fc" id="L305">                i++;</span>
+            }
+        }
+<span class="fc" id="L308">        int digits = i;</span>
+<span class="fc" id="L309">        long row = 0;</span>
+<span class="pc bpc" id="L310" title="1 of 6 branches missed.">        while (i &lt; n &amp;&amp; FormulaParser.isDigit(text.charAt(i)) &amp;&amp; i - digits &lt; 8) {</span>
+<span class="fc" id="L311">            row = row * 10 + (text.charAt(i) - '0');</span>
+<span class="fc" id="L312">            i++;</span>
+        }
+<span class="pc bpc" id="L314" title="1 of 4 branches missed.">        if (i &lt; n &amp;&amp; FormulaParser.isDigit(text.charAt(i))) {</span>
+<span class="nc" id="L315">            return -1;</span>
+        }
+<span class="fc bfc" id="L317" title="All 4 branches covered.">        if (col &gt;= 0 &amp;&amp; i &gt; digits) {</span>
+<span class="pc bpc" id="L318" title="2 of 4 branches missed.">            if (row &lt; 1 || row &gt; Node.MAX_ROW + 1) {</span>
+<span class="nc" id="L319">                return -1;</span>
+            }
+<span class="fc" id="L321">            out[0] = (int) row - 1;</span>
+<span class="fc" id="L322">            out[1] = col;</span>
+<span class="fc" id="L323">            out[2] = 0;</span>
+<span class="fc" id="L324">            return i;</span>
+        }
+<span class="fc bfc" id="L326" title="All 2 branches covered.">        if (col &gt;= 0) {</span>
+<span class="fc" id="L327">            out[0] = 0;</span>
+<span class="fc" id="L328">            out[1] = col;</span>
+<span class="fc" id="L329">            out[2] = 1;</span>
+<span class="fc" id="L330">            return i;</span>
+        }
+<span class="pc bpc" id="L332" title="2 of 6 branches missed.">        if (i &gt; digits &amp;&amp; row &gt;= 1 &amp;&amp; row &lt;= Node.MAX_ROW + 1) {</span>
+<span class="fc" id="L333">            out[0] = (int) row - 1;</span>
+<span class="fc" id="L334">            out[1] = 0;</span>
+<span class="fc" id="L335">            out[2] = 2;</span>
+<span class="fc" id="L336">            return i;</span>
+        }
+<span class="fc" id="L338">        return -1;</span>
+    }
+
+    /// Gives each distinct reference its color, in the order they appear.
+    private static void color(List&lt;Token&gt; tokens) {
+<span class="fc" id="L343">        List&lt;Token&gt; seen = new ArrayList&lt;Token&gt;();</span>
+<span class="fc bfc" id="L344" title="All 2 branches covered.">        for (Token t : tokens) {</span>
+<span class="fc bfc" id="L345" title="All 2 branches covered.">            if (t.kind != REFERENCE) {</span>
+<span class="fc" id="L346">                continue;</span>
+            }
+<span class="fc bfc" id="L348" title="All 2 branches covered.">            for (Token s : seen) {</span>
+<span class="pc bpc" id="L349" title="3 of 12 branches missed.">                if (s.r1 == t.r1 &amp;&amp; s.c1 == t.c1 &amp;&amp; s.r2 == t.r2 &amp;&amp; s.c2 == t.c2</span>
+<span class="nc bnc" id="L350" title="All 2 branches missed.">                        &amp;&amp; (s.sheet == null ? t.sheet == null : s.sheet.equalsIgnoreCase(t.sheet))) {</span>
+<span class="fc" id="L351">                    t.color = s.color;</span>
+<span class="fc" id="L352">                    break;</span>
+                }
+<span class="fc" id="L354">            }</span>
+<span class="fc bfc" id="L355" title="All 2 branches covered.">            if (t.color &lt; 0) {</span>
+<span class="fc" id="L356">                t.color = seen.size();</span>
+<span class="fc" id="L357">                seen.add(t);</span>
+            }
+<span class="fc" id="L359">        }</span>
+<span class="fc" id="L360">    }</span>
+
+    /// The function the caret is in and which of its arguments, counted from 0: `{name, index}`
+    /// as an `Object[]`, or null outside every function.
+    static Object[] call(List&lt;Token&gt; tokens, String text, int caret) {
+<span class="fc" id="L365">        List&lt;Object[]&gt; stack = new ArrayList&lt;Object[]&gt;();</span>
+<span class="fc" id="L366">        String pending = null;</span>
+<span class="fc bfc" id="L367" title="All 2 branches covered.">        for (Token t : tokens) {</span>
+<span class="fc bfc" id="L368" title="All 2 branches covered.">            if (t.start &gt;= caret) {</span>
+<span class="fc" id="L369">                break;</span>
+            }
+<span class="fc bfc" id="L371" title="All 2 branches covered.">            if (t.kind == FUNCTION) {</span>
+<span class="fc" id="L372">                pending = FormulaParser.asciiUpper(text.substring(t.start, t.end));</span>
+<span class="fc" id="L373">                continue;</span>
+            }
+<span class="fc bfc" id="L375" title="All 2 branches covered.">            if (t.kind == SPACE) {</span>
+<span class="fc" id="L376">                continue;</span>
+            }
+<span class="fc bfc" id="L378" title="All 2 branches covered.">            if (t.kind == OPEN) {</span>
+                // an array constant's commas separate its values, not arguments
+<span class="fc bfc" id="L380" title="All 2 branches covered.">                stack.add(new Object[] {text.charAt(t.start) == '{' ? null : pending, new int[1]});</span>
+<span class="fc bfc" id="L381" title="All 2 branches covered.">            } else if (t.kind == CLOSE) {</span>
+<span class="pc bpc" id="L382" title="1 of 2 branches missed.">                if (!stack.isEmpty()) {</span>
+<span class="fc" id="L383">                    stack.remove(stack.size() - 1);</span>
+                }
+<span class="pc bpc" id="L385" title="1 of 4 branches missed.">            } else if (t.kind == SEPARATOR &amp;&amp; !stack.isEmpty()) {</span>
+<span class="fc" id="L386">                ((int[]) stack.get(stack.size() - 1)[1])[0]++;</span>
+            }
+<span class="fc" id="L388">            pending = null;</span>
+<span class="fc" id="L389">        }</span>
+<span class="fc bfc" id="L390" title="All 2 branches covered.">        for (int i = stack.size() - 1; i &gt;= 0; i--) {</span>
+<span class="fc" id="L391">            Object[] top = stack.get(i);</span>
+            // the innermost function: parentheses that only group, and the braces of an array
+            // constant, are passed through to the call around them
+<span class="fc bfc" id="L394" title="All 2 branches covered.">            if (top[0] != null) {</span>
+<span class="fc" id="L395">                return new Object[] {top[0], Integer.valueOf(((int[]) top[1])[0])};</span>
+            }
+        }
+<span class="fc" id="L398">        return null;</span>
+    }
+
+    /// Where a function or name being typed at the caret starts, or -1 when the caret is not
+    /// at the end of one.
+    static int wordAt(List&lt;Token&gt; tokens, int caret) {
+<span class="fc bfc" id="L404" title="All 2 branches covered.">        for (Token t : tokens) {</span>
+<span class="pc bpc" id="L405" title="2 of 8 branches missed.">            if (t.end == caret &amp;&amp; (t.kind == NAME || t.kind == FUNCTION || t.kind == BOOLEAN)) {</span>
+<span class="fc" id="L406">                return t.start;</span>
+            }
+<span class="pc bpc" id="L408" title="1 of 6 branches missed.">            if (t.end == caret &amp;&amp; t.kind == REFERENCE &amp;&amp; t.sheet == null) {</span>
+                // CO or LOG1 are cells too, until the name is typed out
+<span class="fc" id="L410">                return t.start;</span>
+            }
+<span class="fc" id="L412">        }</span>
+<span class="fc" id="L413">        return -1;</span>
+    }
+
+    /// Whether a reference may be put at the caret by tapping a cell: after `=`, an operator,
+    /// an opening parenthesis or a separator.
+    static boolean takesReference(List&lt;Token&gt; tokens, int caret) {
+<span class="fc" id="L419">        Token before = null;</span>
+<span class="fc bfc" id="L420" title="All 2 branches covered.">        for (Token t : tokens) {</span>
+<span class="pc bpc" id="L421" title="1 of 2 branches missed.">            if (t.end &gt; caret) {</span>
+<span class="nc" id="L422">                break;</span>
+            }
+<span class="pc bpc" id="L424" title="1 of 2 branches missed.">            if (t.kind != SPACE) {</span>
+<span class="fc" id="L425">                before = t;</span>
+            }
+<span class="fc" id="L427">        }</span>
+<span class="fc bfc" id="L428" title="All 2 branches covered.">        if (before == null) {</span>
+<span class="fc" id="L429">            return false;</span>
+        }
+<span class="pc bpc" id="L431" title="4 of 8 branches missed.">        return before.kind == OPERATOR &amp;&amp; before.end &lt;= caret || before.kind == OPEN || before.kind == SEPARATOR;</span>
+    }
+
+    /// The reference that ends at the caret, or null.
+    static Token referenceEndingAt(List&lt;Token&gt; tokens, int caret) {
+<span class="nc bnc" id="L436" title="All 2 branches missed.">        for (Token t : tokens) {</span>
+<span class="nc bnc" id="L437" title="All 4 branches missed.">            if (t.kind == REFERENCE &amp;&amp; t.end == caret) {</span>
+<span class="nc" id="L438">                return t;</span>
+            }
+<span class="nc" id="L440">        }</span>
+<span class="nc" id="L441">        return null;</span>
+    }
+
+    /// The next of F4's four forms of a reference without its sheet: `A1`, `$A$1`, `A$1`,
+    /// `$A1` and back to `A1`. A range takes the form its first corner leads to; a whole
+    /// column or row has only its own part to fix.
+    static String cycleAbsolute(String ref) {
+<span class="fc" id="L448">        String[] corners = Util.split(ref, &quot;:&quot;);</span>
+<span class="fc" id="L449">        boolean[] first = absolute(corners[0]);</span>
+        boolean col;
+        boolean row;
+<span class="fc bfc" id="L452" title="All 4 branches covered.">        if (!first[0] &amp;&amp; !first[1]) {</span>
+<span class="fc" id="L453">            col = true;</span>
+<span class="fc" id="L454">            row = true;</span>
+<span class="fc bfc" id="L455" title="All 4 branches covered.">        } else if (first[0] &amp;&amp; first[1]) {</span>
+<span class="fc" id="L456">            col = false;</span>
+<span class="fc" id="L457">            row = true;</span>
+<span class="fc bfc" id="L458" title="All 2 branches covered.">        } else if (first[1]) {</span>
+<span class="fc" id="L459">            col = true;</span>
+<span class="fc" id="L460">            row = false;</span>
+        } else {
+<span class="fc" id="L462">            col = false;</span>
+<span class="fc" id="L463">            row = false;</span>
+        }
+<span class="fc" id="L465">        StringBuilder out = new StringBuilder();</span>
+<span class="fc bfc" id="L466" title="All 2 branches covered.">        for (int i = 0; i &lt; corners.length; i++) {</span>
+<span class="fc bfc" id="L467" title="All 2 branches covered.">            if (i &gt; 0) {</span>
+<span class="fc" id="L468">                out.append(':');</span>
+            }
+<span class="fc" id="L470">            String c = corners[i];</span>
+<span class="fc" id="L471">            StringBuilder letters = new StringBuilder();</span>
+<span class="fc" id="L472">            StringBuilder digits = new StringBuilder();</span>
+<span class="fc bfc" id="L473" title="All 2 branches covered.">            for (int k = 0; k &lt; c.length(); k++) {</span>
+<span class="fc" id="L474">                char ch = c.charAt(k);</span>
+<span class="fc bfc" id="L475" title="All 4 branches covered.">                if (ch &gt;= '0' &amp;&amp; ch &lt;= '9') {</span>
+<span class="fc" id="L476">                    digits.append(ch);</span>
+<span class="fc bfc" id="L477" title="All 2 branches covered.">                } else if (ch != '$') {</span>
+<span class="fc" id="L478">                    letters.append(ch);</span>
+                }
+            }
+<span class="fc bfc" id="L481" title="All 2 branches covered.">            boolean onlyColumn = digits.length() == 0;</span>
+<span class="fc bfc" id="L482" title="All 2 branches covered.">            boolean onlyRow = letters.length() == 0;</span>
+<span class="fc bfc" id="L483" title="All 2 branches covered.">            if (letters.length() &gt; 0) {</span>
+<span class="pc bpc" id="L484" title="1 of 6 branches missed.">                if (col || onlyColumn &amp;&amp; row) {</span>
+<span class="fc" id="L485">                    out.append('$');</span>
+                }
+<span class="fc" id="L487">                out.append(letters);</span>
+            }
+<span class="fc bfc" id="L489" title="All 2 branches covered.">            if (digits.length() &gt; 0) {</span>
+<span class="pc bpc" id="L490" title="1 of 6 branches missed.">                if (row || onlyRow &amp;&amp; col) {</span>
+<span class="fc" id="L491">                    out.append('$');</span>
+                }
+<span class="fc" id="L493">                out.append(digits);</span>
+            }
+        }
+<span class="fc" id="L496">        return out.toString();</span>
+    }
+
+    /// Whether a corner's column and row are absolute.
+    private static boolean[] absolute(String corner) {
+<span class="fc" id="L501">        boolean[] out = new boolean[2];</span>
+<span class="fc" id="L502">        int k = 0;</span>
+<span class="pc bpc" id="L503" title="1 of 4 branches missed.">        if (k &lt; corner.length() &amp;&amp; corner.charAt(k) == '$') {</span>
+<span class="fc" id="L504">            out[0] = true;</span>
+<span class="fc" id="L505">            k++;</span>
+        }
+<span class="pc bpc" id="L507" title="1 of 8 branches missed.">        while (k &lt; corner.length() &amp;&amp; corner.charAt(k) != '$' &amp;&amp; (corner.charAt(k) &lt; '0' || corner.charAt(k) &gt; '9')) {</span>
+<span class="fc" id="L508">            k++;</span>
+        }
+<span class="fc bfc" id="L510" title="All 4 branches covered.">        out[1] = k &lt; corner.length() &amp;&amp; corner.charAt(k) == '$';</span>
+<span class="fc" id="L511">        return out;</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

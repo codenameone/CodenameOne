@@ -1,0 +1,585 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TextFunctions.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.spreadsheet</a> &gt; <span class="el_source">TextFunctions.java</span></div><h1>TextFunctions.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.spreadsheet;
+
+/// The text functions.
+final class TextFunctions {
+    static final String SCALAR_NAMES = &quot;CHAR CLEAN CODE DOLLAR EXACT FIND FIXED LEFT LEN LOWER MID NUMBERVALUE PROPER&quot;
+            + &quot; REPLACE REPT RIGHT SEARCH SUBSTITUTE TEXT TEXTAFTER TEXTBEFORE TRIM UNICHAR UNICODE UPPER VALUE&quot;;
+
+    static final String RANGE_NAMES = &quot;CONCAT CONCATENATE TEXTJOIN&quot;;
+
+    /// The longest text a cell holds.
+    /// The longest text a formula makes, as in Excel. Every function that joins text stops
+    /// at it while it joins, not after: a file's formulas are not trusted with memory.
+    static final int MAX_TEXT = 32767;
+
+    private TextFunctions() {
+    }
+
+    private static Double d(double v) {
+<span class="fc" id="L41">        return Double.valueOf(v);</span>
+    }
+
+    private static int count(Object[] a, int i, int fallback) {
+<span class="fc" id="L45">        int n = Evaluator.integer(a, i, fallback);</span>
+<span class="fc bfc" id="L46" title="All 2 branches covered.">        if (n &lt; 0) {</span>
+<span class="fc" id="L47">            throw EvalError.VALUE;</span>
+        }
+<span class="fc" id="L49">        return n;</span>
+    }
+
+    static Object call(String name, Evaluator ev, Object[] a) {
+<span class="pc bpc" id="L53" title="1 of 26 branches missed.">        switch (Functions.index(SWITCH_1, name)) {</span>
+            case 0: // CHAR
+            case 1: { // UNICHAR
+<span class="fc" id="L56">                int code = Evaluator.integer(a, 0);</span>
+<span class="pc bpc" id="L57" title="1 of 6 branches missed.">                if (code &lt; 1 || code &gt; (&quot;CHAR&quot;.equals(name) ? 255 : 0x10ffff)) {</span>
+<span class="fc" id="L58">                    throw EvalError.VALUE;</span>
+                }
+<span class="pc bpc" id="L60" title="1 of 6 branches missed.">                if (code &gt;= 0xd800 &amp;&amp; code &lt;= 0xdfff &amp;&amp; !&quot;CHAR&quot;.equals(name)) {</span>
+                    // half of a pair is no character: Excel answers #N/A
+<span class="fc" id="L62">                    throw EvalError.NA;</span>
+                }
+<span class="fc" id="L64">                StringBuilder sb = new StringBuilder();</span>
+<span class="fc bfc" id="L65" title="All 2 branches covered.">                if (code &gt; 0xffff) {</span>
+<span class="fc" id="L66">                    int v = code - 0x10000;</span>
+<span class="fc" id="L67">                    sb.append((char) (0xd800 + (v &gt;&gt; 10))).append((char) (0xdc00 + (v &amp; 0x3ff)));</span>
+<span class="fc" id="L68">                } else {</span>
+<span class="fc" id="L69">                    sb.append((char) code);</span>
+                }
+<span class="fc" id="L71">                return sb.toString();</span>
+            }
+            case 2: // CODE
+            case 3: { // UNICODE
+<span class="fc" id="L75">                String s = Evaluator.text(a, 0);</span>
+<span class="fc bfc" id="L76" title="All 2 branches covered.">                if (s.length() == 0) {</span>
+<span class="fc" id="L77">                    throw EvalError.VALUE;</span>
+                }
+<span class="fc" id="L79">                char c = s.charAt(0);</span>
+<span class="pc bpc" id="L80" title="3 of 8 branches missed.">                if (c &gt;= 0xd800 &amp;&amp; c &lt; 0xdc00 &amp;&amp; s.length() &gt; 1 &amp;&amp; &quot;UNICODE&quot;.equals(name)</span>
+<span class="pc bpc" id="L81" title="2 of 4 branches missed.">                        &amp;&amp; s.charAt(1) &gt;= 0xdc00 &amp;&amp; s.charAt(1) &lt;= 0xdfff) {</span>
+<span class="fc" id="L82">                    return d(0x10000 + ((c - 0xd800) &lt;&lt; 10) + (s.charAt(1) - 0xdc00));</span>
+                }
+<span class="fc" id="L84">                return d(c);</span>
+            }
+            case 4: { // CLEAN
+<span class="fc" id="L87">                String s = Evaluator.text(a, 0);</span>
+<span class="fc" id="L88">                StringBuilder sb = new StringBuilder();</span>
+<span class="fc bfc" id="L89" title="All 2 branches covered.">                for (int i = 0; i &lt; s.length(); i++) {</span>
+<span class="fc bfc" id="L90" title="All 2 branches covered.">                    if (s.charAt(i) &gt;= ' ') {</span>
+<span class="fc" id="L91">                        sb.append(s.charAt(i));</span>
+                    }
+                }
+<span class="fc" id="L94">                return sb.toString();</span>
+            }
+            case 5: { // DOLLAR
+<span class="fc" id="L97">                double x = Evaluator.num(a, 0);</span>
+<span class="fc" id="L98">                int places = Evaluator.integer(a, 1, 2);</span>
+<span class="fc" id="L99">                String body = &quot;$&quot; + fixed(Math.abs(x), places, true);</span>
+<span class="fc bfc" id="L100" title="All 2 branches covered.">                return x &lt; 0 ? &quot;-&quot; + body : body;</span>
+            }
+            case 6: { // FIXED
+<span class="fc" id="L103">                double x = Evaluator.num(a, 0);</span>
+<span class="fc bfc" id="L104" title="All 2 branches covered.">                String body = fixed(Math.abs(x), Evaluator.integer(a, 1, 2), !Evaluator.bool(a, 2, false));</span>
+<span class="pc bpc" id="L105" title="1 of 4 branches missed.">                return x &lt; 0 &amp;&amp; Values.round(x, Evaluator.integer(a, 1, 2)) != 0 ? &quot;-&quot; + body : body;</span>
+            }
+            case 7: // EXACT
+<span class="fc" id="L108">                return Boolean.valueOf(Evaluator.text(a, 0).equals(Evaluator.text(a, 1)));</span>
+            case 8: // FIND
+            case 9: { // SEARCH
+<span class="fc" id="L111">                String needle = Evaluator.text(a, 0);</span>
+<span class="fc" id="L112">                String hay = Evaluator.text(a, 1);</span>
+<span class="fc" id="L113">                int start = Evaluator.integer(a, 2, 1);</span>
+<span class="fc bfc" id="L114" title="All 4 branches covered.">                if (start &lt; 1 || start &gt; hay.length() + 1) {</span>
+<span class="fc" id="L115">                    throw EvalError.VALUE;</span>
+                }
+<span class="fc bfc" id="L117" title="All 2 branches covered.">                int at = &quot;FIND&quot;.equals(name) ? hay.indexOf(needle, start - 1) : search(needle, hay, start - 1);</span>
+<span class="fc bfc" id="L118" title="All 2 branches covered.">                if (at &lt; 0) {</span>
+<span class="fc" id="L119">                    throw EvalError.VALUE;</span>
+                }
+<span class="fc" id="L121">                return d(at + 1);</span>
+            }
+            case 10: { // LEFT
+<span class="fc" id="L124">                String s = Evaluator.text(a, 0);</span>
+<span class="fc" id="L125">                return s.substring(0, Math.min(s.length(), count(a, 1, 1)));</span>
+            }
+            case 11: { // RIGHT
+<span class="fc" id="L128">                String s = Evaluator.text(a, 0);</span>
+<span class="fc" id="L129">                return s.substring(s.length() - Math.min(s.length(), count(a, 1, 1)));</span>
+            }
+            case 12: { // MID
+<span class="fc" id="L132">                String s = Evaluator.text(a, 0);</span>
+<span class="fc" id="L133">                int start = Evaluator.integer(a, 1);</span>
+<span class="fc" id="L134">                int n = count(a, 2, 0);</span>
+<span class="fc bfc" id="L135" title="All 2 branches covered.">                if (start &lt; 1) {</span>
+<span class="fc" id="L136">                    throw EvalError.VALUE;</span>
+                }
+<span class="fc bfc" id="L138" title="All 2 branches covered.">                if (start &gt; s.length()) {</span>
+<span class="fc" id="L139">                    return &quot;&quot;;</span>
+                }
+<span class="fc" id="L141">                return s.substring(start - 1, (int) Math.min((long) s.length(), (long) start - 1 + n));</span>
+            }
+            case 13: // LEN
+<span class="fc" id="L144">                return d(Evaluator.text(a, 0).length());</span>
+            case 14: // LOWER
+<span class="fc" id="L146">                return Evaluator.text(a, 0).toLowerCase();</span>
+            case 15: // UPPER
+<span class="fc" id="L148">                return Evaluator.text(a, 0).toUpperCase();</span>
+            case 16: { // PROPER
+<span class="fc" id="L150">                String s = Evaluator.text(a, 0);</span>
+<span class="fc" id="L151">                StringBuilder sb = new StringBuilder(s.length());</span>
+<span class="fc" id="L152">                boolean first = true;</span>
+<span class="fc bfc" id="L153" title="All 2 branches covered.">                for (int i = 0; i &lt; s.length(); i++) {</span>
+<span class="fc" id="L154">                    char c = s.charAt(i);</span>
+<span class="fc bfc" id="L155" title="All 2 branches covered.">                    boolean letter = Character.toUpperCase(c) != Character.toLowerCase(c);</span>
+<span class="fc bfc" id="L156" title="All 4 branches covered.">                    sb.append(letter ? first ? Character.toUpperCase(c) : Character.toLowerCase(c) : c);</span>
+<span class="fc bfc" id="L157" title="All 2 branches covered.">                    first = !letter;</span>
+                }
+<span class="fc" id="L159">                return sb.toString();</span>
+            }
+            case 17: { // REPLACE
+<span class="fc" id="L162">                String s = Evaluator.text(a, 0);</span>
+<span class="fc" id="L163">                int start = Evaluator.integer(a, 1);</span>
+<span class="fc" id="L164">                int n = count(a, 2, 0);</span>
+<span class="fc bfc" id="L165" title="All 2 branches covered.">                if (start &lt; 1) {</span>
+<span class="fc" id="L166">                    throw EvalError.VALUE;</span>
+                }
+<span class="fc" id="L168">                int from = Math.min(s.length(), start - 1);</span>
+<span class="fc" id="L169">                int to = (int) Math.min((long) s.length(), (long) from + n);</span>
+<span class="fc" id="L170">                return s.substring(0, from) + Evaluator.text(a, 3) + s.substring(to);</span>
+            }
+            case 18: { // REPT
+<span class="fc" id="L173">                String s = Evaluator.text(a, 0);</span>
+<span class="fc" id="L174">                int n = count(a, 1, 0);</span>
+<span class="pc bpc" id="L175" title="1 of 2 branches missed.">                if ((long) s.length() * n &gt; MAX_TEXT) {</span>
+<span class="nc" id="L176">                    throw EvalError.VALUE;</span>
+                }
+<span class="fc" id="L178">                StringBuilder sb = new StringBuilder();</span>
+<span class="fc bfc" id="L179" title="All 2 branches covered.">                for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc" id="L180">                    sb.append(s);</span>
+                }
+<span class="fc" id="L182">                return sb.toString();</span>
+            }
+            case 19: // SUBSTITUTE
+<span class="fc" id="L185">                return substitute(a);</span>
+            case 20: { // TEXT
+<span class="fc" id="L187">                Object v = Evaluator.arg(a, 0);</span>
+<span class="fc" id="L188">                String code = Evaluator.text(a, 1);</span>
+<span class="fc bfc" id="L189" title="All 6 branches covered.">                if (v instanceof Double &amp;&amp; ((Double) v).doubleValue() &lt; 0 &amp;&amp; new CellFormat(code).isDate()) {</span>
+                    // a cell shows a row of hashes for a date before the first one; a function
+                    // has an error to answer with
+<span class="fc" id="L192">                    throw EvalError.VALUE;</span>
+                }
+<span class="pc bpc" id="L194" title="1 of 2 branches missed.">                return CellFormat.format(code, v == Evaluator.MISSING ? null : v, ev.workbook.isDate1904()); //NOPMD CompareObjectsWithEquals - the marker of an omitted argument is one object</span>
+            }
+            case 21: // TEXTAFTER
+            case 22: // TEXTBEFORE
+<span class="fc" id="L198">                return textAround(name, a);</span>
+            case 23: { // TRIM
+<span class="fc" id="L200">                String s = Evaluator.text(a, 0);</span>
+<span class="fc" id="L201">                StringBuilder sb = new StringBuilder();</span>
+<span class="fc" id="L202">                boolean pending = false;</span>
+<span class="fc bfc" id="L203" title="All 2 branches covered.">                for (int i = 0; i &lt; s.length(); i++) {</span>
+<span class="fc" id="L204">                    char c = s.charAt(i);</span>
+<span class="fc bfc" id="L205" title="All 2 branches covered.">                    if (c == ' ') {</span>
+<span class="fc bfc" id="L206" title="All 2 branches covered.">                        pending = sb.length() &gt; 0;</span>
+                    } else {
+<span class="fc bfc" id="L208" title="All 2 branches covered.">                        if (pending) {</span>
+<span class="fc" id="L209">                            sb.append(' ');</span>
+<span class="fc" id="L210">                            pending = false;</span>
+                        }
+<span class="fc" id="L212">                        sb.append(c);</span>
+                    }
+                }
+<span class="fc" id="L215">                return sb.toString();</span>
+            }
+            case 24: { // VALUE
+<span class="fc" id="L218">                Object v = Evaluator.arg(a, 0);</span>
+<span class="fc bfc" id="L219" title="All 2 branches covered.">                if (v instanceof Double) {</span>
+<span class="fc" id="L220">                    return v;</span>
+                }
+<span class="fc bfc" id="L222" title="All 2 branches covered.">                if (v == null) {</span>
+                    // a blank cell is 0 to VALUE, as to every other number
+<span class="fc" id="L224">                    return Double.valueOf(0);</span>
+                }
+<span class="fc bfc" id="L226" title="All 2 branches covered.">                if (!(v instanceof String)) {</span>
+<span class="fc" id="L227">                    throw EvalError.VALUE;</span>
+                }
+<span class="fc" id="L229">                Double parsed = amount((String) v);</span>
+<span class="fc bfc" id="L230" title="All 2 branches covered.">                if (parsed == null) {</span>
+<span class="fc" id="L231">                    throw EvalError.VALUE;</span>
+                }
+<span class="fc" id="L233">                return parsed;</span>
+            }
+            case 25: // NUMBERVALUE
+<span class="fc" id="L236">                return numberValue(a);</span>
+            case 26: { // CONCATENATE
+<span class="fc" id="L238">                StringBuilder sb = new StringBuilder();</span>
+<span class="fc bfc" id="L239" title="All 2 branches covered.">                for (Object argItem : a) {</span>
+<span class="fc" id="L240">                    append(sb, ev.scalar(argItem));</span>
+                }
+<span class="fc" id="L242">                return sb.toString();</span>
+            }
+            case 27: { // CONCAT
+<span class="fc" id="L245">                StringBuilder sb = new StringBuilder();</span>
+<span class="fc bfc" id="L246" title="All 2 branches covered.">                for (Object argItem : a) {</span>
+<span class="fc bfc" id="L247" title="All 2 branches covered.">                    for (Object[][] m : ev.areas(argItem)) {</span>
+<span class="fc bfc" id="L248" title="All 2 branches covered.">                        for (Object[] line : m) {</span>
+<span class="fc bfc" id="L249" title="All 2 branches covered.">                            for (Object value : line) {</span>
+<span class="fc" id="L250">                                append(sb, value);</span>
+                            }
+                        }
+<span class="fc" id="L253">                    }</span>
+                }
+<span class="fc" id="L255">                return sb.toString();</span>
+            }
+            case 28: { // TEXTJOIN
+<span class="pc bpc" id="L258" title="1 of 2 branches missed.">                if (a.length &lt; 3) {</span>
+<span class="nc" id="L259">                    throw EvalError.VALUE;</span>
+                }
+<span class="fc" id="L261">                Object[][] delimiters = ev.matrix(a[0]);</span>
+<span class="fc" id="L262">                boolean ignoreEmpty = Values.bool(ev.scalar(a[1]));</span>
+<span class="fc" id="L263">                StringBuilder sb = new StringBuilder();</span>
+<span class="fc" id="L264">                int joined = 0;</span>
+<span class="fc bfc" id="L265" title="All 2 branches covered.">                for (int i = 2; i &lt; a.length; i++) {</span>
+<span class="fc bfc" id="L266" title="All 2 branches covered.">                    for (Object[][] m : ev.areas(a[i])) {</span>
+<span class="fc bfc" id="L267" title="All 2 branches covered.">                        for (Object[] line : m) {</span>
+<span class="fc bfc" id="L268" title="All 2 branches covered.">                            for (Object v : line) {</span>
+<span class="pc bpc" id="L269" title="1 of 2 branches missed.">                                if (v instanceof CellError) {</span>
+<span class="nc" id="L270">                                    return v;</span>
+                                }
+<span class="pc bpc" id="L272" title="1 of 2 branches missed.">                                String s = v == null ? &quot;&quot; : Values.text(v);</span>
+<span class="fc bfc" id="L273" title="All 4 branches covered.">                                if (ignoreEmpty &amp;&amp; s.length() == 0) {</span>
+<span class="fc" id="L274">                                    continue;</span>
+                                }
+<span class="fc bfc" id="L276" title="All 2 branches covered.">                                if (joined &gt; 0) {</span>
+<span class="fc" id="L277">                                    int count = delimiters.length * Evaluator.width(delimiters);</span>
+<span class="pc bpc" id="L278" title="1 of 2 branches missed.">                                    if (count &gt; 0) {</span>
+<span class="fc" id="L279">                                        int k = (joined - 1) % count;</span>
+<span class="fc" id="L280">                                        int w = Evaluator.width(delimiters);</span>
+<span class="fc" id="L281">                                        Object delimiter = delimiters[k / w][k % w];</span>
+<span class="pc bpc" id="L282" title="1 of 2 branches missed.">                                        sb.append(delimiter == null ? &quot;&quot; : Values.text(delimiter));</span>
+                                    }
+                                }
+<span class="fc" id="L285">                                sb.append(s);</span>
+<span class="fc" id="L286">                                joined++;</span>
+<span class="pc bpc" id="L287" title="1 of 2 branches missed.">                                if (sb.length() &gt; MAX_TEXT) {</span>
+<span class="nc" id="L288">                                    throw EvalError.VALUE;</span>
+                                }
+                            }
+                        }
+<span class="fc" id="L292">                    }</span>
+                }
+<span class="fc" id="L294">                return sb.toString();</span>
+            }
+            default:
+<span class="nc" id="L297">                return CellError.NAME;</span>
+        }
+    }
+
+    private static void append(StringBuilder sb, Object v) {
+<span class="pc bpc" id="L302" title="1 of 2 branches missed.">        if (v instanceof CellError) {</span>
+<span class="nc" id="L303">            throw EvalError.of((CellError) v);</span>
+        }
+<span class="pc bpc" id="L305" title="1 of 4 branches missed.">        if (v != null &amp;&amp; v != Evaluator.MISSING) { //NOPMD CompareObjectsWithEquals - the marker of an omitted argument is one object</span>
+<span class="fc" id="L306">            sb.append(Values.text(v));</span>
+<span class="fc bfc" id="L307" title="All 2 branches covered.">            if (sb.length() &gt; MAX_TEXT) {</span>
+<span class="fc" id="L308">                throw EvalError.VALUE;</span>
+            }
+        }
+<span class="fc" id="L311">    }</span>
+
+    /// Where a pattern with wildcards first matches at or after a position, ignoring case.
+    private static int search(String needle, String hay, int from) {
+<span class="fc" id="L315">        String pattern = needle + &quot;*&quot;;</span>
+<span class="fc bfc" id="L316" title="All 2 branches covered.">        for (int i = from; i &lt;= hay.length(); i++) {</span>
+<span class="fc bfc" id="L317" title="All 2 branches covered.">            if (Criteria.wildcardMatch(pattern, 0, hay, i)) {</span>
+<span class="fc" id="L318">                return i;</span>
+            }
+        }
+<span class="fc" id="L321">        return -1;</span>
+    }
+
+    /// A number the way an amount is written: `$5`, and `(5)` for what is owed.
+    private static Double amount(String raw) {
+<span class="fc" id="L326">        String s = raw.trim();</span>
+<span class="pc bpc" id="L327" title="1 of 6 branches missed.">        boolean owed = s.length() &gt; 2 &amp;&amp; s.charAt(0) == '(' &amp;&amp; s.charAt(s.length() - 1) == ')';</span>
+<span class="fc bfc" id="L328" title="All 2 branches covered.">        if (owed) {</span>
+<span class="fc" id="L329">            s = s.substring(1, s.length() - 1).trim();</span>
+        }
+<span class="fc bfc" id="L331" title="All 4 branches covered.">        if (s.length() &gt; 1 &amp;&amp; s.charAt(0) == '$') {</span>
+<span class="fc" id="L332">            s = s.substring(1);</span>
+        }
+<span class="fc" id="L334">        Double parsed = Values.parseNumber(s);</span>
+<span class="fc bfc" id="L335" title="All 4 branches covered.">        return parsed != null &amp;&amp; owed ? Double.valueOf(-parsed.doubleValue()) : parsed;</span>
+    }
+
+    /// A number with a fixed count of decimals, which may be negative to round to tens.
+    static String fixed(double abs, int places, boolean grouping) {
+<span class="pc bpc" id="L340" title="1 of 2 branches missed.">        if (places &gt; 127) {</span>
+<span class="nc" id="L341">            throw EvalError.VALUE;</span>
+        }
+<span class="fc" id="L343">        double rounded = Values.round(abs, places);</span>
+<span class="pc bpc" id="L344" title="2 of 4 branches missed.">        if (Double.isNaN(rounded) || Double.isInfinite(rounded)) {</span>
+<span class="nc" id="L345">            throw EvalError.NUM;</span>
+        }
+<span class="fc" id="L347">        int decimals = Math.max(0, places);</span>
+<span class="fc" id="L348">        StringBuilder digits = new StringBuilder();</span>
+<span class="fc" id="L349">        StringBuilder tail = new StringBuilder();</span>
+        // A number has fifteen digits that mean something. The ones after them are zeros
+        // here, as in a spreadsheet, and never the noise of the binary fraction.
+<span class="fc" id="L352">        int shown = 0;</span>
+<span class="fc" id="L353">        long fraction = 0;</span>
+<span class="fc" id="L354">        String small = null;</span>
+<span class="fc bfc" id="L355" title="All 2 branches covered.">        if (rounded &gt;= 1e15) {</span>
+<span class="fc" id="L356">            int e = (int) Math.floor(com.codename1.util.MathUtil.log10(rounded));</span>
+<span class="fc" id="L357">            double scaled = Math.floor(rounded / Values.pow10(e - 14) + 0.5);</span>
+<span class="fc bfc" id="L358" title="All 2 branches covered.">            if (scaled &gt;= 1e15) {</span>
+<span class="fc" id="L359">                scaled /= 10;</span>
+<span class="fc" id="L360">                e++;</span>
+            }
+<span class="fc" id="L362">            digits.append((long) scaled);</span>
+<span class="fc bfc" id="L363" title="All 2 branches covered.">            for (int i = 14; i &lt; e; i++) {</span>
+<span class="fc" id="L364">                digits.append('0');</span>
+            }
+<span class="pc bpc" id="L366" title="1 of 6 branches missed.">        } else if (rounded &gt; 0 &amp;&amp; rounded &lt; 0.1 &amp;&amp; decimals &gt; 15) {</span>
+            // the zeros after the point are not among the fifteen digits: 0.00012345678901234500
+<span class="fc" id="L368">            int[] exp = new int[1];</span>
+<span class="fc" id="L369">            String mantissa = Long.toString(Values.significand(rounded, 15, exp));</span>
+<span class="fc" id="L370">            StringBuilder sb = new StringBuilder();</span>
+<span class="fc bfc" id="L371" title="All 2 branches covered.">            for (int i = -1; i &gt; exp[0]; i--) {</span>
+<span class="fc" id="L372">                sb.append('0');</span>
+            }
+<span class="fc" id="L374">            sb.append(mantissa);</span>
+<span class="fc bfc" id="L375" title="All 2 branches covered.">            small = sb.length() &gt; decimals ? sb.substring(0, decimals) : sb.toString();</span>
+<span class="fc" id="L376">            shown = small.length();</span>
+<span class="fc" id="L377">            digits.append('0');</span>
+<span class="fc" id="L378">        } else {</span>
+<span class="fc" id="L379">            long whole = (long) Math.floor(rounded);</span>
+<span class="fc bfc" id="L380" title="All 2 branches covered.">            int wholeDigits = whole == 0 ? 0 : Long.toString(whole).length();</span>
+<span class="fc" id="L381">            shown = Math.min(decimals, Math.max(0, 15 - wholeDigits));</span>
+<span class="fc" id="L382">            long scale = (long) Values.pow10(shown);</span>
+<span class="fc" id="L383">            fraction = (long) Math.floor((rounded - whole) * scale + 0.5);</span>
+<span class="pc bpc" id="L384" title="1 of 2 branches missed.">            if (fraction &gt;= scale) {</span>
+<span class="nc" id="L385">                whole++;</span>
+<span class="nc" id="L386">                fraction = 0;</span>
+            }
+<span class="fc" id="L388">            digits.append(whole);</span>
+        }
+<span class="fc bfc" id="L390" title="All 2 branches covered.">        if (decimals &gt; 0) {</span>
+<span class="fc" id="L391">            tail.append('.');</span>
+<span class="fc bfc" id="L392" title="All 2 branches covered.">            if (small != null) {</span>
+<span class="fc" id="L393">                tail.append(small);</span>
+<span class="fc bfc" id="L394" title="All 2 branches covered.">            } else if (shown &gt; 0) {</span>
+<span class="fc" id="L395">                String f = Long.toString(fraction);</span>
+<span class="fc bfc" id="L396" title="All 2 branches covered.">                for (int i = f.length(); i &lt; shown; i++) {</span>
+<span class="fc" id="L397">                    tail.append('0');</span>
+                }
+<span class="fc" id="L399">                tail.append(f);</span>
+            }
+<span class="fc bfc" id="L401" title="All 2 branches covered.">            for (int i = shown; i &lt; decimals; i++) {</span>
+<span class="fc" id="L402">                tail.append('0');</span>
+            }
+        }
+<span class="fc bfc" id="L405" title="All 2 branches covered.">        if (grouping) {</span>
+<span class="fc" id="L406">            group(digits);</span>
+        }
+<span class="fc" id="L408">        return digits.append(tail).toString();</span>
+    }
+
+    private static void group(StringBuilder digits) {
+<span class="fc bfc" id="L412" title="All 2 branches covered.">        for (int i = digits.length() - 3; i &gt; 0; i -= 3) {</span>
+<span class="fc" id="L413">            digits.insert(i, ',');</span>
+        }
+<span class="fc" id="L415">    }</span>
+
+    private static Object substitute(Object[] a) {
+<span class="fc" id="L418">        String s = Evaluator.text(a, 0);</span>
+<span class="fc" id="L419">        String from = Evaluator.text(a, 1);</span>
+<span class="fc" id="L420">        String to = Evaluator.text(a, 2);</span>
+<span class="fc bfc" id="L421" title="All 2 branches covered.">        if (from.length() == 0) {</span>
+<span class="fc" id="L422">            return s;</span>
+        }
+<span class="fc" id="L424">        int instance = 0;</span>
+<span class="fc bfc" id="L425" title="All 2 branches covered.">        if (Evaluator.has(a, 3)) {</span>
+<span class="fc" id="L426">            instance = Evaluator.integer(a, 3);</span>
+<span class="fc bfc" id="L427" title="All 2 branches covered.">            if (instance &lt; 1) {</span>
+<span class="fc" id="L428">                throw EvalError.VALUE;</span>
+            }
+        }
+<span class="fc" id="L431">        StringBuilder sb = new StringBuilder();</span>
+<span class="fc" id="L432">        int pos = 0;</span>
+<span class="fc" id="L433">        int seen = 0;</span>
+        while (true) {
+<span class="fc" id="L435">            int at = s.indexOf(from, pos);</span>
+<span class="fc bfc" id="L436" title="All 2 branches covered.">            if (at &lt; 0) {</span>
+<span class="fc" id="L437">                break;</span>
+            }
+<span class="fc" id="L439">            seen++;</span>
+<span class="fc bfc" id="L440" title="All 4 branches covered.">            if (instance == 0 || seen == instance) {</span>
+<span class="fc" id="L441">                sb.append(s.substring(pos, at)).append(to);</span>
+            } else {
+<span class="fc" id="L443">                sb.append(s.substring(pos, at + from.length()));</span>
+            }
+<span class="fc" id="L445">            pos = at + from.length();</span>
+<span class="fc bfc" id="L446" title="All 2 branches covered.">            if (sb.length() &gt; MAX_TEXT) {</span>
+<span class="fc" id="L447">                throw EvalError.VALUE;</span>
+            }
+<span class="fc bfc" id="L449" title="All 2 branches covered.">            if (seen == instance) {</span>
+<span class="fc" id="L450">                break;</span>
+            }
+<span class="fc" id="L452">        }</span>
+<span class="fc" id="L453">        sb.append(s.substring(pos));</span>
+<span class="pc bpc" id="L454" title="1 of 2 branches missed.">        if (sb.length() &gt; MAX_TEXT) {</span>
+<span class="nc" id="L455">            throw EvalError.VALUE;</span>
+        }
+<span class="fc" id="L457">        return sb.toString();</span>
+    }
+
+    private static Object textAround(String name, Object[] a) {
+<span class="fc" id="L461">        String s = Evaluator.text(a, 0);</span>
+<span class="fc" id="L462">        String delimiter = Evaluator.text(a, 1);</span>
+<span class="fc" id="L463">        int instance = Evaluator.integer(a, 2, 1);</span>
+<span class="fc bfc" id="L464" title="All 2 branches covered.">        boolean ignoreCase = Evaluator.num(a, 3, 0) != 0;</span>
+<span class="fc bfc" id="L465" title="All 2 branches covered.">        boolean matchEnd = Evaluator.num(a, 4, 0) != 0;</span>
+<span class="fc bfc" id="L466" title="All 4 branches covered.">        if (instance == 0 || delimiter.length() == 0) {</span>
+<span class="fc" id="L467">            throw EvalError.VALUE;</span>
+        }
+        // Searched in the text itself, ignoring case character by character: a folded copy
+        // can differ in length from the text, and the offsets found in it would cut the
+        // text in the wrong place.
+<span class="fc" id="L472">        int n = delimiter.length();</span>
+<span class="fc" id="L473">        int at = -1;</span>
+<span class="fc bfc" id="L474" title="All 2 branches covered.">        if (instance &gt; 0) {</span>
+<span class="fc" id="L475">            int pos = 0;</span>
+<span class="fc bfc" id="L476" title="All 2 branches covered.">            for (int i = 0; i &lt; instance; i++) {</span>
+<span class="fc" id="L477">                at = find(s, delimiter, pos, ignoreCase, true);</span>
+<span class="fc bfc" id="L478" title="All 2 branches covered.">                if (at &lt; 0) {</span>
+<span class="fc" id="L479">                    break;</span>
+                }
+<span class="fc" id="L481">                pos = at + n;</span>
+            }
+<span class="fc bfc" id="L483" title="All 4 branches covered.">            if (at &lt; 0 &amp;&amp; matchEnd) {</span>
+<span class="fc" id="L484">                at = s.length();</span>
+            }
+<span class="fc" id="L486">        } else {</span>
+<span class="fc" id="L487">            int pos = s.length();</span>
+<span class="fc bfc" id="L488" title="All 2 branches covered.">            for (int i = 0; i &lt; -instance; i++) {</span>
+<span class="fc bfc" id="L489" title="All 2 branches covered.">                at = pos - n &lt; 0 ? -1 : find(s, delimiter, pos - n, ignoreCase, false);</span>
+<span class="fc bfc" id="L490" title="All 2 branches covered.">                if (at &lt; 0) {</span>
+<span class="fc" id="L491">                    break;</span>
+                }
+<span class="fc" id="L493">                pos = at;</span>
+            }
+<span class="pc bpc" id="L495" title="1 of 4 branches missed.">            if (at &lt; 0 &amp;&amp; matchEnd) {</span>
+<span class="nc bnc" id="L496" title="All 2 branches missed.">                return &quot;TEXTAFTER&quot;.equals(name) ? s : &quot;&quot;;</span>
+            }
+        }
+<span class="fc bfc" id="L499" title="All 2 branches covered.">        if (at &lt; 0) {</span>
+<span class="pc bpc" id="L500" title="1 of 2 branches missed.">            if (Evaluator.has(a, 5)) {</span>
+<span class="nc" id="L501">                return a[5];</span>
+            }
+<span class="fc" id="L503">            throw EvalError.NA;</span>
+        }
+<span class="fc bfc" id="L505" title="All 2 branches covered.">        if (&quot;TEXTBEFORE&quot;.equals(name)) {</span>
+<span class="fc" id="L506">            return s.substring(0, at);</span>
+        }
+<span class="fc bfc" id="L508" title="All 2 branches covered.">        return at &gt;= s.length() ? &quot;&quot; : s.substring(at + delimiter.length());</span>
+    }
+
+    /// Where a delimiter is, searching forward from a position or backward from it.
+    private static int find(String s, String delimiter, int from, boolean ignoreCase, boolean forward) {
+<span class="fc" id="L513">        int n = delimiter.length();</span>
+<span class="fc" id="L514">        int last = s.length() - n;</span>
+<span class="fc bfc" id="L515" title="All 2 branches covered.">        if (forward) {</span>
+<span class="fc bfc" id="L516" title="All 2 branches covered.">            for (int i = Math.max(0, from); i &lt;= last; i++) {</span>
+<span class="fc bfc" id="L517" title="All 2 branches covered.">                if (s.regionMatches(ignoreCase, i, delimiter, 0, n)) {</span>
+<span class="fc" id="L518">                    return i;</span>
+                }
+            }
+        } else {
+<span class="pc bpc" id="L522" title="1 of 2 branches missed.">            for (int i = Math.min(from, last); i &gt;= 0; i--) {</span>
+<span class="pc bpc" id="L523" title="1 of 2 branches missed.">                if (s.regionMatches(ignoreCase, i, delimiter, 0, n)) {</span>
+<span class="fc" id="L524">                    return i;</span>
+                }
+            }
+        }
+<span class="fc" id="L528">        return -1;</span>
+    }
+
+    private static Object numberValue(Object[] a) {
+<span class="fc" id="L532">        String s = Evaluator.text(a, 0);</span>
+<span class="fc bfc" id="L533" title="All 2 branches covered.">        String decimal = Evaluator.has(a, 1) ? Evaluator.text(a, 1) : &quot;.&quot;;</span>
+<span class="fc bfc" id="L534" title="All 2 branches covered.">        String group = Evaluator.has(a, 2) ? Evaluator.text(a, 2) : &quot;,&quot;;</span>
+<span class="fc bfc" id="L535" title="All 4 branches covered.">        if (decimal.length() == 0 || group.length() == 0) {</span>
+<span class="fc" id="L536">            throw EvalError.VALUE;</span>
+        }
+<span class="fc" id="L538">        char dec = decimal.charAt(0);</span>
+<span class="fc" id="L539">        char grp = group.charAt(0);</span>
+<span class="fc" id="L540">        StringBuilder sb = new StringBuilder();</span>
+<span class="fc" id="L541">        int percents = 0;</span>
+<span class="fc" id="L542">        boolean seenDecimal = false;</span>
+<span class="fc bfc" id="L543" title="All 2 branches covered.">        for (int i = 0; i &lt; s.length(); i++) {</span>
+<span class="fc" id="L544">            char c = s.charAt(i);</span>
+<span class="pc bpc" id="L545" title="4 of 8 branches missed.">            if (c == ' ' || c == '\t' || c == '\n' || c == '\r') {</span>
+<span class="nc" id="L546">                continue;</span>
+            }
+<span class="fc bfc" id="L548" title="All 2 branches covered.">            if (c == dec) {</span>
+<span class="pc bpc" id="L549" title="1 of 2 branches missed.">                if (seenDecimal) {</span>
+<span class="nc" id="L550">                    throw EvalError.VALUE;</span>
+                }
+<span class="fc" id="L552">                seenDecimal = true;</span>
+<span class="fc" id="L553">                sb.append('.');</span>
+<span class="fc bfc" id="L554" title="All 2 branches covered.">            } else if (c == grp) {</span>
+<span class="pc bpc" id="L555" title="1 of 2 branches missed.">                if (seenDecimal) {</span>
+<span class="nc" id="L556">                    throw EvalError.VALUE;</span>
+                }
+<span class="pc bpc" id="L558" title="1 of 2 branches missed.">            } else if (c == '%') {</span>
+<span class="nc" id="L559">                percents++;</span>
+            } else {
+<span class="fc" id="L561">                sb.append(c);</span>
+            }
+        }
+<span class="fc bfc" id="L564" title="All 2 branches covered.">        if (sb.length() == 0) {</span>
+<span class="fc" id="L565">            return d(0);</span>
+        }
+        double v;
+        try {
+<span class="fc" id="L569">            v = Double.parseDouble(sb.toString());</span>
+<span class="fc" id="L570">        } catch (NumberFormatException e) {</span>
+<span class="fc" id="L571">            throw EvalError.VALUE;</span>
+<span class="fc" id="L572">        }</span>
+<span class="pc bpc" id="L573" title="1 of 2 branches missed.">        for (int i = 0; i &lt; percents; i++) {</span>
+<span class="nc" id="L574">            v /= 100;</span>
+        }
+<span class="fc" id="L576">        return d(v);</span>
+    }
+
+<span class="fc" id="L579">    private static final java.util.HashMap&lt;String, Integer&gt; SWITCH_1 = Functions.switchTable(</span>
+            &quot;CHAR&quot;, &quot;UNICHAR&quot;, &quot;CODE&quot;, &quot;UNICODE&quot;, &quot;CLEAN&quot;, &quot;DOLLAR&quot;, &quot;FIXED&quot;, &quot;EXACT&quot;, &quot;FIND&quot;,
+            &quot;SEARCH&quot;, &quot;LEFT&quot;, &quot;RIGHT&quot;, &quot;MID&quot;, &quot;LEN&quot;, &quot;LOWER&quot;, &quot;UPPER&quot;, &quot;PROPER&quot;, &quot;REPLACE&quot;, &quot;REPT&quot;,
+            &quot;SUBSTITUTE&quot;, &quot;TEXT&quot;, &quot;TEXTAFTER&quot;, &quot;TEXTBEFORE&quot;, &quot;TRIM&quot;, &quot;VALUE&quot;, &quot;NUMBERVALUE&quot;,
+            &quot;CONCATENATE&quot;, &quot;CONCAT&quot;, &quot;TEXTJOIN&quot;);
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

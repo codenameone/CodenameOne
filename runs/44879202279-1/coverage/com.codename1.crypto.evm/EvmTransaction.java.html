@@ -1,0 +1,572 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EvmTransaction.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.crypto.evm</a> &gt; <span class="el_source">EvmTransaction.java</span></div><h1>EvmTransaction.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008-2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.crypto.evm;
+
+import com.codename1.crypto.UInt256;
+import com.codename1.crypto.encoding.Rlp;
+import com.codename1.security.Hash;
+import com.codename1.security.Secp256k1;
+import java.util.ArrayList;
+import java.util.List;
+
+/// An EVM transaction in any of the three envelopes nodes accept: legacy (with EIP-155
+/// replay protection), EIP-2930 access-list (type 1) and EIP-1559 dynamic-fee (type 2).
+///
+/// Built, signed and serialized locally, so a node receives finished bytes and never a key:
+///
+/// ```java
+/// long nonce = 0;
+/// UInt256 tip = UInt256.parseUnits(&quot;1&quot;, 9);           // 1 gwei
+/// UInt256 maxFee = UInt256.parseUnits(&quot;30&quot;, 9);
+/// byte[] privateKey = SecureRandom.bytes(32);
+/// EvmTransaction tx = EvmTransaction.eip1559(1, nonce, tip, maxFee, 21000,
+///         EvmAddress.parse(&quot;0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed&quot;), UInt256.parseUnits(&quot;0.01&quot;, 18), null);
+/// byte[] raw = tx.sign(privateKey).encode();   // eth_sendRawTransaction
+/// ```
+///
+/// Instances are immutable; [#sign] and [#withSignature] answer a signed copy, and
+/// [#decode] reads any signed or unsigned envelope back, recovering its [#sender].
+@com.codename1.impl.SharedWithBackend
+public final class EvmTransaction {
+    /// The legacy envelope; signed under EIP-155 when the chain id is not zero.
+    public static final int LEGACY = 0;
+    /// The EIP-2930 envelope, a legacy gas price plus an access list.
+    public static final int ACCESS_LIST = 1;
+    /// The EIP-1559 envelope with a priority fee and a fee cap.
+    public static final int DYNAMIC_FEE = 2;
+
+    private final int type;
+    private final long chainId;
+    private final long nonce;
+    private final UInt256 gasPrice;
+    private final UInt256 maxPriorityFeePerGas;
+    private final UInt256 maxFeePerGas;
+    private final long gasLimit;
+    private final EvmAddress to;
+    private final UInt256 value;
+    private final byte[] data;
+    private final List&lt;AccessEntry&gt; accessList;
+    private final int recoveryId;
+    private final byte[] r;
+    private final byte[] s;
+
+    /// One access-list entry: an address and the storage slots the transaction will touch.
+    public static final class AccessEntry {
+        private final EvmAddress address;
+        private final List&lt;byte[]&gt; storageKeys;
+
+        /// An entry for `address` with 32-byte `storageKeys` (may be empty).
+<span class="fc" id="L79">        public AccessEntry(EvmAddress address, List&lt;byte[]&gt; storageKeys) {</span>
+<span class="fc" id="L80">            this.address = address;</span>
+<span class="fc" id="L81">            this.storageKeys = new ArrayList&lt;byte[]&gt;();</span>
+<span class="pc bpc" id="L82" title="1 of 2 branches missed.">            if (storageKeys != null) {</span>
+<span class="fc bfc" id="L83" title="All 2 branches covered.">                for (byte[] key : storageKeys) {</span>
+<span class="pc bpc" id="L84" title="1 of 2 branches missed.">                    if (key.length != 32) {</span>
+<span class="nc" id="L85">                        throw new IllegalArgumentException(&quot;a storage key is 32 bytes&quot;);</span>
+                    }
+<span class="fc" id="L87">                    this.storageKeys.add(copy(key));</span>
+<span class="fc" id="L88">                }</span>
+            }
+<span class="fc" id="L90">        }</span>
+
+        /// The address.
+        public EvmAddress getAddress() {
+<span class="nc" id="L94">            return address;</span>
+        }
+
+        /// The number of storage keys.
+        public int getStorageKeyCount() {
+<span class="nc" id="L99">            return storageKeys.size();</span>
+        }
+
+        /// A copy of a storage key.
+        public byte[] getStorageKey(int index) {
+<span class="nc" id="L104">            return copy(storageKeys.get(index));</span>
+        }
+
+        Object rlp() {
+<span class="fc" id="L108">            List&lt;Object&gt; keys = new ArrayList&lt;Object&gt;();</span>
+<span class="fc bfc" id="L109" title="All 2 branches covered.">            for (byte[] storageKeysItem : storageKeys) {</span>
+<span class="fc" id="L110">                keys.add(storageKeysItem);</span>
+<span class="fc" id="L111">            }</span>
+<span class="fc" id="L112">            List&lt;Object&gt; out = new ArrayList&lt;Object&gt;();</span>
+<span class="fc" id="L113">            out.add(address.toBytes());</span>
+<span class="fc" id="L114">            out.add(keys);</span>
+<span class="fc" id="L115">            return out;</span>
+        }
+    }
+
+    private EvmTransaction(int type, long chainId, long nonce, UInt256 gasPrice, UInt256 maxPriorityFeePerGas,
+            UInt256 maxFeePerGas, long gasLimit, EvmAddress to, UInt256 value, byte[] data,
+<span class="fc" id="L121">            List&lt;AccessEntry&gt; accessList, int recoveryId, byte[] r, byte[] s) {</span>
+<span class="pc bpc" id="L122" title="3 of 6 branches missed.">        if (chainId &lt; 0 || nonce &lt; 0 || gasLimit &lt; 0) {</span>
+<span class="nc" id="L123">            throw new IllegalArgumentException(&quot;negative transaction field&quot;);</span>
+        }
+<span class="pc bpc" id="L125" title="1 of 4 branches missed.">        if (type != LEGACY &amp;&amp; chainId == 0) {</span>
+<span class="nc" id="L126">            throw new IllegalArgumentException(&quot;a typed transaction needs a chain id&quot;);</span>
+        }
+<span class="fc" id="L128">        this.type = type;</span>
+<span class="fc" id="L129">        this.chainId = chainId;</span>
+<span class="fc" id="L130">        this.nonce = nonce;</span>
+<span class="fc" id="L131">        this.gasPrice = gasPrice;</span>
+<span class="fc" id="L132">        this.maxPriorityFeePerGas = maxPriorityFeePerGas;</span>
+<span class="fc" id="L133">        this.maxFeePerGas = maxFeePerGas;</span>
+<span class="fc" id="L134">        this.gasLimit = gasLimit;</span>
+<span class="fc" id="L135">        this.to = to;</span>
+<span class="fc bfc" id="L136" title="All 2 branches covered.">        this.value = value == null ? UInt256.ZERO : value;</span>
+<span class="fc bfc" id="L137" title="All 2 branches covered.">        this.data = data == null ? new byte[0] : copy(data);</span>
+<span class="fc bfc" id="L138" title="All 2 branches covered.">        this.accessList = accessList == null ? new ArrayList&lt;AccessEntry&gt;() : new ArrayList&lt;AccessEntry&gt;(accessList);</span>
+<span class="fc" id="L139">        this.recoveryId = recoveryId;</span>
+<span class="fc" id="L140">        this.r = r;</span>
+<span class="fc" id="L141">        this.s = s;</span>
+<span class="fc" id="L142">    }</span>
+
+    /// A legacy transaction. A `chainId` of 0 signs without EIP-155 replay protection,
+    /// which nodes increasingly refuse; pass the real chain id.
+    ///
+    /// #### Parameters
+    ///
+    /// - `to`: the recipient, or `null` to deploy `data` as a contract
+    public static EvmTransaction legacy(long chainId, long nonce, UInt256 gasPrice, long gasLimit, EvmAddress to,
+            UInt256 value, byte[] data) {
+<span class="fc" id="L152">        return new EvmTransaction(LEGACY, chainId, nonce, gasPrice, null, null, gasLimit, to, value, data, null,</span>
+                -1, null, null);
+    }
+
+    /// An EIP-2930 access-list transaction.
+    public static EvmTransaction accessList(long chainId, long nonce, UInt256 gasPrice, long gasLimit,
+            EvmAddress to, UInt256 value, byte[] data, List&lt;AccessEntry&gt; accessList) {
+<span class="fc" id="L159">        return new EvmTransaction(ACCESS_LIST, chainId, nonce, gasPrice, null, null, gasLimit, to, value, data,</span>
+                accessList, -1, null, null);
+    }
+
+    /// An EIP-1559 transaction, the default on every chain that has it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `maxPriorityFeePerGas`: the tip to the block producer, in wei per gas
+    ///
+    /// - `maxFeePerGas`: the most the sender pays per gas, base fee included
+    ///
+    /// - `to`: the recipient, or `null` to deploy `data` as a contract
+    public static EvmTransaction eip1559(long chainId, long nonce, UInt256 maxPriorityFeePerGas,
+            UInt256 maxFeePerGas, long gasLimit, EvmAddress to, UInt256 value, byte[] data) {
+<span class="fc" id="L174">        return new EvmTransaction(DYNAMIC_FEE, chainId, nonce, null, maxPriorityFeePerGas, maxFeePerGas, gasLimit,</span>
+                to, value, data, null, -1, null, null);
+    }
+
+    /// This transaction with an access list (types 1 and 2 only).
+    public EvmTransaction withAccessList(List&lt;AccessEntry&gt; entries) {
+<span class="pc bpc" id="L180" title="1 of 2 branches missed.">        if (type == LEGACY) {</span>
+<span class="nc" id="L181">            throw new IllegalStateException(&quot;a legacy transaction has no access list&quot;);</span>
+        }
+<span class="fc" id="L183">        return new EvmTransaction(type, chainId, nonce, gasPrice, maxPriorityFeePerGas, maxFeePerGas, gasLimit, to,</span>
+                value, data, entries, -1, null, null);
+    }
+
+    // ----------------------------------------------------------------
+
+    private List&lt;Object&gt; fields(boolean forSigning) {
+<span class="fc" id="L190">        List&lt;Object&gt; f = new ArrayList&lt;Object&gt;();</span>
+<span class="fc bfc" id="L191" title="All 2 branches covered.">        if (type != LEGACY) {</span>
+<span class="fc" id="L192">            f.add(Rlp.longBytes(chainId));</span>
+        }
+<span class="fc" id="L194">        f.add(Rlp.longBytes(nonce));</span>
+<span class="fc bfc" id="L195" title="All 2 branches covered.">        if (type == DYNAMIC_FEE) {</span>
+<span class="fc" id="L196">            f.add(maxPriorityFeePerGas.toMinimalBytes());</span>
+<span class="fc" id="L197">            f.add(maxFeePerGas.toMinimalBytes());</span>
+        } else {
+<span class="fc" id="L199">            f.add(gasPrice.toMinimalBytes());</span>
+        }
+<span class="fc" id="L201">        f.add(Rlp.longBytes(gasLimit));</span>
+<span class="fc bfc" id="L202" title="All 2 branches covered.">        f.add(to == null ? new byte[0] : to.toBytes());</span>
+<span class="fc" id="L203">        f.add(value.toMinimalBytes());</span>
+<span class="fc" id="L204">        f.add(data);</span>
+<span class="fc bfc" id="L205" title="All 2 branches covered.">        if (type != LEGACY) {</span>
+<span class="fc" id="L206">            List&lt;Object&gt; list = new ArrayList&lt;Object&gt;();</span>
+<span class="fc bfc" id="L207" title="All 2 branches covered.">            for (AccessEntry accessListItem : accessList) {</span>
+<span class="fc" id="L208">                list.add(accessListItem.rlp());</span>
+<span class="fc" id="L209">            }</span>
+<span class="fc" id="L210">            f.add(list);</span>
+        }
+<span class="fc bfc" id="L212" title="All 2 branches covered.">        if (forSigning) {</span>
+<span class="fc bfc" id="L213" title="All 4 branches covered.">            if (type == LEGACY &amp;&amp; chainId != 0) {</span>
+<span class="fc" id="L214">                f.add(Rlp.longBytes(chainId));</span>
+<span class="fc" id="L215">                f.add(new byte[0]);</span>
+<span class="fc" id="L216">                f.add(new byte[0]);</span>
+            }
+        } else {
+            long v;
+<span class="fc bfc" id="L220" title="All 2 branches covered.">            if (type != LEGACY) {</span>
+<span class="fc" id="L221">                v = recoveryId;</span>
+<span class="fc bfc" id="L222" title="All 2 branches covered.">            } else if (chainId != 0) {</span>
+<span class="fc" id="L223">                v = recoveryId + chainId * 2 + 35;</span>
+            } else {
+<span class="fc" id="L225">                v = recoveryId + 27;</span>
+            }
+<span class="fc" id="L227">            f.add(Rlp.longBytes(v));</span>
+<span class="fc" id="L228">            f.add(strip(r));</span>
+<span class="fc" id="L229">            f.add(strip(s));</span>
+        }
+<span class="fc" id="L231">        return f;</span>
+    }
+
+    private byte[] envelope(List&lt;Object&gt; fields) {
+<span class="fc" id="L235">        byte[] body = Rlp.encode(fields);</span>
+<span class="fc bfc" id="L236" title="All 2 branches covered.">        if (type == LEGACY) {</span>
+<span class="fc" id="L237">            return body;</span>
+        }
+<span class="fc" id="L239">        byte[] out = new byte[body.length + 1];</span>
+<span class="fc" id="L240">        out[0] = (byte) type;</span>
+<span class="fc" id="L241">        System.arraycopy(body, 0, out, 1, body.length);</span>
+<span class="fc" id="L242">        return out;</span>
+    }
+
+    /// The 32-byte Keccak hash a signer signs.
+    public byte[] signingHash() {
+<span class="fc" id="L247">        return Hash.keccak256(envelope(fields(true)));</span>
+    }
+
+    /// Signs with a secp256k1 private key and answers the signed transaction.
+    public EvmTransaction sign(byte[] privateKey) {
+<span class="fc" id="L252">        Secp256k1.EcdsaSignature sig = Secp256k1.sign(signingHash(), privateKey);</span>
+<span class="fc" id="L253">        return withSignature(sig.r(), sig.s(), sig.recoveryId());</span>
+    }
+
+    /// The signed transaction, given the 65-byte `r || s || recoveryId` signature of
+    /// [#signingHash] that an external signer (hardware wallet, HSM) produced.
+    public EvmTransaction withSignature(byte[] signature65) {
+<span class="pc bpc" id="L259" title="2 of 4 branches missed.">        if (signature65 == null || signature65.length != 65) {</span>
+<span class="nc" id="L260">            throw new IllegalArgumentException(&quot;a recoverable signature is 65 bytes&quot;);</span>
+        }
+<span class="fc" id="L262">        byte[] rr = new byte[32];</span>
+<span class="fc" id="L263">        byte[] ss = new byte[32];</span>
+<span class="fc" id="L264">        System.arraycopy(signature65, 0, rr, 0, 32);</span>
+<span class="fc" id="L265">        System.arraycopy(signature65, 32, ss, 0, 32);</span>
+<span class="fc" id="L266">        int v = signature65[64] &amp; 0xff;</span>
+<span class="pc bpc" id="L267" title="1 of 2 branches missed.">        return withSignature(rr, ss, v &gt;= 27 ? v - 27 : v);</span>
+    }
+
+    private EvmTransaction withSignature(byte[] rr, byte[] ss, int recId) {
+<span class="pc bpc" id="L271" title="2 of 4 branches missed.">        if (recId &lt; 0 || recId &gt; 1) {</span>
+<span class="nc" id="L272">            throw new IllegalArgumentException(&quot;recovery id must be 0 or 1&quot;);</span>
+        }
+<span class="fc" id="L274">        return new EvmTransaction(type, chainId, nonce, gasPrice, maxPriorityFeePerGas, maxFeePerGas, gasLimit, to,</span>
+<span class="fc" id="L275">                value, data, accessList, recId, pad32(rr), pad32(ss));</span>
+    }
+
+    /// Tells whether the transaction carries a signature.
+    public boolean isSigned() {
+<span class="fc bfc" id="L280" title="All 2 branches covered.">        return r != null;</span>
+    }
+
+    /// The broadcastable bytes of a signed transaction, for `eth_sendRawTransaction`.
+    public byte[] encode() {
+<span class="fc bfc" id="L285" title="All 2 branches covered.">        if (!isSigned()) {</span>
+<span class="fc" id="L286">            throw new IllegalStateException(&quot;sign the transaction first&quot;);</span>
+        }
+<span class="fc" id="L288">        return envelope(fields(false));</span>
+    }
+
+    /// [#encode] as `0x` hex.
+    public String encodeHex() {
+<span class="nc" id="L293">        return &quot;0x&quot; + Hash.toHex(encode());</span>
+    }
+
+    /// The transaction hash nodes and explorers know a signed transaction by.
+    public byte[] hash() {
+<span class="fc" id="L298">        return Hash.keccak256(encode());</span>
+    }
+
+    /// The address that signed the transaction, recovered from the signature.
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalStateException`: when unsigned
+    ///
+    /// - `com.codename1.security.CryptoException`: when the signature recovers no key
+    public EvmAddress sender() {
+<span class="pc bpc" id="L309" title="1 of 2 branches missed.">        if (!isSigned()) {</span>
+<span class="nc" id="L310">            throw new IllegalStateException(&quot;unsigned transaction&quot;);</span>
+        }
+<span class="fc" id="L312">        byte[] pub = Secp256k1.recoverPublicKey(signingHash(), new Secp256k1.EcdsaSignature(r, s, recoveryId),</span>
+                false);
+<span class="fc" id="L314">        return EvmAddress.fromPublicKey(pub);</span>
+    }
+
+    /// The most this transaction can cost: `value + gasLimit * (maxFeePerGas or gasPrice)`.
+    public UInt256 maxCost() {
+<span class="nc bnc" id="L319" title="All 2 branches missed.">        UInt256 price = type == DYNAMIC_FEE ? maxFeePerGas : gasPrice;</span>
+<span class="nc" id="L320">        return value.add(price.multiply(gasLimit));</span>
+    }
+
+    // ----------------------------------------------------------------
+
+    /// Reads a transaction in any envelope, signed or as the unsigned payload a wallet is
+    /// asked to sign.
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: for malformed or non-canonical bytes, or an envelope
+    ///   other than 0, 1 and 2
+    public static EvmTransaction decode(byte[] raw) {
+<span class="pc bpc" id="L333" title="2 of 4 branches missed.">        if (raw == null || raw.length == 0) {</span>
+<span class="nc" id="L334">            throw new IllegalArgumentException(&quot;empty transaction&quot;);</span>
+        }
+<span class="fc" id="L336">        int first = raw[0] &amp; 0xff;</span>
+<span class="fc bfc" id="L337" title="All 2 branches covered.">        if (first &gt;= 0xc0) {</span>
+<span class="fc" id="L338">            return decodeFields(LEGACY, list(Rlp.decode(raw)));</span>
+        }
+<span class="fc bfc" id="L340" title="All 4 branches covered.">        if (first != ACCESS_LIST &amp;&amp; first != DYNAMIC_FEE) {</span>
+<span class="fc" id="L341">            throw new IllegalArgumentException(&quot;unsupported transaction type &quot; + first);</span>
+        }
+<span class="fc" id="L343">        byte[] body = new byte[raw.length - 1];</span>
+<span class="fc" id="L344">        System.arraycopy(raw, 1, body, 0, body.length);</span>
+<span class="fc" id="L345">        return decodeFields(first, list(Rlp.decode(body)));</span>
+    }
+
+    /// [#decode] from `0x` hex.
+    public static EvmTransaction decodeHex(String hex) {
+<span class="fc" id="L350">        return decode(Hash.fromHex(hex));</span>
+    }
+
+    private static EvmTransaction decodeFields(int type, List&lt;?&gt; f) {
+<span class="fc bfc" id="L354" title="All 4 branches covered.">        int base = type == LEGACY ? 6 : (type == ACCESS_LIST ? 8 : 9);</span>
+<span class="fc" id="L355">        int n = f.size();</span>
+<span class="fc bfc" id="L356" title="All 2 branches covered.">        boolean signed = n == base + 3;</span>
+<span class="pc bpc" id="L357" title="1 of 4 branches missed.">        if (!(signed || n == base)) {</span>
+<span class="nc" id="L358">            throw new IllegalArgumentException(&quot;wrong field count &quot; + n);</span>
+        }
+<span class="fc" id="L360">        int at = 0;</span>
+<span class="fc" id="L361">        long chainId = 0;</span>
+<span class="fc bfc" id="L362" title="All 2 branches covered.">        if (type != LEGACY) {</span>
+<span class="fc" id="L363">            chainId = num(f.get(at++));</span>
+        }
+<span class="fc" id="L365">        long nonce = num(f.get(at++));</span>
+<span class="fc" id="L366">        UInt256 gasPrice = null;</span>
+<span class="fc" id="L367">        UInt256 tip = null;</span>
+<span class="fc" id="L368">        UInt256 cap = null;</span>
+<span class="fc bfc" id="L369" title="All 2 branches covered.">        if (type == DYNAMIC_FEE) {</span>
+<span class="fc" id="L370">            tip = big(f.get(at++));</span>
+<span class="fc" id="L371">            cap = big(f.get(at++));</span>
+        } else {
+<span class="fc" id="L373">            gasPrice = big(f.get(at++));</span>
+        }
+<span class="fc" id="L375">        long gas = num(f.get(at++));</span>
+<span class="fc" id="L376">        byte[] toBytes = bytes(f.get(at++));</span>
+        EvmAddress to;
+<span class="fc bfc" id="L378" title="All 2 branches covered.">        if (toBytes.length == 0) {</span>
+<span class="fc" id="L379">            to = null;</span>
+        } else {
+<span class="fc" id="L381">            to = EvmAddress.fromBytes(toBytes);</span>
+        }
+<span class="fc" id="L383">        UInt256 value = big(f.get(at++));</span>
+<span class="fc" id="L384">        byte[] data = bytes(f.get(at++));</span>
+<span class="fc" id="L385">        List&lt;AccessEntry&gt; access = null;</span>
+<span class="fc bfc" id="L386" title="All 2 branches covered.">        if (type != LEGACY) {</span>
+<span class="fc" id="L387">            access = new ArrayList&lt;AccessEntry&gt;();</span>
+<span class="fc" id="L388">            List&lt;?&gt; entries = list(f.get(at++));</span>
+<span class="fc bfc" id="L389" title="All 2 branches covered.">            for (Object entriesItem : entries) {</span>
+<span class="fc" id="L390">                List&lt;?&gt; e = list(entriesItem);</span>
+<span class="pc bpc" id="L391" title="1 of 2 branches missed.">                if (e.size() != 2) {</span>
+<span class="nc" id="L392">                    throw new IllegalArgumentException(&quot;bad access list entry&quot;);</span>
+                }
+<span class="fc" id="L394">                List&lt;?&gt; keys = list(e.get(1));</span>
+<span class="fc" id="L395">                List&lt;byte[]&gt; keyList = new ArrayList&lt;byte[]&gt;();</span>
+<span class="fc bfc" id="L396" title="All 2 branches covered.">                for (Object keysItem : keys) {</span>
+<span class="fc" id="L397">                    keyList.add(bytes(keysItem));</span>
+<span class="fc" id="L398">                }</span>
+<span class="fc" id="L399">                access.add(new AccessEntry(EvmAddress.fromBytes(bytes(e.get(0))), keyList));</span>
+<span class="fc" id="L400">            }</span>
+        }
+<span class="fc bfc" id="L402" title="All 2 branches covered.">        if (!signed) {</span>
+<span class="fc" id="L403">            return new EvmTransaction(type, chainId, nonce, gasPrice, tip, cap, gas, to, value, data, access, -1,</span>
+                    null, null);
+        }
+<span class="fc" id="L406">        long v = num(f.get(at++));</span>
+<span class="fc" id="L407">        byte[] rr = bytes(f.get(at++));</span>
+<span class="fc" id="L408">        byte[] ss = bytes(f.get(at));</span>
+<span class="pc bpc" id="L409" title="3 of 6 branches missed.">        if (type == LEGACY &amp;&amp; rr.length == 0 &amp;&amp; ss.length == 0) {</span>
+            // the unsigned EIP-155 payload: [..., chainId, 0, 0]
+<span class="nc" id="L411">            return new EvmTransaction(type, v, nonce, gasPrice, tip, cap, gas, to, value, data, access, -1, null,</span>
+                    null);
+        }
+<span class="pc bpc" id="L414" title="2 of 4 branches missed.">        if (rr.length &gt; 32 || ss.length &gt; 32) {</span>
+<span class="nc" id="L415">            throw new IllegalArgumentException(&quot;signature component too long&quot;);</span>
+        }
+        int recId;
+<span class="fc bfc" id="L418" title="All 2 branches covered.">        if (type != LEGACY) {</span>
+<span class="fc" id="L419">            recId = (int) v;</span>
+<span class="pc bpc" id="L420" title="1 of 4 branches missed.">        } else if (v == 27 || v == 28) {</span>
+<span class="fc" id="L421">            recId = (int) (v - 27);</span>
+<span class="pc bpc" id="L422" title="1 of 2 branches missed.">        } else if (v &gt;= 37) {</span>
+<span class="fc" id="L423">            chainId = (v - 35) / 2;</span>
+<span class="fc" id="L424">            recId = (int) ((v - 35) % 2);</span>
+        } else {
+<span class="nc" id="L426">            throw new IllegalArgumentException(&quot;bad v &quot; + v);</span>
+        }
+<span class="pc bpc" id="L428" title="2 of 4 branches missed.">        if (recId &lt; 0 || recId &gt; 1) {</span>
+<span class="nc" id="L429">            throw new IllegalArgumentException(&quot;bad y parity &quot; + v);</span>
+        }
+<span class="fc" id="L431">        return new EvmTransaction(type, chainId, nonce, gasPrice, tip, cap, gas, to, value, data, access, recId,</span>
+<span class="fc" id="L432">                pad32(rr), pad32(ss));</span>
+    }
+
+    // ----------------------------------------------------------------
+
+    /// The envelope: [#LEGACY], [#ACCESS_LIST] or [#DYNAMIC_FEE].
+    public int getType() {
+<span class="fc" id="L439">        return type;</span>
+    }
+
+    /// The chain id; 0 for a legacy transaction signed without EIP-155.
+    public long getChainId() {
+<span class="fc" id="L444">        return chainId;</span>
+    }
+
+    /// The sender's nonce.
+    public long getNonce() {
+<span class="fc" id="L449">        return nonce;</span>
+    }
+
+    /// The gas price of a legacy or access-list transaction; `null` for EIP-1559.
+    public UInt256 getGasPrice() {
+<span class="nc" id="L454">        return gasPrice;</span>
+    }
+
+    /// The EIP-1559 tip; `null` for the other envelopes.
+    public UInt256 getMaxPriorityFeePerGas() {
+<span class="fc" id="L459">        return maxPriorityFeePerGas;</span>
+    }
+
+    /// The EIP-1559 fee cap; `null` for the other envelopes.
+    public UInt256 getMaxFeePerGas() {
+<span class="fc" id="L464">        return maxFeePerGas;</span>
+    }
+
+    /// The gas limit.
+    public long getGasLimit() {
+<span class="fc" id="L469">        return gasLimit;</span>
+    }
+
+    /// The recipient, or `null` for a contract deployment.
+    public EvmAddress getTo() {
+<span class="fc" id="L474">        return to;</span>
+    }
+
+    /// The value sent, in wei.
+    public UInt256 getValue() {
+<span class="fc" id="L479">        return value;</span>
+    }
+
+    /// A copy of the call data.
+    public byte[] getData() {
+<span class="fc" id="L484">        return copy(data);</span>
+    }
+
+    /// The access list, empty for a legacy transaction.
+    public List&lt;AccessEntry&gt; getAccessList() {
+<span class="fc" id="L489">        return new ArrayList&lt;AccessEntry&gt;(accessList);</span>
+    }
+
+    /// The 65-byte `r || s || recoveryId` signature, or `null` when unsigned.
+    public byte[] getSignature() {
+<span class="nc bnc" id="L494" title="All 2 branches missed.">        if (r == null) {</span>
+<span class="nc" id="L495">            return null;</span>
+        }
+<span class="nc" id="L497">        byte[] out = new byte[65];</span>
+<span class="nc" id="L498">        System.arraycopy(r, 0, out, 0, 32);</span>
+<span class="nc" id="L499">        System.arraycopy(s, 0, out, 32, 32);</span>
+<span class="nc" id="L500">        out[64] = (byte) recoveryId;</span>
+<span class="nc" id="L501">        return out;</span>
+    }
+
+    // ----------------------------------------------------------------
+
+    private static List&lt;?&gt; list(Object o) {
+<span class="pc bpc" id="L507" title="1 of 2 branches missed.">        if (!(o instanceof List)) {</span>
+<span class="nc" id="L508">            throw new IllegalArgumentException(&quot;expected an RLP list&quot;);</span>
+        }
+<span class="fc" id="L510">        return (List&lt;?&gt;) o;</span>
+    }
+
+    private static byte[] bytes(Object o) {
+<span class="pc bpc" id="L514" title="1 of 2 branches missed.">        if (!(o instanceof byte[])) {</span>
+<span class="nc" id="L515">            throw new IllegalArgumentException(&quot;expected an RLP string&quot;);</span>
+        }
+<span class="fc" id="L517">        return (byte[]) o;</span>
+    }
+
+    private static byte[] integer(Object o) {
+<span class="fc" id="L521">        byte[] b = bytes(o);</span>
+<span class="pc bpc" id="L522" title="1 of 4 branches missed.">        if (b.length &gt; 0 &amp;&amp; b[0] == 0) {</span>
+<span class="nc" id="L523">            throw new IllegalArgumentException(&quot;integer with a leading zero&quot;);</span>
+        }
+<span class="pc bpc" id="L525" title="1 of 2 branches missed.">        if (b.length &gt; 32) {</span>
+<span class="nc" id="L526">            throw new IllegalArgumentException(&quot;integer over 256 bits&quot;);</span>
+        }
+<span class="fc" id="L528">        return b;</span>
+    }
+
+    private static long num(Object o) {
+<span class="fc" id="L532">        byte[] b = integer(o);</span>
+<span class="pc bpc" id="L533" title="4 of 6 branches missed.">        if (b.length &gt; 8 || (b.length == 8 &amp;&amp; b[0] &lt; 0)) {</span>
+<span class="nc" id="L534">            throw new IllegalArgumentException(&quot;integer too large&quot;);</span>
+        }
+<span class="fc" id="L536">        long v = 0;</span>
+<span class="fc bfc" id="L537" title="All 2 branches covered.">        for (byte bItem : b) {</span>
+<span class="fc" id="L538">            v = (v &lt;&lt; 8) | (bItem &amp; 0xff);</span>
+        }
+<span class="fc" id="L540">        return v;</span>
+    }
+
+    private static UInt256 big(Object o) {
+<span class="fc" id="L544">        return UInt256.fromBytes(integer(o));</span>
+    }
+
+    private static byte[] strip(byte[] b) {
+<span class="fc" id="L548">        int start = 0;</span>
+<span class="pc bpc" id="L549" title="2 of 4 branches missed.">        while (start &lt; b.length &amp;&amp; b[start] == 0) {</span>
+<span class="nc" id="L550">            start++;</span>
+        }
+<span class="fc" id="L552">        byte[] out = new byte[b.length - start];</span>
+<span class="fc" id="L553">        System.arraycopy(b, start, out, 0, out.length);</span>
+<span class="fc" id="L554">        return out;</span>
+    }
+
+    private static byte[] pad32(byte[] b) {
+<span class="pc bpc" id="L558" title="1 of 2 branches missed.">        if (b.length &gt; 32) {</span>
+<span class="nc" id="L559">            throw new IllegalArgumentException(&quot;more than 32 bytes&quot;);</span>
+        }
+<span class="fc" id="L561">        byte[] out = new byte[32];</span>
+<span class="fc" id="L562">        System.arraycopy(b, 0, out, 32 - b.length, b.length);</span>
+<span class="fc" id="L563">        return out;</span>
+    }
+
+    static byte[] copy(byte[] b) {
+<span class="fc" id="L567">        byte[] out = new byte[b.length];</span>
+<span class="fc" id="L568">        System.arraycopy(b, 0, out, 0, b.length);</span>
+<span class="fc" id="L569">        return out;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

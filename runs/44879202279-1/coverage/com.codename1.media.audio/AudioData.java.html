@@ -1,0 +1,217 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AudioData.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.media.audio</a> &gt; <span class="el_source">AudioData.java</span></div><h1>AudioData.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.media.audio;
+
+/// In-memory PCM audio: one float array per channel, samples nominally in the
+/// range -1 to 1. This is the Web Audio `AudioBuffer`, named differently so it
+/// does not clash with the microphone capture class
+/// `com.codename1.media.AudioBuffer`.
+///
+/// Create one with [BaseAudioContext#createBuffer(int, int, float)] or
+/// [#fromInterleaved(float[], int, int, int, float)], play it with an
+/// [AudioBufferSourceNode], and get one back from
+/// [OfflineAudioContext#startRendering()].
+public final class AudioData {
+    private final float[][] channels;
+    private final int length;
+    private final float sampleRate;
+
+    /// Creates silent audio.
+    ///
+    /// #### Parameters
+    ///
+    /// - `numberOfChannels`: 1 to 32
+    ///
+    /// - `length`: the length in frames, at least 1
+    ///
+    /// - `sampleRate`: frames per second, 3000 to 768000
+<span class="fc" id="L48">    public AudioData(int numberOfChannels, int length, float sampleRate) {</span>
+<span class="pc bpc" id="L49" title="2 of 4 branches missed.">        if (numberOfChannels &lt; 1 || numberOfChannels &gt; AudioBus.MAX_CHANNELS) {</span>
+<span class="nc" id="L50">            throw new IllegalArgumentException(&quot;numberOfChannels must be between 1 and &quot;</span>
+                    + AudioBus.MAX_CHANNELS + &quot;: &quot; + numberOfChannels);
+        }
+<span class="pc bpc" id="L53" title="1 of 2 branches missed.">        if (length &lt; 1) {</span>
+<span class="nc" id="L54">            throw new IllegalArgumentException(&quot;length must be at least 1: &quot; + length);</span>
+        }
+<span class="fc" id="L56">        BaseAudioContext.checkSampleRate(sampleRate);</span>
+<span class="fc" id="L57">        this.length = length;</span>
+<span class="fc" id="L58">        this.sampleRate = sampleRate;</span>
+<span class="fc" id="L59">        channels = new float[numberOfChannels][];</span>
+<span class="fc bfc" id="L60" title="All 2 branches covered.">        for (int i = 0; i &lt; numberOfChannels; i++) {</span>
+<span class="fc" id="L61">            channels[i] = new float[length];</span>
+        }
+<span class="fc" id="L63">    }</span>
+
+    /// Creates audio from interleaved samples, the layout `WAVWriter`, the
+    /// microphone `AudioBuffer` and most decoders use.
+    ///
+    /// #### Parameters
+    ///
+    /// - `interleaved`: the samples
+    ///
+    /// - `offset`: the index of the first sample
+    ///
+    /// - `frames`: the number of frames to copy
+    ///
+    /// - `numberOfChannels`: the number of interleaved channels
+    ///
+    /// - `sampleRate`: frames per second
+    ///
+    /// #### Returns
+    ///
+    /// a new `AudioData` holding a copy of the samples
+    public static AudioData fromInterleaved(float[] interleaved, int offset, int frames,
+                                            int numberOfChannels, float sampleRate) {
+<span class="nc bnc" id="L85" title="All 6 branches missed.">        if (offset &lt; 0 || frames &lt; 1 || offset + frames * numberOfChannels &gt; interleaved.length) {</span>
+<span class="nc" id="L86">            throw new IllegalArgumentException(&quot;offset/frames out of range&quot;);</span>
+        }
+<span class="nc" id="L88">        AudioData d = new AudioData(numberOfChannels, frames, sampleRate);</span>
+<span class="nc bnc" id="L89" title="All 2 branches missed.">        for (int c = 0; c &lt; numberOfChannels; c++) {</span>
+<span class="nc" id="L90">            float[] dst = d.channels[c];</span>
+<span class="nc" id="L91">            int src = offset + c;</span>
+<span class="nc bnc" id="L92" title="All 2 branches missed.">            for (int i = 0; i &lt; frames; i++) {</span>
+<span class="nc" id="L93">                dst[i] = interleaved[src];</span>
+<span class="nc" id="L94">                src += numberOfChannels;</span>
+            }
+        }
+<span class="nc" id="L97">        return d;</span>
+    }
+
+    /// Copies the samples out interleaved, for `WAVWriter` or a port API.
+    ///
+    /// #### Returns
+    ///
+    /// a new array of `getLength() * getNumberOfChannels()` samples
+    public float[] toInterleaved() {
+<span class="nc" id="L106">        int n = channels.length;</span>
+<span class="nc" id="L107">        float[] out = new float[length * n];</span>
+<span class="nc bnc" id="L108" title="All 2 branches missed.">        for (int c = 0; c &lt; n; c++) {</span>
+<span class="nc" id="L109">            float[] src = channels[c];</span>
+<span class="nc" id="L110">            int dst = c;</span>
+<span class="nc bnc" id="L111" title="All 2 branches missed.">            for (int i = 0; i &lt; length; i++) {</span>
+<span class="nc" id="L112">                out[dst] = src[i];</span>
+<span class="nc" id="L113">                dst += n;</span>
+            }
+        }
+<span class="nc" id="L116">        return out;</span>
+    }
+
+    /// The sample rate.
+    ///
+    /// #### Returns
+    ///
+    /// frames per second
+    public float getSampleRate() {
+<span class="fc" id="L125">        return sampleRate;</span>
+    }
+
+    /// The length.
+    ///
+    /// #### Returns
+    ///
+    /// the number of frames
+    public int getLength() {
+<span class="fc" id="L134">        return length;</span>
+    }
+
+    /// The duration.
+    ///
+    /// #### Returns
+    ///
+    /// the length in seconds
+    public double getDuration() {
+<span class="nc" id="L143">        return length / (double) sampleRate;</span>
+    }
+
+    /// The number of channels.
+    ///
+    /// #### Returns
+    ///
+    /// the channel count
+    public int getNumberOfChannels() {
+<span class="fc" id="L152">        return channels.length;</span>
+    }
+
+    /// The live sample array of a channel. Writes to it are heard by any
+    /// [AudioBufferSourceNode] that is playing this data.
+    ///
+    /// #### Parameters
+    ///
+    /// - `channel`: the channel index
+    ///
+    /// #### Returns
+    ///
+    /// the channel's samples, not a copy
+    public float[] getChannelData(int channel) {
+<span class="fc" id="L166">        checkChannel(channel);</span>
+<span class="fc" id="L167">        return channels[channel];</span>
+    }
+
+    /// Copies samples of one channel into `destination`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `destination`: the array to fill
+    ///
+    /// - `channel`: the channel index
+    ///
+    /// - `startInChannel`: the first frame to copy
+    public void copyFromChannel(float[] destination, int channel, int startInChannel) {
+<span class="nc" id="L180">        checkChannel(channel);</span>
+<span class="nc bnc" id="L181" title="All 4 branches missed.">        if (startInChannel &lt; 0 || startInChannel &gt; length) {</span>
+<span class="nc" id="L182">            throw new IllegalArgumentException(&quot;startInChannel out of range: &quot; + startInChannel);</span>
+        }
+<span class="nc" id="L184">        int n = Math.min(destination.length, length - startInChannel);</span>
+<span class="nc" id="L185">        System.arraycopy(channels[channel], startInChannel, destination, 0, n);</span>
+<span class="nc" id="L186">    }</span>
+
+    /// Copies `source` into one channel.
+    ///
+    /// #### Parameters
+    ///
+    /// - `source`: the samples
+    ///
+    /// - `channel`: the channel index
+    ///
+    /// - `startInChannel`: the first frame to write
+    public void copyToChannel(float[] source, int channel, int startInChannel) {
+<span class="nc" id="L198">        checkChannel(channel);</span>
+<span class="nc bnc" id="L199" title="All 4 branches missed.">        if (startInChannel &lt; 0 || startInChannel &gt; length) {</span>
+<span class="nc" id="L200">            throw new IllegalArgumentException(&quot;startInChannel out of range: &quot; + startInChannel);</span>
+        }
+<span class="nc" id="L202">        int n = Math.min(source.length, length - startInChannel);</span>
+<span class="nc" id="L203">        System.arraycopy(source, 0, channels[channel], startInChannel, n);</span>
+<span class="nc" id="L204">    }</span>
+
+    float[][] channels() {
+<span class="fc" id="L207">        return channels;</span>
+    }
+
+    private void checkChannel(int channel) {
+<span class="pc bpc" id="L211" title="2 of 4 branches missed.">        if (channel &lt; 0 || channel &gt;= channels.length) {</span>
+<span class="nc" id="L212">            throw new IllegalArgumentException(&quot;No channel &quot; + channel + &quot; in &quot;</span>
+                    + channels.length + &quot; channel audio&quot;);
+        }
+<span class="fc" id="L215">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,157 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PdfTable.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.pdf</a> &gt; <span class="el_source">PdfTable.java</span></div><h1>PdfTable.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.pdf;
+
+import java.util.ArrayList;
+import java.util.List;
+
+/// A table for [PdfLayout]. Columns share the available width in
+/// proportion to their weights; cells fill the rows left to right and wrap
+/// their text. A row that does not fit continues on the next page, and the
+/// header rows are repeated at the top of every page the table spans.
+///
+/// ```java
+/// PdfDocument doc = new PdfDocument();
+/// PdfLayout layout = new PdfLayout(doc, PdfPageSize.A4, 54);
+/// PdfTable t = new PdfTable(3, 1, 1).setHeaderRows(1);
+/// t.addCell(new PdfParagraph(&quot;Item&quot;, PdfFont.HELVETICA_BOLD, 10), 1, 0xeeeeee);
+/// t.addCell(new PdfParagraph(&quot;Qty&quot;, PdfFont.HELVETICA_BOLD, 10), 1, 0xeeeeee);
+/// t.addCell(new PdfParagraph(&quot;Price&quot;, PdfFont.HELVETICA_BOLD, 10), 1, 0xeeeeee);
+/// t.addCell(&quot;Consulting&quot;).addCell(&quot;12&quot;).addCell(&quot;$1,200.00&quot;);
+/// layout.add(t);
+/// ```
+@com.codename1.impl.SharedWithBackend
+public final class PdfTable {
+    final float[] weights;
+<span class="fc" id="L46">    final List&lt;Cell&gt; cells = new ArrayList&lt;Cell&gt;();</span>
+    int headerRows;
+<span class="fc" id="L48">    float padding = 4;</span>
+<span class="fc" id="L49">    float borderWidth = 0.5f;</span>
+<span class="fc" id="L50">    int borderColor = 0x999999;</span>
+<span class="fc" id="L51">    PdfFont font = PdfFont.HELVETICA;</span>
+<span class="fc" id="L52">    float fontSize = 10;</span>
+<span class="fc" id="L53">    float spaceAfter = 8;</span>
+
+    /// A table with one column per weight; each weight must be positive.
+<span class="fc" id="L56">    public PdfTable(float... columnWeights) {</span>
+<span class="pc bpc" id="L57" title="2 of 4 branches missed.">        if (columnWeights == null || columnWeights.length == 0) {</span>
+<span class="nc" id="L58">            throw new IllegalArgumentException(&quot;A table needs at least one column&quot;);</span>
+        }
+<span class="fc" id="L60">        weights = new float[columnWeights.length];</span>
+<span class="fc bfc" id="L61" title="All 2 branches covered.">        for (int i = 0; i &lt; weights.length; i++) {</span>
+            // A zero, negative or NaN weight would place every column at NaN.
+<span class="pc bpc" id="L63" title="1 of 4 branches missed.">            if (!(columnWeights[i] &gt; 0) || columnWeights[i] == Float.POSITIVE_INFINITY) { // NOPMD LogicInversion - also rejects NaN, which every comparison fails</span>
+<span class="fc" id="L64">                throw new IllegalArgumentException(&quot;Column weights must be positive and finite&quot;);</span>
+            }
+<span class="fc" id="L66">            weights[i] = columnWeights[i];</span>
+        }
+<span class="fc" id="L68">    }</span>
+
+    /// The number of leading rows that form the header; 0 by default.
+    public PdfTable setHeaderRows(int rows) {
+<span class="fc" id="L72">        this.headerRows = rows;</span>
+<span class="fc" id="L73">        return this;</span>
+    }
+
+    /// The space between a cell's border and its text; 4 points by default.
+    public PdfTable setCellPadding(float points) {
+<span class="nc" id="L78">        this.padding = points;</span>
+<span class="nc" id="L79">        return this;</span>
+    }
+
+    /// The width and color of the cell borders; a width of 0 draws none.
+    public PdfTable setBorder(float width, int rgb) {
+<span class="nc" id="L84">        this.borderWidth = width;</span>
+<span class="nc" id="L85">        this.borderColor = rgb;</span>
+<span class="nc" id="L86">        return this;</span>
+    }
+
+    /// The font of cells added as plain strings.
+    public PdfTable setFont(PdfFont font, float size) {
+<span class="nc" id="L91">        this.font = font;</span>
+<span class="nc" id="L92">        this.fontSize = size;</span>
+<span class="nc" id="L93">        return this;</span>
+    }
+
+    /// The space below the table; 8 points by default.
+    public PdfTable setSpaceAfter(float points) {
+<span class="nc" id="L98">        this.spaceAfter = points;</span>
+<span class="nc" id="L99">        return this;</span>
+    }
+
+    /// Adds a cell of plain text in the table's font.
+    public PdfTable addCell(String text) {
+<span class="fc" id="L104">        return addCell(new PdfParagraph(text, font, fontSize), 1, -1);</span>
+    }
+
+    /// Adds a cell holding `paragraph`.
+    public PdfTable addCell(PdfParagraph paragraph) {
+<span class="nc" id="L109">        return addCell(paragraph, 1, -1);</span>
+    }
+
+    /// Adds a cell spanning `colspan` columns, filled with `backgroundRgb`,
+    /// or transparent when it is negative.
+    public PdfTable addCell(PdfParagraph paragraph, int colspan, int backgroundRgb) {
+<span class="fc" id="L115">        cells.add(new Cell(paragraph, Math.max(1, Math.min(colspan, weights.length)), backgroundRgb));</span>
+<span class="fc" id="L116">        return this;</span>
+    }
+
+    static final class Cell {
+        final PdfParagraph paragraph;
+        final int colspan;
+        final int background;
+
+<span class="fc" id="L124">        Cell(PdfParagraph paragraph, int colspan, int background) {</span>
+<span class="fc" id="L125">            this.paragraph = paragraph;</span>
+<span class="fc" id="L126">            this.colspan = colspan;</span>
+<span class="fc" id="L127">            this.background = background;</span>
+<span class="fc" id="L128">        }</span>
+    }
+
+    /// The cells grouped into rows.
+    List&lt;List&lt;Cell&gt;&gt; rows() {
+<span class="fc" id="L133">        List&lt;List&lt;Cell&gt;&gt; rows = new ArrayList&lt;List&lt;Cell&gt;&gt;();</span>
+<span class="fc" id="L134">        List&lt;Cell&gt; row = new ArrayList&lt;Cell&gt;();</span>
+<span class="fc" id="L135">        int used = 0;</span>
+<span class="fc bfc" id="L136" title="All 2 branches covered.">        for (int i = 0; i &lt; cells.size(); i++) { // NOPMD ForLoopCanBeForeach - indexed like the surrounding decoder loops</span>
+<span class="fc" id="L137">            Cell c = cells.get(i);</span>
+<span class="pc bpc" id="L138" title="1 of 2 branches missed.">            if (used + c.colspan &gt; weights.length) {</span>
+<span class="nc" id="L139">                rows.add(row);</span>
+<span class="nc" id="L140">                row = new ArrayList&lt;Cell&gt;();</span>
+<span class="nc" id="L141">                used = 0;</span>
+            }
+<span class="fc" id="L143">            row.add(c);</span>
+<span class="fc" id="L144">            used += c.colspan;</span>
+<span class="fc bfc" id="L145" title="All 2 branches covered.">            if (used == weights.length) {</span>
+<span class="fc" id="L146">                rows.add(row);</span>
+<span class="fc" id="L147">                row = new ArrayList&lt;Cell&gt;();</span>
+<span class="fc" id="L148">                used = 0;</span>
+            }
+        }
+<span class="pc bpc" id="L151" title="1 of 2 branches missed.">        if (!row.isEmpty()) {</span>
+<span class="nc" id="L152">            rows.add(row);</span>
+        }
+<span class="fc" id="L154">        return rows;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,278 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Surface.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.gpu.shaders</a> &gt; <span class="el_source">Surface.java</span></div><h1>Surface.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.gpu.shaders;
+
+import com.codename1.gpu.shader.ShaderMaterial;
+import com.codename1.gpu.shader.ShaderNode;
+import com.codename1.gpu.shader.ShaderType;
+
+import static com.codename1.gpu.shader.ShaderNode.*;
+
+/// Man made and natural surfaces for `Material.Type.PBR`. Patterns are laid
+/// out by `Shading.boxUv`, in world units, so they need no UVs and stay the
+/// same size on every mesh; `SCALE` sets repeats per unit.
+public final class Surface {
+    /// `VEC3` the main colour: paint, wood, stone or tint.
+    public static final String COLOR = &quot;srfColor&quot;;
+    /// `VEC3` the second colour: bare metal, rust, grain or flakes.
+    public static final String COLOR2 = &quot;srfColor2&quot;;
+    /// `FLOAT` how much of the second layer shows, 0 to 1.
+    public static final String AMOUNT = &quot;srfAmount&quot;;
+    /// `FLOAT` pattern repeats per world unit.
+    public static final String SCALE = &quot;srfScale&quot;;
+    /// `FLOAT` opacity of glass and ice facing the camera.
+    public static final String OPACITY = &quot;srfOpacity&quot;;
+    /// The most paint splats `paintSplats` keeps.
+    public static final int MAX_SPLATS = 6;
+
+    private Surface() {
+    }
+
+    private static ShaderMaterial base(int color, int color2, float amount, float scale) {
+<span class="fc" id="L52">        return new ShaderMaterial().declareUniform(COLOR, ShaderType.VEC3).declareUniform(COLOR2, ShaderType.VEC3)</span>
+<span class="fc" id="L53">                .declareUniform(AMOUNT, ShaderType.FLOAT).declareUniform(SCALE, ShaderType.FLOAT)</span>
+<span class="fc" id="L54">                .setColorUniform(COLOR, color).setColorUniform(COLOR2, color2).setUniform(AMOUNT, amount)</span>
+<span class="fc" id="L55">                .setUniform(SCALE, scale);</span>
+    }
+
+    private static ShaderNode c1() {
+<span class="fc" id="L59">        return uniform(COLOR, ShaderType.VEC3);</span>
+    }
+
+    private static ShaderNode c2() {
+<span class="fc" id="L63">        return uniform(COLOR2, ShaderType.VEC3);</span>
+    }
+
+    private static ShaderNode amount() {
+<span class="fc" id="L67">        return uniform(AMOUNT, ShaderType.FLOAT);</span>
+    }
+
+    private static ShaderNode uvw() {
+<span class="fc" id="L71">        return Shading.boxUv(1f).mul(uniform(SCALE, ShaderType.FLOAT));</span>
+    }
+
+    /// Painted metal worn through to bare steel in patches: containers,
+    /// hulls, railings. `COLOR` is the paint, `COLOR2` the metal, `AMOUNT`
+    /// the wear.
+    ///
+    /// #### Returns
+    ///
+    /// a new shader material
+    public static ShaderMaterial paintedMetal() {
+<span class="fc" id="L82">        ShaderMaterial m = base(0x2f6f8f, 0x9a9c9e, 0.35f, 1.5f);</span>
+<span class="fc" id="L83">        ShaderNode n = Noise.fbm(uvw(), 4);</span>
+<span class="fc" id="L84">        ShaderNode wear = smoothstep(f(1f).sub(amount().mul(0.6f)), f(1.05f).sub(amount().mul(0.6f)), n);</span>
+<span class="fc" id="L85">        ShaderNode streak = Noise.value(vec(uvw().x().mul(6f), uvw().y().mul(0.4f))).mul(0.12f).add(0.94f);</span>
+<span class="fc" id="L86">        m.set(ShaderMaterial.Hook.BASE_COLOR, vec(mix(c1().mul(streak), c2(), wear), f(1f)));</span>
+<span class="fc" id="L87">        m.set(ShaderMaterial.Hook.METALLIC, wear);</span>
+<span class="fc" id="L88">        m.set(ShaderMaterial.Hook.ROUGHNESS, mix(f(0.55f), f(0.3f), wear));</span>
+<span class="fc" id="L89">        return m;</span>
+    }
+
+    /// Rust eating into metal: orange-brown blotches, rough where rusted.
+    /// `COLOR` is the metal, `COLOR2` the rust, `AMOUNT` how far it has
+    /// spread.
+    ///
+    /// #### Returns
+    ///
+    /// a new shader material
+    public static ShaderMaterial rust() {
+<span class="fc" id="L100">        ShaderMaterial m = base(0x8c8e90, 0x7a3a16, 0.5f, 1.2f);</span>
+<span class="fc" id="L101">        ShaderNode n = Noise.fbm(uvw(), 5);</span>
+<span class="fc" id="L102">        ShaderNode r = smoothstep(f(0.75f).sub(amount().mul(0.5f)), f(0.9f).sub(amount().mul(0.5f)), n);</span>
+<span class="fc" id="L103">        ShaderNode tone = Noise.value(uvw().mul(9f)).mul(0.35f).add(0.8f);</span>
+<span class="fc" id="L104">        m.set(ShaderMaterial.Hook.BASE_COLOR, vec(mix(c1(), c2().mul(tone), r), f(1f)));</span>
+<span class="fc" id="L105">        m.set(ShaderMaterial.Hook.METALLIC, f(1f).sub(r));</span>
+<span class="fc" id="L106">        m.set(ShaderMaterial.Hook.ROUGHNESS, mix(f(0.35f), f(0.95f), r));</span>
+<span class="fc" id="L107">        m.set(ShaderMaterial.Hook.NORMAL, perturbNormal(mix(vec3(0f, 0f, 1f), Noise.bumpNormal(uvw().mul(4f), 2, 0.6f), r)));</span>
+<span class="fc" id="L108">        return m;</span>
+    }
+
+    /// Wood planks along the texture's u: grain lines, knots and a board
+    /// pattern. Uses the mesh's UVs so the grain follows each plank.
+    /// `COLOR` is the light wood, `COLOR2` the dark grain, `SCALE` boards per
+    /// unit of v.
+    ///
+    /// #### Returns
+    ///
+    /// a new shader material
+    public static ShaderMaterial wood() {
+<span class="fc" id="L120">        ShaderMaterial m = base(0xa8784a, 0x5a3a20, 0.6f, 4f);</span>
+<span class="fc" id="L121">        ShaderNode p = uv().mul(uniform(SCALE, ShaderType.FLOAT));</span>
+<span class="fc" id="L122">        ShaderNode board = floor(p.y());</span>
+<span class="fc" id="L123">        ShaderNode jitter = Noise.hash(vec(board, f(3f)));</span>
+<span class="fc" id="L124">        ShaderNode grain = sin(p.y().mul(40f).add(Noise.fbm(vec(p.x().mul(1.5f).add(jitter.mul(9f)), p.y().mul(3f)), 3)</span>
+<span class="fc" id="L125">                .mul(9f))).mul(0.5f).add(0.5f);</span>
+<span class="fc" id="L126">        ShaderNode gap = smoothstep(0.02f, 0.05f, fract(p.y())).mul(smoothstep(0.98f, 0.95f, fract(p.y())));</span>
+<span class="fc" id="L127">        ShaderNode rgb = mix(c1(), c2(), grain.mul(amount())).mul(jitter.mul(0.25f).add(0.85f)).mul(gap.mul(0.6f).add(0.4f));</span>
+<span class="fc" id="L128">        m.set(ShaderMaterial.Hook.BASE_COLOR, vec(rgb, f(1f)));</span>
+<span class="fc" id="L129">        m.set(ShaderMaterial.Hook.ROUGHNESS, f(0.7f).add(grain.mul(0.15f)));</span>
+<span class="fc" id="L130">        m.set(ShaderMaterial.Hook.METALLIC, f(0f));</span>
+<span class="fc" id="L131">        return m;</span>
+    }
+
+    /// Cast concrete: mottled grey, pores and darker stains low down.
+    ///
+    /// #### Returns
+    ///
+    /// a new shader material
+    public static ShaderMaterial concrete() {
+<span class="fc" id="L140">        ShaderMaterial m = base(0x9a978f, 0x5e5b55, 0.4f, 1f);</span>
+<span class="fc" id="L141">        ShaderNode mottle = Noise.fbm(uvw().mul(2f), 4);</span>
+<span class="fc" id="L142">        ShaderNode pores = smoothstep(0.08f, 0.02f, Noise.cellular(uvw().mul(25f)));</span>
+<span class="fc" id="L143">        ShaderNode stain = smoothstep(f(1.2f), f(0f), worldPos().y()).mul(amount());</span>
+<span class="fc" id="L144">        ShaderNode rgb = mix(c1().mul(mottle.mul(0.25f).add(0.85f)), c2(), saturate(stain.add(pores.mul(0.6f))));</span>
+<span class="fc" id="L145">        m.set(ShaderMaterial.Hook.BASE_COLOR, vec(rgb, f(1f)));</span>
+<span class="fc" id="L146">        m.set(ShaderMaterial.Hook.ROUGHNESS, f(0.92f));</span>
+<span class="fc" id="L147">        m.set(ShaderMaterial.Hook.METALLIC, f(0f));</span>
+<span class="fc" id="L148">        return m;</span>
+    }
+
+    /// Clear glass: see through facing the camera, mirror-like at the edges.
+    /// Use an alpha blended render state. `COLOR` tints it.
+    ///
+    /// #### Returns
+    ///
+    /// a new shader material
+    public static ShaderMaterial glass() {
+<span class="fc" id="L158">        ShaderMaterial m = base(0xd8ecf0, 0xffffff, 0f, 1f).declareUniform(OPACITY, ShaderType.FLOAT)</span>
+<span class="fc" id="L159">                .setUniform(OPACITY, 0.12f);</span>
+<span class="fc" id="L160">        ShaderNode fr = Shading.fresnel(4f);</span>
+<span class="fc" id="L161">        m.set(ShaderMaterial.Hook.BASE_COLOR, vec(c1(), mix(uniform(OPACITY, ShaderType.FLOAT), f(1f), fr)));</span>
+<span class="fc" id="L162">        m.set(ShaderMaterial.Hook.ROUGHNESS, f(0.05f));</span>
+<span class="fc" id="L163">        m.set(ShaderMaterial.Hook.METALLIC, f(0f));</span>
+<span class="fc" id="L164">        return m;</span>
+    }
+
+    /// Ice: blue translucent depths, frosted cracks and a cold rim. Use an
+    /// alpha blended render state for thin ice, opaque for blocks.
+    ///
+    /// #### Returns
+    ///
+    /// a new shader material
+    public static ShaderMaterial ice() {
+<span class="fc" id="L174">        ShaderMaterial m = base(0xbfe3f2, 0x3c86b4, 0.5f, 1.5f).declareUniform(OPACITY, ShaderType.FLOAT)</span>
+<span class="fc" id="L175">                .setUniform(OPACITY, 0.85f);</span>
+<span class="fc" id="L176">        ShaderNode cracks = smoothstep(0.06f, 0.0f, abs(Noise.cellular(uvw()).sub(0.45f)));</span>
+<span class="fc" id="L177">        ShaderNode depth = Noise.fbm(uvw().mul(0.7f), 3);</span>
+<span class="fc" id="L178">        ShaderNode rgb = mix(c2(), c1(), saturate(depth.add(cracks)));</span>
+<span class="fc" id="L179">        m.set(ShaderMaterial.Hook.BASE_COLOR, vec(rgb, uniform(OPACITY, ShaderType.FLOAT)));</span>
+<span class="fc" id="L180">        m.set(ShaderMaterial.Hook.ROUGHNESS, mix(f(0.08f), f(0.6f), cracks));</span>
+<span class="fc" id="L181">        m.set(ShaderMaterial.Hook.EMISSIVE, Shading.rim(c1().mul(amount()), 3f));</span>
+<span class="fc" id="L182">        return m;</span>
+    }
+
+    /// Woven cloth: a fine cross weave and a soft sheen at grazing angles.
+    /// Uses the mesh's UVs.
+    ///
+    /// #### Returns
+    ///
+    /// a new shader material
+    public static ShaderMaterial fabric() {
+<span class="fc" id="L192">        ShaderMaterial m = base(0x8a2f3a, 0xffffff, 0.25f, 80f);</span>
+<span class="fc" id="L193">        ShaderNode p = uv().mul(uniform(SCALE, ShaderType.FLOAT));</span>
+<span class="fc" id="L194">        ShaderNode weave = sin(p.x().mul((float) Math.PI)).mul(sin(p.y().mul((float) Math.PI)));</span>
+<span class="fc" id="L195">        ShaderNode rgb = c1().mul(weave.mul(0.15f).add(0.9f));</span>
+<span class="fc" id="L196">        m.set(ShaderMaterial.Hook.BASE_COLOR, vec(rgb, f(1f)));</span>
+<span class="fc" id="L197">        m.set(ShaderMaterial.Hook.ROUGHNESS, f(0.95f));</span>
+<span class="fc" id="L198">        m.set(ShaderMaterial.Hook.METALLIC, f(0f));</span>
+<span class="fc" id="L199">        m.set(ShaderMaterial.Hook.EMISSIVE, Shading.rim(c1().mul(amount()).add(c2().mul(amount().mul(0.2f))), 2f)</span>
+<span class="fc" id="L200">                .mul(sunColor()));</span>
+<span class="fc" id="L201">        return m;</span>
+    }
+
+    /// Car paint: a glossy coat over a metallic base with sparkling flakes.
+    /// `COLOR` is the paint, `COLOR2` the flake colour.
+    ///
+    /// #### Returns
+    ///
+    /// a new shader material
+    public static ShaderMaterial carPaint() {
+<span class="fc" id="L211">        ShaderMaterial m = base(0x9c1020, 0xffe0d0, 0.6f, 60f);</span>
+<span class="fc" id="L212">        ShaderNode cell = floor(worldPos().mul(uniform(SCALE, ShaderType.FLOAT)));</span>
+<span class="fc" id="L213">        ShaderNode flake = step(f(0.93f), Noise.hash(cell.xy().add(cell.z().mul(17f))));</span>
+<span class="fc" id="L214">        ShaderNode fr = Shading.fresnel(5f);</span>
+<span class="fc" id="L215">        m.set(ShaderMaterial.Hook.BASE_COLOR, vec(mix(c1(), c1().mul(0.4f), fr), f(1f)));</span>
+<span class="fc" id="L216">        m.set(ShaderMaterial.Hook.METALLIC, f(0.6f));</span>
+<span class="fc" id="L217">        m.set(ShaderMaterial.Hook.ROUGHNESS, f(0.18f));</span>
+<span class="fc" id="L218">        ShaderNode sparkle = pow(saturate(dot(reflect(viewDir().negate(), normalize(worldNormal())), sunDir())), 12f);</span>
+<span class="fc" id="L219">        m.set(ShaderMaterial.Hook.EMISSIVE, c2().mul(sunColor()).mul(flake.mul(sparkle).mul(amount()))</span>
+<span class="fc" id="L220">                .add(Shading.rim(vec3(0.25f, 0.28f, 0.32f), 4f)));</span>
+<span class="fc" id="L221">        return m;</span>
+    }
+
+    /// Paint splats on any surface: up to `MAX_SPLATS` blobs with ragged
+    /// edges and drips, glossier than what they cover. Place them with
+    /// `setSplat`; the surface underneath keeps its own colour and texture.
+    ///
+    /// #### Returns
+    ///
+    /// a new shader material
+    public static ShaderMaterial paintSplats() {
+<span class="fc" id="L232">        ShaderMaterial m = new ShaderMaterial();</span>
+<span class="fc bfc" id="L233" title="All 2 branches covered.">        for (int i = 0; i &lt; MAX_SPLATS; i++) {</span>
+<span class="fc" id="L234">            m.declareUniform(&quot;splatP&quot; + i, ShaderType.VEC4).declareUniform(&quot;splatC&quot; + i, ShaderType.VEC3);</span>
+        }
+<span class="fc" id="L236">        ShaderNode p = worldPos();</span>
+<span class="fc" id="L237">        ShaderNode rgb = baseColor().rgb();</span>
+<span class="fc" id="L238">        ShaderNode wet = f(0f);</span>
+<span class="fc bfc" id="L239" title="All 2 branches covered.">        for (int i = 0; i &lt; MAX_SPLATS; i++) {</span>
+<span class="fc" id="L240">            ShaderNode sp = uniform(&quot;splatP&quot; + i, ShaderType.VEC4);</span>
+<span class="fc" id="L241">            ShaderNode d = p.sub(sp.swizzle(&quot;xyz&quot;));</span>
+<span class="fc" id="L242">            ShaderNode r = max(sp.w(), f(0.0001f));</span>
+            // ragged rim: noise around the centre, plus a drip running down walls
+<span class="fc" id="L244">            ShaderNode edge = Noise.value(vec(atan2(d.z(), d.x()).mul(2.5f), f(i * 7.3f))).mul(0.45f).add(0.75f);</span>
+<span class="fc" id="L245">            ShaderNode drip = smoothstep(f(0f), r.mul(-1.5f), d.y()).mul(smoothstep(r.mul(0.3f), f(0f), abs(d.x()).add(abs(d.z()).mul(0.2f))));</span>
+<span class="fc" id="L246">            ShaderNode cover = smoothstep(r.mul(edge), r.mul(edge).mul(0.85f), length(d)).add(drip);</span>
+<span class="fc" id="L247">            cover = saturate(cover).mul(step(f(0.0002f), sp.w()));</span>
+<span class="fc" id="L248">            rgb = mix(rgb, uniform(&quot;splatC&quot; + i, ShaderType.VEC3), cover);</span>
+<span class="fc" id="L249">            wet = max(wet, cover);</span>
+        }
+<span class="fc" id="L251">        m.set(ShaderMaterial.Hook.BASE_COLOR, vec(rgb, baseColor().w()));</span>
+<span class="fc" id="L252">        m.set(ShaderMaterial.Hook.ROUGHNESS, mix(f(0.8f), f(0.25f), wet));</span>
+<span class="fc" id="L253">        return m;</span>
+    }
+
+    /// Places or clears a splat of a `paintSplats` material.
+    ///
+    /// #### Parameters
+    ///
+    /// - `splats`: a material from `paintSplats`
+    ///
+    /// - `index`: 0 to `MAX_SPLATS - 1`; reuse the oldest when full
+    ///
+    /// - `x`: world centre
+    ///
+    /// - `y`: world centre
+    ///
+    /// - `z`: world centre
+    ///
+    /// - `radius`: world radius, 0 to clear the slot
+    ///
+    /// - `rgb`: paint colour as `0xRRGGBB`
+    public static void setSplat(ShaderMaterial splats, int index, float x, float y, float z, float radius, int rgb) {
+<span class="fc" id="L274">        splats.setUniform(&quot;splatP&quot; + index, x, y, z, radius);</span>
+<span class="fc" id="L275">        splats.setColorUniform(&quot;splatC&quot; + index, rgb);</span>
+<span class="fc" id="L276">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

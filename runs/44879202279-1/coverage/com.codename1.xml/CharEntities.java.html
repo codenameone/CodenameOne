@@ -1,0 +1,229 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CharEntities.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.xml</a> &gt; <span class="el_source">CharEntities.java</span></div><h1>CharEntities.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.xml;
+
+import java.util.Hashtable;
+
+/// The character entity tables of the XML and HTML parsers, and the lookups
+/// over them.
+///
+/// It lives here rather than in `com.codename1.ui.html` so that [XMLParser] can
+/// decode entities without linking any UI class: the parser is shared with the
+/// server runtime. `com.codename1.ui.html.HTMLUtils` delegates to it, so the
+/// lenient HTML behaviour is unchanged.
+@com.codename1.impl.SharedWithBackend
+public final class CharEntities {
+
+    /// The char entities strings supported in XML. When a char entity is found these will be compared against first.
+<span class="fc" id="L38">    private static final String[] XML_CHAR_ENTITIES = {</span>
+            &quot;lt&quot;, // lesser-than
+            &quot;gt&quot;, // greater-than
+            &quot;amp&quot;, // ampersand
+            &quot;quot&quot;, //quotation mark
+            &quot;apos&quot;, // apostrophe
+    };
+    /// The numericals value of char entities strings above.
+<span class="fc" id="L46">    private static final int[] XML_CHAR_ENTITIES_VALS = {</span>
+            60, // &quot;lt&quot;, // lesser-than
+            62, // &quot;gt&quot;, // greater-than
+            38, // &quot;amp&quot;, // ampersand
+            34, // &quot;quot&quot;, //quotation mark
+            39, // &quot;apos&quot;, // apostrophe
+    };
+    /// This is a list of ISO 8859-1 Symbols that can be used as HTML char entities
+<span class="fc" id="L54">    private static final String[] HTML_BASIC_CHAR_ENTITY_STRINGS = {</span>
+            &quot;nbsp&quot;, &quot;iexcl&quot;, &quot;cent&quot;, &quot;pound&quot;, &quot;curren&quot;, &quot;yen&quot;, &quot;brvbar&quot;, &quot;sect&quot;, &quot;uml&quot;, &quot;copy&quot;, &quot;ordf&quot;, &quot;laquo&quot;, &quot;not&quot;, &quot;shy&quot;, &quot;reg&quot;, &quot;macr&quot;, &quot;deg&quot;, &quot;plusmn&quot;, &quot;sup2&quot;, &quot;sup3&quot;, &quot;acute&quot;,
+            &quot;micro&quot;, &quot;para&quot;, &quot;middot&quot;, &quot;cedil&quot;, &quot;sup1&quot;, &quot;ordm&quot;, &quot;raquo&quot;, &quot;frac14&quot;, &quot;frac12&quot;, &quot;frac34&quot;, &quot;iquest&quot;, &quot;Agrave&quot;, &quot;Aacute&quot;, &quot;Acirc&quot;, &quot;Atilde&quot;, &quot;Auml&quot;, &quot;Aring&quot;, &quot;AElig&quot;,
+            &quot;Ccedil&quot;, &quot;Egrave&quot;, &quot;Eacute&quot;, &quot;Ecirc&quot;, &quot;Euml&quot;, &quot;Igrave&quot;, &quot;Iacute&quot;, &quot;Icirc&quot;, &quot;Iuml&quot;, &quot;ETH&quot;, &quot;Ntilde&quot;, &quot;Ograve&quot;, &quot;Oacute&quot;, &quot;Ocirc&quot;, &quot;Otilde&quot;, &quot;Ouml&quot;, &quot;times&quot;, &quot;Oslash&quot;,
+            &quot;Ugrave&quot;, &quot;Uacute&quot;, &quot;Ucirc&quot;, &quot;Uuml&quot;, &quot;Yacute&quot;, &quot;THORN&quot;, &quot;szlig&quot;, &quot;agrave&quot;, &quot;aacute&quot;, &quot;acirc&quot;, &quot;atilde&quot;, &quot;auml&quot;, &quot;aring&quot;, &quot;aelig&quot;, &quot;ccedil&quot;, &quot;egrave&quot;, &quot;eacute&quot;, &quot;ecirc&quot;,
+            &quot;euml&quot;, &quot;igrave&quot;, &quot;iacute&quot;, &quot;icirc&quot;, &quot;iuml&quot;, &quot;eth&quot;, &quot;ntilde&quot;, &quot;ograve&quot;, &quot;oacute&quot;, &quot;ocirc&quot;, &quot;otilde&quot;, &quot;ouml&quot;, &quot;divide&quot;, &quot;oslash&quot;, &quot;ugrave&quot;, &quot;uacute&quot;, &quot;ucirc&quot;, &quot;uuml&quot;,
+            &quot;yacute&quot;, &quot;thorn&quot;, &quot;yuml&quot;};
+    /// Common HTML 4 named entities outside the contiguous ISO-8859-1 range above. Keeping these in
+    /// the shared parser utility lets all tolerant HTMLParser clients decode modern pasted fragments
+    /// without maintaining their own entity tables.
+<span class="fc" id="L64">    private static final String[] HTML_EXTENDED_CHAR_ENTITY_STRINGS = {</span>
+            &quot;OElig&quot;, &quot;oelig&quot;, &quot;Scaron&quot;, &quot;scaron&quot;, &quot;Yuml&quot;, &quot;fnof&quot;, &quot;circ&quot;, &quot;tilde&quot;,
+            &quot;ensp&quot;, &quot;emsp&quot;, &quot;thinsp&quot;, &quot;zwnj&quot;, &quot;zwj&quot;, &quot;lrm&quot;, &quot;rlm&quot;, &quot;ndash&quot;, &quot;mdash&quot;,
+            &quot;lsquo&quot;, &quot;rsquo&quot;, &quot;sbquo&quot;, &quot;ldquo&quot;, &quot;rdquo&quot;, &quot;bdquo&quot;, &quot;dagger&quot;, &quot;Dagger&quot;, &quot;bull&quot;,
+            &quot;hellip&quot;, &quot;permil&quot;, &quot;prime&quot;, &quot;Prime&quot;, &quot;lsaquo&quot;, &quot;rsaquo&quot;, &quot;oline&quot;, &quot;frasl&quot;, &quot;euro&quot;,
+            &quot;image&quot;, &quot;weierp&quot;, &quot;real&quot;, &quot;trade&quot;, &quot;alefsym&quot;
+    };
+<span class="fc" id="L71">    private static final int[] HTML_EXTENDED_CHAR_ENTITY_VALUES = {</span>
+            338, 339, 352, 353, 376, 402, 710, 732,
+            8194, 8195, 8201, 8204, 8205, 8206, 8207, 8211, 8212,
+            8216, 8217, 8218, 8220, 8221, 8222, 8224, 8225, 8226,
+            8230, 8240, 8242, 8243, 8249, 8250, 8254, 8260, 8364,
+            8465, 8472, 8476, 8482, 8501
+    };
+
+    private CharEntities() {
+    }
+
+    /// Converts a char entity to the matching character, the lenient way the
+    /// HTML parser always has: the XML names match ignoring case, and a numeric
+    /// reference is truncated to one `char`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `charEntity`: The char entity to convert (Not including the &amp; and ;)
+    ///
+    /// - `lookupHTMLentities`: true to include the basic HTML named char entities (unicode 160-255), false otherwise
+    ///
+    /// - `userDefinedCharEntities`: A hashtable containing (String,int) denoting the char entity name and its unicode
+    ///
+    /// #### Returns
+    ///
+    /// A string containing a single char
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: if the entity is unknown
+    @SuppressWarnings(&quot;PMD.EmptyCatchBlock&quot;)
+    public static String convert(String charEntity, boolean lookupHTMLentities, Hashtable userDefinedCharEntities) {
+<span class="fc" id="L103">        int charCode = -1;</span>
+<span class="fc bfc" id="L104" title="All 2 branches covered.">        if (charEntity.startsWith(&quot;#&quot;)) { //numbered char entity</span>
+<span class="fc bfc" id="L105" title="All 2 branches covered.">            if (charEntity.startsWith(&quot;#x&quot;)) { //hex</span>
+                try {
+<span class="fc" id="L107">                    charCode = Integer.parseInt(charEntity.substring(2), 16);</span>
+<span class="nc" id="L108">                } catch (NumberFormatException nfe) {</span>
+                    //if not a number - simply ignore char entity
+<span class="pc" id="L110">                }</span>
+            } else {
+                try {
+<span class="fc" id="L113">                    charCode = Integer.parseInt(charEntity.substring(1));</span>
+<span class="nc" id="L114">                } catch (NumberFormatException nfe) {</span>
+                    //if not a number - simply ignore char entity
+<span class="pc" id="L116">                }</span>
+            }
+        } else { //not numbered, rather a symbol
+<span class="fc" id="L119">            charCode = getCharEntityCode(charEntity, lookupHTMLentities, userDefinedCharEntities);</span>
+        }
+
+<span class="fc bfc" id="L122" title="All 2 branches covered.">        if (charCode != -1) {</span>
+<span class="fc" id="L123">            return String.valueOf((char) charCode);</span>
+        }
+<span class="fc" id="L125">        throw new IllegalArgumentException(&quot;Unknown character entity - &quot; + charEntity);</span>
+    }
+
+    /// Decodes a reference the way XML defines it: the five predefined names,
+    /// matched exactly, a decimal or hexadecimal character reference to a legal
+    /// code point (a supplementary one becomes a surrogate pair), or a name in
+    /// `userDefinedCharEntities`. Entities a document declares itself are never
+    /// consulted, so nothing a document says can be expanded.
+    ///
+    /// #### Parameters
+    ///
+    /// - `ref`: the reference without the &amp; and ;
+    ///
+    /// - `userDefinedCharEntities`: names the application added, or null
+    ///
+    /// #### Returns
+    ///
+    /// the decoded characters, or null when the reference is undefined or invalid
+    public static String decodeXml(String ref, Hashtable userDefinedCharEntities) {
+<span class="fc bfc" id="L144" title="All 2 branches covered.">        for (int i = 0; i &lt; XML_CHAR_ENTITIES.length; i++) {</span>
+<span class="pc bpc" id="L145" title="1 of 2 branches missed.">            if (XML_CHAR_ENTITIES[i].equals(ref)) {</span>
+<span class="nc" id="L146">                return String.valueOf((char) XML_CHAR_ENTITIES_VALS[i]);</span>
+            }
+        }
+<span class="fc bfc" id="L149" title="All 4 branches covered.">        if (ref.length() &gt; 1 &amp;&amp; ref.charAt(0) == '#') {</span>
+<span class="fc" id="L150">            int code = parseCharRef(ref);</span>
+<span class="fc bfc" id="L151" title="All 6 branches covered.">            if (code &lt;= 0 || (code &gt;= 0xd800 &amp;&amp; code &lt;= 0xdfff)) {</span>
+<span class="fc" id="L152">                return null;</span>
+            }
+<span class="fc bfc" id="L154" title="All 2 branches covered.">            if (code &gt;= 0x10000) {</span>
+<span class="fc" id="L155">                int v = code - 0x10000;</span>
+<span class="fc" id="L156">                char[] pair = {(char) (0xd800 + (v &gt;&gt; 10)), (char) (0xdc00 + (v &amp; 0x3ff))};</span>
+<span class="fc" id="L157">                return new String(pair);</span>
+            }
+<span class="fc" id="L159">            return String.valueOf((char) code);</span>
+        }
+<span class="fc bfc" id="L161" title="All 2 branches covered.">        if (userDefinedCharEntities != null) {</span>
+<span class="fc" id="L162">            Object code = userDefinedCharEntities.get(ref);</span>
+<span class="pc bpc" id="L163" title="1 of 2 branches missed.">            if (code instanceof Integer) {</span>
+<span class="fc" id="L164">                return String.valueOf((char) ((Integer) code).intValue());</span>
+            }
+        }
+<span class="fc" id="L167">        return null;</span>
+    }
+
+    /// The code point of `#123` or `#x7b`, or -1 when it is not one.
+    private static int parseCharRef(String ref) {
+<span class="pc bpc" id="L172" title="1 of 6 branches missed.">        boolean hex = ref.length() &gt; 2 &amp;&amp; (ref.charAt(1) == 'x' || ref.charAt(1) == 'X');</span>
+<span class="fc bfc" id="L173" title="All 2 branches covered.">        int start = hex ? 2 : 1;</span>
+<span class="fc bfc" id="L174" title="All 2 branches covered.">        int radix = hex ? 16 : 10;</span>
+<span class="fc" id="L175">        int value = 0;</span>
+<span class="fc bfc" id="L176" title="All 2 branches covered.">        for (int i = start; i &lt; ref.length(); i++) {</span>
+<span class="fc" id="L177">            int digit = Character.digit(ref.charAt(i), radix);</span>
+<span class="pc bpc" id="L178" title="1 of 2 branches missed.">            if (digit &lt; 0) {</span>
+<span class="nc" id="L179">                return -1;</span>
+            }
+<span class="fc" id="L181">            value = value * radix + digit;</span>
+<span class="fc bfc" id="L182" title="All 2 branches covered.">            if (value &gt; 0x10ffff) {</span>
+<span class="fc" id="L183">                return -1;</span>
+            }
+        }
+<span class="fc" id="L186">        return value;</span>
+    }
+
+    private static int getCharEntityCode(String symbol, boolean html, Hashtable userDefined) {
+        // First tries the XML basic char entities
+<span class="fc bfc" id="L191" title="All 2 branches covered.">        for (int i = 0; i &lt; XML_CHAR_ENTITIES.length; i++) {</span>
+<span class="fc bfc" id="L192" title="All 2 branches covered.">            if (symbol.equalsIgnoreCase(XML_CHAR_ENTITIES[i])) {</span>
+<span class="fc" id="L193">                return XML_CHAR_ENTITIES_VALS[i];</span>
+            }
+        }
+<span class="fc bfc" id="L196" title="All 2 branches covered.">        if (html) {</span>
+            // Not one of the most popular char codes, proceed to check the ISO-8859-1 symbols array
+<span class="fc" id="L198">            int val = indexOf(symbol, HTML_BASIC_CHAR_ENTITY_STRINGS);</span>
+<span class="fc bfc" id="L199" title="All 2 branches covered.">            if (val != -1) {</span>
+<span class="fc" id="L200">                return val + 160;</span>
+            }
+<span class="fc" id="L202">            val = indexOf(symbol, HTML_EXTENDED_CHAR_ENTITY_STRINGS);</span>
+<span class="fc bfc" id="L203" title="All 2 branches covered.">            if (val != -1) {</span>
+<span class="fc" id="L204">                return HTML_EXTENDED_CHAR_ENTITY_VALUES[val];</span>
+            }
+        }
+
+        // Not found in the standard symbol table, see if it is in the user defined symbols table
+<span class="fc bfc" id="L209" title="All 2 branches covered.">        if (userDefined != null) {</span>
+<span class="fc" id="L210">            Object charObj = userDefined.get(symbol);</span>
+<span class="pc bpc" id="L211" title="1 of 2 branches missed.">            if (charObj instanceof Integer) {</span>
+<span class="nc" id="L212">                return ((Integer) charObj).intValue();</span>
+            }
+        }
+
+        // Not found anywhere
+<span class="fc" id="L217">        return -1;</span>
+    }
+
+    private static int indexOf(String str, String[] options) {
+<span class="fc bfc" id="L221" title="All 2 branches covered.">        for (int i = 0; i &lt; options.length; i++) {</span>
+<span class="fc bfc" id="L222" title="All 2 branches covered.">            if (str.equals(options[i])) {</span>
+<span class="fc" id="L223">                return i;</span>
+            }
+        }
+<span class="fc" id="L226">        return -1;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,2139 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DataGrid.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.table</a> &gt; <span class="el_source">DataGrid.java</span></div><h1>DataGrid.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ui.table;
+
+import com.codename1.ui.Component;
+import com.codename1.ui.Container;
+import com.codename1.ui.Display;
+import com.codename1.ui.Font;
+import com.codename1.ui.Graphics;
+import com.codename1.ui.ScrollSurface;
+import com.codename1.ui.TopLevelContainer;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.events.DataChangedListener;
+import com.codename1.ui.events.SelectionListener;
+import com.codename1.ui.geom.Dimension;
+import com.codename1.ui.layouts.Layout;
+import com.codename1.ui.plaf.Style;
+import com.codename1.ui.util.EventDispatcher;
+
+import java.util.ArrayList;
+import java.util.List;
+
+/// A grid of data for large sets: a `TableModel` or a tree of rows, with
+/// sorting, filtering, grouping, frozen columns, resizable and movable
+/// columns, selection, keyboard navigation and editing in place.
+///
+/// The grid paints its cells itself, like the `com.codename1.ui.scheduler`
+/// views. There is no component per cell or per row: only the rows on screen
+/// are painted, sorting and filtering move row numbers in an array and never
+/// the data, and opening a node of a tree costs what it shows. A million rows
+/// scroll as one hundred do. `Table`, which lays out a component per cell,
+/// is the class for a small form laid out as a table.
+///
+/// ```java
+/// TableModel model = new DefaultTableModel(new String[]{&quot;Name&quot;, &quot;Team&quot;, &quot;Score&quot;}, new Object[][]{
+///         {&quot;dana&quot;, &quot;red&quot;, 7}, {&quot;Ann&quot;, &quot;blue&quot;, 3}, {&quot;carl&quot;, &quot;red&quot;, 9}}, true);
+/// Form form = new Form(&quot;Scores&quot;, new BorderLayout());
+/// DataGrid grid = new DataGrid(model);
+/// grid.getColumn(0).setFlex(1);
+/// grid.getColumn(2).setKind(GridColumn.Kind.NUMBER).setAggregate(GridAggregate.SUM);
+/// grid.setFrozenColumns(1);
+/// grid.sortBy(grid.getColumn(2), false);
+/// form.add(BorderLayout.CENTER, grid);
+/// form.show();
+/// ```
+///
+/// #### Rows
+///
+/// A row number of the grid is a *view row*: an index into what is shown
+/// after filtering, sorting, grouping and the opening of nodes. It is not a
+/// row of the model; `getModelRow(int)` and `getNode(int)` translate it.
+///
+/// #### Trees
+///
+/// Built over a `TreeTableModel`, the grid is a tree table: the tree column
+/// (`setTreeColumn`, the first visible one by default) shows each node
+/// indented under its parent with an arrow that opens it. Children are asked
+/// of the model when a node is first opened. Sorting orders siblings.
+///
+/// #### Editing
+///
+/// A cell is edited when its column and its model both allow it. A boolean
+/// toggles with a tap. Any other value is edited by its column's
+/// `GridCellEditor`, which supplies a component the grid lays over the cell
+/// while it is edited and removes afterwards: a text field, or a picker for
+/// a date or a choice.
+///
+/// #### Styles
+///
+/// `DataGrid` (the background), `DataGridHeader`, `DataGridRow` and its
+/// selected state, `DataGridRowAlt` (every other row), `DataGridGroupRow`,
+/// `DataGridLine` (the foreground is the colour of the grid lines),
+/// `DataGridCheck` and `DataGridEditor`. Only colours, fonts and paddings are
+/// read; nothing has a border.
+public class DataGrid extends ScrollSurface {
+
+    /// What a tap selects.
+<span class="fc" id="L99">    public enum SelectionMode {</span>
+        /// Nothing is selected; the keyboard still moves between cells.
+<span class="fc" id="L101">        NONE,</span>
+        /// One row.
+<span class="fc" id="L103">        SINGLE_ROW,</span>
+        /// Any rows: Shift extends from the last row chosen, Control or
+        /// Command adds and removes one, and a mouse drag selects a range.
+<span class="fc" id="L106">        MULTIPLE_ROWS,</span>
+        /// One cell, outlined, in a row that is shown selected.
+<span class="fc" id="L108">        SINGLE_CELL</span>
+    }
+
+    private static final int GESTURE_NONE = 0;
+    private static final int GESTURE_RESIZE = 1;
+    private static final int GESTURE_MOVE = 2;
+    private static final int GESTURE_SELECT = 3;
+
+    private GridRows rows;
+    private FlatRows flat;
+    private TreeRows tree;
+    private boolean listening;
+<span class="fc" id="L120">    private final DataChangedListener modelListener = new DataChangedListener() {</span>
+        @Override
+        public void dataChanged(int row, int column) {
+<span class="fc" id="L123">            modelChanged(row, column);</span>
+<span class="fc" id="L124">        }</span>
+    };
+
+<span class="fc" id="L127">    private final ArrayList&lt;GridColumn&gt; columns = new ArrayList&lt;GridColumn&gt;();</span>
+    private GridColumn treeColumn;
+    private int frozen;
+<span class="fc" id="L130">    private final ArrayList&lt;GridColumn&gt; sortColumns = new ArrayList&lt;GridColumn&gt;();</span>
+<span class="fc" id="L131">    private final ArrayList&lt;Boolean&gt; sortAscending = new ArrayList&lt;Boolean&gt;();</span>
+
+<span class="fc" id="L133">    private SelectionMode selectionMode = SelectionMode.MULTIPLE_ROWS;</span>
+<span class="fc" id="L134">    private final GridSelection selection = new GridSelection();</span>
+<span class="fc" id="L135">    private int lead = -1;</span>
+    private int leadColumn;
+<span class="fc" id="L137">    private int anchor = -1;</span>
+
+    private float rowHeightMM;
+<span class="fc" id="L140">    private boolean headerVisible = true;</span>
+<span class="fc" id="L141">    private boolean striped = true;</span>
+<span class="fc" id="L142">    private boolean horizontalLines = true;</span>
+<span class="fc" id="L143">    private boolean verticalLines = true;</span>
+<span class="fc" id="L144">    private String emptyText = &quot;&quot;;</span>
+<span class="fc" id="L145">    private GridCellRenderer defaultRenderer = new DefaultGridCellRenderer();</span>
+<span class="fc" id="L146">    private GridCellEditor defaultEditor = new DefaultGridCellEditor();</span>
+    private GridCellPicker cellPicker;
+    private boolean picking;
+    private com.codename1.ui.Painter overlayPainter;
+
+    // layout
+<span class="fc" id="L152">    private boolean dirty = true;</span>
+<span class="fc" id="L153">    private int laidW = -1;</span>
+<span class="fc" id="L154">    private int laidH = -1;</span>
+<span class="fc" id="L155">    private int laidGen = -1;</span>
+<span class="fc" id="L156">    private GridColumn[] vis = new GridColumn[0];</span>
+<span class="fc" id="L157">    private int[] colX = new int[0];</span>
+<span class="fc" id="L158">    private int[] colW = new int[0];</span>
+    private int frozenCount;
+    private int frozenW;
+    private int scrollW;
+<span class="fc" id="L162">    private int rowH = 1;</span>
+    private int headerH;
+    private int indentW;
+    private int arrowW;
+
+    // gestures
+    private int gesture;
+<span class="fc" id="L169">    private int dragColumn = -1;</span>
+    private int dragStartX;
+    private int dragStartW;
+    private int dragX;
+<span class="fc" id="L173">    private int moveTarget = -1;</span>
+
+    // editing
+<span class="fc" id="L176">    private int editRow = -1;</span>
+    private GridColumn editColumn;
+    private Component editor;
+    private GridCellEditor editorSource;
+    private Container editorHolder;
+    private Object editKey;
+    private boolean committing;
+    // True while the selection is what selectAll() made it: only then does a
+    // rebuild select every row again, however many there are now.
+    private boolean selectedAll;
+
+<span class="fc" id="L187">    private final GridCell cell = new GridCell();</span>
+<span class="fc" id="L188">    private final EventDispatcher selectionListeners = new EventDispatcher();</span>
+<span class="fc" id="L189">    private final EventDispatcher actionListeners = new EventDispatcher();</span>
+
+    /// A grid with no data.
+    public DataGrid() {
+<span class="nc" id="L193">        this(new DefaultTableModel(new String[0], new Object[0][]));</span>
+<span class="nc" id="L194">    }</span>
+
+    /// A grid over the rows of a table model, with a column for each of its
+    /// columns.
+<span class="fc" id="L198">    public DataGrid(TableModel model) {</span>
+<span class="fc" id="L199">        setUIID(&quot;DataGrid&quot;);</span>
+<span class="fc" id="L200">        setModel(model);</span>
+<span class="fc" id="L201">    }</span>
+
+    /// A tree grid over a tree table model, with a column for each of its
+    /// columns.
+<span class="fc" id="L205">    public DataGrid(TreeTableModel model) {</span>
+<span class="fc" id="L206">        setUIID(&quot;DataGrid&quot;);</span>
+<span class="fc" id="L207">        setModel(model);</span>
+<span class="fc" id="L208">    }</span>
+
+    // ------------------------------------------------------------- models
+
+    /// Shows the rows of a table model, with a column for each of its
+    /// columns. Sorting, filtering and grouping are kept when their columns
+    /// still exist.
+    public final void setModel(TableModel model) {
+<span class="fc" id="L216">        cancelEdit();</span>
+<span class="fc" id="L217">        unlisten();</span>
+<span class="fc" id="L218">        flat = new FlatRows(model);</span>
+<span class="fc" id="L219">        tree = null;</span>
+<span class="fc" id="L220">        rows = flat;</span>
+<span class="fc" id="L221">        resetColumns(model.getColumnCount());</span>
+<span class="fc" id="L222">        listen();</span>
+<span class="fc" id="L223">        rebuildKeepingNothing();</span>
+<span class="fc" id="L224">    }</span>
+
+    /// Shows the nodes of a tree table model, with a column for each of its
+    /// columns. The roots are shown closed.
+    public final void setModel(TreeTableModel model) {
+<span class="fc" id="L229">        cancelEdit();</span>
+<span class="fc" id="L230">        unlisten();</span>
+<span class="fc" id="L231">        flat = null;</span>
+<span class="fc" id="L232">        tree = new TreeRows(model);</span>
+<span class="fc" id="L233">        rows = tree;</span>
+<span class="fc" id="L234">        resetColumns(model.getColumnCount());</span>
+<span class="fc" id="L235">        rebuildKeepingNothing();</span>
+<span class="fc" id="L236">    }</span>
+
+    /// The table model shown, or null for a tree grid.
+    public TableModel getTableModel() {
+<span class="pc bpc" id="L240" title="1 of 2 branches missed.">        return flat == null ? null : flat.model();</span>
+    }
+
+    /// The tree model shown, or null for a flat grid.
+    public TreeTableModel getTreeModel() {
+<span class="nc bnc" id="L245" title="All 2 branches missed.">        return tree == null ? null : tree.model();</span>
+    }
+
+    /// Whether this is a tree grid.
+    public boolean isTree() {
+<span class="fc bfc" id="L250" title="All 2 branches covered.">        return tree != null;</span>
+    }
+
+    private void resetColumns(int count) {
+<span class="fc" id="L254">        columns.clear();</span>
+<span class="fc" id="L255">        sortColumns.clear();</span>
+<span class="fc" id="L256">        sortAscending.clear();</span>
+<span class="fc" id="L257">        treeColumn = null;</span>
+<span class="fc bfc" id="L258" title="All 2 branches covered.">        for (int i = 0; i &lt; count; i++) {</span>
+<span class="fc" id="L259">            String name = rows.columnName(i);</span>
+<span class="pc bpc" id="L260" title="1 of 2 branches missed.">            columns.add(new GridColumn(i, name == null ? &quot;&quot; : name));</span>
+        }
+<span class="fc bfc" id="L262" title="All 2 branches covered.">        if (flat != null) {</span>
+<span class="fc" id="L263">            flat.setGroupColumn(null);</span>
+        }
+<span class="fc" id="L265">        pushColumns();</span>
+<span class="fc" id="L266">    }</span>
+
+    private void pushColumns() {
+<span class="fc" id="L269">        GridColumn[] all = new GridColumn[columns.size()];</span>
+<span class="fc" id="L270">        columns.toArray(all);</span>
+<span class="fc bfc" id="L271" title="All 2 branches covered.">        if (flat != null) {</span>
+<span class="fc" id="L272">            flat.setColumns(all);</span>
+        }
+<span class="fc" id="L274">        GridColumn[] sc = new GridColumn[sortColumns.size()];</span>
+<span class="fc" id="L275">        boolean[] sa = new boolean[sc.length];</span>
+<span class="fc bfc" id="L276" title="All 2 branches covered.">        for (int i = 0; i &lt; sc.length; i++) {</span>
+<span class="fc" id="L277">            sc[i] = sortColumns.get(i);</span>
+<span class="fc" id="L278">            sa[i] = sortAscending.get(i).booleanValue();</span>
+        }
+<span class="fc" id="L280">        rows.setSort(sc, sa);</span>
+<span class="fc" id="L281">        dirty = true;</span>
+<span class="fc" id="L282">    }</span>
+
+    private void listen() {
+<span class="pc bpc" id="L285" title="1 of 6 branches missed.">        if (!listening &amp;&amp; flat != null &amp;&amp; isInitialized()) {</span>
+<span class="fc" id="L286">            flat.model().addDataChangeListener(modelListener);</span>
+<span class="fc" id="L287">            listening = true;</span>
+        }
+<span class="fc" id="L289">    }</span>
+
+    private void unlisten() {
+<span class="pc bpc" id="L292" title="1 of 4 branches missed.">        if (listening &amp;&amp; flat != null) {</span>
+<span class="fc" id="L293">            flat.model().removeDataChangeListener(modelListener);</span>
+        }
+<span class="fc" id="L295">        listening = false;</span>
+<span class="fc" id="L296">    }</span>
+
+    @Override
+    protected void initComponent() {
+<span class="fc" id="L300">        super.initComponent();</span>
+<span class="fc" id="L301">        boolean was = listening;</span>
+<span class="fc" id="L302">        listen();</span>
+<span class="pc bpc" id="L303" title="1 of 4 branches missed.">        if (!was &amp;&amp; listening) {</span>
+            // It may have changed while nobody listened.
+<span class="fc" id="L305">            refresh();</span>
+        }
+<span class="fc" id="L307">    }</span>
+
+    @Override
+    protected void deinitialize() {
+<span class="fc" id="L311">        commitEdit();</span>
+<span class="fc" id="L312">        unlisten();</span>
+<span class="fc" id="L313">        super.deinitialize();</span>
+<span class="fc" id="L314">    }</span>
+
+    // A TableModel fires (row, column) for a changed cell. It has no event
+    // for an inserted or removed row: DefaultTableModel fires the cells of an
+    // inserted row, and Integer.MIN_VALUE for a removed one. Selection and
+    // edits remember rows by model index, so a change in the row count moves
+    // them: a cell event that comes with more rows is taken as rows inserted
+    // at that row, and a row count that shrank with no position drops the
+    // selection rather than leave it on whatever record slid into its rows.
+    private void modelChanged(int row, int column) {
+<span class="pc bpc" id="L324" title="1 of 2 branches missed.">        if (flat == null) {</span>
+<span class="nc" id="L325">            refresh();</span>
+<span class="nc" id="L326">            return;</span>
+        }
+<span class="fc bfc" id="L328" title="All 2 branches covered.">        if (row == Integer.MIN_VALUE) {</span>
+            // A removal, or &quot;everything changed&quot;: no position to follow.
+            // Events posted from another thread may also arrive after an
+            // insert has evened out the row count.
+<span class="fc" id="L332">            rebuildKeepingNothing();</span>
+<span class="fc" id="L333">            return;</span>
+        }
+<span class="fc" id="L335">        int delta = flat.model().getRowCount() - flat.modelRowsBuilt();</span>
+<span class="fc bfc" id="L336" title="All 2 branches covered.">        if (delta == 0) {</span>
+<span class="pc bpc" id="L337" title="1 of 4 branches missed.">            if (row &gt;= 0 &amp;&amp; !dependsOnValues(column)) {</span>
+                // A value changed where nothing depends on its order.
+<span class="fc" id="L339">                repaint();</span>
+<span class="fc" id="L340">                return;</span>
+            }
+<span class="fc" id="L342">            refresh();</span>
+<span class="fc" id="L343">            return;</span>
+        }
+<span class="fc" id="L345">        dropEdit();</span>
+<span class="pc bpc" id="L346" title="5 of 6 branches missed.">        if (delta &lt; 0 &amp;&amp; (row &lt; 0 || row &gt;= flat.modelRowsBuilt())) {</span>
+<span class="nc" id="L347">            rebuildKeepingNothing();</span>
+<span class="nc" id="L348">            return;</span>
+        }
+<span class="fc" id="L350">        Object[] keys = selectionKeys();</span>
+<span class="pc bpc" id="L351" title="1 of 4 branches missed.">        Object leadKey = lead &gt;= 0 &amp;&amp; lead &lt; rows.size() ? rows.key(lead) : null;</span>
+<span class="pc bpc" id="L352" title="5 of 6 branches missed.">        boolean all = selectedAll &amp;&amp; !selection.isEmpty() &amp;&amp; selection.size() == rows.size();</span>
+<span class="fc" id="L353">        int at = Math.max(0, row);</span>
+<span class="fc bfc" id="L354" title="All 2 branches covered.">        if (keys != null) {</span>
+<span class="fc bfc" id="L355" title="All 2 branches covered.">            for (int i = 0; i &lt; keys.length; i++) {</span>
+<span class="fc" id="L356">                keys[i] = shiftKey(keys[i], at, delta);</span>
+            }
+        }
+<span class="fc" id="L359">        leadKey = shiftKey(leadKey, at, delta);</span>
+<span class="pc bpc" id="L360" title="1 of 4 branches missed.">        Object anchorKey = shiftKey(anchor &gt;= 0 &amp;&amp; anchor &lt; rows.size() ? rows.key(anchor) : null, at, delta);</span>
+<span class="fc" id="L361">        rows.rebuild();</span>
+<span class="fc" id="L362">        restoreSelection(keys, leadKey, all);</span>
+<span class="fc bfc" id="L363" title="All 2 branches covered.">        anchor = anchorKey == null ? lead : rows.find(anchorKey);</span>
+<span class="fc" id="L364">    }</span>
+
+    // Whether a change to a value of the model column can move rows: it is
+    // sorted or grouped by, or a filter may read it.
+    private boolean dependsOnValues(int modelColumn) {
+<span class="pc bpc" id="L369" title="1 of 2 branches missed.">        if (rows.filter != null) {</span>
+<span class="nc" id="L370">            return true;</span>
+        }
+<span class="fc" id="L372">        GridColumn g = flat.getGroupColumn();</span>
+<span class="pc bpc" id="L373" title="3 of 4 branches missed.">        if (g != null &amp;&amp; g.getModelColumn() == modelColumn) {</span>
+<span class="nc" id="L374">            return true;</span>
+        }
+<span class="fc bfc" id="L376" title="All 2 branches covered.">        for (GridColumn c : sortColumns) {</span>
+<span class="fc bfc" id="L377" title="All 2 branches covered.">            if (c.getModelColumn() == modelColumn) {</span>
+<span class="fc" id="L378">                return true;</span>
+            }
+<span class="fc" id="L380">        }</span>
+<span class="fc" id="L381">        return false;</span>
+    }
+
+    // A model row index key after `delta` rows were inserted at `at`, or
+    // removed from `at` on when negative; null for a removed row. Group keys
+    // follow their values and are left alone.
+    private static Object shiftKey(Object key, int at, int delta) {
+<span class="fc bfc" id="L388" title="All 2 branches covered.">        if (!(key instanceof Integer)) {</span>
+<span class="fc" id="L389">            return key;</span>
+        }
+<span class="fc" id="L391">        int v = ((Integer) key).intValue();</span>
+<span class="fc bfc" id="L392" title="All 2 branches covered.">        if (v &lt; at) {</span>
+<span class="fc" id="L393">            return key;</span>
+        }
+<span class="pc bpc" id="L395" title="3 of 4 branches missed.">        if (delta &lt; 0 &amp;&amp; v &lt; at - delta) {</span>
+<span class="nc" id="L396">            return null;</span>
+        }
+<span class="fc" id="L398">        return Integer.valueOf(v + delta);</span>
+    }
+
+    // Closes an open editor without writing it: the row it edits may no
+    // longer be the row it is over, or exist at all.
+    private void dropEdit() {
+<span class="pc bpc" id="L404" title="1 of 4 branches missed.">        if (editor != null &amp;&amp; !committing) {</span>
+<span class="fc" id="L405">            committing = true;</span>
+            try {
+<span class="fc" id="L407">                closeEditor();</span>
+            } finally {
+<span class="fc" id="L409">                committing = false;</span>
+            }
+        }
+<span class="fc" id="L412">    }</span>
+
+    /// Reads the model again: filters, sorts and groups its rows anew and
+    /// keeps the selection on the same rows where they are still shown.
+    public void refresh() {
+<span class="fc" id="L417">        Object[] keys = selectionKeys();</span>
+<span class="pc bpc" id="L418" title="3 of 4 branches missed.">        Object leadKey = lead &gt;= 0 &amp;&amp; lead &lt; rows.size() ? rows.key(lead) : null;</span>
+<span class="pc bpc" id="L419" title="2 of 4 branches missed.">        if (flat != null &amp;&amp; flat.model().getRowCount() != flat.modelRowsBuilt()) {</span>
+            // Rows came or went while no one was listening: where is unknown.
+<span class="nc" id="L421">            rebuildKeepingNothing();</span>
+<span class="nc" id="L422">            return;</span>
+        }
+<span class="pc bpc" id="L424" title="5 of 6 branches missed.">        boolean all = selectedAll &amp;&amp; !selection.isEmpty() &amp;&amp; selection.size() == rows.size();</span>
+<span class="fc" id="L425">        dropEdit();</span>
+<span class="pc bpc" id="L426" title="1 of 2 branches missed.">        if (tree != null) {</span>
+<span class="nc" id="L427">            tree.forget(null);</span>
+        } else {
+<span class="fc" id="L429">            rows.rebuild();</span>
+        }
+<span class="fc" id="L431">        restoreSelection(keys, leadKey, all);</span>
+<span class="fc" id="L432">    }</span>
+
+    /// Asks the tree model again for the children of one node, and shows
+    /// them. Use it after the children of a node changed; `refresh()` reads
+    /// the whole tree again.
+    public void refreshNode(Object node) {
+<span class="nc bnc" id="L438" title="All 2 branches missed.">        if (tree == null) {</span>
+<span class="nc" id="L439">            return;</span>
+        }
+<span class="nc" id="L441">        Object[] keys = selectionKeys();</span>
+<span class="nc bnc" id="L442" title="All 4 branches missed.">        Object leadKey = lead &gt;= 0 &amp;&amp; lead &lt; rows.size() ? rows.key(lead) : null;</span>
+<span class="nc" id="L443">        dropEdit();</span>
+<span class="nc" id="L444">        tree.forget(node);</span>
+<span class="nc" id="L445">        restoreSelection(keys, leadKey, false);</span>
+<span class="nc" id="L446">    }</span>
+
+    private void rebuildKeepingNothing() {
+<span class="fc" id="L449">        dropEdit();</span>
+<span class="fc" id="L450">        selectedAll = false;</span>
+<span class="fc" id="L451">        selection.clear();</span>
+<span class="fc" id="L452">        lead = -1;</span>
+<span class="fc" id="L453">        anchor = -1;</span>
+<span class="fc" id="L454">        rows.rebuild();</span>
+<span class="fc" id="L455">        dirty = true;</span>
+<span class="fc" id="L456">        repaint();</span>
+<span class="fc" id="L457">    }</span>
+
+    // Keys of the selected rows, or null when there are too many to be worth
+    // remembering one by one.
+    private Object[] selectionKeys() {
+<span class="fc" id="L462">        int n = selection.size();</span>
+<span class="pc bpc" id="L463" title="2 of 8 branches missed.">        if (n == 0 || n &gt; 100000 || (selectedAll &amp;&amp; n == rows.size())) {</span>
+<span class="fc" id="L464">            return null;</span>
+        }
+<span class="fc" id="L466">        int[] sel = selection.toArray();</span>
+<span class="fc" id="L467">        Object[] keys = new Object[sel.length];</span>
+<span class="fc bfc" id="L468" title="All 2 branches covered.">        for (int i = 0; i &lt; sel.length; i++) {</span>
+<span class="pc bpc" id="L469" title="1 of 2 branches missed.">            keys[i] = sel[i] &lt; rows.size() ? rows.key(sel[i]) : null;</span>
+        }
+<span class="fc" id="L471">        return keys;</span>
+    }
+
+    private void restoreSelection(Object[] keys, Object leadKey, boolean all) {
+<span class="fc" id="L475">        int oldLead = lead;</span>
+<span class="fc" id="L476">        selection.clear();</span>
+<span class="fc" id="L477">        selectedAll = all;</span>
+<span class="pc bpc" id="L478" title="1 of 4 branches missed.">        if (all &amp;&amp; rows.size() &gt; 0) {</span>
+<span class="fc" id="L479">            selection.set(0, rows.size() - 1);</span>
+<span class="fc bfc" id="L480" title="All 2 branches covered.">        } else if (keys != null) {</span>
+<span class="fc bfc" id="L481" title="All 2 branches covered.">            for (Object key : keys) {</span>
+<span class="pc bpc" id="L482" title="1 of 2 branches missed.">                if (key != null) {</span>
+<span class="fc" id="L483">                    int r = rows.find(key);</span>
+<span class="pc bpc" id="L484" title="1 of 2 branches missed.">                    if (r &gt;= 0) {</span>
+<span class="fc" id="L485">                        selection.add(r, r);</span>
+                    }
+                }
+            }
+        }
+<span class="fc bfc" id="L490" title="All 2 branches covered.">        lead = leadKey == null ? -1 : rows.find(leadKey);</span>
+<span class="pc bpc" id="L491" title="1 of 2 branches missed.">        if (anchor &gt;= rows.size()) {</span>
+<span class="nc" id="L492">            anchor = lead;</span>
+        }
+<span class="fc" id="L494">        dirty = true;</span>
+<span class="fc" id="L495">        repaint();</span>
+<span class="fc bfc" id="L496" title="All 2 branches covered.">        if (oldLead != lead) {</span>
+<span class="fc" id="L497">            selectionListeners.fireSelectionEvent(oldLead, lead);</span>
+        }
+<span class="fc" id="L499">    }</span>
+
+    // ------------------------------------------------------------ columns
+
+    /// The columns, in the order they are shown, hidden ones included.
+    public List&lt;GridColumn&gt; getColumns() {
+<span class="nc" id="L505">        return new ArrayList&lt;GridColumn&gt;(columns);</span>
+    }
+
+    /// How many columns there are, hidden ones included.
+    public int getColumnCount() {
+<span class="nc" id="L510">        return columns.size();</span>
+    }
+
+    /// The column at a place in the order, hidden ones counted.
+    public GridColumn getColumn(int index) {
+<span class="fc" id="L515">        return columns.get(index);</span>
+    }
+
+    /// The column showing a column of the model, or null.
+    public GridColumn getColumnForModel(int modelColumn) {
+<span class="nc bnc" id="L520" title="All 2 branches missed.">        for (GridColumn col : columns) {</span>
+<span class="nc bnc" id="L521" title="All 2 branches missed.">            if (col.getModelColumn() == modelColumn) {</span>
+<span class="nc" id="L522">                return col;</span>
+            }
+<span class="nc" id="L524">        }</span>
+<span class="nc" id="L525">        return null;</span>
+    }
+
+    /// Replaces the columns. A model column with no `GridColumn` is not
+    /// shown, and one may be shown twice.
+    public void setColumns(GridColumn... cols) {
+<span class="fc" id="L531">        cancelEdit();</span>
+<span class="fc" id="L532">        columns.clear();</span>
+<span class="fc bfc" id="L533" title="All 2 branches covered.">        for (GridColumn gc : cols) {</span>
+<span class="fc" id="L534">            columns.add(gc);</span>
+        }
+<span class="fc" id="L536">        dropMissing();</span>
+<span class="fc" id="L537">        pushColumns();</span>
+<span class="fc" id="L538">        rows.rebuild();</span>
+<span class="fc" id="L539">        repaint();</span>
+<span class="fc" id="L540">    }</span>
+
+    /// Adds a column at the end.
+    public void addColumn(GridColumn c) {
+<span class="nc" id="L544">        columns.add(c);</span>
+<span class="nc" id="L545">        pushColumns();</span>
+<span class="nc" id="L546">        repaint();</span>
+<span class="nc" id="L547">    }</span>
+
+    /// Removes a column.
+    public void removeColumn(GridColumn c) {
+<span class="nc" id="L551">        cancelEdit();</span>
+<span class="nc" id="L552">        columns.remove(c);</span>
+<span class="nc" id="L553">        dropMissing();</span>
+<span class="nc" id="L554">        pushColumns();</span>
+<span class="nc" id="L555">        rows.rebuild();</span>
+<span class="nc" id="L556">        repaint();</span>
+<span class="nc" id="L557">    }</span>
+
+    /// Moves the column at `from` in the order to `to`, hidden ones counted.
+    public void moveColumn(int from, int to) {
+<span class="pc bpc" id="L561" title="5 of 10 branches missed.">        if (from == to || from &lt; 0 || to &lt; 0 || from &gt;= columns.size() || to &gt;= columns.size()) {</span>
+<span class="nc" id="L562">            return;</span>
+        }
+<span class="fc" id="L564">        cancelEdit();</span>
+<span class="fc" id="L565">        GridColumn c = columns.remove(from);</span>
+<span class="fc" id="L566">        columns.add(to, c);</span>
+<span class="fc" id="L567">        pushColumns();</span>
+<span class="fc" id="L568">        repaint();</span>
+<span class="fc" id="L569">    }</span>
+
+    private void dropMissing() {
+<span class="pc bpc" id="L572" title="1 of 2 branches missed.">        for (int i = sortColumns.size() - 1; i &gt;= 0; i--) {</span>
+<span class="nc bnc" id="L573" title="All 2 branches missed.">            if (!columns.contains(sortColumns.get(i))) {</span>
+<span class="nc" id="L574">                sortColumns.remove(i);</span>
+<span class="nc" id="L575">                sortAscending.remove(i);</span>
+            }
+        }
+<span class="pc bpc" id="L578" title="4 of 6 branches missed.">        if (flat != null &amp;&amp; flat.getGroupColumn() != null &amp;&amp; !columns.contains(flat.getGroupColumn())) {</span>
+<span class="nc" id="L579">            flat.setGroupColumn(null);</span>
+        }
+<span class="pc bpc" id="L581" title="3 of 4 branches missed.">        if (treeColumn != null &amp;&amp; !columns.contains(treeColumn)) {</span>
+<span class="nc" id="L582">            treeColumn = null;</span>
+        }
+<span class="fc" id="L584">    }</span>
+
+    /// Asks the grid to lay its columns out again, after a column's width,
+    /// title or visibility changed.
+    public void refreshColumns() {
+<span class="fc bfc" id="L589" title="All 2 branches covered.">        for (GridColumn col : columns) {</span>
+<span class="fc" id="L590">            col.width(-1);</span>
+<span class="fc" id="L591">        }</span>
+<span class="fc" id="L592">        pushColumns();</span>
+<span class="fc" id="L593">        repaint();</span>
+<span class="fc" id="L594">    }</span>
+
+    /// How many of the first visible columns stay in place while the rest
+    /// scroll sideways.
+    public int getFrozenColumns() {
+<span class="fc" id="L599">        return frozen;</span>
+    }
+
+    /// Sets how many of the first visible columns stay in place while the
+    /// rest scroll sideways; 0 by default.
+    public void setFrozenColumns(int count) {
+<span class="fc" id="L605">        frozen = Math.max(0, count);</span>
+<span class="fc" id="L606">        dirty = true;</span>
+<span class="fc" id="L607">        repaint();</span>
+<span class="fc" id="L608">    }</span>
+
+    /// The column a tree grid draws the tree in, or null for the first
+    /// visible one.
+    public GridColumn getTreeColumn() {
+<span class="nc" id="L613">        return treeColumn;</span>
+    }
+
+    /// Sets the column a tree grid draws the tree in; null, the default, is
+    /// the first visible one.
+    public void setTreeColumn(GridColumn c) {
+<span class="nc" id="L619">        GridColumn before = effectiveTreeColumn();</span>
+<span class="nc" id="L620">        treeColumn = c;</span>
+<span class="nc" id="L621">        remeasureIndented(before);</span>
+<span class="nc" id="L622">        dirty = true;</span>
+<span class="nc" id="L623">        repaint();</span>
+<span class="nc" id="L624">    }</span>
+
+    // ---------------------------------------------------- sort and filter
+
+    /// Sorts by one column alone.
+    public void sortBy(GridColumn c, boolean ascending) {
+<span class="fc" id="L630">        sortColumns.clear();</span>
+<span class="fc" id="L631">        sortAscending.clear();</span>
+<span class="pc bpc" id="L632" title="1 of 2 branches missed.">        if (c != null) {</span>
+<span class="fc" id="L633">            sortColumns.add(c);</span>
+<span class="fc" id="L634">            sortAscending.add(Boolean.valueOf(ascending));</span>
+        }
+<span class="fc" id="L636">        resort();</span>
+<span class="fc" id="L637">    }</span>
+
+    /// Adds a column to sort by after the ones already sorted by, or changes
+    /// its direction when it is one of them.
+    public void addSort(GridColumn c, boolean ascending) {
+<span class="fc" id="L642">        int i = sortColumns.indexOf(c);</span>
+<span class="pc bpc" id="L643" title="1 of 2 branches missed.">        if (i &gt;= 0) {</span>
+<span class="nc" id="L644">            sortAscending.set(i, Boolean.valueOf(ascending));</span>
+        } else {
+<span class="fc" id="L646">            sortColumns.add(c);</span>
+<span class="fc" id="L647">            sortAscending.add(Boolean.valueOf(ascending));</span>
+        }
+<span class="fc" id="L649">        resort();</span>
+<span class="fc" id="L650">    }</span>
+
+    /// Stops sorting: rows are shown in the model's order.
+    public void clearSort() {
+<span class="fc" id="L654">        sortColumns.clear();</span>
+<span class="fc" id="L655">        sortAscending.clear();</span>
+<span class="fc" id="L656">        resort();</span>
+<span class="fc" id="L657">    }</span>
+
+    /// The columns sorted by, most significant first.
+    public List&lt;GridColumn&gt; getSortColumns() {
+<span class="fc" id="L661">        return new ArrayList&lt;GridColumn&gt;(sortColumns);</span>
+    }
+
+    /// 1 when sorted by `c` ascending, -1 descending, 0 when not sorted by it.
+    public int getSortDirection(GridColumn c) {
+<span class="fc" id="L666">        int i = sortColumns.indexOf(c);</span>
+<span class="fc bfc" id="L667" title="All 2 branches covered.">        if (i &lt; 0) {</span>
+<span class="fc" id="L668">            return 0;</span>
+        }
+<span class="fc bfc" id="L670" title="All 2 branches covered.">        return sortAscending.get(i).booleanValue() ? 1 : -1;</span>
+    }
+
+    private void resort() {
+<span class="fc" id="L674">        pushColumns();</span>
+<span class="fc" id="L675">        refreshRows();</span>
+<span class="fc" id="L676">    }</span>
+
+    // Rebuilds the view rows from what is already loaded.
+    private void refreshRows() {
+<span class="fc" id="L680">        Object[] keys = selectionKeys();</span>
+<span class="pc bpc" id="L681" title="1 of 4 branches missed.">        Object leadKey = lead &gt;= 0 &amp;&amp; lead &lt; rows.size() ? rows.key(lead) : null;</span>
+<span class="pc bpc" id="L682" title="2 of 6 branches missed.">        boolean all = selectedAll &amp;&amp; !selection.isEmpty() &amp;&amp; selection.size() == rows.size();</span>
+<span class="fc" id="L683">        dropEdit();</span>
+<span class="fc" id="L684">        rows.rebuild();</span>
+<span class="fc" id="L685">        restoreSelection(keys, leadKey, all);</span>
+<span class="fc" id="L686">    }</span>
+
+    /// The filter of the rows, or null.
+    public GridFilter getFilter() {
+<span class="nc" id="L690">        return rows.filter;</span>
+    }
+
+    /// Shows only the rows a filter accepts; null shows them all.
+    public void setFilter(GridFilter filter) {
+<span class="fc" id="L695">        cancelEdit();</span>
+<span class="fc" id="L696">        rows.filter = filter;</span>
+<span class="fc" id="L697">        refreshRows();</span>
+<span class="fc" id="L698">    }</span>
+
+    /// The column the rows are grouped by, or null.
+    public GridColumn getGroupColumn() {
+<span class="nc bnc" id="L702" title="All 2 branches missed.">        return flat == null ? null : flat.getGroupColumn();</span>
+    }
+
+    /// Groups the rows by the values of a column, each group under a row of
+    /// its own that opens and closes it; null stops grouping. A tree grid is
+    /// never grouped.
+    ///
+    /// Groups are ordered by their value, in the column's sort direction
+    /// when it is sorted by, and the group rows show the column's
+    /// `GridAggregate`s.
+    public void setGroupColumn(GridColumn c) {
+<span class="pc bpc" id="L713" title="1 of 2 branches missed.">        if (flat == null) {</span>
+<span class="nc" id="L714">            return;</span>
+        }
+<span class="fc" id="L716">        cancelEdit();</span>
+<span class="fc" id="L717">        GridColumn before = effectiveTreeColumn();</span>
+<span class="fc" id="L718">        flat.setGroupColumn(c);</span>
+<span class="fc" id="L719">        remeasureIndented(before);</span>
+<span class="fc" id="L720">        refreshRows();</span>
+<span class="fc" id="L721">    }</span>
+
+    // The column that is indented and carries the arrows measures wider
+    // than it would otherwise; when another column takes that role, a width
+    // measured before would cut its text, so both are measured again. A
+    // width set in millimetres, or dragged to by the user, is kept.
+    private void remeasureIndented(GridColumn before) {
+<span class="fc" id="L728">        GridColumn after = effectiveTreeColumn();</span>
+<span class="pc bpc" id="L729" title="1 of 2 branches missed.">        if (before == after) { //NOPMD CompareObjectsWithEquals - a column is an identity</span>
+<span class="nc" id="L730">            return;</span>
+        }
+<span class="pc bpc" id="L732" title="3 of 4 branches missed.">        if (before != null &amp;&amp; before.measured()) {</span>
+<span class="nc" id="L733">            before.width(-1);</span>
+        }
+<span class="pc bpc" id="L735" title="2 of 4 branches missed.">        if (after != null &amp;&amp; after.measured()) {</span>
+<span class="fc" id="L736">            after.width(-1);</span>
+        }
+<span class="fc" id="L738">        dirty = true;</span>
+<span class="fc" id="L739">    }</span>
+
+    // --------------------------------------------------------------- rows
+
+    /// How many rows are shown, group rows included.
+    public int getRowCount() {
+<span class="fc" id="L745">        return rows.size();</span>
+    }
+
+    /// The value a view row shows in a column.
+    public Object getValueAt(int row, GridColumn c) {
+<span class="fc" id="L750">        return rows.value(row, c.getModelColumn());</span>
+    }
+
+    /// Sets the value of a view row in a column, through the model.
+    public void setValueAt(int row, GridColumn c, Object value) {
+<span class="nc" id="L755">        rows.setValue(row, c.getModelColumn(), value);</span>
+<span class="nc bnc" id="L756" title="All 2 branches missed.">        if (tree != null) {</span>
+<span class="nc" id="L757">            repaint();</span>
+        }
+<span class="nc" id="L759">    }</span>
+
+    /// The model row a view row shows, or -1 for a group row or in a tree
+    /// grid.
+    public int getModelRow(int row) {
+<span class="fc" id="L764">        return rows.modelRow(row);</span>
+    }
+
+    /// The view row showing a model row, or -1 when it is filtered out or in
+    /// a closed group.
+    public int getViewRow(int modelRow) {
+<span class="pc bpc" id="L770" title="1 of 2 branches missed.">        return flat == null ? -1 : flat.viewRowOf(modelRow);</span>
+    }
+
+    /// The node a view row of a tree grid shows, or null.
+    public Object getNode(int row) {
+<span class="fc" id="L775">        return rows.node(row);</span>
+    }
+
+    /// The view row showing a node, or -1 when it is not shown.
+    public int getRowOfNode(Object node) {
+<span class="nc bnc" id="L780" title="All 2 branches missed.">        return tree == null ? -1 : tree.find(node);</span>
+    }
+
+    /// Whether a view row is a group row.
+    public boolean isGroupRow(int row) {
+<span class="fc" id="L785">        return rows.isGroup(row);</span>
+    }
+
+    /// How deep a view row is in the tree: 0 for a root.
+    public int getDepth(int row) {
+<span class="pc bpc" id="L790" title="1 of 2 branches missed.">        return tree == null ? 0 : tree.depth(row);</span>
+    }
+
+    /// Whether a view row can be opened: a node that is not a leaf, or a
+    /// group.
+    public boolean isExpandable(int row) {
+<span class="nc" id="L796">        return rows.isExpandable(row);</span>
+    }
+
+    /// Whether a view row is open.
+    public boolean isExpanded(int row) {
+<span class="pc bpc" id="L801" title="1 of 4 branches missed.">        return rows.isExpandable(row) &amp;&amp; rows.isExpanded(row);</span>
+    }
+
+    /// Opens or closes a view row: a node of a tree, or a group.
+    public void setExpanded(int row, boolean open) {
+<span class="pc bpc" id="L806" title="2 of 4 branches missed.">        if (row &lt; 0 || row &gt;= rows.size()) {</span>
+<span class="nc" id="L807">            return;</span>
+        }
+<span class="fc" id="L809">        cancelEdit();</span>
+<span class="fc" id="L810">        int delta = rows.setExpanded(row, open);</span>
+<span class="pc bpc" id="L811" title="1 of 2 branches missed.">        if (delta != 0) {</span>
+<span class="fc" id="L812">            int oldLead = lead;</span>
+<span class="fc" id="L813">            selection.shift(row + 1, delta);</span>
+<span class="fc bfc" id="L814" title="All 2 branches covered.">            if (lead &gt; row) {</span>
+<span class="pc bpc" id="L815" title="2 of 4 branches missed.">                lead = delta &lt; 0 &amp;&amp; lead &lt;= row - delta ? row : lead + delta;</span>
+            }
+<span class="fc bfc" id="L817" title="All 2 branches covered.">            if (anchor &gt; row) {</span>
+<span class="pc bpc" id="L818" title="2 of 4 branches missed.">                anchor = delta &lt; 0 &amp;&amp; anchor &lt;= row - delta ? row : anchor + delta;</span>
+            }
+<span class="fc bfc" id="L820" title="All 2 branches covered.">            if (oldLead != lead) {</span>
+<span class="fc" id="L821">                selectionListeners.fireSelectionEvent(oldLead, lead);</span>
+            }
+<span class="pc bnc" id="L823" title="All 2 branches missed.">        } else if (tree != null) {</span>
+            // Opened under a filter, where every path is shown open, or a
+            // leaf: nothing moved.
+<span class="nc" id="L826">            refreshRows();</span>
+        }
+<span class="fc" id="L828">        dirty = true;</span>
+<span class="fc" id="L829">        repaint();</span>
+<span class="fc" id="L830">    }</span>
+
+    /// Opens or closes a node of a tree grid, whether it is shown or not; a
+    /// node that is not shown opens the next time it is.
+    public void setNodeExpanded(Object node, boolean open) {
+<span class="nc bnc" id="L835" title="All 2 branches missed.">        if (tree == null) {</span>
+<span class="nc" id="L836">            return;</span>
+        }
+<span class="nc" id="L838">        int row = tree.find(node);</span>
+<span class="nc bnc" id="L839" title="All 2 branches missed.">        if (row &gt;= 0) {</span>
+<span class="nc" id="L840">            setExpanded(row, open);</span>
+        } else {
+<span class="nc" id="L842">            tree.setNodeExpanded(node, open);</span>
+        }
+<span class="nc" id="L844">    }</span>
+
+    /// Whether a node of a tree grid is open.
+    public boolean isNodeExpanded(Object node) {
+<span class="nc bnc" id="L848" title="All 4 branches missed.">        return tree != null &amp;&amp; tree.isExpandedNode(node);</span>
+    }
+
+    /// Opens every row. In a tree grid this loads the whole tree.
+    public void expandAll() {
+<span class="fc bfc" id="L853" title="All 2 branches covered.">        for (int r = 0; r &lt; rows.size(); r++) {</span>
+<span class="fc bfc" id="L854" title="All 4 branches covered.">            if (rows.isExpandable(r) &amp;&amp; !rows.isExpanded(r)) {</span>
+<span class="fc" id="L855">                setExpanded(r, true);</span>
+            }
+        }
+<span class="fc" id="L858">    }</span>
+
+    /// Closes every row.
+    public void collapseAll() {
+<span class="nc bnc" id="L862" title="All 2 branches missed.">        for (int r = rows.size() - 1; r &gt;= 0; r--) {</span>
+<span class="nc bnc" id="L863" title="All 4 branches missed.">            if (rows.isExpandable(r) &amp;&amp; rows.isExpanded(r)) {</span>
+<span class="nc" id="L864">                setExpanded(r, false);</span>
+            }
+        }
+<span class="nc" id="L867">    }</span>
+
+    // ---------------------------------------------------------- selection
+
+    /// What a tap selects.
+    public SelectionMode getSelectionMode() {
+<span class="nc" id="L873">        return selectionMode;</span>
+    }
+
+    /// Sets what a tap selects; `MULTIPLE_ROWS` by default.
+    public void setSelectionMode(SelectionMode mode) {
+<span class="pc bpc" id="L878" title="1 of 2 branches missed.">        selectionMode = mode == null ? SelectionMode.NONE : mode;</span>
+<span class="pc bpc" id="L879" title="1 of 2 branches missed.">        if (selectionMode == SelectionMode.NONE) {</span>
+<span class="nc" id="L880">            selectedAll = false;</span>
+<span class="nc" id="L881">            selection.clear();</span>
+<span class="pc bpc" id="L882" title="1 of 4 branches missed.">        } else if (selectionMode != SelectionMode.MULTIPLE_ROWS &amp;&amp; selection.size() &gt; 1) {</span>
+<span class="fc" id="L883">            selectedAll = false;</span>
+<span class="fc" id="L884">            selection.set(lead, lead);</span>
+        }
+<span class="fc" id="L886">        repaint();</span>
+<span class="fc" id="L887">    }</span>
+
+    /// The row the keyboard is on, the last one chosen, or -1.
+    public int getSelectedRow() {
+<span class="fc" id="L891">        return lead;</span>
+    }
+
+    /// The visible column index of the cell the keyboard is on.
+    public int getSelectedColumn() {
+<span class="fc" id="L896">        return leadColumn;</span>
+    }
+
+    /// The selected view rows, in order.
+    public int[] getSelectedRows() {
+<span class="fc" id="L901">        return selection.toArray();</span>
+    }
+
+    /// How many rows are selected.
+    public int getSelectedRowCount() {
+<span class="fc" id="L906">        return selection.size();</span>
+    }
+
+    /// Whether a view row is selected.
+    public boolean isRowSelected(int row) {
+<span class="fc" id="L911">        return selection.contains(row);</span>
+    }
+
+    /// Selects one view row and moves the keyboard to it; -1 clears the
+    /// selection.
+    public void setSelectedRow(int row) {
+<span class="fc" id="L917">        int old = lead;</span>
+<span class="pc bpc" id="L918" title="2 of 4 branches missed.">        if (row &lt; 0 || row &gt;= rows.size()) {</span>
+<span class="nc" id="L919">            selectedAll = false;</span>
+<span class="nc" id="L920">            selection.clear();</span>
+<span class="nc" id="L921">            lead = -1;</span>
+<span class="nc" id="L922">            anchor = -1;</span>
+        } else {
+<span class="pc bpc" id="L924" title="1 of 2 branches missed.">            if (selectionMode != SelectionMode.NONE) {</span>
+<span class="fc" id="L925">                selectedAll = false;</span>
+<span class="fc" id="L926">                selection.set(row, row);</span>
+            }
+<span class="fc" id="L928">            lead = row;</span>
+<span class="fc" id="L929">            anchor = row;</span>
+        }
+<span class="fc" id="L931">        repaint();</span>
+<span class="fc" id="L932">        selectionListeners.fireSelectionEvent(old, lead);</span>
+<span class="fc" id="L933">    }</span>
+
+    /// Selects a range of view rows, adding to the selection when `add`.
+    public void selectRows(int from, int to, boolean add) {
+<span class="pc bpc" id="L937" title="1 of 2 branches missed.">        if (selectionMode != SelectionMode.MULTIPLE_ROWS) {</span>
+<span class="nc" id="L938">            setSelectedRow(to);</span>
+<span class="nc" id="L939">            return;</span>
+        }
+<span class="fc" id="L941">        int n = rows.size();</span>
+<span class="pc bpc" id="L942" title="1 of 2 branches missed.">        if (n == 0) {</span>
+<span class="nc" id="L943">            return;</span>
+        }
+<span class="fc" id="L945">        from = Math.max(0, Math.min(n - 1, from));</span>
+<span class="fc" id="L946">        to = Math.max(0, Math.min(n - 1, to));</span>
+<span class="pc bpc" id="L947" title="1 of 2 branches missed.">        if (add) {</span>
+<span class="nc" id="L948">            selection.add(from, to);</span>
+        } else {
+<span class="fc" id="L950">            selection.set(from, to);</span>
+<span class="fc" id="L951">            anchor = from;</span>
+        }
+<span class="pc bpc" id="L953" title="3 of 6 branches missed.">        selectedAll = selection.size() == n &amp;&amp; from == 0 &amp;&amp; to == n - 1;</span>
+<span class="fc" id="L954">        int old = lead;</span>
+<span class="fc" id="L955">        lead = to;</span>
+<span class="fc" id="L956">        repaint();</span>
+<span class="fc" id="L957">        selectionListeners.fireSelectionEvent(old, lead);</span>
+<span class="fc" id="L958">    }</span>
+
+    /// Selects every row.
+    public void selectAll() {
+<span class="pc bpc" id="L962" title="1 of 2 branches missed.">        if (rows.size() &gt; 0) {</span>
+<span class="fc" id="L963">            selectRows(0, rows.size() - 1, false);</span>
+        }
+<span class="fc" id="L965">    }</span>
+
+    /// Selects nothing.
+    public void clearSelection() {
+<span class="nc" id="L969">        int old = lead;</span>
+<span class="nc" id="L970">        selectedAll = false;</span>
+<span class="nc" id="L971">        selection.clear();</span>
+<span class="nc" id="L972">        repaint();</span>
+<span class="nc" id="L973">        selectionListeners.fireSelectionEvent(old, lead);</span>
+<span class="nc" id="L974">    }</span>
+
+    /// Listens to changes of the selection. The values given are the row the
+    /// keyboard was on and is on now; read the rest from the grid.
+    public void addSelectionListener(SelectionListener l) {
+<span class="fc" id="L979">        selectionListeners.addListener(l);</span>
+<span class="fc" id="L980">    }</span>
+
+    /// Stops listening to changes of the selection.
+    public void removeSelectionListener(SelectionListener l) {
+<span class="fc" id="L984">        selectionListeners.removeListener(l);</span>
+<span class="fc" id="L985">    }</span>
+
+    /// Listens to rows being opened: a double tap, or Enter on a cell that is
+    /// not edited. The selected row is the one opened.
+    public void addActionListener(ActionListener l) {
+<span class="nc" id="L990">        actionListeners.addListener(l);</span>
+<span class="nc" id="L991">    }</span>
+
+    /// Stops listening to rows being opened.
+    public void removeActionListener(ActionListener l) {
+<span class="nc" id="L995">        actionListeners.removeListener(l);</span>
+<span class="nc" id="L996">    }</span>
+
+    // ---------------------------------------------------------- appearance
+
+    /// The height of a row in millimetres, 0 for the height of the font.
+    public float getRowHeightMM() {
+<span class="nc" id="L1002">        return rowHeightMM;</span>
+    }
+
+    /// Sets the height of a row in millimetres; 0, the default, fits the
+    /// row style's font and padding.
+    public void setRowHeightMM(float mm) {
+<span class="nc" id="L1008">        rowHeightMM = Math.max(0, mm);</span>
+<span class="nc" id="L1009">        dirty = true;</span>
+<span class="nc" id="L1010">        repaint();</span>
+<span class="nc" id="L1011">    }</span>
+
+    /// The height of a row, in pixels, as last laid out.
+    public int getRowHeight() {
+<span class="fc" id="L1015">        refreshLayout();</span>
+<span class="fc" id="L1016">        return rowH;</span>
+    }
+
+    /// Whether the header row is shown.
+    public boolean isHeaderVisible() {
+<span class="nc" id="L1021">        return headerVisible;</span>
+    }
+
+    /// Shows or hides the header row.
+    public void setHeaderVisible(boolean v) {
+<span class="nc" id="L1026">        headerVisible = v;</span>
+<span class="nc" id="L1027">        dirty = true;</span>
+<span class="nc" id="L1028">        repaint();</span>
+<span class="nc" id="L1029">    }</span>
+
+    /// Whether every other row is painted in `DataGridRowAlt`.
+    public boolean isStriped() {
+<span class="nc" id="L1033">        return striped;</span>
+    }
+
+    /// Sets whether every other row is painted in `DataGridRowAlt`.
+    public void setStriped(boolean striped) {
+<span class="nc" id="L1038">        this.striped = striped;</span>
+<span class="nc" id="L1039">        repaint();</span>
+<span class="nc" id="L1040">    }</span>
+
+    /// Sets which grid lines are drawn.
+    public void setGridLines(boolean horizontal, boolean vertical) {
+<span class="nc" id="L1044">        horizontalLines = horizontal;</span>
+<span class="nc" id="L1045">        verticalLines = vertical;</span>
+<span class="nc" id="L1046">        repaint();</span>
+<span class="nc" id="L1047">    }</span>
+
+    /// The text shown when there are no rows.
+    public String getEmptyText() {
+<span class="nc" id="L1051">        return emptyText;</span>
+    }
+
+    /// Sets the text shown when there are no rows; empty by default.
+    public void setEmptyText(String text) {
+<span class="nc bnc" id="L1056" title="All 2 branches missed.">        emptyText = text == null ? &quot;&quot; : text;</span>
+<span class="nc" id="L1057">        repaint();</span>
+<span class="nc" id="L1058">    }</span>
+
+    /// The renderer of a column that has none.
+    public GridCellRenderer getDefaultRenderer() {
+<span class="nc" id="L1062">        return defaultRenderer;</span>
+    }
+
+    /// Sets the renderer of a column that has none.
+    public void setDefaultRenderer(GridCellRenderer r) {
+<span class="nc bnc" id="L1067" title="All 2 branches missed.">        defaultRenderer = r == null ? new DefaultGridCellRenderer() : r;</span>
+<span class="nc" id="L1068">        refreshColumns();</span>
+<span class="nc" id="L1069">    }</span>
+
+    /// The editor of a column that has none.
+    public GridCellEditor getDefaultEditor() {
+<span class="nc" id="L1073">        return defaultEditor;</span>
+    }
+
+    /// Sets the editor of a column that has none.
+    public void setDefaultEditor(GridCellEditor e) {
+<span class="nc bnc" id="L1078" title="All 2 branches missed.">        defaultEditor = e == null ? new DefaultGridCellEditor() : e;</span>
+<span class="nc" id="L1079">    }</span>
+
+    // ------------------------------------------------------------- layout
+
+    @Override
+    protected void layoutSurface(int width, int height) {
+<span class="fc" id="L1085">        int gen = GridLook.generation();</span>
+<span class="fc bfc" id="L1086" title="All 8 branches covered.">        if (!dirty &amp;&amp; width == laidW &amp;&amp; height == laidH &amp;&amp; gen == laidGen) {</span>
+<span class="fc" id="L1087">            return;</span>
+        }
+<span class="fc" id="L1089">        laidW = width;</span>
+<span class="fc" id="L1090">        laidH = height;</span>
+<span class="fc" id="L1091">        laidGen = gen;</span>
+<span class="fc" id="L1092">        dirty = false;</span>
+<span class="fc" id="L1093">        ArrayList&lt;GridColumn&gt; v = new ArrayList&lt;GridColumn&gt;();</span>
+<span class="fc bfc" id="L1094" title="All 2 branches covered.">        for (GridColumn col : columns) {</span>
+<span class="fc" id="L1095">            GridColumn c = col;</span>
+<span class="pc bpc" id="L1096" title="3 of 6 branches missed.">            if (c.isVisible() &amp;&amp; c.getModelColumn() &gt;= 0 &amp;&amp; c.getModelColumn() &lt; rows.columnCount()) {</span>
+<span class="fc" id="L1097">                v.add(c);</span>
+            }
+<span class="fc" id="L1099">        }</span>
+<span class="fc" id="L1100">        vis = new GridColumn[v.size()];</span>
+<span class="fc" id="L1101">        v.toArray(vis);</span>
+<span class="fc" id="L1102">        Style rowSt = GridLook.style(&quot;DataGridRow&quot;);</span>
+<span class="fc" id="L1103">        Style headSt = GridLook.style(&quot;DataGridHeader&quot;);</span>
+<span class="fc" id="L1104">        int fontH = rowSt.getFont().getHeight();</span>
+<span class="pc bpc" id="L1105" title="1 of 2 branches missed.">        if (rowHeightMM &gt; 0) {</span>
+<span class="nc" id="L1106">            rowH = GridLook.mm(rowHeightMM);</span>
+        } else {
+<span class="fc" id="L1108">            rowH = Math.max(GridLook.mm(6), fontH + Math.max(GridLook.mm(2.4f),</span>
+<span class="fc" id="L1109">                    rowSt.getPaddingTop() + rowSt.getPaddingBottom()));</span>
+        }
+<span class="pc bpc" id="L1111" title="1 of 2 branches missed.">        headerH = headerVisible ? Math.max(GridLook.mm(6.5f), headSt.getFont().getHeight()</span>
+<span class="fc" id="L1112">                + Math.max(GridLook.mm(2.8f), headSt.getPaddingTop() + headSt.getPaddingBottom())) : 0;</span>
+<span class="fc" id="L1113">        indentW = GridLook.mm(4);</span>
+<span class="fc bfc" id="L1114" title="All 2 branches covered.">        arrowW = hasArrows() ? GridLook.mm(4) : 0;</span>
+<span class="fc" id="L1115">        int n = vis.length;</span>
+<span class="fc" id="L1116">        colW = new int[n];</span>
+<span class="fc" id="L1117">        colX = new int[n];</span>
+<span class="fc" id="L1118">        int total = 0;</span>
+<span class="fc" id="L1119">        int flexSum = 0;</span>
+<span class="fc" id="L1120">        GridColumn tc = effectiveTreeColumn();</span>
+<span class="fc bfc" id="L1121" title="All 2 branches covered.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc" id="L1122">            GridColumn c = vis[i];</span>
+<span class="fc" id="L1123">            int w = c.width();</span>
+<span class="fc bfc" id="L1124" title="All 2 branches covered.">            if (w &lt; 0) {</span>
+<span class="fc bfc" id="L1125" title="All 4 branches covered.">                w = c.getWidthMM() &gt; 0 ? GridLook.mm(c.getWidthMM()) : measure(c, c == tc); //NOPMD CompareObjectsWithEquals - a column is an identity</span>
+<span class="fc" id="L1126">                c.width(w);</span>
+            }
+<span class="fc" id="L1128">            colW[i] = w;</span>
+<span class="fc" id="L1129">            total += w;</span>
+<span class="fc" id="L1130">            flexSum += c.getFlex();</span>
+        }
+<span class="pc bpc" id="L1132" title="3 of 4 branches missed.">        if (flexSum &gt; 0 &amp;&amp; total &lt; width) {</span>
+<span class="nc" id="L1133">            int extra = width - total;</span>
+<span class="nc" id="L1134">            int given = 0;</span>
+<span class="nc" id="L1135">            int last = -1;</span>
+<span class="nc bnc" id="L1136" title="All 2 branches missed.">            for (int i = 0; i &lt; n; i++) {</span>
+<span class="nc" id="L1137">                int f = vis[i].getFlex();</span>
+<span class="nc bnc" id="L1138" title="All 2 branches missed.">                if (f &gt; 0) {</span>
+<span class="nc" id="L1139">                    int add = extra * f / flexSum;</span>
+<span class="nc" id="L1140">                    colW[i] += add;</span>
+<span class="nc" id="L1141">                    given += add;</span>
+<span class="nc" id="L1142">                    last = i;</span>
+                }
+            }
+<span class="nc bnc" id="L1145" title="All 2 branches missed.">            if (last &gt;= 0) {</span>
+<span class="nc" id="L1146">                colW[last] += extra - given;</span>
+            }
+        }
+<span class="fc" id="L1149">        frozenCount = Math.min(frozen, n);</span>
+<span class="fc" id="L1150">        int x = 0;</span>
+<span class="fc bfc" id="L1151" title="All 2 branches covered.">        for (int i = 0; i &lt; frozenCount; i++) {</span>
+<span class="fc" id="L1152">            colX[i] = x;</span>
+<span class="fc" id="L1153">            x += colW[i];</span>
+        }
+<span class="fc" id="L1155">        frozenW = x;</span>
+<span class="fc" id="L1156">        x = 0;</span>
+<span class="fc bfc" id="L1157" title="All 2 branches covered.">        for (int i = frozenCount; i &lt; n; i++) {</span>
+<span class="fc" id="L1158">            colX[i] = x;</span>
+<span class="fc" id="L1159">            x += colW[i];</span>
+        }
+<span class="fc" id="L1161">        scrollW = x;</span>
+<span class="fc" id="L1162">        setHeaderSize(frozenW, headerH);</span>
+<span class="fc" id="L1163">    }</span>
+
+    private boolean hasArrows() {
+<span class="pc bpc" id="L1166" title="1 of 6 branches missed.">        return tree != null || (flat != null &amp;&amp; flat.getGroupColumn() != null);</span>
+    }
+
+    private GridColumn effectiveTreeColumn() {
+<span class="fc bfc" id="L1170" title="All 2 branches covered.">        if (!hasArrows()) {</span>
+<span class="fc" id="L1171">            return null;</span>
+        }
+<span class="pc bpc" id="L1173" title="5 of 6 branches missed.">        if (treeColumn != null &amp;&amp; treeColumn.isVisible() &amp;&amp; columns.contains(treeColumn)) {</span>
+<span class="nc" id="L1174">            return treeColumn;</span>
+        }
+<span class="pc bpc" id="L1176" title="1 of 2 branches missed.">        for (GridColumn col : columns) {</span>
+<span class="pc bpc" id="L1177" title="1 of 2 branches missed.">            if (col.isVisible()) {</span>
+<span class="fc" id="L1178">                return col;</span>
+            }
+<span class="nc" id="L1180">        }</span>
+<span class="nc" id="L1181">        return null;</span>
+    }
+
+    // The width a column needs for its title and the first rows.
+    private int measure(GridColumn c, boolean isTree) {
+<span class="fc" id="L1186">        Style head = GridLook.style(&quot;DataGridHeader&quot;);</span>
+<span class="fc" id="L1187">        int w = head.getFont().stringWidth(c.getTitle()) + GridLook.mm(3) + GridLook.mm(4);</span>
+<span class="fc" id="L1188">        Style rowSt = GridLook.style(&quot;DataGridRow&quot;);</span>
+<span class="fc bfc" id="L1189" title="All 2 branches covered.">        GridCellRenderer r = c.getRenderer() != null ? c.getRenderer() : defaultRenderer;</span>
+<span class="fc" id="L1190">        int n = Math.min(rows.size(), 60);</span>
+<span class="fc bfc" id="L1191" title="All 2 branches covered.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc" id="L1192">            fillCell(i, c, rowSt);</span>
+<span class="fc" id="L1193">            int cw = r.getPreferredWidth(cell);</span>
+<span class="fc bfc" id="L1194" title="All 2 branches covered.">            if (isTree) {</span>
+<span class="fc" id="L1195">                cw += rows.depth(i) * GridLook.mm(4) + GridLook.mm(4);</span>
+            }
+<span class="fc" id="L1197">            w = Math.max(w, cw);</span>
+        }
+<span class="fc" id="L1199">        int min = GridLook.mm(c.getMinWidthMM());</span>
+<span class="fc" id="L1200">        int max = GridLook.mm(c.getMaxWidthMM());</span>
+<span class="fc" id="L1201">        return Math.max(min, Math.min(max, w));</span>
+    }
+
+    @Override
+    protected int getContentWidth() {
+<span class="fc" id="L1206">        return scrollW;</span>
+    }
+
+    @Override
+    protected int getContentHeight() {
+        // Clamped: 17 million rows of a tall row would pass an int.
+<span class="fc" id="L1212">        return (int) Math.min(Integer.MAX_VALUE, (long) rows.size() * rowH);</span>
+    }
+
+    @Override
+    protected Dimension calcPreferredSize() {
+<span class="fc" id="L1217">        layoutSurface(Math.max(1, getWidth()), Math.max(1, getHeight()));</span>
+<span class="fc" id="L1218">        Style s = getStyle();</span>
+<span class="fc" id="L1219">        int w = frozenW + scrollW + s.getHorizontalPadding();</span>
+<span class="fc" id="L1220">        int h = headerH + Math.min(Math.max(rows.size(), 3), 12) * rowH + s.getVerticalPadding();</span>
+<span class="fc" id="L1221">        return new Dimension(Math.min(w, Display.getInstance().getDisplayWidth()), h);</span>
+    }
+
+    @Override
+    protected int getPageStep(int bodyHeight) {
+<span class="nc" id="L1226">        return Math.max(rowH, bodyHeight / rowH * rowH);</span>
+    }
+
+    // -------------------------------------------------------------- paint
+
+    @Override
+    protected void paintContent(Graphics g, int x, int y) {
+<span class="fc" id="L1233">        Style bg = GridLook.style(&quot;DataGrid&quot;);</span>
+<span class="fc" id="L1234">        GridLook.fill(g, bg, g.getClipX(), g.getClipY(), g.getClipWidth(), g.getClipHeight());</span>
+<span class="fc" id="L1235">        paintRows(g, x, y, frozenCount, vis.length);</span>
+<span class="pc bpc" id="L1236" title="3 of 4 branches missed.">        if (rows.size() == 0 &amp;&amp; emptyText.length() &gt; 0) {</span>
+<span class="nc" id="L1237">            Style st = GridLook.style(&quot;DataGridRow&quot;);</span>
+<span class="nc" id="L1238">            Font f = st.getFont();</span>
+<span class="nc" id="L1239">            g.setFont(f);</span>
+<span class="nc" id="L1240">            g.setColor(GridLook.mix(GridLook.under(st), st.getFgColor(), 140));</span>
+<span class="nc" id="L1241">            int bw = getBodyWidth();</span>
+<span class="nc" id="L1242">            String t = GridLook.fit(emptyText, f, bw - GridLook.mm(4));</span>
+<span class="nc" id="L1243">            g.drawString(t, getX() + getHeaderWidth() + (bw - f.stringWidth(t)) / 2, y + GridLook.mm(4));</span>
+        }
+<span class="fc" id="L1245">    }</span>
+
+    @Override
+    protected void paintLeftHeader(Graphics g, int x, int y) {
+<span class="fc" id="L1249">        Style bg = GridLook.style(&quot;DataGrid&quot;);</span>
+<span class="fc" id="L1250">        GridLook.fill(g, bg, g.getClipX(), g.getClipY(), g.getClipWidth(), g.getClipHeight());</span>
+<span class="fc" id="L1251">        paintRows(g, x, y, 0, frozenCount);</span>
+<span class="fc" id="L1252">        g.setColor(lineColor(150));</span>
+<span class="fc" id="L1253">        g.drawLine(x + frozenW - 1, g.getClipY(), x + frozenW - 1, g.getClipY() + g.getClipHeight());</span>
+<span class="fc" id="L1254">    }</span>
+
+    @Override
+    protected void paintTopHeader(Graphics g, int x, int y) {
+<span class="fc" id="L1258">        paintHeaders(g, x, y, frozenCount, vis.length);</span>
+<span class="fc" id="L1259">    }</span>
+
+    @Override
+    protected void paintCorner(Graphics g, int x, int y) {
+<span class="fc" id="L1263">        paintHeaders(g, x, y, 0, frozenCount);</span>
+<span class="fc" id="L1264">        g.setColor(lineColor(150));</span>
+<span class="fc" id="L1265">        g.drawLine(x + frozenW - 1, y, x + frozenW - 1, y + headerH);</span>
+<span class="fc" id="L1266">    }</span>
+
+    private int lineColor(int amount) {
+<span class="fc" id="L1269">        Style line = GridLook.style(&quot;DataGridLine&quot;);</span>
+<span class="fc" id="L1270">        return GridLook.mix(GridLook.under(GridLook.style(&quot;DataGridRow&quot;)), line.getFgColor(), amount);</span>
+    }
+
+    private void paintRows(Graphics g, int x, int y, int from, int to) {
+<span class="fc" id="L1274">        int n = rows.size();</span>
+<span class="pc bpc" id="L1275" title="2 of 4 branches missed.">        if (n == 0 || from &gt;= to) {</span>
+<span class="nc" id="L1276">            return;</span>
+        }
+<span class="fc" id="L1278">        int cx = g.getClipX();</span>
+<span class="fc" id="L1279">        int cy = g.getClipY();</span>
+<span class="fc" id="L1280">        int cw = g.getClipWidth();</span>
+<span class="fc" id="L1281">        int ch = g.getClipHeight();</span>
+<span class="fc" id="L1282">        int first = Math.max(0, (cy - y) / rowH);</span>
+<span class="fc" id="L1283">        int last = Math.min(n - 1, (cy + ch - 1 - y) / rowH);</span>
+<span class="fc" id="L1284">        Style rowSt = GridLook.style(&quot;DataGridRow&quot;);</span>
+<span class="fc" id="L1285">        Style rowSel = GridLook.selected(&quot;DataGridRow&quot;);</span>
+<span class="fc" id="L1286">        Style alt = GridLook.style(&quot;DataGridRowAlt&quot;);</span>
+<span class="fc" id="L1287">        Style groupSt = GridLook.style(&quot;DataGridGroupRow&quot;);</span>
+<span class="fc" id="L1288">        int hline = lineColor(60);</span>
+<span class="fc" id="L1289">        int left = x + colX[from];</span>
+<span class="fc" id="L1290">        int right = x + colX[to - 1] + colW[to - 1];</span>
+<span class="fc" id="L1291">        boolean focused = hasFocus();</span>
+<span class="fc bfc" id="L1292" title="All 2 branches covered.">        for (int r = first; r &lt;= last; r++) {</span>
+<span class="fc" id="L1293">            int ry = (int) (y + (long) r * rowH);</span>
+<span class="pc bpc" id="L1294" title="1 of 4 branches missed.">            boolean sel = selectionMode != SelectionMode.NONE &amp;&amp; selection.contains(r);</span>
+<span class="fc" id="L1295">            boolean group = rows.isGroup(r);</span>
+            Style st;
+<span class="fc bfc" id="L1297" title="All 2 branches covered.">            if (sel) {</span>
+<span class="fc" id="L1298">                st = rowSel;</span>
+<span class="fc bfc" id="L1299" title="All 2 branches covered.">            } else if (group) {</span>
+<span class="fc" id="L1300">                st = groupSt;</span>
+<span class="pc bpc" id="L1301" title="1 of 4 branches missed.">            } else if (striped &amp;&amp; (r &amp; 1) == 1) {</span>
+<span class="fc" id="L1302">                st = alt;</span>
+            } else {
+<span class="fc" id="L1304">                st = rowSt;</span>
+            }
+<span class="fc" id="L1306">            GridLook.fill(g, st, Math.max(cx, left), ry, Math.min(cx + cw, right) - Math.max(cx, left), rowH);</span>
+<span class="fc bfc" id="L1307" title="All 2 branches covered.">            for (int i = from; i &lt; to; i++) {</span>
+<span class="fc" id="L1308">                int x0 = x + colX[i];</span>
+<span class="pc bpc" id="L1309" title="1 of 4 branches missed.">                if (x0 + colW[i] &lt; cx || x0 &gt; cx + cw) {</span>
+<span class="fc" id="L1310">                    continue;</span>
+                }
+<span class="fc" id="L1312">                paintCell(g, r, i, x0, ry, colW[i], st, sel);</span>
+<span class="pc bpc" id="L1313" title="1 of 4 branches missed.">                if (verticalLines &amp;&amp; !group) {</span>
+<span class="fc" id="L1314">                    g.setColor(hline);</span>
+<span class="fc" id="L1315">                    g.drawLine(x0 + colW[i] - 1, ry, x0 + colW[i] - 1, ry + rowH - 1);</span>
+                }
+            }
+<span class="pc bpc" id="L1318" title="3 of 4 branches missed.">            if (horizontalLines || group) {</span>
+<span class="fc" id="L1319">                g.setColor(hline);</span>
+<span class="fc" id="L1320">                g.drawLine(Math.max(cx, left), ry + rowH - 1, Math.min(cx + cw, right), ry + rowH - 1);</span>
+            }
+<span class="pc bpc" id="L1322" title="5 of 14 branches missed.">            if (r == lead &amp;&amp; focused &amp;&amp; leadColumn &gt;= from &amp;&amp; leadColumn &lt; to</span>
+                    &amp;&amp; (selectionMode == SelectionMode.SINGLE_CELL || selectionMode == SelectionMode.NONE
+                    || editRow &lt; 0)) {
+<span class="pc bpc" id="L1325" title="2 of 4 branches missed.">                if (selectionMode == SelectionMode.SINGLE_CELL || selectionMode == SelectionMode.NONE) {</span>
+<span class="nc" id="L1326">                    g.setColor(GridLook.style(&quot;DataGridCheck&quot;).getBgColor());</span>
+<span class="nc" id="L1327">                    int lx = x + colX[leadColumn];</span>
+<span class="nc" id="L1328">                    g.drawRect(lx, ry, colW[leadColumn] - 1, rowH - 1);</span>
+<span class="nc" id="L1329">                    g.drawRect(lx + 1, ry + 1, colW[leadColumn] - 3, rowH - 3);</span>
+                }
+            }
+        }
+<span class="fc" id="L1333">    }</span>
+
+    private void fillCell(int r, GridColumn c, Style st) {
+<span class="fc" id="L1336">        cell.grid = this;</span>
+<span class="fc" id="L1337">        cell.row = r;</span>
+<span class="fc" id="L1338">        cell.column = c;</span>
+<span class="fc" id="L1339">        cell.value = rows.value(r, c.getModelColumn());</span>
+<span class="fc" id="L1340">        cell.group = rows.isGroup(r);</span>
+<span class="fc" id="L1341">        cell.rowSelected = selection.contains(r);</span>
+<span class="pc bpc" id="L1342" title="1 of 6 branches missed.">        cell.lead = r == lead &amp;&amp; c == (leadColumn &lt; vis.length ? vis[leadColumn] : null); //NOPMD CompareObjectsWithEquals - a column is an identity</span>
+<span class="fc bfc" id="L1343" title="All 6 branches covered.">        cell.editable = !cell.group &amp;&amp; c.isEditable() &amp;&amp; rows.isEditable(r, c.getModelColumn());</span>
+<span class="fc" id="L1344">        cell.depth = rows.depth(r);</span>
+<span class="fc" id="L1345">        cell.style = st;</span>
+<span class="fc" id="L1346">    }</span>
+
+    private void paintCell(Graphics g, int r, int i, int x0, int ry, int w, Style st, boolean sel) {
+<span class="fc" id="L1349">        GridColumn c = vis[i];</span>
+<span class="fc" id="L1350">        int ox = g.getClipX();</span>
+<span class="fc" id="L1351">        int oy = g.getClipY();</span>
+<span class="fc" id="L1352">        int ow = g.getClipWidth();</span>
+<span class="fc" id="L1353">        int oh = g.getClipHeight();</span>
+<span class="fc" id="L1354">        g.clipRect(x0, ry, w, rowH);</span>
+<span class="fc" id="L1355">        fillCell(r, c, st);</span>
+<span class="fc" id="L1356">        int cx = x0;</span>
+<span class="fc bfc" id="L1357" title="All 4 branches covered.">        if (arrowW &gt; 0 &amp;&amp; c == effectiveTreeColumn()) { //NOPMD CompareObjectsWithEquals - a column is an identity</span>
+<span class="fc" id="L1358">            cx += rows.depth(r) * indentW;</span>
+<span class="fc bfc" id="L1359" title="All 2 branches covered.">            if (rows.isExpandable(r)) {</span>
+<span class="pc bpc" id="L1360" title="1 of 2 branches missed.">                g.setColor(GridLook.mix(GridLook.under(st), st.getFgColor(), sel ? 230 : 170));</span>
+<span class="fc" id="L1361">                GridLook.arrow(g, cx, ry + (rowH - arrowW) / 2, arrowW, rows.isExpanded(r));</span>
+            }
+<span class="fc" id="L1363">            cx += arrowW;</span>
+        }
+<span class="fc bfc" id="L1365" title="All 4 branches covered.">        if (cell.group &amp;&amp; c == effectiveTreeColumn()) { //NOPMD CompareObjectsWithEquals - a column is an identity</span>
+<span class="fc" id="L1366">            Font f = st.getFont();</span>
+<span class="fc" id="L1367">            g.setFont(f);</span>
+<span class="fc" id="L1368">            g.setColor(st.getFgColor());</span>
+<span class="fc" id="L1369">            String label = rows.groupLabel(r) + &quot;  (&quot; + rows.groupCount(r) + &quot;)&quot;;</span>
+            // A group's label may run over the columns after it that show
+            // nothing for the group.
+<span class="fc" id="L1372">            int span = w - (cx - x0);</span>
+<span class="pc bpc" id="L1373" title="3 of 6 branches missed.">            for (int k = i + 1; k &lt; vis.length &amp;&amp; vis[k].getAggregate() == null</span>
+<span class="fc bfc" id="L1374" title="All 2 branches covered.">                    &amp;&amp; (i &gt;= frozenCount || k &lt; frozenCount); k++) {</span>
+<span class="fc" id="L1375">                span += colW[k];</span>
+            }
+<span class="fc" id="L1377">            g.setClip(ox, oy, ow, oh);</span>
+<span class="fc" id="L1378">            g.clipRect(cx, ry, span, rowH);</span>
+<span class="fc" id="L1379">            g.drawString(GridLook.fit(label, f, span - GridLook.mm(1.5f)), cx + GridLook.mm(1), ry + (rowH - f.getHeight()) / 2);</span>
+<span class="fc bfc" id="L1380" title="All 4 branches covered.">        } else if (!cell.group || c.getAggregate() != null) {</span>
+<span class="fc bfc" id="L1381" title="All 2 branches covered.">            GridCellRenderer rend = c.getRenderer() != null ? c.getRenderer() : defaultRenderer;</span>
+<span class="pc bpc" id="L1382" title="1 of 6 branches missed.">            if (!(editRow == r &amp;&amp; editColumn == c &amp;&amp; editor != null)) { //NOPMD CompareObjectsWithEquals - a column is an identity</span>
+<span class="fc" id="L1383">                rend.paint(g, cell, cx, ry, x0 + w - cx, rowH);</span>
+            }
+        }
+<span class="fc" id="L1386">        g.setClip(ox, oy, ow, oh);</span>
+<span class="fc" id="L1387">    }</span>
+
+    private void paintHeaders(Graphics g, int x, int y, int from, int to) {
+<span class="pc bpc" id="L1390" title="2 of 4 branches missed.">        if (headerH == 0 || from &gt;= to) {</span>
+<span class="nc" id="L1391">            return;</span>
+        }
+<span class="fc" id="L1393">        Style head = GridLook.style(&quot;DataGridHeader&quot;);</span>
+<span class="fc" id="L1394">        int cx = g.getClipX();</span>
+<span class="fc" id="L1395">        int cw = g.getClipWidth();</span>
+<span class="fc" id="L1396">        GridLook.fill(g, head, cx, y, cw, headerH);</span>
+<span class="fc" id="L1397">        Font f = head.getFont();</span>
+<span class="fc" id="L1398">        g.setFont(f);</span>
+<span class="fc" id="L1399">        int pad = Math.max(GridLook.mm(1.5f), head.getPaddingLeftNoRTL());</span>
+<span class="fc" id="L1400">        int arrow = GridLook.mm(2.6f);</span>
+<span class="fc" id="L1401">        int line = lineColor(110);</span>
+<span class="fc bfc" id="L1402" title="All 2 branches covered.">        for (int i = from; i &lt; to; i++) {</span>
+<span class="fc" id="L1403">            int x0 = x + colX[i];</span>
+<span class="fc" id="L1404">            int w = colW[i];</span>
+<span class="pc bpc" id="L1405" title="1 of 4 branches missed.">            if (x0 + w &lt; cx || x0 &gt; cx + cw) {</span>
+<span class="fc" id="L1406">                continue;</span>
+            }
+<span class="fc" id="L1408">            GridColumn c = vis[i];</span>
+<span class="pc bpc" id="L1409" title="3 of 4 branches missed.">            if (gesture == GESTURE_MOVE &amp;&amp; i == dragColumn) {</span>
+<span class="nc" id="L1410">                GridLook.fill(g, GridLook.selected(&quot;DataGridRow&quot;), x0, y, w, headerH);</span>
+            }
+<span class="fc" id="L1412">            int dir = getSortDirection(c);</span>
+<span class="fc bfc" id="L1413" title="All 2 branches covered.">            int textW = w - pad * 2 - (dir != 0 ? arrow + GridLook.mm(1) : 0);</span>
+<span class="fc" id="L1414">            String t = GridLook.fit(c.getTitle(), f, textW);</span>
+<span class="fc" id="L1415">            g.setColor(head.getFgColor());</span>
+<span class="fc" id="L1416">            int align = c.resolveAlignment(null);</span>
+<span class="fc bfc" id="L1417" title="All 2 branches covered.">            if (c.getKind() == GridColumn.Kind.NUMBER) {</span>
+<span class="fc" id="L1418">                align = Component.RIGHT;</span>
+            }
+<span class="fc" id="L1420">            int tw = f.stringWidth(t);</span>
+<span class="fc" id="L1421">            int tx = DefaultGridCellRenderer.place(align, x0 + pad, textW, tw);</span>
+<span class="fc" id="L1422">            g.drawString(t, tx, y + (headerH - f.getHeight()) / 2);</span>
+<span class="fc bfc" id="L1423" title="All 2 branches covered.">            if (dir != 0) {</span>
+<span class="fc" id="L1424">                int ax = x0 + w - pad - arrow;</span>
+<span class="fc" id="L1425">                int ay = y + (headerH - arrow) / 2;</span>
+<span class="fc bfc" id="L1426" title="All 2 branches covered.">                if (dir &gt; 0) {</span>
+<span class="fc" id="L1427">                    g.fillTriangle(ax, ay + arrow * 3 / 4, ax + arrow, ay + arrow * 3 / 4, ax + arrow / 2, ay + arrow / 4);</span>
+                } else {
+<span class="fc" id="L1429">                    g.fillTriangle(ax, ay + arrow / 4, ax + arrow, ay + arrow / 4, ax + arrow / 2, ay + arrow * 3 / 4);</span>
+                }
+<span class="fc bfc" id="L1431" title="All 2 branches covered.">                if (sortColumns.size() &gt; 1) {</span>
+<span class="fc" id="L1432">                    Font small = f;</span>
+<span class="fc" id="L1433">                    String num = String.valueOf(sortColumns.indexOf(c) + 1);</span>
+<span class="fc" id="L1434">                    g.drawString(num, ax - small.stringWidth(num) - 1, y + (headerH - small.getHeight()) / 2);</span>
+                }
+            }
+<span class="fc" id="L1437">            g.setColor(line);</span>
+<span class="fc" id="L1438">            g.drawLine(x0 + w - 1, y + headerH / 4, x0 + w - 1, y + headerH * 3 / 4);</span>
+        }
+<span class="fc" id="L1440">        g.setColor(line);</span>
+<span class="fc" id="L1441">        g.drawLine(cx, y + headerH - 1, cx + cw, y + headerH - 1);</span>
+<span class="fc" id="L1442">    }</span>
+
+    @Override
+    protected void paintOverlay(Graphics g, int x, int y) {
+<span class="pc bpc" id="L1446" title="5 of 6 branches missed.">        if (gesture == GESTURE_MOVE &amp;&amp; moveTarget &gt;= 0 &amp;&amp; dragColumn &gt;= 0) {</span>
+<span class="nc bnc" id="L1447" title="All 2 branches missed.">            int tx = columnScreenX(moveTarget, moveTarget &gt; dragColumn);</span>
+<span class="nc" id="L1448">            g.setColor(GridLook.style(&quot;DataGridCheck&quot;).getBgColor());</span>
+<span class="nc" id="L1449">            g.fillRect(x + tx - 1, y, 3, headerH);</span>
+<span class="nc" id="L1450">            Style head = GridLook.selected(&quot;DataGridRow&quot;);</span>
+<span class="nc" id="L1451">            int w = colW[dragColumn];</span>
+<span class="nc" id="L1452">            int a = g.getAlpha();</span>
+<span class="nc" id="L1453">            g.setAlpha(a * 3 / 4);</span>
+<span class="nc" id="L1454">            GridLook.fill(g, head, x + dragX - w / 2, y, w, headerH);</span>
+<span class="nc" id="L1455">            g.setAlpha(a);</span>
+<span class="nc" id="L1456">            g.setColor(head.getFgColor());</span>
+<span class="nc" id="L1457">            Font f = GridLook.style(&quot;DataGridHeader&quot;).getFont();</span>
+<span class="nc" id="L1458">            g.setFont(f);</span>
+<span class="nc" id="L1459">            g.drawString(GridLook.fit(vis[dragColumn].getTitle(), f, w - GridLook.mm(3)),</span>
+<span class="nc" id="L1460">                    x + dragX - w / 2 + GridLook.mm(1.5f), y + (headerH - f.getHeight()) / 2);</span>
+        }
+<span class="pc bpc" id="L1462" title="3 of 4 branches missed.">        if (gesture == GESTURE_RESIZE &amp;&amp; dragColumn &gt;= 0) {</span>
+<span class="nc" id="L1463">            int ex = columnScreenX(dragColumn, true);</span>
+<span class="nc" id="L1464">            g.setColor(GridLook.style(&quot;DataGridCheck&quot;).getBgColor());</span>
+<span class="nc" id="L1465">            g.drawLine(x + ex - 1, y, x + ex - 1, y + getHeight());</span>
+        }
+<span class="fc bfc" id="L1467" title="All 2 branches covered.">        if (overlayPainter != null) {</span>
+<span class="fc" id="L1468">            overlayPainter.paint(g, new com.codename1.ui.geom.Rectangle(x, y, getWidth(), getHeight()));</span>
+        }
+<span class="fc" id="L1470">    }</span>
+
+    // Where a visible column's left edge, or its right edge, is in the
+    // component's coordinates.
+    private int columnScreenX(int i, boolean rightEdge) {
+<span class="fc bfc" id="L1475" title="All 2 branches covered.">        int e = colX[i] + (rightEdge ? colW[i] : 0);</span>
+<span class="fc bfc" id="L1476" title="All 2 branches covered.">        return i &lt; frozenCount ? e : getHeaderWidth() + e - getOffsetX();</span>
+    }
+
+    /// Sets what takes the taps on cells while it asks for them, as the formula editor of a
+    /// spreadsheet does to put the tapped cell's reference into a formula. Null, the default,
+    /// leaves every tap to the grid.
+    ///
+    /// #### Parameters
+    ///
+    /// - `picker`: the picker, or null
+    public void setCellPicker(GridCellPicker picker) {
+<span class="fc" id="L1487">        cellPicker = picker;</span>
+<span class="fc" id="L1488">        picking = false;</span>
+<span class="fc" id="L1489">    }</span>
+
+    /// The picker set with `#setCellPicker(GridCellPicker)`.
+    ///
+    /// #### Returns
+    ///
+    /// the picker, or null
+    public GridCellPicker getCellPicker() {
+<span class="fc" id="L1497">        return cellPicker;</span>
+    }
+
+    /// Sets a painter that draws over the cells and the headers, after everything else, as the
+    /// outlines a spreadsheet draws around the cells a formula being edited refers to. The
+    /// rectangle it is given is the grid's, in the coordinates it paints in, so a cell is at
+    /// the rectangle's corner plus what `#getCellBounds(int, int, int[])` answers. Null, the
+    /// default, draws nothing; `repaint()` after what it draws changes.
+    ///
+    /// #### Parameters
+    ///
+    /// - `painter`: the painter, or null
+    public void setOverlayPainter(com.codename1.ui.Painter painter) {
+<span class="fc" id="L1510">        overlayPainter = painter;</span>
+<span class="fc" id="L1511">        repaint();</span>
+<span class="fc" id="L1512">    }</span>
+
+    /// The painter set with `#setOverlayPainter(com.codename1.ui.Painter)`.
+    ///
+    /// #### Returns
+    ///
+    /// the painter, or null
+    public com.codename1.ui.Painter getOverlayPainter() {
+<span class="fc" id="L1520">        return overlayPainter;</span>
+    }
+
+    /// The bounds of a cell in the grid's own coordinates: x, y, width,
+    /// height. `column` is an index among the visible columns.
+    public void getCellBounds(int row, int column, int[] out) {
+<span class="fc" id="L1526">        refreshLayout();</span>
+<span class="pc bpc" id="L1527" title="2 of 4 branches missed.">        if (column &lt; 0 || column &gt;= vis.length) {</span>
+<span class="nc" id="L1528">            out[0] = 0;</span>
+<span class="nc" id="L1529">            out[1] = 0;</span>
+<span class="nc" id="L1530">            out[2] = 0;</span>
+<span class="nc" id="L1531">            out[3] = 0;</span>
+<span class="nc" id="L1532">            return;</span>
+        }
+<span class="fc" id="L1534">        out[0] = columnScreenX(column, false);</span>
+<span class="fc" id="L1535">        out[1] = (int) (headerH + (long) row * rowH - getOffsetY());</span>
+<span class="fc" id="L1536">        out[2] = colW[column];</span>
+<span class="fc" id="L1537">        out[3] = rowH;</span>
+<span class="fc" id="L1538">    }</span>
+
+    /// The columns shown, in order: the ones `getSelectedColumn()` and
+    /// `getCellBounds` count.
+    public GridColumn[] getVisibleColumns() {
+<span class="fc" id="L1543">        refreshLayout();</span>
+<span class="fc" id="L1544">        GridColumn[] out = new GridColumn[vis.length];</span>
+<span class="fc" id="L1545">        System.arraycopy(vis, 0, out, 0, vis.length);</span>
+<span class="fc" id="L1546">        return out;</span>
+    }
+
+    /// Scrolls so a view row is shown, and a visible column too when it is
+    /// 0 or more.
+    public void scrollToCell(int row, int column) {
+<span class="fc" id="L1552">        refreshLayout();</span>
+<span class="fc" id="L1553">        int ox = getOffsetX();</span>
+<span class="fc" id="L1554">        int oy = getOffsetY();</span>
+<span class="fc" id="L1555">        int bh = getBodyHeight();</span>
+<span class="pc bpc" id="L1556" title="1 of 2 branches missed.">        if (row &gt;= 0) {</span>
+<span class="fc" id="L1557">            int top = (int) Math.min(Integer.MAX_VALUE - rowH, (long) row * rowH);</span>
+<span class="pc bpc" id="L1558" title="1 of 2 branches missed.">            if (top &lt; oy) {</span>
+<span class="nc" id="L1559">                oy = top;</span>
+<span class="pc bpc" id="L1560" title="1 of 2 branches missed.">            } else if (top + rowH &gt; oy + bh) {</span>
+<span class="nc" id="L1561">                oy = top + rowH - bh;</span>
+            }
+        }
+<span class="pc bpc" id="L1564" title="2 of 4 branches missed.">        if (column &gt;= frozenCount &amp;&amp; column &lt; vis.length) {</span>
+<span class="fc" id="L1565">            int bw = getBodyWidth();</span>
+<span class="fc" id="L1566">            int l = colX[column];</span>
+<span class="fc" id="L1567">            int r = l + colW[column];</span>
+<span class="pc bpc" id="L1568" title="1 of 2 branches missed.">            if (l &lt; ox) {</span>
+<span class="nc" id="L1569">                ox = l;</span>
+<span class="pc bpc" id="L1570" title="1 of 2 branches missed.">            } else if (r &gt; ox + bw) {</span>
+<span class="nc" id="L1571">                ox = Math.min(l, r - bw);</span>
+            }
+        }
+<span class="fc" id="L1574">        scrollTo(ox, oy);</span>
+<span class="fc" id="L1575">    }</span>
+
+    // ---------------------------------------------------------- hit test
+
+    // The visible column at a point of the component, or -1.
+    private int columnAt(int x) {
+<span class="fc bfc" id="L1581" title="All 2 branches covered.">        boolean inFrozen = x &lt; getHeaderWidth();</span>
+<span class="fc bfc" id="L1582" title="All 2 branches covered.">        int cx = inFrozen ? x : x - getHeaderWidth() + getOffsetX();</span>
+<span class="fc bfc" id="L1583" title="All 2 branches covered.">        int from = inFrozen ? 0 : frozenCount;</span>
+<span class="fc bfc" id="L1584" title="All 2 branches covered.">        int to = inFrozen ? frozenCount : vis.length;</span>
+<span class="fc bfc" id="L1585" title="All 2 branches covered.">        for (int i = from; i &lt; to; i++) {</span>
+<span class="pc bpc" id="L1586" title="1 of 4 branches missed.">            if (cx &gt;= colX[i] &amp;&amp; cx &lt; colX[i] + colW[i]) {</span>
+<span class="fc" id="L1587">                return i;</span>
+            }
+        }
+<span class="fc" id="L1590">        return -1;</span>
+    }
+
+    private int rowAt(int y) {
+<span class="pc bpc" id="L1594" title="1 of 2 branches missed.">        if (y &lt; headerH) {</span>
+<span class="nc" id="L1595">            return -1;</span>
+        }
+<span class="fc" id="L1597">        int r = (y - headerH + getOffsetY()) / rowH;</span>
+<span class="pc bpc" id="L1598" title="2 of 4 branches missed.">        return r &gt;= 0 &amp;&amp; r &lt; rows.size() ? r : -1;</span>
+    }
+
+    // The column whose right edge is near a point of the header, or -1.
+    private int edgeAt(int x, int y) {
+<span class="pc bpc" id="L1603" title="1 of 2 branches missed.">        if (y &gt;= headerH) {</span>
+<span class="nc" id="L1604">            return -1;</span>
+        }
+<span class="fc" id="L1606">        int slop = GridLook.mm(1.2f);</span>
+<span class="fc bfc" id="L1607" title="All 2 branches covered.">        for (int i = 0; i &lt; vis.length; i++) {</span>
+<span class="fc" id="L1608">            int e = columnScreenX(i, true);</span>
+<span class="pc bpc" id="L1609" title="2 of 6 branches missed.">            if (Math.abs(x - e) &lt;= slop &amp;&amp; vis[i].isResizable()</span>
+<span class="pc bpc" id="L1610" title="1 of 2 branches missed.">                    &amp;&amp; (i &lt; frozenCount || e &gt; getHeaderWidth())) {</span>
+<span class="fc" id="L1611">                return i;</span>
+            }
+        }
+<span class="fc" id="L1614">        return -1;</span>
+    }
+
+    private boolean overArrow(int row, int col, int x) {
+<span class="pc bpc" id="L1618" title="2 of 8 branches missed.">        if (arrowW == 0 || col &lt; 0 || vis[col] != effectiveTreeColumn() || !rows.isExpandable(row)) { //NOPMD CompareObjectsWithEquals - a column is an identity</span>
+<span class="fc" id="L1619">            return false;</span>
+        }
+<span class="fc" id="L1621">        int left = columnScreenX(col, false) + rows.depth(row) * indentW;</span>
+<span class="pc bpc" id="L1622" title="2 of 4 branches missed.">        return x &gt;= left - GridLook.mm(1) &amp;&amp; x &lt; left + arrowW + GridLook.mm(1);</span>
+    }
+
+    // ------------------------------------------------------------- input
+
+    @Override
+    protected void pressStarted(int x, int y) {
+<span class="fc" id="L1629">        picking = false;</span>
+<span class="fc bfc" id="L1630" title="All 6 branches covered.">        if (cellPicker != null &amp;&amp; y &gt;= headerH &amp;&amp; cellPicker.isPicking(this)) {</span>
+<span class="fc" id="L1631">            refreshLayout();</span>
+<span class="pc bpc" id="L1632" title="2 of 4 branches missed.">            if (rowAt(y) &gt;= 0 &amp;&amp; columnAt(x) &gt;= 0) {</span>
+                // the tap goes to the picker, and the edit stays open
+<span class="fc" id="L1634">                picking = true;</span>
+<span class="fc" id="L1635">                return;</span>
+            }
+        }
+<span class="pc bpc" id="L1638" title="1 of 2 branches missed.">        if (editor != null) {</span>
+<span class="nc" id="L1639">            commitEdit();</span>
+        }
+<span class="fc" id="L1641">    }</span>
+
+    @Override
+    protected void tapped(int x, int y, boolean doubleTap) {
+<span class="fc" id="L1645">        refreshLayout();</span>
+<span class="fc bfc" id="L1646" title="All 2 branches covered.">        if (picking) {</span>
+<span class="fc" id="L1647">            picking = false;</span>
+<span class="fc" id="L1648">            int pickedRow = rowAt(y);</span>
+<span class="fc" id="L1649">            int pickedColumn = columnAt(x);</span>
+<span class="pc bpc" id="L1650" title="3 of 6 branches missed.">            if (cellPicker != null &amp;&amp; pickedRow &gt;= 0 &amp;&amp; pickedColumn &gt;= 0) {</span>
+<span class="fc" id="L1651">                cellPicker.cellPicked(this, pickedRow, pickedColumn, Display.getInstance().isShiftKeyDown());</span>
+            }
+<span class="fc" id="L1653">            return;</span>
+        }
+<span class="fc" id="L1655">        requestFocus();</span>
+<span class="fc" id="L1656">        int col = columnAt(x);</span>
+<span class="fc bfc" id="L1657" title="All 2 branches covered.">        if (y &lt; headerH) {</span>
+<span class="pc bpc" id="L1658" title="1 of 4 branches missed.">            if (col &gt;= 0 &amp;&amp; vis[col].isSortable()) {</span>
+<span class="fc" id="L1659">                headerTapped(vis[col]);</span>
+            }
+<span class="fc" id="L1661">            return;</span>
+        }
+<span class="fc" id="L1663">        int row = rowAt(y);</span>
+<span class="pc bpc" id="L1664" title="1 of 2 branches missed.">        if (row &lt; 0) {</span>
+<span class="nc" id="L1665">            return;</span>
+        }
+<span class="pc bpc" id="L1667" title="1 of 6 branches missed.">        if (overArrow(row, col, x) || (rows.isGroup(row) &amp;&amp; !doubleTap)) {</span>
+<span class="fc bfc" id="L1668" title="All 2 branches covered.">            setExpanded(row, !rows.isExpanded(row));</span>
+<span class="fc" id="L1669">            return;</span>
+        }
+<span class="fc" id="L1671">        Display d = Display.getInstance();</span>
+<span class="pc bpc" id="L1672" title="2 of 4 branches missed.">        boolean toggle = d.isControlKeyDown() || d.isMetaKeyDown();</span>
+<span class="fc" id="L1673">        boolean extend = d.isShiftKeyDown();</span>
+<span class="fc" id="L1674">        int old = lead;</span>
+<span class="fc" id="L1675">        choose(row, toggle, extend);</span>
+<span class="pc bpc" id="L1676" title="1 of 2 branches missed.">        if (col &gt;= 0) {</span>
+<span class="fc" id="L1677">            leadColumn = col;</span>
+        }
+<span class="fc" id="L1679">        selectionListeners.fireSelectionEvent(old, lead);</span>
+<span class="pc bpc" id="L1680" title="2 of 4 branches missed.">        if (col &gt;= 0 &amp;&amp; isCellEditable(row, col)) {</span>
+<span class="fc" id="L1681">            GridColumn c = vis[col];</span>
+<span class="fc bfc" id="L1682" title="All 2 branches covered.">            if (c.resolveKind(rows.value(row, c.getModelColumn())) == GridColumn.Kind.BOOLEAN) {</span>
+<span class="fc" id="L1683">                toggleBoolean(row, c);</span>
+<span class="fc" id="L1684">                return;</span>
+            }
+<span class="pc bpc" id="L1686" title="1 of 2 branches missed.">            if (doubleTap) {</span>
+<span class="nc" id="L1687">                editCellAt(row, col);</span>
+<span class="nc" id="L1688">                return;</span>
+            }
+<span class="pc bnc" id="L1690" title="All 2 branches missed.">        } else if (doubleTap) {</span>
+<span class="nc bnc" id="L1691" title="All 2 branches missed.">            if (rows.isExpandable(row)) {</span>
+<span class="nc bnc" id="L1692" title="All 2 branches missed.">                setExpanded(row, !rows.isExpanded(row));</span>
+            }
+<span class="nc" id="L1694">            actionListeners.fireActionEvent(new ActionEvent(this, ActionEvent.Type.PointerPressed, x, y));</span>
+        }
+<span class="fc" id="L1696">        repaint();</span>
+<span class="fc" id="L1697">    }</span>
+
+    private void headerTapped(GridColumn c) {
+<span class="fc" id="L1700">        int dir = getSortDirection(c);</span>
+<span class="pc bpc" id="L1701" title="1 of 4 branches missed.">        if (Display.getInstance().isShiftKeyDown() &amp;&amp; !sortColumns.isEmpty()) {</span>
+<span class="pc bpc" id="L1702" title="1 of 2 branches missed.">            if (dir == 0) {</span>
+<span class="fc" id="L1703">                addSort(c, true);</span>
+<span class="nc bnc" id="L1704" title="All 2 branches missed.">            } else if (dir &gt; 0) {</span>
+<span class="nc" id="L1705">                addSort(c, false);</span>
+            } else {
+<span class="nc" id="L1707">                int i = sortColumns.indexOf(c);</span>
+<span class="nc" id="L1708">                sortColumns.remove(i);</span>
+<span class="nc" id="L1709">                sortAscending.remove(i);</span>
+<span class="nc" id="L1710">                resort();</span>
+            }
+<span class="fc" id="L1712">            return;</span>
+        }
+<span class="fc bfc" id="L1714" title="All 2 branches covered.">        if (dir == 0) {</span>
+<span class="fc" id="L1715">            sortBy(c, true);</span>
+<span class="fc bfc" id="L1716" title="All 2 branches covered.">        } else if (dir &gt; 0) {</span>
+<span class="fc" id="L1717">            sortBy(c, false);</span>
+        } else {
+<span class="fc" id="L1719">            clearSort();</span>
+        }
+<span class="fc" id="L1721">    }</span>
+
+    private void choose(int row, boolean toggle, boolean extend) {
+<span class="pc bpc" id="L1724" title="1 of 2 branches missed.">        if (selectionMode == SelectionMode.MULTIPLE_ROWS) {</span>
+<span class="pc bpc" id="L1725" title="1 of 4 branches missed.">            if (extend &amp;&amp; anchor &gt;= 0) {</span>
+<span class="pc bpc" id="L1726" title="1 of 2 branches missed.">                if (toggle) {</span>
+<span class="nc" id="L1727">                    selectedAll = false;</span>
+<span class="nc" id="L1728">                    selection.add(anchor, row);</span>
+                } else {
+<span class="fc" id="L1730">                    selectedAll = false;</span>
+<span class="fc" id="L1731">                    selection.set(anchor, row);</span>
+                }
+<span class="pc bpc" id="L1733" title="1 of 2 branches missed.">            } else if (toggle) {</span>
+<span class="nc" id="L1734">                selectedAll = false;</span>
+<span class="nc" id="L1735">                selection.toggle(row);</span>
+<span class="nc" id="L1736">                anchor = row;</span>
+            } else {
+<span class="fc" id="L1738">                selectedAll = false;</span>
+<span class="fc" id="L1739">                selection.set(row, row);</span>
+<span class="fc" id="L1740">                anchor = row;</span>
+            }
+<span class="nc bnc" id="L1742" title="All 2 branches missed.">        } else if (selectionMode != SelectionMode.NONE) {</span>
+<span class="nc" id="L1743">            selectedAll = false;</span>
+<span class="nc" id="L1744">            selection.set(row, row);</span>
+<span class="nc" id="L1745">            anchor = row;</span>
+        }
+<span class="fc" id="L1747">        lead = row;</span>
+<span class="fc" id="L1748">    }</span>
+
+    private boolean isCellEditable(int row, int col) {
+<span class="pc bpc" id="L1751" title="4 of 10 branches missed.">        if (row &lt; 0 || row &gt;= rows.size() || col &lt; 0 || col &gt;= vis.length || rows.isGroup(row)) {</span>
+<span class="fc" id="L1752">            return false;</span>
+        }
+<span class="fc" id="L1754">        GridColumn c = vis[col];</span>
+<span class="fc bfc" id="L1755" title="All 4 branches covered.">        return c.isEditable() &amp;&amp; rows.isEditable(row, c.getModelColumn());</span>
+    }
+
+    private void toggleBoolean(int row, GridColumn c) {
+<span class="fc" id="L1759">        Object v = rows.value(row, c.getModelColumn());</span>
+<span class="pc bpc" id="L1760" title="2 of 4 branches missed.">        boolean on = v instanceof Boolean &amp;&amp; ((Boolean) v).booleanValue();</span>
+<span class="pc bpc" id="L1761" title="1 of 2 branches missed.">        rows.setValue(row, c.getModelColumn(), Boolean.valueOf(!on));</span>
+<span class="fc" id="L1762">        repaint();</span>
+<span class="fc" id="L1763">    }</span>
+
+    @Override
+    protected boolean editStarted(int x, int y, EditTrigger trigger) {
+<span class="fc" id="L1767">        refreshLayout();</span>
+<span class="pc bpc" id="L1768" title="1 of 2 branches missed.">        if (editor != null) {</span>
+<span class="nc" id="L1769">            commitEdit();</span>
+        }
+<span class="fc" id="L1771">        int edge = edgeAt(x, y);</span>
+<span class="fc bfc" id="L1772" title="All 2 branches covered.">        if (edge &gt;= 0) {</span>
+<span class="fc" id="L1773">            gesture = GESTURE_RESIZE;</span>
+<span class="fc" id="L1774">            dragColumn = edge;</span>
+<span class="fc" id="L1775">            dragStartX = x;</span>
+<span class="fc" id="L1776">            dragStartW = colW[edge];</span>
+<span class="fc" id="L1777">            return true;</span>
+        }
+<span class="pc bpc" id="L1779" title="1 of 2 branches missed.">        if (y &lt; headerH) {</span>
+<span class="fc" id="L1780">            int col = columnAt(x);</span>
+<span class="pc bpc" id="L1781" title="3 of 6 branches missed.">            if (col &gt;= 0 &amp;&amp; vis[col].isMovable() &amp;&amp; trigger != EditTrigger.HANDLE_DRAG) {</span>
+<span class="fc" id="L1782">                gesture = GESTURE_MOVE;</span>
+<span class="fc" id="L1783">                dragColumn = col;</span>
+<span class="fc" id="L1784">                dragX = x;</span>
+<span class="fc" id="L1785">                moveTarget = col;</span>
+<span class="fc" id="L1786">                return true;</span>
+            }
+<span class="nc" id="L1788">            return false;</span>
+        }
+<span class="nc bnc" id="L1790" title="All 4 branches missed.">        if (trigger == EditTrigger.DRAG &amp;&amp; selectionMode == SelectionMode.MULTIPLE_ROWS) {</span>
+<span class="nc" id="L1791">            int row = rowAt(y);</span>
+<span class="nc bnc" id="L1792" title="All 2 branches missed.">            if (row &gt;= 0) {</span>
+<span class="nc" id="L1793">                gesture = GESTURE_SELECT;</span>
+<span class="nc" id="L1794">                int old = lead;</span>
+<span class="nc bnc" id="L1795" title="All 4 branches missed.">                if (!Display.getInstance().isShiftKeyDown() || anchor &lt; 0) {</span>
+<span class="nc" id="L1796">                    anchor = row;</span>
+                }
+<span class="nc" id="L1798">                selectedAll = false;</span>
+<span class="nc" id="L1799">                selection.set(anchor, row);</span>
+<span class="nc" id="L1800">                lead = row;</span>
+<span class="nc" id="L1801">                selectionListeners.fireSelectionEvent(old, lead);</span>
+<span class="nc" id="L1802">                return true;</span>
+            }
+        }
+<span class="nc" id="L1805">        return false;</span>
+    }
+
+    @Override
+    protected void editMoved(int x, int y) {
+<span class="fc bfc" id="L1810" title="All 2 branches covered.">        if (gesture == GESTURE_RESIZE) {</span>
+<span class="fc" id="L1811">            GridColumn c = vis[dragColumn];</span>
+<span class="fc" id="L1812">            int w = Math.max(GridLook.mm(c.getMinWidthMM()), dragStartW + (x - dragStartX));</span>
+<span class="fc" id="L1813">            c.resizedTo(w);</span>
+<span class="fc" id="L1814">            dirty = true;</span>
+<span class="pc bpc" id="L1815" title="1 of 2 branches missed.">        } else if (gesture == GESTURE_MOVE) {</span>
+<span class="fc" id="L1816">            dragX = x;</span>
+<span class="fc" id="L1817">            int over = columnAt(Math.max(0, Math.min(getWidth() - 1, x)));</span>
+<span class="pc bpc" id="L1818" title="1 of 2 branches missed.">            if (over &gt;= 0) {</span>
+                // Columns move within their own region: the frozen ones
+                // among themselves, the others among themselves.
+<span class="pc bpc" id="L1821" title="3 of 6 branches missed.">                boolean same = (over &lt; frozenCount) == (dragColumn &lt; frozenCount);</span>
+<span class="pc bpc" id="L1822" title="1 of 2 branches missed.">                if (same) {</span>
+<span class="fc" id="L1823">                    moveTarget = over;</span>
+                }
+            }
+<span class="pc bnc" id="L1826" title="All 2 branches missed.">        } else if (gesture == GESTURE_SELECT) {</span>
+<span class="nc" id="L1827">            int row = rowAt(Math.max(headerH, Math.min(getHeight() - 1, y)));</span>
+<span class="nc bnc" id="L1828" title="All 4 branches missed.">            if (row &lt; 0 &amp;&amp; y &gt;= headerH) {</span>
+<span class="nc" id="L1829">                row = rows.size() - 1;</span>
+            }
+<span class="nc bnc" id="L1831" title="All 4 branches missed.">            if (row &gt;= 0 &amp;&amp; row != lead) {</span>
+<span class="nc" id="L1832">                int old = lead;</span>
+<span class="nc" id="L1833">                selectedAll = false;</span>
+<span class="nc" id="L1834">                selection.set(anchor, row);</span>
+<span class="nc" id="L1835">                lead = row;</span>
+<span class="nc" id="L1836">                selectionListeners.fireSelectionEvent(old, lead);</span>
+            }
+        }
+<span class="fc" id="L1839">        repaint();</span>
+<span class="fc" id="L1840">    }</span>
+
+    @Override
+    protected void editEnded(boolean committed) {
+<span class="pc bpc" id="L1844" title="3 of 8 branches missed.">        if (gesture == GESTURE_MOVE &amp;&amp; committed &amp;&amp; moveTarget &gt;= 0 &amp;&amp; moveTarget != dragColumn) {</span>
+<span class="fc" id="L1845">            GridColumn moving = vis[dragColumn];</span>
+<span class="fc" id="L1846">            GridColumn target = vis[moveTarget];</span>
+<span class="fc" id="L1847">            moveColumn(columns.indexOf(moving), columns.indexOf(target));</span>
+<span class="pc bpc" id="L1848" title="1 of 2 branches missed.">            if (leadColumn == dragColumn) {</span>
+<span class="fc" id="L1849">                leadColumn = moveTarget;</span>
+            }
+<span class="pc bpc" id="L1851" title="3 of 6 branches missed.">        } else if (gesture == GESTURE_RESIZE &amp;&amp; committed &amp;&amp; dragColumn &gt;= 0) {</span>
+            // The width is kept in millimetres, like one that was set, and the
+            // exact pixels are kept for this density.
+<span class="fc" id="L1854">            GridColumn c = vis[dragColumn];</span>
+<span class="fc" id="L1855">            int px = c.width();</span>
+<span class="fc" id="L1856">            float ppmm = Math.max(0.01f, Display.getInstance().convertToPixels(100f) / 100f);</span>
+<span class="fc" id="L1857">            c.setWidthMM(px / ppmm);</span>
+<span class="fc" id="L1858">            c.width(px);</span>
+<span class="fc" id="L1859">            dirty = true;</span>
+        }
+<span class="fc" id="L1861">        gesture = GESTURE_NONE;</span>
+<span class="fc" id="L1862">        dragColumn = -1;</span>
+<span class="fc" id="L1863">        moveTarget = -1;</span>
+<span class="fc" id="L1864">        repaint();</span>
+<span class="fc" id="L1865">    }</span>
+
+    @Override
+    protected boolean isEditAutoScroll(int x, int y) {
+<span class="pc bpc" id="L1869" title="1 of 4 branches missed.">        return gesture == GESTURE_SELECT || gesture == GESTURE_MOVE;</span>
+    }
+
+    @Override
+    protected void hoverAt(int x, int y) {
+<span class="nc" id="L1874">        refreshLayout();</span>
+<span class="nc" id="L1875">        int edge = edgeAt(x, y);</span>
+<span class="nc bnc" id="L1876" title="All 2 branches missed.">        if (edge &gt;= 0) {</span>
+<span class="nc" id="L1877">            setHoverTarget(vis[edge], Component.E_RESIZE_CURSOR);</span>
+        } else {
+<span class="nc" id="L1879">            setHoverTarget(null, Component.DEFAULT_CURSOR);</span>
+        }
+<span class="nc" id="L1881">    }</span>
+
+    @Override
+    protected void scrollChanged() {
+<span class="pc bpc" id="L1885" title="1 of 4 branches missed.">        if (editor != null &amp;&amp; !committing) {</span>
+<span class="fc" id="L1886">            commitEdit();</span>
+        }
+<span class="fc" id="L1888">    }</span>
+
+    @Override
+    public boolean handlesInput() {
+        // The arrows move between cells, not to the next component.
+<span class="nc bnc" id="L1893" title="All 2 branches missed.">        return rows.size() &gt; 0;</span>
+    }
+
+    @Override
+    public void keyPressed(int keyCode) {
+<span class="pc bpc" id="L1898" title="2 of 4 branches missed.">        if (editor != null || rows.size() == 0) {</span>
+<span class="nc" id="L1899">            super.keyPressed(keyCode);</span>
+<span class="nc" id="L1900">            return;</span>
+        }
+<span class="fc" id="L1902">        refreshLayout();</span>
+<span class="fc" id="L1903">        int ga = Display.getInstance().getGameAction(keyCode);</span>
+<span class="pc bpc" id="L1904" title="3 of 4 branches missed.">        boolean extend = Display.getInstance().isShiftKeyDown() &amp;&amp; selectionMode == SelectionMode.MULTIPLE_ROWS;</span>
+<span class="pc bpc" id="L1905" title="1 of 2 branches missed.">        int row = lead &lt; 0 ? 0 : lead;</span>
+<span class="fc" id="L1906">        int col = leadColumn;</span>
+<span class="pc bpc" id="L1907" title="3 of 6 branches missed.">        switch (ga) {</span>
+            case Display.GAME_UP:
+<span class="nc bnc" id="L1909" title="All 2 branches missed.">                moveLead(Math.max(0, row - (lead &lt; 0 ? 0 : 1)), col, extend);</span>
+<span class="nc" id="L1910">                return;</span>
+            case Display.GAME_DOWN:
+<span class="pc bpc" id="L1912" title="1 of 2 branches missed.">                moveLead(Math.min(rows.size() - 1, row + (lead &lt; 0 ? 0 : 1)), col, extend);</span>
+<span class="fc" id="L1913">                return;</span>
+            case Display.GAME_LEFT:
+<span class="pc bpc" id="L1915" title="3 of 8 branches missed.">                if (lead &gt;= 0 &amp;&amp; rows.isExpandable(lead) &amp;&amp; rows.isExpanded(lead) &amp;&amp; arrowW &gt; 0) {</span>
+<span class="fc" id="L1916">                    setExpanded(lead, false);</span>
+<span class="pc bpc" id="L1917" title="4 of 8 branches missed.">                } else if (lead &gt;= 0 &amp;&amp; tree != null &amp;&amp; tree.depth(lead) &gt; 0 &amp;&amp; col &lt;= 0) {</span>
+<span class="fc" id="L1918">                    int d = tree.depth(lead);</span>
+<span class="fc" id="L1919">                    int p = lead - 1;</span>
+<span class="pc bpc" id="L1920" title="1 of 4 branches missed.">                    while (p &gt; 0 &amp;&amp; tree.depth(p) &gt;= d) {</span>
+<span class="fc" id="L1921">                        p--;</span>
+                    }
+<span class="fc" id="L1923">                    moveLead(p, col, false);</span>
+<span class="fc" id="L1924">                } else {</span>
+<span class="nc" id="L1925">                    moveLead(row, Math.max(0, col - 1), false);</span>
+                }
+<span class="fc" id="L1927">                return;</span>
+            case Display.GAME_RIGHT:
+<span class="pc bpc" id="L1929" title="4 of 8 branches missed.">                if (lead &gt;= 0 &amp;&amp; rows.isExpandable(lead) &amp;&amp; !rows.isExpanded(lead) &amp;&amp; arrowW &gt; 0) {</span>
+<span class="fc" id="L1930">                    setExpanded(lead, true);</span>
+                } else {
+<span class="nc" id="L1932">                    moveLead(row, Math.min(vis.length - 1, col + 1), false);</span>
+                }
+<span class="fc" id="L1934">                return;</span>
+            case Display.GAME_FIRE:
+<span class="nc bnc" id="L1936" title="All 2 branches missed.">                if (lead &lt; 0) {</span>
+<span class="nc" id="L1937">                    return;</span>
+                }
+<span class="nc bnc" id="L1939" title="All 2 branches missed.">                if (isCellEditable(lead, col)) {</span>
+<span class="nc" id="L1940">                    GridColumn c = vis[col];</span>
+<span class="nc bnc" id="L1941" title="All 2 branches missed.">                    if (c.resolveKind(rows.value(lead, c.getModelColumn())) == GridColumn.Kind.BOOLEAN) {</span>
+<span class="nc" id="L1942">                        toggleBoolean(lead, c);</span>
+                    } else {
+<span class="nc" id="L1944">                        editCellAt(lead, col);</span>
+                    }
+<span class="nc bnc" id="L1946" title="All 2 branches missed.">                } else if (rows.isExpandable(lead)) {</span>
+<span class="nc bnc" id="L1947" title="All 2 branches missed.">                    setExpanded(lead, !rows.isExpanded(lead));</span>
+                } else {
+<span class="nc" id="L1949">                    actionListeners.fireActionEvent(new ActionEvent(this, ActionEvent.Type.KeyPress, keyCode));</span>
+                }
+<span class="nc" id="L1951">                return;</span>
+            default:
+<span class="nc" id="L1953">                super.keyPressed(keyCode);</span>
+        }
+<span class="nc" id="L1955">    }</span>
+
+    private void moveLead(int row, int col, boolean extend) {
+<span class="fc" id="L1958">        int old = lead;</span>
+<span class="pc bpc" id="L1959" title="3 of 4 branches missed.">        if (extend &amp;&amp; anchor &gt;= 0) {</span>
+<span class="nc" id="L1960">            selectedAll = false;</span>
+<span class="nc" id="L1961">            selection.set(anchor, row);</span>
+<span class="nc" id="L1962">            lead = row;</span>
+        } else {
+<span class="fc" id="L1964">            choose(row, false, false);</span>
+        }
+<span class="fc" id="L1966">        leadColumn = Math.max(0, col);</span>
+<span class="fc" id="L1967">        scrollToCell(row, leadColumn);</span>
+<span class="fc" id="L1968">        repaint();</span>
+<span class="fc" id="L1969">        selectionListeners.fireSelectionEvent(old, lead);</span>
+<span class="fc" id="L1970">    }</span>
+
+    // ------------------------------------------------------------ editing
+
+    /// Whether a cell is being edited.
+    @Override
+    public boolean isEditing() {
+<span class="fc bfc" id="L1977" title="All 2 branches covered.">        return editor != null;</span>
+    }
+
+    /// The view row being edited, or -1.
+    public int getEditingRow() {
+<span class="nc bnc" id="L1982" title="All 2 branches missed.">        return editor == null ? -1 : editRow;</span>
+    }
+
+    /// The column being edited, or null.
+    public GridColumn getEditingColumn() {
+<span class="nc bnc" id="L1987" title="All 2 branches missed.">        return editor == null ? null : editColumn;</span>
+    }
+
+    /// Edits a cell, when it may be edited. `column` is an index among the
+    /// visible columns. A boolean is toggled at once; anything else gets its
+    /// column's editor over the cell.
+    ///
+    /// #### Returns
+    ///
+    /// true when the cell is being edited, or was toggled
+    public boolean editCellAt(int row, int column) {
+<span class="fc" id="L1998">        refreshLayout();</span>
+<span class="fc bfc" id="L1999" title="All 2 branches covered.">        if (!isCellEditable(row, column)) {</span>
+<span class="fc" id="L2000">            return false;</span>
+        }
+<span class="fc" id="L2002">        commitEdit();</span>
+<span class="fc" id="L2003">        GridColumn c = vis[column];</span>
+<span class="pc bpc" id="L2004" title="1 of 2 branches missed.">        if (c.resolveKind(rows.value(row, c.getModelColumn())) == GridColumn.Kind.BOOLEAN) {</span>
+<span class="nc" id="L2005">            toggleBoolean(row, c);</span>
+<span class="nc" id="L2006">            return true;</span>
+        }
+<span class="fc" id="L2008">        TopLevelContainer top = getTopLevelContainer();</span>
+<span class="pc bpc" id="L2009" title="1 of 2 branches missed.">        if (top == null) {</span>
+<span class="nc" id="L2010">            return false;</span>
+        }
+<span class="fc" id="L2012">        scrollToCell(row, column);</span>
+<span class="fc" id="L2013">        stopFling();</span>
+<span class="fc" id="L2014">        fillCell(row, c, GridLook.selected(&quot;DataGridRow&quot;));</span>
+<span class="fc bfc" id="L2015" title="All 2 branches covered.">        GridCellEditor source = c.getEditor() != null ? c.getEditor() : defaultEditor;</span>
+<span class="fc" id="L2016">        Component cmp = source.createEditor(this, cell);</span>
+<span class="pc bpc" id="L2017" title="1 of 2 branches missed.">        if (cmp == null) {</span>
+<span class="nc" id="L2018">            return false;</span>
+        }
+<span class="fc" id="L2020">        editRow = row;</span>
+<span class="fc" id="L2021">        editColumn = c;</span>
+<span class="fc" id="L2022">        editKey = rows.key(row);</span>
+<span class="fc" id="L2023">        editorSource = source;</span>
+<span class="fc" id="L2024">        editor = cmp;</span>
+<span class="fc" id="L2025">        leadColumn = column;</span>
+<span class="fc" id="L2026">        final int col = column;</span>
+<span class="fc" id="L2027">        final Component ed = cmp;</span>
+<span class="fc" id="L2028">        Container layer = top.getFormLayeredPane(DataGrid.class, true);</span>
+<span class="fc" id="L2029">        editorHolder = new EditorLayer(new Layout() {</span>
+            @Override
+            public void layoutContainer(Container parent) {
+<span class="fc" id="L2032">                int[] b = new int[4];</span>
+<span class="fc" id="L2033">                getCellBounds(editRow, col, b);</span>
+<span class="fc" id="L2034">                ed.setX(getAbsoluteX() + b[0] - parent.getAbsoluteX());</span>
+<span class="fc" id="L2035">                ed.setY(getAbsoluteY() + b[1] - parent.getAbsoluteY());</span>
+<span class="fc" id="L2036">                ed.setWidth(b[2]);</span>
+<span class="fc" id="L2037">                ed.setHeight(b[3]);</span>
+<span class="fc" id="L2038">            }</span>
+
+            @Override
+            public Dimension getPreferredSize(Container parent) {
+                // as big as the pane it is in: a container paints its children clipped to
+                // itself, and the pane lays this out at its preferred size, so at 0 by 0 an
+                // editor that Codename One paints was never seen
+<span class="fc" id="L2045">                Container pane = parent.getParent();</span>
+<span class="pc bpc" id="L2046" title="1 of 2 branches missed.">                return pane == null ? new Dimension(0, 0) : new Dimension(pane.getWidth(), pane.getHeight());</span>
+            }
+        }, ed);
+<span class="fc" id="L2049">        editorHolder.add(cmp);</span>
+<span class="fc" id="L2050">        layer.add(editorHolder);</span>
+<span class="fc" id="L2051">        layer.revalidate();</span>
+<span class="fc" id="L2052">        repaint();</span>
+<span class="pc bpc" id="L2053" title="1 of 2 branches missed.">        if (cmp.isEditable()) {</span>
+<span class="fc" id="L2054">            cmp.startEditingAsync();</span>
+        } else {
+<span class="nc" id="L2056">            cmp.requestFocus();</span>
+        }
+<span class="fc" id="L2058">        return true;</span>
+    }
+
+    /// Ends the edit, writing the editor's value to the model.
+    public void commitEdit() {
+<span class="pc bpc" id="L2063" title="1 of 4 branches missed.">        if (editor == null || committing) {</span>
+<span class="fc" id="L2064">            return;</span>
+        }
+<span class="fc" id="L2066">        committing = true;</span>
+        try {
+<span class="fc" id="L2068">            int row = rows.find(editKey);</span>
+<span class="pc bpc" id="L2069" title="1 of 2 branches missed.">            if (row &gt;= 0) {</span>
+<span class="fc" id="L2070">                fillCell(row, editColumn, GridLook.style(&quot;DataGridRow&quot;));</span>
+<span class="fc" id="L2071">                Object v = editorSource.getEditorValue(editor, cell);</span>
+<span class="fc" id="L2072">                Object before = cell.getValue();</span>
+<span class="pc bpc" id="L2073" title="3 of 6 branches missed.">                if (v == null ? before != null : !v.equals(before)) {</span>
+<span class="fc" id="L2074">                    rows.setValue(row, editColumn.getModelColumn(), v);</span>
+                }
+            }
+        } finally {
+<span class="fc" id="L2078">            closeEditor();</span>
+<span class="fc" id="L2079">            committing = false;</span>
+        }
+<span class="fc" id="L2081">    }</span>
+
+    /// Ends the edit without changing the model, and any drag in progress.
+    @Override
+    public final void cancelEdit() {
+<span class="fc" id="L2086">        super.cancelEdit();</span>
+<span class="pc bpc" id="L2087" title="1 of 4 branches missed.">        if (editor != null &amp;&amp; !committing) {</span>
+<span class="fc" id="L2088">            committing = true;</span>
+            try {
+<span class="fc" id="L2090">                closeEditor();</span>
+            } finally {
+<span class="fc" id="L2092">                committing = false;</span>
+            }
+        }
+<span class="fc" id="L2095">    }</span>
+
+    private void closeEditor() {
+<span class="fc" id="L2098">        Component ed = editor;</span>
+<span class="fc" id="L2099">        Container holder = editorHolder;</span>
+<span class="fc" id="L2100">        editor = null;</span>
+<span class="fc" id="L2101">        editorHolder = null;</span>
+<span class="fc" id="L2102">        editorSource = null;</span>
+<span class="fc" id="L2103">        editKey = null;</span>
+<span class="fc" id="L2104">        editRow = -1;</span>
+<span class="fc" id="L2105">        editColumn = null;</span>
+<span class="pc bpc" id="L2106" title="2 of 4 branches missed.">        if (ed != null &amp;&amp; ed.isEditing()) {</span>
+<span class="nc" id="L2107">            ed.stopEditing(null);</span>
+        }
+<span class="pc bpc" id="L2109" title="1 of 2 branches missed.">        if (holder != null) {</span>
+<span class="fc" id="L2110">            Container layer = holder.getParent();</span>
+<span class="fc" id="L2111">            holder.remove();</span>
+<span class="pc bpc" id="L2112" title="1 of 2 branches missed.">            if (layer != null) {</span>
+<span class="fc" id="L2113">                layer.revalidate();</span>
+            }
+        }
+<span class="fc bfc" id="L2116" title="All 2 branches covered.">        if (isInitialized()) {</span>
+<span class="fc" id="L2117">            requestFocus();</span>
+        }
+<span class="fc" id="L2119">        repaint();</span>
+<span class="fc" id="L2120">    }</span>
+
+    // The layer the editor is laid in. It covers the form, so only the
+    // editor itself takes the pointer: a tap anywhere else reaches what is
+    // under it.
+    private static final class EditorLayer extends Container {
+        private final Component editor;
+
+        EditorLayer(Layout layout, Component editor) {
+<span class="fc" id="L2129">            super(layout);</span>
+<span class="fc" id="L2130">            this.editor = editor;</span>
+<span class="fc" id="L2131">        }</span>
+
+        @Override
+        public boolean contains(int x, int y) {
+<span class="nc" id="L2135">            return editor.contains(x, y);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,221 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>NdefMessage.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.nfc</a> &gt; <span class="el_source">NdefMessage.java</span></div><h1>NdefMessage.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.nfc;
+
+import java.io.ByteArrayOutputStream;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
+/// An NDEF message -- the payload of an NDEF-formatted tag. A message
+/// contains one or more [NdefRecord]s in order.
+///
+/// Construct messages directly:
+///
+/// ```java
+/// NdefMessage msg = new NdefMessage(
+///     NdefRecord.createUri(&quot;https://codenameone.com&quot;),
+///     NdefRecord.createText(&quot;en&quot;, &quot;Codename One&quot;));
+/// nfc.writeNdef(tag, msg);
+/// ```
+///
+/// or parse a raw byte stream via [#parse(byte[])] (the format ports use to
+/// hand a discovered tag back to your code).
+public final class NdefMessage {
+
+    private final List&lt;NdefRecord&gt; records;
+
+<span class="fc" id="L48">    public NdefMessage(NdefRecord... records) {</span>
+<span class="fc bfc" id="L49" title="All 4 branches covered.">        if (records == null || records.length == 0) {</span>
+<span class="fc" id="L50">            throw new IllegalArgumentException(&quot;at least one record required&quot;);</span>
+        }
+<span class="fc" id="L52">        List&lt;NdefRecord&gt; rs = new ArrayList&lt;NdefRecord&gt;(records.length);</span>
+<span class="fc bfc" id="L53" title="All 2 branches covered.">        for (int i = 0; i &lt; records.length; i++) {</span>
+<span class="fc bfc" id="L54" title="All 2 branches covered.">            if (records[i] == null) {</span>
+<span class="fc" id="L55">                throw new IllegalArgumentException(&quot;record &quot; + i + &quot; is null&quot;);</span>
+            }
+<span class="fc" id="L57">            rs.add(records[i]);</span>
+        }
+<span class="fc" id="L59">        this.records = Collections.unmodifiableList(rs);</span>
+<span class="fc" id="L60">    }</span>
+
+<span class="fc" id="L62">    public NdefMessage(List&lt;NdefRecord&gt; records) {</span>
+<span class="fc bfc" id="L63" title="All 4 branches covered.">        if (records == null || records.isEmpty()) {</span>
+<span class="fc" id="L64">            throw new IllegalArgumentException(&quot;at least one record required&quot;);</span>
+        }
+<span class="fc" id="L66">        List&lt;NdefRecord&gt; rs = new ArrayList&lt;NdefRecord&gt;(records.size());</span>
+<span class="fc bfc" id="L67" title="All 2 branches covered.">        for (int i = 0; i &lt; records.size(); i++) {</span>
+<span class="fc" id="L68">            NdefRecord r = records.get(i);</span>
+<span class="fc bfc" id="L69" title="All 2 branches covered.">            if (r == null) {</span>
+<span class="fc" id="L70">                throw new IllegalArgumentException(&quot;record &quot; + i + &quot; is null&quot;);</span>
+            }
+<span class="fc" id="L72">            rs.add(r);</span>
+        }
+<span class="fc" id="L74">        this.records = Collections.unmodifiableList(rs);</span>
+<span class="fc" id="L75">    }</span>
+
+    /// The records carried by this message in tag order. Immutable.
+    public List&lt;NdefRecord&gt; getRecords() {
+<span class="fc" id="L79">        return records;</span>
+    }
+
+    /// Convenience -- returns the first record, since most NDEF messages
+    /// carry a single payload.
+    public NdefRecord getFirstRecord() {
+<span class="fc" id="L85">        return records.get(0);</span>
+    }
+
+    /// Serialises this message to a flat byte array using the NDEF wire
+    /// format. Ports call this to hand a message to the OS for writing.
+    public byte[] toByteArray() {
+<span class="fc" id="L91">        ByteArrayOutputStream bos = new ByteArrayOutputStream();</span>
+<span class="fc" id="L92">        int n = records.size();</span>
+<span class="fc bfc" id="L93" title="All 2 branches covered.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc" id="L94">            NdefRecord r = records.get(i);</span>
+<span class="fc" id="L95">            byte[] type = r.getType();</span>
+<span class="fc" id="L96">            byte[] id = r.getId();</span>
+<span class="fc" id="L97">            byte[] payload = r.getPayload();</span>
+<span class="fc bfc" id="L98" title="All 2 branches covered.">            boolean shortRecord = payload.length &lt; 256;</span>
+<span class="fc bfc" id="L99" title="All 2 branches covered.">            boolean hasId = id.length &gt; 0;</span>
+<span class="fc" id="L100">            int header = r.getTnf() &amp; 0x07;</span>
+<span class="fc bfc" id="L101" title="All 2 branches covered.">            if (i == 0) {</span>
+<span class="fc" id="L102">                header |= 0x80; // MB</span>
+            }
+<span class="fc bfc" id="L104" title="All 2 branches covered.">            if (i == n - 1) {</span>
+<span class="fc" id="L105">                header |= 0x40; // ME</span>
+            }
+<span class="fc bfc" id="L107" title="All 2 branches covered.">            if (shortRecord) {</span>
+<span class="fc" id="L108">                header |= 0x10; // SR</span>
+            }
+<span class="fc bfc" id="L110" title="All 2 branches covered.">            if (hasId) {</span>
+<span class="fc" id="L111">                header |= 0x08; // IL</span>
+            }
+<span class="fc" id="L113">            bos.write(header);</span>
+<span class="fc" id="L114">            bos.write(type.length &amp; 0xFF);</span>
+<span class="fc bfc" id="L115" title="All 2 branches covered.">            if (shortRecord) {</span>
+<span class="fc" id="L116">                bos.write(payload.length &amp; 0xFF);</span>
+            } else {
+<span class="fc" id="L118">                bos.write((payload.length &gt;&gt;&gt; 24) &amp; 0xFF);</span>
+<span class="fc" id="L119">                bos.write((payload.length &gt;&gt;&gt; 16) &amp; 0xFF);</span>
+<span class="fc" id="L120">                bos.write((payload.length &gt;&gt;&gt; 8) &amp; 0xFF);</span>
+<span class="fc" id="L121">                bos.write(payload.length &amp; 0xFF);</span>
+            }
+<span class="fc bfc" id="L123" title="All 2 branches covered.">            if (hasId) {</span>
+<span class="fc" id="L124">                bos.write(id.length &amp; 0xFF);</span>
+            }
+<span class="fc" id="L126">            bos.write(type, 0, type.length);</span>
+<span class="fc bfc" id="L127" title="All 2 branches covered.">            if (hasId) {</span>
+<span class="fc" id="L128">                bos.write(id, 0, id.length);</span>
+            }
+<span class="fc" id="L130">            bos.write(payload, 0, payload.length);</span>
+        }
+<span class="fc" id="L132">        return bos.toByteArray();</span>
+    }
+
+    /// Parses an NDEF byte stream into a message. Tolerates the
+    /// short-record (SR) flag and the optional id-length (IL) flag.
+    /// Concatenated messages (multiple MB/ME-bracketed groups in the same
+    /// stream) are not supported -- pass a single message.
+    ///
+    /// #### Throws
+    ///
+    /// - [NfcException] with [NfcError#INVALID_NDEF] when the input is
+    ///   malformed
+    public static NdefMessage parse(byte[] raw) throws NfcException {
+<span class="fc bfc" id="L145" title="All 2 branches covered.">        if (raw == null) {</span>
+<span class="fc" id="L146">            throw new NfcException(NfcError.INVALID_NDEF, &quot;null NDEF payload&quot;);</span>
+        }
+<span class="fc" id="L148">        List&lt;NdefRecord&gt; out = new ArrayList&lt;NdefRecord&gt;();</span>
+<span class="fc" id="L149">        int p = 0;</span>
+<span class="fc" id="L150">        boolean sawMb = false;</span>
+<span class="fc" id="L151">        boolean sawMe = false;</span>
+<span class="fc bfc" id="L152" title="All 2 branches covered.">        while (p &lt; raw.length) {</span>
+<span class="fc" id="L153">            int header = raw[p++] &amp; 0xFF;</span>
+<span class="fc bfc" id="L154" title="All 2 branches covered.">            boolean mb = (header &amp; 0x80) != 0;</span>
+<span class="fc bfc" id="L155" title="All 2 branches covered.">            boolean me = (header &amp; 0x40) != 0;</span>
+<span class="fc bfc" id="L156" title="All 2 branches covered.">            boolean sr = (header &amp; 0x10) != 0;</span>
+<span class="fc bfc" id="L157" title="All 2 branches covered.">            boolean il = (header &amp; 0x08) != 0;</span>
+<span class="fc" id="L158">            byte tnf = (byte) (header &amp; 0x07);</span>
+<span class="fc bfc" id="L159" title="All 2 branches covered.">            if (out.isEmpty()) {</span>
+<span class="fc bfc" id="L160" title="All 2 branches covered.">                if (!mb) {</span>
+<span class="fc" id="L161">                    throw new NfcException(NfcError.INVALID_NDEF,</span>
+                            &quot;missing MB on first record&quot;);
+                }
+<span class="fc" id="L164">                sawMb = true;</span>
+            }
+<span class="fc bfc" id="L166" title="All 2 branches covered.">            if (p &gt;= raw.length) {</span>
+<span class="fc" id="L167">                throw new NfcException(NfcError.INVALID_NDEF, &quot;truncated&quot;);</span>
+            }
+<span class="fc" id="L169">            int typeLen = raw[p++] &amp; 0xFF;</span>
+            int payloadLen;
+<span class="fc bfc" id="L171" title="All 2 branches covered.">            if (sr) {</span>
+<span class="pc bpc" id="L172" title="1 of 2 branches missed.">                if (p &gt;= raw.length) {</span>
+<span class="nc" id="L173">                    throw new NfcException(NfcError.INVALID_NDEF,</span>
+                            &quot;truncated SR length&quot;);
+                }
+<span class="fc" id="L176">                payloadLen = raw[p++] &amp; 0xFF;</span>
+            } else {
+<span class="pc bpc" id="L178" title="1 of 2 branches missed.">                if (p + 4 &gt; raw.length) {</span>
+<span class="nc" id="L179">                    throw new NfcException(NfcError.INVALID_NDEF,</span>
+                            &quot;truncated payload length&quot;);
+                }
+<span class="fc" id="L182">                payloadLen = ((raw[p] &amp; 0xFF) &lt;&lt; 24)</span>
+                        | ((raw[p + 1] &amp; 0xFF) &lt;&lt; 16)
+                        | ((raw[p + 2] &amp; 0xFF) &lt;&lt; 8)
+                        | (raw[p + 3] &amp; 0xFF);
+<span class="fc" id="L186">                p += 4;</span>
+            }
+<span class="fc" id="L188">            int idLen = 0;</span>
+<span class="fc bfc" id="L189" title="All 2 branches covered.">            if (il) {</span>
+<span class="pc bpc" id="L190" title="1 of 2 branches missed.">                if (p &gt;= raw.length) {</span>
+<span class="nc" id="L191">                    throw new NfcException(NfcError.INVALID_NDEF,</span>
+                            &quot;truncated id length&quot;);
+                }
+<span class="fc" id="L194">                idLen = raw[p++] &amp; 0xFF;</span>
+            }
+<span class="pc bpc" id="L196" title="1 of 4 branches missed.">            if (p + typeLen + idLen + payloadLen &gt; raw.length || payloadLen &lt; 0) {</span>
+<span class="fc" id="L197">                throw new NfcException(NfcError.INVALID_NDEF, &quot;truncated fields&quot;);</span>
+            }
+<span class="fc" id="L199">            byte[] type = new byte[typeLen];</span>
+<span class="fc" id="L200">            System.arraycopy(raw, p, type, 0, typeLen);</span>
+<span class="fc" id="L201">            p += typeLen;</span>
+<span class="fc" id="L202">            byte[] id = new byte[idLen];</span>
+<span class="fc" id="L203">            System.arraycopy(raw, p, id, 0, idLen);</span>
+<span class="fc" id="L204">            p += idLen;</span>
+<span class="fc" id="L205">            byte[] payload = new byte[payloadLen];</span>
+<span class="fc" id="L206">            System.arraycopy(raw, p, payload, 0, payloadLen);</span>
+<span class="fc" id="L207">            p += payloadLen;</span>
+<span class="fc" id="L208">            out.add(new NdefRecord(tnf, type, id, payload));</span>
+<span class="fc bfc" id="L209" title="All 2 branches covered.">            if (me) {</span>
+<span class="fc" id="L210">                sawMe = true;</span>
+<span class="fc" id="L211">                break;</span>
+            }
+<span class="fc" id="L213">        }</span>
+<span class="pc bpc" id="L214" title="2 of 6 branches missed.">        if (!sawMb || !sawMe || out.isEmpty()) {</span>
+<span class="fc" id="L215">            throw new NfcException(NfcError.INVALID_NDEF,</span>
+                    &quot;incomplete NDEF message&quot;);
+        }
+<span class="fc" id="L218">        return new NdefMessage(out);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,217 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ScenePresets.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.gpu.shaders</a> &gt; <span class="el_source">ScenePresets.java</span></div><h1>ScenePresets.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.gpu.shaders;
+
+import com.codename1.gpu.Environment;
+import com.codename1.gpu.GraphicsDevice;
+import com.codename1.gpu.Light;
+import com.codename1.gpu.PostProcess;
+import com.codename1.gpu.shader.ShaderMaterial;
+
+/// Complete looks: a sun, the sky's light, fog, tone mapping, post effects
+/// and a matching `Sky` dome, tuned to work together. Start from one and
+/// adjust; every part is an ordinary object you can change.
+///
+/// ```java
+/// import com.codename1.gpu.*;
+/// import com.codename1.gpu.shaders.ScenePresets;
+///
+/// void frame(GraphicsDevice device, int w, int h) {
+///     ScenePresets.Preset look = ScenePresets.harbourDusk();
+///     look.apply(device);
+///     Material dome = new Material(Material.Type.UNLIT).setShader(look.getSky()).setFogged(false);
+///     // per frame, after drawing the scene:
+///     device.beginPostProcess(look.getPost(), w, h);
+/// }
+/// ```
+public final class ScenePresets {
+    private ScenePresets() {
+    }
+
+    /// A light, environment, post chain and sky dome that belong together.
+    public static final class Preset {
+        private final Light light;
+        private final Environment environment;
+        private final PostProcess post;
+        private final ShaderMaterial sky;
+        private final int clearColor;
+
+<span class="fc" id="L59">        Preset(Light light, Environment environment, PostProcess post, ShaderMaterial sky, int clearColor) {</span>
+<span class="fc" id="L60">            this.light = light;</span>
+<span class="fc" id="L61">            this.environment = environment;</span>
+<span class="fc" id="L62">            this.post = post;</span>
+<span class="fc" id="L63">            this.sky = sky;</span>
+<span class="fc" id="L64">            this.clearColor = clearColor;</span>
+<span class="fc" id="L65">        }</span>
+
+        /// The sun.
+        ///
+        /// #### Returns
+        ///
+        /// the light
+        public Light getLight() {
+<span class="fc" id="L73">            return light;</span>
+        }
+
+        /// The fog, sky light and tone mapping.
+        ///
+        /// #### Returns
+        ///
+        /// the environment
+        public Environment getEnvironment() {
+<span class="fc" id="L82">            return environment;</span>
+        }
+
+        /// Bloom, grade, vignette and grain.
+        ///
+        /// #### Returns
+        ///
+        /// the post chain
+        public PostProcess getPost() {
+<span class="fc" id="L91">            return post;</span>
+        }
+
+        /// A `Sky.gradient` dome material set to match.
+        ///
+        /// #### Returns
+        ///
+        /// the sky shader
+        public ShaderMaterial getSky() {
+<span class="fc" id="L100">            return sky;</span>
+        }
+
+        /// The colour to clear to, the horizon's, for scenes without a dome.
+        ///
+        /// #### Returns
+        ///
+        /// an ARGB colour
+        public int getClearColor() {
+<span class="nc" id="L109">            return clearColor;</span>
+        }
+
+        /// Installs the light and the environment on a device.
+        ///
+        /// #### Parameters
+        ///
+        /// - `device`: the device to draw with
+        public void apply(GraphicsDevice device) {
+<span class="nc" id="L118">            device.setLight(light);</span>
+<span class="nc" id="L119">            device.setEnvironment(environment);</span>
+<span class="nc" id="L120">        }</span>
+    }
+
+    private static Light sun(float x, float y, float z, int color, int ambient, float softness) {
+<span class="fc" id="L124">        return new Light().setDirection(x, y, z).setColor(color).setAmbientColor(ambient).setShadows(true)</span>
+<span class="fc" id="L125">                .setShadowMap(2048, 40f).setShadowStyle(0.75f, 0.0015f).setShadowSoftness(softness);</span>
+    }
+
+    /// Golden hour by the sea: a low warm sun across the water, a deep blue
+    /// sky lighting the shadows, light haze, and a soft bloom on the
+    /// highlights.
+    ///
+    /// #### Returns
+    ///
+    /// a new preset
+    public static Preset harbourDusk() {
+<span class="fc" id="L136">        Light l = sun(-0.75f, -0.32f, -0.55f, 0xffffc49a, 0xff2a3044, 2.5f);</span>
+<span class="fc" id="L137">        Environment e = new Environment().setHemisphere(0xff5a6c9c, 0xff3a2c28)</span>
+<span class="fc" id="L138">                .setFog(0xffc89a86, 0.012f, 0.08f).setToneMapping(true).setExposure(1.15f);</span>
+<span class="fc" id="L139">        PostProcess p = new PostProcess().setBloom(0.75f, 0.55f).setGrade(1.08f, 1.12f, 0xff2a3a5a, 0xffffc8a0)</span>
+<span class="fc" id="L140">                .setVignette(0.35f).setGrain(0.03f);</span>
+<span class="fc" id="L141">        return new Preset(l, e, p, Sky.dusk(Sky.gradient()), 0xfff0a46a);</span>
+    }
+
+    /// Bright midday: a high white sun, blue sky light, crisp shadows.
+    ///
+    /// #### Returns
+    ///
+    /// a new preset
+    public static Preset clearNoon() {
+<span class="fc" id="L150">        Light l = sun(-0.3f, -0.9f, -0.25f, 0xfffff6e8, 0xff40464f, 1.2f);</span>
+<span class="fc" id="L151">        Environment e = new Environment().setHemisphere(0xff8fb4e0, 0xff5a5040)</span>
+<span class="fc" id="L152">                .setFog(0xffbcd8ec, 0.004f, 0.05f).setToneMapping(true).setExposure(1f);</span>
+<span class="fc" id="L153">        PostProcess p = new PostProcess().setBloom(0.9f, 0.25f).setGrade(1.05f, 1.08f, 0xff203048, 0xfffff0e0)</span>
+<span class="fc" id="L154">                .setVignette(0.2f);</span>
+<span class="fc" id="L155">        return new Preset(l, e, p, Sky.day(Sky.gradient()), 0xffbcd8ec);</span>
+    }
+
+    /// Overcast: no hard shadows to speak of, flat grey light, thick haze.
+    ///
+    /// #### Returns
+    ///
+    /// a new preset
+    public static Preset overcast() {
+<span class="fc" id="L164">        Light l = sun(-0.2f, -0.95f, -0.1f, 0xff9a9ea4, 0xff70767e, 4f).setShadowStyle(0.3f, 0.0015f);</span>
+<span class="fc" id="L165">        Environment e = new Environment().setHemisphere(0xffa8aeb4, 0xff55585c)</span>
+<span class="fc" id="L166">                .setFog(0xffb4b9bd, 0.02f, 0.04f).setToneMapping(true).setExposure(1.05f);</span>
+<span class="fc" id="L167">        PostProcess p = new PostProcess().setGrade(0.95f, 0.8f, 0xff303840, 0xffe8ecf0).setVignette(0.25f);</span>
+<span class="fc" id="L168">        return new Preset(l, e, p, Sky.overcast(Sky.gradient()), 0xffb4b9bd);</span>
+    }
+
+    /// Night: cold moonlight, deep blue shadows, strong bloom for lamps and
+    /// emissive surfaces.
+    ///
+    /// #### Returns
+    ///
+    /// a new preset
+    public static Preset night() {
+<span class="fc" id="L178">        Light l = sun(0.4f, -0.6f, -0.5f, 0xff5a6a90, 0xff0c1222, 2f);</span>
+<span class="fc" id="L179">        Environment e = new Environment().setHemisphere(0xff1a2440, 0xff080a10)</span>
+<span class="fc" id="L180">                .setFog(0xff16233a, 0.015f, 0.06f).setToneMapping(true).setExposure(1.3f);</span>
+<span class="fc" id="L181">        PostProcess p = new PostProcess().setBloom(0.55f, 0.9f).setGrade(1.1f, 0.85f, 0xff101830, 0xffc0d0ff)</span>
+<span class="fc" id="L182">                .setVignette(0.45f).setGrain(0.05f);</span>
+<span class="fc" id="L183">        return new Preset(l, e, p, Sky.night(Sky.gradient()), 0xff16233a);</span>
+    }
+
+    /// Desert: a harsh white sun, hot sand bouncing light into the shadows,
+    /// heat haze on the horizon.
+    ///
+    /// #### Returns
+    ///
+    /// a new preset
+    public static Preset desert() {
+<span class="fc" id="L193">        Light l = sun(-0.4f, -0.8f, 0.3f, 0xfffff0d8, 0xff4a4036, 1.2f);</span>
+<span class="fc" id="L194">        Environment e = new Environment().setHemisphere(0xffa8c4e4, 0xffb08a5c)</span>
+<span class="fc" id="L195">                .setFog(0xffe8d4b4, 0.008f, 0.05f).setToneMapping(true).setExposure(1.05f);</span>
+<span class="fc" id="L196">        PostProcess p = new PostProcess().setBloom(0.85f, 0.3f).setGrade(1.1f, 1.05f, 0xff3a2a1a, 0xfffff0d0);</span>
+<span class="fc" id="L197">        ShaderMaterial sky = Sky.day(Sky.gradient()).setColorUniform(Sky.HORIZON, 0xe8dcc4).setUniform(Sky.CLOUDS, 0.1f);</span>
+<span class="fc" id="L198">        return new Preset(l, e, p, sky, 0xffe8d4b4);</span>
+    }
+
+    /// Arctic: a low pale sun, blue-white snow light from everywhere, cold
+    /// grade.
+    ///
+    /// #### Returns
+    ///
+    /// a new preset
+    public static Preset arctic() {
+<span class="fc" id="L208">        Light l = sun(-0.6f, -0.4f, -0.7f, 0xfff4f0ff, 0xff60708a, 2f);</span>
+<span class="fc" id="L209">        Environment e = new Environment().setHemisphere(0xffa8c8f0, 0xffd8e4f0)</span>
+<span class="fc" id="L210">                .setFog(0xffd8e6f2, 0.01f, 0.05f).setToneMapping(true).setExposure(0.95f);</span>
+<span class="fc" id="L211">        PostProcess p = new PostProcess().setBloom(0.85f, 0.35f).setGrade(1.05f, 0.9f, 0xff304a70, 0xfff0f4ff)</span>
+<span class="fc" id="L212">                .setVignette(0.25f);</span>
+<span class="fc" id="L213">        ShaderMaterial sky = Sky.day(Sky.gradient()).setColorUniform(Sky.HORIZON, 0xdce8f4).setUniform(Sky.CLOUDS, 0.5f);</span>
+<span class="fc" id="L214">        return new Preset(l, e, p, sky, 0xffd8e6f2);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

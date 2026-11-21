@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>IIRFilterNode.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.media.audio</a> &gt; <span class="el_source">IIRFilterNode.java</span></div><h1>IIRFilterNode.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.media.audio;
+
+/// A general infinite impulse response filter with fixed coefficients, the Web
+/// Audio `IIRFilterNode`. The output has the input's channel count.
+public final class IIRFilterNode extends AudioNode {
+    private static final int MAX_ORDER = 20;
+    private final double[] b;
+    private final double[] a;
+
+    // ---- render side ----
+<span class="fc" id="L33">    private final double[][] xs = new double[AudioBus.MAX_CHANNELS][];</span>
+<span class="fc" id="L34">    private final double[][] ys = new double[AudioBus.MAX_CHANNELS][];</span>
+    private int head;
+
+    IIRFilterNode(BaseAudioContext context, double[] feedforward, double[] feedback) {
+<span class="fc" id="L38">        super(context, 1, 1, 2, ChannelCountMode.MAX, ChannelInterpretation.SPEAKERS);</span>
+<span class="pc bpc" id="L39" title="3 of 6 branches missed.">        if (feedforward == null || feedforward.length &lt; 1 || feedforward.length &gt; MAX_ORDER) {</span>
+<span class="nc" id="L40">            throw new IllegalArgumentException(&quot;feedforward needs 1 to 20 coefficients&quot;);</span>
+        }
+<span class="pc bpc" id="L42" title="3 of 6 branches missed.">        if (feedback == null || feedback.length &lt; 1 || feedback.length &gt; MAX_ORDER) {</span>
+<span class="nc" id="L43">            throw new IllegalArgumentException(&quot;feedback needs 1 to 20 coefficients&quot;);</span>
+        }
+<span class="pc bpc" id="L45" title="1 of 2 branches missed.">        if (feedback[0] == 0) {</span>
+<span class="nc" id="L46">            throw new IllegalArgumentException(&quot;feedback[0] must not be 0&quot;);</span>
+        }
+<span class="fc" id="L48">        boolean any = false;</span>
+<span class="fc bfc" id="L49" title="All 2 branches covered.">        for (double v : feedforward) {</span>
+<span class="pc bpc" id="L50" title="1 of 2 branches missed.">            if (v != 0) {</span>
+<span class="fc" id="L51">                any = true;</span>
+            }
+        }
+<span class="pc bpc" id="L54" title="1 of 2 branches missed.">        if (!any) {</span>
+<span class="nc" id="L55">            throw new IllegalArgumentException(&quot;feedforward must not be all 0&quot;);</span>
+        }
+<span class="fc" id="L57">        double a0 = feedback[0];</span>
+<span class="fc" id="L58">        b = new double[feedforward.length];</span>
+<span class="fc" id="L59">        a = new double[feedback.length];</span>
+<span class="fc bfc" id="L60" title="All 2 branches covered.">        for (int i = 0; i &lt; b.length; i++) {</span>
+<span class="fc" id="L61">            b[i] = feedforward[i] / a0;</span>
+        }
+<span class="fc bfc" id="L63" title="All 2 branches covered.">        for (int i = 0; i &lt; a.length; i++) {</span>
+<span class="fc" id="L64">            a[i] = feedback[i] / a0;</span>
+        }
+<span class="fc" id="L66">    }</span>
+
+    /// Computes the filter's response at each of `frequencyHz`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `frequencyHz`: the frequencies to evaluate
+    ///
+    /// - `magResponse`: receives the linear magnitude at each frequency
+    ///
+    /// - `phaseResponse`: receives the phase in radians at each frequency
+    public void getFrequencyResponse(float[] frequencyHz, float[] magResponse, float[] phaseResponse) {
+<span class="nc bnc" id="L78" title="All 4 branches missed.">        if (magResponse.length &lt; frequencyHz.length || phaseResponse.length &lt; frequencyHz.length) {</span>
+<span class="nc" id="L79">            throw new IllegalArgumentException(&quot;Response arrays are shorter than the frequency array&quot;);</span>
+        }
+<span class="nc" id="L81">        BiquadFilterNode.response(b, a, context.getSampleRate(), frequencyHz, magResponse, phaseResponse);</span>
+<span class="nc" id="L82">    }</span>
+
+    @Override
+    void process(long q) {
+<span class="fc" id="L86">        AudioBus in = inBuses[0];</span>
+<span class="fc" id="L87">        AudioBus out = outBuses[0];</span>
+<span class="fc" id="L88">        out.setChannels(in.channels);</span>
+<span class="fc" id="L89">        int nb = b.length;</span>
+<span class="fc" id="L90">        int na = a.length;</span>
+<span class="fc bfc" id="L91" title="All 2 branches covered.">        for (int i = 0; i &lt; BaseAudioContext.RENDER_QUANTUM; i++) {</span>
+<span class="fc" id="L92">            int h = head;</span>
+<span class="fc bfc" id="L93" title="All 2 branches covered.">            for (int ch = 0; ch &lt; in.channels; ch++) {</span>
+<span class="fc" id="L94">                double[] x = xs[ch];</span>
+<span class="fc" id="L95">                double[] y = ys[ch];</span>
+<span class="fc bfc" id="L96" title="All 2 branches covered.">                if (x == null) {</span>
+<span class="fc" id="L97">                    x = new double[MAX_ORDER];</span>
+<span class="fc" id="L98">                    y = new double[MAX_ORDER];</span>
+<span class="fc" id="L99">                    xs[ch] = x;</span>
+<span class="fc" id="L100">                    ys[ch] = y;</span>
+                }
+<span class="fc" id="L102">                double v = in.data[ch][i];</span>
+<span class="fc" id="L103">                x[h] = v;</span>
+<span class="fc" id="L104">                double acc = 0;</span>
+<span class="fc bfc" id="L105" title="All 2 branches covered.">                for (int k = 0; k &lt; nb; k++) {</span>
+<span class="fc" id="L106">                    acc += b[k] * x[(h - k + MAX_ORDER) % MAX_ORDER];</span>
+                }
+<span class="fc bfc" id="L108" title="All 2 branches covered.">                for (int k = 1; k &lt; na; k++) {</span>
+<span class="fc" id="L109">                    acc -= a[k] * y[(h - k + MAX_ORDER) % MAX_ORDER];</span>
+                }
+<span class="pc bpc" id="L111" title="1 of 2 branches missed.">                if (Math.abs(acc) &lt; 1e-30) {</span>
+<span class="nc" id="L112">                    acc = 0;</span>
+                }
+<span class="fc" id="L114">                y[h] = acc;</span>
+<span class="fc" id="L115">                out.data[ch][i] = (float) acc;</span>
+            }
+<span class="fc" id="L117">            head = (h + 1) % MAX_ORDER;</span>
+        }
+<span class="fc" id="L119">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

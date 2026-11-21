@@ -1,0 +1,654 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Values.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.spreadsheet</a> &gt; <span class="el_source">Values.java</span></div><h1>Values.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.spreadsheet;
+
+import com.codename1.util.MathUtil;
+
+/// The conversions between the kinds of value a cell holds, as a spreadsheet makes them:
+/// TRUE is 1 in arithmetic, text that reads as a number is that number, and an empty cell is
+/// zero or the empty text depending on who asks.
+final class Values {
+<span class="fc" id="L31">    private static final double[] POW10 = {</span>
+        1e0, 1e1, 1e2, 1e3, 1e4, 1e5, 1e6, 1e7, 1e8, 1e9, 1e10, 1e11, 1e12, 1e13, 1e14, 1e15, 1e16, 1e17, 1e18,
+        1e19, 1e20, 1e21, 1e22
+    };
+
+    private Values() {
+    }
+
+    /// Ten to a power that may be negative.
+    static double pow10signed(int e) {
+<span class="fc bfc" id="L41" title="All 2 branches covered.">        return e &gt;= 0 ? pow10(e) : 1 / pow10(-e);</span>
+    }
+
+    static double pow2(int e) {
+<span class="fc" id="L45">        double r = 1;</span>
+<span class="fc bfc" id="L46" title="All 2 branches covered.">        for (int i = 0; i &lt; e; i++) {</span>
+<span class="fc" id="L47">            r *= 2;</span>
+        }
+<span class="fc" id="L49">        return r;</span>
+    }
+
+    static double pow10(int e) {
+<span class="pc bpc" id="L53" title="1 of 4 branches missed.">        if (e &gt;= 0 &amp;&amp; e &lt; POW10.length) {</span>
+<span class="fc" id="L54">            return POW10[e];</span>
+        }
+<span class="pc bpc" id="L56" title="3 of 4 branches missed.">        if (e &lt; 0 &amp;&amp; -e &lt; POW10.length) {</span>
+<span class="nc" id="L57">            return 1 / POW10[-e];</span>
+        }
+<span class="fc" id="L59">        return MathUtil.pow(10, e);</span>
+    }
+
+    /// The number a value stands for in arithmetic. Throws the error the value is, or
+    /// `#VALUE!` for text that is not a number.
+    static double num(Object v) {
+<span class="fc bfc" id="L65" title="All 2 branches covered.">        if (v instanceof Double) {</span>
+<span class="fc" id="L66">            return ((Double) v).doubleValue();</span>
+        }
+<span class="pc bpc" id="L68" title="1 of 4 branches missed.">        if (v == null || v == Evaluator.MISSING) { //NOPMD CompareObjectsWithEquals - the marker of an omitted argument is one object</span>
+<span class="fc" id="L69">            return 0;</span>
+        }
+<span class="fc bfc" id="L71" title="All 2 branches covered.">        if (v instanceof Boolean) {</span>
+<span class="fc bfc" id="L72" title="All 2 branches covered.">            return ((Boolean) v).booleanValue() ? 1 : 0;</span>
+        }
+<span class="fc bfc" id="L74" title="All 2 branches covered.">        if (v instanceof String) {</span>
+<span class="fc" id="L75">            Double d = parseNumber((String) v);</span>
+<span class="fc bfc" id="L76" title="All 2 branches covered.">            if (d == null) {</span>
+<span class="fc" id="L77">                throw EvalError.VALUE;</span>
+            }
+<span class="fc" id="L79">            return d.doubleValue();</span>
+        }
+<span class="pc bpc" id="L81" title="1 of 2 branches missed.">        if (v instanceof CellError) {</span>
+<span class="fc" id="L82">            throw EvalError.of((CellError) v);</span>
+        }
+<span class="nc" id="L84">        throw EvalError.VALUE;</span>
+    }
+
+    static String text(Object v) {
+<span class="fc bfc" id="L88" title="All 2 branches covered.">        if (v instanceof String) {</span>
+<span class="fc" id="L89">            return (String) v;</span>
+        }
+<span class="pc bpc" id="L91" title="1 of 4 branches missed.">        if (v == null || v == Evaluator.MISSING) { //NOPMD CompareObjectsWithEquals - the marker of an omitted argument is one object</span>
+<span class="fc" id="L92">            return &quot;&quot;;</span>
+        }
+<span class="fc bfc" id="L94" title="All 2 branches covered.">        if (v instanceof Double) {</span>
+<span class="fc" id="L95">            return general(((Double) v).doubleValue());</span>
+        }
+<span class="pc bpc" id="L97" title="1 of 2 branches missed.">        if (v instanceof Boolean) {</span>
+<span class="pc bpc" id="L98" title="1 of 2 branches missed.">            return ((Boolean) v).booleanValue() ? &quot;TRUE&quot; : &quot;FALSE&quot;;</span>
+        }
+<span class="nc bnc" id="L100" title="All 2 branches missed.">        if (v instanceof CellError) {</span>
+<span class="nc" id="L101">            throw EvalError.of((CellError) v);</span>
+        }
+<span class="nc" id="L103">        throw EvalError.VALUE;</span>
+    }
+
+    static boolean bool(Object v) {
+<span class="fc bfc" id="L107" title="All 2 branches covered.">        if (v instanceof Boolean) {</span>
+<span class="fc" id="L108">            return ((Boolean) v).booleanValue();</span>
+        }
+<span class="pc bpc" id="L110" title="1 of 4 branches missed.">        if (v == null || v == Evaluator.MISSING) { //NOPMD CompareObjectsWithEquals - the marker of an omitted argument is one object</span>
+<span class="fc" id="L111">            return false;</span>
+        }
+<span class="fc bfc" id="L113" title="All 2 branches covered.">        if (v instanceof Double) {</span>
+<span class="fc bfc" id="L114" title="All 2 branches covered.">            return ((Double) v).doubleValue() != 0;</span>
+        }
+<span class="pc bpc" id="L116" title="1 of 2 branches missed.">        if (v instanceof String) {</span>
+<span class="fc" id="L117">            String s = (String) v;</span>
+<span class="pc bpc" id="L118" title="1 of 2 branches missed.">            if (&quot;TRUE&quot;.equalsIgnoreCase(s)) {</span>
+<span class="nc" id="L119">                return true;</span>
+            }
+<span class="pc bpc" id="L121" title="1 of 2 branches missed.">            if (&quot;FALSE&quot;.equalsIgnoreCase(s)) {</span>
+<span class="nc" id="L122">                return false;</span>
+            }
+<span class="fc" id="L124">            throw EvalError.VALUE;</span>
+        }
+<span class="nc bnc" id="L126" title="All 2 branches missed.">        if (v instanceof CellError) {</span>
+<span class="nc" id="L127">            throw EvalError.of((CellError) v);</span>
+        }
+<span class="nc" id="L129">        throw EvalError.VALUE;</span>
+    }
+
+    /// Reads text as a number the way a cell does when it is typed in: `12`, `-1.5e3`, `45%`,
+    /// `1,234.5`, an ISO date (`2024-03-01`, optionally with a time) or a time (`13:45`,
+    /// `13:45:10`). Answers null for anything else. Dates use the 1900 system.
+    static Double parseNumber(String raw) {
+<span class="fc" id="L136">        String s = raw.trim();</span>
+<span class="fc" id="L137">        int n = s.length();</span>
+<span class="pc bpc" id="L138" title="1 of 2 branches missed.">        if (n == 0) {</span>
+<span class="nc" id="L139">            return null;</span>
+        }
+<span class="fc" id="L141">        boolean percent = false;</span>
+<span class="fc bfc" id="L142" title="All 2 branches covered.">        if (s.charAt(n - 1) == '%') {</span>
+<span class="fc" id="L143">            percent = true;</span>
+<span class="fc" id="L144">            s = s.substring(0, n - 1).trim();</span>
+<span class="fc" id="L145">            n = s.length();</span>
+<span class="pc bpc" id="L146" title="1 of 2 branches missed.">            if (n == 0) {</span>
+<span class="nc" id="L147">                return null;</span>
+            }
+        }
+<span class="fc" id="L150">        int i = 0;</span>
+<span class="fc" id="L151">        char c = s.charAt(0);</span>
+<span class="pc bpc" id="L152" title="1 of 4 branches missed.">        if (c == '+' || c == '-') {</span>
+<span class="fc" id="L153">            i++;</span>
+        }
+<span class="fc" id="L155">        int digits = 0;</span>
+<span class="fc" id="L156">        boolean grouping = false;</span>
+<span class="fc bfc" id="L157" title="All 2 branches covered.">        while (i &lt; n) {</span>
+<span class="fc" id="L158">            c = s.charAt(i);</span>
+<span class="fc bfc" id="L159" title="All 4 branches covered.">            if (c &gt;= '0' &amp;&amp; c &lt;= '9') {</span>
+<span class="fc" id="L160">                digits++;</span>
+<span class="pc bpc" id="L161" title="1 of 6 branches missed.">            } else if (c == ',' &amp;&amp; digits &gt; 0 &amp;&amp; isThreeDigits(s, i + 1)) {</span>
+<span class="fc" id="L162">                grouping = true;</span>
+            } else {
+                break;
+            }
+<span class="fc" id="L166">            i++;</span>
+        }
+<span class="fc bfc" id="L168" title="All 4 branches covered.">        if (i &lt; n &amp;&amp; s.charAt(i) == '.') {</span>
+<span class="fc" id="L169">            i++;</span>
+<span class="fc bfc" id="L170" title="All 6 branches covered.">            while (i &lt; n &amp;&amp; s.charAt(i) &gt;= '0' &amp;&amp; s.charAt(i) &lt;= '9') {</span>
+<span class="fc" id="L171">                i++;</span>
+<span class="fc" id="L172">                digits++;</span>
+            }
+        }
+<span class="fc bfc" id="L175" title="All 8 branches covered.">        if (digits &gt; 0 &amp;&amp; i &lt; n &amp;&amp; (s.charAt(i) == 'e' || s.charAt(i) == 'E')) {</span>
+<span class="fc" id="L176">            int j = i + 1;</span>
+<span class="pc bpc" id="L177" title="2 of 6 branches missed.">            if (j &lt; n &amp;&amp; (s.charAt(j) == '+' || s.charAt(j) == '-')) {</span>
+<span class="fc" id="L178">                j++;</span>
+            }
+<span class="fc" id="L180">            int expDigits = 0;</span>
+<span class="pc bpc" id="L181" title="2 of 6 branches missed.">            while (j &lt; n &amp;&amp; s.charAt(j) &gt;= '0' &amp;&amp; s.charAt(j) &lt;= '9') {</span>
+<span class="fc" id="L182">                j++;</span>
+<span class="fc" id="L183">                expDigits++;</span>
+            }
+<span class="pc bpc" id="L185" title="2 of 4 branches missed.">            if (expDigits &gt; 0 &amp;&amp; expDigits &lt; 4) {</span>
+<span class="fc" id="L186">                i = j;</span>
+            }
+        }
+<span class="fc bfc" id="L189" title="All 4 branches covered.">        if (digits &gt; 0 &amp;&amp; i == n) {</span>
+<span class="fc bfc" id="L190" title="All 2 branches covered.">            if (grouping) {</span>
+<span class="fc" id="L191">                StringBuilder sb = new StringBuilder(n);</span>
+<span class="fc bfc" id="L192" title="All 2 branches covered.">                for (int k = 0; k &lt; n; k++) {</span>
+<span class="fc bfc" id="L193" title="All 2 branches covered.">                    if (s.charAt(k) != ',') {</span>
+<span class="fc" id="L194">                        sb.append(s.charAt(k));</span>
+                    }
+                }
+<span class="fc" id="L197">                s = sb.toString();</span>
+            }
+<span class="pc bpc" id="L199" title="1 of 2 branches missed.">            if (!isDecimal(s)) {</span>
+<span class="nc" id="L200">                return null;</span>
+            }
+            try {
+<span class="fc" id="L203">                double d = Double.parseDouble(s);</span>
+<span class="fc bfc" id="L204" title="All 2 branches covered.">                return Double.valueOf(percent ? d / 100 : d);</span>
+<span class="nc" id="L205">            } catch (NumberFormatException err) {</span>
+<span class="nc" id="L206">                return null;</span>
+            }
+        }
+<span class="pc bpc" id="L209" title="1 of 2 branches missed.">        if (percent) {</span>
+<span class="nc" id="L210">            return null;</span>
+        }
+<span class="fc" id="L212">        return parseDateTime(s);</span>
+    }
+
+    private static boolean isThreeDigits(String s, int from) {
+<span class="fc bfc" id="L216" title="All 2 branches covered.">        if (from + 3 &gt; s.length()) {</span>
+<span class="fc" id="L217">            return false;</span>
+        }
+<span class="fc bfc" id="L219" title="All 2 branches covered.">        for (int i = from; i &lt; from + 3; i++) {</span>
+<span class="fc" id="L220">            char c = s.charAt(i);</span>
+<span class="pc bpc" id="L221" title="2 of 4 branches missed.">            if (c &lt; '0' || c &gt; '9') {</span>
+<span class="nc" id="L222">                return false;</span>
+            }
+        }
+<span class="pc bpc" id="L225" title="3 of 6 branches missed.">        return from + 3 == s.length() || s.charAt(from + 3) &lt; '0' || s.charAt(from + 3) &gt; '9';</span>
+    }
+
+    /// Whether text names a day, and not only a time of day or a number.
+    static boolean isDateText(String text) {
+<span class="fc" id="L230">        String s = text.trim();</span>
+<span class="pc bpc" id="L231" title="2 of 8 branches missed.">        return namedDate(s, new int[1]) &gt;= 0 || s.length() &gt;= 8 &amp;&amp; s.indexOf('-') == 4 &amp;&amp; parseDateTime(s) != null;</span>
+    }
+
+    /// `yyyy-mm-dd`, `yyyy-mm-ddThh:mm[:ss]`, `yyyy-mm-dd hh:mm[:ss]`, `hh:mm[:ss[.fff]]`.
+    /// The day is numbered in the 1900 system.
+    static Double parseDateTime(String s) {
+<span class="fc" id="L237">        int n = s.length();</span>
+<span class="fc" id="L238">        double day = 0;</span>
+<span class="fc" id="L239">        int i = 0;</span>
+<span class="fc" id="L240">        boolean hasDate = false;</span>
+<span class="fc" id="L241">        int[] named = {0};</span>
+<span class="fc" id="L242">        double byName = namedDate(s, named);</span>
+<span class="fc bfc" id="L243" title="All 2 branches covered.">        if (byName &gt;= 0) {</span>
+<span class="fc" id="L244">            day = byName;</span>
+<span class="fc" id="L245">            i = named[0];</span>
+<span class="fc" id="L246">            hasDate = true;</span>
+<span class="fc bfc" id="L247" title="All 2 branches covered.">            if (i == n) {</span>
+<span class="fc" id="L248">                return Double.valueOf(day);</span>
+            }
+<span class="pc bpc" id="L250" title="1 of 2 branches missed.">            if (s.charAt(i) != ' ') {</span>
+<span class="nc" id="L251">                return null;</span>
+            }
+<span class="fc" id="L253">            i++;</span>
+<span class="fc bfc" id="L254" title="All 4 branches covered.">        } else if (n &gt;= 8 &amp;&amp; s.indexOf('-') == 4) {</span>
+<span class="fc" id="L255">            int[] pos = {0};</span>
+<span class="fc" id="L256">            int y = digits(s, pos, 4);</span>
+<span class="pc bpc" id="L257" title="2 of 4 branches missed.">            if (y &lt; 0 || !eat(s, pos, '-')) {</span>
+<span class="nc" id="L258">                return null;</span>
+            }
+<span class="fc" id="L260">            int m = digits(s, pos, 2);</span>
+<span class="pc bpc" id="L261" title="3 of 6 branches missed.">            if (m &lt; 1 || m &gt; 12 || !eat(s, pos, '-')) {</span>
+<span class="nc" id="L262">                return null;</span>
+            }
+<span class="fc" id="L264">            int d = digits(s, pos, 2);</span>
+<span class="pc bpc" id="L265" title="3 of 6 branches missed.">            if (d &lt; 1 || d &gt; DateUtil.daysInMonth(y, m) || y &lt; 1900) {</span>
+<span class="nc" id="L266">                return null;</span>
+            }
+<span class="fc" id="L268">            day = DateUtil.serial(y, m, d, false);</span>
+<span class="fc" id="L269">            i = pos[0];</span>
+<span class="fc" id="L270">            hasDate = true;</span>
+<span class="fc bfc" id="L271" title="All 2 branches covered.">            if (i == n) {</span>
+<span class="fc" id="L272">                return Double.valueOf(day);</span>
+            }
+<span class="pc bpc" id="L274" title="1 of 4 branches missed.">            if (s.charAt(i) != 'T' &amp;&amp; s.charAt(i) != ' ') {</span>
+<span class="nc" id="L275">                return null;</span>
+            }
+<span class="fc" id="L277">            i++;</span>
+        }
+<span class="fc" id="L279">        int[] pos = {i};</span>
+<span class="fc" id="L280">        int h = digits(s, pos, 2);</span>
+<span class="fc bfc" id="L281" title="All 4 branches covered.">        if (h &lt; 0 || !eat(s, pos, ':')) {</span>
+<span class="fc" id="L282">            return null;</span>
+        }
+<span class="fc" id="L284">        int min = digits(s, pos, 2);</span>
+<span class="pc bpc" id="L285" title="2 of 4 branches missed.">        if (min &lt; 0 || min &gt; 59) {</span>
+<span class="nc" id="L286">            return null;</span>
+        }
+<span class="fc" id="L288">        double sec = 0;</span>
+<span class="fc bfc" id="L289" title="All 2 branches covered.">        if (eat(s, pos, ':')) {</span>
+<span class="fc" id="L290">            int whole = digits(s, pos, 2);</span>
+<span class="pc bpc" id="L291" title="2 of 4 branches missed.">            if (whole &lt; 0 || whole &gt; 59) {</span>
+<span class="nc" id="L292">                return null;</span>
+            }
+<span class="fc" id="L294">            sec = whole;</span>
+<span class="fc bfc" id="L295" title="All 2 branches covered.">            if (eat(s, pos, '.')) {</span>
+<span class="fc" id="L296">                int start = pos[0];</span>
+<span class="fc" id="L297">                int frac = digits(s, pos, 9);</span>
+<span class="pc bpc" id="L298" title="1 of 2 branches missed.">                if (frac &lt; 0) {</span>
+<span class="nc" id="L299">                    return null;</span>
+                }
+<span class="fc" id="L301">                sec += frac / pow10(pos[0] - start);</span>
+            }
+        }
+        // a trailing Z or offset is accepted and ignored: the cell holds wall-clock time
+<span class="pc bpc" id="L305" title="3 of 6 branches missed.">        if (pos[0] &lt; n &amp;&amp; hasDate &amp;&amp; s.charAt(pos[0]) == 'Z') {</span>
+<span class="nc" id="L306">            pos[0]++;</span>
+        }
+        // &quot;6:35 AM&quot;, &quot;6:35pm&quot;, &quot;6:35 p&quot;: the hour is then one of a twelve hour clock
+<span class="fc bfc" id="L309" title="All 4 branches covered.">        int meridiem = pos[0] &lt; n &amp;&amp; s.charAt(pos[0]) == ' ' ? pos[0] + 1 : pos[0];</span>
+<span class="pc bpc" id="L310" title="2 of 10 branches missed.">        if (meridiem &lt; n &amp;&amp; n - meridiem &lt;= 2 &amp;&amp; (n - meridiem == 1 || s.charAt(n - 1) == 'M' || s.charAt(n - 1) == 'm')) {</span>
+<span class="fc" id="L311">            char half = s.charAt(meridiem);</span>
+<span class="fc bfc" id="L312" title="All 4 branches covered.">            boolean pm = half == 'P' || half == 'p';</span>
+<span class="fc bfc" id="L313" title="All 8 branches covered.">            if (!pm &amp;&amp; half != 'A' &amp;&amp; half != 'a' || h &gt; 12) {</span>
+<span class="fc" id="L314">                return null;</span>
+            }
+<span class="fc bfc" id="L316" title="All 2 branches covered.">            h = h == 12 ? 0 : h;</span>
+<span class="fc bfc" id="L317" title="All 2 branches covered.">            if (pm) {</span>
+<span class="fc" id="L318">                h += 12;</span>
+            }
+<span class="fc" id="L320">            pos[0] = n;</span>
+        }
+<span class="pc bpc" id="L322" title="2 of 6 branches missed.">        if (pos[0] != n || h &gt; 23 &amp;&amp; hasDate) {</span>
+<span class="nc" id="L323">            return null;</span>
+        }
+<span class="fc" id="L325">        return Double.valueOf(day + (h * 3600 + min * 60 + sec) / 86400);</span>
+    }
+
+<span class="fc" id="L328">    private static final String[] MONTHS = {&quot;JANUARY&quot;, &quot;FEBRUARY&quot;, &quot;MARCH&quot;, &quot;APRIL&quot;, &quot;MAY&quot;, &quot;JUNE&quot;, &quot;JULY&quot;, &quot;AUGUST&quot;,</span>
+        &quot;SEPTEMBER&quot;, &quot;OCTOBER&quot;, &quot;NOVEMBER&quot;, &quot;DECEMBER&quot;};
+
+    private static int month(String s, int[] pos) {
+<span class="fc" id="L332">        int i = pos[0];</span>
+<span class="fc" id="L333">        int start = i;</span>
+<span class="pc bpc" id="L334" title="1 of 10 branches missed.">        while (i &lt; s.length() &amp;&amp; (s.charAt(i) &gt;= 'A' &amp;&amp; s.charAt(i) &lt;= 'Z' || s.charAt(i) &gt;= 'a' &amp;&amp; s.charAt(i) &lt;= 'z')) {</span>
+<span class="fc" id="L335">            i++;</span>
+        }
+<span class="fc" id="L337">        int len = i - start;</span>
+<span class="fc bfc" id="L338" title="All 4 branches covered.">        for (int m = 0; m &lt; 12 &amp;&amp; len &gt;= 3; m++) {</span>
+<span class="fc bfc" id="L339" title="All 6 branches covered.">            if ((len == 3 || len == MONTHS[m].length()) &amp;&amp; s.regionMatches(true, start, MONTHS[m], 0, len)) {</span>
+<span class="fc" id="L340">                pos[0] = i;</span>
+<span class="fc" id="L341">                return m + 1;</span>
+            }
+        }
+<span class="fc" id="L344">        return -1;</span>
+    }
+
+    /// The day number of a date that names its month in English, `2-Jan-2020`,
+    /// `2 January 2020` or `Jan 2, 2020`, and -1 for anything else. `pos` is left after it.
+    ///
+    /// A date of digits and slashes is not read, here or anywhere: 1/2/2020 is the first of
+    /// February to half the world and the second of January to the other half, and a file
+    /// does not say which it was written for. `yyyy-mm-dd` and a named month mean one day.
+    static double namedDate(String s, int[] pos) {
+<span class="fc bfc" id="L354" title="All 2 branches covered.">        if (s.length() &lt; 8) {</span>
+<span class="fc" id="L355">            return -1;</span>
+        }
+        int d;
+        int m;
+<span class="fc bfc" id="L359" title="All 4 branches covered.">        if (s.charAt(0) &gt;= '0' &amp;&amp; s.charAt(0) &lt;= '9') {</span>
+<span class="fc" id="L360">            d = digits(s, pos, 2);</span>
+<span class="fc bfc" id="L361" title="All 4 branches covered.">            if (!eat(s, pos, '-') &amp;&amp; !eat(s, pos, ' ')) {</span>
+<span class="fc" id="L362">                return -1;</span>
+            }
+<span class="fc" id="L364">            m = month(s, pos);</span>
+<span class="pc bpc" id="L365" title="1 of 6 branches missed.">            if (m &lt; 0 || !eat(s, pos, '-') &amp;&amp; !eat(s, pos, ' ')) {</span>
+<span class="fc" id="L366">                return -1;</span>
+            }
+        } else {
+<span class="fc" id="L369">            m = month(s, pos);</span>
+<span class="pc bpc" id="L370" title="1 of 4 branches missed.">            if (m &lt; 0 || !eat(s, pos, ' ')) {</span>
+<span class="fc" id="L371">                return -1;</span>
+            }
+<span class="fc" id="L373">            d = digits(s, pos, 2);</span>
+<span class="pc bpc" id="L374" title="2 of 4 branches missed.">            if (d &lt; 0 || !eat(s, pos, ',')) {</span>
+<span class="nc" id="L375">                return -1;</span>
+            }
+<span class="fc" id="L377">            eat(s, pos, ' ');</span>
+        }
+<span class="fc" id="L379">        int start = pos[0];</span>
+<span class="fc" id="L380">        int y = digits(s, pos, 4);</span>
+<span class="pc bpc" id="L381" title="3 of 8 branches missed.">        if (pos[0] - start != 4 || y &lt; 1900 || d &lt; 1 || d &gt; DateUtil.daysInMonth(y, m)) {</span>
+<span class="fc" id="L382">            return -1;</span>
+        }
+<span class="fc" id="L384">        return DateUtil.serial(y, m, d, false);</span>
+    }
+
+    private static boolean eat(String s, int[] pos, char c) {
+<span class="fc bfc" id="L388" title="All 4 branches covered.">        if (pos[0] &lt; s.length() &amp;&amp; s.charAt(pos[0]) == c) {</span>
+<span class="fc" id="L389">            pos[0]++;</span>
+<span class="fc" id="L390">            return true;</span>
+        }
+<span class="fc" id="L392">        return false;</span>
+    }
+
+    /// Reads up to `max` digits, answers -1 when there is none.
+    private static int digits(String s, int[] pos, int max) {
+<span class="fc" id="L397">        int i = pos[0];</span>
+<span class="fc" id="L398">        int start = i;</span>
+<span class="fc" id="L399">        int v = 0;</span>
+<span class="fc bfc" id="L400" title="All 8 branches covered.">        while (i &lt; s.length() &amp;&amp; i - start &lt; max &amp;&amp; s.charAt(i) &gt;= '0' &amp;&amp; s.charAt(i) &lt;= '9') {</span>
+<span class="fc" id="L401">            v = v * 10 + (s.charAt(i) - '0');</span>
+<span class="fc" id="L402">            i++;</span>
+        }
+<span class="fc bfc" id="L404" title="All 2 branches covered.">        if (i == start) {</span>
+<span class="fc" id="L405">            return -1;</span>
+        }
+<span class="fc" id="L407">        pos[0] = i;</span>
+<span class="fc" id="L408">        return v;</span>
+    }
+
+    /// A number as the General format writes it: at most 15 significant digits, no trailing
+    /// zeros, scientific notation only for the very large and the very small. The digits are
+    /// produced here, not by `Double.toString`: 0.1+0.2 has to read `0.3`, and the same on
+    /// every platform.
+    static String general(double d) {
+<span class="fc bfc" id="L416" title="All 4 branches covered.">        if (d != 0 &amp;&amp; Math.abs(d) &lt; 1e-300) {</span>
+            // Scaling the digits out of a number this small overflows a long, and multiplying
+            // it into range loses the few bits it has. Its shortest decimal form is exact
+            // enough: the mantissa goes through General for the rounding, the exponent as is.
+<span class="fc" id="L420">            String text = Double.toString(d);</span>
+<span class="fc" id="L421">            int e = text.indexOf('E');</span>
+<span class="pc bpc" id="L422" title="1 of 2 branches missed.">            if (e &gt; 0) {</span>
+<span class="fc" id="L423">                double mantissa = Double.parseDouble(text.substring(0, e));</span>
+<span class="fc" id="L424">                int exponent = Integer.parseInt(text.substring(e + 1));</span>
+<span class="fc" id="L425">                String digits = general(mantissa);</span>
+<span class="fc bfc" id="L426" title="All 2 branches covered.">                if (Math.abs(Double.parseDouble(digits)) &gt;= 10) {</span>
+                    // 9.999999999999999 rounds to 10 in fifteen digits
+<span class="fc" id="L428">                    digits = general(mantissa / 10);</span>
+<span class="fc" id="L429">                    exponent++;</span>
+                }
+<span class="fc" id="L431">                return digits + &quot;E&quot; + exponent;</span>
+            }
+        }
+<span class="fc bfc" id="L434" title="All 2 branches covered.">        if (d == 0) {</span>
+<span class="fc" id="L435">            return &quot;0&quot;;</span>
+        }
+<span class="pc bpc" id="L437" title="2 of 4 branches missed.">        if (Double.isNaN(d) || Double.isInfinite(d)) {</span>
+<span class="nc" id="L438">            return CellError.NUM.toString();</span>
+        }
+<span class="fc" id="L440">        StringBuilder sb = new StringBuilder(24);</span>
+<span class="fc bfc" id="L441" title="All 2 branches covered.">        if (d &lt; 0) {</span>
+<span class="fc" id="L442">            sb.append('-');</span>
+<span class="fc" id="L443">            d = -d;</span>
+        }
+<span class="fc bfc" id="L445" title="All 4 branches covered.">        if (d &lt; 1e15 &amp;&amp; d == Math.floor(d)) {</span>
+<span class="fc" id="L446">            sb.append((long) d);</span>
+<span class="fc" id="L447">            return sb.toString();</span>
+        }
+<span class="fc" id="L449">        int[] exp = new int[1];</span>
+<span class="fc" id="L450">        long mant = significand(d, 15, exp);</span>
+<span class="fc" id="L451">        int e = exp[0];</span>
+<span class="fc" id="L452">        String digits = Long.toString(mant);</span>
+<span class="fc" id="L453">        int last = digits.length();</span>
+<span class="fc bfc" id="L454" title="All 4 branches covered.">        while (last &gt; 1 &amp;&amp; digits.charAt(last - 1) == '0') {</span>
+<span class="fc" id="L455">            last--;</span>
+        }
+<span class="fc bfc" id="L457" title="All 4 branches covered.">        if (e &gt;= 15 || e &lt; -9) {</span>
+<span class="fc" id="L458">            sb.append(digits.charAt(0));</span>
+<span class="fc bfc" id="L459" title="All 2 branches covered.">            if (last &gt; 1) {</span>
+<span class="fc" id="L460">                sb.append('.').append(digits.substring(1, last));</span>
+            }
+<span class="fc bfc" id="L462" title="All 2 branches covered.">            sb.append('E').append(e &lt; 0 ? '-' : '+');</span>
+<span class="fc" id="L463">            int abs = Math.abs(e);</span>
+<span class="pc bpc" id="L464" title="1 of 2 branches missed.">            if (abs &lt; 10) {</span>
+<span class="nc" id="L465">                sb.append('0');</span>
+            }
+<span class="fc" id="L467">            sb.append(abs);</span>
+<span class="fc" id="L468">            return sb.toString();</span>
+        }
+<span class="fc bfc" id="L470" title="All 2 branches covered.">        if (e &lt; 0) {</span>
+<span class="fc" id="L471">            sb.append(&quot;0.&quot;);</span>
+<span class="fc bfc" id="L472" title="All 2 branches covered.">            for (int i = -1; i &gt; e; i--) {</span>
+<span class="fc" id="L473">                sb.append('0');</span>
+            }
+<span class="fc" id="L475">            sb.append(digits.substring(0, last));</span>
+<span class="fc" id="L476">            return sb.toString();</span>
+        }
+<span class="fc bfc" id="L478" title="All 2 branches covered.">        if (last &lt;= e + 1) {</span>
+<span class="fc" id="L479">            sb.append(digits.substring(0, e + 1));</span>
+        } else {
+<span class="fc" id="L481">            sb.append(digits.substring(0, e + 1)).append('.').append(digits.substring(e + 1, last));</span>
+        }
+<span class="fc" id="L483">        return sb.toString();</span>
+    }
+
+    /// The first `count` significant decimal digits of a positive number as an integer, and
+    /// in `exp[0]` the power of ten of its first digit.
+    static long significand(double d, int count, int[] exp) {
+<span class="fc" id="L489">        int e = (int) Math.floor(MathUtil.log10(d));</span>
+<span class="fc" id="L490">        long mant = scaled(d, count - 1 - e);</span>
+<span class="fc" id="L491">        long limit = (long) pow10(count);</span>
+<span class="fc bfc" id="L492" title="All 2 branches covered.">        if (mant &gt;= limit) {</span>
+<span class="fc" id="L493">            e++;</span>
+<span class="fc" id="L494">            mant = scaled(d, count - 1 - e);</span>
+<span class="pc bpc" id="L495" title="1 of 2 branches missed.">        } else if (mant &lt; limit / 10) {</span>
+<span class="nc" id="L496">            e--;</span>
+<span class="nc" id="L497">            mant = scaled(d, count - 1 - e);</span>
+        }
+<span class="fc" id="L499">        exp[0] = e;</span>
+<span class="fc" id="L500">        return mant;</span>
+    }
+
+    private static long scaled(double d, int power) {
+        double v;
+<span class="fc bfc" id="L505" title="All 2 branches covered.">        if (power &gt;= 0) {</span>
+<span class="fc bfc" id="L506" title="All 2 branches covered.">            v = power &lt;= 22 ? d * POW10[power] : d * POW10[22] * pow10(power - 22);</span>
+        } else {
+<span class="fc bfc" id="L508" title="All 2 branches covered.">            v = -power &lt;= 22 ? d / POW10[-power] : d / POW10[22] / pow10(-power - 22);</span>
+        }
+<span class="fc" id="L510">        return (long) Math.floor(v + 0.5);</span>
+    }
+
+    /// Rounds half away from zero at a decimal place, the rounding of ROUND and of number
+    /// formats. Scaling by a power of ten first would turn 1.005 into 100.49999999999999;
+    /// the nudge by one part in 2^50 undoes exactly that representation error.
+    static double round(double d, int places) {
+<span class="pc bpc" id="L517" title="2 of 6 branches missed.">        if (d == 0 || Double.isNaN(d) || Double.isInfinite(d)) {</span>
+<span class="fc" id="L518">            return d;</span>
+        }
+<span class="fc bfc" id="L520" title="All 2 branches covered.">        if (places &gt; 15) {</span>
+<span class="fc" id="L521">            return d;</span>
+        }
+<span class="fc" id="L523">        double abs = Math.abs(d);</span>
+        double scaled;
+<span class="fc bfc" id="L525" title="All 2 branches covered.">        if (places &gt;= 0) {</span>
+<span class="fc" id="L526">            scaled = abs * pow10(places);</span>
+        } else {
+<span class="fc" id="L528">            scaled = abs / pow10(-places);</span>
+        }
+<span class="fc bfc" id="L530" title="All 2 branches covered.">        if (scaled &gt;= 9.007199254740992E15) {</span>
+<span class="fc" id="L531">            return d;</span>
+        }
+        // The nudge is a share of the number, and for a number of fifteen digits that share
+        // would be a half by itself: 999999999999999 is whole and stays what it is.
+<span class="fc bfc" id="L535" title="All 2 branches covered.">        double r = scaled == Math.floor(scaled) ? scaled : Math.floor(scaled + Math.min(scaled * 8.9e-16, 0.1) + 0.5);</span>
+<span class="fc bfc" id="L536" title="All 2 branches covered.">        double result = places &gt;= 0 ? r / pow10(places) : r * pow10(-places);</span>
+<span class="fc bfc" id="L537" title="All 2 branches covered.">        return d &lt; 0 ? -result : result;</span>
+    }
+
+    /// Compares two values for sorting and for the comparison operators: numbers sort before
+    /// text, text before logical values, and text ignores case.
+    static int compare(Object a, Object b) {
+<span class="pc bpc" id="L543" title="1 of 2 branches missed.">        if (a == Evaluator.MISSING) { //NOPMD CompareObjectsWithEquals - the marker of an omitted argument is one object</span>
+<span class="nc" id="L544">            a = null;</span>
+        }
+<span class="pc bpc" id="L546" title="1 of 2 branches missed.">        if (b == Evaluator.MISSING) { //NOPMD CompareObjectsWithEquals - the marker of an omitted argument is one object</span>
+<span class="nc" id="L547">            b = null;</span>
+        }
+<span class="pc bpc" id="L549" title="1 of 4 branches missed.">        if (a == null &amp;&amp; b == null) {</span>
+<span class="nc" id="L550">            return 0;</span>
+        }
+        // an empty cell is the zero of whatever it is compared with
+<span class="fc bfc" id="L553" title="All 2 branches covered.">        if (a == null) {</span>
+<span class="pc bpc" id="L554" title="2 of 4 branches missed.">            a = b instanceof String ? (Object) &quot;&quot; : b instanceof Boolean ? (Object) Boolean.FALSE : (Object) Double.valueOf(0);</span>
+        }
+<span class="fc bfc" id="L556" title="All 2 branches covered.">        if (b == null) {</span>
+<span class="pc bpc" id="L557" title="1 of 4 branches missed.">            b = a instanceof String ? (Object) &quot;&quot; : a instanceof Boolean ? (Object) Boolean.FALSE : (Object) Double.valueOf(0);</span>
+        }
+<span class="fc" id="L559">        int ra = rank(a);</span>
+<span class="fc" id="L560">        int rb = rank(b);</span>
+<span class="fc bfc" id="L561" title="All 2 branches covered.">        if (ra != rb) {</span>
+<span class="fc bfc" id="L562" title="All 2 branches covered.">            return ra &lt; rb ? -1 : 1;</span>
+        }
+<span class="fc bfc" id="L564" title="All 2 branches covered.">        if (a instanceof Double) {</span>
+<span class="fc" id="L565">            double x = ((Double) a).doubleValue();</span>
+<span class="fc" id="L566">            double y = ((Double) b).doubleValue();</span>
+            // Two numbers that agree in their fifteen digits are the same number to a
+            // spreadsheet: 0.1+0.2=0.3 is true there, and it shows both as 0.3.
+<span class="fc bfc" id="L569" title="All 2 branches covered.">            if (Math.abs(x - y) &lt;= Math.max(Math.abs(x), Math.abs(y)) * 1e-15) {</span>
+<span class="fc" id="L570">                return 0;</span>
+            }
+<span class="fc bfc" id="L572" title="All 2 branches covered.">            return x &lt; y ? -1 : 1;</span>
+        }
+<span class="pc bpc" id="L574" title="1 of 2 branches missed.">        if (a instanceof String) {</span>
+<span class="fc" id="L575">            return compareText((String) a, (String) b);</span>
+        }
+<span class="nc bnc" id="L577" title="All 2 branches missed.">        if (a instanceof Boolean) {</span>
+<span class="nc" id="L578">            boolean x = ((Boolean) a).booleanValue();</span>
+<span class="nc" id="L579">            boolean y = ((Boolean) b).booleanValue();</span>
+<span class="nc bnc" id="L580" title="All 4 branches missed.">            return x == y ? 0 : x ? 1 : -1;</span>
+        }
+<span class="nc" id="L582">        return 0;</span>
+    }
+
+    private static int rank(Object v) {
+<span class="fc bfc" id="L586" title="All 2 branches covered.">        if (v instanceof Double) {</span>
+<span class="fc" id="L587">            return 0;</span>
+        }
+<span class="fc bfc" id="L589" title="All 2 branches covered.">        if (v instanceof String) {</span>
+<span class="fc" id="L590">            return 1;</span>
+        }
+<span class="pc bpc" id="L592" title="1 of 2 branches missed.">        if (v instanceof Boolean) {</span>
+<span class="fc" id="L593">            return 2;</span>
+        }
+<span class="nc" id="L595">        return 3;</span>
+    }
+
+    static int compareText(String a, String b) {
+<span class="fc" id="L599">        int n = Math.min(a.length(), b.length());</span>
+<span class="fc bfc" id="L600" title="All 2 branches covered.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc" id="L601">            char x = Character.toUpperCase(a.charAt(i));</span>
+<span class="fc" id="L602">            char y = Character.toUpperCase(b.charAt(i));</span>
+<span class="fc bfc" id="L603" title="All 2 branches covered.">            if (x != y) {</span>
+<span class="fc bfc" id="L604" title="All 2 branches covered.">                return x &lt; y ? -1 : 1;</span>
+            }
+        }
+<span class="pc bpc" id="L607" title="1 of 4 branches missed.">        return a.length() == b.length() ? 0 : a.length() &lt; b.length() ? -1 : 1;</span>
+    }
+
+    static boolean equalsIgnoreCase(Object a, Object b) {
+<span class="nc bnc" id="L611" title="All 2 branches missed.">        return compare(a, b) == 0;</span>
+    }
+
+    /// Whether text is a number in decimal notation: a sign, digits with at most one point,
+    /// and an exponent. `Double.parseDouble` also takes `0x1p3`, `1d` and `NaN`, which no
+    /// spreadsheet writes as a number, and a device's class library may read them otherwise.
+    static boolean isDecimal(String s) {
+<span class="fc" id="L618">        int n = s.length();</span>
+<span class="fc" id="L619">        int i = 0;</span>
+<span class="pc bpc" id="L620" title="1 of 6 branches missed.">        if (i &lt; n &amp;&amp; (s.charAt(i) == '+' || s.charAt(i) == '-')) {</span>
+<span class="fc" id="L621">            i++;</span>
+        }
+<span class="fc" id="L623">        int digits = 0;</span>
+<span class="fc" id="L624">        boolean point = false;</span>
+<span class="fc bfc" id="L625" title="All 2 branches covered.">        for (; i &lt; n; i++) {</span>
+<span class="fc" id="L626">            char c = s.charAt(i);</span>
+<span class="fc bfc" id="L627" title="All 4 branches covered.">            if (c &gt;= '0' &amp;&amp; c &lt;= '9') {</span>
+<span class="fc" id="L628">                digits++;</span>
+<span class="pc bpc" id="L629" title="1 of 4 branches missed.">            } else if (c == '.' &amp;&amp; !point) {</span>
+<span class="fc" id="L630">                point = true;</span>
+            } else {
+                break;
+            }
+        }
+<span class="fc bfc" id="L635" title="All 2 branches covered.">        if (digits == 0) {</span>
+<span class="fc" id="L636">            return false;</span>
+        }
+<span class="fc bfc" id="L638" title="All 6 branches covered.">        if (i &lt; n &amp;&amp; (s.charAt(i) == 'e' || s.charAt(i) == 'E')) {</span>
+<span class="fc" id="L639">            i++;</span>
+<span class="pc bpc" id="L640" title="1 of 6 branches missed.">            if (i &lt; n &amp;&amp; (s.charAt(i) == '+' || s.charAt(i) == '-')) {</span>
+<span class="fc" id="L641">                i++;</span>
+            }
+<span class="fc" id="L643">            int exponent = 0;</span>
+<span class="pc bpc" id="L644" title="2 of 6 branches missed.">            for (; i &lt; n &amp;&amp; s.charAt(i) &gt;= '0' &amp;&amp; s.charAt(i) &lt;= '9'; i++) {</span>
+<span class="fc" id="L645">                exponent++;</span>
+            }
+<span class="pc bpc" id="L647" title="1 of 2 branches missed.">            if (exponent == 0) {</span>
+<span class="nc" id="L648">                return false;</span>
+            }
+        }
+<span class="fc bfc" id="L651" title="All 2 branches covered.">        return i == n;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

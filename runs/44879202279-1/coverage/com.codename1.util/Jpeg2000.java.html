@@ -1,0 +1,2243 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Jpeg2000.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.util</a> &gt; <span class="el_source">Jpeg2000.java</span></div><h1>Jpeg2000.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.util;
+
+/// A pure-Java JPEG 2000 decoder, for platforms whose image APIs cannot read the format
+/// (most of them) and for the backend, which has no image support of its own for it.
+///
+/// It reads either a JP2 file (the `jp2h` header boxes and the `jp2c` codestream) or a raw
+/// J2K codestream, and decodes every tile into one integer plane per component. The
+/// decoder covers what PDF producers emit: all five progression orders, multiple tiles and
+/// tile-parts, subsampled components, default and custom precincts, every code-block style
+/// switch, the 5/3 and 9/7 wavelets, scalar quantization, the RCT and ICT component
+/// transforms and bit depths from 1 to 16. Region of interest shifts and progression order
+/// changes (`POC`) are ignored, and High Throughput code-blocks are refused.
+///
+/// Malformed or truncated data never escapes as an exception: `decode` answers null, or
+/// the image as far as it could be decoded. Images above 25 megapixels are refused.
+///
+/// ```java
+/// byte[] data = new byte[0]; // the contents of a .jp2 or .j2k file
+/// Jpeg2000 j = Jpeg2000.decode(data);
+/// if (j != null) {
+///     int[] argb = j.toArgb();
+///     // on the client: Image.createImage(argb, j.getWidth(), j.getHeight())
+/// }
+/// ```
+@com.codename1.impl.SharedWithBackend
+<span class="fc" id="L48">public final class Jpeg2000 {</span>
+    /// Converts colour components the file does not describe itself, as when a PDF gives the
+    /// image's colour space in its own dictionary.
+    public interface Colors {
+        /// The number of components a colour has; ignored for an indexed space.
+        int getComponents();
+
+        /// True for an indexed (palette) space, which takes the raw sample as its one component.
+        boolean isIndexed();
+
+        /// The RGB value (0xRRGGBB) of the colour whose components, each scaled to 0..1 (or the
+        /// raw index for an indexed space), are in `components`.
+        int toRgb(double[] components);
+    }
+
+    private int width;
+    private int height;
+
+    /// The image width in pixels.
+    public int getWidth() {
+<span class="fc" id="L68">        return width;</span>
+    }
+
+    /// The image height in pixels.
+    public int getHeight() {
+<span class="fc" id="L73">        return height;</span>
+    }
+
+    /// ARGB pixels, row by row, `getWidth() * getHeight()` of them; null when the image's
+    /// components cannot be turned into a colour. A JP2 palette is applied, YCC and CMYK are
+    /// converted, and an alpha channel named by a `cdef` box, or a component past the colour
+    /// ones, becomes the alpha.
+    public int[] toArgb() {
+<span class="fc" id="L81">        return argb(null, true);</span>
+    }
+
+    /// ARGB pixels as [#toArgb()], with the colours of `colors` instead of the file's own.
+    /// With `alpha` false any alpha channel is ignored and the image is opaque.
+    public int[] toArgb(Colors colors, boolean alpha) {
+<span class="nc" id="L87">        return argb(colors, alpha);</span>
+    }
+
+    private static final int MAX_PIXELS = 25000000;
+    private static final long MAX_CODE_BLOCKS = 1 &lt;&lt; 20;
+    private long codeBlocks;
+<span class="fc" id="L93">    private static final RuntimeException EOD = new RuntimeException(&quot;jpx: end of data&quot;);</span>
+
+    // SIZ
+    private int xsiz;
+    private int ysiz;
+    private int xosiz;
+    private int yosiz;
+    private int xtsiz;
+    private int ytsiz;
+    private int xtosiz;
+    private int ytosiz;
+    private int ntx;
+    private int ncomp;
+    private int[] prec;
+    private boolean[] sgnd;
+    private int[] dx;
+    private int[] dy;
+    private int[][] planes;
+    private int[] pw;
+    private int[] ph;
+    private boolean bad;
+    private boolean mctUsed;
+
+    // main header
+    private Cod mainCod;
+    private Comp[] mainCoc;
+    private Quant mainQcd;
+    private Quant[] mainQcc;
+    private Buf ppm;
+    private int ppmPos;
+    private Tile[] tiles;
+
+    // JP2 boxes
+<span class="fc" id="L126">    private int enumCs = -1;</span>
+    private int[][] palette;
+    private int[] palDepth;
+    private boolean[] palSigned;
+    private int[] cmapComp;
+    private int[] cmapType;
+    private int[] cmapCol;
+    private int[] cdefCn;
+    private int[] cdefTyp;
+    private int[] cdefAsoc;
+
+    // packet reading state
+    private byte[] hb;
+    private int hpos;
+    private int hend;
+    private int hcur;
+    private int hbits;
+    private byte[] bb;
+    private int bpos;
+    private int bend;
+    private boolean sep;
+<span class="fc" id="L147">    private CB[] pCb = new CB[64];</span>
+<span class="fc" id="L148">    private int[] pLen = new int[64];</span>
+<span class="fc" id="L149">    private int[] pN = new int[64];</span>
+<span class="fc" id="L150">    private boolean[] pStart = new boolean[64];</span>
+
+    // tier-1 state
+<span class="fc" id="L153">    private byte[] sig = new byte[0];</span>
+<span class="fc" id="L154">    private byte[] sgn = new byte[0];</span>
+<span class="fc" id="L155">    private byte[] vis = new byte[0];</span>
+<span class="fc" id="L156">    private byte[] ref = new byte[0];</span>
+<span class="fc" id="L157">    private int[] mag = new int[0];</span>
+<span class="fc" id="L158">    private final int[] cst = new int[19];</span>
+<span class="fc" id="L159">    private final int[] cmps = new int[19];</span>
+    private byte[] md;
+    private int mp;
+    private int me;
+    private int ma;
+    private int mc;
+    private int mct;
+    private int rcur;
+    private int rbits;
+
+<span class="fc" id="L169">    private static final int[] QE = {0x5601, 0x3401, 0x1801, 0x0AC1, 0x0521, 0x0221, 0x5601, 0x5401,</span>
+        0x4801, 0x3801, 0x3001, 0x2401, 0x1C01, 0x1601, 0x5601, 0x5401, 0x5101, 0x4801, 0x3801,
+        0x3401, 0x3001, 0x2801, 0x2401, 0x2201, 0x1C01, 0x1801, 0x1601, 0x1401, 0x1201, 0x1101,
+        0x0AC1, 0x09C1, 0x08A1, 0x0521, 0x0441, 0x02A1, 0x0221, 0x0141, 0x0111, 0x0085, 0x0049,
+        0x0025, 0x0015, 0x0009, 0x0005, 0x0001, 0x5601};
+<span class="fc" id="L174">    private static final int[] NMPS = {1, 2, 3, 4, 5, 38, 7, 8, 9, 10, 11, 12, 13, 29, 15, 16, 17,</span>
+        18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40,
+        41, 42, 43, 44, 45, 45, 46};
+<span class="fc" id="L177">    private static final int[] NLPS = {1, 6, 9, 12, 29, 33, 6, 14, 14, 14, 17, 18, 20, 21, 14, 14,</span>
+        15, 16, 17, 18, 19, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36,
+        37, 38, 39, 40, 41, 42, 43, 46};
+<span class="fc" id="L180">    private static final int[] SW = {1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0,</span>
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+<span class="fc" id="L182">    private static final int[] SC_CTX = {13, 12, 11, 10, 9, 10, 11, 12, 13};</span>
+<span class="fc" id="L183">    private static final int[] SC_XOR = {1, 1, 1, 1, 0, 0, 0, 0, 0};</span>
+<span class="fc" id="L184">    private static final int[][] ZC = new int[4][45];</span>
+
+    static {
+<span class="fc bfc" id="L187" title="All 2 branches covered.">        for (int h = 0; h &lt; 3; h++) {</span>
+<span class="fc bfc" id="L188" title="All 2 branches covered.">            for (int v = 0; v &lt; 3; v++) {</span>
+<span class="fc bfc" id="L189" title="All 2 branches covered.">                for (int d = 0; d &lt; 5; d++) {</span>
+<span class="fc" id="L190">                    int i = h * 15 + v * 5 + d;</span>
+<span class="fc" id="L191">                    ZC[0][i] = zcLL(h, v, d);</span>
+<span class="fc" id="L192">                    ZC[2][i] = ZC[0][i];</span>
+<span class="fc" id="L193">                    ZC[1][i] = zcLL(v, h, d);</span>
+<span class="fc" id="L194">                    ZC[3][i] = zcHH(h + v, d);</span>
+                }
+            }
+        }
+<span class="fc" id="L198">    }</span>
+
+    private static int zcLL(int h, int v, int d) {
+<span class="fc bfc" id="L201" title="All 2 branches covered.">        if (h == 2) {</span>
+<span class="fc" id="L202">            return 8;</span>
+        }
+<span class="fc bfc" id="L204" title="All 2 branches covered.">        if (h == 1) {</span>
+<span class="fc bfc" id="L205" title="All 4 branches covered.">            return v &gt;= 1 ? 7 : d &gt;= 1 ? 6 : 5;</span>
+        }
+<span class="fc bfc" id="L207" title="All 2 branches covered.">        if (v == 2) {</span>
+<span class="fc" id="L208">            return 4;</span>
+        }
+<span class="fc bfc" id="L210" title="All 2 branches covered.">        if (v == 1) {</span>
+<span class="fc" id="L211">            return 3;</span>
+        }
+<span class="fc bfc" id="L213" title="All 2 branches covered.">        return d &gt;= 2 ? 2 : d;</span>
+    }
+
+    private static int zcHH(int hv, int d) {
+<span class="fc bfc" id="L217" title="All 2 branches covered.">        if (d &gt;= 3) {</span>
+<span class="fc" id="L218">            return 8;</span>
+        }
+<span class="fc bfc" id="L220" title="All 2 branches covered.">        if (d == 2) {</span>
+<span class="fc bfc" id="L221" title="All 2 branches covered.">            return hv &gt;= 1 ? 7 : 6;</span>
+        }
+<span class="fc bfc" id="L223" title="All 2 branches covered.">        if (d == 1) {</span>
+<span class="fc bfc" id="L224" title="All 4 branches covered.">            return hv &gt;= 2 ? 5 : hv == 1 ? 4 : 3;</span>
+        }
+<span class="fc bfc" id="L226" title="All 2 branches covered.">        return hv &gt;= 2 ? 2 : hv;</span>
+    }
+
+<span class="fc" id="L229">    private static final class Buf {</span>
+<span class="fc" id="L230">        byte[] a = new byte[16];</span>
+        int n;
+
+        void add(byte[] s, int o, int l) {
+<span class="pc bpc" id="L234" title="1 of 2 branches missed.">            if (l &lt;= 0) {</span>
+<span class="nc" id="L235">                return;</span>
+            }
+<span class="fc bfc" id="L237" title="All 2 branches covered.">            if (n + l &gt; a.length) {</span>
+<span class="fc" id="L238">                byte[] b = new byte[Math.max(a.length * 2, n + l)];</span>
+<span class="fc" id="L239">                System.arraycopy(a, 0, b, 0, n);</span>
+<span class="fc" id="L240">                a = b;</span>
+            }
+<span class="fc" id="L242">            System.arraycopy(s, o, a, n, l);</span>
+<span class="fc" id="L243">            n += l;</span>
+<span class="fc" id="L244">        }</span>
+    }
+
+    private static final class Comp {
+        int levels;
+        int xcb;
+        int ycb;
+        int style;
+        boolean rev;
+        int[] ppx;
+        int[] ppy;
+    }
+
+    private static final class Cod {
+        int scod;
+        int prog;
+        int layers;
+        int mct;
+        Comp comp;
+    }
+
+    private static final class Quant {
+        int style;
+        int guard;
+        int[] exps;
+        int[] mants;
+    }
+
+<span class="fc" id="L272">    private static final class Tile {</span>
+        Cod cod;
+        Comp[] coc;
+        Quant qcd;
+        Quant[] qcc;
+<span class="fc" id="L277">        Buf data = new Buf();</span>
+        Buf hdr;
+    }
+
+<span class="fc" id="L281">    private static final class CB {</span>
+        int x0;
+        int y0;
+        int x1;
+        int y1;
+        boolean included;
+<span class="fc" id="L287">        int lblock = 3;</span>
+        int zbp;
+        int passes;
+        Buf data;
+<span class="fc" id="L291">        int[] segLen = new int[4];</span>
+<span class="fc" id="L292">        int[] segPasses = new int[4];</span>
+        int nseg;
+    }
+
+    private static final class TagTree {
+        int[][] val;
+        int[][] low;
+        int[] w;
+        int levels;
+        int w0;
+
+<span class="fc" id="L303">        TagTree(int nx, int ny) {</span>
+<span class="fc" id="L304">            int lv = 1;</span>
+<span class="fc" id="L305">            int a = nx;</span>
+<span class="fc" id="L306">            int b = ny;</span>
+<span class="pc bpc" id="L307" title="2 of 4 branches missed.">            while (a &gt; 1 || b &gt; 1) {</span>
+<span class="nc" id="L308">                a = (a + 1) &gt;&gt; 1;</span>
+<span class="nc" id="L309">                b = (b + 1) &gt;&gt; 1;</span>
+<span class="nc" id="L310">                lv++;</span>
+            }
+<span class="fc" id="L312">            levels = lv;</span>
+<span class="fc" id="L313">            w0 = nx;</span>
+<span class="fc" id="L314">            val = new int[lv][];</span>
+<span class="fc" id="L315">            low = new int[lv][];</span>
+<span class="fc" id="L316">            w = new int[lv];</span>
+<span class="fc" id="L317">            a = nx;</span>
+<span class="fc" id="L318">            b = ny;</span>
+<span class="fc bfc" id="L319" title="All 2 branches covered.">            for (int i = 0; i &lt; lv; i++) {</span>
+<span class="fc" id="L320">                w[i] = a;</span>
+<span class="fc" id="L321">                int n = a * b;</span>
+<span class="fc" id="L322">                val[i] = new int[n];</span>
+<span class="fc" id="L323">                low[i] = new int[n];</span>
+<span class="fc bfc" id="L324" title="All 2 branches covered.">                for (int j = 0; j &lt; n; j++) {</span>
+<span class="fc" id="L325">                    val[i][j] = Integer.MAX_VALUE;</span>
+                }
+<span class="fc" id="L327">                a = (a + 1) &gt;&gt; 1;</span>
+<span class="fc" id="L328">                b = (b + 1) &gt;&gt; 1;</span>
+            }
+<span class="fc" id="L330">        }</span>
+    }
+
+    private static final class Prec {
+        CB[] cbs;
+        TagTree incl;
+        TagTree zbp;
+    }
+
+    private static final class Band {
+        int type;
+        int x0;
+        int y0;
+        int x1;
+        int y1;
+        int w;
+        int h;
+        int cbw;
+        int cbh;
+        int mb;
+        float delta;
+        Prec[] precs;
+        int[] idata;
+        float[] fdata;
+    }
+
+    private static final class Res {
+        int x0;
+        int y0;
+        int x1;
+        int y1;
+        int ppx;
+        int ppy;
+        int npx;
+        int npy;
+        int pgx0;
+        int pgy0;
+        Band[] bands;
+    }
+
+    private static final class TC {
+        int x0;
+        int y0;
+        int x1;
+        int y1;
+        Comp cp;
+        Res[] res;
+        int[] idata;
+        float[] fdata;
+    }
+
+    /// Parses a JP2 file or a raw J2K codestream; null when it cannot be decoded.
+    public static Jpeg2000 decode(byte[] data) {
+<span class="pc bpc" id="L383" title="2 of 4 branches missed.">        if (data == null || data.length &lt; 12) {</span>
+<span class="nc" id="L384">            return null;</span>
+        }
+<span class="fc" id="L386">        Jpeg2000 d = new Jpeg2000();</span>
+        try {
+<span class="pc bpc" id="L388" title="1 of 2 branches missed.">            if (!d.parse(data)) {</span>
+<span class="nc" id="L389">                return null;</span>
+            }
+<span class="nc" id="L391">        } catch (RuntimeException e) {</span>
+<span class="nc bnc" id="L392" title="All 4 branches missed.">            if (d.bad || d.planes == null) {</span>
+<span class="nc" id="L393">                return null;</span>
+            }
+<span class="fc" id="L395">        }</span>
+<span class="pc bpc" id="L396" title="4 of 8 branches missed.">        if (d.bad || d.planes == null || d.width &lt;= 0 || d.height &lt;= 0) {</span>
+<span class="nc" id="L397">            return null;</span>
+        }
+<span class="fc" id="L399">        return d;</span>
+    }
+
+    private static int u16(byte[] b, int p) {
+<span class="fc" id="L403">        return ((b[p] &amp; 0xff) &lt;&lt; 8) | (b[p + 1] &amp; 0xff);</span>
+    }
+
+    private static long u32(byte[] b, int p) {
+<span class="fc" id="L407">        return ((long) (b[p] &amp; 0xff) &lt;&lt; 24) | ((b[p + 1] &amp; 0xff) &lt;&lt; 16) | ((b[p + 2] &amp; 0xff) &lt;&lt; 8)</span>
+                | (b[p + 3] &amp; 0xff);
+    }
+
+    private static int i32(byte[] b, int p) {
+<span class="fc" id="L412">        long v = u32(b, p);</span>
+<span class="pc bpc" id="L413" title="1 of 2 branches missed.">        if (v &gt; Integer.MAX_VALUE) {</span>
+<span class="nc" id="L414">            throw EOD;</span>
+        }
+<span class="fc" id="L416">        return (int) v;</span>
+    }
+
+    private boolean parse(byte[] b) {
+<span class="pc bpc" id="L420" title="2 of 4 branches missed.">        if ((b[0] &amp; 0xff) == 0xFF &amp;&amp; (b[1] &amp; 0xff) == 0x4F) {</span>
+<span class="fc" id="L421">            return codestream(b, 0, b.length);</span>
+        }
+<span class="nc" id="L423">        int p = 0;</span>
+<span class="nc" id="L424">        int n = b.length;</span>
+<span class="nc bnc" id="L425" title="All 2 branches missed.">        while (p + 8 &lt;= n) {</span>
+<span class="nc" id="L426">            long len = u32(b, p);</span>
+<span class="nc" id="L427">            int type = (int) u32(b, p + 4);</span>
+<span class="nc" id="L428">            int hdr = 8;</span>
+<span class="nc bnc" id="L429" title="All 2 branches missed.">            if (len == 1) {</span>
+<span class="nc bnc" id="L430" title="All 2 branches missed.">                if (p + 16 &gt; n) {</span>
+<span class="nc" id="L431">                    break;</span>
+                }
+<span class="nc" id="L433">                len = (u32(b, p + 8) &lt;&lt; 32) | u32(b, p + 12);</span>
+<span class="nc" id="L434">                hdr = 16;</span>
+<span class="nc bnc" id="L435" title="All 2 branches missed.">            } else if (len == 0) {</span>
+<span class="nc" id="L436">                len = n - p;</span>
+            }
+<span class="nc bnc" id="L438" title="All 2 branches missed.">            if (len &lt; hdr) {</span>
+<span class="nc" id="L439">                break;</span>
+            }
+<span class="nc" id="L441">            long el = p + len;</span>
+<span class="nc bnc" id="L442" title="All 2 branches missed.">            int end = el &gt; n ? n : (int) el;</span>
+<span class="nc bnc" id="L443" title="All 2 branches missed.">            if (type == 0x6A703268) {</span>
+<span class="nc" id="L444">                boxes(b, p + hdr, end);</span>
+<span class="nc bnc" id="L445" title="All 2 branches missed.">            } else if (type == 0x6A703263) {</span>
+<span class="nc" id="L446">                return codestream(b, p + hdr, end);</span>
+            }
+<span class="nc" id="L448">            p = end;</span>
+<span class="nc" id="L449">        }</span>
+<span class="nc" id="L450">        return false;</span>
+    }
+
+    private void boxes(byte[] b, int p, int n) {
+<span class="nc bnc" id="L454" title="All 2 branches missed.">        while (p + 8 &lt;= n) {</span>
+<span class="nc" id="L455">            long len = u32(b, p);</span>
+<span class="nc" id="L456">            int type = (int) u32(b, p + 4);</span>
+<span class="nc" id="L457">            int hdr = 8;</span>
+<span class="nc bnc" id="L458" title="All 2 branches missed.">            if (len == 1) {</span>
+<span class="nc bnc" id="L459" title="All 2 branches missed.">                if (p + 16 &gt; n) {</span>
+<span class="nc" id="L460">                    return;</span>
+                }
+<span class="nc" id="L462">                len = (u32(b, p + 8) &lt;&lt; 32) | u32(b, p + 12);</span>
+<span class="nc" id="L463">                hdr = 16;</span>
+<span class="nc bnc" id="L464" title="All 2 branches missed.">            } else if (len == 0) {</span>
+<span class="nc" id="L465">                len = n - p;</span>
+            }
+<span class="nc bnc" id="L467" title="All 2 branches missed.">            if (len &lt; hdr) {</span>
+<span class="nc" id="L468">                return;</span>
+            }
+<span class="nc" id="L470">            long el = p + len;</span>
+<span class="nc bnc" id="L471" title="All 2 branches missed.">            int end = el &gt; n ? n : (int) el;</span>
+<span class="nc" id="L472">            int s = p + hdr;</span>
+            try {
+<span class="nc bnc" id="L474" title="All 2 branches missed.">                if (type == 0x636F6C72) {</span>
+<span class="nc bnc" id="L475" title="All 6 branches missed.">                    if (s + 7 &lt;= end &amp;&amp; b[s] == 1 &amp;&amp; enumCs &lt; 0) {</span>
+<span class="nc" id="L476">                        enumCs = (int) u32(b, s + 3);</span>
+                    }
+<span class="nc bnc" id="L478" title="All 2 branches missed.">                } else if (type == 0x70636C72) {</span>
+<span class="nc" id="L479">                    parsePclr(b, s, end);</span>
+<span class="nc bnc" id="L480" title="All 2 branches missed.">                } else if (type == 0x636D6170) {</span>
+<span class="nc" id="L481">                    int cnt = (end - s) / 4;</span>
+<span class="nc" id="L482">                    cmapComp = new int[cnt];</span>
+<span class="nc" id="L483">                    cmapType = new int[cnt];</span>
+<span class="nc" id="L484">                    cmapCol = new int[cnt];</span>
+<span class="nc bnc" id="L485" title="All 2 branches missed.">                    for (int i = 0; i &lt; cnt; i++) {</span>
+<span class="nc" id="L486">                        cmapComp[i] = u16(b, s + 4 * i);</span>
+<span class="nc" id="L487">                        cmapType[i] = b[s + 4 * i + 2] &amp; 0xff;</span>
+<span class="nc" id="L488">                        cmapCol[i] = b[s + 4 * i + 3] &amp; 0xff;</span>
+                    }
+<span class="nc bnc" id="L490" title="All 2 branches missed.">                } else if (type == 0x63646566) {</span>
+<span class="nc" id="L491">                    int cnt = Math.min(u16(b, s), (end - s - 2) / 6);</span>
+<span class="nc" id="L492">                    cdefCn = new int[cnt];</span>
+<span class="nc" id="L493">                    cdefTyp = new int[cnt];</span>
+<span class="nc" id="L494">                    cdefAsoc = new int[cnt];</span>
+<span class="nc bnc" id="L495" title="All 2 branches missed.">                    for (int i = 0; i &lt; cnt; i++) {</span>
+<span class="nc" id="L496">                        cdefCn[i] = u16(b, s + 2 + 6 * i);</span>
+<span class="nc" id="L497">                        cdefTyp[i] = u16(b, s + 4 + 6 * i);</span>
+<span class="nc" id="L498">                        cdefAsoc[i] = u16(b, s + 6 + 6 * i);</span>
+                    }
+                }
+<span class="nc" id="L501">            } catch (RuntimeException e) {</span>
+                // a damaged header box is ignored; the codestream still decodes
+<span class="nc" id="L503">            }</span>
+<span class="nc" id="L504">            p = end;</span>
+<span class="nc" id="L505">        }</span>
+<span class="nc" id="L506">    }</span>
+
+    private void parsePclr(byte[] b, int s, int end) {
+<span class="nc" id="L509">        int ne = u16(b, s);</span>
+<span class="nc" id="L510">        int npc = b[s + 2] &amp; 0xff;</span>
+<span class="nc bnc" id="L511" title="All 6 branches missed.">        if (ne &lt; 1 || ne &gt; 1024 || npc &lt; 1) {</span>
+<span class="nc" id="L512">            return;</span>
+        }
+<span class="nc" id="L514">        int[] depth = new int[npc];</span>
+<span class="nc" id="L515">        boolean[] signed = new boolean[npc];</span>
+<span class="nc" id="L516">        int p = s + 3;</span>
+<span class="nc bnc" id="L517" title="All 2 branches missed.">        for (int i = 0; i &lt; npc; i++) {</span>
+<span class="nc" id="L518">            depth[i] = (b[p] &amp; 0x7f) + 1;</span>
+<span class="nc bnc" id="L519" title="All 2 branches missed.">            signed[i] = (b[p] &amp; 0x80) != 0;</span>
+<span class="nc bnc" id="L520" title="All 2 branches missed.">            if (depth[i] &gt; 16) {</span>
+<span class="nc" id="L521">                return;</span>
+            }
+<span class="nc" id="L523">            p++;</span>
+        }
+<span class="nc" id="L525">        int[][] pal = new int[npc][ne];</span>
+<span class="nc bnc" id="L526" title="All 2 branches missed.">        for (int e = 0; e &lt; ne; e++) {</span>
+<span class="nc bnc" id="L527" title="All 2 branches missed.">            for (int i = 0; i &lt; npc; i++) {</span>
+<span class="nc" id="L528">                int nb = (depth[i] + 7) &gt;&gt; 3;</span>
+<span class="nc" id="L529">                int v = 0;</span>
+<span class="nc bnc" id="L530" title="All 2 branches missed.">                for (int k = 0; k &lt; nb; k++) {</span>
+<span class="nc" id="L531">                    v = (v &lt;&lt; 8) | (b[p++] &amp; 0xff);</span>
+                }
+<span class="nc bnc" id="L533" title="All 4 branches missed.">                if (signed[i] &amp;&amp; (v &amp; (1 &lt;&lt; (depth[i] - 1))) != 0) {</span>
+<span class="nc" id="L534">                    v -= 1 &lt;&lt; depth[i];</span>
+                }
+<span class="nc" id="L536">                pal[i][e] = v;</span>
+            }
+        }
+<span class="nc bnc" id="L539" title="All 2 branches missed.">        if (p &gt; end) {</span>
+<span class="nc" id="L540">            return;</span>
+        }
+<span class="nc" id="L542">        palette = pal;</span>
+<span class="nc" id="L543">        palDepth = depth;</span>
+<span class="nc" id="L544">        palSigned = signed;</span>
+<span class="nc" id="L545">    }</span>
+
+    private boolean codestream(byte[] b, int off, int end) {
+<span class="pc bpc" id="L548" title="2 of 4 branches missed.">        if (end - off &lt; 4 || u16(b, off) != 0xFF4F) {</span>
+<span class="nc" id="L549">            return false;</span>
+        }
+<span class="fc" id="L551">        int p = off + 2;</span>
+<span class="fc" id="L552">        boolean inTiles = false;</span>
+<span class="pc bpc" id="L553" title="1 of 2 branches missed.">        while (p + 2 &lt;= end) {</span>
+<span class="fc" id="L554">            int m = u16(b, p);</span>
+<span class="fc bfc" id="L555" title="All 2 branches covered.">            if (m == 0xFFD9) {</span>
+<span class="fc" id="L556">                break;</span>
+            }
+<span class="fc bfc" id="L558" title="All 2 branches covered.">            if (m == 0xFF90) {</span>
+<span class="pc bpc" id="L559" title="3 of 6 branches missed.">                if (planes == null || mainCod == null || mainQcd == null) {</span>
+<span class="nc" id="L560">                    return false;</span>
+                }
+<span class="fc" id="L562">                inTiles = true;</span>
+                int np;
+                try {
+<span class="fc" id="L565">                    np = tilePart(b, p, end);</span>
+<span class="nc" id="L566">                } catch (RuntimeException e) {</span>
+<span class="nc" id="L567">                    break;</span>
+<span class="fc" id="L568">                }</span>
+<span class="pc bpc" id="L569" title="1 of 2 branches missed.">                if (np &lt;= p) {</span>
+<span class="nc" id="L570">                    break;</span>
+                }
+<span class="fc" id="L572">                p = np;</span>
+<span class="fc" id="L573">                continue;</span>
+            }
+<span class="pc bpc" id="L575" title="3 of 6 branches missed.">            if (inTiles || (m &amp; 0xFF00) != 0xFF00 || p + 4 &gt; end) {</span>
+<span class="nc" id="L576">                break;</span>
+            }
+<span class="fc" id="L578">            int len = u16(b, p + 2);</span>
+<span class="fc" id="L579">            int s = p + 4;</span>
+<span class="fc" id="L580">            int e = p + 2 + len;</span>
+<span class="pc bpc" id="L581" title="2 of 4 branches missed.">            if (len &lt; 2 || e &gt; end) {</span>
+<span class="nc" id="L582">                return false;</span>
+            }
+<span class="fc bfc" id="L584" title="All 2 branches covered.">            if (m == 0xFF51) {</span>
+<span class="pc bpc" id="L585" title="1 of 2 branches missed.">                if (!siz(b, s, e)) {</span>
+<span class="nc" id="L586">                    bad = true;</span>
+<span class="nc" id="L587">                    return false;</span>
+                }
+<span class="pc bpc" id="L589" title="1 of 2 branches missed.">            } else if (planes == null) {</span>
+<span class="nc bnc" id="L590" title="All 2 branches missed.">                if (m != 0xFF64) {</span>
+<span class="nc" id="L591">                    return false;</span>
+                }
+<span class="fc bfc" id="L593" title="All 2 branches covered.">            } else if (m == 0xFF52) {</span>
+<span class="fc" id="L594">                mainCod = parseCod(b, s);</span>
+<span class="pc bpc" id="L595" title="1 of 2 branches missed.">            } else if (m == 0xFF53) {</span>
+<span class="nc bnc" id="L596" title="All 2 branches missed.">                int c = ncomp &lt; 257 ? b[s] &amp; 0xff : u16(b, s);</span>
+<span class="nc bnc" id="L597" title="All 2 branches missed.">                int q = ncomp &lt; 257 ? s + 1 : s + 2;</span>
+<span class="nc bnc" id="L598" title="All 2 branches missed.">                if (c &lt; ncomp) {</span>
+<span class="nc bnc" id="L599" title="All 2 branches missed.">                    mainCoc[c] = parseSpcod(b, q + 1, (b[q] &amp; 1) != 0);</span>
+                }
+<span class="pc bfc" id="L601" title="All 2 branches covered.">            } else if (m == 0xFF5C) {</span>
+<span class="fc" id="L602">                mainQcd = parseQuant(b, s, e);</span>
+<span class="pc bpc" id="L603" title="1 of 2 branches missed.">            } else if (m == 0xFF5D) {</span>
+<span class="nc bnc" id="L604" title="All 2 branches missed.">                int c = ncomp &lt; 257 ? b[s] &amp; 0xff : u16(b, s);</span>
+<span class="nc bnc" id="L605" title="All 2 branches missed.">                int q = ncomp &lt; 257 ? s + 1 : s + 2;</span>
+<span class="nc bnc" id="L606" title="All 2 branches missed.">                if (c &lt; ncomp) {</span>
+<span class="nc" id="L607">                    mainQcc[c] = parseQuant(b, q, e);</span>
+                }
+<span class="pc bpc" id="L609" title="1 of 2 branches missed.">            } else if (m == 0xFF60) {</span>
+<span class="nc bnc" id="L610" title="All 2 branches missed.">                if (ppm == null) {</span>
+<span class="nc" id="L611">                    ppm = new Buf();</span>
+                }
+<span class="nc" id="L613">                ppm.add(b, s + 1, e - s - 1);</span>
+            }
+<span class="fc" id="L615">            p = e;</span>
+<span class="fc" id="L616">        }</span>
+<span class="pc bpc" id="L617" title="2 of 4 branches missed.">        if (planes == null || tiles == null) {</span>
+<span class="nc" id="L618">            return false;</span>
+        }
+<span class="fc bfc" id="L620" title="All 2 branches covered.">        for (int i = 0; i &lt; tiles.length; i++) {</span>
+<span class="pc bpc" id="L621" title="1 of 2 branches missed.">            if (tiles[i] != null) {</span>
+                try {
+<span class="fc" id="L623">                    decodeTile(tiles[i], i);</span>
+<span class="nc" id="L624">                } catch (RuntimeException e) {</span>
+<span class="nc bnc" id="L625" title="All 2 branches missed.">                    if (bad) {</span>
+<span class="nc" id="L626">                        return false;</span>
+                    }
+                    // keep the tiles that did decode
+<span class="fc" id="L629">                }</span>
+            }
+        }
+<span class="fc" id="L632">        return true;</span>
+    }
+
+    private boolean siz(byte[] b, int s, int e) {
+<span class="pc bpc" id="L636" title="1 of 2 branches missed.">        if (e - s &lt; 38) {</span>
+<span class="nc" id="L637">            return false;</span>
+        }
+<span class="fc" id="L639">        xsiz = i32(b, s + 2);</span>
+<span class="fc" id="L640">        ysiz = i32(b, s + 6);</span>
+<span class="fc" id="L641">        xosiz = i32(b, s + 10);</span>
+<span class="fc" id="L642">        yosiz = i32(b, s + 14);</span>
+<span class="fc" id="L643">        xtsiz = i32(b, s + 18);</span>
+<span class="fc" id="L644">        ytsiz = i32(b, s + 22);</span>
+<span class="fc" id="L645">        xtosiz = i32(b, s + 26);</span>
+<span class="fc" id="L646">        ytosiz = i32(b, s + 30);</span>
+<span class="fc" id="L647">        ncomp = u16(b, s + 34);</span>
+<span class="fc" id="L648">        width = xsiz - xosiz;</span>
+<span class="fc" id="L649">        height = ysiz - yosiz;</span>
+<span class="pc bpc" id="L650" title="12 of 24 branches missed.">        if (width &lt;= 0 || height &lt;= 0 || (long) width * height &gt; MAX_PIXELS || ncomp &lt; 1</span>
+                || ncomp &gt; 256 || e - s &lt; 36 + 3 * ncomp || xtsiz &lt;= 0 || ytsiz &lt;= 0
+                || xtosiz &gt; xosiz || ytosiz &gt; yosiz || (long) xtosiz + xtsiz &lt;= xosiz
+                || (long) ytosiz + ytsiz &lt;= yosiz) {
+<span class="nc" id="L654">            return false;</span>
+        }
+<span class="fc" id="L656">        long tx = ((long) xsiz - xtosiz + xtsiz - 1) / xtsiz;</span>
+<span class="fc" id="L657">        long ty = ((long) ysiz - ytosiz + ytsiz - 1) / ytsiz;</span>
+<span class="pc bpc" id="L658" title="1 of 2 branches missed.">        if (tx * ty &gt; 65535) {</span>
+<span class="nc" id="L659">            return false;</span>
+        }
+<span class="fc" id="L661">        ntx = (int) tx;</span>
+<span class="fc" id="L662">        int nty = (int) ty;</span>
+<span class="fc" id="L663">        prec = new int[ncomp];</span>
+<span class="fc" id="L664">        sgnd = new boolean[ncomp];</span>
+<span class="fc" id="L665">        dx = new int[ncomp];</span>
+<span class="fc" id="L666">        dy = new int[ncomp];</span>
+<span class="fc" id="L667">        pw = new int[ncomp];</span>
+<span class="fc" id="L668">        ph = new int[ncomp];</span>
+<span class="fc" id="L669">        long total = 0;</span>
+<span class="fc bfc" id="L670" title="All 2 branches covered.">        for (int c = 0; c &lt; ncomp; c++) {</span>
+<span class="fc" id="L671">            int ss = b[s + 36 + 3 * c] &amp; 0xff;</span>
+<span class="fc" id="L672">            prec[c] = (ss &amp; 0x7f) + 1;</span>
+<span class="pc bpc" id="L673" title="1 of 2 branches missed.">            sgnd[c] = (ss &amp; 0x80) != 0;</span>
+<span class="fc" id="L674">            dx[c] = b[s + 37 + 3 * c] &amp; 0xff;</span>
+<span class="fc" id="L675">            dy[c] = b[s + 38 + 3 * c] &amp; 0xff;</span>
+<span class="pc bpc" id="L676" title="3 of 6 branches missed.">            if (prec[c] &gt; 16 || dx[c] &lt; 1 || dy[c] &lt; 1) {</span>
+<span class="nc" id="L677">                return false;</span>
+            }
+<span class="fc" id="L679">            pw[c] = ceilDiv(xsiz, dx[c]) - ceilDiv(xosiz, dx[c]);</span>
+<span class="fc" id="L680">            ph[c] = ceilDiv(ysiz, dy[c]) - ceilDiv(yosiz, dy[c]);</span>
+<span class="fc" id="L681">            total += (long) pw[c] * ph[c];</span>
+        }
+<span class="pc bpc" id="L683" title="1 of 2 branches missed.">        if (total &gt; 4L * MAX_PIXELS) {</span>
+<span class="nc" id="L684">            return false;</span>
+        }
+<span class="fc" id="L686">        mainCoc = new Comp[ncomp];</span>
+<span class="fc" id="L687">        mainQcc = new Quant[ncomp];</span>
+<span class="fc" id="L688">        tiles = new Tile[ntx * nty];</span>
+<span class="fc" id="L689">        planes = new int[ncomp][];</span>
+<span class="fc bfc" id="L690" title="All 2 branches covered.">        for (int c = 0; c &lt; ncomp; c++) {</span>
+<span class="fc" id="L691">            planes[c] = new int[pw[c] * ph[c]];</span>
+<span class="pc bpc" id="L692" title="1 of 2 branches missed.">            if (!sgnd[c]) {</span>
+<span class="fc" id="L693">                int mid = 1 &lt;&lt; (prec[c] - 1);</span>
+<span class="fc" id="L694">                int[] pl = planes[c];</span>
+<span class="fc bfc" id="L695" title="All 2 branches covered.">                for (int i = 0; i &lt; pl.length; i++) {</span>
+<span class="fc" id="L696">                    pl[i] = mid;</span>
+                }
+            }
+        }
+<span class="fc" id="L700">        return true;</span>
+    }
+
+    private static int ceilDiv(int a, int b) {
+<span class="fc" id="L704">        return (int) (((long) a + b - 1) / b);</span>
+    }
+
+    private static int ceilShift(int v, int s) {
+<span class="fc" id="L708">        return (int) (((long) v + (1L &lt;&lt; s) - 1) &gt;&gt; s);</span>
+    }
+
+    private Cod parseCod(byte[] b, int s) {
+<span class="fc" id="L712">        Cod c = new Cod();</span>
+<span class="fc" id="L713">        c.scod = b[s] &amp; 0xff;</span>
+<span class="fc" id="L714">        c.prog = b[s + 1] &amp; 0xff;</span>
+<span class="fc" id="L715">        c.layers = u16(b, s + 2);</span>
+<span class="fc" id="L716">        c.mct = b[s + 4] &amp; 0xff;</span>
+<span class="pc bpc" id="L717" title="1 of 2 branches missed.">        c.comp = parseSpcod(b, s + 5, (c.scod &amp; 1) != 0);</span>
+<span class="pc bpc" id="L718" title="2 of 4 branches missed.">        if (c.layers &lt; 1 || c.prog &gt; 4) {</span>
+<span class="nc" id="L719">            bad = true;</span>
+<span class="nc" id="L720">            throw EOD;</span>
+        }
+<span class="fc" id="L722">        return c;</span>
+    }
+
+    private Comp parseSpcod(byte[] b, int p, boolean custom) {
+<span class="fc" id="L726">        Comp c = new Comp();</span>
+<span class="fc" id="L727">        c.levels = b[p] &amp; 0xff;</span>
+<span class="fc" id="L728">        c.xcb = (b[p + 1] &amp; 0xf) + 2;</span>
+<span class="fc" id="L729">        c.ycb = (b[p + 2] &amp; 0xf) + 2;</span>
+<span class="fc" id="L730">        c.style = b[p + 3] &amp; 0xff;</span>
+<span class="pc bpc" id="L731" title="1 of 2 branches missed.">        c.rev = (b[p + 4] &amp; 0xff) == 1;</span>
+<span class="pc bpc" id="L732" title="5 of 10 branches missed.">        if (c.levels &gt; 32 || c.xcb &gt; 10 || c.ycb &gt; 10 || c.xcb + c.ycb &gt; 12 || (c.style &amp; 0xC0) != 0) {</span>
+<span class="nc" id="L733">            bad = true;</span>
+<span class="nc" id="L734">            throw EOD;</span>
+        }
+<span class="fc" id="L736">        c.ppx = new int[c.levels + 1];</span>
+<span class="fc" id="L737">        c.ppy = new int[c.levels + 1];</span>
+<span class="fc bfc" id="L738" title="All 2 branches covered.">        for (int r = 0; r &lt;= c.levels; r++) {</span>
+<span class="pc bpc" id="L739" title="1 of 2 branches missed.">            if (custom) {</span>
+<span class="nc" id="L740">                int v = b[p + 5 + r] &amp; 0xff;</span>
+<span class="nc" id="L741">                c.ppx[r] = v &amp; 0xf;</span>
+<span class="nc" id="L742">                c.ppy[r] = v &gt;&gt; 4;</span>
+<span class="nc" id="L743">            } else {</span>
+<span class="fc" id="L744">                c.ppx[r] = 15;</span>
+<span class="fc" id="L745">                c.ppy[r] = 15;</span>
+            }
+        }
+<span class="fc" id="L748">        return c;</span>
+    }
+
+    private static Quant parseQuant(byte[] b, int s, int e) {
+<span class="fc" id="L752">        Quant q = new Quant();</span>
+<span class="fc" id="L753">        int sq = b[s] &amp; 0xff;</span>
+<span class="fc" id="L754">        q.style = sq &amp; 0x1f;</span>
+<span class="fc" id="L755">        q.guard = sq &gt;&gt; 5;</span>
+<span class="pc bpc" id="L756" title="1 of 2 branches missed.">        if (q.style == 0) {</span>
+<span class="fc" id="L757">            int n = Math.max(1, e - s - 1);</span>
+<span class="fc" id="L758">            q.exps = new int[n];</span>
+<span class="fc" id="L759">            q.mants = new int[n];</span>
+<span class="pc bpc" id="L760" title="1 of 4 branches missed.">            for (int i = 0; i &lt; n &amp;&amp; s + 1 + i &lt; e; i++) {</span>
+<span class="fc" id="L761">                q.exps[i] = (b[s + 1 + i] &amp; 0xff) &gt;&gt; 3;</span>
+            }
+<span class="fc" id="L763">        } else {</span>
+<span class="nc" id="L764">            int n = Math.max(1, (e - s - 1) / 2);</span>
+<span class="nc" id="L765">            q.exps = new int[n];</span>
+<span class="nc" id="L766">            q.mants = new int[n];</span>
+<span class="nc bnc" id="L767" title="All 4 branches missed.">            for (int i = 0; i &lt; n &amp;&amp; s + 2 + 2 * i &lt; e; i++) {</span>
+<span class="nc" id="L768">                int v = u16(b, s + 1 + 2 * i);</span>
+<span class="nc" id="L769">                q.exps[i] = v &gt;&gt; 11;</span>
+<span class="nc" id="L770">                q.mants[i] = v &amp; 0x7ff;</span>
+            }
+        }
+<span class="fc" id="L773">        return q;</span>
+    }
+
+    private int tilePart(byte[] b, int p, int end) {
+<span class="fc" id="L777">        int lsot = u16(b, p + 2);</span>
+<span class="fc" id="L778">        int isot = u16(b, p + 4);</span>
+<span class="fc" id="L779">        long psot = u32(b, p + 6);</span>
+<span class="pc bpc" id="L780" title="2 of 4 branches missed.">        if (lsot != 10 || isot &gt;= tiles.length) {</span>
+<span class="nc" id="L781">            return -1;</span>
+        }
+<span class="fc" id="L783">        Tile t = tiles[isot];</span>
+<span class="pc bpc" id="L784" title="1 of 2 branches missed.">        if (t == null) {</span>
+<span class="fc" id="L785">            t = new Tile();</span>
+<span class="fc" id="L786">            t.coc = new Comp[ncomp];</span>
+<span class="fc" id="L787">            t.qcc = new Quant[ncomp];</span>
+<span class="fc" id="L788">            tiles[isot] = t;</span>
+        }
+<span class="fc" id="L790">        int q = p + 2 + lsot;</span>
+<span class="pc bpc" id="L791" title="1 of 2 branches missed.">        while (q + 4 &lt;= end) {</span>
+<span class="fc" id="L792">            int m = u16(b, q);</span>
+<span class="pc bpc" id="L793" title="1 of 2 branches missed.">            if (m == 0xFF93) {</span>
+<span class="fc" id="L794">                q += 2;</span>
+<span class="fc" id="L795">                break;</span>
+            }
+<span class="nc" id="L797">            int len = u16(b, q + 2);</span>
+<span class="nc" id="L798">            int s = q + 4;</span>
+<span class="nc" id="L799">            int e = q + 2 + len;</span>
+<span class="nc bnc" id="L800" title="All 4 branches missed.">            if (len &lt; 2 || e &gt; end) {</span>
+<span class="nc" id="L801">                return -1;</span>
+            }
+<span class="nc bnc" id="L803" title="All 2 branches missed.">            if (m == 0xFF52) {</span>
+<span class="nc" id="L804">                t.cod = parseCod(b, s);</span>
+<span class="nc bnc" id="L805" title="All 2 branches missed.">            } else if (m == 0xFF53) {</span>
+<span class="nc bnc" id="L806" title="All 2 branches missed.">                int c = ncomp &lt; 257 ? b[s] &amp; 0xff : u16(b, s);</span>
+<span class="nc bnc" id="L807" title="All 2 branches missed.">                int qq = ncomp &lt; 257 ? s + 1 : s + 2;</span>
+<span class="nc bnc" id="L808" title="All 2 branches missed.">                if (c &lt; ncomp) {</span>
+<span class="nc bnc" id="L809" title="All 2 branches missed.">                    t.coc[c] = parseSpcod(b, qq + 1, (b[qq] &amp; 1) != 0);</span>
+                }
+<span class="nc bnc" id="L811" title="All 2 branches missed.">            } else if (m == 0xFF5C) {</span>
+<span class="nc" id="L812">                t.qcd = parseQuant(b, s, e);</span>
+<span class="nc bnc" id="L813" title="All 2 branches missed.">            } else if (m == 0xFF5D) {</span>
+<span class="nc bnc" id="L814" title="All 2 branches missed.">                int c = ncomp &lt; 257 ? b[s] &amp; 0xff : u16(b, s);</span>
+<span class="nc bnc" id="L815" title="All 2 branches missed.">                int qq = ncomp &lt; 257 ? s + 1 : s + 2;</span>
+<span class="nc bnc" id="L816" title="All 2 branches missed.">                if (c &lt; ncomp) {</span>
+<span class="nc" id="L817">                    t.qcc[c] = parseQuant(b, qq, e);</span>
+                }
+<span class="nc bnc" id="L819" title="All 2 branches missed.">            } else if (m == 0xFF61) {</span>
+<span class="nc bnc" id="L820" title="All 2 branches missed.">                if (t.hdr == null) {</span>
+<span class="nc" id="L821">                    t.hdr = new Buf();</span>
+                }
+<span class="nc" id="L823">                t.hdr.add(b, s + 1, e - s - 1);</span>
+            }
+<span class="nc" id="L825">            q = e;</span>
+<span class="nc" id="L826">        }</span>
+        int dataEnd;
+<span class="pc bpc" id="L828" title="1 of 2 branches missed.">        if (psot == 0) {</span>
+<span class="nc" id="L829">            dataEnd = end;</span>
+<span class="nc bnc" id="L830" title="All 4 branches missed.">            if (end - 2 &gt;= q &amp;&amp; u16(b, end - 2) == 0xFFD9) {</span>
+<span class="nc" id="L831">                dataEnd = end - 2;</span>
+            }
+        } else {
+<span class="fc" id="L834">            long de = p + psot;</span>
+<span class="pc bpc" id="L835" title="1 of 2 branches missed.">            dataEnd = de &gt; end ? end : (int) de;</span>
+        }
+<span class="pc bpc" id="L837" title="1 of 2 branches missed.">        if (dataEnd &gt; q) {</span>
+<span class="fc" id="L838">            t.data.add(b, q, dataEnd - q);</span>
+        }
+<span class="pc bpc" id="L840" title="3 of 4 branches missed.">        if (ppm != null &amp;&amp; ppmPos + 4 &lt;= ppm.n) {</span>
+<span class="nc" id="L841">            long n = u32(ppm.a, ppmPos);</span>
+<span class="nc" id="L842">            int nn = (int) Math.min(n, (long) (ppm.n - ppmPos - 4));</span>
+<span class="nc bnc" id="L843" title="All 2 branches missed.">            if (t.hdr == null) {</span>
+<span class="nc" id="L844">                t.hdr = new Buf();</span>
+            }
+<span class="nc" id="L846">            t.hdr.add(ppm.a, ppmPos + 4, nn);</span>
+<span class="nc" id="L847">            ppmPos += 4 + nn;</span>
+        }
+<span class="fc" id="L849">        return dataEnd;</span>
+    }
+
+    // ------------------------------------------------------------------ tile structure
+
+    private static float pow2(int e) {
+<span class="fc" id="L855">        float r = 1;</span>
+<span class="pc bpc" id="L856" title="1 of 2 branches missed.">        if (e &gt;= 0) {</span>
+<span class="pc bpc" id="L857" title="1 of 2 branches missed.">            while (e-- &gt; 0) {</span>
+<span class="nc" id="L858">                r *= 2;</span>
+            }
+        } else {
+<span class="nc bnc" id="L861" title="All 2 branches missed.">            while (e++ &lt; 0) {</span>
+<span class="nc" id="L862">                r *= 0.5f;</span>
+            }
+        }
+<span class="fc" id="L865">        return r;</span>
+    }
+
+    private TC buildTc(int c, int tx0, int ty0, int tx1, int ty1, Comp cp, Quant qp) {
+<span class="fc" id="L869">        TC tc = new TC();</span>
+<span class="fc" id="L870">        tc.cp = cp;</span>
+<span class="fc" id="L871">        tc.x0 = ceilDiv(tx0, dx[c]);</span>
+<span class="fc" id="L872">        tc.y0 = ceilDiv(ty0, dy[c]);</span>
+<span class="fc" id="L873">        tc.x1 = ceilDiv(tx1, dx[c]);</span>
+<span class="fc" id="L874">        tc.y1 = ceilDiv(ty1, dy[c]);</span>
+<span class="fc" id="L875">        int nl = cp.levels;</span>
+<span class="fc" id="L876">        tc.res = new Res[nl + 1];</span>
+<span class="fc bfc" id="L877" title="All 2 branches covered.">        for (int r = 0; r &lt;= nl; r++) {</span>
+<span class="fc" id="L878">            Res rr = new Res();</span>
+<span class="fc" id="L879">            int s = nl - r;</span>
+<span class="fc" id="L880">            rr.x0 = ceilShift(tc.x0, s);</span>
+<span class="fc" id="L881">            rr.y0 = ceilShift(tc.y0, s);</span>
+<span class="fc" id="L882">            rr.x1 = ceilShift(tc.x1, s);</span>
+<span class="fc" id="L883">            rr.y1 = ceilShift(tc.y1, s);</span>
+<span class="fc" id="L884">            rr.ppx = cp.ppx[r];</span>
+<span class="fc" id="L885">            rr.ppy = cp.ppy[r];</span>
+<span class="fc bfc" id="L886" title="All 2 branches covered.">            if (r &gt; 0) {</span>
+<span class="pc bpc" id="L887" title="1 of 2 branches missed.">                if (rr.ppx == 0) {</span>
+<span class="nc" id="L888">                    rr.ppx = 1;</span>
+                }
+<span class="pc bpc" id="L890" title="1 of 2 branches missed.">                if (rr.ppy == 0) {</span>
+<span class="nc" id="L891">                    rr.ppy = 1;</span>
+                }
+            }
+<span class="pc bpc" id="L894" title="1 of 2 branches missed.">            rr.npx = rr.x1 &gt; rr.x0 ? ceilShift(rr.x1, rr.ppx) - (rr.x0 &gt;&gt; rr.ppx) : 0;</span>
+<span class="pc bpc" id="L895" title="1 of 2 branches missed.">            rr.npy = rr.y1 &gt; rr.y0 ? ceilShift(rr.y1, rr.ppy) - (rr.y0 &gt;&gt; rr.ppy) : 0;</span>
+<span class="pc bpc" id="L896" title="1 of 2 branches missed.">            if ((long) rr.npx * rr.npy &gt; 4000000L) {</span>
+<span class="nc" id="L897">                throw EOD;</span>
+            }
+<span class="fc" id="L899">            rr.pgx0 = rr.x0 &gt;&gt; rr.ppx;</span>
+<span class="fc" id="L900">            rr.pgy0 = rr.y0 &gt;&gt; rr.ppy;</span>
+<span class="fc bfc" id="L901" title="All 2 branches covered.">            int nb = r == 0 ? 1 : 3;</span>
+<span class="fc" id="L902">            rr.bands = new Band[nb];</span>
+<span class="fc bfc" id="L903" title="All 2 branches covered.">            int pb = r == 0 ? 0 : 1;</span>
+<span class="fc bfc" id="L904" title="All 2 branches covered.">            for (int bi = 0; bi &lt; nb; bi++) {</span>
+<span class="fc" id="L905">                Band bd = new Band();</span>
+<span class="fc bfc" id="L906" title="All 2 branches covered.">                bd.type = r == 0 ? 0 : bi + 1;</span>
+<span class="fc bfc" id="L907" title="All 2 branches covered.">                if (r == 0) {</span>
+<span class="fc" id="L908">                    bd.x0 = rr.x0;</span>
+<span class="fc" id="L909">                    bd.y0 = rr.y0;</span>
+<span class="fc" id="L910">                    bd.x1 = rr.x1;</span>
+<span class="fc" id="L911">                    bd.y1 = rr.y1;</span>
+                } else {
+<span class="fc" id="L913">                    int xo = (bd.type &amp; 1);</span>
+<span class="fc" id="L914">                    int yo = bd.type &gt;&gt; 1;</span>
+<span class="fc" id="L915">                    int lev = nl - r + 1;</span>
+<span class="fc" id="L916">                    bd.x0 = ceilShift(tc.x0 - (xo &lt;&lt; (lev - 1)), lev);</span>
+<span class="fc" id="L917">                    bd.y0 = ceilShift(tc.y0 - (yo &lt;&lt; (lev - 1)), lev);</span>
+<span class="fc" id="L918">                    bd.x1 = ceilShift(tc.x1 - (xo &lt;&lt; (lev - 1)), lev);</span>
+<span class="fc" id="L919">                    bd.y1 = ceilShift(tc.y1 - (yo &lt;&lt; (lev - 1)), lev);</span>
+                }
+<span class="fc" id="L921">                bd.w = Math.max(0, bd.x1 - bd.x0);</span>
+<span class="fc" id="L922">                bd.h = Math.max(0, bd.y1 - bd.y0);</span>
+<span class="fc" id="L923">                bd.cbw = Math.min(cp.xcb, rr.ppx - pb);</span>
+<span class="fc" id="L924">                bd.cbh = Math.min(cp.ycb, rr.ppy - pb);</span>
+<span class="fc bfc" id="L925" title="All 2 branches covered.">                int idx = r == 0 ? 0 : 3 * (r - 1) + bd.type;</span>
+                int eps;
+                int mant;
+<span class="pc bpc" id="L928" title="1 of 2 branches missed.">                if (qp.style == 1) {</span>
+<span class="nc bnc" id="L929" title="All 2 branches missed.">                    eps = qp.exps[0] - (r == 0 ? 0 : r - 1);</span>
+<span class="nc" id="L930">                    mant = qp.mants[0];</span>
+                } else {
+<span class="fc" id="L932">                    int k = Math.min(idx, qp.exps.length - 1);</span>
+<span class="fc" id="L933">                    eps = qp.exps[k];</span>
+<span class="fc" id="L934">                    mant = qp.mants[k];</span>
+                }
+<span class="fc" id="L936">                bd.mb = qp.guard + eps - 1;</span>
+<span class="fc bfc" id="L937" title="All 4 branches covered.">                int gain = bd.type == 0 ? 0 : bd.type == 3 ? 2 : 1;</span>
+<span class="fc" id="L938">                bd.delta = pow2(prec[c] + gain - eps) * (1 + mant / 2048f);</span>
+<span class="pc bpc" id="L939" title="1 of 2 branches missed.">                if (cp.rev) {</span>
+<span class="fc" id="L940">                    bd.idata = new int[bd.w * bd.h];</span>
+                } else {
+<span class="nc" id="L942">                    bd.fdata = new float[bd.w * bd.h];</span>
+                }
+<span class="fc" id="L944">                int np = rr.npx * rr.npy;</span>
+<span class="fc" id="L945">                bd.precs = new Prec[np];</span>
+<span class="fc" id="L946">                int ps = Math.max(0, rr.ppx - pb); // a precinct exponent of 0 past resolution 0 is invalid</span>
+<span class="fc" id="L947">                int pt = Math.max(0, rr.ppy - pb);</span>
+<span class="fc bfc" id="L948" title="All 2 branches covered.">                for (int ky = 0; ky &lt; rr.npy; ky++) {</span>
+<span class="fc bfc" id="L949" title="All 2 branches covered.">                    for (int kx = 0; kx &lt; rr.npx; kx++) {</span>
+<span class="fc" id="L950">                        Prec pr = new Prec();</span>
+<span class="fc" id="L951">                        int px0 = (rr.pgx0 + kx) &lt;&lt; ps;</span>
+<span class="fc" id="L952">                        int py0 = (rr.pgy0 + ky) &lt;&lt; pt;</span>
+<span class="fc" id="L953">                        int ix0 = Math.max(px0, bd.x0);</span>
+<span class="fc" id="L954">                        int iy0 = Math.max(py0, bd.y0);</span>
+<span class="fc" id="L955">                        int ix1 = Math.min(px0 + (1 &lt;&lt; ps), bd.x1);</span>
+<span class="fc" id="L956">                        int iy1 = Math.min(py0 + (1 &lt;&lt; pt), bd.y1);</span>
+<span class="pc bpc" id="L957" title="2 of 4 branches missed.">                        if (ix1 &gt; ix0 &amp;&amp; iy1 &gt; iy0) {</span>
+<span class="fc" id="L958">                            int cx0 = ix0 &gt;&gt; bd.cbw;</span>
+<span class="fc" id="L959">                            int cy0 = iy0 &gt;&gt; bd.cbh;</span>
+<span class="fc" id="L960">                            int nx = ceilShift(ix1, bd.cbw) - cx0;</span>
+<span class="fc" id="L961">                            int ny = ceilShift(iy1, bd.cbh) - cy0;</span>
+                            // Tiny code-blocks over a large image are millions
+                            // of objects; a real file has a few thousand.
+<span class="fc" id="L964">                            codeBlocks += (long) nx * ny;</span>
+<span class="pc bpc" id="L965" title="3 of 6 branches missed.">                            if (nx &lt; 0 || ny &lt; 0 || codeBlocks &gt; MAX_CODE_BLOCKS) {</span>
+<span class="nc" id="L966">                                throw new IllegalStateException(&quot;too many code-blocks&quot;);</span>
+                            }
+<span class="fc" id="L968">                            pr.cbs = new CB[nx * ny];</span>
+<span class="fc bfc" id="L969" title="All 2 branches covered.">                            for (int j = 0; j &lt; ny; j++) {</span>
+<span class="fc bfc" id="L970" title="All 2 branches covered.">                                for (int i = 0; i &lt; nx; i++) {</span>
+<span class="fc" id="L971">                                    CB cb = new CB();</span>
+<span class="fc" id="L972">                                    cb.x0 = Math.max(ix0, (cx0 + i) &lt;&lt; bd.cbw);</span>
+<span class="fc" id="L973">                                    cb.y0 = Math.max(iy0, (cy0 + j) &lt;&lt; bd.cbh);</span>
+<span class="fc" id="L974">                                    cb.x1 = Math.min(ix1, (cx0 + i + 1) &lt;&lt; bd.cbw);</span>
+<span class="fc" id="L975">                                    cb.y1 = Math.min(iy1, (cy0 + j + 1) &lt;&lt; bd.cbh);</span>
+<span class="fc" id="L976">                                    pr.cbs[j * nx + i] = cb;</span>
+                                }
+                            }
+<span class="fc" id="L979">                            pr.incl = new TagTree(nx, ny);</span>
+<span class="fc" id="L980">                            pr.zbp = new TagTree(nx, ny);</span>
+<span class="fc" id="L981">                        } else {</span>
+<span class="nc" id="L982">                            pr.cbs = new CB[0];</span>
+                        }
+<span class="fc" id="L984">                        bd.precs[ky * rr.npx + kx] = pr;</span>
+                    }
+                }
+<span class="fc" id="L987">                rr.bands[bi] = bd;</span>
+            }
+<span class="fc" id="L989">            tc.res[r] = rr;</span>
+        }
+<span class="fc" id="L991">        return tc;</span>
+    }
+
+    private void decodeTile(Tile t, int ti) {
+<span class="pc bpc" id="L995" title="1 of 2 branches missed.">        Cod cod = t.cod != null ? t.cod : mainCod;</span>
+<span class="fc" id="L996">        int p = ti % ntx;</span>
+<span class="fc" id="L997">        int q = ti / ntx;</span>
+<span class="fc" id="L998">        int tx0 = (int) Math.max((long) xtosiz + (long) p * xtsiz, xosiz);</span>
+<span class="fc" id="L999">        int ty0 = (int) Math.max((long) ytosiz + (long) q * ytsiz, yosiz);</span>
+<span class="fc" id="L1000">        int tx1 = (int) Math.min((long) xtosiz + (long) (p + 1) * xtsiz, xsiz);</span>
+<span class="fc" id="L1001">        int ty1 = (int) Math.min((long) ytosiz + (long) (q + 1) * ytsiz, ysiz);</span>
+<span class="pc bpc" id="L1002" title="2 of 4 branches missed.">        if (tx1 &lt;= tx0 || ty1 &lt;= ty0) {</span>
+<span class="nc" id="L1003">            return;</span>
+        }
+<span class="fc" id="L1005">        TC[] tcs = new TC[ncomp];</span>
+<span class="fc" id="L1006">        int maxR = 0;</span>
+<span class="fc bfc" id="L1007" title="All 2 branches covered.">        for (int c = 0; c &lt; ncomp; c++) {</span>
+<span class="fc" id="L1008">            Comp cp = t.coc[c];</span>
+<span class="pc bpc" id="L1009" title="1 of 2 branches missed.">            if (cp == null) {</span>
+<span class="pc bpc" id="L1010" title="2 of 4 branches missed.">                cp = t.cod != null ? t.cod.comp : mainCoc[c] != null ? mainCoc[c] : mainCod.comp;</span>
+            }
+<span class="fc" id="L1012">            Quant qp = t.qcc[c];</span>
+<span class="pc bpc" id="L1013" title="1 of 2 branches missed.">            if (qp == null) {</span>
+<span class="pc bpc" id="L1014" title="2 of 4 branches missed.">                qp = t.qcd != null ? t.qcd : mainQcc[c] != null ? mainQcc[c] : mainQcd;</span>
+            }
+<span class="fc" id="L1016">            tcs[c] = buildTc(c, tx0, ty0, tx1, ty1, cp, qp);</span>
+<span class="fc" id="L1017">            maxR = Math.max(maxR, cp.levels);</span>
+        }
+<span class="fc" id="L1019">        bb = t.data.a;</span>
+<span class="fc" id="L1020">        bpos = 0;</span>
+<span class="fc" id="L1021">        bend = t.data.n;</span>
+<span class="pc bpc" id="L1022" title="3 of 4 branches missed.">        sep = t.hdr != null &amp;&amp; t.hdr.n &gt; 0;</span>
+<span class="pc bpc" id="L1023" title="1 of 2 branches missed.">        if (sep) {</span>
+<span class="nc" id="L1024">            hb = t.hdr.a;</span>
+<span class="nc" id="L1025">            hpos = 0;</span>
+<span class="nc" id="L1026">            hend = t.hdr.n;</span>
+        } else {
+<span class="fc" id="L1028">            hb = bb;</span>
+        }
+<span class="pc bpc" id="L1030" title="1 of 2 branches missed.">        boolean sop = (cod.scod &amp; 2) != 0;</span>
+<span class="pc bpc" id="L1031" title="1 of 2 branches missed.">        boolean eph = (cod.scod &amp; 4) != 0;</span>
+<span class="fc" id="L1032">        int nl = cod.layers;</span>
+        try {
+<span class="pc bpc" id="L1034" title="3 of 4 branches missed.">            if (cod.prog == 0 || cod.prog == 1) {</span>
+<span class="pc bpc" id="L1035" title="1 of 2 branches missed.">                int outer = cod.prog == 0 ? nl : maxR + 1;</span>
+<span class="pc bpc" id="L1036" title="1 of 2 branches missed.">                int inner = cod.prog == 0 ? maxR + 1 : nl;</span>
+<span class="fc bfc" id="L1037" title="All 2 branches covered.">                for (int o = 0; o &lt; outer; o++) {</span>
+<span class="fc bfc" id="L1038" title="All 2 branches covered.">                    for (int i = 0; i &lt; inner; i++) {</span>
+<span class="pc bpc" id="L1039" title="1 of 2 branches missed.">                        int l = cod.prog == 0 ? o : i;</span>
+<span class="pc bpc" id="L1040" title="1 of 2 branches missed.">                        int r = cod.prog == 0 ? i : o;</span>
+<span class="fc bfc" id="L1041" title="All 2 branches covered.">                        for (int c = 0; c &lt; ncomp; c++) {</span>
+<span class="fc" id="L1042">                            TC tc = tcs[c];</span>
+<span class="pc bpc" id="L1043" title="1 of 2 branches missed.">                            if (r &gt; tc.cp.levels) {</span>
+<span class="nc" id="L1044">                                continue;</span>
+                            }
+<span class="fc" id="L1046">                            Res rr = tc.res[r];</span>
+<span class="fc" id="L1047">                            int np = rr.npx * rr.npy;</span>
+<span class="fc bfc" id="L1048" title="All 2 branches covered.">                            for (int k = 0; k &lt; np; k++) {</span>
+<span class="fc" id="L1049">                                packet(rr, k, l, tc.cp.style, sop, eph);</span>
+                            }
+                        }
+                    }
+                }
+<span class="fc" id="L1054">            } else {</span>
+<span class="nc" id="L1055">                positionOrder(tcs, cod.prog, nl, sop, eph, tx0, ty0);</span>
+            }
+<span class="nc" id="L1057">        } catch (RuntimeException e) {</span>
+<span class="nc bnc" id="L1058" title="All 2 branches missed.">            if (bad) {</span>
+<span class="nc" id="L1059">                throw e;</span>
+            }
+            // truncated stream: decode what arrived
+<span class="fc" id="L1062">        }</span>
+<span class="fc bfc" id="L1063" title="All 2 branches covered.">        for (int c = 0; c &lt; ncomp; c++) {</span>
+<span class="fc" id="L1064">            TC tc = tcs[c];</span>
+<span class="fc bfc" id="L1065" title="All 2 branches covered.">            for (int r = 0; r &lt; tc.res.length; r++) {</span>
+<span class="fc" id="L1066">                Res rr = tc.res[r];</span>
+<span class="fc bfc" id="L1067" title="All 2 branches covered.">                for (int bi = 0; bi &lt; rr.bands.length; bi++) {</span>
+<span class="fc" id="L1068">                    Band bd = rr.bands[bi];</span>
+<span class="fc bfc" id="L1069" title="All 2 branches covered.">                    for (int k = 0; k &lt; bd.precs.length; k++) {</span>
+<span class="fc" id="L1070">                        CB[] cbs = bd.precs[k].cbs;</span>
+<span class="fc bfc" id="L1071" title="All 2 branches covered.">                        for (int j = 0; j &lt; cbs.length; j++) { // NOPMD ForLoopCanBeForeach - indexed like the surrounding decoder loops</span>
+                            try {
+<span class="fc" id="L1073">                                decodeCb(cbs[j], bd, tc.cp.style, tc.cp.rev);</span>
+<span class="nc" id="L1074">                            } catch (RuntimeException e) {</span>
+                                // a damaged code-block stays as decoded so far
+<span class="fc" id="L1076">                            }</span>
+                        }
+                    }
+                }
+            }
+<span class="fc" id="L1081">            idwt(tc);</span>
+        }
+<span class="pc bpc" id="L1083" title="1 of 2 branches missed.">        storeTile(tcs, cod.mct == 1);</span>
+<span class="fc" id="L1084">    }</span>
+
+    private void positionOrder(TC[] tcs, int prog, int nl, boolean sop, boolean eph, int tx0, int ty0) {
+<span class="nc" id="L1087">        int n = 0;</span>
+<span class="nc bnc" id="L1088" title="All 2 branches missed.">        for (int c = 0; c &lt; ncomp; c++) {</span>
+<span class="nc bnc" id="L1089" title="All 2 branches missed.">            for (int r = 0; r &lt;= tcs[c].cp.levels; r++) {</span>
+<span class="nc" id="L1090">                n += tcs[c].res[r].npx * tcs[c].res[r].npy;</span>
+            }
+        }
+<span class="nc" id="L1093">        long[][] keys = new long[n][];</span>
+<span class="nc" id="L1094">        int i = 0;</span>
+<span class="nc bnc" id="L1095" title="All 2 branches missed.">        for (int c = 0; c &lt; ncomp; c++) {</span>
+<span class="nc" id="L1096">            TC tc = tcs[c];</span>
+<span class="nc" id="L1097">            int lv = tc.cp.levels;</span>
+<span class="nc bnc" id="L1098" title="All 2 branches missed.">            for (int r = 0; r &lt;= lv; r++) {</span>
+<span class="nc" id="L1099">                Res rr = tc.res[r];</span>
+<span class="nc bnc" id="L1100" title="All 2 branches missed.">                for (int k = 0; k &lt; rr.npx * rr.npy; k++) {</span>
+<span class="nc" id="L1101">                    int kx = k % rr.npx;</span>
+<span class="nc" id="L1102">                    int ky = k / rr.npx;</span>
+                    // a precinct clipped by the tile's edge is reached at the tile's own
+                    // origin, whatever its resolution rounds that origin to
+<span class="nc" id="L1105">                    long px = (long) (rr.pgx0 + kx) &lt;&lt; rr.ppx;</span>
+<span class="nc" id="L1106">                    long py = (long) (rr.pgy0 + ky) &lt;&lt; rr.ppy;</span>
+<span class="nc bnc" id="L1107" title="All 2 branches missed.">                    long rx = px &lt;= rr.x0 ? tx0 : (px &lt;&lt; (lv - r)) * dx[c];</span>
+<span class="nc bnc" id="L1108" title="All 2 branches missed.">                    long ry = py &lt;= rr.y0 ? ty0 : (py &lt;&lt; (lv - r)) * dy[c];</span>
+                    long[] key;
+<span class="nc bnc" id="L1110" title="All 2 branches missed.">                    if (prog == 2) {</span>
+<span class="nc" id="L1111">                        key = new long[] {r, ry, rx, c, k};</span>
+<span class="nc bnc" id="L1112" title="All 2 branches missed.">                    } else if (prog == 3) {</span>
+<span class="nc" id="L1113">                        key = new long[] {ry, rx, c, r, k};</span>
+                    } else {
+<span class="nc" id="L1115">                        key = new long[] {c, ry, rx, r, k};</span>
+                    }
+<span class="nc" id="L1117">                    keys[i++] = key;</span>
+                }
+            }
+        }
+<span class="nc" id="L1121">        sortKeys(keys);</span>
+<span class="nc bnc" id="L1122" title="All 2 branches missed.">        for (i = 0; i &lt; n; i++) {</span>
+<span class="nc" id="L1123">            long[] key = keys[i];</span>
+            int c;
+            int r;
+<span class="nc bnc" id="L1126" title="All 2 branches missed.">            if (prog == 2) {</span>
+<span class="nc" id="L1127">                r = (int) key[0];</span>
+<span class="nc" id="L1128">                c = (int) key[3];</span>
+<span class="nc bnc" id="L1129" title="All 2 branches missed.">            } else if (prog == 3) {</span>
+<span class="nc" id="L1130">                c = (int) key[2];</span>
+<span class="nc" id="L1131">                r = (int) key[3];</span>
+            } else {
+<span class="nc" id="L1133">                c = (int) key[0];</span>
+<span class="nc" id="L1134">                r = (int) key[3];</span>
+            }
+<span class="nc" id="L1136">            int k = (int) key[4];</span>
+<span class="nc bnc" id="L1137" title="All 2 branches missed.">            for (int l = 0; l &lt; nl; l++) {</span>
+<span class="nc" id="L1138">                packet(tcs[c].res[r], k, l, tcs[c].cp.style, sop, eph);</span>
+            }
+        }
+<span class="nc" id="L1141">    }</span>
+
+    private static int cmpKey(long[] a, long[] b) {
+<span class="nc bnc" id="L1144" title="All 2 branches missed.">        for (int i = 0; i &lt; a.length; i++) {</span>
+<span class="nc bnc" id="L1145" title="All 2 branches missed.">            if (a[i] != b[i]) {</span>
+<span class="nc bnc" id="L1146" title="All 2 branches missed.">                return a[i] &lt; b[i] ? -1 : 1;</span>
+            }
+        }
+<span class="nc" id="L1149">        return 0;</span>
+    }
+
+    private static void sortKeys(long[][] a) {
+<span class="nc" id="L1153">        int n = a.length;</span>
+<span class="nc" id="L1154">        long[][] tmp = new long[n][];</span>
+<span class="nc bnc" id="L1155" title="All 2 branches missed.">        for (int w = 1; w &lt; n; w &lt;&lt;= 1) {</span>
+<span class="nc bnc" id="L1156" title="All 2 branches missed.">            for (int lo = 0; lo &lt; n - w; lo += w &lt;&lt; 1) {</span>
+<span class="nc" id="L1157">                int mid = lo + w;</span>
+<span class="nc" id="L1158">                int hi = Math.min(lo + (w &lt;&lt; 1), n);</span>
+<span class="nc" id="L1159">                int i = lo;</span>
+<span class="nc" id="L1160">                int j = mid;</span>
+<span class="nc" id="L1161">                int k = lo;</span>
+<span class="nc bnc" id="L1162" title="All 4 branches missed.">                while (i &lt; mid &amp;&amp; j &lt; hi) {</span>
+<span class="nc bnc" id="L1163" title="All 2 branches missed.">                    tmp[k++] = cmpKey(a[j], a[i]) &lt; 0 ? a[j++] : a[i++];</span>
+                }
+<span class="nc bnc" id="L1165" title="All 2 branches missed.">                while (i &lt; mid) {</span>
+<span class="nc" id="L1166">                    tmp[k++] = a[i++];</span>
+                }
+<span class="nc bnc" id="L1168" title="All 2 branches missed.">                while (j &lt; hi) {</span>
+<span class="nc" id="L1169">                    tmp[k++] = a[j++];</span>
+                }
+<span class="nc" id="L1171">                System.arraycopy(tmp, lo, a, lo, hi - lo);</span>
+            }
+        }
+<span class="nc" id="L1174">    }</span>
+
+    // ------------------------------------------------------------------ packets
+
+    private int bit() {
+<span class="fc bfc" id="L1179" title="All 2 branches covered.">        if (hbits == 0) {</span>
+<span class="pc bpc" id="L1180" title="1 of 2 branches missed.">            if (hpos &gt;= hend) {</span>
+<span class="nc" id="L1181">                throw EOD;</span>
+            }
+<span class="pc bpc" id="L1183" title="1 of 2 branches missed.">            boolean ff = hcur == 0xFF;</span>
+<span class="fc" id="L1184">            hcur = hb[hpos++] &amp; 0xff;</span>
+<span class="pc bpc" id="L1185" title="1 of 2 branches missed.">            hbits = ff ? 7 : 8;</span>
+        }
+<span class="fc" id="L1187">        hbits--;</span>
+<span class="fc" id="L1188">        return (hcur &gt;&gt; hbits) &amp; 1;</span>
+    }
+
+    private int bits(int n) {
+<span class="fc" id="L1192">        int v = 0;</span>
+<span class="fc bfc" id="L1193" title="All 2 branches covered.">        while (n-- &gt; 0) {</span>
+<span class="fc" id="L1194">            v = (v &lt;&lt; 1) | bit();</span>
+        }
+<span class="fc" id="L1196">        return v;</span>
+    }
+
+    private boolean tagDecode(TagTree tt, int leaf, int thresh) {
+<span class="fc" id="L1200">        int x = leaf % tt.w0;</span>
+<span class="fc" id="L1201">        int y = leaf / tt.w0;</span>
+<span class="fc" id="L1202">        int lowv = 0;</span>
+<span class="fc bfc" id="L1203" title="All 2 branches covered.">        for (int lv = tt.levels - 1; lv &gt;= 0; lv--) {</span>
+<span class="fc" id="L1204">            int i = (x &gt;&gt; lv) + (y &gt;&gt; lv) * tt.w[lv];</span>
+<span class="fc" id="L1205">            int[] low = tt.low[lv];</span>
+<span class="fc" id="L1206">            int[] val = tt.val[lv];</span>
+<span class="pc bpc" id="L1207" title="1 of 2 branches missed.">            if (low[i] &lt; lowv) {</span>
+<span class="nc" id="L1208">                low[i] = lowv;</span>
+            } else {
+<span class="fc" id="L1210">                lowv = low[i];</span>
+            }
+<span class="pc bpc" id="L1212" title="1 of 4 branches missed.">            while (lowv &lt; thresh &amp;&amp; lowv &lt; val[i]) {</span>
+<span class="fc bfc" id="L1213" title="All 2 branches covered.">                if (bit() == 1) {</span>
+<span class="fc" id="L1214">                    val[i] = lowv;</span>
+                } else {
+<span class="fc" id="L1216">                    lowv++;</span>
+                }
+            }
+<span class="fc" id="L1219">            low[i] = lowv;</span>
+        }
+<span class="pc bpc" id="L1221" title="1 of 2 branches missed.">        return tt.val[0][leaf] &lt; thresh;</span>
+    }
+
+    private static boolean segStart(int p, int style) {
+<span class="pc bpc" id="L1225" title="3 of 4 branches missed.">        if (p == 0 || (style &amp; 4) != 0) {</span>
+<span class="fc" id="L1226">            return true;</span>
+        }
+<span class="nc bnc" id="L1228" title="All 6 branches missed.">        return (style &amp; 1) != 0 &amp;&amp; p &gt;= 10 &amp;&amp; (p - 10) % 3 != 1;</span>
+    }
+
+    private static int segEnd(int p, int style) {
+<span class="pc bpc" id="L1232" title="1 of 2 branches missed.">        if ((style &amp; 4) != 0) {</span>
+<span class="nc" id="L1233">            return p;</span>
+        }
+<span class="pc bpc" id="L1235" title="1 of 2 branches missed.">        if ((style &amp; 1) != 0) {</span>
+<span class="nc bnc" id="L1236" title="All 2 branches missed.">            if (p &lt; 10) {</span>
+<span class="nc" id="L1237">                return 9;</span>
+            }
+<span class="nc bnc" id="L1239" title="All 2 branches missed.">            return (p - 10) % 3 == 0 ? p + 1 : p;</span>
+        }
+<span class="fc" id="L1241">        return Integer.MAX_VALUE;</span>
+    }
+
+    private static int floorLog2(int n) {
+<span class="fc" id="L1245">        int r = 0;</span>
+<span class="fc bfc" id="L1246" title="All 2 branches covered.">        while (n &gt; 1) {</span>
+<span class="fc" id="L1247">            n &gt;&gt;= 1;</span>
+<span class="fc" id="L1248">            r++;</span>
+        }
+<span class="fc" id="L1250">        return r;</span>
+    }
+
+    private void packet(Res rr, int k, int l, int style, boolean sop, boolean eph) {
+<span class="pc bpc" id="L1254" title="7 of 8 branches missed.">        if (sop &amp;&amp; bpos + 6 &lt;= bend &amp;&amp; bb[bpos] == (byte) 0xFF &amp;&amp; bb[bpos + 1] == (byte) 0x91) {</span>
+<span class="nc" id="L1255">            bpos += 6;</span>
+        }
+<span class="pc bpc" id="L1257" title="1 of 2 branches missed.">        if (!sep) {</span>
+<span class="fc" id="L1258">            hpos = bpos;</span>
+<span class="fc" id="L1259">            hend = bend;</span>
+        }
+<span class="fc" id="L1261">        hcur = 0;</span>
+<span class="fc" id="L1262">        hbits = 0;</span>
+<span class="fc" id="L1263">        int np = 0;</span>
+<span class="pc bpc" id="L1264" title="1 of 2 branches missed.">        if (bit() != 0) {</span>
+<span class="fc bfc" id="L1265" title="All 2 branches covered.">            for (int bi = 0; bi &lt; rr.bands.length; bi++) {</span>
+<span class="fc" id="L1266">                Prec pr = rr.bands[bi].precs[k];</span>
+<span class="fc" id="L1267">                CB[] cbs = pr.cbs;</span>
+<span class="fc bfc" id="L1268" title="All 2 branches covered.">                for (int i = 0; i &lt; cbs.length; i++) {</span>
+<span class="fc" id="L1269">                    CB cb = cbs[i];</span>
+                    boolean inc;
+<span class="pc bpc" id="L1271" title="1 of 2 branches missed.">                    if (!cb.included) {</span>
+<span class="fc" id="L1272">                        inc = tagDecode(pr.incl, i, l + 1);</span>
+<span class="pc bpc" id="L1273" title="1 of 2 branches missed.">                        if (inc) {</span>
+<span class="fc" id="L1274">                            tagDecode(pr.zbp, i, Integer.MAX_VALUE);</span>
+<span class="fc" id="L1275">                            cb.zbp = pr.zbp.val[0][i];</span>
+<span class="fc" id="L1276">                            cb.included = true;</span>
+                        }
+                    } else {
+<span class="nc bnc" id="L1279" title="All 2 branches missed.">                        inc = bit() == 1;</span>
+                    }
+<span class="pc bpc" id="L1281" title="1 of 2 branches missed.">                    if (!inc) {</span>
+<span class="nc" id="L1282">                        continue;</span>
+                    }
+                    int n;
+<span class="pc bpc" id="L1285" title="1 of 2 branches missed.">                    if (bit() == 0) {</span>
+<span class="nc" id="L1286">                        n = 1;</span>
+<span class="pc bpc" id="L1287" title="1 of 2 branches missed.">                    } else if (bit() == 0) {</span>
+<span class="nc" id="L1288">                        n = 2;</span>
+                    } else {
+<span class="fc" id="L1290">                        n = bits(2);</span>
+<span class="pc bpc" id="L1291" title="1 of 2 branches missed.">                        if (n &lt; 3) {</span>
+<span class="nc" id="L1292">                            n += 3;</span>
+                        } else {
+<span class="fc" id="L1294">                            n = bits(5);</span>
+<span class="pc bpc" id="L1295" title="1 of 2 branches missed.">                            n = n &lt; 31 ? n + 6 : 37 + bits(7);</span>
+                        }
+                    }
+<span class="pc bpc" id="L1298" title="1 of 2 branches missed.">                    while (bit() == 1) {</span>
+<span class="nc" id="L1299">                        cb.lblock++;</span>
+<span class="nc bnc" id="L1300" title="All 2 branches missed.">                        if (cb.lblock &gt; 31) {</span>
+<span class="nc" id="L1301">                            throw EOD;</span>
+                        }
+                    }
+<span class="fc" id="L1304">                    int pp = cb.passes;</span>
+<span class="fc" id="L1305">                    int left = n;</span>
+<span class="fc bfc" id="L1306" title="All 2 branches covered.">                    while (left &gt; 0) {</span>
+<span class="fc" id="L1307">                        int se = segEnd(pp, style);</span>
+<span class="fc" id="L1308">                        int cnt = (int) Math.min((long) left, (long) se - pp + 1);</span>
+<span class="fc" id="L1309">                        int nbits = cb.lblock + floorLog2(cnt);</span>
+<span class="pc bpc" id="L1310" title="1 of 2 branches missed.">                        if (nbits &gt; 31) {</span>
+<span class="nc" id="L1311">                            throw EOD;</span>
+                        }
+<span class="fc" id="L1313">                        int len = bits(nbits);</span>
+<span class="pc bpc" id="L1314" title="1 of 2 branches missed.">                        if (np == pCb.length) {</span>
+<span class="nc" id="L1315">                            growPending();</span>
+                        }
+<span class="fc" id="L1317">                        pCb[np] = cb;</span>
+<span class="fc" id="L1318">                        pLen[np] = len;</span>
+<span class="fc" id="L1319">                        pN[np] = cnt;</span>
+<span class="fc" id="L1320">                        pStart[np] = segStart(pp, style);</span>
+<span class="fc" id="L1321">                        np++;</span>
+<span class="fc" id="L1322">                        pp += cnt;</span>
+<span class="fc" id="L1323">                        left -= cnt;</span>
+<span class="fc" id="L1324">                    }</span>
+                }
+            }
+        }
+<span class="pc bpc" id="L1328" title="3 of 4 branches missed.">        if (hcur == 0xFF &amp;&amp; hbits == 0) {</span>
+<span class="nc" id="L1329">            hpos++;</span>
+<span class="pc bpc" id="L1330" title="1 of 2 branches missed.">        } else if (hcur == 0xFF) {</span>
+<span class="nc" id="L1331">            hpos++;</span>
+        }
+<span class="fc" id="L1333">        hbits = 0;</span>
+<span class="pc bpc" id="L1334" title="7 of 8 branches missed.">        if (eph &amp;&amp; hpos + 2 &lt;= hend &amp;&amp; hb[hpos] == (byte) 0xFF &amp;&amp; hb[hpos + 1] == (byte) 0x92) {</span>
+<span class="nc" id="L1335">            hpos += 2;</span>
+        }
+<span class="pc bpc" id="L1337" title="1 of 2 branches missed.">        if (!sep) {</span>
+<span class="fc" id="L1338">            bpos = hpos;</span>
+        }
+<span class="fc bfc" id="L1340" title="All 2 branches covered.">        for (int i = 0; i &lt; np; i++) {</span>
+<span class="fc" id="L1341">            int len = pLen[i];</span>
+<span class="pc bpc" id="L1342" title="1 of 2 branches missed.">            if (len &gt; bend - bpos) {</span>
+<span class="nc" id="L1343">                throw EOD;</span>
+            }
+<span class="fc" id="L1345">            CB cb = pCb[i];</span>
+<span class="pc bpc" id="L1346" title="1 of 2 branches missed.">            if (cb.data == null) {</span>
+<span class="fc" id="L1347">                cb.data = new Buf();</span>
+            }
+<span class="fc" id="L1349">            cb.data.add(bb, bpos, len);</span>
+<span class="fc" id="L1350">            bpos += len;</span>
+<span class="pc bpc" id="L1351" title="3 of 4 branches missed.">            if (pStart[i] || cb.nseg == 0) {</span>
+<span class="pc bpc" id="L1352" title="1 of 2 branches missed.">                if (cb.nseg == cb.segLen.length) {</span>
+<span class="nc" id="L1353">                    int[] a = new int[cb.nseg * 2];</span>
+<span class="nc" id="L1354">                    System.arraycopy(cb.segLen, 0, a, 0, cb.nseg);</span>
+<span class="nc" id="L1355">                    cb.segLen = a;</span>
+<span class="nc" id="L1356">                    a = new int[cb.nseg * 2];</span>
+<span class="nc" id="L1357">                    System.arraycopy(cb.segPasses, 0, a, 0, cb.nseg);</span>
+<span class="nc" id="L1358">                    cb.segPasses = a;</span>
+                }
+<span class="fc" id="L1360">                cb.segLen[cb.nseg] = len;</span>
+<span class="fc" id="L1361">                cb.segPasses[cb.nseg] = pN[i];</span>
+<span class="fc" id="L1362">                cb.nseg++;</span>
+            } else {
+<span class="nc" id="L1364">                cb.segLen[cb.nseg - 1] += len;</span>
+<span class="nc" id="L1365">                cb.segPasses[cb.nseg - 1] += pN[i];</span>
+            }
+<span class="fc" id="L1367">            cb.passes += pN[i];</span>
+        }
+<span class="fc" id="L1369">    }</span>
+
+    private void growPending() {
+<span class="nc" id="L1372">        int n = pCb.length * 2;</span>
+<span class="nc" id="L1373">        CB[] a = new CB[n];</span>
+<span class="nc" id="L1374">        System.arraycopy(pCb, 0, a, 0, pCb.length);</span>
+<span class="nc" id="L1375">        pCb = a;</span>
+<span class="nc" id="L1376">        int[] b = new int[n];</span>
+<span class="nc" id="L1377">        System.arraycopy(pLen, 0, b, 0, pLen.length);</span>
+<span class="nc" id="L1378">        pLen = b;</span>
+<span class="nc" id="L1379">        b = new int[n];</span>
+<span class="nc" id="L1380">        System.arraycopy(pN, 0, b, 0, pN.length);</span>
+<span class="nc" id="L1381">        pN = b;</span>
+<span class="nc" id="L1382">        boolean[] s = new boolean[n];</span>
+<span class="nc" id="L1383">        System.arraycopy(pStart, 0, s, 0, pStart.length);</span>
+<span class="nc" id="L1384">        pStart = s;</span>
+<span class="nc" id="L1385">    }</span>
+
+    // ------------------------------------------------------------------ MQ and raw decoding
+
+    private void resetContexts() {
+<span class="fc bfc" id="L1390" title="All 2 branches covered.">        for (int i = 0; i &lt; 19; i++) {</span>
+<span class="fc" id="L1391">            cst[i] = 0;</span>
+<span class="fc" id="L1392">            cmps[i] = 0;</span>
+        }
+<span class="fc" id="L1394">        cst[0] = 4;</span>
+<span class="fc" id="L1395">        cst[17] = 3;</span>
+<span class="fc" id="L1396">        cst[18] = 46;</span>
+<span class="fc" id="L1397">    }</span>
+
+    private void mqInit(byte[] d, int s, int e) {
+<span class="fc" id="L1400">        md = d;</span>
+<span class="fc" id="L1401">        mp = s;</span>
+<span class="fc" id="L1402">        me = e;</span>
+<span class="pc bpc" id="L1403" title="1 of 2 branches missed.">        int b = mp &lt; me ? d[mp] &amp; 0xff : 0xFF;</span>
+<span class="fc" id="L1404">        mc = b &lt;&lt; 16;</span>
+<span class="fc" id="L1405">        mqByteIn();</span>
+<span class="fc" id="L1406">        mc &lt;&lt;= 7;</span>
+<span class="fc" id="L1407">        mct -= 7;</span>
+<span class="fc" id="L1408">        ma = 0x8000;</span>
+<span class="fc" id="L1409">    }</span>
+
+    private void mqByteIn() {
+<span class="fc bfc" id="L1412" title="All 2 branches covered.">        int b = mp &lt; me ? md[mp] &amp; 0xff : 0xFF;</span>
+<span class="fc bfc" id="L1413" title="All 2 branches covered.">        if (b == 0xFF) {</span>
+<span class="pc bpc" id="L1414" title="1 of 2 branches missed.">            int b1 = mp + 1 &lt; me ? md[mp + 1] &amp; 0xff : 0xFF;</span>
+<span class="pc bpc" id="L1415" title="1 of 2 branches missed.">            if (b1 &gt; 0x8F) {</span>
+<span class="fc" id="L1416">                mc += 0xFF00;</span>
+<span class="fc" id="L1417">                mct = 8;</span>
+            } else {
+<span class="nc" id="L1419">                mp++;</span>
+<span class="nc" id="L1420">                mc += b1 &lt;&lt; 9;</span>
+<span class="nc" id="L1421">                mct = 7;</span>
+            }
+<span class="fc" id="L1423">        } else {</span>
+<span class="fc" id="L1424">            mp++;</span>
+<span class="fc bfc" id="L1425" title="All 2 branches covered.">            int b1 = mp &lt; me ? md[mp] &amp; 0xff : 0xFF;</span>
+<span class="fc" id="L1426">            mc += b1 &lt;&lt; 8;</span>
+<span class="fc" id="L1427">            mct = 8;</span>
+        }
+<span class="fc" id="L1429">    }</span>
+
+    private int mq(int cx) {
+<span class="fc" id="L1432">        int st = cst[cx];</span>
+<span class="fc" id="L1433">        int qe = QE[st];</span>
+        int d;
+<span class="fc" id="L1435">        ma -= qe;</span>
+<span class="fc bfc" id="L1436" title="All 2 branches covered.">        if ((mc &gt;&gt;&gt; 16) &lt; qe) {</span>
+<span class="fc bfc" id="L1437" title="All 2 branches covered.">            if (ma &lt; qe) {</span>
+<span class="fc" id="L1438">                ma = qe;</span>
+<span class="fc" id="L1439">                d = cmps[cx];</span>
+<span class="fc" id="L1440">                cst[cx] = NMPS[st];</span>
+            } else {
+<span class="fc" id="L1442">                ma = qe;</span>
+<span class="fc" id="L1443">                d = 1 - cmps[cx];</span>
+<span class="fc bfc" id="L1444" title="All 2 branches covered.">                if (SW[st] != 0) {</span>
+<span class="fc" id="L1445">                    cmps[cx] = d;</span>
+                }
+<span class="fc" id="L1447">                cst[cx] = NLPS[st];</span>
+            }
+        } else {
+<span class="fc" id="L1450">            mc -= qe &lt;&lt; 16;</span>
+<span class="fc bfc" id="L1451" title="All 2 branches covered.">            if ((ma &amp; 0x8000) != 0) {</span>
+<span class="fc" id="L1452">                return cmps[cx];</span>
+            }
+<span class="fc bfc" id="L1454" title="All 2 branches covered.">            if (ma &lt; qe) {</span>
+<span class="fc" id="L1455">                d = 1 - cmps[cx];</span>
+<span class="fc bfc" id="L1456" title="All 2 branches covered.">                if (SW[st] != 0) {</span>
+<span class="fc" id="L1457">                    cmps[cx] = d;</span>
+                }
+<span class="fc" id="L1459">                cst[cx] = NLPS[st];</span>
+            } else {
+<span class="fc" id="L1461">                d = cmps[cx];</span>
+<span class="fc" id="L1462">                cst[cx] = NMPS[st];</span>
+            }
+        }
+        do {
+<span class="fc bfc" id="L1466" title="All 2 branches covered.">            if (mct == 0) {</span>
+<span class="fc" id="L1467">                mqByteIn();</span>
+            }
+<span class="fc" id="L1469">            ma &lt;&lt;= 1;</span>
+<span class="fc" id="L1470">            mc &lt;&lt;= 1;</span>
+<span class="fc" id="L1471">            mct--;</span>
+<span class="fc bfc" id="L1472" title="All 2 branches covered.">        } while ((ma &amp; 0x8000) == 0);</span>
+<span class="fc" id="L1473">        return d;</span>
+    }
+
+    private void rawInit(byte[] d, int s, int e) {
+<span class="nc" id="L1477">        md = d;</span>
+<span class="nc" id="L1478">        mp = s;</span>
+<span class="nc" id="L1479">        me = e;</span>
+<span class="nc" id="L1480">        rbits = 0;</span>
+<span class="nc" id="L1481">        rcur = 0;</span>
+<span class="nc" id="L1482">    }</span>
+
+    private int rawBit() {
+<span class="nc bnc" id="L1485" title="All 2 branches missed.">        if (rbits == 0) {</span>
+<span class="nc bnc" id="L1486" title="All 2 branches missed.">            boolean ff = rcur == 0xFF;</span>
+<span class="nc bnc" id="L1487" title="All 2 branches missed.">            rcur = mp &lt; me ? md[mp++] &amp; 0xff : 0xFF;</span>
+<span class="nc bnc" id="L1488" title="All 2 branches missed.">            rbits = ff ? 7 : 8;</span>
+        }
+<span class="nc" id="L1490">        rbits--;</span>
+<span class="nc" id="L1491">        return (rcur &gt;&gt; rbits) &amp; 1;</span>
+    }
+
+    // ------------------------------------------------------------------ tier-1
+
+    private void decodeCb(CB cb, Band bd, int style, boolean rev) {
+<span class="fc" id="L1497">        int w = cb.x1 - cb.x0;</span>
+<span class="fc" id="L1498">        int h = cb.y1 - cb.y0;</span>
+<span class="pc bpc" id="L1499" title="4 of 8 branches missed.">        if (w &lt;= 0 || h &lt;= 0 || cb.nseg == 0 || cb.data == null) {</span>
+<span class="nc" id="L1500">            return;</span>
+        }
+<span class="fc" id="L1502">        int planesN = bd.mb - cb.zbp;</span>
+<span class="pc bpc" id="L1503" title="1 of 2 branches missed.">        if (planesN &lt;= 0) {</span>
+<span class="nc" id="L1504">            return;</span>
+        }
+<span class="pc bpc" id="L1506" title="1 of 2 branches missed.">        if (planesN &gt; 30) {</span>
+<span class="nc" id="L1507">            planesN = 30;</span>
+        }
+<span class="fc" id="L1509">        int stride = w + 2;</span>
+<span class="fc" id="L1510">        int size = stride * (h + 2);</span>
+<span class="fc bfc" id="L1511" title="All 2 branches covered.">        if (sig.length &lt; size) {</span>
+<span class="fc" id="L1512">            sig = new byte[size];</span>
+<span class="fc" id="L1513">            sgn = new byte[size];</span>
+<span class="fc" id="L1514">            vis = new byte[size];</span>
+<span class="fc" id="L1515">            ref = new byte[size];</span>
+<span class="fc" id="L1516">            mag = new int[size];</span>
+        } else {
+<span class="fc bfc" id="L1518" title="All 2 branches covered.">            for (int i = 0; i &lt; size; i++) {</span>
+<span class="fc" id="L1519">                sig[i] = 0;</span>
+<span class="fc" id="L1520">                sgn[i] = 0;</span>
+<span class="fc" id="L1521">                vis[i] = 0;</span>
+<span class="fc" id="L1522">                ref[i] = 0;</span>
+<span class="fc" id="L1523">                mag[i] = 0;</span>
+            }
+        }
+<span class="fc" id="L1526">        resetContexts();</span>
+<span class="fc" id="L1527">        int[] lut = ZC[bd.type];</span>
+<span class="pc bpc" id="L1528" title="1 of 2 branches missed.">        boolean vc = (style &amp; 8) != 0;</span>
+<span class="fc" id="L1529">        int maxPasses = 3 * planesN - 2;</span>
+<span class="fc" id="L1530">        int pass = 0;</span>
+<span class="fc" id="L1531">        int off = 0;</span>
+<span class="fc" id="L1532">        byte[] data = cb.data.a;</span>
+<span class="fc" id="L1533">        int dlen = cb.data.n;</span>
+<span class="pc bpc" id="L1534" title="1 of 4 branches missed.">        for (int s = 0; s &lt; cb.nseg &amp;&amp; pass &lt; maxPasses; s++) {</span>
+<span class="fc" id="L1535">            int len = Math.min(cb.segLen[s], dlen - off);</span>
+<span class="pc bpc" id="L1536" title="1 of 2 branches missed.">            if (len &lt; 0) {</span>
+<span class="nc" id="L1537">                break;</span>
+            }
+<span class="pc bpc" id="L1539" title="5 of 6 branches missed.">            boolean raw = (style &amp; 1) != 0 &amp;&amp; pass &gt;= 10 &amp;&amp; (pass - 10) % 3 != 2;</span>
+<span class="pc bpc" id="L1540" title="1 of 2 branches missed.">            if (raw) {</span>
+<span class="nc" id="L1541">                rawInit(data, off, off + len);</span>
+            } else {
+<span class="fc" id="L1543">                mqInit(data, off, off + len);</span>
+            }
+<span class="fc" id="L1545">            int np = cb.segPasses[s];</span>
+<span class="pc bpc" id="L1546" title="1 of 4 branches missed.">            for (int j = 0; j &lt; np &amp;&amp; pass &lt; maxPasses; j++, pass++) {</span>
+<span class="fc" id="L1547">                int plane = planesN - 1 - (pass + 2) / 3;</span>
+<span class="fc bfc" id="L1548" title="All 2 branches covered.">                int type = pass == 0 ? 2 : (pass - 1) % 3;</span>
+<span class="fc bfc" id="L1549" title="All 2 branches covered.">                if (type == 0) {</span>
+<span class="fc" id="L1550">                    sigPass(w, h, stride, plane, lut, vc, raw);</span>
+<span class="fc bfc" id="L1551" title="All 2 branches covered.">                } else if (type == 1) {</span>
+<span class="fc" id="L1552">                    refPass(w, h, stride, plane, vc, raw);</span>
+                } else {
+<span class="fc" id="L1554">                    cleanPass(w, h, stride, plane, lut, vc);</span>
+<span class="pc bpc" id="L1555" title="1 of 2 branches missed.">                    if ((style &amp; 32) != 0) {</span>
+<span class="nc" id="L1556">                        mq(18);</span>
+<span class="nc" id="L1557">                        mq(18);</span>
+<span class="nc" id="L1558">                        mq(18);</span>
+<span class="nc" id="L1559">                        mq(18);</span>
+                    }
+                }
+<span class="pc bpc" id="L1562" title="1 of 2 branches missed.">                if ((style &amp; 2) != 0) {</span>
+<span class="nc" id="L1563">                    resetContexts();</span>
+                }
+            }
+<span class="fc" id="L1566">            off += len;</span>
+        }
+<span class="fc" id="L1568">        int bx = cb.x0 - bd.x0;</span>
+<span class="fc" id="L1569">        int by = cb.y0 - bd.y0;</span>
+<span class="pc bpc" id="L1570" title="1 of 2 branches missed.">        if (rev) {</span>
+<span class="fc" id="L1571">            int[] dst = bd.idata;</span>
+<span class="fc bfc" id="L1572" title="All 2 branches covered.">            for (int y = 0; y &lt; h; y++) {</span>
+<span class="fc" id="L1573">                int i = (y + 1) * stride + 1;</span>
+<span class="fc" id="L1574">                int o = (by + y) * bd.w + bx;</span>
+<span class="fc bfc" id="L1575" title="All 2 branches covered.">                for (int x = 0; x &lt; w; x++, i++, o++) {</span>
+<span class="fc" id="L1576">                    int v = mag[i] &gt;&gt; 1;</span>
+<span class="fc bfc" id="L1577" title="All 2 branches covered.">                    dst[o] = sgn[i] != 0 ? -v : v;</span>
+                }
+            }
+<span class="fc" id="L1580">        } else {</span>
+<span class="nc" id="L1581">            float[] dst = bd.fdata;</span>
+<span class="nc" id="L1582">            float f = bd.delta * 0.5f;</span>
+<span class="nc bnc" id="L1583" title="All 2 branches missed.">            for (int y = 0; y &lt; h; y++) {</span>
+<span class="nc" id="L1584">                int i = (y + 1) * stride + 1;</span>
+<span class="nc" id="L1585">                int o = (by + y) * bd.w + bx;</span>
+<span class="nc bnc" id="L1586" title="All 2 branches missed.">                for (int x = 0; x &lt; w; x++, i++, o++) {</span>
+<span class="nc" id="L1587">                    float v = mag[i] * f;</span>
+<span class="nc bnc" id="L1588" title="All 2 branches missed.">                    dst[o] = sgn[i] != 0 ? -v : v;</span>
+                }
+            }
+        }
+<span class="fc" id="L1592">    }</span>
+
+    private int zc(int i, int stride, boolean vcm, int[] lut) {
+<span class="fc" id="L1595">        byte[] s = sig;</span>
+<span class="fc" id="L1596">        int hh = s[i - 1] + s[i + 1];</span>
+<span class="fc" id="L1597">        int v = s[i - stride];</span>
+<span class="fc" id="L1598">        int d = s[i - stride - 1] + s[i - stride + 1];</span>
+<span class="pc bpc" id="L1599" title="1 of 2 branches missed.">        if (!vcm) {</span>
+<span class="fc" id="L1600">            v += s[i + stride];</span>
+<span class="fc" id="L1601">            d += s[i + stride - 1] + s[i + stride + 1];</span>
+        }
+<span class="fc" id="L1603">        return lut[hh * 15 + v * 5 + d];</span>
+    }
+
+    private int scv(int j) {
+<span class="fc bfc" id="L1607" title="All 4 branches covered.">        return sig[j] == 0 ? 0 : sgn[j] != 0 ? -1 : 1;</span>
+    }
+
+    private void decodeSign(int i, int stride, boolean vcm, boolean raw) {
+<span class="pc bpc" id="L1611" title="1 of 2 branches missed.">        if (raw) {</span>
+<span class="nc" id="L1612">            sgn[i] = (byte) rawBit();</span>
+<span class="nc" id="L1613">            return;</span>
+        }
+<span class="fc" id="L1615">        int hc = scv(i - 1) + scv(i + 1);</span>
+<span class="pc bpc" id="L1616" title="1 of 2 branches missed.">        int vv = scv(i - stride) + (vcm ? 0 : scv(i + stride));</span>
+<span class="fc bfc" id="L1617" title="All 4 branches covered.">        hc = hc &lt; -1 ? -1 : hc &gt; 1 ? 1 : hc;</span>
+<span class="fc bfc" id="L1618" title="All 4 branches covered.">        vv = vv &lt; -1 ? -1 : vv &gt; 1 ? 1 : vv;</span>
+<span class="fc" id="L1619">        int t = (hc + 1) * 3 + vv + 1;</span>
+<span class="fc" id="L1620">        sgn[i] = (byte) (mq(SC_CTX[t]) ^ SC_XOR[t]);</span>
+<span class="fc" id="L1621">    }</span>
+
+    private void sigPass(int w, int h, int stride, int plane, int[] lut, boolean vc, boolean raw) {
+<span class="fc" id="L1624">        int one = 3 &lt;&lt; plane;</span>
+<span class="fc bfc" id="L1625" title="All 2 branches covered.">        for (int y0 = 0; y0 &lt; h; y0 += 4) {</span>
+<span class="fc" id="L1626">            int ymax = Math.min(y0 + 4, h);</span>
+<span class="fc bfc" id="L1627" title="All 2 branches covered.">            for (int x = 0; x &lt; w; x++) {</span>
+<span class="fc bfc" id="L1628" title="All 2 branches covered.">                for (int y = y0; y &lt; ymax; y++) {</span>
+<span class="fc" id="L1629">                    int i = (y + 1) * stride + x + 1;</span>
+<span class="fc bfc" id="L1630" title="All 2 branches covered.">                    if (sig[i] != 0) {</span>
+<span class="fc" id="L1631">                        continue;</span>
+                    }
+<span class="pc bpc" id="L1633" title="3 of 4 branches missed.">                    boolean vcm = vc &amp;&amp; (y &amp; 3) == 3;</span>
+<span class="fc bfc" id="L1634" title="All 2 branches covered.">                    if (zc(i, stride, vcm, lut) == 0) {</span>
+<span class="fc" id="L1635">                        continue;</span>
+                    }
+<span class="fc" id="L1637">                    vis[i] = 1;</span>
+<span class="pc bpc" id="L1638" title="1 of 2 branches missed.">                    int b = raw ? rawBit() : mq(zc(i, stride, vcm, lut));</span>
+<span class="fc bfc" id="L1639" title="All 2 branches covered.">                    if (b != 0) {</span>
+<span class="fc" id="L1640">                        decodeSign(i, stride, vcm, raw);</span>
+<span class="fc" id="L1641">                        sig[i] = 1;</span>
+<span class="fc" id="L1642">                        mag[i] = one;</span>
+                    }
+                }
+            }
+        }
+<span class="fc" id="L1647">    }</span>
+
+    private void refPass(int w, int h, int stride, int plane, boolean vc, boolean raw) {
+<span class="fc" id="L1650">        int half = 1 &lt;&lt; plane;</span>
+<span class="fc bfc" id="L1651" title="All 2 branches covered.">        for (int y0 = 0; y0 &lt; h; y0 += 4) {</span>
+<span class="fc" id="L1652">            int ymax = Math.min(y0 + 4, h);</span>
+<span class="fc bfc" id="L1653" title="All 2 branches covered.">            for (int x = 0; x &lt; w; x++) {</span>
+<span class="fc bfc" id="L1654" title="All 2 branches covered.">                for (int y = y0; y &lt; ymax; y++) {</span>
+<span class="fc" id="L1655">                    int i = (y + 1) * stride + x + 1;</span>
+<span class="fc bfc" id="L1656" title="All 4 branches covered.">                    if (sig[i] == 0 || vis[i] != 0) {</span>
+<span class="fc" id="L1657">                        continue;</span>
+                    }
+                    int b;
+<span class="pc bpc" id="L1660" title="1 of 2 branches missed.">                    if (raw) {</span>
+<span class="nc" id="L1661">                        b = rawBit();</span>
+                    } else {
+                        int ctx;
+<span class="fc bfc" id="L1664" title="All 2 branches covered.">                        if (ref[i] != 0) {</span>
+<span class="fc" id="L1665">                            ctx = 16;</span>
+                        } else {
+<span class="pc bpc" id="L1667" title="3 of 4 branches missed.">                            boolean vcm = vc &amp;&amp; (y &amp; 3) == 3;</span>
+<span class="fc" id="L1668">                            int n = sig[i - 1] + sig[i + 1] + sig[i - stride] + sig[i - stride - 1] + sig[i - stride + 1];</span>
+<span class="pc bpc" id="L1669" title="1 of 2 branches missed.">                            if (!vcm) {</span>
+<span class="fc" id="L1670">                                n += sig[i + stride] + sig[i + stride - 1] + sig[i + stride + 1];</span>
+                            }
+<span class="fc bfc" id="L1672" title="All 2 branches covered.">                            ctx = n != 0 ? 15 : 14;</span>
+                        }
+<span class="fc" id="L1674">                        b = mq(ctx);</span>
+                    }
+<span class="fc bfc" id="L1676" title="All 2 branches covered.">                    mag[i] += b != 0 ? half : -half;</span>
+<span class="fc" id="L1677">                    ref[i] = 1;</span>
+                }
+            }
+        }
+<span class="fc" id="L1681">    }</span>
+
+    private void cleanPass(int w, int h, int stride, int plane, int[] lut, boolean vc) {
+<span class="fc" id="L1684">        int one = 3 &lt;&lt; plane;</span>
+<span class="fc bfc" id="L1685" title="All 2 branches covered.">        for (int y0 = 0; y0 &lt; h; y0 += 4) {</span>
+<span class="fc" id="L1686">            int ymax = Math.min(y0 + 4, h);</span>
+<span class="fc bfc" id="L1687" title="All 2 branches covered.">            for (int x = 0; x &lt; w; x++) {</span>
+<span class="fc" id="L1688">                int y = y0;</span>
+<span class="pc bpc" id="L1689" title="1 of 2 branches missed.">                if (y0 + 3 &lt; h) {</span>
+<span class="fc" id="L1690">                    boolean rl = true;</span>
+<span class="fc bfc" id="L1691" title="All 4 branches covered.">                    for (int k = 0; k &lt; 4 &amp;&amp; rl; k++) {</span>
+<span class="fc" id="L1692">                        int i = (y0 + k + 1) * stride + x + 1;</span>
+<span class="pc bpc" id="L1693" title="3 of 10 branches missed.">                        rl = sig[i] == 0 &amp;&amp; vis[i] == 0 &amp;&amp; zc(i, stride, vc &amp;&amp; k == 3, lut) == 0;</span>
+                    }
+<span class="fc bfc" id="L1695" title="All 2 branches covered.">                    if (rl) {</span>
+<span class="fc bfc" id="L1696" title="All 2 branches covered.">                        if (mq(17) == 0) {</span>
+<span class="fc" id="L1697">                            continue;</span>
+                        }
+<span class="fc" id="L1699">                        int r = (mq(18) &lt;&lt; 1) | mq(18);</span>
+<span class="fc" id="L1700">                        y = y0 + r;</span>
+<span class="fc" id="L1701">                        int i = (y + 1) * stride + x + 1;</span>
+<span class="pc bpc" id="L1702" title="3 of 4 branches missed.">                        decodeSign(i, stride, vc &amp;&amp; (y &amp; 3) == 3, false);</span>
+<span class="fc" id="L1703">                        sig[i] = 1;</span>
+<span class="fc" id="L1704">                        mag[i] = one;</span>
+<span class="fc" id="L1705">                        y++;</span>
+                    }
+                }
+<span class="fc bfc" id="L1708" title="All 2 branches covered.">                for (; y &lt; ymax; y++) {</span>
+<span class="fc" id="L1709">                    int i = (y + 1) * stride + x + 1;</span>
+<span class="fc bfc" id="L1710" title="All 2 branches covered.">                    if (vis[i] != 0) {</span>
+<span class="fc" id="L1711">                        vis[i] = 0;</span>
+<span class="fc" id="L1712">                        continue;</span>
+                    }
+<span class="fc bfc" id="L1714" title="All 2 branches covered.">                    if (sig[i] != 0) {</span>
+<span class="fc" id="L1715">                        continue;</span>
+                    }
+<span class="pc bpc" id="L1717" title="3 of 4 branches missed.">                    boolean vcm = vc &amp;&amp; (y &amp; 3) == 3;</span>
+<span class="fc bfc" id="L1718" title="All 2 branches covered.">                    if (mq(zc(i, stride, vcm, lut)) != 0) {</span>
+<span class="fc" id="L1719">                        decodeSign(i, stride, vcm, false);</span>
+<span class="fc" id="L1720">                        sig[i] = 1;</span>
+<span class="fc" id="L1721">                        mag[i] = one;</span>
+                    }
+                }
+            }
+        }
+<span class="fc" id="L1726">    }</span>
+
+    // ------------------------------------------------------------------ wavelet
+
+    private static int mirror(int j, int n) {
+<span class="pc bpc" id="L1731" title="1 of 2 branches missed.">        if (n == 1) {</span>
+<span class="nc" id="L1732">            return 0;</span>
+        }
+<span class="fc" id="L1734">        int period = 2 * n - 2;</span>
+<span class="fc" id="L1735">        j %= period;</span>
+<span class="fc bfc" id="L1736" title="All 2 branches covered.">        if (j &lt; 0) {</span>
+<span class="fc" id="L1737">            j += period;</span>
+        }
+<span class="pc bpc" id="L1739" title="1 of 2 branches missed.">        return j &gt;= n ? period - j : j;</span>
+    }
+
+    private static final int PAD = 4;
+
+    private static void idwt53(int[] a, int off, int stride, int n, int i0, int[] buf) {
+<span class="pc bpc" id="L1745" title="1 of 2 branches missed.">        if (n == 1) {</span>
+<span class="nc bnc" id="L1746" title="All 2 branches missed.">            if ((i0 &amp; 1) != 0) {</span>
+<span class="nc" id="L1747">                a[off] /= 2;</span>
+            }
+<span class="nc" id="L1749">            return;</span>
+        }
+<span class="fc bfc" id="L1751" title="All 2 branches covered.">        for (int k = 0; k &lt; n; k++) {</span>
+<span class="fc" id="L1752">            buf[PAD + k] = a[off + k * stride];</span>
+        }
+<span class="fc bfc" id="L1754" title="All 2 branches covered.">        for (int j = 1; j &lt;= PAD; j++) {</span>
+<span class="fc" id="L1755">            buf[PAD - j] = buf[PAD + mirror(-j, n)];</span>
+<span class="fc" id="L1756">            buf[PAD + n - 1 + j] = buf[PAD + mirror(n - 1 + j, n)];</span>
+        }
+<span class="fc" id="L1758">        int len = n + 2 * PAD;</span>
+<span class="fc" id="L1759">        int ev = i0 &amp; 1;</span>
+<span class="pc bpc" id="L1760" title="1 of 4 branches missed.">        for (int t = (ev == 1 ? 1 : 2); t &lt; len - 1; t += 2) {</span>
+<span class="fc" id="L1761">            buf[t] -= (buf[t - 1] + buf[t + 1] + 2) &gt;&gt; 2;</span>
+        }
+<span class="pc bpc" id="L1763" title="1 of 4 branches missed.">        for (int t = (ev == 1 ? 2 : 1); t &lt; len - 1; t += 2) {</span>
+<span class="fc" id="L1764">            buf[t] += (buf[t - 1] + buf[t + 1]) &gt;&gt; 1;</span>
+        }
+<span class="fc bfc" id="L1766" title="All 2 branches covered.">        for (int k = 0; k &lt; n; k++) {</span>
+<span class="fc" id="L1767">            a[off + k * stride] = buf[PAD + k];</span>
+        }
+<span class="fc" id="L1769">    }</span>
+
+    private static final float ALPHA = -1.586134342059924f;
+    private static final float BETA = -0.052980118572961f;
+    private static final float GAMMA = 0.882911075530934f;
+    private static final float DELTA = 0.443506852043971f;
+    private static final float K = 1.230174104914001f;
+    private static final float INV_K = 1f / 1.230174104914001f;
+
+    private static void idwt97(float[] a, int off, int stride, int n, int i0, float[] buf) {
+<span class="nc bnc" id="L1779" title="All 2 branches missed.">        if (n == 1) {</span>
+<span class="nc bnc" id="L1780" title="All 2 branches missed.">            if ((i0 &amp; 1) != 0) {</span>
+<span class="nc" id="L1781">                a[off] /= 2;</span>
+            }
+<span class="nc" id="L1783">            return;</span>
+        }
+<span class="nc bnc" id="L1785" title="All 2 branches missed.">        for (int k = 0; k &lt; n; k++) {</span>
+<span class="nc" id="L1786">            buf[PAD + k] = a[off + k * stride];</span>
+        }
+<span class="nc bnc" id="L1788" title="All 2 branches missed.">        for (int j = 1; j &lt;= PAD; j++) {</span>
+<span class="nc" id="L1789">            buf[PAD - j] = buf[PAD + mirror(-j, n)];</span>
+<span class="nc" id="L1790">            buf[PAD + n - 1 + j] = buf[PAD + mirror(n - 1 + j, n)];</span>
+        }
+<span class="nc" id="L1792">        int len = n + 2 * PAD;</span>
+<span class="nc bnc" id="L1793" title="All 2 branches missed.">        int e0 = (i0 &amp; 1) == 0 ? 0 : 1;</span>
+<span class="nc" id="L1794">        int o0 = 1 - e0;</span>
+<span class="nc bnc" id="L1795" title="All 2 branches missed.">        for (int t = e0; t &lt; len; t += 2) {</span>
+<span class="nc" id="L1796">            buf[t] *= K;</span>
+        }
+<span class="nc bnc" id="L1798" title="All 2 branches missed.">        for (int t = o0; t &lt; len; t += 2) {</span>
+<span class="nc" id="L1799">            buf[t] *= INV_K;</span>
+        }
+<span class="nc bnc" id="L1801" title="All 2 branches missed.">        int es = e0 == 0 ? 2 : 1;</span>
+<span class="nc bnc" id="L1802" title="All 2 branches missed.">        int os = o0 == 0 ? 2 : 1;</span>
+<span class="nc bnc" id="L1803" title="All 2 branches missed.">        for (int t = es; t &lt; len - 1; t += 2) {</span>
+<span class="nc" id="L1804">            buf[t] -= DELTA * (buf[t - 1] + buf[t + 1]);</span>
+        }
+<span class="nc bnc" id="L1806" title="All 2 branches missed.">        for (int t = os; t &lt; len - 1; t += 2) {</span>
+<span class="nc" id="L1807">            buf[t] -= GAMMA * (buf[t - 1] + buf[t + 1]);</span>
+        }
+<span class="nc bnc" id="L1809" title="All 2 branches missed.">        for (int t = es; t &lt; len - 1; t += 2) {</span>
+<span class="nc" id="L1810">            buf[t] -= BETA * (buf[t - 1] + buf[t + 1]);</span>
+        }
+<span class="nc bnc" id="L1812" title="All 2 branches missed.">        for (int t = os; t &lt; len - 1; t += 2) {</span>
+<span class="nc" id="L1813">            buf[t] -= ALPHA * (buf[t - 1] + buf[t + 1]);</span>
+        }
+<span class="nc bnc" id="L1815" title="All 2 branches missed.">        for (int k = 0; k &lt; n; k++) {</span>
+<span class="nc" id="L1816">            a[off + k * stride] = buf[PAD + k];</span>
+        }
+<span class="nc" id="L1818">    }</span>
+
+    private void idwt(TC tc) {
+<span class="fc" id="L1821">        boolean rev = tc.cp.rev;</span>
+<span class="fc" id="L1822">        Res r0 = tc.res[0];</span>
+<span class="fc" id="L1823">        int[] ic = r0.bands[0].idata;</span>
+<span class="fc" id="L1824">        float[] fc = r0.bands[0].fdata;</span>
+<span class="fc" id="L1825">        int pw0 = r0.x1 - r0.x0;</span>
+<span class="fc" id="L1826">        int ph0 = r0.y1 - r0.y0;</span>
+<span class="fc" id="L1827">        int px0 = r0.x0;</span>
+<span class="fc" id="L1828">        int py0 = r0.y0;</span>
+<span class="fc bfc" id="L1829" title="All 2 branches covered.">        for (int r = 1; r &lt; tc.res.length; r++) {</span>
+<span class="fc" id="L1830">            Res rr = tc.res[r];</span>
+<span class="fc" id="L1831">            int rw = rr.x1 - rr.x0;</span>
+<span class="fc" id="L1832">            int rh = rr.y1 - rr.y0;</span>
+<span class="pc bpc" id="L1833" title="2 of 4 branches missed.">            if (rw &lt;= 0 || rh &lt;= 0) {</span>
+<span class="nc bnc" id="L1834" title="All 2 branches missed.">                ic = rev ? new int[0] : null;</span>
+<span class="nc bnc" id="L1835" title="All 2 branches missed.">                fc = rev ? null : new float[0];</span>
+<span class="nc" id="L1836">                pw0 = Math.max(0, rw);</span>
+<span class="nc" id="L1837">                ph0 = Math.max(0, rh);</span>
+<span class="nc" id="L1838">                px0 = rr.x0;</span>
+<span class="nc" id="L1839">                py0 = rr.y0;</span>
+<span class="nc" id="L1840">                continue;</span>
+            }
+<span class="pc bpc" id="L1842" title="1 of 2 branches missed.">            int[] ia = rev ? new int[rw * rh] : null;</span>
+<span class="pc bpc" id="L1843" title="1 of 2 branches missed.">            float[] fa = rev ? null : new float[rw * rh];</span>
+<span class="fc" id="L1844">            place(ia, fa, rw, rh, rr.x0, rr.y0, ic, fc, px0, py0, pw0, ph0, 0, 0);</span>
+<span class="fc bfc" id="L1845" title="All 2 branches covered.">            for (int bi = 0; bi &lt; 3; bi++) {</span>
+<span class="fc" id="L1846">                Band bd = rr.bands[bi];</span>
+<span class="fc" id="L1847">                place(ia, fa, rw, rh, rr.x0, rr.y0, bd.idata, bd.fdata, bd.x0, bd.y0, bd.w, bd.h,</span>
+                        bd.type &amp; 1, bd.type &gt;&gt; 1);
+            }
+<span class="fc" id="L1850">            int m = Math.max(rw, rh) + 2 * PAD;</span>
+<span class="pc bpc" id="L1851" title="1 of 2 branches missed.">            if (rev) {</span>
+<span class="fc" id="L1852">                int[] buf = new int[m];</span>
+<span class="fc bfc" id="L1853" title="All 2 branches covered.">                for (int y = 0; y &lt; rh; y++) {</span>
+<span class="fc" id="L1854">                    idwt53(ia, y * rw, 1, rw, rr.x0, buf);</span>
+                }
+<span class="fc bfc" id="L1856" title="All 2 branches covered.">                for (int x = 0; x &lt; rw; x++) {</span>
+<span class="fc" id="L1857">                    idwt53(ia, x, rw, rh, rr.y0, buf);</span>
+                }
+<span class="fc" id="L1859">            } else {</span>
+<span class="nc" id="L1860">                float[] buf = new float[m];</span>
+<span class="nc bnc" id="L1861" title="All 2 branches missed.">                for (int y = 0; y &lt; rh; y++) {</span>
+<span class="nc" id="L1862">                    idwt97(fa, y * rw, 1, rw, rr.x0, buf);</span>
+                }
+<span class="nc bnc" id="L1864" title="All 2 branches missed.">                for (int x = 0; x &lt; rw; x++) {</span>
+<span class="nc" id="L1865">                    idwt97(fa, x, rw, rh, rr.y0, buf);</span>
+                }
+            }
+<span class="fc" id="L1868">            ic = ia;</span>
+<span class="fc" id="L1869">            fc = fa;</span>
+<span class="fc" id="L1870">            pw0 = rw;</span>
+<span class="fc" id="L1871">            ph0 = rh;</span>
+<span class="fc" id="L1872">            px0 = rr.x0;</span>
+<span class="fc" id="L1873">            py0 = rr.y0;</span>
+        }
+<span class="fc" id="L1875">        tc.idata = ic;</span>
+<span class="fc" id="L1876">        tc.fdata = fc;</span>
+<span class="fc" id="L1877">    }</span>
+
+    private static void place(int[] ia, float[] fa, int rw, int rh, int rx0, int ry0, int[] is,
+            float[] fs, int bx0, int by0, int bw, int bh, int xo, int yo) {
+<span class="fc bfc" id="L1881" title="All 2 branches covered.">        for (int v = 0; v &lt; bh; v++) {</span>
+<span class="fc" id="L1882">            int ay = 2 * (by0 + v) + yo - ry0;</span>
+<span class="pc bpc" id="L1883" title="2 of 4 branches missed.">            if (ay &lt; 0 || ay &gt;= rh) {</span>
+<span class="nc" id="L1884">                continue;</span>
+            }
+<span class="fc bfc" id="L1886" title="All 2 branches covered.">            for (int u = 0; u &lt; bw; u++) {</span>
+<span class="fc" id="L1887">                int ax = 2 * (bx0 + u) + xo - rx0;</span>
+<span class="pc bpc" id="L1888" title="2 of 4 branches missed.">                if (ax &lt; 0 || ax &gt;= rw) {</span>
+<span class="nc" id="L1889">                    continue;</span>
+                }
+<span class="pc bpc" id="L1891" title="2 of 4 branches missed.">                if (ia != null &amp;&amp; is != null) {</span>
+<span class="fc" id="L1892">                    ia[ay * rw + ax] = is[v * bw + u];</span>
+<span class="nc bnc" id="L1893" title="All 4 branches missed.">                } else if (fa != null &amp;&amp; fs != null) {</span>
+<span class="nc" id="L1894">                    fa[ay * rw + ax] = fs[v * bw + u];</span>
+                }
+            }
+        }
+<span class="fc" id="L1898">    }</span>
+
+    private static int roundF(float v) {
+<span class="nc bnc" id="L1901" title="All 2 branches missed.">        return v &gt;= 0 ? (int) (v + 0.5f) : -(int) (0.5f - v);</span>
+    }
+
+    private void storeTile(TC[] tcs, boolean mct) {
+<span class="pc bpc" id="L1905" title="3 of 4 branches missed.">        if (mct &amp;&amp; ncomp &gt;= 3) {</span>
+<span class="nc" id="L1906">            TC a = tcs[0];</span>
+<span class="nc" id="L1907">            TC b = tcs[1];</span>
+<span class="nc" id="L1908">            TC c = tcs[2];</span>
+<span class="nc bnc" id="L1909" title="All 8 branches missed.">            boolean same = a.x1 - a.x0 == b.x1 - b.x0 &amp;&amp; a.x1 - a.x0 == c.x1 - c.x0</span>
+                    &amp;&amp; a.y1 - a.y0 == b.y1 - b.y0 &amp;&amp; a.y1 - a.y0 == c.y1 - c.y0;
+<span class="nc bnc" id="L1911" title="All 12 branches missed.">            if (same &amp;&amp; a.idata != null &amp;&amp; b.idata != null &amp;&amp; c.idata != null</span>
+                    &amp;&amp; a.idata.length == b.idata.length &amp;&amp; a.idata.length == c.idata.length) {
+<span class="nc" id="L1913">                int[] y0 = a.idata;</span>
+<span class="nc" id="L1914">                int[] y1 = b.idata;</span>
+<span class="nc" id="L1915">                int[] y2 = c.idata;</span>
+<span class="nc bnc" id="L1916" title="All 2 branches missed.">                for (int i = 0; i &lt; y0.length; i++) {</span>
+<span class="nc" id="L1917">                    int g = y0[i] - ((y1[i] + y2[i]) &gt;&gt; 2);</span>
+<span class="nc" id="L1918">                    int r = y2[i] + g;</span>
+<span class="nc" id="L1919">                    int bl = y1[i] + g;</span>
+<span class="nc" id="L1920">                    y0[i] = r;</span>
+<span class="nc" id="L1921">                    y1[i] = g;</span>
+<span class="nc" id="L1922">                    y2[i] = bl;</span>
+                }
+<span class="nc" id="L1924">                mctUsed = true;</span>
+<span class="nc bnc" id="L1925" title="All 12 branches missed.">            } else if (same &amp;&amp; a.fdata != null &amp;&amp; b.fdata != null &amp;&amp; c.fdata != null</span>
+                    &amp;&amp; a.fdata.length == b.fdata.length &amp;&amp; a.fdata.length == c.fdata.length) {
+<span class="nc" id="L1927">                float[] y0 = a.fdata;</span>
+<span class="nc" id="L1928">                float[] y1 = b.fdata;</span>
+<span class="nc" id="L1929">                float[] y2 = c.fdata;</span>
+<span class="nc bnc" id="L1930" title="All 2 branches missed.">                for (int i = 0; i &lt; y0.length; i++) {</span>
+<span class="nc" id="L1931">                    float yy = y0[i];</span>
+<span class="nc" id="L1932">                    float cb = y1[i];</span>
+<span class="nc" id="L1933">                    float cr = y2[i];</span>
+<span class="nc" id="L1934">                    y0[i] = yy + 1.402f * cr;</span>
+<span class="nc" id="L1935">                    y1[i] = yy - 0.34413f * cb - 0.71414f * cr;</span>
+<span class="nc" id="L1936">                    y2[i] = yy + 1.772f * cb;</span>
+                }
+<span class="nc" id="L1938">                mctUsed = true;</span>
+            }
+        }
+<span class="fc bfc" id="L1941" title="All 2 branches covered.">        for (int c = 0; c &lt; ncomp; c++) {</span>
+<span class="fc" id="L1942">            TC tc = tcs[c];</span>
+<span class="fc" id="L1943">            int w = tc.x1 - tc.x0;</span>
+<span class="fc" id="L1944">            int h = tc.y1 - tc.y0;</span>
+<span class="fc" id="L1945">            int p = prec[c];</span>
+<span class="pc bpc" id="L1946" title="1 of 2 branches missed.">            int shift = sgnd[c] ? 0 : 1 &lt;&lt; (p - 1);</span>
+<span class="pc bpc" id="L1947" title="1 of 2 branches missed.">            int min = sgnd[c] ? -(1 &lt;&lt; (p - 1)) : 0;</span>
+<span class="pc bpc" id="L1948" title="1 of 2 branches missed.">            int max = sgnd[c] ? (1 &lt;&lt; (p - 1)) - 1 : (1 &lt;&lt; p) - 1;</span>
+<span class="fc" id="L1949">            int ox = tc.x0 - ceilDiv(xosiz, dx[c]);</span>
+<span class="fc" id="L1950">            int oy = tc.y0 - ceilDiv(yosiz, dy[c]);</span>
+<span class="fc" id="L1951">            int[] dst = planes[c];</span>
+<span class="fc" id="L1952">            int dw = pw[c];</span>
+<span class="fc" id="L1953">            int[] is = tc.idata;</span>
+<span class="fc" id="L1954">            float[] fs = tc.fdata;</span>
+<span class="pc bpc" id="L1955" title="6 of 8 branches missed.">            if ((is == null || is.length &lt; w * h) &amp;&amp; (fs == null || fs.length &lt; w * h)) {</span>
+<span class="nc" id="L1956">                continue;</span>
+            }
+<span class="fc bfc" id="L1958" title="All 2 branches covered.">            for (int y = 0; y &lt; h; y++) {</span>
+<span class="fc" id="L1959">                int py = oy + y;</span>
+<span class="pc bpc" id="L1960" title="2 of 4 branches missed.">                if (py &lt; 0 || py &gt;= ph[c]) {</span>
+<span class="nc" id="L1961">                    continue;</span>
+                }
+<span class="fc bfc" id="L1963" title="All 2 branches covered.">                for (int x = 0; x &lt; w; x++) {</span>
+<span class="fc" id="L1964">                    int px = ox + x;</span>
+<span class="pc bpc" id="L1965" title="2 of 4 branches missed.">                    if (px &lt; 0 || px &gt;= dw) {</span>
+<span class="nc" id="L1966">                        continue;</span>
+                    }
+<span class="pc bpc" id="L1968" title="1 of 2 branches missed.">                    int v = is != null ? is[y * w + x] : roundF(fs[y * w + x]);</span>
+<span class="fc" id="L1969">                    v += shift;</span>
+<span class="pc bpc" id="L1970" title="2 of 4 branches missed.">                    dst[py * dw + px] = v &lt; min ? min : v &gt; max ? max : v;</span>
+                }
+            }
+        }
+<span class="fc" id="L1974">    }</span>
+
+    // ------------------------------------------------------------------ output
+
+    /// ARGB pixels (row-major, `width * height`).
+    ///
+    /// `cs` is a colour space given outside the file; when it is null the codestream's own components
+    /// decide: 1 is gray, 3 is RGB, 4 is CMYK, and a JP2 palette (`pclr`) is applied. When it is
+    /// non-null its component count is fed to `toRgb`, each component scaled to 0..1 (an
+    /// Indexed space takes the raw index). With `smaskInData` an extra component (named by a
+    /// JP2 `cdef` box, or the one after the colour components) becomes the alpha channel.
+    /// Returns null on failure.
+    private int[] argb(Colors cs, boolean smaskInData) {
+        try {
+<span class="fc" id="L1988">            return argbImpl(cs, smaskInData);</span>
+<span class="nc" id="L1989">        } catch (RuntimeException e) {</span>
+<span class="nc" id="L1990">            return null;</span>
+        }
+    }
+
+    private int[] argbImpl(Colors cs, boolean smask) {
+<span class="pc bpc" id="L1995" title="1 of 2 branches missed.">        if (planes == null) {</span>
+<span class="nc" id="L1996">            return null;</span>
+        }
+<span class="pc bpc" id="L1998" title="3 of 4 branches missed.">        boolean indexed = cs != null &amp;&amp; cs.isIndexed();</span>
+        int nch;
+        int[] chComp;
+        int[][] chPal;
+        int[] chPrec;
+        boolean[] chSigned;
+<span class="pc bpc" id="L2004" title="3 of 4 branches missed.">        if (palette != null &amp;&amp; !indexed) {</span>
+<span class="nc bnc" id="L2005" title="All 2 branches missed.">            if (cmapComp != null) {</span>
+<span class="nc" id="L2006">                nch = cmapComp.length;</span>
+            } else {
+<span class="nc" id="L2008">                nch = palette.length;</span>
+            }
+<span class="nc" id="L2010">            chComp = new int[nch];</span>
+<span class="nc" id="L2011">            chPal = new int[nch][];</span>
+<span class="nc" id="L2012">            chPrec = new int[nch];</span>
+<span class="nc" id="L2013">            chSigned = new boolean[nch];</span>
+<span class="nc bnc" id="L2014" title="All 2 branches missed.">            for (int i = 0; i &lt; nch; i++) {</span>
+<span class="nc bnc" id="L2015" title="All 2 branches missed.">                int comp = cmapComp != null ? cmapComp[i] : 0;</span>
+<span class="nc bnc" id="L2016" title="All 4 branches missed.">                int col = cmapComp != null ? (cmapType[i] == 1 ? cmapCol[i] : -1) : i;</span>
+<span class="nc bnc" id="L2017" title="All 2 branches missed.">                if (comp &gt;= ncomp) {</span>
+<span class="nc" id="L2018">                    return null;</span>
+                }
+<span class="nc" id="L2020">                chComp[i] = comp;</span>
+<span class="nc bnc" id="L2021" title="All 4 branches missed.">                if (col &gt;= 0 &amp;&amp; col &lt; palette.length) {</span>
+<span class="nc" id="L2022">                    chPal[i] = palette[col];</span>
+<span class="nc" id="L2023">                    chPrec[i] = palDepth[col];</span>
+<span class="nc" id="L2024">                    chSigned[i] = palSigned[col];</span>
+                } else {
+<span class="nc" id="L2026">                    chPrec[i] = prec[comp];</span>
+<span class="nc" id="L2027">                    chSigned[i] = sgnd[comp];</span>
+                }
+            }
+        } else {
+<span class="fc" id="L2031">            nch = ncomp;</span>
+<span class="fc" id="L2032">            chComp = new int[nch];</span>
+<span class="fc" id="L2033">            chPal = new int[nch][];</span>
+<span class="fc" id="L2034">            chPrec = new int[nch];</span>
+<span class="fc" id="L2035">            chSigned = new boolean[nch];</span>
+<span class="fc bfc" id="L2036" title="All 2 branches covered.">            for (int i = 0; i &lt; nch; i++) {</span>
+<span class="fc" id="L2037">                chComp[i] = i;</span>
+<span class="fc" id="L2038">                chPrec[i] = prec[i];</span>
+<span class="fc" id="L2039">                chSigned[i] = sgnd[i];</span>
+            }
+        }
+<span class="fc" id="L2042">        int alpha = -1;</span>
+<span class="fc" id="L2043">        int[] order = new int[nch];</span>
+<span class="fc" id="L2044">        int no = 0;</span>
+<span class="pc bpc" id="L2045" title="1 of 2 branches missed.">        if (cdefCn != null) {</span>
+<span class="nc" id="L2046">            int[] byAsoc = new int[nch];</span>
+<span class="nc bnc" id="L2047" title="All 2 branches missed.">            for (int i = 0; i &lt; nch; i++) {</span>
+<span class="nc" id="L2048">                byAsoc[i] = -1;</span>
+            }
+<span class="nc" id="L2050">            boolean[] used = new boolean[nch];</span>
+<span class="nc bnc" id="L2051" title="All 2 branches missed.">            for (int i = 0; i &lt; cdefCn.length; i++) {</span>
+<span class="nc" id="L2052">                int cn = cdefCn[i];</span>
+<span class="nc bnc" id="L2053" title="All 2 branches missed.">                if (cn &gt;= nch) {</span>
+<span class="nc" id="L2054">                    continue;</span>
+                }
+<span class="nc bnc" id="L2056" title="All 4 branches missed.">                if (cdefTyp[i] == 1 || cdefTyp[i] == 2) {</span>
+<span class="nc" id="L2057">                    alpha = cn;</span>
+<span class="nc" id="L2058">                    used[cn] = true;</span>
+<span class="nc bnc" id="L2059" title="All 6 branches missed.">                } else if (cdefTyp[i] == 0 &amp;&amp; cdefAsoc[i] &gt;= 1 &amp;&amp; cdefAsoc[i] &lt;= nch) {</span>
+<span class="nc" id="L2060">                    byAsoc[cdefAsoc[i] - 1] = cn;</span>
+<span class="nc" id="L2061">                    used[cn] = true;</span>
+                }
+            }
+<span class="nc bnc" id="L2064" title="All 2 branches missed.">            for (int i = 0; i &lt; nch; i++) {</span>
+<span class="nc bnc" id="L2065" title="All 2 branches missed.">                if (byAsoc[i] &gt;= 0) {</span>
+<span class="nc" id="L2066">                    order[no++] = byAsoc[i];</span>
+                }
+            }
+<span class="nc bnc" id="L2069" title="All 2 branches missed.">            for (int i = 0; i &lt; nch; i++) {</span>
+<span class="nc bnc" id="L2070" title="All 2 branches missed.">                if (!used[i]) {</span>
+<span class="nc" id="L2071">                    order[no++] = i;</span>
+                }
+            }
+<span class="nc" id="L2074">        } else {</span>
+<span class="fc bfc" id="L2075" title="All 2 branches covered.">            for (int i = 0; i &lt; nch; i++) {</span>
+<span class="fc" id="L2076">                order[no++] = i;</span>
+            }
+        }
+        int need;
+<span class="pc bpc" id="L2080" title="1 of 2 branches missed.">        if (cs != null) {</span>
+<span class="nc bnc" id="L2081" title="All 2 branches missed.">            need = indexed ? 1 : Math.max(1, cs.getComponents());</span>
+<span class="pc bpc" id="L2082" title="2 of 4 branches missed.">        } else if (enumCs == 16 || enumCs == 18) {</span>
+<span class="nc" id="L2083">            need = 3;</span>
+<span class="pc bpc" id="L2084" title="1 of 2 branches missed.">        } else if (enumCs == 17) {</span>
+<span class="nc" id="L2085">            need = 1;</span>
+<span class="pc bpc" id="L2086" title="1 of 2 branches missed.">        } else if (enumCs == 12) {</span>
+<span class="nc" id="L2087">            need = 4;</span>
+        } else {
+<span class="pc bpc" id="L2089" title="3 of 4 branches missed.">            need = no &lt;= 2 ? 1 : no == 3 ? 3 : 4;</span>
+        }
+<span class="pc bpc" id="L2091" title="1 of 2 branches missed.">        if (no &lt; need) {</span>
+<span class="nc bnc" id="L2092" title="All 4 branches missed.">            if (cs == null &amp;&amp; no &gt;= 1) {</span>
+<span class="nc bnc" id="L2093" title="All 2 branches missed.">                need = no &gt;= 3 ? 3 : 1;</span>
+            } else {
+<span class="nc" id="L2095">                return null;</span>
+            }
+        }
+<span class="pc bpc" id="L2098" title="3 of 6 branches missed.">        if (alpha &lt; 0 &amp;&amp; smask &amp;&amp; no &gt; need) {</span>
+<span class="nc" id="L2099">            alpha = order[need];</span>
+        }
+<span class="pc bpc" id="L2101" title="1 of 2 branches missed.">        if (!smask) {</span>
+<span class="nc" id="L2102">            alpha = -1;</span>
+        }
+<span class="pc bpc" id="L2104" title="1 of 2 branches missed.">        int nsel = need + (alpha &gt;= 0 ? 1 : 0);</span>
+<span class="fc" id="L2105">        int[] sel = new int[nsel];</span>
+<span class="fc bfc" id="L2106" title="All 2 branches covered.">        for (int i = 0; i &lt; need; i++) {</span>
+<span class="fc" id="L2107">            sel[i] = order[i];</span>
+        }
+<span class="pc bpc" id="L2109" title="1 of 2 branches missed.">        if (alpha &gt;= 0) {</span>
+<span class="nc" id="L2110">            sel[need] = alpha;</span>
+        }
+<span class="fc" id="L2112">        int w = width;</span>
+<span class="fc" id="L2113">        int h = height;</span>
+<span class="fc" id="L2114">        int[][] xm = new int[nsel][];</span>
+<span class="fc" id="L2115">        int[][] ym = new int[nsel][];</span>
+<span class="fc" id="L2116">        int[][] src = new int[nsel][];</span>
+<span class="fc" id="L2117">        int[] srcW = new int[nsel];</span>
+<span class="fc" id="L2118">        int[] mins = new int[nsel];</span>
+<span class="fc" id="L2119">        int[] maxs = new int[nsel];</span>
+<span class="fc" id="L2120">        int[][] pals = new int[nsel][];</span>
+<span class="fc bfc" id="L2121" title="All 2 branches covered.">        for (int s = 0; s &lt; nsel; s++) {</span>
+<span class="fc" id="L2122">            int ch = sel[s];</span>
+<span class="fc" id="L2123">            int c = chComp[ch];</span>
+<span class="fc" id="L2124">            src[s] = planes[c];</span>
+<span class="fc" id="L2125">            srcW[s] = pw[c];</span>
+<span class="fc" id="L2126">            pals[s] = chPal[ch];</span>
+<span class="fc" id="L2127">            int p = chPrec[ch];</span>
+<span class="pc bpc" id="L2128" title="1 of 2 branches missed.">            mins[s] = chSigned[ch] ? -(1 &lt;&lt; (p - 1)) : 0;</span>
+<span class="fc" id="L2129">            maxs[s] = (1 &lt;&lt; p) - 1;</span>
+<span class="fc" id="L2130">            xm[s] = axisMap(w, xosiz, dx[c], pw[c]);</span>
+<span class="fc" id="L2131">            ym[s] = axisMap(h, yosiz, dy[c], ph[c]);</span>
+        }
+<span class="fc" id="L2133">        int[] out = new int[w * h];</span>
+<span class="fc" id="L2134">        int[] raw = new int[nsel];</span>
+<span class="fc" id="L2135">        int[] last = new int[nsel];</span>
+<span class="fc" id="L2136">        int lastRgb = 0;</span>
+<span class="fc" id="L2137">        boolean haveLast = false;</span>
+<span class="pc bpc" id="L2138" title="1 of 2 branches missed.">        double[] cc = cs != null ? new double[need] : null;</span>
+<span class="pc bpc" id="L2139" title="6 of 8 branches missed.">        boolean ycc = cs == null &amp;&amp; need == 3 &amp;&amp; enumCs == 18 &amp;&amp; !mctUsed;</span>
+<span class="fc bfc" id="L2140" title="All 2 branches covered.">        for (int y = 0; y &lt; h; y++) {</span>
+<span class="fc bfc" id="L2141" title="All 2 branches covered.">            for (int x = 0; x &lt; w; x++) {</span>
+<span class="fc bfc" id="L2142" title="All 2 branches covered.">                for (int s = 0; s &lt; nsel; s++) {</span>
+<span class="fc" id="L2143">                    int v = src[s][ym[s][y] * srcW[s] + xm[s][x]];</span>
+<span class="fc" id="L2144">                    int[] pl = pals[s];</span>
+<span class="pc bpc" id="L2145" title="1 of 2 branches missed.">                    if (pl != null) {</span>
+<span class="nc bnc" id="L2146" title="All 4 branches missed.">                        v = pl[v &lt; 0 ? 0 : v &gt;= pl.length ? pl.length - 1 : v];</span>
+                    }
+<span class="fc" id="L2148">                    raw[s] = v;</span>
+                }
+<span class="fc" id="L2150">                int a = 255;</span>
+<span class="pc bpc" id="L2151" title="1 of 2 branches missed.">                if (alpha &gt;= 0) {</span>
+<span class="nc" id="L2152">                    a = scale8(raw[need], mins[need], maxs[need]);</span>
+                }
+<span class="fc" id="L2154">                boolean same = haveLast;</span>
+<span class="fc bfc" id="L2155" title="All 4 branches covered.">                for (int s = 0; s &lt; need &amp;&amp; same; s++) {</span>
+<span class="pc bpc" id="L2156" title="1 of 2 branches missed.">                    same = raw[s] == last[s];</span>
+                }
+                int rgb;
+<span class="pc bpc" id="L2159" title="1 of 2 branches missed.">                if (same) {</span>
+<span class="nc" id="L2160">                    rgb = lastRgb;</span>
+                } else {
+<span class="pc bpc" id="L2162" title="1 of 2 branches missed.">                    if (cs != null) {</span>
+<span class="nc bnc" id="L2163" title="All 2 branches missed.">                        if (indexed) {</span>
+<span class="nc" id="L2164">                            cc[0] = raw[0];</span>
+                        } else {
+<span class="nc bnc" id="L2166" title="All 2 branches missed.">                            for (int s = 0; s &lt; need; s++) {</span>
+<span class="nc" id="L2167">                                cc[s] = (raw[s] - mins[s]) / (double) maxs[s];</span>
+                            }
+                        }
+<span class="nc" id="L2170">                        rgb = cs.toRgb(cc) &amp; 0xffffff;</span>
+<span class="pc bpc" id="L2171" title="1 of 2 branches missed.">                    } else if (need == 1) {</span>
+<span class="fc" id="L2172">                        int g = scale8(raw[0], mins[0], maxs[0]);</span>
+<span class="fc" id="L2173">                        rgb = (g &lt;&lt; 16) | (g &lt;&lt; 8) | g;</span>
+<span class="pc bnc" id="L2174" title="All 2 branches missed.">                    } else if (need == 3) {</span>
+<span class="nc" id="L2175">                        int r = scale8(raw[0], mins[0], maxs[0]);</span>
+<span class="nc" id="L2176">                        int g = scale8(raw[1], mins[1], maxs[1]);</span>
+<span class="nc" id="L2177">                        int b = scale8(raw[2], mins[2], maxs[2]);</span>
+<span class="nc bnc" id="L2178" title="All 2 branches missed.">                        if (ycc) {</span>
+<span class="nc" id="L2179">                            int cb = g - 128;</span>
+<span class="nc" id="L2180">                            int cr = b - 128;</span>
+<span class="nc" id="L2181">                            int yy = r;</span>
+<span class="nc" id="L2182">                            r = clamp8(roundF(yy + 1.402f * cr));</span>
+<span class="nc" id="L2183">                            g = clamp8(roundF(yy - 0.34413f * cb - 0.71414f * cr));</span>
+<span class="nc" id="L2184">                            b = clamp8(roundF(yy + 1.772f * cb));</span>
+                        }
+<span class="nc" id="L2186">                        rgb = (r &lt;&lt; 16) | (g &lt;&lt; 8) | b;</span>
+<span class="nc" id="L2187">                    } else {</span>
+<span class="nc bnc" id="L2188" title="All 2 branches missed.">                        if (cc == null) {</span>
+<span class="nc" id="L2189">                            cc = new double[4];</span>
+                        }
+<span class="nc bnc" id="L2191" title="All 2 branches missed.">                        for (int s = 0; s &lt; 4; s++) {</span>
+<span class="nc" id="L2192">                            cc[s] = (raw[s] - mins[s]) / (double) maxs[s];</span>
+                        }
+<span class="nc" id="L2194">                        rgb = (unit8((1 - cc[0]) * (1 - cc[3])) &lt;&lt; 16) | (unit8((1 - cc[1]) * (1 - cc[3])) &lt;&lt; 8)</span>
+<span class="nc" id="L2195">                                | unit8((1 - cc[2]) * (1 - cc[3]));</span>
+                    }
+<span class="fc bfc" id="L2197" title="All 2 branches covered.">                    for (int s = 0; s &lt; need; s++) {</span>
+<span class="fc" id="L2198">                        last[s] = raw[s];</span>
+                    }
+<span class="fc" id="L2200">                    lastRgb = rgb;</span>
+<span class="fc" id="L2201">                    haveLast = true;</span>
+                }
+<span class="fc" id="L2203">                out[y * w + x] = (a &lt;&lt; 24) | rgb;</span>
+            }
+        }
+<span class="fc" id="L2206">        return out;</span>
+    }
+
+    /// `v`, from 0 to 1, as a byte; the naive CMYK conversion of the PDF renderer.
+    private static int unit8(double v) {
+<span class="nc" id="L2211">        int i = (int) (v * 255 + 0.5);</span>
+<span class="nc bnc" id="L2212" title="All 4 branches missed.">        return i &lt; 0 ? 0 : i &gt; 255 ? 255 : i;</span>
+    }
+
+    private static int clamp8(int v) {
+<span class="nc bnc" id="L2216" title="All 4 branches missed.">        return v &lt; 0 ? 0 : v &gt; 255 ? 255 : v;</span>
+    }
+
+    private static int scale8(int v, int min, int max) {
+<span class="fc" id="L2220">        int u = v - min;</span>
+<span class="fc bfc" id="L2221" title="All 2 branches covered.">        if (u &lt;= 0) {</span>
+<span class="fc" id="L2222">            return 0;</span>
+        }
+<span class="pc bpc" id="L2224" title="1 of 2 branches missed.">        if (u &gt;= max) {</span>
+<span class="nc" id="L2225">            return 255;</span>
+        }
+<span class="pc bpc" id="L2227" title="1 of 2 branches missed.">        if (max == 255) {</span>
+<span class="fc" id="L2228">            return u;</span>
+        }
+<span class="nc" id="L2230">        return (int) (((long) u * 255 + (max &gt;&gt; 1)) / max);</span>
+    }
+
+    private static int[] axisMap(int n, int off, int d, int size) {
+<span class="fc" id="L2234">        int[] m = new int[n];</span>
+<span class="fc" id="L2235">        int base = ceilDiv(off, d);</span>
+<span class="fc bfc" id="L2236" title="All 2 branches covered.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc" id="L2237">            int v = (off + i) / d - base;</span>
+<span class="pc bpc" id="L2238" title="2 of 4 branches missed.">            m[i] = v &lt; 0 ? 0 : v &gt;= size ? size - 1 : v;</span>
+        }
+<span class="fc" id="L2240">        return m;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

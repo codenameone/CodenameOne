@@ -1,0 +1,258 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DefaultGraphEdgeRenderer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.graph</a> &gt; <span class="el_source">DefaultGraphEdgeRenderer.java</span></div><h1>DefaultGraphEdgeRenderer.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ui.graph;
+
+import com.codename1.graph.GraphEdge;
+import com.codename1.graph.GraphNode;
+import com.codename1.graph.GraphPort;
+import com.codename1.ui.Font;
+import com.codename1.ui.Graphics;
+import com.codename1.ui.plaf.Style;
+
+import java.util.HashMap;
+import java.util.Map;
+
+/// Paints an edge as a line with an arrowhead on a directed edge and its
+/// label in a pill at the middle.
+///
+/// Colours come from `NodeGraphEdge` (the line) and `NodeGraphEdgeLabel`
+/// (the pill and its text); a selected edge takes the colour of
+/// `NodeGraphNodeSelected`. An edge's style key picks a colour from
+/// `setColor`.
+<span class="fc" id="L42">public class DefaultGraphEdgeRenderer implements GraphEdgeRenderer {</span>
+<span class="fc" id="L43">    private final Map&lt;String, Integer&gt; colors = new HashMap&lt;String, Integer&gt;();</span>
+    private boolean colorByPortType;
+
+    /// True when an edge takes the colour of the port it leaves.
+    public boolean isColorByPortType() {
+<span class="nc" id="L48">        return colorByPortType;</span>
+    }
+
+    /// Draws an edge that has no colour of its own in the colour its source
+    /// port's type has in the graph's `DefaultGraphNodeRenderer`, so the
+    /// wires of a node editor read by type. Off by default.
+    public void setColorByPortType(boolean colorByPortType) {
+<span class="nc" id="L55">        this.colorByPortType = colorByPortType;</span>
+<span class="nc" id="L56">    }</span>
+
+    private int typeColor(NodeGraph graph, GraphEdge edge, int fallback) {
+<span class="nc" id="L59">        GraphNodeRenderer r = graph.getNodeRenderer();</span>
+<span class="nc bnc" id="L60" title="All 2 branches missed.">        GraphNode n = edge.getSourcePortId() == null ? null : graph.getModel().getNode(edge.getSourceId());</span>
+<span class="nc bnc" id="L61" title="All 2 branches missed.">        GraphPort p = n == null ? null : n.getOutput(edge.getSourcePortId());</span>
+<span class="nc bnc" id="L62" title="All 6 branches missed.">        if (p == null || p.getType() == null || !(r instanceof DefaultGraphNodeRenderer)) {</span>
+<span class="nc" id="L63">            return fallback;</span>
+        }
+<span class="nc" id="L65">        return ((DefaultGraphNodeRenderer) r).getAccent(p.getType(), fallback);</span>
+    }
+
+    /// Maps an edge style key to a line colour.
+    public void setColor(String styleKey, int rgb) {
+<span class="nc" id="L70">        colors.put(styleKey, Integer.valueOf(rgb));</span>
+<span class="nc" id="L71">    }</span>
+
+    @Override
+    public void paintEdge(Graphics g, NodeGraph graph, GraphEdge edge, double[] xs, double[] ys, int count, boolean selected) {
+<span class="pc bpc" id="L75" title="1 of 2 branches missed.">        if (count &lt; 2) {</span>
+<span class="nc" id="L76">            return;</span>
+        }
+<span class="fc" id="L78">        Style s = GraphLook.style(&quot;NodeGraphEdge&quot;);</span>
+<span class="fc" id="L79">        int color = s.getFgColor();</span>
+<span class="pc bpc" id="L80" title="1 of 2 branches missed.">        Integer custom = edge.getStyleKey() == null ? null : colors.get(edge.getStyleKey());</span>
+<span class="pc bpc" id="L81" title="1 of 2 branches missed.">        if (custom != null) {</span>
+<span class="nc" id="L82">            color = custom.intValue();</span>
+<span class="pc bpc" id="L83" title="1 of 2 branches missed.">        } else if (colorByPortType) {</span>
+<span class="nc" id="L84">            color = typeColor(graph, edge, color);</span>
+        }
+<span class="pc bpc" id="L86" title="1 of 2 branches missed.">        if (selected) {</span>
+<span class="nc" id="L87">            color = GraphLook.style(&quot;NodeGraphNodeSelected&quot;).getFgColor();</span>
+        }
+<span class="fc" id="L89">        float zoom = graph.getZoom();</span>
+<span class="pc bpc" id="L90" title="1 of 2 branches missed.">        float width = Math.max(1f, GraphLook.mm(0.3f) * Math.min(zoom, 2f) * (selected ? 1.8f : 1f));</span>
+<span class="fc" id="L91">        g.setColor(color);</span>
+<span class="fc" id="L92">        double size = Math.max(4, GraphLook.mm(1.5f) * Math.min(zoom, 1.5f));</span>
+<span class="fc" id="L93">        int head = edge.getTargetArrow();</span>
+<span class="fc" id="L94">        int tail = edge.getSourceArrow();</span>
+<span class="fc" id="L95">        int style = edge.getLineStyle();</span>
+        // stop the line short of a filled head so its tip is sharp
+<span class="fc" id="L97">        double ex = xs[count - 1];</span>
+<span class="fc" id="L98">        double ey = ys[count - 1];</span>
+<span class="fc" id="L99">        double dx = ex - xs[count - 2];</span>
+<span class="fc" id="L100">        double dy = ey - ys[count - 2];</span>
+<span class="fc" id="L101">        double len = Math.sqrt(dx * dx + dy * dy);</span>
+<span class="fc" id="L102">        double sx = xs[0];</span>
+<span class="fc" id="L103">        double sy = ys[0];</span>
+<span class="fc" id="L104">        double tdx = sx - xs[1];</span>
+<span class="fc" id="L105">        double tdy = sy - ys[1];</span>
+<span class="fc" id="L106">        double tlen = Math.sqrt(tdx * tdx + tdy * tdy);</span>
+<span class="fc" id="L107">        double headCut = cut(head, size);</span>
+<span class="fc" id="L108">        double tailCut = cut(tail, size);</span>
+<span class="fc" id="L109">        double phase = 0;</span>
+<span class="fc bfc" id="L110" title="All 2 branches covered.">        for (int i = 0; i &lt; count - 1; i++) {</span>
+<span class="fc" id="L111">            double x1 = xs[i];</span>
+<span class="fc" id="L112">            double y1 = ys[i];</span>
+<span class="fc" id="L113">            double x2 = xs[i + 1];</span>
+<span class="fc" id="L114">            double y2 = ys[i + 1];</span>
+<span class="pc bpc" id="L115" title="3 of 10 branches missed.">            if (i == 0 &amp;&amp; tailCut &gt; 0 &amp;&amp; tlen &gt; tailCut &amp;&amp; (count &gt; 2 || tlen &gt; tailCut + headCut)) {</span>
+<span class="fc" id="L116">                x1 = sx - tdx / tlen * tailCut;</span>
+<span class="fc" id="L117">                y1 = sy - tdy / tlen * tailCut;</span>
+            }
+            // a segment shorter than the cut would come out the other side of its start
+<span class="pc bpc" id="L120" title="1 of 6 branches missed.">            if (i == count - 2 &amp;&amp; headCut &gt; 0 &amp;&amp; len &gt; headCut) {</span>
+<span class="fc" id="L121">                x2 = ex - dx / len * headCut;</span>
+<span class="fc" id="L122">                y2 = ey - dy / len * headCut;</span>
+            }
+<span class="fc bfc" id="L124" title="All 2 branches covered.">            if (style == GraphEdge.LINE_SOLID) {</span>
+<span class="fc" id="L125">                GraphLook.line(g, x1, y1, x2, y2, width);</span>
+            } else {
+<span class="fc bfc" id="L127" title="All 2 branches covered.">                phase = dashes(g, x1, y1, x2, y2, width, style == GraphEdge.LINE_DOTTED, phase);</span>
+            }
+        }
+<span class="pc bpc" id="L130" title="1 of 2 branches missed.">        if (len &gt; 0.01) {</span>
+<span class="fc" id="L131">            paintHead(g, head, ex, ey, dx / len, dy / len, size, width);</span>
+        }
+<span class="pc bpc" id="L133" title="1 of 2 branches missed.">        if (tlen &gt; 0.01) {</span>
+<span class="fc" id="L134">            paintHead(g, tail, sx, sy, tdx / tlen, tdy / tlen, size, width);</span>
+        }
+<span class="pc bpc" id="L136" title="5 of 6 branches missed.">        if (edge.getLabel() != null &amp;&amp; edge.getLabel().length() &gt; 0 &amp;&amp; zoom &gt;= graph.getDetailZoom()) {</span>
+<span class="nc" id="L137">            paintLabel(g, graph.getZoom(), edge.getLabel(), xs, ys, count);</span>
+        }
+<span class="fc" id="L139">    }</span>
+
+    // How far from its tip the line under a head stops.
+    private static double cut(int kind, double size) {
+<span class="fc bfc" id="L143" title="All 4 branches covered.">        switch (kind) {</span>
+            case GraphEdge.ARROW_FILLED:
+<span class="fc" id="L145">                return size * 0.8;</span>
+            case GraphEdge.ARROW_DIAMOND:
+<span class="fc" id="L147">                return size * 1.4;</span>
+            case GraphEdge.ARROW_CIRCLE:
+<span class="fc" id="L149">                return size * 0.8;</span>
+            default:
+<span class="fc" id="L151">                return 0;</span>
+        }
+    }
+
+    // Draws one segment as dashes or dots; a stroke has no dash pattern, so
+    // the segment is walked. The phase carries the pattern round a bend.
+    private static double dashes(Graphics g, double x1, double y1, double x2, double y2,
+            float width, boolean dotted, double phase) {
+<span class="fc" id="L159">        double dx = x2 - x1;</span>
+<span class="fc" id="L160">        double dy = y2 - y1;</span>
+<span class="fc" id="L161">        double len = Math.sqrt(dx * dx + dy * dy);</span>
+<span class="pc bpc" id="L162" title="1 of 2 branches missed.">        if (len &lt; 0.01) {</span>
+<span class="nc" id="L163">            return phase;</span>
+        }
+<span class="fc bfc" id="L165" title="All 2 branches covered.">        double on = dotted ? Math.max(1.5, width) : Math.max(4, width * 4);</span>
+<span class="fc bfc" id="L166" title="All 2 branches covered.">        double off = dotted ? Math.max(3, width * 2.5) : Math.max(3, width * 3);</span>
+<span class="fc" id="L167">        double period = on + off;</span>
+<span class="fc" id="L168">        double at = -phase;</span>
+<span class="fc bfc" id="L169" title="All 2 branches covered.">        while (at &lt; len) {</span>
+<span class="fc" id="L170">            double a = Math.max(0, at);</span>
+<span class="fc" id="L171">            double b = Math.min(len, at + on);</span>
+<span class="pc bpc" id="L172" title="1 of 2 branches missed.">            if (b &gt; a) {</span>
+<span class="fc" id="L173">                GraphLook.line(g, x1 + dx * a / len, y1 + dy * a / len, x1 + dx * b / len, y1 + dy * b / len, width);</span>
+            }
+<span class="fc" id="L175">            at += period;</span>
+<span class="fc" id="L176">        }</span>
+<span class="fc" id="L177">        return (phase + len) % period;</span>
+    }
+
+    // Paints the mark at one end of an edge; the unit vector points at the tip.
+    private static void paintHead(Graphics g, int kind, double ex, double ey, double ux, double uy,
+            double size, float width) {
+<span class="fc" id="L183">        double half = size * 0.55;</span>
+<span class="fc bfc" id="L184" title="All 5 branches covered.">        switch (kind) {</span>
+            case GraphEdge.ARROW_FILLED: {
+<span class="fc" id="L186">                int[] ax = {(int) Math.round(ex), (int) Math.round(ex - ux * size - uy * half),</span>
+<span class="fc" id="L187">                    (int) Math.round(ex - ux * size + uy * half)};</span>
+<span class="fc" id="L188">                int[] ay = {(int) Math.round(ey), (int) Math.round(ey - uy * size + ux * half),</span>
+<span class="fc" id="L189">                    (int) Math.round(ey - uy * size - ux * half)};</span>
+<span class="fc" id="L190">                g.fillPolygon(ax, ay, 3);</span>
+<span class="fc" id="L191">                break;</span>
+            }
+            case GraphEdge.ARROW_OPEN:
+<span class="fc" id="L194">                GraphLook.line(g, ex, ey, ex - ux * size - uy * half, ey - uy * size + ux * half, width);</span>
+<span class="fc" id="L195">                GraphLook.line(g, ex, ey, ex - ux * size + uy * half, ey - uy * size - ux * half, width);</span>
+<span class="fc" id="L196">                break;</span>
+            case GraphEdge.ARROW_DIAMOND: {
+<span class="fc" id="L198">                double mid = size * 0.75;</span>
+<span class="fc" id="L199">                double side = size * 0.42;</span>
+<span class="fc" id="L200">                int[] ax = {(int) Math.round(ex), (int) Math.round(ex - ux * mid - uy * side),</span>
+<span class="fc" id="L201">                    (int) Math.round(ex - ux * size * 1.5), (int) Math.round(ex - ux * mid + uy * side)};</span>
+<span class="fc" id="L202">                int[] ay = {(int) Math.round(ey), (int) Math.round(ey - uy * mid + ux * side),</span>
+<span class="fc" id="L203">                    (int) Math.round(ey - uy * size * 1.5), (int) Math.round(ey - uy * mid - ux * side)};</span>
+<span class="fc" id="L204">                g.fillPolygon(ax, ay, 4);</span>
+<span class="fc" id="L205">                break;</span>
+            }
+            case GraphEdge.ARROW_CIRCLE: {
+<span class="fc" id="L208">                int r = (int) Math.max(2, Math.round(size * 0.45));</span>
+<span class="fc" id="L209">                int cx = (int) Math.round(ex - ux * r);</span>
+<span class="fc" id="L210">                int cy = (int) Math.round(ey - uy * r);</span>
+<span class="fc" id="L211">                g.fillArc(cx - r, cy - r, r * 2, r * 2, 0, 360);</span>
+<span class="fc" id="L212">                break;</span>
+            }
+            default:
+                break;
+        }
+<span class="fc" id="L217">    }</span>
+
+    private void paintLabel(Graphics g, float zoom, String text, double[] xs, double[] ys, int count) {
+<span class="nc" id="L220">        double total = 0;</span>
+<span class="nc bnc" id="L221" title="All 2 branches missed.">        for (int i = 0; i &lt; count - 1; i++) {</span>
+<span class="nc" id="L222">            total += dist(xs[i], ys[i], xs[i + 1], ys[i + 1]);</span>
+        }
+<span class="nc" id="L224">        double half = total / 2;</span>
+<span class="nc" id="L225">        double mx = xs[0];</span>
+<span class="nc" id="L226">        double my = ys[0];</span>
+<span class="nc bnc" id="L227" title="All 2 branches missed.">        for (int i = 0; i &lt; count - 1; i++) {</span>
+<span class="nc" id="L228">            double d = dist(xs[i], ys[i], xs[i + 1], ys[i + 1]);</span>
+<span class="nc bnc" id="L229" title="All 4 branches missed.">            if (half &lt;= d &amp;&amp; d &gt; 0) {</span>
+<span class="nc" id="L230">                mx = xs[i] + (xs[i + 1] - xs[i]) * half / d;</span>
+<span class="nc" id="L231">                my = ys[i] + (ys[i + 1] - ys[i]) * half / d;</span>
+<span class="nc" id="L232">                break;</span>
+            }
+<span class="nc" id="L234">            half -= d;</span>
+        }
+<span class="nc" id="L236">        Style ls = GraphLook.style(&quot;NodeGraphEdgeLabel&quot;);</span>
+<span class="nc" id="L237">        Font f = GraphLook.font(&quot;NodeGraphEdgeLabel&quot;, zoom);</span>
+<span class="nc" id="L238">        int pad = GraphLook.mm(1f, zoom);</span>
+<span class="nc" id="L239">        int tw = f.stringWidth(text);</span>
+<span class="nc" id="L240">        int th = f.getHeight();</span>
+<span class="nc" id="L241">        int x = (int) Math.round(mx) - tw / 2 - pad;</span>
+<span class="nc" id="L242">        int y = (int) Math.round(my) - th / 2 - pad / 2;</span>
+<span class="nc" id="L243">        int w = tw + pad * 2;</span>
+<span class="nc" id="L244">        int h = th + pad;</span>
+<span class="nc" id="L245">        g.setColor(GraphLook.bg(ls, 0xffffff));</span>
+<span class="nc" id="L246">        g.fillRoundRect(x, y, w, h, h, h);</span>
+<span class="nc" id="L247">        g.setColor(ls.getFgColor());</span>
+<span class="nc" id="L248">        g.setFont(f);</span>
+<span class="nc" id="L249">        g.drawString(text, x + pad, y + pad / 2);</span>
+<span class="nc" id="L250">    }</span>
+
+    private static double dist(double x1, double y1, double x2, double y2) {
+<span class="nc" id="L253">        double dx = x2 - x1;</span>
+<span class="nc" id="L254">        double dy = y2 - y1;</span>
+<span class="nc" id="L255">        return Math.sqrt(dx * dx + dy * dy);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,613 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ARSession.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ar</a> &gt; <span class="el_source">ARSession.java</span></div><h1>ARSession.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ar;
+
+import com.codename1.impl.ARImpl;
+import com.codename1.ui.Display;
+import com.codename1.util.AsyncResource;
+import com.codename1.util.SuccessCallback;
+
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.Map;
+
+/// Active augmented reality session. Obtained from
+/// `AR#open(ARSessionOptions)`.
+///
+/// Only one `ARSession` may be open at a time; opening a second throws
+/// `IllegalStateException`. Closing the session releases the camera and
+/// tracking hardware and invalidates the `ARView` returned by
+/// `#createView()`.
+///
+/// All events are delivered on the EDT and every getter reflects the state as
+/// of the most recently delivered events. High-frequency refinements (anchor
+/// and plane updates, camera pose, light estimate) are coalesced so the EDT
+/// sees the latest value rather than a backlog.
+public final class ARSession implements AutoCloseable {
+    private final ARImpl impl;
+    private final ARSessionOptions options;
+<span class="fc" id="L49">    private final Bridge bridge = new Bridge();</span>
+    private ARView view;
+    private boolean closed;
+
+<span class="fc" id="L53">    private final LinkedHashMap&lt;String, ARPlane&gt; planes = new LinkedHashMap&lt;String, ARPlane&gt;();</span>
+<span class="fc" id="L54">    private final LinkedHashMap&lt;String, ARAnchor&gt; anchors = new LinkedHashMap&lt;String, ARAnchor&gt;();</span>
+<span class="fc" id="L55">    private ARTrackingState trackingState = ARTrackingState.NOT_TRACKING;</span>
+<span class="fc" id="L56">    private ARTrackingFailureReason failureReason = ARTrackingFailureReason.INITIALIZING;</span>
+<span class="fc" id="L57">    private ARPose cameraPose = ARPose.IDENTITY;</span>
+<span class="fc" id="L58">    private ARLightEstimate lightEstimate = ARLightEstimate.INVALID;</span>
+
+<span class="fc" id="L60">    private final ArrayList&lt;ARTrackingListener&gt; trackingListeners = new ArrayList&lt;ARTrackingListener&gt;();</span>
+<span class="fc" id="L61">    private final ArrayList&lt;ARPlaneListener&gt; planeListeners = new ArrayList&lt;ARPlaneListener&gt;();</span>
+<span class="fc" id="L62">    private final ArrayList&lt;ARAnchorListener&gt; anchorListeners = new ArrayList&lt;ARAnchorListener&gt;();</span>
+
+<span class="fc" id="L64">    ARSession(ARImpl impl, ARSessionOptions options) {</span>
+<span class="fc" id="L65">        this.impl = impl;</span>
+<span class="fc" id="L66">        this.options = options;</span>
+<span class="fc" id="L67">        impl.setEventSink(bridge);</span>
+<span class="fc" id="L68">    }</span>
+
+    /// Creates the AR view that renders the camera image composited with the
+    /// anchored content. Each session owns one view; subsequent calls return
+    /// the same instance.
+    public ARView createView() {
+<span class="fc bfc" id="L74" title="All 2 branches covered.">        if (view == null) {</span>
+<span class="fc" id="L75">            view = new ARView(this, impl.createViewPeer());</span>
+        }
+<span class="fc" id="L77">        return view;</span>
+    }
+
+    /// The options the session was opened with. Read-only snapshot; mutating
+    /// it after `AR#open(ARSessionOptions)` has no effect.
+    public ARSessionOptions getOptions() {
+<span class="fc" id="L83">        return options;</span>
+    }
+
+    /// The session's overall tracking quality as of the latest update.
+    public ARTrackingState getTrackingState() {
+<span class="fc" id="L88">        return trackingState;</span>
+    }
+
+    /// Why tracking is degraded, or `ARTrackingFailureReason#NONE` when it is
+    /// not.
+    public ARTrackingFailureReason getTrackingFailureReason() {
+<span class="fc" id="L94">        return failureReason;</span>
+    }
+
+    /// The latest device pose in world space. Poll-style: the value refreshes
+    /// every frame without firing events.
+    public ARPose getCameraPose() {
+<span class="fc" id="L100">        return cameraPose;</span>
+    }
+
+    /// The latest estimate of real-world lighting. Poll-style: the value
+    /// refreshes every frame without firing events. Before the first platform
+    /// estimate this returns `ARLightEstimate#INVALID`.
+    public ARLightEstimate getLightEstimate() {
+<span class="fc" id="L107">        return lightEstimate;</span>
+    }
+
+    /// Performs an asynchronous hit test from a normalized view coordinate
+    /// (`0.0` top left to `1.0` bottom right) into the world. The returned
+    /// `AsyncResource` resolves on the EDT with the intersections ordered
+    /// nearest first; an empty array means nothing was hit.
+    ///
+    /// #### Parameters
+    ///
+    /// - `xNorm`: the horizontal view coordinate, `0.0` to `1.0`
+    ///
+    /// - `yNorm`: the vertical view coordinate, `0.0` to `1.0`
+    ///
+    /// #### Returns
+    ///
+    /// resolves with the hits; call `ARHitResult#createAnchor()` on one to
+    /// place content there
+    public AsyncResource&lt;ARHitResult[]&gt; hitTest(float xNorm, float yNorm) {
+<span class="fc" id="L126">        checkClosed();</span>
+<span class="fc" id="L127">        final AsyncResource&lt;ARHitResult[]&gt; out = new AsyncResource&lt;ARHitResult[]&gt;();</span>
+<span class="fc" id="L128">        AsyncResource&lt;ARHitResult[]&gt; in = new AsyncResource&lt;ARHitResult[]&gt;();</span>
+<span class="fc" id="L129">        in.ready(new SuccessCallback&lt;ARHitResult[]&gt;() {</span>
+            @Override public void onSucess(ARHitResult[] hits) {
+<span class="fc bfc" id="L131" title="All 2 branches covered.">                if (hits == null) {</span>
+<span class="fc" id="L132">                    hits = new ARHitResult[0];</span>
+                }
+<span class="fc bfc" id="L134" title="All 2 branches covered.">                for (int i = 0; i &lt; hits.length; i++) {</span>
+<span class="fc" id="L135">                    hits[i].session = ARSession.this;</span>
+                }
+<span class="fc" id="L137">                out.complete(hits);</span>
+<span class="fc" id="L138">            }</span>
+        });
+<span class="fc" id="L140">        in.except(new ErrorForwarder(out));</span>
+<span class="fc" id="L141">        impl.hitTest(xNorm, yNorm, in);</span>
+<span class="fc" id="L142">        return out;</span>
+    }
+
+    /// Forwards an implementation hit-test failure to the application-facing
+    /// resource. A named static class since it only needs the target resource,
+    /// not the enclosing session.
+    private static final class ErrorForwarder implements SuccessCallback&lt;Throwable&gt; {
+        private final AsyncResource&lt;ARHitResult[]&gt; out;
+
+<span class="fc" id="L151">        ErrorForwarder(AsyncResource&lt;ARHitResult[]&gt; out) {</span>
+<span class="fc" id="L152">            this.out = out;</span>
+<span class="fc" id="L153">        }</span>
+
+        @Override
+        public void onSucess(Throwable t) {
+<span class="nc" id="L157">            out.error(t);</span>
+<span class="nc" id="L158">        }</span>
+    }
+
+    /// Creates an anchor at an arbitrary world pose and registers it with the
+    /// session. Prefer `ARHitResult#createAnchor()` when placing content on
+    /// detected geometry.
+    ///
+    /// #### Parameters
+    ///
+    /// - `pose`: the world pose to anchor
+    ///
+    /// #### Returns
+    ///
+    /// the new anchor
+    public ARAnchor createAnchor(ARPose pose) {
+<span class="fc" id="L173">        checkClosed();</span>
+<span class="fc bfc" id="L174" title="All 2 branches covered.">        if (pose == null) {</span>
+<span class="fc" id="L175">            throw new IllegalArgumentException(&quot;pose is required&quot;);</span>
+        }
+<span class="fc" id="L177">        return registerAnchor(impl.createAnchor(pose), pose);</span>
+    }
+
+    ARAnchor createAnchorFromHitInternal(ARHitResult hit) {
+<span class="fc" id="L181">        checkClosed();</span>
+<span class="fc" id="L182">        return registerAnchor(impl.createAnchorFromHit(hit.getNativeHandle(), hit.getPose()),</span>
+<span class="fc" id="L183">                hit.getPose());</span>
+    }
+
+    private ARAnchor registerAnchor(String id, ARPose pose) {
+<span class="fc" id="L187">        ARAnchor anchor = new ARAnchor(id, pose);</span>
+<span class="fc" id="L188">        anchor.session = this;</span>
+<span class="fc" id="L189">        anchors.put(id, anchor);</span>
+<span class="fc" id="L190">        fireAnchorEvent(new ARAnchorEvent(ARAnchorEvent.Kind.ADDED, anchor, this));</span>
+<span class="fc" id="L191">        return anchor;</span>
+    }
+
+    /// The anchors currently registered with the session, in registration
+    /// order.
+    public ARAnchor[] getAnchors() {
+<span class="fc" id="L197">        return anchors.values().toArray(new ARAnchor[anchors.size()]);</span>
+    }
+
+    /// The planes the session currently tracks, in detection order.
+    public ARPlane[] getPlanes() {
+<span class="fc" id="L202">        return planes.values().toArray(new ARPlane[planes.size()]);</span>
+    }
+
+    /// Registers a tracking state listener. Events fire on the EDT.
+    public void addTrackingListener(ARTrackingListener l) {
+<span class="pc bpc" id="L207" title="2 of 4 branches missed.">        if (l != null &amp;&amp; !trackingListeners.contains(l)) {</span>
+<span class="fc" id="L208">            trackingListeners.add(l);</span>
+        }
+<span class="fc" id="L210">    }</span>
+
+    /// Removes a tracking state listener.
+    public void removeTrackingListener(ARTrackingListener l) {
+<span class="nc" id="L214">        trackingListeners.remove(l);</span>
+<span class="nc" id="L215">    }</span>
+
+    /// Registers a plane listener. Events fire on the EDT.
+    public void addPlaneListener(ARPlaneListener l) {
+<span class="pc bpc" id="L219" title="2 of 4 branches missed.">        if (l != null &amp;&amp; !planeListeners.contains(l)) {</span>
+<span class="fc" id="L220">            planeListeners.add(l);</span>
+        }
+<span class="fc" id="L222">    }</span>
+
+    /// Removes a plane listener.
+    public void removePlaneListener(ARPlaneListener l) {
+<span class="fc" id="L226">        planeListeners.remove(l);</span>
+<span class="fc" id="L227">    }</span>
+
+    /// Registers an anchor listener. Events fire on the EDT.
+    public void addAnchorListener(ARAnchorListener l) {
+<span class="pc bpc" id="L231" title="2 of 4 branches missed.">        if (l != null &amp;&amp; !anchorListeners.contains(l)) {</span>
+<span class="fc" id="L232">            anchorListeners.add(l);</span>
+        }
+<span class="fc" id="L234">    }</span>
+
+    /// Removes an anchor listener.
+    public void removeAnchorListener(ARAnchorListener l) {
+<span class="nc" id="L238">        anchorListeners.remove(l);</span>
+<span class="nc" id="L239">    }</span>
+
+    /// Suspends tracking and the camera while keeping this session object
+    /// alive. Pair with `#resume()`.
+    public void pause() {
+<span class="fc bfc" id="L244" title="All 2 branches covered.">        if (!closed) {</span>
+<span class="fc" id="L245">            impl.pause();</span>
+        }
+<span class="fc" id="L247">    }</span>
+
+    /// Re-acquires the camera and resumes tracking after `#pause()`.
+    public void resume() {
+<span class="fc bfc" id="L251" title="All 2 branches covered.">        if (!closed) {</span>
+<span class="fc" id="L252">            impl.resume();</span>
+        }
+<span class="fc" id="L254">    }</span>
+
+    /// Releases the session. Idempotent.
+    @Override
+    public void close() {
+<span class="fc bfc" id="L259" title="All 2 branches covered.">        if (closed) {</span>
+<span class="fc" id="L260">            return;</span>
+        }
+<span class="fc" id="L262">        closed = true;</span>
+<span class="fc" id="L263">        bridge.stop();</span>
+        try {
+<span class="fc" id="L265">            impl.close();</span>
+        } finally {
+<span class="fc" id="L267">            AR.clearActive(this);</span>
+        }
+<span class="fc" id="L269">    }</span>
+
+    /// True once `#close()` has been called on this session.
+    public boolean isClosed() {
+<span class="fc" id="L273">        return closed;</span>
+    }
+
+    void anchorDetachedInternal(ARAnchor anchor) {
+<span class="pc bpc" id="L277" title="1 of 2 branches missed.">        if (!closed) {</span>
+<span class="fc" id="L278">            impl.removeAnchor(anchor.getId());</span>
+        }
+<span class="pc bpc" id="L280" title="1 of 2 branches missed.">        if (anchors.remove(anchor.getId()) != null) {</span>
+<span class="fc" id="L281">            fireAnchorEvent(new ARAnchorEvent(ARAnchorEvent.Kind.REMOVED, anchor, this));</span>
+        }
+<span class="fc" id="L283">    }</span>
+
+    void anchorNodeChangedInternal(ARAnchor anchor, ARNode node) {
+<span class="pc bpc" id="L286" title="1 of 2 branches missed.">        if (!closed) {</span>
+<span class="fc" id="L287">            impl.setAnchorNode(anchor.getId(), node);</span>
+        }
+<span class="fc" id="L289">    }</span>
+
+    void nodeChangedInternal(String anchorId, ARNode root) {
+<span class="pc bpc" id="L292" title="2 of 4 branches missed.">        if (!closed &amp;&amp; anchorId != null) {</span>
+<span class="fc" id="L293">            impl.nodeChanged(anchorId, root);</span>
+        }
+<span class="fc" id="L295">    }</span>
+
+    ARImpl getImpl() {
+<span class="nc" id="L298">        return impl;</span>
+    }
+
+    private void checkClosed() {
+<span class="fc bfc" id="L302" title="All 2 branches covered.">        if (closed) {</span>
+<span class="fc" id="L303">            throw new IllegalStateException(&quot;the AR session is closed&quot;);</span>
+        }
+<span class="fc" id="L305">    }</span>
+
+    private void fireTrackingEvent() {
+<span class="fc" id="L308">        ARTrackingListener[] ls = trackingListeners.toArray(</span>
+<span class="fc" id="L309">                new ARTrackingListener[trackingListeners.size()]);</span>
+<span class="fc bfc" id="L310" title="All 2 branches covered.">        for (ARTrackingListener l : ls) {</span>
+<span class="fc" id="L311">            l.trackingStateChanged(this, trackingState, failureReason);</span>
+        }
+<span class="fc" id="L313">    }</span>
+
+    private void firePlaneEvent(ARPlaneEvent ev) {
+<span class="fc" id="L316">        ARPlaneListener[] ls = planeListeners.toArray(</span>
+<span class="fc" id="L317">                new ARPlaneListener[planeListeners.size()]);</span>
+<span class="fc bfc" id="L318" title="All 2 branches covered.">        for (ARPlaneListener l : ls) {</span>
+<span class="fc" id="L319">            l.planeChanged(ev);</span>
+        }
+<span class="fc" id="L321">    }</span>
+
+    private void fireAnchorEvent(ARAnchorEvent ev) {
+<span class="fc" id="L324">        ARAnchorListener[] ls = anchorListeners.toArray(</span>
+<span class="fc" id="L325">                new ARAnchorListener[anchorListeners.size()]);</span>
+<span class="fc bfc" id="L326" title="All 2 branches covered.">        for (ARAnchorListener l : ls) {</span>
+<span class="fc" id="L327">            l.anchorChanged(ev);</span>
+        }
+<span class="fc" id="L329">    }</span>
+
+    private static final int OP_TRACKING = 0;
+    private static final int OP_PLANE_ADDED = 1;
+    private static final int OP_PLANE_REMOVED = 2;
+    private static final int OP_ANCHOR_ADDED = 3;
+    private static final int OP_ANCHOR_REMOVED = 4;
+
+    /// Marshals implementation events - which may arrive on any thread - to
+    /// the EDT. Discrete events (add/remove/tracking) keep their order;
+    /// per-frame refinements coalesce to the latest value per id so a slow
+    /// EDT never accumulates a backlog.
+<span class="fc" id="L341">    private final class Bridge implements ARImpl.EventSink {</span>
+<span class="fc" id="L342">        private final Object lock = new Object();</span>
+<span class="fc" id="L343">        private final ArrayList&lt;Object[]&gt; ops = new ArrayList&lt;Object[]&gt;();</span>
+<span class="fc" id="L344">        private final LinkedHashMap&lt;String, ARPlane&gt; planeUpdates =</span>
+                new LinkedHashMap&lt;String, ARPlane&gt;();
+<span class="fc" id="L346">        private final LinkedHashMap&lt;String, Object[]&gt; anchorUpdates =</span>
+                new LinkedHashMap&lt;String, Object[]&gt;();
+        private ARPose pendingCameraPose;
+        private ARLightEstimate pendingLight;
+        private boolean drainScheduled;
+        // Set under the lock when the session closes; every producer checks
+        // it so late implementation events are dropped without touching the
+        // (EDT-confined) session state.
+        private boolean stopped;
+
+        void stop() {
+<span class="fc" id="L357">            synchronized (lock) {</span>
+<span class="fc" id="L358">                stopped = true;</span>
+<span class="fc" id="L359">                ops.clear();</span>
+<span class="fc" id="L360">                planeUpdates.clear();</span>
+<span class="fc" id="L361">                anchorUpdates.clear();</span>
+<span class="fc" id="L362">                pendingCameraPose = null;</span>
+<span class="fc" id="L363">                pendingLight = null;</span>
+<span class="fc" id="L364">            }</span>
+<span class="fc" id="L365">        }</span>
+
+        @Override
+        public void onTrackingStateChanged(ARTrackingState state, ARTrackingFailureReason reason) {
+<span class="fc" id="L369">            enqueueOp(new Object[]{Integer.valueOf(OP_TRACKING), state, reason});</span>
+<span class="fc" id="L370">        }</span>
+
+        @Override
+        public void onPlaneAdded(ARPlane plane) {
+<span class="pc bpc" id="L374" title="1 of 2 branches missed.">            if (plane != null) {</span>
+<span class="fc" id="L375">                enqueueOp(new Object[]{Integer.valueOf(OP_PLANE_ADDED), plane});</span>
+            }
+<span class="fc" id="L377">        }</span>
+
+        @Override
+        public void onPlaneUpdated(ARPlane plane) {
+<span class="pc bpc" id="L381" title="1 of 2 branches missed.">            if (plane == null) {</span>
+<span class="nc" id="L382">                return;</span>
+            }
+<span class="fc" id="L384">            synchronized (lock) {</span>
+<span class="pc bpc" id="L385" title="1 of 2 branches missed.">                if (stopped) {</span>
+<span class="nc" id="L386">                    return;</span>
+                }
+<span class="fc" id="L388">                planeUpdates.put(plane.getId(), plane);</span>
+<span class="fc" id="L389">                scheduleDrain();</span>
+<span class="fc" id="L390">            }</span>
+<span class="fc" id="L391">        }</span>
+
+        @Override
+        public void onPlaneRemoved(String planeId) {
+<span class="pc bpc" id="L395" title="1 of 2 branches missed.">            if (planeId != null) {</span>
+<span class="fc" id="L396">                enqueueOp(new Object[]{Integer.valueOf(OP_PLANE_REMOVED), planeId});</span>
+            }
+<span class="fc" id="L398">        }</span>
+
+        @Override
+        public void onAnchorAdded(ARAnchor anchor) {
+<span class="pc bpc" id="L402" title="1 of 2 branches missed.">            if (anchor != null) {</span>
+<span class="fc" id="L403">                enqueueOp(new Object[]{Integer.valueOf(OP_ANCHOR_ADDED), anchor});</span>
+            }
+<span class="fc" id="L405">        }</span>
+
+        @Override
+        public void onAnchorUpdated(String anchorId, ARPose pose, ARTrackingState state) {
+<span class="fc" id="L409">            onFaceAnchorUpdated(anchorId, pose, state, null, null, null);</span>
+<span class="fc" id="L410">        }</span>
+
+        @Override
+        public void onFaceAnchorUpdated(String anchorId, ARPose pose, ARTrackingState state,
+                                        ARPose[] regionPoses, float[] meshVertices,
+                                        int[] meshTriangles) {
+<span class="pc bpc" id="L416" title="1 of 2 branches missed.">            if (anchorId == null) {</span>
+<span class="nc" id="L417">                return;</span>
+            }
+<span class="fc" id="L419">            synchronized (lock) {</span>
+<span class="pc bpc" id="L420" title="1 of 2 branches missed.">                if (stopped) {</span>
+<span class="nc" id="L421">                    return;</span>
+                }
+<span class="fc" id="L423">                Object[] prev = anchorUpdates.get(anchorId);</span>
+<span class="fc bfc" id="L424" title="All 2 branches covered.">                if (prev != null) {</span>
+                    // Merge with the pending update so face payloads survive a
+                    // later pose-only refinement in the same batch.
+<span class="pc bpc" id="L427" title="1 of 2 branches missed.">                    if (pose == null) {</span>
+<span class="nc" id="L428">                        pose = (ARPose) prev[0];</span>
+                    }
+<span class="pc bpc" id="L430" title="1 of 2 branches missed.">                    if (state == null) {</span>
+<span class="nc" id="L431">                        state = (ARTrackingState) prev[1];</span>
+                    }
+<span class="pc bpc" id="L433" title="1 of 2 branches missed.">                    if (regionPoses == null) {</span>
+<span class="fc" id="L434">                        regionPoses = (ARPose[]) prev[2];</span>
+                    }
+<span class="pc bpc" id="L436" title="1 of 2 branches missed.">                    if (meshVertices == null) {</span>
+<span class="fc" id="L437">                        meshVertices = (float[]) prev[3];</span>
+                    }
+<span class="pc bpc" id="L439" title="1 of 2 branches missed.">                    if (meshTriangles == null) {</span>
+<span class="fc" id="L440">                        meshTriangles = (int[]) prev[4];</span>
+                    }
+                }
+<span class="fc" id="L443">                anchorUpdates.put(anchorId,</span>
+                        new Object[]{pose, state, regionPoses, meshVertices, meshTriangles});
+<span class="fc" id="L445">                scheduleDrain();</span>
+<span class="fc" id="L446">            }</span>
+<span class="fc" id="L447">        }</span>
+
+        @Override
+        public void onAnchorRemoved(String anchorId) {
+<span class="pc bpc" id="L451" title="1 of 2 branches missed.">            if (anchorId != null) {</span>
+<span class="fc" id="L452">                enqueueOp(new Object[]{Integer.valueOf(OP_ANCHOR_REMOVED), anchorId});</span>
+            }
+<span class="fc" id="L454">        }</span>
+
+        @Override
+        public void onLightEstimate(ARLightEstimate estimate) {
+<span class="pc bpc" id="L458" title="1 of 2 branches missed.">            if (estimate == null) {</span>
+<span class="nc" id="L459">                return;</span>
+            }
+<span class="fc" id="L461">            synchronized (lock) {</span>
+<span class="pc bpc" id="L462" title="1 of 2 branches missed.">                if (stopped) {</span>
+<span class="nc" id="L463">                    return;</span>
+                }
+<span class="fc" id="L465">                pendingLight = estimate;</span>
+<span class="fc" id="L466">                scheduleDrain();</span>
+<span class="fc" id="L467">            }</span>
+<span class="fc" id="L468">        }</span>
+
+        @Override
+        public void onCameraPose(ARPose pose) {
+<span class="pc bpc" id="L472" title="1 of 2 branches missed.">            if (pose == null) {</span>
+<span class="nc" id="L473">                return;</span>
+            }
+<span class="fc" id="L475">            synchronized (lock) {</span>
+<span class="pc bpc" id="L476" title="1 of 2 branches missed.">                if (stopped) {</span>
+<span class="nc" id="L477">                    return;</span>
+                }
+<span class="fc" id="L479">                pendingCameraPose = pose;</span>
+<span class="fc" id="L480">                scheduleDrain();</span>
+<span class="fc" id="L481">            }</span>
+<span class="fc" id="L482">        }</span>
+
+        private void enqueueOp(Object[] op) {
+<span class="fc" id="L485">            synchronized (lock) {</span>
+<span class="fc bfc" id="L486" title="All 2 branches covered.">                if (stopped) {</span>
+<span class="fc" id="L487">                    return;</span>
+                }
+<span class="fc" id="L489">                ops.add(op);</span>
+<span class="fc" id="L490">                scheduleDrain();</span>
+<span class="fc" id="L491">            }</span>
+<span class="fc" id="L492">        }</span>
+
+        private void scheduleDrain() {
+<span class="fc bfc" id="L495" title="All 2 branches covered.">            if (drainScheduled) {</span>
+<span class="fc" id="L496">                return;</span>
+            }
+<span class="fc" id="L498">            drainScheduled = true;</span>
+<span class="fc" id="L499">            Display.getInstance().callSerially(new Runnable() {</span>
+                @Override public void run() {
+<span class="fc" id="L501">                    drain();</span>
+<span class="fc" id="L502">                }</span>
+            });
+<span class="fc" id="L504">        }</span>
+
+        private void drain() {
+            Object[][] opsSnapshot;
+            ARPlane[] planeSnapshot;
+            Map.Entry[] anchorSnapshot;
+            ARPose newCameraPose;
+            ARLightEstimate newLight;
+<span class="fc" id="L512">            synchronized (lock) {</span>
+<span class="fc" id="L513">                drainScheduled = false;</span>
+<span class="pc bpc" id="L514" title="1 of 2 branches missed.">                if (stopped) {</span>
+<span class="nc" id="L515">                    return;</span>
+                }
+<span class="fc" id="L517">                opsSnapshot = ops.toArray(new Object[ops.size()][]);</span>
+<span class="fc" id="L518">                ops.clear();</span>
+<span class="fc" id="L519">                planeSnapshot = planeUpdates.values().toArray(new ARPlane[planeUpdates.size()]);</span>
+<span class="fc" id="L520">                planeUpdates.clear();</span>
+<span class="fc" id="L521">                anchorSnapshot = anchorUpdates.entrySet().toArray(</span>
+<span class="fc" id="L522">                        new Map.Entry[anchorUpdates.size()]);</span>
+<span class="fc" id="L523">                anchorUpdates.clear();</span>
+<span class="fc" id="L524">                newCameraPose = pendingCameraPose;</span>
+<span class="fc" id="L525">                pendingCameraPose = null;</span>
+<span class="fc" id="L526">                newLight = pendingLight;</span>
+<span class="fc" id="L527">                pendingLight = null;</span>
+<span class="fc" id="L528">            }</span>
+<span class="fc bfc" id="L529" title="All 2 branches covered.">            if (newCameraPose != null) {</span>
+<span class="fc" id="L530">                cameraPose = newCameraPose;</span>
+            }
+<span class="fc bfc" id="L532" title="All 2 branches covered.">            if (newLight != null) {</span>
+<span class="fc" id="L533">                lightEstimate = newLight;</span>
+            }
+<span class="fc bfc" id="L535" title="All 2 branches covered.">            for (Object[] op : opsSnapshot) {</span>
+<span class="fc" id="L536">                applyOp(op);</span>
+            }
+<span class="fc bfc" id="L538" title="All 2 branches covered.">            for (ARPlane p : planeSnapshot) {</span>
+<span class="fc bfc" id="L539" title="All 2 branches covered.">                if (planes.containsKey(p.getId())) {</span>
+<span class="fc" id="L540">                    planes.put(p.getId(), p);</span>
+<span class="fc" id="L541">                    firePlaneEvent(new ARPlaneEvent(ARPlaneEvent.Kind.UPDATED, p, ARSession.this));</span>
+                }
+            }
+<span class="fc bfc" id="L544" title="All 2 branches covered.">            for (Map.Entry entry : anchorSnapshot) {</span>
+<span class="fc" id="L545">                String id = (String) entry.getKey();</span>
+<span class="fc" id="L546">                Object[] u = (Object[]) entry.getValue();</span>
+<span class="fc" id="L547">                ARAnchor anchor = anchors.get(id);</span>
+<span class="pc bpc" id="L548" title="1 of 2 branches missed.">                if (anchor == null) {</span>
+<span class="nc" id="L549">                    continue;</span>
+                }
+<span class="fc" id="L551">                anchor.update((ARPose) u[0], (ARTrackingState) u[1]);</span>
+<span class="fc bfc" id="L552" title="All 2 branches covered.">                if (anchor instanceof ARFaceAnchor) {</span>
+<span class="fc" id="L553">                    ((ARFaceAnchor) anchor).updateFace(</span>
+                            (ARPose[]) u[2], (float[]) u[3], (int[]) u[4]);
+                }
+<span class="fc" id="L556">                fireAnchorEvent(new ARAnchorEvent(ARAnchorEvent.Kind.UPDATED, anchor,</span>
+                        ARSession.this));
+            }
+<span class="fc" id="L559">        }</span>
+
+        private void applyOp(Object[] op) {
+<span class="pc bpc" id="L562" title="1 of 6 branches missed.">            switch (((Integer) op[0]).intValue()) {</span>
+                case OP_TRACKING: {
+<span class="fc" id="L564">                    ARTrackingState state = (ARTrackingState) op[1];</span>
+<span class="fc" id="L565">                    ARTrackingFailureReason reason = (ARTrackingFailureReason) op[2];</span>
+<span class="pc bpc" id="L566" title="1 of 2 branches missed.">                    trackingState = state == null ? ARTrackingState.NOT_TRACKING : state;</span>
+<span class="pc bpc" id="L567" title="1 of 2 branches missed.">                    failureReason = reason == null ? ARTrackingFailureReason.NONE : reason;</span>
+<span class="fc" id="L568">                    fireTrackingEvent();</span>
+<span class="fc" id="L569">                    break;</span>
+                }
+                case OP_PLANE_ADDED: {
+<span class="fc" id="L572">                    ARPlane plane = (ARPlane) op[1];</span>
+<span class="fc" id="L573">                    boolean known = planes.containsKey(plane.getId());</span>
+<span class="fc" id="L574">                    planes.put(plane.getId(), plane);</span>
+<span class="pc bpc" id="L575" title="1 of 2 branches missed.">                    firePlaneEvent(new ARPlaneEvent(</span>
+                            known ? ARPlaneEvent.Kind.UPDATED : ARPlaneEvent.Kind.ADDED,
+                            plane, ARSession.this));
+<span class="fc" id="L578">                    break;</span>
+                }
+                case OP_PLANE_REMOVED: {
+<span class="fc" id="L581">                    ARPlane plane = planes.remove((String) op[1]);</span>
+<span class="pc bpc" id="L582" title="1 of 2 branches missed.">                    if (plane != null) {</span>
+<span class="fc" id="L583">                        firePlaneEvent(new ARPlaneEvent(ARPlaneEvent.Kind.REMOVED, plane,</span>
+                                ARSession.this));
+                    }
+                    break;
+                }
+                case OP_ANCHOR_ADDED: {
+<span class="fc" id="L589">                    ARAnchor anchor = (ARAnchor) op[1];</span>
+<span class="pc bpc" id="L590" title="1 of 2 branches missed.">                    if (!anchors.containsKey(anchor.getId())) {</span>
+<span class="fc" id="L591">                        anchor.session = ARSession.this;</span>
+<span class="fc" id="L592">                        anchors.put(anchor.getId(), anchor);</span>
+<span class="fc" id="L593">                        fireAnchorEvent(new ARAnchorEvent(ARAnchorEvent.Kind.ADDED, anchor,</span>
+                                ARSession.this));
+                    }
+                    break;
+                }
+                case OP_ANCHOR_REMOVED: {
+<span class="fc" id="L599">                    ARAnchor anchor = anchors.remove((String) op[1]);</span>
+<span class="pc bpc" id="L600" title="1 of 2 branches missed.">                    if (anchor != null) {</span>
+<span class="fc" id="L601">                        anchor.markDetached();</span>
+<span class="fc" id="L602">                        fireAnchorEvent(new ARAnchorEvent(ARAnchorEvent.Kind.REMOVED, anchor,</span>
+                                ARSession.this));
+                    }
+                    break;
+                }
+                default:
+                    break;
+            }
+<span class="fc" id="L610">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

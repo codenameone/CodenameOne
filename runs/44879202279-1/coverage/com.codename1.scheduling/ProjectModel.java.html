@@ -1,0 +1,428 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ProjectModel.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.scheduling</a> &gt; <span class="el_source">ProjectModel.java</span></div><h1>ProjectModel.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.scheduling;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
+/// A project: a tree of tasks, the links between them, the resources they
+/// use and the calendar their durations are measured in.
+///
+/// Building or editing a project is two steps. The methods that change it
+/// (`addTask`, `link`, a setter on a task) only change it; `update` then
+/// schedules the whole project and tells the listeners, so a hundred edits
+/// cost one pass:
+///
+/// ```java
+/// ProjectModel p = new ProjectModel();
+/// GanttTask design = new GanttTask(&quot;design&quot;, &quot;Design&quot;, 3 * p.getCalendar().getMillisPerDay());
+/// GanttTask build = new GanttTask(&quot;build&quot;, &quot;Build&quot;, 5 * p.getCalendar().getMillisPerDay());
+/// p.addTask(design).addTask(build);
+/// p.link(design, build);
+/// p.update();
+/// ```
+public class ProjectModel {
+<span class="fc" id="L46">    private final List&lt;GanttTask&gt; roots = new ArrayList&lt;GanttTask&gt;();</span>
+<span class="fc" id="L47">    private final List&lt;TaskDependency&gt; dependencies = new ArrayList&lt;TaskDependency&gt;();</span>
+<span class="fc" id="L48">    private final List&lt;ScheduleResource&gt; resources = new ArrayList&lt;ScheduleResource&gt;();</span>
+<span class="fc" id="L49">    private final List&lt;ProjectChangeListener&gt; listeners = new ArrayList&lt;ProjectChangeListener&gt;();</span>
+    private WorkCalendar calendar;
+    private long start;
+    long finish;
+    private long criticalSlack;
+    private List&lt;GanttTask&gt; flat;
+
+    /// A project that starts today, on the default working week.
+    public ProjectModel() {
+<span class="nc" id="L58">        this(new WorkCalendar(), System.currentTimeMillis());</span>
+<span class="nc" id="L59">    }</span>
+
+<span class="fc" id="L61">    public ProjectModel(WorkCalendar calendar, long start) {</span>
+<span class="pc bpc" id="L62" title="1 of 2 branches missed.">        if (calendar == null) {</span>
+<span class="nc" id="L63">            throw new IllegalArgumentException(&quot;calendar&quot;);</span>
+        }
+<span class="fc" id="L65">        this.calendar = calendar;</span>
+<span class="fc" id="L66">        this.start = TimeMath.startOfDay(start, calendar.getZone());</span>
+<span class="fc" id="L67">        this.finish = this.start;</span>
+<span class="fc" id="L68">    }</span>
+
+    public WorkCalendar getCalendar() {
+<span class="fc" id="L71">        return calendar;</span>
+    }
+
+    public ProjectModel setCalendar(WorkCalendar v) {
+<span class="nc bnc" id="L75" title="All 2 branches missed.">        if (v == null) {</span>
+<span class="nc" id="L76">            throw new IllegalArgumentException(&quot;calendar&quot;);</span>
+        }
+<span class="nc" id="L78">        calendar = v;</span>
+<span class="nc" id="L79">        return this;</span>
+    }
+
+    /// The earliest any task is scheduled.
+    public long getStart() {
+<span class="fc" id="L84">        return start;</span>
+    }
+
+    public ProjectModel setStart(long millis) {
+<span class="nc" id="L88">        start = millis;</span>
+<span class="nc" id="L89">        return this;</span>
+    }
+
+    /// When the last task finishes, from the last scheduling pass.
+    public long getFinish() {
+<span class="fc" id="L94">        return finish;</span>
+    }
+
+    /// A task with this much total slack or less is critical. Zero by
+    /// default; a day makes the tasks that are nearly critical stand out too.
+    public long getCriticalSlack() {
+<span class="fc" id="L100">        return criticalSlack;</span>
+    }
+
+    public ProjectModel setCriticalSlack(long millis) {
+<span class="fc" id="L104">        criticalSlack = Math.max(0, millis);</span>
+<span class="fc" id="L105">        return this;</span>
+    }
+
+    /// Adds a top level task.
+    public ProjectModel addTask(GanttTask task) {
+<span class="fc" id="L110">        return addTask(null, -1, task);</span>
+    }
+
+    /// Adds a task under `parent`, which becomes a summary.
+    public ProjectModel addTask(GanttTask parent, GanttTask task) {
+<span class="fc" id="L115">        return addTask(parent, -1, task);</span>
+    }
+
+    /// Adds a task at a position among `parent`'s children; -1 is the end,
+    /// and a null parent is the top level. A task that is in the project
+    /// already is moved. A task belongs to one project: one that is a task
+    /// of another is to be removed from that project first, with
+    /// `removeTask`, which also drops the links that project has to it.
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: when the task would go under itself,
+    ///   when the parent is not in this project, or when its links would
+    ///   then run in a loop through the summary
+    public ProjectModel addTask(GanttTask parent, int index, GanttTask task) {
+<span class="pc bpc" id="L130" title="2 of 4 branches missed.">        if (task == null || task == parent) { //NOPMD CompareObjectsWithEquals</span>
+<span class="nc" id="L131">            throw new IllegalArgumentException(&quot;task&quot;);</span>
+        }
+<span class="pc bpc" id="L133" title="1 of 4 branches missed.">        if (parent != null &amp;&amp; parent.isDescendantOf(task)) {</span>
+<span class="nc" id="L134">            throw new IllegalArgumentException(&quot;A task cannot go under one of its own children&quot;);</span>
+        }
+<span class="pc bpc" id="L136" title="1 of 4 branches missed.">        if (parent != null &amp;&amp; !contains(parent)) {</span>
+<span class="nc" id="L137">            throw new IllegalArgumentException(&quot;The parent is not a task of this project&quot;);</span>
+        }
+<span class="fc bfc" id="L139" title="All 2 branches covered.">        if (dependencies.isEmpty()) {</span>
+            // Nothing is linked, so no place in the tree can close a loop.
+<span class="fc" id="L141">            place(parent, index, task);</span>
+<span class="fc" id="L142">            return this;</span>
+        }
+<span class="fc" id="L144">        boolean was = contains(task);</span>
+<span class="fc" id="L145">        GanttTask oldParent = task.parent;</span>
+<span class="pc bpc" id="L146" title="1 of 4 branches missed.">        int oldIndex = was ? (oldParent == null ? roots : oldParent.children).indexOf(task) : -1;</span>
+<span class="fc" id="L147">        place(parent, index, task);</span>
+<span class="fc bfc" id="L148" title="All 2 branches covered.">        if (ProjectScheduler.order(this) == null) {</span>
+            // A link into a summary holds its children, so a task that is
+            // linked to its new parent would wait for itself.
+<span class="pc bpc" id="L151" title="1 of 2 branches missed.">            if (was) {</span>
+<span class="fc" id="L152">                place(oldParent, oldIndex, task);</span>
+            } else {
+<span class="nc" id="L154">                detach(task);</span>
+<span class="nc" id="L155">                task.parent = null;</span>
+<span class="nc" id="L156">                flat = null;</span>
+            }
+<span class="fc" id="L158">            throw new IllegalArgumentException(&quot;The links of &quot; + task + &quot; would run in a loop under &quot; + parent);</span>
+        }
+<span class="fc" id="L160">        return this;</span>
+    }
+
+    /// Whether a task is in this project's tree.
+    public boolean contains(GanttTask task) {
+<span class="pc bpc" id="L165" title="1 of 2 branches missed.">        if (task == null) {</span>
+<span class="nc" id="L166">            return false;</span>
+        }
+<span class="fc" id="L168">        GanttTask top = task;</span>
+<span class="fc bfc" id="L169" title="All 2 branches covered.">        while (top.parent != null) {</span>
+<span class="fc" id="L170">            top = top.parent;</span>
+        }
+<span class="fc" id="L172">        return roots.contains(top);</span>
+    }
+
+    private void place(GanttTask parent, int index, GanttTask task) {
+<span class="fc" id="L176">        detach(task);</span>
+<span class="fc bfc" id="L177" title="All 2 branches covered.">        List&lt;GanttTask&gt; into = parent == null ? roots : parent.children;</span>
+<span class="pc bpc" id="L178" title="1 of 4 branches missed.">        if (index &lt; 0 || index &gt; into.size()) {</span>
+<span class="fc" id="L179">            into.add(task);</span>
+        } else {
+<span class="fc" id="L181">            into.add(index, task);</span>
+        }
+<span class="fc" id="L183">        task.parent = parent;</span>
+<span class="fc" id="L184">        flat = null;</span>
+<span class="fc" id="L185">    }</span>
+
+    /// Moves a task, with everything under it, to another place in the tree.
+    ///
+    /// #### Returns
+    ///
+    /// false when the move would put the task under itself, under a task
+    /// that is not in this project, or would close a loop of links through
+    /// a summary
+    public boolean moveTask(GanttTask task, GanttTask newParent, int index) {
+<span class="pc bpc" id="L195" title="2 of 6 branches missed.">        if (task == newParent || (newParent != null &amp;&amp; newParent.isDescendantOf(task))) { //NOPMD CompareObjectsWithEquals</span>
+<span class="fc" id="L196">            return false;</span>
+        }
+<span class="pc bpc" id="L198" title="2 of 4 branches missed.">        if (newParent != null &amp;&amp; !contains(newParent)) {</span>
+<span class="nc" id="L199">            return false;</span>
+        }
+<span class="fc" id="L201">        GanttTask oldParent = task.parent;</span>
+<span class="pc bpc" id="L202" title="1 of 2 branches missed.">        List&lt;GanttTask&gt; from = oldParent == null ? roots : oldParent.children;</span>
+<span class="fc" id="L203">        int oldIndex = from.indexOf(task);</span>
+<span class="fc" id="L204">        place(newParent, index, task);</span>
+<span class="fc bfc" id="L205" title="All 2 branches covered.">        if (ProjectScheduler.order(this) == null) {</span>
+<span class="fc" id="L206">            place(oldParent, oldIndex, task);</span>
+<span class="fc" id="L207">            return false;</span>
+        }
+<span class="fc" id="L209">        return true;</span>
+    }
+
+    /// Removes a task, everything under it, and every link to any of them.
+    public ProjectModel removeTask(GanttTask task) {
+<span class="fc bfc" id="L214" title="All 2 branches covered.">        for (int i = dependencies.size() - 1; i &gt;= 0; i--) {</span>
+<span class="fc" id="L215">            TaskDependency d = dependencies.get(i);</span>
+<span class="pc bpc" id="L216" title="1 of 4 branches missed.">            if (within(d.getPredecessor(), task) || within(d.getSuccessor(), task)) {</span>
+<span class="fc" id="L217">                dependencies.remove(i);</span>
+            }
+        }
+<span class="fc" id="L220">        detach(task);</span>
+<span class="fc" id="L221">        task.parent = null;</span>
+<span class="fc" id="L222">        flat = null;</span>
+<span class="fc" id="L223">        return this;</span>
+    }
+
+    private static boolean within(GanttTask t, GanttTask root) {
+<span class="pc bpc" id="L227" title="1 of 4 branches missed.">        return t == root || t.isDescendantOf(root); //NOPMD CompareObjectsWithEquals</span>
+    }
+
+    private void detach(GanttTask task) {
+<span class="fc bfc" id="L231" title="All 2 branches covered.">        if (task.parent != null) {</span>
+<span class="fc" id="L232">            task.parent.children.remove(task);</span>
+        } else {
+<span class="fc" id="L234">            roots.remove(task);</span>
+        }
+<span class="fc" id="L236">    }</span>
+
+    public List&lt;GanttTask&gt; getRootTasks() {
+<span class="fc" id="L239">        return Collections.unmodifiableList(roots);</span>
+    }
+
+    /// Every task, a parent before its children, in the order of the outline.
+    public List&lt;GanttTask&gt; getTasks() {
+<span class="fc bfc" id="L244" title="All 2 branches covered.">        if (flat == null) {</span>
+<span class="fc" id="L245">            List&lt;GanttTask&gt; out = new ArrayList&lt;GanttTask&gt;();</span>
+<span class="fc" id="L246">            flatten(roots, out);</span>
+<span class="fc" id="L247">            flat = Collections.unmodifiableList(out);</span>
+        }
+<span class="fc" id="L249">        return flat;</span>
+    }
+
+    private static void flatten(List&lt;GanttTask&gt; level, List&lt;GanttTask&gt; out) {
+<span class="fc bfc" id="L253" title="All 2 branches covered.">        for (GanttTask t : level) {</span>
+<span class="fc" id="L254">            out.add(t);</span>
+<span class="fc bfc" id="L255" title="All 2 branches covered.">            if (!t.children.isEmpty()) {</span>
+<span class="fc" id="L256">                flatten(t.children, out);</span>
+            }
+<span class="fc" id="L258">        }</span>
+<span class="fc" id="L259">    }</span>
+
+    public GanttTask getTask(String id) {
+<span class="fc" id="L262">        List&lt;GanttTask&gt; all = getTasks();</span>
+<span class="pc bpc" id="L263" title="1 of 2 branches missed.">        for (GanttTask candidate : all) {</span>
+<span class="fc bfc" id="L264" title="All 2 branches covered.">            if (candidate.getId().equals(id)) {</span>
+<span class="fc" id="L265">                return candidate;</span>
+            }
+<span class="fc" id="L267">        }</span>
+<span class="nc" id="L268">        return null;</span>
+    }
+
+    /// Links two tasks finish to start.
+    public TaskDependency link(GanttTask predecessor, GanttTask successor) {
+<span class="fc" id="L273">        return link(predecessor, successor, TaskDependency.Type.FINISH_TO_START, 0);</span>
+    }
+
+    /// Links two tasks.
+    ///
+    /// A link whose successor is a summary holds the start of every task
+    /// under it, whatever its type: a summary's finish is the result of its
+    /// children and cannot be held by itself.
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: when `canLink` says no
+    public TaskDependency link(GanttTask predecessor, GanttTask successor, TaskDependency.Type type, long lag) {
+<span class="fc bfc" id="L286" title="All 2 branches covered.">        if (!canLink(predecessor, successor)) {</span>
+<span class="fc" id="L287">            throw new IllegalArgumentException(&quot;Cannot link &quot; + predecessor + &quot; to &quot; + successor);</span>
+        }
+<span class="fc" id="L289">        TaskDependency d = new TaskDependency(predecessor, successor, type, lag);</span>
+<span class="fc" id="L290">        dependencies.add(d);</span>
+<span class="fc" id="L291">        return d;</span>
+    }
+
+    /// Whether a link from `predecessor` to `successor` is possible: they are
+    /// two tasks of this project, neither is inside the other, they are not
+    /// linked already, and the link would not close a loop.
+    public boolean canLink(GanttTask predecessor, GanttTask successor) {
+<span class="pc bpc" id="L298" title="2 of 6 branches missed.">        if (predecessor == null || successor == null || predecessor == successor //NOPMD CompareObjectsWithEquals</span>
+<span class="pc bpc" id="L299" title="1 of 4 branches missed.">                || predecessor.isDescendantOf(successor) || successor.isDescendantOf(predecessor)) {</span>
+<span class="fc" id="L300">            return false;</span>
+        }
+        // The engine finds a task by its place in the outline, which a task
+        // outside the project does not have.
+<span class="fc bfc" id="L304" title="All 4 branches covered.">        if (!contains(predecessor) || !contains(successor)) {</span>
+<span class="fc" id="L305">            return false;</span>
+        }
+<span class="fc bfc" id="L307" title="All 2 branches covered.">        if (getDependency(predecessor, successor) != null) {</span>
+<span class="fc" id="L308">            return false;</span>
+        }
+<span class="fc" id="L310">        TaskDependency probe = new TaskDependency(predecessor, successor, TaskDependency.Type.FINISH_TO_START, 0);</span>
+<span class="fc" id="L311">        dependencies.add(probe);</span>
+<span class="fc bfc" id="L312" title="All 2 branches covered.">        boolean ok = ProjectScheduler.order(this) != null;</span>
+<span class="fc" id="L313">        dependencies.remove(dependencies.size() - 1);</span>
+<span class="fc" id="L314">        return ok;</span>
+    }
+
+    public ProjectModel unlink(TaskDependency d) {
+<span class="nc" id="L318">        dependencies.remove(d);</span>
+<span class="nc" id="L319">        return this;</span>
+    }
+
+    public List&lt;TaskDependency&gt; getDependencies() {
+<span class="fc" id="L323">        return Collections.unmodifiableList(dependencies);</span>
+    }
+
+    /// The link from one task to another, or null.
+    public TaskDependency getDependency(GanttTask predecessor, GanttTask successor) {
+<span class="fc bfc" id="L328" title="All 2 branches covered.">        for (TaskDependency d : dependencies) {</span>
+<span class="fc bfc" id="L329" title="All 4 branches covered.">            if (d.getPredecessor() == predecessor &amp;&amp; d.getSuccessor() == successor) { //NOPMD CompareObjectsWithEquals</span>
+<span class="fc" id="L330">                return d;</span>
+            }
+<span class="fc" id="L332">        }</span>
+<span class="fc" id="L333">        return null;</span>
+    }
+
+    /// The links that end at `task`.
+    public List&lt;TaskDependency&gt; getPredecessors(GanttTask task) {
+<span class="fc" id="L338">        List&lt;TaskDependency&gt; out = new ArrayList&lt;TaskDependency&gt;();</span>
+<span class="fc bfc" id="L339" title="All 2 branches covered.">        for (TaskDependency d : dependencies) {</span>
+<span class="fc bfc" id="L340" title="All 2 branches covered.">            if (d.getSuccessor() == task) { //NOPMD CompareObjectsWithEquals</span>
+<span class="fc" id="L341">                out.add(d);</span>
+            }
+<span class="fc" id="L343">        }</span>
+<span class="fc" id="L344">        return out;</span>
+    }
+
+    /// The links that start at `task`.
+    public List&lt;TaskDependency&gt; getSuccessors(GanttTask task) {
+<span class="fc" id="L349">        List&lt;TaskDependency&gt; out = new ArrayList&lt;TaskDependency&gt;();</span>
+<span class="fc bfc" id="L350" title="All 2 branches covered.">        for (TaskDependency d : dependencies) {</span>
+<span class="fc bfc" id="L351" title="All 2 branches covered.">            if (d.getPredecessor() == task) { //NOPMD CompareObjectsWithEquals</span>
+<span class="fc" id="L352">                out.add(d);</span>
+            }
+<span class="fc" id="L354">        }</span>
+<span class="fc" id="L355">        return out;</span>
+    }
+
+    public ProjectModel addResource(ScheduleResource r) {
+<span class="pc bpc" id="L359" title="1 of 2 branches missed.">        if (r != null) {</span>
+<span class="fc" id="L360">            resources.add(r);</span>
+        }
+<span class="fc" id="L362">        return this;</span>
+    }
+
+    public ProjectModel removeResource(ScheduleResource r) {
+<span class="nc" id="L366">        resources.remove(r);</span>
+<span class="nc" id="L367">        return this;</span>
+    }
+
+    public List&lt;ScheduleResource&gt; getResources() {
+<span class="fc" id="L371">        return Collections.unmodifiableList(resources);</span>
+    }
+
+    public ScheduleResource getResource(String id) {
+<span class="pc bpc" id="L375" title="1 of 2 branches missed.">        for (ScheduleResource resource : resources) {</span>
+<span class="pc bpc" id="L376" title="1 of 2 branches missed.">            if (resource.getId().equals(id)) {</span>
+<span class="fc" id="L377">                return resource;</span>
+            }
+<span class="nc" id="L379">        }</span>
+<span class="nc" id="L380">        return null;</span>
+    }
+
+    /// Records every task's current dates as its baseline.
+    public ProjectModel captureBaseline() {
+<span class="fc" id="L385">        List&lt;GanttTask&gt; all = getTasks();</span>
+<span class="fc bfc" id="L386" title="All 2 branches covered.">        for (GanttTask t : all) {</span>
+<span class="fc" id="L387">            t.setBaseline(t.getStart(), t.getEnd());</span>
+<span class="fc" id="L388">        }</span>
+<span class="fc" id="L389">        return this;</span>
+    }
+
+    /// Removes every leveling delay. Call `update` after it.
+    public ProjectModel clearLeveling() {
+<span class="fc" id="L394">        List&lt;GanttTask&gt; all = getTasks();</span>
+<span class="fc bfc" id="L395" title="All 2 branches covered.">        for (GanttTask each : all) {</span>
+<span class="fc" id="L396">            each.setLevelingDelay(0);</span>
+<span class="fc" id="L397">        }</span>
+<span class="fc" id="L398">        return this;</span>
+    }
+
+    /// Schedules the project and tells the listeners. Call it after a change,
+    /// or after a group of them.
+    public void update() {
+<span class="fc" id="L404">        ProjectScheduler.schedule(this);</span>
+<span class="fc" id="L405">        fireChanged();</span>
+<span class="fc" id="L406">    }</span>
+
+    public void addChangeListener(ProjectChangeListener l) {
+<span class="pc bpc" id="L409" title="2 of 4 branches missed.">        if (l != null &amp;&amp; !listeners.contains(l)) {</span>
+<span class="fc" id="L410">            listeners.add(l);</span>
+        }
+<span class="fc" id="L412">    }</span>
+
+    public void removeChangeListener(ProjectChangeListener l) {
+<span class="fc" id="L415">        listeners.remove(l);</span>
+<span class="fc" id="L416">    }</span>
+
+    /// Tells the listeners without scheduling, for a change that moves no
+    /// date, such as a name.
+    public void fireChanged() {
+<span class="fc bfc" id="L421" title="All 2 branches covered.">        for (int i = listeners.size() - 1; i &gt;= 0; i--) {</span>
+<span class="pc bpc" id="L422" title="1 of 2 branches missed.">            if (i &lt; listeners.size()) {</span>
+<span class="fc" id="L423">                listeners.get(i).projectChanged(this);</span>
+            }
+        }
+<span class="fc" id="L426">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

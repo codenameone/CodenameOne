@@ -1,0 +1,1309 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MessageDigestImpl.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.security</a> &gt; <span class="el_source">MessageDigestImpl.java</span></div><h1>MessageDigestImpl.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008-2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.security;
+
+// Pure-Java implementations of MD5 / SHA-1 / SHA-2 (224, 256, 384, 512). These
+// are the well-known reference algorithms (RFC 1321, RFC 3174, FIPS 180-4).
+//
+// One class with a small dispatch is more compact than five separate classes
+// and keeps all the round constants close to the rounds that use them.
+@com.codename1.impl.SharedWithBackend
+<span class="fc" id="L31">abstract class MessageDigestImpl {</span>
+
+    abstract void update(byte[] data, int offset, int length);
+    abstract void update(byte b);
+    abstract byte[] digest();
+    abstract int digestLength();
+    abstract void reset();
+
+    static MessageDigestImpl create(String algorithm) {
+<span class="pc bpc" id="L40" title="1 of 2 branches missed.">        if (algorithm == null) {</span>
+<span class="nc" id="L41">            throw new CryptoException(&quot;algorithm must not be null&quot;);</span>
+        }
+<span class="fc" id="L43">        String a = normalise(algorithm);</span>
+<span class="fc bfc" id="L44" title="All 2 branches covered.">        if (&quot;MD5&quot;.equals(a)) {</span>
+<span class="fc" id="L45">            return new Md5();</span>
+        }
+<span class="fc bfc" id="L47" title="All 2 branches covered.">        if (&quot;SHA1&quot;.equals(a)) {</span>
+<span class="fc" id="L48">            return new Sha1();</span>
+        }
+<span class="pc bpc" id="L50" title="1 of 2 branches missed.">        if (&quot;SHA224&quot;.equals(a)) {</span>
+<span class="nc" id="L51">            return new Sha256Family(true);</span>
+        }
+<span class="fc bfc" id="L53" title="All 2 branches covered.">        if (&quot;SHA256&quot;.equals(a)) {</span>
+<span class="fc" id="L54">            return new Sha256Family(false);</span>
+        }
+<span class="fc bfc" id="L56" title="All 2 branches covered.">        if (&quot;SHA384&quot;.equals(a)) {</span>
+<span class="fc" id="L57">            return new Sha512Family(true);</span>
+        }
+<span class="fc bfc" id="L59" title="All 2 branches covered.">        if (&quot;SHA512&quot;.equals(a)) {</span>
+<span class="fc" id="L60">            return new Sha512Family(false);</span>
+        }
+<span class="fc bfc" id="L62" title="All 2 branches covered.">        if (&quot;KECCAK256&quot;.equals(a)) {</span>
+<span class="fc" id="L63">            return new Keccak(32, (byte) 0x01);</span>
+        }
+<span class="fc bfc" id="L65" title="All 2 branches covered.">        if (&quot;RIPEMD160&quot;.equals(a)) {</span>
+<span class="fc" id="L66">            return new Ripemd160();</span>
+        }
+<span class="pc bpc" id="L68" title="1 of 2 branches missed.">        if (&quot;SHA3256&quot;.equals(a)) {</span>
+<span class="fc" id="L69">            return new Keccak(32, (byte) 0x06);</span>
+        }
+<span class="nc" id="L71">        throw new CryptoException(&quot;unsupported hash algorithm: &quot; + algorithm);</span>
+    }
+
+    static String normalise(String algorithm) {
+<span class="fc" id="L75">        StringBuilder b = new StringBuilder(algorithm.length());</span>
+<span class="fc bfc" id="L76" title="All 2 branches covered.">        for (int i = 0; i &lt; algorithm.length(); i++) {</span>
+<span class="fc" id="L77">            char c = algorithm.charAt(i);</span>
+<span class="pc bpc" id="L78" title="2 of 6 branches missed.">            if (c == '-' || c == '_' || c == ' ') {</span>
+<span class="nc" id="L79">                continue;</span>
+            }
+<span class="pc bpc" id="L81" title="3 of 4 branches missed.">            if (c &gt;= 'a' &amp;&amp; c &lt;= 'z') {</span>
+<span class="nc" id="L82">                c = (char) (c - 'a' + 'A');</span>
+            }
+<span class="fc" id="L84">            b.append(c);</span>
+        }
+<span class="fc" id="L86">        return b.toString();</span>
+    }
+
+    // ===============================================================
+    // shared 64-byte (512-bit) block engine used by MD5 and SHA-1/SHA-256
+<span class="fc" id="L91">    abstract static class Block64 extends MessageDigestImpl {</span>
+<span class="fc" id="L92">        final byte[] buffer = new byte[64];</span>
+        int bufferLen;
+        long byteCount;
+
+        abstract void processBlock(byte[] block, int offset);
+        abstract void writeStateBigEndian(byte[] out);
+
+        @Override
+        void update(byte[] data, int offset, int length) {
+<span class="fc" id="L101">            byteCount += length;</span>
+<span class="fc bfc" id="L102" title="All 2 branches covered.">            if (bufferLen &gt; 0) {</span>
+<span class="fc" id="L103">                int copy = 64 - bufferLen;</span>
+<span class="fc bfc" id="L104" title="All 2 branches covered.">                if (copy &gt; length) {</span>
+<span class="fc" id="L105">                    copy = length;</span>
+                }
+<span class="fc" id="L107">                System.arraycopy(data, offset, buffer, bufferLen, copy);</span>
+<span class="fc" id="L108">                bufferLen += copy;</span>
+<span class="fc" id="L109">                offset += copy;</span>
+<span class="fc" id="L110">                length -= copy;</span>
+<span class="fc bfc" id="L111" title="All 2 branches covered.">                if (bufferLen == 64) {</span>
+<span class="fc" id="L112">                    processBlock(buffer, 0);</span>
+<span class="fc" id="L113">                    bufferLen = 0;</span>
+                }
+            }
+<span class="fc bfc" id="L116" title="All 2 branches covered.">            while (length &gt;= 64) {</span>
+<span class="fc" id="L117">                processBlock(data, offset);</span>
+<span class="fc" id="L118">                offset += 64;</span>
+<span class="fc" id="L119">                length -= 64;</span>
+            }
+<span class="fc bfc" id="L121" title="All 2 branches covered.">            if (length &gt; 0) {</span>
+<span class="fc" id="L122">                System.arraycopy(data, offset, buffer, 0, length);</span>
+<span class="fc" id="L123">                bufferLen = length;</span>
+            }
+<span class="fc" id="L125">        }</span>
+
+        @Override
+        void update(byte b) {
+<span class="fc" id="L129">            byteCount++;</span>
+<span class="fc" id="L130">            buffer[bufferLen++] = b;</span>
+<span class="fc bfc" id="L131" title="All 2 branches covered.">            if (bufferLen == 64) {</span>
+<span class="fc" id="L132">                processBlock(buffer, 0);</span>
+<span class="fc" id="L133">                bufferLen = 0;</span>
+            }
+<span class="fc" id="L135">        }</span>
+
+        final byte[] finishCommon(boolean bigEndianLength) {
+<span class="fc" id="L138">            long bits = byteCount * 8L;</span>
+<span class="fc" id="L139">            buffer[bufferLen++] = (byte) 0x80;</span>
+<span class="fc bfc" id="L140" title="All 2 branches covered.">            if (bufferLen &gt; 56) {</span>
+<span class="fc bfc" id="L141" title="All 2 branches covered.">                while (bufferLen &lt; 64) {</span>
+<span class="fc" id="L142">                    buffer[bufferLen++] = 0;</span>
+                }
+<span class="fc" id="L144">                processBlock(buffer, 0);</span>
+<span class="fc" id="L145">                bufferLen = 0;</span>
+            }
+<span class="fc bfc" id="L147" title="All 2 branches covered.">            while (bufferLen &lt; 56) {</span>
+<span class="fc" id="L148">                buffer[bufferLen++] = 0;</span>
+            }
+<span class="fc bfc" id="L150" title="All 2 branches covered.">            if (bigEndianLength) {</span>
+<span class="fc" id="L151">                buffer[56] = (byte) (bits &gt;&gt;&gt; 56);</span>
+<span class="fc" id="L152">                buffer[57] = (byte) (bits &gt;&gt;&gt; 48);</span>
+<span class="fc" id="L153">                buffer[58] = (byte) (bits &gt;&gt;&gt; 40);</span>
+<span class="fc" id="L154">                buffer[59] = (byte) (bits &gt;&gt;&gt; 32);</span>
+<span class="fc" id="L155">                buffer[60] = (byte) (bits &gt;&gt;&gt; 24);</span>
+<span class="fc" id="L156">                buffer[61] = (byte) (bits &gt;&gt;&gt; 16);</span>
+<span class="fc" id="L157">                buffer[62] = (byte) (bits &gt;&gt;&gt; 8);</span>
+<span class="fc" id="L158">                buffer[63] = (byte) bits;</span>
+            } else {
+<span class="fc" id="L160">                buffer[56] = (byte) bits;</span>
+<span class="fc" id="L161">                buffer[57] = (byte) (bits &gt;&gt;&gt; 8);</span>
+<span class="fc" id="L162">                buffer[58] = (byte) (bits &gt;&gt;&gt; 16);</span>
+<span class="fc" id="L163">                buffer[59] = (byte) (bits &gt;&gt;&gt; 24);</span>
+<span class="fc" id="L164">                buffer[60] = (byte) (bits &gt;&gt;&gt; 32);</span>
+<span class="fc" id="L165">                buffer[61] = (byte) (bits &gt;&gt;&gt; 40);</span>
+<span class="fc" id="L166">                buffer[62] = (byte) (bits &gt;&gt;&gt; 48);</span>
+<span class="fc" id="L167">                buffer[63] = (byte) (bits &gt;&gt;&gt; 56);</span>
+            }
+<span class="fc" id="L169">            processBlock(buffer, 0);</span>
+<span class="fc" id="L170">            byte[] out = new byte[digestLength()];</span>
+<span class="fc" id="L171">            writeStateBigEndian(out);</span>
+<span class="fc" id="L172">            reset();</span>
+<span class="fc" id="L173">            return out;</span>
+        }
+    }
+
+    // ===============================================================
+    // MD5 -- RFC 1321 (little-endian length, little-endian word loads)
+    static final class Md5 extends Block64 {
+        int a;
+        int b;
+        int c;
+        int d;
+
+<span class="fc" id="L185">        Md5() {</span>
+<span class="fc" id="L186">            reset();</span>
+<span class="fc" id="L187">        }</span>
+
+        @Override
+        public void reset() {
+<span class="fc" id="L191">            a = 0x67452301;</span>
+<span class="fc" id="L192">            b = 0xefcdab89;</span>
+<span class="fc" id="L193">            c = 0x98badcfe;</span>
+<span class="fc" id="L194">            d = 0x10325476;</span>
+<span class="fc" id="L195">            bufferLen = 0;</span>
+<span class="fc" id="L196">            byteCount = 0;</span>
+<span class="fc" id="L197">        }</span>
+
+        @Override
+        public int digestLength() {
+<span class="fc" id="L201">            return 16;</span>
+        }
+
+        @Override
+        public byte[] digest() {
+<span class="fc" id="L206">            return finishCommon(false);</span>
+        }
+
+        @Override
+        void writeStateBigEndian(byte[] out) {
+            // MD5 actually writes its state little-endian; we reuse the name
+            // for the shared finish path.
+<span class="fc" id="L213">            writeLE(out, 0, a);</span>
+<span class="fc" id="L214">            writeLE(out, 4, b);</span>
+<span class="fc" id="L215">            writeLE(out, 8, c);</span>
+<span class="fc" id="L216">            writeLE(out, 12, d);</span>
+<span class="fc" id="L217">        }</span>
+
+        private static void writeLE(byte[] out, int o, int v) {
+<span class="fc" id="L220">            out[o] = (byte) v;</span>
+<span class="fc" id="L221">            out[o + 1] = (byte) (v &gt;&gt;&gt; 8);</span>
+<span class="fc" id="L222">            out[o + 2] = (byte) (v &gt;&gt;&gt; 16);</span>
+<span class="fc" id="L223">            out[o + 3] = (byte) (v &gt;&gt;&gt; 24);</span>
+<span class="fc" id="L224">        }</span>
+
+        private static int readLE(byte[] src, int o) {
+<span class="fc" id="L227">            return  (src[o] &amp; 0xff)</span>
+                  | (src[o + 1] &amp; 0xff) &lt;&lt; 8
+                  | (src[o + 2] &amp; 0xff) &lt;&lt; 16
+                  | (src[o + 3] &amp; 0xff) &lt;&lt; 24;
+        }
+
+        private static int rol(int v, int s) {
+<span class="fc" id="L234">            return (v &lt;&lt; s) | (v &gt;&gt;&gt; (32 - s));</span>
+        }
+
+        @Override
+        void processBlock(byte[] block, int o) {
+<span class="fc" id="L239">            int x0  = readLE(block, o);</span>
+<span class="fc" id="L240">            int x1  = readLE(block, o + 4);</span>
+<span class="fc" id="L241">            int x2  = readLE(block, o + 8);</span>
+<span class="fc" id="L242">            int x3  = readLE(block, o + 12);</span>
+<span class="fc" id="L243">            int x4  = readLE(block, o + 16);</span>
+<span class="fc" id="L244">            int x5  = readLE(block, o + 20);</span>
+<span class="fc" id="L245">            int x6  = readLE(block, o + 24);</span>
+<span class="fc" id="L246">            int x7  = readLE(block, o + 28);</span>
+<span class="fc" id="L247">            int x8  = readLE(block, o + 32);</span>
+<span class="fc" id="L248">            int x9  = readLE(block, o + 36);</span>
+<span class="fc" id="L249">            int x10 = readLE(block, o + 40);</span>
+<span class="fc" id="L250">            int x11 = readLE(block, o + 44);</span>
+<span class="fc" id="L251">            int x12 = readLE(block, o + 48);</span>
+<span class="fc" id="L252">            int x13 = readLE(block, o + 52);</span>
+<span class="fc" id="L253">            int x14 = readLE(block, o + 56);</span>
+<span class="fc" id="L254">            int x15 = readLE(block, o + 60);</span>
+
+<span class="fc" id="L256">            int aa = a;</span>
+<span class="fc" id="L257">            int bb = b;</span>
+<span class="fc" id="L258">            int cc = c;</span>
+<span class="fc" id="L259">            int dd = d;</span>
+
+            // round 1
+<span class="fc" id="L262">            aa = bb + rol(aa + ((bb &amp; cc) | (~bb &amp; dd)) + x0  + 0xd76aa478, 7);</span>
+<span class="fc" id="L263">            dd = aa + rol(dd + ((aa &amp; bb) | (~aa &amp; cc)) + x1  + 0xe8c7b756, 12);</span>
+<span class="fc" id="L264">            cc = dd + rol(cc + ((dd &amp; aa) | (~dd &amp; bb)) + x2  + 0x242070db, 17);</span>
+<span class="fc" id="L265">            bb = cc + rol(bb + ((cc &amp; dd) | (~cc &amp; aa)) + x3  + 0xc1bdceee, 22);</span>
+<span class="fc" id="L266">            aa = bb + rol(aa + ((bb &amp; cc) | (~bb &amp; dd)) + x4  + 0xf57c0faf, 7);</span>
+<span class="fc" id="L267">            dd = aa + rol(dd + ((aa &amp; bb) | (~aa &amp; cc)) + x5  + 0x4787c62a, 12);</span>
+<span class="fc" id="L268">            cc = dd + rol(cc + ((dd &amp; aa) | (~dd &amp; bb)) + x6  + 0xa8304613, 17);</span>
+<span class="fc" id="L269">            bb = cc + rol(bb + ((cc &amp; dd) | (~cc &amp; aa)) + x7  + 0xfd469501, 22);</span>
+<span class="fc" id="L270">            aa = bb + rol(aa + ((bb &amp; cc) | (~bb &amp; dd)) + x8  + 0x698098d8, 7);</span>
+<span class="fc" id="L271">            dd = aa + rol(dd + ((aa &amp; bb) | (~aa &amp; cc)) + x9  + 0x8b44f7af, 12);</span>
+<span class="fc" id="L272">            cc = dd + rol(cc + ((dd &amp; aa) | (~dd &amp; bb)) + x10 + 0xffff5bb1, 17);</span>
+<span class="fc" id="L273">            bb = cc + rol(bb + ((cc &amp; dd) | (~cc &amp; aa)) + x11 + 0x895cd7be, 22);</span>
+<span class="fc" id="L274">            aa = bb + rol(aa + ((bb &amp; cc) | (~bb &amp; dd)) + x12 + 0x6b901122, 7);</span>
+<span class="fc" id="L275">            dd = aa + rol(dd + ((aa &amp; bb) | (~aa &amp; cc)) + x13 + 0xfd987193, 12);</span>
+<span class="fc" id="L276">            cc = dd + rol(cc + ((dd &amp; aa) | (~dd &amp; bb)) + x14 + 0xa679438e, 17);</span>
+<span class="fc" id="L277">            bb = cc + rol(bb + ((cc &amp; dd) | (~cc &amp; aa)) + x15 + 0x49b40821, 22);</span>
+
+            // round 2
+<span class="fc" id="L280">            aa = bb + rol(aa + ((bb &amp; dd) | (cc &amp; ~dd)) + x1  + 0xf61e2562, 5);</span>
+<span class="fc" id="L281">            dd = aa + rol(dd + ((aa &amp; cc) | (bb &amp; ~cc)) + x6  + 0xc040b340, 9);</span>
+<span class="fc" id="L282">            cc = dd + rol(cc + ((dd &amp; bb) | (aa &amp; ~bb)) + x11 + 0x265e5a51, 14);</span>
+<span class="fc" id="L283">            bb = cc + rol(bb + ((cc &amp; aa) | (dd &amp; ~aa)) + x0  + 0xe9b6c7aa, 20);</span>
+<span class="fc" id="L284">            aa = bb + rol(aa + ((bb &amp; dd) | (cc &amp; ~dd)) + x5  + 0xd62f105d, 5);</span>
+<span class="fc" id="L285">            dd = aa + rol(dd + ((aa &amp; cc) | (bb &amp; ~cc)) + x10 + 0x02441453, 9);</span>
+<span class="fc" id="L286">            cc = dd + rol(cc + ((dd &amp; bb) | (aa &amp; ~bb)) + x15 + 0xd8a1e681, 14);</span>
+<span class="fc" id="L287">            bb = cc + rol(bb + ((cc &amp; aa) | (dd &amp; ~aa)) + x4  + 0xe7d3fbc8, 20);</span>
+<span class="fc" id="L288">            aa = bb + rol(aa + ((bb &amp; dd) | (cc &amp; ~dd)) + x9  + 0x21e1cde6, 5);</span>
+<span class="fc" id="L289">            dd = aa + rol(dd + ((aa &amp; cc) | (bb &amp; ~cc)) + x14 + 0xc33707d6, 9);</span>
+<span class="fc" id="L290">            cc = dd + rol(cc + ((dd &amp; bb) | (aa &amp; ~bb)) + x3  + 0xf4d50d87, 14);</span>
+<span class="fc" id="L291">            bb = cc + rol(bb + ((cc &amp; aa) | (dd &amp; ~aa)) + x8  + 0x455a14ed, 20);</span>
+<span class="fc" id="L292">            aa = bb + rol(aa + ((bb &amp; dd) | (cc &amp; ~dd)) + x13 + 0xa9e3e905, 5);</span>
+<span class="fc" id="L293">            dd = aa + rol(dd + ((aa &amp; cc) | (bb &amp; ~cc)) + x2  + 0xfcefa3f8, 9);</span>
+<span class="fc" id="L294">            cc = dd + rol(cc + ((dd &amp; bb) | (aa &amp; ~bb)) + x7  + 0x676f02d9, 14);</span>
+<span class="fc" id="L295">            bb = cc + rol(bb + ((cc &amp; aa) | (dd &amp; ~aa)) + x12 + 0x8d2a4c8a, 20);</span>
+
+            // round 3
+<span class="fc" id="L298">            aa = bb + rol(aa + (bb ^ cc ^ dd) + x5  + 0xfffa3942, 4);</span>
+<span class="fc" id="L299">            dd = aa + rol(dd + (aa ^ bb ^ cc) + x8  + 0x8771f681, 11);</span>
+<span class="fc" id="L300">            cc = dd + rol(cc + (dd ^ aa ^ bb) + x11 + 0x6d9d6122, 16);</span>
+<span class="fc" id="L301">            bb = cc + rol(bb + (cc ^ dd ^ aa) + x14 + 0xfde5380c, 23);</span>
+<span class="fc" id="L302">            aa = bb + rol(aa + (bb ^ cc ^ dd) + x1  + 0xa4beea44, 4);</span>
+<span class="fc" id="L303">            dd = aa + rol(dd + (aa ^ bb ^ cc) + x4  + 0x4bdecfa9, 11);</span>
+<span class="fc" id="L304">            cc = dd + rol(cc + (dd ^ aa ^ bb) + x7  + 0xf6bb4b60, 16);</span>
+<span class="fc" id="L305">            bb = cc + rol(bb + (cc ^ dd ^ aa) + x10 + 0xbebfbc70, 23);</span>
+<span class="fc" id="L306">            aa = bb + rol(aa + (bb ^ cc ^ dd) + x13 + 0x289b7ec6, 4);</span>
+<span class="fc" id="L307">            dd = aa + rol(dd + (aa ^ bb ^ cc) + x0  + 0xeaa127fa, 11);</span>
+<span class="fc" id="L308">            cc = dd + rol(cc + (dd ^ aa ^ bb) + x3  + 0xd4ef3085, 16);</span>
+<span class="fc" id="L309">            bb = cc + rol(bb + (cc ^ dd ^ aa) + x6  + 0x04881d05, 23);</span>
+<span class="fc" id="L310">            aa = bb + rol(aa + (bb ^ cc ^ dd) + x9  + 0xd9d4d039, 4);</span>
+<span class="fc" id="L311">            dd = aa + rol(dd + (aa ^ bb ^ cc) + x12 + 0xe6db99e5, 11);</span>
+<span class="fc" id="L312">            cc = dd + rol(cc + (dd ^ aa ^ bb) + x15 + 0x1fa27cf8, 16);</span>
+<span class="fc" id="L313">            bb = cc + rol(bb + (cc ^ dd ^ aa) + x2  + 0xc4ac5665, 23);</span>
+
+            // round 4
+<span class="fc" id="L316">            aa = bb + rol(aa + (cc ^ (bb | ~dd)) + x0  + 0xf4292244, 6);</span>
+<span class="fc" id="L317">            dd = aa + rol(dd + (bb ^ (aa | ~cc)) + x7  + 0x432aff97, 10);</span>
+<span class="fc" id="L318">            cc = dd + rol(cc + (aa ^ (dd | ~bb)) + x14 + 0xab9423a7, 15);</span>
+<span class="fc" id="L319">            bb = cc + rol(bb + (dd ^ (cc | ~aa)) + x5  + 0xfc93a039, 21);</span>
+<span class="fc" id="L320">            aa = bb + rol(aa + (cc ^ (bb | ~dd)) + x12 + 0x655b59c3, 6);</span>
+<span class="fc" id="L321">            dd = aa + rol(dd + (bb ^ (aa | ~cc)) + x3  + 0x8f0ccc92, 10);</span>
+<span class="fc" id="L322">            cc = dd + rol(cc + (aa ^ (dd | ~bb)) + x10 + 0xffeff47d, 15);</span>
+<span class="fc" id="L323">            bb = cc + rol(bb + (dd ^ (cc | ~aa)) + x1  + 0x85845dd1, 21);</span>
+<span class="fc" id="L324">            aa = bb + rol(aa + (cc ^ (bb | ~dd)) + x8  + 0x6fa87e4f, 6);</span>
+<span class="fc" id="L325">            dd = aa + rol(dd + (bb ^ (aa | ~cc)) + x15 + 0xfe2ce6e0, 10);</span>
+<span class="fc" id="L326">            cc = dd + rol(cc + (aa ^ (dd | ~bb)) + x6  + 0xa3014314, 15);</span>
+<span class="fc" id="L327">            bb = cc + rol(bb + (dd ^ (cc | ~aa)) + x13 + 0x4e0811a1, 21);</span>
+<span class="fc" id="L328">            aa = bb + rol(aa + (cc ^ (bb | ~dd)) + x4  + 0xf7537e82, 6);</span>
+<span class="fc" id="L329">            dd = aa + rol(dd + (bb ^ (aa | ~cc)) + x11 + 0xbd3af235, 10);</span>
+<span class="fc" id="L330">            cc = dd + rol(cc + (aa ^ (dd | ~bb)) + x2  + 0x2ad7d2bb, 15);</span>
+<span class="fc" id="L331">            bb = cc + rol(bb + (dd ^ (cc | ~aa)) + x9  + 0xeb86d391, 21);</span>
+
+<span class="fc" id="L333">            a += aa;</span>
+<span class="fc" id="L334">            b += bb;</span>
+<span class="fc" id="L335">            c += cc;</span>
+<span class="fc" id="L336">            d += dd;</span>
+<span class="fc" id="L337">        }</span>
+    }
+
+    // ===============================================================
+    // SHA-1 -- RFC 3174
+    static final class Sha1 extends Block64 {
+        int h0;
+        int h1;
+        int h2;
+        int h3;
+        int h4;
+<span class="fc" id="L348">        final int[] w = new int[80];</span>
+
+<span class="fc" id="L350">        Sha1() {</span>
+<span class="fc" id="L351">            reset();</span>
+<span class="fc" id="L352">        }</span>
+
+        @Override
+        public void reset() {
+<span class="fc" id="L356">            h0 = 0x67452301;</span>
+<span class="fc" id="L357">            h1 = 0xEFCDAB89;</span>
+<span class="fc" id="L358">            h2 = 0x98BADCFE;</span>
+<span class="fc" id="L359">            h3 = 0x10325476;</span>
+<span class="fc" id="L360">            h4 = 0xC3D2E1F0;</span>
+<span class="fc" id="L361">            bufferLen = 0;</span>
+<span class="fc" id="L362">            byteCount = 0;</span>
+<span class="fc" id="L363">        }</span>
+
+        @Override
+        public int digestLength() {
+<span class="fc" id="L367">            return 20;</span>
+        }
+
+        @Override
+        public byte[] digest() {
+<span class="fc" id="L372">            return finishCommon(true);</span>
+        }
+
+        @Override
+        void writeStateBigEndian(byte[] out) {
+<span class="fc" id="L377">            writeBE(out, 0, h0);</span>
+<span class="fc" id="L378">            writeBE(out, 4, h1);</span>
+<span class="fc" id="L379">            writeBE(out, 8, h2);</span>
+<span class="fc" id="L380">            writeBE(out, 12, h3);</span>
+<span class="fc" id="L381">            writeBE(out, 16, h4);</span>
+<span class="fc" id="L382">        }</span>
+
+        @Override
+        void processBlock(byte[] block, int o) {
+<span class="fc bfc" id="L386" title="All 2 branches covered.">            for (int i = 0; i &lt; 16; i++) {</span>
+<span class="fc" id="L387">                w[i] = (block[o + i * 4] &amp; 0xff) &lt;&lt; 24</span>
+                     | (block[o + i * 4 + 1] &amp; 0xff) &lt;&lt; 16
+                     | (block[o + i * 4 + 2] &amp; 0xff) &lt;&lt; 8
+                     | (block[o + i * 4 + 3] &amp; 0xff);
+            }
+<span class="fc bfc" id="L392" title="All 2 branches covered.">            for (int i = 16; i &lt; 80; i++) {</span>
+<span class="fc" id="L393">                int t = w[i - 3] ^ w[i - 8] ^ w[i - 14] ^ w[i - 16];</span>
+<span class="fc" id="L394">                w[i] = (t &lt;&lt; 1) | (t &gt;&gt;&gt; 31);</span>
+            }
+<span class="fc" id="L396">            int a = h0;</span>
+<span class="fc" id="L397">            int b = h1;</span>
+<span class="fc" id="L398">            int c = h2;</span>
+<span class="fc" id="L399">            int d = h3;</span>
+<span class="fc" id="L400">            int e = h4;</span>
+<span class="fc bfc" id="L401" title="All 2 branches covered.">            for (int i = 0; i &lt; 80; i++) {</span>
+                int f;
+                int k;
+<span class="fc bfc" id="L404" title="All 2 branches covered.">                if (i &lt; 20) {</span>
+<span class="fc" id="L405">                    f = (b &amp; c) | (~b &amp; d);</span>
+<span class="fc" id="L406">                    k = 0x5A827999;</span>
+<span class="fc bfc" id="L407" title="All 2 branches covered.">                } else if (i &lt; 40) {</span>
+<span class="fc" id="L408">                    f = b ^ c ^ d;</span>
+<span class="fc" id="L409">                    k = 0x6ED9EBA1;</span>
+<span class="fc bfc" id="L410" title="All 2 branches covered.">                } else if (i &lt; 60) {</span>
+<span class="fc" id="L411">                    f = (b &amp; c) | (b &amp; d) | (c &amp; d);</span>
+<span class="fc" id="L412">                    k = 0x8F1BBCDC;</span>
+                } else {
+<span class="fc" id="L414">                    f = b ^ c ^ d;</span>
+<span class="fc" id="L415">                    k = 0xCA62C1D6;</span>
+                }
+<span class="fc" id="L417">                int t = ((a &lt;&lt; 5) | (a &gt;&gt;&gt; 27)) + f + e + k + w[i];</span>
+<span class="fc" id="L418">                e = d;</span>
+<span class="fc" id="L419">                d = c;</span>
+<span class="fc" id="L420">                c = (b &lt;&lt; 30) | (b &gt;&gt;&gt; 2);</span>
+<span class="fc" id="L421">                b = a;</span>
+<span class="fc" id="L422">                a = t;</span>
+            }
+<span class="fc" id="L424">            h0 += a;</span>
+<span class="fc" id="L425">            h1 += b;</span>
+<span class="fc" id="L426">            h2 += c;</span>
+<span class="fc" id="L427">            h3 += d;</span>
+<span class="fc" id="L428">            h4 += e;</span>
+<span class="fc" id="L429">        }</span>
+    }
+
+    // ===============================================================
+    // SHA-224 / SHA-256 -- FIPS 180-4 (32-bit word version)
+    static final class Sha256Family extends Block64 {
+<span class="fc" id="L435">        private static final int[] K = {</span>
+            0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5,
+            0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
+            0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3,
+            0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
+            0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc,
+            0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
+            0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7,
+            0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967,
+            0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13,
+            0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85,
+            0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3,
+            0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
+            0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5,
+            0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
+            0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208,
+            0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2
+        };
+
+        private final boolean truncated; // sha-224 if true
+        private int h0;
+        private int h1;
+        private int h2;
+        private int h3;
+        private int h4;
+        private int h5;
+        private int h6;
+        private int h7;
+<span class="fc" id="L463">        private final int[] w = new int[64];</span>
+<span class="fc" id="L464">        private final int[] state = new int[8];</span>
+
+<span class="fc" id="L466">        Sha256Family(boolean truncated) {</span>
+<span class="fc" id="L467">            this.truncated = truncated;</span>
+<span class="fc" id="L468">            reset();</span>
+<span class="fc" id="L469">        }</span>
+
+        @Override
+        public void reset() {
+<span class="pc bpc" id="L473" title="1 of 2 branches missed.">            if (truncated) {</span>
+<span class="nc" id="L474">                h0 = 0xc1059ed8; h1 = 0x367cd507; h2 = 0x3070dd17; h3 = 0xf70e5939;</span>
+<span class="nc" id="L475">                h4 = 0xffc00b31; h5 = 0x68581511; h6 = 0x64f98fa7; h7 = 0xbefa4fa4;</span>
+            } else {
+<span class="fc" id="L477">                h0 = 0x6a09e667; h1 = 0xbb67ae85; h2 = 0x3c6ef372; h3 = 0xa54ff53a;</span>
+<span class="fc" id="L478">                h4 = 0x510e527f; h5 = 0x9b05688c; h6 = 0x1f83d9ab; h7 = 0x5be0cd19;</span>
+            }
+<span class="fc" id="L480">            bufferLen = 0;</span>
+<span class="fc" id="L481">            byteCount = 0;</span>
+<span class="fc" id="L482">        }</span>
+
+        @Override
+        public int digestLength() {
+<span class="pc bpc" id="L486" title="1 of 2 branches missed.">            return truncated ? 28 : 32;</span>
+        }
+
+        @Override
+        public byte[] digest() {
+<span class="fc" id="L491">            return finishCommon(true);</span>
+        }
+
+        @Override
+        void writeStateBigEndian(byte[] out) {
+<span class="fc" id="L496">            writeBE(out, 0, h0);</span>
+<span class="fc" id="L497">            writeBE(out, 4, h1);</span>
+<span class="fc" id="L498">            writeBE(out, 8, h2);</span>
+<span class="fc" id="L499">            writeBE(out, 12, h3);</span>
+<span class="fc" id="L500">            writeBE(out, 16, h4);</span>
+<span class="fc" id="L501">            writeBE(out, 20, h5);</span>
+<span class="fc" id="L502">            writeBE(out, 24, h6);</span>
+<span class="pc bpc" id="L503" title="1 of 2 branches missed.">            if (!truncated) {</span>
+<span class="fc" id="L504">                writeBE(out, 28, h7);</span>
+            }
+<span class="fc" id="L506">        }</span>
+
+        @Override
+        void processBlock(byte[] block, int o) {
+<span class="fc bfc" id="L510" title="All 2 branches covered.">            for (int i = 0; i &lt; 16; i++) {</span>
+<span class="fc" id="L511">                w[i] = (block[o + i * 4] &amp; 0xff) &lt;&lt; 24</span>
+                     | (block[o + i * 4 + 1] &amp; 0xff) &lt;&lt; 16
+                     | (block[o + i * 4 + 2] &amp; 0xff) &lt;&lt; 8
+                     | (block[o + i * 4 + 3] &amp; 0xff);
+            }
+<span class="fc" id="L516">            int[] st = state;</span>
+<span class="fc" id="L517">            st[0] = h0; st[1] = h1; st[2] = h2; st[3] = h3;</span>
+<span class="fc" id="L518">            st[4] = h4; st[5] = h5; st[6] = h6; st[7] = h7;</span>
+<span class="fc" id="L519">            compress(st, w);</span>
+<span class="fc" id="L520">            h0 = st[0]; h1 = st[1]; h2 = st[2]; h3 = st[3];</span>
+<span class="fc" id="L521">            h4 = st[4]; h5 = st[5]; h6 = st[6]; h7 = st[7];</span>
+<span class="fc" id="L522">        }</span>
+
+        /// One SHA-256 compression of the block whose sixteen big-endian
+        /// words are in `w[0..15]` (w has room for 64) into `st[0..7]`.
+        static void compress(int[] st, int[] w) {
+<span class="fc bfc" id="L527" title="All 2 branches covered.">            for (int i = 16; i &lt; 64; i++) {</span>
+<span class="fc" id="L528">                int v15 = w[i - 15];</span>
+<span class="fc" id="L529">                int s0 = ((v15 &gt;&gt;&gt; 7) | (v15 &lt;&lt; 25)) ^ ((v15 &gt;&gt;&gt; 18) | (v15 &lt;&lt; 14)) ^ (v15 &gt;&gt;&gt; 3);</span>
+<span class="fc" id="L530">                int v2 = w[i - 2];</span>
+<span class="fc" id="L531">                int s1 = ((v2 &gt;&gt;&gt; 17) | (v2 &lt;&lt; 15)) ^ ((v2 &gt;&gt;&gt; 19) | (v2 &lt;&lt; 13)) ^ (v2 &gt;&gt;&gt; 10);</span>
+<span class="fc" id="L532">                w[i] = w[i - 16] + s0 + w[i - 7] + s1;</span>
+            }
+<span class="fc" id="L534">            int a = st[0];</span>
+<span class="fc" id="L535">            int b = st[1];</span>
+<span class="fc" id="L536">            int c = st[2];</span>
+<span class="fc" id="L537">            int d = st[3];</span>
+<span class="fc" id="L538">            int e = st[4];</span>
+<span class="fc" id="L539">            int f = st[5];</span>
+<span class="fc" id="L540">            int g = st[6];</span>
+<span class="fc" id="L541">            int h = st[7];</span>
+<span class="fc bfc" id="L542" title="All 2 branches covered.">            for (int i = 0; i &lt; 64; i++) {</span>
+<span class="fc" id="L543">                int s1 = ((e &gt;&gt;&gt; 6) | (e &lt;&lt; 26)) ^ ((e &gt;&gt;&gt; 11) | (e &lt;&lt; 21)) ^ ((e &gt;&gt;&gt; 25) | (e &lt;&lt; 7));</span>
+<span class="fc" id="L544">                int ch = (e &amp; f) ^ (~e &amp; g);</span>
+<span class="fc" id="L545">                int t1 = h + s1 + ch + K[i] + w[i];</span>
+<span class="fc" id="L546">                int s0 = ((a &gt;&gt;&gt; 2) | (a &lt;&lt; 30)) ^ ((a &gt;&gt;&gt; 13) | (a &lt;&lt; 19)) ^ ((a &gt;&gt;&gt; 22) | (a &lt;&lt; 10));</span>
+<span class="fc" id="L547">                int mj = (a &amp; b) ^ (a &amp; c) ^ (b &amp; c);</span>
+<span class="fc" id="L548">                int t2 = s0 + mj;</span>
+<span class="fc" id="L549">                h = g; g = f; f = e;</span>
+<span class="fc" id="L550">                e = d + t1;</span>
+<span class="fc" id="L551">                d = c; c = b; b = a;</span>
+<span class="fc" id="L552">                a = t1 + t2;</span>
+            }
+<span class="fc" id="L554">            st[0] += a; st[1] += b; st[2] += c; st[3] += d;</span>
+<span class="fc" id="L555">            st[4] += e; st[5] += f; st[6] += g; st[7] += h;</span>
+<span class="fc" id="L556">        }</span>
+    }
+
+    // ===============================================================
+    // SHA-384 / SHA-512 -- FIPS 180-4 (64-bit word version, 128-byte blocks,
+    // 128-bit length field). Uses a 128-byte block engine.
+    static final class Sha512Family extends MessageDigestImpl {
+<span class="fc" id="L563">        private static final long[] K = {</span>
+            0x428a2f98d728ae22L, 0x7137449123ef65cdL, 0xb5c0fbcfec4d3b2fL, 0xe9b5dba58189dbbcL,
+            0x3956c25bf348b538L, 0x59f111f1b605d019L, 0x923f82a4af194f9bL, 0xab1c5ed5da6d8118L,
+            0xd807aa98a3030242L, 0x12835b0145706fbeL, 0x243185be4ee4b28cL, 0x550c7dc3d5ffb4e2L,
+            0x72be5d74f27b896fL, 0x80deb1fe3b1696b1L, 0x9bdc06a725c71235L, 0xc19bf174cf692694L,
+            0xe49b69c19ef14ad2L, 0xefbe4786384f25e3L, 0x0fc19dc68b8cd5b5L, 0x240ca1cc77ac9c65L,
+            0x2de92c6f592b0275L, 0x4a7484aa6ea6e483L, 0x5cb0a9dcbd41fbd4L, 0x76f988da831153b5L,
+            0x983e5152ee66dfabL, 0xa831c66d2db43210L, 0xb00327c898fb213fL, 0xbf597fc7beef0ee4L,
+            0xc6e00bf33da88fc2L, 0xd5a79147930aa725L, 0x06ca6351e003826fL, 0x142929670a0e6e70L,
+            0x27b70a8546d22ffcL, 0x2e1b21385c26c926L, 0x4d2c6dfc5ac42aedL, 0x53380d139d95b3dfL,
+            0x650a73548baf63deL, 0x766a0abb3c77b2a8L, 0x81c2c92e47edaee6L, 0x92722c851482353bL,
+            0xa2bfe8a14cf10364L, 0xa81a664bbc423001L, 0xc24b8b70d0f89791L, 0xc76c51a30654be30L,
+            0xd192e819d6ef5218L, 0xd69906245565a910L, 0xf40e35855771202aL, 0x106aa07032bbd1b8L,
+            0x19a4c116b8d2d0c8L, 0x1e376c085141ab53L, 0x2748774cdf8eeb99L, 0x34b0bcb5e19b48a8L,
+            0x391c0cb3c5c95a63L, 0x4ed8aa4ae3418acbL, 0x5b9cca4f7763e373L, 0x682e6ff3d6b2b8a3L,
+            0x748f82ee5defb2fcL, 0x78a5636f43172f60L, 0x84c87814a1f0ab72L, 0x8cc702081a6439ecL,
+            0x90befffa23631e28L, 0xa4506cebde82bde9L, 0xbef9a3f7b2c67915L, 0xc67178f2e372532bL,
+            0xca273eceea26619cL, 0xd186b8c721c0c207L, 0xeada7dd6cde0eb1eL, 0xf57d4f7fee6ed178L,
+            0x06f067aa72176fbaL, 0x0a637dc5a2c898a6L, 0x113f9804bef90daeL, 0x1b710b35131c471bL,
+            0x28db77f523047d84L, 0x32caab7b40c72493L, 0x3c9ebe0a15c9bebcL, 0x431d67c49c100d4cL,
+            0x4cc5d4becb3e42b6L, 0x597f299cfc657e2aL, 0x5fcb6fab3ad6faecL, 0x6c44198c4a475817L
+        };
+
+        private final boolean truncated; // sha-384 if true
+        private long h0;
+        private long h1;
+        private long h2;
+        private long h3;
+        private long h4;
+        private long h5;
+        private long h6;
+        private long h7;
+<span class="fc" id="L595">        private final byte[] buffer = new byte[128];</span>
+        private int bufferLen;
+        private long byteCount; // we cap message length at 2^63-1 bytes which is plenty
+<span class="fc" id="L598">        private final long[] w = new long[80];</span>
+<span class="fc" id="L599">        private final long[] state = new long[8];</span>
+
+<span class="fc" id="L601">        Sha512Family(boolean truncated) {</span>
+<span class="fc" id="L602">            this.truncated = truncated;</span>
+<span class="fc" id="L603">            reset();</span>
+<span class="fc" id="L604">        }</span>
+
+        @Override
+        public void reset() {
+<span class="fc bfc" id="L608" title="All 2 branches covered.">            if (truncated) {</span>
+<span class="fc" id="L609">                h0 = 0xcbbb9d5dc1059ed8L; h1 = 0x629a292a367cd507L; h2 = 0x9159015a3070dd17L;</span>
+<span class="fc" id="L610">                h3 = 0x152fecd8f70e5939L; h4 = 0x67332667ffc00b31L; h5 = 0x8eb44a8768581511L;</span>
+<span class="fc" id="L611">                h6 = 0xdb0c2e0d64f98fa7L; h7 = 0x47b5481dbefa4fa4L;</span>
+            } else {
+<span class="fc" id="L613">                h0 = 0x6a09e667f3bcc908L; h1 = 0xbb67ae8584caa73bL; h2 = 0x3c6ef372fe94f82bL;</span>
+<span class="fc" id="L614">                h3 = 0xa54ff53a5f1d36f1L; h4 = 0x510e527fade682d1L; h5 = 0x9b05688c2b3e6c1fL;</span>
+<span class="fc" id="L615">                h6 = 0x1f83d9abfb41bd6bL; h7 = 0x5be0cd19137e2179L;</span>
+            }
+<span class="fc" id="L617">            bufferLen = 0;</span>
+<span class="fc" id="L618">            byteCount = 0;</span>
+<span class="fc" id="L619">        }</span>
+
+        @Override
+        public int digestLength() {
+<span class="fc bfc" id="L623" title="All 2 branches covered.">            return truncated ? 48 : 64;</span>
+        }
+
+        @Override
+        void update(byte[] data, int offset, int length) {
+<span class="fc" id="L628">            byteCount += length;</span>
+<span class="fc bfc" id="L629" title="All 2 branches covered.">            if (bufferLen &gt; 0) {</span>
+<span class="fc" id="L630">                int copy = 128 - bufferLen;</span>
+<span class="fc bfc" id="L631" title="All 2 branches covered.">                if (copy &gt; length) {</span>
+<span class="fc" id="L632">                    copy = length;</span>
+                }
+<span class="fc" id="L634">                System.arraycopy(data, offset, buffer, bufferLen, copy);</span>
+<span class="fc" id="L635">                bufferLen += copy;</span>
+<span class="fc" id="L636">                offset += copy;</span>
+<span class="fc" id="L637">                length -= copy;</span>
+<span class="fc bfc" id="L638" title="All 2 branches covered.">                if (bufferLen == 128) {</span>
+<span class="fc" id="L639">                    processBlock(buffer, 0);</span>
+<span class="fc" id="L640">                    bufferLen = 0;</span>
+                }
+            }
+<span class="fc bfc" id="L643" title="All 2 branches covered.">            while (length &gt;= 128) {</span>
+<span class="fc" id="L644">                processBlock(data, offset);</span>
+<span class="fc" id="L645">                offset += 128;</span>
+<span class="fc" id="L646">                length -= 128;</span>
+            }
+<span class="fc bfc" id="L648" title="All 2 branches covered.">            if (length &gt; 0) {</span>
+<span class="fc" id="L649">                System.arraycopy(data, offset, buffer, 0, length);</span>
+<span class="fc" id="L650">                bufferLen = length;</span>
+            }
+<span class="fc" id="L652">        }</span>
+
+        @Override
+        void update(byte b) {
+<span class="nc" id="L656">            byteCount++;</span>
+<span class="nc" id="L657">            buffer[bufferLen++] = b;</span>
+<span class="nc bnc" id="L658" title="All 2 branches missed.">            if (bufferLen == 128) {</span>
+<span class="nc" id="L659">                processBlock(buffer, 0);</span>
+<span class="nc" id="L660">                bufferLen = 0;</span>
+            }
+<span class="nc" id="L662">        }</span>
+
+        @Override
+        public byte[] digest() {
+<span class="fc" id="L666">            long bits = byteCount * 8L;</span>
+<span class="fc" id="L667">            buffer[bufferLen++] = (byte) 0x80;</span>
+<span class="fc bfc" id="L668" title="All 2 branches covered.">            if (bufferLen &gt; 112) {</span>
+<span class="fc bfc" id="L669" title="All 2 branches covered.">                while (bufferLen &lt; 128) {</span>
+<span class="fc" id="L670">                    buffer[bufferLen++] = 0;</span>
+                }
+<span class="fc" id="L672">                processBlock(buffer, 0);</span>
+<span class="fc" id="L673">                bufferLen = 0;</span>
+            }
+<span class="fc bfc" id="L675" title="All 2 branches covered.">            while (bufferLen &lt; 112) {</span>
+<span class="fc" id="L676">                buffer[bufferLen++] = 0;</span>
+            }
+            // high 64 bits of the 128-bit length field are always 0 here since
+            // a Java byte array cannot hold more than 2^31-1 bytes.
+<span class="fc bfc" id="L680" title="All 2 branches covered.">            for (int i = 112; i &lt; 120; i++) {</span>
+<span class="fc" id="L681">                buffer[i] = 0;</span>
+            }
+<span class="fc" id="L683">            buffer[120] = (byte) (bits &gt;&gt;&gt; 56);</span>
+<span class="fc" id="L684">            buffer[121] = (byte) (bits &gt;&gt;&gt; 48);</span>
+<span class="fc" id="L685">            buffer[122] = (byte) (bits &gt;&gt;&gt; 40);</span>
+<span class="fc" id="L686">            buffer[123] = (byte) (bits &gt;&gt;&gt; 32);</span>
+<span class="fc" id="L687">            buffer[124] = (byte) (bits &gt;&gt;&gt; 24);</span>
+<span class="fc" id="L688">            buffer[125] = (byte) (bits &gt;&gt;&gt; 16);</span>
+<span class="fc" id="L689">            buffer[126] = (byte) (bits &gt;&gt;&gt; 8);</span>
+<span class="fc" id="L690">            buffer[127] = (byte) bits;</span>
+<span class="fc" id="L691">            processBlock(buffer, 0);</span>
+
+<span class="fc" id="L693">            byte[] out = new byte[digestLength()];</span>
+<span class="fc" id="L694">            writeBE64(out, 0,  h0);</span>
+<span class="fc" id="L695">            writeBE64(out, 8,  h1);</span>
+<span class="fc" id="L696">            writeBE64(out, 16, h2);</span>
+<span class="fc" id="L697">            writeBE64(out, 24, h3);</span>
+<span class="fc" id="L698">            writeBE64(out, 32, h4);</span>
+<span class="fc" id="L699">            writeBE64(out, 40, h5);</span>
+            // sha-384 omits h6, h7
+<span class="fc bfc" id="L701" title="All 2 branches covered.">            if (!truncated) {</span>
+<span class="fc" id="L702">                writeBE64(out, 48, h6);</span>
+<span class="fc" id="L703">                writeBE64(out, 56, h7);</span>
+            }
+<span class="fc" id="L705">            reset();</span>
+<span class="fc" id="L706">            return out;</span>
+        }
+
+        private void processBlock(byte[] block, int o) {
+<span class="fc bfc" id="L710" title="All 2 branches covered.">            for (int i = 0; i &lt; 16; i++) {</span>
+<span class="fc" id="L711">                int p = o + i * 8;</span>
+<span class="fc" id="L712">                w[i] = ((long) (block[p]     &amp; 0xff) &lt;&lt; 56)</span>
+                     | ((long) (block[p + 1] &amp; 0xff) &lt;&lt; 48)
+                     | ((long) (block[p + 2] &amp; 0xff) &lt;&lt; 40)
+                     | ((long) (block[p + 3] &amp; 0xff) &lt;&lt; 32)
+                     | ((long) (block[p + 4] &amp; 0xff) &lt;&lt; 24)
+                     | ((long) (block[p + 5] &amp; 0xff) &lt;&lt; 16)
+                     | ((long) (block[p + 6] &amp; 0xff) &lt;&lt; 8)
+                     | ((long) (block[p + 7] &amp; 0xff));
+            }
+<span class="fc" id="L721">            long[] st = state;</span>
+<span class="fc" id="L722">            st[0] = h0; st[1] = h1; st[2] = h2; st[3] = h3;</span>
+<span class="fc" id="L723">            st[4] = h4; st[5] = h5; st[6] = h6; st[7] = h7;</span>
+<span class="fc" id="L724">            compress(st, w);</span>
+<span class="fc" id="L725">            h0 = st[0]; h1 = st[1]; h2 = st[2]; h3 = st[3];</span>
+<span class="fc" id="L726">            h4 = st[4]; h5 = st[5]; h6 = st[6]; h7 = st[7];</span>
+<span class="fc" id="L727">        }</span>
+
+        /// One SHA-512 compression of the block whose sixteen big-endian
+        /// words are in `w[0..15]` (w has room for 80) into `st[0..7]`.
+        static void compress(long[] st, long[] w) {
+<span class="fc bfc" id="L732" title="All 2 branches covered.">            for (int i = 16; i &lt; 80; i++) {</span>
+<span class="fc" id="L733">                long v15 = w[i - 15];</span>
+<span class="fc" id="L734">                long s0 = ((v15 &gt;&gt;&gt; 1) | (v15 &lt;&lt; 63))</span>
+                        ^ ((v15 &gt;&gt;&gt; 8) | (v15 &lt;&lt; 56))
+                        ^ (v15 &gt;&gt;&gt; 7);
+<span class="fc" id="L737">                long v2 = w[i - 2];</span>
+<span class="fc" id="L738">                long s1 = ((v2 &gt;&gt;&gt; 19) | (v2 &lt;&lt; 45))</span>
+                        ^ ((v2 &gt;&gt;&gt; 61) | (v2 &lt;&lt; 3))
+                        ^ (v2 &gt;&gt;&gt; 6);
+<span class="fc" id="L741">                w[i] = w[i - 16] + s0 + w[i - 7] + s1;</span>
+            }
+<span class="fc" id="L743">            long a = st[0];</span>
+<span class="fc" id="L744">            long b = st[1];</span>
+<span class="fc" id="L745">            long c = st[2];</span>
+<span class="fc" id="L746">            long d = st[3];</span>
+<span class="fc" id="L747">            long e = st[4];</span>
+<span class="fc" id="L748">            long f = st[5];</span>
+<span class="fc" id="L749">            long g = st[6];</span>
+<span class="fc" id="L750">            long h = st[7];</span>
+<span class="fc bfc" id="L751" title="All 2 branches covered.">            for (int i = 0; i &lt; 80; i++) {</span>
+<span class="fc" id="L752">                long s1 = ((e &gt;&gt;&gt; 14) | (e &lt;&lt; 50))</span>
+                        ^ ((e &gt;&gt;&gt; 18) | (e &lt;&lt; 46))
+                        ^ ((e &gt;&gt;&gt; 41) | (e &lt;&lt; 23));
+<span class="fc" id="L755">                long ch = (e &amp; f) ^ (~e &amp; g);</span>
+<span class="fc" id="L756">                long t1 = h + s1 + ch + K[i] + w[i];</span>
+<span class="fc" id="L757">                long s0 = ((a &gt;&gt;&gt; 28) | (a &lt;&lt; 36))</span>
+                        ^ ((a &gt;&gt;&gt; 34) | (a &lt;&lt; 30))
+                        ^ ((a &gt;&gt;&gt; 39) | (a &lt;&lt; 25));
+<span class="fc" id="L760">                long mj = (a &amp; b) ^ (a &amp; c) ^ (b &amp; c);</span>
+<span class="fc" id="L761">                long t2 = s0 + mj;</span>
+<span class="fc" id="L762">                h = g; g = f; f = e;</span>
+<span class="fc" id="L763">                e = d + t1;</span>
+<span class="fc" id="L764">                d = c; c = b; b = a;</span>
+<span class="fc" id="L765">                a = t1 + t2;</span>
+            }
+<span class="fc" id="L767">            st[0] += a; st[1] += b; st[2] += c; st[3] += d;</span>
+<span class="fc" id="L768">            st[4] += e; st[5] += f; st[6] += g; st[7] += h;</span>
+<span class="fc" id="L769">        }</span>
+    }
+
+    // ===============================================================
+    // Keccak sponge over Keccak-f[1600] -- FIPS 202, with the original
+    // Keccak padding as an alternative domain byte.
+    //
+    // The two algorithms built on it differ in ONE byte: the first padding
+    // byte is 0x01 for the original Keccak (what Ethereum hashes with: block
+    // and transaction hashes, addresses, ABI selectors) and 0x06 for the
+    // standardised SHA3 (FIPS 202 appends the two domain bits 01 before the
+    // pad10*1). Everything else -- the permutation, the rate, the squeeze --
+    // is shared, so one class covers both.
+    static final class Keccak extends MessageDigestImpl {
+<span class="fc" id="L783">        private static final long[] RC = {</span>
+            0x0000000000000001L, 0x0000000000008082L, 0x800000000000808aL, 0x8000000080008000L,
+            0x000000000000808bL, 0x0000000080000001L, 0x8000000080008081L, 0x8000000000008009L,
+            0x000000000000008aL, 0x0000000000000088L, 0x0000000080008009L, 0x000000008000000aL,
+            0x000000008000808bL, 0x800000000000008bL, 0x8000000000008089L, 0x8000000000008003L,
+            0x8000000000008002L, 0x8000000000000080L, 0x000000000000800aL, 0x800000008000000aL,
+            0x8000000080008081L, 0x8000000000008080L, 0x0000000080000001L, 0x8000000080008008L
+        };
+
+        private final int outLen;
+        private final int rate;
+        private final byte domain;
+<span class="fc" id="L795">        private final long[] state = new long[25];</span>
+        private final byte[] buffer;
+        private int bufferLen;
+
+<span class="fc" id="L799">        Keccak(int outLen, byte domain) {</span>
+<span class="fc" id="L800">            this.outLen = outLen;</span>
+<span class="fc" id="L801">            this.rate = 200 - 2 * outLen;</span>
+<span class="fc" id="L802">            this.domain = domain;</span>
+<span class="fc" id="L803">            this.buffer = new byte[rate];</span>
+<span class="fc" id="L804">        }</span>
+
+        @Override
+        public void reset() {
+<span class="fc bfc" id="L808" title="All 2 branches covered.">            for (int i = 0; i &lt; 25; i++) {</span>
+<span class="fc" id="L809">                state[i] = 0;</span>
+            }
+<span class="fc" id="L811">            bufferLen = 0;</span>
+<span class="fc" id="L812">        }</span>
+
+        @Override
+        public int digestLength() {
+<span class="fc" id="L816">            return outLen;</span>
+        }
+
+        @Override
+        void update(byte b) {
+<span class="fc" id="L821">            buffer[bufferLen++] = b;</span>
+<span class="fc bfc" id="L822" title="All 2 branches covered.">            if (bufferLen == rate) {</span>
+<span class="fc" id="L823">                absorb();</span>
+            }
+<span class="fc" id="L825">        }</span>
+
+        @Override
+        void update(byte[] data, int offset, int length) {
+<span class="fc" id="L829">            int o = offset;</span>
+<span class="fc" id="L830">            int remaining = length;</span>
+<span class="fc bfc" id="L831" title="All 4 branches covered.">            while (bufferLen == 0 &amp;&amp; remaining &gt;= rate) {</span>
+<span class="fc" id="L832">                absorb(data, o);</span>
+<span class="fc" id="L833">                o += rate;</span>
+<span class="fc" id="L834">                remaining -= rate;</span>
+            }
+<span class="fc bfc" id="L836" title="All 2 branches covered.">            while (remaining &gt; 0) {</span>
+<span class="fc" id="L837">                int n = rate - bufferLen;</span>
+<span class="fc bfc" id="L838" title="All 2 branches covered.">                if (n &gt; remaining) {</span>
+<span class="fc" id="L839">                    n = remaining;</span>
+                }
+<span class="fc" id="L841">                System.arraycopy(data, o, buffer, bufferLen, n);</span>
+<span class="fc" id="L842">                bufferLen += n;</span>
+<span class="fc" id="L843">                o += n;</span>
+<span class="fc" id="L844">                remaining -= n;</span>
+<span class="fc bfc" id="L845" title="All 2 branches covered.">                if (bufferLen == rate) {</span>
+<span class="fc" id="L846">                    absorb();</span>
+                }
+<span class="fc" id="L848">            }</span>
+<span class="fc" id="L849">        }</span>
+
+        @Override
+        public byte[] digest() {
+<span class="fc bfc" id="L853" title="All 2 branches covered.">            for (int i = bufferLen; i &lt; rate; i++) {</span>
+<span class="fc" id="L854">                buffer[i] = 0;</span>
+            }
+<span class="fc" id="L856">            buffer[bufferLen] ^= domain;</span>
+<span class="fc" id="L857">            buffer[rate - 1] ^= (byte) 0x80;</span>
+<span class="fc" id="L858">            bufferLen = rate;</span>
+<span class="fc" id="L859">            absorb();</span>
+<span class="fc" id="L860">            byte[] out = new byte[outLen];</span>
+<span class="fc bfc" id="L861" title="All 2 branches covered.">            for (int i = 0; i &lt; outLen; i++) {</span>
+<span class="fc" id="L862">                out[i] = (byte) (state[i &gt;&gt; 3] &gt;&gt;&gt; ((i &amp; 7) &lt;&lt; 3));</span>
+            }
+<span class="fc" id="L864">            reset();</span>
+<span class="fc" id="L865">            return out;</span>
+        }
+
+        // XORs the full buffer into the state lane by lane (little endian) and
+        // runs the permutation.
+        private void absorb() {
+<span class="fc" id="L871">            absorb(buffer, 0);</span>
+<span class="fc" id="L872">            bufferLen = 0;</span>
+<span class="fc" id="L873">        }</span>
+
+        private void absorb(byte[] src, int off) {
+<span class="fc" id="L876">            int lanes = rate &gt;&gt; 3;</span>
+<span class="fc" id="L877">            long[] st = state;</span>
+<span class="fc bfc" id="L878" title="All 2 branches covered.">            for (int i = 0; i &lt; lanes; i++) {</span>
+<span class="fc" id="L879">                int o = off + (i &lt;&lt; 3);</span>
+<span class="fc" id="L880">                st[i] ^= (src[o] &amp; 0xffL) | (src[o + 1] &amp; 0xffL) &lt;&lt; 8 | (src[o + 2] &amp; 0xffL) &lt;&lt; 16</span>
+                        | (src[o + 3] &amp; 0xffL) &lt;&lt; 24 | (src[o + 4] &amp; 0xffL) &lt;&lt; 32 | (src[o + 5] &amp; 0xffL) &lt;&lt; 40
+                        | (src[o + 6] &amp; 0xffL) &lt;&lt; 48 | (long) src[o + 7] &lt;&lt; 56;
+            }
+<span class="fc" id="L884">            permute();</span>
+<span class="fc" id="L885">        }</span>
+
+        // Keccak-f[1600] with the 25 lanes in locals and each round's theta,
+        // rho, pi and chi written out lane by lane: no array traffic and no
+        // index tables inside the 24 rounds.
+        private void permute() {
+<span class="fc" id="L891">            long[] st = state;</span>
+<span class="fc" id="L892">            long a0 = st[0];</span>
+<span class="fc" id="L893">            long a1 = st[1];</span>
+<span class="fc" id="L894">            long a2 = st[2];</span>
+<span class="fc" id="L895">            long a3 = st[3];</span>
+<span class="fc" id="L896">            long a4 = st[4];</span>
+<span class="fc" id="L897">            long a5 = st[5];</span>
+<span class="fc" id="L898">            long a6 = st[6];</span>
+<span class="fc" id="L899">            long a7 = st[7];</span>
+<span class="fc" id="L900">            long a8 = st[8];</span>
+<span class="fc" id="L901">            long a9 = st[9];</span>
+<span class="fc" id="L902">            long a10 = st[10];</span>
+<span class="fc" id="L903">            long a11 = st[11];</span>
+<span class="fc" id="L904">            long a12 = st[12];</span>
+<span class="fc" id="L905">            long a13 = st[13];</span>
+<span class="fc" id="L906">            long a14 = st[14];</span>
+<span class="fc" id="L907">            long a15 = st[15];</span>
+<span class="fc" id="L908">            long a16 = st[16];</span>
+<span class="fc" id="L909">            long a17 = st[17];</span>
+<span class="fc" id="L910">            long a18 = st[18];</span>
+<span class="fc" id="L911">            long a19 = st[19];</span>
+<span class="fc" id="L912">            long a20 = st[20];</span>
+<span class="fc" id="L913">            long a21 = st[21];</span>
+<span class="fc" id="L914">            long a22 = st[22];</span>
+<span class="fc" id="L915">            long a23 = st[23];</span>
+<span class="fc" id="L916">            long a24 = st[24];</span>
+<span class="fc bfc" id="L917" title="All 2 branches covered.">            for (int round = 0; round &lt; 24; round++) {</span>
+<span class="fc" id="L918">                long c0 = a0 ^ a5 ^ a10 ^ a15 ^ a20;</span>
+<span class="fc" id="L919">                long c1 = a1 ^ a6 ^ a11 ^ a16 ^ a21;</span>
+<span class="fc" id="L920">                long c2 = a2 ^ a7 ^ a12 ^ a17 ^ a22;</span>
+<span class="fc" id="L921">                long c3 = a3 ^ a8 ^ a13 ^ a18 ^ a23;</span>
+<span class="fc" id="L922">                long c4 = a4 ^ a9 ^ a14 ^ a19 ^ a24;</span>
+<span class="fc" id="L923">                long d0 = c4 ^ ((c1 &lt;&lt; 1) | (c1 &gt;&gt;&gt; 63));</span>
+<span class="fc" id="L924">                long d1 = c0 ^ ((c2 &lt;&lt; 1) | (c2 &gt;&gt;&gt; 63));</span>
+<span class="fc" id="L925">                long d2 = c1 ^ ((c3 &lt;&lt; 1) | (c3 &gt;&gt;&gt; 63));</span>
+<span class="fc" id="L926">                long d3 = c2 ^ ((c4 &lt;&lt; 1) | (c4 &gt;&gt;&gt; 63));</span>
+<span class="fc" id="L927">                long d4 = c3 ^ ((c0 &lt;&lt; 1) | (c0 &gt;&gt;&gt; 63));</span>
+<span class="fc" id="L928">                long b0 = (a0 ^ d0);</span>
+<span class="fc" id="L929">                long t1 = a1 ^ d1;</span>
+<span class="fc" id="L930">                long b10 = (t1 &lt;&lt; 1) | (t1 &gt;&gt;&gt; 63);</span>
+<span class="fc" id="L931">                long t2 = a2 ^ d2;</span>
+<span class="fc" id="L932">                long b20 = (t2 &lt;&lt; 62) | (t2 &gt;&gt;&gt; 2);</span>
+<span class="fc" id="L933">                long t3 = a3 ^ d3;</span>
+<span class="fc" id="L934">                long b5 = (t3 &lt;&lt; 28) | (t3 &gt;&gt;&gt; 36);</span>
+<span class="fc" id="L935">                long t4 = a4 ^ d4;</span>
+<span class="fc" id="L936">                long b15 = (t4 &lt;&lt; 27) | (t4 &gt;&gt;&gt; 37);</span>
+<span class="fc" id="L937">                long t5 = a5 ^ d0;</span>
+<span class="fc" id="L938">                long b16 = (t5 &lt;&lt; 36) | (t5 &gt;&gt;&gt; 28);</span>
+<span class="fc" id="L939">                long t6 = a6 ^ d1;</span>
+<span class="fc" id="L940">                long b1 = (t6 &lt;&lt; 44) | (t6 &gt;&gt;&gt; 20);</span>
+<span class="fc" id="L941">                long t7 = a7 ^ d2;</span>
+<span class="fc" id="L942">                long b11 = (t7 &lt;&lt; 6) | (t7 &gt;&gt;&gt; 58);</span>
+<span class="fc" id="L943">                long t8 = a8 ^ d3;</span>
+<span class="fc" id="L944">                long b21 = (t8 &lt;&lt; 55) | (t8 &gt;&gt;&gt; 9);</span>
+<span class="fc" id="L945">                long t9 = a9 ^ d4;</span>
+<span class="fc" id="L946">                long b6 = (t9 &lt;&lt; 20) | (t9 &gt;&gt;&gt; 44);</span>
+<span class="fc" id="L947">                long t10 = a10 ^ d0;</span>
+<span class="fc" id="L948">                long b7 = (t10 &lt;&lt; 3) | (t10 &gt;&gt;&gt; 61);</span>
+<span class="fc" id="L949">                long t11 = a11 ^ d1;</span>
+<span class="fc" id="L950">                long b17 = (t11 &lt;&lt; 10) | (t11 &gt;&gt;&gt; 54);</span>
+<span class="fc" id="L951">                long t12 = a12 ^ d2;</span>
+<span class="fc" id="L952">                long b2 = (t12 &lt;&lt; 43) | (t12 &gt;&gt;&gt; 21);</span>
+<span class="fc" id="L953">                long t13 = a13 ^ d3;</span>
+<span class="fc" id="L954">                long b12 = (t13 &lt;&lt; 25) | (t13 &gt;&gt;&gt; 39);</span>
+<span class="fc" id="L955">                long t14 = a14 ^ d4;</span>
+<span class="fc" id="L956">                long b22 = (t14 &lt;&lt; 39) | (t14 &gt;&gt;&gt; 25);</span>
+<span class="fc" id="L957">                long t15 = a15 ^ d0;</span>
+<span class="fc" id="L958">                long b23 = (t15 &lt;&lt; 41) | (t15 &gt;&gt;&gt; 23);</span>
+<span class="fc" id="L959">                long t16 = a16 ^ d1;</span>
+<span class="fc" id="L960">                long b8 = (t16 &lt;&lt; 45) | (t16 &gt;&gt;&gt; 19);</span>
+<span class="fc" id="L961">                long t17 = a17 ^ d2;</span>
+<span class="fc" id="L962">                long b18 = (t17 &lt;&lt; 15) | (t17 &gt;&gt;&gt; 49);</span>
+<span class="fc" id="L963">                long t18 = a18 ^ d3;</span>
+<span class="fc" id="L964">                long b3 = (t18 &lt;&lt; 21) | (t18 &gt;&gt;&gt; 43);</span>
+<span class="fc" id="L965">                long t19 = a19 ^ d4;</span>
+<span class="fc" id="L966">                long b13 = (t19 &lt;&lt; 8) | (t19 &gt;&gt;&gt; 56);</span>
+<span class="fc" id="L967">                long t20 = a20 ^ d0;</span>
+<span class="fc" id="L968">                long b14 = (t20 &lt;&lt; 18) | (t20 &gt;&gt;&gt; 46);</span>
+<span class="fc" id="L969">                long t21 = a21 ^ d1;</span>
+<span class="fc" id="L970">                long b24 = (t21 &lt;&lt; 2) | (t21 &gt;&gt;&gt; 62);</span>
+<span class="fc" id="L971">                long t22 = a22 ^ d2;</span>
+<span class="fc" id="L972">                long b9 = (t22 &lt;&lt; 61) | (t22 &gt;&gt;&gt; 3);</span>
+<span class="fc" id="L973">                long t23 = a23 ^ d3;</span>
+<span class="fc" id="L974">                long b19 = (t23 &lt;&lt; 56) | (t23 &gt;&gt;&gt; 8);</span>
+<span class="fc" id="L975">                long t24 = a24 ^ d4;</span>
+<span class="fc" id="L976">                long b4 = (t24 &lt;&lt; 14) | (t24 &gt;&gt;&gt; 50);</span>
+<span class="fc" id="L977">                a0 = b0 ^ (~b1 &amp; b2);</span>
+<span class="fc" id="L978">                a1 = b1 ^ (~b2 &amp; b3);</span>
+<span class="fc" id="L979">                a2 = b2 ^ (~b3 &amp; b4);</span>
+<span class="fc" id="L980">                a3 = b3 ^ (~b4 &amp; b0);</span>
+<span class="fc" id="L981">                a4 = b4 ^ (~b0 &amp; b1);</span>
+<span class="fc" id="L982">                a5 = b5 ^ (~b6 &amp; b7);</span>
+<span class="fc" id="L983">                a6 = b6 ^ (~b7 &amp; b8);</span>
+<span class="fc" id="L984">                a7 = b7 ^ (~b8 &amp; b9);</span>
+<span class="fc" id="L985">                a8 = b8 ^ (~b9 &amp; b5);</span>
+<span class="fc" id="L986">                a9 = b9 ^ (~b5 &amp; b6);</span>
+<span class="fc" id="L987">                a10 = b10 ^ (~b11 &amp; b12);</span>
+<span class="fc" id="L988">                a11 = b11 ^ (~b12 &amp; b13);</span>
+<span class="fc" id="L989">                a12 = b12 ^ (~b13 &amp; b14);</span>
+<span class="fc" id="L990">                a13 = b13 ^ (~b14 &amp; b10);</span>
+<span class="fc" id="L991">                a14 = b14 ^ (~b10 &amp; b11);</span>
+<span class="fc" id="L992">                a15 = b15 ^ (~b16 &amp; b17);</span>
+<span class="fc" id="L993">                a16 = b16 ^ (~b17 &amp; b18);</span>
+<span class="fc" id="L994">                a17 = b17 ^ (~b18 &amp; b19);</span>
+<span class="fc" id="L995">                a18 = b18 ^ (~b19 &amp; b15);</span>
+<span class="fc" id="L996">                a19 = b19 ^ (~b15 &amp; b16);</span>
+<span class="fc" id="L997">                a20 = b20 ^ (~b21 &amp; b22);</span>
+<span class="fc" id="L998">                a21 = b21 ^ (~b22 &amp; b23);</span>
+<span class="fc" id="L999">                a22 = b22 ^ (~b23 &amp; b24);</span>
+<span class="fc" id="L1000">                a23 = b23 ^ (~b24 &amp; b20);</span>
+<span class="fc" id="L1001">                a24 = b24 ^ (~b20 &amp; b21);</span>
+<span class="fc" id="L1002">                a0 ^= RC[round];</span>
+            }
+<span class="fc" id="L1004">            st[0] = a0;</span>
+<span class="fc" id="L1005">            st[1] = a1;</span>
+<span class="fc" id="L1006">            st[2] = a2;</span>
+<span class="fc" id="L1007">            st[3] = a3;</span>
+<span class="fc" id="L1008">            st[4] = a4;</span>
+<span class="fc" id="L1009">            st[5] = a5;</span>
+<span class="fc" id="L1010">            st[6] = a6;</span>
+<span class="fc" id="L1011">            st[7] = a7;</span>
+<span class="fc" id="L1012">            st[8] = a8;</span>
+<span class="fc" id="L1013">            st[9] = a9;</span>
+<span class="fc" id="L1014">            st[10] = a10;</span>
+<span class="fc" id="L1015">            st[11] = a11;</span>
+<span class="fc" id="L1016">            st[12] = a12;</span>
+<span class="fc" id="L1017">            st[13] = a13;</span>
+<span class="fc" id="L1018">            st[14] = a14;</span>
+<span class="fc" id="L1019">            st[15] = a15;</span>
+<span class="fc" id="L1020">            st[16] = a16;</span>
+<span class="fc" id="L1021">            st[17] = a17;</span>
+<span class="fc" id="L1022">            st[18] = a18;</span>
+<span class="fc" id="L1023">            st[19] = a19;</span>
+<span class="fc" id="L1024">            st[20] = a20;</span>
+<span class="fc" id="L1025">            st[21] = a21;</span>
+<span class="fc" id="L1026">            st[22] = a22;</span>
+<span class="fc" id="L1027">            st[23] = a23;</span>
+<span class="fc" id="L1028">            st[24] = a24;</span>
+<span class="fc" id="L1029">        }</span>
+    }
+
+    // ===============================================================
+    // shared little helpers
+    static void writeBE(byte[] out, int o, int v) {
+<span class="fc" id="L1035">        out[o]     = (byte) (v &gt;&gt;&gt; 24);</span>
+<span class="fc" id="L1036">        out[o + 1] = (byte) (v &gt;&gt;&gt; 16);</span>
+<span class="fc" id="L1037">        out[o + 2] = (byte) (v &gt;&gt;&gt; 8);</span>
+<span class="fc" id="L1038">        out[o + 3] = (byte) v;</span>
+<span class="fc" id="L1039">    }</span>
+
+    static void writeBE64(byte[] out, int o, long v) {
+<span class="fc" id="L1042">        out[o]     = (byte) (v &gt;&gt;&gt; 56);</span>
+<span class="fc" id="L1043">        out[o + 1] = (byte) (v &gt;&gt;&gt; 48);</span>
+<span class="fc" id="L1044">        out[o + 2] = (byte) (v &gt;&gt;&gt; 40);</span>
+<span class="fc" id="L1045">        out[o + 3] = (byte) (v &gt;&gt;&gt; 32);</span>
+<span class="fc" id="L1046">        out[o + 4] = (byte) (v &gt;&gt;&gt; 24);</span>
+<span class="fc" id="L1047">        out[o + 5] = (byte) (v &gt;&gt;&gt; 16);</span>
+<span class="fc" id="L1048">        out[o + 6] = (byte) (v &gt;&gt;&gt; 8);</span>
+<span class="fc" id="L1049">        out[o + 7] = (byte) v;</span>
+<span class="fc" id="L1050">    }</span>
+    // RIPEMD-160 (Dobbertin, Bosselaers, Preneel), unrolled: both lines of
+    // 80 steps run on locals, and the sixteen message words are read once.
+    static final class Ripemd160 extends Block64 {
+        int h0;
+        int h1;
+        int h2;
+        int h3;
+        int h4;
+
+<span class="fc" id="L1060">        Ripemd160() {</span>
+<span class="fc" id="L1061">            reset();</span>
+<span class="fc" id="L1062">        }</span>
+
+        @Override
+        public void reset() {
+<span class="fc" id="L1066">            h0 = 0x67452301;</span>
+<span class="fc" id="L1067">            h1 = 0xefcdab89;</span>
+<span class="fc" id="L1068">            h2 = 0x98badcfe;</span>
+<span class="fc" id="L1069">            h3 = 0x10325476;</span>
+<span class="fc" id="L1070">            h4 = 0xc3d2e1f0;</span>
+<span class="fc" id="L1071">            bufferLen = 0;</span>
+<span class="fc" id="L1072">            byteCount = 0;</span>
+<span class="fc" id="L1073">        }</span>
+
+        @Override
+        public int digestLength() {
+<span class="fc" id="L1077">            return 20;</span>
+        }
+
+        @Override
+        public byte[] digest() {
+<span class="fc" id="L1082">            return finishCommon(false);</span>
+        }
+
+        @Override
+        void writeStateBigEndian(byte[] out) {
+            // little-endian, like MD5; the shared finish path keeps the name
+<span class="fc" id="L1088">            writeLE(out, 0, h0);</span>
+<span class="fc" id="L1089">            writeLE(out, 4, h1);</span>
+<span class="fc" id="L1090">            writeLE(out, 8, h2);</span>
+<span class="fc" id="L1091">            writeLE(out, 12, h3);</span>
+<span class="fc" id="L1092">            writeLE(out, 16, h4);</span>
+<span class="fc" id="L1093">        }</span>
+
+        private static void writeLE(byte[] out, int o, int v) {
+<span class="fc" id="L1096">            out[o] = (byte) v;</span>
+<span class="fc" id="L1097">            out[o + 1] = (byte) (v &gt;&gt;&gt; 8);</span>
+<span class="fc" id="L1098">            out[o + 2] = (byte) (v &gt;&gt;&gt; 16);</span>
+<span class="fc" id="L1099">            out[o + 3] = (byte) (v &gt;&gt;&gt; 24);</span>
+<span class="fc" id="L1100">        }</span>
+
+<span class="fc" id="L1102">        final int[] x = new int[16];</span>
+<span class="fc" id="L1103">        final int[] lr = new int[5];</span>
+
+        @Override
+        void processBlock(byte[] block, int o) {
+<span class="fc" id="L1107">            int[] x = this.x;</span>
+<span class="fc bfc" id="L1108" title="All 2 branches covered.">            for (int i = 0; i &lt; 16; i++, o += 4) {</span>
+<span class="fc" id="L1109">                x[i] = (block[o] &amp; 0xff) | (block[o + 1] &amp; 0xff) &lt;&lt; 8 | (block[o + 2] &amp; 0xff) &lt;&lt; 16 | block[o + 3] &lt;&lt; 24;</span>
+            }
+<span class="fc" id="L1111">            int[] l = lr;</span>
+<span class="fc" id="L1112">            left(x, h0, h1, h2, h3, h4, l);</span>
+<span class="fc" id="L1113">            int la = l[0];</span>
+<span class="fc" id="L1114">            int lb = l[1];</span>
+<span class="fc" id="L1115">            int lc = l[2];</span>
+<span class="fc" id="L1116">            int ld = l[3];</span>
+<span class="fc" id="L1117">            int le = l[4];</span>
+<span class="fc" id="L1118">            right(x, h0, h1, h2, h3, h4, l);</span>
+<span class="fc" id="L1119">            int t = h1 + lc + l[3];</span>
+<span class="fc" id="L1120">            h1 = h2 + ld + l[4];</span>
+<span class="fc" id="L1121">            h2 = h3 + le + l[0];</span>
+<span class="fc" id="L1122">            h3 = h4 + la + l[1];</span>
+<span class="fc" id="L1123">            h4 = h0 + lb + l[2];</span>
+<span class="fc" id="L1124">            h0 = t;</span>
+<span class="fc" id="L1125">        }</span>
+
+        // The two lines are separate methods because one method holding all
+        // 160 steps is past HotSpot's limit for JIT compilation and runs
+        // interpreted, seven times slower.
+        private static void left(int[] x, int la, int lb, int lc, int ld, int le, int[] out) {
+            int t;
+<span class="fc" id="L1132">            t = la + (lb ^ lc ^ ld) + x[0]; la = ((t &lt;&lt; 11) | (t &gt;&gt;&gt; 21)) + le; lc = (lc &lt;&lt; 10) | (lc &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1133">            t = le + (la ^ lb ^ lc) + x[1]; le = ((t &lt;&lt; 14) | (t &gt;&gt;&gt; 18)) + ld; lb = (lb &lt;&lt; 10) | (lb &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1134">            t = ld + (le ^ la ^ lb) + x[2]; ld = ((t &lt;&lt; 15) | (t &gt;&gt;&gt; 17)) + lc; la = (la &lt;&lt; 10) | (la &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1135">            t = lc + (ld ^ le ^ la) + x[3]; lc = ((t &lt;&lt; 12) | (t &gt;&gt;&gt; 20)) + lb; le = (le &lt;&lt; 10) | (le &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1136">            t = lb + (lc ^ ld ^ le) + x[4]; lb = ((t &lt;&lt; 5) | (t &gt;&gt;&gt; 27)) + la; ld = (ld &lt;&lt; 10) | (ld &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1137">            t = la + (lb ^ lc ^ ld) + x[5]; la = ((t &lt;&lt; 8) | (t &gt;&gt;&gt; 24)) + le; lc = (lc &lt;&lt; 10) | (lc &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1138">            t = le + (la ^ lb ^ lc) + x[6]; le = ((t &lt;&lt; 7) | (t &gt;&gt;&gt; 25)) + ld; lb = (lb &lt;&lt; 10) | (lb &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1139">            t = ld + (le ^ la ^ lb) + x[7]; ld = ((t &lt;&lt; 9) | (t &gt;&gt;&gt; 23)) + lc; la = (la &lt;&lt; 10) | (la &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1140">            t = lc + (ld ^ le ^ la) + x[8]; lc = ((t &lt;&lt; 11) | (t &gt;&gt;&gt; 21)) + lb; le = (le &lt;&lt; 10) | (le &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1141">            t = lb + (lc ^ ld ^ le) + x[9]; lb = ((t &lt;&lt; 13) | (t &gt;&gt;&gt; 19)) + la; ld = (ld &lt;&lt; 10) | (ld &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1142">            t = la + (lb ^ lc ^ ld) + x[10]; la = ((t &lt;&lt; 14) | (t &gt;&gt;&gt; 18)) + le; lc = (lc &lt;&lt; 10) | (lc &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1143">            t = le + (la ^ lb ^ lc) + x[11]; le = ((t &lt;&lt; 15) | (t &gt;&gt;&gt; 17)) + ld; lb = (lb &lt;&lt; 10) | (lb &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1144">            t = ld + (le ^ la ^ lb) + x[12]; ld = ((t &lt;&lt; 6) | (t &gt;&gt;&gt; 26)) + lc; la = (la &lt;&lt; 10) | (la &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1145">            t = lc + (ld ^ le ^ la) + x[13]; lc = ((t &lt;&lt; 7) | (t &gt;&gt;&gt; 25)) + lb; le = (le &lt;&lt; 10) | (le &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1146">            t = lb + (lc ^ ld ^ le) + x[14]; lb = ((t &lt;&lt; 9) | (t &gt;&gt;&gt; 23)) + la; ld = (ld &lt;&lt; 10) | (ld &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1147">            t = la + (lb ^ lc ^ ld) + x[15]; la = ((t &lt;&lt; 8) | (t &gt;&gt;&gt; 24)) + le; lc = (lc &lt;&lt; 10) | (lc &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1148">            t = le + ((la &amp; lb) | (~la &amp; lc)) + x[7] + 0x5a827999; le = ((t &lt;&lt; 7) | (t &gt;&gt;&gt; 25)) + ld; lb = (lb &lt;&lt; 10) | (lb &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1149">            t = ld + ((le &amp; la) | (~le &amp; lb)) + x[4] + 0x5a827999; ld = ((t &lt;&lt; 6) | (t &gt;&gt;&gt; 26)) + lc; la = (la &lt;&lt; 10) | (la &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1150">            t = lc + ((ld &amp; le) | (~ld &amp; la)) + x[13] + 0x5a827999; lc = ((t &lt;&lt; 8) | (t &gt;&gt;&gt; 24)) + lb; le = (le &lt;&lt; 10) | (le &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1151">            t = lb + ((lc &amp; ld) | (~lc &amp; le)) + x[1] + 0x5a827999; lb = ((t &lt;&lt; 13) | (t &gt;&gt;&gt; 19)) + la; ld = (ld &lt;&lt; 10) | (ld &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1152">            t = la + ((lb &amp; lc) | (~lb &amp; ld)) + x[10] + 0x5a827999; la = ((t &lt;&lt; 11) | (t &gt;&gt;&gt; 21)) + le; lc = (lc &lt;&lt; 10) | (lc &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1153">            t = le + ((la &amp; lb) | (~la &amp; lc)) + x[6] + 0x5a827999; le = ((t &lt;&lt; 9) | (t &gt;&gt;&gt; 23)) + ld; lb = (lb &lt;&lt; 10) | (lb &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1154">            t = ld + ((le &amp; la) | (~le &amp; lb)) + x[15] + 0x5a827999; ld = ((t &lt;&lt; 7) | (t &gt;&gt;&gt; 25)) + lc; la = (la &lt;&lt; 10) | (la &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1155">            t = lc + ((ld &amp; le) | (~ld &amp; la)) + x[3] + 0x5a827999; lc = ((t &lt;&lt; 15) | (t &gt;&gt;&gt; 17)) + lb; le = (le &lt;&lt; 10) | (le &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1156">            t = lb + ((lc &amp; ld) | (~lc &amp; le)) + x[12] + 0x5a827999; lb = ((t &lt;&lt; 7) | (t &gt;&gt;&gt; 25)) + la; ld = (ld &lt;&lt; 10) | (ld &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1157">            t = la + ((lb &amp; lc) | (~lb &amp; ld)) + x[0] + 0x5a827999; la = ((t &lt;&lt; 12) | (t &gt;&gt;&gt; 20)) + le; lc = (lc &lt;&lt; 10) | (lc &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1158">            t = le + ((la &amp; lb) | (~la &amp; lc)) + x[9] + 0x5a827999; le = ((t &lt;&lt; 15) | (t &gt;&gt;&gt; 17)) + ld; lb = (lb &lt;&lt; 10) | (lb &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1159">            t = ld + ((le &amp; la) | (~le &amp; lb)) + x[5] + 0x5a827999; ld = ((t &lt;&lt; 9) | (t &gt;&gt;&gt; 23)) + lc; la = (la &lt;&lt; 10) | (la &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1160">            t = lc + ((ld &amp; le) | (~ld &amp; la)) + x[2] + 0x5a827999; lc = ((t &lt;&lt; 11) | (t &gt;&gt;&gt; 21)) + lb; le = (le &lt;&lt; 10) | (le &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1161">            t = lb + ((lc &amp; ld) | (~lc &amp; le)) + x[14] + 0x5a827999; lb = ((t &lt;&lt; 7) | (t &gt;&gt;&gt; 25)) + la; ld = (ld &lt;&lt; 10) | (ld &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1162">            t = la + ((lb &amp; lc) | (~lb &amp; ld)) + x[11] + 0x5a827999; la = ((t &lt;&lt; 13) | (t &gt;&gt;&gt; 19)) + le; lc = (lc &lt;&lt; 10) | (lc &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1163">            t = le + ((la &amp; lb) | (~la &amp; lc)) + x[8] + 0x5a827999; le = ((t &lt;&lt; 12) | (t &gt;&gt;&gt; 20)) + ld; lb = (lb &lt;&lt; 10) | (lb &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1164">            t = ld + ((le | ~la) ^ lb) + x[3] + 0x6ed9eba1; ld = ((t &lt;&lt; 11) | (t &gt;&gt;&gt; 21)) + lc; la = (la &lt;&lt; 10) | (la &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1165">            t = lc + ((ld | ~le) ^ la) + x[10] + 0x6ed9eba1; lc = ((t &lt;&lt; 13) | (t &gt;&gt;&gt; 19)) + lb; le = (le &lt;&lt; 10) | (le &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1166">            t = lb + ((lc | ~ld) ^ le) + x[14] + 0x6ed9eba1; lb = ((t &lt;&lt; 6) | (t &gt;&gt;&gt; 26)) + la; ld = (ld &lt;&lt; 10) | (ld &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1167">            t = la + ((lb | ~lc) ^ ld) + x[4] + 0x6ed9eba1; la = ((t &lt;&lt; 7) | (t &gt;&gt;&gt; 25)) + le; lc = (lc &lt;&lt; 10) | (lc &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1168">            t = le + ((la | ~lb) ^ lc) + x[9] + 0x6ed9eba1; le = ((t &lt;&lt; 14) | (t &gt;&gt;&gt; 18)) + ld; lb = (lb &lt;&lt; 10) | (lb &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1169">            t = ld + ((le | ~la) ^ lb) + x[15] + 0x6ed9eba1; ld = ((t &lt;&lt; 9) | (t &gt;&gt;&gt; 23)) + lc; la = (la &lt;&lt; 10) | (la &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1170">            t = lc + ((ld | ~le) ^ la) + x[8] + 0x6ed9eba1; lc = ((t &lt;&lt; 13) | (t &gt;&gt;&gt; 19)) + lb; le = (le &lt;&lt; 10) | (le &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1171">            t = lb + ((lc | ~ld) ^ le) + x[1] + 0x6ed9eba1; lb = ((t &lt;&lt; 15) | (t &gt;&gt;&gt; 17)) + la; ld = (ld &lt;&lt; 10) | (ld &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1172">            t = la + ((lb | ~lc) ^ ld) + x[2] + 0x6ed9eba1; la = ((t &lt;&lt; 14) | (t &gt;&gt;&gt; 18)) + le; lc = (lc &lt;&lt; 10) | (lc &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1173">            t = le + ((la | ~lb) ^ lc) + x[7] + 0x6ed9eba1; le = ((t &lt;&lt; 8) | (t &gt;&gt;&gt; 24)) + ld; lb = (lb &lt;&lt; 10) | (lb &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1174">            t = ld + ((le | ~la) ^ lb) + x[0] + 0x6ed9eba1; ld = ((t &lt;&lt; 13) | (t &gt;&gt;&gt; 19)) + lc; la = (la &lt;&lt; 10) | (la &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1175">            t = lc + ((ld | ~le) ^ la) + x[6] + 0x6ed9eba1; lc = ((t &lt;&lt; 6) | (t &gt;&gt;&gt; 26)) + lb; le = (le &lt;&lt; 10) | (le &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1176">            t = lb + ((lc | ~ld) ^ le) + x[13] + 0x6ed9eba1; lb = ((t &lt;&lt; 5) | (t &gt;&gt;&gt; 27)) + la; ld = (ld &lt;&lt; 10) | (ld &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1177">            t = la + ((lb | ~lc) ^ ld) + x[11] + 0x6ed9eba1; la = ((t &lt;&lt; 12) | (t &gt;&gt;&gt; 20)) + le; lc = (lc &lt;&lt; 10) | (lc &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1178">            t = le + ((la | ~lb) ^ lc) + x[5] + 0x6ed9eba1; le = ((t &lt;&lt; 7) | (t &gt;&gt;&gt; 25)) + ld; lb = (lb &lt;&lt; 10) | (lb &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1179">            t = ld + ((le | ~la) ^ lb) + x[12] + 0x6ed9eba1; ld = ((t &lt;&lt; 5) | (t &gt;&gt;&gt; 27)) + lc; la = (la &lt;&lt; 10) | (la &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1180">            t = lc + ((ld &amp; la) | (le &amp; ~la)) + x[1] + 0x8f1bbcdc; lc = ((t &lt;&lt; 11) | (t &gt;&gt;&gt; 21)) + lb; le = (le &lt;&lt; 10) | (le &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1181">            t = lb + ((lc &amp; le) | (ld &amp; ~le)) + x[9] + 0x8f1bbcdc; lb = ((t &lt;&lt; 12) | (t &gt;&gt;&gt; 20)) + la; ld = (ld &lt;&lt; 10) | (ld &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1182">            t = la + ((lb &amp; ld) | (lc &amp; ~ld)) + x[11] + 0x8f1bbcdc; la = ((t &lt;&lt; 14) | (t &gt;&gt;&gt; 18)) + le; lc = (lc &lt;&lt; 10) | (lc &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1183">            t = le + ((la &amp; lc) | (lb &amp; ~lc)) + x[10] + 0x8f1bbcdc; le = ((t &lt;&lt; 15) | (t &gt;&gt;&gt; 17)) + ld; lb = (lb &lt;&lt; 10) | (lb &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1184">            t = ld + ((le &amp; lb) | (la &amp; ~lb)) + x[0] + 0x8f1bbcdc; ld = ((t &lt;&lt; 14) | (t &gt;&gt;&gt; 18)) + lc; la = (la &lt;&lt; 10) | (la &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1185">            t = lc + ((ld &amp; la) | (le &amp; ~la)) + x[8] + 0x8f1bbcdc; lc = ((t &lt;&lt; 15) | (t &gt;&gt;&gt; 17)) + lb; le = (le &lt;&lt; 10) | (le &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1186">            t = lb + ((lc &amp; le) | (ld &amp; ~le)) + x[12] + 0x8f1bbcdc; lb = ((t &lt;&lt; 9) | (t &gt;&gt;&gt; 23)) + la; ld = (ld &lt;&lt; 10) | (ld &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1187">            t = la + ((lb &amp; ld) | (lc &amp; ~ld)) + x[4] + 0x8f1bbcdc; la = ((t &lt;&lt; 8) | (t &gt;&gt;&gt; 24)) + le; lc = (lc &lt;&lt; 10) | (lc &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1188">            t = le + ((la &amp; lc) | (lb &amp; ~lc)) + x[13] + 0x8f1bbcdc; le = ((t &lt;&lt; 9) | (t &gt;&gt;&gt; 23)) + ld; lb = (lb &lt;&lt; 10) | (lb &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1189">            t = ld + ((le &amp; lb) | (la &amp; ~lb)) + x[3] + 0x8f1bbcdc; ld = ((t &lt;&lt; 14) | (t &gt;&gt;&gt; 18)) + lc; la = (la &lt;&lt; 10) | (la &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1190">            t = lc + ((ld &amp; la) | (le &amp; ~la)) + x[7] + 0x8f1bbcdc; lc = ((t &lt;&lt; 5) | (t &gt;&gt;&gt; 27)) + lb; le = (le &lt;&lt; 10) | (le &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1191">            t = lb + ((lc &amp; le) | (ld &amp; ~le)) + x[15] + 0x8f1bbcdc; lb = ((t &lt;&lt; 6) | (t &gt;&gt;&gt; 26)) + la; ld = (ld &lt;&lt; 10) | (ld &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1192">            t = la + ((lb &amp; ld) | (lc &amp; ~ld)) + x[14] + 0x8f1bbcdc; la = ((t &lt;&lt; 8) | (t &gt;&gt;&gt; 24)) + le; lc = (lc &lt;&lt; 10) | (lc &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1193">            t = le + ((la &amp; lc) | (lb &amp; ~lc)) + x[5] + 0x8f1bbcdc; le = ((t &lt;&lt; 6) | (t &gt;&gt;&gt; 26)) + ld; lb = (lb &lt;&lt; 10) | (lb &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1194">            t = ld + ((le &amp; lb) | (la &amp; ~lb)) + x[6] + 0x8f1bbcdc; ld = ((t &lt;&lt; 5) | (t &gt;&gt;&gt; 27)) + lc; la = (la &lt;&lt; 10) | (la &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1195">            t = lc + ((ld &amp; la) | (le &amp; ~la)) + x[2] + 0x8f1bbcdc; lc = ((t &lt;&lt; 12) | (t &gt;&gt;&gt; 20)) + lb; le = (le &lt;&lt; 10) | (le &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1196">            t = lb + (lc ^ (ld | ~le)) + x[4] + 0xa953fd4e; lb = ((t &lt;&lt; 9) | (t &gt;&gt;&gt; 23)) + la; ld = (ld &lt;&lt; 10) | (ld &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1197">            t = la + (lb ^ (lc | ~ld)) + x[0] + 0xa953fd4e; la = ((t &lt;&lt; 15) | (t &gt;&gt;&gt; 17)) + le; lc = (lc &lt;&lt; 10) | (lc &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1198">            t = le + (la ^ (lb | ~lc)) + x[5] + 0xa953fd4e; le = ((t &lt;&lt; 5) | (t &gt;&gt;&gt; 27)) + ld; lb = (lb &lt;&lt; 10) | (lb &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1199">            t = ld + (le ^ (la | ~lb)) + x[9] + 0xa953fd4e; ld = ((t &lt;&lt; 11) | (t &gt;&gt;&gt; 21)) + lc; la = (la &lt;&lt; 10) | (la &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1200">            t = lc + (ld ^ (le | ~la)) + x[7] + 0xa953fd4e; lc = ((t &lt;&lt; 6) | (t &gt;&gt;&gt; 26)) + lb; le = (le &lt;&lt; 10) | (le &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1201">            t = lb + (lc ^ (ld | ~le)) + x[12] + 0xa953fd4e; lb = ((t &lt;&lt; 8) | (t &gt;&gt;&gt; 24)) + la; ld = (ld &lt;&lt; 10) | (ld &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1202">            t = la + (lb ^ (lc | ~ld)) + x[2] + 0xa953fd4e; la = ((t &lt;&lt; 13) | (t &gt;&gt;&gt; 19)) + le; lc = (lc &lt;&lt; 10) | (lc &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1203">            t = le + (la ^ (lb | ~lc)) + x[10] + 0xa953fd4e; le = ((t &lt;&lt; 12) | (t &gt;&gt;&gt; 20)) + ld; lb = (lb &lt;&lt; 10) | (lb &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1204">            t = ld + (le ^ (la | ~lb)) + x[14] + 0xa953fd4e; ld = ((t &lt;&lt; 5) | (t &gt;&gt;&gt; 27)) + lc; la = (la &lt;&lt; 10) | (la &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1205">            t = lc + (ld ^ (le | ~la)) + x[1] + 0xa953fd4e; lc = ((t &lt;&lt; 12) | (t &gt;&gt;&gt; 20)) + lb; le = (le &lt;&lt; 10) | (le &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1206">            t = lb + (lc ^ (ld | ~le)) + x[3] + 0xa953fd4e; lb = ((t &lt;&lt; 13) | (t &gt;&gt;&gt; 19)) + la; ld = (ld &lt;&lt; 10) | (ld &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1207">            t = la + (lb ^ (lc | ~ld)) + x[8] + 0xa953fd4e; la = ((t &lt;&lt; 14) | (t &gt;&gt;&gt; 18)) + le; lc = (lc &lt;&lt; 10) | (lc &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1208">            t = le + (la ^ (lb | ~lc)) + x[11] + 0xa953fd4e; le = ((t &lt;&lt; 11) | (t &gt;&gt;&gt; 21)) + ld; lb = (lb &lt;&lt; 10) | (lb &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1209">            t = ld + (le ^ (la | ~lb)) + x[6] + 0xa953fd4e; ld = ((t &lt;&lt; 8) | (t &gt;&gt;&gt; 24)) + lc; la = (la &lt;&lt; 10) | (la &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1210">            t = lc + (ld ^ (le | ~la)) + x[15] + 0xa953fd4e; lc = ((t &lt;&lt; 5) | (t &gt;&gt;&gt; 27)) + lb; le = (le &lt;&lt; 10) | (le &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1211">            t = lb + (lc ^ (ld | ~le)) + x[13] + 0xa953fd4e; lb = ((t &lt;&lt; 6) | (t &gt;&gt;&gt; 26)) + la; ld = (ld &lt;&lt; 10) | (ld &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1212">            out[0] = la;</span>
+<span class="fc" id="L1213">            out[1] = lb;</span>
+<span class="fc" id="L1214">            out[2] = lc;</span>
+<span class="fc" id="L1215">            out[3] = ld;</span>
+<span class="fc" id="L1216">            out[4] = le;</span>
+<span class="fc" id="L1217">        }</span>
+
+        private static void right(int[] x, int ra, int rb, int rc, int rd, int re, int[] out) {
+            int t;
+<span class="fc" id="L1221">            t = ra + (rb ^ (rc | ~rd)) + x[5] + 0x50a28be6; ra = ((t &lt;&lt; 8) | (t &gt;&gt;&gt; 24)) + re; rc = (rc &lt;&lt; 10) | (rc &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1222">            t = re + (ra ^ (rb | ~rc)) + x[14] + 0x50a28be6; re = ((t &lt;&lt; 9) | (t &gt;&gt;&gt; 23)) + rd; rb = (rb &lt;&lt; 10) | (rb &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1223">            t = rd + (re ^ (ra | ~rb)) + x[7] + 0x50a28be6; rd = ((t &lt;&lt; 9) | (t &gt;&gt;&gt; 23)) + rc; ra = (ra &lt;&lt; 10) | (ra &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1224">            t = rc + (rd ^ (re | ~ra)) + x[0] + 0x50a28be6; rc = ((t &lt;&lt; 11) | (t &gt;&gt;&gt; 21)) + rb; re = (re &lt;&lt; 10) | (re &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1225">            t = rb + (rc ^ (rd | ~re)) + x[9] + 0x50a28be6; rb = ((t &lt;&lt; 13) | (t &gt;&gt;&gt; 19)) + ra; rd = (rd &lt;&lt; 10) | (rd &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1226">            t = ra + (rb ^ (rc | ~rd)) + x[2] + 0x50a28be6; ra = ((t &lt;&lt; 15) | (t &gt;&gt;&gt; 17)) + re; rc = (rc &lt;&lt; 10) | (rc &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1227">            t = re + (ra ^ (rb | ~rc)) + x[11] + 0x50a28be6; re = ((t &lt;&lt; 15) | (t &gt;&gt;&gt; 17)) + rd; rb = (rb &lt;&lt; 10) | (rb &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1228">            t = rd + (re ^ (ra | ~rb)) + x[4] + 0x50a28be6; rd = ((t &lt;&lt; 5) | (t &gt;&gt;&gt; 27)) + rc; ra = (ra &lt;&lt; 10) | (ra &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1229">            t = rc + (rd ^ (re | ~ra)) + x[13] + 0x50a28be6; rc = ((t &lt;&lt; 7) | (t &gt;&gt;&gt; 25)) + rb; re = (re &lt;&lt; 10) | (re &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1230">            t = rb + (rc ^ (rd | ~re)) + x[6] + 0x50a28be6; rb = ((t &lt;&lt; 7) | (t &gt;&gt;&gt; 25)) + ra; rd = (rd &lt;&lt; 10) | (rd &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1231">            t = ra + (rb ^ (rc | ~rd)) + x[15] + 0x50a28be6; ra = ((t &lt;&lt; 8) | (t &gt;&gt;&gt; 24)) + re; rc = (rc &lt;&lt; 10) | (rc &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1232">            t = re + (ra ^ (rb | ~rc)) + x[8] + 0x50a28be6; re = ((t &lt;&lt; 11) | (t &gt;&gt;&gt; 21)) + rd; rb = (rb &lt;&lt; 10) | (rb &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1233">            t = rd + (re ^ (ra | ~rb)) + x[1] + 0x50a28be6; rd = ((t &lt;&lt; 14) | (t &gt;&gt;&gt; 18)) + rc; ra = (ra &lt;&lt; 10) | (ra &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1234">            t = rc + (rd ^ (re | ~ra)) + x[10] + 0x50a28be6; rc = ((t &lt;&lt; 14) | (t &gt;&gt;&gt; 18)) + rb; re = (re &lt;&lt; 10) | (re &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1235">            t = rb + (rc ^ (rd | ~re)) + x[3] + 0x50a28be6; rb = ((t &lt;&lt; 12) | (t &gt;&gt;&gt; 20)) + ra; rd = (rd &lt;&lt; 10) | (rd &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1236">            t = ra + (rb ^ (rc | ~rd)) + x[12] + 0x50a28be6; ra = ((t &lt;&lt; 6) | (t &gt;&gt;&gt; 26)) + re; rc = (rc &lt;&lt; 10) | (rc &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1237">            t = re + ((ra &amp; rc) | (rb &amp; ~rc)) + x[6] + 0x5c4dd124; re = ((t &lt;&lt; 9) | (t &gt;&gt;&gt; 23)) + rd; rb = (rb &lt;&lt; 10) | (rb &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1238">            t = rd + ((re &amp; rb) | (ra &amp; ~rb)) + x[11] + 0x5c4dd124; rd = ((t &lt;&lt; 13) | (t &gt;&gt;&gt; 19)) + rc; ra = (ra &lt;&lt; 10) | (ra &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1239">            t = rc + ((rd &amp; ra) | (re &amp; ~ra)) + x[3] + 0x5c4dd124; rc = ((t &lt;&lt; 15) | (t &gt;&gt;&gt; 17)) + rb; re = (re &lt;&lt; 10) | (re &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1240">            t = rb + ((rc &amp; re) | (rd &amp; ~re)) + x[7] + 0x5c4dd124; rb = ((t &lt;&lt; 7) | (t &gt;&gt;&gt; 25)) + ra; rd = (rd &lt;&lt; 10) | (rd &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1241">            t = ra + ((rb &amp; rd) | (rc &amp; ~rd)) + x[0] + 0x5c4dd124; ra = ((t &lt;&lt; 12) | (t &gt;&gt;&gt; 20)) + re; rc = (rc &lt;&lt; 10) | (rc &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1242">            t = re + ((ra &amp; rc) | (rb &amp; ~rc)) + x[13] + 0x5c4dd124; re = ((t &lt;&lt; 8) | (t &gt;&gt;&gt; 24)) + rd; rb = (rb &lt;&lt; 10) | (rb &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1243">            t = rd + ((re &amp; rb) | (ra &amp; ~rb)) + x[5] + 0x5c4dd124; rd = ((t &lt;&lt; 9) | (t &gt;&gt;&gt; 23)) + rc; ra = (ra &lt;&lt; 10) | (ra &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1244">            t = rc + ((rd &amp; ra) | (re &amp; ~ra)) + x[10] + 0x5c4dd124; rc = ((t &lt;&lt; 11) | (t &gt;&gt;&gt; 21)) + rb; re = (re &lt;&lt; 10) | (re &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1245">            t = rb + ((rc &amp; re) | (rd &amp; ~re)) + x[14] + 0x5c4dd124; rb = ((t &lt;&lt; 7) | (t &gt;&gt;&gt; 25)) + ra; rd = (rd &lt;&lt; 10) | (rd &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1246">            t = ra + ((rb &amp; rd) | (rc &amp; ~rd)) + x[15] + 0x5c4dd124; ra = ((t &lt;&lt; 7) | (t &gt;&gt;&gt; 25)) + re; rc = (rc &lt;&lt; 10) | (rc &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1247">            t = re + ((ra &amp; rc) | (rb &amp; ~rc)) + x[8] + 0x5c4dd124; re = ((t &lt;&lt; 12) | (t &gt;&gt;&gt; 20)) + rd; rb = (rb &lt;&lt; 10) | (rb &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1248">            t = rd + ((re &amp; rb) | (ra &amp; ~rb)) + x[12] + 0x5c4dd124; rd = ((t &lt;&lt; 7) | (t &gt;&gt;&gt; 25)) + rc; ra = (ra &lt;&lt; 10) | (ra &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1249">            t = rc + ((rd &amp; ra) | (re &amp; ~ra)) + x[4] + 0x5c4dd124; rc = ((t &lt;&lt; 6) | (t &gt;&gt;&gt; 26)) + rb; re = (re &lt;&lt; 10) | (re &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1250">            t = rb + ((rc &amp; re) | (rd &amp; ~re)) + x[9] + 0x5c4dd124; rb = ((t &lt;&lt; 15) | (t &gt;&gt;&gt; 17)) + ra; rd = (rd &lt;&lt; 10) | (rd &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1251">            t = ra + ((rb &amp; rd) | (rc &amp; ~rd)) + x[1] + 0x5c4dd124; ra = ((t &lt;&lt; 13) | (t &gt;&gt;&gt; 19)) + re; rc = (rc &lt;&lt; 10) | (rc &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1252">            t = re + ((ra &amp; rc) | (rb &amp; ~rc)) + x[2] + 0x5c4dd124; re = ((t &lt;&lt; 11) | (t &gt;&gt;&gt; 21)) + rd; rb = (rb &lt;&lt; 10) | (rb &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1253">            t = rd + ((re | ~ra) ^ rb) + x[15] + 0x6d703ef3; rd = ((t &lt;&lt; 9) | (t &gt;&gt;&gt; 23)) + rc; ra = (ra &lt;&lt; 10) | (ra &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1254">            t = rc + ((rd | ~re) ^ ra) + x[5] + 0x6d703ef3; rc = ((t &lt;&lt; 7) | (t &gt;&gt;&gt; 25)) + rb; re = (re &lt;&lt; 10) | (re &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1255">            t = rb + ((rc | ~rd) ^ re) + x[1] + 0x6d703ef3; rb = ((t &lt;&lt; 15) | (t &gt;&gt;&gt; 17)) + ra; rd = (rd &lt;&lt; 10) | (rd &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1256">            t = ra + ((rb | ~rc) ^ rd) + x[3] + 0x6d703ef3; ra = ((t &lt;&lt; 11) | (t &gt;&gt;&gt; 21)) + re; rc = (rc &lt;&lt; 10) | (rc &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1257">            t = re + ((ra | ~rb) ^ rc) + x[7] + 0x6d703ef3; re = ((t &lt;&lt; 8) | (t &gt;&gt;&gt; 24)) + rd; rb = (rb &lt;&lt; 10) | (rb &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1258">            t = rd + ((re | ~ra) ^ rb) + x[14] + 0x6d703ef3; rd = ((t &lt;&lt; 6) | (t &gt;&gt;&gt; 26)) + rc; ra = (ra &lt;&lt; 10) | (ra &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1259">            t = rc + ((rd | ~re) ^ ra) + x[6] + 0x6d703ef3; rc = ((t &lt;&lt; 6) | (t &gt;&gt;&gt; 26)) + rb; re = (re &lt;&lt; 10) | (re &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1260">            t = rb + ((rc | ~rd) ^ re) + x[9] + 0x6d703ef3; rb = ((t &lt;&lt; 14) | (t &gt;&gt;&gt; 18)) + ra; rd = (rd &lt;&lt; 10) | (rd &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1261">            t = ra + ((rb | ~rc) ^ rd) + x[11] + 0x6d703ef3; ra = ((t &lt;&lt; 12) | (t &gt;&gt;&gt; 20)) + re; rc = (rc &lt;&lt; 10) | (rc &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1262">            t = re + ((ra | ~rb) ^ rc) + x[8] + 0x6d703ef3; re = ((t &lt;&lt; 13) | (t &gt;&gt;&gt; 19)) + rd; rb = (rb &lt;&lt; 10) | (rb &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1263">            t = rd + ((re | ~ra) ^ rb) + x[12] + 0x6d703ef3; rd = ((t &lt;&lt; 5) | (t &gt;&gt;&gt; 27)) + rc; ra = (ra &lt;&lt; 10) | (ra &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1264">            t = rc + ((rd | ~re) ^ ra) + x[2] + 0x6d703ef3; rc = ((t &lt;&lt; 14) | (t &gt;&gt;&gt; 18)) + rb; re = (re &lt;&lt; 10) | (re &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1265">            t = rb + ((rc | ~rd) ^ re) + x[10] + 0x6d703ef3; rb = ((t &lt;&lt; 13) | (t &gt;&gt;&gt; 19)) + ra; rd = (rd &lt;&lt; 10) | (rd &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1266">            t = ra + ((rb | ~rc) ^ rd) + x[0] + 0x6d703ef3; ra = ((t &lt;&lt; 13) | (t &gt;&gt;&gt; 19)) + re; rc = (rc &lt;&lt; 10) | (rc &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1267">            t = re + ((ra | ~rb) ^ rc) + x[4] + 0x6d703ef3; re = ((t &lt;&lt; 7) | (t &gt;&gt;&gt; 25)) + rd; rb = (rb &lt;&lt; 10) | (rb &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1268">            t = rd + ((re | ~ra) ^ rb) + x[13] + 0x6d703ef3; rd = ((t &lt;&lt; 5) | (t &gt;&gt;&gt; 27)) + rc; ra = (ra &lt;&lt; 10) | (ra &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1269">            t = rc + ((rd &amp; re) | (~rd &amp; ra)) + x[8] + 0x7a6d76e9; rc = ((t &lt;&lt; 15) | (t &gt;&gt;&gt; 17)) + rb; re = (re &lt;&lt; 10) | (re &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1270">            t = rb + ((rc &amp; rd) | (~rc &amp; re)) + x[6] + 0x7a6d76e9; rb = ((t &lt;&lt; 5) | (t &gt;&gt;&gt; 27)) + ra; rd = (rd &lt;&lt; 10) | (rd &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1271">            t = ra + ((rb &amp; rc) | (~rb &amp; rd)) + x[4] + 0x7a6d76e9; ra = ((t &lt;&lt; 8) | (t &gt;&gt;&gt; 24)) + re; rc = (rc &lt;&lt; 10) | (rc &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1272">            t = re + ((ra &amp; rb) | (~ra &amp; rc)) + x[1] + 0x7a6d76e9; re = ((t &lt;&lt; 11) | (t &gt;&gt;&gt; 21)) + rd; rb = (rb &lt;&lt; 10) | (rb &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1273">            t = rd + ((re &amp; ra) | (~re &amp; rb)) + x[3] + 0x7a6d76e9; rd = ((t &lt;&lt; 14) | (t &gt;&gt;&gt; 18)) + rc; ra = (ra &lt;&lt; 10) | (ra &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1274">            t = rc + ((rd &amp; re) | (~rd &amp; ra)) + x[11] + 0x7a6d76e9; rc = ((t &lt;&lt; 14) | (t &gt;&gt;&gt; 18)) + rb; re = (re &lt;&lt; 10) | (re &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1275">            t = rb + ((rc &amp; rd) | (~rc &amp; re)) + x[15] + 0x7a6d76e9; rb = ((t &lt;&lt; 6) | (t &gt;&gt;&gt; 26)) + ra; rd = (rd &lt;&lt; 10) | (rd &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1276">            t = ra + ((rb &amp; rc) | (~rb &amp; rd)) + x[0] + 0x7a6d76e9; ra = ((t &lt;&lt; 14) | (t &gt;&gt;&gt; 18)) + re; rc = (rc &lt;&lt; 10) | (rc &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1277">            t = re + ((ra &amp; rb) | (~ra &amp; rc)) + x[5] + 0x7a6d76e9; re = ((t &lt;&lt; 6) | (t &gt;&gt;&gt; 26)) + rd; rb = (rb &lt;&lt; 10) | (rb &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1278">            t = rd + ((re &amp; ra) | (~re &amp; rb)) + x[12] + 0x7a6d76e9; rd = ((t &lt;&lt; 9) | (t &gt;&gt;&gt; 23)) + rc; ra = (ra &lt;&lt; 10) | (ra &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1279">            t = rc + ((rd &amp; re) | (~rd &amp; ra)) + x[2] + 0x7a6d76e9; rc = ((t &lt;&lt; 12) | (t &gt;&gt;&gt; 20)) + rb; re = (re &lt;&lt; 10) | (re &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1280">            t = rb + ((rc &amp; rd) | (~rc &amp; re)) + x[13] + 0x7a6d76e9; rb = ((t &lt;&lt; 9) | (t &gt;&gt;&gt; 23)) + ra; rd = (rd &lt;&lt; 10) | (rd &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1281">            t = ra + ((rb &amp; rc) | (~rb &amp; rd)) + x[9] + 0x7a6d76e9; ra = ((t &lt;&lt; 12) | (t &gt;&gt;&gt; 20)) + re; rc = (rc &lt;&lt; 10) | (rc &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1282">            t = re + ((ra &amp; rb) | (~ra &amp; rc)) + x[7] + 0x7a6d76e9; re = ((t &lt;&lt; 5) | (t &gt;&gt;&gt; 27)) + rd; rb = (rb &lt;&lt; 10) | (rb &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1283">            t = rd + ((re &amp; ra) | (~re &amp; rb)) + x[10] + 0x7a6d76e9; rd = ((t &lt;&lt; 15) | (t &gt;&gt;&gt; 17)) + rc; ra = (ra &lt;&lt; 10) | (ra &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1284">            t = rc + ((rd &amp; re) | (~rd &amp; ra)) + x[14] + 0x7a6d76e9; rc = ((t &lt;&lt; 8) | (t &gt;&gt;&gt; 24)) + rb; re = (re &lt;&lt; 10) | (re &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1285">            t = rb + (rc ^ rd ^ re) + x[12]; rb = ((t &lt;&lt; 8) | (t &gt;&gt;&gt; 24)) + ra; rd = (rd &lt;&lt; 10) | (rd &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1286">            t = ra + (rb ^ rc ^ rd) + x[15]; ra = ((t &lt;&lt; 5) | (t &gt;&gt;&gt; 27)) + re; rc = (rc &lt;&lt; 10) | (rc &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1287">            t = re + (ra ^ rb ^ rc) + x[10]; re = ((t &lt;&lt; 12) | (t &gt;&gt;&gt; 20)) + rd; rb = (rb &lt;&lt; 10) | (rb &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1288">            t = rd + (re ^ ra ^ rb) + x[4]; rd = ((t &lt;&lt; 9) | (t &gt;&gt;&gt; 23)) + rc; ra = (ra &lt;&lt; 10) | (ra &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1289">            t = rc + (rd ^ re ^ ra) + x[1]; rc = ((t &lt;&lt; 12) | (t &gt;&gt;&gt; 20)) + rb; re = (re &lt;&lt; 10) | (re &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1290">            t = rb + (rc ^ rd ^ re) + x[5]; rb = ((t &lt;&lt; 5) | (t &gt;&gt;&gt; 27)) + ra; rd = (rd &lt;&lt; 10) | (rd &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1291">            t = ra + (rb ^ rc ^ rd) + x[8]; ra = ((t &lt;&lt; 14) | (t &gt;&gt;&gt; 18)) + re; rc = (rc &lt;&lt; 10) | (rc &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1292">            t = re + (ra ^ rb ^ rc) + x[7]; re = ((t &lt;&lt; 6) | (t &gt;&gt;&gt; 26)) + rd; rb = (rb &lt;&lt; 10) | (rb &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1293">            t = rd + (re ^ ra ^ rb) + x[6]; rd = ((t &lt;&lt; 8) | (t &gt;&gt;&gt; 24)) + rc; ra = (ra &lt;&lt; 10) | (ra &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1294">            t = rc + (rd ^ re ^ ra) + x[2]; rc = ((t &lt;&lt; 13) | (t &gt;&gt;&gt; 19)) + rb; re = (re &lt;&lt; 10) | (re &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1295">            t = rb + (rc ^ rd ^ re) + x[13]; rb = ((t &lt;&lt; 6) | (t &gt;&gt;&gt; 26)) + ra; rd = (rd &lt;&lt; 10) | (rd &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1296">            t = ra + (rb ^ rc ^ rd) + x[14]; ra = ((t &lt;&lt; 5) | (t &gt;&gt;&gt; 27)) + re; rc = (rc &lt;&lt; 10) | (rc &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1297">            t = re + (ra ^ rb ^ rc) + x[0]; re = ((t &lt;&lt; 15) | (t &gt;&gt;&gt; 17)) + rd; rb = (rb &lt;&lt; 10) | (rb &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1298">            t = rd + (re ^ ra ^ rb) + x[3]; rd = ((t &lt;&lt; 13) | (t &gt;&gt;&gt; 19)) + rc; ra = (ra &lt;&lt; 10) | (ra &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1299">            t = rc + (rd ^ re ^ ra) + x[9]; rc = ((t &lt;&lt; 11) | (t &gt;&gt;&gt; 21)) + rb; re = (re &lt;&lt; 10) | (re &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1300">            t = rb + (rc ^ rd ^ re) + x[11]; rb = ((t &lt;&lt; 11) | (t &gt;&gt;&gt; 21)) + ra; rd = (rd &lt;&lt; 10) | (rd &gt;&gt;&gt; 22);</span>
+<span class="fc" id="L1301">            out[0] = ra;</span>
+<span class="fc" id="L1302">            out[1] = rb;</span>
+<span class="fc" id="L1303">            out[2] = rc;</span>
+<span class="fc" id="L1304">            out[3] = rd;</span>
+<span class="fc" id="L1305">            out[4] = re;</span>
+<span class="fc" id="L1306">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

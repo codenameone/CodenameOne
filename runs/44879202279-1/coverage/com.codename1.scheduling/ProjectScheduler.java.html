@@ -1,0 +1,438 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ProjectScheduler.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.scheduling</a> &gt; <span class="el_source">ProjectScheduler.java</span></div><h1>ProjectScheduler.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.scheduling;
+
+import java.util.ArrayList;
+import java.util.List;
+
+/// Works out when every task of a project happens.
+///
+/// A forward pass gives each task the earliest dates its predecessors, its
+/// constraint and its leveling delay allow, in the project's working time. A
+/// backward pass from the project's finish gives the latest dates that delay
+/// nothing, and the difference is slack: a task with none is critical.
+///
+/// `ProjectModel.update` runs it. The whole project is scheduled every time;
+/// a pass is linear in tasks and links, and a partial one would have to prove
+/// what it may skip.
+public final class ProjectScheduler {
+    private ProjectScheduler() {
+    }
+
+    /// Schedules `model`, writing dates and slack into its tasks.
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalStateException`: when the links form a loop, which
+    ///   `ProjectModel.link` and `moveTask` do not allow
+    public static void schedule(ProjectModel model) {
+<span class="fc" id="L49">        List&lt;GanttTask&gt; tasks = model.getTasks();</span>
+<span class="fc" id="L50">        int[] order = order(model);</span>
+<span class="pc bpc" id="L51" title="1 of 2 branches missed.">        if (order == null) {</span>
+<span class="nc" id="L52">            throw new IllegalStateException(&quot;The project's links form a loop&quot;);</span>
+        }
+<span class="fc" id="L54">        int n = tasks.size();</span>
+<span class="fc" id="L55">        WorkCalendar cal = model.getCalendar();</span>
+<span class="fc" id="L56">        List&lt;TaskDependency&gt; deps = model.getDependencies();</span>
+<span class="fc" id="L57">        List&lt;List&lt;TaskDependency&gt;&gt; incoming = new ArrayList&lt;List&lt;TaskDependency&gt;&gt;(n);</span>
+<span class="fc" id="L58">        List&lt;List&lt;TaskDependency&gt;&gt; outgoing = new ArrayList&lt;List&lt;TaskDependency&gt;&gt;(n);</span>
+<span class="fc bfc" id="L59" title="All 2 branches covered.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc" id="L60">            incoming.add(null);</span>
+<span class="fc" id="L61">            outgoing.add(null);</span>
+        }
+<span class="fc bfc" id="L63" title="All 2 branches covered.">        for (TaskDependency d : deps) {</span>
+<span class="fc" id="L64">            put(incoming, d.getSuccessor().index, d);</span>
+<span class="fc" id="L65">            put(outgoing, d.getPredecessor().index, d);</span>
+<span class="fc" id="L66">        }</span>
+
+<span class="fc" id="L68">        long projectStart = cal.nextWorkingTime(model.getStart());</span>
+<span class="fc" id="L69">        long projectFinish = projectStart;</span>
+<span class="fc bfc" id="L70" title="All 2 branches covered.">        for (int o = 0; o &lt; n; o++) {</span>
+<span class="fc" id="L71">            GanttTask t = tasks.get(order[o]);</span>
+<span class="fc bfc" id="L72" title="All 2 branches covered.">            if (t.isSummary()) {</span>
+<span class="fc" id="L73">                long es = Long.MAX_VALUE;</span>
+<span class="fc" id="L74">                long ef = Long.MIN_VALUE;</span>
+<span class="fc bfc" id="L75" title="All 2 branches covered.">                for (int c = 0; c &lt; t.children.size(); c++) {</span>
+<span class="fc" id="L76">                    GanttTask child = t.children.get(c);</span>
+<span class="fc" id="L77">                    es = Math.min(es, child.earlyStart);</span>
+<span class="fc" id="L78">                    ef = Math.max(ef, child.earlyFinish);</span>
+                }
+<span class="fc" id="L80">                t.earlyStart = es;</span>
+<span class="fc" id="L81">                t.earlyFinish = ef;</span>
+<span class="fc" id="L82">                continue;</span>
+            }
+<span class="fc" id="L84">            forward(t, cal, incoming, projectStart);</span>
+<span class="fc" id="L85">            projectFinish = Math.max(projectFinish, t.earlyFinish);</span>
+        }
+<span class="fc" id="L87">        model.finish = projectFinish;</span>
+
+<span class="fc" id="L89">        List&lt;GanttTask&gt; leaves = new ArrayList&lt;GanttTask&gt;();</span>
+<span class="fc bfc" id="L90" title="All 2 branches covered.">        for (int o = n - 1; o &gt;= 0; o--) {</span>
+<span class="fc" id="L91">            GanttTask t = tasks.get(order[o]);</span>
+<span class="fc bfc" id="L92" title="All 2 branches covered.">            if (!t.isSummary()) {</span>
+<span class="fc" id="L93">                backward(t, cal, outgoing, projectFinish, leaves);</span>
+            }
+        }
+<span class="fc" id="L96">        long threshold = model.getCriticalSlack();</span>
+<span class="fc bfc" id="L97" title="All 2 branches covered.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc" id="L98">            GanttTask t = tasks.get(i);</span>
+<span class="fc bfc" id="L99" title="All 2 branches covered.">            if (t.isSummary()) {</span>
+<span class="fc" id="L100">                continue;</span>
+            }
+<span class="fc" id="L102">            t.totalSlack = cal.workingTimeBetween(t.earlyStart, t.lateStart);</span>
+<span class="fc bfc" id="L103" title="All 2 branches covered.">            t.critical = t.totalSlack &lt;= threshold;</span>
+<span class="fc" id="L104">            t.freeSlack = freeSlack(t, cal, outgoing, projectFinish, leaves);</span>
+<span class="fc bfc" id="L105" title="All 2 branches covered.">            if (!t.isManuallyScheduled()) {</span>
+<span class="fc" id="L106">                t.setDates(t.earlyStart, t.earlyFinish);</span>
+            }
+        }
+        // A parent comes before its children in the outline, so backwards is
+        // children first.
+<span class="fc bfc" id="L111" title="All 2 branches covered.">        for (int i = n - 1; i &gt;= 0; i--) {</span>
+<span class="fc" id="L112">            GanttTask t = tasks.get(i);</span>
+<span class="fc bfc" id="L113" title="All 2 branches covered.">            if (t.isSummary()) {</span>
+<span class="fc" id="L114">                rollUp(t, cal);</span>
+            }
+        }
+<span class="fc" id="L117">    }</span>
+
+    /// The tasks' indices in an order in which every task comes after what it
+    /// waits for, or null when the links form a loop. Also numbers the tasks.
+    static int[] order(ProjectModel model) {
+<span class="fc" id="L122">        List&lt;GanttTask&gt; tasks = model.getTasks();</span>
+<span class="fc" id="L123">        int n = tasks.size();</span>
+<span class="fc bfc" id="L124" title="All 2 branches covered.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc" id="L125">            tasks.get(i).index = i;</span>
+        }
+<span class="fc" id="L127">        List&lt;TaskDependency&gt; deps = model.getDependencies();</span>
+        // Edges as two parallel lists: a summary waits for its children, a
+        // successor for its predecessor, and every task under a summary that
+        // is a successor waits for that predecessor too.
+<span class="fc" id="L131">        IntList from = new IntList();</span>
+<span class="fc" id="L132">        IntList to = new IntList();</span>
+<span class="fc bfc" id="L133" title="All 2 branches covered.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc" id="L134">            GanttTask t = tasks.get(i);</span>
+<span class="fc bfc" id="L135" title="All 2 branches covered.">            if (t.parent != null) {</span>
+<span class="fc" id="L136">                from.add(i);</span>
+<span class="fc" id="L137">                to.add(t.parent.index);</span>
+            }
+        }
+<span class="fc" id="L140">        List&lt;GanttTask&gt; leaves = new ArrayList&lt;GanttTask&gt;();</span>
+<span class="fc bfc" id="L141" title="All 2 branches covered.">        for (TaskDependency d : deps) {</span>
+<span class="fc" id="L142">            GanttTask s = d.getSuccessor();</span>
+<span class="fc bfc" id="L143" title="All 2 branches covered.">            if (s.isSummary()) {</span>
+<span class="fc" id="L144">                leaves.clear();</span>
+<span class="fc" id="L145">                leavesOf(s, leaves);</span>
+<span class="fc bfc" id="L146" title="All 2 branches covered.">                for (GanttTask leaf : leaves) {</span>
+<span class="fc" id="L147">                    from.add(d.getPredecessor().index);</span>
+<span class="fc" id="L148">                    to.add(leaf.index);</span>
+<span class="fc" id="L149">                }</span>
+            } else {
+<span class="fc" id="L151">                from.add(d.getPredecessor().index);</span>
+<span class="fc" id="L152">                to.add(s.index);</span>
+            }
+<span class="fc" id="L154">        }</span>
+<span class="fc" id="L155">        int edges = from.size;</span>
+<span class="fc" id="L156">        int[] degree = new int[n];</span>
+<span class="fc" id="L157">        int[] firstEdge = new int[n + 1];</span>
+<span class="fc bfc" id="L158" title="All 2 branches covered.">        for (int e = 0; e &lt; edges; e++) {</span>
+<span class="fc" id="L159">            degree[to.data[e]]++;</span>
+<span class="fc" id="L160">            firstEdge[from.data[e] + 1]++;</span>
+        }
+<span class="fc bfc" id="L162" title="All 2 branches covered.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc" id="L163">            firstEdge[i + 1] += firstEdge[i];</span>
+        }
+<span class="fc" id="L165">        int[] fill = new int[n];</span>
+<span class="fc" id="L166">        int[] target = new int[edges];</span>
+<span class="fc bfc" id="L167" title="All 2 branches covered.">        for (int e = 0; e &lt; edges; e++) {</span>
+<span class="fc" id="L168">            int f = from.data[e];</span>
+<span class="fc" id="L169">            target[firstEdge[f] + fill[f]++] = to.data[e];</span>
+        }
+<span class="fc" id="L171">        int[] out = new int[n];</span>
+<span class="fc" id="L172">        int head = 0;</span>
+<span class="fc" id="L173">        int tail = 0;</span>
+<span class="fc bfc" id="L174" title="All 2 branches covered.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc bfc" id="L175" title="All 2 branches covered.">            if (degree[i] == 0) {</span>
+<span class="fc" id="L176">                out[tail++] = i;</span>
+            }
+        }
+<span class="fc bfc" id="L179" title="All 2 branches covered.">        while (head &lt; tail) {</span>
+<span class="fc" id="L180">            int t = out[head++];</span>
+<span class="fc bfc" id="L181" title="All 2 branches covered.">            for (int e = firstEdge[t]; e &lt; firstEdge[t + 1]; e++) {</span>
+<span class="fc" id="L182">                int next = target[e];</span>
+<span class="fc" id="L183">                degree[next]--;</span>
+<span class="fc bfc" id="L184" title="All 2 branches covered.">                if (degree[next] == 0) {</span>
+<span class="fc" id="L185">                    out[tail++] = next;</span>
+                }
+            }
+<span class="fc" id="L188">        }</span>
+<span class="fc bfc" id="L189" title="All 2 branches covered.">        return tail == n ? out : null;</span>
+    }
+
+    private static void forward(GanttTask t, WorkCalendar cal, List&lt;List&lt;TaskDependency&gt;&gt; incoming, long projectStart) {
+<span class="fc" id="L193">        t.constraintViolated = false;</span>
+<span class="fc bfc" id="L194" title="All 2 branches covered.">        if (t.isManuallyScheduled()) {</span>
+<span class="fc" id="L195">            t.earlyStart = t.getStart();</span>
+<span class="fc" id="L196">            t.earlyFinish = t.getEnd();</span>
+<span class="fc" id="L197">            return;</span>
+        }
+<span class="fc" id="L199">        long dur = t.getDuration();</span>
+<span class="fc" id="L200">        long s = projectStart;</span>
+<span class="fc bfc" id="L201" title="All 2 branches covered.">        for (GanttTask a = t; a != null; a = a.parent) {</span>
+<span class="fc" id="L202">            List&lt;TaskDependency&gt; in = incoming.get(a.index);</span>
+<span class="fc bfc" id="L203" title="All 2 branches covered.">            if (in == null) {</span>
+<span class="fc" id="L204">                continue;</span>
+            }
+<span class="fc bfc" id="L206" title="All 2 branches covered.">            for (TaskDependency d : in) {</span>
+<span class="fc" id="L207">                GanttTask p = d.getPredecessor();</span>
+                // Without a lag the bound is the predecessor's own instant:
+                // adding zero working time would carry the close of one day
+                // to the opening of the next, and a milestone belongs to the
+                // day it closes.
+<span class="fc bfc" id="L212" title="All 2 branches covered.">                long bound = d.fromFinish() ? p.earlyFinish : p.earlyStart;</span>
+<span class="fc bfc" id="L213" title="All 2 branches covered.">                if (d.getLag() != 0) {</span>
+<span class="fc" id="L214">                    bound = cal.addWorkingTime(bound, d.getLag());</span>
+                }
+                // A link to a summary holds the start of what is under it.
+<span class="fc bfc" id="L217" title="All 4 branches covered.">                if (a == t &amp;&amp; !d.constrainsStart()) { //NOPMD CompareObjectsWithEquals</span>
+<span class="fc" id="L218">                    bound = cal.subtractWorkingTime(bound, dur);</span>
+                }
+<span class="fc" id="L220">                s = Math.max(s, bound);</span>
+<span class="fc" id="L221">            }</span>
+        }
+<span class="fc" id="L223">        long date = t.getConstraintDate();</span>
+<span class="fc bfc" id="L224" title="All 5 branches covered.">        switch (t.getConstraint()) {</span>
+            case START_NO_EARLIER_THAN:
+<span class="fc" id="L226">                s = Math.max(s, date);</span>
+<span class="fc" id="L227">                break;</span>
+            case FINISH_NO_EARLIER_THAN:
+<span class="fc" id="L229">                s = Math.max(s, cal.subtractWorkingTime(date, dur));</span>
+<span class="fc" id="L230">                break;</span>
+            case MUST_START_ON:
+<span class="fc bfc" id="L232" title="All 2 branches covered.">                t.constraintViolated = date &lt; s;</span>
+<span class="fc" id="L233">                s = date;</span>
+<span class="fc" id="L234">                break;</span>
+            case MUST_FINISH_ON:
+<span class="fc" id="L236">                long must = cal.subtractWorkingTime(date, dur);</span>
+<span class="pc bpc" id="L237" title="1 of 2 branches missed.">                t.constraintViolated = must &lt; s;</span>
+<span class="fc" id="L238">                s = must;</span>
+<span class="fc" id="L239">                break;</span>
+            default:
+                break;
+        }
+<span class="fc bfc" id="L243" title="All 2 branches covered.">        if (t.getLevelingDelay() &gt; 0) {</span>
+<span class="fc" id="L244">            s = cal.addWorkingTime(cal.nextWorkingTime(s), t.getLevelingDelay());</span>
+        }
+<span class="fc bfc" id="L246" title="All 2 branches covered.">        if (dur == 0) {</span>
+            // A milestone may sit where a working period closes: the end of
+            // Friday, not the start of Monday.
+<span class="pc bpc" id="L249" title="1 of 2 branches missed.">            t.earlyStart = cal.previousWorkingTime(s) == s ? s : cal.nextWorkingTime(s);</span>
+<span class="fc" id="L250">            t.earlyFinish = t.earlyStart;</span>
+        } else {
+<span class="fc" id="L252">            t.earlyStart = cal.nextWorkingTime(s);</span>
+<span class="fc" id="L253">            t.earlyFinish = cal.addWorkingTime(t.earlyStart, dur);</span>
+        }
+<span class="pc bpc" id="L255" title="1 of 2 branches missed.">        if (t.getConstraint() == GanttTask.Constraint.START_NO_LATER_THAN) {</span>
+<span class="nc bnc" id="L256" title="All 2 branches missed.">            t.constraintViolated = t.earlyStart &gt; date;</span>
+<span class="fc bfc" id="L257" title="All 2 branches covered.">        } else if (t.getConstraint() == GanttTask.Constraint.FINISH_NO_LATER_THAN) {</span>
+<span class="pc bpc" id="L258" title="1 of 2 branches missed.">            t.constraintViolated = t.earlyFinish &gt; date;</span>
+        }
+<span class="fc" id="L260">    }</span>
+
+    private static boolean pinned(GanttTask t) {
+<span class="fc bfc" id="L263" title="All 4 branches covered.">        return t.isManuallyScheduled() || t.getConstraint() == GanttTask.Constraint.MUST_START_ON</span>
+<span class="fc bfc" id="L264" title="All 2 branches covered.">                || t.getConstraint() == GanttTask.Constraint.MUST_FINISH_ON;</span>
+    }
+
+    private static void backward(GanttTask t, WorkCalendar cal, List&lt;List&lt;TaskDependency&gt;&gt; outgoing,
+                                 long projectFinish, List&lt;GanttTask&gt; leaves) {
+<span class="fc bfc" id="L269" title="All 2 branches covered.">        if (pinned(t)) {</span>
+<span class="fc" id="L270">            t.lateStart = t.earlyStart;</span>
+<span class="fc" id="L271">            t.lateFinish = t.earlyFinish;</span>
+<span class="fc" id="L272">            return;</span>
+        }
+<span class="fc" id="L274">        long dur = t.getDuration();</span>
+<span class="fc" id="L275">        long lf = projectFinish;</span>
+<span class="fc bfc" id="L276" title="All 2 branches covered.">        for (GanttTask a = t; a != null; a = a.parent) {</span>
+<span class="fc" id="L277">            List&lt;TaskDependency&gt; out = outgoing.get(a.index);</span>
+<span class="fc bfc" id="L278" title="All 2 branches covered.">            if (out == null) {</span>
+<span class="fc" id="L279">                continue;</span>
+            }
+<span class="fc bfc" id="L281" title="All 2 branches covered.">            for (TaskDependency d : out) {</span>
+                // A summary's finish is the latest of its children, so a link
+                // from its finish holds each of them. Its start holds none.
+<span class="pc bpc" id="L284" title="1 of 4 branches missed.">                if (a != t &amp;&amp; !d.fromFinish()) { //NOPMD CompareObjectsWithEquals</span>
+<span class="nc" id="L285">                    continue;</span>
+                }
+<span class="fc" id="L287">                GanttTask s = d.getSuccessor();</span>
+<span class="fc bfc" id="L288" title="All 2 branches covered.">                if (s.isSummary()) {</span>
+<span class="fc" id="L289">                    leaves.clear();</span>
+<span class="fc" id="L290">                    leavesOf(s, leaves);</span>
+<span class="fc bfc" id="L291" title="All 2 branches covered.">                    for (GanttTask leaf : leaves) {</span>
+<span class="fc" id="L292">                        lf = Math.min(lf, lateBound(d, leaf.lateStart, cal, dur));</span>
+<span class="fc" id="L293">                    }</span>
+                } else {
+<span class="fc bfc" id="L295" title="All 2 branches covered.">                    lf = Math.min(lf, lateBound(d, d.constrainsStart() ? s.lateStart : s.lateFinish, cal, dur));</span>
+                }
+<span class="fc" id="L297">            }</span>
+        }
+<span class="fc bfc" id="L299" title="All 2 branches covered.">        if (t.getConstraint() == GanttTask.Constraint.FINISH_NO_LATER_THAN) {</span>
+<span class="fc" id="L300">            lf = Math.min(lf, t.getConstraintDate());</span>
+<span class="pc bpc" id="L301" title="1 of 2 branches missed.">        } else if (t.getConstraint() == GanttTask.Constraint.START_NO_LATER_THAN) {</span>
+<span class="nc" id="L302">            lf = Math.min(lf, cal.addWorkingTime(t.getConstraintDate(), dur));</span>
+        }
+<span class="fc bfc" id="L304" title="All 2 branches covered.">        if (dur == 0) {</span>
+<span class="fc" id="L305">            t.lateFinish = lf;</span>
+<span class="fc" id="L306">            t.lateStart = lf;</span>
+        } else {
+<span class="fc" id="L308">            t.lateFinish = cal.previousWorkingTime(lf);</span>
+<span class="fc" id="L309">            t.lateStart = cal.subtractWorkingTime(t.lateFinish, dur);</span>
+        }
+<span class="fc" id="L311">    }</span>
+
+    // The latest finish of a predecessor that lets the successor's end be at
+    // `target`.
+    private static long lateBound(TaskDependency d, long target, WorkCalendar cal, long dur) {
+<span class="fc bfc" id="L316" title="All 2 branches covered.">        long b = d.getLag() == 0 ? target : cal.subtractWorkingTime(target, d.getLag());</span>
+<span class="fc bfc" id="L317" title="All 2 branches covered.">        if (!d.fromFinish()) {</span>
+<span class="fc" id="L318">            b = cal.addWorkingTime(b, dur);</span>
+        }
+<span class="fc" id="L320">        return b;</span>
+    }
+
+    private static long freeSlack(GanttTask t, WorkCalendar cal, List&lt;List&lt;TaskDependency&gt;&gt; outgoing,
+                                  long projectFinish, List&lt;GanttTask&gt; leaves) {
+<span class="fc" id="L325">        long best = Long.MAX_VALUE;</span>
+<span class="fc bfc" id="L326" title="All 2 branches covered.">        for (GanttTask a = t; a != null; a = a.parent) {</span>
+<span class="fc" id="L327">            List&lt;TaskDependency&gt; out = outgoing.get(a.index);</span>
+<span class="fc bfc" id="L328" title="All 2 branches covered.">            if (out == null) {</span>
+<span class="fc" id="L329">                continue;</span>
+            }
+<span class="fc bfc" id="L331" title="All 2 branches covered.">            for (TaskDependency d : out) {</span>
+<span class="pc bpc" id="L332" title="1 of 4 branches missed.">                if (a != t &amp;&amp; !d.fromFinish()) { //NOPMD CompareObjectsWithEquals</span>
+<span class="nc" id="L333">                    continue;</span>
+                }
+<span class="fc bfc" id="L335" title="All 2 branches covered.">                long mine = d.fromFinish() ? t.earlyFinish : t.earlyStart;</span>
+<span class="fc" id="L336">                GanttTask s = d.getSuccessor();</span>
+<span class="fc bfc" id="L337" title="All 2 branches covered.">                if (s.isSummary()) {</span>
+<span class="fc" id="L338">                    leaves.clear();</span>
+<span class="fc" id="L339">                    leavesOf(s, leaves);</span>
+<span class="fc bfc" id="L340" title="All 2 branches covered.">                    for (GanttTask leaf : leaves) {</span>
+<span class="fc" id="L341">                        long allowed = cal.subtractWorkingTime(leaf.earlyStart, d.getLag());</span>
+<span class="fc" id="L342">                        best = Math.min(best, cal.workingTimeBetween(mine, allowed));</span>
+<span class="fc" id="L343">                    }</span>
+                } else {
+<span class="fc bfc" id="L345" title="All 2 branches covered.">                    long allowed = cal.subtractWorkingTime(d.constrainsStart() ? s.earlyStart : s.earlyFinish, d.getLag());</span>
+<span class="fc" id="L346">                    best = Math.min(best, cal.workingTimeBetween(mine, allowed));</span>
+                }
+<span class="fc" id="L348">            }</span>
+        }
+<span class="fc bfc" id="L350" title="All 2 branches covered.">        if (best == Long.MAX_VALUE) {</span>
+<span class="fc" id="L351">            best = cal.workingTimeBetween(t.earlyFinish, projectFinish);</span>
+        }
+<span class="fc" id="L353">        return Math.max(0, best);</span>
+    }
+
+    private static void rollUp(GanttTask t, WorkCalendar cal) {
+<span class="fc" id="L357">        long ls = Long.MAX_VALUE;</span>
+<span class="fc" id="L358">        long lf = Long.MIN_VALUE;</span>
+<span class="fc" id="L359">        long slack = Long.MAX_VALUE;</span>
+<span class="fc" id="L360">        long free = Long.MAX_VALUE;</span>
+<span class="fc" id="L361">        boolean critical = false;</span>
+<span class="fc" id="L362">        boolean violated = false;</span>
+<span class="fc" id="L363">        long work = 0;</span>
+<span class="fc" id="L364">        long done = 0;</span>
+<span class="fc bfc" id="L365" title="All 2 branches covered.">        for (int c = 0; c &lt; t.children.size(); c++) {</span>
+<span class="fc" id="L366">            GanttTask child = t.children.get(c);</span>
+<span class="fc" id="L367">            ls = Math.min(ls, child.lateStart);</span>
+<span class="fc" id="L368">            lf = Math.max(lf, child.lateFinish);</span>
+<span class="fc" id="L369">            slack = Math.min(slack, child.totalSlack);</span>
+<span class="fc" id="L370">            free = Math.min(free, child.freeSlack);</span>
+<span class="fc" id="L371">            critical |= child.critical;</span>
+<span class="fc" id="L372">            violated |= child.constraintViolated;</span>
+            // A manual task's length is its dates, whatever duration it was
+            // given: it weighs that much in the summary's progress. Its own
+            // duration is left alone for when it is scheduled again.
+<span class="pc bpc" id="L376" title="1 of 4 branches missed.">            long d = child.isManuallyScheduled() &amp;&amp; !child.isSummary()</span>
+<span class="fc" id="L377">                    ? Math.max(0, cal.workingTimeBetween(child.earlyStart, child.earlyFinish))</span>
+<span class="fc" id="L378">                    : child.getDuration();</span>
+<span class="fc" id="L379">            work += d;</span>
+<span class="fc" id="L380">            done += d * child.getPercentComplete();</span>
+        }
+<span class="fc" id="L382">        t.lateStart = ls;</span>
+<span class="fc" id="L383">        t.lateFinish = lf;</span>
+<span class="fc" id="L384">        t.totalSlack = slack;</span>
+<span class="fc" id="L385">        t.freeSlack = free;</span>
+<span class="fc" id="L386">        t.critical = critical;</span>
+<span class="fc" id="L387">        t.constraintViolated = violated;</span>
+<span class="fc" id="L388">        t.setDates(t.earlyStart, t.earlyFinish);</span>
+<span class="fc" id="L389">        t.setDuration(Math.max(0, cal.workingTimeBetween(t.earlyStart, t.earlyFinish)));</span>
+<span class="fc bfc" id="L390" title="All 2 branches covered.">        if (work &gt; 0) {</span>
+<span class="fc" id="L391">            t.setPercentComplete((int) (done / work));</span>
+<span class="pc bpc" id="L392" title="1 of 2 branches missed.">        } else if (!t.children.isEmpty()) {</span>
+            // Nothing to weigh by (manual tasks in hours off, milestones):
+            // every child counts the same rather than leaving it stale.
+<span class="fc" id="L395">            int sum = 0;</span>
+<span class="fc bfc" id="L396" title="All 2 branches covered.">            for (int c = 0; c &lt; t.children.size(); c++) {</span>
+<span class="fc" id="L397">                sum += t.children.get(c).getPercentComplete();</span>
+            }
+<span class="fc" id="L399">            t.setPercentComplete(sum / t.children.size());</span>
+        }
+<span class="fc" id="L401">    }</span>
+
+    /// Adds every task under `t` that has no children of its own to `out`.
+    static void leavesOf(GanttTask t, List&lt;GanttTask&gt; out) {
+<span class="fc bfc" id="L405" title="All 2 branches covered.">        for (int c = 0; c &lt; t.children.size(); c++) {</span>
+<span class="fc" id="L406">            GanttTask child = t.children.get(c);</span>
+<span class="pc bpc" id="L407" title="1 of 2 branches missed.">            if (child.children.isEmpty()) {</span>
+<span class="fc" id="L408">                out.add(child);</span>
+            } else {
+<span class="nc" id="L410">                leavesOf(child, out);</span>
+            }
+        }
+<span class="fc" id="L413">    }</span>
+
+    private static void put(List&lt;List&lt;TaskDependency&gt;&gt; lists, int index, TaskDependency d) {
+<span class="fc" id="L416">        List&lt;TaskDependency&gt; l = lists.get(index);</span>
+<span class="fc bfc" id="L417" title="All 2 branches covered.">        if (l == null) {</span>
+<span class="fc" id="L418">            l = new ArrayList&lt;TaskDependency&gt;(2);</span>
+<span class="fc" id="L419">            lists.set(index, l);</span>
+        }
+<span class="fc" id="L421">        l.add(d);</span>
+<span class="fc" id="L422">    }</span>
+
+<span class="fc" id="L424">    private static final class IntList {</span>
+<span class="fc" id="L425">        int[] data = new int[32];</span>
+        int size;
+
+        void add(int v) {
+<span class="pc bpc" id="L429" title="1 of 2 branches missed.">            if (size == data.length) {</span>
+<span class="nc" id="L430">                int[] bigger = new int[size * 2];</span>
+<span class="nc" id="L431">                System.arraycopy(data, 0, bigger, 0, size);</span>
+<span class="nc" id="L432">                data = bigger;</span>
+            }
+<span class="fc" id="L434">            data[size++] = v;</span>
+<span class="fc" id="L435">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

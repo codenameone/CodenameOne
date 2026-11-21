@@ -1,0 +1,150 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EntitlementInfo.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.payment</a> &gt; <span class="el_source">EntitlementInfo.java</span></div><h1>EntitlementInfo.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Codename One in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.payment;
+
+import java.util.HashMap;
+import java.util.Map;
+
+/// One entitlement of a customer, as the Codename One Commerce service
+/// reported it. An entitlement is what the application checks (&quot;pro&quot;), and is
+/// independent of the store and of the product that granted it.
+///
+/// Instances are immutable. They are created by [CustomerInfo] from the
+/// service's answer and never by the application.
+public final class EntitlementInfo {
+    private final String id;
+    private final boolean active;
+    private final long expiresDate;
+    private final String productId;
+    private final String store;
+    private final String periodType;
+    private final String ownershipType;
+    private final String billingStage;
+    private final boolean willRenew;
+    private final String provenance;
+
+    /// Builds an entitlement from its parsed JSON object.
+    ///
+    /// #### Parameters
+    ///
+    /// - `id`: the entitlement id, used when the object does not carry one
+    ///
+    /// - `json`: the parsed object, may be null
+<span class="fc" id="L53">    EntitlementInfo(String id, Map json) {</span>
+<span class="pc bpc" id="L54" title="1 of 2 branches missed.">        Map m = json == null ? new HashMap() : json;</span>
+<span class="fc" id="L55">        String own = CustomerInfo.asString(m.get(&quot;entitlementId&quot;));</span>
+<span class="pc bpc" id="L56" title="1 of 2 branches missed.">        this.id = own == null ? id : own;</span>
+<span class="fc" id="L57">        this.active = CustomerInfo.asBoolean(m.get(&quot;active&quot;));</span>
+<span class="fc" id="L58">        this.expiresDate = CustomerInfo.asLong(m.get(&quot;expiresDate&quot;));</span>
+<span class="fc" id="L59">        this.productId = CustomerInfo.asString(m.get(&quot;productId&quot;));</span>
+<span class="fc" id="L60">        this.store = CustomerInfo.asString(m.get(&quot;store&quot;));</span>
+<span class="fc" id="L61">        this.periodType = CustomerInfo.asString(m.get(&quot;periodType&quot;));</span>
+<span class="fc" id="L62">        this.ownershipType = CustomerInfo.asString(m.get(&quot;ownershipType&quot;));</span>
+<span class="fc" id="L63">        this.billingStage = CustomerInfo.asString(m.get(&quot;billingStage&quot;));</span>
+<span class="fc" id="L64">        this.willRenew = CustomerInfo.asBoolean(m.get(&quot;willRenew&quot;));</span>
+<span class="fc" id="L65">        this.provenance = CustomerInfo.asString(m.get(&quot;provenance&quot;));</span>
+<span class="fc" id="L66">    }</span>
+
+    /// The entitlement id, the name the application checks.
+    public String getId() {
+<span class="fc" id="L70">        return id;</span>
+    }
+
+    /// Whether the service considers the entitlement held. This is the
+    /// service's decision, made with its own clock; it is not recomputed on
+    /// the device from [#getExpiresDate()].
+    public boolean isActive() {
+<span class="fc" id="L77">        return active;</span>
+    }
+
+    /// When the entitlement ends, in milliseconds since the epoch, or 0 when
+    /// it has no end (a lifetime purchase) or the service did not say.
+    public long getExpiresDate() {
+<span class="fc" id="L83">        return expiresDate;</span>
+    }
+
+    /// The store product that granted the entitlement, or null.
+    public String getProductId() {
+<span class="fc" id="L88">        return productId;</span>
+    }
+
+    /// The store the grant came from, as the service names it, or null.
+    public String getStore() {
+<span class="fc" id="L93">        return store;</span>
+    }
+
+    /// The kind of period the customer is in (a trial, an introductory
+    /// period, the normal one), as the service names it, or null.
+    public String getPeriodType() {
+<span class="fc" id="L99">        return periodType;</span>
+    }
+
+    /// Whether the customer bought the product or received it through family
+    /// sharing, as the service names it, or null.
+    public String getOwnershipType() {
+<span class="fc" id="L105">        return ownershipType;</span>
+    }
+
+    /// Where the subscription is in its billing life (in a grace period, in
+    /// billing retry and so on), as the service names it, or null.
+    public String getBillingStage() {
+<span class="fc" id="L111">        return billingStage;</span>
+    }
+
+    /// Whether the subscription behind the entitlement is set to renew.
+    public boolean isWillRenew() {
+<span class="fc" id="L116">        return willRenew;</span>
+    }
+
+    /// How the grant came to be (a purchase, a promotional grant, a
+    /// transfer), as the service names it, or null.
+    public String getProvenance() {
+<span class="fc" id="L122">        return provenance;</span>
+    }
+
+    /// This entitlement as the JSON object it was built from, for storage.
+    ///
+    /// #### Returns
+    ///
+    /// a new map, which the caller may change
+    public Map&lt;String, Object&gt; toMap() {
+<span class="fc" id="L131">        Map&lt;String, Object&gt; out = new HashMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L132">        CustomerInfo.putIfSet(out, &quot;entitlementId&quot;, id);</span>
+<span class="fc bfc" id="L133" title="All 2 branches covered.">        out.put(&quot;active&quot;, active ? Boolean.TRUE : Boolean.FALSE);</span>
+<span class="fc" id="L134">        out.put(&quot;expiresDate&quot;, Long.valueOf(expiresDate));</span>
+<span class="fc" id="L135">        CustomerInfo.putIfSet(out, &quot;productId&quot;, productId);</span>
+<span class="fc" id="L136">        CustomerInfo.putIfSet(out, &quot;store&quot;, store);</span>
+<span class="fc" id="L137">        CustomerInfo.putIfSet(out, &quot;periodType&quot;, periodType);</span>
+<span class="fc" id="L138">        CustomerInfo.putIfSet(out, &quot;ownershipType&quot;, ownershipType);</span>
+<span class="fc" id="L139">        CustomerInfo.putIfSet(out, &quot;billingStage&quot;, billingStage);</span>
+<span class="fc bfc" id="L140" title="All 2 branches covered.">        out.put(&quot;willRenew&quot;, willRenew ? Boolean.TRUE : Boolean.FALSE);</span>
+<span class="fc" id="L141">        CustomerInfo.putIfSet(out, &quot;provenance&quot;, provenance);</span>
+<span class="fc" id="L142">        return out;</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="nc" id="L147">        return &quot;EntitlementInfo{&quot; + id + &quot;, active=&quot; + active + &quot;, expiresDate=&quot; + expiresDate + &quot;}&quot;;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

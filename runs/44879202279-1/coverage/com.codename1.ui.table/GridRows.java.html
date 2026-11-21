@@ -1,0 +1,232 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>GridRows.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.table</a> &gt; <span class="el_source">GridRows.java</span></div><h1>GridRows.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ui.table;
+
+import java.util.Date;
+
+/// The rows a `DataGrid` shows, in the order it shows them: the model's
+/// rows filtered and sorted, with group rows or the open nodes of a tree.
+///
+/// A view row is an index into this, never into the model. Nothing here
+/// copies the data: a flat view is an array of model row numbers, a tree a
+/// list of the nodes that are open.
+<span class="fc" id="L33">abstract class GridRows {</span>
+    /// The columns sorted by, most significant first, and their directions.
+<span class="fc" id="L35">    GridColumn[] sortColumns = new GridColumn[0];</span>
+<span class="fc" id="L36">    boolean[] sortAscending = new boolean[0];</span>
+    GridFilter filter;
+<span class="fc" id="L38">    final GridRow probe = new GridRow();</span>
+
+    abstract int size();
+
+    abstract int columnCount();
+
+    abstract String columnName(int modelColumn);
+
+    /// Whether a view row is a group row rather than data.
+    boolean isGroup(int row) {
+<span class="fc" id="L48">        return false;</span>
+    }
+
+    /// The label of a group row: its column's formatted key.
+    String groupLabel(int row) {
+<span class="nc" id="L53">        return &quot;&quot;;</span>
+    }
+
+    /// How many data rows a group row stands for.
+    int groupCount(int row) {
+<span class="nc" id="L58">        return 0;</span>
+    }
+
+    /// How far in a row is drawn: a tree's depth, or 1 for the data rows
+    /// under a group.
+    abstract int depth(int row);
+
+    abstract boolean isExpandable(int row);
+
+    abstract boolean isExpanded(int row);
+
+    /// Opens or closes a row in place.
+    ///
+    /// #### Returns
+    ///
+    /// how many rows were added, negative when removed
+    abstract int setExpanded(int row, boolean open);
+
+    abstract Object value(int row, int modelColumn);
+
+    abstract boolean isEditable(int row, int modelColumn);
+
+    abstract void setValue(int row, int modelColumn, Object value);
+
+    /// What identifies a row across a rebuild: a model row number, a node or
+    /// a group's key.
+    abstract Object key(int row);
+
+    /// The view row of a key, or -1 when it is not shown.
+    abstract int find(Object key);
+
+    /// Applies the filter, the sort and the grouping again.
+    abstract void rebuild();
+
+    /// The model row of a view row of a flat grid, -1 for any other row.
+    int modelRow(int row) {
+<span class="nc" id="L94">        return -1;</span>
+    }
+
+    /// The node of a view row of a tree grid, null for any other row.
+    Object node(int row) {
+<span class="nc" id="L99">        return null;</span>
+    }
+
+    final void setSort(GridColumn[] columns, boolean[] ascending) {
+<span class="fc" id="L103">        sortColumns = columns;</span>
+<span class="fc" id="L104">        sortAscending = ascending;</span>
+<span class="fc" id="L105">    }</span>
+
+    // ------------------------------------------------------------- order
+
+    /// The default order: null first, then numbers by value, dates by time,
+    /// booleans false first, and anything else by its text, case folded
+    /// character by character so a Turkish device sorts like any other.
+    static int naturalCompare(Object a, Object b) {
+<span class="fc bfc" id="L113" title="All 2 branches covered.">        if (a == b) { //NOPMD CompareObjectsWithEquals - identity is the fast path, not equality</span>
+<span class="fc" id="L114">            return 0;</span>
+        }
+<span class="pc bpc" id="L116" title="1 of 2 branches missed.">        if (a == null) {</span>
+<span class="nc" id="L117">            return -1;</span>
+        }
+<span class="pc bpc" id="L119" title="1 of 2 branches missed.">        if (b == null) {</span>
+<span class="nc" id="L120">            return 1;</span>
+        }
+<span class="pc bpc" id="L122" title="1 of 4 branches missed.">        if (a instanceof Number &amp;&amp; b instanceof Number) {</span>
+<span class="fc bfc" id="L123" title="All 4 branches covered.">            if (isIntegral(a) &amp;&amp; isIntegral(b)) {</span>
+<span class="fc" id="L124">                long x = ((Number) a).longValue();</span>
+<span class="fc" id="L125">                long y = ((Number) b).longValue();</span>
+<span class="pc bpc" id="L126" title="1 of 4 branches missed.">                return x &lt; y ? -1 : (x == y ? 0 : 1);</span>
+            }
+<span class="fc" id="L128">            return Double.compare(((Number) a).doubleValue(), ((Number) b).doubleValue());</span>
+        }
+<span class="pc bpc" id="L130" title="3 of 4 branches missed.">        if (a instanceof Date &amp;&amp; b instanceof Date) {</span>
+<span class="nc" id="L131">            long x = ((Date) a).getTime();</span>
+<span class="nc" id="L132">            long y = ((Date) b).getTime();</span>
+<span class="nc bnc" id="L133" title="All 4 branches missed.">            return x &lt; y ? -1 : (x == y ? 0 : 1);</span>
+        }
+<span class="pc bpc" id="L135" title="3 of 4 branches missed.">        if (a instanceof Boolean &amp;&amp; b instanceof Boolean) {</span>
+<span class="nc" id="L136">            boolean x = ((Boolean) a).booleanValue();</span>
+<span class="nc" id="L137">            boolean y = ((Boolean) b).booleanValue();</span>
+<span class="nc bnc" id="L138" title="All 4 branches missed.">            return x == y ? 0 : (x ? 1 : -1);</span>
+        }
+<span class="fc" id="L140">        return compareText(a.toString(), b.toString());</span>
+    }
+
+    private static boolean isIntegral(Object n) {
+<span class="pc bpc" id="L144" title="2 of 8 branches missed.">        return n instanceof Integer || n instanceof Long || n instanceof Short || n instanceof Byte;</span>
+    }
+
+    static int compareText(String a, String b) {
+<span class="fc" id="L148">        int n = Math.min(a.length(), b.length());</span>
+<span class="pc bpc" id="L149" title="1 of 2 branches missed.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc" id="L150">            char x = a.charAt(i);</span>
+<span class="fc" id="L151">            char y = b.charAt(i);</span>
+<span class="fc bfc" id="L152" title="All 2 branches covered.">            if (x != y) {</span>
+<span class="fc" id="L153">                char lx = Character.toLowerCase(x);</span>
+<span class="fc" id="L154">                char ly = Character.toLowerCase(y);</span>
+<span class="pc bpc" id="L155" title="1 of 2 branches missed.">                if (lx != ly) {</span>
+<span class="fc" id="L156">                    return lx - ly;</span>
+                }
+            }
+        }
+<span class="nc bnc" id="L160" title="All 2 branches missed.">        if (a.length() != b.length()) {</span>
+<span class="nc" id="L161">            return a.length() - b.length();</span>
+        }
+        // Equal but for case: settle it, so the order is total.
+<span class="nc" id="L164">        return a.compareTo(b);</span>
+    }
+
+    /// Compares two positions of the sort keys.
+    static java.util.Comparator[] comparators(GridColumn[] cols) {
+<span class="fc" id="L169">        java.util.Comparator[] out = new java.util.Comparator[cols.length];</span>
+<span class="fc bfc" id="L170" title="All 2 branches covered.">        for (int i = 0; i &lt; cols.length; i++) {</span>
+<span class="fc" id="L171">            out[i] = cols[i].getComparator();</span>
+        }
+<span class="fc" id="L173">        return out;</span>
+    }
+
+    interface Order {
+        int compare(int a, int b);
+    }
+
+    /// Sorts `idx[from..to)` with a stable merge sort, which keeps rows that
+    /// compare equal in the order they were in: the property that lets a
+    /// sort by one column refine the sort by another.
+    static void sort(int[] idx, int from, int to, Order order) {
+<span class="fc" id="L184">        int n = to - from;</span>
+<span class="pc bpc" id="L185" title="1 of 2 branches missed.">        if (n &lt; 2) {</span>
+<span class="nc" id="L186">            return;</span>
+        }
+<span class="fc" id="L188">        int[] buf = new int[n];</span>
+<span class="fc" id="L189">        mergeSort(idx, buf, from, to, order);</span>
+<span class="fc" id="L190">    }</span>
+
+    private static void mergeSort(int[] a, int[] buf, int from, int to, Order order) {
+<span class="fc" id="L193">        int n = to - from;</span>
+<span class="fc bfc" id="L194" title="All 2 branches covered.">        if (n &lt;= 12) {</span>
+<span class="fc bfc" id="L195" title="All 2 branches covered.">            for (int i = from + 1; i &lt; to; i++) {</span>
+<span class="fc" id="L196">                int v = a[i];</span>
+<span class="fc" id="L197">                int j = i - 1;</span>
+<span class="fc bfc" id="L198" title="All 4 branches covered.">                while (j &gt;= from &amp;&amp; order.compare(a[j], v) &gt; 0) {</span>
+<span class="fc" id="L199">                    a[j + 1] = a[j];</span>
+<span class="fc" id="L200">                    j--;</span>
+                }
+<span class="fc" id="L202">                a[j + 1] = v;</span>
+            }
+<span class="fc" id="L204">            return;</span>
+        }
+<span class="fc" id="L206">        int mid = (from + to) &gt;&gt;&gt; 1;</span>
+<span class="fc" id="L207">        mergeSort(a, buf, from, mid, order);</span>
+<span class="fc" id="L208">        mergeSort(a, buf, mid, to, order);</span>
+<span class="fc bfc" id="L209" title="All 2 branches covered.">        if (order.compare(a[mid - 1], a[mid]) &lt;= 0) {</span>
+<span class="fc" id="L210">            return;</span>
+        }
+<span class="fc" id="L212">        System.arraycopy(a, from, buf, 0, n);</span>
+<span class="fc" id="L213">        int i = 0;</span>
+<span class="fc" id="L214">        int iEnd = mid - from;</span>
+<span class="fc" id="L215">        int j = iEnd;</span>
+<span class="fc" id="L216">        int k = from;</span>
+<span class="fc bfc" id="L217" title="All 4 branches covered.">        while (i &lt; iEnd &amp;&amp; j &lt; n) {</span>
+<span class="fc bfc" id="L218" title="All 2 branches covered.">            if (order.compare(buf[j], buf[i]) &lt; 0) {</span>
+<span class="fc" id="L219">                a[k++] = buf[j++];</span>
+            } else {
+<span class="fc" id="L221">                a[k++] = buf[i++];</span>
+            }
+        }
+<span class="fc bfc" id="L224" title="All 2 branches covered.">        while (i &lt; iEnd) {</span>
+<span class="fc" id="L225">            a[k++] = buf[i++];</span>
+        }
+<span class="fc bfc" id="L227" title="All 2 branches covered.">        while (j &lt; n) {</span>
+<span class="fc" id="L228">            a[k++] = buf[j++];</span>
+        }
+<span class="fc" id="L230">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

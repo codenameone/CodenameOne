@@ -1,0 +1,322 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>WebSocket.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.io</a> &gt; <span class="el_source">WebSocket.java</span></div><h1>WebSocket.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+
+package com.codename1.io;
+
+import com.codename1.impl.WebSocketEventSink;
+import com.codename1.impl.WebSocketImpl;
+
+/// Client-side WebSocket. Connections are created via [build] and configured
+/// with fluent handler setters before being started with [connect]:
+///
+/// ```
+/// WebSocket ws = WebSocket.build(&quot;wss://example.com/chat&quot;)
+///     .onConnect(w        -&gt; w.send(&quot;hello&quot;))
+///     .onTextMessage((w, m) -&gt; Log.p(&quot;recv &quot; + m))
+///     .onClose((w, c, r)  -&gt; Log.p(&quot;closed &quot; + c + &quot; / &quot; + r))
+///     .onError((w, e)     -&gt; Log.e(e))
+///     .connect();
+/// ```
+///
+/// Each handler receives the `WebSocket` as its first argument so it can
+/// send, query state, or close without capturing an external reference.
+///
+/// Handlers fire on a background thread. Use
+/// `Display.getInstance().callSerially(...)` inside a handler if you need
+/// to touch UI from it.
+///
+/// Use [isSupported] to check at runtime whether the current port supports
+/// WebSocket -- older ports return `false` and [build] will throw on them.
+public final class WebSocket {
+
+    /// Handler for the connection-established event.
+    public interface ConnectHandler {
+        void onConnect(WebSocket ws);
+    }
+
+    /// Handler for an incoming text frame.
+    public interface TextHandler {
+        void onText(WebSocket ws, String message);
+    }
+
+    /// Handler for an incoming binary frame.
+    public interface BinaryHandler {
+        void onBinary(WebSocket ws, byte[] message);
+    }
+
+    /// Handler for the close event.
+    public interface CloseHandler {
+        /// Called once when the connection closes.
+        ///
+        /// @param ws         the socket that closed
+        /// @param statusCode the RFC 6455 close status code (1000 = normal, etc.)
+        /// @param reason     the human-readable reason, or empty string
+        void onClose(WebSocket ws, int statusCode, String reason);
+    }
+
+    /// Handler for transport- or protocol-level errors. The connection is
+    /// closed by the time this fires.
+    public interface ErrorHandler {
+        void onError(WebSocket ws, Exception ex);
+    }
+
+    private final WebSocketImpl impl;
+    // Handlers are assigned from the thread that configures the socket and
+    // read from the background dispatch thread, so they are volatile to
+    // publish writes across threads.
+    @SuppressWarnings(&quot;PMD.AvoidUsingVolatile&quot;)
+    private volatile ConnectHandler connectHandler;
+    @SuppressWarnings(&quot;PMD.AvoidUsingVolatile&quot;)
+    private volatile TextHandler textHandler;
+    @SuppressWarnings(&quot;PMD.AvoidUsingVolatile&quot;)
+    private volatile BinaryHandler binaryHandler;
+    @SuppressWarnings(&quot;PMD.AvoidUsingVolatile&quot;)
+    private volatile CloseHandler closeHandler;
+    @SuppressWarnings(&quot;PMD.AvoidUsingVolatile&quot;)
+    private volatile ErrorHandler errorHandler;
+
+<span class="fc" id="L98">    private WebSocket(WebSocketImpl impl) {</span>
+<span class="fc" id="L99">        this.impl = impl;</span>
+<span class="fc" id="L100">        final WebSocket self = this;</span>
+<span class="fc" id="L101">        impl.setEventSink(new WebSocketEventSink() {</span>
+            @Override
+            public void onConnect() {
+<span class="fc" id="L104">                ConnectHandler h = connectHandler;</span>
+<span class="fc bfc" id="L105" title="All 2 branches covered.">                if (h != null) {</span>
+                    try {
+<span class="fc" id="L107">                        h.onConnect(self);</span>
+<span class="nc" id="L108">                    } catch (Throwable t) {</span>
+<span class="nc" id="L109">                        dispatchError(t);</span>
+<span class="fc" id="L110">                    }</span>
+                }
+<span class="fc" id="L112">            }</span>
+
+            @Override
+            public void onTextMessage(String message) {
+<span class="fc" id="L116">                TextHandler h = textHandler;</span>
+<span class="fc bfc" id="L117" title="All 2 branches covered.">                if (h != null) {</span>
+                    try {
+<span class="fc" id="L119">                        h.onText(self, message);</span>
+<span class="fc" id="L120">                    } catch (Throwable t) {</span>
+<span class="fc" id="L121">                        dispatchError(t);</span>
+<span class="fc" id="L122">                    }</span>
+                }
+<span class="fc" id="L124">            }</span>
+
+            @Override
+            public void onBinaryMessage(byte[] message) {
+<span class="fc" id="L128">                BinaryHandler h = binaryHandler;</span>
+<span class="fc bfc" id="L129" title="All 2 branches covered.">                if (h != null) {</span>
+                    try {
+<span class="fc" id="L131">                        h.onBinary(self, message);</span>
+<span class="nc" id="L132">                    } catch (Throwable t) {</span>
+<span class="nc" id="L133">                        dispatchError(t);</span>
+<span class="fc" id="L134">                    }</span>
+                }
+<span class="fc" id="L136">            }</span>
+
+            @Override
+            public void onClose(int statusCode, String reason) {
+<span class="fc" id="L140">                CloseHandler h = closeHandler;</span>
+<span class="fc bfc" id="L141" title="All 2 branches covered.">                if (h != null) {</span>
+                    try {
+<span class="fc" id="L143">                        h.onClose(self, statusCode, reason);</span>
+<span class="nc" id="L144">                    } catch (Throwable t) {</span>
+<span class="nc" id="L145">                        dispatchError(t);</span>
+<span class="fc" id="L146">                    }</span>
+                }
+<span class="fc" id="L148">            }</span>
+
+            @Override
+            public void onError(Exception ex) {
+<span class="fc" id="L152">                ErrorHandler h = errorHandler;</span>
+<span class="fc bfc" id="L153" title="All 2 branches covered.">                if (h != null) {</span>
+                    try {
+<span class="fc" id="L155">                        h.onError(self, ex);</span>
+<span class="nc" id="L156">                    } catch (Throwable swallow) {</span>
+                        // Last-ditch: a throwable from the user's error
+                        // handler has nowhere else to go without
+                        // recursing into onError again. Log and drop it.
+<span class="nc" id="L160">                        Log.e(swallow);</span>
+<span class="fc" id="L161">                    }</span>
+                }
+<span class="fc" id="L163">            }</span>
+
+            private void dispatchError(Throwable t) {
+<span class="fc" id="L166">                ErrorHandler h = errorHandler;</span>
+<span class="pc bpc" id="L167" title="1 of 2 branches missed.">                if (h != null) {</span>
+<span class="pc bpc" id="L168" title="1 of 2 branches missed.">                    Exception wrapped = (t instanceof Exception) ? (Exception) t : new RuntimeException(t);</span>
+                    try {
+<span class="fc" id="L170">                        h.onError(self, wrapped);</span>
+<span class="nc" id="L171">                    } catch (Throwable swallow) {</span>
+                        // Same rationale as onError() above.
+<span class="nc" id="L173">                        Log.e(swallow);</span>
+<span class="fc" id="L174">                    }</span>
+                }
+<span class="fc" id="L176">            }</span>
+        });
+<span class="fc" id="L178">    }</span>
+
+    /// Whether the current port supports WebSocket.
+    public static boolean isSupported() {
+<span class="fc" id="L182">        return Util.getImplementation().isWebSocketSupported();</span>
+    }
+
+    /// Create an unconnected WebSocket bound to `url`. The URL must use the
+    /// `ws://` or `wss://` scheme. Call [connect] to start the handshake.
+    ///
+    /// @throws RuntimeException if the current port does not support WebSocket.
+    public static WebSocket build(String url) {
+<span class="fc" id="L190">        WebSocketImpl impl = Util.getImplementation().createWebSocketImpl(url);</span>
+<span class="fc" id="L191">        return new WebSocket(impl);</span>
+    }
+
+    /// Register a handler for the connection-established event. Returns
+    /// `this` for chaining.
+    public WebSocket onConnect(ConnectHandler handler) {
+<span class="fc" id="L197">        this.connectHandler = handler;</span>
+<span class="fc" id="L198">        return this;</span>
+    }
+
+    /// Register a handler for incoming text frames. Returns `this` for chaining.
+    public WebSocket onTextMessage(TextHandler handler) {
+<span class="fc" id="L203">        this.textHandler = handler;</span>
+<span class="fc" id="L204">        return this;</span>
+    }
+
+    /// Register a handler for incoming binary frames. Returns `this` for chaining.
+    public WebSocket onBinaryMessage(BinaryHandler handler) {
+<span class="fc" id="L209">        this.binaryHandler = handler;</span>
+<span class="fc" id="L210">        return this;</span>
+    }
+
+    /// Register a handler for the close event. Returns `this` for chaining.
+    public WebSocket onClose(CloseHandler handler) {
+<span class="fc" id="L215">        this.closeHandler = handler;</span>
+<span class="fc" id="L216">        return this;</span>
+    }
+
+    /// Register a handler for transport errors. Returns `this` for chaining.
+    public WebSocket onError(ErrorHandler handler) {
+<span class="fc" id="L221">        this.errorHandler = handler;</span>
+<span class="fc" id="L222">        return this;</span>
+    }
+
+    /// Offer one or more subprotocols (RFC 6455 `Sec-WebSocket-Protocol`),
+    /// in preference order, to negotiate during the handshake. Must be
+    /// called before [connect]. After the connection opens,
+    /// [getSelectedSubprotocol] returns the one the server chose (or null).
+    /// Returns `this` for chaining.
+    ///
+    /// ```
+    /// WebSocket.build(&quot;wss://api.example.com/graphql&quot;)
+    ///     .subprotocols(&quot;graphql-transport-ws&quot;)
+    ///     .onConnect(w -&gt; Log.p(&quot;using &quot; + w.getSelectedSubprotocol()))
+    ///     .connect();
+    /// ```
+    public WebSocket subprotocols(String... protocols) {
+<span class="fc" id="L238">        impl.setRequestedSubprotocols(protocols);</span>
+<span class="fc" id="L239">        return this;</span>
+    }
+
+    /// Add a header to the opening handshake. Must be called before [connect].
+    /// Passing a null value removes a previously set header. Returns `this` for
+    /// chaining.
+    ///
+    /// Typically used to carry an authorization or attestation token, since a
+    /// WebSocket has no other place to put one.
+    ///
+    /// ```
+    /// WebSocket.build(&quot;wss://api.example.com/stream&quot;)
+    ///     .header(&quot;X-CN1-Attest&quot;, token)
+    ///     .connect();
+    /// ```
+    ///
+    /// #### Not supported everywhere
+    ///
+    /// Emitted on Android, desktop, Windows and Linux, which build the opening
+    /// handshake themselves. **Silently dropped on iOS and in the browser**,
+    /// which hand the handshake to a platform WebSocket that exposes no way to
+    /// add headers to it.
+    ///
+    /// Where headers are unavailable, obtain a short-lived ticket over an
+    /// ordinary HTTPS request -- which can be attested and pinned normally --
+    /// and pass it in the URL query instead. That also avoids leaking a
+    /// long-lived credential into a URL.
+    ///
+    /// Headers the handshake sets itself -- `Host`, `Upgrade`, `Connection`,
+    /// `Sec-WebSocket-Key`, `Sec-WebSocket-Version`, `Sec-WebSocket-Protocol`
+    /// -- are reserved and are ignored if passed here. Use [subprotocols] for
+    /// the last of those.
+    public WebSocket header(String name, String value) {
+<span class="nc" id="L272">        impl.setRequestHeader(name, value);</span>
+<span class="nc" id="L273">        return this;</span>
+    }
+
+    /// The subprotocol the server selected during the handshake, or null
+    /// when none was negotiated. Valid once the [ConnectHandler] has fired.
+    public String getSelectedSubprotocol() {
+<span class="fc" id="L279">        return impl.getSelectedSubprotocol();</span>
+    }
+
+    /// Start the handshake using the platform default connect timeout.
+    /// Returns `this` for chaining; success is signalled asynchronously
+    /// via the registered [ConnectHandler].
+    public WebSocket connect() {
+<span class="fc" id="L286">        impl.connect(0);</span>
+<span class="fc" id="L287">        return this;</span>
+    }
+
+    /// Start the handshake with an explicit connect timeout in milliseconds.
+    /// `0` means &quot;use platform default&quot;.
+    public WebSocket connect(int connectTimeoutMs) {
+<span class="fc" id="L293">        impl.connect(connectTimeoutMs);</span>
+<span class="fc" id="L294">        return this;</span>
+    }
+
+    /// Close the connection. Idempotent.
+    public void close() {
+<span class="fc" id="L299">        impl.close();</span>
+<span class="fc" id="L300">    }</span>
+
+    /// Send a text frame. Throws `IllegalStateException` if the connection
+    /// is not [WebSocketState#OPEN].
+    public void send(String text) {
+<span class="fc" id="L305">        impl.sendText(text);</span>
+<span class="fc" id="L306">    }</span>
+
+    /// Send a binary frame. Throws `IllegalStateException` if the connection
+    /// is not [WebSocketState#OPEN].
+    public void send(byte[] binary) {
+<span class="fc" id="L311">        impl.sendBinary(binary);</span>
+<span class="fc" id="L312">    }</span>
+
+    public WebSocketState getReadyState() {
+<span class="fc" id="L315">        return impl.getReadyState();</span>
+    }
+
+    public String getUrl() {
+<span class="fc" id="L319">        return impl.getUrl();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

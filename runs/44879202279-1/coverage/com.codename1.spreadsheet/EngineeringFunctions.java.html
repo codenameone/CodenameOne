@@ -1,0 +1,365 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EngineeringFunctions.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.spreadsheet</a> &gt; <span class="el_source">EngineeringFunctions.java</span></div><h1>EngineeringFunctions.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.spreadsheet;
+
+/// The engineering functions: number bases, bit operations, the error function and unit
+/// conversion. The complex number functions are not here.
+final class EngineeringFunctions {
+    static final String SCALAR_NAMES = &quot;BIN2DEC BIN2HEX BIN2OCT BITAND BITLSHIFT BITOR BITRSHIFT BITXOR CONVERT DEC2BIN&quot;
+            + &quot; DEC2HEX DEC2OCT DELTA ERF ERF.PRECISE ERFC ERFC.PRECISE GESTEP HEX2BIN HEX2DEC HEX2OCT OCT2BIN OCT2DEC&quot;
+            + &quot; OCT2HEX&quot;;
+
+    static final String RANGE_NAMES = &quot;&quot;;
+
+    private static final double MAX_BITS = 281474976710655d;
+
+    /// Units as name, group and the factor to the group's base unit, one after the other.
+<span class="fc" id="L37">    private static final String[] UNITS = {</span>
+        &quot;g&quot;, &quot;mass&quot;, &quot;1&quot;, &quot;kg&quot;, &quot;mass&quot;, &quot;1000&quot;, &quot;sg&quot;, &quot;mass&quot;, &quot;14593.9029372064&quot;, &quot;lbm&quot;, &quot;mass&quot;, &quot;453.59237&quot;,
+        &quot;u&quot;, &quot;mass&quot;, &quot;1.66053906660e-24&quot;, &quot;ozm&quot;, &quot;mass&quot;, &quot;28.349523125&quot;, &quot;grain&quot;, &quot;mass&quot;, &quot;0.06479891&quot;,
+        &quot;stone&quot;, &quot;mass&quot;, &quot;6350.29318&quot;, &quot;ton&quot;, &quot;mass&quot;, &quot;907184.74&quot;, &quot;uk_ton&quot;, &quot;mass&quot;, &quot;1016046.9088&quot;,
+        &quot;m&quot;, &quot;length&quot;, &quot;1&quot;, &quot;km&quot;, &quot;length&quot;, &quot;1000&quot;, &quot;cm&quot;, &quot;length&quot;, &quot;0.01&quot;, &quot;mm&quot;, &quot;length&quot;, &quot;0.001&quot;,
+        &quot;mi&quot;, &quot;length&quot;, &quot;1609.344&quot;, &quot;Nmi&quot;, &quot;length&quot;, &quot;1852&quot;, &quot;in&quot;, &quot;length&quot;, &quot;0.0254&quot;, &quot;ft&quot;, &quot;length&quot;, &quot;0.3048&quot;,
+        &quot;yd&quot;, &quot;length&quot;, &quot;0.9144&quot;, &quot;ang&quot;, &quot;length&quot;, &quot;1e-10&quot;, &quot;ly&quot;, &quot;length&quot;, &quot;9.4607304725808e15&quot;,
+        &quot;sec&quot;, &quot;time&quot;, &quot;1&quot;, &quot;s&quot;, &quot;time&quot;, &quot;1&quot;, &quot;min&quot;, &quot;time&quot;, &quot;60&quot;, &quot;mn&quot;, &quot;time&quot;, &quot;60&quot;, &quot;hr&quot;, &quot;time&quot;, &quot;3600&quot;,
+        &quot;day&quot;, &quot;time&quot;, &quot;86400&quot;, &quot;d&quot;, &quot;time&quot;, &quot;86400&quot;, &quot;yr&quot;, &quot;time&quot;, &quot;31557600&quot;,
+        &quot;Pa&quot;, &quot;pressure&quot;, &quot;1&quot;, &quot;p&quot;, &quot;pressure&quot;, &quot;1&quot;, &quot;atm&quot;, &quot;pressure&quot;, &quot;101325&quot;, &quot;at&quot;, &quot;pressure&quot;, &quot;101325&quot;,
+        &quot;mmHg&quot;, &quot;pressure&quot;, &quot;133.322&quot;, &quot;psi&quot;, &quot;pressure&quot;, &quot;6894.75729316836&quot;, &quot;Torr&quot;, &quot;pressure&quot;, &quot;133.322368421053&quot;,
+        &quot;N&quot;, &quot;force&quot;, &quot;1&quot;, &quot;dyn&quot;, &quot;force&quot;, &quot;1e-5&quot;, &quot;dy&quot;, &quot;force&quot;, &quot;1e-5&quot;, &quot;lbf&quot;, &quot;force&quot;, &quot;4.4482216152605&quot;,
+        &quot;J&quot;, &quot;energy&quot;, &quot;1&quot;, &quot;kJ&quot;, &quot;energy&quot;, &quot;1000&quot;, &quot;e&quot;, &quot;energy&quot;, &quot;1e-7&quot;, &quot;c&quot;, &quot;energy&quot;, &quot;4.184&quot;, &quot;cal&quot;, &quot;energy&quot;,
+        &quot;4.1868&quot;, &quot;eV&quot;, &quot;energy&quot;, &quot;1.602176634e-19&quot;, &quot;ev&quot;, &quot;energy&quot;, &quot;1.602176634e-19&quot;, &quot;HPh&quot;, &quot;energy&quot;,
+        &quot;2684519.53769617&quot;, &quot;hh&quot;, &quot;energy&quot;, &quot;2684519.53769617&quot;, &quot;Wh&quot;, &quot;energy&quot;, &quot;3600&quot;, &quot;wh&quot;, &quot;energy&quot;, &quot;3600&quot;,
+        &quot;kWh&quot;, &quot;energy&quot;, &quot;3600000&quot;, &quot;flb&quot;, &quot;energy&quot;, &quot;1.3558179483314&quot;, &quot;BTU&quot;, &quot;energy&quot;, &quot;1055.05585262&quot;,
+        &quot;btu&quot;, &quot;energy&quot;, &quot;1055.05585262&quot;,
+        &quot;W&quot;, &quot;power&quot;, &quot;1&quot;, &quot;w&quot;, &quot;power&quot;, &quot;1&quot;, &quot;kW&quot;, &quot;power&quot;, &quot;1000&quot;, &quot;HP&quot;, &quot;power&quot;, &quot;745.69987158227&quot;,
+        &quot;h&quot;, &quot;power&quot;, &quot;745.69987158227&quot;, &quot;PS&quot;, &quot;power&quot;, &quot;735.49875&quot;,
+        &quot;l&quot;, &quot;volume&quot;, &quot;1&quot;, &quot;L&quot;, &quot;volume&quot;, &quot;1&quot;, &quot;lt&quot;, &quot;volume&quot;, &quot;1&quot;, &quot;ml&quot;, &quot;volume&quot;, &quot;0.001&quot;, &quot;tsp&quot;, &quot;volume&quot;,
+        &quot;0.00492892159375&quot;, &quot;tbs&quot;, &quot;volume&quot;, &quot;0.01478676478125&quot;, &quot;oz&quot;, &quot;volume&quot;, &quot;0.0295735295625&quot;, &quot;cup&quot;, &quot;volume&quot;,
+        &quot;0.2365882365&quot;, &quot;pt&quot;, &quot;volume&quot;, &quot;0.473176473&quot;, &quot;us_pt&quot;, &quot;volume&quot;, &quot;0.473176473&quot;, &quot;uk_pt&quot;, &quot;volume&quot;,
+        &quot;0.56826125&quot;, &quot;qt&quot;, &quot;volume&quot;, &quot;0.946352946&quot;, &quot;gal&quot;, &quot;volume&quot;, &quot;3.785411784&quot;, &quot;uk_gal&quot;, &quot;volume&quot;, &quot;4.54609&quot;,
+        &quot;m3&quot;, &quot;volume&quot;, &quot;1000&quot;, &quot;m^3&quot;, &quot;volume&quot;, &quot;1000&quot;, &quot;ft3&quot;, &quot;volume&quot;, &quot;28.316846592&quot;, &quot;ft^3&quot;, &quot;volume&quot;,
+        &quot;28.316846592&quot;, &quot;in3&quot;, &quot;volume&quot;, &quot;0.016387064&quot;, &quot;in^3&quot;, &quot;volume&quot;, &quot;0.016387064&quot;,
+        &quot;m2&quot;, &quot;area&quot;, &quot;1&quot;, &quot;m^2&quot;, &quot;area&quot;, &quot;1&quot;, &quot;ha&quot;, &quot;area&quot;, &quot;10000&quot;, &quot;ft2&quot;, &quot;area&quot;, &quot;0.09290304&quot;, &quot;ft^2&quot;, &quot;area&quot;,
+        &quot;0.09290304&quot;, &quot;in2&quot;, &quot;area&quot;, &quot;0.00064516&quot;, &quot;in^2&quot;, &quot;area&quot;, &quot;0.00064516&quot;, &quot;mi2&quot;, &quot;area&quot;, &quot;2589988.110336&quot;,
+        &quot;mi^2&quot;, &quot;area&quot;, &quot;2589988.110336&quot;, &quot;yd2&quot;, &quot;area&quot;, &quot;0.83612736&quot;, &quot;yd^2&quot;, &quot;area&quot;, &quot;0.83612736&quot;, &quot;uk_acre&quot;,
+        &quot;area&quot;, &quot;4046.8564224&quot;, &quot;us_acre&quot;, &quot;area&quot;, &quot;4046.87260987425&quot;,
+        &quot;bit&quot;, &quot;data&quot;, &quot;1&quot;, &quot;byte&quot;, &quot;data&quot;, &quot;8&quot;, &quot;kbit&quot;, &quot;data&quot;, &quot;1000&quot;, &quot;kbyte&quot;, &quot;data&quot;, &quot;8000&quot;,
+        &quot;Mbyte&quot;, &quot;data&quot;, &quot;8000000&quot;, &quot;Gbyte&quot;, &quot;data&quot;, &quot;8000000000&quot;, &quot;kibyte&quot;, &quot;data&quot;, &quot;8192&quot;, &quot;Mibyte&quot;, &quot;data&quot;,
+        &quot;8388608&quot;, &quot;Gibyte&quot;, &quot;data&quot;, &quot;8589934592&quot;,
+        &quot;m/s&quot;, &quot;speed&quot;, &quot;1&quot;, &quot;m/sec&quot;, &quot;speed&quot;, &quot;1&quot;, &quot;m/h&quot;, &quot;speed&quot;, &quot;0.000277777777777778&quot;, &quot;m/hr&quot;, &quot;speed&quot;,
+        &quot;0.000277777777777778&quot;, &quot;mph&quot;, &quot;speed&quot;, &quot;0.44704&quot;, &quot;kn&quot;, &quot;speed&quot;, &quot;0.514444444444444&quot;, &quot;km/h&quot;, &quot;speed&quot;,
+        &quot;0.277777777777778&quot;, &quot;km/hr&quot;, &quot;speed&quot;, &quot;0.277777777777778&quot;,
+        &quot;T&quot;, &quot;magnetism&quot;, &quot;1&quot;, &quot;ga&quot;, &quot;magnetism&quot;, &quot;0.0001&quot;,
+    };
+
+    private EngineeringFunctions() {
+    }
+
+    private static Double d(double v) {
+<span class="fc" id="L79">        return Double.valueOf(v);</span>
+    }
+
+    /// Reads a number of up to ten digits in a base; a tenth digit at or above half the base
+    /// makes it negative, two's complement.
+    private static double parse(Object arg, int radix) {
+<span class="fc bfc" id="L85" title="All 2 branches covered.">        String s = arg instanceof Double ? Values.general(((Double) arg).doubleValue()) : Values.text(arg);</span>
+<span class="fc bfc" id="L86" title="All 2 branches covered.">        if (s.length() &gt; 10) {</span>
+<span class="fc" id="L87">            throw EvalError.NUM;</span>
+        }
+<span class="fc" id="L89">        double v = 0;</span>
+<span class="fc bfc" id="L90" title="All 2 branches covered.">        for (int i = 0; i &lt; s.length(); i++) {</span>
+<span class="fc" id="L91">            char c = s.charAt(i);</span>
+            int digit;
+<span class="fc bfc" id="L93" title="All 4 branches covered.">            if (c &gt;= '0' &amp;&amp; c &lt;= '9') {</span>
+<span class="fc" id="L94">                digit = c - '0';</span>
+<span class="pc bpc" id="L95" title="1 of 4 branches missed.">            } else if (c &gt;= 'a' &amp;&amp; c &lt;= 'f') {</span>
+<span class="nc" id="L96">                digit = c - 'a' + 10;</span>
+<span class="fc bfc" id="L97" title="All 4 branches covered.">            } else if (c &gt;= 'A' &amp;&amp; c &lt;= 'F') {</span>
+<span class="fc" id="L98">                digit = c - 'A' + 10;</span>
+            } else {
+<span class="fc" id="L100">                throw EvalError.NUM;</span>
+            }
+<span class="fc bfc" id="L102" title="All 2 branches covered.">            if (digit &gt;= radix) {</span>
+<span class="fc" id="L103">                throw EvalError.NUM;</span>
+            }
+<span class="fc" id="L105">            v = v * radix + digit;</span>
+        }
+<span class="fc" id="L107">        double full = 1;</span>
+<span class="fc bfc" id="L108" title="All 2 branches covered.">        for (int i = 0; i &lt; 10; i++) {</span>
+<span class="fc" id="L109">            full *= radix;</span>
+        }
+<span class="pc bpc" id="L111" title="1 of 4 branches missed.">        if (s.length() == 10 &amp;&amp; v &gt;= full / 2) {</span>
+<span class="fc" id="L112">            v -= full;</span>
+        }
+<span class="fc" id="L114">        return v;</span>
+    }
+
+    private static String print(double value, int radix, Object[] a, int placesIndex) {
+<span class="fc bfc" id="L118" title="All 2 branches covered.">        double v = value &lt; 0 ? Math.ceil(value) : Math.floor(value);</span>
+<span class="fc" id="L119">        double full = 1;</span>
+<span class="fc bfc" id="L120" title="All 2 branches covered.">        for (int i = 0; i &lt; 10; i++) {</span>
+<span class="fc" id="L121">            full *= radix;</span>
+        }
+<span class="pc bpc" id="L123" title="1 of 4 branches missed.">        if (v &gt;= full / 2 || v &lt; -full / 2) {</span>
+<span class="fc" id="L124">            throw EvalError.NUM;</span>
+        }
+<span class="fc bfc" id="L126" title="All 2 branches covered.">        boolean negative = v &lt; 0;</span>
+<span class="fc bfc" id="L127" title="All 2 branches covered.">        long bits = (long) (negative ? v + full : v);</span>
+<span class="fc" id="L128">        StringBuilder sb = new StringBuilder();</span>
+        do {
+<span class="fc" id="L130">            int digit = (int) (bits % radix);</span>
+<span class="fc bfc" id="L131" title="All 2 branches covered.">            sb.insert(0, (char) (digit &lt; 10 ? '0' + digit : 'A' + digit - 10));</span>
+<span class="fc" id="L132">            bits /= radix;</span>
+<span class="fc bfc" id="L133" title="All 2 branches covered.">        } while (bits &gt; 0);</span>
+<span class="fc bfc" id="L134" title="All 4 branches covered.">        if (!negative &amp;&amp; Evaluator.has(a, placesIndex)) {</span>
+<span class="fc" id="L135">            int places = Evaluator.integer(a, placesIndex);</span>
+<span class="pc bpc" id="L136" title="1 of 4 branches missed.">            if (places &lt; sb.length() || places &gt; 10) {</span>
+<span class="fc" id="L137">                throw EvalError.NUM;</span>
+            }
+<span class="fc bfc" id="L139" title="All 2 branches covered.">            while (sb.length() &lt; places) {</span>
+<span class="fc" id="L140">                sb.insert(0, '0');</span>
+            }
+        }
+<span class="fc" id="L143">        return sb.toString();</span>
+    }
+
+    private static long bits(Object[] a, int i) {
+<span class="fc" id="L147">        double v = Evaluator.num(a, i);</span>
+<span class="pc bpc" id="L148" title="1 of 6 branches missed.">        if (v &lt; 0 || v &gt; MAX_BITS || v != Math.floor(v)) {</span>
+<span class="fc" id="L149">            throw EvalError.NUM;</span>
+        }
+<span class="fc" id="L151">        return (long) v;</span>
+    }
+
+    static Object call(String name, Evaluator ev, Object[] a) {
+<span class="pc bpc" id="L155" title="1 of 23 branches missed.">        switch (Functions.index(SWITCH_1, name)) {</span>
+            case 0: // BIN2DEC
+<span class="fc" id="L157">                return d(parse(Evaluator.arg(a, 0), 2));</span>
+            case 1: // OCT2DEC
+<span class="fc" id="L159">                return d(parse(Evaluator.arg(a, 0), 8));</span>
+            case 2: // HEX2DEC
+<span class="fc" id="L161">                return d(parse(Evaluator.arg(a, 0), 16));</span>
+            case 3: // BIN2OCT
+<span class="fc" id="L163">                return print(parse(Evaluator.arg(a, 0), 2), 8, a, 1);</span>
+            case 4: // BIN2HEX
+<span class="fc" id="L165">                return print(parse(Evaluator.arg(a, 0), 2), 16, a, 1);</span>
+            case 5: // OCT2BIN
+<span class="fc" id="L167">                return print(parse(Evaluator.arg(a, 0), 8), 2, a, 1);</span>
+            case 6: // OCT2HEX
+<span class="fc" id="L169">                return print(parse(Evaluator.arg(a, 0), 8), 16, a, 1);</span>
+            case 7: // HEX2BIN
+<span class="fc" id="L171">                return print(parse(Evaluator.arg(a, 0), 16), 2, a, 1);</span>
+            case 8: // HEX2OCT
+<span class="fc" id="L173">                return print(parse(Evaluator.arg(a, 0), 16), 8, a, 1);</span>
+            case 9: // DEC2BIN
+<span class="fc" id="L175">                return print(Evaluator.num(a, 0), 2, a, 1);</span>
+            case 10: // DEC2OCT
+<span class="fc" id="L177">                return print(Evaluator.num(a, 0), 8, a, 1);</span>
+            case 11: // DEC2HEX
+<span class="fc" id="L179">                return print(Evaluator.num(a, 0), 16, a, 1);</span>
+            case 12: // BITAND
+<span class="fc" id="L181">                return d(bits(a, 0) &amp; bits(a, 1));</span>
+            case 13: // BITOR
+<span class="fc" id="L183">                return d(bits(a, 0) | bits(a, 1));</span>
+            case 14: // BITXOR
+<span class="fc" id="L185">                return d(bits(a, 0) ^ bits(a, 1));</span>
+            case 15: // BITLSHIFT
+            case 16: { // BITRSHIFT
+<span class="fc" id="L188">                long v = bits(a, 0);</span>
+<span class="fc" id="L189">                int shift = Evaluator.integer(a, 1);</span>
+<span class="pc bpc" id="L190" title="2 of 4 branches missed.">                if (shift &lt; -53 || shift &gt; 53) {</span>
+<span class="nc" id="L191">                    throw EvalError.NUM;</span>
+                }
+<span class="fc bfc" id="L193" title="All 2 branches covered.">                if (&quot;BITRSHIFT&quot;.equals(name)) {</span>
+<span class="fc" id="L194">                    shift = -shift;</span>
+                }
+<span class="fc bfc" id="L196" title="All 2 branches covered.">                double r = shift &gt;= 0 ? (double) v * Values.pow2(shift) : (double) (v &gt;&gt; -shift);</span>
+<span class="pc bpc" id="L197" title="1 of 2 branches missed.">                if (r &gt; MAX_BITS) {</span>
+<span class="nc" id="L198">                    throw EvalError.NUM;</span>
+                }
+<span class="fc" id="L200">                return d(r);</span>
+            }
+            case 17: // DELTA
+<span class="fc bfc" id="L203" title="All 2 branches covered.">                return d(Evaluator.num(a, 0) == Evaluator.num(a, 1, 0) ? 1 : 0);</span>
+            case 18: // GESTEP
+<span class="fc bfc" id="L205" title="All 2 branches covered.">                return d(Evaluator.num(a, 0) &gt;= Evaluator.num(a, 1, 0) ? 1 : 0);</span>
+            case 19: // ERF
+<span class="fc bfc" id="L207" title="All 2 branches covered.">                if (Evaluator.has(a, 1)) {</span>
+<span class="fc" id="L208">                    return d(DistributionFunctions.erf(Evaluator.num(a, 1)) - DistributionFunctions.erf(Evaluator.num(a, 0)));</span>
+                }
+<span class="fc" id="L210">                return d(DistributionFunctions.erf(Evaluator.num(a, 0)));</span>
+            case 20: // ERF.PRECISE
+<span class="fc" id="L212">                return d(DistributionFunctions.erf(Evaluator.num(a, 0)));</span>
+            case 21: // ERFC
+            case 22: // ERFC.PRECISE
+<span class="fc" id="L215">                return d(DistributionFunctions.erfc(Evaluator.num(a, 0)));</span>
+            case 23: // CONVERT
+<span class="fc" id="L217">                return d(convert(Evaluator.num(a, 0), Evaluator.text(a, 1), Evaluator.text(a, 2)));</span>
+            default:
+<span class="nc" id="L219">                return CellError.NAME;</span>
+        }
+    }
+
+    private static int unit(String name) {
+<span class="fc bfc" id="L224" title="All 2 branches covered.">        for (int i = 0; i &lt; UNITS.length; i += 3) {</span>
+<span class="fc bfc" id="L225" title="All 2 branches covered.">            if (UNITS[i].equals(name)) {</span>
+<span class="fc" id="L226">                return i;</span>
+            }
+        }
+<span class="fc" id="L229">        return -1;</span>
+    }
+
+    /// The factor of a metric prefix, or 0 for a character that is not one.
+    private static double prefix(String p) {
+<span class="pc bpc" id="L234" title="16 of 19 branches missed.">        switch (Functions.index(SWITCH_2, p)) {</span>
+            case 0: // Y
+<span class="nc" id="L236">                return 1e24;</span>
+            case 1: // Z
+<span class="nc" id="L238">                return 1e21;</span>
+            case 2: // E
+<span class="nc" id="L240">                return 1e18;</span>
+            case 3: // P
+<span class="nc" id="L242">                return 1e15;</span>
+            case 4: // T
+<span class="fc" id="L244">                return 1e12;</span>
+            case 5: // G
+<span class="nc" id="L246">                return 1e9;</span>
+            case 6: // M
+<span class="nc" id="L248">                return 1e6;</span>
+            case 7: // k
+<span class="nc" id="L250">                return 1e3;</span>
+            case 8: // h
+<span class="nc" id="L252">                return 1e2;</span>
+            case 9: // da
+            case 10: // e
+<span class="nc" id="L255">                return 1e1;</span>
+            case 11: // d
+<span class="nc" id="L257">                return 1e-1;</span>
+            case 12: // c
+<span class="nc" id="L259">                return 1e-2;</span>
+            case 13: // m
+<span class="nc" id="L261">                return 1e-3;</span>
+            case 14: // u
+<span class="nc" id="L263">                return 1e-6;</span>
+            case 15: // n
+<span class="fc" id="L265">                return 1e-9;</span>
+            case 16: // p
+<span class="nc" id="L267">                return 1e-12;</span>
+            case 17: // f
+<span class="nc" id="L269">                return 1e-15;</span>
+            case 18: // a
+<span class="nc" id="L271">                return 1e-18;</span>
+            default:
+<span class="fc" id="L273">                return 0;</span>
+        }
+    }
+
+    /// Finds a unit, with a metric prefix if the name as written is not one: [index, factor].
+    private static double[] resolve(String name) {
+<span class="fc" id="L279">        int i = unit(name);</span>
+<span class="fc bfc" id="L280" title="All 2 branches covered.">        if (i &gt;= 0) {</span>
+<span class="fc" id="L281">            return new double[] {i, 1};</span>
+        }
+<span class="fc bfc" id="L283" title="All 2 branches covered.">        for (int len = 2; len &gt;= 1; len--) {</span>
+<span class="fc bfc" id="L284" title="All 2 branches covered.">            if (name.length() &gt; len) {</span>
+<span class="fc" id="L285">                double f = prefix(name.substring(0, len));</span>
+<span class="fc" id="L286">                int u = unit(name.substring(len));</span>
+<span class="pc bpc" id="L287" title="1 of 4 branches missed.">                if (f != 0 &amp;&amp; u &gt;= 0) {</span>
+<span class="nc" id="L288">                    return new double[] {u, f};</span>
+                }
+            }
+        }
+<span class="fc" id="L292">        throw EvalError.NA;</span>
+    }
+
+    private static double convert(double value, String from, String to) {
+<span class="fc" id="L296">        double kelvin = toKelvin(value, from);</span>
+<span class="fc bfc" id="L297" title="All 2 branches covered.">        if (!Double.isNaN(kelvin)) {</span>
+<span class="fc" id="L298">            double result = fromKelvin(kelvin, to);</span>
+<span class="pc bpc" id="L299" title="1 of 2 branches missed.">            if (Double.isNaN(result)) {</span>
+<span class="nc" id="L300">                throw EvalError.NA;</span>
+            }
+<span class="fc" id="L302">            return result;</span>
+        }
+<span class="fc" id="L304">        double[] f = resolve(from);</span>
+<span class="fc" id="L305">        double[] t = resolve(to);</span>
+<span class="fc" id="L306">        int fi = (int) f[0];</span>
+<span class="fc" id="L307">        int ti = (int) t[0];</span>
+<span class="fc bfc" id="L308" title="All 2 branches covered.">        if (!UNITS[fi + 1].equals(UNITS[ti + 1])) {</span>
+<span class="fc" id="L309">            throw EvalError.NA;</span>
+        }
+<span class="fc" id="L311">        return value * f[1] * Double.parseDouble(UNITS[fi + 2]) / (t[1] * Double.parseDouble(UNITS[ti + 2]));</span>
+    }
+
+    private static double toKelvin(double v, String unit) {
+<span class="pc bpc" id="L315" title="2 of 5 branches missed.">        switch (Functions.index(SWITCH_3, unit)) {</span>
+            case 0: // C
+            case 1: // cel
+<span class="fc" id="L318">                return v + 273.15;</span>
+            case 2: // F
+            case 3: // fah
+<span class="fc" id="L321">                return (v - 32) * 5 / 9 + 273.15;</span>
+            case 4: // K
+            case 5: // kel
+<span class="nc" id="L324">                return v;</span>
+            case 6: // Rank
+<span class="nc" id="L326">                return v * 5 / 9;</span>
+            default:
+<span class="fc" id="L328">                return Double.NaN;</span>
+        }
+    }
+
+    private static double fromKelvin(double k, String unit) {
+<span class="pc bpc" id="L333" title="2 of 5 branches missed.">        switch (Functions.index(SWITCH_4, unit)) {</span>
+            case 0: // C
+            case 1: // cel
+<span class="fc" id="L336">                return k - 273.15;</span>
+            case 2: // F
+            case 3: // fah
+<span class="fc" id="L339">                return (k - 273.15) * 9 / 5 + 32;</span>
+            case 4: // K
+            case 5: // kel
+<span class="fc" id="L342">                return k;</span>
+            case 6: // Rank
+<span class="nc" id="L344">                return k * 9 / 5;</span>
+            default:
+<span class="nc" id="L346">                return Double.NaN;</span>
+        }
+    }
+
+<span class="fc" id="L350">    private static final java.util.HashMap&lt;String, Integer&gt; SWITCH_1 = Functions.switchTable(</span>
+            &quot;BIN2DEC&quot;, &quot;OCT2DEC&quot;, &quot;HEX2DEC&quot;, &quot;BIN2OCT&quot;, &quot;BIN2HEX&quot;, &quot;OCT2BIN&quot;, &quot;OCT2HEX&quot;, &quot;HEX2BIN&quot;,
+            &quot;HEX2OCT&quot;, &quot;DEC2BIN&quot;, &quot;DEC2OCT&quot;, &quot;DEC2HEX&quot;, &quot;BITAND&quot;, &quot;BITOR&quot;, &quot;BITXOR&quot;, &quot;BITLSHIFT&quot;,
+            &quot;BITRSHIFT&quot;, &quot;DELTA&quot;, &quot;GESTEP&quot;, &quot;ERF&quot;, &quot;ERF.PRECISE&quot;, &quot;ERFC&quot;, &quot;ERFC.PRECISE&quot;, &quot;CONVERT&quot;);
+
+<span class="fc" id="L355">    private static final java.util.HashMap&lt;String, Integer&gt; SWITCH_2 = Functions.switchTable(</span>
+            &quot;Y&quot;, &quot;Z&quot;, &quot;E&quot;, &quot;P&quot;, &quot;T&quot;, &quot;G&quot;, &quot;M&quot;, &quot;k&quot;, &quot;h&quot;, &quot;da&quot;, &quot;e&quot;, &quot;d&quot;, &quot;c&quot;, &quot;m&quot;, &quot;u&quot;, &quot;n&quot;, &quot;p&quot;,
+            &quot;f&quot;, &quot;a&quot;);
+
+<span class="fc" id="L359">    private static final java.util.HashMap&lt;String, Integer&gt; SWITCH_3 = Functions.switchTable(</span>
+            &quot;C&quot;, &quot;cel&quot;, &quot;F&quot;, &quot;fah&quot;, &quot;K&quot;, &quot;kel&quot;, &quot;Rank&quot;);
+
+<span class="fc" id="L362">    private static final java.util.HashMap&lt;String, Integer&gt; SWITCH_4 = Functions.switchTable(</span>
+            &quot;C&quot;, &quot;cel&quot;, &quot;F&quot;, &quot;fah&quot;, &quot;K&quot;, &quot;kel&quot;, &quot;Rank&quot;);
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

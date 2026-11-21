@@ -1,0 +1,201 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AudioScheduledSourceNode.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.media.audio</a> &gt; <span class="el_source">AudioScheduledSourceNode.java</span></div><h1>AudioScheduledSourceNode.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.media.audio;
+
+import com.codename1.ui.CN;
+
+/// A source node that is started and stopped at scheduled times, the Web Audio
+/// `AudioScheduledSourceNode`. A source can be started only once; create a new
+/// one to play again.
+public abstract class AudioScheduledSourceNode extends AudioNode {
+    private boolean started;
+    private Runnable onEnded;
+<span class="fc" id="L33">    final Runnable endedTask = new Runnable() {</span>
+        @Override
+        public void run() {
+<span class="fc" id="L36">            Runnable r = onEnded;</span>
+<span class="pc bpc" id="L37" title="1 of 2 branches missed.">            if (r != null) {</span>
+<span class="fc" id="L38">                r.run();</span>
+            }
+<span class="fc" id="L40">        }</span>
+    };
+
+    // ---- render side ----
+<span class="fc" id="L44">    double rStart = Double.NaN;</span>
+<span class="fc" id="L45">    double rStop = Double.POSITIVE_INFINITY;</span>
+    boolean rEnded;
+    /// First and one past the last active frame of the current quantum.
+    int rFrom;
+    int rTo;
+
+    AudioScheduledSourceNode(BaseAudioContext context, int outputs) {
+<span class="fc" id="L52">        super(context, 0, outputs, 2, ChannelCountMode.MAX, ChannelInterpretation.SPEAKERS);</span>
+<span class="fc" id="L53">    }</span>
+
+    /// Starts playing now.
+    public void start() {
+<span class="fc" id="L57">        start(0);</span>
+<span class="fc" id="L58">    }</span>
+
+    /// Starts playing at `when`; a time already past starts at once.
+    ///
+    /// #### Parameters
+    ///
+    /// - `when`: context time in seconds
+    public void start(double when) {
+<span class="fc" id="L66">        startAt(when, null);</span>
+<span class="fc" id="L67">    }</span>
+
+    final void startAt(double when, final Runnable extra) {
+<span class="fc" id="L70">        checkWhen(when);</span>
+<span class="fc bfc" id="L71" title="All 2 branches covered.">        if (started) {</span>
+<span class="fc" id="L72">            throw new IllegalStateException(&quot;A source node can only be started once&quot;);</span>
+        }
+<span class="fc" id="L74">        started = true;</span>
+<span class="fc" id="L75">        final double w = when;</span>
+<span class="fc" id="L76">        final AudioScheduledSourceNode self = this;</span>
+<span class="fc" id="L77">        context.post(new Runnable() {</span>
+            @Override
+            public void run() {
+<span class="fc bfc" id="L80" title="All 2 branches covered.">                if (extra != null) {</span>
+<span class="fc" id="L81">                    extra.run();</span>
+                }
+<span class="fc" id="L83">                rStart = w;</span>
+<span class="fc" id="L84">                context.rActivate(self);</span>
+<span class="fc" id="L85">            }</span>
+        });
+<span class="fc" id="L87">    }</span>
+
+    /// Stops playing now.
+    public void stop() {
+<span class="nc" id="L91">        stop(0);</span>
+<span class="nc" id="L92">    }</span>
+
+    /// Stops playing at `when`. Calling it again replaces the earlier stop time.
+    ///
+    /// #### Parameters
+    ///
+    /// - `when`: context time in seconds
+    public void stop(double when) {
+<span class="fc" id="L100">        checkWhen(when);</span>
+<span class="pc bpc" id="L101" title="1 of 2 branches missed.">        if (!started) {</span>
+<span class="nc" id="L102">            throw new IllegalStateException(&quot;stop() called before start()&quot;);</span>
+        }
+<span class="fc" id="L104">        final double w = when;</span>
+<span class="fc" id="L105">        context.post(new Runnable() {</span>
+            @Override
+            public void run() {
+<span class="fc" id="L108">                rStop = w;</span>
+<span class="fc" id="L109">            }</span>
+        });
+<span class="fc" id="L111">    }</span>
+
+    /// Sets what runs when the source stops playing, either because it reached
+    /// its stop time or because it ran out of audio. It runs on the EDT for an
+    /// [AudioContext], and on the rendering thread, between render quanta, for
+    /// an [OfflineAudioContext].
+    ///
+    /// #### Parameters
+    ///
+    /// - `onEnded`: the callback, or null
+    public void setOnEnded(Runnable onEnded) {
+<span class="fc" id="L122">        this.onEnded = onEnded;</span>
+<span class="fc" id="L123">    }</span>
+
+    private static void checkWhen(double when) {
+<span class="pc bpc" id="L126" title="1 of 2 branches missed.">        if (!BaseAudioContext.nonNegativeFinite(when)) {</span>
+<span class="nc" id="L127">            throw new IllegalArgumentException(&quot;Time must be 0 or more and finite: &quot; + when);</span>
+        }
+<span class="fc" id="L129">    }</span>
+
+    /// Computes `rFrom`/`rTo` for quantum `q`. Returns false when nothing of this
+    /// quantum plays, after ending the node if its stop time has passed.
+    final boolean window(long q) {
+<span class="pc bpc" id="L134" title="1 of 4 branches missed.">        if (rEnded || Double.isNaN(rStart)) {</span>
+<span class="fc" id="L135">            return false;</span>
+        }
+<span class="fc" id="L137">        float sr = context.getSampleRate();</span>
+<span class="fc" id="L138">        long frame0 = q * BaseAudioContext.RENDER_QUANTUM;</span>
+<span class="fc" id="L139">        long startFrame = (long) Math.ceil(BaseAudioContext.snapFrames(rStart * sr));</span>
+<span class="fc bfc" id="L140" title="All 2 branches covered.">        long stopFrame = Double.isInfinite(rStop) ? Long.MAX_VALUE</span>
+<span class="fc" id="L141">                : (long) Math.ceil(BaseAudioContext.snapFrames(rStop * sr));</span>
+<span class="fc" id="L142">        long from = Math.max(frame0, startFrame);</span>
+<span class="fc" id="L143">        long to = Math.min(frame0 + BaseAudioContext.RENDER_QUANTUM, stopFrame);</span>
+<span class="fc bfc" id="L144" title="All 2 branches covered.">        if (to &lt;= from) {</span>
+<span class="pc bpc" id="L145" title="1 of 2 branches missed.">            if (stopFrame &lt;= frame0 + BaseAudioContext.RENDER_QUANTUM) {</span>
+<span class="nc" id="L146">                end();</span>
+            }
+<span class="fc" id="L148">            return false;</span>
+        }
+<span class="fc" id="L150">        rFrom = (int) (from - frame0);</span>
+<span class="fc" id="L151">        rTo = (int) (to - frame0);</span>
+<span class="fc" id="L152">        return true;</span>
+    }
+
+    /// Whether the stop time falls inside or before the end of quantum `q`.
+    final boolean stopsIn(long q) {
+<span class="fc bfc" id="L157" title="All 2 branches covered.">        if (Double.isInfinite(rStop)) {</span>
+<span class="fc" id="L158">            return false;</span>
+        }
+<span class="fc" id="L160">        long stopFrame = (long) Math.ceil(BaseAudioContext.snapFrames(rStop * context.getSampleRate()));</span>
+<span class="fc bfc" id="L161" title="All 2 branches covered.">        return stopFrame &lt;= (q + 1) * BaseAudioContext.RENDER_QUANTUM;</span>
+    }
+
+    /// Marks the node finished; outputs are silent from now on.
+    final void end() {
+<span class="pc bpc" id="L166" title="1 of 2 branches missed.">        if (!rEnded) {</span>
+<span class="fc" id="L167">            rEnded = true;</span>
+<span class="fc" id="L168">            context.rEnded(this);</span>
+        }
+<span class="fc" id="L170">    }</span>
+
+    final void dispatchEnded(boolean onThisThread) {
+<span class="fc bfc" id="L173" title="All 2 branches covered.">        if (onEnded == null) {</span>
+<span class="fc" id="L174">            return;</span>
+        }
+<span class="pc bpc" id="L176" title="1 of 2 branches missed.">        if (onThisThread) {</span>
+<span class="fc" id="L177">            endedTask.run();</span>
+        } else {
+<span class="nc" id="L179">            CN.callSerially(endedTask);</span>
+        }
+<span class="fc" id="L181">    }</span>
+
+    @Override
+    final void process(long q) {
+<span class="fc bfc" id="L185" title="All 2 branches covered.">        for (int i = 0; i &lt; outBuses.length; i++) {</span>
+<span class="fc" id="L186">            outBuses[i].setChannels(1);</span>
+        }
+<span class="fc bfc" id="L188" title="All 2 branches covered.">        if (!window(q)) {</span>
+<span class="fc" id="L189">            return;</span>
+        }
+<span class="fc" id="L191">        render(q, rFrom, rTo);</span>
+<span class="fc bfc" id="L192" title="All 2 branches covered.">        if (stopsIn(q)) {</span>
+<span class="fc" id="L193">            end();</span>
+        }
+<span class="fc" id="L195">    }</span>
+
+    /// Renders active frames `from` to `to` of quantum `q`. The outputs were set
+    /// to one silent channel; a subclass changes the count before writing.
+    abstract void render(long q, int from, int to);
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

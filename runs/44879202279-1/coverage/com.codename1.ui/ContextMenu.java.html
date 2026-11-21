@@ -1,0 +1,205 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ContextMenu.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui</a> &gt; <span class="el_source">ContextMenu.java</span></div><h1>ContextMenu.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation. Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Codename One in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ui;
+
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.geom.Rectangle;
+import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.layouts.BoxLayout;
+
+/// The right-click menu.
+///
+/// Codename One has carried the *event* for a long time --
+/// `Component#addContextMenuListener(ActionListener)` fires on a secondary mouse button, a
+/// stylus barrel button or a long press -- and has never had anything that turns it into a
+/// menu. Every application that wanted one built its own popup, which is why none of them
+/// looked like the platform.
+///
+/// Two ways in. Give a component its commands and the menu appears by itself:
+///
+/// ```java
+/// label.setContextMenuCommands(cut, copy, paste);
+/// ```
+///
+/// Or open it from a listener, when the commands depend on what was clicked:
+///
+/// ```java
+/// table.addContextMenuListener(e -&gt; {
+///     ContextMenu.show(table, e.getX(), e.getY(), commandsFor(rowAt(e.getY())));
+///     e.consume();
+/// });
+/// ```
+///
+/// The menu is an anchored popup, which means it is drawn inside the application's surface
+/// rather than in a window of its own -- deliberately, and for the same reasons
+/// `Dialog#showPopupDialog(Rectangle)` gives: the rectangle it points at is in its host's
+/// coordinate space, a separate window would never receive the click meant to dismiss it,
+/// and it would steal focus from its opener every time it appeared. It is styled through
+/// `PopupContentPane` and `Command`, which the desktop native themes define.
+///
+/// A null or empty command array opens nothing. That is not a special case to work around:
+/// a menu with no items is a rectangle the user has to dismiss to learn it was empty.
+public final class ContextMenu {
+
+    private ContextMenu() {
+    }
+
+    /// Opens the menu at a point, in the coordinate space of the anchor's top level.
+    ///
+    /// #### Parameters
+    ///
+    /// - `anchor`: the component the menu belongs to; its top level hosts the popup
+    ///
+    /// - `x`: the pointer x coordinate
+    ///
+    /// - `y`: the pointer y coordinate
+    ///
+    /// - `commands`: the menu items, in order
+    ///
+    /// #### Returns
+    ///
+    /// the command the user chose, or null if the menu was dismissed or never opened
+    public static Command show(Component anchor, int x, int y, Command... commands) {
+<span class="pc bpc" id="L84" title="1 of 4 branches missed.">        if (anchor == null || !hasAnyCommand(commands)) {</span>
+<span class="fc" id="L85">            return null;</span>
+        }
+<span class="nc" id="L87">        Command[] chosen = new Command[1];</span>
+<span class="nc" id="L88">        Dialog menu = build(commands, chosen);</span>
+<span class="nc" id="L89">        TopLevelContainer host = anchor.getTopLevelContainer();</span>
+<span class="nc bnc" id="L90" title="All 2 branches missed.">        if (host != null) {</span>
+<span class="nc" id="L91">            menu.setTopLevelHost(host);</span>
+        }
+        // A one-pixel rectangle at the pointer: the popup points at where the user clicked,
+        // not at the middle of whatever they clicked on. Anchoring to the component would put
+        // a menu for a full-width row in the centre of the screen.
+<span class="nc" id="L96">        menu.showPopupDialog(new Rectangle(x, y, 1, 1));</span>
+<span class="nc" id="L97">        return chosen[0];</span>
+    }
+
+    /// Opens the menu over a component rather than at a point, for a caller that has no
+    /// pointer position -- a keyboard menu key, or a disclosure button that opens the same
+    /// menu a right click would.
+    ///
+    /// #### Parameters
+    ///
+    /// - `anchor`: the component to point at
+    ///
+    /// - `commands`: the menu items, in order
+    ///
+    /// #### Returns
+    ///
+    /// the command the user chose, or null
+    public static Command show(Component anchor, Command... commands) {
+<span class="nc bnc" id="L114" title="All 4 branches missed.">        if (anchor == null || !hasAnyCommand(commands)) {</span>
+<span class="nc" id="L115">            return null;</span>
+        }
+<span class="nc" id="L117">        Command[] chosen = new Command[1];</span>
+<span class="nc" id="L118">        build(commands, chosen).showPopupDialog(anchor);</span>
+<span class="nc" id="L119">        return chosen[0];</span>
+    }
+
+    /// True when the array holds at least one command to show.
+    ///
+    /// Length alone is not the question. `build` skips null entries, so an array that is
+    /// nonempty but all nulls produced a popup with no buttons in it -- a modal rectangle the
+    /// user has to dismiss to discover it was empty. That is the same outcome the class
+    /// documents for a null or empty array, where the contract is to open nothing, so the
+    /// check is about content rather than length.
+    ///
+    /// #### Parameters
+    ///
+    /// - `commands`: the candidate menu items, possibly null
+    ///
+    /// #### Returns
+    ///
+    /// true when at least one entry is non-null
+    private static boolean hasAnyCommand(Command[] commands) {
+<span class="fc bfc" id="L138" title="All 2 branches covered.">        if (commands == null) {</span>
+<span class="fc" id="L139">            return false;</span>
+        }
+<span class="pc bpc" id="L141" title="1 of 2 branches missed.">        for (Command cmd : commands) {</span>
+<span class="nc bnc" id="L142" title="All 2 branches missed.">            if (cmd != null) {</span>
+<span class="nc" id="L143">                return true;</span>
+            }
+        }
+<span class="fc" id="L146">        return false;</span>
+    }
+
+    /// Builds the popup: one left-aligned button per command, stacked, in a dialog with no
+    /// title and no chrome of its own.
+    ///
+    /// The buttons carry the command's NAME rather than the command itself. A
+    /// `Button(Command)` fires the command from inside its own action event, which would run
+    /// it while the menu is still showing -- so a command that opens a form or another dialog
+    /// would put it underneath a menu still holding the popup layer, and the menu would
+    /// outlive the screen it belonged to. Here the menu is disposed first and the command
+    /// dispatched after, which is the order `Dialog` uses for its own command buttons.
+    ///
+    /// #### Parameters
+    ///
+    /// - `commands`: the menu items
+    ///
+    /// - `chosen`: a one-element box the pressed command is written into
+    ///
+    /// #### Returns
+    ///
+    /// the popup, not yet shown
+    private static Dialog build(Command[] commands, final Command[] chosen) {
+<span class="nc" id="L169">        final Dialog menu = new Dialog();</span>
+<span class="nc" id="L170">        menu.setDisposeWhenPointerOutOfBounds(true);</span>
+<span class="nc" id="L171">        menu.setLayout(new BorderLayout());</span>
+<span class="nc" id="L172">        menu.setAutoDispose(true);</span>
+        // A context menu never becomes an operating system window even where the theme asks
+        // for one by default -- see the class note. setNativeWindowMode is per instance and
+        // outranks both the static default and the theme constant.
+<span class="nc" id="L176">        menu.setNativeWindowMode(false);</span>
+
+<span class="nc" id="L178">        Container items = new Container(BoxLayout.y());</span>
+<span class="nc" id="L179">        items.setUIID(&quot;CommandList&quot;);</span>
+<span class="nc" id="L180">        items.setScrollableY(true);</span>
+        // `final` on the loop variable, not merely convention: the core compiles at Java 5
+        // source level, where a foreach variable is NOT implicitly final and so cannot be
+        // captured by the listener below without it.
+<span class="nc bnc" id="L184" title="All 2 branches missed.">        for (final Command cmd : commands) {</span>
+<span class="nc bnc" id="L185" title="All 2 branches missed.">            if (cmd == null) {</span>
+<span class="nc" id="L186">                continue;</span>
+            }
+<span class="nc" id="L188">            Button b = new Button(cmd.getCommandName(), cmd.getIcon());</span>
+<span class="nc" id="L189">            b.setUIID(&quot;Command&quot;);</span>
+<span class="nc" id="L190">            b.setEnabled(cmd.isEnabled());</span>
+<span class="nc" id="L191">            b.addActionListener(new ActionListener() {</span>
+                @Override
+                public void actionPerformed(ActionEvent evt) {
+<span class="nc" id="L194">                    chosen[0] = cmd;</span>
+<span class="nc" id="L195">                    menu.dispose();</span>
+<span class="nc" id="L196">                    cmd.actionPerformed(new ActionEvent(cmd, ActionEvent.Type.Command));</span>
+<span class="nc" id="L197">                }</span>
+            });
+<span class="nc" id="L199">            items.add(b);</span>
+        }
+<span class="nc" id="L201">        menu.add(BorderLayout.CENTER, items);</span>
+<span class="nc" id="L202">        return menu;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

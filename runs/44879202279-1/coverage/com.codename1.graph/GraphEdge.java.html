@@ -1,0 +1,219 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>GraphEdge.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.graph</a> &gt; <span class="el_source">GraphEdge.java</span></div><h1>GraphEdge.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.graph;
+
+/// A connection from one node to another, optionally from a port to a port.
+public class GraphEdge {
+    /// An unbroken line, the default.
+    public static final int LINE_SOLID = 0;
+
+    /// A line of dashes.
+    public static final int LINE_DASHED = 1;
+
+    /// A line of dots.
+    public static final int LINE_DOTTED = 2;
+
+    /// No mark at an end of the edge.
+    public static final int ARROW_NONE = 0;
+
+    /// A filled arrowhead.
+    public static final int ARROW_FILLED = 1;
+
+    /// An arrowhead of two open strokes.
+    public static final int ARROW_OPEN = 2;
+
+    /// A diamond.
+    public static final int ARROW_DIAMOND = 3;
+
+    /// A circle.
+    public static final int ARROW_CIRCLE = 4;
+
+    private final String id;
+    private final String sourceId;
+    private final String sourcePortId;
+    private final String targetId;
+    private final String targetPortId;
+    private String label;
+<span class="fc" id="L57">    private boolean directed = true;</span>
+    private String styleKey;
+    private Object userData;
+    private double[] route;
+    private int lineStyle;
+    private int sourceArrow;
+<span class="fc" id="L63">    private int targetArrow = -1;</span>
+
+    /// An edge between two nodes.
+    public GraphEdge(String id, String sourceId, String targetId) {
+<span class="fc" id="L67">        this(id, sourceId, null, targetId, null);</span>
+<span class="fc" id="L68">    }</span>
+
+    /// An edge between two ports. Either port id may be null to attach to
+    /// the node itself.
+<span class="fc" id="L72">    public GraphEdge(String id, String sourceId, String sourcePortId, String targetId, String targetPortId) {</span>
+<span class="fc" id="L73">        this.id = id;</span>
+<span class="fc" id="L74">        this.sourceId = sourceId;</span>
+<span class="fc" id="L75">        this.sourcePortId = sourcePortId;</span>
+<span class="fc" id="L76">        this.targetId = targetId;</span>
+<span class="fc" id="L77">        this.targetPortId = targetPortId;</span>
+<span class="fc" id="L78">    }</span>
+
+    /// The id, unique within the model.
+    public String getId() {
+<span class="fc" id="L82">        return id;</span>
+    }
+
+    /// The id of the node the edge leaves.
+    public String getSourceId() {
+<span class="fc" id="L87">        return sourceId;</span>
+    }
+
+    /// The id of the output port the edge leaves, or null.
+    public String getSourcePortId() {
+<span class="fc" id="L92">        return sourcePortId;</span>
+    }
+
+    /// The id of the node the edge enters.
+    public String getTargetId() {
+<span class="fc" id="L97">        return targetId;</span>
+    }
+
+    /// The id of the input port the edge enters, or null.
+    public String getTargetPortId() {
+<span class="fc" id="L102">        return targetPortId;</span>
+    }
+
+    /// The text painted at the middle of the edge, or null.
+    public String getLabel() {
+<span class="fc" id="L107">        return label;</span>
+    }
+
+    /// Sets the label.
+    public void setLabel(String label) {
+<span class="fc" id="L112">        this.label = label;</span>
+<span class="fc" id="L113">    }</span>
+
+    /// True, the default, when the edge is painted with an arrowhead.
+    public boolean isDirected() {
+<span class="fc" id="L117">        return directed;</span>
+    }
+
+    /// Paints the edge with or without an arrowhead.
+    public void setDirected(boolean directed) {
+<span class="fc" id="L122">        this.directed = directed;</span>
+<span class="fc" id="L123">    }</span>
+
+    /// A key a renderer may map to a colour or a dash, or null.
+    public String getStyleKey() {
+<span class="fc" id="L127">        return styleKey;</span>
+    }
+
+    /// Sets the style key.
+    public void setStyleKey(String styleKey) {
+<span class="fc" id="L132">        this.styleKey = styleKey;</span>
+<span class="fc" id="L133">    }</span>
+
+    /// Anything the application keeps with the edge.
+    public Object getUserData() {
+<span class="fc" id="L137">        return userData;</span>
+    }
+
+    /// Sets the application's data.
+    public void setUserData(Object userData) {
+<span class="nc" id="L142">        this.userData = userData;</span>
+<span class="nc" id="L143">    }</span>
+
+    /// The bend points an arrangement routed the edge through, as x, y pairs in
+    /// world units, or null for a direct line between its ends.
+    public double[] getRoute() {
+<span class="fc" id="L148">        return route;</span>
+    }
+
+    /// Sets the bend points; null removes them.
+    public void setRoute(double[] route) {
+<span class="fc" id="L153">        this.route = route;</span>
+<span class="fc" id="L154">    }</span>
+
+    /// How the line is drawn: `LINE_SOLID`, `LINE_DASHED` or `LINE_DOTTED`.
+    public int getLineStyle() {
+<span class="fc" id="L158">        return lineStyle;</span>
+    }
+
+    /// Sets how the line is drawn.
+    public void setLineStyle(int lineStyle) {
+<span class="fc" id="L163">        this.lineStyle = lineStyle;</span>
+<span class="fc" id="L164">    }</span>
+
+    /// The mark at the source end, one of the `ARROW_` constants;
+    /// `ARROW_NONE` by default.
+    public int getSourceArrow() {
+<span class="fc" id="L169">        return sourceArrow;</span>
+    }
+
+    /// Sets the mark at the source end.
+    public void setSourceArrow(int sourceArrow) {
+<span class="fc" id="L174">        this.sourceArrow = sourceArrow;</span>
+<span class="fc" id="L175">    }</span>
+
+    /// The mark at the target end, one of the `ARROW_` constants. Until
+    /// `setTargetArrow` is called it follows `isDirected`: `ARROW_FILLED` for a
+    /// directed edge and `ARROW_NONE` otherwise.
+    public int getTargetArrow() {
+<span class="fc bfc" id="L181" title="All 2 branches covered.">        if (targetArrow &lt; 0) {</span>
+<span class="fc bfc" id="L182" title="All 2 branches covered.">            return directed ? ARROW_FILLED : ARROW_NONE;</span>
+        }
+<span class="fc" id="L184">        return targetArrow;</span>
+    }
+
+    /// Sets the mark at the target end; a negative value goes back to
+    /// following `isDirected`.
+    public void setTargetArrow(int targetArrow) {
+<span class="fc" id="L190">        this.targetArrow = targetArrow;</span>
+<span class="fc" id="L191">    }</span>
+
+    /// True when `setTargetArrow` chose the target mark, so that it no longer
+    /// follows `isDirected`.
+    public boolean isTargetArrowSet() {
+<span class="fc bfc" id="L196" title="All 2 branches covered.">        return targetArrow &gt;= 0;</span>
+    }
+
+    /// An edge like this one under another id and between other nodes, with
+    /// the same ports, label, line and arrows. The route is not copied: it was
+    /// laid for where the original nodes are.
+    public GraphEdge copy(String newId, String newSourceId, String newTargetId) {
+<span class="fc" id="L203">        GraphEdge c = new GraphEdge(newId, newSourceId, sourcePortId, newTargetId, targetPortId);</span>
+<span class="fc" id="L204">        c.label = label;</span>
+<span class="fc" id="L205">        c.directed = directed;</span>
+<span class="fc" id="L206">        c.styleKey = styleKey;</span>
+<span class="fc" id="L207">        c.userData = userData;</span>
+<span class="fc" id="L208">        c.lineStyle = lineStyle;</span>
+<span class="fc" id="L209">        c.sourceArrow = sourceArrow;</span>
+<span class="fc" id="L210">        c.targetArrow = targetArrow;</span>
+<span class="fc" id="L211">        return c;</span>
+    }
+
+    /// True when the edge touches the node with this id.
+    public boolean touches(String nodeId) {
+<span class="pc bpc" id="L216" title="2 of 6 branches missed.">        return nodeId != null &amp;&amp; (nodeId.equals(sourceId) || nodeId.equals(targetId));</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

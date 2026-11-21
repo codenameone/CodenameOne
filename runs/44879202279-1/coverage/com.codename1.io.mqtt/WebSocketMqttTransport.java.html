@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>WebSocketMqttTransport.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.io.mqtt</a> &gt; <span class="el_source">WebSocketMqttTransport.java</span></div><h1>WebSocketMqttTransport.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.io.mqtt;
+
+import com.codename1.io.WebSocket;
+import com.codename1.ui.CN;
+import java.io.IOException;
+import java.util.concurrent.atomic.AtomicBoolean;
+
+/// MQTT over WebSocket (the `mqtt` subprotocol, one binary message per write),
+/// through [WebSocket]. This is the way to TLS: use a `wss://` URL. A packet may
+/// span messages and a message may hold several packets; the client reassembles.
+final class WebSocketMqttTransport implements MqttTransport {
+    private final String url;
+    private final int timeout;
+<span class="nc" id="L36">    private final AtomicBoolean closed = new AtomicBoolean();</span>
+    private WebSocket socket;
+
+<span class="nc" id="L39">    WebSocketMqttTransport(String url, int timeout) {</span>
+<span class="nc" id="L40">        this.url = url;</span>
+<span class="nc" id="L41">        this.timeout = timeout;</span>
+<span class="nc" id="L42">    }</span>
+
+    @Override
+    public void open(final Handler h) {
+<span class="nc bnc" id="L46" title="All 2 branches missed.">        if (!WebSocket.isSupported()) {</span>
+<span class="nc" id="L47">            h.closed(&quot;WebSockets are not supported on this platform&quot;);</span>
+<span class="nc" id="L48">            return;</span>
+        }
+<span class="nc" id="L50">        socket = WebSocket.build(url).subprotocols(&quot;mqtt&quot;)</span>
+<span class="nc" id="L51">                .onConnect(new WebSocket.ConnectHandler() {</span>
+                    public void onConnect(WebSocket ws) {
+<span class="nc" id="L53">                        CN.callSerially(new Runnable() {</span>
+                            public void run() {
+<span class="nc bnc" id="L55" title="All 2 branches missed.">                                if (!closed.get()) {</span>
+<span class="nc" id="L56">                                    h.opened();</span>
+                                }
+<span class="nc" id="L58">                            }</span>
+                        });
+<span class="nc" id="L60">                    }</span>
+                })
+<span class="nc" id="L62">                .onBinaryMessage(new WebSocket.BinaryHandler() {</span>
+                    public void onBinary(WebSocket ws, final byte[] message) {
+<span class="nc" id="L64">                        CN.callSerially(new Runnable() {</span>
+                            public void run() {
+<span class="nc bnc" id="L66" title="All 2 branches missed.">                                if (!closed.get()) {</span>
+<span class="nc" id="L67">                                    h.received(message, message.length);</span>
+                                }
+<span class="nc" id="L69">                            }</span>
+                        });
+<span class="nc" id="L71">                    }</span>
+                })
+<span class="nc" id="L73">                .onClose(new WebSocket.CloseHandler() {</span>
+                    public void onClose(WebSocket ws, final int statusCode, final String reason) {
+<span class="nc" id="L75">                        fail(h, &quot;WebSocket closed (&quot; + statusCode + &quot;) &quot; + reason);</span>
+<span class="nc" id="L76">                    }</span>
+                })
+<span class="nc" id="L78">                .onError(new WebSocket.ErrorHandler() {</span>
+                    public void onError(WebSocket ws, Exception ex) {
+<span class="nc" id="L80">                        fail(h, &quot;WebSocket error: &quot; + ex);</span>
+<span class="nc" id="L81">                    }</span>
+                })
+<span class="nc" id="L83">                .connect(timeout);</span>
+<span class="nc" id="L84">    }</span>
+
+    private void fail(final Handler h, final String reason) {
+<span class="nc" id="L87">        CN.callSerially(new Runnable() {</span>
+            @Override
+            public void run() {
+<span class="nc bnc" id="L90" title="All 2 branches missed.">                if (!closed.get()) {</span>
+<span class="nc" id="L91">                    h.closed(reason);</span>
+                }
+<span class="nc" id="L93">            }</span>
+        });
+<span class="nc" id="L95">    }</span>
+
+    @Override
+    public void send(byte[] data) throws IOException {
+<span class="nc bnc" id="L99" title="All 4 branches missed.">        if (socket == null || closed.get()) {</span>
+<span class="nc" id="L100">            throw new IOException(&quot;Not connected&quot;);</span>
+        }
+<span class="nc" id="L102">        socket.send(data);</span>
+<span class="nc" id="L103">    }</span>
+
+    @Override
+    public void close() {
+<span class="nc" id="L107">        closed.set(true);</span>
+<span class="nc bnc" id="L108" title="All 2 branches missed.">        if (socket != null) {</span>
+<span class="nc" id="L109">            socket.close();</span>
+        }
+<span class="nc" id="L111">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

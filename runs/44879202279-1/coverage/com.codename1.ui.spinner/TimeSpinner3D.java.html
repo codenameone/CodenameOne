@@ -1,0 +1,586 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TimeSpinner3D.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.spinner</a> &gt; <span class="el_source">TimeSpinner3D.java</span></div><h1>TimeSpinner3D.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ui.spinner;
+
+import com.codename1.ui.Component;
+import com.codename1.ui.Container;
+import com.codename1.ui.Graphics;
+import com.codename1.ui.Label;
+import com.codename1.ui.geom.Dimension;
+import com.codename1.ui.layouts.LayeredLayout;
+import com.codename1.ui.plaf.Style;
+import com.codename1.ui.spinner.SpinnerNode.RowFormatter;
+
+import java.util.Calendar;
+import java.util.Date;
+
+import static com.codename1.ui.CN.convertToPixels;
+
+/// Hour and minute wheels selecting a time of day, in either 24 hour or AM/PM
+/// form according to `#setShowMeridiem(boolean)`.
+///
+/// The body of a lightweight [Picker][com.codename1.ui.spinner.Picker] of type
+/// time, and usable on its own as an ordinary `Container`. The minute wheel
+/// can step by more than one minute, which is what a picker offering quarter
+/// hours uses.
+///
+/// With `#setDurationMode(boolean)` set it selects a LENGTH of time instead,
+/// and the meridiem is not shown; prefer
+/// [DurationSpinner3D][com.codename1.ui.spinner.DurationSpinner3D] for that,
+/// which also offers a day wheel.
+///
+/// [getValue()][#getValue()] and [setValue(Object)][#setValue(Object)] carry
+/// the time as minutes since midnight, as an `Integer`.
+public class TimeSpinner3D extends Container implements InternalPickerWidget {
+
+    static final int DEFAULT_MINUTE_STEP = 5;
+    private Spinner3D hour;
+    private Spinner3D minute;
+    private Spinner3D amPM;
+
+<span class="fc" id="L61">    private int minHour = -1;</span>
+<span class="fc" id="L62">    private int maxHour = -1;</span>
+
+<span class="fc" id="L64">    private int startHour = 1;</span>
+<span class="fc" id="L65">    private int endHour = 12;</span>
+<span class="fc" id="L66">    private int minuteStep = DEFAULT_MINUTE_STEP;</span>
+
+    private boolean durationMode;
+<span class="fc" id="L69">    private boolean showHours = true;</span>
+<span class="fc" id="L70">    private boolean showMinutes = true;</span>
+<span class="fc" id="L71">    private boolean showMeridiem = true;</span>
+<span class="fc" id="L72">    private int currentHour = 8;</span>
+<span class="fc" id="L73">    private int currentMinute = 0;</span>
+<span class="fc" id="L74">    private boolean currentMeridiem = false;</span>
+
+    /// Default constructor
+<span class="fc" id="L77">    public TimeSpinner3D(int minuteStep) {</span>
+<span class="fc" id="L78">        this.minuteStep = minuteStep;</span>
+<span class="fc" id="L79">        initSpinner();</span>
+<span class="fc" id="L80">    }</span>
+
+    public TimeSpinner3D() {
+<span class="fc" id="L83">        this(DEFAULT_MINUTE_STEP);</span>
+<span class="fc" id="L84">    }</span>
+
+    /// Default constructor
+    void initSpinner() {
+<span class="pc bpc" id="L88" title="1 of 2 branches missed.">        if (hour == null) {</span>
+<span class="fc" id="L89">            hour = Spinner3D.create(startHour, endHour, currentHour, 1);</span>
+<span class="fc" id="L90">            hour.setRowFormatter(new HourRowFormatter());</span>
+<span class="fc" id="L91">            Style hourStyle = Style.createProxyStyle(hour.getRowStyle(), hour.getSelectedRowStyle());</span>
+<span class="fc" id="L92">            hourStyle.setAlignment(Component.RIGHT);</span>
+<span class="fc" id="L93">            hourStyle.setPaddingRight(3f);</span>
+<span class="fc" id="L94">            minute = Spinner3D.create(0, 59, currentMinute, minuteStep);</span>
+<span class="fc" id="L95">            minute.setRowFormatter(new MinuteRowFormatter());</span>
+
+<span class="fc" id="L97">            Style minuteStyle = Style.createProxyStyle(minute.getRowStyle(), minute.getSelectedRowStyle());</span>
+<span class="fc" id="L98">            minuteStyle.setAlignment(Component.RIGHT);</span>
+<span class="fc" id="L99">            minuteStyle.setPaddingRight(3f);</span>
+
+<span class="pc bpc" id="L101" title="1 of 2 branches missed.">            if (currentMeridiem) {</span>
+<span class="nc" id="L102">                amPM = Spinner3D.create(0, 2, 1, 1);</span>
+            } else {
+<span class="fc" id="L104">                amPM = Spinner3D.create(0, 2, 0, 1);</span>
+            }
+
+<span class="fc" id="L107">            amPM.setRowFormatter(new AmPmRowFormatter());</span>
+<span class="fc" id="L108">            addComponents();</span>
+        }
+<span class="fc" id="L110">    }</span>
+
+    void addComponents() {
+
+
+<span class="pc bpc" id="L115" title="1 of 2 branches missed.">        if (amPM != null) {</span>
+            //setLayout(BoxLayout.x());
+<span class="fc" id="L117">            setLayout(new LayeredLayout());</span>
+<span class="fc" id="L118">            addComponent(hour);</span>
+
+<span class="fc" id="L120">            LayeredLayout ll = (LayeredLayout) getLayout();</span>
+<span class="fc bfc" id="L121" title="All 2 branches covered.">            if (durationMode) {</span>
+<span class="fc" id="L122">                Label hoursLabel = new Label(getUIManager().localize(&quot;hours&quot;, &quot;hours&quot;), &quot;TimeSpinnerHoursLabel&quot;);</span>
+<span class="fc" id="L123">                Label minutesLabel = new Label(getUIManager().localize(&quot;minutes&quot;, &quot;minutes&quot;), &quot;TimeSpinnerMinutesLabel&quot;);</span>
+<span class="fc" id="L124">                addComponent(hoursLabel);</span>
+<span class="fc" id="L125">                addComponent(minute);</span>
+<span class="fc" id="L126">                addComponent(minutesLabel);</span>
+
+<span class="fc" id="L128">                ll.setInsets(hour, &quot;0 75% 0 0&quot;);</span>
+<span class="fc" id="L129">                ll.setInsets(hoursLabel, &quot;0 50% 0 25%&quot;);</span>
+<span class="fc" id="L130">                ll.setInsets(minute, &quot;0 25% 0 50%&quot;);</span>
+<span class="fc" id="L131">                ll.setInsets(minutesLabel, &quot;0 0 0 75%&quot;);</span>
+<span class="fc" id="L132">            } else {</span>
+<span class="fc" id="L133">                addComponent(minute);</span>
+<span class="fc bfc" id="L134" title="All 2 branches covered.">                if (showMeridiem) {</span>
+                    //content.addComponent(createSeparator());
+<span class="fc" id="L136">                    addComponent(amPM);</span>
+<span class="fc" id="L137">                    ll.setInsets(hour, &quot;0 67% 0 0&quot;)</span>
+<span class="fc" id="L138">                            .setInsets(minute, &quot;0 33% 0 33%&quot;)</span>
+<span class="fc" id="L139">                            .setInsets(amPM, &quot;0 0 0 67%&quot;);</span>
+                } else {
+<span class="fc" id="L141">                    ll.setInsets(hour, &quot;0 50% 0 0&quot;)</span>
+<span class="fc" id="L142">                            .setInsets(minute, &quot;0 0 0 50%&quot;);</span>
+                }
+            }
+
+
+        }
+<span class="fc" id="L148">        setHoursVisible(showHours);</span>
+<span class="fc" id="L149">        setMinutesVisible(showMinutes);</span>
+
+<span class="fc" id="L151">    }</span>
+
+    @Override
+    protected Dimension calcPreferredSize() {
+<span class="fc" id="L155">        Dimension size = super.calcPreferredSize();</span>
+<span class="fc" id="L156">        Label l = new Label(&quot;00  00  AM&quot;, &quot;Spinner3DRow&quot;);</span>
+<span class="fc" id="L157">        float w = l.getPreferredW() * 1.5f + convertToPixels(10f);</span>
+<span class="fc" id="L158">        size.setWidth((int) w);</span>
+<span class="fc" id="L159">        return size;</span>
+    }
+
+
+    /// {@inheritDoc}
+    @Override
+    public String[] getPropertyNames() {
+<span class="nc" id="L166">        return new String[]{&quot;currentHour&quot;, &quot;currentMinute&quot;, &quot;minuteStep&quot;, &quot;currentMeridiem&quot;, &quot;showMeridiem&quot;, &quot;durationMode&quot;};</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public Class[] getPropertyTypes() {
+<span class="nc" id="L172">        return new Class[]{Integer.class, Integer.class, Integer.class, Boolean.class, Boolean.class, Boolean.class};</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public Object getPropertyValue(String name) {
+<span class="pc bpc" id="L178" title="1 of 2 branches missed.">        if (&quot;durationMode&quot;.equals(name)) {</span>
+<span class="nc bnc" id="L179" title="All 2 branches missed.">            if (durationMode) {</span>
+<span class="nc" id="L180">                return Boolean.TRUE;</span>
+            }
+<span class="nc" id="L182">            return Boolean.FALSE;</span>
+        }
+<span class="pc bpc" id="L184" title="1 of 2 branches missed.">        if (&quot;currentHour&quot;.equals(name)) {</span>
+<span class="fc" id="L185">            return Integer.valueOf(currentHour);</span>
+        }
+<span class="nc bnc" id="L187" title="All 2 branches missed.">        if (&quot;currentMinute&quot;.equals(name)) {</span>
+<span class="nc" id="L188">            return Integer.valueOf(currentMinute);</span>
+        }
+<span class="nc bnc" id="L190" title="All 2 branches missed.">        if (&quot;minuteStep&quot;.equals(name)) {</span>
+<span class="nc" id="L191">            return Integer.valueOf(minuteStep);</span>
+        }
+<span class="nc bnc" id="L193" title="All 2 branches missed.">        if (&quot;currentMeridiem&quot;.equals(name)) {</span>
+<span class="nc bnc" id="L194" title="All 2 branches missed.">            if (currentMeridiem) {</span>
+<span class="nc" id="L195">                return Boolean.TRUE;</span>
+            }
+<span class="nc" id="L197">            return Boolean.FALSE;</span>
+        }
+<span class="nc bnc" id="L199" title="All 2 branches missed.">        if (&quot;showMeridiem&quot;.equals(name)) {</span>
+<span class="nc bnc" id="L200" title="All 2 branches missed.">            if (showMeridiem) {</span>
+<span class="nc" id="L201">                return Boolean.TRUE;</span>
+            }
+<span class="nc" id="L203">            return Boolean.FALSE;</span>
+        }
+<span class="nc" id="L205">        return null;</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    public String setPropertyValue(String name, Object value) {
+<span class="fc bfc" id="L211" title="All 2 branches covered.">        if (&quot;currentHour&quot;.equals(name)) {</span>
+<span class="fc" id="L212">            setCurrentHour(Integer.parseInt(value.toString()));</span>
+<span class="fc" id="L213">            return null;</span>
+        }
+<span class="pc bpc" id="L215" title="1 of 2 branches missed.">        if (&quot;currentMinute&quot;.equals(name)) {</span>
+<span class="fc" id="L216">            setCurrentMinute(Integer.parseInt(value.toString()));</span>
+<span class="fc" id="L217">            return null;</span>
+        }
+<span class="nc bnc" id="L219" title="All 2 branches missed.">        if (&quot;minuteStep&quot;.equals(name)) {</span>
+<span class="nc" id="L220">            setMinuteStep(Integer.parseInt(value.toString()));</span>
+<span class="nc" id="L221">            return null;</span>
+        }
+<span class="nc bnc" id="L223" title="All 2 branches missed.">        if (&quot;currentMeridiem&quot;.equals(name)) {</span>
+<span class="nc" id="L224">            setCurrentMeridiem(((Boolean) value).booleanValue());</span>
+<span class="nc" id="L225">            return null;</span>
+        }
+<span class="nc bnc" id="L227" title="All 2 branches missed.">        if (&quot;showMeridiem&quot;.equals(name)) {</span>
+<span class="nc" id="L228">            setShowMeridiem(((Boolean) value).booleanValue());</span>
+<span class="nc" id="L229">            return null;</span>
+        }
+
+
+<span class="nc" id="L233">        return super.setPropertyValue(name, value);</span>
+    }
+
+    /// Gets the minutes spinner step size.
+    ///
+    /// #### Returns
+    ///
+    /// the minuteStep
+    public int getMinuteStep() {
+<span class="nc" id="L242">        return minuteStep;</span>
+    }
+
+    /// Sets the step-size for the minutes spinner.
+    ///
+    /// #### Parameters
+    ///
+    /// - `minuteStep`: The step size.  Must be beween 1 and 60.
+    public void setMinuteStep(int minuteStep) {
+<span class="nc bnc" id="L251" title="All 4 branches missed.">        if (minuteStep &lt; 1 || minuteStep &gt; 60) {</span>
+<span class="nc" id="L252">            throw new IllegalArgumentException(&quot;Minute step must be between 1 and 60&quot;);</span>
+        }
+<span class="nc" id="L254">        this.minuteStep = minuteStep;</span>
+<span class="nc bnc" id="L255" title="All 2 branches missed.">        if (minute != null) {</span>
+<span class="nc" id="L256">            minute.setModel(new SpinnerNumberModel(0, 60, currentMinute, minuteStep));</span>
+        }
+<span class="nc" id="L258">    }</span>
+
+    /// Sets the hours range to display. Note that the spinner must not be in duration mode, and must by in 24 hour
+    /// mode, otherwise this will thrown an `IllegalStateException`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `min`: The minimum hour to display (0-24). Set to -1 to allow any minimum.
+    ///
+    /// - `nax`: The maximum hour to display (0-24).  Set -1 to allow any maximum.
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalStateException`: If the spinner is not in 24 hour mode.
+    ///
+    /// #### See also
+    ///
+    /// - #getMinHour()
+    ///
+    /// - #getMaxHour()
+    public void setHourRange(int min, int max) {
+<span class="nc bnc" id="L279" title="All 8 branches missed.">        if (min &gt;= 0 &amp;&amp; max &gt;= min &amp;&amp; (showMeridiem || durationMode)) {</span>
+<span class="nc" id="L280">            throw new IllegalStateException(&quot;TimeSpinner hour range only applies when isShowMeridiem() is false and durationMode is false.&quot;);</span>
+        }
+<span class="nc" id="L282">        minHour = min;</span>
+<span class="nc" id="L283">        maxHour = max;</span>
+<span class="nc" id="L284">        rebuildHours();</span>
+<span class="nc" id="L285">    }</span>
+
+    /// Gets the current minimum hour to display.  -1 for no limit
+    ///
+    /// #### Returns
+    ///
+    /// The current minimum hour (0-24).  -1 for no limit.
+    ///
+    /// #### See also
+    ///
+    /// - #setHourRange(int, int)
+    ///
+    /// - #getMaxHour()
+    public int getMinHour() {
+<span class="nc" id="L299">        return minHour;</span>
+    }
+
+    /// Gets the current maximum hour to display.  -1 for no limit.
+    ///
+    /// #### Returns
+    ///
+    /// The current maximum hour (0-24). -1 for no limit.
+    ///
+    /// #### See also
+    ///
+    /// - #getMinHour()
+    ///
+    /// - #setHourRange(int, int)
+    public int getMaxHour() {
+<span class="nc" id="L314">        return maxHour;</span>
+    }
+
+    /// #### Returns
+    ///
+    /// the showMeridiem
+    public boolean isShowMeridiem() {
+<span class="pc bpc" id="L321" title="3 of 4 branches missed.">        return showMeridiem &amp;&amp; !durationMode;</span>
+    }
+
+    /// Shows AM/PM indication
+    ///
+    /// #### Parameters
+    ///
+    /// - `showMeridiem`: the showMeridiem to set
+    public void setShowMeridiem(boolean showMeridiem) {
+<span class="pc bpc" id="L330" title="1 of 2 branches missed.">        if (durationMode) {</span>
+<span class="nc" id="L331">            return;</span>
+        }
+<span class="fc" id="L333">        this.showMeridiem = showMeridiem;</span>
+<span class="fc" id="L334">        rebuildHours();</span>
+<span class="fc" id="L335">    }</span>
+
+    private void rebuildHours() {
+<span class="fc bfc" id="L338" title="All 2 branches covered.">        if (durationMode) {</span>
+<span class="fc" id="L339">            startHour = 0;</span>
+<span class="fc" id="L340">            endHour = 24;</span>
+<span class="pc bpc" id="L341" title="1 of 2 branches missed.">        } else if (showMeridiem) {</span>
+<span class="nc" id="L342">            startHour = 1;</span>
+<span class="nc" id="L343">            endHour = 12;</span>
+        } else {
+<span class="fc" id="L345">            startHour = 0;</span>
+<span class="fc" id="L346">            endHour = 23;</span>
+<span class="pc bpc" id="L347" title="3 of 4 branches missed.">            if (minHour &gt;= 0 &amp;&amp; minHour &lt;= 23) {</span>
+<span class="nc" id="L348">                startHour = minHour;</span>
+            }
+<span class="pc bpc" id="L350" title="5 of 6 branches missed.">            if (maxHour &gt;= 0 &amp;&amp; maxHour &lt;= 23 &amp;&amp; maxHour &gt; startHour) {</span>
+<span class="nc" id="L351">                endHour = maxHour;</span>
+            }
+        }
+<span class="pc bpc" id="L354" title="1 of 2 branches missed.">        if (hour != null) {</span>
+<span class="fc" id="L355">            hour.setModel(new SpinnerNumberModel(startHour, endHour, currentHour, 1));</span>
+        }
+<span class="fc" id="L357">        removeAll();</span>
+<span class="fc" id="L358">        addComponents();</span>
+<span class="pc bpc" id="L359" title="1 of 2 branches missed.">        if (isInitialized()) {</span>
+<span class="nc" id="L360">            getParent().revalidate();</span>
+        }
+<span class="fc" id="L362">    }</span>
+
+    /// The hour from 1-12 or 0-23
+    ///
+    /// #### Returns
+    ///
+    /// the currentHour
+    public int getCurrentHour() {
+<span class="nc bnc" id="L370" title="All 2 branches missed.">        if (hour != null) {</span>
+<span class="nc" id="L371">            return ((Integer) hour.getValue()).intValue();</span>
+        }
+<span class="nc" id="L373">        return currentHour;</span>
+    }
+
+    /// Set the hour from 1-12 or 0-23
+    ///
+    /// #### Parameters
+    ///
+    /// - `currentHour`: the currentHour to set
+    public void setCurrentHour(int currentHour) {
+<span class="fc" id="L382">        this.currentHour = currentHour;</span>
+<span class="pc bpc" id="L383" title="1 of 2 branches missed.">        if (hour != null) {</span>
+<span class="fc" id="L384">            hour.setValue(Integer.valueOf(currentHour));</span>
+        }
+<span class="fc" id="L386">    }</span>
+
+    /// #### Returns
+    ///
+    /// the currentMinute
+    public int getCurrentMinute() {
+<span class="nc bnc" id="L392" title="All 2 branches missed.">        if (minute != null) {</span>
+<span class="nc" id="L393">            return ((Integer) minute.getValue()).intValue();</span>
+        }
+<span class="nc" id="L395">        return currentMinute;</span>
+    }
+
+    /// #### Parameters
+    ///
+    /// - `currentMinute`: the currentMinute to set
+    public void setCurrentMinute(int currentMinute) {
+<span class="fc" id="L402">        this.currentMinute = currentMinute;</span>
+<span class="pc bpc" id="L403" title="1 of 2 branches missed.">        if (minute != null) {</span>
+<span class="fc" id="L404">            minute.setValue(Integer.valueOf(currentMinute));</span>
+        }
+<span class="fc" id="L406">    }</span>
+
+    /// #### Returns
+    ///
+    /// the currentMeridiem
+    public boolean isCurrentMeridiem() {
+<span class="nc bnc" id="L412" title="All 2 branches missed.">        if (durationMode) {</span>
+<span class="nc" id="L413">            return false;</span>
+        }
+<span class="nc bnc" id="L415" title="All 2 branches missed.">        if (amPM != null) {</span>
+<span class="nc bnc" id="L416" title="All 2 branches missed.">            return ((Integer) amPM.getValue()).intValue() != 0;</span>
+        }
+<span class="nc" id="L418">        return currentMeridiem;</span>
+    }
+
+    /// #### Parameters
+    ///
+    /// - `currentMeridiem`: the currentMeridiem to set
+    public void setCurrentMeridiem(boolean currentMeridiem) {
+<span class="pc bpc" id="L425" title="1 of 2 branches missed.">        if (durationMode) {</span>
+<span class="nc" id="L426">            return;</span>
+        }
+<span class="fc" id="L428">        this.currentMeridiem = currentMeridiem;</span>
+<span class="pc bpc" id="L429" title="1 of 2 branches missed.">        if (amPM != null) {</span>
+<span class="pc bpc" id="L430" title="1 of 2 branches missed.">            if (currentMeridiem) {</span>
+<span class="fc" id="L431">                amPM.setValue(Integer.valueOf(1));</span>
+            } else {
+<span class="nc" id="L433">                amPM.setValue(Integer.valueOf(0));</span>
+            }
+        }
+<span class="fc" id="L436">    }</span>
+
+    /// Duration mode uses the time spinner to indicate a duration in hours and minutes
+    ///
+    /// #### Returns
+    ///
+    /// the durationMode
+    public boolean isDurationMode() {
+<span class="fc" id="L444">        return durationMode;</span>
+    }
+
+    /// Duration mode uses the time spinner to indicate a duration in hours and minutes
+    ///
+    /// #### Parameters
+    ///
+    /// - `durationMode`: the durationMode to set
+    public void setDurationMode(boolean durationMode) {
+<span class="fc" id="L453">        this.durationMode = durationMode;</span>
+<span class="pc bpc" id="L454" title="1 of 2 branches missed.">        if (durationMode) {</span>
+<span class="fc" id="L455">            showMeridiem = false;</span>
+        }
+<span class="fc" id="L457">        rebuildHours();</span>
+<span class="fc" id="L458">    }</span>
+
+    /// Show or hide the hours spinner.
+    ///
+    /// #### Parameters
+    ///
+    /// - `visible`: True to show the hours spinner.
+    public void setHoursVisible(boolean visible) {
+<span class="fc" id="L466">        showHours = visible;</span>
+
+<span class="fc" id="L468">        hour.setVisible(visible);</span>
+<span class="pc bpc" id="L469" title="1 of 2 branches missed.">        hour.setHidden(!visible);</span>
+
+
+<span class="fc" id="L472">    }</span>
+
+    /// Show or hide the minutes spinner.
+    ///
+    /// #### Parameters
+    ///
+    /// - `visible`: True to make the minutes spinner visible.
+    public void setMinutesVisible(boolean visible) {
+<span class="fc" id="L480">        showMinutes = visible;</span>
+<span class="fc" id="L481">        minute.setVisible(visible);</span>
+<span class="pc bpc" id="L482" title="1 of 2 branches missed.">        minute.setHidden(!visible);</span>
+
+<span class="fc" id="L484">    }</span>
+
+    @Override
+    public Object getValue() {
+<span class="nc" id="L488">        Calendar cld = Calendar.getInstance();</span>
+<span class="nc" id="L489">        cld.setTime(new Date());</span>
+<span class="nc" id="L490">        cld.set(Calendar.MINUTE, getCurrentMinute());</span>
+<span class="nc" id="L491">        cld.set(Calendar.SECOND, 0);</span>
+<span class="nc" id="L492">        cld.set(Calendar.MILLISECOND, 0);</span>
+<span class="nc" id="L493">        int hour = getCurrentHour();</span>
+<span class="nc bnc" id="L494" title="All 4 branches missed.">        if (showMeridiem &amp;&amp; hour == 12) {</span>
+<span class="nc" id="L495">            hour = 0;</span>
+        }
+<span class="nc bnc" id="L497" title="All 2 branches missed.">        cld.set(showMeridiem ? Calendar.HOUR : Calendar.HOUR_OF_DAY, hour);</span>
+<span class="nc bnc" id="L498" title="All 2 branches missed.">        if (showMeridiem) {</span>
+<span class="nc bnc" id="L499" title="All 2 branches missed.">            cld.set(Calendar.AM_PM, isCurrentMeridiem() ? 1 : 0);</span>
+        }
+<span class="nc" id="L501">        Calendar zero = Calendar.getInstance();</span>
+<span class="nc" id="L502">        zero.setTime(new Date());</span>
+<span class="nc" id="L503">        zero.set(Calendar.HOUR_OF_DAY, 0);</span>
+<span class="nc" id="L504">        zero.set(Calendar.MINUTE, 0);</span>
+<span class="nc" id="L505">        zero.set(Calendar.SECOND, 0);</span>
+<span class="nc" id="L506">        zero.set(Calendar.MILLISECOND, 0);</span>
+<span class="nc" id="L507">        return (int) ((cld.getTime().getTime() - zero.getTime().getTime()) / 1000L / 60L);</span>
+    }
+
+    @Override
+    public void setValue(Object value) {
+<span class="pc bpc" id="L512" title="1 of 2 branches missed.">        if (value == null) {</span>
+<span class="nc" id="L513">            value = 0;</span>
+        }
+<span class="fc" id="L515">        Integer dt = (Integer) value;</span>
+<span class="fc" id="L516">        Calendar cld = Calendar.getInstance();</span>
+<span class="fc" id="L517">        cld.setTime(new Date());</span>
+<span class="fc" id="L518">        cld.set(Calendar.HOUR_OF_DAY, 0);</span>
+<span class="fc" id="L519">        cld.set(Calendar.MINUTE, 0);</span>
+<span class="fc" id="L520">        cld.set(Calendar.SECOND, 0);</span>
+<span class="fc" id="L521">        cld.set(Calendar.MILLISECOND, 0);</span>
+<span class="fc" id="L522">        cld.setTime(new Date(cld.getTime().getTime() + dt.intValue() * 60L * 1000L));</span>
+<span class="fc" id="L523">        setCurrentMinute(cld.get(Calendar.MINUTE));</span>
+<span class="fc bfc" id="L524" title="All 2 branches covered.">        int hour = cld.get(showMeridiem ? Calendar.HOUR : Calendar.HOUR_OF_DAY);</span>
+<span class="pc bpc" id="L525" title="1 of 4 branches missed.">        if (showMeridiem &amp;&amp; hour == 0) {</span>
+<span class="nc" id="L526">            hour = 12;</span>
+        }
+<span class="fc" id="L528">        setCurrentHour(hour);</span>
+<span class="pc bpc" id="L529" title="1 of 2 branches missed.">        setCurrentMeridiem(cld.get(Calendar.AM_PM) != 0);</span>
+<span class="fc" id="L530">    }</span>
+
+    @Override
+    public void paint(Graphics g) {
+<span class="nc" id="L534">        int alpha = g.getAlpha();</span>
+<span class="nc" id="L535">        g.setColor(hour.getSelectedOverlayStyle().getBgColor());</span>
+<span class="nc" id="L536">        g.setAlpha(255);</span>
+<span class="nc" id="L537">        g.fillRect(getX(), getY(), getWidth(), getHeight());</span>
+<span class="nc" id="L538">        super.paint(g);</span>
+<span class="nc" id="L539">        g.setAlpha(alpha);</span>
+<span class="nc" id="L540">    }</span>
+
+
+    private static class AmPmRowFormatter implements RowFormatter {
+        @Override
+        public String format(String input) {
+<span class="nc bnc" id="L546" title="All 2 branches missed.">            if (Double.parseDouble(input) &lt; 1) {</span>
+<span class="nc" id="L547">                return &quot;AM&quot;;</span>
+            }
+<span class="nc" id="L549">            return &quot;PM&quot;;</span>
+        }
+    }
+
+    private static class MinuteRowFormatter implements RowFormatter {
+
+        @Override
+        @SuppressWarnings(&quot;PMD.EmptyCatchBlock&quot;)
+        public String format(String input) {
+<span class="nc bnc" id="L558" title="All 2 branches missed.">            if (input != null) {</span>
+                try {
+<span class="nc" id="L560">                    int i = (int) Double.parseDouble(input);</span>
+<span class="nc bnc" id="L561" title="All 2 branches missed.">                    if (i &lt; 10) {</span>
+<span class="nc" id="L562">                        return &quot;0&quot; + i;</span>
+                    } else {
+<span class="nc" id="L564">                        return Integer.toString(i);</span>
+                    }
+<span class="nc" id="L566">                } catch (Throwable t) {</span>
+                    // ignore and return null below
+                }
+            }
+<span class="nc" id="L570">            return null;</span>
+        }
+    }
+
+    private static class HourRowFormatter implements RowFormatter {
+
+        @Override
+        public String format(String input) {
+<span class="nc bnc" id="L578" title="All 2 branches missed.">            if (input != null) {</span>
+<span class="nc" id="L579">                return Integer.toString((int) Double.parseDouble(input));</span>
+            }
+<span class="nc" id="L581">            return null;</span>
+        }
+
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

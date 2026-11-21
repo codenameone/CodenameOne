@@ -1,0 +1,488 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>WheelJoint.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.gaming.physics.box2d.dynamics.joints</a> &gt; <span class="el_source">WheelJoint.java</span></div><h1>WheelJoint.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2013, Daniel Murphy
+ * All rights reserved.
+ * 
+ * Redistribution and use in source and binary forms, with or without modification,
+ * are permitted provided that the following conditions are met:
+ * 	* Redistributions of source code must retain the above copyright notice,
+ * 	  this list of conditions and the following disclaimer.
+ * 	* Redistributions in binary form must reproduce the above copyright notice,
+ * 	  this list of conditions and the following disclaimer in the documentation
+ * 	  and/or other materials provided with the distribution.
+ * 
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS &quot;AS IS&quot; AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+ * IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+ * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+ * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+ * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
+ ******************************************************************************/
+package com.codename1.gaming.physics.box2d.dynamics.joints;
+
+import com.codename1.gaming.physics.box2d.common.MathUtils;
+import com.codename1.gaming.physics.box2d.common.Rot;
+import com.codename1.gaming.physics.box2d.common.Settings;
+import com.codename1.gaming.physics.box2d.common.Vec2;
+import com.codename1.gaming.physics.box2d.dynamics.Body;
+import com.codename1.gaming.physics.box2d.dynamics.SolverData;
+import com.codename1.gaming.physics.box2d.pooling.IWorldPool;
+
+//Linear constraint (point-to-line)
+//d = pB - pA = xB + rB - xA - rA
+//C = dot(ay, d)
+//Cdot = dot(d, cross(wA, ay)) + dot(ay, vB + cross(wB, rB) - vA - cross(wA, rA))
+//   = -dot(ay, vA) - dot(cross(d + rA, ay), wA) + dot(ay, vB) + dot(cross(rB, ay), vB)
+//J = [-ay, -cross(d + rA, ay), ay, cross(rB, ay)]
+
+//Spring linear constraint
+//C = dot(ax, d)
+//Cdot = = -dot(ax, vA) - dot(cross(d + rA, ax), wA) + dot(ax, vB) + dot(cross(rB, ax), vB)
+//J = [-ax -cross(d+rA, ax) ax cross(rB, ax)]
+
+//Motor rotational constraint
+//Cdot = wB - wA
+//J = [0 0 -1 0 0 1]
+
+/// A wheel joint. This joint provides two degrees of freedom: translation along an axis fixed in
+/// bodyA and rotation in the plane. You can use a joint limit to restrict the range of motion and a
+/// joint motor to drive the rotation or to model rotational friction. This joint is designed for
+/// vehicle suspensions.
+public class WheelJoint extends Joint {
+
+  private float m_frequencyHz;
+  private float m_dampingRatio;
+
+  // Solver shared
+<span class="fc" id="L60">  private final Vec2 m_localAnchorA = new Vec2();</span>
+<span class="fc" id="L61">  private final Vec2 m_localAnchorB = new Vec2();</span>
+<span class="fc" id="L62">  private final Vec2 m_localXAxisA = new Vec2();</span>
+<span class="fc" id="L63">  private final Vec2 m_localYAxisA = new Vec2();</span>
+
+  private float m_impulse;
+  private float m_motorImpulse;
+  private float m_springImpulse;
+
+  private float m_maxMotorTorque;
+  private float m_motorSpeed;
+  private boolean m_enableMotor;
+
+  // Solver temp
+  private int m_indexA;
+  private int m_indexB;
+<span class="fc" id="L76">  private final Vec2 m_localCenterA = new Vec2();</span>
+<span class="fc" id="L77">  private final Vec2 m_localCenterB = new Vec2();</span>
+  private float m_invMassA;
+  private float m_invMassB;
+  private float m_invIA;
+  private float m_invIB;
+
+<span class="fc" id="L83">  private final Vec2 m_ax = new Vec2();</span>
+<span class="fc" id="L84">  private final Vec2 m_ay = new Vec2();</span>
+  private float m_sAx, m_sBx;
+  private float m_sAy, m_sBy;
+
+  private float m_mass;
+  private float m_motorMass;
+  private float m_springMass;
+
+  private float m_bias;
+  private float m_gamma;
+
+  protected WheelJoint(IWorldPool argPool, WheelJointDef def) {
+<span class="fc" id="L96">    super(argPool, def);</span>
+<span class="fc" id="L97">    m_localAnchorA.set(def.localAnchorA);</span>
+<span class="fc" id="L98">    m_localAnchorB.set(def.localAnchorB);</span>
+<span class="fc" id="L99">    m_localXAxisA.set(def.localAxisA);</span>
+<span class="fc" id="L100">    Vec2.crossToOutUnsafe(1.0f, m_localXAxisA, m_localYAxisA);</span>
+
+
+<span class="fc" id="L103">    m_motorMass = 0.0f;</span>
+<span class="fc" id="L104">    m_motorImpulse = 0.0f;</span>
+
+<span class="fc" id="L106">    m_maxMotorTorque = def.maxMotorTorque;</span>
+<span class="fc" id="L107">    m_motorSpeed = def.motorSpeed;</span>
+<span class="fc" id="L108">    m_enableMotor = def.enableMotor;</span>
+
+<span class="fc" id="L110">    m_frequencyHz = def.frequencyHz;</span>
+<span class="fc" id="L111">    m_dampingRatio = def.dampingRatio;</span>
+<span class="fc" id="L112">  }</span>
+
+  public Vec2 getLocalAnchorA() {
+<span class="nc" id="L115">    return m_localAnchorA;</span>
+  }
+
+  public Vec2 getLocalAnchorB() {
+<span class="nc" id="L119">    return m_localAnchorB;</span>
+  }
+
+  public void getAnchorA(Vec2 argOut) {
+<span class="fc" id="L123">    m_bodyA.getWorldPointToOut(m_localAnchorA, argOut);</span>
+<span class="fc" id="L124">  }</span>
+
+  public void getAnchorB(Vec2 argOut) {
+<span class="nc" id="L127">    m_bodyB.getWorldPointToOut(m_localAnchorB, argOut);</span>
+<span class="nc" id="L128">  }</span>
+
+  public void getReactionForce(float inv_dt, Vec2 argOut) {
+<span class="fc" id="L131">    final Vec2 temp = pool.popVec2();</span>
+<span class="fc" id="L132">    temp.set(m_ay).mulLocal(m_impulse);</span>
+<span class="fc" id="L133">    argOut.set(m_ax).mulLocal(m_springImpulse).addLocal(temp).mulLocal(inv_dt);</span>
+<span class="fc" id="L134">    pool.pushVec2(1);</span>
+<span class="fc" id="L135">  }</span>
+
+  public float getReactionTorque(float inv_dt) {
+<span class="fc" id="L138">    return inv_dt * m_motorImpulse;</span>
+  }
+
+  public float getJointTranslation() {
+<span class="fc" id="L142">    Body b1 = m_bodyA;</span>
+<span class="fc" id="L143">    Body b2 = m_bodyB;</span>
+
+<span class="fc" id="L145">    Vec2 p1 = pool.popVec2();</span>
+<span class="fc" id="L146">    Vec2 p2 = pool.popVec2();</span>
+<span class="fc" id="L147">    Vec2 axis = pool.popVec2();</span>
+<span class="fc" id="L148">    b1.getWorldPointToOut(m_localAnchorA, p1);</span>
+<span class="fc" id="L149">    b2.getWorldPointToOut(m_localAnchorA, p2);</span>
+<span class="fc" id="L150">    p2.subLocal(p1);</span>
+<span class="fc" id="L151">    b1.getWorldVectorToOut(m_localXAxisA, axis);</span>
+
+<span class="fc" id="L153">    float translation = Vec2.dot(p2, axis);</span>
+<span class="fc" id="L154">    pool.pushVec2(3);</span>
+<span class="fc" id="L155">    return translation;</span>
+  }
+
+  /// For serialization
+  public Vec2 getLocalAxisA() {
+<span class="fc" id="L160">    return m_localXAxisA;</span>
+  }
+
+  public float getJointSpeed() {
+<span class="fc" id="L164">    return m_bodyA.m_angularVelocity - m_bodyB.m_angularVelocity;</span>
+  }
+
+  public boolean isMotorEnabled() {
+<span class="fc" id="L168">    return m_enableMotor;</span>
+  }
+
+  public void enableMotor(boolean flag) {
+<span class="fc" id="L172">    m_bodyA.setAwake(true);</span>
+<span class="fc" id="L173">    m_bodyB.setAwake(true);</span>
+<span class="fc" id="L174">    m_enableMotor = flag;</span>
+<span class="fc" id="L175">  }</span>
+
+  public void setMotorSpeed(float speed) {
+<span class="fc" id="L178">    m_bodyA.setAwake(true);</span>
+<span class="fc" id="L179">    m_bodyB.setAwake(true);</span>
+<span class="fc" id="L180">    m_motorSpeed = speed;</span>
+<span class="fc" id="L181">  }</span>
+
+  public float getMotorSpeed() {
+<span class="fc" id="L184">    return m_motorSpeed;</span>
+  }
+
+  public float getMaxMotorTorque() {
+<span class="fc" id="L188">    return m_maxMotorTorque;</span>
+  }
+
+  public void setMaxMotorTorque(float torque) {
+<span class="fc" id="L192">    m_bodyA.setAwake(true);</span>
+<span class="fc" id="L193">    m_bodyB.setAwake(true);</span>
+<span class="fc" id="L194">    m_maxMotorTorque = torque;</span>
+<span class="fc" id="L195">  }</span>
+
+  public float getMotorTorque(float inv_dt) {
+<span class="fc" id="L198">    return m_motorImpulse * inv_dt;</span>
+  }
+
+  public void setSpringFrequencyHz(float hz) {
+<span class="fc" id="L202">    m_frequencyHz = hz;</span>
+<span class="fc" id="L203">  }</span>
+
+  public float getSpringFrequencyHz() {
+<span class="fc" id="L206">    return m_frequencyHz;</span>
+  }
+
+  public void setSpringDampingRatio(float ratio) {
+<span class="nc" id="L210">    m_dampingRatio = ratio;</span>
+<span class="nc" id="L211">  }</span>
+
+  public float getSpringDampingRatio() {
+<span class="nc" id="L214">    return m_dampingRatio;</span>
+  }
+
+  // pooling
+<span class="fc" id="L218">  private final Vec2 rA = new Vec2();</span>
+<span class="fc" id="L219">  private final Vec2 rB = new Vec2();</span>
+<span class="fc" id="L220">  private final Vec2 d = new Vec2();</span>
+
+  public void initVelocityConstraints(SolverData data) {
+<span class="fc" id="L223">    m_indexA = m_bodyA.m_islandIndex;</span>
+<span class="fc" id="L224">    m_indexB = m_bodyB.m_islandIndex;</span>
+<span class="fc" id="L225">    m_localCenterA.set(m_bodyA.m_sweep.localCenter);</span>
+<span class="fc" id="L226">    m_localCenterB.set(m_bodyB.m_sweep.localCenter);</span>
+<span class="fc" id="L227">    m_invMassA = m_bodyA.m_invMass;</span>
+<span class="fc" id="L228">    m_invMassB = m_bodyB.m_invMass;</span>
+<span class="fc" id="L229">    m_invIA = m_bodyA.m_invI;</span>
+<span class="fc" id="L230">    m_invIB = m_bodyB.m_invI;</span>
+
+<span class="fc" id="L232">    float mA = m_invMassA, mB = m_invMassB;</span>
+<span class="fc" id="L233">    float iA = m_invIA, iB = m_invIB;</span>
+
+<span class="fc" id="L235">    Vec2 cA = data.positions[m_indexA].c;</span>
+<span class="fc" id="L236">    float aA = data.positions[m_indexA].a;</span>
+<span class="fc" id="L237">    Vec2 vA = data.velocities[m_indexA].v;</span>
+<span class="fc" id="L238">    float wA = data.velocities[m_indexA].w;</span>
+
+<span class="fc" id="L240">    Vec2 cB = data.positions[m_indexB].c;</span>
+<span class="fc" id="L241">    float aB = data.positions[m_indexB].a;</span>
+<span class="fc" id="L242">    Vec2 vB = data.velocities[m_indexB].v;</span>
+<span class="fc" id="L243">    float wB = data.velocities[m_indexB].w;</span>
+
+<span class="fc" id="L245">    final Rot qA = pool.popRot();</span>
+<span class="fc" id="L246">    final Rot qB = pool.popRot();</span>
+<span class="fc" id="L247">    final Vec2 temp = pool.popVec2();</span>
+
+<span class="fc" id="L249">    qA.set(aA);</span>
+<span class="fc" id="L250">    qB.set(aB);</span>
+
+    // Compute the effective masses.
+<span class="fc" id="L253">    Rot.mulToOutUnsafe(qA, temp.set(m_localAnchorA).subLocal(m_localCenterA), rA);</span>
+<span class="fc" id="L254">    Rot.mulToOutUnsafe(qB, temp.set(m_localAnchorB).subLocal(m_localCenterB), rB);</span>
+<span class="fc" id="L255">    d.set(cB).addLocal(rB).subLocal(cA).subLocal(rA);</span>
+
+    // Point to line constraint
+    {
+<span class="fc" id="L259">      Rot.mulToOut(qA, m_localYAxisA, m_ay);</span>
+<span class="fc" id="L260">      m_sAy = Vec2.cross(temp.set(d).addLocal(rA), m_ay);</span>
+<span class="fc" id="L261">      m_sBy = Vec2.cross(rB, m_ay);</span>
+
+<span class="fc" id="L263">      m_mass = mA + mB + iA * m_sAy * m_sAy + iB * m_sBy * m_sBy;</span>
+
+<span class="pc bpc" id="L265" title="1 of 2 branches missed.">      if (m_mass &gt; 0.0f) {</span>
+<span class="fc" id="L266">        m_mass = 1.0f / m_mass;</span>
+      }
+    }
+
+    // Spring constraint
+<span class="fc" id="L271">    m_springMass = 0.0f;</span>
+<span class="fc" id="L272">    m_bias = 0.0f;</span>
+<span class="fc" id="L273">    m_gamma = 0.0f;</span>
+<span class="fc bfc" id="L274" title="All 2 branches covered.">    if (m_frequencyHz &gt; 0.0f) {</span>
+<span class="fc" id="L275">      Rot.mulToOut(qA, m_localXAxisA, m_ax);</span>
+<span class="fc" id="L276">      m_sAx = Vec2.cross(temp.set(d).addLocal(rA), m_ax);</span>
+<span class="fc" id="L277">      m_sBx = Vec2.cross(rB, m_ax);</span>
+
+<span class="fc" id="L279">      float invMass = mA + mB + iA * m_sAx * m_sAx + iB * m_sBx * m_sBx;</span>
+
+<span class="pc bpc" id="L281" title="1 of 2 branches missed.">      if (invMass &gt; 0.0f) {</span>
+<span class="fc" id="L282">        m_springMass = 1.0f / invMass;</span>
+
+<span class="fc" id="L284">        float C = Vec2.dot(d, m_ax);</span>
+
+        // Frequency
+<span class="fc" id="L287">        float omega = 2.0f * MathUtils.PI * m_frequencyHz;</span>
+
+        // Damping coefficient
+<span class="fc" id="L290">        float d = 2.0f * m_springMass * m_dampingRatio * omega;</span>
+
+        // Spring stiffness
+<span class="fc" id="L293">        float k = m_springMass * omega * omega;</span>
+
+        // magic formulas
+<span class="fc" id="L296">        float h = data.step.dt;</span>
+<span class="fc" id="L297">        m_gamma = h * (d + h * k);</span>
+<span class="pc bpc" id="L298" title="1 of 2 branches missed.">        if (m_gamma &gt; 0.0f) {</span>
+<span class="fc" id="L299">          m_gamma = 1.0f / m_gamma;</span>
+        }
+
+<span class="fc" id="L302">        m_bias = C * h * k * m_gamma;</span>
+
+<span class="fc" id="L304">        m_springMass = invMass + m_gamma;</span>
+<span class="pc bpc" id="L305" title="1 of 2 branches missed.">        if (m_springMass &gt; 0.0f) {</span>
+<span class="fc" id="L306">          m_springMass = 1.0f / m_springMass;</span>
+        }
+      }
+<span class="fc" id="L309">    } else {</span>
+<span class="fc" id="L310">      m_springImpulse = 0.0f;</span>
+    }
+
+    // Rotational motor
+<span class="fc bfc" id="L314" title="All 2 branches covered.">    if (m_enableMotor) {</span>
+<span class="fc" id="L315">      m_motorMass = iA + iB;</span>
+<span class="pc bpc" id="L316" title="1 of 2 branches missed.">      if (m_motorMass &gt; 0.0f) {</span>
+<span class="fc" id="L317">        m_motorMass = 1.0f / m_motorMass;</span>
+      }
+    } else {
+<span class="fc" id="L320">      m_motorMass = 0.0f;</span>
+<span class="fc" id="L321">      m_motorImpulse = 0.0f;</span>
+    }
+
+<span class="pc bpc" id="L324" title="1 of 2 branches missed.">    if (data.step.warmStarting) {</span>
+<span class="fc" id="L325">      final Vec2 P = pool.popVec2();</span>
+      // Account for variable time step.
+<span class="fc" id="L327">      m_impulse *= data.step.dtRatio;</span>
+<span class="fc" id="L328">      m_springImpulse *= data.step.dtRatio;</span>
+<span class="fc" id="L329">      m_motorImpulse *= data.step.dtRatio;</span>
+
+<span class="fc" id="L331">      P.x = m_impulse * m_ay.x + m_springImpulse * m_ax.x;</span>
+<span class="fc" id="L332">      P.y = m_impulse * m_ay.y + m_springImpulse * m_ax.y;</span>
+<span class="fc" id="L333">      float LA = m_impulse * m_sAy + m_springImpulse * m_sAx + m_motorImpulse;</span>
+<span class="fc" id="L334">      float LB = m_impulse * m_sBy + m_springImpulse * m_sBx + m_motorImpulse;</span>
+
+<span class="fc" id="L336">      vA.x -= m_invMassA * P.x;</span>
+<span class="fc" id="L337">      vA.y -= m_invMassA * P.y;</span>
+<span class="fc" id="L338">      wA -= m_invIA * LA;</span>
+
+<span class="fc" id="L340">      vB.x += m_invMassB * P.x;</span>
+<span class="fc" id="L341">      vB.y += m_invMassB * P.y;</span>
+<span class="fc" id="L342">      wB += m_invIB * LB;</span>
+<span class="fc" id="L343">      pool.pushVec2(1);</span>
+<span class="fc" id="L344">    } else {</span>
+<span class="nc" id="L345">      m_impulse = 0.0f;</span>
+<span class="nc" id="L346">      m_springImpulse = 0.0f;</span>
+<span class="nc" id="L347">      m_motorImpulse = 0.0f;</span>
+    }
+<span class="fc" id="L349">    pool.pushRot(2);</span>
+<span class="fc" id="L350">    pool.pushVec2(1);</span>
+
+    // data.velocities[m_indexA].v = vA;
+<span class="fc" id="L353">    data.velocities[m_indexA].w = wA;</span>
+    // data.velocities[m_indexB].v = vB;
+<span class="fc" id="L355">    data.velocities[m_indexB].w = wB;</span>
+<span class="fc" id="L356">  }</span>
+
+  public void solveVelocityConstraints(SolverData data) {
+<span class="fc" id="L359">    float mA = m_invMassA, mB = m_invMassB;</span>
+<span class="fc" id="L360">    float iA = m_invIA, iB = m_invIB;</span>
+
+<span class="fc" id="L362">    Vec2 vA = data.velocities[m_indexA].v;</span>
+<span class="fc" id="L363">    float wA = data.velocities[m_indexA].w;</span>
+<span class="fc" id="L364">    Vec2 vB = data.velocities[m_indexB].v;</span>
+<span class="fc" id="L365">    float wB = data.velocities[m_indexB].w;</span>
+
+<span class="fc" id="L367">    final Vec2 temp = pool.popVec2();</span>
+<span class="fc" id="L368">    final Vec2 P = pool.popVec2();</span>
+
+    // Solve spring constraint
+    {
+<span class="fc" id="L372">      float Cdot = Vec2.dot(m_ax, temp.set(vB).subLocal(vA)) + m_sBx * wB - m_sAx * wA;</span>
+<span class="fc" id="L373">      float impulse = -m_springMass * (Cdot + m_bias + m_gamma * m_springImpulse);</span>
+<span class="fc" id="L374">      m_springImpulse += impulse;</span>
+
+<span class="fc" id="L376">      P.x = impulse * m_ax.x;</span>
+<span class="fc" id="L377">      P.y = impulse * m_ax.y;</span>
+<span class="fc" id="L378">      float LA = impulse * m_sAx;</span>
+<span class="fc" id="L379">      float LB = impulse * m_sBx;</span>
+
+<span class="fc" id="L381">      vA.x -= mA * P.x;</span>
+<span class="fc" id="L382">      vA.y -= mA * P.y;</span>
+<span class="fc" id="L383">      wA -= iA * LA;</span>
+
+<span class="fc" id="L385">      vB.x += mB * P.x;</span>
+<span class="fc" id="L386">      vB.y += mB * P.y;</span>
+<span class="fc" id="L387">      wB += iB * LB;</span>
+    }
+
+    // Solve rotational motor constraint
+    {
+<span class="fc" id="L392">      float Cdot = wB - wA - m_motorSpeed;</span>
+<span class="fc" id="L393">      float impulse = -m_motorMass * Cdot;</span>
+
+<span class="fc" id="L395">      float oldImpulse = m_motorImpulse;</span>
+<span class="fc" id="L396">      float maxImpulse = data.step.dt * m_maxMotorTorque;</span>
+<span class="fc" id="L397">      m_motorImpulse = MathUtils.clamp(m_motorImpulse + impulse, -maxImpulse, maxImpulse);</span>
+<span class="fc" id="L398">      impulse = m_motorImpulse - oldImpulse;</span>
+
+<span class="fc" id="L400">      wA -= iA * impulse;</span>
+<span class="fc" id="L401">      wB += iB * impulse;</span>
+    }
+
+    // Solve point to line constraint
+    {
+<span class="fc" id="L406">      float Cdot = Vec2.dot(m_ay, temp.set(vB).subLocal(vA)) + m_sBy * wB - m_sAy * wA;</span>
+<span class="fc" id="L407">      float impulse = -m_mass * Cdot;</span>
+<span class="fc" id="L408">      m_impulse += impulse;</span>
+
+<span class="fc" id="L410">      P.x = impulse * m_ay.x;</span>
+<span class="fc" id="L411">      P.y = impulse * m_ay.y;</span>
+<span class="fc" id="L412">      float LA = impulse * m_sAy;</span>
+<span class="fc" id="L413">      float LB = impulse * m_sBy;</span>
+
+<span class="fc" id="L415">      vA.x -= mA * P.x;</span>
+<span class="fc" id="L416">      vA.y -= mA * P.y;</span>
+<span class="fc" id="L417">      wA -= iA * LA;</span>
+
+<span class="fc" id="L419">      vB.x += mB * P.x;</span>
+<span class="fc" id="L420">      vB.y += mB * P.y;</span>
+<span class="fc" id="L421">      wB += iB * LB;</span>
+    }
+<span class="fc" id="L423">    pool.pushVec2(2);</span>
+
+    // data.velocities[m_indexA].v = vA;
+<span class="fc" id="L426">    data.velocities[m_indexA].w = wA;</span>
+    // data.velocities[m_indexB].v = vB;
+<span class="fc" id="L428">    data.velocities[m_indexB].w = wB;</span>
+<span class="fc" id="L429">  }</span>
+
+  public boolean solvePositionConstraints(SolverData data) {
+<span class="fc" id="L432">    Vec2 cA = data.positions[m_indexA].c;</span>
+<span class="fc" id="L433">    float aA = data.positions[m_indexA].a;</span>
+<span class="fc" id="L434">    Vec2 cB = data.positions[m_indexB].c;</span>
+<span class="fc" id="L435">    float aB = data.positions[m_indexB].a;</span>
+
+<span class="fc" id="L437">    final Rot qA = pool.popRot();</span>
+<span class="fc" id="L438">    final Rot qB = pool.popRot();</span>
+<span class="fc" id="L439">    final Vec2 temp = pool.popVec2();</span>
+
+<span class="fc" id="L441">    qA.set(aA);</span>
+<span class="fc" id="L442">    qB.set(aB);</span>
+
+<span class="fc" id="L444">    Rot.mulToOut(qA, temp.set(m_localAnchorA).subLocal(m_localCenterA), rA);</span>
+<span class="fc" id="L445">    Rot.mulToOut(qB, temp.set(m_localAnchorB).subLocal(m_localCenterB), rB);</span>
+<span class="fc" id="L446">    d.set(cB).subLocal(cA).addLocal(rB).subLocal(rA);</span>
+
+<span class="fc" id="L448">    Vec2 ay = pool.popVec2();</span>
+<span class="fc" id="L449">    Rot.mulToOut(qA, m_localYAxisA, ay);</span>
+
+<span class="fc" id="L451">    float sAy = Vec2.cross(temp.set(d).addLocal(rA), ay);</span>
+<span class="fc" id="L452">    float sBy = Vec2.cross(rB, ay);</span>
+
+<span class="fc" id="L454">    float C = Vec2.dot(d, ay);</span>
+
+<span class="fc" id="L456">    float k = m_invMassA + m_invMassB + m_invIA * m_sAy * m_sAy + m_invIB * m_sBy * m_sBy;</span>
+
+    float impulse;
+<span class="pc bpc" id="L459" title="1 of 2 branches missed.">    if (k != 0.0f) {</span>
+<span class="fc" id="L460">      impulse = -C / k;</span>
+    } else {
+<span class="nc" id="L462">      impulse = 0.0f;</span>
+    }
+
+<span class="fc" id="L465">    final Vec2 P = pool.popVec2();</span>
+<span class="fc" id="L466">    P.x = impulse * ay.x;</span>
+<span class="fc" id="L467">    P.y = impulse * ay.y;</span>
+<span class="fc" id="L468">    float LA = impulse * sAy;</span>
+<span class="fc" id="L469">    float LB = impulse * sBy;</span>
+
+<span class="fc" id="L471">    cA.x -= m_invMassA * P.x;</span>
+<span class="fc" id="L472">    cA.y -= m_invMassA * P.y;</span>
+<span class="fc" id="L473">    aA -= m_invIA * LA;</span>
+<span class="fc" id="L474">    cB.x += m_invMassB * P.x;</span>
+<span class="fc" id="L475">    cB.y += m_invMassB * P.y;</span>
+<span class="fc" id="L476">    aB += m_invIB * LB;</span>
+
+<span class="fc" id="L478">    pool.pushVec2(3);</span>
+<span class="fc" id="L479">    pool.pushRot(2);</span>
+    // data.positions[m_indexA].c = cA;
+<span class="fc" id="L481">    data.positions[m_indexA].a = aA;</span>
+    // data.positions[m_indexB].c = cB;
+<span class="fc" id="L483">    data.positions[m_indexB].a = aB;</span>
+
+<span class="pc bpc" id="L485" title="1 of 2 branches missed.">    return MathUtils.abs(C) &lt;= Settings.linearSlop;</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

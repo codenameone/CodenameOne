@@ -1,0 +1,298 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PeerComponent.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui</a> &gt; <span class="el_source">PeerComponent.java</span></div><h1>PeerComponent.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores
+ * CA 94065 USA or visit www.oracle.com if you need additional information or
+ * have any questions.
+ */
+package com.codename1.ui;
+
+import com.codename1.ui.geom.Rectangle;
+
+/// A peer component is essentially a &quot;dummy&quot; Codename One component used to calculate the position
+/// of the actual native platform specific component. The behavior of a peer component is
+/// very platform specific, it is meant for platforms where a native component can be
+/// integrated with a Codename One component.
+/// Codename One features such as glass pane, z-ordering, dialogs &amp; menus might not work
+/// as expected in all situations where peer components are involved. E.g. a peer component
+/// might hide itself when a menu/dialog is shown and recreate itself when it is hidden/disposed.
+public class PeerComponent extends Component {
+<span class="fc" id="L36">    private final Rectangle lastPos = new Rectangle(-1, -1, -1, -1);</span>
+    private Object nativePeer;
+    private Image peerImage;
+
+    /// This constructor is used by the platform implementation to create instances
+    /// of this class use the static create method.
+    ///
+    /// #### Parameters
+    ///
+    /// - `nativePeer`: the native platform specific peer component.
+<span class="fc" id="L46">    protected PeerComponent(Object nativePeer) {</span>
+<span class="fc" id="L47">        setGrabsPointerEvents(true);</span>
+<span class="fc" id="L48">        this.nativePeer = nativePeer;</span>
+<span class="fc" id="L49">    }</span>
+
+    /// Use this method to encapsulate a native UI object
+    ///
+    /// #### Parameters
+    ///
+    /// - `nativePeer`: the native platform specific peer component.
+    public static PeerComponent create(Object nativePeer) {
+<span class="nc bnc" id="L57" title="All 2 branches missed.">        if (nativePeer == null) {</span>
+<span class="nc" id="L58">            return null;</span>
+        }
+<span class="nc" id="L60">        return Display.impl.createNativePeer(nativePeer);</span>
+    }
+
+    /// The peer image is drawn when the component doesn't exist or during transition
+    /// a placeholder image can be placed in the beginning to show something while
+    /// the peer is being created asynchronously. This image might be replaced by
+    /// an internal image representing the actual content of the peer
+    ///
+    /// #### Returns
+    ///
+    /// an image
+    protected Image getPeerImage() {
+<span class="nc bnc" id="L72" title="All 2 branches missed.">        if (peerImage == null) {</span>
+<span class="nc" id="L73">            peerImage = generatePeerImage();</span>
+        }
+<span class="nc" id="L75">        return peerImage;</span>
+    }
+
+    /// The peer image is drawn when the component doesn't exist or during transition
+    /// a placeholder image can be placed in the beginning to show something while
+    /// the peer is being created asynchronously. This image might be replaced by
+    /// an internal image representing the actual content of the peer
+    ///
+    /// #### Parameters
+    ///
+    /// - `i`: the peer image
+    protected void setPeerImage(Image i) {
+<span class="nc" id="L87">        peerImage = i;</span>
+<span class="nc" id="L88">    }</span>
+
+    /// The native implementation should implement this method to generate a native peer
+    /// image representing the component
+    ///
+    /// #### Returns
+    ///
+    /// a screenshot of the component
+    protected Image generatePeerImage() {
+<span class="nc" id="L97">        return null;</span>
+    }
+
+    /// Subclasses should return true here if the peer image should be rendered instead of the actual peer
+    ///
+    /// #### Returns
+    ///
+    /// true to render the peer image
+    protected boolean shouldRenderPeerImage() {
+<span class="fc" id="L106">        return false;</span>
+    }
+
+    /// Returns the native peer instance
+    ///
+    /// #### Returns
+    ///
+    /// the native peer
+    public Object getNativePeer() {
+<span class="nc" id="L115">        return nativePeer;</span>
+    }
+
+    void setNativePeer(Object nativePeer) {
+<span class="nc" id="L119">        this.nativePeer = nativePeer;</span>
+<span class="nc" id="L120">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public boolean animate() {
+<span class="nc" id="L125">        return false;</span>
+    }
+
+    /// {@inheritDoc}
+    @Override
+    protected void deinitialize() {
+<span class="fc" id="L131">        Form.activePeerCount--;</span>
+<span class="fc" id="L132">        super.deinitialize();</span>
+<span class="fc" id="L133">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    protected void fireClicked() {
+<span class="nc" id="L138">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    protected void initComponent() {
+<span class="fc" id="L143">        Form.activePeerCount++;</span>
+<span class="fc" id="L144">        super.initComponent();</span>
+<span class="fc" id="L145">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public void keyPressed(int keyCode) {
+<span class="nc" id="L150">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public void keyReleased(int keyCode) {
+<span class="nc" id="L155">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public void keyRepeated(int keyCode) {
+<span class="nc" id="L160">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public void paint(Graphics g) {
+<span class="fc" id="L165">        onPositionSizeChangeImpl();</span>
+<span class="pc bpc" id="L166" title="5 of 6 branches missed.">        if (shouldRenderPeerImage() &amp;&amp; getWidth() &gt; 0 &amp;&amp; getHeight() &gt; 0) {</span>
+<span class="nc" id="L167">            Image img = getPeerImage();</span>
+<span class="nc bnc" id="L168" title="All 2 branches missed.">            if (img != null) {</span>
+<span class="nc" id="L169">                g.drawImage(img, getX(), getY(), getWidth(), getHeight());</span>
+            }
+<span class="nc" id="L171">        } else {</span>
+<span class="fc" id="L172">            super.paint(g);</span>
+<span class="fc" id="L173">            g.drawPeerComponent(this);</span>
+
+        }
+<span class="fc" id="L176">    }</span>
+
+    private void onPositionSizeChangeImpl() {
+<span class="fc" id="L179">        int w = getWidth();</span>
+<span class="fc" id="L180">        int h = getHeight();</span>
+<span class="pc bpc" id="L181" title="1 of 6 branches missed.">        if (isInitialized() &amp;&amp; w &gt; 0 &amp;&amp; h &gt; 0) {</span>
+<span class="fc" id="L182">            int scrollX = getScrollX();</span>
+<span class="fc" id="L183">            int scrollY = getScrollY();</span>
+<span class="fc" id="L184">            int x = getAbsoluteX() + scrollX;</span>
+<span class="fc" id="L185">            int y = getAbsoluteY() + scrollY;</span>
+<span class="pc bpc" id="L186" title="2 of 8 branches missed.">            if (x != lastPos.getX() || y != lastPos.getY() || w != lastPos.getSize().getWidth() || h != lastPos.getSize().getHeight()) {</span>
+<span class="fc" id="L187">                lastPos.setX(x);</span>
+<span class="fc" id="L188">                lastPos.setY(y);</span>
+<span class="fc" id="L189">                lastPos.getSize().setWidth(w);</span>
+<span class="fc" id="L190">                lastPos.getSize().setHeight(h);</span>
+<span class="fc" id="L191">                onPositionSizeChange();</span>
+            }
+        }
+<span class="fc" id="L194">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    void onParentPositionChange() {
+<span class="fc" id="L199">        onPositionSizeChangeImpl();</span>
+<span class="fc" id="L200">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    protected void paintBackground(Graphics g) {
+<span class="fc" id="L205">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public void paintBackgrounds(Graphics g) {
+<span class="nc" id="L210">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    protected void paintBorder(Graphics g) {
+<span class="nc" id="L215">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    protected void paintScrollbarX(Graphics g) {
+<span class="nc" id="L220">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    protected void paintScrollbarY(Graphics g) {
+<span class="nc" id="L225">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    protected void paintScrollbars(Graphics g) {
+<span class="nc" id="L230">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public void pointerDragged(int[] x, int[] y) {
+<span class="nc" id="L235">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public void pointerDragged(int x, int y) {
+<span class="nc" id="L240">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public void pointerHover(int[] x, int[] y) {
+<span class="nc" id="L245">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public void pointerHoverReleased(int[] x, int[] y) {
+<span class="nc" id="L250">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public void pointerPressed(int[] x, int[] y) {
+<span class="nc" id="L255">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public void pointerPressed(int x, int y) {
+<span class="nc" id="L260">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public void pointerReleased(int[] x, int[] y) {
+<span class="nc" id="L265">    }</span>
+
+    /// {@inheritDoc}
+    @Override
+    public void pointerReleased(int x, int y) {
+<span class="nc" id="L270">    }</span>
+
+    /// Updates the size of the component from the native widget
+    public void invalidate() {
+<span class="nc" id="L274">        setShouldCalcPreferredSize(true);</span>
+<span class="nc" id="L275">        TopLevelContainer parentForm = getTopLevelContainer();</span>
+<span class="nc bnc" id="L276" title="All 2 branches missed.">        if (parentForm != null) {</span>
+<span class="nc" id="L277">            parentForm.asContainer().revalidate();</span>
+        }
+<span class="nc" id="L279">    }</span>
+
+    /// Callback useful for sublclasses that need to track the change in size/position
+    /// of the component (notice that this might be invoked too many times for a single change)!
+    protected void onPositionSizeChange() {
+<span class="fc" id="L284">    }</span>
+
+    /// An optional callback for peers indicating that the peer is now rendered as part of
+    /// a transition or some other state and is thus not truly visible. In this case the
+    /// peer should either make itself invisible or render itself as an image instead of
+    /// natively
+    ///
+    /// #### Parameters
+    ///
+    /// - `l`: true to enable lightweight mode, false to disable it
+    @Override
+    protected void setLightweightMode(boolean l) {
+<span class="fc" id="L296">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

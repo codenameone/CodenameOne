@@ -1,0 +1,357 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Script.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.crypto.bitcoin</a> &gt; <span class="el_source">Script.java</span></div><h1>Script.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008-2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.crypto.bitcoin;
+
+import com.codename1.security.Hash;
+
+/// A Bitcoin script: the locking `scriptPubKey` of an output, or the `scriptSig`, redeem and
+/// witness scripts that unlock one. Immutable.
+///
+/// The standard output templates have factories ([#p2pkh], [#p2wpkh], [#p2tr]...) and
+/// matching tests; [#builder] writes anything else with minimal pushes.
+@com.codename1.impl.SharedWithBackend
+public final class Script {
+    /// `OP_0`, also the empty push.
+    public static final int OP_0 = 0x00;
+    /// `OP_PUSHDATA1`.
+    public static final int OP_PUSHDATA1 = 0x4c;
+    /// `OP_PUSHDATA2`.
+    public static final int OP_PUSHDATA2 = 0x4d;
+    /// `OP_PUSHDATA4`.
+    public static final int OP_PUSHDATA4 = 0x4e;
+    /// `OP_1NEGATE`.
+    public static final int OP_1NEGATE = 0x4f;
+    /// `OP_1`; `OP_2`..`OP_16` follow it.
+    public static final int OP_1 = 0x51;
+    /// `OP_16`.
+    public static final int OP_16 = 0x60;
+    /// `OP_RETURN`.
+    public static final int OP_RETURN = 0x6a;
+    /// `OP_DUP`.
+    public static final int OP_DUP = 0x76;
+    /// `OP_EQUAL`.
+    public static final int OP_EQUAL = 0x87;
+    /// `OP_EQUALVERIFY`.
+    public static final int OP_EQUALVERIFY = 0x88;
+    /// `OP_HASH160`.
+    public static final int OP_HASH160 = 0xa9;
+    /// `OP_CHECKSIG`.
+    public static final int OP_CHECKSIG = 0xac;
+    /// `OP_CHECKMULTISIG`.
+    public static final int OP_CHECKMULTISIG = 0xae;
+    /// `OP_CHECKLOCKTIMEVERIFY`.
+    public static final int OP_CHECKLOCKTIMEVERIFY = 0xb1;
+    /// `OP_CHECKSEQUENCEVERIFY`.
+    public static final int OP_CHECKSEQUENCEVERIFY = 0xb2;
+    /// `OP_CHECKSIGADD`, the Tapscript multisig opcode.
+    public static final int OP_CHECKSIGADD = 0xba;
+
+<span class="fc" id="L69">    private static final Script EMPTY = new Script(new byte[0]);</span>
+
+    private final byte[] program;
+
+<span class="fc" id="L73">    private Script(byte[] program) {</span>
+<span class="fc" id="L74">        this.program = program;</span>
+<span class="fc" id="L75">    }</span>
+
+    /// The empty script.
+    public static Script empty() {
+<span class="fc" id="L79">        return EMPTY;</span>
+    }
+
+    /// Wraps serialized script bytes.
+    public static Script of(byte[] program) {
+<span class="fc" id="L84">        return new Script(Wire.copy(program));</span>
+    }
+
+    /// Wraps script bytes given in hex.
+    public static Script fromHex(String hex) {
+<span class="fc" id="L89">        return new Script(Hash.fromHex(hex));</span>
+    }
+
+    /// `OP_DUP OP_HASH160 &lt;hash&gt; OP_EQUALVERIFY OP_CHECKSIG`.
+    public static Script p2pkh(byte[] pubKeyHash20) {
+<span class="fc" id="L94">        check(pubKeyHash20, 20);</span>
+<span class="fc" id="L95">        return builder().op(OP_DUP).op(OP_HASH160).push(pubKeyHash20).op(OP_EQUALVERIFY).op(OP_CHECKSIG).build();</span>
+    }
+
+    /// `OP_HASH160 &lt;hash&gt; OP_EQUAL`.
+    public static Script p2sh(byte[] scriptHash20) {
+<span class="fc" id="L100">        check(scriptHash20, 20);</span>
+<span class="fc" id="L101">        return builder().op(OP_HASH160).push(scriptHash20).op(OP_EQUAL).build();</span>
+    }
+
+    /// `OP_0 &lt;hash&gt;`, native SegWit v0 key hash.
+    public static Script p2wpkh(byte[] pubKeyHash20) {
+<span class="fc" id="L106">        check(pubKeyHash20, 20);</span>
+<span class="fc" id="L107">        return builder().op(OP_0).push(pubKeyHash20).build();</span>
+    }
+
+    /// `OP_0 &lt;sha256(witnessScript)&gt;`, native SegWit v0 script hash.
+    public static Script p2wsh(byte[] scriptHash32) {
+<span class="fc" id="L112">        check(scriptHash32, 32);</span>
+<span class="fc" id="L113">        return builder().op(OP_0).push(scriptHash32).build();</span>
+    }
+
+    /// `OP_1 &lt;x-only key&gt;`, Taproot.
+    public static Script p2tr(byte[] outputKey32) {
+<span class="fc" id="L118">        check(outputKey32, 32);</span>
+<span class="fc" id="L119">        return builder().op(OP_1).push(outputKey32).build();</span>
+    }
+
+    /// A witness output of any version (0 to 16) and program.
+    public static Script witness(int version, byte[] program) {
+<span class="pc bpc" id="L124" title="4 of 8 branches missed.">        if (version &lt; 0 || version &gt; 16 || program.length &lt; 2 || program.length &gt; 40) {</span>
+<span class="nc" id="L125">            throw new IllegalArgumentException(&quot;bad witness program&quot;);</span>
+        }
+<span class="fc bfc" id="L127" title="All 2 branches covered.">        return builder().op(version == 0 ? OP_0 : OP_1 + version - 1).push(program).build();</span>
+    }
+
+    /// `OP_RETURN &lt;data&gt;`, a provably unspendable data carrier.
+    public static Script opReturn(byte[] data) {
+<span class="nc" id="L132">        return builder().op(OP_RETURN).push(data).build();</span>
+    }
+
+    /// `m &lt;pubkey&gt;... n OP_CHECKMULTISIG`, the bare multisig redeem or witness script.
+    public static Script multisig(int m, byte[][] publicKeys) {
+<span class="pc bpc" id="L137" title="3 of 6 branches missed.">        if (m &lt; 1 || m &gt; publicKeys.length || publicKeys.length &gt; 16) {</span>
+<span class="nc" id="L138">            throw new IllegalArgumentException(&quot;multisig takes 1 &lt;= m &lt;= n &lt;= 16&quot;);</span>
+        }
+<span class="fc" id="L140">        Builder b = builder().number(m);</span>
+<span class="fc bfc" id="L141" title="All 2 branches covered.">        for (byte[] key : publicKeys) {</span>
+<span class="fc" id="L142">            b.push(key);</span>
+        }
+<span class="fc" id="L144">        return b.number(publicKeys.length).op(OP_CHECKMULTISIG).build();</span>
+    }
+
+    /// A builder that appends opcodes and minimal pushes.
+    public static Builder builder() {
+<span class="fc" id="L149">        return new Builder();</span>
+    }
+
+    /// Appends opcodes and pushes to a script.
+    public static final class Builder {
+<span class="fc" id="L154">        private final Wire out = new Wire();</span>
+
+<span class="fc" id="L156">        Builder() {</span>
+<span class="fc" id="L157">        }</span>
+
+        /// Appends one opcode.
+        public Builder op(int opcode) {
+<span class="pc bpc" id="L161" title="2 of 4 branches missed.">            if (opcode &lt; 0 || opcode &gt; 0xff) {</span>
+<span class="nc" id="L162">                throw new IllegalArgumentException(&quot;bad opcode&quot;);</span>
+            }
+<span class="fc" id="L164">            out.u8(opcode);</span>
+<span class="fc" id="L165">            return this;</span>
+        }
+
+        /// Appends a data push with the shortest push opcode for its length.
+        public Builder push(byte[] data) {
+<span class="fc" id="L170">            int n = data.length;</span>
+<span class="pc bpc" id="L171" title="1 of 2 branches missed.">            if (n &lt; OP_PUSHDATA1) {</span>
+<span class="fc" id="L172">                out.u8(n);</span>
+<span class="nc bnc" id="L173" title="All 2 branches missed.">            } else if (n &lt;= 0xff) {</span>
+<span class="nc" id="L174">                out.u8(OP_PUSHDATA1).u8(n);</span>
+<span class="nc bnc" id="L175" title="All 2 branches missed.">            } else if (n &lt;= 0xffff) {</span>
+<span class="nc" id="L176">                out.u8(OP_PUSHDATA2).u8(n &amp; 0xff).u8(n &gt;&gt;&gt; 8);</span>
+            } else {
+<span class="nc" id="L178">                out.u8(OP_PUSHDATA4).u32(n);</span>
+            }
+<span class="fc" id="L180">            out.bytes(data);</span>
+<span class="fc" id="L181">            return this;</span>
+        }
+
+        /// Appends a number as script arithmetic reads it: `OP_0`, `OP_1NEGATE`, `OP_1`..`OP_16`,
+        /// or a minimal little-endian sign-magnitude push.
+        public Builder number(long value) {
+<span class="pc bpc" id="L187" title="1 of 2 branches missed.">            if (value == 0) {</span>
+<span class="nc" id="L188">                return op(OP_0);</span>
+            }
+<span class="pc bpc" id="L190" title="1 of 2 branches missed.">            if (value == -1) {</span>
+<span class="nc" id="L191">                return op(OP_1NEGATE);</span>
+            }
+<span class="pc bpc" id="L193" title="2 of 4 branches missed.">            if (value &gt;= 1 &amp;&amp; value &lt;= 16) {</span>
+<span class="fc" id="L194">                return op(OP_1 + (int) value - 1);</span>
+            }
+<span class="nc" id="L196">            return push(scriptNumber(value));</span>
+        }
+
+        /// The script.
+        public Script build() {
+<span class="fc" id="L201">            return new Script(out.toBytes());</span>
+        }
+    }
+
+    static byte[] scriptNumber(long value) {
+<span class="nc bnc" id="L206" title="All 2 branches missed.">        boolean negative = value &lt; 0;</span>
+<span class="nc bnc" id="L207" title="All 2 branches missed.">        long abs = negative ? -value : value;</span>
+<span class="nc" id="L208">        Wire w = new Wire();</span>
+<span class="nc bnc" id="L209" title="All 2 branches missed.">        while (abs != 0) {</span>
+<span class="nc" id="L210">            w.u8((int) (abs &amp; 0xff));</span>
+<span class="nc" id="L211">            abs &gt;&gt;&gt;= 8;</span>
+        }
+<span class="nc" id="L213">        byte[] b = w.toBytes();</span>
+<span class="nc bnc" id="L214" title="All 2 branches missed.">        if ((b[b.length - 1] &amp; 0x80) != 0) {</span>
+<span class="nc" id="L215">            byte[] ext = new byte[b.length + 1];</span>
+<span class="nc" id="L216">            System.arraycopy(b, 0, ext, 0, b.length);</span>
+<span class="nc bnc" id="L217" title="All 2 branches missed.">            ext[b.length] = (byte) (negative ? 0x80 : 0);</span>
+<span class="nc" id="L218">            return ext;</span>
+        }
+<span class="nc bnc" id="L220" title="All 2 branches missed.">        if (negative) {</span>
+<span class="nc" id="L221">            b[b.length - 1] |= (byte) 0x80;</span>
+        }
+<span class="nc" id="L223">        return b;</span>
+    }
+
+    // ---------------------------------------------------------------- classification
+
+    /// Tells whether this is a P2PKH output.
+    public boolean isP2pkh() {
+<span class="pc bpc" id="L230" title="3 of 8 branches missed.">        return program.length == 25 &amp;&amp; at(0) == OP_DUP &amp;&amp; at(1) == OP_HASH160 &amp;&amp; at(2) == 20</span>
+<span class="pc bpc" id="L231" title="2 of 4 branches missed.">                &amp;&amp; at(23) == OP_EQUALVERIFY &amp;&amp; at(24) == OP_CHECKSIG;</span>
+    }
+
+    /// Tells whether this is a P2SH output.
+    public boolean isP2sh() {
+<span class="pc bpc" id="L236" title="3 of 8 branches missed.">        return program.length == 23 &amp;&amp; at(0) == OP_HASH160 &amp;&amp; at(1) == 20 &amp;&amp; at(22) == OP_EQUAL;</span>
+    }
+
+    /// Tells whether this is a P2WPKH output.
+    public boolean isP2wpkh() {
+<span class="pc bpc" id="L241" title="1 of 4 branches missed.">        return getWitnessVersion() == 0 &amp;&amp; program.length == 22;</span>
+    }
+
+    /// Tells whether this is a P2WSH output.
+    public boolean isP2wsh() {
+<span class="pc bpc" id="L246" title="2 of 4 branches missed.">        return getWitnessVersion() == 0 &amp;&amp; program.length == 34;</span>
+    }
+
+    /// Tells whether this is a Taproot output.
+    public boolean isP2tr() {
+<span class="pc bpc" id="L251" title="1 of 4 branches missed.">        return getWitnessVersion() == 1 &amp;&amp; program.length == 34;</span>
+    }
+
+    /// The witness version of a SegWit output, or -1 when this is not one.
+    public int getWitnessVersion() {
+<span class="pc bpc" id="L256" title="3 of 6 branches missed.">        if (program.length &lt; 4 || program.length &gt; 42 || at(1) != program.length - 2) {</span>
+<span class="nc" id="L257">            return -1;</span>
+        }
+<span class="fc" id="L259">        int v = at(0);</span>
+<span class="fc bfc" id="L260" title="All 2 branches covered.">        if (v == OP_0) {</span>
+<span class="fc" id="L261">            return 0;</span>
+        }
+<span class="pc bpc" id="L263" title="2 of 4 branches missed.">        if (v &gt;= OP_1 &amp;&amp; v &lt;= OP_16) {</span>
+<span class="fc" id="L264">            return v - OP_1 + 1;</span>
+        }
+<span class="nc" id="L266">        return -1;</span>
+    }
+
+    /// The witness program of a SegWit output, or `null`.
+    public byte[] getWitnessProgram() {
+<span class="pc bpc" id="L271" title="1 of 2 branches missed.">        if (getWitnessVersion() &lt; 0) {</span>
+<span class="nc" id="L272">            return null;</span>
+        }
+<span class="fc" id="L274">        byte[] out = new byte[program.length - 2];</span>
+<span class="fc" id="L275">        System.arraycopy(program, 2, out, 0, out.length);</span>
+<span class="fc" id="L276">        return out;</span>
+    }
+
+    /// The 20-byte hash a P2PKH or P2SH output commits to, the 20 or 32-byte program of a
+    /// SegWit output, or `null` for any other script.
+    public byte[] getDestinationHash() {
+<span class="fc bfc" id="L282" title="All 2 branches covered.">        if (isP2pkh()) {</span>
+<span class="fc" id="L283">            return slice(3, 20);</span>
+        }
+<span class="pc bpc" id="L285" title="1 of 2 branches missed.">        if (isP2sh()) {</span>
+<span class="fc" id="L286">            return slice(2, 20);</span>
+        }
+<span class="nc" id="L288">        return getWitnessProgram();</span>
+    }
+
+    private byte[] slice(int from, int n) {
+<span class="fc" id="L292">        byte[] out = new byte[n];</span>
+<span class="fc" id="L293">        System.arraycopy(program, from, out, 0, n);</span>
+<span class="fc" id="L294">        return out;</span>
+    }
+
+    private int at(int i) {
+<span class="fc" id="L298">        return program[i] &amp; 0xff;</span>
+    }
+
+    /// A copy of the serialized script.
+    public byte[] toBytes() {
+<span class="nc" id="L303">        return Wire.copy(program);</span>
+    }
+
+    /// The script length in bytes.
+    public int length() {
+<span class="fc" id="L308">        return program.length;</span>
+    }
+
+    byte[] raw() {
+<span class="fc" id="L312">        return program;</span>
+    }
+
+    /// The serialized script in hex.
+    public String toHex() {
+<span class="fc" id="L317">        return Hash.toHex(program);</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="nc" id="L322">        return toHex();</span>
+    }
+
+    @Override
+    public boolean equals(Object o) {
+<span class="pc bpc" id="L327" title="1 of 2 branches missed.">        if (!(o instanceof Script)) {</span>
+<span class="nc" id="L328">            return false;</span>
+        }
+<span class="fc" id="L330">        byte[] other = ((Script) o).program;</span>
+<span class="pc bpc" id="L331" title="1 of 2 branches missed.">        if (other.length != program.length) {</span>
+<span class="nc" id="L332">            return false;</span>
+        }
+<span class="fc bfc" id="L334" title="All 2 branches covered.">        for (int iter = 0; iter &lt; other.length; iter++) {</span>
+<span class="pc bpc" id="L335" title="1 of 2 branches missed.">            if (other[iter] != program[iter]) {</span>
+<span class="nc" id="L336">                return false;</span>
+            }
+        }
+<span class="fc" id="L339">        return true;</span>
+    }
+
+    @Override
+    public int hashCode() {
+<span class="nc" id="L344">        int h = 1;</span>
+<span class="nc bnc" id="L345" title="All 2 branches missed.">        for (byte programByte : program) {</span>
+<span class="nc" id="L346">            h = h * 31 + programByte;</span>
+        }
+<span class="nc" id="L348">        return h;</span>
+    }
+
+    private static void check(byte[] b, int n) {
+<span class="pc bpc" id="L352" title="2 of 4 branches missed.">        if (b == null || b.length != n) {</span>
+<span class="nc" id="L353">            throw new IllegalArgumentException(&quot;expected &quot; + n + &quot; bytes&quot;);</span>
+        }
+<span class="fc" id="L355">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,1169 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Command.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui</a> &gt; <span class="el_source">Command.java</span></div><h1>Command.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores
+ * CA 94065 USA or visit www.oracle.com if you need additional information or
+ * have any questions.
+ */
+
+package com.codename1.ui;
+
+import com.codename1.compat.java.util.Objects;
+import com.codename1.impl.NativeMenuConventions;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
+
+import java.util.HashMap;
+
+/// The Command class provides a useful extension to the ActionListener
+/// interface in cases where the same functionality may be accessed by several controls.
+public class Command implements ActionListener&lt;ActionEvent&gt; {
+<span class="fc" id="L37">    private boolean disposesDialog = true;</span>
+    private Image icon;
+    private char materialIcon;
+    private Font iconFont;
+    private Image pressedIcon;
+    private Image rolloverIcon;
+    private Image disabledIcon;
+    private String command;
+<span class="fc" id="L45">    private boolean enabled = true;</span>
+<span class="fc" id="L46">    private float iconGapMM = -1;</span>
+<span class="fc" id="L47">    private float materialIconSize = -1;</span>
+
+    /// Simplifies code dealing with commands allowing them to be used in switch statements
+    /// more easily
+    private int commandId;
+
+    private HashMap&lt;String, Object&gt; clientProperties;
+
+    /// Creates a new instance of Command
+    ///
+    /// #### Parameters
+    ///
+    /// - `command`: the string that will be placed on the Soft buttons\Menu
+<span class="fc" id="L60">    public Command(String command) {</span>
+<span class="fc" id="L61">        this.command = command;</span>
+<span class="fc" id="L62">    }</span>
+
+    /// Creates a new instance of Command
+    ///
+    /// #### Parameters
+    ///
+    /// - `command`: the string that will be placed on the Soft buttons\Menu
+    ///
+    /// - `icon`: the icon representing the command
+<span class="fc" id="L71">    public Command(String command, Image icon) {</span>
+<span class="fc" id="L72">        this.command = command;</span>
+<span class="fc" id="L73">        this.icon = icon;</span>
+<span class="fc" id="L74">    }</span>
+
+
+    /// Creates a new instance of Command
+    ///
+    /// #### Parameters
+    ///
+    /// - `command`: the string that will be placed on the Soft buttons\Menu
+    ///
+    /// - `id`: @param id      user defined ID for a command simplifying switch statement code
+    /// working with a command
+<span class="fc" id="L85">    public Command(String command, int id) {</span>
+<span class="fc" id="L86">        this.command = command;</span>
+<span class="fc" id="L87">        this.commandId = id;</span>
+<span class="fc" id="L88">    }</span>
+
+    /// Creates a new instance of Command
+    ///
+    /// #### Parameters
+    ///
+    /// - `command`: the string that will be placed on the Soft buttons\Menu
+    ///
+    /// - `icon`: the icon representing the command
+    ///
+    /// - `id`: @param id      user defined ID for a command simplifying switch statement code
+    /// working with a command
+<span class="fc" id="L100">    public Command(String command, Image icon, int id) {</span>
+<span class="fc" id="L101">        this.command = command;</span>
+<span class="fc" id="L102">        this.commandId = id;</span>
+<span class="fc" id="L103">        this.icon = icon;</span>
+<span class="fc" id="L104">    }</span>
+
+    /// Creates a new command instance that encapsulates the action listener and details, the main
+    /// value of this approach is in our ability to write commands using the shorthand lambda syntax
+    /// of Java 8.
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: the name/title of the command
+    ///
+    /// - `icon`: the icon for the command
+    ///
+    /// - `ev`: the even handler
+    ///
+    /// #### Returns
+    ///
+    /// a newly created Command instance
+    public static Command create(String name, Image icon, final ActionListener ev) {
+<span class="fc" id="L122">        Command cmd = new Command(name) {</span>
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+<span class="fc" id="L125">                ev.actionPerformed(evt);</span>
+<span class="fc" id="L126">            }</span>
+        };
+<span class="fc" id="L128">        cmd.setIcon(icon);</span>
+<span class="fc" id="L129">        return cmd;</span>
+    }
+
+    /// Creates a new command instance that encapsulates the action listener and details, the main
+    /// value of this approach is in our ability to write commands using the shorthand lambda syntax
+    /// of Java 8.
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: the name/title of the command
+    ///
+    /// - `icon`: the icon for the command
+    ///
+    /// - `ev`: the even handler
+    ///
+    /// #### Returns
+    ///
+    /// a newly created Command instance
+    ///
+    public static Command createMaterial(String name, char icon, final ActionListener ev) {
+<span class="fc" id="L149">        Command cmd = new Command(name) {</span>
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+<span class="fc" id="L152">                ev.actionPerformed(evt);</span>
+<span class="fc" id="L153">            }</span>
+        };
+<span class="fc" id="L155">        cmd.setMaterialIcon(icon);</span>
+<span class="fc" id="L156">        return cmd;</span>
+    }
+
+    /// Return the command ID
+    ///
+    /// #### Returns
+    ///
+    /// the command ID
+    public int getId() {
+<span class="fc" id="L165">        return commandId;</span>
+    }
+
+    /// gets the Command Name
+    ///
+    /// #### Returns
+    ///
+    /// the Command name
+    public String getCommandName() {
+<span class="fc" id="L174">        return command;</span>
+    }
+
+    /// sets the Command name
+    ///
+    /// #### Parameters
+    ///
+    /// - `command`
+    public void setCommandName(String command) {
+<span class="fc" id="L183">        this.command = command;</span>
+<span class="fc" id="L184">    }</span>
+
+    /// Returns the icon representing the command
+    ///
+    /// #### Returns
+    ///
+    /// an icon representing the command
+    public Image getIcon() {
+<span class="fc" id="L192">        return icon;</span>
+    }
+
+    /// Sets the icon for the command
+    ///
+    /// #### Parameters
+    ///
+    /// - `icon`: the new icon
+    public void setIcon(Image icon) {
+<span class="fc" id="L201">        this.icon = icon;</span>
+<span class="fc" id="L202">    }</span>
+
+    /// Returns a string representation of the object
+    ///
+    /// #### Returns
+    ///
+    /// Returns a string representation of the object
+    @Override
+    public String toString() {
+<span class="fc" id="L211">        return getCommandName();</span>
+    }
+
+    /// Indicates the icon that is displayed on the button when the button is in
+    /// pressed state
+    ///
+    /// #### Returns
+    ///
+    /// icon used
+    public Image getPressedIcon() {
+<span class="fc" id="L221">        return pressedIcon;</span>
+    }
+
+    /// Indicates the icon that is displayed on the button when the button is in
+    /// pressed state
+    ///
+    /// #### Parameters
+    ///
+    /// - `pressedIcon`: icon used
+    public void setPressedIcon(Image pressedIcon) {
+<span class="fc" id="L231">        this.pressedIcon = pressedIcon;</span>
+<span class="fc" id="L232">    }</span>
+
+    /// Indicates the icon that is displayed on the button when the button is in
+    /// the disabled state
+    ///
+    /// #### Returns
+    ///
+    /// icon used
+    public Image getDisabledIcon() {
+<span class="fc" id="L241">        return disabledIcon;</span>
+    }
+
+    /// Indicates the icon that is displayed on the button when the button is in
+    /// the disabled state
+    ///
+    /// #### Parameters
+    ///
+    /// - `disabledIcon`: icon used
+    public void setDisabledIcon(Image disabledIcon) {
+<span class="fc" id="L251">        this.disabledIcon = disabledIcon;</span>
+<span class="fc" id="L252">    }</span>
+
+    /// Indicates the icon that is displayed on the button when the button is in
+    /// rolled over state
+    ///
+    /// #### Returns
+    ///
+    /// icon used
+    public Image getRolloverIcon() {
+<span class="fc" id="L261">        return rolloverIcon;</span>
+    }
+
+    /// Indicates the icon that is displayed on the button when the button is in
+    /// rolled over state
+    ///
+    /// #### Parameters
+    ///
+    /// - `rolloverIcon`: icon to use
+    public void setRolloverIcon(Image rolloverIcon) {
+<span class="fc" id="L271">        this.rolloverIcon = rolloverIcon;</span>
+<span class="fc" id="L272">    }</span>
+
+    /// compare two commands
+    ///
+    /// #### Parameters
+    ///
+    /// - `obj`: a Command Object to compare
+    ///
+    /// #### Returns
+    ///
+    /// true if the obj has the same command name
+    @Override
+    public boolean equals(Object obj) {
+<span class="pc bpc" id="L285" title="1 of 2 branches missed.">        if (!(obj instanceof Command)) {</span>
+<span class="nc" id="L286">            return false;</span>
+        }
+<span class="fc bfc" id="L288" title="All 2 branches covered.">        if (((Command) obj).command == null) {</span>
+<span class="pc bpc" id="L289" title="4 of 10 branches missed.">            return obj.getClass() == getClass() &amp;&amp; command == null &amp;&amp;</span>
+                    ((Command) obj).icon == icon &amp;&amp; ((Command) obj).commandId == commandId &amp;&amp; //NOPMD CompareObjectsWithEquals
+<span class="pc bpc" id="L291" title="1 of 2 branches missed.">                    ((Command) obj).materialIcon == materialIcon &amp;&amp; com.codename1.util.MathUtil.compare(((Command) obj).materialIconSize, materialIconSize) == 0 &amp;&amp;</span>
+<span class="pc bpc" id="L292" title="1 of 2 branches missed.">                    (Objects.equals(clientProperties, ((Command) obj).clientProperties));</span>
+        } else {
+<span class="pc bpc" id="L294" title="3 of 10 branches missed.">            return obj.getClass() == getClass() &amp;&amp; ((Command) obj).command.equals(command) &amp;&amp;</span>
+                    ((Command) obj).icon == icon &amp;&amp; ((Command) obj).commandId == commandId &amp;&amp; //NOPMD CompareObjectsWithEquals
+<span class="pc bpc" id="L296" title="1 of 2 branches missed.">                    ((Command) obj).materialIcon == materialIcon &amp;&amp; com.codename1.util.MathUtil.compare(((Command) obj).materialIconSize, materialIconSize) == 0 &amp;&amp;</span>
+<span class="pc bpc" id="L297" title="1 of 2 branches missed.">                    (Objects.equals(clientProperties, ((Command) obj).clientProperties));</span>
+        }
+    }
+
+    /// Allows storing commands in a vector/hashtable
+    ///
+    /// #### Returns
+    ///
+    /// unique hashcode for the command class
+    @Override
+    public int hashCode() {
+<span class="fc" id="L308">        return getClass().hashCode() + commandId;</span>
+    }
+
+    /// This method is called when the soft button/Menu item is clicked
+    ///
+    /// #### Parameters
+    ///
+    /// - `evt`: the Event Object
+    @Override
+    public void actionPerformed(ActionEvent evt) {
+<span class="fc" id="L318">    }</span>
+
+    /// Indicates whether this command causes the dialog to dispose implicitly, defaults to true
+    public boolean isDisposesDialog() {
+<span class="fc" id="L322">        return disposesDialog;</span>
+    }
+
+    /// Indicates whether this command causes the dialog to dispose implicitly, defaults to true
+    public void setDisposesDialog(boolean disposesDialog) {
+<span class="nc" id="L327">        this.disposesDialog = disposesDialog;</span>
+<span class="nc" id="L328">    }</span>
+
+    /// Allows disabling/enabling the command
+    ///
+    /// #### Returns
+    ///
+    /// the enabled
+    public boolean isEnabled() {
+<span class="fc" id="L336">        return enabled;</span>
+    }
+
+    /// Allows disabling/enabling the command
+    ///
+    /// #### Parameters
+    ///
+    /// - `enabled`: the enabled to set
+    public void setEnabled(boolean enabled) {
+<span class="fc bfc" id="L345" title="All 2 branches covered.">        if (this.enabled != enabled) {</span>
+<span class="fc" id="L346">            this.enabled = enabled;</span>
+<span class="fc" id="L347">            Display.refreshNativeMenuIfPublished(this);</span>
+        }
+<span class="fc" id="L349">    }</span>
+
+    /// The client properties are a useful way to associate meta-data with a command
+    /// without subclassing
+    ///
+    /// #### Parameters
+    ///
+    /// - `key`: an arbitrary user key
+    ///
+    /// #### Returns
+    ///
+    /// an arbitrary user object
+    public Object getClientProperty(String key) {
+<span class="fc bfc" id="L362" title="All 2 branches covered.">        if (clientProperties != null) {</span>
+<span class="fc" id="L363">            return clientProperties.get(key);</span>
+        }
+<span class="fc" id="L365">        return null;</span>
+    }
+
+    /// The client properties are a useful way to associate meta-data with a command
+    /// without sub classing
+    ///
+    /// #### Parameters
+    ///
+    /// - `key`: an arbitrary user key
+    ///
+    /// - `value`: an arbitrary user object, null to remove
+    public void putClientProperty(String key, Object value) {
+<span class="fc bfc" id="L377" title="All 2 branches covered.">        if (clientProperties == null) {</span>
+<span class="fc" id="L378">            clientProperties = new HashMap&lt;String, Object&gt;();</span>
+        }
+<span class="fc bfc" id="L380" title="All 2 branches covered.">        if (value == null) {</span>
+<span class="fc" id="L381">            clientProperties.remove(key);</span>
+        } else {
+<span class="fc" id="L383">            clientProperties.put(key, value);</span>
+        }
+<span class="fc" id="L385">    }</span>
+
+    /// Client property key carrying the desktop native-menu placement hint for this command.
+    /// When a desktop app bridges its commands to the native menu bar (title-bar mode
+    /// {@code native}/{@code custom}), the value selects which menu the command appears under.
+    /// Recognized values (case-insensitive): `#DESKTOP_MENU_APP`, `#DESKTOP_MENU_ABOUT`,
+    /// `#DESKTOP_MENU_PREFERENCES`, `#DESKTOP_MENU_QUIT`, `#DESKTOP_MENU_FILE`,
+    /// `#DESKTOP_MENU_EDIT`, `#DESKTOP_MENU_VIEW`, `#DESKTOP_MENU_WINDOW`, `#DESKTOP_MENU_HELP`.
+    /// Any other value becomes a top-level menu with that literal title. Commands without the
+    /// hint are grouped under a default application-commands menu.
+    ///
+    /// The value is a path: {@code &quot;File/Open Recent&quot;} puts the command in an &quot;Open Recent&quot;
+    /// submenu of the File menu, created on demand, and deeper paths nest further. The first
+    /// segment keeps the meaning above. Write {@code //} for a slash that is part of a title.
+    public static final String DESKTOP_MENU = &quot;DesktopMenu&quot;;
+
+    /// Standard desktop menu placement: the macOS application menu. Platforms without one put
+    /// these commands in File.
+    public static final String DESKTOP_MENU_APP = &quot;App&quot;;
+    /// The About standard command, read as `#DESKTOP_ROLE_ABOUT`: placed where each platform
+    /// keeps it, see `#setDesktopRole(String)`.
+    public static final String DESKTOP_MENU_ABOUT = &quot;About&quot;;
+    /// The Settings standard command, read as `#DESKTOP_ROLE_SETTINGS`: placed where each
+    /// platform keeps it, see `#setDesktopRole(String)`.
+    public static final String DESKTOP_MENU_PREFERENCES = &quot;Preferences&quot;;
+    /// The Quit standard command, read as `#DESKTOP_ROLE_QUIT`: placed where each platform
+    /// keeps it, see `#setDesktopRole(String)`.
+    public static final String DESKTOP_MENU_QUIT = &quot;Quit&quot;;
+    /// Standard desktop menu placement: the File menu.
+    public static final String DESKTOP_MENU_FILE = &quot;File&quot;;
+    /// Standard desktop menu placement: the Edit menu.
+    public static final String DESKTOP_MENU_EDIT = &quot;Edit&quot;;
+    /// Standard desktop menu placement: the View menu.
+    public static final String DESKTOP_MENU_VIEW = &quot;View&quot;;
+    /// Standard desktop menu placement: the Window menu.
+    public static final String DESKTOP_MENU_WINDOW = &quot;Window&quot;;
+    /// Standard desktop menu placement: the Help menu.
+    public static final String DESKTOP_MENU_HELP = &quot;Help&quot;;
+
+    /// Sets the desktop native-menu placement hint for this command. See `#DESKTOP_MENU`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `menu`: one of the {@code DESKTOP_MENU_*} constants or a custom top-level menu title
+    ///
+    /// #### Returns
+    ///
+    /// this command, for chaining
+    public Command setDesktopMenu(String menu) {
+<span class="fc" id="L434">        putClientProperty(DESKTOP_MENU, menu);</span>
+<span class="fc" id="L435">        return this;</span>
+    }
+
+    /// Returns the desktop native-menu placement hint, or null when unset. See `#DESKTOP_MENU`.
+    ///
+    /// #### Returns
+    ///
+    /// the placement hint or null
+    public String getDesktopMenu() {
+<span class="fc" id="L444">        Object o = getClientProperty(DESKTOP_MENU);</span>
+<span class="fc bfc" id="L445" title="All 2 branches covered.">        return o == null ? null : o.toString();</span>
+    }
+
+    /// Client property key carrying the separator group of this command within its desktop menu
+    /// (as an {@code Integer}), see `#setDesktopMenuGroup(int)`.
+    public static final String DESKTOP_MENU_GROUP = &quot;DesktopMenuGroup&quot;;
+
+    /// Client property key marking a command as a separator line in the desktop menu, see
+    /// `#createDesktopSeparator(String)`.
+    public static final String DESKTOP_SEPARATOR = &quot;DesktopSeparator&quot;;
+
+    /// Client property key carrying the checked state of a check or radio desktop menu item
+    /// (as a {@code Boolean}). Its presence makes the item checkable, see
+    /// `#setDesktopChecked(boolean)`.
+    public static final String DESKTOP_CHECKED = &quot;DesktopChecked&quot;;
+
+    /// Client property key carrying the name of the radio group of a desktop menu item, see
+    /// `#setDesktopRadioGroup(String)`.
+    public static final String DESKTOP_RADIO_GROUP = &quot;DesktopRadioGroup&quot;;
+
+    /// Places this command in a separator group within its desktop menu. Items of one menu are
+    /// ordered by group, keeping the order they were added in within a group, and the native
+    /// menu draws a separator line wherever the group changes. Commands default to group 0.
+    ///
+    /// #### Parameters
+    ///
+    /// - `group`: the group number, lower groups come first
+    ///
+    /// #### Returns
+    ///
+    /// this command, for chaining
+    public Command setDesktopMenuGroup(int group) {
+<span class="fc" id="L477">        putClientProperty(DESKTOP_MENU_GROUP, Integer.valueOf(group));</span>
+<span class="fc" id="L478">        return this;</span>
+    }
+
+    /// Returns the separator group set with `#setDesktopMenuGroup(int)`, 0 when unset.
+    ///
+    /// #### Returns
+    ///
+    /// the group number
+    public int getDesktopMenuGroup() {
+<span class="fc" id="L487">        Object o = getClientProperty(DESKTOP_MENU_GROUP);</span>
+<span class="fc bfc" id="L488" title="All 2 branches covered.">        return o instanceof Integer ? ((Integer) o).intValue() : 0;</span>
+    }
+
+    private static int separatorCounter;
+
+    /// Creates a command that shows as a separator line in a desktop native menu, at the
+    /// position it is added in. It has no label and never runs. Where groups already
+    /// separate the items (`#setDesktopMenuGroup(int)`) it is not needed.
+    ///
+    /// #### Parameters
+    ///
+    /// - `menu`: the menu path the separator goes in, see `#setDesktopMenu(String)`
+    ///
+    /// #### Returns
+    ///
+    /// the separator command
+    public static Command createDesktopSeparator(String menu) {
+<span class="fc" id="L505">        Command c = new Command(&quot;-&quot;);</span>
+        // A distinct value per separator: Command.equals compares client properties, and the
+        // de-duplication that gathers the published commands would otherwise fold every
+        // separator of a menu into the first one.
+<span class="fc" id="L509">        c.putClientProperty(DESKTOP_SEPARATOR, Integer.valueOf(separatorCounter++));</span>
+<span class="fc" id="L510">        c.setDesktopMenu(menu);</span>
+<span class="fc" id="L511">        return c;</span>
+    }
+
+    /// True when this command was created by `#createDesktopSeparator(String)`.
+    ///
+    /// #### Returns
+    ///
+    /// true for a separator
+    public boolean isDesktopSeparator() {
+<span class="fc bfc" id="L520" title="All 2 branches covered.">        return getClientProperty(DESKTOP_SEPARATOR) != null;</span>
+    }
+
+    /// Makes this command a check item in the desktop native menu and sets its state. When
+    /// the user picks the item the state flips before the command runs, so the action reads
+    /// the new value from `#isDesktopChecked()`. Changing the state while the command is in
+    /// the native menu updates the menu.
+    ///
+    /// #### Parameters
+    ///
+    /// - `checked`: the checked state
+    ///
+    /// #### Returns
+    ///
+    /// this command, for chaining
+    public Command setDesktopChecked(boolean checked) {
+<span class="fc" id="L536">        Object old = getClientProperty(DESKTOP_CHECKED);</span>
+<span class="fc bfc" id="L537" title="All 2 branches covered.">        Boolean b = checked ? Boolean.TRUE : Boolean.FALSE;</span>
+<span class="fc bfc" id="L538" title="All 2 branches covered.">        if (b.equals(old)) {</span>
+<span class="fc" id="L539">            return this;</span>
+        }
+<span class="fc" id="L541">        putClientProperty(DESKTOP_CHECKED, b);</span>
+<span class="fc bfc" id="L542" title="All 2 branches covered.">        if (checked) {</span>
+<span class="fc" id="L543">            stampDesktopCheck();</span>
+<span class="fc" id="L544">            clearRadioSiblings();</span>
+        }
+<span class="fc" id="L546">        Display.refreshNativeMenuIfPublished(this);</span>
+<span class="fc" id="L547">        return this;</span>
+    }
+
+    /// True when this command is a check or radio item, see `#setDesktopChecked(boolean)`.
+    ///
+    /// #### Returns
+    ///
+    /// true when the item shows a check state
+    public boolean isDesktopCheckable() {
+<span class="pc bpc" id="L556" title="1 of 4 branches missed.">        return getClientProperty(DESKTOP_CHECKED) != null || getDesktopRadioGroup() != null;</span>
+    }
+
+    /// The checked state of a check or radio item, false when the command is not checkable.
+    ///
+    /// #### Returns
+    ///
+    /// the checked state
+    public boolean isDesktopChecked() {
+<span class="fc" id="L565">        return Boolean.TRUE.equals(getClientProperty(DESKTOP_CHECKED));</span>
+    }
+
+    /// Makes this command a radio item of the named group in the desktop native menu. At most
+    /// one command of a group is checked: checking one, from the menu or with
+    /// `#setDesktopChecked(boolean)`, unchecks the others. Picking the checked item again
+    /// leaves it checked.
+    ///
+    /// #### Parameters
+    ///
+    /// - `group`: the radio group name, null to make this an ordinary item again
+    ///
+    /// #### Returns
+    ///
+    /// this command, for chaining
+    public Command setDesktopRadioGroup(String group) {
+<span class="fc" id="L581">        putClientProperty(DESKTOP_RADIO_GROUP, group);</span>
+<span class="fc bfc" id="L582" title="All 2 branches covered.">        if (group == null) {</span>
+            // The checked state was created for the radio item; without it the command is an
+            // ordinary item again rather than a check item.
+<span class="fc" id="L585">            putClientProperty(DESKTOP_CHECKED, null);</span>
+<span class="pc bpc" id="L586" title="1 of 2 branches missed.">        } else if (getClientProperty(DESKTOP_CHECKED) == null) {</span>
+<span class="fc" id="L587">            putClientProperty(DESKTOP_CHECKED, Boolean.FALSE);</span>
+<span class="nc bnc" id="L588" title="All 2 branches missed.">        } else if (isDesktopChecked()) {</span>
+<span class="nc" id="L589">            stampDesktopCheck();</span>
+<span class="nc" id="L590">            clearRadioSiblings();</span>
+        }
+<span class="fc" id="L592">        Display.refreshNativeMenuIfPublished(this);</span>
+<span class="fc" id="L593">        return this;</span>
+    }
+
+    /// Returns the radio group set with `#setDesktopRadioGroup(String)`, or null.
+    ///
+    /// #### Returns
+    ///
+    /// the radio group name or null
+    public String getDesktopRadioGroup() {
+<span class="fc" id="L602">        Object o = getClientProperty(DESKTOP_RADIO_GROUP);</span>
+<span class="fc bfc" id="L603" title="All 2 branches covered.">        return o instanceof String ? (String) o : null;</span>
+    }
+
+    // Orders the checks of radio items, so the most recently checked member of a group wins
+    // wherever the group's commands meet. A field rather than a client property, since
+    // equals() compares client properties.
+    private static int desktopCheckCounter;
+    private int desktopCheckStamp;
+
+    private void stampDesktopCheck() {
+<span class="fc" id="L613">        desktopCheckStamp = ++desktopCheckCounter;</span>
+<span class="fc" id="L614">    }</span>
+
+    /// Unchecks the other members of this command's radio group on the native menu surfaces
+    /// that publish this command: the current form and open windows. A group on a surface that
+    /// is not published (a form still being built, say) is settled when that surface is
+    /// published, by `#settleRadioGroups(java.util.List)`, which keeps the most recently
+    /// checked member. There is deliberately no registry of all commands: it would hold every
+    /// command, and through their listeners every form, for the life of the application.
+    private void clearRadioSiblings() {
+<span class="fc" id="L623">        String group = getDesktopRadioGroup();</span>
+<span class="fc bfc" id="L624" title="All 2 branches covered.">        if (group == null) {</span>
+<span class="fc" id="L625">            return;</span>
+        }
+<span class="fc bfc" id="L627" title="All 2 branches covered.">        for (java.util.List members : Display.getInstance().getPublishedNativeMenuSurfaces()) {</span>
+            // By identity: contains() would use equals(), which compares fields and client
+            // properties, so an equal command elsewhere would claim this surface.
+<span class="fc" id="L630">            boolean member = false;</span>
+<span class="fc bfc" id="L631" title="All 2 branches covered.">            for (Object o : members) {</span>
+<span class="fc bfc" id="L632" title="All 2 branches covered.">                if (o == this) { //NOPMD CompareObjectsWithEquals</span>
+<span class="fc" id="L633">                    member = true;</span>
+<span class="fc" id="L634">                    break;</span>
+                }
+<span class="fc" id="L636">            }</span>
+<span class="fc bfc" id="L637" title="All 2 branches covered.">            if (!member) {</span>
+                // Same group name on another surface is another group.
+<span class="fc" id="L639">                continue;</span>
+            }
+<span class="fc bfc" id="L641" title="All 2 branches covered.">            for (Object o : members) {</span>
+<span class="pc bpc" id="L642" title="1 of 2 branches missed.">                if (!(o instanceof Command)) {</span>
+<span class="nc" id="L643">                    continue;</span>
+                }
+<span class="fc" id="L645">                Command c = (Command) o;</span>
+<span class="pc bpc" id="L646" title="1 of 6 branches missed.">                if (c != this &amp;&amp; group.equals(c.getDesktopRadioGroup()) &amp;&amp; c.isDesktopChecked()) { //NOPMD CompareObjectsWithEquals</span>
+<span class="nc" id="L647">                    c.putClientProperty(DESKTOP_CHECKED, Boolean.FALSE);</span>
+                }
+<span class="fc" id="L649">            }</span>
+<span class="fc" id="L650">        }</span>
+<span class="fc" id="L651">    }</span>
+
+    /// Enables or disables the commands that follow a surface's document-modified state, see
+    /// `#setDesktopEnabledWhenModified(boolean)`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `commands`: the commands of one form or window; entries that are not commands are
+    /// ignored
+    ///
+    /// - `modified`: the new modified state
+    ///
+    /// - `surface`: the form or window reporting it
+    ///
+    /// - `revision`: the surface's report count, see
+    /// `#applyDocumentModifiedOnPublish(java.util.List, boolean, Object, int)`
+    static void followDocumentModified(java.util.List commands, boolean modified, Object surface, int revision) {
+        // An explicit report: applies to every command and makes this surface their owner.
+<span class="pc bpc" id="L669" title="1 of 2 branches missed.">        if (commands == null) {</span>
+<span class="nc" id="L670">            return;</span>
+        }
+<span class="fc bfc" id="L672" title="All 2 branches covered.">        for (Object o : commands) {</span>
+<span class="pc bpc" id="L673" title="1 of 4 branches missed.">            if (o instanceof Command &amp;&amp; ((Command) o).isDesktopEnabledWhenModified()) {</span>
+<span class="fc" id="L674">                ((Command) o).documentStateSurface = surface;</span>
+<span class="fc" id="L675">                ((Command) o).documentStateRevision = revision;</span>
+<span class="fc" id="L676">                ((Command) o).setEnabled(modified);</span>
+            }
+<span class="fc" id="L678">        }</span>
+<span class="fc" id="L679">    }</span>
+
+    /// As `#followDocumentModified(java.util.List, boolean, Object, int)`, called as a surface
+    /// publishes. It reaches only the commands this surface's current state has not reached --
+    /// a Save added after the state was reported, moved here from another form or window, or
+    /// removed and re-added here across a later report (the revision tells those apart). Publishing
+    /// never re-applies a surface's state to a command it already set: a command shared by a
+    /// clean form and a modified window would otherwise flip on every publish, and each flip
+    /// schedules the next republish, forever.
+    ///
+    /// #### Parameters
+    ///
+    /// - `commands`: the commands of one form or window
+    ///
+    /// - `modified`: the reported modified state
+    ///
+    /// - `surface`: the form or window publishing them
+    ///
+    /// - `revision`: how many times the surface has reported a state
+    static void applyDocumentModifiedOnPublish(java.util.List commands, boolean modified, Object surface,
+            int revision) {
+<span class="pc bpc" id="L700" title="1 of 2 branches missed.">        if (commands == null) {</span>
+<span class="nc" id="L701">            return;</span>
+        }
+<span class="fc bfc" id="L703" title="All 2 branches covered.">        for (Object o : commands) {</span>
+<span class="pc bpc" id="L704" title="1 of 4 branches missed.">            if (o instanceof Command &amp;&amp; ((Command) o).isDesktopEnabledWhenModified()) {</span>
+<span class="fc" id="L705">                Command c = (Command) o;</span>
+<span class="fc bfc" id="L706" title="All 2 branches covered.">                if (c.documentStateSurface == surface) { //NOPMD CompareObjectsWithEquals</span>
+<span class="fc bfc" id="L707" title="All 2 branches covered.">                    if (c.documentStateRevision == revision) {</span>
+                        // This state reached it already.
+<span class="fc" id="L709">                        continue;</span>
+                    }
+<span class="pc bpc" id="L711" title="3 of 4 branches missed.">                } else if (c.documentStateSurface != null &amp;&amp; stillPublishes(c.documentStateSurface, c)) {</span>
+                    // Owned by another surface that still shows it: taking it over is what
+                    // would make a shared command flip forever.
+<span class="nc" id="L714">                    continue;</span>
+                }
+<span class="fc" id="L716">                c.documentStateSurface = surface;</span>
+<span class="fc" id="L717">                c.documentStateRevision = revision;</span>
+<span class="fc" id="L718">                c.setEnabled(modified);</span>
+            }
+<span class="fc" id="L720">        }</span>
+<span class="fc" id="L721">    }</span>
+
+    /// Whether `list` holds `c` itself. By identity: `Command#equals(Object)` is structural, so
+    /// an equal command left behind on a surface would otherwise make that surface still look
+    /// like the owner of one moved away from it.
+    static boolean containsIdentical(java.util.List list, Command c) {
+<span class="nc bnc" id="L727" title="All 2 branches missed.">        if (list == null) {</span>
+<span class="nc" id="L728">            return false;</span>
+        }
+<span class="nc bnc" id="L730" title="All 2 branches missed.">        for (Object o : list) {</span>
+<span class="nc bnc" id="L731" title="All 2 branches missed.">            if (o == c) { //NOPMD CompareObjectsWithEquals</span>
+<span class="nc" id="L732">                return true;</span>
+            }
+<span class="nc" id="L734">        }</span>
+<span class="nc" id="L735">        return false;</span>
+    }
+
+    private static boolean stillPublishes(Object surface, Command c) {
+<span class="nc bnc" id="L739" title="All 2 branches missed.">        if (surface instanceof Form) {</span>
+<span class="nc" id="L740">            return ((Form) surface).publishesDocumentCommand(c);</span>
+        }
+<span class="nc bnc" id="L742" title="All 4 branches missed.">        return surface instanceof Window &amp;&amp; ((Window) surface).publishesDocumentCommand(c);</span>
+    }
+
+    // The form or window whose document-modified state last set this command's enabled
+    // state, null when none has.
+    private Object documentStateSurface;
+    // That surface's report count when it did.
+    private int documentStateRevision;
+
+    /// Leaves at most one checked member in each radio group among the given commands, the
+    /// most recently checked one. Called on every surface as it is published, which settles a
+    /// group whose members were checked while the surface was not published.
+    ///
+    /// #### Parameters
+    ///
+    /// - `commands`: the commands one surface publishes; entries that are not commands are
+    /// ignored
+    static void settleRadioGroups(java.util.List commands) {
+<span class="fc" id="L760">        HashMap&lt;String, Command&gt; winners = null;</span>
+<span class="fc bfc" id="L761" title="All 2 branches covered.">        for (Object o : commands) {</span>
+<span class="pc bpc" id="L762" title="1 of 2 branches missed.">            if (!(o instanceof Command)) {</span>
+<span class="nc" id="L763">                continue;</span>
+            }
+<span class="fc" id="L765">            Command c = (Command) o;</span>
+<span class="fc" id="L766">            String group = c.getDesktopRadioGroup();</span>
+<span class="fc bfc" id="L767" title="All 4 branches covered.">            if (group == null || !c.isDesktopChecked()) {</span>
+<span class="fc" id="L768">                continue;</span>
+            }
+<span class="fc bfc" id="L770" title="All 2 branches covered.">            if (winners == null) {</span>
+<span class="fc" id="L771">                winners = new HashMap&lt;String, Command&gt;();</span>
+            }
+<span class="fc" id="L773">            Command w = winners.get(group);</span>
+<span class="fc bfc" id="L774" title="All 2 branches covered.">            if (w == null) {</span>
+<span class="fc" id="L775">                winners.put(group, c);</span>
+<span class="fc bfc" id="L776" title="All 2 branches covered.">            } else if (c.desktopCheckStamp &gt; w.desktopCheckStamp) {</span>
+<span class="fc" id="L777">                w.putClientProperty(DESKTOP_CHECKED, Boolean.FALSE);</span>
+<span class="fc" id="L778">                winners.put(group, c);</span>
+            } else {
+<span class="fc" id="L780">                c.putClientProperty(DESKTOP_CHECKED, Boolean.FALSE);</span>
+            }
+<span class="fc" id="L782">        }</span>
+<span class="fc" id="L783">    }</span>
+
+    /// Client property key carrying the upper-cased character of the desktop keyboard
+    /// accelerator (as an {@code Integer}), see `#setDesktopShortcut(char, int)`.
+    public static final String DESKTOP_SHORTCUT_KEY = &quot;DesktopShortcutKey&quot;;
+
+    /// Client property key carrying the modifier bit-mask of the desktop keyboard accelerator
+    /// (as an {@code Integer}), see `#setDesktopShortcut(char, int)`.
+    public static final String DESKTOP_SHORTCUT_MODIFIERS = &quot;DesktopShortcutModifiers&quot;;
+
+    /// Accelerator modifier flag for the platform's primary command key: Command on macOS,
+    /// Control on Windows/Linux. This is the modifier used by the vast majority of menu
+    /// shortcuts so it's the default.
+    public static final int DESKTOP_SHORTCUT_MODIFIER_PRIMARY = 1;
+
+    /// Accelerator modifier flag for the Shift key.
+    public static final int DESKTOP_SHORTCUT_MODIFIER_SHIFT = 2;
+
+    /// Accelerator modifier flag for the Alt/Option key.
+    public static final int DESKTOP_SHORTCUT_MODIFIER_ALT = 4;
+
+    /// Assigns a keyboard accelerator to this command for the desktop native menu bar using the
+    /// platform's primary modifier (Command on macOS, Control elsewhere). For example
+    /// {@code setDesktopShortcut('S')} produces Cmd+S / Ctrl+S next to the menu item. The hint is
+    /// inert on platforms without a native menu bar, so it's safe to set unconditionally.
+    ///
+    /// #### Parameters
+    ///
+    /// - `keyChar`: the accelerator character (case-insensitive)
+    ///
+    /// #### Returns
+    ///
+    /// this command, for chaining
+    public Command setDesktopShortcut(char keyChar) {
+<span class="fc" id="L817">        return setDesktopShortcut(keyChar, DESKTOP_SHORTCUT_MODIFIER_PRIMARY);</span>
+    }
+
+    /// Assigns a keyboard accelerator to this command for the desktop native menu bar. See
+    /// `#setDesktopShortcut(char)` for the common case.
+    ///
+    /// #### Parameters
+    ///
+    /// - `keyChar`: the accelerator character (case-insensitive)
+    ///
+    /// - `modifiers`: a bit-mask of `#DESKTOP_SHORTCUT_MODIFIER_PRIMARY`,
+    /// `#DESKTOP_SHORTCUT_MODIFIER_SHIFT` and `#DESKTOP_SHORTCUT_MODIFIER_ALT`
+    ///
+    /// #### Returns
+    ///
+    /// this command, for chaining
+    public Command setDesktopShortcut(char keyChar, int modifiers) {
+<span class="fc" id="L834">        putClientProperty(DESKTOP_SHORTCUT_KEY, Integer.valueOf(Character.toUpperCase(keyChar)));</span>
+<span class="fc" id="L835">        putClientProperty(DESKTOP_SHORTCUT_MODIFIERS, Integer.valueOf(modifiers));</span>
+<span class="fc" id="L836">        return this;</span>
+    }
+
+    /// Returns the upper-cased accelerator character assigned via `#setDesktopShortcut(char, int)`,
+    /// or 0 when no accelerator is set.
+    ///
+    /// #### Returns
+    ///
+    /// the accelerator character or 0
+    public int getDesktopShortcutKeyChar() {
+<span class="fc" id="L846">        Object o = getClientProperty(DESKTOP_SHORTCUT_KEY);</span>
+<span class="fc bfc" id="L847" title="All 2 branches covered.">        return o == null ? 0 : ((Integer) o).intValue();</span>
+    }
+
+    /// Returns the accelerator modifier bit-mask assigned via `#setDesktopShortcut(char, int)`,
+    /// or 0 when no accelerator is set.
+    ///
+    /// #### Returns
+    ///
+    /// the modifier bit-mask
+    public int getDesktopShortcutModifiers() {
+<span class="fc" id="L857">        Object o = getClientProperty(DESKTOP_SHORTCUT_MODIFIERS);</span>
+<span class="fc bfc" id="L858" title="All 2 branches covered.">        return o == null ? 0 : ((Integer) o).intValue();</span>
+    }
+
+    /// Client property key carrying the standard desktop role of this command, one of the
+    /// `DESKTOP_ROLE_*` constants. See `#setDesktopRole(String)`.
+    public static final String DESKTOP_ROLE = &quot;DesktopRole&quot;;
+
+    /// Standard command: shows the application's About information. In the application menu
+    /// on macOS, at the foot of Help on Windows and Linux.
+    public static final String DESKTOP_ROLE_ABOUT = &quot;about&quot;;
+    /// Standard command: opens the application's settings. &quot;Settings&quot; in the application menu
+    /// on macOS, &quot;Options&quot; under Tools on Windows, &quot;Preferences&quot; at the foot of Edit on Linux.
+    public static final String DESKTOP_ROLE_SETTINGS = &quot;settings&quot;;
+    /// Standard command: quits the application. &quot;Quit&quot; on macOS and Linux, &quot;Exit&quot; on Windows,
+    /// and absent from a browser page, which cannot quit.
+    public static final String DESKTOP_ROLE_QUIT = &quot;quit&quot;;
+    /// Standard command: hides the application. macOS only.
+    public static final String DESKTOP_ROLE_HIDE_APP = &quot;hide&quot;;
+    /// Standard command: creates a new document.
+    public static final String DESKTOP_ROLE_NEW = &quot;new&quot;;
+    /// Standard command: opens a document.
+    public static final String DESKTOP_ROLE_OPEN = &quot;open&quot;;
+    /// Standard command: saves the document. Follows the document-modified state of its form
+    /// or window, see `Form#setDocumentModified(boolean)`.
+    public static final String DESKTOP_ROLE_SAVE = &quot;save&quot;;
+    /// Standard command: saves the document under a new name.
+    public static final String DESKTOP_ROLE_SAVE_AS = &quot;saveAs&quot;;
+    /// Standard command: closes the document or window.
+    public static final String DESKTOP_ROLE_CLOSE = &quot;close&quot;;
+    /// Standard command: prints.
+    public static final String DESKTOP_ROLE_PRINT = &quot;print&quot;;
+    /// Standard command: undo.
+    public static final String DESKTOP_ROLE_UNDO = &quot;undo&quot;;
+    /// Standard command: redo.
+    public static final String DESKTOP_ROLE_REDO = &quot;redo&quot;;
+    /// Standard command: cut.
+    public static final String DESKTOP_ROLE_CUT = &quot;cut&quot;;
+    /// Standard command: copy.
+    public static final String DESKTOP_ROLE_COPY = &quot;copy&quot;;
+    /// Standard command: paste.
+    public static final String DESKTOP_ROLE_PASTE = &quot;paste&quot;;
+    /// Standard command: select all.
+    public static final String DESKTOP_ROLE_SELECT_ALL = &quot;selectAll&quot;;
+    /// Standard command: find.
+    public static final String DESKTOP_ROLE_FIND = &quot;find&quot;;
+    /// Standard command: toggles full screen.
+    public static final String DESKTOP_ROLE_FULL_SCREEN = &quot;fullScreen&quot;;
+    /// Standard command: minimizes the window. Absent from a browser page.
+    public static final String DESKTOP_ROLE_MINIMIZE = &quot;minimize&quot;;
+    /// Standard command: zooms (macOS) or maximizes the window. Absent from a browser page.
+    public static final String DESKTOP_ROLE_ZOOM = &quot;zoom&quot;;
+    /// Standard command: opens the application's help.
+    public static final String DESKTOP_ROLE_HELP = &quot;help&quot;;
+
+    /// Client property key carrying the platforms a command is published on, see
+    /// `#setDesktopPlatforms(String...)`.
+    public static final String DESKTOP_PLATFORMS = &quot;DesktopPlatforms&quot;;
+
+    /// Client property key that makes a command's enabled state follow the document-modified
+    /// state of its form or window (as a {@code Boolean}), see
+    /// `#setDesktopEnabledWhenModified(boolean)`.
+    public static final String DESKTOP_ENABLED_WHEN_MODIFIED = &quot;DesktopEnabledWhenModified&quot;;
+
+    /// Marks this command as one of the standard commands every desktop application has, so
+    /// the native menu bar puts it where the platform's own applications do: About, Settings
+    /// and Quit in the application menu on macOS; About under Help, Options under Tools and
+    /// Exit under File on Windows; Preferences under Edit on Linux. Each role also brings the
+    /// platform's standard shortcut and its position within the menu.
+    ///
+    /// What the command sets itself wins: an explicit `#setDesktopMenu(String)`,
+    /// `#setDesktopMenuGroup(int)` or `#setDesktopShortcut(char, int)` overrides the role's.
+    /// The label is the command's own name; `#createDesktopRole(String, ActionListener)` creates
+    /// a command named the way the running platform names the role (Quit or Exit, Settings or
+    /// Options or Preferences). A role the platform has no place for (Hide outside macOS, Quit
+    /// in a browser) leaves the command out of that platform's menu bar.
+    ///
+    /// #### Parameters
+    ///
+    /// - `role`: one of the `DESKTOP_ROLE_*` constants, or null to clear it
+    ///
+    /// #### Returns
+    ///
+    /// this command, for chaining
+    public Command setDesktopRole(String role) {
+<span class="fc" id="L942">        putClientProperty(DESKTOP_ROLE, role);</span>
+<span class="fc" id="L943">        return this;</span>
+    }
+
+    /// Returns the standard desktop role, or null when unset. See `#setDesktopRole(String)`.
+    ///
+    /// #### Returns
+    ///
+    /// one of the `DESKTOP_ROLE_*` constants or null
+    public String getDesktopRole() {
+<span class="fc" id="L952">        Object o = getClientProperty(DESKTOP_ROLE);</span>
+<span class="fc bfc" id="L953" title="All 2 branches covered.">        return o == null ? null : o.toString();</span>
+    }
+
+    /// Creates a command for a standard desktop role, named the way the running platform names
+    /// it: &quot;Quit&quot; on macOS and Linux and &quot;Exit&quot; on Windows, &quot;Settings&quot;, &quot;Options&quot; or
+    /// &quot;Preferences&quot;, &quot;About&quot; followed by the application name. The name can be translated
+    /// through the `cn1.menu.&lt;role&gt;` resource key, for example `cn1.menu.quit`. See
+    /// `#setDesktopRole(String)`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `role`: one of the `DESKTOP_ROLE_*` constants
+    ///
+    /// - `listener`: the action, may be null
+    ///
+    /// #### Returns
+    ///
+    /// the new command
+    public static Command createDesktopRole(String role, ActionListener listener) {
+<span class="fc" id="L972">        Command c = new RoleCommand(role, listener);</span>
+<span class="fc" id="L973">        c.setDesktopRole(role);</span>
+<span class="fc" id="L974">        return c;</span>
+    }
+
+    /// The command `#createDesktopRole(String, ActionListener)` makes. The platform's name is
+    /// looked up when it is read, not when the command is made: a command created from a
+    /// static or field initializer exists before Display knows the platform. That lasts until
+    /// the application names the command itself.
+    private static final class RoleCommand extends Command {
+        private final String role;
+        private final ActionListener listener;
+        private boolean named;
+
+        RoleCommand(String role, ActionListener listener) {
+<span class="fc" id="L987">            super(null);</span>
+<span class="fc" id="L988">            this.role = role;</span>
+<span class="fc" id="L989">            this.listener = listener;</span>
+<span class="fc" id="L990">        }</span>
+
+        @Override
+        public String getCommandName() {
+<span class="fc bfc" id="L994" title="All 2 branches covered.">            if (named) {</span>
+<span class="fc" id="L995">                return super.getCommandName();</span>
+            }
+<span class="fc" id="L997">            String label = NativeMenuConventions.labelOf(NativeMenuConventions.current(), role);</span>
+<span class="pc bpc" id="L998" title="1 of 2 branches missed.">            if (label == null) {</span>
+                // A role this platform does not show still gets a name for the application's
+                // own menus: the Windows one, which every platform's users read correctly.
+<span class="nc" id="L1001">                label = NativeMenuConventions.labelOf(NativeMenuConventions.WINDOWS, role);</span>
+            }
+<span class="pc bpc" id="L1003" title="1 of 2 branches missed.">            return label == null ? role : label;</span>
+        }
+
+        @Override
+        public void setCommandName(String command) {
+<span class="fc" id="L1008">            named = true;</span>
+<span class="fc" id="L1009">            super.setCommandName(command);</span>
+<span class="fc" id="L1010">        }</span>
+
+        @Override
+        public void actionPerformed(ActionEvent evt) {
+<span class="nc bnc" id="L1014" title="All 2 branches missed.">            if (listener != null) {</span>
+<span class="nc" id="L1015">                listener.actionPerformed(evt);</span>
+            }
+<span class="nc" id="L1017">        }</span>
+
+        @Override
+        public boolean equals(Object obj) {
+<span class="pc bpc" id="L1021" title="2 of 6 branches missed.">            return super.equals(obj) &amp;&amp; named == ((RoleCommand) obj).named</span>
+                    &amp;&amp; listener == ((RoleCommand) obj).listener; //NOPMD CompareObjectsWithEquals
+        }
+
+        @Override
+        public int hashCode() {
+<span class="nc bnc" id="L1027" title="All 2 branches missed.">            return super.hashCode() * 2 + (named ? 1 : 0);</span>
+        }
+    }
+
+    /// Publishes this command on the native menu bar of the listed platforms only, for a
+    /// command that only makes sense on some of them. The names are `mac`, `win`, `linux`
+    /// and `web` (the JavaScript port's in-page menu). The command stays in the application's
+    /// own menus everywhere; only the native menu bar is affected.
+    ///
+    /// #### Parameters
+    ///
+    /// - `platforms`: the platform names; none, or null, publishes it everywhere
+    ///
+    /// #### Returns
+    ///
+    /// this command, for chaining
+    public Command setDesktopPlatforms(String... platforms) {
+<span class="pc bpc" id="L1044" title="1 of 4 branches missed.">        if (platforms == null || platforms.length == 0) {</span>
+<span class="fc" id="L1045">            putClientProperty(DESKTOP_PLATFORMS, null);</span>
+        } else {
+<span class="fc" id="L1047">            String[] copy = new String[platforms.length];</span>
+<span class="fc" id="L1048">            System.arraycopy(platforms, 0, copy, 0, platforms.length);</span>
+<span class="fc" id="L1049">            putClientProperty(DESKTOP_PLATFORMS, copy);</span>
+        }
+<span class="fc" id="L1051">        return this;</span>
+    }
+
+    /// True when this command is published on the native menu bar of the named platform. See
+    /// `#setDesktopPlatforms(String...)`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `platform`: `mac`, `win`, `linux` or `web`
+    ///
+    /// #### Returns
+    ///
+    /// true when no platform list is set or the list names this platform
+    public boolean isDesktopPlatform(String platform) {
+<span class="fc" id="L1065">        Object o = getClientProperty(DESKTOP_PLATFORMS);</span>
+<span class="fc bfc" id="L1066" title="All 2 branches covered.">        if (!(o instanceof String[])) {</span>
+<span class="fc" id="L1067">            return true;</span>
+        }
+<span class="fc bfc" id="L1069" title="All 2 branches covered.">        for (String p : (String[]) o) {</span>
+<span class="pc bpc" id="L1070" title="1 of 4 branches missed.">            if (p != null &amp;&amp; p.equalsIgnoreCase(platform)) {</span>
+<span class="fc" id="L1071">                return true;</span>
+            }
+        }
+<span class="fc" id="L1074">        return false;</span>
+    }
+
+    /// Makes this command's enabled state follow the document-modified state of the form or
+    /// window publishing it: enabled while the document has unsaved changes, disabled once it
+    /// is saved. On by default for `#DESKTOP_ROLE_SAVE`. Nothing changes until the application
+    /// calls `Form#setDocumentModified(boolean)` or `Window#setDocumentModified(boolean)`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `follow`: true to follow the modified state
+    ///
+    /// #### Returns
+    ///
+    /// this command, for chaining
+    public Command setDesktopEnabledWhenModified(boolean follow) {
+<span class="nc" id="L1090">        putClientProperty(DESKTOP_ENABLED_WHEN_MODIFIED, Boolean.valueOf(follow));</span>
+<span class="nc" id="L1091">        return this;</span>
+    }
+
+    /// True when this command's enabled state follows the document-modified state. See
+    /// `#setDesktopEnabledWhenModified(boolean)`.
+    ///
+    /// #### Returns
+    ///
+    /// true when it follows the modified state
+    public boolean isDesktopEnabledWhenModified() {
+<span class="fc" id="L1101">        Object o = getClientProperty(DESKTOP_ENABLED_WHEN_MODIFIED);</span>
+<span class="pc bpc" id="L1102" title="1 of 2 branches missed.">        if (o instanceof Boolean) {</span>
+<span class="nc" id="L1103">            return ((Boolean) o).booleanValue();</span>
+        }
+<span class="fc" id="L1105">        return DESKTOP_ROLE_SAVE.equals(getDesktopRole());</span>
+    }
+
+    /// #### Returns
+    ///
+    /// the materialIcon
+    public char getMaterialIcon() {
+<span class="fc" id="L1112">        return materialIcon;</span>
+    }
+
+    /// #### Parameters
+    ///
+    /// - `materialIcon`: the materialIcon to set
+    public void setMaterialIcon(char materialIcon) {
+<span class="fc" id="L1119">        this.materialIcon = materialIcon;</span>
+<span class="fc" id="L1120">    }</span>
+
+    /// The gap between the text and the icon in millimeters or -1 for default
+    ///
+    /// #### Returns
+    ///
+    /// the iconGapMM
+    public float getIconGapMM() {
+<span class="fc" id="L1128">        return iconGapMM;</span>
+    }
+
+    /// The gap between the text and the icon in millimeters or -1 for default
+    ///
+    /// #### Parameters
+    ///
+    /// - `iconGapMM`: the iconGapMM to set
+    public void setIconGapMM(float iconGapMM) {
+<span class="fc" id="L1137">        this.iconGapMM = iconGapMM;</span>
+<span class="fc" id="L1138">    }</span>
+
+    /// #### Returns
+    ///
+    /// the materialIconSize
+    public float getMaterialIconSize() {
+<span class="fc" id="L1144">        return materialIconSize;</span>
+    }
+
+    /// #### Parameters
+    ///
+    /// - `materialIconSize`: the materialIconSize to set
+    public void setMaterialIconSize(float materialIconSize) {
+<span class="fc" id="L1151">        this.materialIconSize = materialIconSize;</span>
+<span class="fc" id="L1152">    }</span>
+
+    /// #### Returns
+    ///
+    /// the set iconFont or null if none defined (meaning for material icons instead of the system default MaterialDesign font
+    public Font getIconFont() {
+<span class="fc" id="L1158">        return iconFont;</span>
+    }
+
+    /// #### Parameters
+    ///
+    /// - `iconFont`: use iconFont for material icons instead of the system default MaterialDesign font
+    public void setIconFont(Font iconFont) {
+<span class="fc" id="L1165">        this.iconFont = iconFont;</span>
+<span class="fc" id="L1166">    }</span>
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,201 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Look.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.scheduler</a> &gt; <span class="el_source">Look.java</span></div><h1>Look.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ui.scheduler;
+
+import com.codename1.ui.Display;
+import com.codename1.ui.Font;
+import com.codename1.ui.Graphics;
+import com.codename1.ui.plaf.Style;
+import com.codename1.ui.plaf.UIManager;
+
+import java.util.HashMap;
+
+/// The styles the scheduling components paint with, looked up by UIID once
+/// per theme and not once per item.
+///
+/// The surfaces draw thousands of rectangles with no component behind them,
+/// so a UIID here is a source of colours and a font, not of a border or a
+/// padding.
+final class Look {
+<span class="fc" id="L40">    private static final HashMap&lt;String, Style&gt; STYLES = new HashMap&lt;String, Style&gt;();</span>
+<span class="fc" id="L41">    private static int generation = -1;</span>
+
+    private Look() {
+    }
+
+    private static void check() {
+<span class="fc" id="L47">        int now = UIManager.getThemeGeneration();</span>
+<span class="fc bfc" id="L48" title="All 2 branches covered.">        if (now != generation) {</span>
+<span class="fc" id="L49">            generation = now;</span>
+<span class="fc" id="L50">            STYLES.clear();</span>
+        }
+<span class="fc" id="L52">    }</span>
+
+    static Style style(String uiid) {
+<span class="fc" id="L55">        check();</span>
+<span class="fc" id="L56">        Style s = STYLES.get(uiid);</span>
+<span class="fc bfc" id="L57" title="All 2 branches covered.">        if (s == null) {</span>
+<span class="fc" id="L58">            s = UIManager.getInstance().getComponentStyle(uiid);</span>
+<span class="fc" id="L59">            STYLES.put(uiid, s);</span>
+        }
+<span class="fc" id="L61">        return s;</span>
+    }
+
+    static Style selected(String uiid) {
+<span class="fc" id="L65">        check();</span>
+<span class="fc" id="L66">        String key = uiid + &quot;#sel&quot;;</span>
+<span class="fc" id="L67">        Style s = STYLES.get(key);</span>
+<span class="fc bfc" id="L68" title="All 2 branches covered.">        if (s == null) {</span>
+<span class="fc" id="L69">            s = UIManager.getInstance().getComponentSelectedStyle(uiid);</span>
+<span class="fc" id="L70">            STYLES.put(key, s);</span>
+        }
+<span class="fc" id="L72">        return s;</span>
+    }
+
+    static int mm(float mm) {
+<span class="fc" id="L76">        return Math.max(1, Display.getInstance().convertToPixels(mm));</span>
+    }
+
+    /// Fills with a style's background colour and opacity.
+    static void fill(Graphics g, Style s, int x, int y, int w, int h) {
+<span class="fc" id="L81">        int op = s.getBgTransparency() &amp; 0xff;</span>
+<span class="pc bpc" id="L82" title="2 of 6 branches missed.">        if (op == 0 || w &lt;= 0 || h &lt;= 0) {</span>
+<span class="fc" id="L83">            return;</span>
+        }
+<span class="fc" id="L85">        g.setColor(s.getBgColor());</span>
+<span class="pc bpc" id="L86" title="1 of 2 branches missed.">        if (op == 255) {</span>
+<span class="fc" id="L87">            g.fillRect(x, y, w, h);</span>
+        } else {
+<span class="nc" id="L89">            int a = g.getAlpha();</span>
+<span class="nc" id="L90">            g.setAlpha(a * op / 255);</span>
+<span class="nc" id="L91">            g.fillRect(x, y, w, h);</span>
+<span class="nc" id="L92">            g.setAlpha(a);</span>
+        }
+<span class="fc" id="L94">    }</span>
+
+    /// The shadow of something held above the surface, `level` of the way
+    /// up from 0 to 1.
+    static void shadow(Graphics g, int x, int y, int w, int h, float level) {
+<span class="nc bnc" id="L99" title="All 6 branches missed.">        if (level &lt;= 0 || w &lt;= 0 || h &lt;= 0) {</span>
+<span class="nc" id="L100">            return;</span>
+        }
+<span class="nc" id="L102">        int a = g.getAlpha();</span>
+<span class="nc" id="L103">        int reach = Math.max(2, mm(1.1f));</span>
+<span class="nc" id="L104">        int drop = Math.round(mm(0.6f) * level);</span>
+<span class="nc" id="L105">        int arc = mm(1.2f);</span>
+<span class="nc" id="L106">        g.setColor(0);</span>
+        // Each ring is drawn over the ones outside it, which is what makes
+        // the shadow darker towards the thing that casts it.
+<span class="nc" id="L109">        g.setAlpha(Math.max(1, Math.round(a * 0.2f * level / reach)));</span>
+<span class="nc bnc" id="L110" title="All 2 branches missed.">        for (int i = reach; i &gt;= 1; i--) {</span>
+<span class="nc" id="L111">            g.fillRoundRect(x - i, y - i + drop, w + 2 * i, h + 2 * i, arc + 2 * i, arc + 2 * i);</span>
+        }
+<span class="nc" id="L113">        g.setAlpha(a);</span>
+<span class="nc" id="L114">    }</span>
+
+    /// The light of the pointer on what it is over: a wash of `rgb` and
+    /// a line around it, `level` of the way up from 0 to 1.
+    static void glow(Graphics g, int rgb, int x, int y, int w, int h, float level) {
+<span class="pc bpc" id="L119" title="2 of 6 branches missed.">        if (level &lt;= 0 || w &lt;= 0 || h &lt;= 0) {</span>
+<span class="fc" id="L120">            return;</span>
+        }
+<span class="fc" id="L122">        int a = g.getAlpha();</span>
+<span class="fc" id="L123">        int arc = mm(0.8f);</span>
+<span class="fc" id="L124">        g.setColor(rgb);</span>
+<span class="fc" id="L125">        g.setAlpha(Math.round(a * 0.16f * level));</span>
+<span class="fc" id="L126">        g.fillRoundRect(x, y, w, h, arc, arc);</span>
+<span class="fc" id="L127">        g.setAlpha(Math.round(a * 0.55f * level));</span>
+<span class="fc" id="L128">        g.drawRoundRect(x, y, w - 1, h - 1, arc, arc);</span>
+<span class="fc" id="L129">        g.setAlpha(a);</span>
+<span class="fc" id="L130">    }</span>
+
+    /// The same wash with no line, for an empty place a press would fill.
+    static void wash(Graphics g, int rgb, int x, int y, int w, int h, float level) {
+<span class="pc bpc" id="L134" title="5 of 6 branches missed.">        if (level &lt;= 0 || w &lt;= 0 || h &lt;= 0) {</span>
+<span class="fc" id="L135">            return;</span>
+        }
+<span class="nc" id="L137">        int a = g.getAlpha();</span>
+<span class="nc" id="L138">        g.setColor(rgb);</span>
+<span class="nc" id="L139">        g.setAlpha(Math.round(a * 0.09f * level));</span>
+<span class="nc" id="L140">        g.fillRect(x, y, w, h);</span>
+<span class="nc" id="L141">        g.setAlpha(a);</span>
+<span class="nc" id="L142">    }</span>
+
+    /// The longest start of `text` that fits `width`, ending in an ellipsis
+    /// when anything was cut. Empty when not even that fits.
+    static String fit(String text, Font f, int width) {
+<span class="pc bpc" id="L147" title="2 of 6 branches missed.">        if (text == null || text.length() == 0 || width &lt;= 0) {</span>
+<span class="fc" id="L148">            return &quot;&quot;;</span>
+        }
+<span class="fc bfc" id="L150" title="All 2 branches covered.">        if (f.stringWidth(text) &lt;= width) {</span>
+<span class="fc" id="L151">            return text;</span>
+        }
+<span class="fc" id="L153">        int dots = f.stringWidth(&quot;...&quot;);</span>
+<span class="pc bpc" id="L154" title="1 of 2 branches missed.">        if (dots &gt; width) {</span>
+<span class="nc" id="L155">            return &quot;&quot;;</span>
+        }
+<span class="fc" id="L157">        int lo = 0;</span>
+<span class="fc" id="L158">        int hi = text.length();</span>
+<span class="fc bfc" id="L159" title="All 2 branches covered.">        while (lo &lt; hi) {</span>
+<span class="fc" id="L160">            int mid = (lo + hi + 1) / 2;</span>
+<span class="fc bfc" id="L161" title="All 2 branches covered.">            if (f.substringWidth(text, 0, mid) + dots &lt;= width) {</span>
+<span class="fc" id="L162">                lo = mid;</span>
+            } else {
+<span class="fc" id="L164">                hi = mid - 1;</span>
+            }
+<span class="fc" id="L166">        }</span>
+<span class="pc bpc" id="L167" title="1 of 2 branches missed.">        return lo == 0 ? &quot;&quot; : text.substring(0, lo) + &quot;...&quot;;</span>
+    }
+
+    /// The colour a style's lines are drawn over. A grid style usually has
+    /// no background of its own, and the colour a theme leaves in a
+    /// transparent one is black: mixed with that, a pale line came out
+    /// nearly black. What is under such a grid is the component.
+    static int under(Style st) {
+<span class="pc bpc" id="L175" title="1 of 2 branches missed.">        if ((st.getBgTransparency() &amp; 0xff) == 0) {</span>
+<span class="fc" id="L176">            return style(&quot;Scheduler&quot;).getBgColor();</span>
+        }
+<span class="nc" id="L178">        return st.getBgColor();</span>
+    }
+
+    /// A line of a grid, as strong as `amount` of 255.
+    static int line(Style grid, int amount) {
+<span class="fc" id="L183">        return mix(under(grid), grid.getFgColor(), amount);</span>
+    }
+
+    /// Mixes two RGB colours: 0 is all `a`, 255 all `b`.
+    static int mix(int a, int b, int amount) {
+<span class="fc" id="L188">        int inv = 255 - amount;</span>
+<span class="fc" id="L189">        int r = (((a &gt;&gt; 16) &amp; 0xff) * inv + ((b &gt;&gt; 16) &amp; 0xff) * amount) / 255;</span>
+<span class="fc" id="L190">        int gr = (((a &gt;&gt; 8) &amp; 0xff) * inv + ((b &gt;&gt; 8) &amp; 0xff) * amount) / 255;</span>
+<span class="fc" id="L191">        int bl = ((a &amp; 0xff) * inv + (b &amp; 0xff) * amount) / 255;</span>
+<span class="fc" id="L192">        return (r &lt;&lt; 16) | (gr &lt;&lt; 8) | bl;</span>
+    }
+
+    /// Black or white, whichever reads on `rgb`.
+    static int textOn(int rgb) {
+<span class="nc" id="L197">        int lum = (((rgb &gt;&gt; 16) &amp; 0xff) * 299 + ((rgb &gt;&gt; 8) &amp; 0xff) * 587 + (rgb &amp; 0xff) * 114) / 1000;</span>
+<span class="nc bnc" id="L198" title="All 2 branches missed.">        return lum &gt; 150 ? 0x1c1b1f : 0xffffff;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

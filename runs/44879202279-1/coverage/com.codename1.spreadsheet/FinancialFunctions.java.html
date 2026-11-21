@@ -1,0 +1,492 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>FinancialFunctions.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.spreadsheet</a> &gt; <span class="el_source">FinancialFunctions.java</span></div><h1>FinancialFunctions.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.spreadsheet;
+
+import com.codename1.util.MathUtil;
+
+/// The financial functions: loans and annuities, cash flows and depreciation.
+final class FinancialFunctions {
+    static final String SCALAR_NAMES = &quot;CUMIPMT CUMPRINC DB DDB DOLLARDE DOLLARFR EFFECT FV IPMT ISPMT NOMINAL NPER&quot;
+            + &quot; PDURATION PMT PPMT PV RATE RRI SLN SYD VDB&quot;;
+
+    static final String RANGE_NAMES = &quot;FVSCHEDULE IRR MIRR NPV XIRR XNPV&quot;;
+
+    private FinancialFunctions() {
+    }
+
+    private static Double d(double v) {
+<span class="fc" id="L38">        return Double.valueOf(v);</span>
+    }
+
+    private static double pow(double x, double y) {
+<span class="fc" id="L42">        return Evaluator.power(x, y);</span>
+    }
+
+    static double pmt(double rate, double nper, double pv, double fv, double type) {
+<span class="fc bfc" id="L46" title="All 2 branches covered.">        if (nper == 0) {</span>
+<span class="fc" id="L47">            throw EvalError.NUM;</span>
+        }
+<span class="fc bfc" id="L49" title="All 2 branches covered.">        if (rate == 0) {</span>
+<span class="fc" id="L50">            return -(pv + fv) / nper;</span>
+        }
+<span class="fc" id="L52">        double f = pow(1 + rate, nper);</span>
+<span class="fc" id="L53">        return -(rate * (pv * f + fv)) / ((1 + rate * type) * (f - 1));</span>
+    }
+
+    static double fv(double rate, double nper, double pmt, double pv, double type) {
+<span class="fc bfc" id="L57" title="All 2 branches covered.">        if (rate == 0) {</span>
+<span class="fc" id="L58">            return -(pv + pmt * nper);</span>
+        }
+<span class="fc" id="L60">        double f = pow(1 + rate, nper);</span>
+<span class="fc" id="L61">        return -(pv * f + pmt * (1 + rate * type) * (f - 1) / rate);</span>
+    }
+
+    private static double ipmt(double rate, double per, double nper, double pv, double fv, double type) {
+<span class="pc bpc" id="L65" title="1 of 4 branches missed.">        if (per &lt; 1 || per &gt; nper) {</span>
+<span class="fc" id="L66">            throw EvalError.NUM;</span>
+        }
+<span class="fc" id="L68">        double payment = pmt(rate, nper, pv, fv, type);</span>
+<span class="fc bfc" id="L69" title="All 2 branches covered.">        if (per == 1) {</span>
+<span class="pc bpc" id="L70" title="1 of 2 branches missed.">            return type != 0 ? 0 : -pv * rate;</span>
+        }
+        // the balance after the payments before this one
+<span class="pc bpc" id="L73" title="1 of 2 branches missed.">        double balance = type != 0 ? fv(rate, per - 2, payment, pv, 1) - payment : fv(rate, per - 1, payment, pv, 0);</span>
+<span class="fc" id="L74">        return balance * rate;</span>
+    }
+
+    static Object call(String name, Evaluator ev, Object[] a) {
+<span class="pc bpc" id="L78" title="1 of 25 branches missed.">        switch (Functions.index(SWITCH_1, name)) {</span>
+            case 0: // PMT
+<span class="fc" id="L80">                return d(pmt(Evaluator.num(a, 0), Evaluator.num(a, 1), Evaluator.num(a, 2), Evaluator.num(a, 3, 0),</span>
+<span class="fc bfc" id="L81" title="All 2 branches covered.">                        Evaluator.num(a, 4, 0) != 0 ? 1 : 0));</span>
+            case 1: // FV
+<span class="fc" id="L83">                return d(fv(Evaluator.num(a, 0), Evaluator.num(a, 1), Evaluator.num(a, 2), Evaluator.num(a, 3, 0),</span>
+<span class="fc bfc" id="L84" title="All 2 branches covered.">                        Evaluator.num(a, 4, 0) != 0 ? 1 : 0));</span>
+            case 2: { // PV
+<span class="fc" id="L86">                double rate = Evaluator.num(a, 0);</span>
+<span class="fc" id="L87">                double nper = Evaluator.num(a, 1);</span>
+<span class="fc" id="L88">                double payment = Evaluator.num(a, 2);</span>
+<span class="fc" id="L89">                double future = Evaluator.num(a, 3, 0);</span>
+<span class="fc bfc" id="L90" title="All 2 branches covered.">                double type = Evaluator.num(a, 4, 0) != 0 ? 1 : 0;</span>
+<span class="fc bfc" id="L91" title="All 2 branches covered.">                if (rate == 0) {</span>
+<span class="fc" id="L92">                    return d(-(future + payment * nper));</span>
+                }
+<span class="fc" id="L94">                double f = pow(1 + rate, nper);</span>
+<span class="fc" id="L95">                return d(-(future + payment * (1 + rate * type) * (f - 1) / rate) / f);</span>
+            }
+            case 3: { // NPER
+<span class="fc" id="L98">                double rate = Evaluator.num(a, 0);</span>
+<span class="fc" id="L99">                double payment = Evaluator.num(a, 1);</span>
+<span class="fc" id="L100">                double pv = Evaluator.num(a, 2);</span>
+<span class="fc" id="L101">                double future = Evaluator.num(a, 3, 0);</span>
+<span class="fc bfc" id="L102" title="All 2 branches covered.">                double type = Evaluator.num(a, 4, 0) != 0 ? 1 : 0;</span>
+<span class="fc bfc" id="L103" title="All 2 branches covered.">                if (rate == 0) {</span>
+<span class="fc bfc" id="L104" title="All 2 branches covered.">                    if (payment == 0) {</span>
+<span class="fc" id="L105">                        throw EvalError.NUM;</span>
+                    }
+<span class="fc" id="L107">                    return d(-(pv + future) / payment);</span>
+                }
+<span class="fc" id="L109">                double k = payment * (1 + rate * type) / rate;</span>
+<span class="fc" id="L110">                double ratio = (k - future) / (k + pv);</span>
+<span class="fc bfc" id="L111" title="All 2 branches covered.">                if (ratio &lt;= 0) {</span>
+<span class="fc" id="L112">                    throw EvalError.NUM;</span>
+                }
+<span class="fc" id="L114">                return d(MathUtil.log(ratio) / MathUtil.log(1 + rate));</span>
+            }
+            case 4: { // RATE
+<span class="fc" id="L117">                double nper = Evaluator.num(a, 0);</span>
+<span class="fc" id="L118">                double payment = Evaluator.num(a, 1);</span>
+<span class="fc" id="L119">                double pv = Evaluator.num(a, 2);</span>
+<span class="fc" id="L120">                double future = Evaluator.num(a, 3, 0);</span>
+<span class="fc bfc" id="L121" title="All 2 branches covered.">                double type = Evaluator.num(a, 4, 0) != 0 ? 1 : 0;</span>
+<span class="fc" id="L122">                double rate = Evaluator.num(a, 5, 0.1);</span>
+                // no interest at all is an answer the search below cannot land on exactly
+<span class="fc bfc" id="L124" title="All 2 branches covered.">                if (Math.abs(fv(0, nper, payment, pv, type) - future) &lt;= 1e-12 * (Math.abs(pv) + Math.abs(payment * nper) + Math.abs(future))) {</span>
+<span class="fc" id="L125">                    return d(0);</span>
+                }
+<span class="fc bfc" id="L127" title="All 2 branches covered.">                for (int i = 0; i &lt; 100; i++) {</span>
+<span class="fc" id="L128">                    double y = fv(rate, nper, payment, pv, type) - future;</span>
+<span class="fc" id="L129">                    double h = Math.max(1e-7, Math.abs(rate) * 1e-7);</span>
+<span class="fc" id="L130">                    double slope = (fv(rate + h, nper, payment, pv, type) - future - y) / h;</span>
+<span class="pc bpc" id="L131" title="2 of 6 branches missed.">                    if (slope == 0 || Double.isNaN(slope) || Double.isNaN(y)) {</span>
+<span class="nc" id="L132">                        break;</span>
+                    }
+<span class="fc" id="L134">                    double next = rate - y / slope;</span>
+<span class="fc bfc" id="L135" title="All 2 branches covered.">                    if (Math.abs(next - rate) &lt; 1e-11) {</span>
+<span class="fc" id="L136">                        return d(next);</span>
+                    }
+<span class="fc" id="L138">                    rate = next;</span>
+                }
+<span class="fc" id="L140">                throw EvalError.NUM;</span>
+            }
+            case 5: // IPMT
+<span class="fc" id="L143">                return d(ipmt(Evaluator.num(a, 0), Evaluator.num(a, 1), Evaluator.num(a, 2), Evaluator.num(a, 3),</span>
+<span class="pc bpc" id="L144" title="1 of 2 branches missed.">                        Evaluator.num(a, 4, 0), Evaluator.num(a, 5, 0) != 0 ? 1 : 0));</span>
+            case 6: { // PPMT
+<span class="fc" id="L146">                double rate = Evaluator.num(a, 0);</span>
+<span class="fc" id="L147">                double nper = Evaluator.num(a, 2);</span>
+<span class="fc" id="L148">                double pv = Evaluator.num(a, 3);</span>
+<span class="fc" id="L149">                double future = Evaluator.num(a, 4, 0);</span>
+<span class="fc bfc" id="L150" title="All 2 branches covered.">                double type = Evaluator.num(a, 5, 0) != 0 ? 1 : 0;</span>
+<span class="fc" id="L151">                return d(pmt(rate, nper, pv, future, type) - ipmt(rate, Evaluator.num(a, 1), nper, pv, future, type));</span>
+            }
+            case 7: // CUMIPMT
+            case 8: { // CUMPRINC
+<span class="fc" id="L155">                double rate = Evaluator.num(a, 0);</span>
+<span class="fc" id="L156">                double nper = Evaluator.num(a, 1);</span>
+<span class="fc" id="L157">                double pv = Evaluator.num(a, 2);</span>
+<span class="fc" id="L158">                int start = Evaluator.integer(a, 3);</span>
+<span class="fc" id="L159">                int end = Evaluator.integer(a, 4);</span>
+<span class="fc" id="L160">                double type = Evaluator.num(a, 5);</span>
+<span class="pc bpc" id="L161" title="9 of 16 branches missed.">                if (rate &lt;= 0 || nper &lt;= 0 || pv &lt;= 0 || start &lt; 1 || end &lt; start || end &gt; nper</span>
+                        || type != 0 &amp;&amp; type != 1) {
+<span class="nc" id="L163">                    throw EvalError.NUM;</span>
+                }
+<span class="fc" id="L165">                double payment = pmt(rate, nper, pv, 0, type);</span>
+<span class="fc" id="L166">                double total = 0;</span>
+<span class="fc bfc" id="L167" title="All 2 branches covered.">                for (int per = start; per &lt;= end; per++) {</span>
+<span class="fc" id="L168">                    double interest = ipmt(rate, per, nper, pv, 0, type);</span>
+<span class="fc bfc" id="L169" title="All 2 branches covered.">                    total += &quot;CUMIPMT&quot;.equals(name) ? interest : payment - interest;</span>
+                }
+<span class="fc" id="L171">                return d(total);</span>
+            }
+            case 9: { // ISPMT
+<span class="fc" id="L174">                double nper = Evaluator.num(a, 2);</span>
+<span class="fc bfc" id="L175" title="All 2 branches covered.">                if (nper == 0) {</span>
+<span class="fc" id="L176">                    throw EvalError.DIV0;</span>
+                }
+<span class="fc" id="L178">                return d(-Evaluator.num(a, 3) * Evaluator.num(a, 0) * (1 - Evaluator.num(a, 1) / nper));</span>
+            }
+            case 10: { // SLN
+<span class="fc" id="L181">                double life = Evaluator.num(a, 2);</span>
+<span class="fc bfc" id="L182" title="All 2 branches covered.">                if (life == 0) {</span>
+<span class="fc" id="L183">                    throw EvalError.DIV0;</span>
+                }
+<span class="fc" id="L185">                return d((Evaluator.num(a, 0) - Evaluator.num(a, 1)) / life);</span>
+            }
+            case 11: { // SYD
+<span class="fc" id="L188">                double life = Evaluator.num(a, 2);</span>
+<span class="fc" id="L189">                double per = Evaluator.num(a, 3);</span>
+<span class="fc bfc" id="L190" title="All 6 branches covered.">                if (life &lt;= 0 || per &lt; 1 || per &gt; life) {</span>
+<span class="fc" id="L191">                    throw EvalError.NUM;</span>
+                }
+<span class="fc" id="L193">                return d((Evaluator.num(a, 0) - Evaluator.num(a, 1)) * (life - per + 1) * 2 / (life * (life + 1)));</span>
+            }
+            case 12: { // DB
+<span class="fc" id="L196">                double cost = Evaluator.num(a, 0);</span>
+<span class="fc" id="L197">                double salvage = Evaluator.num(a, 1);</span>
+<span class="fc" id="L198">                int life = Evaluator.integer(a, 2);</span>
+<span class="fc" id="L199">                int period = Evaluator.integer(a, 3);</span>
+<span class="fc" id="L200">                int month = Evaluator.integer(a, 4, 12);</span>
+<span class="pc bpc" id="L201" title="5 of 16 branches missed.">                if (cost &lt; 0 || salvage &lt; 0 || life &lt;= 0 || period &lt; 1 || month &lt; 1 || month &gt; 12</span>
+                        || period &gt; life + (month &lt; 12 ? 1 : 0)) {
+<span class="fc" id="L203">                    throw EvalError.NUM;</span>
+                }
+<span class="pc bpc" id="L205" title="1 of 2 branches missed.">                if (cost == 0) {</span>
+<span class="nc" id="L206">                    return d(0);</span>
+                }
+<span class="fc" id="L208">                double rate = Values.round(1 - pow(salvage / cost, 1.0 / life), 3);</span>
+<span class="fc" id="L209">                double total = cost * rate * month / 12;</span>
+<span class="fc" id="L210">                double current = total;</span>
+<span class="fc bfc" id="L211" title="All 2 branches covered.">                for (int p = 2; p &lt;= period; p++) {</span>
+<span class="fc bfc" id="L212" title="All 2 branches covered.">                    if (p == life + 1) {</span>
+<span class="fc" id="L213">                        current = (cost - total) * rate * (12 - month) / 12;</span>
+                    } else {
+<span class="fc" id="L215">                        current = (cost - total) * rate;</span>
+                    }
+<span class="fc" id="L217">                    total += current;</span>
+                }
+<span class="fc" id="L219">                return d(current);</span>
+            }
+            case 13: { // DDB
+<span class="fc" id="L222">                double cost = Evaluator.num(a, 0);</span>
+<span class="fc" id="L223">                double salvage = Evaluator.num(a, 1);</span>
+<span class="fc" id="L224">                double life = Evaluator.num(a, 2);</span>
+<span class="fc" id="L225">                double period = Evaluator.num(a, 3);</span>
+<span class="fc" id="L226">                double factor = Evaluator.num(a, 4, 2);</span>
+<span class="pc bpc" id="L227" title="4 of 12 branches missed.">                if (cost &lt; 0 || salvage &lt; 0 || life &lt;= 0 || period &lt; 1 || period &gt; life || factor &lt;= 0) {</span>
+<span class="fc" id="L228">                    throw EvalError.NUM;</span>
+                }
+<span class="fc" id="L230">                double book = cost;</span>
+<span class="fc" id="L231">                double current = 0;</span>
+<span class="fc bfc" id="L232" title="All 2 branches covered.">                if (period &gt; 1200) {</span>
+                    // A life of centuries in months is still a few hundred periods; past that
+                    // the period count comes from the file and is not looped to. The book
+                    // value falls geometrically until it meets the salvage value and stays.
+<span class="fc" id="L236">                    double rate = Math.min(factor / life, 1);</span>
+<span class="fc" id="L237">                    book = Math.max(cost * MathUtil.pow(1 - rate, Math.floor(period) - 1), salvage);</span>
+<span class="pc bpc" id="L238" title="1 of 2 branches missed.">                    if (cost &lt;= salvage) {</span>
+<span class="fc" id="L239">                        book = cost;</span>
+                    }
+<span class="fc" id="L241">                    return d(Math.min(book * factor / life, Math.max(0, book - salvage)));</span>
+                }
+<span class="fc bfc" id="L243" title="All 2 branches covered.">                for (int p = 1; p &lt;= (int) period; p++) {</span>
+<span class="fc" id="L244">                    current = Math.min(book * factor / life, Math.max(0, book - salvage));</span>
+<span class="fc" id="L245">                    book -= current;</span>
+                }
+<span class="fc" id="L247">                return d(current);</span>
+            }
+            case 14: // VDB
+<span class="fc" id="L250">                return d(vdb(a));</span>
+            case 15: { // EFFECT
+<span class="fc" id="L252">                double nominal = Evaluator.num(a, 0);</span>
+<span class="fc" id="L253">                double periods = Math.floor(Evaluator.num(a, 1));</span>
+<span class="fc bfc" id="L254" title="All 4 branches covered.">                if (nominal &lt;= 0 || periods &lt; 1) {</span>
+<span class="fc" id="L255">                    throw EvalError.NUM;</span>
+                }
+<span class="fc" id="L257">                return d(pow(1 + nominal / periods, periods) - 1);</span>
+            }
+            case 16: { // NOMINAL
+<span class="fc" id="L260">                double effective = Evaluator.num(a, 0);</span>
+<span class="fc" id="L261">                double periods = Math.floor(Evaluator.num(a, 1));</span>
+<span class="fc bfc" id="L262" title="All 4 branches covered.">                if (effective &lt;= 0 || periods &lt; 1) {</span>
+<span class="fc" id="L263">                    throw EvalError.NUM;</span>
+                }
+<span class="fc" id="L265">                return d((pow(1 + effective, 1 / periods) - 1) * periods);</span>
+            }
+            case 17: { // RRI
+<span class="fc" id="L268">                double nper = Evaluator.num(a, 0);</span>
+<span class="fc" id="L269">                double pv = Evaluator.num(a, 1);</span>
+<span class="pc bpc" id="L270" title="1 of 4 branches missed.">                if (nper &lt;= 0 || pv == 0) {</span>
+<span class="fc" id="L271">                    throw EvalError.NUM;</span>
+                }
+<span class="fc" id="L273">                return d(pow(Evaluator.num(a, 2) / pv, 1 / nper) - 1);</span>
+            }
+            case 18: { // PDURATION
+<span class="fc" id="L276">                double rate = Evaluator.num(a, 0);</span>
+<span class="fc" id="L277">                double pv = Evaluator.num(a, 1);</span>
+<span class="fc" id="L278">                double future = Evaluator.num(a, 2);</span>
+<span class="fc bfc" id="L279" title="All 6 branches covered.">                if (rate &lt;= 0 || pv &lt;= 0 || future &lt;= 0) {</span>
+<span class="fc" id="L280">                    throw EvalError.NUM;</span>
+                }
+<span class="fc" id="L282">                return d((MathUtil.log(future) - MathUtil.log(pv)) / MathUtil.log(1 + rate));</span>
+            }
+            case 19: // DOLLARDE
+            case 20: { // DOLLARFR
+<span class="fc" id="L286">                double x = Evaluator.num(a, 0);</span>
+<span class="fc" id="L287">                double fraction = Math.floor(Evaluator.num(a, 1));</span>
+<span class="fc bfc" id="L288" title="All 2 branches covered.">                if (fraction &lt; 0) {</span>
+<span class="fc" id="L289">                    throw EvalError.NUM;</span>
+                }
+<span class="pc bpc" id="L291" title="1 of 2 branches missed.">                if (fraction == 0) {</span>
+<span class="nc" id="L292">                    throw EvalError.DIV0;</span>
+                }
+<span class="fc bfc" id="L294" title="All 2 branches covered.">                double whole = x &lt; 0 ? Math.ceil(x) : Math.floor(x);</span>
+<span class="fc" id="L295">                double scale = Values.pow10((int) Math.ceil(MathUtil.log10(fraction)));</span>
+<span class="fc bfc" id="L296" title="All 2 branches covered.">                if (&quot;DOLLARDE&quot;.equals(name)) {</span>
+<span class="fc" id="L297">                    return d(whole + (x - whole) * scale / fraction);</span>
+                }
+<span class="fc" id="L299">                return d(whole + (x - whole) * fraction / scale);</span>
+            }
+            case 21: { // NPV
+<span class="fc" id="L302">                double rate = ev.scalarNum(a, 0);</span>
+<span class="fc" id="L303">                DoubleList flows = ev.numbers(a, 1);</span>
+<span class="fc" id="L304">                double total = 0;</span>
+<span class="fc" id="L305">                double f = 1;</span>
+<span class="fc bfc" id="L306" title="All 2 branches covered.">                for (int i = 0; i &lt; flows.size; i++) {</span>
+<span class="fc" id="L307">                    f *= 1 + rate;</span>
+<span class="fc" id="L308">                    total += flows.data[i] / f;</span>
+                }
+<span class="fc" id="L310">                return d(total);</span>
+            }
+            case 22: { // FVSCHEDULE
+<span class="fc" id="L313">                DoubleList rates = new DoubleList();</span>
+<span class="fc" id="L314">                ev.numbers(Evaluator.arg(a, 1), rates, false);</span>
+<span class="fc" id="L315">                double v = ev.scalarNum(a, 0);</span>
+<span class="fc bfc" id="L316" title="All 2 branches covered.">                for (int i = 0; i &lt; rates.size; i++) {</span>
+<span class="fc" id="L317">                    v *= 1 + rates.data[i];</span>
+                }
+<span class="fc" id="L319">                return d(v);</span>
+            }
+            case 23: { // IRR
+<span class="fc" id="L322">                DoubleList flows = new DoubleList();</span>
+<span class="fc" id="L323">                ev.numbers(Evaluator.arg(a, 0), flows, false);</span>
+<span class="fc" id="L324">                double[] times = new double[flows.size];</span>
+<span class="fc bfc" id="L325" title="All 2 branches covered.">                for (int i = 0; i &lt; times.length; i++) {</span>
+<span class="fc" id="L326">                    times[i] = i;</span>
+                }
+<span class="fc" id="L328">                return d(solveRate(flows, times, ev.scalarNum(a, 1, 0.1)));</span>
+            }
+            case 24: { // MIRR
+<span class="fc" id="L331">                DoubleList flows = new DoubleList();</span>
+<span class="fc" id="L332">                ev.numbers(Evaluator.arg(a, 0), flows, false);</span>
+<span class="fc" id="L333">                double finance = ev.scalarNum(a, 1);</span>
+<span class="fc" id="L334">                double reinvest = ev.scalarNum(a, 2);</span>
+<span class="fc" id="L335">                int n = flows.size;</span>
+<span class="fc" id="L336">                double positive = 0;</span>
+<span class="fc" id="L337">                double negative = 0;</span>
+<span class="fc bfc" id="L338" title="All 2 branches covered.">                for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc" id="L339">                    double v = flows.data[i];</span>
+<span class="fc bfc" id="L340" title="All 2 branches covered.">                    if (v &gt; 0) {</span>
+<span class="fc" id="L341">                        positive += v * pow(1 + reinvest, n - 1 - i);</span>
+                    } else {
+<span class="fc" id="L343">                        negative += v / pow(1 + finance, i);</span>
+                    }
+                }
+<span class="pc bpc" id="L346" title="2 of 6 branches missed.">                if (positive == 0 || negative == 0 || n &lt; 2) {</span>
+<span class="fc" id="L347">                    throw EvalError.DIV0;</span>
+                }
+<span class="fc" id="L349">                return d(pow(-positive / negative, 1.0 / (n - 1)) - 1);</span>
+            }
+            case 25: // XNPV
+            case 26: { // XIRR
+<span class="fc" id="L353">                boolean npv = &quot;XNPV&quot;.equals(name);</span>
+<span class="fc" id="L354">                DoubleList flows = new DoubleList();</span>
+<span class="fc" id="L355">                DoubleList dates = new DoubleList();</span>
+<span class="fc bfc" id="L356" title="All 2 branches covered.">                ev.numbers(Evaluator.arg(a, npv ? 1 : 0), flows, false);</span>
+<span class="fc bfc" id="L357" title="All 2 branches covered.">                ev.numbers(Evaluator.arg(a, npv ? 2 : 1), dates, false);</span>
+<span class="pc bpc" id="L358" title="1 of 4 branches missed.">                if (flows.size != dates.size || flows.size == 0) {</span>
+<span class="fc" id="L359">                    throw EvalError.NUM;</span>
+                }
+<span class="fc" id="L361">                double[] times = new double[dates.size];</span>
+<span class="fc bfc" id="L362" title="All 2 branches covered.">                for (int i = 0; i &lt; times.length; i++) {</span>
+<span class="fc" id="L363">                    times[i] = (Math.floor(dates.data[i]) - Math.floor(dates.data[0])) / 365;</span>
+<span class="pc bpc" id="L364" title="1 of 2 branches missed.">                    if (times[i] &lt; 0) {</span>
+<span class="nc" id="L365">                        throw EvalError.NUM;</span>
+                    }
+                }
+<span class="fc bfc" id="L368" title="All 2 branches covered.">                if (npv) {</span>
+<span class="fc" id="L369">                    double rate = ev.scalarNum(a, 0);</span>
+<span class="pc bpc" id="L370" title="1 of 2 branches missed.">                    if (rate &lt;= -1) {</span>
+<span class="nc" id="L371">                        throw EvalError.NUM;</span>
+                    }
+<span class="fc" id="L373">                    return d(present(flows, times, rate));</span>
+                }
+<span class="fc" id="L375">                return d(solveRate(flows, times, ev.scalarNum(a, 2, 0.1)));</span>
+            }
+            default:
+<span class="nc" id="L378">                return CellError.NAME;</span>
+        }
+    }
+
+    private static double present(DoubleList flows, double[] times, double rate) {
+<span class="fc" id="L383">        double total = 0;</span>
+<span class="fc bfc" id="L384" title="All 2 branches covered.">        for (int i = 0; i &lt; flows.size; i++) {</span>
+<span class="fc" id="L385">            total += flows.data[i] / MathUtil.pow(1 + rate, times[i]);</span>
+        }
+<span class="fc" id="L387">        return total;</span>
+    }
+
+    /// The rate at which cash flows are worth nothing today: Newton's method from the guess,
+    /// then bisection if that wanders off.
+    private static double solveRate(DoubleList flows, double[] times, double guess) {
+<span class="fc" id="L393">        boolean positive = false;</span>
+<span class="fc" id="L394">        boolean negative = false;</span>
+<span class="fc bfc" id="L395" title="All 2 branches covered.">        for (int i = 0; i &lt; flows.size; i++) {</span>
+<span class="fc bfc" id="L396" title="All 2 branches covered.">            positive |= flows.data[i] &gt; 0;</span>
+<span class="fc bfc" id="L397" title="All 2 branches covered.">            negative |= flows.data[i] &lt; 0;</span>
+        }
+<span class="fc bfc" id="L399" title="All 4 branches covered.">        if (!positive || !negative) {</span>
+<span class="fc" id="L400">            throw EvalError.NUM;</span>
+        }
+<span class="fc" id="L402">        double rate = guess;</span>
+<span class="pc bpc" id="L403" title="1 of 2 branches missed.">        for (int i = 0; i &lt; 60; i++) {</span>
+<span class="pc bpc" id="L404" title="1 of 2 branches missed.">            if (rate &lt;= -1) {</span>
+<span class="nc" id="L405">                break;</span>
+            }
+<span class="fc" id="L407">            double y = present(flows, times, rate);</span>
+<span class="fc" id="L408">            double slope = 0;</span>
+<span class="fc bfc" id="L409" title="All 2 branches covered.">            for (int k = 0; k &lt; flows.size; k++) {</span>
+<span class="fc" id="L410">                slope -= times[k] * flows.data[k] / MathUtil.pow(1 + rate, times[k] + 1);</span>
+            }
+<span class="pc bpc" id="L412" title="3 of 6 branches missed.">            if (slope == 0 || Double.isNaN(y) || Double.isNaN(slope)) {</span>
+<span class="nc" id="L413">                break;</span>
+            }
+<span class="fc" id="L415">            double next = rate - y / slope;</span>
+<span class="fc bfc" id="L416" title="All 2 branches covered.">            if (Math.abs(next - rate) &lt; 1e-12) {</span>
+<span class="fc" id="L417">                return next;</span>
+            }
+<span class="fc" id="L419">            rate = next;</span>
+        }
+<span class="nc" id="L421">        double lo = -0.999999;</span>
+<span class="nc" id="L422">        double hi = 1;</span>
+<span class="nc" id="L423">        double flo = present(flows, times, lo);</span>
+<span class="nc" id="L424">        double fhi = present(flows, times, hi);</span>
+<span class="nc bnc" id="L425" title="All 4 branches missed.">        for (int i = 0; i &lt; 60 &amp;&amp; flo * fhi &gt; 0; i++) {</span>
+<span class="nc" id="L426">            hi *= 2;</span>
+<span class="nc" id="L427">            fhi = present(flows, times, hi);</span>
+        }
+<span class="nc bnc" id="L429" title="All 2 branches missed.">        if (flo * fhi &gt; 0) {</span>
+<span class="nc" id="L430">            throw EvalError.NUM;</span>
+        }
+<span class="nc bnc" id="L432" title="All 2 branches missed.">        for (int i = 0; i &lt; 200; i++) {</span>
+<span class="nc" id="L433">            double mid = (lo + hi) / 2;</span>
+<span class="nc" id="L434">            double fm = present(flows, times, mid);</span>
+<span class="nc bnc" id="L435" title="All 2 branches missed.">            if (flo * fm &lt;= 0) {</span>
+<span class="nc" id="L436">                hi = mid;</span>
+            } else {
+<span class="nc" id="L438">                lo = mid;</span>
+<span class="nc" id="L439">                flo = fm;</span>
+            }
+        }
+<span class="nc" id="L442">        return (lo + hi) / 2;</span>
+    }
+
+    private static double vdb(Object[] a) {
+<span class="fc" id="L446">        double cost = Evaluator.num(a, 0);</span>
+<span class="fc" id="L447">        double salvage = Evaluator.num(a, 1);</span>
+<span class="fc" id="L448">        double life = Evaluator.num(a, 2);</span>
+<span class="fc" id="L449">        double start = Evaluator.num(a, 3);</span>
+<span class="fc" id="L450">        double end = Evaluator.num(a, 4);</span>
+<span class="fc" id="L451">        double factor = Evaluator.num(a, 5, 2);</span>
+<span class="fc" id="L452">        boolean noSwitch = Evaluator.bool(a, 6, false);</span>
+<span class="pc bpc" id="L453" title="6 of 14 branches missed.">        if (cost &lt; 0 || salvage &lt; 0 || life &lt;= 0 || start &lt; 0 || end &lt; start || end &gt; life || factor &lt;= 0) {</span>
+<span class="fc" id="L454">            throw EvalError.NUM;</span>
+        }
+<span class="fc" id="L456">        double total = 0;</span>
+<span class="fc" id="L457">        double book = cost;</span>
+<span class="fc" id="L458">        boolean straight = false;</span>
+<span class="fc" id="L459">        double line = 0;</span>
+<span class="fc" id="L460">        int last = (int) Math.ceil(end);</span>
+<span class="fc bfc" id="L461" title="All 2 branches covered.">        for (int p = 1; p &lt;= last; p++) {</span>
+            double dep;
+<span class="pc bpc" id="L463" title="1 of 2 branches missed.">            if (straight) {</span>
+<span class="nc" id="L464">                dep = line;</span>
+            } else {
+<span class="fc" id="L466">                dep = Math.min(book * factor / life, Math.max(0, book - salvage));</span>
+<span class="fc" id="L467">                double remaining = life - p + 1;</span>
+<span class="pc bpc" id="L468" title="1 of 2 branches missed.">                double sl = remaining &lt;= 0 ? 0 : (book - salvage) / remaining;</span>
+<span class="pc bpc" id="L469" title="1 of 4 branches missed.">                if (!noSwitch &amp;&amp; sl &gt; dep) {</span>
+<span class="nc" id="L470">                    straight = true;</span>
+<span class="nc" id="L471">                    line = sl;</span>
+<span class="nc" id="L472">                    dep = sl;</span>
+                }
+            }
+<span class="fc" id="L475">            dep = Math.min(dep, Math.max(0, book - salvage));</span>
+            // the part of this period that lies between start and end
+<span class="fc" id="L477">            double from = Math.max(start, p - 1);</span>
+<span class="fc" id="L478">            double to = Math.min(end, p);</span>
+<span class="fc bfc" id="L479" title="All 2 branches covered.">            if (to &gt; from) {</span>
+<span class="fc" id="L480">                total += dep * (to - from);</span>
+            }
+<span class="fc" id="L482">            book -= dep;</span>
+        }
+<span class="fc" id="L484">        return total;</span>
+    }
+
+<span class="fc" id="L487">    private static final java.util.HashMap&lt;String, Integer&gt; SWITCH_1 = Functions.switchTable(</span>
+            &quot;PMT&quot;, &quot;FV&quot;, &quot;PV&quot;, &quot;NPER&quot;, &quot;RATE&quot;, &quot;IPMT&quot;, &quot;PPMT&quot;, &quot;CUMIPMT&quot;, &quot;CUMPRINC&quot;, &quot;ISPMT&quot;,
+            &quot;SLN&quot;, &quot;SYD&quot;, &quot;DB&quot;, &quot;DDB&quot;, &quot;VDB&quot;, &quot;EFFECT&quot;, &quot;NOMINAL&quot;, &quot;RRI&quot;, &quot;PDURATION&quot;, &quot;DOLLARDE&quot;,
+            &quot;DOLLARFR&quot;, &quot;NPV&quot;, &quot;FVSCHEDULE&quot;, &quot;IRR&quot;, &quot;MIRR&quot;, &quot;XNPV&quot;, &quot;XIRR&quot;);
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

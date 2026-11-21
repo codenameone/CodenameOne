@@ -1,0 +1,200 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EvmRpc.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.crypto.rpc</a> &gt; <span class="el_source">EvmRpc.java</span></div><h1>EvmRpc.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008-2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.crypto.rpc;
+
+import com.codename1.security.Hash;
+import com.codename1.crypto.UInt256;
+import com.codename1.crypto.evm.Erc20;
+import com.codename1.crypto.evm.EvmAddress;
+import com.codename1.crypto.evm.EvmTransaction;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+/// An Ethereum JSON-RPC client, for any EVM chain: balances, nonces, fees, gas estimates,
+/// calls, broadcasting and receipts.
+///
+/// ```java
+/// EvmRpc rpc = new EvmRpc(new NetworkTransport(), &quot;https://ethereum-sepolia-rpc.publicnode.com&quot;);
+/// Wallet wallet = Wallet.fromMnemonic(Mnemonic.generate(128), &quot;&quot;);
+/// EvmAddress me = wallet.getEvmAddress(0, 0);
+/// EvmAddress to = EvmAddress.parse(&quot;0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed&quot;);
+/// UInt256 value = UInt256.parseUnits(&quot;0.01&quot;, 18);
+/// long nonce = rpc.getTransactionCount(me, &quot;pending&quot;);
+/// UInt256[] fees = rpc.suggestFees();
+/// EvmTransaction tx = EvmTransaction.eip1559(rpc.chainId(), nonce, fees[0], fees[1], 21000, to, value, null);
+/// String hash = rpc.sendRawTransaction(wallet.signEvmTransaction(tx, Wallet.evmPath(0, 0)));
+/// ```
+///
+/// Block tags are the node's: `latest`, `pending`, `safe`, `finalized`, or a quantity.
+@com.codename1.impl.SharedWithBackend
+public class EvmRpc extends JsonRpc {
+    /// A client for a node.
+    public EvmRpc(RpcTransport transport, String url) {
+<span class="fc" id="L56">        super(transport, url);</span>
+<span class="fc" id="L57">    }</span>
+
+    static UInt256 quantity(Object o, String what) throws IOException {
+<span class="pc bpc" id="L60" title="1 of 2 branches missed.">        if (o instanceof String) {</span>
+            try {
+<span class="fc" id="L62">                return UInt256.parse((String) o);</span>
+<span class="nc" id="L63">            } catch (IllegalArgumentException e) {</span>
+<span class="nc" id="L64">                throw new IOException(what + &quot;: not a quantity: &quot; + o, e);</span>
+            }
+        }
+<span class="nc" id="L67">        throw new IOException(what + &quot;: expected a quantity&quot;);</span>
+    }
+
+    static long smallQuantity(Object o, String what) throws IOException {
+        try {
+<span class="fc" id="L72">            return quantity(o, what).longValueExact();</span>
+<span class="nc" id="L73">        } catch (ArithmeticException e) {</span>
+<span class="nc" id="L74">            throw new IOException(what + &quot;: out of range&quot;, e);</span>
+        }
+    }
+
+    /// `eth_chainId`.
+    public long chainId() throws IOException {
+<span class="fc" id="L80">        return smallQuantity(call(&quot;eth_chainId&quot;), &quot;eth_chainId&quot;);</span>
+    }
+
+    /// `eth_blockNumber`.
+    public long blockNumber() throws IOException {
+<span class="nc" id="L85">        return smallQuantity(call(&quot;eth_blockNumber&quot;), &quot;eth_blockNumber&quot;);</span>
+    }
+
+    /// `eth_getBalance` in wei at a block tag.
+    public UInt256 getBalance(EvmAddress address, String block) throws IOException {
+<span class="fc" id="L90">        return quantity(call(&quot;eth_getBalance&quot;, address.toLowerCaseString(), block), &quot;eth_getBalance&quot;);</span>
+    }
+
+    /// The latest balance in wei.
+    public UInt256 getBalance(EvmAddress address) throws IOException {
+<span class="fc" id="L95">        return getBalance(address, &quot;latest&quot;);</span>
+    }
+
+    /// `eth_getTransactionCount`: the next nonce at a block tag; `pending` counts what is
+    /// queued in the node's pool.
+    public long getTransactionCount(EvmAddress address, String block) throws IOException {
+<span class="nc" id="L101">        return smallQuantity(call(&quot;eth_getTransactionCount&quot;, address.toLowerCaseString(), block),</span>
+                &quot;eth_getTransactionCount&quot;);
+    }
+
+    /// `eth_gasPrice` in wei.
+    public UInt256 gasPrice() throws IOException {
+<span class="nc" id="L107">        return quantity(call(&quot;eth_gasPrice&quot;), &quot;eth_gasPrice&quot;);</span>
+    }
+
+    /// `eth_maxPriorityFeePerGas` in wei.
+    public UInt256 maxPriorityFeePerGas() throws IOException {
+<span class="fc" id="L112">        return quantity(call(&quot;eth_maxPriorityFeePerGas&quot;), &quot;eth_maxPriorityFeePerGas&quot;);</span>
+    }
+
+    /// `eth_feeHistory`, as the node answers it.
+    public Map&lt;?, ?&gt; feeHistory(int blocks, String newestBlock, double[] rewardPercentiles) throws IOException {
+<span class="nc" id="L117">        List&lt;Object&gt; p = new ArrayList&lt;Object&gt;();</span>
+<span class="nc bnc" id="L118" title="All 2 branches missed.">        if (rewardPercentiles != null) {</span>
+<span class="nc bnc" id="L119" title="All 2 branches missed.">            for (double rewardPercentilesItem : rewardPercentiles) {</span>
+<span class="nc" id="L120">                p.add(Double.valueOf(rewardPercentilesItem));</span>
+            }
+        }
+<span class="nc" id="L123">        return asMap(call(&quot;eth_feeHistory&quot;, UInt256.valueOf(blocks).toQuantity(), newestBlock, p), &quot;eth_feeHistory&quot;);</span>
+    }
+
+    /// EIP-1559 fees for a transaction to be included soon: `{maxPriorityFeePerGas,
+    /// maxFeePerGas}`, the priority fee the node suggests and a fee cap of twice the latest base
+    /// fee plus it, which covers six full blocks of base-fee growth.
+    public UInt256[] suggestFees() throws IOException {
+<span class="fc" id="L130">        UInt256 tip = maxPriorityFeePerGas();</span>
+<span class="fc" id="L131">        Map&lt;?, ?&gt; block = asMap(call(&quot;eth_getBlockByNumber&quot;, &quot;latest&quot;, Boolean.FALSE), &quot;eth_getBlockByNumber&quot;);</span>
+<span class="fc" id="L132">        Object base = block.get(&quot;baseFeePerGas&quot;);</span>
+<span class="pc bpc" id="L133" title="1 of 2 branches missed.">        if (base == null) {</span>
+<span class="nc" id="L134">            UInt256 price = gasPrice();</span>
+<span class="nc" id="L135">            return new UInt256[] {price, price};</span>
+        }
+<span class="fc" id="L137">        UInt256 b = quantity(base, &quot;baseFeePerGas&quot;);</span>
+<span class="fc" id="L138">        return new UInt256[] {tip, b.add(b).add(tip)};</span>
+    }
+
+    private static Map&lt;String, Object&gt; callObject(EvmAddress from, EvmAddress to, UInt256 value, byte[] data) {
+<span class="fc" id="L142">        Map&lt;String, Object&gt; o = new LinkedHashMap&lt;String, Object&gt;();</span>
+<span class="pc bpc" id="L143" title="1 of 2 branches missed.">        if (from != null) {</span>
+<span class="nc" id="L144">            o.put(&quot;from&quot;, from.toLowerCaseString());</span>
+        }
+<span class="pc bpc" id="L146" title="1 of 2 branches missed.">        if (to != null) {</span>
+<span class="fc" id="L147">            o.put(&quot;to&quot;, to.toLowerCaseString());</span>
+        }
+<span class="pc bpc" id="L149" title="3 of 4 branches missed.">        if (value != null &amp;&amp; !value.isZero()) {</span>
+<span class="nc" id="L150">            o.put(&quot;value&quot;, value.toQuantity());</span>
+        }
+<span class="pc bpc" id="L152" title="2 of 4 branches missed.">        if (data != null &amp;&amp; data.length &gt; 0) {</span>
+<span class="fc" id="L153">            o.put(&quot;data&quot;, &quot;0x&quot; + Hash.toHex(data));</span>
+        }
+<span class="fc" id="L155">        return o;</span>
+    }
+
+    /// `eth_estimateGas` for a call; `to` is `null` for a contract creation.
+    public long estimateGas(EvmAddress from, EvmAddress to, UInt256 value, byte[] data) throws IOException {
+<span class="nc" id="L160">        return smallQuantity(call(&quot;eth_estimateGas&quot;, callObject(from, to, value, data)), &quot;eth_estimateGas&quot;);</span>
+    }
+
+    /// `eth_call` at a block tag, answering the returned bytes.
+    public byte[] call(EvmAddress to, byte[] data, String block) throws IOException {
+<span class="fc" id="L165">        String r = asString(call(&quot;eth_call&quot;, callObject(null, to, null, data), block), &quot;eth_call&quot;);</span>
+<span class="pc bpc" id="L166" title="1 of 2 branches missed.">        return Hash.fromHex(r.startsWith(&quot;0x&quot;) ? r.substring(2) : r);</span>
+    }
+
+    /// `eth_call` at the latest block.
+    public byte[] call(EvmAddress to, byte[] data) throws IOException {
+<span class="fc" id="L171">        return call(to, data, &quot;latest&quot;);</span>
+    }
+
+    /// An ERC-20 token balance in the token's base units.
+    public UInt256 erc20BalanceOf(EvmAddress token, EvmAddress owner) throws IOException {
+<span class="fc" id="L176">        return Erc20.decodeUint(call(token, Erc20.balanceOf(owner)));</span>
+    }
+
+    /// `eth_sendRawTransaction`, answering the transaction hash.
+    public String sendRawTransaction(EvmTransaction signed) throws IOException {
+<span class="nc" id="L181">        return asString(call(&quot;eth_sendRawTransaction&quot;, signed.encodeHex()), &quot;eth_sendRawTransaction&quot;);</span>
+    }
+
+    /// `eth_getTransactionReceipt`: the receipt, or `null` while the transaction is unmined.
+    public Map&lt;?, ?&gt; getTransactionReceipt(String txHash) throws IOException {
+<span class="fc" id="L186">        Object r = call(&quot;eth_getTransactionReceipt&quot;, txHash);</span>
+<span class="pc bpc" id="L187" title="1 of 2 branches missed.">        return r == null ? null : asMap(r, &quot;eth_getTransactionReceipt&quot;);</span>
+    }
+
+    /// Whether a mined receipt reports success (`status` 1).
+    public static boolean isSuccess(Map&lt;?, ?&gt; receipt) {
+<span class="nc bnc" id="L192" title="All 4 branches missed.">        return receipt != null &amp;&amp; &quot;0x1&quot;.equals(receipt.get(&quot;status&quot;));</span>
+    }
+
+    /// `eth_getLogs` for a filter object (`address`, `topics`, `fromBlock`, `toBlock`).
+    public List&lt;?&gt; getLogs(Map&lt;String, Object&gt; filter) throws IOException {
+<span class="nc" id="L197">        return asList(call(&quot;eth_getLogs&quot;, filter), &quot;eth_getLogs&quot;);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

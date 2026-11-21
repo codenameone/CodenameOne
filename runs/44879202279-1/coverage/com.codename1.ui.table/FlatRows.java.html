@@ -1,0 +1,408 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>FlatRows.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.table</a> &gt; <span class="el_source">FlatRows.java</span></div><h1>FlatRows.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ui.table;
+
+import java.util.HashMap;
+
+/// The rows of a `TableModel`: filtered, sorted and optionally grouped by a
+/// column, as an array of model row numbers.
+///
+/// A view entry of 0 or more is a model row; a negative one, `-(g + 1)`, is
+/// the row of group `g`.
+final class FlatRows extends GridRows {
+    /// The key of the group of rows whose value is null.
+<span class="fc" id="L34">    private static final Object NULL_KEY = new Object();</span>
+
+    private final TableModel model;
+    private GridColumn groupColumn;
+<span class="fc" id="L38">    private GridColumn[] columns = new GridColumn[0];</span>
+
+    // The data rows that pass the filter, in order.
+<span class="fc" id="L41">    private int[] data = new int[0];</span>
+    private int dataSize;
+    // How many rows the model had when the rows were last built.
+    private int modelRows;
+
+<span class="fc" id="L46">    private int[] view = new int[0];</span>
+    private int viewSize;
+    private int[] modelToView;
+
+<span class="fc" id="L50">    private Object[] groupKey = new Object[0];</span>
+<span class="fc" id="L51">    private int[] groupStart = new int[0];</span>
+<span class="fc" id="L52">    private int[] groupCount = new int[0];</span>
+<span class="fc" id="L53">    private Object[][] groupAggregates = new Object[0][];</span>
+    private int groups;
+<span class="fc" id="L55">    private final HashMap&lt;Object, Boolean&gt; collapsed = new HashMap&lt;Object, Boolean&gt;();</span>
+
+<span class="fc" id="L57">    FlatRows(TableModel model) {</span>
+<span class="fc" id="L58">        this.model = model;</span>
+<span class="fc" id="L59">    }</span>
+
+    /// How many rows the model had at the last rebuild.
+    int modelRowsBuilt() {
+<span class="fc" id="L63">        return modelRows;</span>
+    }
+
+    TableModel model() {
+<span class="fc" id="L67">        return model;</span>
+    }
+
+    /// The columns of the grid, all of them, for the aggregates.
+    void setColumns(GridColumn[] columns) {
+<span class="fc" id="L72">        this.columns = columns;</span>
+<span class="fc" id="L73">    }</span>
+
+    GridColumn getGroupColumn() {
+<span class="fc" id="L76">        return groupColumn;</span>
+    }
+
+    void setGroupColumn(GridColumn c) {
+<span class="fc bfc" id="L80" title="All 2 branches covered.">        if (c != groupColumn) { //NOPMD CompareObjectsWithEquals - a column is an identity</span>
+<span class="fc" id="L81">            collapsed.clear();</span>
+        }
+<span class="fc" id="L83">        groupColumn = c;</span>
+<span class="fc" id="L84">    }</span>
+
+    @Override
+    int size() {
+<span class="fc" id="L88">        return viewSize;</span>
+    }
+
+    @Override
+    int columnCount() {
+<span class="fc" id="L93">        return model.getColumnCount();</span>
+    }
+
+    @Override
+    String columnName(int modelColumn) {
+<span class="fc" id="L98">        return model.getColumnName(modelColumn);</span>
+    }
+
+    /// How many data rows pass the filter, open groups or not.
+    int dataCount() {
+<span class="nc" id="L103">        return dataSize;</span>
+    }
+
+    @Override
+    boolean isGroup(int row) {
+<span class="fc bfc" id="L108" title="All 2 branches covered.">        return view[row] &lt; 0;</span>
+    }
+
+    @Override
+    String groupLabel(int row) {
+<span class="fc" id="L113">        Object k = groupKey[-view[row] - 1];</span>
+<span class="fc" id="L114">        GridColumn gc = groupColumn;</span>
+<span class="pc bpc" id="L115" title="1 of 2 branches missed.">        if (gc == null) {</span>
+<span class="nc" id="L116">            return &quot;&quot;;</span>
+        }
+<span class="pc bpc" id="L118" title="1 of 2 branches missed.">        return gc.format(k == NULL_KEY ? null : k); //NOPMD CompareObjectsWithEquals - sentinel</span>
+    }
+
+    @Override
+    int groupCount(int row) {
+<span class="pc bpc" id="L123" title="1 of 2 branches missed.">        return view[row] &lt; 0 ? groupCount[-view[row] - 1] : 0;</span>
+    }
+
+    @Override
+    int depth(int row) {
+<span class="fc bfc" id="L128" title="All 4 branches covered.">        return groupColumn != null &amp;&amp; view[row] &gt;= 0 ? 1 : 0;</span>
+    }
+
+    @Override
+    boolean isExpandable(int row) {
+<span class="fc bfc" id="L133" title="All 2 branches covered.">        return view[row] &lt; 0;</span>
+    }
+
+    @Override
+    boolean isExpanded(int row) {
+<span class="pc bpc" id="L138" title="1 of 4 branches missed.">        return view[row] &lt; 0 &amp;&amp; !collapsed.containsKey(groupKey[-view[row] - 1]);</span>
+    }
+
+    @Override
+    int setExpanded(int row, boolean open) {
+<span class="pc bpc" id="L143" title="2 of 4 branches missed.">        if (view[row] &gt;= 0 || open == isExpanded(row)) {</span>
+<span class="nc" id="L144">            return 0;</span>
+        }
+<span class="fc" id="L146">        int g = -view[row] - 1;</span>
+<span class="fc bfc" id="L147" title="All 2 branches covered.">        if (open) {</span>
+<span class="fc" id="L148">            collapsed.remove(groupKey[g]);</span>
+        } else {
+<span class="fc" id="L150">            collapsed.put(groupKey[g], Boolean.TRUE);</span>
+        }
+<span class="fc" id="L152">        int before = viewSize;</span>
+<span class="fc" id="L153">        buildView();</span>
+<span class="fc" id="L154">        return viewSize - before;</span>
+    }
+
+    @Override
+    Object value(int row, int modelColumn) {
+<span class="fc" id="L159">        int v = view[row];</span>
+<span class="fc bfc" id="L160" title="All 2 branches covered.">        if (v &gt;= 0) {</span>
+<span class="fc" id="L161">            return model.getValueAt(v, modelColumn);</span>
+        }
+<span class="fc" id="L163">        int g = -v - 1;</span>
+<span class="pc bpc" id="L164" title="1 of 4 branches missed.">        if (groupColumn != null &amp;&amp; groupColumn.getModelColumn() == modelColumn) {</span>
+<span class="pc bpc" id="L165" title="1 of 2 branches missed.">            return groupKey[g] == NULL_KEY ? null : groupKey[g]; //NOPMD CompareObjectsWithEquals - sentinel</span>
+        }
+<span class="fc" id="L167">        Object[] agg = groupAggregates[g];</span>
+<span class="pc bpc" id="L168" title="1 of 4 branches missed.">        return agg != null &amp;&amp; modelColumn &lt; agg.length ? agg[modelColumn] : null;</span>
+    }
+
+    @Override
+    boolean isEditable(int row, int modelColumn) {
+<span class="pc bpc" id="L173" title="1 of 4 branches missed.">        return view[row] &gt;= 0 &amp;&amp; model.isCellEditable(view[row], modelColumn);</span>
+    }
+
+    @Override
+    void setValue(int row, int modelColumn, Object value) {
+<span class="pc bpc" id="L178" title="1 of 2 branches missed.">        if (view[row] &gt;= 0) {</span>
+<span class="fc" id="L179">            model.setValueAt(view[row], modelColumn, value);</span>
+        }
+<span class="fc" id="L181">    }</span>
+
+    @Override
+    int modelRow(int row) {
+<span class="fc" id="L185">        return view[row];</span>
+    }
+
+    @Override
+    Object key(int row) {
+<span class="fc" id="L190">        int v = view[row];</span>
+<span class="pc bpc" id="L191" title="1 of 2 branches missed.">        if (v &gt;= 0) {</span>
+<span class="fc" id="L192">            return Integer.valueOf(v);</span>
+        }
+<span class="nc" id="L194">        return new GroupKey(groupKey[-v - 1]);</span>
+    }
+
+    @Override
+    int find(Object key) {
+<span class="fc bfc" id="L199" title="All 2 branches covered.">        if (key instanceof Integer) {</span>
+<span class="fc" id="L200">            int r = ((Integer) key).intValue();</span>
+<span class="fc" id="L201">            int[] m = modelToView();</span>
+<span class="pc bpc" id="L202" title="2 of 4 branches missed.">            return r &gt;= 0 &amp;&amp; r &lt; m.length ? m[r] : -1;</span>
+        }
+<span class="pc bpc" id="L204" title="1 of 2 branches missed.">        if (key instanceof GroupKey) {</span>
+<span class="fc" id="L205">            Object k = ((GroupKey) key).key;</span>
+<span class="pc bpc" id="L206" title="1 of 2 branches missed.">            for (int i = 0; i &lt; viewSize; i++) {</span>
+<span class="fc bfc" id="L207" title="All 4 branches covered.">                if (view[i] &lt; 0 &amp;&amp; equal(groupKey[-view[i] - 1], k)) {</span>
+<span class="fc" id="L208">                    return i;</span>
+                }
+            }
+        }
+<span class="nc" id="L212">        return -1;</span>
+    }
+
+    /// The view row of a model row, or -1 when it is filtered out or in a
+    /// closed group.
+    int viewRowOf(int modelRow) {
+<span class="fc" id="L218">        int[] m = modelToView();</span>
+<span class="pc bpc" id="L219" title="2 of 4 branches missed.">        return modelRow &gt;= 0 &amp;&amp; modelRow &lt; m.length ? m[modelRow] : -1;</span>
+    }
+
+    private int[] modelToView() {
+<span class="fc bfc" id="L223" title="All 2 branches covered.">        if (modelToView == null) {</span>
+<span class="fc" id="L224">            int[] m = new int[model.getRowCount()];</span>
+<span class="fc bfc" id="L225" title="All 2 branches covered.">            for (int i = 0; i &lt; m.length; i++) {</span>
+<span class="fc" id="L226">                m[i] = -1;</span>
+            }
+<span class="fc bfc" id="L228" title="All 2 branches covered.">            for (int i = 0; i &lt; viewSize; i++) {</span>
+<span class="fc" id="L229">                int v = view[i];</span>
+<span class="pc bpc" id="L230" title="1 of 4 branches missed.">                if (v &gt;= 0 &amp;&amp; v &lt; m.length) {</span>
+<span class="fc" id="L231">                    m[v] = i;</span>
+                }
+            }
+<span class="fc" id="L234">            modelToView = m;</span>
+        }
+<span class="fc" id="L236">        return modelToView;</span>
+    }
+
+    @Override
+    void rebuild() {
+<span class="fc" id="L241">        int n = model.getRowCount();</span>
+<span class="fc" id="L242">        modelRows = n;</span>
+<span class="fc" id="L243">        int[] keep = new int[n];</span>
+<span class="fc" id="L244">        int m = 0;</span>
+<span class="fc" id="L245">        GridFilter f = filter;</span>
+<span class="fc bfc" id="L246" title="All 2 branches covered.">        for (int r = 0; r &lt; n; r++) {</span>
+<span class="fc bfc" id="L247" title="All 2 branches covered.">            if (f != null) {</span>
+<span class="fc" id="L248">                probe.table(model, r);</span>
+<span class="fc bfc" id="L249" title="All 2 branches covered.">                if (!f.accept(probe)) {</span>
+<span class="fc" id="L250">                    continue;</span>
+                }
+            }
+<span class="fc" id="L253">            keep[m++] = r;</span>
+        }
+        final GridColumn[] keyColumns;
+        final boolean[] keyAscending;
+<span class="fc bfc" id="L257" title="All 2 branches covered.">        if (groupColumn != null) {</span>
+<span class="fc" id="L258">            keyColumns = new GridColumn[sortColumns.length + 1];</span>
+<span class="fc" id="L259">            keyAscending = new boolean[keyColumns.length];</span>
+<span class="fc" id="L260">            keyColumns[0] = groupColumn;</span>
+<span class="fc" id="L261">            keyAscending[0] = groupAscending();</span>
+<span class="fc" id="L262">            System.arraycopy(sortColumns, 0, keyColumns, 1, sortColumns.length);</span>
+<span class="fc" id="L263">            System.arraycopy(sortAscending, 0, keyAscending, 1, sortColumns.length);</span>
+        } else {
+<span class="fc" id="L265">            keyColumns = sortColumns;</span>
+<span class="fc" id="L266">            keyAscending = sortAscending;</span>
+        }
+<span class="pc bpc" id="L268" title="1 of 4 branches missed.">        if (keyColumns.length &gt; 0 &amp;&amp; m &gt; 1) {</span>
+            // The values are read once, not once per comparison: a model
+            // may compute them.
+<span class="fc" id="L271">            final Object[][] keys = new Object[keyColumns.length][m];</span>
+<span class="fc bfc" id="L272" title="All 2 branches covered.">            for (int k = 0; k &lt; keyColumns.length; k++) {</span>
+<span class="fc" id="L273">                int col = keyColumns[k].getModelColumn();</span>
+<span class="fc" id="L274">                Object[] dest = keys[k];</span>
+<span class="fc bfc" id="L275" title="All 2 branches covered.">                for (int i = 0; i &lt; m; i++) {</span>
+<span class="fc" id="L276">                    dest[i] = model.getValueAt(keep[i], col);</span>
+                }
+            }
+<span class="fc" id="L279">            int[] pos = GridSorter.order(m, keys, comparators(keyColumns), keyAscending);</span>
+<span class="fc" id="L280">            int[] sorted = new int[m];</span>
+<span class="fc bfc" id="L281" title="All 2 branches covered.">            for (int i = 0; i &lt; m; i++) {</span>
+<span class="fc" id="L282">                sorted[i] = keep[pos[i]];</span>
+            }
+<span class="fc" id="L284">            keep = sorted;</span>
+        }
+<span class="fc" id="L286">        data = keep;</span>
+<span class="fc" id="L287">        dataSize = m;</span>
+<span class="fc" id="L288">        buildGroups();</span>
+<span class="fc" id="L289">        buildView();</span>
+<span class="fc" id="L290">    }</span>
+
+    private boolean groupAscending() {
+<span class="pc bpc" id="L293" title="1 of 2 branches missed.">        for (int i = 0; i &lt; sortColumns.length; i++) {</span>
+<span class="nc bnc" id="L294" title="All 2 branches missed.">            if (sortColumns[i] == groupColumn) { //NOPMD CompareObjectsWithEquals - a column is an identity</span>
+<span class="nc" id="L295">                return sortAscending[i];</span>
+            }
+        }
+<span class="fc" id="L298">        return true;</span>
+    }
+
+    private void buildGroups() {
+<span class="fc" id="L302">        groups = 0;</span>
+<span class="fc bfc" id="L303" title="All 2 branches covered.">        if (groupColumn == null) {</span>
+<span class="fc" id="L304">            return;</span>
+        }
+<span class="fc" id="L306">        int col = groupColumn.getModelColumn();</span>
+<span class="fc" id="L307">        Object[] keys = new Object[Math.max(4, dataSize / 8 + 1)];</span>
+<span class="fc" id="L308">        int[] start = new int[keys.length];</span>
+<span class="fc" id="L309">        Object last = null;</span>
+<span class="fc" id="L310">        boolean any = false;</span>
+<span class="fc bfc" id="L311" title="All 2 branches covered.">        for (int i = 0; i &lt; dataSize; i++) {</span>
+<span class="fc" id="L312">            Object v = model.getValueAt(data[i], col);</span>
+<span class="fc bfc" id="L313" title="All 4 branches covered.">            if (!any || groupColumn.compare(v, last) != 0) {</span>
+<span class="pc bpc" id="L314" title="1 of 2 branches missed.">                if (groups == keys.length) {</span>
+<span class="nc" id="L315">                    Object[] k2 = new Object[groups * 2];</span>
+<span class="nc" id="L316">                    System.arraycopy(keys, 0, k2, 0, groups);</span>
+<span class="nc" id="L317">                    keys = k2;</span>
+<span class="nc" id="L318">                    int[] s2 = new int[groups * 2];</span>
+<span class="nc" id="L319">                    System.arraycopy(start, 0, s2, 0, groups);</span>
+<span class="nc" id="L320">                    start = s2;</span>
+                }
+<span class="fc bfc" id="L322" title="All 2 branches covered.">                keys[groups] = v == null ? NULL_KEY : v;</span>
+<span class="fc" id="L323">                start[groups] = i;</span>
+<span class="fc" id="L324">                groups++;</span>
+<span class="fc" id="L325">                last = v;</span>
+<span class="fc" id="L326">                any = true;</span>
+            }
+        }
+<span class="fc" id="L329">        groupKey = keys;</span>
+<span class="fc" id="L330">        groupStart = start;</span>
+<span class="fc" id="L331">        groupCount = new int[groups];</span>
+<span class="fc bfc" id="L332" title="All 2 branches covered.">        for (int g = 0; g &lt; groups; g++) {</span>
+<span class="fc bfc" id="L333" title="All 2 branches covered.">            int end = g + 1 &lt; groups ? start[g + 1] : dataSize;</span>
+<span class="fc" id="L334">            groupCount[g] = end - start[g];</span>
+        }
+<span class="fc" id="L336">        groupAggregates = new Object[groups][];</span>
+<span class="fc" id="L337">        int cols = model.getColumnCount();</span>
+<span class="fc bfc" id="L338" title="All 2 branches covered.">        for (GridColumn gc : columns) {</span>
+<span class="fc" id="L339">            GridAggregate a = gc.getAggregate();</span>
+<span class="fc" id="L340">            int mc = gc.getModelColumn();</span>
+<span class="pc bpc" id="L341" title="2 of 6 branches missed.">            if (a == null || mc &lt; 0 || mc &gt;= cols) {</span>
+<span class="nc" id="L342">                continue;</span>
+            }
+<span class="fc bfc" id="L344" title="All 2 branches covered.">            for (int g = 0; g &lt; groups; g++) {</span>
+<span class="fc" id="L345">                Object acc = null;</span>
+<span class="fc" id="L346">                int end = groupStart[g] + groupCount[g];</span>
+<span class="fc bfc" id="L347" title="All 2 branches covered.">                for (int i = groupStart[g]; i &lt; end; i++) {</span>
+<span class="fc" id="L348">                    acc = a.fold(gc, acc, model.getValueAt(data[i], mc));</span>
+                }
+<span class="pc bpc" id="L350" title="1 of 2 branches missed.">                if (groupAggregates[g] == null) {</span>
+<span class="fc" id="L351">                    groupAggregates[g] = new Object[cols];</span>
+                }
+<span class="fc" id="L353">                groupAggregates[g][mc] = a.finish(acc);</span>
+            }
+        }
+<span class="fc" id="L356">    }</span>
+
+    private void buildView() {
+<span class="fc" id="L359">        modelToView = null;</span>
+<span class="fc bfc" id="L360" title="All 2 branches covered.">        if (groupColumn == null) {</span>
+<span class="fc" id="L361">            view = data;</span>
+<span class="fc" id="L362">            viewSize = dataSize;</span>
+<span class="fc" id="L363">            return;</span>
+        }
+<span class="fc" id="L365">        int n = groups;</span>
+<span class="fc bfc" id="L366" title="All 2 branches covered.">        for (int g = 0; g &lt; groups; g++) {</span>
+<span class="fc bfc" id="L367" title="All 2 branches covered.">            if (!collapsed.containsKey(groupKey[g])) {</span>
+<span class="fc" id="L368">                n += groupCount[g];</span>
+            }
+        }
+<span class="fc" id="L371">        int[] v = new int[n];</span>
+<span class="fc" id="L372">        int k = 0;</span>
+<span class="fc bfc" id="L373" title="All 2 branches covered.">        for (int g = 0; g &lt; groups; g++) {</span>
+<span class="fc" id="L374">            v[k++] = -(g + 1);</span>
+<span class="fc bfc" id="L375" title="All 2 branches covered.">            if (!collapsed.containsKey(groupKey[g])) {</span>
+<span class="fc" id="L376">                System.arraycopy(data, groupStart[g], v, k, groupCount[g]);</span>
+<span class="fc" id="L377">                k += groupCount[g];</span>
+            }
+        }
+<span class="fc" id="L380">        view = v;</span>
+<span class="fc" id="L381">        viewSize = n;</span>
+<span class="fc" id="L382">    }</span>
+
+    private static boolean equal(Object a, Object b) {
+<span class="pc bpc" id="L385" title="3 of 4 branches missed.">        return a == null ? b == null : a.equals(b);</span>
+    }
+
+    /// A group's key as a selection remembers it, told apart from a model
+    /// row number.
+    static final class GroupKey {
+        final Object key;
+
+<span class="fc" id="L393">        GroupKey(Object key) {</span>
+<span class="fc" id="L394">            this.key = key;</span>
+<span class="fc" id="L395">        }</span>
+
+        @Override
+        public boolean equals(Object o) {
+<span class="nc bnc" id="L399" title="All 4 branches missed.">            return o instanceof GroupKey &amp;&amp; equal(((GroupKey) o).key, key);</span>
+        }
+
+        @Override
+        public int hashCode() {
+<span class="nc bnc" id="L404" title="All 2 branches missed.">            return key == null ? 0 : key.hashCode();</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

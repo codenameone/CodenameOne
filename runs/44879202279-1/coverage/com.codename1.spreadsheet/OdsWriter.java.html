@@ -1,0 +1,511 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>OdsWriter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.spreadsheet</a> &gt; <span class="el_source">OdsWriter.java</span></div><h1>OdsWriter.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.spreadsheet;
+
+import com.codename1.io.zip.ZipArchiveOutputStream;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.util.zip.CRC32;
+import java.util.zip.ZipEntry;
+
+/// Writes a workbook as an OpenDocument spreadsheet.
+final class OdsWriter {
+    private static final String MIME = &quot;application/vnd.oasis.opendocument.spreadsheet&quot;;
+    private static final String HEAD = &quot;&lt;?xml version=\&quot;1.0\&quot; encoding=\&quot;UTF-8\&quot;?&gt;\n&quot;;
+    private static final String NAMESPACES = &quot; xmlns:office=\&quot;urn:oasis:names:tc:opendocument:xmlns:office:1.0\&quot;&quot;
+            + &quot; xmlns:style=\&quot;urn:oasis:names:tc:opendocument:xmlns:style:1.0\&quot;&quot;
+            + &quot; xmlns:text=\&quot;urn:oasis:names:tc:opendocument:xmlns:text:1.0\&quot;&quot;
+            + &quot; xmlns:table=\&quot;urn:oasis:names:tc:opendocument:xmlns:table:1.0\&quot;&quot;
+            + &quot; xmlns:fo=\&quot;urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0\&quot;&quot;
+            + &quot; xmlns:number=\&quot;urn:oasis:names:tc:opendocument:xmlns:datastyle:1.0\&quot;&quot;
+            + &quot; xmlns:config=\&quot;urn:oasis:names:tc:opendocument:xmlns:config:1.0\&quot;&quot;
+            + &quot; xmlns:of=\&quot;urn:oasis:names:tc:opendocument:xmlns:of:1.2\&quot;&quot;
+            + &quot; xmlns:calcext=\&quot;urn:org:documentfoundation:names:experimental:calc:xmlns:calcext:1.0\&quot;&quot;
+            + &quot; office:version=\&quot;1.3\&quot;&quot;;
+
+    /// The width OpenDocument gives a column that a spreadsheet counts as one character wide.
+    /// Excel counts a column in characters of the default font and OpenDocument measures it;
+    /// this is the ratio LibreOffice converts by, so that a width survives the trip through
+    /// either program.
+    static final double MM_PER_CHARACTER = 2.47;
+
+    private final Workbook book;
+    /// The merged regions of the sheet being written, by their first cell.
+<span class="fc" id="L54">    private final java.util.HashMap&lt;Long, int[]&gt; anchors = new java.util.HashMap&lt;Long, int[]&gt;();</span>
+
+    private static Long key(int row, int column) {
+<span class="fc" id="L57">        return Long.valueOf(((long) row &lt;&lt; 20) | column);</span>
+    }
+
+<span class="fc" id="L60">    OdsWriter(Workbook book) {</span>
+<span class="fc" id="L61">        this.book = book;</span>
+<span class="fc" id="L62">    }</span>
+
+    void write(OutputStream out) throws IOException {
+<span class="fc" id="L65">        ZipArchiveOutputStream zip = new ZipArchiveOutputStream(out);</span>
+        // The type comes first and uncompressed, so that a program can tell what the file is
+        // from its first bytes without knowing zip.
+<span class="fc" id="L68">        byte[] mime = MIME.getBytes(&quot;UTF-8&quot;);</span>
+<span class="fc" id="L69">        ZipEntry first = new ZipEntry(&quot;mimetype&quot;);</span>
+<span class="fc" id="L70">        first.setMethod(ZipArchiveOutputStream.STORED);</span>
+<span class="fc" id="L71">        first.setSize(mime.length);</span>
+<span class="fc" id="L72">        first.setCompressedSize(mime.length);</span>
+<span class="fc" id="L73">        CRC32 crc = new CRC32();</span>
+<span class="fc" id="L74">        crc.update(mime, 0, mime.length);</span>
+<span class="fc" id="L75">        first.setCrc(crc.getValue());</span>
+<span class="fc" id="L76">        zip.putNextEntry(first);</span>
+<span class="fc" id="L77">        zip.write(mime, 0, mime.length);</span>
+<span class="fc" id="L78">        zip.closeEntry();</span>
+
+<span class="fc" id="L80">        XmlOut x = part(zip, &quot;META-INF/manifest.xml&quot;);</span>
+<span class="fc" id="L81">        x.raw(HEAD).raw(&quot;&lt;manifest:manifest xmlns:manifest=\&quot;urn:oasis:names:tc:opendocument:xmlns:manifest:1.0\&quot;&quot;)</span>
+<span class="fc" id="L82">                .raw(&quot; manifest:version=\&quot;1.3\&quot;&gt;&quot;)</span>
+<span class="fc" id="L83">                .raw(&quot;&lt;manifest:file-entry manifest:full-path=\&quot;/\&quot; manifest:version=\&quot;1.3\&quot; manifest:media-type=\&quot;&quot;)</span>
+<span class="fc" id="L84">                .raw(MIME).raw(&quot;\&quot;/&gt;&quot;)</span>
+<span class="fc" id="L85">                .raw(&quot;&lt;manifest:file-entry manifest:full-path=\&quot;content.xml\&quot; manifest:media-type=\&quot;text/xml\&quot;/&gt;&quot;)</span>
+<span class="fc" id="L86">                .raw(&quot;&lt;manifest:file-entry manifest:full-path=\&quot;styles.xml\&quot; manifest:media-type=\&quot;text/xml\&quot;/&gt;&quot;)</span>
+<span class="fc" id="L87">                .raw(&quot;&lt;manifest:file-entry manifest:full-path=\&quot;settings.xml\&quot; manifest:media-type=\&quot;text/xml\&quot;/&gt;&quot;)</span>
+<span class="fc" id="L88">                .raw(&quot;&lt;/manifest:manifest&gt;&quot;);</span>
+<span class="fc" id="L89">        end(zip, x);</span>
+
+<span class="fc" id="L91">        x = part(zip, &quot;styles.xml&quot;);</span>
+<span class="fc" id="L92">        x.raw(HEAD).raw(&quot;&lt;office:document-styles&quot;).raw(NAMESPACES).raw(&quot;/&gt;&quot;);</span>
+<span class="fc" id="L93">        end(zip, x);</span>
+
+<span class="fc" id="L95">        x = part(zip, &quot;settings.xml&quot;);</span>
+<span class="fc" id="L96">        writeSettings(x);</span>
+<span class="fc" id="L97">        end(zip, x);</span>
+
+<span class="fc" id="L99">        x = part(zip, &quot;content.xml&quot;);</span>
+<span class="fc" id="L100">        writeContent(x);</span>
+<span class="fc" id="L101">        end(zip, x);</span>
+<span class="fc" id="L102">        zip.finish();</span>
+<span class="fc" id="L103">    }</span>
+
+    private static XmlOut part(ZipArchiveOutputStream zip, String name) throws IOException {
+<span class="fc" id="L106">        zip.putNextEntry(new ZipEntry(name));</span>
+<span class="fc" id="L107">        return new XmlOut(zip);</span>
+    }
+
+    private static void end(ZipArchiveOutputStream zip, XmlOut x) throws IOException {
+<span class="fc" id="L111">        x.flush();</span>
+<span class="fc" id="L112">        zip.closeEntry();</span>
+<span class="fc" id="L113">    }</span>
+
+    private static void item(XmlOut x, String name, String type, int value) throws IOException {
+<span class="fc" id="L116">        x.raw(&quot;&lt;config:config-item&quot;).attr(&quot;config:name&quot;, name).attr(&quot;config:type&quot;, type).raw(&quot;&gt;&quot;).raw(value)</span>
+<span class="fc" id="L117">                .raw(&quot;&lt;/config:config-item&gt;&quot;);</span>
+<span class="fc" id="L118">    }</span>
+
+    private void writeSettings(XmlOut x) throws IOException {
+<span class="fc" id="L121">        x.raw(HEAD).raw(&quot;&lt;office:document-settings&quot;).raw(NAMESPACES).raw(&quot;&gt;&lt;office:settings&gt;&quot;)</span>
+<span class="fc" id="L122">                .raw(&quot;&lt;config:config-item-set config:name=\&quot;ooo:view-settings\&quot;&gt;&quot;)</span>
+<span class="fc" id="L123">                .raw(&quot;&lt;config:config-item-map-indexed config:name=\&quot;Views\&quot;&gt;&lt;config:config-item-map-entry&gt;&quot;)</span>
+<span class="fc" id="L124">                .raw(&quot;&lt;config:config-item config:name=\&quot;ViewId\&quot; config:type=\&quot;string\&quot;&gt;view1&lt;/config:config-item&gt;&quot;)</span>
+<span class="fc" id="L125">                .raw(&quot;&lt;config:config-item-map-named config:name=\&quot;Tables\&quot;&gt;&quot;);</span>
+<span class="fc bfc" id="L126" title="All 2 branches covered.">        for (int i = 0; i &lt; book.getSheetCount(); i++) {</span>
+<span class="fc" id="L127">            Sheet sheet = book.getSheet(i);</span>
+<span class="fc" id="L128">            int rows = sheet.getFrozenRows();</span>
+<span class="fc" id="L129">            int columns = sheet.getFrozenColumns();</span>
+<span class="pc bpc" id="L130" title="1 of 4 branches missed.">            if (rows == 0 &amp;&amp; columns == 0) {</span>
+<span class="fc" id="L131">                continue;</span>
+            }
+<span class="fc" id="L133">            x.raw(&quot;&lt;config:config-item-map-entry&quot;).attr(&quot;config:name&quot;, sheet.getName()).raw(&quot;&gt;&quot;);</span>
+<span class="pc bpc" id="L134" title="1 of 2 branches missed.">            item(x, &quot;HorizontalSplitMode&quot;, &quot;short&quot;, columns &gt; 0 ? 2 : 0);</span>
+<span class="pc bpc" id="L135" title="1 of 2 branches missed.">            item(x, &quot;VerticalSplitMode&quot;, &quot;short&quot;, rows &gt; 0 ? 2 : 0);</span>
+<span class="fc" id="L136">            item(x, &quot;HorizontalSplitPosition&quot;, &quot;int&quot;, columns);</span>
+<span class="fc" id="L137">            item(x, &quot;VerticalSplitPosition&quot;, &quot;int&quot;, rows);</span>
+<span class="fc" id="L138">            item(x, &quot;ActiveSplitRange&quot;, &quot;short&quot;, 2);</span>
+<span class="fc" id="L139">            item(x, &quot;PositionLeft&quot;, &quot;int&quot;, 0);</span>
+<span class="fc" id="L140">            item(x, &quot;PositionRight&quot;, &quot;int&quot;, columns);</span>
+<span class="fc" id="L141">            item(x, &quot;PositionTop&quot;, &quot;int&quot;, 0);</span>
+<span class="fc" id="L142">            item(x, &quot;PositionBottom&quot;, &quot;int&quot;, rows);</span>
+<span class="fc" id="L143">            x.raw(&quot;&lt;/config:config-item-map-entry&gt;&quot;);</span>
+        }
+<span class="fc" id="L145">        x.raw(&quot;&lt;/config:config-item-map-named&gt;&lt;/config:config-item-map-entry&gt;&lt;/config:config-item-map-indexed&gt;&quot;)</span>
+<span class="fc" id="L146">                .raw(&quot;&lt;/config:config-item-set&gt;&lt;/office:settings&gt;&lt;/office:document-settings&gt;&quot;);</span>
+<span class="fc" id="L147">    }</span>
+
+    private void writeContent(XmlOut x) throws IOException {
+<span class="fc" id="L150">        x.raw(HEAD).raw(&quot;&lt;office:document-content&quot;).raw(NAMESPACES).raw(&quot;&gt;&lt;office:automatic-styles&gt;&quot;);</span>
+        // column widths
+<span class="fc bfc" id="L152" title="All 2 branches covered.">        for (int s = 0; s &lt; book.getSheetCount(); s++) {</span>
+<span class="fc" id="L153">            Sheet sheet = book.getSheet(s);</span>
+<span class="fc" id="L154">            int widths = Math.max(sheet.usedColumns(), sheet.widthExtent());</span>
+<span class="fc bfc" id="L155" title="All 2 branches covered.">            for (int c = 0; c &lt; widths; c++) {</span>
+<span class="fc" id="L156">                double w = sheet.getColumnWidth(c);</span>
+<span class="fc bfc" id="L157" title="All 2 branches covered.">                if (w &gt; 0) {</span>
+<span class="fc" id="L158">                    x.raw(&quot;&lt;style:style&quot;).attr(&quot;style:name&quot;, &quot;co&quot; + s + &quot;_&quot; + c).raw(&quot; style:family=\&quot;table-column\&quot;&gt;&quot;)</span>
+<span class="fc" id="L159">                            .raw(&quot;&lt;style:table-column-properties&quot;)</span>
+<span class="fc" id="L160">                            .attr(&quot;style:column-width&quot;, millimetres(w * MM_PER_CHARACTER)).raw(&quot;/&gt;&lt;/style:style&gt;&quot;);</span>
+                }
+            }
+        }
+<span class="fc" id="L164">        int formats = book.formatCount();</span>
+<span class="fc" id="L165">        boolean[] hasDataStyle = new boolean[formats];</span>
+<span class="fc bfc" id="L166" title="All 2 branches covered.">        for (int i = 1; i &lt; formats; i++) {</span>
+<span class="fc" id="L167">            hasDataStyle[i] = book.format(i).writeOds(x, &quot;N&quot; + i);</span>
+        }
+<span class="fc bfc" id="L169" title="All 2 branches covered.">        for (int i = 0; i &lt; formats; i++) {</span>
+<span class="fc bfc" id="L170" title="All 2 branches covered.">            for (int bold = 0; bold &lt; 2; bold++) {</span>
+<span class="fc bfc" id="L171" title="All 4 branches covered.">                if (i == 0 &amp;&amp; bold == 0) {</span>
+<span class="fc" id="L172">                    continue;</span>
+                }
+<span class="fc bfc" id="L174" title="All 2 branches covered.">                x.raw(&quot;&lt;style:style&quot;).attr(&quot;style:name&quot;, (bold == 1 ? &quot;ch&quot; : &quot;ce&quot;) + i)</span>
+<span class="fc" id="L175">                        .raw(&quot; style:family=\&quot;table-cell\&quot; style:parent-style-name=\&quot;Default\&quot;&quot;);</span>
+<span class="fc bfc" id="L176" title="All 2 branches covered.">                if (hasDataStyle[i]) {</span>
+<span class="fc" id="L177">                    x.attr(&quot;style:data-style-name&quot;, &quot;N&quot; + i);</span>
+                }
+<span class="fc bfc" id="L179" title="All 2 branches covered.">                x.raw(bold == 1 ? &quot;&gt;&lt;style:text-properties fo:font-weight=\&quot;bold\&quot;/&gt;&lt;/style:style&gt;&quot; : &quot;/&gt;&quot;);</span>
+            }
+        }
+<span class="fc" id="L182">        x.raw(&quot;&lt;/office:automatic-styles&gt;&lt;office:body&gt;&lt;office:spreadsheet&gt;&quot;);</span>
+        // The formulas are written with the meaning they have here, which is Excel's: a
+        // criterion is a wildcard pattern for the whole cell. An OpenDocument file that does not
+        // say so is read with regular expressions, and COUNTIF(range,&quot;*et&quot;) counts nothing.
+        // Text compares without case here as in Excel, and OpenDocument's default is with it.
+<span class="fc" id="L187">        x.raw(&quot;&lt;table:calculation-settings table:case-sensitive=\&quot;false\&quot; table:use-wildcards=\&quot;true\&quot;&quot;)</span>
+<span class="fc" id="L188">                .raw(&quot; table:use-regular-expressions=\&quot;false\&quot;&quot;)</span>
+<span class="fc" id="L189">                .raw(&quot; table:search-criteria-must-apply-to-whole-cell=\&quot;true\&quot;&quot;);</span>
+<span class="pc bpc" id="L190" title="1 of 2 branches missed.">        if (book.isDate1904()) {</span>
+<span class="nc" id="L191">            x.raw(&quot;&gt;&lt;table:null-date table:date-value=\&quot;1904-01-01\&quot;/&gt;&lt;/table:calculation-settings&gt;&quot;);</span>
+        } else {
+<span class="fc" id="L193">            x.raw(&quot;/&gt;&quot;);</span>
+        }
+<span class="fc bfc" id="L195" title="All 2 branches covered.">        for (int s = 0; s &lt; book.getSheetCount(); s++) {</span>
+<span class="fc" id="L196">            writeSheet(x, book.getSheet(s), s);</span>
+        }
+<span class="fc bfc" id="L198" title="All 2 branches covered.">        if (book.getSheetCount() == 0) {</span>
+            // a spreadsheet has at least one table, as the XLSX writer's placeholder sheet
+<span class="fc" id="L200">            x.raw(&quot;&lt;table:table table:name=\&quot;Sheet1\&quot;&gt;&lt;table:table-column/&gt;&lt;table:table-row&gt;&lt;table:table-cell/&gt;&quot;</span>
+                    + &quot;&lt;/table:table-row&gt;&lt;/table:table&gt;&quot;);
+        }
+<span class="fc" id="L203">        String[] names = book.getDefinedNames();</span>
+<span class="fc bfc" id="L204" title="All 2 branches covered.">        if (names.length &gt; 0) {</span>
+<span class="fc" id="L205">            x.raw(&quot;&lt;table:named-expressions&gt;&quot;);</span>
+<span class="fc bfc" id="L206" title="All 2 branches covered.">            for (String nameItem : names) {</span>
+<span class="fc" id="L207">                Node node = book.definedNameNode(nameItem);</span>
+<span class="fc bfc" id="L208" title="All 2 branches covered.">                if (node == null) {</span>
+<span class="fc" id="L209">                    continue;</span>
+                }
+                // a reference to the row above is stored wrapped, as the last row; LibreOffice
+                // does not wrap, so the base cell is moved far enough that nothing has to
+<span class="fc" id="L213">                int[] reach = FormulaParser.reach(node);</span>
+<span class="pc bpc" id="L214" title="1 of 4 branches missed.">                Node expression = reach[0] == 0 &amp;&amp; reach[1] == 0 ? node : FormulaParser.fromCell(node, reach[0], reach[1]);</span>
+<span class="fc" id="L215">                x.raw(&quot;&lt;table:named-expression&quot;).attr(&quot;table:name&quot;, nameItem)</span>
+<span class="fc" id="L216">                        .attr(&quot;table:expression&quot;, FormulaParser.print(expression, true));</span>
+<span class="pc bpc" id="L217" title="1 of 2 branches missed.">                if (book.getSheetCount() &gt; 0) {</span>
+<span class="fc" id="L218">                    StringBuilder base = new StringBuilder(&quot;$&quot;);</span>
+<span class="fc" id="L219">                    FormulaParser.appendSheetName(base, book.getSheet(0).getName());</span>
+<span class="fc" id="L220">                    base.append(&quot;.$&quot;);</span>
+<span class="fc" id="L221">                    FormulaParser.appendColumn(base, reach[1]);</span>
+<span class="fc" id="L222">                    x.attr(&quot;table:base-cell-address&quot;, base.append('$').append(reach[0] + 1).toString());</span>
+                }
+<span class="fc" id="L224">                x.raw(&quot;/&gt;&quot;);</span>
+            }
+<span class="fc" id="L226">            x.raw(&quot;&lt;/table:named-expressions&gt;&quot;);</span>
+        }
+<span class="fc" id="L228">        x.raw(&quot;&lt;/office:spreadsheet&gt;&lt;/office:body&gt;&lt;/office:document-content&gt;&quot;);</span>
+<span class="fc" id="L229">    }</span>
+
+    private static String millimetres(double mm) {
+<span class="fc" id="L232">        return FormulaParser.numberText(Math.floor(mm * 100 + 0.5) / 100) + &quot;mm&quot;;</span>
+    }
+
+    private void writeSheet(XmlOut x, Sheet sheet, int index) throws IOException {
+<span class="fc" id="L236">        x.raw(&quot;&lt;table:table&quot;).attr(&quot;table:name&quot;, sheet.getName()).raw(&quot;&gt;&quot;);</span>
+<span class="fc" id="L237">        int columns = Math.max(1, Math.max(sheet.usedColumns(), sheet.widthExtent()));</span>
+<span class="fc bfc" id="L238" title="All 2 branches covered.">        for (int c = 0; c &lt; columns; c++) {</span>
+<span class="fc" id="L239">            x.raw(&quot;&lt;table:table-column&quot;);</span>
+<span class="fc bfc" id="L240" title="All 2 branches covered.">            if (sheet.getColumnWidth(c) &gt; 0) {</span>
+<span class="fc" id="L241">                x.attr(&quot;table:style-name&quot;, &quot;co&quot; + index + &quot;_&quot; + c);</span>
+            }
+<span class="fc" id="L243">            x.raw(&quot;/&gt;&quot;);</span>
+        }
+<span class="fc" id="L245">        int rows = Math.max(sheet.usedRows(), sheet.outlineExtent());</span>
+<span class="fc" id="L246">        anchors.clear();</span>
+<span class="fc" id="L247">        int[] lastAnchor = new int[0];</span>
+<span class="fc bfc" id="L248" title="All 2 branches covered.">        for (int i = 0; i &lt; sheet.getMergedRegionCount(); i++) {</span>
+<span class="fc" id="L249">            int[] region = sheet.getMergedRegion(i);</span>
+<span class="fc" id="L250">            anchors.put(key(region[0], region[1]), region);</span>
+<span class="fc" id="L251">            rows = Math.max(rows, region[0] + 1);</span>
+<span class="pc bpc" id="L252" title="1 of 2 branches missed.">            if (region[0] &gt;= lastAnchor.length) {</span>
+<span class="fc" id="L253">                int[] grown = new int[region[0] + 1];</span>
+<span class="fc bfc" id="L254" title="All 2 branches covered.">                for (int k = lastAnchor.length; k &lt; grown.length; k++) {</span>
+<span class="fc" id="L255">                    grown[k] = -1;</span>
+                }
+<span class="fc" id="L257">                System.arraycopy(lastAnchor, 0, grown, 0, lastAnchor.length);</span>
+<span class="fc" id="L258">                lastAnchor = grown;</span>
+            }
+<span class="fc" id="L260">            lastAnchor[region[0]] = Math.max(lastAnchor[region[0]], region[1]);</span>
+        }
+<span class="fc" id="L262">        boolean header = sheet.isHeaderRow();</span>
+<span class="fc" id="L263">        int depth = 0;</span>
+<span class="fc" id="L264">        int emptyRows = 0;</span>
+<span class="fc bfc" id="L265" title="All 2 branches covered.">        for (int r = 0; r &lt; rows; r++) {</span>
+<span class="fc" id="L266">            int level = sheet.getRowOutlineLevel(r);</span>
+<span class="fc" id="L267">            Cell[] cells = sheet.rowCells(r);</span>
+<span class="fc" id="L268">            int last = -1;</span>
+<span class="fc bfc" id="L269" title="All 2 branches covered.">            if (cells != null) {</span>
+<span class="fc bfc" id="L270" title="All 4 branches covered.">                for (int c = cells.length - 1; c &gt;= 0 &amp;&amp; last &lt; 0; c--) {</span>
+<span class="pc bpc" id="L271" title="3 of 6 branches missed.">                    if (cells[c] != null &amp;&amp; (cells[c].value != null || cells[c].formulaText != null)) {</span>
+<span class="fc" id="L272">                        last = c;</span>
+                    }
+                }
+            }
+<span class="fc bfc" id="L276" title="All 2 branches covered.">            if (r &lt; lastAnchor.length) {</span>
+                // a merged region starts at a cell even when the cell is empty
+<span class="fc" id="L278">                last = Math.max(last, lastAnchor[r]);</span>
+            }
+<span class="fc bfc" id="L280" title="All 4 branches covered.">            if (last &lt; 0 &amp;&amp; level == depth) {</span>
+<span class="fc" id="L281">                emptyRows++;</span>
+<span class="fc" id="L282">                continue;</span>
+            }
+<span class="fc" id="L284">            emptyRows = flushEmptyRows(x, emptyRows);</span>
+<span class="fc bfc" id="L285" title="All 2 branches covered.">            for (; depth &lt; level; depth++) {</span>
+<span class="fc" id="L286">                x.raw(&quot;&lt;table:table-row-group&gt;&quot;);</span>
+            }
+<span class="fc bfc" id="L288" title="All 2 branches covered.">            for (; depth &gt; level; depth--) {</span>
+<span class="fc" id="L289">                x.raw(&quot;&lt;/table:table-row-group&gt;&quot;);</span>
+            }
+<span class="fc bfc" id="L291" title="All 2 branches covered.">            if (last &lt; 0) {</span>
+<span class="fc" id="L292">                emptyRows++;</span>
+<span class="fc" id="L293">                continue;</span>
+            }
+<span class="fc" id="L295">            x.raw(&quot;&lt;table:table-row&gt;&quot;);</span>
+<span class="fc" id="L296">            int emptyCells = 0;</span>
+<span class="fc bfc" id="L297" title="All 2 branches covered.">            for (int c = 0; c &lt;= last; c++) {</span>
+<span class="pc bpc" id="L298" title="1 of 4 branches missed.">                Cell cell = cells != null &amp;&amp; c &lt; cells.length ? cells[c] : null;</span>
+<span class="fc bfc" id="L299" title="All 2 branches covered.">                int[] region = anchors.isEmpty() ? null : anchors.get(key(r, c));</span>
+<span class="fc bfc" id="L300" title="All 6 branches covered.">                boolean empty = cell == null || cell.value == null &amp;&amp; cell.formulaText == null;</span>
+<span class="fc bfc" id="L301" title="All 4 branches covered.">                if (empty &amp;&amp; region == null) {</span>
+<span class="fc" id="L302">                    emptyCells++;</span>
+<span class="fc" id="L303">                    continue;</span>
+                }
+<span class="fc" id="L305">                emptyCells = flushEmptyCells(x, emptyCells);</span>
+<span class="fc bfc" id="L306" title="All 6 branches covered.">                writeCell(x, empty ? null : cell, header &amp;&amp; r == 0, region);</span>
+            }
+<span class="fc" id="L308">            x.raw(&quot;&lt;/table:table-row&gt;&quot;);</span>
+        }
+<span class="fc" id="L310">        flushEmptyRows(x, emptyRows);</span>
+<span class="fc bfc" id="L311" title="All 2 branches covered.">        for (; depth &gt; 0; depth--) {</span>
+<span class="fc" id="L312">            x.raw(&quot;&lt;/table:table-row-group&gt;&quot;);</span>
+        }
+<span class="fc bfc" id="L314" title="All 2 branches covered.">        if (rows == 0) {</span>
+<span class="fc" id="L315">            x.raw(&quot;&lt;table:table-row&gt;&lt;table:table-cell/&gt;&lt;/table:table-row&gt;&quot;);</span>
+        }
+<span class="fc" id="L317">        x.raw(&quot;&lt;/table:table&gt;&quot;);</span>
+<span class="fc" id="L318">    }</span>
+
+    private static int flushEmptyRows(XmlOut x, int count) throws IOException {
+<span class="fc bfc" id="L321" title="All 2 branches covered.">        if (count &gt; 0) {</span>
+<span class="fc" id="L322">            x.raw(&quot;&lt;table:table-row&quot;);</span>
+<span class="fc bfc" id="L323" title="All 2 branches covered.">            if (count &gt; 1) {</span>
+<span class="fc" id="L324">                x.attr(&quot;table:number-rows-repeated&quot;, count);</span>
+            }
+<span class="fc" id="L326">            x.raw(&quot;&gt;&lt;table:table-cell/&gt;&lt;/table:table-row&gt;&quot;);</span>
+        }
+<span class="fc" id="L328">        return 0;</span>
+    }
+
+    private static int flushEmptyCells(XmlOut x, int count) throws IOException {
+<span class="fc bfc" id="L332" title="All 2 branches covered.">        if (count &gt; 0) {</span>
+<span class="fc" id="L333">            x.raw(&quot;&lt;table:table-cell&quot;);</span>
+<span class="fc bfc" id="L334" title="All 2 branches covered.">            if (count &gt; 1) {</span>
+<span class="fc" id="L335">                x.attr(&quot;table:number-columns-repeated&quot;, count);</span>
+            }
+<span class="fc" id="L337">            x.raw(&quot;/&gt;&quot;);</span>
+        }
+<span class="fc" id="L339">        return 0;</span>
+    }
+
+    /// The part of a second, as a point and up to nine digits with the trailing zeros dropped.
+    private static void nanoDigits(StringBuilder sb, long nanos) {
+<span class="fc bfc" id="L344" title="All 2 branches covered.">        if (nanos &lt;= 0) {</span>
+<span class="fc" id="L345">            return;</span>
+        }
+<span class="fc" id="L347">        String digits = String.valueOf(1000000000L + nanos).substring(1);</span>
+<span class="fc" id="L348">        int end = digits.length();</span>
+<span class="fc bfc" id="L349" title="All 2 branches covered.">        while (digits.charAt(end - 1) == '0') {</span>
+<span class="fc" id="L350">            end--;</span>
+        }
+<span class="fc" id="L352">        sb.append('.').append(digits.substring(0, end));</span>
+<span class="fc" id="L353">    }</span>
+
+    private static void two(StringBuilder sb, long v) {
+<span class="fc bfc" id="L356" title="All 2 branches covered.">        if (v &lt; 10) {</span>
+<span class="fc" id="L357">            sb.append('0');</span>
+        }
+<span class="fc" id="L359">        sb.append(v);</span>
+<span class="fc" id="L360">    }</span>
+
+    private void writeCell(XmlOut x, Cell cell, boolean bold, int[] region) throws IOException {
+<span class="fc bfc" id="L363" title="All 2 branches covered.">        if (cell == null) {</span>
+<span class="fc" id="L364">            x.raw(&quot;&lt;table:table-cell&quot;);</span>
+<span class="fc" id="L365">            spans(x, region);</span>
+<span class="fc" id="L366">            x.raw(&quot;/&gt;&quot;);</span>
+<span class="fc" id="L367">            return;</span>
+        }
+<span class="fc" id="L369">        Object v = cell.value;</span>
+<span class="fc bfc" id="L370" title="All 2 branches covered.">        if (v instanceof Double) {</span>
+<span class="fc" id="L371">            double d = ((Double) v).doubleValue();</span>
+<span class="pc bpc" id="L372" title="2 of 4 branches missed.">            if (Double.isNaN(d) || Double.isInfinite(d)) {</span>
+<span class="nc" id="L373">                v = CellError.NUM;</span>
+            }
+        }
+<span class="fc" id="L376">        x.raw(&quot;&lt;table:table-cell&quot;);</span>
+<span class="fc bfc" id="L377" title="All 4 branches covered.">        if (cell.format != 0 || bold) {</span>
+<span class="fc bfc" id="L378" title="All 2 branches covered.">            x.attr(&quot;table:style-name&quot;, (bold ? &quot;ch&quot; : &quot;ce&quot;) + cell.format);</span>
+        }
+<span class="fc" id="L380">        spans(x, region);</span>
+<span class="fc bfc" id="L381" title="All 2 branches covered.">        if (cell.formula != null) {</span>
+<span class="fc" id="L382">            x.attr(&quot;table:formula&quot;, &quot;of:=&quot; + FormulaParser.print(cell.formula, true));</span>
+<span class="fc bfc" id="L383" title="All 4 branches covered.">            if (cell.arrayFormula || book.spreads(cell)) {</span>
+                // a one-cell matrix: LibreOffice then calculates the formula over arrays, as
+                // this evaluator did, instead of meeting each range at the formula's row
+<span class="fc bfc" id="L386" title="All 2 branches covered.">                int cols = cell.arrayFormula ? cell.arrayCols : 1;</span>
+<span class="fc bfc" id="L387" title="All 2 branches covered.">                int rows = cell.arrayFormula ? cell.arrayRows : 1;</span>
+<span class="fc" id="L388">                x.raw(&quot; table:number-matrix-columns-spanned=\&quot;&quot; + cols + &quot;\&quot; table:number-matrix-rows-spanned=\&quot;&quot;</span>
+                        + rows + &quot;\&quot;&quot;);
+<span class="fc" id="L390">            }</span>
+<span class="pc bpc" id="L391" title="1 of 4 branches missed.">        } else if (cell.formulaText != null &amp;&amp; cell.odsSyntax) {</span>
+<span class="fc" id="L392">            x.attr(&quot;table:formula&quot;, &quot;of:=&quot; + cell.formulaText);</span>
+        }
+<span class="fc" id="L394">        String shown = null;</span>
+<span class="fc" id="L395">        CellFormat format = book.format(cell.format);</span>
+<span class="fc bfc" id="L396" title="All 2 branches covered.">        if (v instanceof Double) {</span>
+<span class="fc" id="L397">            double d = ((Double) v).doubleValue();</span>
+            // past Excel's last day a date has no four-digit year, and the number is kept instead
+            // a serial before day 1, and day 60 -- Excel's 29 February 1900 -- are no dates
+            // of the 1900 calendar an OpenDocument file can name, so outside a time-only
+            // format it stays a number under its date style
+<span class="fc bfc" id="L402" title="All 10 branches covered.">            if (format.isDate() &amp;&amp; d &gt;= 0 &amp;&amp; d &lt;= DateFunctions.LAST_DAY &amp;&amp; (d &gt;= 1 || format.isTimeOnly())</span>
+<span class="pc bpc" id="L403" title="2 of 6 branches missed.">                    &amp;&amp; (book.isDate1904() || Math.floor(d) != 60 || format.isTimeOnly())) {</span>
+<span class="fc" id="L404">                StringBuilder sb = new StringBuilder();</span>
+                // nanoseconds, so a time reads back as the number it was, not whole seconds
+<span class="fc" id="L406">                long nanos = (long) Math.floor((d - Math.floor(d)) * 86400.0E9 + 0.5);</span>
+<span class="fc" id="L407">                double day = Math.floor(d);</span>
+<span class="pc bpc" id="L408" title="1 of 2 branches missed.">                if (nanos &gt;= 86400000000000L) {</span>
+<span class="nc" id="L409">                    nanos = 0;</span>
+<span class="nc" id="L410">                    day += 1;</span>
+                }
+<span class="fc" id="L412">                long seconds = nanos / 1000000000L;</span>
+<span class="fc bfc" id="L413" title="All 2 branches covered.">                if (format.isTimeOnly()) {</span>
+                    // whole seconds and the part of one apart: nanoseconds of a long duration
+                    // pass what a long holds
+<span class="fc" id="L416">                    long total = (long) (Math.floor(d) * 86400) + nanos / 1000000000L;</span>
+<span class="pc bpc" id="L417" title="1 of 2 branches missed.">                    if (day &gt; Math.floor(d)) {</span>
+<span class="nc" id="L418">                        total = (long) (day * 86400);</span>
+                    }
+<span class="fc" id="L420">                    long totalNanos = nanos;</span>
+<span class="fc" id="L421">                    sb.append(&quot;PT&quot;);</span>
+<span class="fc" id="L422">                    two(sb, total / 3600);</span>
+<span class="fc" id="L423">                    sb.append('H');</span>
+<span class="fc" id="L424">                    two(sb, total / 60 % 60);</span>
+<span class="fc" id="L425">                    sb.append('M');</span>
+<span class="fc" id="L426">                    two(sb, total % 60);</span>
+<span class="fc" id="L427">                    nanoDigits(sb, totalNanos % 1000000000L);</span>
+<span class="fc" id="L428">                    sb.append('S');</span>
+<span class="fc" id="L429">                    x.raw(&quot; office:value-type=\&quot;time\&quot;&quot;).attr(&quot;office:time-value&quot;, sb.toString());</span>
+<span class="fc" id="L430">                } else {</span>
+<span class="fc" id="L431">                    int[] f = DateUtil.fields(day, book.isDate1904());</span>
+                    // day 60 of the 1900 system is a day no calendar has
+<span class="pc bpc" id="L433" title="2 of 6 branches missed.">                    if (f[1] == 2 &amp;&amp; f[2] == 29 &amp;&amp; !DateUtil.isLeapYear(f[0])) {</span>
+<span class="nc" id="L434">                        f[2] = 28;</span>
+                    }
+<span class="fc" id="L436">                    sb.append(f[0]).append('-');</span>
+<span class="fc" id="L437">                    two(sb, f[1]);</span>
+<span class="fc" id="L438">                    sb.append('-');</span>
+<span class="fc" id="L439">                    two(sb, f[2]);</span>
+<span class="fc bfc" id="L440" title="All 2 branches covered.">                    if (nanos != 0) {</span>
+<span class="fc" id="L441">                        sb.append('T');</span>
+<span class="fc" id="L442">                        two(sb, seconds / 3600);</span>
+<span class="fc" id="L443">                        sb.append(':');</span>
+<span class="fc" id="L444">                        two(sb, seconds / 60 % 60);</span>
+<span class="fc" id="L445">                        sb.append(':');</span>
+<span class="fc" id="L446">                        two(sb, seconds % 60);</span>
+<span class="fc" id="L447">                        nanoDigits(sb, nanos % 1000000000L);</span>
+                    }
+<span class="fc" id="L449">                    x.raw(&quot; office:value-type=\&quot;date\&quot;&quot;).attr(&quot;office:date-value&quot;, sb.toString());</span>
+                }
+<span class="fc" id="L451">            } else {</span>
+<span class="fc bfc" id="L452" title="All 4 branches covered.">                x.raw(format.isGeneral() || format.code().indexOf('%') &lt; 0 ? &quot; office:value-type=\&quot;float\&quot;&quot;</span>
+<span class="fc" id="L453">                        : &quot; office:value-type=\&quot;percentage\&quot;&quot;).attr(&quot;office:value&quot;, FormulaParser.numberText(d));</span>
+            }
+<span class="fc" id="L455">            shown = format.format(v, book.isDate1904());</span>
+<span class="fc bfc" id="L456" title="All 2 branches covered.">        } else if (v instanceof Boolean) {</span>
+<span class="fc" id="L457">            boolean b = ((Boolean) v).booleanValue();</span>
+<span class="fc bfc" id="L458" title="All 2 branches covered.">            x.raw(&quot; office:value-type=\&quot;boolean\&quot;&quot;).attr(&quot;office:boolean-value&quot;, b ? &quot;true&quot; : &quot;false&quot;);</span>
+<span class="fc bfc" id="L459" title="All 2 branches covered.">            shown = b ? &quot;TRUE&quot; : &quot;FALSE&quot;;</span>
+<span class="fc bfc" id="L460" title="All 2 branches covered.">        } else if (v instanceof CellError) {</span>
+<span class="fc" id="L461">            x.raw(&quot; office:value-type=\&quot;string\&quot; office:string-value=\&quot;\&quot; calcext:value-type=\&quot;error\&quot;&quot;);</span>
+<span class="fc bfc" id="L462" title="All 2 branches covered.">            shown = v == CellError.CIRCULAR ? &quot;Err:522&quot; : v.toString(); //NOPMD CompareObjectsWithEquals - an error value is a constant</span>
+<span class="fc bfc" id="L463" title="All 2 branches covered.">        } else if (v instanceof String) {</span>
+<span class="fc" id="L464">            x.raw(&quot; office:value-type=\&quot;string\&quot;&quot;);</span>
+<span class="fc" id="L465">            shown = (String) v;</span>
+        }
+<span class="fc bfc" id="L467" title="All 4 branches covered.">        if (shown == null || shown.length() == 0) {</span>
+<span class="fc" id="L468">            x.raw(&quot;/&gt;&quot;);</span>
+<span class="fc" id="L469">            return;</span>
+        }
+<span class="fc" id="L471">        x.raw(&quot;&gt;&lt;text:p&gt;&quot;);</span>
+<span class="fc" id="L472">        paragraphs(x, shown);</span>
+<span class="fc" id="L473">        x.raw(&quot;&lt;/text:p&gt;&lt;/table:table-cell&gt;&quot;);</span>
+<span class="fc" id="L474">    }</span>
+
+    private static void spans(XmlOut x, int[] region) throws IOException {
+<span class="fc bfc" id="L477" title="All 2 branches covered.">        if (region != null) {</span>
+<span class="fc" id="L478">            x.attr(&quot;table:number-columns-spanned&quot;, region[3] - region[1] + 1)</span>
+<span class="fc" id="L479">                    .attr(&quot;table:number-rows-spanned&quot;, region[2] - region[0] + 1);</span>
+        }
+<span class="fc" id="L481">    }</span>
+
+    /// Text inside a paragraph: XML collapses runs of spaces and has no place for a tab or a
+    /// line break, so the format has elements for them.
+    private static void paragraphs(XmlOut x, String s) throws IOException {
+<span class="fc" id="L486">        int n = s.length();</span>
+<span class="fc" id="L487">        int start = 0;</span>
+<span class="fc bfc" id="L488" title="All 2 branches covered.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc" id="L489">            char c = s.charAt(i);</span>
+<span class="pc bpc" id="L490" title="1 of 10 branches missed.">            boolean space = c == ' ' &amp;&amp; (i == 0 || i == n - 1 || s.charAt(i - 1) == ' ' || s.charAt(i - 1) == '\n');</span>
+<span class="pc bpc" id="L491" title="1 of 8 branches missed.">            if (c != '\n' &amp;&amp; c != '\t' &amp;&amp; c != '\r' &amp;&amp; !space) {</span>
+<span class="fc" id="L492">                continue;</span>
+            }
+<span class="fc bfc" id="L494" title="All 2 branches covered.">            if (i &gt; start) {</span>
+<span class="fc" id="L495">                x.text(s.substring(start, i), false);</span>
+            }
+<span class="fc" id="L497">            start = i + 1;</span>
+<span class="fc bfc" id="L498" title="All 2 branches covered.">            if (c == '\n') {</span>
+<span class="fc" id="L499">                x.raw(&quot;&lt;/text:p&gt;&lt;text:p&gt;&quot;);</span>
+<span class="fc bfc" id="L500" title="All 2 branches covered.">            } else if (c == '\t') {</span>
+<span class="fc" id="L501">                x.raw(&quot;&lt;text:tab/&gt;&quot;);</span>
+<span class="pc bpc" id="L502" title="1 of 2 branches missed.">            } else if (space) {</span>
+<span class="fc" id="L503">                x.raw(&quot;&lt;text:s/&gt;&quot;);</span>
+            }
+        }
+<span class="fc bfc" id="L506" title="All 2 branches covered.">        if (start &lt; n) {</span>
+<span class="fc" id="L507">            x.text(s.substring(start), false);</span>
+        }
+<span class="fc" id="L509">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

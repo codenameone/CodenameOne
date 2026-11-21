@@ -1,0 +1,269 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ThemeStrings.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.util</a> &gt; <span class="el_source">ThemeStrings.java</span></div><h1>ThemeStrings.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+
+package com.codename1.ui.util;
+
+import java.io.DataInputStream;
+import java.io.IOException;
+
+/// The strings of one theme load, each stored once.
+///
+/// A theme repeats a few values thousands of times -- `0`, `ffffff`,
+/// `native:MainRegular` -- and reading each with `readUTF`, `toHexString` or
+/// `&quot;&quot; + int` made a byte array, a char array and a String per entry, almost all
+/// of them garbage on arrival. The pages that garbage filled stay resident after
+/// it is collected, so deduplicating the result afterwards saves nothing. This
+/// decodes into reusable buffers and creates a String only for a value it has not
+/// seen in this load; a repeated value allocates nothing.
+final class ThemeStrings {
+<span class="fc" id="L39">    private byte[] bytes = new byte[64];</span>
+<span class="fc" id="L40">    private char[] chars = new char[64];</span>
+    private String[] table;
+    private int size;
+
+    /// `entries` is the entry count the theme declares. Every key is a distinct
+    /// string and the values add a few hundred more, so a table sized for that up
+    /// front never has to grow: growing a 5,000 entry theme from a small table
+    /// discarded four tables on the way.
+<span class="fc" id="L48">    ThemeStrings(int entries) {</span>
+<span class="fc" id="L49">        int want = Math.max(entries, 0) * 2 + 1024;</span>
+<span class="fc" id="L50">        int len = 1024;</span>
+<span class="pc bpc" id="L51" title="1 of 4 branches missed.">        while (len &lt; want &amp;&amp; len &lt; (1 &lt;&lt; 20)) {</span>
+<span class="fc" id="L52">            len &lt;&lt;= 1;</span>
+        }
+<span class="fc" id="L54">        table = new String[len];</span>
+<span class="fc" id="L55">    }</span>
+
+    /// Reads a string written by `DataOutputStream.writeUTF` (modified UTF-8).
+    String readUTF(DataInputStream in) throws IOException {
+<span class="fc" id="L59">        int len = in.readUnsignedShort();</span>
+<span class="pc bpc" id="L60" title="1 of 2 branches missed.">        if (bytes.length &lt; len) {</span>
+<span class="nc" id="L61">            bytes = new byte[len];</span>
+        }
+<span class="fc" id="L63">        in.readFully(bytes, 0, len);</span>
+<span class="pc bpc" id="L64" title="1 of 2 branches missed.">        if (chars.length &lt; len) {</span>
+<span class="nc" id="L65">            chars = new char[len];</span>
+        }
+<span class="fc" id="L67">        byte[] b = bytes;</span>
+<span class="fc" id="L68">        char[] c = chars;</span>
+<span class="fc" id="L69">        int n = 0;</span>
+<span class="fc" id="L70">        int i = 0;</span>
+<span class="fc bfc" id="L71" title="All 2 branches covered.">        while (i &lt; len) {</span>
+<span class="fc" id="L72">            int x = b[i] &amp; 0xff;</span>
+<span class="fc bfc" id="L73" title="All 2 branches covered.">            if (x &lt; 0x80) {</span>
+<span class="fc" id="L74">                c[n++] = (char) x;</span>
+<span class="fc" id="L75">                i++;</span>
+<span class="fc bfc" id="L76" title="All 2 branches covered.">            } else if ((x &amp; 0xe0) == 0xc0) {</span>
+<span class="pc bpc" id="L77" title="1 of 4 branches missed.">                if (i + 1 &gt;= len || (b[i + 1] &amp; 0xc0) != 0x80) {</span>
+<span class="fc" id="L78">                    throw new IOException(&quot;Malformed UTF-8 in theme&quot;);</span>
+                }
+<span class="fc" id="L80">                c[n++] = (char) (((x &amp; 0x1f) &lt;&lt; 6) | (b[i + 1] &amp; 0x3f));</span>
+<span class="fc" id="L81">                i += 2;</span>
+<span class="fc bfc" id="L82" title="All 2 branches covered.">            } else if ((x &amp; 0xf0) == 0xe0) {</span>
+<span class="pc bpc" id="L83" title="3 of 6 branches missed.">                if (i + 2 &gt;= len || (b[i + 1] &amp; 0xc0) != 0x80 || (b[i + 2] &amp; 0xc0) != 0x80) {</span>
+<span class="fc" id="L84">                    throw new IOException(&quot;Malformed UTF-8 in theme&quot;);</span>
+                }
+<span class="nc" id="L86">                c[n++] = (char) (((x &amp; 0x0f) &lt;&lt; 12) | ((b[i + 1] &amp; 0x3f) &lt;&lt; 6) | (b[i + 2] &amp; 0x3f));</span>
+<span class="nc" id="L87">                i += 3;</span>
+            } else {
+<span class="fc" id="L89">                throw new IOException(&quot;Malformed UTF-8 in theme&quot;);</span>
+            }
+<span class="fc" id="L91">        }</span>
+<span class="fc" id="L92">        return intern(n);</span>
+    }
+
+    /// `Integer.toHexString(v)`.
+    String hex(int v) {
+<span class="fc" id="L97">        char[] c = chars;</span>
+<span class="fc" id="L98">        int n = 0;</span>
+<span class="fc" id="L99">        int shift = 28;</span>
+<span class="fc bfc" id="L100" title="All 4 branches covered.">        while (shift &gt; 0 &amp;&amp; ((v &gt;&gt;&gt; shift) &amp; 0xf) == 0) {</span>
+<span class="fc" id="L101">            shift -= 4;</span>
+        }
+<span class="fc bfc" id="L103" title="All 2 branches covered.">        for (; shift &gt;= 0; shift -= 4) {</span>
+<span class="fc" id="L104">            int d = (v &gt;&gt;&gt; shift) &amp; 0xf;</span>
+<span class="fc bfc" id="L105" title="All 2 branches covered.">            c[n++] = (char) (d &lt; 10 ? '0' + d : 'a' + d - 10);</span>
+        }
+<span class="fc" id="L107">        return intern(n);</span>
+    }
+
+    /// `&quot;&quot; + v` for a value from 0 to 255, which is all a theme stores this way.
+    String decimal(int v) {
+<span class="fc" id="L112">        char[] c = chars;</span>
+<span class="fc" id="L113">        int n = 0;</span>
+<span class="fc bfc" id="L114" title="All 2 branches covered.">        if (v &gt;= 100) {</span>
+<span class="fc" id="L115">            c[n++] = (char) ('0' + v / 100);</span>
+        }
+<span class="fc bfc" id="L117" title="All 2 branches covered.">        if (v &gt;= 10) {</span>
+<span class="fc" id="L118">            c[n++] = (char) ('0' + v / 10 % 10);</span>
+        }
+<span class="fc" id="L120">        c[n++] = (char) ('0' + v % 10);</span>
+<span class="fc" id="L121">        return intern(n);</span>
+    }
+
+    /// `&quot;&quot; + a + &quot;,&quot; + b + &quot;,&quot; + c + &quot;,&quot; + d`, the form padding and margin are
+    /// stored in. Each `+` on a float made a String of its own.
+    String floats(float a, float b, float c, float d) {
+<span class="fc" id="L127">        ensureChars(64);</span>
+<span class="fc" id="L128">        int n = appendFloat(a, 0);</span>
+<span class="fc" id="L129">        chars[n++] = ',';</span>
+<span class="fc" id="L130">        n = appendFloat(b, n);</span>
+<span class="fc" id="L131">        chars[n++] = ',';</span>
+<span class="fc" id="L132">        n = appendFloat(c, n);</span>
+<span class="fc" id="L133">        chars[n++] = ',';</span>
+<span class="fc" id="L134">        n = appendFloat(d, n);</span>
+<span class="fc" id="L135">        return intern(n);</span>
+    }
+
+    /// `&quot;&quot; + a + &quot;,&quot; + b + &quot;,&quot; + c + &quot;,&quot; + d` for the integer form older themes use.
+    String ints(int a, int b, int c, int d) {
+<span class="fc" id="L140">        ensureChars(64);</span>
+<span class="fc" id="L141">        int n = appendInt(a, 0);</span>
+<span class="fc" id="L142">        chars[n++] = ',';</span>
+<span class="fc" id="L143">        n = appendInt(b, n);</span>
+<span class="fc" id="L144">        chars[n++] = ',';</span>
+<span class="fc" id="L145">        n = appendInt(c, n);</span>
+<span class="fc" id="L146">        chars[n++] = ',';</span>
+<span class="fc" id="L147">        n = appendInt(d, n);</span>
+<span class="fc" id="L148">        return intern(n);</span>
+    }
+
+    /// Appends `Float.toString(f)`. A theme's values have at most one decimal
+    /// (2.0, 0.5, 48.9); those are written digit by digit, which is what
+    /// `Float.toString` prints for them, and anything else is handed to it.
+    /// The digits are the shortest form that reads back as `f`; a VM whose
+    /// `Float.toString` prints more digits for such a value produced a
+    /// longer string before, never a different float once the theme parses it.
+    private int appendFloat(float f, int n) {
+<span class="fc" id="L158">        float tenths = f * 10f;</span>
+<span class="fc" id="L159">        int t = (int) tenths;</span>
+<span class="pc bpc" id="L160" title="2 of 12 branches missed.">        if (t == tenths &amp;&amp; t &gt; -10000000 &amp;&amp; t &lt; 10000000 &amp;&amp; (float) (t / 10.0) == f &amp;&amp; !(t == 0 &amp;&amp; 1 / f &lt; 0)) {</span>
+<span class="fc bfc" id="L161" title="All 2 branches covered.">            if (t &lt; 0) {</span>
+<span class="fc" id="L162">                chars[n++] = '-';</span>
+<span class="fc" id="L163">                t = -t;</span>
+            }
+<span class="fc" id="L165">            n = appendInt(t / 10, n);</span>
+<span class="fc" id="L166">            chars[n++] = '.';</span>
+<span class="fc" id="L167">            chars[n++] = (char) ('0' + t % 10);</span>
+<span class="fc" id="L168">            return n;</span>
+        }
+<span class="fc" id="L170">        String s = Float.toString(f);</span>
+<span class="fc" id="L171">        int len = s.length();</span>
+<span class="fc" id="L172">        ensureChars(n + len + 48);</span>
+<span class="fc" id="L173">        s.getChars(0, len, chars, n);</span>
+<span class="fc" id="L174">        return n + len;</span>
+    }
+
+    private int appendInt(int v, int n) {
+<span class="pc bpc" id="L178" title="1 of 2 branches missed.">        if (v &lt; 0) {</span>
+<span class="nc" id="L179">            String s = String.valueOf(v);</span>
+<span class="nc" id="L180">            int len = s.length();</span>
+<span class="nc" id="L181">            s.getChars(0, len, chars, n);</span>
+<span class="nc" id="L182">            return n + len;</span>
+        }
+<span class="fc" id="L184">        int start = n;</span>
+        do {
+<span class="fc" id="L186">            chars[n++] = (char) ('0' + v % 10);</span>
+<span class="fc" id="L187">            v /= 10;</span>
+<span class="fc bfc" id="L188" title="All 2 branches covered.">        } while (v != 0);</span>
+<span class="fc bfc" id="L189" title="All 2 branches covered.">        for (int i = start, j = n - 1; i &lt; j; i++, j--) {</span>
+<span class="fc" id="L190">            char x = chars[i];</span>
+<span class="fc" id="L191">            chars[i] = chars[j];</span>
+<span class="fc" id="L192">            chars[j] = x;</span>
+        }
+<span class="fc" id="L194">        return n;</span>
+    }
+
+    private void ensureChars(int n) {
+<span class="fc bfc" id="L198" title="All 2 branches covered.">        if (chars.length &lt; n) {</span>
+<span class="fc" id="L199">            char[] c = new char[n];</span>
+<span class="fc" id="L200">            System.arraycopy(chars, 0, c, 0, chars.length);</span>
+<span class="fc" id="L201">            chars = c;</span>
+        }
+<span class="fc" id="L203">    }</span>
+
+    /// The shared copy of a string built elsewhere.
+    String share(String s) {
+<span class="fc" id="L207">        int n = s.length();</span>
+<span class="pc bpc" id="L208" title="1 of 2 branches missed.">        if (chars.length &lt; n) {</span>
+<span class="nc" id="L209">            chars = new char[n];</span>
+        }
+<span class="fc" id="L211">        s.getChars(0, n, chars, 0);</span>
+<span class="fc" id="L212">        return intern(n);</span>
+    }
+
+    private String intern(int n) {
+<span class="fc" id="L216">        char[] c = chars;</span>
+<span class="fc" id="L217">        int h = 0;</span>
+<span class="fc bfc" id="L218" title="All 2 branches covered.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc" id="L219">            h = 31 * h + c[i];</span>
+        }
+<span class="fc" id="L221">        String[] t = table;</span>
+<span class="fc" id="L222">        int mask = t.length - 1;</span>
+<span class="fc" id="L223">        int i = (h ^ (h &gt;&gt;&gt; 16)) &amp; mask;</span>
+        while (true) {
+<span class="fc" id="L225">            String s = t[i];</span>
+<span class="fc bfc" id="L226" title="All 2 branches covered.">            if (s == null) {</span>
+<span class="fc" id="L227">                break;</span>
+            }
+<span class="fc bfc" id="L229" title="All 4 branches covered.">            if (s.length() == n &amp;&amp; same(s, c, n)) {</span>
+<span class="fc" id="L230">                return s;</span>
+            }
+<span class="fc" id="L232">            i = (i + 1) &amp; mask;</span>
+<span class="fc" id="L233">        }</span>
+<span class="fc" id="L234">        String s = new String(c, 0, n);</span>
+<span class="fc" id="L235">        t[i] = s;</span>
+<span class="fc" id="L236">        size++;</span>
+<span class="fc bfc" id="L237" title="All 2 branches covered.">        if (size * 2 &gt; t.length) {</span>
+<span class="fc" id="L238">            grow();</span>
+        }
+<span class="fc" id="L240">        return s;</span>
+    }
+
+    private static boolean same(String s, char[] c, int n) {
+<span class="fc bfc" id="L244" title="All 2 branches covered.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc bfc" id="L245" title="All 2 branches covered.">            if (s.charAt(i) != c[i]) {</span>
+<span class="fc" id="L246">                return false;</span>
+            }
+        }
+<span class="fc" id="L249">        return true;</span>
+    }
+
+    private void grow() {
+<span class="fc" id="L253">        String[] old = table;</span>
+<span class="fc" id="L254">        String[] t = new String[old.length * 2];</span>
+<span class="fc" id="L255">        int mask = t.length - 1;</span>
+<span class="fc bfc" id="L256" title="All 2 branches covered.">        for (String s : old) {</span>
+<span class="fc bfc" id="L257" title="All 2 branches covered.">            if (s != null) {</span>
+<span class="fc" id="L258">                int h = s.hashCode();</span>
+<span class="fc" id="L259">                int i = (h ^ (h &gt;&gt;&gt; 16)) &amp; mask;</span>
+<span class="fc bfc" id="L260" title="All 2 branches covered.">                while (t[i] != null) {</span>
+<span class="fc" id="L261">                    i = (i + 1) &amp; mask;</span>
+                }
+<span class="fc" id="L263">                t[i] = s;</span>
+            }
+        }
+<span class="fc" id="L266">        table = t;</span>
+<span class="fc" id="L267">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

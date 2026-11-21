@@ -1,0 +1,512 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PdfCanvas.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.pdf</a> &gt; <span class="el_source">PdfCanvas.java</span></div><h1>PdfCanvas.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.pdf;
+
+import com.codename1.util.Bidi;
+import com.codename1.impl.pdf.FontState;
+import com.codename1.impl.pdf.PdfFormat;
+
+/// Draws the content of one [PdfPage].
+///
+/// Coordinates are in points (1/72 inch) with the origin at the **top
+/// left** of the page and `y` growing downwards, as in Codename One's
+/// `Graphics`; text is placed by its baseline. Shapes are built as a path
+/// and then filled, stroked or used as a clip:
+///
+/// ```java
+/// PdfDocument doc = new PdfDocument();
+/// PdfPage page = doc.addPage(PdfPageSize.A4);
+/// PdfCanvas c = page.getCanvas();
+/// c.setFillColor(0x1565c0);
+/// c.fillRect(36, 36, page.getWidth() - 72, 40);
+/// c.setFillColor(0xffffff);
+/// c.setFont(PdfFont.HELVETICA_BOLD, 18);
+/// c.drawText(&quot;Invoice 2031&quot;, 48, 62);
+/// c.setStrokeColor(0x999999);
+/// c.setLineWidth(0.5f);
+/// c.drawLine(36, 90, page.getWidth() - 36, 90);
+/// ```
+///
+/// [#save()] and [#restore()] bracket changes to the color, line style,
+/// transform, clip and font.
+@com.codename1.impl.SharedWithBackend
+public final class PdfCanvas {
+    /// Butt line cap: the stroke ends at the end point.
+    public static final int CAP_BUTT = 0;
+    /// Round line cap.
+    public static final int CAP_ROUND = 1;
+    /// Square line cap: the stroke extends half its width past the end.
+    public static final int CAP_SQUARE = 2;
+    /// Mitered line join.
+    public static final int JOIN_MITER = 0;
+    /// Round line join.
+    public static final int JOIN_ROUND = 1;
+    /// Beveled line join.
+    public static final int JOIN_BEVEL = 2;
+
+    private static final double KAPPA = 0.5522847498;
+
+    private final PdfPage page;
+<span class="fc" id="L70">    private final StringBuilder content = new StringBuilder(); // NOPMD AvoidStringBufferField - the builder accumulates the output for the object lifetime</span>
+    private PdfFont font;
+    private float fontSize;
+    private FontState fontState;
+<span class="fc" id="L74">    private PdfFont[] savedFonts = new PdfFont[8];</span>
+<span class="fc" id="L75">    private float[] savedSizes = new float[8];</span>
+<span class="fc" id="L76">    private FontState[] savedStates = new FontState[8];</span>
+    private int depth;
+    private float curX;
+    private float curY;
+
+<span class="fc" id="L81">    PdfCanvas(PdfPage page) {</span>
+<span class="fc" id="L82">        this.fontState = null;</span>
+<span class="fc" id="L83">        this.page = page;</span>
+        // The page's own drawing runs inside an outer q, so an overlay can
+        // start again from the default state whatever was left open.
+<span class="fc" id="L86">        content.append(&quot;q\n&quot;);</span>
+<span class="fc" id="L87">        baseMatrix();</span>
+<span class="fc" id="L88">    }</span>
+
+    private void baseMatrix() {
+<span class="fc" id="L91">        content.append(&quot;1 0 0 -1 0 &quot;);</span>
+<span class="fc" id="L92">        PdfFormat.number(content, page.getHeight());</span>
+<span class="fc" id="L93">        content.append(&quot; cm\n&quot;);</span>
+<span class="fc" id="L94">    }</span>
+
+    /// Closes every open save and every transform, clip or color the page
+    /// content left behind, so what is drawn next (a header or footer)
+    /// starts from the default state.
+    void beginOverlay() {
+<span class="pc bpc" id="L100" title="1 of 2 branches missed.">        while (depth &gt; 0) {</span>
+<span class="nc" id="L101">            restore();</span>
+        }
+<span class="fc" id="L103">        content.append(&quot;Q\nq\n&quot;);</span>
+<span class="fc" id="L104">        baseMatrix();</span>
+<span class="fc" id="L105">    }</span>
+
+    String content() {
+        // Close what the caller left saved, then the outer q, so the stream
+        // is balanced however the canvas was used; the builder is untouched.
+<span class="fc" id="L110">        StringBuilder close = new StringBuilder(content.length() + 2 * depth + 2);</span>
+<span class="fc" id="L111">        close.append(content);</span>
+<span class="fc bfc" id="L112" title="All 2 branches covered.">        for (int i = 0; i &lt; depth; i++) {</span>
+<span class="fc" id="L113">            close.append(&quot;Q\n&quot;);</span>
+        }
+<span class="fc" id="L115">        return close.append(&quot;Q\n&quot;).toString();</span>
+    }
+
+    private PdfCanvas op(String operator) {
+<span class="fc" id="L119">        content.append(operator).append('\n');</span>
+<span class="fc" id="L120">        return this;</span>
+    }
+
+    private void n(double v) {
+<span class="fc" id="L124">        PdfFormat.number(content, v);</span>
+<span class="fc" id="L125">        content.append(' ');</span>
+<span class="fc" id="L126">    }</span>
+
+    /// Saves the graphics state: colors, line style, transform, clip and
+    /// font.
+    public PdfCanvas save() {
+<span class="pc bpc" id="L131" title="1 of 2 branches missed.">        if (depth == savedFonts.length) {</span>
+<span class="nc" id="L132">            PdfFont[] f = new PdfFont[depth * 2];</span>
+<span class="nc" id="L133">            float[] z = new float[depth * 2];</span>
+<span class="nc" id="L134">            FontState[] st = new FontState[depth * 2];</span>
+<span class="nc" id="L135">            System.arraycopy(savedFonts, 0, f, 0, depth);</span>
+<span class="nc" id="L136">            System.arraycopy(savedSizes, 0, z, 0, depth);</span>
+<span class="nc" id="L137">            System.arraycopy(savedStates, 0, st, 0, depth);</span>
+<span class="nc" id="L138">            savedFonts = f;</span>
+<span class="nc" id="L139">            savedSizes = z;</span>
+<span class="nc" id="L140">            savedStates = st;</span>
+        }
+<span class="fc" id="L142">        savedFonts[depth] = font;</span>
+<span class="fc" id="L143">        savedSizes[depth] = fontSize;</span>
+<span class="fc" id="L144">        savedStates[depth] = fontState;</span>
+<span class="fc" id="L145">        depth++;</span>
+<span class="fc" id="L146">        return op(&quot;q&quot;);</span>
+    }
+
+    /// Restores the state saved by the matching [#save()].
+    public PdfCanvas restore() {
+<span class="pc bpc" id="L151" title="1 of 2 branches missed.">        if (depth == 0) {</span>
+<span class="nc" id="L152">            throw new IllegalStateException(&quot;restore() without save()&quot;);</span>
+        }
+<span class="fc" id="L154">        depth--;</span>
+<span class="fc" id="L155">        font = savedFonts[depth];</span>
+<span class="fc" id="L156">        fontSize = savedSizes[depth];</span>
+<span class="fc" id="L157">        fontState = savedStates[depth];</span>
+<span class="fc" id="L158">        savedFonts[depth] = null;</span>
+<span class="fc" id="L159">        savedStates[depth] = null;</span>
+<span class="fc" id="L160">        return op(&quot;Q&quot;);</span>
+    }
+
+    /// Moves the origin by `dx`, `dy`.
+    public PdfCanvas translate(float dx, float dy) {
+<span class="nc" id="L165">        return transform(1, 0, 0, 1, dx, dy);</span>
+    }
+
+    /// Scales later drawing by `sx`, `sy` around the origin.
+    public PdfCanvas scale(float sx, float sy) {
+<span class="nc" id="L170">        return transform(sx, 0, 0, sy, 0, 0);</span>
+    }
+
+    /// Rotates later drawing by `radians` clockwise around the origin.
+    public PdfCanvas rotate(double radians) {
+<span class="nc" id="L175">        float c = (float) Math.cos(radians);</span>
+<span class="nc" id="L176">        float s = (float) Math.sin(radians);</span>
+<span class="nc" id="L177">        return transform(c, s, -s, c, 0, 0);</span>
+    }
+
+    /// Concatenates the matrix `[a b c d e f]` with the current transform:
+    /// a point `(x, y)` maps to `(a*x + c*y + e, b*x + d*y + f)`.
+    public PdfCanvas transform(float a, float b, float c, float d, float e, float f) {
+<span class="nc" id="L183">        n(a);</span>
+<span class="nc" id="L184">        n(b);</span>
+<span class="nc" id="L185">        n(c);</span>
+<span class="nc" id="L186">        n(d);</span>
+<span class="nc" id="L187">        n(e);</span>
+<span class="nc" id="L188">        n(f);</span>
+<span class="nc" id="L189">        return op(&quot;cm&quot;);</span>
+    }
+
+    /// Sets the color shapes and text are filled with, `0xRRGGBB`.
+    public PdfCanvas setFillColor(int rgb) {
+<span class="fc" id="L194">        color(rgb);</span>
+<span class="fc" id="L195">        return op(&quot;rg&quot;);</span>
+    }
+
+    /// Sets the color lines are stroked with, `0xRRGGBB`.
+    public PdfCanvas setStrokeColor(int rgb) {
+<span class="fc" id="L200">        color(rgb);</span>
+<span class="fc" id="L201">        return op(&quot;RG&quot;);</span>
+    }
+
+    private void color(int rgb) {
+<span class="fc" id="L205">        n(((rgb &gt;&gt; 16) &amp; 0xff) / 255.0);</span>
+<span class="fc" id="L206">        n(((rgb &gt;&gt; 8) &amp; 0xff) / 255.0);</span>
+<span class="fc" id="L207">        n((rgb &amp; 0xff) / 255.0);</span>
+<span class="fc" id="L208">    }</span>
+
+    /// Sets the opacity of fills and text, from 0 (invisible) to 1.
+    public PdfCanvas setFillAlpha(float alpha) {
+<span class="nc" id="L212">        content.append('/').append(page.document().extGState(&quot;ca&quot;, clamp(alpha))).append(' ');</span>
+<span class="nc" id="L213">        return op(&quot;gs&quot;);</span>
+    }
+
+    /// Sets the opacity of strokes, from 0 (invisible) to 1.
+    public PdfCanvas setStrokeAlpha(float alpha) {
+<span class="nc" id="L218">        content.append('/').append(page.document().extGState(&quot;CA&quot;, clamp(alpha))).append(' ');</span>
+<span class="nc" id="L219">        return op(&quot;gs&quot;);</span>
+    }
+
+    private static float clamp(float a) {
+<span class="nc bnc" id="L223" title="All 4 branches missed.">        return a &lt; 0 ? 0 : a &gt; 1 ? 1 : a;</span>
+    }
+
+    /// Sets the width of stroked lines in points.
+    public PdfCanvas setLineWidth(float width) {
+<span class="fc" id="L228">        n(width);</span>
+<span class="fc" id="L229">        return op(&quot;w&quot;);</span>
+    }
+
+    /// Sets the line cap, one of the `CAP_` constants.
+    public PdfCanvas setLineCap(int cap) {
+<span class="nc" id="L234">        content.append(cap).append(' ');</span>
+<span class="nc" id="L235">        return op(&quot;J&quot;);</span>
+    }
+
+    /// Sets the line join, one of the `JOIN_` constants.
+    public PdfCanvas setLineJoin(int join) {
+<span class="nc" id="L240">        content.append(join).append(' ');</span>
+<span class="nc" id="L241">        return op(&quot;j&quot;);</span>
+    }
+
+    /// Sets the miter limit of mitered joins.
+    public PdfCanvas setMiterLimit(float limit) {
+<span class="nc" id="L246">        n(limit);</span>
+<span class="nc" id="L247">        return op(&quot;M&quot;);</span>
+    }
+
+    /// Sets the dash pattern: alternating dash and gap lengths, starting
+    /// `phase` points into the pattern. Null or empty draws solid lines.
+    public PdfCanvas setDash(float[] pattern, float phase) {
+<span class="fc" id="L253">        content.append('[');</span>
+<span class="pc bpc" id="L254" title="1 of 2 branches missed.">        if (pattern != null) {</span>
+<span class="fc bfc" id="L255" title="All 2 branches covered.">            for (int i = 0; i &lt; pattern.length; i++) { // NOPMD ForLoopCanBeForeach - indexed like the surrounding decoder loops</span>
+<span class="fc" id="L256">                n(pattern[i]);</span>
+            }
+        }
+<span class="fc" id="L259">        content.append(&quot;] &quot;);</span>
+<span class="fc" id="L260">        n(phase);</span>
+<span class="fc" id="L261">        return op(&quot;d&quot;);</span>
+    }
+
+    /// Starts a new subpath at `(x, y)`.
+    public PdfCanvas moveTo(float x, float y) {
+<span class="fc" id="L266">        n(x);</span>
+<span class="fc" id="L267">        n(y);</span>
+<span class="fc" id="L268">        curX = x;</span>
+<span class="fc" id="L269">        curY = y;</span>
+<span class="fc" id="L270">        return op(&quot;m&quot;);</span>
+    }
+
+    /// Adds a straight segment to `(x, y)`.
+    public PdfCanvas lineTo(float x, float y) {
+<span class="fc" id="L275">        n(x);</span>
+<span class="fc" id="L276">        n(y);</span>
+<span class="fc" id="L277">        curX = x;</span>
+<span class="fc" id="L278">        curY = y;</span>
+<span class="fc" id="L279">        return op(&quot;l&quot;);</span>
+    }
+
+    /// Adds a cubic Bezier segment through control points `(x1, y1)` and
+    /// `(x2, y2)` to `(x3, y3)`.
+    public PdfCanvas curveTo(float x1, float y1, float x2, float y2, float x3, float y3) {
+<span class="nc" id="L285">        n(x1);</span>
+<span class="nc" id="L286">        n(y1);</span>
+<span class="nc" id="L287">        n(x2);</span>
+<span class="nc" id="L288">        n(y2);</span>
+<span class="nc" id="L289">        n(x3);</span>
+<span class="nc" id="L290">        n(y3);</span>
+<span class="nc" id="L291">        curX = x3;</span>
+<span class="nc" id="L292">        curY = y3;</span>
+<span class="nc" id="L293">        return op(&quot;c&quot;);</span>
+    }
+
+    /// Adds a quadratic Bezier segment through control point `(cx, cy)` to
+    /// `(x, y)`.
+    public PdfCanvas quadTo(float cx, float cy, float x, float y) {
+<span class="nc" id="L299">        float x1 = curX + 2f / 3f * (cx - curX);</span>
+<span class="nc" id="L300">        float y1 = curY + 2f / 3f * (cy - curY);</span>
+<span class="nc" id="L301">        float x2 = x + 2f / 3f * (cx - x);</span>
+<span class="nc" id="L302">        float y2 = y + 2f / 3f * (cy - y);</span>
+<span class="nc" id="L303">        return curveTo(x1, y1, x2, y2, x, y);</span>
+    }
+
+    /// Closes the current subpath with a straight segment to its start.
+    public PdfCanvas closePath() {
+<span class="nc" id="L308">        return op(&quot;h&quot;);</span>
+    }
+
+    /// Adds a rectangle as a closed subpath.
+    public PdfCanvas rect(float x, float y, float w, float h) {
+<span class="fc" id="L313">        n(x);</span>
+<span class="fc" id="L314">        n(y);</span>
+<span class="fc" id="L315">        n(w);</span>
+<span class="fc" id="L316">        n(h);</span>
+<span class="fc" id="L317">        return op(&quot;re&quot;);</span>
+    }
+
+    /// Adds a rectangle with corners rounded to `radius` points.
+    public PdfCanvas roundRect(float x, float y, float w, float h, float radius) {
+<span class="nc" id="L322">        float r = Math.min(radius, Math.min(w, h) / 2);</span>
+<span class="nc bnc" id="L323" title="All 2 branches missed.">        if (r &lt;= 0) {</span>
+<span class="nc" id="L324">            return rect(x, y, w, h);</span>
+        }
+<span class="nc" id="L326">        float k = (float) (r * KAPPA);</span>
+<span class="nc" id="L327">        moveTo(x + r, y);</span>
+<span class="nc" id="L328">        lineTo(x + w - r, y);</span>
+<span class="nc" id="L329">        curveTo(x + w - r + k, y, x + w, y + r - k, x + w, y + r);</span>
+<span class="nc" id="L330">        lineTo(x + w, y + h - r);</span>
+<span class="nc" id="L331">        curveTo(x + w, y + h - r + k, x + w - r + k, y + h, x + w - r, y + h);</span>
+<span class="nc" id="L332">        lineTo(x + r, y + h);</span>
+<span class="nc" id="L333">        curveTo(x + r - k, y + h, x, y + h - r + k, x, y + h - r);</span>
+<span class="nc" id="L334">        lineTo(x, y + r);</span>
+<span class="nc" id="L335">        curveTo(x, y + r - k, x + r - k, y, x + r, y);</span>
+<span class="nc" id="L336">        return closePath();</span>
+    }
+
+    /// Adds the ellipse inscribed in the given rectangle.
+    public PdfCanvas ellipse(float x, float y, float w, float h) {
+<span class="nc" id="L341">        float rx = w / 2;</span>
+<span class="nc" id="L342">        float ry = h / 2;</span>
+<span class="nc" id="L343">        float cx = x + rx;</span>
+<span class="nc" id="L344">        float cy = y + ry;</span>
+<span class="nc" id="L345">        float kx = (float) (rx * KAPPA);</span>
+<span class="nc" id="L346">        float ky = (float) (ry * KAPPA);</span>
+<span class="nc" id="L347">        moveTo(cx + rx, cy);</span>
+<span class="nc" id="L348">        curveTo(cx + rx, cy + ky, cx + kx, cy + ry, cx, cy + ry);</span>
+<span class="nc" id="L349">        curveTo(cx - kx, cy + ry, cx - rx, cy + ky, cx - rx, cy);</span>
+<span class="nc" id="L350">        curveTo(cx - rx, cy - ky, cx - kx, cy - ry, cx, cy - ry);</span>
+<span class="nc" id="L351">        curveTo(cx + kx, cy - ry, cx + rx, cy - ky, cx + rx, cy);</span>
+<span class="nc" id="L352">        return closePath();</span>
+    }
+
+    /// Fills the current path (nonzero winding) and ends it.
+    public PdfCanvas fill() {
+<span class="fc" id="L357">        return op(&quot;f&quot;);</span>
+    }
+
+    /// Fills the current path with the even-odd rule and ends it.
+    public PdfCanvas fillEvenOdd() {
+<span class="nc" id="L362">        return op(&quot;f*&quot;);</span>
+    }
+
+    /// Strokes the current path and ends it.
+    public PdfCanvas stroke() {
+<span class="fc" id="L367">        return op(&quot;S&quot;);</span>
+    }
+
+    /// Fills, then strokes the current path, and ends it.
+    public PdfCanvas fillAndStroke() {
+<span class="nc" id="L372">        return op(&quot;B&quot;);</span>
+    }
+
+    /// Intersects the clip with the current path (nonzero winding) and
+    /// ends the path. Bracket with [#save()] and [#restore()] to undo.
+    public PdfCanvas clip() {
+<span class="nc" id="L378">        return op(&quot;W n&quot;);</span>
+    }
+
+    /// Intersects the clip with the current path (even-odd) and ends it.
+    public PdfCanvas clipEvenOdd() {
+<span class="nc" id="L383">        return op(&quot;W* n&quot;);</span>
+    }
+
+    /// Fills a rectangle.
+    public PdfCanvas fillRect(float x, float y, float w, float h) {
+<span class="fc" id="L388">        return rect(x, y, w, h).fill();</span>
+    }
+
+    /// Strokes the outline of a rectangle.
+    public PdfCanvas strokeRect(float x, float y, float w, float h) {
+<span class="fc" id="L393">        return rect(x, y, w, h).stroke();</span>
+    }
+
+    /// Strokes a line from `(x1, y1)` to `(x2, y2)`.
+    public PdfCanvas drawLine(float x1, float y1, float x2, float y2) {
+<span class="fc" id="L398">        return moveTo(x1, y1).lineTo(x2, y2).stroke();</span>
+    }
+
+    /// Sets the font later text is drawn with.
+    public PdfCanvas setFont(PdfFont font, float size) {
+<span class="fc" id="L403">        this.font = font;</span>
+<span class="fc" id="L404">        this.fontSize = size;</span>
+<span class="fc" id="L405">        this.fontState = page.document().fontState(font);</span>
+<span class="fc" id="L406">        return this;</span>
+    }
+
+    /// The current font, null before [#setFont(PdfFont, float)].
+    public PdfFont getFont() {
+<span class="nc" id="L411">        return font;</span>
+    }
+
+    /// The current font size in points.
+    public float getFontSize() {
+<span class="nc" id="L416">        return fontSize;</span>
+    }
+
+    /// Draws `text` in the current font and fill color with its baseline
+    /// starting at `(x, y)`. Line breaks are not interpreted; lay out
+    /// several lines with [PdfLayout].
+    ///
+    /// Text is given in reading order. Right-to-left scripts (Hebrew,
+    /// Arabic) are reordered for display by the Unicode bidirectional
+    /// algorithm, with the direction taken from the first strong character,
+    /// and Arabic letters are joined, using the font's own contextual forms
+    /// when it is a TrueType font that has them.
+    public PdfCanvas drawText(String text, float x, float y) {
+<span class="fc" id="L429">        return drawText(text, x, y, PdfParagraph.DIRECTION_AUTO);</span>
+    }
+
+    /// Draws `text` as [#drawText(String, float, float)] does, in a
+    /// paragraph of direction `direction`, one of the
+    /// `PdfParagraph.DIRECTION_` constants. The text still starts at `x`.
+    public PdfCanvas drawText(String text, float x, float y, int direction) {
+<span class="pc bpc" id="L436" title="1 of 2 branches missed.">        if (font == null) {</span>
+<span class="nc" id="L437">            setFont(PdfFont.HELVETICA, 12);</span>
+        }
+<span class="pc bpc" id="L439" title="2 of 4 branches missed.">        boolean rtl = direction == PdfParagraph.DIRECTION_RTL</span>
+<span class="pc bpc" id="L440" title="1 of 2 branches missed.">                || direction == PdfParagraph.DIRECTION_AUTO &amp;&amp; Bidi.direction(text) == Bidi.RTL;</span>
+<span class="pc bpc" id="L441" title="1 of 2 branches missed.">        if (Bidi.isLeftToRight(text, rtl)) {</span>
+<span class="fc" id="L442">            drawRun(text, x, y, false);</span>
+<span class="fc" id="L443">            return this;</span>
+        }
+<span class="nc" id="L445">        byte[] levels = Bidi.levels(text, rtl);</span>
+<span class="nc" id="L446">        float cx = x;</span>
+<span class="nc" id="L447">        int[][] runs = visualRuns(levels);</span>
+<span class="nc bnc" id="L448" title="All 2 branches missed.">        for (int i = 0; i &lt; runs.length; i++) { // NOPMD ForLoopCanBeForeach - indexed like the surrounding decoder loops</span>
+<span class="nc" id="L449">            String piece = text.substring(runs[i][0], runs[i][1]);</span>
+<span class="nc bnc" id="L450" title="All 2 branches missed.">            drawRun(piece, cx, y, (levels[runs[i][0]] &amp; 1) != 0);</span>
+<span class="nc" id="L451">            cx += font.getStringWidth(piece, fontSize);</span>
+        }
+<span class="nc" id="L453">        return this;</span>
+    }
+
+    /// The level runs of `levels` as `{start, end}` pairs, left to right.
+    static int[][] visualRuns(byte[] levels) {
+<span class="nc" id="L458">        int n = levels.length;</span>
+<span class="nc" id="L459">        java.util.List&lt;int[]&gt; runs = new java.util.ArrayList&lt;int[]&gt;();</span>
+<span class="nc" id="L460">        int start = 0;</span>
+<span class="nc bnc" id="L461" title="All 2 branches missed.">        for (int i = 1; i &lt;= n; i++) {</span>
+<span class="nc bnc" id="L462" title="All 4 branches missed.">            if (i == n || levels[i] != levels[start]) {</span>
+<span class="nc" id="L463">                runs.add(new int[] {start, i});</span>
+<span class="nc" id="L464">                start = i;</span>
+            }
+        }
+<span class="nc" id="L467">        byte[] rl = new byte[runs.size()];</span>
+<span class="nc bnc" id="L468" title="All 2 branches missed.">        for (int i = 0; i &lt; rl.length; i++) {</span>
+<span class="nc" id="L469">            rl[i] = levels[runs.get(i)[0]];</span>
+        }
+<span class="nc" id="L471">        int[] order = Bidi.visualOrder(rl);</span>
+<span class="nc" id="L472">        int[][] out = new int[order.length][];</span>
+<span class="nc bnc" id="L473" title="All 2 branches missed.">        for (int i = 0; i &lt; order.length; i++) {</span>
+<span class="nc" id="L474">            out[i] = runs.get(order[i]);</span>
+        }
+<span class="nc" id="L476">        return out;</span>
+    }
+
+    /// Draws one directional run, `text` in logical order.
+    void drawRun(String text, float x, float y, boolean rtl) {
+<span class="fc" id="L481">        page.useFont(fontState);</span>
+<span class="fc" id="L482">        content.append(&quot;BT /&quot;).append(fontState.resourceName).append(' ');</span>
+<span class="fc" id="L483">        n(fontSize);</span>
+<span class="fc" id="L484">        content.append(&quot;Tf 1 0 0 -1 &quot;);</span>
+<span class="fc" id="L485">        n(x);</span>
+<span class="fc" id="L486">        n(y);</span>
+<span class="fc" id="L487">        content.append(&quot;Tm &quot;);</span>
+<span class="fc" id="L488">        fontState.showText(content, text, rtl);</span>
+<span class="fc" id="L489">        op(&quot; Tj ET&quot;);</span>
+<span class="fc" id="L490">    }</span>
+
+    /// Draws `image` scaled into the rectangle `(x, y, w, h)`.
+    public PdfCanvas drawImage(PdfImage image, float x, float y, float w, float h) {
+<span class="nc" id="L494">        String name = page.useImage(image);</span>
+<span class="nc" id="L495">        content.append(&quot;q &quot;);</span>
+<span class="nc" id="L496">        n(w);</span>
+<span class="nc" id="L497">        content.append(&quot;0 0 &quot;);</span>
+<span class="nc" id="L498">        n(-h);</span>
+<span class="nc" id="L499">        n(x);</span>
+<span class="nc" id="L500">        n(y + h);</span>
+<span class="nc" id="L501">        content.append(&quot;cm /&quot;).append(name);</span>
+<span class="nc" id="L502">        return op(&quot; Do Q&quot;);</span>
+    }
+
+    /// Appends raw content-stream operators, for what this class does not
+    /// cover. The text must be valid PDF content in the page's flipped
+    /// coordinate system; nothing checks it.
+    public PdfCanvas appendRaw(String operators) {
+<span class="nc" id="L509">        return op(operators);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

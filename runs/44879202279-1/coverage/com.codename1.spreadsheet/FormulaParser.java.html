@@ -1,0 +1,1508 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>FormulaParser.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.spreadsheet</a> &gt; <span class="el_source">FormulaParser.java</span></div><h1>FormulaParser.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.spreadsheet;
+
+import java.util.ArrayList;
+
+/// Parses formula text into a tree and writes a tree back as text, in the dialect of Excel
+/// files or of OpenDocument files. The two differ in how a reference is written
+/// (`Sheet1!A1:B2` against `[$Sheet1.A1:.B2]`), in the separators of arguments and array
+/// constants, and in the prefixes of newer function names; the trees are the same.
+///
+/// Operator precedence follows Excel: range, intersection, union, sign, percent, power,
+/// multiplication, addition, concatenation, comparison. The sign binds tighter than the power,
+/// so `-2^2` is 4, and the power associates to the left.
+final class FormulaParser {
+<span class="fc" id="L36">    private static final String[] ERRORS = {</span>
+        &quot;#DIV/0!&quot;, &quot;#N/A&quot;, &quot;#NAME?&quot;, &quot;#NULL!&quot;, &quot;#NUM!&quot;, &quot;#REF!&quot;, &quot;#VALUE!&quot;
+    };
+<span class="fc" id="L39">    private static final String[] PREFIXES = {</span>
+        &quot;_XLFN._XLWS.&quot;, &quot;_XLFN.&quot;, &quot;_XLWS.&quot;, &quot;COM.MICROSOFT.&quot;, &quot;ORG.LIBREOFFICE.&quot;, &quot;ORG.OPENOFFICE.&quot;
+    };
+
+    private final String s;
+    private final int len;
+    private final boolean ods;
+    private final char argSeparator;
+    private int p;
+
+<span class="fc" id="L49">    private FormulaParser(String s, boolean ods) {</span>
+<span class="fc" id="L50">        this.s = s;</span>
+<span class="fc" id="L51">        this.len = s.length();</span>
+<span class="fc" id="L52">        this.ods = ods;</span>
+<span class="fc bfc" id="L53" title="All 2 branches covered.">        this.argSeparator = ods ? ';' : ',';</span>
+<span class="fc" id="L54">    }</span>
+
+    /// Levels of nesting a formula may have: parentheses, arguments and signs each count.
+    /// Excel's own limit is on functions (MAX_FUNCTIONS); this one is what a small stack
+    /// can parse and evaluate, and room enough for 64 functions with their parentheses.
+    static final int MAX_DEPTH = 128;
+
+    /// Functions nested in each other, Excel's limit.
+    static final int MAX_FUNCTIONS = 64;
+
+    private int functions;
+    /// Twice the 8,192 characters Excel allows a formula.
+    private static final int MAX_LENGTH = 16384;
+    private int depth;
+
+    /// Whether text can be a defined name: a letter, an underscore or a backslash, then
+    /// letters, digits, periods and underscores, and nothing a formula reads as a cell or a
+    /// truth value.
+    static boolean isName(String name) {
+<span class="pc bpc" id="L73" title="2 of 6 branches missed.">        if (name == null || name.length() == 0 || name.length() &gt; 255) {</span>
+<span class="fc" id="L74">            return false;</span>
+        }
+<span class="fc bfc" id="L76" title="All 2 branches covered.">        for (int i = 0; i &lt; name.length(); i++) {</span>
+<span class="fc" id="L77">            char c = name.charAt(i);</span>
+<span class="pc bpc" id="L78" title="2 of 8 branches missed.">            boolean start = isLetter(c) || c == '_' || c == '\\' || c &gt; 127;</span>
+<span class="fc bfc" id="L79" title="All 8 branches covered.">            if (!(start || i &gt; 0 &amp;&amp; (isDigit(c) || c == '.'))) {</span>
+<span class="fc" id="L80">                return false;</span>
+            }
+        }
+<span class="fc bfc" id="L83" title="All 2 branches covered.">        return !looksLikeCellOrLiteral(name);</span>
+    }
+
+    /// Parses formula text that does not include the leading equals sign.
+    static Node parse(String text, boolean ods) {
+<span class="fc" id="L88">        FormulaParser parser = new FormulaParser(text, ods);</span>
+        // 1+1+1+... is not nested as written and is a tree as deep as it is long once parsed,
+        // which everything that walks the tree would then have to survive
+<span class="fc bfc" id="L91" title="All 2 branches covered.">        if (text.length() &gt; MAX_LENGTH) {</span>
+<span class="fc" id="L92">            throw parser.fail();</span>
+        }
+<span class="fc" id="L94">        Node n = parser.comparison();</span>
+<span class="fc" id="L95">        parser.ws();</span>
+<span class="fc bfc" id="L96" title="All 2 branches covered.">        if (parser.p &lt; parser.len) {</span>
+<span class="fc" id="L97">            throw parser.fail();</span>
+        }
+<span class="fc" id="L99">        return n;</span>
+    }
+
+    private FormulaSyntaxException fail() {
+<span class="fc" id="L103">        return new FormulaSyntaxException(&quot;Cannot parse formula at &quot; + p + &quot;: &quot; + s, p);</span>
+    }
+
+    private void ws() {
+<span class="fc bfc" id="L107" title="All 2 branches covered.">        while (p &lt; len) {</span>
+<span class="fc" id="L108">            char c = s.charAt(p);</span>
+<span class="pc bpc" id="L109" title="3 of 8 branches missed.">            if (c != ' ' &amp;&amp; c != '\n' &amp;&amp; c != '\r' &amp;&amp; c != '\t') {</span>
+<span class="fc" id="L110">                return;</span>
+            }
+<span class="fc" id="L112">            p++;</span>
+<span class="fc" id="L113">        }</span>
+<span class="fc" id="L114">    }</span>
+
+    private boolean eat(char c) {
+<span class="fc bfc" id="L117" title="All 4 branches covered.">        if (p &lt; len &amp;&amp; s.charAt(p) == c) {</span>
+<span class="fc" id="L118">            p++;</span>
+<span class="fc" id="L119">            return true;</span>
+        }
+<span class="fc" id="L121">        return false;</span>
+    }
+
+    private void expect(char c) {
+<span class="fc" id="L125">        ws();</span>
+<span class="fc bfc" id="L126" title="All 2 branches covered.">        if (!eat(c)) {</span>
+<span class="fc" id="L127">            throw fail();</span>
+        }
+<span class="fc" id="L129">    }</span>
+
+    private Node comparison() {
+<span class="fc" id="L132">        Node left = concat();</span>
+        for (;;) {
+<span class="fc" id="L134">            ws();</span>
+            String op;
+<span class="fc bfc" id="L136" title="All 2 branches covered.">            if (s.startsWith(&quot;&lt;&gt;&quot;, p)) {</span>
+<span class="fc" id="L137">                op = &quot;&lt;&gt;&quot;;</span>
+<span class="fc bfc" id="L138" title="All 2 branches covered.">            } else if (s.startsWith(&quot;&lt;=&quot;, p)) {</span>
+<span class="fc" id="L139">                op = &quot;&lt;=&quot;;</span>
+<span class="fc bfc" id="L140" title="All 2 branches covered.">            } else if (s.startsWith(&quot;&gt;=&quot;, p)) {</span>
+<span class="fc" id="L141">                op = &quot;&gt;=&quot;;</span>
+<span class="fc bfc" id="L142" title="All 2 branches covered.">            } else if (s.startsWith(&quot;&lt;&quot;, p)) {</span>
+<span class="fc" id="L143">                op = &quot;&lt;&quot;;</span>
+<span class="fc bfc" id="L144" title="All 2 branches covered.">            } else if (s.startsWith(&quot;&gt;&quot;, p)) {</span>
+<span class="fc" id="L145">                op = &quot;&gt;&quot;;</span>
+<span class="fc bfc" id="L146" title="All 2 branches covered.">            } else if (s.startsWith(&quot;=&quot;, p)) {</span>
+<span class="fc" id="L147">                op = &quot;=&quot;;</span>
+            } else {
+<span class="fc" id="L149">                return left;</span>
+            }
+<span class="fc" id="L151">            p += op.length();</span>
+<span class="fc" id="L152">            left = new Node(Node.BINARY, op, left, concat());</span>
+<span class="fc" id="L153">        }</span>
+    }
+
+    private Node concat() {
+<span class="fc" id="L157">        Node left = additive();</span>
+        for (;;) {
+<span class="fc" id="L159">            ws();</span>
+<span class="fc bfc" id="L160" title="All 2 branches covered.">            if (!eat('&amp;')) {</span>
+<span class="fc" id="L161">                return left;</span>
+            }
+<span class="fc" id="L163">            left = new Node(Node.BINARY, &quot;&amp;&quot;, left, additive());</span>
+        }
+    }
+
+    private Node additive() {
+<span class="fc" id="L168">        Node left = multiplicative();</span>
+        for (;;) {
+<span class="fc" id="L170">            ws();</span>
+<span class="fc bfc" id="L171" title="All 2 branches covered.">            if (eat('+')) {</span>
+<span class="fc" id="L172">                left = new Node(Node.BINARY, &quot;+&quot;, left, multiplicative());</span>
+<span class="fc bfc" id="L173" title="All 2 branches covered.">            } else if (eat('-')) {</span>
+<span class="fc" id="L174">                left = new Node(Node.BINARY, &quot;-&quot;, left, multiplicative());</span>
+            } else {
+<span class="fc" id="L176">                return left;</span>
+            }
+        }
+    }
+
+    private Node multiplicative() {
+<span class="fc" id="L182">        Node left = power();</span>
+        for (;;) {
+<span class="fc" id="L184">            ws();</span>
+<span class="fc bfc" id="L185" title="All 2 branches covered.">            if (eat('*')) {</span>
+<span class="fc" id="L186">                left = new Node(Node.BINARY, &quot;*&quot;, left, power());</span>
+<span class="fc bfc" id="L187" title="All 2 branches covered.">            } else if (eat('/')) {</span>
+<span class="fc" id="L188">                left = new Node(Node.BINARY, &quot;/&quot;, left, power());</span>
+            } else {
+<span class="fc" id="L190">                return left;</span>
+            }
+        }
+    }
+
+    private Node power() {
+<span class="fc" id="L196">        Node left = percent();</span>
+        for (;;) {
+<span class="fc" id="L198">            ws();</span>
+<span class="fc bfc" id="L199" title="All 2 branches covered.">            if (!eat('^')) {</span>
+<span class="fc" id="L200">                return left;</span>
+            }
+<span class="fc" id="L202">            left = new Node(Node.BINARY, &quot;^&quot;, left, percent());</span>
+        }
+    }
+
+    private Node percent() {
+<span class="fc" id="L207">        Node n = unary();</span>
+        // every sign after an operand is a level of the tree, as every sign before it is
+<span class="fc" id="L209">        for (int signs = 0;; signs++) {</span>
+<span class="fc" id="L210">            ws();</span>
+<span class="fc bfc" id="L211" title="All 2 branches covered.">            if (!eat('%')) {</span>
+<span class="fc" id="L212">                return n;</span>
+            }
+<span class="pc bpc" id="L214" title="1 of 2 branches missed.">            if (signs + depth &gt;= MAX_DEPTH) {</span>
+<span class="nc" id="L215">                throw fail();</span>
+            }
+<span class="fc" id="L217">            n = new Node(Node.PERCENT, null, n);</span>
+        }
+    }
+
+    private Node unary() {
+        // Every level of nesting -- a parenthesis, an argument, a sign -- comes through here.
+        // Excel nests 64 functions; a formula nested thousands deep is an attack on the stack
+        // of whoever reads it, and overflowing a stack is not an exception on every device.
+<span class="fc" id="L225">        depth++;</span>
+<span class="pc bpc" id="L226" title="1 of 2 branches missed.">        if (depth &gt; MAX_DEPTH) {</span>
+<span class="nc" id="L227">            throw fail();</span>
+        }
+<span class="fc" id="L229">        Node n = unaryInner();</span>
+<span class="fc" id="L230">        depth--;</span>
+<span class="fc" id="L231">        return n;</span>
+    }
+
+    private Node unaryInner() {
+<span class="fc" id="L235">        ws();</span>
+<span class="fc bfc" id="L236" title="All 2 branches covered.">        if (p &lt; len) {</span>
+<span class="fc" id="L237">            char c = s.charAt(p);</span>
+<span class="fc bfc" id="L238" title="All 4 branches covered.">            if (c == '-' || c == '+') {</span>
+<span class="fc" id="L239">                p++;</span>
+<span class="fc bfc" id="L240" title="All 2 branches covered.">                return new Node(Node.UNARY, c == '-' ? &quot;-&quot; : &quot;+&quot;, unary());</span>
+            }
+<span class="fc bfc" id="L242" title="All 2 branches covered.">            if (c == '@') {</span>
+                // implicit intersection: the cell of a range in the formula's own row or column
+<span class="fc" id="L244">                p++;</span>
+<span class="fc" id="L245">                return new Node(Node.UNARY, &quot;@&quot;, unary());</span>
+            }
+        }
+<span class="fc" id="L248">        return intersection();</span>
+    }
+
+    private Node intersection() {
+<span class="fc" id="L252">        Node left = range();</span>
+        for (;;) {
+<span class="fc" id="L254">            int save = p;</span>
+<span class="fc bfc" id="L255" title="All 2 branches covered.">            if (ods) {</span>
+<span class="fc" id="L256">                ws();</span>
+<span class="pc bpc" id="L257" title="1 of 2 branches missed.">                if (eat('~')) {</span>
+<span class="nc" id="L258">                    left = new Node(Node.BINARY, &quot;,&quot;, left, range());</span>
+<span class="nc" id="L259">                    continue;</span>
+                }
+<span class="pc bpc" id="L261" title="3 of 6 branches missed.">                if (p &lt; len &amp;&amp; s.charAt(p) == '!' &amp;&amp; left.isReferenceLike()) {</span>
+<span class="nc" id="L262">                    p++;</span>
+<span class="nc" id="L263">                    left = new Node(Node.BINARY, &quot; &quot;, left, range());</span>
+<span class="nc" id="L264">                    continue;</span>
+                }
+<span class="fc" id="L266">                p = save;</span>
+<span class="fc" id="L267">                return left;</span>
+            }
+            // In Excel a space between two references is the intersection operator.
+<span class="fc bfc" id="L270" title="All 6 branches covered.">            if (p &gt;= len || s.charAt(p) != ' ' || !left.isReferenceLike()) {</span>
+<span class="fc" id="L271">                return left;</span>
+            }
+<span class="fc" id="L273">            ws();</span>
+<span class="fc bfc" id="L274" title="All 2 branches covered.">            if (p &gt;= len) {</span>
+<span class="fc" id="L275">                return left;</span>
+            }
+<span class="fc" id="L277">            char c = s.charAt(p);</span>
+<span class="pc bpc" id="L278" title="1 of 12 branches missed.">            if (!isLetter(c) &amp;&amp; !(c &gt;= '0' &amp;&amp; c &lt;= '9') &amp;&amp; c != '$' &amp;&amp; c != '\'' &amp;&amp; c != '(') {</span>
+<span class="fc" id="L279">                p = save;</span>
+<span class="fc" id="L280">                return left;</span>
+            }
+<span class="fc" id="L282">            Node right = range();</span>
+<span class="fc bfc" id="L283" title="All 2 branches covered.">            if (!right.isReferenceLike()) {</span>
+<span class="fc" id="L284">                throw fail();</span>
+            }
+<span class="fc" id="L286">            left = new Node(Node.BINARY, &quot; &quot;, left, right);</span>
+<span class="fc" id="L287">        }</span>
+    }
+
+    private Node range() {
+<span class="fc" id="L291">        Node left = primary();</span>
+<span class="fc bfc" id="L292" title="All 4 branches covered.">        while (p &lt; len &amp;&amp; s.charAt(p) == ':') {</span>
+<span class="fc" id="L293">            p++;</span>
+<span class="fc" id="L294">            Node right = primary();</span>
+<span class="fc bfc" id="L295" title="All 6 branches covered.">            if (left.kind == Node.REF &amp;&amp; right.kind == Node.REF &amp;&amp; right.sheet != null) {</span>
+                // Sheet1!A1:Sheet1!B2 names its sheet twice; A1:Other!B2 is no rectangle
+<span class="pc bpc" id="L297" title="2 of 6 branches missed.">                if (left.sheet == null || left.sheet2 != null || right.sheet2 != null</span>
+<span class="pc bpc" id="L298" title="1 of 2 branches missed.">                        || !left.sheet.equalsIgnoreCase(right.sheet)) {</span>
+<span class="fc" id="L299">                    throw fail();</span>
+                }
+<span class="fc" id="L301">                right.sheet = null;</span>
+            }
+<span class="fc bfc" id="L303" title="All 4 branches covered.">            if (left.kind == Node.REF &amp;&amp; right.kind == Node.REF) {</span>
+<span class="fc" id="L304">                left = bound(left, right);</span>
+            } else {
+<span class="fc" id="L306">                left = new Node(Node.BINARY, &quot;:&quot;, left, right);</span>
+            }
+<span class="fc" id="L308">        }</span>
+<span class="fc" id="L309">        return left;</span>
+    }
+
+    /// The area that spans two references, which is what the colon means between them.
+    private static Node bound(Node a, Node b) {
+<span class="fc" id="L314">        Node n = a.copyRef();</span>
+<span class="fc" id="L315">        n.area = true;</span>
+<span class="pc bpc" id="L316" title="1 of 4 branches missed.">        n.wholeCol = a.wholeCol &amp;&amp; b.wholeCol;</span>
+<span class="pc bpc" id="L317" title="1 of 4 branches missed.">        n.wholeRow = a.wholeRow &amp;&amp; b.wholeRow;</span>
+<span class="pc bpc" id="L318" title="1 of 2 branches missed.">        if (b.r1 &lt; a.r1) {</span>
+<span class="nc" id="L319">            n.r1 = b.r1;</span>
+<span class="nc" id="L320">            n.absR1 = b.absR1;</span>
+        }
+<span class="pc bpc" id="L322" title="1 of 2 branches missed.">        if (b.c1 &lt; a.c1) {</span>
+<span class="nc" id="L323">            n.c1 = b.c1;</span>
+<span class="nc" id="L324">            n.absC1 = b.absC1;</span>
+        }
+<span class="fc" id="L326">        n.r2 = a.r2;</span>
+<span class="fc" id="L327">        n.absR2 = a.absR2;</span>
+<span class="pc bpc" id="L328" title="1 of 2 branches missed.">        if (b.r2 &gt;= a.r2) {</span>
+<span class="fc" id="L329">            n.r2 = b.r2;</span>
+<span class="fc" id="L330">            n.absR2 = b.absR2;</span>
+        }
+<span class="fc" id="L332">        n.c2 = a.c2;</span>
+<span class="fc" id="L333">        n.absC2 = a.absC2;</span>
+<span class="pc bpc" id="L334" title="1 of 2 branches missed.">        if (b.c2 &gt;= a.c2) {</span>
+<span class="fc" id="L335">            n.c2 = b.c2;</span>
+<span class="fc" id="L336">            n.absC2 = b.absC2;</span>
+        }
+<span class="fc" id="L338">        return n;</span>
+    }
+
+    private Node primary() {
+<span class="fc" id="L342">        ws();</span>
+<span class="fc bfc" id="L343" title="All 2 branches covered.">        if (p &gt;= len) {</span>
+<span class="fc" id="L344">            throw fail();</span>
+        }
+<span class="fc" id="L346">        char c = s.charAt(p);</span>
+<span class="fc bfc" id="L347" title="All 2 branches covered.">        if (c == '&quot;') {</span>
+<span class="fc" id="L348">            return new Node(Node.STR, string());</span>
+        }
+<span class="fc bfc" id="L350" title="All 2 branches covered.">        if (c == '(') {</span>
+<span class="fc" id="L351">            p++;</span>
+<span class="fc" id="L352">            Node inner = comparison();</span>
+<span class="fc" id="L353">            ws();</span>
+<span class="fc bfc" id="L354" title="All 4 branches covered.">            while (!ods &amp;&amp; eat(',')) {</span>
+<span class="fc" id="L355">                inner = new Node(Node.BINARY, &quot;,&quot;, inner, comparison());</span>
+<span class="fc" id="L356">                ws();</span>
+            }
+<span class="fc" id="L358">            expect(')');</span>
+<span class="fc" id="L359">            return new Node(Node.PAREN, null, inner);</span>
+        }
+<span class="fc bfc" id="L361" title="All 2 branches covered.">        if (c == '{') {</span>
+<span class="fc" id="L362">            return arrayConstant();</span>
+        }
+<span class="fc bfc" id="L364" title="All 2 branches covered.">        if (c == '#') {</span>
+<span class="fc" id="L365">            return new Node(Node.ERR, errorLiteral());</span>
+        }
+<span class="fc bfc" id="L367" title="All 4 branches covered.">        if (ods &amp;&amp; c == '[') {</span>
+<span class="fc" id="L368">            return odsReference();</span>
+        }
+<span class="fc bfc" id="L370" title="All 10 branches covered.">        if (isDigit(c) || c == '.' || c == '$' &amp;&amp; p + 1 &lt; len &amp;&amp; isDigit(s.charAt(p + 1))) {</span>
+<span class="fc" id="L371">            Node rows = wholeRows();</span>
+<span class="fc bfc" id="L372" title="All 2 branches covered.">            if (rows != null) {</span>
+<span class="fc" id="L373">                return rows;</span>
+            }
+<span class="fc bfc" id="L375" title="All 2 branches covered.">            if (c == '$') {</span>
+<span class="fc" id="L376">                throw fail();</span>
+            }
+<span class="fc" id="L378">            return new Node(Node.NUM, number());</span>
+        }
+<span class="pc bpc" id="L380" title="1 of 4 branches missed.">        if (c == '\'' &amp;&amp; !ods) {</span>
+<span class="fc" id="L381">            String sheet = quoted();</span>
+<span class="fc" id="L382">            String sheet2 = null;</span>
+<span class="fc bfc" id="L383" title="All 2 branches covered.">            if (eat(':')) {</span>
+<span class="pc bpc" id="L384" title="2 of 4 branches missed.">                sheet2 = p &lt; len &amp;&amp; s.charAt(p) == '\'' ? quoted() : plainName();</span>
+            } else {
+                // 'First sheet:Last sheet'!A1 is how a spreadsheet writes a run of sheets when
+                // either name needs the quotes. No sheet name can hold a colon, so one inside
+                // the quotes always parts two names.
+<span class="fc" id="L389">                int colon = sheet.indexOf(':');</span>
+<span class="pc bpc" id="L390" title="1 of 4 branches missed.">                if (colon &gt; 0 &amp;&amp; colon &lt; sheet.length() - 1) {</span>
+<span class="fc" id="L391">                    sheet2 = sheet.substring(colon + 1);</span>
+<span class="fc" id="L392">                    sheet = sheet.substring(0, colon);</span>
+                }
+            }
+<span class="fc bfc" id="L395" title="All 2 branches covered.">            if (!eat('!')) {</span>
+<span class="fc" id="L396">                throw fail();</span>
+            }
+<span class="fc" id="L398">            return sheetReference(sheet, sheet2);</span>
+        }
+<span class="fc bfc" id="L400" title="All 8 branches covered.">        if (isLetter(c) || c == '_' || c == '$' || c == '\\') {</span>
+<span class="fc" id="L401">            return identifier();</span>
+        }
+<span class="fc" id="L403">        throw fail();</span>
+    }
+
+    private String plainName() {
+<span class="fc" id="L407">        int start = p;</span>
+<span class="fc bfc" id="L408" title="All 4 branches covered.">        while (p &lt; len &amp;&amp; isIdentifierPart(s.charAt(p))) {</span>
+<span class="fc" id="L409">            p++;</span>
+        }
+<span class="fc bfc" id="L411" title="All 2 branches covered.">        if (p == start) {</span>
+<span class="fc" id="L412">            throw fail();</span>
+        }
+<span class="fc" id="L414">        return s.substring(start, p);</span>
+    }
+
+    private Node identifier() {
+<span class="fc" id="L418">        int start = p;</span>
+<span class="fc" id="L419">        String id = plainName();</span>
+<span class="fc bfc" id="L420" title="All 2 branches covered.">        if (!ods) {</span>
+<span class="fc bfc" id="L421" title="All 2 branches covered.">            if (eat('!')) {</span>
+<span class="fc" id="L422">                return sheetReference(id, null);</span>
+            }
+<span class="fc bfc" id="L424" title="All 4 branches covered.">            if (p &lt; len &amp;&amp; s.charAt(p) == ':') {</span>
+                // Sheet1:Sheet3!A1, a reference through several sheets
+<span class="fc" id="L426">                int q = p + 1;</span>
+<span class="fc" id="L427">                int from = q;</span>
+<span class="fc bfc" id="L428" title="All 4 branches covered.">                while (q &lt; len &amp;&amp; isIdentifierPart(s.charAt(q))) {</span>
+<span class="fc" id="L429">                    q++;</span>
+                }
+<span class="fc bfc" id="L431" title="All 6 branches covered.">                if (q &gt; from &amp;&amp; q &lt; len &amp;&amp; s.charAt(q) == '!') {</span>
+<span class="fc" id="L432">                    String sheet2 = s.substring(from, q);</span>
+<span class="fc" id="L433">                    p = q + 1;</span>
+<span class="fc" id="L434">                    return sheetReference(id, sheet2);</span>
+                }
+            }
+        }
+<span class="fc" id="L438">        int q = p;</span>
+<span class="fc bfc" id="L439" title="All 4 branches covered.">        while (q &lt; len &amp;&amp; s.charAt(q) == ' ') {</span>
+<span class="fc" id="L440">            q++;</span>
+        }
+<span class="fc bfc" id="L442" title="All 6 branches covered.">        if (q &lt; len &amp;&amp; s.charAt(q) == '(' &amp;&amp; id.indexOf('$') &lt; 0) {</span>
+<span class="fc" id="L443">            p = q + 1;</span>
+<span class="fc" id="L444">            return function(id);</span>
+        }
+<span class="fc" id="L446">        p = start;</span>
+<span class="fc" id="L447">        Node ref = cellOrColumns();</span>
+<span class="fc bfc" id="L448" title="All 2 branches covered.">        if (ref != null) {</span>
+<span class="fc" id="L449">            return ref;</span>
+        }
+<span class="fc" id="L451">        p = start + id.length();</span>
+<span class="fc bfc" id="L452" title="All 2 branches covered.">        if (&quot;TRUE&quot;.equalsIgnoreCase(id)) {</span>
+<span class="fc" id="L453">            return new Node(Node.BOOL, Boolean.TRUE);</span>
+        }
+<span class="fc bfc" id="L455" title="All 2 branches covered.">        if (&quot;FALSE&quot;.equalsIgnoreCase(id)) {</span>
+<span class="fc" id="L456">            return new Node(Node.BOOL, Boolean.FALSE);</span>
+        }
+<span class="fc bfc" id="L458" title="All 2 branches covered.">        if (id.indexOf('$') &gt;= 0) {</span>
+<span class="fc" id="L459">            throw fail();</span>
+        }
+<span class="fc" id="L461">        return new Node(Node.NAME, id);</span>
+    }
+
+    private Node sheetReference(String sheet, String sheet2) {
+<span class="fc" id="L465">        Node n = cellOrColumns();</span>
+<span class="fc bfc" id="L466" title="All 2 branches covered.">        if (n == null) {</span>
+<span class="fc" id="L467">            n = wholeRows();</span>
+        }
+<span class="fc bfc" id="L469" title="All 2 branches covered.">        if (n == null) {</span>
+<span class="fc bfc" id="L470" title="All 4 branches covered.">            if (p &lt; len &amp;&amp; s.charAt(p) == '#') {</span>
+<span class="nc" id="L471">                return new Node(Node.ERR, errorLiteral());</span>
+            }
+            // a name scoped to a sheet; names are looked up in the workbook either way
+<span class="fc" id="L474">            return new Node(Node.NAME, plainName());</span>
+        }
+<span class="fc" id="L476">        n.sheet = sheet;</span>
+<span class="fc" id="L477">        n.sheet2 = sheet2;</span>
+<span class="fc" id="L478">        return n;</span>
+    }
+
+    /// Reads `A1`, `$A$1` or the whole columns `A:C` at the current position, or answers null
+    /// and consumes nothing. `LOG10` is a cell in such a file, and a function only when a
+    /// parenthesis follows, which the caller has already ruled out.
+    private Node cellOrColumns() {
+<span class="fc" id="L485">        int save = p;</span>
+<span class="fc" id="L486">        boolean absC = eat('$');</span>
+<span class="fc" id="L487">        int cs = p;</span>
+<span class="fc bfc" id="L488" title="All 6 branches covered.">        while (p &lt; len &amp;&amp; isLetter(s.charAt(p)) &amp;&amp; p - cs &lt; 4) {</span>
+<span class="fc" id="L489">            p++;</span>
+        }
+<span class="fc" id="L491">        int letters = p - cs;</span>
+<span class="fc bfc" id="L492" title="All 4 branches covered.">        if (letters &gt;= 1 &amp;&amp; letters &lt;= 3) {</span>
+<span class="fc" id="L493">            int col = column(s, cs, p);</span>
+<span class="fc bfc" id="L494" title="All 2 branches covered.">            if (col &lt;= Node.MAX_COL) {</span>
+<span class="fc" id="L495">                int afterCol = p;</span>
+<span class="fc" id="L496">                boolean absR = eat('$');</span>
+<span class="fc" id="L497">                int rs = p;</span>
+<span class="pc bpc" id="L498" title="1 of 6 branches missed.">                while (p &lt; len &amp;&amp; isDigit(s.charAt(p)) &amp;&amp; p - rs &lt; 8) {</span>
+<span class="fc" id="L499">                    p++;</span>
+                }
+<span class="pc bpc" id="L501" title="1 of 8 branches missed.">                if (p &gt; rs &amp;&amp; p - rs &lt;= 7 &amp;&amp; !(p &lt; len &amp;&amp; isIdentifierPart(s.charAt(p)))) {</span>
+<span class="fc" id="L502">                    int row = Integer.parseInt(s.substring(rs, p)) - 1;</span>
+<span class="pc bpc" id="L503" title="1 of 4 branches missed.">                    if (row &gt;= 0 &amp;&amp; row &lt;= Node.MAX_ROW) {</span>
+<span class="fc" id="L504">                        Node n = new Node(Node.REF);</span>
+<span class="fc" id="L505">                        n.r1 = row;</span>
+<span class="fc" id="L506">                        n.r2 = row;</span>
+<span class="fc" id="L507">                        n.c1 = col;</span>
+<span class="fc" id="L508">                        n.c2 = col;</span>
+<span class="fc" id="L509">                        n.absR1 = absR;</span>
+<span class="fc" id="L510">                        n.absR2 = absR;</span>
+<span class="fc" id="L511">                        n.absC1 = absC;</span>
+<span class="fc" id="L512">                        n.absC2 = absC;</span>
+<span class="fc" id="L513">                        return n;</span>
+                    }
+                }
+<span class="fc" id="L516">                p = afterCol;</span>
+<span class="fc bfc" id="L517" title="All 4 branches covered.">                if (p &lt; len &amp;&amp; s.charAt(p) == ':') {</span>
+<span class="fc" id="L518">                    int q = p + 1;</span>
+<span class="fc bfc" id="L519" title="All 4 branches covered.">                    boolean abs2 = q &lt; len &amp;&amp; s.charAt(q) == '$';</span>
+<span class="fc bfc" id="L520" title="All 2 branches covered.">                    if (abs2) {</span>
+<span class="fc" id="L521">                        q++;</span>
+                    }
+<span class="fc" id="L523">                    int cs2 = q;</span>
+<span class="fc bfc" id="L524" title="All 6 branches covered.">                    while (q &lt; len &amp;&amp; isLetter(s.charAt(q)) &amp;&amp; q - cs2 &lt; 4) {</span>
+<span class="fc" id="L525">                        q++;</span>
+                    }
+<span class="fc bfc" id="L527" title="All 10 branches covered.">                    if (q &gt; cs2 &amp;&amp; q - cs2 &lt;= 3 &amp;&amp; !(q &lt; len &amp;&amp; (isIdentifierPart(s.charAt(q)) || s.charAt(q) == '('</span>
+<span class="pc bpc" id="L528" title="1 of 2 branches missed.">                            || s.charAt(q) == '!'))) {</span>
+<span class="fc" id="L529">                        int col2 = column(s, cs2, q);</span>
+<span class="pc bpc" id="L530" title="1 of 2 branches missed.">                        if (col2 &lt;= Node.MAX_COL) {</span>
+<span class="fc" id="L531">                            p = q;</span>
+<span class="fc" id="L532">                            Node n = new Node(Node.REF);</span>
+<span class="fc" id="L533">                            n.area = true;</span>
+<span class="fc" id="L534">                            n.wholeCol = true;</span>
+<span class="fc" id="L535">                            n.r1 = 0;</span>
+<span class="fc" id="L536">                            n.r2 = Node.MAX_ROW;</span>
+<span class="fc" id="L537">                            n.c1 = Math.min(col, col2);</span>
+<span class="fc" id="L538">                            n.c2 = Math.max(col, col2);</span>
+<span class="fc" id="L539">                            n.absC1 = absC;</span>
+<span class="fc" id="L540">                            n.absC2 = abs2;</span>
+<span class="fc" id="L541">                            return n;</span>
+                        }
+                    }
+                }
+            }
+        }
+<span class="fc" id="L547">        p = save;</span>
+<span class="fc" id="L548">        return null;</span>
+    }
+
+    /// Reads the whole rows `1:3` or `$1:$3`, or answers null and consumes nothing.
+    private Node wholeRows() {
+<span class="fc" id="L553">        int save = p;</span>
+<span class="fc" id="L554">        boolean abs1 = eat('$');</span>
+<span class="fc" id="L555">        int rs = p;</span>
+<span class="fc bfc" id="L556" title="All 4 branches covered.">        while (p &lt; len &amp;&amp; isDigit(s.charAt(p))) {</span>
+<span class="fc" id="L557">            p++;</span>
+        }
+<span class="fc bfc" id="L559" title="All 8 branches covered.">        if (p &gt; rs &amp;&amp; p - rs &lt;= 7 &amp;&amp; p &lt; len &amp;&amp; s.charAt(p) == ':') {</span>
+<span class="fc" id="L560">            int first = Integer.parseInt(s.substring(rs, p)) - 1;</span>
+<span class="fc" id="L561">            p++;</span>
+<span class="fc" id="L562">            boolean abs2 = eat('$');</span>
+<span class="fc" id="L563">            int rs2 = p;</span>
+<span class="fc bfc" id="L564" title="All 4 branches covered.">            while (p &lt; len &amp;&amp; isDigit(s.charAt(p))) {</span>
+<span class="fc" id="L565">                p++;</span>
+            }
+<span class="pc bpc" id="L567" title="2 of 8 branches missed.">            if (p &gt; rs2 &amp;&amp; p - rs2 &lt;= 7 &amp;&amp; !(p &lt; len &amp;&amp; (isIdentifierPart(s.charAt(p))))) {</span>
+<span class="fc" id="L568">                int second = Integer.parseInt(s.substring(rs2, p)) - 1;</span>
+<span class="pc bpc" id="L569" title="3 of 8 branches missed.">                if (first &gt;= 0 &amp;&amp; second &gt;= 0 &amp;&amp; first &lt;= Node.MAX_ROW &amp;&amp; second &lt;= Node.MAX_ROW) {</span>
+<span class="fc" id="L570">                    Node n = new Node(Node.REF);</span>
+<span class="fc" id="L571">                    n.area = true;</span>
+<span class="fc" id="L572">                    n.wholeRow = true;</span>
+<span class="fc" id="L573">                    n.c1 = 0;</span>
+<span class="fc" id="L574">                    n.c2 = Node.MAX_COL;</span>
+<span class="fc" id="L575">                    n.r1 = Math.min(first, second);</span>
+<span class="fc" id="L576">                    n.r2 = Math.max(first, second);</span>
+<span class="fc" id="L577">                    n.absR1 = abs1;</span>
+<span class="fc" id="L578">                    n.absR2 = abs2;</span>
+<span class="fc" id="L579">                    return n;</span>
+                }
+            }
+        }
+<span class="fc" id="L583">        p = save;</span>
+<span class="fc" id="L584">        return null;</span>
+    }
+
+    /// An OpenDocument reference: `[.A1]`, `[.A1:.B2]`, `[$Sheet1.A1]`, `['My Sheet'.A1:.B2]`,
+    /// `[.A:.C]`.
+    private Node odsReference() {
+<span class="fc" id="L590">        p++;</span>
+<span class="fc" id="L591">        Node a = odsPart();</span>
+<span class="pc bpc" id="L592" title="1 of 2 branches missed.">        if (a.kind != Node.REF) {</span>
+<span class="nc" id="L593">            expect(']');</span>
+<span class="nc" id="L594">            return a;</span>
+        }
+<span class="fc bfc" id="L596" title="All 2 branches covered.">        if (eat(':')) {</span>
+<span class="fc" id="L597">            Node b = odsPart();</span>
+<span class="pc bpc" id="L598" title="1 of 2 branches missed.">            if (b.kind != Node.REF) {</span>
+<span class="nc" id="L599">                expect(']');</span>
+<span class="nc" id="L600">                return b;</span>
+            }
+<span class="fc" id="L602">            String second = b.sheet;</span>
+<span class="fc" id="L603">            b.sheet = null;</span>
+<span class="fc" id="L604">            a = bound(a, b);</span>
+<span class="pc bpc" id="L605" title="1 of 4 branches missed.">            if (second != null &amp;&amp; !second.equals(a.sheet)) {</span>
+<span class="fc" id="L606">                a.sheet2 = second;</span>
+                // one cell through several sheets is written with both corners in this
+                // format, and is still one cell
+<span class="pc bpc" id="L609" title="3 of 8 branches missed.">                if (a.r1 == a.r2 &amp;&amp; a.c1 == a.c2 &amp;&amp; !a.wholeCol &amp;&amp; !a.wholeRow) {</span>
+<span class="fc" id="L610">                    a.area = false;</span>
+                }
+            }
+        }
+<span class="fc" id="L614">        expect(']');</span>
+<span class="fc" id="L615">        return a;</span>
+    }
+
+    private Node odsPart() {
+<span class="pc bpc" id="L619" title="2 of 4 branches missed.">        if (p &lt; len &amp;&amp; s.charAt(p) == '#') {</span>
+<span class="nc" id="L620">            return new Node(Node.ERR, errorLiteral());</span>
+        }
+<span class="fc" id="L622">        eat('$');</span>
+<span class="fc" id="L623">        String sheet = null;</span>
+<span class="pc bpc" id="L624" title="1 of 4 branches missed.">        if (p &lt; len &amp;&amp; s.charAt(p) == '\'') {</span>
+<span class="fc" id="L625">            sheet = quoted();</span>
+        } else {
+<span class="fc" id="L627">            int start = p;</span>
+<span class="pc bpc" id="L628" title="1 of 6 branches missed.">            while (p &lt; len &amp;&amp; s.charAt(p) != '.' &amp;&amp; s.charAt(p) != ']') {</span>
+<span class="fc" id="L629">                p++;</span>
+            }
+<span class="fc bfc" id="L631" title="All 2 branches covered.">            if (p &gt; start) {</span>
+<span class="fc" id="L632">                sheet = s.substring(start, p);</span>
+            }
+        }
+<span class="fc bfc" id="L635" title="All 2 branches covered.">        if (!eat('.')) {</span>
+<span class="fc" id="L636">            throw fail();</span>
+        }
+<span class="pc bpc" id="L638" title="2 of 4 branches missed.">        if (p &lt; len &amp;&amp; s.charAt(p) == '#') {</span>
+<span class="nc" id="L639">            return new Node(Node.ERR, errorLiteral());</span>
+        }
+<span class="fc" id="L641">        Node n = cellOrColumns();</span>
+<span class="fc bfc" id="L642" title="All 2 branches covered.">        if (n == null) {</span>
+            // half of a whole column or whole row reference: `.A` or `.1`
+<span class="fc" id="L644">            boolean abs = eat('$');</span>
+<span class="fc" id="L645">            int start = p;</span>
+<span class="fc" id="L646">            n = new Node(Node.REF);</span>
+<span class="pc bpc" id="L647" title="1 of 4 branches missed.">            if (p &lt; len &amp;&amp; isLetter(s.charAt(p))) {</span>
+<span class="pc bpc" id="L648" title="1 of 4 branches missed.">                while (p &lt; len &amp;&amp; isLetter(s.charAt(p))) {</span>
+<span class="fc" id="L649">                    p++;</span>
+                }
+<span class="fc" id="L651">                n.wholeCol = true;</span>
+<span class="fc" id="L652">                n.c1 = column(s, start, p);</span>
+<span class="fc" id="L653">                n.c2 = n.c1;</span>
+<span class="fc" id="L654">                n.r2 = Node.MAX_ROW;</span>
+<span class="fc" id="L655">                n.absC1 = abs;</span>
+<span class="fc" id="L656">                n.absC2 = abs;</span>
+            } else {
+<span class="pc bpc" id="L658" title="1 of 4 branches missed.">                while (p &lt; len &amp;&amp; isDigit(s.charAt(p))) {</span>
+<span class="fc" id="L659">                    p++;</span>
+                }
+<span class="pc bpc" id="L661" title="1 of 4 branches missed.">                if (p == start || p - start &gt; 7) {</span>
+<span class="fc" id="L662">                    throw fail();</span>
+                }
+<span class="fc" id="L664">                n.wholeRow = true;</span>
+<span class="fc" id="L665">                n.r1 = Integer.parseInt(s.substring(start, p)) - 1;</span>
+<span class="fc" id="L666">                n.r2 = n.r1;</span>
+<span class="fc" id="L667">                n.c2 = Node.MAX_COL;</span>
+<span class="fc" id="L668">                n.absR1 = abs;</span>
+<span class="fc" id="L669">                n.absR2 = abs;</span>
+            }
+<span class="pc bpc" id="L671" title="3 of 6 branches missed.">            if (n.c1 &gt; Node.MAX_COL || n.r1 &lt; 0 || n.r1 &gt; Node.MAX_ROW) {</span>
+<span class="nc" id="L672">                throw fail();</span>
+            }
+        }
+<span class="fc" id="L675">        n.sheet = sheet;</span>
+<span class="fc" id="L676">        return n;</span>
+    }
+
+    private Node function(String id) {
+<span class="fc" id="L680">        String name = canonicalFunctionName(id);</span>
+<span class="fc bfc" id="L681" title="All 2 branches covered.">        if (ods) {</span>
+<span class="fc" id="L682">            name = Functions.fromOds(name);</span>
+        }
+<span class="fc" id="L684">        functions++;</span>
+<span class="fc bfc" id="L685" title="All 2 branches covered.">        if (functions &gt; MAX_FUNCTIONS) {</span>
+<span class="fc" id="L686">            functions--;</span>
+<span class="fc" id="L687">            throw fail();</span>
+        }
+        try {
+<span class="fc" id="L690">            return functionArgs(name);</span>
+        } finally {
+<span class="fc" id="L692">            functions--;</span>
+        }
+    }
+
+    private Node functionArgs(String name) {
+<span class="fc" id="L697">        ArrayList&lt;Node&gt; args = new ArrayList&lt;Node&gt;();</span>
+<span class="fc" id="L698">        ws();</span>
+<span class="fc bfc" id="L699" title="All 2 branches covered.">        if (eat(')')) {</span>
+<span class="fc" id="L700">            return counted(name, new Node[0]);</span>
+        }
+        for (;;) {
+<span class="fc" id="L703">            ws();</span>
+<span class="fc bfc" id="L704" title="All 6 branches covered.">            if (p &lt; len &amp;&amp; (s.charAt(p) == argSeparator || s.charAt(p) == ')')) {</span>
+<span class="fc" id="L705">                args.add(new Node(Node.MISSING));</span>
+            } else {
+<span class="fc" id="L707">                args.add(comparison());</span>
+            }
+<span class="fc" id="L709">            ws();</span>
+<span class="fc bfc" id="L710" title="All 2 branches covered.">            if (!eat(argSeparator)) {</span>
+<span class="fc" id="L711">                expect(')');</span>
+<span class="fc" id="L712">                break;</span>
+            }
+        }
+<span class="fc" id="L715">        Node[] array = new Node[args.size()];</span>
+<span class="fc" id="L716">        args.toArray(array);</span>
+<span class="fc" id="L717">        return counted(name, array);</span>
+    }
+
+    /// A call, once its arguments are counted against what the function takes. A name this
+    /// implementation does not know is left to evaluate to `#NAME?`.
+    private Node counted(String name, Node[] args) {
+<span class="pc bpc" id="L723" title="1 of 4 branches missed.">        if (&quot;SINGLE&quot;.equals(name) &amp;&amp; args.length == 1) {</span>
+            // what Excel writes into a file for the @ typed in a formula
+<span class="fc" id="L725">            return new Node(Node.UNARY, &quot;@&quot;, args[0]);</span>
+        }
+<span class="fc" id="L727">        int[] range = Functions.arity(name);</span>
+<span class="fc bfc" id="L728" title="All 6 branches covered.">        if (range != null &amp;&amp; (args.length &lt; range[0] || args.length &gt; range[1])) {</span>
+<span class="fc bfc" id="L729" title="All 2 branches covered.">            throw new FormulaSyntaxException(name + &quot; takes &quot; + (range[0] == range[1] ? String.valueOf(range[0])</span>
+                    : range[0] + &quot; to &quot; + range[1]) + &quot; arguments, not &quot; + args.length + &quot;: &quot; + s);
+        }
+<span class="fc" id="L732">        return new Node(Node.FUNC, name, args);</span>
+    }
+
+    /// Function names are upper case in the tree, without the prefixes the files put on names
+    /// newer than the format (`_xlfn.XLOOKUP`, `COM.MICROSOFT.XLOOKUP`).
+    static String canonicalFunctionName(String id) {
+<span class="fc" id="L738">        String name = asciiUpper(id);</span>
+<span class="fc bfc" id="L739" title="All 2 branches covered.">        for (String prefix : PREFIXES) {</span>
+<span class="fc bfc" id="L740" title="All 2 branches covered.">            if (name.startsWith(prefix)) {</span>
+<span class="fc" id="L741">                return name.substring(prefix.length());</span>
+            }
+        }
+<span class="fc" id="L744">        return name;</span>
+    }
+
+    private Node arrayConstant() {
+<span class="fc" id="L748">        p++;</span>
+<span class="fc bfc" id="L749" title="All 2 branches covered.">        char colSeparator = ods ? ';' : ',';</span>
+<span class="fc bfc" id="L750" title="All 2 branches covered.">        char rowSeparator = ods ? '|' : ';';</span>
+<span class="fc" id="L751">        ArrayList&lt;Object[]&gt; rows = new ArrayList&lt;Object[]&gt;();</span>
+<span class="fc" id="L752">        ArrayList&lt;Object&gt; row = new ArrayList&lt;Object&gt;();</span>
+        for (;;) {
+<span class="fc" id="L754">            ws();</span>
+<span class="fc" id="L755">            row.add(arrayElement());</span>
+<span class="fc" id="L756">            ws();</span>
+<span class="fc bfc" id="L757" title="All 2 branches covered.">            if (eat(colSeparator)) {</span>
+<span class="fc" id="L758">                continue;</span>
+            }
+<span class="fc" id="L760">            rows.add(row.toArray());</span>
+<span class="fc" id="L761">            row = new ArrayList&lt;Object&gt;();</span>
+<span class="fc bfc" id="L762" title="All 2 branches covered.">            if (!eat(rowSeparator)) {</span>
+<span class="fc" id="L763">                expect('}');</span>
+<span class="fc" id="L764">                break;</span>
+            }
+        }
+<span class="fc" id="L767">        Node n = new Node(Node.ARRAY);</span>
+<span class="fc" id="L768">        n.array = new Object[rows.size()][];</span>
+<span class="fc" id="L769">        rows.toArray(n.array);</span>
+<span class="fc" id="L770">        int width = n.array[0].length;</span>
+<span class="fc bfc" id="L771" title="All 2 branches covered.">        for (int i = 1; i &lt; n.array.length; i++) {</span>
+<span class="pc bpc" id="L772" title="1 of 2 branches missed.">            if (n.array[i].length != width) {</span>
+<span class="nc" id="L773">                throw fail();</span>
+            }
+        }
+<span class="fc" id="L776">        return n;</span>
+    }
+
+    private Object arrayElement() {
+<span class="fc bfc" id="L780" title="All 2 branches covered.">        if (p &gt;= len) {</span>
+<span class="fc" id="L781">            throw fail();</span>
+        }
+<span class="fc" id="L783">        char c = s.charAt(p);</span>
+<span class="fc bfc" id="L784" title="All 2 branches covered.">        if (c == '&quot;') {</span>
+<span class="fc" id="L785">            return string();</span>
+        }
+<span class="fc bfc" id="L787" title="All 2 branches covered.">        if (c == '#') {</span>
+<span class="fc" id="L788">            return errorLiteral();</span>
+        }
+<span class="fc bfc" id="L790" title="All 4 branches covered.">        if (c == '-' || c == '+') {</span>
+<span class="fc" id="L791">            p++;</span>
+<span class="fc" id="L792">            double d = number().doubleValue();</span>
+<span class="pc bpc" id="L793" title="1 of 2 branches missed.">            return Double.valueOf(c == '-' ? -d : d);</span>
+        }
+<span class="fc bfc" id="L795" title="All 4 branches covered.">        if (isDigit(c) || c == '.') {</span>
+<span class="fc" id="L796">            return number();</span>
+        }
+<span class="fc bfc" id="L798" title="All 2 branches covered.">        if (s.regionMatches(true, p, &quot;TRUE&quot;, 0, 4)) {</span>
+<span class="fc" id="L799">            p += 4;</span>
+<span class="fc" id="L800">            return Boolean.TRUE;</span>
+        }
+<span class="pc bpc" id="L802" title="1 of 2 branches missed.">        if (s.regionMatches(true, p, &quot;FALSE&quot;, 0, 5)) {</span>
+<span class="nc" id="L803">            p += 5;</span>
+<span class="nc" id="L804">            return Boolean.FALSE;</span>
+        }
+<span class="fc" id="L806">        throw fail();</span>
+    }
+
+    private CellError errorLiteral() {
+<span class="fc bfc" id="L810" title="All 2 branches covered.">        for (String e : ERRORS) {</span>
+<span class="fc bfc" id="L811" title="All 2 branches covered.">            if (s.regionMatches(true, p, e, 0, e.length())) {</span>
+<span class="fc" id="L812">                p += e.length();</span>
+<span class="fc" id="L813">                return CellError.valueOf(e);</span>
+            }
+        }
+<span class="fc" id="L816">        throw fail();</span>
+    }
+
+    private Double number() {
+<span class="fc" id="L820">        int start = p;</span>
+<span class="fc bfc" id="L821" title="All 4 branches covered.">        while (p &lt; len &amp;&amp; isDigit(s.charAt(p))) {</span>
+<span class="fc" id="L822">            p++;</span>
+        }
+<span class="fc bfc" id="L824" title="All 4 branches covered.">        if (p &lt; len &amp;&amp; s.charAt(p) == '.') {</span>
+<span class="fc" id="L825">            p++;</span>
+<span class="fc bfc" id="L826" title="All 4 branches covered.">            while (p &lt; len &amp;&amp; isDigit(s.charAt(p))) {</span>
+<span class="fc" id="L827">                p++;</span>
+            }
+        }
+<span class="fc bfc" id="L830" title="All 6 branches covered.">        if (p &lt; len &amp;&amp; (s.charAt(p) == 'E' || s.charAt(p) == 'e')) {</span>
+<span class="fc" id="L831">            int q = p + 1;</span>
+<span class="fc bfc" id="L832" title="All 6 branches covered.">            if (q &lt; len &amp;&amp; (s.charAt(q) == '+' || s.charAt(q) == '-')) {</span>
+<span class="fc" id="L833">                q++;</span>
+            }
+<span class="fc bfc" id="L835" title="All 4 branches covered.">            if (q &lt; len &amp;&amp; isDigit(s.charAt(q))) {</span>
+<span class="fc bfc" id="L836" title="All 4 branches covered.">                while (q &lt; len &amp;&amp; isDigit(s.charAt(q))) {</span>
+<span class="fc" id="L837">                    q++;</span>
+                }
+<span class="fc" id="L839">                p = q;</span>
+            }
+        }
+<span class="fc" id="L842">        String text = s.substring(start, p);</span>
+<span class="fc bfc" id="L843" title="All 4 branches covered.">        if (text.length() == 0 || &quot;.&quot;.equals(text)) {</span>
+<span class="fc" id="L844">            throw fail();</span>
+        }
+        Double d;
+        try {
+<span class="fc" id="L848">            d = Double.valueOf(text);</span>
+<span class="fc" id="L849">        } catch (NumberFormatException err) {</span>
+<span class="fc" id="L850">            throw fail();</span>
+<span class="fc" id="L851">        }</span>
+        // Excel refuses a literal past the largest double; kept, it would be written as text
+        // no reader takes for a number
+<span class="fc bfc" id="L854" title="All 2 branches covered.">        if (d.isInfinite()) {</span>
+<span class="fc" id="L855">            throw fail();</span>
+        }
+<span class="fc" id="L857">        return d;</span>
+    }
+
+    private String string() {
+<span class="fc" id="L861">        p++;</span>
+<span class="fc" id="L862">        StringBuilder sb = new StringBuilder();</span>
+<span class="fc bfc" id="L863" title="All 2 branches covered.">        while (p &lt; len) {</span>
+<span class="fc" id="L864">            char c = s.charAt(p++);</span>
+<span class="fc bfc" id="L865" title="All 2 branches covered.">            if (c == '&quot;') {</span>
+<span class="fc bfc" id="L866" title="All 4 branches covered.">                if (p &lt; len &amp;&amp; s.charAt(p) == '&quot;') {</span>
+<span class="fc" id="L867">                    sb.append('&quot;');</span>
+<span class="fc" id="L868">                    p++;</span>
+                } else {
+<span class="fc" id="L870">                    return sb.toString();</span>
+                }
+            } else {
+<span class="fc" id="L873">                sb.append(c);</span>
+            }
+<span class="fc" id="L875">        }</span>
+<span class="fc" id="L876">        throw fail();</span>
+    }
+
+    private String quoted() {
+<span class="fc" id="L880">        p++;</span>
+<span class="fc" id="L881">        StringBuilder sb = new StringBuilder();</span>
+<span class="fc bfc" id="L882" title="All 2 branches covered.">        while (p &lt; len) {</span>
+<span class="fc" id="L883">            char c = s.charAt(p++);</span>
+<span class="fc bfc" id="L884" title="All 2 branches covered.">            if (c == '\'') {</span>
+<span class="fc bfc" id="L885" title="All 4 branches covered.">                if (p &lt; len &amp;&amp; s.charAt(p) == '\'') {</span>
+<span class="fc" id="L886">                    sb.append('\'');</span>
+<span class="fc" id="L887">                    p++;</span>
+                } else {
+<span class="fc" id="L889">                    return sb.toString();</span>
+                }
+            } else {
+<span class="fc" id="L892">                sb.append(c);</span>
+            }
+<span class="fc" id="L894">        }</span>
+<span class="fc" id="L895">        throw fail();</span>
+    }
+
+    static boolean isDigit(char c) {
+<span class="fc bfc" id="L899" title="All 4 branches covered.">        return c &gt;= '0' &amp;&amp; c &lt;= '9';</span>
+    }
+
+    static boolean isLetter(char c) {
+<span class="fc bfc" id="L903" title="All 8 branches covered.">        return c &gt;= 'A' &amp;&amp; c &lt;= 'Z' || c &gt;= 'a' &amp;&amp; c &lt;= 'z';</span>
+    }
+
+    private static boolean isIdentifierPart(char c) {
+<span class="pc bpc" id="L907" title="1 of 16 branches missed.">        return isLetter(c) || isDigit(c) || c == '_' || c == '.' || c == '$' || c == '\\' || c == '?' || c &gt; 127;</span>
+    }
+
+    /// Function names and column letters are ASCII by specification; `toUpperCase()` would
+    /// fold them by the device's locale.
+    static String asciiUpper(String text) {
+<span class="fc" id="L913">        int n = text.length();</span>
+<span class="fc" id="L914">        StringBuilder sb = null;</span>
+<span class="fc bfc" id="L915" title="All 2 branches covered.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc" id="L916">            char c = text.charAt(i);</span>
+<span class="pc bpc" id="L917" title="1 of 4 branches missed.">            if (c &gt;= 'a' &amp;&amp; c &lt;= 'z') {</span>
+<span class="fc bfc" id="L918" title="All 2 branches covered.">                if (sb == null) {</span>
+<span class="fc" id="L919">                    sb = new StringBuilder(n);</span>
+<span class="fc" id="L920">                    sb.append(text.substring(0, i));</span>
+                }
+<span class="fc" id="L922">                sb.append((char) (c - 32));</span>
+<span class="fc bfc" id="L923" title="All 2 branches covered.">            } else if (sb != null) {</span>
+<span class="fc" id="L924">                sb.append(c);</span>
+            }
+        }
+<span class="fc bfc" id="L927" title="All 2 branches covered.">        return sb == null ? text : sb.toString();</span>
+    }
+
+    /// The zero based column of letters such as `A` or `xfd`.
+    static int column(String text, int from, int to) {
+<span class="fc" id="L932">        int col = 0;</span>
+<span class="fc bfc" id="L933" title="All 2 branches covered.">        for (int i = from; i &lt; to; i++) {</span>
+<span class="fc" id="L934">            char c = text.charAt(i);</span>
+<span class="fc bfc" id="L935" title="All 2 branches covered.">            if (c &gt;= 'a') {</span>
+<span class="fc" id="L936">                c -= 32;</span>
+            }
+<span class="fc" id="L938">            col = col * 26 + (c - 'A' + 1);</span>
+        }
+<span class="fc" id="L940">        return col - 1;</span>
+    }
+
+    static void appendColumn(StringBuilder sb, int col) {
+<span class="fc" id="L944">        int n = col + 1;</span>
+<span class="fc" id="L945">        int start = sb.length();</span>
+<span class="fc bfc" id="L946" title="All 2 branches covered.">        while (n &gt; 0) {</span>
+<span class="fc" id="L947">            int rem = (n - 1) % 26;</span>
+<span class="fc" id="L948">            sb.insert(start, (char) ('A' + rem));</span>
+<span class="fc" id="L949">            n = (n - 1) / 26;</span>
+<span class="fc" id="L950">        }</span>
+<span class="fc" id="L951">    }</span>
+
+    // ------------------------------------------------------------------ writing
+
+    /// Writes a tree as formula text, without the leading equals sign.
+    static String print(Node n, boolean ods) {
+<span class="fc" id="L957">        StringBuilder sb = new StringBuilder();</span>
+<span class="fc" id="L958">        print(sb, n, ods, true);</span>
+<span class="fc" id="L959">        return sb.toString();</span>
+    }
+
+    /// Writes a tree the way a formula is shown and typed: Excel's syntax, and function
+    /// names without the prefixes files give to the newer ones.
+    static String display(Node n) {
+<span class="fc" id="L965">        StringBuilder sb = new StringBuilder();</span>
+<span class="fc" id="L966">        print(sb, n, false, false);</span>
+<span class="fc" id="L967">        return sb.toString();</span>
+    }
+
+    private static void print(StringBuilder sb, Node n, boolean ods, boolean prefixes) {
+<span class="pc bpc" id="L971" title="2 of 13 branches missed.">        switch (n.kind) {</span>
+            case Node.NUM:
+<span class="fc" id="L973">                sb.append(numberText(((Double) n.value).doubleValue()));</span>
+<span class="fc" id="L974">                break;</span>
+            case Node.STR:
+<span class="fc" id="L976">                appendString(sb, n.name());</span>
+<span class="fc" id="L977">                break;</span>
+            case Node.BOOL:
+<span class="nc bnc" id="L979" title="All 2 branches missed.">                sb.append(((Boolean) n.value).booleanValue() ? &quot;TRUE&quot; : &quot;FALSE&quot;);</span>
+<span class="nc" id="L980">                break;</span>
+            case Node.ERR:
+<span class="pc bpc" id="L982" title="3 of 4 branches missed.">                if (ods &amp;&amp; n.value == CellError.REF) { //NOPMD CompareObjectsWithEquals - an error value is a constant</span>
+<span class="nc" id="L983">                    sb.append(&quot;[.#REF!]&quot;);</span>
+                } else {
+<span class="fc" id="L985">                    sb.append(n.value.toString());</span>
+                }
+<span class="fc" id="L987">                break;</span>
+            case Node.REF:
+<span class="fc" id="L989">                printReference(sb, n, ods);</span>
+<span class="fc" id="L990">                break;</span>
+            case Node.NAME:
+<span class="fc" id="L992">                sb.append(n.name());</span>
+<span class="fc" id="L993">                break;</span>
+            case Node.FUNC:
+<span class="fc bfc" id="L995" title="All 4 branches covered.">                sb.append(!prefixes ? n.name() : ods ? Functions.toOds(n.name())</span>
+<span class="fc" id="L996">                        : Functions.filePrefix(n.name(), false) + n.name()).append('(');</span>
+<span class="fc bfc" id="L997" title="All 2 branches covered.">                for (int i = 0; i &lt; n.args.length; i++) {</span>
+<span class="fc bfc" id="L998" title="All 2 branches covered.">                    if (i &gt; 0) {</span>
+<span class="fc bfc" id="L999" title="All 2 branches covered.">                        sb.append(ods ? ';' : ',');</span>
+                    }
+<span class="fc" id="L1001">                    print(sb, n.args[i], ods, prefixes);</span>
+                }
+<span class="fc" id="L1003">                sb.append(')');</span>
+<span class="fc" id="L1004">                break;</span>
+            case Node.BINARY:
+                // a chain of operators is walked and not recursed into: see Node.spine
+<span class="fc" id="L1007">                Node[] spine = Node.spine(n);</span>
+<span class="fc" id="L1008">                print(sb, spine[0].args[0], ods, prefixes);</span>
+<span class="fc bfc" id="L1009" title="All 2 branches covered.">                for (Node link : spine) {</span>
+<span class="fc" id="L1010">                    String op = link.name();</span>
+<span class="fc bfc" id="L1011" title="All 4 branches covered.">                    if (ods &amp;&amp; &quot;,&quot;.equals(op)) {</span>
+<span class="fc" id="L1012">                        sb.append('~');</span>
+<span class="fc bfc" id="L1013" title="All 4 branches covered.">                    } else if (ods &amp;&amp; &quot; &quot;.equals(op)) {</span>
+<span class="fc" id="L1014">                        sb.append('!');</span>
+                    } else {
+<span class="fc" id="L1016">                        sb.append(op);</span>
+                    }
+<span class="fc" id="L1018">                    print(sb, link.args[1], ods, prefixes);</span>
+                }
+<span class="fc" id="L1020">                break;</span>
+            case Node.UNARY:
+<span class="pc bpc" id="L1022" title="1 of 6 branches missed.">                if (&quot;@&quot;.equals(n.name()) &amp;&amp; (ods || prefixes)) {</span>
+<span class="pc bpc" id="L1023" title="1 of 2 branches missed.">                    if (ods) {</span>
+                        // LibreOffice intersects a range in a formula of one cell by itself
+<span class="nc" id="L1025">                        print(sb, n.args[0], ods, prefixes);</span>
+                    } else {
+<span class="fc" id="L1027">                        sb.append(&quot;_xlfn.SINGLE(&quot;);</span>
+<span class="fc" id="L1028">                        print(sb, n.args[0], ods, prefixes);</span>
+<span class="fc" id="L1029">                        sb.append(')');</span>
+                    }
+<span class="fc" id="L1031">                    break;</span>
+                }
+<span class="fc" id="L1033">                sb.append(n.name());</span>
+<span class="fc" id="L1034">                print(sb, n.args[0], ods, prefixes);</span>
+<span class="fc" id="L1035">                break;</span>
+            case Node.PERCENT:
+<span class="fc" id="L1037">                print(sb, n.args[0], ods, prefixes);</span>
+<span class="fc" id="L1038">                sb.append('%');</span>
+<span class="fc" id="L1039">                break;</span>
+            case Node.PAREN:
+<span class="fc" id="L1041">                sb.append('(');</span>
+<span class="fc" id="L1042">                print(sb, n.args[0], ods, prefixes);</span>
+<span class="fc" id="L1043">                sb.append(')');</span>
+<span class="fc" id="L1044">                break;</span>
+            case Node.ARRAY:
+<span class="fc" id="L1046">                sb.append('{');</span>
+<span class="fc bfc" id="L1047" title="All 2 branches covered.">                for (int r = 0; r &lt; n.array.length; r++) {</span>
+<span class="fc bfc" id="L1048" title="All 2 branches covered.">                    if (r &gt; 0) {</span>
+<span class="fc bfc" id="L1049" title="All 2 branches covered.">                        sb.append(ods ? '|' : ';');</span>
+                    }
+<span class="fc bfc" id="L1051" title="All 2 branches covered.">                    for (int c = 0; c &lt; n.array[r].length; c++) {</span>
+<span class="fc bfc" id="L1052" title="All 2 branches covered.">                        if (c &gt; 0) {</span>
+<span class="fc bfc" id="L1053" title="All 2 branches covered.">                            sb.append(ods ? ';' : ',');</span>
+                        }
+<span class="fc" id="L1055">                        Object v = n.array[r][c];</span>
+<span class="fc bfc" id="L1056" title="All 2 branches covered.">                        if (v instanceof String) {</span>
+<span class="fc" id="L1057">                            appendString(sb, (String) v);</span>
+<span class="pc bpc" id="L1058" title="1 of 2 branches missed.">                        } else if (v instanceof Double) {</span>
+<span class="fc" id="L1059">                            sb.append(numberText(((Double) v).doubleValue()));</span>
+<span class="nc bnc" id="L1060" title="All 2 branches missed.">                        } else if (v instanceof Boolean) {</span>
+<span class="nc bnc" id="L1061" title="All 2 branches missed.">                            sb.append(((Boolean) v).booleanValue() ? &quot;TRUE&quot; : &quot;FALSE&quot;);</span>
+                        } else {
+<span class="nc" id="L1063">                            sb.append(v);</span>
+                        }
+                    }
+                }
+<span class="fc" id="L1067">                sb.append('}');</span>
+<span class="fc" id="L1068">                break;</span>
+            default:
+                break;
+        }
+<span class="fc" id="L1072">    }</span>
+
+    private static void appendString(StringBuilder sb, String text) {
+<span class="fc" id="L1075">        sb.append('&quot;');</span>
+<span class="fc" id="L1076">        int n = text.length();</span>
+<span class="fc bfc" id="L1077" title="All 2 branches covered.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc" id="L1078">            char c = text.charAt(i);</span>
+<span class="pc bpc" id="L1079" title="1 of 2 branches missed.">            if (c == '&quot;') {</span>
+<span class="nc" id="L1080">                sb.append('&quot;');</span>
+            }
+<span class="fc" id="L1082">            sb.append(c);</span>
+        }
+<span class="fc" id="L1084">        sb.append('&quot;');</span>
+<span class="fc" id="L1085">    }</span>
+
+    /// A number the way a formula spells it: no trailing `.0`, and never the grouping or the
+    /// decimal comma of a locale.
+    static String numberText(double d) {
+<span class="fc bfc" id="L1090" title="All 4 branches covered.">        if (d == Math.floor(d) &amp;&amp; Math.abs(d) &lt; 1e15) {</span>
+<span class="fc" id="L1091">            return Long.toString((long) d);</span>
+        }
+<span class="fc" id="L1093">        return Double.toString(d);</span>
+    }
+
+    private static void printReference(StringBuilder sb, Node n, boolean ods) {
+<span class="fc bfc" id="L1097" title="All 2 branches covered.">        if (ods) {</span>
+<span class="fc" id="L1098">            sb.append('[');</span>
+<span class="fc bfc" id="L1099" title="All 2 branches covered.">            if (n.sheet != null) {</span>
+<span class="fc" id="L1100">                sb.append('$');</span>
+<span class="fc" id="L1101">                appendSheetName(sb, n.sheet);</span>
+            }
+<span class="fc" id="L1103">            sb.append('.');</span>
+<span class="fc" id="L1104">            printCorner(sb, n, true);</span>
+            // one cell on several sheets is still a range to this syntax: [$Jan.B2:$Mar.B2]
+<span class="fc bfc" id="L1106" title="All 4 branches covered.">            if (n.area || n.sheet2 != null) {</span>
+<span class="fc" id="L1107">                sb.append(':');</span>
+<span class="fc bfc" id="L1108" title="All 2 branches covered.">                if (n.sheet2 != null) {</span>
+<span class="fc" id="L1109">                    sb.append('$');</span>
+<span class="fc" id="L1110">                    appendSheetName(sb, n.sheet2);</span>
+                }
+<span class="fc" id="L1112">                sb.append('.');</span>
+<span class="fc bfc" id="L1113" title="All 2 branches covered.">                printCorner(sb, n, !n.area);</span>
+            }
+<span class="fc" id="L1115">            sb.append(']');</span>
+<span class="fc" id="L1116">            return;</span>
+        }
+<span class="fc bfc" id="L1118" title="All 2 branches covered.">        if (n.sheet != null) {</span>
+<span class="fc bfc" id="L1119" title="All 2 branches covered.">            if (n.sheet2 != null) {</span>
+                // a quoted span is quoted as a whole: 'First Sheet:Last Sheet'!A1
+<span class="pc bpc" id="L1121" title="2 of 4 branches missed.">                if (needsQuotes(n.sheet) || needsQuotes(n.sheet2)) {</span>
+<span class="nc" id="L1122">                    sb.append('\'').append(escapeQuote(n.sheet)).append(':').append(escapeQuote(n.sheet2)).append('\'');</span>
+                } else {
+<span class="fc" id="L1124">                    sb.append(n.sheet).append(':').append(n.sheet2);</span>
+                }
+            } else {
+<span class="fc" id="L1127">                appendSheetName(sb, n.sheet);</span>
+            }
+<span class="fc" id="L1129">            sb.append('!');</span>
+        }
+<span class="fc" id="L1131">        printCorner(sb, n, true);</span>
+<span class="fc bfc" id="L1132" title="All 2 branches covered.">        if (n.area) {</span>
+<span class="fc" id="L1133">            sb.append(':');</span>
+<span class="fc" id="L1134">            printCorner(sb, n, false);</span>
+        }
+<span class="fc" id="L1136">    }</span>
+
+    private static void printCorner(StringBuilder sb, Node n, boolean first) {
+<span class="fc bfc" id="L1139" title="All 2 branches covered.">        if (!n.wholeRow) {</span>
+<span class="fc bfc" id="L1140" title="All 6 branches covered.">            if (first ? n.absC1 : n.absC2) {</span>
+<span class="fc" id="L1141">                sb.append('$');</span>
+            }
+<span class="fc bfc" id="L1143" title="All 2 branches covered.">            appendColumn(sb, first ? n.c1 : n.c2);</span>
+        }
+<span class="fc bfc" id="L1145" title="All 2 branches covered.">        if (!n.wholeCol) {</span>
+<span class="fc bfc" id="L1146" title="All 6 branches covered.">            if (first ? n.absR1 : n.absR2) {</span>
+<span class="fc" id="L1147">                sb.append('$');</span>
+            }
+<span class="fc bfc" id="L1149" title="All 2 branches covered.">            sb.append((first ? n.r1 : n.r2) + 1);</span>
+        }
+<span class="fc" id="L1151">    }</span>
+
+    static void appendSheetName(StringBuilder sb, String name) {
+<span class="fc bfc" id="L1154" title="All 2 branches covered.">        if (needsQuotes(name)) {</span>
+<span class="fc" id="L1155">            sb.append('\'').append(escapeQuote(name)).append('\'');</span>
+        } else {
+<span class="fc" id="L1157">            sb.append(name);</span>
+        }
+<span class="fc" id="L1159">    }</span>
+
+    private static String escapeQuote(String name) {
+<span class="fc bfc" id="L1162" title="All 2 branches covered.">        if (name.indexOf('\'') &lt; 0) {</span>
+<span class="fc" id="L1163">            return name;</span>
+        }
+<span class="fc" id="L1165">        StringBuilder sb = new StringBuilder();</span>
+<span class="fc bfc" id="L1166" title="All 2 branches covered.">        for (int i = 0; i &lt; name.length(); i++) {</span>
+<span class="fc" id="L1167">            char c = name.charAt(i);</span>
+<span class="fc bfc" id="L1168" title="All 2 branches covered.">            if (c == '\'') {</span>
+<span class="fc" id="L1169">                sb.append('\'');</span>
+            }
+<span class="fc" id="L1171">            sb.append(c);</span>
+        }
+<span class="fc" id="L1173">        return sb.toString();</span>
+    }
+
+    private static boolean needsQuotes(String name) {
+<span class="fc" id="L1177">        int n = name.length();</span>
+<span class="pc bpc" id="L1178" title="1 of 4 branches missed.">        if (n == 0 || isDigit(name.charAt(0))) {</span>
+<span class="fc" id="L1179">            return true;</span>
+        }
+<span class="fc bfc" id="L1181" title="All 2 branches covered.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc" id="L1182">            char c = name.charAt(i);</span>
+<span class="pc bpc" id="L1183" title="1 of 6 branches missed.">            if (!isLetter(c) &amp;&amp; !isDigit(c) &amp;&amp; c != '_') {</span>
+<span class="fc" id="L1184">                return true;</span>
+            }
+        }
+        // a sheet called A1 or TRUE would read as a cell or a literal
+<span class="fc" id="L1188">        return looksLikeCellOrLiteral(name);</span>
+    }
+
+    /// Whether a name is a reference in Excel's other notation, R1C1, R2, C3, RC: Excel
+    /// wants such a sheet name quoted, and reports a file as damaged when it is not.
+    private static boolean isR1C1(String name) {
+<span class="fc" id="L1194">        int i = 0;</span>
+<span class="fc" id="L1195">        int n = name.length();</span>
+<span class="pc bpc" id="L1196" title="1 of 6 branches missed.">        if (i &lt; n &amp;&amp; (name.charAt(i) == 'R' || name.charAt(i) == 'r')) {</span>
+<span class="fc" id="L1197">            i++;</span>
+<span class="pc bpc" id="L1198" title="2 of 4 branches missed.">            while (i &lt; n &amp;&amp; isDigit(name.charAt(i))) {</span>
+<span class="nc" id="L1199">                i++;</span>
+            }
+        }
+<span class="pc bpc" id="L1202" title="2 of 6 branches missed.">        if (i &lt; n &amp;&amp; (name.charAt(i) == 'C' || name.charAt(i) == 'c')) {</span>
+<span class="fc" id="L1203">            i++;</span>
+<span class="pc bpc" id="L1204" title="2 of 4 branches missed.">            while (i &lt; n &amp;&amp; isDigit(name.charAt(i))) {</span>
+<span class="nc" id="L1205">                i++;</span>
+            }
+        }
+<span class="pc bpc" id="L1208" title="3 of 4 branches missed.">        return i == n &amp;&amp; n &gt; 0;</span>
+    }
+
+    private static boolean looksLikeCellOrLiteral(String name) {
+<span class="pc bpc" id="L1212" title="2 of 6 branches missed.">        if (&quot;TRUE&quot;.equalsIgnoreCase(name) || &quot;FALSE&quot;.equalsIgnoreCase(name) || isR1C1(name)) {</span>
+<span class="fc" id="L1213">            return true;</span>
+        }
+<span class="fc" id="L1215">        int i = 0;</span>
+<span class="fc" id="L1216">        int n = name.length();</span>
+<span class="fc bfc" id="L1217" title="All 4 branches covered.">        while (i &lt; n &amp;&amp; isLetter(name.charAt(i))) {</span>
+<span class="fc" id="L1218">            i++;</span>
+        }
+<span class="pc bpc" id="L1220" title="1 of 6 branches missed.">        if (i == 0 || i &gt; 3 || i == n) {</span>
+<span class="fc" id="L1221">            return false;</span>
+        }
+<span class="fc bfc" id="L1223" title="All 4 branches covered.">        while (i &lt; n &amp;&amp; isDigit(name.charAt(i))) {</span>
+<span class="fc" id="L1224">            i++;</span>
+        }
+<span class="fc bfc" id="L1226" title="All 2 branches covered.">        return i == n;</span>
+    }
+
+    // ------------------------------------------------------------------ moving
+
+    /// The formula as it reads when its cell is moved by a number of rows and columns:
+    /// relative references follow, absolute ones stay. This is how a shared formula and a
+    /// filled-down formula are derived from the one that was written.
+    static Node shift(Node n, int dr, int dc) {
+<span class="fc" id="L1235">        return shift(n, dr, dc, false);</span>
+    }
+
+    /// A defined name as it reads from a cell: Excel keeps a name's relative references as
+    /// if written in A1 and moves them to the cell that uses the name, wrapping around the
+    /// edges of the grid, so a reference to the row above is stored as the last row.
+    static Node fromCell(Node definition, int row, int col) {
+<span class="fc bfc" id="L1242" title="All 4 branches covered.">        return row == 0 &amp;&amp; col == 0 ? definition : shift(definition, row, col, true);</span>
+    }
+
+    /// How far up and left of A1 a name's relative references reach once their wrapped
+    /// coordinates are read as offsets: the base cell OpenDocument needs so that none wraps.
+    static int[] reach(Node definition) {
+<span class="fc" id="L1248">        int[] r = new int[2];</span>
+<span class="fc" id="L1249">        ArrayList&lt;Node&gt; stack = new ArrayList&lt;Node&gt;();</span>
+<span class="fc" id="L1250">        stack.add(definition);</span>
+<span class="fc bfc" id="L1251" title="All 2 branches covered.">        while (!stack.isEmpty()) {</span>
+<span class="fc" id="L1252">            Node n = stack.remove(stack.size() - 1);</span>
+<span class="pc bpc" id="L1253" title="1 of 2 branches missed.">            if (n == null) {</span>
+<span class="nc" id="L1254">                continue;</span>
+            }
+<span class="fc bfc" id="L1256" title="All 2 branches covered.">            if (n.kind == Node.REF) {</span>
+<span class="pc bpc" id="L1257" title="1 of 2 branches missed.">                if (!n.wholeCol) {</span>
+<span class="fc" id="L1258">                    r[0] = Math.max(r[0], back(n.absR1, n.r1, Node.MAX_ROW));</span>
+<span class="fc" id="L1259">                    r[0] = Math.max(r[0], back(n.absR2, n.r2, Node.MAX_ROW));</span>
+                }
+<span class="pc bpc" id="L1261" title="1 of 2 branches missed.">                if (!n.wholeRow) {</span>
+<span class="fc" id="L1262">                    r[1] = Math.max(r[1], back(n.absC1, n.c1, Node.MAX_COL));</span>
+<span class="fc" id="L1263">                    r[1] = Math.max(r[1], back(n.absC2, n.c2, Node.MAX_COL));</span>
+                }
+<span class="pc bpc" id="L1265" title="1 of 2 branches missed.">            } else if (n.args != null) {</span>
+<span class="fc bfc" id="L1266" title="All 2 branches covered.">                for (Node a : n.args) {</span>
+<span class="fc" id="L1267">                    stack.add(a);</span>
+                }
+            }
+<span class="fc" id="L1270">        }</span>
+<span class="fc" id="L1271">        return r;</span>
+    }
+
+    /// Gives every reference without a sheet name the one given, in place: a defined name
+    /// read from a file that left its sheet out.
+    static void qualify(Node definition, String sheet) {
+<span class="fc" id="L1277">        ArrayList&lt;Node&gt; stack = new ArrayList&lt;Node&gt;();</span>
+<span class="fc" id="L1278">        stack.add(definition);</span>
+<span class="fc bfc" id="L1279" title="All 2 branches covered.">        while (!stack.isEmpty()) {</span>
+<span class="fc" id="L1280">            Node n = stack.remove(stack.size() - 1);</span>
+<span class="pc bpc" id="L1281" title="1 of 2 branches missed.">            if (n == null) {</span>
+<span class="nc" id="L1282">                continue;</span>
+            }
+<span class="pc bpc" id="L1284" title="2 of 4 branches missed.">            if (n.kind == Node.REF &amp;&amp; n.sheet == null) {</span>
+<span class="fc" id="L1285">                n.sheet = sheet;</span>
+            }
+<span class="pc bpc" id="L1287" title="1 of 2 branches missed.">            if (n.args != null) {</span>
+<span class="nc bnc" id="L1288" title="All 2 branches missed.">                for (Node a : n.args) {</span>
+<span class="nc" id="L1289">                    stack.add(a);</span>
+                }
+            }
+<span class="fc" id="L1292">        }</span>
+<span class="fc" id="L1293">    }</span>
+
+    static boolean hasSheetlessRef(Node definition) {
+<span class="fc" id="L1296">        ArrayList&lt;Node&gt; stack = new ArrayList&lt;Node&gt;();</span>
+<span class="fc" id="L1297">        stack.add(definition);</span>
+<span class="fc bfc" id="L1298" title="All 2 branches covered.">        while (!stack.isEmpty()) {</span>
+<span class="fc" id="L1299">            Node n = stack.remove(stack.size() - 1);</span>
+<span class="pc bpc" id="L1300" title="1 of 2 branches missed.">            if (n == null) {</span>
+<span class="nc" id="L1301">                continue;</span>
+            }
+<span class="fc bfc" id="L1303" title="All 4 branches covered.">            if (n.kind == Node.REF &amp;&amp; n.sheet == null) {</span>
+<span class="fc" id="L1304">                return true;</span>
+            }
+<span class="fc bfc" id="L1306" title="All 2 branches covered.">            if (n.args != null) {</span>
+<span class="fc bfc" id="L1307" title="All 2 branches covered.">                for (Node a : n.args) {</span>
+<span class="fc" id="L1308">                    stack.add(a);</span>
+                }
+            }
+<span class="fc" id="L1311">        }</span>
+<span class="fc" id="L1312">        return false;</span>
+    }
+
+    private static int back(boolean absolute, int v, int max) {
+<span class="fc bfc" id="L1316" title="All 4 branches covered.">        return absolute || v &lt;= max / 2 ? 0 : max + 1 - v;</span>
+    }
+
+    private static int wrap(int v, int size) {
+<span class="fc" id="L1320">        int m = v % size;</span>
+<span class="fc bfc" id="L1321" title="All 2 branches covered.">        return m &lt; 0 ? m + size : m;</span>
+    }
+
+    private static Node shift(Node n, int dr, int dc, boolean wrap) {
+<span class="fc bfc" id="L1325" title="All 2 branches covered.">        if (n.kind == Node.REF) {</span>
+<span class="fc" id="L1326">            Node m = n.copyRef();</span>
+<span class="pc bpc" id="L1327" title="1 of 2 branches missed.">            if (!n.wholeCol) {</span>
+<span class="fc bfc" id="L1328" title="All 2 branches covered.">                if (!n.absR1) {</span>
+<span class="fc" id="L1329">                    m.r1 += dr;</span>
+                }
+<span class="fc bfc" id="L1331" title="All 2 branches covered.">                if (!n.absR2) {</span>
+<span class="fc" id="L1332">                    m.r2 += dr;</span>
+                }
+            }
+<span class="fc bfc" id="L1335" title="All 2 branches covered.">            if (!n.wholeRow) {</span>
+<span class="fc bfc" id="L1336" title="All 2 branches covered.">                if (!n.absC1) {</span>
+<span class="fc" id="L1337">                    m.c1 += dc;</span>
+                }
+<span class="fc bfc" id="L1339" title="All 2 branches covered.">                if (!n.absC2) {</span>
+<span class="fc" id="L1340">                    m.c2 += dc;</span>
+                }
+            }
+<span class="fc bfc" id="L1343" title="All 2 branches covered.">            if (wrap) {</span>
+<span class="fc" id="L1344">                m.r1 = wrap(m.r1, Node.MAX_ROW + 1);</span>
+<span class="fc" id="L1345">                m.r2 = wrap(m.r2, Node.MAX_ROW + 1);</span>
+<span class="fc" id="L1346">                m.c1 = wrap(m.c1, Node.MAX_COL + 1);</span>
+<span class="fc" id="L1347">                m.c2 = wrap(m.c2, Node.MAX_COL + 1);</span>
+<span class="pc bpc" id="L1348" title="1 of 2 branches missed.">                if (m.r1 &gt; m.r2) {</span>
+<span class="nc" id="L1349">                    int t = m.r1;</span>
+<span class="nc" id="L1350">                    m.r1 = m.r2;</span>
+<span class="nc" id="L1351">                    m.r2 = t;</span>
+                }
+<span class="pc bpc" id="L1353" title="1 of 2 branches missed.">                if (m.c1 &gt; m.c2) {</span>
+<span class="nc" id="L1354">                    int t = m.c1;</span>
+<span class="nc" id="L1355">                    m.c1 = m.c2;</span>
+<span class="nc" id="L1356">                    m.c2 = t;</span>
+                }
+<span class="fc" id="L1358">                return m;</span>
+            }
+<span class="pc bpc" id="L1360" title="6 of 16 branches missed.">            if (m.r1 &lt; 0 || m.c1 &lt; 0 || m.r2 &gt; Node.MAX_ROW || m.c2 &gt; Node.MAX_COL || m.r2 &lt; 0 || m.c2 &lt; 0</span>
+                    || m.r1 &gt; Node.MAX_ROW || m.c1 &gt; Node.MAX_COL) {
+<span class="fc" id="L1362">                return new Node(Node.ERR, CellError.REF);</span>
+            }
+<span class="fc" id="L1364">            return m;</span>
+        }
+<span class="pc bpc" id="L1366" title="1 of 4 branches missed.">        if (n.args == null || n.args.length == 0) {</span>
+<span class="fc" id="L1367">            return n;</span>
+        }
+<span class="fc bfc" id="L1369" title="All 2 branches covered.">        if (n.kind == Node.BINARY) {</span>
+            // a chain of operators is walked and not recursed into: see Node.spine
+<span class="fc" id="L1371">            Node[] spine = Node.spine(n);</span>
+<span class="fc" id="L1372">            Node left = shift(spine[0].args[0], dr, dc, wrap);</span>
+<span class="fc bfc" id="L1373" title="All 2 branches covered.">            for (Node link : spine) {</span>
+<span class="fc" id="L1374">                left = new Node(Node.BINARY, link.value, left, shift(link.args[1], dr, dc, wrap));</span>
+            }
+<span class="fc" id="L1376">            return left;</span>
+        }
+<span class="fc" id="L1378">        Node[] args = new Node[n.args.length];</span>
+<span class="fc bfc" id="L1379" title="All 2 branches covered.">        for (int i = 0; i &lt; args.length; i++) {</span>
+<span class="fc" id="L1380">            args[i] = shift(n.args[i], dr, dc, wrap);</span>
+        }
+<span class="fc" id="L1382">        Node m = new Node(n.kind, n.value, args);</span>
+<span class="fc" id="L1383">        m.array = n.array;</span>
+<span class="fc" id="L1384">        return m;</span>
+    }
+
+    /// The formula as it reads after rows or columns were inserted into, or removed from, a
+    /// sheet. References into that sheet move with their cells; a reference whose cells were
+    /// all removed becomes `#REF!`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `n`: the formula
+    ///
+    /// - `refersToEdited`: whether a reference with no sheet name points at the edited sheet
+    ///
+    /// - `editedSheet`: the name of the edited sheet
+    ///
+    /// - `rows`: true for rows, false for columns
+    ///
+    /// - `at`: the first inserted or removed index
+    ///
+    /// - `delta`: the number inserted, or minus the number removed
+    static Node restructure(Node n, boolean refersToEdited, String editedSheet, boolean rows, int at, int delta) {
+<span class="fc" id="L1405">        return restructure(n, refersToEdited, editedSheet, rows, at, delta, false);</span>
+    }
+
+    /// As [#restructure(Node, boolean, String, boolean, int, int)] for a defined name: a
+    /// name's relative references are offsets from the cell that uses it, which moves with
+    /// its own formula, so only its absolute references follow the edit.
+    static Node restructureName(Node n, String editedSheet, boolean rows, int at, int delta) {
+<span class="fc" id="L1412">        return restructure(n, false, editedSheet, rows, at, delta, true);</span>
+    }
+
+    private static Node restructure(Node n, boolean refersToEdited, String editedSheet, boolean rows, int at, int delta,
+            boolean name) {
+<span class="fc bfc" id="L1417" title="All 2 branches covered.">        if (n.kind == Node.REF) {</span>
+<span class="pc bpc" id="L1418" title="2 of 6 branches missed.">            boolean hit = n.sheet == null ? refersToEdited : n.sheet.equalsIgnoreCase(editedSheet) &amp;&amp; n.sheet2 == null;</span>
+<span class="pc bpc" id="L1419" title="2 of 10 branches missed.">            if (!hit || rows &amp;&amp; n.wholeCol || !rows &amp;&amp; n.wholeRow) {</span>
+<span class="fc" id="L1420">                return n;</span>
+            }
+<span class="pc bpc" id="L1422" title="1 of 8 branches missed.">            boolean fixedA = !name || (rows ? n.absR1 : n.absC1);</span>
+<span class="pc bpc" id="L1423" title="1 of 8 branches missed.">            boolean fixedB = !name || (rows ? n.absR2 : n.absC2);</span>
+<span class="fc bfc" id="L1424" title="All 4 branches covered.">            if (!fixedA &amp;&amp; !fixedB) {</span>
+<span class="fc" id="L1425">                return n;</span>
+            }
+<span class="fc bfc" id="L1427" title="All 2 branches covered.">            int a0 = rows ? n.r1 : n.c1;</span>
+<span class="fc bfc" id="L1428" title="All 2 branches covered.">            int b0 = rows ? n.r2 : n.c2;</span>
+<span class="fc" id="L1429">            int a = a0;</span>
+<span class="fc" id="L1430">            int b = b0;</span>
+<span class="fc bfc" id="L1431" title="All 2 branches covered.">            int max = rows ? Node.MAX_ROW : Node.MAX_COL;</span>
+<span class="fc bfc" id="L1432" title="All 2 branches covered.">            if (delta &gt; 0) {</span>
+<span class="fc bfc" id="L1433" title="All 2 branches covered.">                if (a &gt;= at) {</span>
+<span class="fc" id="L1434">                    a += delta;</span>
+                }
+<span class="fc bfc" id="L1436" title="All 2 branches covered.">                if (b &gt;= at) {</span>
+<span class="fc" id="L1437">                    b += delta;</span>
+                }
+            } else {
+<span class="fc" id="L1440">                int count = -delta;</span>
+<span class="fc" id="L1441">                int end = at + count;</span>
+<span class="pc bpc" id="L1442" title="5 of 18 branches missed.">                if (fixedA &amp;&amp; fixedB &amp;&amp; a &gt;= at &amp;&amp; b &lt; end</span>
+                        || fixedA != fixedB &amp;&amp; (fixedA ? a : b) &gt;= at &amp;&amp; (fixedA ? a : b) &lt; end) {
+                    // a name's relative end does not follow an edit, so one whose fixed end
+                    // was removed has nothing left to stand for
+<span class="fc" id="L1446">                    return new Node(Node.ERR, CellError.REF);</span>
+                }
+<span class="fc bfc" id="L1448" title="All 2 branches covered.">                if (a &gt;= end) {</span>
+<span class="fc" id="L1449">                    a -= count;</span>
+<span class="pc bpc" id="L1450" title="1 of 2 branches missed.">                } else if (a &gt;= at) {</span>
+<span class="nc" id="L1451">                    a = at;</span>
+                }
+<span class="fc bfc" id="L1453" title="All 2 branches covered.">                if (b &gt;= end) {</span>
+<span class="fc" id="L1454">                    b -= count;</span>
+<span class="fc bfc" id="L1455" title="All 2 branches covered.">                } else if (b &gt;= at) {</span>
+<span class="fc" id="L1456">                    b = at - 1;</span>
+                }
+            }
+<span class="pc bpc" id="L1459" title="1 of 2 branches missed.">            if (!fixedA) {</span>
+<span class="nc" id="L1460">                a = a0;</span>
+            }
+<span class="pc bpc" id="L1462" title="1 of 2 branches missed.">            if (!fixedB) {</span>
+<span class="nc" id="L1463">                b = b0;</span>
+            }
+<span class="pc bpc" id="L1465" title="1 of 4 branches missed.">            if (b &gt; max || a &gt; max) {</span>
+<span class="fc" id="L1466">                return new Node(Node.ERR, CellError.REF);</span>
+            }
+<span class="fc" id="L1468">            Node m = n.copyRef();</span>
+<span class="fc bfc" id="L1469" title="All 2 branches covered.">            if (rows) {</span>
+<span class="fc" id="L1470">                m.r1 = a;</span>
+<span class="fc" id="L1471">                m.r2 = b;</span>
+            } else {
+<span class="fc" id="L1473">                m.c1 = a;</span>
+<span class="fc" id="L1474">                m.c2 = b;</span>
+            }
+<span class="fc" id="L1476">            return m;</span>
+        }
+<span class="pc bpc" id="L1478" title="1 of 4 branches missed.">        if (n.args == null || n.args.length == 0) {</span>
+<span class="fc" id="L1479">            return n;</span>
+        }
+<span class="fc bfc" id="L1481" title="All 2 branches covered.">        if (n.kind == Node.BINARY) {</span>
+            // a chain of operators is walked and not recursed into: see Node.spine
+<span class="fc" id="L1483">            Node[] spine = Node.spine(n);</span>
+<span class="fc" id="L1484">            Node first = spine[0].args[0];</span>
+<span class="fc" id="L1485">            Node left = restructure(first, refersToEdited, editedSheet, rows, at, delta, name);</span>
+<span class="fc bfc" id="L1486" title="All 2 branches covered.">            boolean moved = left != first; //NOPMD CompareObjectsWithEquals - the same object is meant, not an equal one</span>
+<span class="fc bfc" id="L1487" title="All 2 branches covered.">            for (Node link : spine) {</span>
+<span class="fc" id="L1488">                Node right = restructure(link.args[1], refersToEdited, editedSheet, rows, at, delta, name);</span>
+<span class="fc bfc" id="L1489" title="All 2 branches covered.">                moved |= right != link.args[1]; //NOPMD CompareObjectsWithEquals - the same object is meant, not an equal one</span>
+<span class="fc bfc" id="L1490" title="All 2 branches covered.">                left = moved ? new Node(Node.BINARY, link.value, left, right) : link;</span>
+            }
+<span class="fc" id="L1492">            return left;</span>
+        }
+<span class="fc" id="L1494">        Node[] args = new Node[n.args.length];</span>
+<span class="fc" id="L1495">        boolean changed = false;</span>
+<span class="fc bfc" id="L1496" title="All 2 branches covered.">        for (int i = 0; i &lt; args.length; i++) {</span>
+<span class="fc" id="L1497">            args[i] = restructure(n.args[i], refersToEdited, editedSheet, rows, at, delta, name);</span>
+<span class="fc bfc" id="L1498" title="All 2 branches covered.">            changed |= args[i] != n.args[i]; //NOPMD CompareObjectsWithEquals - the same object is meant, not an equal one</span>
+        }
+<span class="fc bfc" id="L1500" title="All 2 branches covered.">        if (!changed) {</span>
+<span class="fc" id="L1501">            return n;</span>
+        }
+<span class="fc" id="L1503">        Node m = new Node(n.kind, n.value, args);</span>
+<span class="fc" id="L1504">        m.array = n.array;</span>
+<span class="fc" id="L1505">        return m;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

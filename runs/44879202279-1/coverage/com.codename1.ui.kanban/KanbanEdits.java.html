@@ -1,0 +1,274 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>KanbanEdits.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.kanban</a> &gt; <span class="el_source">KanbanEdits.java</span></div><h1>KanbanEdits.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ui.kanban;
+
+import com.codename1.kanban.DefaultKanbanModel;
+import com.codename1.kanban.KanbanCard;
+import com.codename1.kanban.KanbanColumn;
+import com.codename1.kanban.KanbanLane;
+import com.codename1.kanban.KanbanModel;
+import com.codename1.util.UndoableEdit;
+
+/// The steps a `KanbanBoard` records in an `UndoHistory`. Each replays
+/// through the model, so a listening board repaints.
+final class KanbanEdits { // NOPMD MissingStaticMethodInNonInstantiatableClass - a holder of the edit classes
+    private KanbanEdits() {
+    }
+
+    // A step puts back a state the board was in. A limit enforced by the
+    // default model would refuse that when the column filled up since, and
+    // the history would count a step that moved nothing; the limit is set
+    // aside while the step replays. A model of your own that refuses a
+    // replayed change leaves the step without effect.
+    static boolean suspendLimits(KanbanModel model) {
+<span class="pc bpc" id="L44" title="1 of 4 branches missed.">        if (model instanceof DefaultKanbanModel &amp;&amp; ((DefaultKanbanModel) model).isEnforceWipLimits()) {</span>
+<span class="fc" id="L45">            ((DefaultKanbanModel) model).setEnforceWipLimits(false);</span>
+<span class="fc" id="L46">            return true;</span>
+        }
+<span class="fc" id="L48">        return false;</span>
+    }
+
+    static void resumeLimits(KanbanModel model, boolean suspended) {
+<span class="fc bfc" id="L52" title="All 2 branches covered.">        if (suspended) {</span>
+<span class="fc" id="L53">            ((DefaultKanbanModel) model).setEnforceWipLimits(true);</span>
+        }
+<span class="fc" id="L55">    }</span>
+
+    static boolean move(KanbanModel model, KanbanCard card, Place p) {
+<span class="fc" id="L58">        boolean s = suspendLimits(model);</span>
+        try {
+<span class="fc" id="L60">            return model.moveCard(card, p.column, p.lane, p.index);</span>
+        } finally {
+<span class="fc" id="L62">            resumeLimits(model, s);</span>
+        }
+    }
+
+    static boolean insert(KanbanModel model, KanbanCard card, Place p) {
+<span class="fc" id="L67">        boolean s = suspendLimits(model);</span>
+        try {
+<span class="fc" id="L69">            return model.insertCard(card, p.column, p.lane, p.index);</span>
+        } finally {
+<span class="fc" id="L71">            resumeLimits(model, s);</span>
+        }
+    }
+
+    /// Where a card is: its cell and its index in it.
+    static final class Place {
+        final KanbanColumn column;
+        final KanbanLane lane;
+        final int index;
+
+<span class="fc" id="L81">        Place(KanbanColumn column, KanbanLane lane, int index) {</span>
+<span class="fc" id="L82">            this.column = column;</span>
+<span class="fc" id="L83">            this.lane = lane;</span>
+<span class="fc" id="L84">            this.index = index;</span>
+<span class="fc" id="L85">        }</span>
+    }
+
+    /// A card went from one place to another.
+    static final class Move extends UndoableEdit {
+        private final KanbanModel model;
+        private final KanbanCard card;
+        private final Place from;
+        private final Place to;
+        private final String fromLaneId;
+
+<span class="fc" id="L96">        Move(KanbanModel model, KanbanCard card, Place from, Place to, String fromLaneId) {</span>
+<span class="fc" id="L97">            this.model = model;</span>
+<span class="fc" id="L98">            this.card = card;</span>
+<span class="fc" id="L99">            this.from = from;</span>
+<span class="fc" id="L100">            this.to = to;</span>
+<span class="fc" id="L101">            this.fromLaneId = fromLaneId;</span>
+<span class="fc" id="L102">        }</span>
+
+        @Override
+        public void undo() {
+            // a card naming no lane is shown in the first one; moved back there
+            // it names none again, as before
+<span class="pc bpc" id="L108" title="2 of 4 branches missed.">            if (move(model, card, from)</span>
+<span class="nc bnc" id="L109" title="All 2 branches missed.">                    &amp;&amp; (fromLaneId == null || model.getLane(fromLaneId) == null)) {</span>
+<span class="fc" id="L110">                card.setLaneId(fromLaneId);</span>
+            }
+<span class="fc" id="L112">        }</span>
+
+        @Override
+        public void redo() {
+<span class="fc" id="L116">            move(model, card, to);</span>
+<span class="fc" id="L117">        }</span>
+
+        @Override
+        public String getName() {
+<span class="nc" id="L121">            return &quot;Move card&quot;;</span>
+        }
+    }
+
+    /// A card was added, or with `removal` taken out.
+    static final class Presence extends UndoableEdit {
+        private final KanbanModel model;
+        private final KanbanCard card;
+        private final Place at;
+        private final boolean removal;
+        private final String name;
+        private final String laneId;
+
+<span class="fc" id="L134">        Presence(KanbanModel model, KanbanCard card, Place at, boolean removal, String name) {</span>
+<span class="fc" id="L135">            this.model = model;</span>
+<span class="fc" id="L136">            this.card = card;</span>
+<span class="fc" id="L137">            this.laneId = card.getLaneId();</span>
+<span class="fc" id="L138">            this.at = at;</span>
+<span class="fc" id="L139">            this.removal = removal;</span>
+<span class="fc" id="L140">            this.name = name;</span>
+<span class="fc" id="L141">        }</span>
+
+        @Override
+        public void undo() {
+<span class="fc bfc" id="L145" title="All 2 branches covered.">            if (removal) {</span>
+<span class="fc" id="L146">                put();</span>
+            } else {
+<span class="fc" id="L148">                model.removeCard(card);</span>
+            }
+<span class="fc" id="L150">        }</span>
+
+        // a card naming no lane is shown in the first one; put back there it
+        // names none again, as before
+        private void put() {
+<span class="pc bpc" id="L155" title="2 of 4 branches missed.">            if (insert(model, card, at)</span>
+<span class="nc bnc" id="L156" title="All 2 branches missed.">                    &amp;&amp; (laneId == null || model.getLane(laneId) == null)) {</span>
+<span class="fc" id="L157">                card.setLaneId(laneId);</span>
+            }
+<span class="fc" id="L159">        }</span>
+
+        @Override
+        public void redo() {
+<span class="nc bnc" id="L163" title="All 2 branches missed.">            if (removal) {</span>
+<span class="nc" id="L164">                model.removeCard(card);</span>
+            } else {
+<span class="nc" id="L166">                put();</span>
+            }
+<span class="nc" id="L168">        }</span>
+
+        @Override
+        public String getName() {
+<span class="nc" id="L172">            return name;</span>
+        }
+    }
+
+    /// A card was given another title.
+    static final class Rename extends UndoableEdit {
+        private final KanbanModel model;
+        private final KanbanCard card;
+        private final String from;
+        private final String to;
+
+<span class="fc" id="L183">        Rename(KanbanModel model, KanbanCard card, String from, String to) {</span>
+<span class="fc" id="L184">            this.model = model;</span>
+<span class="fc" id="L185">            this.card = card;</span>
+<span class="fc" id="L186">            this.from = from;</span>
+<span class="fc" id="L187">            this.to = to;</span>
+<span class="fc" id="L188">        }</span>
+
+        @Override
+        public void undo() {
+<span class="fc" id="L192">            model.renameCard(card, from);</span>
+<span class="fc" id="L193">        }</span>
+
+        @Override
+        public void redo() {
+<span class="nc" id="L197">            model.renameCard(card, to);</span>
+<span class="nc" id="L198">        }</span>
+
+        @Override
+        public String getName() {
+<span class="nc" id="L202">            return &quot;Rename card&quot;;</span>
+        }
+    }
+
+    /// A column went to another index.
+    static final class ColumnMove extends UndoableEdit {
+        private final KanbanModel model;
+        private final KanbanColumn column;
+        private final int from;
+        private final int to;
+
+<span class="fc" id="L213">        ColumnMove(KanbanModel model, KanbanColumn column, int from, int to) {</span>
+<span class="fc" id="L214">            this.model = model;</span>
+<span class="fc" id="L215">            this.column = column;</span>
+<span class="fc" id="L216">            this.from = from;</span>
+<span class="fc" id="L217">            this.to = to;</span>
+<span class="fc" id="L218">        }</span>
+
+        @Override
+        public void undo() {
+<span class="fc" id="L222">            model.moveColumn(column, from);</span>
+<span class="fc" id="L223">        }</span>
+
+        @Override
+        public void redo() {
+<span class="fc" id="L227">            model.moveColumn(column, to);</span>
+<span class="fc" id="L228">        }</span>
+
+        @Override
+        public String getName() {
+<span class="nc" id="L232">            return &quot;Move column&quot;;</span>
+        }
+    }
+
+    /// A column or a lane was folded or unfolded.
+    static final class Fold extends UndoableEdit {
+        private final KanbanModel model;
+        private final KanbanColumn column;
+        private final KanbanLane lane;
+        private final boolean to;
+
+<span class="fc" id="L243">        Fold(KanbanModel model, KanbanColumn column, KanbanLane lane, boolean to) {</span>
+<span class="fc" id="L244">            this.model = model;</span>
+<span class="fc" id="L245">            this.column = column;</span>
+<span class="fc" id="L246">            this.lane = lane;</span>
+<span class="fc" id="L247">            this.to = to;</span>
+<span class="fc" id="L248">        }</span>
+
+        private void apply(boolean folded) {
+<span class="nc bnc" id="L251" title="All 2 branches missed.">            if (column != null) {</span>
+<span class="nc" id="L252">                model.setCollapsed(column, folded);</span>
+            } else {
+<span class="nc" id="L254">                model.setLaneCollapsed(lane, folded);</span>
+            }
+<span class="nc" id="L256">        }</span>
+
+        @Override
+        public void undo() {
+<span class="nc bnc" id="L260" title="All 2 branches missed.">            apply(!to);</span>
+<span class="nc" id="L261">        }</span>
+
+        @Override
+        public void redo() {
+<span class="nc" id="L265">            apply(to);</span>
+<span class="nc" id="L266">        }</span>
+
+        @Override
+        public String getName() {
+<span class="nc bnc" id="L270" title="All 2 branches missed.">            return to ? &quot;Collapse&quot; : &quot;Expand&quot;;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,305 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TypedData.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.crypto.evm</a> &gt; <span class="el_source">TypedData.java</span></div><h1>TypedData.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008-2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.crypto.evm;
+
+import java.nio.charset.StandardCharsets;
+import com.codename1.io.JSONParser;
+import com.codename1.security.Hash;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.TreeSet;
+
+/// EIP-712 typed structured data: the `eth_signTypedData_v4` document permits, orders and
+/// meta-transactions are signed as.
+///
+/// ```java
+/// String jsonFromTheDapp = &quot;{...}&quot;;           // the eth_signTypedData_v4 argument
+/// byte[] privateKey = SecureRandom.bytes(32);
+/// TypedData doc = TypedData.fromJson(jsonFromTheDapp);
+/// byte[] signature = doc.sign(privateKey);      // r || s || v
+/// ```
+///
+/// The document is the JSON a dapp sends: `types`, `primaryType`, `domain` and `message`.
+/// When `types` omits `EIP712Domain`, it is derived from the domain fields present, as
+/// wallets do.
+@com.codename1.impl.SharedWithBackend
+public final class TypedData {
+    private static final String DOMAIN = &quot;EIP712Domain&quot;;
+<span class="fc" id="L51">    private static final String[][] DOMAIN_FIELDS = {</span>
+        {&quot;name&quot;, &quot;string&quot;}, {&quot;version&quot;, &quot;string&quot;}, {&quot;chainId&quot;, &quot;uint256&quot;},
+        {&quot;verifyingContract&quot;, &quot;address&quot;}, {&quot;salt&quot;, &quot;bytes32&quot;},
+    };
+
+    private final Map&lt;String, List&lt;String[]&gt;&gt; types;
+    private final String primaryType;
+    private final Map&lt;String, Object&gt; domain;
+    private final Map&lt;String, Object&gt; message;
+
+    /// A document from its parts.
+    ///
+    /// #### Parameters
+    ///
+    /// - `types`: struct name to its members, each `{name, type}`, in declaration order
+    ///
+    /// - `primaryType`: the struct `message` is an instance of
+    ///
+    /// - `domain`: the `EIP712Domain` values
+    ///
+    /// - `message`: the values of the primary struct
+    public TypedData(Map&lt;String, List&lt;String[]&gt;&gt; types, String primaryType, Map&lt;String, Object&gt; domain,
+<span class="fc" id="L73">            Map&lt;String, Object&gt; message) {</span>
+<span class="fc" id="L74">        this.types = new LinkedHashMap&lt;String, List&lt;String[]&gt;&gt;(types);</span>
+<span class="fc" id="L75">        this.primaryType = primaryType;</span>
+<span class="fc" id="L76">        this.domain = domain;</span>
+<span class="fc" id="L77">        this.message = message;</span>
+<span class="pc bpc" id="L78" title="1 of 2 branches missed.">        if (!this.types.containsKey(DOMAIN)) {</span>
+<span class="nc" id="L79">            List&lt;String[]&gt; fields = new ArrayList&lt;String[]&gt;();</span>
+<span class="nc bnc" id="L80" title="All 2 branches missed.">            for (String[] domainField : DOMAIN_FIELDS) {</span>
+<span class="nc bnc" id="L81" title="All 2 branches missed.">                if (domain.containsKey(domainField[0])) {</span>
+<span class="nc" id="L82">                    fields.add(domainField);</span>
+                }
+            }
+<span class="nc" id="L85">            this.types.put(DOMAIN, fields);</span>
+        }
+<span class="pc bpc" id="L87" title="1 of 2 branches missed.">        if (!this.types.containsKey(primaryType)) {</span>
+<span class="nc" id="L88">            throw new IllegalArgumentException(&quot;primaryType &quot; + primaryType + &quot; is not among the types&quot;);</span>
+        }
+<span class="fc" id="L90">    }</span>
+
+    /// Reads the `eth_signTypedData_v4` JSON document.
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: for malformed JSON or a document missing a part
+    public static TypedData fromJson(String json) {
+        Object parsed;
+        try {
+            // exact: an integer past a long stays digits, never a rounded double
+<span class="fc" id="L101">            parsed = JSONParser.parseStrict(json, true);</span>
+<span class="nc" id="L102">        } catch (java.io.IOException e) {</span>
+<span class="nc" id="L103">            throw new IllegalArgumentException(&quot;EIP-712 document is not JSON: &quot; + e.getMessage(), e);</span>
+<span class="fc" id="L104">        }</span>
+<span class="fc" id="L105">        Map&lt;?, ?&gt; root = map(parsed, &quot;document&quot;);</span>
+<span class="fc" id="L106">        Map&lt;?, ?&gt; rawTypes = map(root.get(&quot;types&quot;), &quot;types&quot;);</span>
+<span class="fc" id="L107">        Map&lt;String, List&lt;String[]&gt;&gt; types = new LinkedHashMap&lt;String, List&lt;String[]&gt;&gt;();</span>
+<span class="fc" id="L108">        Iterator&lt;?&gt; it = rawTypes.entrySet().iterator();</span>
+<span class="fc bfc" id="L109" title="All 2 branches covered.">        while (it.hasNext()) {</span>
+<span class="fc" id="L110">            Map.Entry&lt;?, ?&gt; e = (Map.Entry&lt;?, ?&gt;) it.next();</span>
+<span class="fc" id="L111">            Object members = e.getValue();</span>
+<span class="pc bpc" id="L112" title="1 of 2 branches missed.">            if (!(members instanceof List)) {</span>
+<span class="nc" id="L113">                throw new IllegalArgumentException(&quot;type &quot; + e.getKey() + &quot; is not a list&quot;);</span>
+            }
+<span class="fc" id="L115">            List&lt;String[]&gt; fields = new ArrayList&lt;String[]&gt;();</span>
+<span class="fc" id="L116">            List&lt;?&gt; l = (List&lt;?&gt;) members;</span>
+<span class="fc bfc" id="L117" title="All 2 branches covered.">            for (Object lItem : l) {</span>
+<span class="fc" id="L118">                Map&lt;?, ?&gt; f = map(lItem, &quot;member&quot;);</span>
+<span class="fc" id="L119">                fields.add(new String[] {text(f.get(&quot;name&quot;)), text(f.get(&quot;type&quot;))});</span>
+<span class="fc" id="L120">            }</span>
+<span class="fc" id="L121">            types.put(String.valueOf(e.getKey()), fields);</span>
+<span class="fc" id="L122">        }</span>
+<span class="fc" id="L123">        Object primary = root.get(&quot;primaryType&quot;);</span>
+<span class="fc" id="L124">        return new TypedData(types, text(primary), strMap(map(root.get(&quot;domain&quot;), &quot;domain&quot;)),</span>
+<span class="fc" id="L125">                strMap(map(root.get(&quot;message&quot;), &quot;message&quot;)));</span>
+    }
+
+    /// The 32-byte digest a wallet signs: `keccak256(0x1901 || domainSeparator ||
+    /// hashStruct(message))`.
+    public byte[] hash() {
+<span class="fc" id="L131">        byte[] all = new byte[66];</span>
+<span class="fc" id="L132">        all[0] = 0x19;</span>
+<span class="fc" id="L133">        all[1] = 0x01;</span>
+<span class="fc" id="L134">        System.arraycopy(domainSeparator(), 0, all, 2, 32);</span>
+<span class="fc" id="L135">        System.arraycopy(hashStruct(primaryType, message), 0, all, 34, 32);</span>
+<span class="fc" id="L136">        return Hash.keccak256(all);</span>
+    }
+
+    /// `hashStruct(EIP712Domain, domain)`.
+    public byte[] domainSeparator() {
+<span class="fc" id="L141">        return hashStruct(DOMAIN, domain);</span>
+    }
+
+    /// The `hashStruct` of the message.
+    public byte[] messageHash() {
+<span class="fc" id="L146">        return hashStruct(primaryType, message);</span>
+    }
+
+    /// Signs the document, answering `r || s || v` with `v` 27 or 28.
+    public byte[] sign(byte[] privateKey) {
+<span class="fc" id="L151">        return PersonalSign.signHash(hash(), privateKey);</span>
+    }
+
+    /// The address that signed the document.
+    public EvmAddress recover(byte[] signature65) {
+<span class="fc" id="L156">        return PersonalSign.recoverHash(hash(), signature65);</span>
+    }
+
+    /// The `encodeType` string of a struct, such as
+    /// `Mail(Person from,Person to,string contents)Person(string name,address wallet)`.
+    public String encodeType(String type) {
+<span class="fc" id="L162">        TreeSet&lt;String&gt; deps = new TreeSet&lt;String&gt;();</span>
+<span class="fc" id="L163">        collect(type, deps);</span>
+<span class="fc" id="L164">        deps.remove(type);</span>
+<span class="fc" id="L165">        StringBuilder out = new StringBuilder();</span>
+<span class="fc" id="L166">        appendType(out, type);</span>
+<span class="fc" id="L167">        Iterator&lt;String&gt; it = deps.iterator();</span>
+<span class="fc bfc" id="L168" title="All 2 branches covered.">        while (it.hasNext()) {</span>
+<span class="fc" id="L169">            appendType(out, it.next());</span>
+        }
+<span class="fc" id="L171">        return out.toString();</span>
+    }
+
+    private void appendType(StringBuilder out, String type) {
+<span class="fc" id="L175">        out.append(type).append('(');</span>
+<span class="fc" id="L176">        List&lt;String[]&gt; fields = types.get(type);</span>
+<span class="fc bfc" id="L177" title="All 2 branches covered.">        for (int iter = 0; iter &lt; fields.size(); iter++) {</span>
+<span class="fc bfc" id="L178" title="All 2 branches covered.">            if (iter &gt; 0) {</span>
+<span class="fc" id="L179">                out.append(',');</span>
+            }
+<span class="fc" id="L181">            out.append(fields.get(iter)[1]).append(' ').append(fields.get(iter)[0]);</span>
+        }
+<span class="fc" id="L183">        out.append(')');</span>
+<span class="fc" id="L184">    }</span>
+
+    private void collect(String type, TreeSet&lt;String&gt; found) {
+<span class="fc" id="L187">        String base = baseType(type);</span>
+<span class="fc bfc" id="L188" title="All 4 branches covered.">        if (!types.containsKey(base) || found.contains(base)) {</span>
+<span class="fc" id="L189">            return;</span>
+        }
+<span class="fc" id="L191">        found.add(base);</span>
+<span class="fc" id="L192">        List&lt;String[]&gt; fields = types.get(base);</span>
+<span class="fc bfc" id="L193" title="All 2 branches covered.">        for (String[] fieldsItem : fields) {</span>
+<span class="fc" id="L194">            collect(fieldsItem[1], found);</span>
+<span class="fc" id="L195">        }</span>
+<span class="fc" id="L196">    }</span>
+
+    private static String baseType(String type) {
+<span class="fc" id="L199">        int bracket = type.indexOf('[');</span>
+<span class="pc bpc" id="L200" title="1 of 2 branches missed.">        return bracket &lt; 0 ? type : type.substring(0, bracket);</span>
+    }
+
+    /// `keccak256(typeHash || encodeData(value))` of a struct.
+    public byte[] hashStruct(String type, Map&lt;String, Object&gt; value) {
+<span class="fc" id="L205">        List&lt;String[]&gt; fields = types.get(type);</span>
+<span class="pc bpc" id="L206" title="1 of 2 branches missed.">        if (fields == null) {</span>
+<span class="nc" id="L207">            throw new IllegalArgumentException(&quot;unknown type &quot; + type);</span>
+        }
+<span class="fc" id="L209">        java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();</span>
+<span class="fc" id="L210">        byte[] typeHash = Hash.keccak256(encodeType(type).getBytes(StandardCharsets.UTF_8));</span>
+<span class="fc" id="L211">        out.write(typeHash, 0, 32);</span>
+<span class="fc bfc" id="L212" title="All 2 branches covered.">        for (String[] f : fields) {</span>
+<span class="fc" id="L213">            byte[] enc = encodeValue(f[1], value.get(f[0]));</span>
+<span class="fc" id="L214">            out.write(enc, 0, 32);</span>
+<span class="fc" id="L215">        }</span>
+<span class="fc" id="L216">        return Hash.keccak256(out.toByteArray());</span>
+    }
+
+    private byte[] encodeValue(String type, Object value) {
+<span class="pc bpc" id="L220" title="1 of 2 branches missed.">        if (type.endsWith(&quot;]&quot;)) {</span>
+<span class="nc" id="L221">            int open = type.lastIndexOf('[');</span>
+<span class="nc" id="L222">            String element = type.substring(0, open);</span>
+<span class="nc" id="L223">            List&lt;?&gt; items = list(value, type);</span>
+<span class="nc" id="L224">            String size = type.substring(open + 1, type.length() - 1);</span>
+<span class="nc bnc" id="L225" title="All 4 branches missed.">            if (size.length() &gt; 0 &amp;&amp; Integer.parseInt(size) != items.size()) {</span>
+<span class="nc" id="L226">                throw new IllegalArgumentException(type + &quot; takes &quot; + size + &quot; items&quot;);</span>
+            }
+<span class="nc" id="L228">            java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();</span>
+<span class="nc bnc" id="L229" title="All 2 branches missed.">            for (Object itemsItem : items) {</span>
+<span class="nc" id="L230">                out.write(encodeValue(element, itemsItem), 0, 32);</span>
+<span class="nc" id="L231">            }</span>
+<span class="nc" id="L232">            return Hash.keccak256(out.toByteArray());</span>
+        }
+<span class="fc bfc" id="L234" title="All 2 branches covered.">        if (types.containsKey(type)) {</span>
+<span class="pc bpc" id="L235" title="1 of 2 branches missed.">            if (value == null) {</span>
+                // a null struct value hashes as all zeros, as the reference implementations do
+<span class="nc" id="L237">                return new byte[32];</span>
+            }
+<span class="fc" id="L239">            return hashStruct(type, strMap(map(value, type)));</span>
+        }
+<span class="fc bfc" id="L241" title="All 2 branches covered.">        if (&quot;string&quot;.equals(type)) {</span>
+<span class="fc" id="L242">            return Hash.keccak256(text(value).getBytes(StandardCharsets.UTF_8));</span>
+        }
+<span class="pc bpc" id="L244" title="1 of 2 branches missed.">        if (&quot;bytes&quot;.equals(type)) {</span>
+<span class="nc bnc" id="L245" title="All 2 branches missed.">            return Hash.keccak256(value instanceof byte[] ? (byte[]) value</span>
+<span class="nc" id="L246">                    : Hash.fromHex(text(value)));</span>
+        }
+<span class="fc" id="L248">        Object v = value;</span>
+<span class="pc bpc" id="L249" title="1 of 2 branches missed.">        if (v instanceof JSONParser.RawJson) {</span>
+            // an integer the JSON reader kept exactly because it exceeds a long
+<span class="nc" id="L251">            String digits = ((JSONParser.RawJson) v).getJson();</span>
+<span class="nc bnc" id="L252" title="All 2 branches missed.">            if (digits.startsWith(&quot;-&quot;)) {</span>
+<span class="nc" id="L253">                throw new IllegalArgumentException(type + &quot; value &quot; + digits + &quot; is out of range&quot;);</span>
+            }
+<span class="nc" id="L255">            v = com.codename1.crypto.UInt256.parse(digits, 10);</span>
+        }
+<span class="pc bpc" id="L257" title="1 of 2 branches missed.">        if (v instanceof Double) {</span>
+<span class="nc" id="L258">            throw new IllegalArgumentException(type + &quot; cannot take a fractional number&quot;);</span>
+        }
+<span class="pc bpc" id="L260" title="3 of 6 branches missed.">        if (v instanceof String &amp;&amp; type.startsWith(&quot;int&quot;) &amp;&amp; ((String) v).startsWith(&quot;0x&quot;)) {</span>
+<span class="nc" id="L261">            v = com.codename1.crypto.UInt256.parse((String) v);</span>
+        }
+<span class="pc bpc" id="L263" title="3 of 6 branches missed.">        if (v instanceof String &amp;&amp; type.startsWith(&quot;bytes&quot;) &amp;&amp; ((String) v).length() &lt; 66) {</span>
+            // a short bytesN hex value is right-padded, as wallets accept it
+<span class="nc" id="L265">            byte[] raw = Hash.fromHex((String) v);</span>
+<span class="nc" id="L266">            int n = Integer.parseInt(type.substring(5));</span>
+<span class="nc" id="L267">            byte[] padded = new byte[n];</span>
+<span class="nc" id="L268">            System.arraycopy(raw, 0, padded, 0, Math.min(raw.length, n));</span>
+<span class="nc" id="L269">            v = padded;</span>
+        }
+<span class="fc" id="L271">        return Abi.Type.parse(Abi.canonical(type)).encode(v);</span>
+    }
+
+    private static Map&lt;?, ?&gt; map(Object o, String what) {
+<span class="pc bpc" id="L275" title="1 of 2 branches missed.">        if (!(o instanceof Map)) {</span>
+<span class="nc" id="L276">            throw new IllegalArgumentException(&quot;EIP-712 &quot; + what + &quot; must be an object&quot;);</span>
+        }
+<span class="fc" id="L278">        return (Map&lt;?, ?&gt;) o;</span>
+    }
+
+    private static List&lt;?&gt; list(Object o, String what) {
+<span class="nc bnc" id="L282" title="All 2 branches missed.">        if (!(o instanceof List)) {</span>
+<span class="nc" id="L283">            throw new IllegalArgumentException(&quot;EIP-712 &quot; + what + &quot; must be an array&quot;);</span>
+        }
+<span class="nc" id="L285">        return (List&lt;?&gt;) o;</span>
+    }
+
+    private static String text(Object o) {
+<span class="pc bpc" id="L289" title="1 of 2 branches missed.">        if (!(o instanceof String)) {</span>
+<span class="nc" id="L290">            throw new IllegalArgumentException(&quot;EIP-712 expected a string&quot;);</span>
+        }
+<span class="fc" id="L292">        return (String) o;</span>
+    }
+
+    private static Map&lt;String, Object&gt; strMap(Map&lt;?, ?&gt; in) {
+<span class="fc" id="L296">        Map&lt;String, Object&gt; out = new LinkedHashMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L297">        Iterator&lt;?&gt; it = in.entrySet().iterator();</span>
+<span class="fc bfc" id="L298" title="All 2 branches covered.">        while (it.hasNext()) {</span>
+<span class="fc" id="L299">            Map.Entry&lt;?, ?&gt; e = (Map.Entry&lt;?, ?&gt;) it.next();</span>
+<span class="fc" id="L300">            out.put(String.valueOf(e.getKey()), e.getValue());</span>
+<span class="fc" id="L301">        }</span>
+<span class="fc" id="L302">        return out;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

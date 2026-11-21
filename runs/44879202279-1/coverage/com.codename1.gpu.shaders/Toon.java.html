@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Toon.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.gpu.shaders</a> &gt; <span class="el_source">Toon.java</span></div><h1>Toon.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.gpu.shaders;
+
+import com.codename1.gpu.shader.ShaderMaterial;
+import com.codename1.gpu.shader.ShaderNode;
+import com.codename1.gpu.shader.ShaderType;
+
+import static com.codename1.gpu.shader.ShaderNode.*;
+
+/// Stylized, non photographic shading. These compute their own lighting
+/// from the sun, so use them on a `Material.Type.UNLIT` material: the
+/// material's colour and texture are the paint, the graph decides the light.
+public final class Toon {
+    /// `FLOAT` the number of light bands, 2 to 5.
+    public static final String BANDS = &quot;toonBands&quot;;
+    /// `VEC3` the colour of the shadowed side, multiplied into the paint.
+    public static final String SHADE = &quot;toonShade&quot;;
+    /// `VEC3` the rim light colour; black for none.
+    public static final String RIM = &quot;toonRim&quot;;
+    /// `FLOAT` hatch lines per world unit.
+    public static final String DENSITY = &quot;toonDensity&quot;;
+
+    private Toon() {
+    }
+
+    private static ShaderNode light() {
+<span class="fc" id="L48">        return dot(normalize(worldNormal()), sunDir()).mul(0.5f).add(0.5f);</span>
+    }
+
+    /// Cel shading: light in hard bands with a thin soft step between them,
+    /// a cool shadow tint and a bright rim.
+    ///
+    /// #### Returns
+    ///
+    /// a new shader material
+    public static ShaderMaterial cel() {
+<span class="fc" id="L58">        ShaderMaterial m = new ShaderMaterial().declareUniform(BANDS, ShaderType.FLOAT)</span>
+<span class="fc" id="L59">                .declareUniform(SHADE, ShaderType.VEC3).declareUniform(RIM, ShaderType.VEC3);</span>
+<span class="fc" id="L60">        ShaderNode bands = uniform(BANDS, ShaderType.FLOAT);</span>
+<span class="fc" id="L61">        ShaderNode x = light().mul(bands);</span>
+        // a band edge 0.08 of a band wide keeps the steps from aliasing
+<span class="fc" id="L63">        ShaderNode stepped = floor(x).add(smoothstep(0.46f, 0.54f, fract(x))).div(bands);</span>
+<span class="fc" id="L64">        ShaderNode lit = mix(uniform(SHADE, ShaderType.VEC3), sunColor(), saturate(stepped));</span>
+<span class="fc" id="L65">        ShaderNode rim = uniform(RIM, ShaderType.VEC3).mul(smoothstep(0.55f, 0.6f, Shading.fresnel(1f)))</span>
+<span class="fc" id="L66">                .mul(step(f(0.5f), light()));</span>
+<span class="fc" id="L67">        m.set(ShaderMaterial.Hook.BASE_COLOR, vec(baseColor().rgb().mul(lit).add(rim), baseColor().w()));</span>
+<span class="fc" id="L68">        m.setUniform(BANDS, 3f).setColorUniform(SHADE, 0x4a5578).setColorUniform(RIM, 0x606060);</span>
+<span class="fc" id="L69">        return m;</span>
+    }
+
+    /// Pen hatching: the darker the light, the more crossing lines, drawn in
+    /// world space so they stay put as the camera moves.
+    ///
+    /// #### Returns
+    ///
+    /// a new shader material
+    public static ShaderMaterial hatching() {
+<span class="fc" id="L79">        ShaderMaterial m = new ShaderMaterial().declareUniform(DENSITY, ShaderType.FLOAT)</span>
+<span class="fc" id="L80">                .declareUniform(SHADE, ShaderType.VEC3);</span>
+<span class="fc" id="L81">        ShaderNode p = Shading.boxUv(1f).mul(uniform(DENSITY, ShaderType.FLOAT));</span>
+<span class="fc" id="L82">        ShaderNode l = light();</span>
+<span class="fc" id="L83">        ShaderNode line1 = smoothstep(0.35f, 0.5f, abs(fract(p.x().add(p.y())).sub(0.5f)));</span>
+<span class="fc" id="L84">        ShaderNode line2 = smoothstep(0.35f, 0.5f, abs(fract(p.x().sub(p.y())).sub(0.5f)));</span>
+<span class="fc" id="L85">        ShaderNode ink = max(line1.mul(step(l, f(0.6f))), line2.mul(step(l, f(0.35f))));</span>
+<span class="fc" id="L86">        ShaderNode rgb = mix(baseColor().rgb(), uniform(SHADE, ShaderType.VEC3), ink);</span>
+<span class="fc" id="L87">        m.set(ShaderMaterial.Hook.BASE_COLOR, vec(rgb, baseColor().w()));</span>
+<span class="fc" id="L88">        m.setUniform(DENSITY, 12f).setColorUniform(SHADE, 0x202430);</span>
+<span class="fc" id="L89">        return m;</span>
+    }
+
+    /// Flat faceted low poly look: one colour per face by height, toward the
+    /// sun or away, with no smooth gradients.
+    ///
+    /// #### Returns
+    ///
+    /// a new shader material
+    public static ShaderMaterial lowPoly() {
+<span class="fc" id="L99">        ShaderMaterial m = new ShaderMaterial().declareUniform(SHADE, ShaderType.VEC3);</span>
+<span class="fc" id="L100">        ShaderNode l = floor(light().mul(4f)).div(4f);</span>
+<span class="fc" id="L101">        ShaderNode rgb = baseColor().rgb().mul(mix(uniform(SHADE, ShaderType.VEC3), sunColor(), l));</span>
+<span class="fc" id="L102">        m.set(ShaderMaterial.Hook.BASE_COLOR, vec(rgb, baseColor().w()));</span>
+<span class="fc" id="L103">        m.setColorUniform(SHADE, 0x55607a);</span>
+<span class="fc" id="L104">        return m;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

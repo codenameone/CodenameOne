@@ -1,0 +1,201 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Camera.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.gpu</a> &gt; <span class="el_source">Camera.java</span></div><h1>Camera.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.gpu;
+
+/// A perspective or orthographic camera. The camera builds a view matrix from an
+/// eye position, a look-at target and an up vector, and a projection matrix from
+/// its lens parameters. Combine the two through `getViewProjection()` which the
+/// device multiplies with each model matrix.
+<span class="fc" id="L29">public final class Camera {</span>
+<span class="fc" id="L30">    private boolean perspective = true;</span>
+<span class="fc" id="L31">    private float fovYRadians = (float) Math.toRadians(60.0);</span>
+<span class="fc" id="L32">    private float aspect = 1.0f;</span>
+<span class="fc" id="L33">    private float near = 0.1f;</span>
+<span class="fc" id="L34">    private float far = 100.0f;</span>
+<span class="fc" id="L35">    private float orthoHeight = 2.0f;</span>
+
+<span class="fc" id="L37">    private float eyeX = 0.0f;</span>
+<span class="fc" id="L38">    private float eyeY = 0.0f;</span>
+<span class="fc" id="L39">    private float eyeZ = 5.0f;</span>
+<span class="fc" id="L40">    private float targetX = 0.0f;</span>
+<span class="fc" id="L41">    private float targetY = 0.0f;</span>
+<span class="fc" id="L42">    private float targetZ = 0.0f;</span>
+<span class="fc" id="L43">    private float upX = 0.0f;</span>
+<span class="fc" id="L44">    private float upY = 1.0f;</span>
+<span class="fc" id="L45">    private float upZ = 0.0f;</span>
+
+<span class="fc" id="L47">    private final float[] view = Matrix4.identity();</span>
+<span class="fc" id="L48">    private final float[] projection = Matrix4.identity();</span>
+<span class="fc" id="L49">    private final float[] viewProjection = Matrix4.identity();</span>
+<span class="fc" id="L50">    private boolean dirty = true;</span>
+
+    /// Configures a perspective projection.
+    ///
+    /// #### Parameters
+    ///
+    /// - `fovYDegrees`: the vertical field of view in degrees
+    ///
+    /// - `near`: the near clip plane distance
+    ///
+    /// - `far`: the far clip plane distance
+    ///
+    /// #### Returns
+    ///
+    /// this camera for chaining
+    public Camera setPerspective(float fovYDegrees, float near, float far) {
+<span class="fc" id="L66">        this.perspective = true;</span>
+<span class="fc" id="L67">        this.fovYRadians = (float) Math.toRadians(fovYDegrees);</span>
+<span class="fc" id="L68">        this.near = near;</span>
+<span class="fc" id="L69">        this.far = far;</span>
+<span class="fc" id="L70">        dirty = true;</span>
+<span class="fc" id="L71">        return this;</span>
+    }
+
+    /// Configures an orthographic projection.
+    ///
+    /// #### Parameters
+    ///
+    /// - `height`: the visible world height; width is derived from the aspect
+    ///
+    /// - `near`: the near clip plane distance
+    ///
+    /// - `far`: the far clip plane distance
+    ///
+    /// #### Returns
+    ///
+    /// this camera for chaining
+    public Camera setOrthographic(float height, float near, float far) {
+<span class="fc" id="L88">        this.perspective = false;</span>
+<span class="fc" id="L89">        this.orthoHeight = height;</span>
+<span class="fc" id="L90">        this.near = near;</span>
+<span class="fc" id="L91">        this.far = far;</span>
+<span class="fc" id="L92">        dirty = true;</span>
+<span class="fc" id="L93">        return this;</span>
+    }
+
+    /// Sets the viewport aspect ratio (width / height). The `RenderView`
+    /// normally calls this from `Renderer.onResize`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `aspect`: the width / height ratio
+    ///
+    /// #### Returns
+    ///
+    /// this camera for chaining
+    public Camera setAspect(float aspect) {
+<span class="fc" id="L107">        this.aspect = aspect;</span>
+<span class="fc" id="L108">        dirty = true;</span>
+<span class="fc" id="L109">        return this;</span>
+    }
+
+    /// Sets the eye (camera) world position.
+    public Camera setPosition(float x, float y, float z) {
+<span class="fc" id="L114">        this.eyeX = x;</span>
+<span class="fc" id="L115">        this.eyeY = y;</span>
+<span class="fc" id="L116">        this.eyeZ = z;</span>
+<span class="fc" id="L117">        dirty = true;</span>
+<span class="fc" id="L118">        return this;</span>
+    }
+
+    /// Sets the world space point the camera looks at.
+    public Camera setTarget(float x, float y, float z) {
+<span class="fc" id="L123">        this.targetX = x;</span>
+<span class="fc" id="L124">        this.targetY = y;</span>
+<span class="fc" id="L125">        this.targetZ = z;</span>
+<span class="fc" id="L126">        dirty = true;</span>
+<span class="fc" id="L127">        return this;</span>
+    }
+
+    /// Sets the camera up vector.
+    public Camera setUp(float x, float y, float z) {
+<span class="fc" id="L132">        this.upX = x;</span>
+<span class="fc" id="L133">        this.upY = y;</span>
+<span class="fc" id="L134">        this.upZ = z;</span>
+<span class="fc" id="L135">        dirty = true;</span>
+<span class="fc" id="L136">        return this;</span>
+    }
+
+    /// Returns the eye (camera) world space x coordinate.
+    public float getEyeX() {
+<span class="fc" id="L141">        return eyeX;</span>
+    }
+
+    /// Returns the eye (camera) world space y coordinate.
+    public float getEyeY() {
+<span class="fc" id="L146">        return eyeY;</span>
+    }
+
+    /// Returns the eye (camera) world space z coordinate.
+    public float getEyeZ() {
+<span class="fc" id="L151">        return eyeZ;</span>
+    }
+
+    /// Returns the distance to the near clip plane.
+    public float getNear() {
+<span class="fc" id="L156">        return near;</span>
+    }
+
+    /// Returns the distance to the far clip plane.
+    public float getFar() {
+<span class="fc" id="L161">        return far;</span>
+    }
+
+    /// Returns the 16 element column-major view matrix.
+    public float[] getViewMatrix() {
+<span class="fc" id="L166">        recompute();</span>
+<span class="fc" id="L167">        return view;</span>
+    }
+
+    /// Returns the 16 element column-major projection matrix.
+    public float[] getProjectionMatrix() {
+<span class="fc" id="L172">        recompute();</span>
+<span class="fc" id="L173">        return projection;</span>
+    }
+
+    /// Returns the 16 element column-major combined projection * view matrix.
+    public float[] getViewProjection() {
+<span class="nc" id="L178">        recompute();</span>
+<span class="nc" id="L179">        return viewProjection;</span>
+    }
+
+    private void recompute() {
+<span class="pc bpc" id="L183" title="1 of 2 branches missed.">        if (!dirty) {</span>
+<span class="nc" id="L184">            return;</span>
+        }
+<span class="fc" id="L186">        float[] v = Matrix4.lookAt(eyeX, eyeY, eyeZ, targetX, targetY, targetZ, upX, upY, upZ);</span>
+<span class="fc" id="L187">        Matrix4.copy(v, view);</span>
+        float[] p;
+<span class="pc bpc" id="L189" title="1 of 2 branches missed.">        if (perspective) {</span>
+<span class="fc" id="L190">            p = Matrix4.perspective(fovYRadians, aspect, near, far);</span>
+        } else {
+<span class="nc" id="L192">            float halfH = orthoHeight * 0.5f;</span>
+<span class="nc" id="L193">            float halfW = halfH * aspect;</span>
+<span class="nc" id="L194">            p = Matrix4.ortho(-halfW, halfW, -halfH, halfH, near, far);</span>
+        }
+<span class="fc" id="L196">        Matrix4.copy(p, projection);</span>
+<span class="fc" id="L197">        Matrix4.multiply(projection, view, viewProjection);</span>
+<span class="fc" id="L198">        dirty = false;</span>
+<span class="fc" id="L199">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

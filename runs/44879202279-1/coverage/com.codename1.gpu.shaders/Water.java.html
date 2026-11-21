@@ -1,0 +1,233 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Water.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.gpu.shaders</a> &gt; <span class="el_source">Water.java</span></div><h1>Water.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.gpu.shaders;
+
+import com.codename1.gpu.shader.ShaderMaterial;
+import com.codename1.gpu.shader.ShaderNode;
+import com.codename1.gpu.shader.ShaderType;
+
+import static com.codename1.gpu.shader.ShaderNode.*;
+
+/// Water surfaces. Each factory returns a `ShaderMaterial` for a
+/// `Material.Type.PBR` material on a finely subdivided plane (see
+/// `Primitives.grid`): the waves move its vertices, the normals and colour
+/// follow them, and the engine's lighting adds the sky reflection and the
+/// sun's glitter.
+///
+/// ```java
+/// import com.codename1.gpu.Material;
+/// import com.codename1.gpu.shaders.Water;
+///
+/// Material sea = new Material(Material.Type.PBR).setShader(Water.ocean()
+///         .setColorUniform(Water.DEEP, 0x0b3d4f).setUniform(Water.WAVE_HEIGHT, 0.6f));
+/// ```
+///
+/// Waves are computed from world `x`/`z`, so place the plane unrotated and
+/// unscaled; a translation is fine. Tune with the uniforms named below,
+/// every frame if you like.
+public final class Water {
+    /// `VEC3` colour of deep water, looking straight down.
+    public static final String DEEP = &quot;waterDeep&quot;;
+    /// `VEC3` colour where light passes through crests and shallows.
+    public static final String SHALLOW = &quot;waterShallow&quot;;
+    /// `VEC3` colour of foam.
+    public static final String FOAM = &quot;waterFoam&quot;;
+    /// `FLOAT` height of the largest wave, world units.
+    public static final String WAVE_HEIGHT = &quot;waveHeight&quot;;
+    /// `FLOAT` length of the largest wave, world units.
+    public static final String WAVE_LENGTH = &quot;waveLength&quot;;
+    /// `FLOAT` speed multiplier; 1 moves like deep sea water.
+    public static final String WAVE_SPEED = &quot;waveSpeed&quot;;
+    /// `FLOAT` 0 for round swells, 1 for sharp crests.
+    public static final String CHOPPINESS = &quot;waveChop&quot;;
+    /// `FLOAT` how much of the crests turns white, 0 to 1.
+    public static final String FOAM_AMOUNT = &quot;foamAmount&quot;;
+    /// `FLOAT` surface roughness; lower is a sharper sun glitter.
+    public static final String ROUGHNESS = &quot;waterRough&quot;;
+    /// `VEC2` the direction the main swell travels.
+    public static final String DIRECTION = &quot;waveDir&quot;;
+    /// `FLOAT` world units per second the surface drifts, for rivers.
+    public static final String FLOW = &quot;waterFlow&quot;;
+
+    // Direction (relative to DIRECTION), relative length and relative height
+    // of each wave. Lengths are not multiples of each other, so the pattern
+    // never visibly repeats.
+<span class="fc" id="L75">    private static final float[][] OCEAN = {</span>
+        {0f, 1f, 1f}, {0.6f, 0.61f, 0.55f}, {-0.45f, 0.37f, 0.33f}, {1.3f, 0.23f, 0.18f}
+    };
+<span class="fc" id="L78">    private static final float[][] LAKE = {{0f, 1f, 1f}, {0.9f, 0.53f, 0.5f}};</span>
+
+    private Water() {
+    }
+
+    /// Open sea: four crossing Gerstner waves, foamy crests, cellular foam
+    /// streaks and fine moving ripples.
+    ///
+    /// #### Returns
+    ///
+    /// a new shader material
+    public static ShaderMaterial ocean() {
+<span class="fc" id="L90">        ShaderMaterial m = build(OCEAN, true, false);</span>
+<span class="fc" id="L91">        m.setColorUniform(DEEP, 0x0a3346).setColorUniform(SHALLOW, 0x2f8f8c).setColorUniform(FOAM, 0xf2f6f5)</span>
+<span class="fc" id="L92">                .setUniform(WAVE_HEIGHT, 0.45f).setUniform(WAVE_LENGTH, 14f).setUniform(WAVE_SPEED, 1f)</span>
+<span class="fc" id="L93">                .setUniform(CHOPPINESS, 0.6f).setUniform(FOAM_AMOUNT, 0.5f).setUniform(ROUGHNESS, 0.08f)</span>
+<span class="fc" id="L94">                .setUniform(DIRECTION, 1f, 0.3f);</span>
+<span class="fc" id="L95">        return m;</span>
+    }
+
+    /// Calm water: two long, low waves and wind ripples, no foam.
+    ///
+    /// #### Returns
+    ///
+    /// a new shader material
+    public static ShaderMaterial lake() {
+<span class="fc" id="L104">        ShaderMaterial m = build(LAKE, false, false);</span>
+<span class="fc" id="L105">        m.setColorUniform(DEEP, 0x1d3a3a).setColorUniform(SHALLOW, 0x4f7f6a)</span>
+<span class="fc" id="L106">                .setUniform(WAVE_HEIGHT, 0.06f).setUniform(WAVE_LENGTH, 6f).setUniform(WAVE_SPEED, 0.6f)</span>
+<span class="fc" id="L107">                .setUniform(CHOPPINESS, 0.2f).setUniform(ROUGHNESS, 0.04f).setUniform(DIRECTION, 1f, 0.2f);</span>
+<span class="fc" id="L108">        return m;</span>
+    }
+
+    /// Running water: the ripples and foam drift along `DIRECTION` at
+    /// `FLOW` units per second.
+    ///
+    /// #### Returns
+    ///
+    /// a new shader material
+    public static ShaderMaterial river() {
+<span class="fc" id="L118">        ShaderMaterial m = build(LAKE, true, true);</span>
+<span class="fc" id="L119">        m.setColorUniform(DEEP, 0x24453c).setColorUniform(SHALLOW, 0x5f8f70).setColorUniform(FOAM, 0xe8efe8)</span>
+<span class="fc" id="L120">                .setUniform(WAVE_HEIGHT, 0.04f).setUniform(WAVE_LENGTH, 3f).setUniform(WAVE_SPEED, 1.4f)</span>
+<span class="fc" id="L121">                .setUniform(CHOPPINESS, 0.3f).setUniform(FOAM_AMOUNT, 0.25f).setUniform(ROUGHNESS, 0.12f)</span>
+<span class="fc" id="L122">                .setUniform(DIRECTION, 1f, 0f).setUniform(FLOW, 1.5f);</span>
+<span class="fc" id="L123">        return m;</span>
+    }
+
+    private static ShaderNode u(String name, ShaderType t) {
+<span class="fc" id="L127">        return uniform(name, t);</span>
+    }
+
+    private static ShaderMaterial build(float[][] waves, boolean foam, boolean flow) {
+<span class="fc" id="L131">        ShaderMaterial m = new ShaderMaterial()</span>
+<span class="fc" id="L132">                .declareUniform(DEEP, ShaderType.VEC3).declareUniform(SHALLOW, ShaderType.VEC3)</span>
+<span class="fc" id="L133">                .declareUniform(WAVE_HEIGHT, ShaderType.FLOAT).declareUniform(WAVE_LENGTH, ShaderType.FLOAT)</span>
+<span class="fc" id="L134">                .declareUniform(WAVE_SPEED, ShaderType.FLOAT).declareUniform(CHOPPINESS, ShaderType.FLOAT)</span>
+<span class="fc" id="L135">                .declareUniform(ROUGHNESS, ShaderType.FLOAT).declareUniform(DIRECTION, ShaderType.VEC2);</span>
+<span class="fc bfc" id="L136" title="All 2 branches covered.">        if (foam) {</span>
+<span class="fc" id="L137">            m.declareUniform(FOAM, ShaderType.VEC3).declareUniform(FOAM_AMOUNT, ShaderType.FLOAT);</span>
+        }
+<span class="fc bfc" id="L139" title="All 2 branches covered.">        if (flow) {</span>
+<span class="fc" id="L140">            m.declareUniform(FLOW, ShaderType.FLOAT);</span>
+        }
+<span class="fc" id="L142">        ShaderNode dir = normalize(u(DIRECTION, ShaderType.VEC2));</span>
+<span class="fc" id="L143">        ShaderNode side = vec(dir.y().negate(), dir.x());</span>
+
+        // vertex stage: displace by the sum of the waves at the undisplaced point
+<span class="fc" id="L146">        ShaderNode offset = null;</span>
+<span class="fc bfc" id="L147" title="All 2 branches covered.">        for (float[] wave : waves) {</span>
+<span class="fc" id="L148">            Wave w = new Wave(wave, dir, side, worldPos().xz());</span>
+<span class="fc" id="L149">            ShaderNode qa = w.q.mul(w.a);</span>
+<span class="fc" id="L150">            ShaderNode o = vec(w.d.x().mul(qa).mul(w.cos), w.a.mul(w.sin), w.d.y().mul(qa).mul(w.cos));</span>
+<span class="fc bfc" id="L151" title="All 2 branches covered.">            offset = offset == null ? o : offset.add(o);</span>
+        }
+<span class="fc" id="L153">        m.set(ShaderMaterial.Hook.VERTEX_OFFSET, offset);</span>
+
+        // fragment stage: the analytic normal and crest height at this pixel
+<span class="fc" id="L156">        ShaderNode p = worldPos().xz();</span>
+<span class="fc" id="L157">        ShaderNode nx = null;</span>
+<span class="fc" id="L158">        ShaderNode nz = null;</span>
+<span class="fc" id="L159">        ShaderNode ny = null;</span>
+<span class="fc" id="L160">        ShaderNode height = null;</span>
+<span class="fc bfc" id="L161" title="All 2 branches covered.">        for (float[] wave : waves) {</span>
+<span class="fc" id="L162">            Wave w = new Wave(wave, dir, side, p);</span>
+<span class="fc" id="L163">            ShaderNode wa = w.k.mul(w.a);</span>
+<span class="fc" id="L164">            ShaderNode dx = w.d.x().mul(wa).mul(w.cos);</span>
+<span class="fc" id="L165">            ShaderNode dz = w.d.y().mul(wa).mul(w.cos);</span>
+<span class="fc" id="L166">            ShaderNode dy = w.q.mul(wa).mul(w.sin);</span>
+<span class="fc" id="L167">            ShaderNode h = w.sin.mul(wave[2]);</span>
+<span class="fc bfc" id="L168" title="All 2 branches covered.">            nx = nx == null ? dx : nx.add(dx);</span>
+<span class="fc bfc" id="L169" title="All 2 branches covered.">            nz = nz == null ? dz : nz.add(dz);</span>
+<span class="fc bfc" id="L170" title="All 2 branches covered.">            ny = ny == null ? dy : ny.add(dy);</span>
+<span class="fc bfc" id="L171" title="All 2 branches covered.">            height = height == null ? h : height.add(h);</span>
+        }
+<span class="fc" id="L173">        ShaderNode crest = saturate(height.mul(0.5f).add(0.5f));</span>
+
+        // fine ripples: two value noise layers drifting against each other
+<span class="fc bfc" id="L176" title="All 2 branches covered.">        ShaderNode drift = flow ? dir.mul(u(FLOW, ShaderType.FLOAT)).mul(time()) : dir.mul(time().mul(0.35f));</span>
+<span class="fc" id="L177">        ShaderNode rp = p.mul(1.7f).sub(drift);</span>
+<span class="fc" id="L178">        ShaderNode r1 = Noise.value(rp);</span>
+<span class="fc" id="L179">        ShaderNode r2 = Noise.value(rp.mul(2.3f).add(vec2(3.1f, 7.7f)).add(side.mul(time().mul(0.4f))));</span>
+<span class="fc" id="L180">        ShaderNode ripple = vec(r1.sub(0.5f), r2.sub(0.5f)).mul(0.35f);</span>
+<span class="fc" id="L181">        ShaderNode normal = normalize(vec(nx.negate().add(ripple.x()), f(1f).sub(ny), nz.negate().add(ripple.y())));</span>
+<span class="fc" id="L182">        m.set(ShaderMaterial.Hook.NORMAL, normal);</span>
+
+        // colour: deep looking down, lighter through the crests and at grazing angles
+<span class="fc" id="L185">        ShaderNode facing = saturate(dot(normal, viewDir()));</span>
+<span class="fc" id="L186">        ShaderNode tint = mix(u(SHALLOW, ShaderType.VEC3), u(DEEP, ShaderType.VEC3),</span>
+<span class="fc" id="L187">                saturate(facing.mul(1.2f).sub(crest.mul(0.35f))));</span>
+<span class="fc" id="L188">        ShaderNode rgb = tint;</span>
+<span class="fc bfc" id="L189" title="All 2 branches covered.">        if (foam) {</span>
+<span class="fc" id="L190">            ShaderNode cells = Noise.cellular(p.mul(0.9f).sub(drift.mul(0.5f)), time().mul(0.6f));</span>
+<span class="fc" id="L191">            ShaderNode streak = smoothstep(0.55f, 0.1f, cells).mul(Noise.value(p.mul(0.35f).add(drift.mul(0.2f))));</span>
+<span class="fc" id="L192">            ShaderNode amount = u(FOAM_AMOUNT, ShaderType.FLOAT);</span>
+<span class="fc" id="L193">            ShaderNode foamMask = saturate(smoothstep(f(1f).sub(amount.mul(0.5f)), f(1.02f), crest).mul(1.5f)</span>
+<span class="fc" id="L194">                    .add(streak.mul(amount).mul(crest)));</span>
+<span class="fc" id="L195">            rgb = mix(tint, u(FOAM, ShaderType.VEC3), foamMask);</span>
+<span class="fc" id="L196">            m.set(ShaderMaterial.Hook.ROUGHNESS, mix(u(ROUGHNESS, ShaderType.FLOAT), f(0.85f), foamMask));</span>
+<span class="fc" id="L197">        } else {</span>
+<span class="fc" id="L198">            m.set(ShaderMaterial.Hook.ROUGHNESS, u(ROUGHNESS, ShaderType.FLOAT));</span>
+        }
+<span class="fc" id="L200">        m.set(ShaderMaterial.Hook.BASE_COLOR, vec(rgb, baseColor().w()));</span>
+<span class="fc" id="L201">        m.set(ShaderMaterial.Hook.METALLIC, f(0f));</span>
+        // light scattered through a crest toward a viewer looking into the sun
+<span class="fc" id="L203">        ShaderNode back = pow(saturate(dot(viewDir().negate(), sunDir())), 4f);</span>
+<span class="fc" id="L204">        m.set(ShaderMaterial.Hook.EMISSIVE, u(SHALLOW, ShaderType.VEC3).mul(sunColor()).mul(back.mul(crest).mul(0.6f)));</span>
+<span class="fc" id="L205">        return m;</span>
+    }
+
+    // One Gerstner wave evaluated at a point.
+    private static final class Wave {
+        final ShaderNode d;
+        final ShaderNode k;
+        final ShaderNode a;
+        final ShaderNode q;
+        final ShaderNode sin;
+        final ShaderNode cos;
+
+<span class="fc" id="L217">        Wave(float[] spec, ShaderNode dir, ShaderNode side, ShaderNode p) {</span>
+<span class="fc" id="L218">            float c = (float) Math.cos(spec[0]);</span>
+<span class="fc" id="L219">            float s = (float) Math.sin(spec[0]);</span>
+<span class="fc" id="L220">            d = normalize(dir.mul(c).add(side.mul(s)));</span>
+<span class="fc" id="L221">            ShaderNode len = uniform(WAVE_LENGTH, ShaderType.FLOAT).mul(spec[1]);</span>
+<span class="fc" id="L222">            k = f(6.2831853f).div(len);</span>
+<span class="fc" id="L223">            a = uniform(WAVE_HEIGHT, ShaderType.FLOAT).mul(spec[2] * 0.5f);</span>
+            // steepness shared between the waves so crests never loop over
+<span class="fc" id="L225">            q = uniform(CHOPPINESS, ShaderType.FLOAT).mul(0.9f / 4f).div(max(k.mul(a), f(0.0001f)));</span>
+<span class="fc" id="L226">            ShaderNode omega = sqrt(k.mul(9.8f)).mul(uniform(WAVE_SPEED, ShaderType.FLOAT));</span>
+<span class="fc" id="L227">            ShaderNode phase = k.mul(dot(d, p)).sub(omega.mul(time()));</span>
+<span class="fc" id="L228">            sin = ShaderNode.sin(phase); // NOPMD UnnecessaryFullyQualifiedName - the field shadows the static import</span>
+<span class="fc" id="L229">            cos = ShaderNode.cos(phase); // NOPMD UnnecessaryFullyQualifiedName - the field shadows the static import</span>
+<span class="fc" id="L230">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

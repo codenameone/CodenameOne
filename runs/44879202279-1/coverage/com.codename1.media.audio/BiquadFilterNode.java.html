@@ -1,0 +1,351 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>BiquadFilterNode.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.media.audio</a> &gt; <span class="el_source">BiquadFilterNode.java</span></div><h1>BiquadFilterNode.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.media.audio;
+
+import com.codename1.util.MathUtil;
+
+/// A second order filter, the Web Audio `BiquadFilterNode`: low and high pass,
+/// band pass, shelves, peaking, notch and all pass. Coefficients follow the
+/// specification's formulas and are recomputed per sample only while a
+/// parameter changes. The output has the input's channel count.
+public final class BiquadFilterNode extends AudioNode {
+    private final AudioParam frequency;
+    private final AudioParam detune;
+    private final AudioParam q;
+    private final AudioParam gain;
+<span class="fc" id="L36">    private BiquadFilterType type = BiquadFilterType.LOWPASS;</span>
+
+    // ---- render side ----
+<span class="fc" id="L39">    private BiquadFilterType rType = BiquadFilterType.LOWPASS;</span>
+<span class="fc" id="L40">    private final double[] x1 = new double[AudioBus.MAX_CHANNELS];</span>
+<span class="fc" id="L41">    private final double[] x2 = new double[AudioBus.MAX_CHANNELS];</span>
+<span class="fc" id="L42">    private final double[] y1 = new double[AudioBus.MAX_CHANNELS];</span>
+<span class="fc" id="L43">    private final double[] y2 = new double[AudioBus.MAX_CHANNELS];</span>
+<span class="fc" id="L44">    private final double[] coef = new double[5];</span>
+
+    BiquadFilterNode(BaseAudioContext context) {
+<span class="fc" id="L47">        super(context, 1, 1, 2, ChannelCountMode.MAX, ChannelInterpretation.SPEAKERS);</span>
+<span class="fc" id="L48">        float nyquist = context.getSampleRate() / 2;</span>
+<span class="fc" id="L49">        frequency = new AudioParam(context, &quot;frequency&quot;, 350f, 0f, nyquist, AutomationRate.A_RATE, false);</span>
+<span class="fc" id="L50">        detune = new AudioParam(context, &quot;detune&quot;, 0f, -153600f, 153600f, AutomationRate.A_RATE, false);</span>
+<span class="fc" id="L51">        q = new AudioParam(context, &quot;Q&quot;, 1f, -Float.MAX_VALUE, Float.MAX_VALUE, AutomationRate.A_RATE, false);</span>
+<span class="fc" id="L52">        gain = new AudioParam(context, &quot;gain&quot;, 0f, -Float.MAX_VALUE, 1541f, AutomationRate.A_RATE, false);</span>
+<span class="fc" id="L53">    }</span>
+
+    /// The cutoff or center frequency in Hz, 350 by default.
+    ///
+    /// #### Returns
+    ///
+    /// the parameter
+    public AudioParam getFrequency() {
+<span class="fc" id="L61">        return frequency;</span>
+    }
+
+    /// A detune of the frequency in cents, 0 by default.
+    ///
+    /// #### Returns
+    ///
+    /// the parameter
+    public AudioParam getDetune() {
+<span class="nc" id="L70">        return detune;</span>
+    }
+
+    /// The quality factor, 1 by default: resonance in dB for low and high pass,
+    /// width for band pass, peaking, notch and all pass. Unused by the shelves.
+    ///
+    /// #### Returns
+    ///
+    /// the parameter
+    public AudioParam getQ() {
+<span class="fc" id="L80">        return q;</span>
+    }
+
+    /// The boost in dB for the shelves and peaking, 0 by default.
+    ///
+    /// #### Returns
+    ///
+    /// the parameter
+    public AudioParam getGain() {
+<span class="fc" id="L89">        return gain;</span>
+    }
+
+    /// The filter type.
+    ///
+    /// #### Returns
+    ///
+    /// the type
+    public BiquadFilterType getType() {
+<span class="nc" id="L98">        return type;</span>
+    }
+
+    /// Sets the filter type.
+    ///
+    /// #### Parameters
+    ///
+    /// - `type`: the type
+    public void setType(final BiquadFilterType type) {
+<span class="pc bpc" id="L107" title="1 of 2 branches missed.">        if (type == null) {</span>
+<span class="nc" id="L108">            throw new IllegalArgumentException(&quot;type is null&quot;);</span>
+        }
+<span class="fc" id="L110">        this.type = type;</span>
+<span class="fc" id="L111">        context.post(new Runnable() {</span>
+            @Override
+            public void run() {
+<span class="fc" id="L114">                rType = type;</span>
+<span class="fc" id="L115">            }</span>
+        });
+<span class="fc" id="L117">    }</span>
+
+    /// Computes the response of the filter, with the parameters' current values,
+    /// at each of `frequencyHz`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `frequencyHz`: the frequencies to evaluate
+    ///
+    /// - `magResponse`: receives the linear magnitude at each frequency
+    ///
+    /// - `phaseResponse`: receives the phase in radians at each frequency
+    public void getFrequencyResponse(float[] frequencyHz, float[] magResponse, float[] phaseResponse) {
+<span class="pc bpc" id="L130" title="2 of 4 branches missed.">        if (magResponse.length &lt; frequencyHz.length || phaseResponse.length &lt; frequencyHz.length) {</span>
+<span class="nc" id="L131">            throw new IllegalArgumentException(&quot;Response arrays are shorter than the frequency array&quot;);</span>
+        }
+<span class="fc" id="L133">        double[] c = new double[5];</span>
+<span class="fc" id="L134">        coefficients(type, frequency.getValue(), detune.getValue(), q.getValue(), gain.getValue(),</span>
+<span class="fc" id="L135">                context.getSampleRate(), c);</span>
+<span class="fc" id="L136">        response(new double[] {c[0], c[1], c[2]}, new double[] {1, c[3], c[4]}, context.getSampleRate(),</span>
+                frequencyHz, magResponse, phaseResponse);
+<span class="fc" id="L138">    }</span>
+
+    static void response(double[] b, double[] a, float sampleRate, float[] frequencyHz,
+                         float[] magResponse, float[] phaseResponse) {
+<span class="fc" id="L142">        double nyquist = sampleRate / 2.0;</span>
+<span class="fc bfc" id="L143" title="All 2 branches covered.">        for (int i = 0; i &lt; frequencyHz.length; i++) {</span>
+<span class="fc" id="L144">            double f = frequencyHz[i];</span>
+<span class="pc bpc" id="L145" title="3 of 6 branches missed.">            if (f &lt; 0 || f &gt; nyquist || Double.isNaN(f)) {</span>
+<span class="nc" id="L146">                magResponse[i] = Float.NaN;</span>
+<span class="nc" id="L147">                phaseResponse[i] = Float.NaN;</span>
+<span class="nc" id="L148">                continue;</span>
+            }
+<span class="fc" id="L150">            double w = Math.PI * f / nyquist;</span>
+<span class="fc" id="L151">            double nr = 0;</span>
+<span class="fc" id="L152">            double ni = 0;</span>
+<span class="fc bfc" id="L153" title="All 2 branches covered.">            for (int k = 0; k &lt; b.length; k++) {</span>
+<span class="fc" id="L154">                nr += b[k] * Math.cos(-k * w);</span>
+<span class="fc" id="L155">                ni += b[k] * Math.sin(-k * w);</span>
+            }
+<span class="fc" id="L157">            double dr = 0;</span>
+<span class="fc" id="L158">            double di = 0;</span>
+<span class="fc bfc" id="L159" title="All 2 branches covered.">            for (int k = 0; k &lt; a.length; k++) {</span>
+<span class="fc" id="L160">                dr += a[k] * Math.cos(-k * w);</span>
+<span class="fc" id="L161">                di += a[k] * Math.sin(-k * w);</span>
+            }
+<span class="fc" id="L163">            double den = dr * dr + di * di;</span>
+<span class="fc" id="L164">            double hr = (nr * dr + ni * di) / den;</span>
+<span class="fc" id="L165">            double hi = (ni * dr - nr * di) / den;</span>
+<span class="fc" id="L166">            magResponse[i] = (float) Math.sqrt(hr * hr + hi * hi);</span>
+<span class="fc" id="L167">            phaseResponse[i] = (float) MathUtil.atan2(hi, hr);</span>
+        }
+<span class="fc" id="L169">    }</span>
+
+    /// Fills `c` with b0, b1, b2, a1, a2, normalized by a0.
+    static void coefficients(BiquadFilterType type, double freq, double detuneCents, double qv,
+                             double gainDb, double sampleRate, double[] c) {
+<span class="pc bpc" id="L174" title="1 of 2 branches missed.">        double f0 = detuneCents == 0 ? freq : freq * MathUtil.pow(2, detuneCents / 1200.0);</span>
+<span class="fc" id="L175">        double nyquist = sampleRate / 2;</span>
+<span class="fc" id="L176">        double norm = f0 / nyquist;</span>
+<span class="fc" id="L177">        double a = MathUtil.pow(10, gainDb / 40);</span>
+<span class="pc bpc" id="L178" title="2 of 4 branches missed.">        if (!(norm &gt; 0 &amp;&amp; norm &lt; 1)) { // NOPMD LogicInversion - a NaN frequency takes this path</span>
+            double pass;
+<span class="nc bnc" id="L180" title="All 2 branches missed.">            boolean low = !(norm &gt;= 1); // NOPMD LogicInversion - NaN reads as the low edge</span>
+<span class="nc bnc" id="L181" title="All 6 branches missed.">            switch (type) {</span>
+                case LOWPASS:
+<span class="nc bnc" id="L183" title="All 2 branches missed.">                    pass = low ? 0 : 1;</span>
+<span class="nc" id="L184">                    break;</span>
+                case HIGHPASS:
+<span class="nc bnc" id="L186" title="All 2 branches missed.">                    pass = low ? 1 : 0;</span>
+<span class="nc" id="L187">                    break;</span>
+                case BANDPASS:
+<span class="nc" id="L189">                    pass = 0;</span>
+<span class="nc" id="L190">                    break;</span>
+                case LOWSHELF:
+<span class="nc bnc" id="L192" title="All 2 branches missed.">                    pass = low ? 1 : a * a;</span>
+<span class="nc" id="L193">                    break;</span>
+                case HIGHSHELF:
+<span class="nc bnc" id="L195" title="All 2 branches missed.">                    pass = low ? a * a : 1;</span>
+<span class="nc" id="L196">                    break;</span>
+                default:
+<span class="nc" id="L198">                    pass = 1;</span>
+                    break;
+            }
+<span class="nc" id="L201">            c[0] = pass;</span>
+<span class="nc" id="L202">            c[1] = 0;</span>
+<span class="nc" id="L203">            c[2] = 0;</span>
+<span class="nc" id="L204">            c[3] = 0;</span>
+<span class="nc" id="L205">            c[4] = 0;</span>
+<span class="nc" id="L206">            return;</span>
+        }
+<span class="fc bfc" id="L208" title="All 8 branches covered.">        boolean qType = type == BiquadFilterType.BANDPASS || type == BiquadFilterType.NOTCH</span>
+                || type == BiquadFilterType.ALLPASS || type == BiquadFilterType.PEAKING;
+<span class="fc bfc" id="L210" title="All 4 branches covered.">        if (qType &amp;&amp; !(qv &gt; 0)) { // NOPMD LogicInversion - NaN takes this path too</span>
+            // The specification's Q &lt;= 0 cases: each formula's limit as alpha
+            // grows without bound, a constant gain -- bandpass passes (1),
+            // notch silences (0), allpass inverts (-1), peaking is A^2.
+            double gain;
+<span class="fc bfc" id="L215" title="All 2 branches covered.">            if (type == BiquadFilterType.BANDPASS) {</span>
+<span class="fc" id="L216">                gain = 1;</span>
+<span class="fc bfc" id="L217" title="All 2 branches covered.">            } else if (type == BiquadFilterType.NOTCH) {</span>
+<span class="fc" id="L218">                gain = 0;</span>
+<span class="fc bfc" id="L219" title="All 2 branches covered.">            } else if (type == BiquadFilterType.ALLPASS) {</span>
+<span class="fc" id="L220">                gain = -1;</span>
+            } else {
+<span class="fc" id="L222">                gain = a * a;</span>
+            }
+<span class="fc" id="L224">            c[0] = gain;</span>
+<span class="fc" id="L225">            c[1] = 0;</span>
+<span class="fc" id="L226">            c[2] = 0;</span>
+<span class="fc" id="L227">            c[3] = 0;</span>
+<span class="fc" id="L228">            c[4] = 0;</span>
+<span class="fc" id="L229">            return;</span>
+        }
+<span class="fc" id="L231">        double w0 = Math.PI * norm;</span>
+<span class="fc" id="L232">        double cos = Math.cos(w0);</span>
+<span class="fc" id="L233">        double sin = Math.sin(w0);</span>
+<span class="fc" id="L234">        double alphaQ = sin / (2 * qv);</span>
+<span class="fc" id="L235">        double alphaQdB = sin / (2 * MathUtil.pow(10, qv / 20));</span>
+<span class="fc" id="L236">        double alphaS = sin / 2 * Math.sqrt(2);</span>
+<span class="fc" id="L237">        double sqrtA = Math.sqrt(a);</span>
+        double b0;
+        double b1;
+        double b2;
+        double a0;
+        double a1;
+        double a2;
+<span class="pc bpc" id="L244" title="6 of 8 branches missed.">        switch (type) {</span>
+            case LOWPASS:
+<span class="fc" id="L246">                b0 = (1 - cos) / 2;</span>
+<span class="fc" id="L247">                b1 = 1 - cos;</span>
+<span class="fc" id="L248">                b2 = (1 - cos) / 2;</span>
+<span class="fc" id="L249">                a0 = 1 + alphaQdB;</span>
+<span class="fc" id="L250">                a1 = -2 * cos;</span>
+<span class="fc" id="L251">                a2 = 1 - alphaQdB;</span>
+<span class="fc" id="L252">                break;</span>
+            case HIGHPASS:
+<span class="nc" id="L254">                b0 = (1 + cos) / 2;</span>
+<span class="nc" id="L255">                b1 = -(1 + cos);</span>
+<span class="nc" id="L256">                b2 = (1 + cos) / 2;</span>
+<span class="nc" id="L257">                a0 = 1 + alphaQdB;</span>
+<span class="nc" id="L258">                a1 = -2 * cos;</span>
+<span class="nc" id="L259">                a2 = 1 - alphaQdB;</span>
+<span class="nc" id="L260">                break;</span>
+            case BANDPASS:
+<span class="nc" id="L262">                b0 = alphaQ;</span>
+<span class="nc" id="L263">                b1 = 0;</span>
+<span class="nc" id="L264">                b2 = -alphaQ;</span>
+<span class="nc" id="L265">                a0 = 1 + alphaQ;</span>
+<span class="nc" id="L266">                a1 = -2 * cos;</span>
+<span class="nc" id="L267">                a2 = 1 - alphaQ;</span>
+<span class="nc" id="L268">                break;</span>
+            case NOTCH:
+<span class="nc" id="L270">                b0 = 1;</span>
+<span class="nc" id="L271">                b1 = -2 * cos;</span>
+<span class="nc" id="L272">                b2 = 1;</span>
+<span class="nc" id="L273">                a0 = 1 + alphaQ;</span>
+<span class="nc" id="L274">                a1 = -2 * cos;</span>
+<span class="nc" id="L275">                a2 = 1 - alphaQ;</span>
+<span class="nc" id="L276">                break;</span>
+            case ALLPASS:
+<span class="nc" id="L278">                b0 = 1 - alphaQ;</span>
+<span class="nc" id="L279">                b1 = -2 * cos;</span>
+<span class="nc" id="L280">                b2 = 1 + alphaQ;</span>
+<span class="nc" id="L281">                a0 = 1 + alphaQ;</span>
+<span class="nc" id="L282">                a1 = -2 * cos;</span>
+<span class="nc" id="L283">                a2 = 1 - alphaQ;</span>
+<span class="nc" id="L284">                break;</span>
+            case PEAKING:
+<span class="fc" id="L286">                b0 = 1 + alphaQ * a;</span>
+<span class="fc" id="L287">                b1 = -2 * cos;</span>
+<span class="fc" id="L288">                b2 = 1 - alphaQ * a;</span>
+<span class="fc" id="L289">                a0 = 1 + alphaQ / a;</span>
+<span class="fc" id="L290">                a1 = -2 * cos;</span>
+<span class="fc" id="L291">                a2 = 1 - alphaQ / a;</span>
+<span class="fc" id="L292">                break;</span>
+            case LOWSHELF:
+<span class="nc" id="L294">                b0 = a * ((a + 1) - (a - 1) * cos + 2 * alphaS * sqrtA);</span>
+<span class="nc" id="L295">                b1 = 2 * a * ((a - 1) - (a + 1) * cos);</span>
+<span class="nc" id="L296">                b2 = a * ((a + 1) - (a - 1) * cos - 2 * alphaS * sqrtA);</span>
+<span class="nc" id="L297">                a0 = (a + 1) + (a - 1) * cos + 2 * alphaS * sqrtA;</span>
+<span class="nc" id="L298">                a1 = -2 * ((a - 1) + (a + 1) * cos);</span>
+<span class="nc" id="L299">                a2 = (a + 1) + (a - 1) * cos - 2 * alphaS * sqrtA;</span>
+<span class="nc" id="L300">                break;</span>
+            default:
+<span class="nc" id="L302">                b0 = a * ((a + 1) + (a - 1) * cos + 2 * alphaS * sqrtA);</span>
+<span class="nc" id="L303">                b1 = -2 * a * ((a - 1) + (a + 1) * cos);</span>
+<span class="nc" id="L304">                b2 = a * ((a + 1) + (a - 1) * cos - 2 * alphaS * sqrtA);</span>
+<span class="nc" id="L305">                a0 = (a + 1) - (a - 1) * cos + 2 * alphaS * sqrtA;</span>
+<span class="nc" id="L306">                a1 = 2 * ((a - 1) - (a + 1) * cos);</span>
+<span class="nc" id="L307">                a2 = (a + 1) - (a - 1) * cos - 2 * alphaS * sqrtA;</span>
+                break;
+        }
+<span class="fc" id="L310">        c[0] = b0 / a0;</span>
+<span class="fc" id="L311">        c[1] = b1 / a0;</span>
+<span class="fc" id="L312">        c[2] = b2 / a0;</span>
+<span class="fc" id="L313">        c[3] = a1 / a0;</span>
+<span class="fc" id="L314">        c[4] = a2 / a0;</span>
+<span class="fc" id="L315">    }</span>
+
+    @Override
+    void process(long qn) {
+<span class="fc" id="L319">        AudioBus in = inBuses[0];</span>
+<span class="fc" id="L320">        AudioBus out = outBuses[0];</span>
+<span class="fc" id="L321">        float[] f = frequency.compute(qn);</span>
+<span class="fc" id="L322">        float[] dt = detune.compute(qn);</span>
+<span class="fc" id="L323">        float[] qq = q.compute(qn);</span>
+<span class="fc" id="L324">        float[] g = gain.compute(qn);</span>
+<span class="pc bpc" id="L325" title="3 of 8 branches missed.">        boolean constant = frequency.isConstant() &amp;&amp; detune.isConstant() &amp;&amp; q.isConstant() &amp;&amp; gain.isConstant();</span>
+<span class="fc" id="L326">        out.setChannels(in.channels);</span>
+<span class="fc" id="L327">        float sr = context.getSampleRate();</span>
+<span class="fc" id="L328">        double[] c = coef;</span>
+<span class="fc bfc" id="L329" title="All 2 branches covered.">        if (constant) {</span>
+<span class="fc" id="L330">            coefficients(rType, f[0], dt[0], qq[0], g[0], sr, c);</span>
+        }
+<span class="fc bfc" id="L332" title="All 2 branches covered.">        for (int i = 0; i &lt; BaseAudioContext.RENDER_QUANTUM; i++) {</span>
+<span class="fc bfc" id="L333" title="All 2 branches covered.">            if (!constant) {</span>
+<span class="fc" id="L334">                coefficients(rType, f[i], dt[i], qq[i], g[i], sr, c);</span>
+            }
+<span class="fc bfc" id="L336" title="All 2 branches covered.">            for (int ch = 0; ch &lt; in.channels; ch++) {</span>
+<span class="fc" id="L337">                double x = in.data[ch][i];</span>
+<span class="fc" id="L338">                double y = c[0] * x + c[1] * x1[ch] + c[2] * x2[ch] - c[3] * y1[ch] - c[4] * y2[ch];</span>
+<span class="fc" id="L339">                x2[ch] = x1[ch];</span>
+<span class="fc" id="L340">                x1[ch] = x;</span>
+<span class="fc" id="L341">                y2[ch] = y1[ch];</span>
+<span class="pc bpc" id="L342" title="1 of 4 branches missed.">                if (!(Math.abs(y) &gt;= 1e-30) || Double.isInfinite(y)) { // NOPMD LogicInversion - NaN resets the state</span>
+<span class="fc" id="L343">                    y = 0;</span>
+                }
+<span class="fc" id="L345">                y1[ch] = y;</span>
+<span class="fc" id="L346">                out.data[ch][i] = (float) y;</span>
+            }
+        }
+<span class="fc" id="L349">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

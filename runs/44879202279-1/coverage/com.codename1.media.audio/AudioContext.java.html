@@ -1,0 +1,219 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AudioContext.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.media.audio</a> &gt; <span class="el_source">AudioContext.java</span></div><h1>AudioContext.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.media.audio;
+
+import com.codename1.io.Log;
+import com.codename1.ui.Display;
+import java.util.concurrent.atomic.AtomicReference;
+
+/// Renders an audio graph to the device's speaker in real time, the Web Audio
+/// `AudioContext`.
+///
+/// Not every platform has a real-time audio output; check [#isSupported()] or
+/// test [#create()] for null, and fall back to `Media` or `SoundPool` playback.
+/// [OfflineAudioContext] works everywhere.
+///
+/// ```java
+/// AudioContext audio = AudioContext.create();
+/// if (audio != null) {
+///     OscillatorNode osc = audio.createOscillator();
+///     GainNode amp = audio.createGain();
+///     osc.connect(amp).connect(audio.getDestination());
+///     double now = audio.getCurrentTime();
+///     amp.getGain().setValueAtTime(0, now).linearRampToValueAtTime(0.5f, now + 0.02)
+///             .setTargetAtTime(0, now + 0.1, 0.2);
+///     osc.start(now);
+///     osc.stop(now + 1.5);
+/// }
+/// ```
+///
+/// The graph renders on the platform's audio thread. Callbacks such as
+/// [AudioScheduledSourceNode#setOnEnded(Runnable)] are delivered on the EDT.
+public final class AudioContext extends BaseAudioContext {
+    private final AudioOutputPeer peer;
+<span class="nc" id="L54">    private AudioContextState state = AudioContextState.RUNNING;</span>
+
+    // ---- render side ----
+    private AudioBus rBus;
+<span class="nc" id="L58">    private int rPos = RENDER_QUANTUM;</span>
+    private boolean rFailed;
+
+    private AudioContext(AudioOutputPeer peer) {
+<span class="nc" id="L62">        super(peer.getSampleRate(), peer.getChannels(), peer.getChannels());</span>
+<span class="nc" id="L63">        this.peer = peer;</span>
+<span class="nc" id="L64">    }</span>
+
+    /// Whether this platform can play an audio graph in real time.
+    ///
+    /// #### Returns
+    ///
+    /// true when [#create()] can succeed
+    public static boolean isSupported() {
+<span class="fc" id="L72">        return Display.getInstance().isAudioOutputSupported();</span>
+    }
+
+    /// Opens the default output at the device's preferred sample rate.
+    ///
+    /// #### Returns
+    ///
+    /// a running context, or null when the platform has no real-time output
+    public static AudioContext create() {
+<span class="fc" id="L81">        return create(0);</span>
+    }
+
+    /// Opens the default output.
+    ///
+    /// #### Parameters
+    ///
+    /// - `sampleRate`: the rate wanted, or 0 for the device's own; the device
+    ///   may run at another, which [#getSampleRate()] reports
+    ///
+    /// #### Returns
+    ///
+    /// a running context, or null when the platform has no real-time output
+    public static AudioContext create(int sampleRate) {
+<span class="pc bpc" id="L95" title="1 of 2 branches missed.">        if (!isSupported()) {</span>
+<span class="fc" id="L96">            return null;</span>
+        }
+<span class="nc" id="L98">        Forwarder f = new Forwarder();</span>
+<span class="nc" id="L99">        AudioOutputPeer peer = Display.getInstance().openAudioOutput(sampleRate, 2, f);</span>
+<span class="nc bnc" id="L100" title="All 2 branches missed.">        if (peer == null) {</span>
+<span class="nc" id="L101">            return null;</span>
+        }
+<span class="nc" id="L103">        AudioContext ctx = new AudioContext(peer);</span>
+<span class="nc" id="L104">        f.target.set(ctx);</span>
+<span class="nc" id="L105">        peer.start();</span>
+<span class="nc" id="L106">        return ctx;</span>
+    }
+
+    @Override
+    public AudioContextState getState() {
+<span class="nc" id="L111">        return state;</span>
+    }
+
+    /// The processing latency the graph adds: one render quantum.
+    ///
+    /// #### Returns
+    ///
+    /// seconds
+    public double getBaseLatency() {
+<span class="nc" id="L120">        return RENDER_QUANTUM / (double) getSampleRate();</span>
+    }
+
+    /// The latency the platform reports between rendering and hearing a sample.
+    ///
+    /// #### Returns
+    ///
+    /// seconds, or 0 when unknown
+    public double getOutputLatency() {
+        // A closed peer may already have freed its native handle.
+<span class="nc bnc" id="L130" title="All 2 branches missed.">        if (getState() == AudioContextState.CLOSED) {</span>
+<span class="nc" id="L131">            return 0;</span>
+        }
+<span class="nc" id="L133">        return peer.getOutputLatency();</span>
+    }
+
+    /// Pauses rendering; the clock stops.
+    public void suspend() {
+<span class="nc bnc" id="L138" title="All 2 branches missed.">        if (state == AudioContextState.RUNNING) {</span>
+<span class="nc" id="L139">            peer.stop();</span>
+<span class="nc" id="L140">            state = AudioContextState.SUSPENDED;</span>
+        }
+<span class="nc" id="L142">    }</span>
+
+    /// Resumes rendering after [#suspend()].
+    public void resume() {
+<span class="nc bnc" id="L146" title="All 2 branches missed.">        if (state == AudioContextState.CLOSED) {</span>
+<span class="nc" id="L147">            throw new IllegalStateException(&quot;The context is closed&quot;);</span>
+        }
+<span class="nc bnc" id="L149" title="All 2 branches missed.">        if (state == AudioContextState.SUSPENDED) {</span>
+<span class="nc" id="L150">            peer.start();</span>
+<span class="nc" id="L151">            state = AudioContextState.RUNNING;</span>
+        }
+<span class="nc" id="L153">    }</span>
+
+    /// Releases the output for good.
+    public void close() {
+<span class="nc bnc" id="L157" title="All 2 branches missed.">        if (state != AudioContextState.CLOSED) {</span>
+<span class="nc" id="L158">            peer.close();</span>
+<span class="nc" id="L159">            state = AudioContextState.CLOSED;</span>
+        }
+<span class="nc" id="L161">    }</span>
+
+    @Override
+    boolean dispatchesEndedInline() {
+<span class="nc" id="L165">        return false;</span>
+    }
+
+    void fill(float[] out, int frames, int channels) {
+<span class="nc bnc" id="L169" title="All 2 branches missed.">        if (rFailed) {</span>
+<span class="nc" id="L170">            silence(out, frames * channels);</span>
+<span class="nc" id="L171">            return;</span>
+        }
+        try {
+<span class="nc" id="L174">            int o = 0;</span>
+<span class="nc" id="L175">            int left = frames;</span>
+<span class="nc bnc" id="L176" title="All 2 branches missed.">            while (left &gt; 0) {</span>
+<span class="nc bnc" id="L177" title="All 2 branches missed.">                if (rPos &gt;= RENDER_QUANTUM) {</span>
+<span class="nc" id="L178">                    rBus = renderQuantum();</span>
+<span class="nc" id="L179">                    rPos = 0;</span>
+                }
+<span class="nc" id="L181">                AudioBus bus = rBus;</span>
+<span class="nc" id="L182">                int n = Math.min(left, RENDER_QUANTUM - rPos);</span>
+<span class="nc bnc" id="L183" title="All 2 branches missed.">                for (int i = 0; i &lt; n; i++) {</span>
+<span class="nc bnc" id="L184" title="All 2 branches missed.">                    for (int c = 0; c &lt; channels; c++) {</span>
+<span class="nc bnc" id="L185" title="All 2 branches missed.">                        out[o++] = c &lt; bus.channels ? bus.data[c][rPos + i] : 0f;</span>
+                    }
+                }
+<span class="nc" id="L188">                rPos += n;</span>
+<span class="nc" id="L189">                left -= n;</span>
+<span class="nc" id="L190">            }</span>
+<span class="nc" id="L191">        } catch (RuntimeException e) {</span>
+<span class="nc" id="L192">            rFailed = true;</span>
+<span class="nc" id="L193">            Log.e(e);</span>
+<span class="nc" id="L194">            silence(out, frames * channels);</span>
+<span class="nc" id="L195">        }</span>
+<span class="nc" id="L196">    }</span>
+
+    private static void silence(float[] out, int n) {
+<span class="nc bnc" id="L199" title="All 2 branches missed.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="nc" id="L200">            out[i] = 0f;</span>
+        }
+<span class="nc" id="L202">    }</span>
+
+    /// Hands the port a callback before the context it renders exists.
+<span class="nc" id="L205">    private static final class Forwarder implements AudioRenderCallback {</span>
+<span class="nc" id="L206">        final AtomicReference&lt;AudioContext&gt; target = new AtomicReference&lt;AudioContext&gt;();</span>
+
+        @Override
+        public void render(float[] interleaved, int frames, int channels) {
+<span class="nc" id="L210">            AudioContext ctx = target.get();</span>
+<span class="nc bnc" id="L211" title="All 2 branches missed.">            if (ctx == null) {</span>
+<span class="nc" id="L212">                silence(interleaved, frames * channels);</span>
+            } else {
+<span class="nc" id="L214">                ctx.fill(interleaved, frames, channels);</span>
+            }
+<span class="nc" id="L216">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

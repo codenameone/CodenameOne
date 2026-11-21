@@ -1,0 +1,803 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>StatFunctions.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.spreadsheet</a> &gt; <span class="el_source">StatFunctions.java</span></div><h1>StatFunctions.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.spreadsheet;
+
+import com.codename1.util.MathUtil;
+import java.util.ArrayList;
+
+/// The counting, averaging and descriptive statistics functions.
+final class StatFunctions {
+    static final String SCALAR_NAMES = &quot;FISHER FISHERINV STANDARDIZE&quot;;
+
+    static final String RANGE_NAMES = &quot;AGGREGATE AVEDEV AVERAGE AVERAGEA AVERAGEIF AVERAGEIFS CORREL COUNT COUNTA&quot;
+            + &quot; COUNTBLANK COUNTIF COUNTIFS COVAR COVARIANCE.P COVARIANCE.S DEVSQ FORECAST FORECAST.LINEAR FREQUENCY&quot;
+            + &quot; GEOMEAN HARMEAN INTERCEPT KURT LARGE MAX MAXA MAXIFS MEDIAN MIN MINA MINIFS MODE MODE.MULT MODE.SNGL&quot;
+            + &quot; PEARSON PERCENTILE PERCENTILE.EXC PERCENTILE.INC PERCENTRANK PERCENTRANK.EXC PERCENTRANK.INC QUARTILE&quot;
+            + &quot; QUARTILE.EXC QUARTILE.INC RANK RANK.AVG RANK.EQ RSQ SKEW SKEW.P SLOPE SMALL STDEV STDEV.P STDEV.S STDEVA&quot;
+            + &quot; STDEVP STDEVPA STEYX SUBTOTAL TRIMMEAN VAR VAR.P VAR.S VARA VARP VARPA&quot;;
+
+    private StatFunctions() {
+    }
+
+    private static Double d(double v) {
+<span class="fc" id="L43">        return Double.valueOf(v);</span>
+    }
+
+    private static DoubleList all(Evaluator ev, Object[] a, int from, boolean countTextAndLogicals) {
+<span class="fc" id="L47">        DoubleList list = new DoubleList();</span>
+<span class="fc bfc" id="L48" title="All 2 branches covered.">        for (int i = from; i &lt; a.length; i++) {</span>
+<span class="fc" id="L49">            ev.numbers(a[i], list, countTextAndLogicals);</span>
+        }
+<span class="fc" id="L51">        return list;</span>
+    }
+
+    static double variance(DoubleList list, boolean sample) {
+<span class="fc bfc" id="L55" title="All 2 branches covered.">        int n = sample ? list.size - 1 : list.size;</span>
+<span class="fc bfc" id="L56" title="All 2 branches covered.">        if (n &lt;= 0) {</span>
+<span class="fc" id="L57">            throw EvalError.DIV0;</span>
+        }
+<span class="fc" id="L59">        return list.devSq() / n;</span>
+    }
+
+    static double max(DoubleList list) {
+<span class="fc bfc" id="L63" title="All 2 branches covered.">        double m = list.size == 0 ? 0 : list.data[0];</span>
+<span class="fc bfc" id="L64" title="All 2 branches covered.">        for (int i = 1; i &lt; list.size; i++) {</span>
+<span class="fc bfc" id="L65" title="All 2 branches covered.">            if (list.data[i] &gt; m) {</span>
+<span class="fc" id="L66">                m = list.data[i];</span>
+            }
+        }
+<span class="fc" id="L69">        return m;</span>
+    }
+
+    static double min(DoubleList list) {
+<span class="fc bfc" id="L73" title="All 2 branches covered.">        double m = list.size == 0 ? 0 : list.data[0];</span>
+<span class="fc bfc" id="L74" title="All 2 branches covered.">        for (int i = 1; i &lt; list.size; i++) {</span>
+<span class="fc bfc" id="L75" title="All 2 branches covered.">            if (list.data[i] &lt; m) {</span>
+<span class="fc" id="L76">                m = list.data[i];</span>
+            }
+        }
+<span class="fc" id="L79">        return m;</span>
+    }
+
+    static double median(DoubleList list) {
+<span class="pc bpc" id="L83" title="1 of 2 branches missed.">        if (list.size == 0) {</span>
+<span class="nc" id="L84">            throw EvalError.NUM;</span>
+        }
+<span class="fc" id="L86">        double[] s = list.sorted();</span>
+<span class="fc" id="L87">        int mid = s.length / 2;</span>
+<span class="fc bfc" id="L88" title="All 2 branches covered.">        return (s.length &amp; 1) == 1 ? s[mid] : (s[mid - 1] + s[mid]) / 2;</span>
+    }
+
+    static double percentile(DoubleList list, double k, boolean exclusive) {
+<span class="fc" id="L92">        int n = list.size;</span>
+<span class="pc bpc" id="L93" title="1 of 6 branches missed.">        if (n == 0 || k &lt; 0 || k &gt; 1) {</span>
+<span class="fc" id="L94">            throw EvalError.NUM;</span>
+        }
+<span class="fc" id="L96">        double[] s = list.sorted();</span>
+        double pos;
+<span class="fc bfc" id="L98" title="All 2 branches covered.">        if (exclusive) {</span>
+<span class="fc" id="L99">            pos = k * (n + 1) - 1;</span>
+<span class="fc bfc" id="L100" title="All 4 branches covered.">            if (pos &lt; 0 || pos &gt; n - 1) {</span>
+<span class="fc" id="L101">                throw EvalError.NUM;</span>
+            }
+        } else {
+<span class="fc" id="L104">            pos = k * (n - 1);</span>
+        }
+<span class="fc" id="L106">        int lower = (int) Math.floor(pos);</span>
+<span class="fc bfc" id="L107" title="All 2 branches covered.">        if (lower &gt;= n - 1) {</span>
+<span class="fc" id="L108">            return s[n - 1];</span>
+        }
+<span class="fc" id="L110">        return s[lower] + (pos - lower) * (s[lower + 1] - s[lower]);</span>
+    }
+
+    /// The value that occurs most often; the one met first wins a tie.
+    static double mode(DoubleList list) {
+        // The most frequent value, the earliest in the list among those as frequent: counted
+        // over a sorted copy, since counting each value against every other is a million
+        // squared steps for a column of a million
+<span class="fc" id="L118">        double[] sorted = list.sorted();</span>
+<span class="fc" id="L119">        double best = 0;</span>
+<span class="fc" id="L120">        int bestCount = 1;</span>
+<span class="fc bfc" id="L121" title="All 2 branches covered.">        for (int i = 0; i &lt; list.size; i++) {</span>
+            // in the list's order, so that of two values as frequent the earlier wins
+<span class="fc" id="L123">            int count = count(sorted, list.data[i]);</span>
+<span class="fc bfc" id="L124" title="All 2 branches covered.">            if (count &gt; bestCount) {</span>
+<span class="fc" id="L125">                bestCount = count;</span>
+<span class="fc" id="L126">                best = list.data[i];</span>
+            }
+        }
+<span class="fc bfc" id="L129" title="All 2 branches covered.">        if (bestCount &lt; 2) {</span>
+<span class="fc" id="L130">            throw EvalError.NA;</span>
+        }
+<span class="fc" id="L132">        return best;</span>
+    }
+
+    /// How often a value is in a sorted array, found by two binary searches.
+    private static int count(double[] sorted, double v) {
+<span class="fc" id="L137">        return upper(sorted, v) - lower(sorted, v);</span>
+    }
+
+    /// The first index whose value is not below v.
+    private static int lower(double[] sorted, double v) {
+<span class="fc" id="L142">        int lo = 0;</span>
+<span class="fc" id="L143">        int hi = sorted.length;</span>
+<span class="fc bfc" id="L144" title="All 2 branches covered.">        while (lo &lt; hi) {</span>
+<span class="fc" id="L145">            int mid = (lo + hi) &gt;&gt;&gt; 1;</span>
+<span class="fc bfc" id="L146" title="All 2 branches covered.">            if (sorted[mid] &lt; v) {</span>
+<span class="fc" id="L147">                lo = mid + 1;</span>
+            } else {
+<span class="fc" id="L149">                hi = mid;</span>
+            }
+<span class="fc" id="L151">        }</span>
+<span class="fc" id="L152">        return lo;</span>
+    }
+
+    /// The first index whose value is above v.
+    private static int upper(double[] sorted, double v) {
+<span class="fc" id="L157">        int lo = 0;</span>
+<span class="fc" id="L158">        int hi = sorted.length;</span>
+<span class="fc bfc" id="L159" title="All 2 branches covered.">        while (lo &lt; hi) {</span>
+<span class="fc" id="L160">            int mid = (lo + hi) &gt;&gt;&gt; 1;</span>
+<span class="fc bfc" id="L161" title="All 2 branches covered.">            if (sorted[mid] &lt;= v) {</span>
+<span class="fc" id="L162">                lo = mid + 1;</span>
+            } else {
+<span class="fc" id="L164">                hi = mid;</span>
+            }
+<span class="fc" id="L166">        }</span>
+<span class="fc" id="L167">        return lo;</span>
+    }
+
+    static double nth(DoubleList list, double k, boolean largest) {
+<span class="fc" id="L171">        int index = (int) Math.ceil(k);</span>
+<span class="fc bfc" id="L172" title="All 4 branches covered.">        if (index &lt; 1 || index &gt; list.size) {</span>
+<span class="fc" id="L173">            throw EvalError.NUM;</span>
+        }
+<span class="fc" id="L175">        double[] s = list.sorted();</span>
+<span class="fc bfc" id="L176" title="All 2 branches covered.">        return largest ? s[s.length - index] : s[index - 1];</span>
+    }
+
+    /// The functions SUBTOTAL and AGGREGATE select by number.
+    static double aggregate(int fn, DoubleList list, double k) {
+<span class="pc bpc" id="L181" title="13 of 19 branches missed.">        switch (fn) {</span>
+            case 1:
+<span class="fc" id="L183">                return list.mean();</span>
+            case 2:
+<span class="fc" id="L185">                return list.size;</span>
+            case 4:
+<span class="fc" id="L187">                return max(list);</span>
+            case 5:
+<span class="nc" id="L189">                return min(list);</span>
+            case 6: {
+<span class="fc" id="L191">                double p = 1;</span>
+<span class="fc bfc" id="L192" title="All 2 branches covered.">                for (int i = 0; i &lt; list.size; i++) {</span>
+<span class="fc" id="L193">                    p *= list.data[i];</span>
+                }
+<span class="pc bpc" id="L195" title="1 of 2 branches missed.">                return list.size == 0 ? 0 : p;</span>
+            }
+            case 7:
+<span class="nc" id="L198">                return Math.sqrt(variance(list, true));</span>
+            case 8:
+<span class="nc" id="L200">                return Math.sqrt(variance(list, false));</span>
+            case 9:
+<span class="fc" id="L202">                return list.sum();</span>
+            case 10:
+<span class="nc" id="L204">                return variance(list, true);</span>
+            case 11:
+<span class="nc" id="L206">                return variance(list, false);</span>
+            case 12:
+<span class="nc" id="L208">                return median(list);</span>
+            case 13:
+<span class="nc" id="L210">                return mode(list);</span>
+            case 14:
+<span class="nc" id="L212">                return nth(list, k, true);</span>
+            case 15:
+<span class="nc" id="L214">                return nth(list, k, false);</span>
+            case 16:
+<span class="nc" id="L216">                return percentile(list, k, false);</span>
+            case 17:
+<span class="nc" id="L218">                return percentile(list, k / 4, false);</span>
+            case 18:
+<span class="nc" id="L220">                return percentile(list, k, true);</span>
+            case 19:
+<span class="nc" id="L222">                return percentile(list, k / 4, true);</span>
+            default:
+<span class="fc" id="L224">                throw EvalError.VALUE;</span>
+        }
+    }
+
+    /// The pairs of two ranges of the same shape in which both values are numbers.
+    static double[][] pairs(Evaluator ev, Object ya, Object xa) {
+<span class="fc" id="L230">        Object[][] y = ev.matrix(ya);</span>
+<span class="fc" id="L231">        Object[][] x = ev.matrix(xa);</span>
+<span class="pc bpc" id="L232" title="1 of 4 branches missed.">        if (y.length != x.length || Evaluator.width(y) != Evaluator.width(x)) {</span>
+<span class="fc" id="L233">            throw EvalError.NA;</span>
+        }
+<span class="fc" id="L235">        DoubleList ys = new DoubleList();</span>
+<span class="fc" id="L236">        DoubleList xs = new DoubleList();</span>
+<span class="fc bfc" id="L237" title="All 2 branches covered.">        for (int r = 0; r &lt; y.length; r++) {</span>
+<span class="fc bfc" id="L238" title="All 2 branches covered.">            for (int c = 0; c &lt; y[r].length; c++) {</span>
+<span class="fc" id="L239">                Object p = y[r][c];</span>
+<span class="fc" id="L240">                Object q = x[r][c];</span>
+<span class="pc bpc" id="L241" title="1 of 2 branches missed.">                if (p instanceof CellError) {</span>
+<span class="nc" id="L242">                    throw EvalError.of((CellError) p);</span>
+                }
+<span class="pc bpc" id="L244" title="1 of 2 branches missed.">                if (q instanceof CellError) {</span>
+<span class="nc" id="L245">                    throw EvalError.of((CellError) q);</span>
+                }
+<span class="fc bfc" id="L247" title="All 4 branches covered.">                if (p instanceof Double &amp;&amp; q instanceof Double) {</span>
+<span class="fc" id="L248">                    ys.add(((Double) p).doubleValue());</span>
+<span class="fc" id="L249">                    xs.add(((Double) q).doubleValue());</span>
+                }
+            }
+        }
+<span class="fc" id="L253">        double[] yd = new double[ys.size];</span>
+<span class="fc" id="L254">        double[] xd = new double[xs.size];</span>
+<span class="fc" id="L255">        System.arraycopy(ys.data, 0, yd, 0, ys.size);</span>
+<span class="fc" id="L256">        System.arraycopy(xs.data, 0, xd, 0, xs.size);</span>
+<span class="fc" id="L257">        return new double[][] {yd, xd};</span>
+    }
+
+    /// Sums over pairs: [n, mean y, mean x, Syy, Sxx, Sxy].
+    static double[] moments(double[][] pairs) {
+<span class="fc" id="L262">        double[] y = pairs[0];</span>
+<span class="fc" id="L263">        double[] x = pairs[1];</span>
+<span class="fc" id="L264">        int n = y.length;</span>
+<span class="fc bfc" id="L265" title="All 2 branches covered.">        if (n == 0) {</span>
+<span class="fc" id="L266">            throw EvalError.DIV0;</span>
+        }
+<span class="fc" id="L268">        double my = 0;</span>
+<span class="fc" id="L269">        double mx = 0;</span>
+<span class="fc bfc" id="L270" title="All 2 branches covered.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc" id="L271">            my += y[i];</span>
+<span class="fc" id="L272">            mx += x[i];</span>
+        }
+<span class="fc" id="L274">        my /= n;</span>
+<span class="fc" id="L275">        mx /= n;</span>
+<span class="fc" id="L276">        double syy = 0;</span>
+<span class="fc" id="L277">        double sxx = 0;</span>
+<span class="fc" id="L278">        double sxy = 0;</span>
+<span class="fc bfc" id="L279" title="All 2 branches covered.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc" id="L280">            syy += (y[i] - my) * (y[i] - my);</span>
+<span class="fc" id="L281">            sxx += (x[i] - mx) * (x[i] - mx);</span>
+<span class="fc" id="L282">            sxy += (x[i] - mx) * (y[i] - my);</span>
+        }
+<span class="fc" id="L284">        return new double[] {n, my, mx, syy, sxx, sxy};</span>
+    }
+
+    static Object call(String name, Evaluator ev, Object[] a) {
+<span class="pc bpc" id="L288" title="1 of 46 branches missed.">        switch (Functions.index(SWITCH_1, name)) {</span>
+            case 0: { // STANDARDIZE
+<span class="fc" id="L290">                double sd = Evaluator.num(a, 2);</span>
+<span class="fc bfc" id="L291" title="All 2 branches covered.">                if (sd &lt;= 0) {</span>
+<span class="fc" id="L292">                    throw EvalError.NUM;</span>
+                }
+<span class="fc" id="L294">                return d((Evaluator.num(a, 0) - Evaluator.num(a, 1)) / sd);</span>
+            }
+            case 1: { // FISHER
+<span class="fc" id="L297">                double x = Evaluator.num(a, 0);</span>
+<span class="fc bfc" id="L298" title="All 4 branches covered.">                if (x &lt;= -1 || x &gt;= 1) {</span>
+<span class="fc" id="L299">                    throw EvalError.NUM;</span>
+                }
+<span class="fc" id="L301">                return d(0.5 * MathUtil.log((1 + x) / (1 - x)));</span>
+            }
+            case 2: { // FISHERINV
+<span class="fc" id="L304">                double e = MathUtil.exp(2 * Evaluator.num(a, 0));</span>
+<span class="fc" id="L305">                return d((e - 1) / (e + 1));</span>
+            }
+            case 3: // AVERAGE
+<span class="fc" id="L308">                return d(all(ev, a, 0, false).mean());</span>
+            case 4: // AVERAGEA
+<span class="fc" id="L310">                return d(all(ev, a, 0, true).mean());</span>
+            case 5: // COUNT
+<span class="fc" id="L312">                return d(count(ev, a, 0));</span>
+            case 6: // COUNTA
+<span class="fc" id="L314">                return d(count(ev, a, 1));</span>
+            case 7: // COUNTBLANK
+<span class="fc" id="L316">                return d(count(ev, a, 2));</span>
+            case 8: // MAX
+<span class="fc" id="L318">                return d(max(all(ev, a, 0, false)));</span>
+            case 9: // MAXA
+<span class="fc" id="L320">                return d(max(all(ev, a, 0, true)));</span>
+            case 10: // MIN
+<span class="fc" id="L322">                return d(min(all(ev, a, 0, false)));</span>
+            case 11: // MINA
+<span class="fc" id="L324">                return d(min(all(ev, a, 0, true)));</span>
+            case 12: // MEDIAN
+<span class="fc" id="L326">                return d(median(all(ev, a, 0, false)));</span>
+            case 13: // MODE
+            case 14: // MODE.SNGL
+<span class="fc" id="L329">                return d(mode(all(ev, a, 0, false)));</span>
+            case 15: // MODE.MULT
+<span class="fc" id="L331">                return modeMult(all(ev, a, 0, false));</span>
+            case 16: // STDEV
+            case 17: // STDEV.S
+<span class="fc" id="L334">                return d(Math.sqrt(variance(all(ev, a, 0, false), true)));</span>
+            case 18: // STDEVP
+            case 19: // STDEV.P
+<span class="fc" id="L337">                return d(Math.sqrt(variance(all(ev, a, 0, false), false)));</span>
+            case 20: // STDEVA
+<span class="fc" id="L339">                return d(Math.sqrt(variance(all(ev, a, 0, true), true)));</span>
+            case 21: // STDEVPA
+<span class="fc" id="L341">                return d(Math.sqrt(variance(all(ev, a, 0, true), false)));</span>
+            case 22: // VAR
+            case 23: // VAR.S
+<span class="fc" id="L344">                return d(variance(all(ev, a, 0, false), true));</span>
+            case 24: // VARP
+            case 25: // VAR.P
+<span class="fc" id="L347">                return d(variance(all(ev, a, 0, false), false));</span>
+            case 26: // VARA
+<span class="fc" id="L349">                return d(variance(all(ev, a, 0, true), true));</span>
+            case 27: // VARPA
+<span class="fc" id="L351">                return d(variance(all(ev, a, 0, true), false));</span>
+            case 28: // DEVSQ
+<span class="fc" id="L353">                return d(all(ev, a, 0, false).devSq());</span>
+            case 29: { // AVEDEV
+<span class="fc" id="L355">                DoubleList list = all(ev, a, 0, false);</span>
+<span class="fc" id="L356">                double m = list.mean();</span>
+<span class="fc" id="L357">                double total = 0;</span>
+<span class="fc bfc" id="L358" title="All 2 branches covered.">                for (int i = 0; i &lt; list.size; i++) {</span>
+<span class="fc" id="L359">                    total += Math.abs(list.data[i] - m);</span>
+                }
+<span class="fc" id="L361">                return d(total / list.size);</span>
+            }
+            case 30: { // GEOMEAN
+<span class="fc" id="L364">                DoubleList list = all(ev, a, 0, false);</span>
+<span class="pc bpc" id="L365" title="1 of 2 branches missed.">                if (list.size == 0) {</span>
+<span class="nc" id="L366">                    throw EvalError.NUM;</span>
+                }
+<span class="fc" id="L368">                double logs = 0;</span>
+<span class="fc bfc" id="L369" title="All 2 branches covered.">                for (int i = 0; i &lt; list.size; i++) {</span>
+<span class="fc" id="L370">                    logs += MathFunctions.ln(list.data[i]);</span>
+                }
+<span class="fc" id="L372">                return d(MathUtil.exp(logs / list.size));</span>
+            }
+            case 31: { // HARMEAN
+<span class="fc" id="L375">                DoubleList list = all(ev, a, 0, false);</span>
+<span class="pc bpc" id="L376" title="1 of 2 branches missed.">                if (list.size == 0) {</span>
+<span class="nc" id="L377">                    throw EvalError.NUM;</span>
+                }
+<span class="fc" id="L379">                double total = 0;</span>
+<span class="fc bfc" id="L380" title="All 2 branches covered.">                for (int i = 0; i &lt; list.size; i++) {</span>
+<span class="fc bfc" id="L381" title="All 2 branches covered.">                    if (list.data[i] &lt;= 0) {</span>
+<span class="fc" id="L382">                        throw EvalError.NUM;</span>
+                    }
+<span class="fc" id="L384">                    total += 1 / list.data[i];</span>
+                }
+<span class="fc" id="L386">                return d(list.size / total);</span>
+            }
+            case 32: // LARGE
+            case 33: { // SMALL
+<span class="fc" id="L390">                DoubleList list = new DoubleList();</span>
+<span class="fc" id="L391">                ev.numbers(Evaluator.arg(a, 0), list, false);</span>
+<span class="fc" id="L392">                return d(nth(list, ev.scalarNum(a, 1), &quot;LARGE&quot;.equals(name)));</span>
+            }
+            case 34: // PERCENTILE
+            case 35: // PERCENTILE.INC
+            case 36: // PERCENTILE.EXC
+            case 37: // QUARTILE
+            case 38: // QUARTILE.INC
+            case 39: { // QUARTILE.EXC
+<span class="fc" id="L400">                DoubleList list = new DoubleList();</span>
+<span class="fc" id="L401">                ev.numbers(Evaluator.arg(a, 0), list, false);</span>
+<span class="fc" id="L402">                double k = ev.scalarNum(a, 1);</span>
+<span class="fc" id="L403">                boolean exclusive = name.endsWith(&quot;.EXC&quot;);</span>
+<span class="fc bfc" id="L404" title="All 2 branches covered.">                if (name.charAt(0) == 'Q') {</span>
+<span class="fc" id="L405">                    k = Math.floor(k);</span>
+<span class="pc bpc" id="L406" title="2 of 10 branches missed.">                    if (k &lt; 0 || k &gt; 4 || exclusive &amp;&amp; (k == 0 || k == 4)) {</span>
+<span class="fc" id="L407">                        throw EvalError.NUM;</span>
+                    }
+<span class="fc" id="L409">                    k /= 4;</span>
+                }
+<span class="fc" id="L411">                return d(percentile(list, k, exclusive));</span>
+            }
+            case 40: // PERCENTRANK
+            case 41: // PERCENTRANK.INC
+            case 42: // PERCENTRANK.EXC
+<span class="fc" id="L416">                return percentRank(ev, a, name.endsWith(&quot;.EXC&quot;));</span>
+            case 43: // RANK
+            case 44: // RANK.EQ
+            case 45: { // RANK.AVG
+<span class="fc" id="L420">                double x = ev.scalarNum(a, 0);</span>
+<span class="fc" id="L421">                DoubleList list = new DoubleList();</span>
+<span class="fc" id="L422">                ev.numbers(Evaluator.arg(a, 1), list, false);</span>
+<span class="fc bfc" id="L423" title="All 2 branches covered.">                boolean ascending = ev.scalarNum(a, 2, 0) != 0;</span>
+<span class="fc" id="L424">                int before = 0;</span>
+<span class="fc" id="L425">                int same = 0;</span>
+<span class="fc bfc" id="L426" title="All 2 branches covered.">                for (int i = 0; i &lt; list.size; i++) {</span>
+<span class="fc" id="L427">                    double v = list.data[i];</span>
+<span class="fc bfc" id="L428" title="All 2 branches covered.">                    if (v == x) {</span>
+<span class="fc" id="L429">                        same++;</span>
+<span class="fc bfc" id="L430" title="All 6 branches covered.">                    } else if (ascending ? v &lt; x : v &gt; x) {</span>
+<span class="fc" id="L431">                        before++;</span>
+                    }
+                }
+<span class="fc bfc" id="L434" title="All 2 branches covered.">                if (same == 0) {</span>
+<span class="fc" id="L435">                    throw EvalError.NA;</span>
+                }
+<span class="fc bfc" id="L437" title="All 2 branches covered.">                return d(&quot;RANK.AVG&quot;.equals(name) ? before + (same + 1) / 2.0 : before + 1);</span>
+            }
+            case 46: { // TRIMMEAN
+<span class="fc" id="L440">                DoubleList list = new DoubleList();</span>
+<span class="fc" id="L441">                ev.numbers(Evaluator.arg(a, 0), list, false);</span>
+<span class="fc" id="L442">                double percent = ev.scalarNum(a, 1);</span>
+<span class="pc bpc" id="L443" title="1 of 6 branches missed.">                if (percent &lt; 0 || percent &gt;= 1 || list.size == 0) {</span>
+<span class="fc" id="L444">                    throw EvalError.NUM;</span>
+                }
+<span class="fc" id="L446">                int cut = (int) Math.floor(list.size * percent / 2);</span>
+<span class="fc" id="L447">                double[] s = list.sorted();</span>
+<span class="fc" id="L448">                double total = 0;</span>
+<span class="fc bfc" id="L449" title="All 2 branches covered.">                for (int i = cut; i &lt; s.length - cut; i++) {</span>
+<span class="fc" id="L450">                    total += s[i];</span>
+                }
+<span class="fc" id="L452">                return d(total / (s.length - 2 * cut));</span>
+            }
+            case 47: { // KURT
+<span class="fc" id="L455">                DoubleList list = all(ev, a, 0, false);</span>
+<span class="fc" id="L456">                double n = list.size;</span>
+<span class="fc bfc" id="L457" title="All 2 branches covered.">                if (n &lt; 4) {</span>
+<span class="fc" id="L458">                    throw EvalError.DIV0;</span>
+                }
+<span class="fc" id="L460">                double sd = Math.sqrt(variance(list, true));</span>
+<span class="pc bpc" id="L461" title="1 of 2 branches missed.">                if (sd == 0) {</span>
+<span class="nc" id="L462">                    throw EvalError.DIV0;</span>
+                }
+<span class="fc" id="L464">                double m = list.mean();</span>
+<span class="fc" id="L465">                double total = 0;</span>
+<span class="fc bfc" id="L466" title="All 2 branches covered.">                for (int i = 0; i &lt; list.size; i++) {</span>
+<span class="fc" id="L467">                    double z = (list.data[i] - m) / sd;</span>
+<span class="fc" id="L468">                    total += z * z * z * z;</span>
+                }
+<span class="fc" id="L470">                return d(n * (n + 1) / ((n - 1) * (n - 2) * (n - 3)) * total - 3 * (n - 1) * (n - 1) / ((n - 2) * (n - 3)));</span>
+            }
+            case 48: // SKEW
+            case 49: { // SKEW.P
+<span class="fc" id="L474">                DoubleList list = all(ev, a, 0, false);</span>
+<span class="fc" id="L475">                double n = list.size;</span>
+<span class="fc" id="L476">                boolean population = &quot;SKEW.P&quot;.equals(name);</span>
+<span class="pc bpc" id="L477" title="1 of 6 branches missed.">                if (n &lt; 3 &amp;&amp; !population || n == 0) {</span>
+<span class="fc" id="L478">                    throw EvalError.DIV0;</span>
+                }
+<span class="fc bfc" id="L480" title="All 2 branches covered.">                double sd = Math.sqrt(variance(list, !population));</span>
+<span class="fc bfc" id="L481" title="All 2 branches covered.">                if (sd == 0) {</span>
+<span class="fc" id="L482">                    throw EvalError.DIV0;</span>
+                }
+<span class="fc" id="L484">                double m = list.mean();</span>
+<span class="fc" id="L485">                double total = 0;</span>
+<span class="fc bfc" id="L486" title="All 2 branches covered.">                for (int i = 0; i &lt; list.size; i++) {</span>
+<span class="fc" id="L487">                    double z = (list.data[i] - m) / sd;</span>
+<span class="fc" id="L488">                    total += z * z * z;</span>
+                }
+<span class="fc bfc" id="L490" title="All 2 branches covered.">                return d(population ? total / n : n / ((n - 1) * (n - 2)) * total);</span>
+            }
+            case 50: // CORREL
+            case 51: // PEARSON
+            case 52: { // RSQ
+<span class="fc" id="L495">                double[] m = moments(pairs(ev, Evaluator.arg(a, 0), Evaluator.arg(a, 1)));</span>
+<span class="pc bpc" id="L496" title="1 of 4 branches missed.">                if (m[3] == 0 || m[4] == 0) {</span>
+<span class="fc" id="L497">                    throw EvalError.DIV0;</span>
+                }
+<span class="fc" id="L499">                double r = m[5] / Math.sqrt(m[3] * m[4]);</span>
+<span class="fc bfc" id="L500" title="All 2 branches covered.">                return d(&quot;RSQ&quot;.equals(name) ? r * r : r);</span>
+            }
+            case 53: // COVAR
+            case 54: // COVARIANCE.P
+            case 55: { // COVARIANCE.S
+<span class="fc" id="L505">                double[] m = moments(pairs(ev, Evaluator.arg(a, 0), Evaluator.arg(a, 1)));</span>
+<span class="fc bfc" id="L506" title="All 2 branches covered.">                double n = name.endsWith(&quot;.S&quot;) ? m[0] - 1 : m[0];</span>
+<span class="fc bfc" id="L507" title="All 2 branches covered.">                if (n &lt;= 0) {</span>
+<span class="fc" id="L508">                    throw EvalError.DIV0;</span>
+                }
+<span class="fc" id="L510">                return d(m[5] / n);</span>
+            }
+            case 56: // SLOPE
+            case 57: // INTERCEPT
+            case 58: { // STEYX
+<span class="fc" id="L515">                double[] m = moments(pairs(ev, Evaluator.arg(a, 0), Evaluator.arg(a, 1)));</span>
+<span class="fc bfc" id="L516" title="All 2 branches covered.">                if (m[4] == 0) {</span>
+<span class="fc" id="L517">                    throw EvalError.DIV0;</span>
+                }
+<span class="fc" id="L519">                double slope = m[5] / m[4];</span>
+<span class="fc bfc" id="L520" title="All 2 branches covered.">                if (&quot;SLOPE&quot;.equals(name)) {</span>
+<span class="fc" id="L521">                    return d(slope);</span>
+                }
+<span class="fc bfc" id="L523" title="All 2 branches covered.">                if (&quot;INTERCEPT&quot;.equals(name)) {</span>
+<span class="fc" id="L524">                    return d(m[1] - slope * m[2]);</span>
+                }
+<span class="pc bpc" id="L526" title="1 of 2 branches missed.">                if (m[0] &lt; 3) {</span>
+<span class="nc" id="L527">                    throw EvalError.DIV0;</span>
+                }
+<span class="fc" id="L529">                return d(Math.sqrt(Math.max(0, m[3] - m[5] * m[5] / m[4]) / (m[0] - 2)));</span>
+            }
+            case 59: // FORECAST
+            case 60: { // FORECAST.LINEAR
+<span class="fc" id="L533">                double x = ev.scalarNum(a, 0);</span>
+<span class="fc" id="L534">                double[] m = moments(pairs(ev, Evaluator.arg(a, 1), Evaluator.arg(a, 2)));</span>
+<span class="fc bfc" id="L535" title="All 2 branches covered.">                if (m[4] == 0) {</span>
+<span class="fc" id="L536">                    throw EvalError.DIV0;</span>
+                }
+<span class="fc" id="L538">                double slope = m[5] / m[4];</span>
+<span class="fc" id="L539">                return d(m[1] - slope * m[2] + slope * x);</span>
+            }
+            case 61: { // FREQUENCY
+<span class="fc" id="L542">                DoubleList data = new DoubleList();</span>
+<span class="fc" id="L543">                ev.numbers(Evaluator.arg(a, 0), data, false);</span>
+<span class="fc" id="L544">                DoubleList binList = new DoubleList();</span>
+<span class="fc" id="L545">                ev.numbers(Evaluator.arg(a, 1), binList, false);</span>
+<span class="fc" id="L546">                double[] bins = binList.sorted();</span>
+<span class="fc" id="L547">                Object[][] out = new Object[bins.length + 1][1];</span>
+<span class="fc" id="L548">                int[] counts = new int[bins.length + 1];</span>
+<span class="fc bfc" id="L549" title="All 2 branches covered.">                for (int i = 0; i &lt; data.size; i++) {</span>
+                    // the first bin the value is not above
+<span class="fc" id="L551">                    counts[lower(bins, data.data[i])]++;</span>
+                }
+<span class="fc bfc" id="L553" title="All 2 branches covered.">                for (int i = 0; i &lt; counts.length; i++) {</span>
+<span class="fc" id="L554">                    out[i][0] = d(counts[i]);</span>
+                }
+<span class="fc" id="L556">                return out;</span>
+            }
+            case 62: { // COUNTIF
+<span class="fc" id="L559">                boolean[][] mask = Criteria.mask(ev, a, 0, 2);</span>
+<span class="fc" id="L560">                return d(countTrue(mask) + Criteria.blanksBeyondData(ev, a, 0, 2));</span>
+            }
+            case 63: // COUNTIFS
+<span class="fc" id="L563">                return d(countTrue(Criteria.mask(ev, a, 0, a.length)) + Criteria.blanksBeyondData(ev, a, 0, a.length));</span>
+            case 64: { // AVERAGEIF
+<span class="pc bpc" id="L565" title="1 of 2 branches missed.">                if (a.length &lt; 2) {</span>
+<span class="nc" id="L566">                    throw EvalError.VALUE;</span>
+                }
+<span class="fc" id="L568">                boolean[][] mask = Criteria.mask(ev, a, 0, 2);</span>
+<span class="fc bfc" id="L569" title="All 2 branches covered.">                return d(masked(ev, mask, Evaluator.has(a, 2) ? a[2] : a[0]).mean());</span>
+            }
+            case 65: // AVERAGEIFS
+            case 66: // MAXIFS
+            case 67: { // MINIFS
+<span class="pc bpc" id="L574" title="1 of 2 branches missed.">                if (a.length &lt; 3) {</span>
+<span class="nc" id="L575">                    throw EvalError.VALUE;</span>
+                }
+<span class="fc" id="L577">                DoubleList list = masked(ev, Criteria.mask(ev, a, 1, a.length), a[0]);</span>
+<span class="fc bfc" id="L578" title="All 2 branches covered.">                if (&quot;AVERAGEIFS&quot;.equals(name)) {</span>
+<span class="fc" id="L579">                    return d(list.mean());</span>
+                }
+<span class="fc bfc" id="L581" title="All 2 branches covered.">                return d(&quot;MAXIFS&quot;.equals(name) ? max(list) : min(list));</span>
+            }
+            case 68: { // SUBTOTAL
+<span class="fc" id="L584">                int fn = (int) ev.scalarNum(a, 0);</span>
+<span class="pc bpc" id="L585" title="1 of 2 branches missed.">                if (fn &gt; 100) {</span>
+<span class="nc" id="L586">                    fn -= 100;</span>
+                }
+<span class="fc bfc" id="L588" title="All 2 branches covered.">                if (fn == 3) {</span>
+<span class="fc" id="L589">                    return d(count(ev, a, 1) - 1);</span>
+                }
+<span class="pc bpc" id="L591" title="1 of 4 branches missed.">                if (fn &lt; 1 || fn &gt; 11) {</span>
+<span class="fc" id="L592">                    throw EvalError.VALUE;</span>
+                }
+<span class="fc" id="L594">                DoubleList list = new DoubleList();</span>
+<span class="fc" id="L595">                ev.skipSubtotals = true;</span>
+                try {
+<span class="fc bfc" id="L597" title="All 2 branches covered.">                    for (int i = 1; i &lt; a.length; i++) {</span>
+<span class="fc" id="L598">                        ev.numbers(a[i], list, false);</span>
+                    }
+                } finally {
+<span class="fc" id="L601">                    ev.skipSubtotals = false;</span>
+                }
+<span class="fc" id="L603">                return d(aggregate(fn, list, 0));</span>
+            }
+            case 69: { // AGGREGATE
+<span class="fc" id="L606">                int fn = (int) ev.scalarNum(a, 0);</span>
+<span class="fc" id="L607">                int options = (int) ev.scalarNum(a, 1, 0);</span>
+<span class="pc bpc" id="L608" title="2 of 8 branches missed.">                boolean ignoreErrors = options == 2 || options == 3 || options == 6 || options == 7;</span>
+<span class="pc bpc" id="L609" title="1 of 2 branches missed.">                boolean takesK = fn &gt;= 14;</span>
+<span class="fc" id="L610">                DoubleList list = new DoubleList();</span>
+<span class="pc bpc" id="L611" title="1 of 2 branches missed.">                int last = takesK ? Math.min(a.length, 3) : a.length;</span>
+<span class="fc" id="L612">                int counted = 0;</span>
+<span class="fc bfc" id="L613" title="All 2 branches covered.">                for (int i = 2; i &lt; last; i++) {</span>
+<span class="fc bfc" id="L614" title="All 2 branches covered.">                    for (Object[][] m : ev.areas(a[i])) {</span>
+<span class="fc bfc" id="L615" title="All 2 branches covered.">                        for (Object[] line : m) {</span>
+<span class="fc bfc" id="L616" title="All 2 branches covered.">                            for (Object v : line) {</span>
+<span class="pc bpc" id="L617" title="1 of 2 branches missed.">                                if (v instanceof CellError) {</span>
+<span class="nc bnc" id="L618" title="All 2 branches missed.">                                    if (!ignoreErrors) {</span>
+<span class="nc" id="L619">                                        throw EvalError.of((CellError) v);</span>
+                                    }
+<span class="fc bfc" id="L621" title="All 2 branches covered.">                                } else if (v instanceof Double) {</span>
+<span class="fc" id="L622">                                    list.add(((Double) v).doubleValue());</span>
+<span class="fc" id="L623">                                    counted++;</span>
+<span class="pc bpc" id="L624" title="2 of 4 branches missed.">                                } else if (v != null &amp;&amp; !&quot;&quot;.equals(v)) {</span>
+<span class="fc" id="L625">                                    counted++;</span>
+                                }
+                            }
+                        }
+<span class="fc" id="L629">                    }</span>
+                }
+<span class="fc bfc" id="L631" title="All 2 branches covered.">                if (fn == 3) {</span>
+<span class="fc" id="L632">                    return d(counted);</span>
+                }
+<span class="pc bpc" id="L634" title="1 of 2 branches missed.">                return d(aggregate(fn, list, takesK ? ev.scalarNum(a, 3) : 0));</span>
+            }
+            default:
+<span class="nc" id="L637">                return CellError.NAME;</span>
+        }
+    }
+
+    /// Counts over arguments: mode 0 the numbers, 1 everything that is not empty, 2 the
+    /// empty cells and empty texts.
+    private static int count(Evaluator ev, Object[] a, int mode) {
+<span class="fc" id="L644">        int count = 0;</span>
+<span class="fc bfc" id="L645" title="All 2 branches covered.">        for (Object whole : a) {</span>
+<span class="fc bfc" id="L646" title="All 2 branches covered.">            if (whole instanceof Ref) {</span>
+                // every area of a union and every sheet of a 3D reference, one at a time
+<span class="fc bfc" id="L648" title="All 2 branches covered.">                for (Ref r = (Ref) whole; r != null; r = r.next) {</span>
+<span class="fc" id="L649">                    int first = ev.workbook.indexOf(r.sheet);</span>
+<span class="fc bfc" id="L650" title="All 2 branches covered.">                    int last = r.lastSheet == null ? first : ev.workbook.indexOf(r.lastSheet);</span>
+<span class="fc bfc" id="L651" title="All 2 branches covered.">                    for (int s = first; s &lt;= last; s++) {</span>
+<span class="fc" id="L652">                        count += count(ev, new Ref(ev.workbook.getSheet(s), null, r.r1, r.c1, r.r2, r.c2), mode);</span>
+                    }
+                }
+<span class="fc" id="L655">                continue;</span>
+            }
+<span class="fc" id="L657">            count += count(ev, whole, mode);</span>
+        }
+<span class="fc" id="L659">        return count;</span>
+    }
+
+    private static int count(Evaluator ev, Object arg, int mode) {
+<span class="fc" id="L663">        int count = 0;</span>
+<span class="fc bfc" id="L664" title="All 4 branches covered.">        if (arg instanceof Ref || arg instanceof Object[][]) {</span>
+<span class="fc bfc" id="L665" title="All 2 branches covered.">            if (arg instanceof Ref) {</span>
+<span class="fc" id="L666">                Ref ref = (Ref) arg;</span>
+<span class="fc bfc" id="L667" title="All 2 branches covered.">                if (mode == 2) {</span>
+                    // every cell of the range counts, the ones past the data included
+<span class="fc" id="L669">                    count += (ref.rows() - ref.clip().rows()) * ref.cols()</span>
+<span class="fc" id="L670">                            + (ref.cols() - ref.clip().cols()) * ref.clip().rows();</span>
+                }
+            }
+<span class="fc" id="L673">            Object[][] m = ev.matrix(arg);</span>
+<span class="fc bfc" id="L674" title="All 2 branches covered.">            for (Object[] line : m) {</span>
+<span class="fc bfc" id="L675" title="All 2 branches covered.">                for (Object v : line) {</span>
+<span class="fc bfc" id="L676" title="All 2 branches covered.">                    if (mode == 0) {</span>
+<span class="fc bfc" id="L677" title="All 2 branches covered.">                        if (v instanceof Double) {</span>
+<span class="fc" id="L678">                            count++;</span>
+                        }
+<span class="fc bfc" id="L680" title="All 2 branches covered.">                    } else if (mode == 1) {</span>
+<span class="fc bfc" id="L681" title="All 2 branches covered.">                        if (v != null) {</span>
+<span class="fc" id="L682">                            count++;</span>
+                        }
+<span class="pc bpc" id="L684" title="1 of 4 branches missed.">                    } else if (v == null || &quot;&quot;.equals(v)) {</span>
+<span class="fc" id="L685">                        count++;</span>
+                    }
+                }
+            }
+<span class="pc bpc" id="L689" title="1 of 2 branches missed.">        } else if (arg != Evaluator.MISSING) { //NOPMD CompareObjectsWithEquals - the marker of an omitted argument is one object</span>
+<span class="fc bfc" id="L690" title="All 2 branches covered.">            if (mode == 0) {</span>
+<span class="pc bpc" id="L691" title="1 of 6 branches missed.">                if (arg instanceof Double || arg instanceof Boolean</span>
+<span class="pc bpc" id="L692" title="1 of 2 branches missed.">                        || arg instanceof String &amp;&amp; Values.parseNumber((String) arg) != null) {</span>
+<span class="fc" id="L693">                    count++;</span>
+                }
+<span class="fc bfc" id="L695" title="All 2 branches covered.">            } else if (mode == 1) {</span>
+<span class="pc bpc" id="L696" title="1 of 2 branches missed.">                if (arg != null) {</span>
+<span class="fc" id="L697">                    count++;</span>
+                }
+<span class="pc bpc" id="L699" title="2 of 4 branches missed.">            } else if (arg == null || &quot;&quot;.equals(arg)) {</span>
+<span class="nc" id="L700">                count++;</span>
+            }
+        }
+<span class="fc" id="L703">        return count;</span>
+    }
+
+    private static int countTrue(boolean[][] mask) {
+<span class="fc" id="L707">        int count = 0;</span>
+<span class="fc bfc" id="L708" title="All 2 branches covered.">        for (boolean[] line : mask) {</span>
+<span class="fc bfc" id="L709" title="All 2 branches covered.">            for (boolean hit : line) {</span>
+<span class="fc bfc" id="L710" title="All 2 branches covered.">                if (hit) {</span>
+<span class="fc" id="L711">                    count++;</span>
+                }
+            }
+        }
+<span class="fc" id="L715">        return count;</span>
+    }
+
+    private static DoubleList masked(Evaluator ev, boolean[][] mask, Object valueRange) {
+<span class="fc" id="L719">        Object[][] values = ev.shaped(valueRange, mask.length, Evaluator.width2(mask));</span>
+<span class="fc" id="L720">        DoubleList list = new DoubleList();</span>
+<span class="fc bfc" id="L721" title="All 2 branches covered.">        for (int r = 0; r &lt; mask.length; r++) {</span>
+<span class="fc bfc" id="L722" title="All 2 branches covered.">            for (int c = 0; c &lt; mask[r].length; c++) {</span>
+<span class="fc bfc" id="L723" title="All 4 branches covered.">                if (mask[r][c] &amp;&amp; values[r][c] instanceof Double) {</span>
+<span class="fc" id="L724">                    list.add(((Double) values[r][c]).doubleValue());</span>
+                }
+            }
+        }
+<span class="fc" id="L728">        return list;</span>
+    }
+
+    private static Object modeMult(DoubleList list) {
+<span class="fc" id="L732">        ArrayList&lt;Double&gt; modes = new ArrayList&lt;Double&gt;();</span>
+<span class="fc" id="L733">        double[] sorted = list.sorted();</span>
+<span class="fc" id="L734">        int best = 2;</span>
+<span class="fc bfc" id="L735" title="All 2 branches covered.">        for (int i = 0; i &lt; list.size; i++) {</span>
+<span class="fc" id="L736">            best = Math.max(best, count(sorted, list.data[i]));</span>
+        }
+        // each value once, in the order it first appears; a value is marked by where its
+        // run starts in the sorted copy
+<span class="fc" id="L740">        boolean[] listed = new boolean[sorted.length];</span>
+<span class="fc bfc" id="L741" title="All 2 branches covered.">        for (int i = 0; i &lt; list.size; i++) {</span>
+<span class="fc" id="L742">            double v = list.data[i];</span>
+<span class="fc" id="L743">            int at = lower(sorted, v);</span>
+<span class="fc bfc" id="L744" title="All 4 branches covered.">            if (!listed[at] &amp;&amp; count(sorted, v) == best) {</span>
+<span class="fc" id="L745">                listed[at] = true;</span>
+<span class="fc" id="L746">                modes.add(d(v));</span>
+            }
+        }
+<span class="fc bfc" id="L749" title="All 2 branches covered.">        if (modes.isEmpty()) {</span>
+<span class="fc" id="L750">            throw EvalError.NA;</span>
+        }
+<span class="fc" id="L752">        Object[][] out = new Object[modes.size()][1];</span>
+<span class="fc bfc" id="L753" title="All 2 branches covered.">        for (int i = 0; i &lt; out.length; i++) {</span>
+<span class="fc" id="L754">            out[i][0] = modes.get(i);</span>
+        }
+<span class="fc" id="L756">        return out;</span>
+    }
+
+    private static Object percentRank(Evaluator ev, Object[] a, boolean exclusive) {
+<span class="fc" id="L760">        DoubleList list = new DoubleList();</span>
+<span class="fc" id="L761">        ev.numbers(Evaluator.arg(a, 0), list, false);</span>
+<span class="fc" id="L762">        double x = ev.scalarNum(a, 1);</span>
+<span class="fc" id="L763">        int significance = (int) ev.scalarNum(a, 2, 3);</span>
+<span class="pc bpc" id="L764" title="1 of 4 branches missed.">        if (list.size == 0 || significance &lt; 1) {</span>
+<span class="fc" id="L765">            throw EvalError.NUM;</span>
+        }
+<span class="fc" id="L767">        double[] s = list.sorted();</span>
+<span class="fc" id="L768">        int n = s.length;</span>
+<span class="fc bfc" id="L769" title="All 4 branches covered.">        if (x &lt; s[0] || x &gt; s[n - 1]) {</span>
+<span class="fc" id="L770">            throw EvalError.NA;</span>
+        }
+        double rank;
+<span class="fc" id="L773">        int below = 0;</span>
+<span class="pc bpc" id="L774" title="1 of 4 branches missed.">        while (below &lt; n &amp;&amp; s[below] &lt; x) {</span>
+<span class="fc" id="L775">            below++;</span>
+        }
+<span class="pc bpc" id="L777" title="1 of 2 branches missed.">        if (s[below] == x) {</span>
+<span class="fc" id="L778">            rank = below;</span>
+        } else {
+<span class="nc" id="L780">            rank = below - 1 + (x - s[below - 1]) / (s[below] - s[below - 1]);</span>
+        }
+        double result;
+<span class="fc bfc" id="L783" title="All 2 branches covered.">        if (exclusive) {</span>
+<span class="fc" id="L784">            result = (rank + 1) / (n + 1);</span>
+        } else {
+<span class="fc bfc" id="L786" title="All 2 branches covered.">            result = n == 1 ? 1 : rank / (n - 1);</span>
+        }
+<span class="fc" id="L788">        return d(MathFunctions.roundDirected(result, significance, false));</span>
+    }
+
+<span class="fc" id="L791">    private static final java.util.HashMap&lt;String, Integer&gt; SWITCH_1 = Functions.switchTable(</span>
+            &quot;STANDARDIZE&quot;, &quot;FISHER&quot;, &quot;FISHERINV&quot;, &quot;AVERAGE&quot;, &quot;AVERAGEA&quot;, &quot;COUNT&quot;, &quot;COUNTA&quot;,
+            &quot;COUNTBLANK&quot;, &quot;MAX&quot;, &quot;MAXA&quot;, &quot;MIN&quot;, &quot;MINA&quot;, &quot;MEDIAN&quot;, &quot;MODE&quot;, &quot;MODE.SNGL&quot;, &quot;MODE.MULT&quot;,
+            &quot;STDEV&quot;, &quot;STDEV.S&quot;, &quot;STDEVP&quot;, &quot;STDEV.P&quot;, &quot;STDEVA&quot;, &quot;STDEVPA&quot;, &quot;VAR&quot;, &quot;VAR.S&quot;, &quot;VARP&quot;,
+            &quot;VAR.P&quot;, &quot;VARA&quot;, &quot;VARPA&quot;, &quot;DEVSQ&quot;, &quot;AVEDEV&quot;, &quot;GEOMEAN&quot;, &quot;HARMEAN&quot;, &quot;LARGE&quot;, &quot;SMALL&quot;,
+            &quot;PERCENTILE&quot;, &quot;PERCENTILE.INC&quot;, &quot;PERCENTILE.EXC&quot;, &quot;QUARTILE&quot;, &quot;QUARTILE.INC&quot;,
+            &quot;QUARTILE.EXC&quot;, &quot;PERCENTRANK&quot;, &quot;PERCENTRANK.INC&quot;, &quot;PERCENTRANK.EXC&quot;, &quot;RANK&quot;, &quot;RANK.EQ&quot;,
+            &quot;RANK.AVG&quot;, &quot;TRIMMEAN&quot;, &quot;KURT&quot;, &quot;SKEW&quot;, &quot;SKEW.P&quot;, &quot;CORREL&quot;, &quot;PEARSON&quot;, &quot;RSQ&quot;, &quot;COVAR&quot;,
+            &quot;COVARIANCE.P&quot;, &quot;COVARIANCE.S&quot;, &quot;SLOPE&quot;, &quot;INTERCEPT&quot;, &quot;STEYX&quot;, &quot;FORECAST&quot;,
+            &quot;FORECAST.LINEAR&quot;, &quot;FREQUENCY&quot;, &quot;COUNTIF&quot;, &quot;COUNTIFS&quot;, &quot;AVERAGEIF&quot;, &quot;AVERAGEIFS&quot;,
+            &quot;MAXIFS&quot;, &quot;MINIFS&quot;, &quot;SUBTOTAL&quot;, &quot;AGGREGATE&quot;);
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

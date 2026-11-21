@@ -1,0 +1,526 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Properties.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.io</a> &gt; <span class="el_source">Properties.java</span></div><h1>Properties.java</h1><pre class="source lang-java linenums">/*
+ *  Licensed to the Apache Software Foundation (ASF) under one or more
+ *  contributor license agreements.  See the NOTICE file distributed with
+ *  this work for additional information regarding copyright ownership.
+ *  The ASF licenses this file to You under the Apache License, Version 2.0
+ *  (the &quot;License&quot;); you may not use this file except in compliance with
+ *  the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+package com.codename1.io;
+
+import com.codename1.util.CaseInsensitiveOrder;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.io.OutputStreamWriter;
+import java.io.Reader;
+import java.io.Writer;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Date;
+import java.util.Enumeration;
+import java.util.HashMap;
+import java.util.Hashtable;
+import java.util.Map;
+import java.util.Set;
+
+/// A `Properties` object is a `Hashtable` where the keys and values
+/// must be `String`s. Each property can have a default
+/// `Properties` list which specifies the default
+/// values to be used when a given key is not found in this `Properties`
+/// instance.
+///
+/// Character Encoding
+///
+/// Note that in some cases `Properties` uses ISO-8859-1 instead of UTF-8.
+/// ISO-8859-1 is only capable of representing a tiny subset of Unicode.
+/// Use either the `loadFromXML`/`storeToXML` methods (which use UTF-8 by
+/// default) or the `load`/`store` overloads that take
+/// an `OutputStreamWriter` (so you can supply a UTF-8 instance) instead.
+///
+/// #### See also
+///
+/// - Hashtable
+///
+/// - java.lang.System#getProperties
+public class Properties extends HashMap&lt;String, String&gt; {
+
+    private static final int NONE = 0;
+    private static final int SLASH = 1;
+    private static final int UNICODE = 2;
+    private static final int CONTINUE = 3;
+    private static final int KEY_DONE = 4;
+    private static final int IGNORE = 5;
+    /// The default values for keys not found in this `Properties`
+    /// instance.
+    protected Properties defaults;
+
+    /// Constructs a new `Properties` object.
+<span class="fc" id="L69">    public Properties() {</span>
+<span class="fc" id="L70">    }</span>
+
+    /// Constructs a new `Properties` object using the specified default
+    /// `Properties`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `properties`: the default `Properties`.
+<span class="fc" id="L78">    public Properties(Properties properties) {</span>
+<span class="fc" id="L79">        defaults = properties;</span>
+<span class="fc" id="L80">    }</span>
+
+    private void dumpString(StringBuilder buffer, String string, boolean key) {
+<span class="fc" id="L83">        int i = 0;</span>
+<span class="pc bpc" id="L84" title="2 of 6 branches missed.">        if (!key &amp;&amp; i &lt; string.length() &amp;&amp; string.charAt(i) == ' ') {</span>
+<span class="nc" id="L85">            buffer.append(&quot;\\ &quot;);</span>
+<span class="nc" id="L86">            i++;</span>
+        }
+<span class="fc" id="L88">        int slen = string.length();</span>
+<span class="fc bfc" id="L89" title="All 2 branches covered.">        for (; i &lt; slen; i++) {</span>
+<span class="fc" id="L90">            char ch = string.charAt(i);</span>
+<span class="pc bpc" id="L91" title="4 of 5 branches missed.">            switch (ch) {</span>
+                case '\t':
+<span class="nc" id="L93">                    buffer.append(&quot;\\t&quot;);</span>
+<span class="nc" id="L94">                    break;</span>
+                case '\n':
+<span class="nc" id="L96">                    buffer.append(&quot;\\n&quot;);</span>
+<span class="nc" id="L97">                    break;</span>
+                case '\f':
+<span class="nc" id="L99">                    buffer.append(&quot;\\f&quot;);</span>
+<span class="nc" id="L100">                    break;</span>
+                case '\r':
+<span class="nc" id="L102">                    buffer.append(&quot;\\r&quot;);</span>
+<span class="nc" id="L103">                    break;</span>
+                default:
+<span class="pc bpc" id="L105" title="2 of 6 branches missed.">                    if (&quot;\\#!=:&quot;.indexOf(ch) &gt;= 0 || (key &amp;&amp; ch == ' ')) {</span>
+<span class="nc" id="L106">                        buffer.append('\\');</span>
+                    }
+<span class="pc bpc" id="L108" title="2 of 4 branches missed.">                    if (ch &gt;= ' ' &amp;&amp; ch &lt;= '~') {</span>
+<span class="fc" id="L109">                        buffer.append(ch);</span>
+                    } else {
+<span class="nc" id="L111">                        String hex = Integer.toHexString(ch);</span>
+<span class="nc" id="L112">                        buffer.append(&quot;\\u&quot;);</span>
+<span class="nc" id="L113">                        int hlen = hex.length();</span>
+<span class="nc bnc" id="L114" title="All 2 branches missed.">                        for (int j = 0; j &lt; 4 - hlen; j++) {</span>
+<span class="nc" id="L115">                            buffer.append(&quot;0&quot;);</span>
+                        }
+<span class="nc" id="L117">                        buffer.append(hex);</span>
+                    }
+            }
+        }
+<span class="fc" id="L121">    }</span>
+
+    /// Searches for the property with the specified name. If the property is not
+    /// found, the default `Properties` are checked. If the property is not
+    /// found in the default `Properties`, `null` is returned.
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: the name of the property to find.
+    ///
+    /// #### Returns
+    ///
+    /// the named property value, or `null` if it can't be found.
+    public String getProperty(String name) {
+<span class="fc" id="L135">        Object result = super.get(name);</span>
+<span class="fc bfc" id="L136" title="All 2 branches covered.">        String property = result instanceof String ? (String) result : null;</span>
+<span class="fc bfc" id="L137" title="All 4 branches covered.">        if (property == null &amp;&amp; defaults != null) {</span>
+<span class="fc" id="L138">            property = defaults.getProperty(name);</span>
+        }
+<span class="fc" id="L140">        return property;</span>
+    }
+
+    /// Searches for the property with the specified name. If the property is not
+    /// found, it looks in the default `Properties`. If the property is not
+    /// found in the default `Properties`, it returns the specified
+    /// default.
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: the name of the property to find.
+    ///
+    /// - `defaultValue`: the default value.
+    ///
+    /// #### Returns
+    ///
+    /// the named property value.
+    public String getProperty(String name, String defaultValue) {
+<span class="fc" id="L158">        Object result = super.get(name);</span>
+<span class="pc bpc" id="L159" title="1 of 2 branches missed.">        String property = result instanceof String ? (String) result : null;</span>
+<span class="pc bpc" id="L160" title="2 of 4 branches missed.">        if (property == null &amp;&amp; defaults != null) {</span>
+<span class="nc" id="L161">            property = defaults.getProperty(name);</span>
+        }
+<span class="pc bpc" id="L163" title="1 of 2 branches missed.">        if (property == null) {</span>
+<span class="fc" id="L164">            return defaultValue;</span>
+        }
+<span class="nc" id="L166">        return property;</span>
+    }
+
+    /// Loads properties from the specified `InputStream`, assumed to be ISO-8859-1.
+    /// See &quot;[Character Encoding](#character_encoding)&quot;.
+    ///
+    /// #### Parameters
+    ///
+    /// - `in`: the `InputStream`
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`
+    public synchronized void load(InputStream in) throws IOException {
+<span class="fc bfc" id="L180" title="All 2 branches covered.">        if (in == null) {</span>
+<span class="fc" id="L181">            throw new NullPointerException(&quot;in == null&quot;);</span>
+        }
+<span class="fc" id="L183">        load(new InputStreamReader(in, &quot;UTF-8&quot;));</span>
+<span class="fc" id="L184">    }</span>
+
+    /// Loads properties from the specified `Reader`.
+    /// The properties file is interpreted according to the following rules:
+    ///
+    /// - Empty lines are ignored.
+    ///
+    /// - Lines starting with either a &quot;#&quot; or a &quot;!&quot; are comment lines and are
+    /// ignored.
+    ///
+    /// - A backslash at the end of the line escapes the following newline
+    /// character (&quot;\r&quot;, &quot;\n&quot;, &quot;\r\n&quot;). If there's whitespace after the
+    /// backslash it will just escape that whitespace instead of concatenating
+    /// the lines. This does not apply to comment lines.
+    ///
+    /// - A property line consists of the key, the space between the key and
+    /// the value, and the value. The key goes up to the first whitespace, &quot;=&quot; or
+    /// &quot;:&quot; that is not escaped. The space between the key and the value contains
+    /// either one whitespace, one &quot;=&quot; or one &quot;:&quot; and any amount of additional
+    /// whitespace before and after that character. The value starts with the
+    /// first character after the space between the key and the value.
+    ///
+    /// - Following escape sequences are recognized: `\ `, `\\`, `\r`, `\n`,
+    /// `\!`, `\#`, `\t`, `\b`, `\f`, and `\uffff` (unicode character).
+    ///
+    /// #### Parameters
+    ///
+    /// - `in`: the `Reader`
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`
+    ///
+    @SuppressWarnings({&quot;fallthrough&quot;, &quot;PMD.SwitchStmtsShouldHaveDefault&quot;})
+    public synchronized void load(Reader in) throws IOException {
+<span class="fc bfc" id="L219" title="All 2 branches covered.">        if (in == null) {</span>
+<span class="fc" id="L220">            throw new NullPointerException(&quot;in == null&quot;);</span>
+        }
+<span class="fc" id="L222">        int mode = NONE;</span>
+<span class="fc" id="L223">        int unicode = 0;</span>
+<span class="fc" id="L224">        int count = 0;</span>
+        char nextChar;
+<span class="fc" id="L226">        char[] buf = new char[40];</span>
+<span class="fc" id="L227">        int offset = 0;</span>
+<span class="fc" id="L228">        int keyLength = -1;</span>
+        int intVal;
+<span class="fc" id="L230">        boolean firstChar = true;</span>
+
+<span class="fc" id="L232">        Reader br = in;</span>
+
+        while (true) {
+<span class="fc" id="L235">            intVal = br.read();</span>
+<span class="fc bfc" id="L236" title="All 2 branches covered.">            if (intVal == -1) {</span>
+<span class="fc" id="L237">                break;</span>
+            }
+<span class="fc" id="L239">            nextChar = (char) intVal;</span>
+
+<span class="pc bpc" id="L241" title="1 of 2 branches missed.">            if (offset == buf.length) {</span>
+<span class="nc" id="L242">                char[] newBuf = new char[buf.length * 2];</span>
+<span class="nc" id="L243">                System.arraycopy(buf, 0, newBuf, 0, offset);</span>
+<span class="nc" id="L244">                buf = newBuf;</span>
+            }
+<span class="fc bfc" id="L246" title="All 2 branches covered.">            if (mode == UNICODE) {</span>
+<span class="fc" id="L247">                int digit = Character.digit(nextChar, 16);</span>
+<span class="fc bfc" id="L248" title="All 2 branches covered.">                if (digit &gt;= 0) {</span>
+<span class="fc" id="L249">                    unicode = (unicode &lt;&lt; 4) + digit;</span>
+<span class="fc" id="L250">                    count++;</span>
+<span class="fc bfc" id="L251" title="All 2 branches covered.">                    if (count &lt; 4) {</span>
+<span class="fc" id="L252">                        continue;</span>
+                    }
+                } else {
+<span class="pc bpc" id="L255" title="1 of 2 branches missed.">                    if (count &lt;= 4) {</span>
+<span class="fc" id="L256">                        throw new IllegalArgumentException(&quot;Invalid Unicode sequence: illegal character&quot;);</span>
+                    }
+                }
+<span class="fc" id="L259">                mode = NONE;</span>
+<span class="fc" id="L260">                buf[offset++] = (char) unicode;</span>
+<span class="pc bpc" id="L261" title="1 of 2 branches missed.">                if (nextChar != '\n') {</span>
+<span class="fc" id="L262">                    continue;</span>
+                }
+            }
+<span class="fc bfc" id="L265" title="All 2 branches covered.">            if (mode == SLASH) {</span>
+<span class="fc" id="L266">                mode = NONE;</span>
+<span class="pc bpc" id="L267" title="4 of 9 branches missed.">                switch (nextChar) {</span>
+                    case '\r':
+<span class="nc" id="L269">                        mode = CONTINUE; // Look for a following \n</span>
+<span class="nc" id="L270">                        continue;</span>
+                    case '\n':
+<span class="fc" id="L272">                        mode = IGNORE; // Ignore whitespace on the next line</span>
+<span class="fc" id="L273">                        continue;</span>
+                    case 'b':
+<span class="nc" id="L275">                        nextChar = '\b';</span>
+<span class="nc" id="L276">                        break;</span>
+                    case 'f':
+<span class="nc" id="L278">                        nextChar = '\f';</span>
+<span class="nc" id="L279">                        break;</span>
+                    case 'n':
+<span class="fc" id="L281">                        nextChar = '\n';</span>
+<span class="fc" id="L282">                        break;</span>
+                    case 'r':
+<span class="nc" id="L284">                        nextChar = '\r';</span>
+<span class="nc" id="L285">                        break;</span>
+                    case 't':
+<span class="fc" id="L287">                        nextChar = '\t';</span>
+<span class="fc" id="L288">                        break;</span>
+                    case 'u':
+<span class="fc" id="L290">                        mode = UNICODE;</span>
+<span class="fc" id="L291">                        unicode = count = 0;</span>
+<span class="fc" id="L292">                        continue;</span>
+                }
+            } else {
+<span class="pc bpc" id="L295" title="1 of 6 branches missed.">                switch (nextChar) {</span>
+                    case '#':
+                    case '!':
+<span class="pc bpc" id="L298" title="1 of 2 branches missed.">                        if (firstChar) {</span>
+                            while (true) {
+<span class="fc" id="L300">                                intVal = br.read();</span>
+<span class="pc bpc" id="L301" title="1 of 2 branches missed.">                                if (intVal == -1) {</span>
+<span class="nc" id="L302">                                    break;</span>
+                                }
+<span class="fc" id="L304">                                nextChar = (char) intVal;</span>
+<span class="pc bpc" id="L305" title="1 of 4 branches missed.">                                if (nextChar == '\r' || nextChar == '\n') {</span>
+<span class="fc" id="L306">                                    break;</span>
+                                }
+                            }
+                            continue;
+                        }
+                        break;
+                    case '\n':
+<span class="pc bpc" id="L313" title="1 of 2 branches missed.">                        if (mode == CONTINUE) { // Part of a \r\n sequence</span>
+<span class="nc" id="L314">                            mode = IGNORE; // Ignore whitespace on the next line</span>
+<span class="nc" id="L315">                            continue;</span>
+                        }
+                        // fall into the next case
+                    case '\r':
+<span class="fc" id="L319">                        mode = NONE;</span>
+<span class="fc" id="L320">                        firstChar = true;</span>
+<span class="pc bpc" id="L321" title="2 of 6 branches missed.">                        if (offset &gt; 0 || (offset == 0 &amp;&amp; keyLength == 0)) {</span>
+<span class="pc bpc" id="L322" title="1 of 2 branches missed.">                            if (keyLength == -1) {</span>
+<span class="nc" id="L323">                                keyLength = offset;</span>
+                            }
+<span class="fc" id="L325">                            String temp = new String(buf, 0, offset);</span>
+<span class="fc" id="L326">                            put(temp.substring(0, keyLength), temp</span>
+<span class="fc" id="L327">                                    .substring(keyLength));</span>
+                        }
+<span class="fc" id="L329">                        keyLength = -1;</span>
+<span class="fc" id="L330">                        offset = 0;</span>
+<span class="fc" id="L331">                        continue;</span>
+                    case '\\':
+<span class="pc bpc" id="L333" title="1 of 2 branches missed.">                        if (mode == KEY_DONE) {</span>
+<span class="nc" id="L334">                            keyLength = offset;</span>
+                        }
+<span class="fc" id="L336">                        mode = SLASH;</span>
+<span class="fc" id="L337">                        continue;</span>
+                    case ':':
+                    case '=':
+<span class="pc bpc" id="L340" title="1 of 2 branches missed.">                        if (keyLength == -1) { // if parsing the key</span>
+<span class="fc" id="L341">                            mode = NONE;</span>
+<span class="fc" id="L342">                            keyLength = offset;</span>
+<span class="fc" id="L343">                            continue;</span>
+                        }
+                        break;
+                }
+<span class="pc bpc" id="L347" title="3 of 8 branches missed.">                if (nextChar == ' ' || nextChar == '\n' || nextChar == '\r' || nextChar == '\t') {</span>
+<span class="pc bpc" id="L348" title="1 of 2 branches missed.">                    if (mode == CONTINUE) {</span>
+<span class="nc" id="L349">                        mode = IGNORE;</span>
+                    }
+                    // if key length == 0 or value length == 0
+<span class="pc bpc" id="L352" title="3 of 6 branches missed.">                    if (offset == 0 || offset == keyLength || mode == IGNORE) {</span>
+<span class="nc" id="L353">                        continue;</span>
+                    }
+<span class="pc bpc" id="L355" title="1 of 2 branches missed.">                    if (keyLength == -1) { // if parsing the key</span>
+<span class="fc" id="L356">                        mode = KEY_DONE;</span>
+<span class="fc" id="L357">                        continue;</span>
+                    }
+                }
+<span class="pc bpc" id="L360" title="1 of 4 branches missed.">                if (mode == IGNORE || mode == CONTINUE) {</span>
+<span class="fc" id="L361">                    mode = NONE;</span>
+                }
+            }
+<span class="fc" id="L364">            firstChar = false;</span>
+<span class="fc bfc" id="L365" title="All 2 branches covered.">            if (mode == KEY_DONE) {</span>
+<span class="fc" id="L366">                keyLength = offset;</span>
+<span class="fc" id="L367">                mode = NONE;</span>
+            }
+<span class="fc" id="L369">            buf[offset++] = nextChar;</span>
+        }
+<span class="pc bpc" id="L371" title="3 of 4 branches missed.">        if (mode == UNICODE &amp;&amp; count &lt;= 4) {</span>
+<span class="nc" id="L372">            throw new IllegalArgumentException(&quot;Invalid Unicode sequence: expected format \\uxxxx&quot;);</span>
+        }
+<span class="pc bpc" id="L374" title="2 of 4 branches missed.">        if (keyLength == -1 &amp;&amp; offset &gt; 0) {</span>
+<span class="nc" id="L375">            keyLength = offset;</span>
+        }
+<span class="pc bpc" id="L377" title="1 of 2 branches missed.">        if (keyLength &gt;= 0) {</span>
+<span class="nc" id="L378">            String temp = new String(buf, 0, offset);</span>
+<span class="nc" id="L379">            String key = temp.substring(0, keyLength);</span>
+<span class="nc" id="L380">            String value = temp.substring(keyLength);</span>
+<span class="nc bnc" id="L381" title="All 2 branches missed.">            if (mode == SLASH) {</span>
+<span class="nc" id="L382">                value += &quot;\u0000&quot;;</span>
+            }
+<span class="nc" id="L384">            put(key, value);</span>
+        }
+<span class="fc" id="L386">    }</span>
+
+    /// Returns all of the property names (keys) in this `Properties` object.
+    public Enumeration&lt;?&gt; propertyNames() {
+<span class="fc" id="L390">        Hashtable&lt;Object, Object&gt; selected = new Hashtable&lt;Object, Object&gt;();</span>
+<span class="fc" id="L391">        selectProperties(selected, false);</span>
+<span class="fc" id="L392">        return selected.keys();</span>
+    }
+
+    /// Returns those property names (keys) in this `Properties` object for which
+    /// both key and value are strings.
+    ///
+    /// #### Returns
+    ///
+    /// a set of keys in the property list
+    ///
+    public Set&lt;String&gt; stringPropertyNames() {
+<span class="fc" id="L403">        Hashtable&lt;String, Object&gt; stringProperties = new Hashtable&lt;String, Object&gt;();</span>
+<span class="fc" id="L404">        selectProperties(stringProperties, true);</span>
+<span class="fc" id="L405">        return Collections.unmodifiableSet(stringProperties.keySet());</span>
+    }
+
+    private &lt;K&gt; void selectProperties(Hashtable&lt;K, Object&gt; selectProperties, final boolean isStringOnly) {
+<span class="fc bfc" id="L409" title="All 2 branches covered.">        if (defaults != null) {</span>
+<span class="fc" id="L410">            defaults.selectProperties(selectProperties, isStringOnly);</span>
+        }
+<span class="fc bfc" id="L412" title="All 2 branches covered.">        for (Map.Entry&lt;String, String&gt; entry : entrySet()) {</span>
+            @SuppressWarnings(&quot;unchecked&quot;)
+<span class="fc" id="L414">            K key = (K) entry.getKey();</span>
+<span class="pc bpc" id="L415" title="1 of 4 branches missed.">            if (isStringOnly &amp;&amp; !(key instanceof String)) {</span>
+                // Only select property with string key and value
+<span class="nc" id="L417">                continue;</span>
+            }
+<span class="fc" id="L419">            Object value = entry.getValue();</span>
+<span class="fc" id="L420">            selectProperties.put(key, value);</span>
+<span class="fc" id="L421">        }</span>
+<span class="fc" id="L422">    }</span>
+
+    /// Saves the mappings in this `Properties` to the specified `OutputStream`, putting the specified comment at the beginning. The output
+    /// from this method is suitable for being read by the
+    /// `#load(InputStream)` method.
+    ///
+    /// #### Parameters
+    ///
+    /// - `out`: the `OutputStream` to write to.
+    ///
+    /// - `comment`: the comment to add at the beginning.
+    ///
+    /// #### Throws
+    ///
+    /// - `ClassCastException`: @throws ClassCastException if the key or value of a mapping is not a
+    /// String.
+    ///
+    /// #### Deprecated
+    ///
+    /// @deprecated This method ignores any `IOException` thrown while
+    /// writing -- use `#store` instead for better exception
+    /// handling.
+    @Deprecated
+    @SuppressWarnings(&quot;PMD.EmptyCatchBlock&quot;)
+    public void save(OutputStream out, String comment) {
+        try {
+<span class="fc" id="L448">            store(out, comment);</span>
+<span class="nc" id="L449">        } catch (IOException e) {</span>
+<span class="fc" id="L450">        }</span>
+<span class="fc" id="L451">    }</span>
+
+    /// Maps the specified key to the specified value. If the key already exists,
+    /// the old value is replaced. The key and value cannot be `null`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: the key.
+    ///
+    /// - `value`: the value.
+    ///
+    /// #### Returns
+    ///
+    /// the old value mapped to the key, or `null`.
+    public Object setProperty(String name, String value) {
+<span class="fc" id="L466">        return put(name, value);</span>
+    }
+
+    /// Stores properties to the specified `OutputStream`, using ISO-8859-1.
+    /// See &quot;[Character Encoding](#character_encoding)&quot;.
+    ///
+    /// #### Parameters
+    ///
+    /// - `out`: the `OutputStream`
+    ///
+    /// - `comment`: an optional comment to be written, or null
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`
+    ///
+    /// - `ClassCastException`: if a key or value is not a string
+    public synchronized void store(OutputStream out, String comment) throws IOException {
+<span class="fc" id="L484">        store(new OutputStreamWriter(out, &quot;UTF-8&quot;), comment);</span>
+<span class="fc" id="L485">    }</span>
+
+    /// Stores the mappings in this `Properties` object to `out`,
+    /// putting the specified comment at the beginning.
+    ///
+    /// #### Parameters
+    ///
+    /// - `writer`: the `Writer`
+    ///
+    /// - `comment`: an optional comment to be written, or null
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`
+    ///
+    /// - `ClassCastException`: if a key or value is not a string
+    ///
+    public synchronized void store(Writer writer, String comment) throws IOException {
+<span class="pc bpc" id="L503" title="1 of 4 branches missed.">        if (comment != null &amp;&amp; comment.length() &gt; 0) {</span>
+<span class="fc" id="L504">            writer.write(&quot;#&quot;);</span>
+<span class="fc" id="L505">            writer.write(comment);</span>
+<span class="fc" id="L506">            writer.write(&quot;\n&quot;);</span>
+<span class="fc" id="L507">            writer.write(&quot;#&quot;);</span>
+<span class="fc" id="L508">            writer.write(new Date().toString());</span>
+<span class="fc" id="L509">            writer.write(&quot;\n&quot;);</span>
+        }
+
+<span class="fc" id="L512">        StringBuilder sb = new StringBuilder(200);</span>
+<span class="fc" id="L513">        ArrayList&lt;String&gt; k = new ArrayList&lt;String&gt;(keySet());</span>
+<span class="fc" id="L514">        Collections.sort(k, new CaseInsensitiveOrder());</span>
+<span class="fc bfc" id="L515" title="All 2 branches covered.">        for (String key : k) {</span>
+<span class="fc" id="L516">            dumpString(sb, key, true);</span>
+<span class="fc" id="L517">            sb.append('=');</span>
+<span class="fc" id="L518">            dumpString(sb, get(key), false);</span>
+<span class="fc" id="L519">            sb.append(&quot;\n&quot;);</span>
+<span class="fc" id="L520">            writer.write(sb.toString());</span>
+<span class="fc" id="L521">            sb.setLength(0);</span>
+<span class="fc" id="L522">        }</span>
+<span class="fc" id="L523">        writer.flush();</span>
+<span class="fc" id="L524">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

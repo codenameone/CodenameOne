@@ -1,0 +1,451 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ArrayFunctions.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.spreadsheet</a> &gt; <span class="el_source">ArrayFunctions.java</span></div><h1>ArrayFunctions.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.spreadsheet;
+
+import java.util.ArrayList;
+
+/// The functions that answer an array: filtering, sorting and reshaping. A cell shows the
+/// first value of such a result, and a function it is handed to receives all of it.
+final class ArrayFunctions {
+    static final String RANGE_NAMES = &quot;CHOOSECOLS CHOOSEROWS DROP EXPAND FILTER HSTACK RANDARRAY SEQUENCE SORT SORTBY&quot;
+            + &quot; TAKE TOCOL TOROW UNIQUE VSTACK WRAPCOLS WRAPROWS&quot;;
+
+    /// The most cells a generated array may have.
+    /// The most elements an array holds, generated or read from a range: one column of a sheet.
+    static final int MAX_CELLS = 1 &lt;&lt; 20;
+
+    private ArrayFunctions() {
+    }
+
+    private static Object[][] make(int rows, int cols) {
+<span class="pc bpc" id="L41" title="1 of 6 branches missed.">        if (rows &lt; 1 || cols &lt; 1 || (long) rows * cols &gt; MAX_CELLS) {</span>
+<span class="fc" id="L42">            throw EvalError.VALUE;</span>
+        }
+<span class="fc" id="L44">        return new Object[rows][cols];</span>
+    }
+
+    private static Object[][] rows(Object[][] m, ArrayList&lt;Integer&gt; picked) {
+<span class="pc bpc" id="L48" title="1 of 2 branches missed.">        if (picked.isEmpty()) {</span>
+<span class="nc" id="L49">            throw EvalError.VALUE;</span>
+        }
+<span class="fc" id="L51">        Object[][] out = new Object[picked.size()][];</span>
+<span class="fc bfc" id="L52" title="All 2 branches covered.">        for (int i = 0; i &lt; out.length; i++) {</span>
+<span class="fc" id="L53">            out[i] = m[picked.get(i).intValue()];</span>
+        }
+<span class="fc" id="L55">        return out;</span>
+    }
+
+    private static Object[][] transpose(Object[][] m) {
+<span class="fc" id="L59">        int w = Evaluator.width(m);</span>
+<span class="fc" id="L60">        Object[][] out = new Object[w][m.length];</span>
+<span class="fc bfc" id="L61" title="All 2 branches covered.">        for (int r = 0; r &lt; m.length; r++) {</span>
+<span class="fc bfc" id="L62" title="All 2 branches covered.">            for (int c = 0; c &lt; w; c++) {</span>
+<span class="fc" id="L63">                out[c][r] = m[r][c];</span>
+            }
+        }
+<span class="fc" id="L66">        return out;</span>
+    }
+
+    /// Sorts row numbers by keys, keeping the order of rows that compare equal.
+    private static void sort(Integer[] order, Object[][][] keys, int[] directions) {
+<span class="fc bfc" id="L71" title="All 2 branches covered.">        for (int i = 1; i &lt; order.length; i++) {</span>
+<span class="fc" id="L72">            Integer moving = order[i];</span>
+<span class="fc" id="L73">            int j = i - 1;</span>
+<span class="fc bfc" id="L74" title="All 4 branches covered.">            while (j &gt;= 0 &amp;&amp; compareRows(order[j].intValue(), moving.intValue(), keys, directions) &gt; 0) {</span>
+<span class="fc" id="L75">                order[j + 1] = order[j];</span>
+<span class="fc" id="L76">                j--;</span>
+            }
+<span class="fc" id="L78">            order[j + 1] = moving;</span>
+        }
+<span class="fc" id="L80">    }</span>
+
+    private static int compareRows(int x, int y, Object[][][] keys, int[] directions) {
+<span class="fc bfc" id="L83" title="All 2 branches covered.">        for (int k = 0; k &lt; keys.length; k++) {</span>
+<span class="fc" id="L84">            Object p = keys[k][x][0];</span>
+<span class="fc" id="L85">            Object q = keys[k][y][0];</span>
+            int cmp;
+<span class="pc bpc" id="L87" title="2 of 4 branches missed.">            if (p == null || q == null) {</span>
+                // empty cells go last whichever way the rest is sorted
+<span class="nc bnc" id="L89" title="All 2 branches missed.">                if (p == q) { //NOPMD CompareObjectsWithEquals - the same object is meant, not an equal one</span>
+<span class="nc" id="L90">                    continue;</span>
+                }
+<span class="nc bnc" id="L92" title="All 2 branches missed.">                return p == null ? 1 : -1;</span>
+            }
+<span class="fc" id="L94">            cmp = Values.compare(p, q);</span>
+<span class="fc bfc" id="L95" title="All 2 branches covered.">            if (cmp != 0) {</span>
+<span class="fc bfc" id="L96" title="All 2 branches covered.">                return directions[k] &lt; 0 ? Values.compare(q, p) : cmp;</span>
+            }
+        }
+<span class="fc" id="L99">        return 0;</span>
+    }
+
+    private static Object[][] column(Object[][] m, int c) {
+<span class="fc" id="L103">        Object[][] out = new Object[m.length][1];</span>
+<span class="fc bfc" id="L104" title="All 2 branches covered.">        for (int r = 0; r &lt; m.length; r++) {</span>
+<span class="fc" id="L105">            out[r][0] = m[r][c];</span>
+        }
+<span class="fc" id="L107">        return out;</span>
+    }
+
+    static Object call(String name, Evaluator ev, Object[] a) {
+<span class="fc bfc" id="L111" title="All 2 branches covered.">        if (a.length == 0) {</span>
+<span class="fc" id="L112">            throw EvalError.VALUE;</span>
+        }
+<span class="pc bpc" id="L114" title="1 of 13 branches missed.">        switch (Functions.index(SWITCH_1, name)) {</span>
+            case 0: { // SEQUENCE
+<span class="fc" id="L116">                int rows = (int) ev.scalarNum(a, 0);</span>
+<span class="fc" id="L117">                int cols = (int) ev.scalarNum(a, 1, 1);</span>
+<span class="fc" id="L118">                double start = ev.scalarNum(a, 2, 1);</span>
+<span class="fc" id="L119">                double step = ev.scalarNum(a, 3, 1);</span>
+<span class="fc" id="L120">                Object[][] out = make(rows, cols);</span>
+<span class="fc bfc" id="L121" title="All 2 branches covered.">                for (int r = 0; r &lt; rows; r++) {</span>
+<span class="fc bfc" id="L122" title="All 2 branches covered.">                    for (int c = 0; c &lt; cols; c++) {</span>
+<span class="fc" id="L123">                        out[r][c] = Double.valueOf(start + step * ((double) r * cols + c));</span>
+                    }
+                }
+<span class="fc" id="L126">                return out;</span>
+            }
+            case 1: { // RANDARRAY
+<span class="fc" id="L129">                int rows = (int) ev.scalarNum(a, 0, 1);</span>
+<span class="fc" id="L130">                int cols = (int) ev.scalarNum(a, 1, 1);</span>
+<span class="fc" id="L131">                double min = ev.scalarNum(a, 2, 0);</span>
+<span class="fc" id="L132">                double max = ev.scalarNum(a, 3, 1);</span>
+<span class="pc bpc" id="L133" title="1 of 4 branches missed.">                boolean whole = Evaluator.has(a, 4) &amp;&amp; Values.bool(ev.scalar(a[4]));</span>
+<span class="fc bfc" id="L134" title="All 2 branches covered.">                if (min &gt; max) {</span>
+<span class="fc" id="L135">                    throw EvalError.VALUE;</span>
+                }
+<span class="fc" id="L137">                Object[][] out = make(rows, cols);</span>
+<span class="fc bfc" id="L138" title="All 2 branches covered.">                for (int r = 0; r &lt; rows; r++) {</span>
+<span class="fc bfc" id="L139" title="All 2 branches covered.">                    for (int c = 0; c &lt; cols; c++) {</span>
+<span class="pc bpc" id="L140" title="1 of 2 branches missed.">                        double v = whole ? Math.ceil(min) + Math.floor(Math.random() * (Math.floor(max) - Math.ceil(min) + 1))</span>
+<span class="fc" id="L141">                                : min + Math.random() * (max - min);</span>
+<span class="fc" id="L142">                        out[r][c] = Double.valueOf(v);</span>
+                    }
+                }
+<span class="fc" id="L145">                return out;</span>
+            }
+            case 2: { // FILTER
+<span class="fc" id="L148">                Object[][] m = ev.matrix(a[0]);</span>
+<span class="fc" id="L149">                Object[][] include = ev.matrix(Evaluator.arg(a, 1));</span>
+<span class="pc bpc" id="L150" title="1 of 4 branches missed.">                boolean byRow = include.length == m.length &amp;&amp; Evaluator.width(include) == 1;</span>
+<span class="pc bpc" id="L151" title="1 of 6 branches missed.">                boolean byCol = !byRow &amp;&amp; include.length == 1 &amp;&amp; Evaluator.width(include) == Evaluator.width(m);</span>
+<span class="pc bpc" id="L152" title="1 of 4 branches missed.">                if (!byRow &amp;&amp; !byCol) {</span>
+<span class="fc" id="L153">                    throw EvalError.VALUE;</span>
+                }
+<span class="pc bpc" id="L155" title="1 of 2 branches missed.">                Object[][] source = byRow ? m : transpose(m);</span>
+<span class="fc" id="L156">                ArrayList&lt;Integer&gt; picked = new ArrayList&lt;Integer&gt;();</span>
+<span class="fc bfc" id="L157" title="All 2 branches covered.">                for (int i = 0; i &lt; source.length; i++) {</span>
+<span class="pc bpc" id="L158" title="1 of 2 branches missed.">                    Object v = byRow ? include[i][0] : include[0][i];</span>
+<span class="pc bpc" id="L159" title="1 of 2 branches missed.">                    if (v instanceof CellError) {</span>
+<span class="nc" id="L160">                        return v;</span>
+                    }
+<span class="pc bpc" id="L162" title="1 of 4 branches missed.">                    if (v != null &amp;&amp; Values.bool(v)) {</span>
+<span class="fc" id="L163">                        picked.add(Integer.valueOf(i));</span>
+                    }
+                }
+<span class="pc bpc" id="L166" title="1 of 2 branches missed.">                if (picked.isEmpty()) {</span>
+<span class="nc bnc" id="L167" title="All 2 branches missed.">                    if (Evaluator.has(a, 2)) {</span>
+<span class="nc" id="L168">                        return a[2];</span>
+                    }
+                    // Excel's own error for an empty result has no place in a file
+<span class="nc" id="L171">                    throw EvalError.VALUE;</span>
+                }
+<span class="fc" id="L173">                Object[][] out = rows(source, picked);</span>
+<span class="pc bpc" id="L174" title="1 of 2 branches missed.">                return byRow ? out : transpose(out);</span>
+            }
+            case 3: { // SORT
+<span class="fc" id="L177">                Object[][] m = ev.matrix(a[0]);</span>
+<span class="fc" id="L178">                int index = (int) ev.scalarNum(a, 1, 1);</span>
+<span class="fc" id="L179">                int direction = (int) ev.scalarNum(a, 2, 1);</span>
+<span class="pc bpc" id="L180" title="1 of 4 branches missed.">                boolean byCol = Evaluator.has(a, 3) &amp;&amp; Values.bool(ev.scalar(a[3]));</span>
+<span class="fc bfc" id="L181" title="All 2 branches covered.">                Object[][] source = byCol ? transpose(m) : m;</span>
+<span class="fc bfc" id="L182" title="All 8 branches covered.">                if (index &lt; 1 || index &gt; Evaluator.width(source) || direction != 1 &amp;&amp; direction != -1) {</span>
+<span class="fc" id="L183">                    throw EvalError.VALUE;</span>
+                }
+<span class="fc" id="L185">                Object[][] out = sorted(source, new Object[][][] {column(source, index - 1)}, new int[] {direction});</span>
+<span class="fc bfc" id="L186" title="All 2 branches covered.">                return byCol ? transpose(out) : out;</span>
+            }
+            case 4: { // SORTBY
+<span class="fc" id="L189">                Object[][] m = ev.matrix(a[0]);</span>
+<span class="fc" id="L190">                int count = a.length / 2;</span>
+<span class="pc bpc" id="L191" title="1 of 2 branches missed.">                if (count &lt; 1) {</span>
+<span class="nc" id="L192">                    throw EvalError.VALUE;</span>
+                }
+<span class="fc" id="L194">                Object[][][] keys = new Object[count][][];</span>
+<span class="fc" id="L195">                int[] directions = new int[count];</span>
+<span class="fc" id="L196">                boolean byCol = false;</span>
+<span class="fc bfc" id="L197" title="All 2 branches covered.">                for (int k = 0; k &lt; count; k++) {</span>
+<span class="fc" id="L198">                    Object[][] by = ev.matrix(a[1 + 2 * k]);</span>
+<span class="pc bpc" id="L199" title="1 of 6 branches missed.">                    if (by.length == 1 &amp;&amp; Evaluator.width(by) == Evaluator.width(m) &amp;&amp; m.length != 1) {</span>
+<span class="nc" id="L200">                        byCol = true;</span>
+<span class="nc" id="L201">                        by = transpose(by);</span>
+                    }
+<span class="pc bpc" id="L203" title="1 of 6 branches missed.">                    if (Evaluator.width(by) != 1 || by.length != (byCol ? Evaluator.width(m) : m.length)) {</span>
+<span class="fc" id="L204">                        throw EvalError.VALUE;</span>
+                    }
+<span class="fc" id="L206">                    keys[k] = by;</span>
+<span class="fc" id="L207">                    double direction = ev.scalarNum(a, 2 + 2 * k, 1);</span>
+<span class="fc bfc" id="L208" title="All 4 branches covered.">                    if (direction != 1 &amp;&amp; direction != -1) {</span>
+<span class="fc" id="L209">                        throw EvalError.VALUE;</span>
+                    }
+<span class="fc" id="L211">                    directions[k] = (int) direction;</span>
+                }
+<span class="pc bpc" id="L213" title="1 of 2 branches missed.">                Object[][] source = byCol ? transpose(m) : m;</span>
+<span class="fc" id="L214">                Object[][] out = sorted(source, keys, directions);</span>
+<span class="pc bpc" id="L215" title="1 of 2 branches missed.">                return byCol ? transpose(out) : out;</span>
+            }
+            case 5: { // UNIQUE
+<span class="fc" id="L218">                Object[][] m = ev.matrix(a[0]);</span>
+<span class="fc bfc" id="L219" title="All 4 branches covered.">                boolean byCol = Evaluator.has(a, 1) &amp;&amp; Values.bool(ev.scalar(a[1]));</span>
+<span class="pc bpc" id="L220" title="1 of 4 branches missed.">                boolean once = Evaluator.has(a, 2) &amp;&amp; Values.bool(ev.scalar(a[2]));</span>
+<span class="fc bfc" id="L221" title="All 2 branches covered.">                Object[][] source = byCol ? transpose(m) : m;</span>
+<span class="fc" id="L222">                ArrayList&lt;Integer&gt; picked = new ArrayList&lt;Integer&gt;();</span>
+                // rows sorted so that equal ones meet, then compared within each run of rows the
+                // sort calls equal: n log n rather than every row against every other
+<span class="pc bpc" id="L225" title="1 of 2 branches missed.">                int width = source.length == 0 ? 0 : source[0].length;</span>
+<span class="fc" id="L226">                Object[][][] keys = new Object[width][][];</span>
+<span class="fc" id="L227">                int[] directions = new int[width];</span>
+<span class="fc bfc" id="L228" title="All 2 branches covered.">                for (int k = 0; k &lt; width; k++) {</span>
+<span class="fc" id="L229">                    keys[k] = column(source, k);</span>
+<span class="fc" id="L230">                    directions[k] = 1;</span>
+                }
+<span class="fc" id="L232">                Integer[] order = new Integer[source.length];</span>
+<span class="fc bfc" id="L233" title="All 2 branches covered.">                for (int i = 0; i &lt; order.length; i++) {</span>
+<span class="fc" id="L234">                    order[i] = Integer.valueOf(i);</span>
+                }
+<span class="fc" id="L236">                sort(order, keys, directions);</span>
+<span class="fc" id="L237">                int[] firstOf = new int[source.length];</span>
+<span class="fc" id="L238">                int[] copies = new int[source.length];</span>
+<span class="fc" id="L239">                int run = 0;</span>
+<span class="fc bfc" id="L240" title="All 2 branches covered.">                while (run &lt; order.length) {</span>
+<span class="fc" id="L241">                    int end = run + 1;</span>
+<span class="fc bfc" id="L242" title="All 4 branches covered.">                    while (end &lt; order.length &amp;&amp; compareRows(order[run].intValue(), order[end].intValue(), keys, directions) == 0) {</span>
+<span class="fc" id="L243">                        end++;</span>
+                    }
+<span class="fc bfc" id="L245" title="All 2 branches covered.">                    for (int p = run; p &lt; end; p++) {</span>
+<span class="fc" id="L246">                        int i = order[p].intValue();</span>
+<span class="fc" id="L247">                        firstOf[i] = i;</span>
+<span class="fc bfc" id="L248" title="All 2 branches covered.">                        for (int q = run; q &lt; end; q++) {</span>
+<span class="fc" id="L249">                            int j = order[q].intValue();</span>
+<span class="pc bpc" id="L250" title="1 of 4 branches missed.">                            if (j &lt; firstOf[i] &amp;&amp; sameRow(source[i], source[j])) {</span>
+<span class="fc" id="L251">                                firstOf[i] = j;</span>
+                            }
+                        }
+                    }
+<span class="fc bfc" id="L255" title="All 2 branches covered.">                    for (int p = run; p &lt; end; p++) {</span>
+<span class="fc" id="L256">                        int i = order[p].intValue();</span>
+<span class="fc" id="L257">                        copies[firstOf[i]]++;</span>
+                    }
+<span class="fc" id="L259">                    run = end;</span>
+<span class="fc" id="L260">                }</span>
+<span class="fc bfc" id="L261" title="All 2 branches covered.">                for (int i = 0; i &lt; source.length; i++) {</span>
+<span class="pc bpc" id="L262" title="1 of 6 branches missed.">                    if (firstOf[i] == i &amp;&amp; (!once || copies[i] == 1)) {</span>
+<span class="fc" id="L263">                        picked.add(Integer.valueOf(i));</span>
+                    }
+                }
+<span class="fc" id="L266">                Object[][] out = rows(source, picked);</span>
+<span class="fc bfc" id="L267" title="All 2 branches covered.">                return byCol ? transpose(out) : out;</span>
+            }
+            case 6: // TOCOL
+            case 7: { // TOROW
+<span class="fc" id="L271">                Object[][] m = ev.matrix(a[0]);</span>
+<span class="fc" id="L272">                int ignore = (int) ev.scalarNum(a, 1, 0);</span>
+<span class="pc bpc" id="L273" title="1 of 4 branches missed.">                boolean byCol = Evaluator.has(a, 2) &amp;&amp; Values.bool(ev.scalar(a[2]));</span>
+<span class="fc bfc" id="L274" title="All 2 branches covered.">                Object[][] source = byCol ? transpose(m) : m;</span>
+<span class="fc" id="L275">                ArrayList&lt;Object&gt; values = new ArrayList&lt;Object&gt;();</span>
+<span class="fc bfc" id="L276" title="All 2 branches covered.">                for (Object[] line : source) {</span>
+<span class="fc bfc" id="L277" title="All 2 branches covered.">                    for (Object v : line) {</span>
+<span class="pc bpc" id="L278" title="6 of 8 branches missed.">                        if (v == null &amp;&amp; (ignore &amp; 1) != 0 || v instanceof CellError &amp;&amp; (ignore &amp; 2) != 0) {</span>
+<span class="nc" id="L279">                            continue;</span>
+                        }
+<span class="fc" id="L281">                        values.add(v);</span>
+                    }
+                }
+<span class="pc bpc" id="L284" title="1 of 2 branches missed.">                if (values.isEmpty()) {</span>
+<span class="nc" id="L285">                    throw EvalError.VALUE;</span>
+                }
+<span class="fc" id="L287">                boolean down = &quot;TOCOL&quot;.equals(name);</span>
+<span class="fc bfc" id="L288" title="All 2 branches covered.">                Object[][] out = down ? new Object[values.size()][1] : new Object[1][values.size()];</span>
+<span class="fc bfc" id="L289" title="All 2 branches covered.">                for (int i = 0; i &lt; values.size(); i++) {</span>
+<span class="fc bfc" id="L290" title="All 2 branches covered.">                    if (down) {</span>
+<span class="fc" id="L291">                        out[i][0] = values.get(i);</span>
+                    } else {
+<span class="fc" id="L293">                        out[0][i] = values.get(i);</span>
+                    }
+                }
+<span class="fc" id="L296">                return out;</span>
+            }
+            case 8: // VSTACK
+            case 9: { // HSTACK
+<span class="fc" id="L300">                boolean vertical = &quot;VSTACK&quot;.equals(name);</span>
+<span class="fc" id="L301">                Object[][][] parts = new Object[a.length][][];</span>
+<span class="fc" id="L302">                int along = 0;</span>
+<span class="fc" id="L303">                int across = 0;</span>
+<span class="fc bfc" id="L304" title="All 2 branches covered.">                for (int i = 0; i &lt; a.length; i++) {</span>
+<span class="fc" id="L305">                    Object[][] m = ev.matrix(a[i]);</span>
+<span class="fc bfc" id="L306" title="All 2 branches covered.">                    parts[i] = vertical ? m : transpose(m);</span>
+<span class="fc" id="L307">                    along += parts[i].length;</span>
+<span class="fc" id="L308">                    across = Math.max(across, Evaluator.width(parts[i]));</span>
+                }
+<span class="fc" id="L310">                Object[][] out = make(along, across);</span>
+<span class="fc" id="L311">                int at = 0;</span>
+<span class="fc bfc" id="L312" title="All 2 branches covered.">                for (Object[][] part : parts) {</span>
+<span class="fc bfc" id="L313" title="All 2 branches covered.">                    for (Object[] partRow : part) {</span>
+<span class="fc bfc" id="L314" title="All 2 branches covered.">                        for (int c = 0; c &lt; across; c++) {</span>
+<span class="fc bfc" id="L315" title="All 2 branches covered.">                            out[at][c] = c &lt; partRow.length ? partRow[c] : CellError.NA;</span>
+                        }
+<span class="fc" id="L317">                        at++;</span>
+                    }
+                }
+<span class="fc bfc" id="L320" title="All 2 branches covered.">                return vertical ? out : transpose(out);</span>
+            }
+            case 10: // TAKE
+            case 11: { // DROP
+<span class="fc" id="L324">                Object[][] m = ev.matrix(a[0]);</span>
+<span class="fc" id="L325">                boolean take = &quot;TAKE&quot;.equals(name);</span>
+<span class="pc bpc" id="L326" title="1 of 2 branches missed.">                int[] rowSpan = span(m.length, Evaluator.has(a, 1) ? Integer.valueOf((int) ev.scalarNum(a, 1)) : null, take);</span>
+<span class="fc bfc" id="L327" title="All 2 branches covered.">                int[] colSpan = span(Evaluator.width(m), Evaluator.has(a, 2) ? Integer.valueOf((int) ev.scalarNum(a, 2)) : null,</span>
+                        take);
+<span class="fc" id="L329">                Object[][] out = make(rowSpan[1] - rowSpan[0], colSpan[1] - colSpan[0]);</span>
+<span class="fc bfc" id="L330" title="All 2 branches covered.">                for (int r = 0; r &lt; out.length; r++) {</span>
+<span class="fc" id="L331">                    System.arraycopy(m[rowSpan[0] + r], colSpan[0], out[r], 0, out[r].length);</span>
+                }
+<span class="fc" id="L333">                return out;</span>
+            }
+            case 12: // CHOOSEROWS
+            case 13: { // CHOOSECOLS
+<span class="fc" id="L337">                Object[][] m = ev.matrix(a[0]);</span>
+<span class="fc" id="L338">                boolean byCol = &quot;CHOOSECOLS&quot;.equals(name);</span>
+<span class="fc bfc" id="L339" title="All 2 branches covered.">                Object[][] source = byCol ? transpose(m) : m;</span>
+<span class="fc" id="L340">                ArrayList&lt;Integer&gt; picked = new ArrayList&lt;Integer&gt;();</span>
+<span class="fc bfc" id="L341" title="All 2 branches covered.">                for (int i = 1; i &lt; a.length; i++) {</span>
+<span class="fc" id="L342">                    Object[][] indices = ev.matrix(a[i]);</span>
+<span class="fc bfc" id="L343" title="All 2 branches covered.">                    for (Object[] line : indices) {</span>
+<span class="fc bfc" id="L344" title="All 2 branches covered.">                        for (Object index : line) {</span>
+<span class="fc" id="L345">                            int n = (int) Values.num(index);</span>
+<span class="fc bfc" id="L346" title="All 2 branches covered.">                            if (n &lt; 0) {</span>
+<span class="fc" id="L347">                                n = source.length + n + 1;</span>
+                            }
+<span class="pc bpc" id="L349" title="1 of 4 branches missed.">                            if (n &lt; 1 || n &gt; source.length) {</span>
+<span class="fc" id="L350">                                throw EvalError.VALUE;</span>
+                            }
+<span class="fc" id="L352">                            picked.add(Integer.valueOf(n - 1));</span>
+                        }
+                    }
+                }
+<span class="fc" id="L356">                Object[][] out = rows(source, picked);</span>
+<span class="fc bfc" id="L357" title="All 2 branches covered.">                return byCol ? transpose(out) : out;</span>
+            }
+            case 14: { // EXPAND
+<span class="fc" id="L360">                Object[][] m = ev.matrix(a[0]);</span>
+<span class="fc" id="L361">                int rows = (int) ev.scalarNum(a, 1, m.length);</span>
+<span class="fc" id="L362">                int cols = (int) ev.scalarNum(a, 2, Evaluator.width(m));</span>
+<span class="pc bpc" id="L363" title="1 of 4 branches missed.">                if (rows &lt; m.length || cols &lt; Evaluator.width(m)) {</span>
+<span class="fc" id="L364">                    throw EvalError.VALUE;</span>
+                }
+<span class="fc bfc" id="L366" title="All 2 branches covered.">                Object pad = Evaluator.has(a, 3) ? ev.scalar(a[3]) : CellError.NA;</span>
+<span class="fc" id="L367">                Object[][] out = make(rows, cols);</span>
+<span class="fc bfc" id="L368" title="All 2 branches covered.">                for (int r = 0; r &lt; rows; r++) {</span>
+<span class="fc bfc" id="L369" title="All 2 branches covered.">                    for (int c = 0; c &lt; cols; c++) {</span>
+<span class="fc bfc" id="L370" title="All 4 branches covered.">                        out[r][c] = r &lt; m.length &amp;&amp; c &lt; m[r].length ? m[r][c] : pad;</span>
+                    }
+                }
+<span class="fc" id="L373">                return out;</span>
+            }
+            case 15: // WRAPROWS
+            case 16: { // WRAPCOLS
+<span class="fc" id="L377">                Object[] vector = LookupFunctions.vector(ev, a[0]);</span>
+<span class="fc" id="L378">                int count = (int) ev.scalarNum(a, 1);</span>
+<span class="fc bfc" id="L379" title="All 2 branches covered.">                if (count &lt; 1) {</span>
+<span class="fc" id="L380">                    throw EvalError.NUM;</span>
+                }
+<span class="fc bfc" id="L382" title="All 2 branches covered.">                Object pad = Evaluator.has(a, 2) ? ev.scalar(a[2]) : CellError.NA;</span>
+<span class="fc" id="L383">                int lines = (vector.length + count - 1) / count;</span>
+<span class="fc" id="L384">                Object[][] out = make(lines, count);</span>
+<span class="fc bfc" id="L385" title="All 2 branches covered.">                for (int i = 0; i &lt; lines * count; i++) {</span>
+<span class="fc bfc" id="L386" title="All 2 branches covered.">                    out[i / count][i % count] = i &lt; vector.length ? vector[i] : pad;</span>
+                }
+<span class="fc bfc" id="L388" title="All 2 branches covered.">                return &quot;WRAPROWS&quot;.equals(name) ? out : transpose(out);</span>
+            }
+            default:
+<span class="nc" id="L391">                return CellError.NAME;</span>
+        }
+    }
+
+    private static Object[][] sorted(Object[][] source, Object[][][] keys, int[] directions) {
+<span class="fc" id="L396">        Integer[] order = new Integer[source.length];</span>
+<span class="fc bfc" id="L397" title="All 2 branches covered.">        for (int i = 0; i &lt; order.length; i++) {</span>
+<span class="fc" id="L398">            order[i] = Integer.valueOf(i);</span>
+        }
+<span class="fc" id="L400">        sort(order, keys, directions);</span>
+<span class="fc" id="L401">        Object[][] out = new Object[source.length][];</span>
+<span class="fc bfc" id="L402" title="All 2 branches covered.">        for (int i = 0; i &lt; out.length; i++) {</span>
+<span class="fc" id="L403">            out[i] = source[order[i].intValue()];</span>
+        }
+<span class="fc" id="L405">        return out;</span>
+    }
+
+    private static boolean sameRow(Object[] x, Object[] y) {
+<span class="fc bfc" id="L409" title="All 2 branches covered.">        for (int c = 0; c &lt; x.length; c++) {</span>
+<span class="fc" id="L410">            Object p = x[c];</span>
+<span class="fc" id="L411">            Object q = y[c];</span>
+<span class="pc bpc" id="L412" title="2 of 4 branches missed.">            if (p == null || q == null) {</span>
+<span class="nc bnc" id="L413" title="All 2 branches missed.">                if (p != q) { //NOPMD CompareObjectsWithEquals - the same object is meant, not an equal one</span>
+<span class="nc" id="L414">                    return false;</span>
+                }
+<span class="pc bpc" id="L416" title="2 of 4 branches missed.">            } else if (p instanceof CellError || q instanceof CellError) {</span>
+<span class="nc bnc" id="L417" title="All 2 branches missed.">                if (p != q) { //NOPMD CompareObjectsWithEquals - the same object is meant, not an equal one</span>
+<span class="nc" id="L418">                    return false;</span>
+                }
+<span class="pc bpc" id="L420" title="1 of 2 branches missed.">            } else if (Values.compare(p, q) != 0) {</span>
+<span class="nc" id="L421">                return false;</span>
+            }
+        }
+<span class="fc" id="L424">        return true;</span>
+    }
+
+    /// The part of a length that TAKE keeps or DROP leaves: [from, to).
+    private static int[] span(int length, Integer countOrNull, boolean take) {
+<span class="fc bfc" id="L429" title="All 2 branches covered.">        if (countOrNull == null) {</span>
+<span class="fc" id="L430">            return new int[] {0, length};</span>
+        }
+<span class="fc" id="L432">        int n = countOrNull.intValue();</span>
+<span class="fc bfc" id="L433" title="All 2 branches covered.">        if (take) {</span>
+<span class="fc bfc" id="L434" title="All 2 branches covered.">            if (n == 0) {</span>
+<span class="fc" id="L435">                throw EvalError.VALUE;</span>
+            }
+<span class="fc bfc" id="L437" title="All 2 branches covered.">            return n &gt; 0 ? new int[] {0, Math.min(n, length)} : new int[] {Math.max(0, length + n), length};</span>
+        }
+<span class="fc bfc" id="L439" title="All 2 branches covered.">        int[] out = n &gt;= 0 ? new int[] {Math.min(n, length), length} : new int[] {0, Math.max(0, length + n)};</span>
+<span class="fc bfc" id="L440" title="All 2 branches covered.">        if (out[0] &gt;= out[1]) {</span>
+<span class="fc" id="L441">            throw EvalError.VALUE;</span>
+        }
+<span class="fc" id="L443">        return out;</span>
+    }
+
+<span class="fc" id="L446">    private static final java.util.HashMap&lt;String, Integer&gt; SWITCH_1 = Functions.switchTable(</span>
+            &quot;SEQUENCE&quot;, &quot;RANDARRAY&quot;, &quot;FILTER&quot;, &quot;SORT&quot;, &quot;SORTBY&quot;, &quot;UNIQUE&quot;, &quot;TOCOL&quot;, &quot;TOROW&quot;,
+            &quot;VSTACK&quot;, &quot;HSTACK&quot;, &quot;TAKE&quot;, &quot;DROP&quot;, &quot;CHOOSEROWS&quot;, &quot;CHOOSECOLS&quot;, &quot;EXPAND&quot;, &quot;WRAPROWS&quot;,
+            &quot;WRAPCOLS&quot;);
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

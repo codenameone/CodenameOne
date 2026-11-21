@@ -1,0 +1,459 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AudioNode.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.media.audio</a> &gt; <span class="el_source">AudioNode.java</span></div><h1>AudioNode.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.media.audio;
+
+import java.util.ArrayList;
+
+/// A processing block of an audio graph, the Web Audio `AudioNode`.
+///
+/// Nodes are created by a context (`context.createGain()` and so on) and wired
+/// with [#connect(AudioNode)]; audio is heard once a path reaches
+/// [BaseAudioContext#getDestination()]. Each input mixes everything connected
+/// to it to a channel count decided by [#getChannelCountMode()],
+/// [#getChannelCount()] and [#getChannelInterpretation()], following the
+/// specification's mixing rules.
+///
+/// A cycle in the graph must contain a [DelayNode]; a cycle without one is
+/// rendered as silence, as the specification requires. Every method may be
+/// called from any thread; changes reach the renderer at its next render
+/// quantum.
+public abstract class AudioNode {
+    final BaseAudioContext context;
+    private final int numberOfInputs;
+    private final int numberOfOutputs;
+    private int channelCount;
+    private ChannelCountMode channelCountMode;
+    private ChannelInterpretation channelInterpretation;
+
+    // ---- render side ----
+    int rChannelCount;
+    ChannelCountMode rMode;
+    ChannelInterpretation rInterp;
+    final ArrayList&lt;ArrayList&lt;Connection&gt;&gt; rInputs;
+<span class="fc" id="L53">    final ArrayList&lt;Connection&gt; rOutgoing = new ArrayList&lt;Connection&gt;();</span>
+    final AudioBus[] inBuses;
+    final AudioBus[] outBuses;
+<span class="fc" id="L56">    private long rQuantum = -1;</span>
+    private boolean rBusy;
+
+    AudioNode(BaseAudioContext context, int numberOfInputs, int numberOfOutputs, int channelCount,
+<span class="fc" id="L60">              ChannelCountMode mode, ChannelInterpretation interp) {</span>
+<span class="fc" id="L61">        this.context = context;</span>
+<span class="fc" id="L62">        this.numberOfInputs = numberOfInputs;</span>
+<span class="fc" id="L63">        this.numberOfOutputs = numberOfOutputs;</span>
+<span class="fc" id="L64">        this.channelCount = channelCount;</span>
+<span class="fc" id="L65">        this.channelCountMode = mode;</span>
+<span class="fc" id="L66">        this.channelInterpretation = interp;</span>
+<span class="fc" id="L67">        rChannelCount = channelCount;</span>
+<span class="fc" id="L68">        rMode = mode;</span>
+<span class="fc" id="L69">        rInterp = interp;</span>
+<span class="fc" id="L70">        rInputs = new ArrayList&lt;ArrayList&lt;Connection&gt;&gt;(numberOfInputs);</span>
+<span class="fc" id="L71">        inBuses = new AudioBus[numberOfInputs];</span>
+<span class="fc bfc" id="L72" title="All 2 branches covered.">        for (int i = 0; i &lt; numberOfInputs; i++) {</span>
+<span class="fc" id="L73">            rInputs.add(new ArrayList&lt;Connection&gt;());</span>
+<span class="fc" id="L74">            inBuses[i] = new AudioBus(1);</span>
+        }
+<span class="fc" id="L76">        int outs = Math.max(1, numberOfOutputs);</span>
+<span class="fc" id="L77">        outBuses = new AudioBus[outs];</span>
+<span class="fc bfc" id="L78" title="All 2 branches covered.">        for (int i = 0; i &lt; outs; i++) {</span>
+<span class="fc" id="L79">            outBuses[i] = new AudioBus(1);</span>
+        }
+<span class="fc" id="L81">    }</span>
+
+    /// The context that created this node.
+    ///
+    /// #### Returns
+    ///
+    /// the context
+    public BaseAudioContext getContext() {
+<span class="nc" id="L89">        return context;</span>
+    }
+
+    /// The number of inputs.
+    ///
+    /// #### Returns
+    ///
+    /// 0 for a source node
+    public int getNumberOfInputs() {
+<span class="nc" id="L98">        return numberOfInputs;</span>
+    }
+
+    /// The number of outputs.
+    ///
+    /// #### Returns
+    ///
+    /// 0 for the destination
+    public int getNumberOfOutputs() {
+<span class="nc" id="L107">        return numberOfOutputs;</span>
+    }
+
+    /// The channel count inputs are mixed to, subject to the channel count mode.
+    ///
+    /// #### Returns
+    ///
+    /// the channel count
+    public int getChannelCount() {
+<span class="fc" id="L116">        return channelCount;</span>
+    }
+
+    /// Sets the channel count.
+    ///
+    /// #### Parameters
+    ///
+    /// - `count`: 1 to 32, or less for nodes that restrict it
+    public void setChannelCount(int count) {
+<span class="nc" id="L125">        checkChannelCount(count);</span>
+<span class="nc" id="L126">        channelCount = count;</span>
+<span class="nc" id="L127">        final int c = count;</span>
+<span class="nc" id="L128">        context.post(new Runnable() {</span>
+            @Override
+            public void run() {
+<span class="nc" id="L131">                rChannelCount = c;</span>
+<span class="nc" id="L132">            }</span>
+        });
+<span class="nc" id="L134">    }</span>
+
+    /// How the channel count of each input is decided.
+    ///
+    /// #### Returns
+    ///
+    /// the mode
+    public ChannelCountMode getChannelCountMode() {
+<span class="nc" id="L142">        return channelCountMode;</span>
+    }
+
+    /// Sets how the channel count of each input is decided.
+    ///
+    /// #### Parameters
+    ///
+    /// - `mode`: the mode
+    public void setChannelCountMode(ChannelCountMode mode) {
+<span class="nc bnc" id="L151" title="All 2 branches missed.">        if (mode == null) {</span>
+<span class="nc" id="L152">            throw new IllegalArgumentException(&quot;mode is null&quot;);</span>
+        }
+<span class="nc" id="L154">        checkChannelCountMode(mode);</span>
+<span class="nc" id="L155">        channelCountMode = mode;</span>
+<span class="nc" id="L156">        final ChannelCountMode m = mode;</span>
+<span class="nc" id="L157">        context.post(new Runnable() {</span>
+            @Override
+            public void run() {
+<span class="nc" id="L160">                rMode = m;</span>
+<span class="nc" id="L161">            }</span>
+        });
+<span class="nc" id="L163">    }</span>
+
+    /// How channels are up-mixed and down-mixed.
+    ///
+    /// #### Returns
+    ///
+    /// the interpretation
+    public ChannelInterpretation getChannelInterpretation() {
+<span class="nc" id="L171">        return channelInterpretation;</span>
+    }
+
+    /// Sets how channels are up-mixed and down-mixed.
+    ///
+    /// #### Parameters
+    ///
+    /// - `interpretation`: the interpretation
+    public void setChannelInterpretation(ChannelInterpretation interpretation) {
+<span class="nc bnc" id="L180" title="All 2 branches missed.">        if (interpretation == null) {</span>
+<span class="nc" id="L181">            throw new IllegalArgumentException(&quot;interpretation is null&quot;);</span>
+        }
+<span class="nc" id="L183">        checkChannelInterpretation(interpretation);</span>
+<span class="nc" id="L184">        channelInterpretation = interpretation;</span>
+<span class="nc" id="L185">        final ChannelInterpretation ci = interpretation;</span>
+<span class="nc" id="L186">        context.post(new Runnable() {</span>
+            @Override
+            public void run() {
+<span class="nc" id="L189">                rInterp = ci;</span>
+<span class="nc" id="L190">            }</span>
+        });
+<span class="nc" id="L192">    }</span>
+
+    /// Connects output 0 to input 0 of `destination`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `destination`: the node to feed
+    ///
+    /// #### Returns
+    ///
+    /// `destination`, so connections can be chained
+    public AudioNode connect(AudioNode destination) {
+<span class="fc" id="L204">        return connect(destination, 0, 0);</span>
+    }
+
+    /// Connects an output of this node to an input of `destination`.
+    /// Connecting the same pair twice has no further effect.
+    ///
+    /// #### Parameters
+    ///
+    /// - `destination`: the node to feed
+    ///
+    /// - `output`: the output of this node
+    ///
+    /// - `input`: the input of `destination`
+    ///
+    /// #### Returns
+    ///
+    /// `destination`
+    public AudioNode connect(AudioNode destination, int output, int input) {
+<span class="pc bpc" id="L222" title="1 of 2 branches missed.">        if (destination == null) {</span>
+<span class="nc" id="L223">            throw new IllegalArgumentException(&quot;destination is null&quot;);</span>
+        }
+<span class="pc bpc" id="L225" title="1 of 2 branches missed.">        if (destination.context != context) { // NOPMD CompareObjectsWithEquals - one context, by identity</span>
+<span class="nc" id="L226">            throw new IllegalArgumentException(&quot;Nodes belong to different contexts&quot;);</span>
+        }
+<span class="fc" id="L228">        checkOutput(output);</span>
+<span class="pc bpc" id="L229" title="2 of 4 branches missed.">        if (input &lt; 0 || input &gt;= destination.numberOfInputs) {</span>
+<span class="nc" id="L230">            throw new IllegalArgumentException(&quot;No input &quot; + input);</span>
+        }
+<span class="fc" id="L232">        final Connection c = new Connection(this, output, destination, null, input);</span>
+<span class="fc" id="L233">        context.post(new Runnable() {</span>
+            @Override
+            public void run() {
+<span class="fc" id="L236">                ArrayList&lt;Connection&gt; list = c.destNode.rInputs.get(c.input);</span>
+<span class="fc bfc" id="L237" title="All 2 branches covered.">                for (int i = 0; i &lt; list.size(); i++) { // NOPMD ForLoopCanBeForeach - no iterator on the render thread</span>
+<span class="fc" id="L238">                    Connection o = list.get(i);</span>
+<span class="pc bpc" id="L239" title="3 of 4 branches missed.">                    if (o.source == c.source &amp;&amp; o.output == c.output) { // NOPMD CompareObjectsWithEquals - graph edges are identities</span>
+<span class="nc" id="L240">                        return;</span>
+                    }
+                }
+<span class="fc" id="L243">                list.add(c);</span>
+<span class="fc" id="L244">                rOutgoing.add(c);</span>
+<span class="fc" id="L245">            }</span>
+        });
+<span class="fc" id="L247">        return destination;</span>
+    }
+
+    /// Connects output 0 to an [AudioParam], whose value then has this output,
+    /// mixed down to mono, added to it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `param`: the parameter to modulate
+    public void connect(AudioParam param) {
+<span class="fc" id="L257">        connect(param, 0);</span>
+<span class="fc" id="L258">    }</span>
+
+    /// Connects an output to an [AudioParam].
+    ///
+    /// #### Parameters
+    ///
+    /// - `param`: the parameter to modulate
+    ///
+    /// - `output`: the output of this node
+    public void connect(AudioParam param, int output) {
+<span class="pc bpc" id="L268" title="1 of 2 branches missed.">        if (param == null) {</span>
+<span class="nc" id="L269">            throw new IllegalArgumentException(&quot;param is null&quot;);</span>
+        }
+<span class="fc" id="L271">        checkOutput(output);</span>
+<span class="fc" id="L272">        final Connection c = new Connection(this, output, null, param, 0);</span>
+<span class="fc" id="L273">        context.post(new Runnable() {</span>
+            @Override
+            public void run() {
+<span class="fc" id="L276">                ArrayList&lt;Connection&gt; list = c.destParam.rInputs;</span>
+<span class="pc bpc" id="L277" title="1 of 2 branches missed.">                for (int i = 0; i &lt; list.size(); i++) { // NOPMD ForLoopCanBeForeach - no iterator on the render thread</span>
+<span class="nc" id="L278">                    Connection o = list.get(i);</span>
+<span class="nc bnc" id="L279" title="All 4 branches missed.">                    if (o.source == c.source &amp;&amp; o.output == c.output) { // NOPMD CompareObjectsWithEquals - graph edges are identities</span>
+<span class="nc" id="L280">                        return;</span>
+                    }
+                }
+<span class="fc" id="L283">                list.add(c);</span>
+<span class="fc" id="L284">                rOutgoing.add(c);</span>
+<span class="fc" id="L285">            }</span>
+        });
+<span class="fc" id="L287">    }</span>
+
+    /// Removes every outgoing connection.
+    public void disconnect() {
+<span class="nc" id="L291">        disconnectMatching(-1, null, null, -1);</span>
+<span class="nc" id="L292">    }</span>
+
+    /// Removes every connection from one output.
+    ///
+    /// #### Parameters
+    ///
+    /// - `output`: the output of this node
+    public void disconnect(int output) {
+<span class="nc" id="L300">        checkOutput(output);</span>
+<span class="nc" id="L301">        disconnectMatching(output, null, null, -1);</span>
+<span class="nc" id="L302">    }</span>
+
+    /// Removes every connection to `destination`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `destination`: the node to stop feeding
+    public void disconnect(AudioNode destination) {
+<span class="nc bnc" id="L310" title="All 2 branches missed.">        if (destination == null) {</span>
+<span class="nc" id="L311">            throw new IllegalArgumentException(&quot;destination is null&quot;);</span>
+        }
+<span class="nc" id="L313">        disconnectMatching(-1, destination, null, -1);</span>
+<span class="nc" id="L314">    }</span>
+
+    /// Removes one connection.
+    ///
+    /// #### Parameters
+    ///
+    /// - `destination`: the node fed
+    ///
+    /// - `output`: the output of this node
+    ///
+    /// - `input`: the input of `destination`
+    public void disconnect(AudioNode destination, int output, int input) {
+<span class="nc bnc" id="L326" title="All 2 branches missed.">        if (destination == null) {</span>
+<span class="nc" id="L327">            throw new IllegalArgumentException(&quot;destination is null&quot;);</span>
+        }
+<span class="nc" id="L329">        checkOutput(output);</span>
+<span class="nc" id="L330">        disconnectMatching(output, destination, null, input);</span>
+<span class="nc" id="L331">    }</span>
+
+    /// Removes every connection to `param`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `param`: the parameter to stop modulating
+    public void disconnect(AudioParam param) {
+<span class="nc bnc" id="L339" title="All 2 branches missed.">        if (param == null) {</span>
+<span class="nc" id="L340">            throw new IllegalArgumentException(&quot;param is null&quot;);</span>
+        }
+<span class="nc" id="L342">        disconnectMatching(-1, null, param, -1);</span>
+<span class="nc" id="L343">    }</span>
+
+    private void disconnectMatching(final int output, final AudioNode node, final AudioParam param,
+                                    final int input) {
+<span class="nc" id="L347">        context.post(new Runnable() {</span>
+            @Override
+            public void run() {
+<span class="nc bnc" id="L350" title="All 2 branches missed.">                for (int i = rOutgoing.size() - 1; i &gt;= 0; i--) {</span>
+<span class="nc" id="L351">                    Connection c = rOutgoing.get(i);</span>
+<span class="nc bnc" id="L352" title="All 4 branches missed.">                    if (output &gt;= 0 &amp;&amp; c.output != output) {</span>
+<span class="nc" id="L353">                        continue;</span>
+                    }
+<span class="nc bnc" id="L355" title="All 4 branches missed.">                    if (node != null &amp;&amp; c.destNode != node) { // NOPMD CompareObjectsWithEquals - graph edges are identities</span>
+<span class="nc" id="L356">                        continue;</span>
+                    }
+<span class="nc bnc" id="L358" title="All 4 branches missed.">                    if (param != null &amp;&amp; c.destParam != param) { // NOPMD CompareObjectsWithEquals - graph edges are identities</span>
+<span class="nc" id="L359">                        continue;</span>
+                    }
+<span class="nc bnc" id="L361" title="All 4 branches missed.">                    if (input &gt;= 0 &amp;&amp; c.input != input) {</span>
+<span class="nc" id="L362">                        continue;</span>
+                    }
+<span class="nc bnc" id="L364" title="All 2 branches missed.">                    if (c.destNode != null) {</span>
+<span class="nc" id="L365">                        c.destNode.rInputs.get(c.input).remove(c);</span>
+                    } else {
+<span class="nc" id="L367">                        c.destParam.rInputs.remove(c);</span>
+                    }
+<span class="nc" id="L369">                    rOutgoing.remove(i);</span>
+                }
+<span class="nc" id="L371">            }</span>
+        });
+<span class="nc" id="L373">    }</span>
+
+    private void checkOutput(int output) {
+<span class="pc bpc" id="L376" title="2 of 4 branches missed.">        if (output &lt; 0 || output &gt;= numberOfOutputs) {</span>
+<span class="nc" id="L377">            throw new IllegalArgumentException(&quot;No output &quot; + output);</span>
+        }
+<span class="fc" id="L379">    }</span>
+
+    void checkChannelCount(int count) {
+<span class="nc bnc" id="L382" title="All 4 branches missed.">        if (count &lt; 1 || count &gt; AudioBus.MAX_CHANNELS) {</span>
+<span class="nc" id="L383">            throw new IllegalArgumentException(&quot;channelCount must be between 1 and &quot;</span>
+                    + AudioBus.MAX_CHANNELS + &quot;: &quot; + count);
+        }
+<span class="nc" id="L386">    }</span>
+
+    void checkChannelCountMode(ChannelCountMode mode) {
+<span class="nc" id="L389">    }</span>
+
+    void checkChannelInterpretation(ChannelInterpretation interpretation) {
+<span class="nc" id="L392">    }</span>
+
+    // ---------------------------------------------------------------- render
+
+    /// The output of this node for render quantum `q`, rendering it first if
+    /// needed. Render thread only.
+    final AudioBus pull(int output, long q) {
+<span class="fc bfc" id="L399" title="All 2 branches covered.">        if (rQuantum == q) {</span>
+<span class="fc" id="L400">            return outBuses[output];</span>
+        }
+<span class="fc bfc" id="L402" title="All 2 branches covered.">        if (rBusy) {</span>
+<span class="fc" id="L403">            return reentered(output, q);</span>
+        }
+<span class="fc" id="L405">        rBusy = true;</span>
+        try {
+<span class="fc bfc" id="L407" title="All 2 branches covered.">            for (int i = 0; i &lt; numberOfInputs; i++) {</span>
+<span class="fc" id="L408">                mixInput(i, q);</span>
+            }
+<span class="fc" id="L410">            process(q);</span>
+        } finally {
+<span class="fc" id="L412">            rBusy = false;</span>
+<span class="fc" id="L413">            rQuantum = q;</span>
+        }
+<span class="fc" id="L415">        return outBuses[output];</span>
+    }
+
+    /// Whether this node already rendered quantum `q`.
+    final boolean renderedQuantum(long q) {
+<span class="fc bfc" id="L420" title="All 2 branches covered.">        return rQuantum == q;</span>
+    }
+
+    /// Called when a cycle reaches this node while it is rendering. Only a
+    /// delay can break a cycle; every other node answers silence.
+    AudioBus reentered(int output, long q) {
+<span class="fc" id="L426">        return context.silentBus();</span>
+    }
+
+    private void mixInput(int index, long q) {
+<span class="fc" id="L430">        ArrayList&lt;Connection&gt; list = rInputs.get(index);</span>
+<span class="fc" id="L431">        int n = list.size();</span>
+<span class="fc" id="L432">        int max = 1;</span>
+<span class="fc bfc" id="L433" title="All 2 branches covered.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc" id="L434">            Connection c = list.get(i);</span>
+<span class="fc" id="L435">            AudioBus b = c.source.pull(c.output, q);</span>
+<span class="fc bfc" id="L436" title="All 2 branches covered.">            if (b.channels &gt; max) {</span>
+<span class="fc" id="L437">                max = b.channels;</span>
+            }
+        }
+        int computed;
+<span class="fc bfc" id="L441" title="All 2 branches covered.">        if (rMode == ChannelCountMode.EXPLICIT) {</span>
+<span class="fc" id="L442">            computed = rChannelCount;</span>
+<span class="fc bfc" id="L443" title="All 2 branches covered.">        } else if (rMode == ChannelCountMode.CLAMPED_MAX) {</span>
+<span class="fc" id="L444">            computed = Math.min(max, rChannelCount);</span>
+        } else {
+<span class="fc" id="L446">            computed = max;</span>
+        }
+<span class="fc" id="L448">        AudioBus in = inBuses[index];</span>
+<span class="fc" id="L449">        in.setChannels(computed);</span>
+<span class="fc bfc" id="L450" title="All 2 branches covered.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc" id="L451">            Connection c = list.get(i);</span>
+<span class="fc" id="L452">            AudioBus.sumInto(c.source.pull(c.output, q), in, rInterp);</span>
+        }
+<span class="fc" id="L454">    }</span>
+
+    /// Renders one quantum from `inBuses` (already mixed) into `outBuses`.
+    abstract void process(long q);
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

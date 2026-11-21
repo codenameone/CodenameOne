@@ -1,0 +1,141 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>JsonRpc.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.crypto.rpc</a> &gt; <span class="el_source">JsonRpc.java</span></div><h1>JsonRpc.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008-2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.crypto.rpc;
+
+import com.codename1.io.JSONParser;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+/// JSON-RPC 2.0 over an [RpcTransport]: what Ethereum and Solana nodes speak. Parameters and
+/// results are the values [com.codename1.io.JSONParser#parseStrict(String, boolean)] reads and
+/// [com.codename1.io.JSONParser#toJson(Object)] writes: `Map`, `List`, `String`, `Boolean`, `Long`,
+/// `Double`, and an integer past a `long` as a [com.codename1.io.JSONParser.RawJson] holding its
+/// exact digits.
+@com.codename1.impl.SharedWithBackend
+public class JsonRpc {
+    private final RpcTransport transport;
+    private final String url;
+<span class="fc" id="L42">    private long nextId = 1;</span>
+
+    /// A client for an endpoint.
+<span class="fc" id="L45">    public JsonRpc(RpcTransport transport, String url) {</span>
+<span class="pc bpc" id="L46" title="2 of 4 branches missed.">        if (transport == null || url == null) {</span>
+<span class="nc" id="L47">            throw new IllegalArgumentException(&quot;transport and url are required&quot;);</span>
+        }
+<span class="fc" id="L49">        this.transport = transport;</span>
+<span class="fc" id="L50">        this.url = url;</span>
+<span class="fc" id="L51">    }</span>
+
+    /// The endpoint.
+    public String getUrl() {
+<span class="nc" id="L55">        return url;</span>
+    }
+
+    /// The transport.
+    public RpcTransport getTransport() {
+<span class="nc" id="L60">        return transport;</span>
+    }
+
+    /// Calls a method and answers its `result`, which may be `null`.
+    ///
+    /// #### Throws
+    ///
+    /// - `RpcException`: for an `error` reply or an HTTP failure
+    /// - `IOException`: when the endpoint could not be reached, or answered something that is
+    ///   not a JSON-RPC response
+    public Object call(String method, Object... params) throws IOException {
+<span class="fc" id="L71">        return callWith(method, Arrays.asList(params));</span>
+    }
+
+    /// Calls a method with a parameter list, or a parameter object when `params` is a `Map`.
+    /// It is not an overload of [#call(String, Object...)], which would take a single
+    /// parameter for the whole list.
+    public Object callWith(String method, Object params) throws IOException {
+<span class="fc" id="L78">        Map&lt;String, Object&gt; req = new LinkedHashMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L79">        long id = nextId++;</span>
+<span class="fc" id="L80">        req.put(&quot;jsonrpc&quot;, &quot;2.0&quot;);</span>
+<span class="fc" id="L81">        req.put(&quot;id&quot;, Long.valueOf(id));</span>
+<span class="fc" id="L82">        req.put(&quot;method&quot;, method);</span>
+<span class="pc bpc" id="L83" title="1 of 2 branches missed.">        req.put(&quot;params&quot;, params == null ? new ArrayList&lt;Object&gt;() : params);</span>
+<span class="fc" id="L84">        String reply = transport.send(&quot;POST&quot;, url, &quot;application/json&quot;, JSONParser.toJson(req));</span>
+        Object parsed;
+        try {
+<span class="fc" id="L87">            parsed = JSONParser.parseStrict(reply, true);</span>
+<span class="nc" id="L88">        } catch (IOException e) {</span>
+<span class="nc" id="L89">            throw new IOException(&quot;not a JSON-RPC response from &quot; + url + &quot;: &quot; + e.getMessage(), e);</span>
+<span class="fc" id="L90">        }</span>
+<span class="pc bpc" id="L91" title="1 of 2 branches missed.">        if (!(parsed instanceof Map)) {</span>
+<span class="nc" id="L92">            throw new IOException(&quot;not a JSON-RPC response from &quot; + url);</span>
+        }
+<span class="fc" id="L94">        Map&lt;?, ?&gt; m = (Map&lt;?, ?&gt;) parsed;</span>
+<span class="fc" id="L95">        Object error = m.get(&quot;error&quot;);</span>
+<span class="fc bfc" id="L96" title="All 2 branches covered.">        if (error instanceof Map) {</span>
+<span class="fc" id="L97">            Map&lt;?, ?&gt; e = (Map&lt;?, ?&gt;) error;</span>
+<span class="fc" id="L98">            Object code = e.get(&quot;code&quot;);</span>
+<span class="fc" id="L99">            Object msg = e.get(&quot;message&quot;);</span>
+<span class="pc bpc" id="L100" title="2 of 4 branches missed.">            throw new RpcException(code instanceof Number ? ((Number) code).intValue() : 0,</span>
+<span class="fc" id="L101">                    msg instanceof String ? (String) msg : &quot;JSON-RPC error&quot;, e.get(&quot;data&quot;), false);</span>
+        }
+<span class="pc bpc" id="L103" title="1 of 2 branches missed.">        if (!m.containsKey(&quot;result&quot;)) {</span>
+<span class="nc" id="L104">            throw new IOException(&quot;JSON-RPC response with neither result nor error&quot;);</span>
+        }
+<span class="fc" id="L106">        return m.get(&quot;result&quot;);</span>
+    }
+
+    /// A result that must be a JSON object.
+    protected static Map&lt;?, ?&gt; asMap(Object o, String what) throws IOException {
+<span class="pc bpc" id="L111" title="1 of 2 branches missed.">        if (!(o instanceof Map)) {</span>
+<span class="nc" id="L112">            throw new IOException(what + &quot;: expected an object&quot;);</span>
+        }
+<span class="fc" id="L114">        return (Map&lt;?, ?&gt;) o;</span>
+    }
+
+    /// A result that must be a JSON array.
+    protected static List&lt;?&gt; asList(Object o, String what) throws IOException {
+<span class="pc bpc" id="L119" title="1 of 2 branches missed.">        if (!(o instanceof List)) {</span>
+<span class="nc" id="L120">            throw new IOException(what + &quot;: expected an array&quot;);</span>
+        }
+<span class="fc" id="L122">        return (List&lt;?&gt;) o;</span>
+    }
+
+    /// A result that must be a JSON string.
+    protected static String asString(Object o, String what) throws IOException {
+<span class="pc bpc" id="L127" title="1 of 2 branches missed.">        if (!(o instanceof String)) {</span>
+<span class="nc" id="L128">            throw new IOException(what + &quot;: expected a string&quot;);</span>
+        }
+<span class="fc" id="L130">        return (String) o;</span>
+    }
+
+    /// A result that must be a JSON integer within `long` range.
+    protected static long asLong(Object o, String what) throws IOException {
+<span class="pc bpc" id="L135" title="3 of 4 branches missed.">        if (o instanceof Long || o instanceof Integer) {</span>
+<span class="fc" id="L136">            return ((Number) o).longValue();</span>
+        }
+<span class="nc" id="L138">        throw new IOException(what + &quot;: expected an integer&quot;);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

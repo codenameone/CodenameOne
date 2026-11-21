@@ -1,0 +1,204 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>GameWorld.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.gaming.level</a> &gt; <span class="el_source">GameWorld.java</span></div><h1>GameWorld.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.gaming.level;
+
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+/// A large game space made of linked `Region`s, streamed in and out around the player so the
+/// world can exceed memory while transitions stay seamless. Hold the regions directly (small
+/// worlds) or supply a `RegionProvider` to page them by id. Call `#update(double,double)` each
+/// frame with the player's world position: the world keeps the containing region active, loads
+/// its linked neighbours, and unloads (saving) regions beyond `#getKeepRadius()` links away.
+public class GameWorld {
+<span class="pc" id="L36">    private final Map&lt;String, Region&gt; regions = new LinkedHashMap&lt;String, Region&gt;();</span>
+    private RegionProvider provider;
+    private String activeRegionId;
+<span class="pc" id="L39">    private int keepRadius = 1;</span>
+
+<span class="fc" id="L41">    public GameWorld() {</span>
+<span class="fc" id="L42">    }</span>
+
+<span class="nc" id="L44">    public GameWorld(RegionProvider provider) {</span>
+<span class="nc" id="L45">        this.provider = provider;</span>
+<span class="nc" id="L46">    }</span>
+
+    public RegionProvider getProvider() {
+<span class="nc" id="L49">        return provider;</span>
+    }
+
+    public GameWorld setProvider(RegionProvider provider) {
+<span class="nc" id="L53">        this.provider = provider;</span>
+<span class="nc" id="L54">        return this;</span>
+    }
+
+    /// How many neighbour links away from the active region stay resident.
+    public int getKeepRadius() {
+<span class="nc" id="L59">        return keepRadius;</span>
+    }
+
+    public GameWorld setKeepRadius(int keepRadius) {
+<span class="nc" id="L63">        this.keepRadius = Math.max(0, keepRadius);</span>
+<span class="nc" id="L64">        return this;</span>
+    }
+
+    /// Serializes the resident regions + active region as a JSON object. (A provider-backed
+    /// world persists individual regions through its `RegionProvider`; this inline form suits
+    /// small/medium worlds embedded in a level file.)
+    public String toJson() {
+<span class="nc" id="L71">        StringBuilder sb = new StringBuilder();</span>
+<span class="nc" id="L72">        sb.append(&quot;{\&quot;active\&quot;:&quot;);</span>
+<span class="nc" id="L73">        Json.writeString(sb, activeRegionId);</span>
+<span class="nc" id="L74">        sb.append(&quot;,\&quot;keepRadius\&quot;:&quot;).append(keepRadius);</span>
+<span class="nc" id="L75">        sb.append(&quot;,\&quot;regions\&quot;:[&quot;);</span>
+<span class="nc" id="L76">        boolean first = true;</span>
+<span class="nc bnc" id="L77" title="All 2 branches missed.">        for (Region r : regions.values()) {</span>
+<span class="nc bnc" id="L78" title="All 2 branches missed.">            if (!first) {</span>
+<span class="nc" id="L79">                sb.append(',');</span>
+            }
+<span class="nc" id="L81">            first = false;</span>
+<span class="nc" id="L82">            sb.append(r.toJson());</span>
+<span class="nc" id="L83">        }</span>
+<span class="nc" id="L84">        sb.append(&quot;]}&quot;);</span>
+<span class="nc" id="L85">        return sb.toString();</span>
+    }
+
+    public static GameWorld fromMap(Map&lt;String, Object&gt; root) {
+<span class="nc" id="L89">        GameWorld w = new GameWorld();</span>
+<span class="nc" id="L90">        w.keepRadius = Json.intval(root.get(&quot;keepRadius&quot;), 1);</span>
+<span class="nc" id="L91">        List&lt;Object&gt; rs = Json.asList(root.get(&quot;regions&quot;));</span>
+<span class="nc bnc" id="L92" title="All 2 branches missed.">        if (rs != null) {</span>
+<span class="nc bnc" id="L93" title="All 2 branches missed.">            for (Object ro : rs) {</span>
+<span class="nc" id="L94">                Map&lt;String, Object&gt; rm = Json.asMap(ro);</span>
+<span class="nc bnc" id="L95" title="All 2 branches missed.">                if (rm != null) {</span>
+<span class="nc" id="L96">                    w.addRegion(Region.fromMap(rm));</span>
+                }
+<span class="nc" id="L98">            }</span>
+        }
+<span class="nc" id="L100">        String active = Json.str(root.get(&quot;active&quot;), null);</span>
+<span class="nc bnc" id="L101" title="All 2 branches missed.">        if (active != null) {</span>
+<span class="nc" id="L102">            w.activeRegionId = active;</span>
+        }
+<span class="nc" id="L104">        return w;</span>
+    }
+
+    public GameWorld addRegion(Region r) {
+<span class="pc bpc" id="L108" title="2 of 4 branches missed.">        if (r != null &amp;&amp; r.getId() != null) {</span>
+<span class="fc" id="L109">            regions.put(r.getId(), r);</span>
+<span class="fc bfc" id="L110" title="All 2 branches covered.">            if (activeRegionId == null) {</span>
+<span class="fc" id="L111">                activeRegionId = r.getId();</span>
+            }
+        }
+<span class="fc" id="L114">        return this;</span>
+    }
+
+    /// Returns a resident region, paging it in through the provider if needed.
+    public Region getRegion(String id) {
+<span class="pc bpc" id="L119" title="1 of 2 branches missed.">        if (id == null) {</span>
+<span class="nc" id="L120">            return null;</span>
+        }
+<span class="fc" id="L122">        Region r = regions.get(id);</span>
+<span class="pc bpc" id="L123" title="3 of 4 branches missed.">        if (r == null &amp;&amp; provider != null) {</span>
+<span class="nc" id="L124">            r = provider.loadRegion(id);</span>
+<span class="nc bnc" id="L125" title="All 2 branches missed.">            if (r != null) {</span>
+<span class="nc" id="L126">                regions.put(id, r);</span>
+            }
+        }
+<span class="fc" id="L129">        return r;</span>
+    }
+
+    public Region getActiveRegion() {
+<span class="fc" id="L133">        return getRegion(activeRegionId);</span>
+    }
+
+    public GameWorld setActiveRegion(String id) {
+<span class="nc" id="L137">        this.activeRegionId = id;</span>
+<span class="nc" id="L138">        return this;</span>
+    }
+
+    /// Currently-resident regions.
+    public List&lt;Region&gt; residentRegions() {
+<span class="nc" id="L143">        return new ArrayList&lt;Region&gt;(regions.values());</span>
+    }
+
+    /// Drives streaming: picks the region containing the player (preferring a neighbour of the
+    /// current active region for seamless crossings), loads neighbours within `#getKeepRadius()`
+    /// and unloads (persisting) the rest.
+    public void update(double playerWorldX, double playerWorldZ) {
+<span class="fc" id="L150">        Region active = getActiveRegion();</span>
+        // cross into a neighbour whose bounds contain the player
+<span class="pc bpc" id="L152" title="2 of 4 branches missed.">        if (active != null &amp;&amp; !active.contains(playerWorldX, playerWorldZ)) {</span>
+<span class="pc bpc" id="L153" title="1 of 2 branches missed.">            for (String nid : active.neighbors().values()) {</span>
+<span class="fc" id="L154">                Region n = getRegion(nid);</span>
+<span class="pc bpc" id="L155" title="2 of 4 branches missed.">                if (n != null &amp;&amp; n.contains(playerWorldX, playerWorldZ)) {</span>
+<span class="fc" id="L156">                    activeRegionId = nid;</span>
+<span class="fc" id="L157">                    active = n;</span>
+<span class="fc" id="L158">                    break;</span>
+                }
+<span class="nc" id="L160">            }</span>
+        }
+<span class="pc bpc" id="L162" title="1 of 2 branches missed.">        if (active == null) {</span>
+<span class="nc" id="L163">            return;</span>
+        }
+        // compute the keep-set: active + neighbours up to keepRadius links
+<span class="fc" id="L166">        Map&lt;String, Boolean&gt; keep = new LinkedHashMap&lt;String, Boolean&gt;();</span>
+<span class="fc" id="L167">        List&lt;String&gt; frontier = new ArrayList&lt;String&gt;();</span>
+<span class="fc" id="L168">        keep.put(active.getId(), Boolean.TRUE);</span>
+<span class="fc" id="L169">        frontier.add(active.getId());</span>
+<span class="fc bfc" id="L170" title="All 2 branches covered.">        for (int depth = 0; depth &lt; keepRadius; depth++) {</span>
+<span class="fc" id="L171">            List&lt;String&gt; next = new ArrayList&lt;String&gt;();</span>
+<span class="fc bfc" id="L172" title="All 2 branches covered.">            for (String frontierId : frontier) {</span>
+<span class="fc" id="L173">                Region r = getRegion(frontierId);</span>
+<span class="pc bpc" id="L174" title="1 of 2 branches missed.">                if (r == null) {</span>
+<span class="nc" id="L175">                    continue;</span>
+                }
+<span class="fc bfc" id="L177" title="All 2 branches covered.">                for (String nid : r.neighbors().values()) {</span>
+<span class="pc bpc" id="L178" title="2 of 4 branches missed.">                    if (nid != null &amp;&amp; !keep.containsKey(nid)) {</span>
+<span class="fc" id="L179">                        keep.put(nid, Boolean.TRUE);</span>
+<span class="fc" id="L180">                        next.add(nid);</span>
+<span class="fc" id="L181">                        getRegion(nid);   // page it in</span>
+                    }
+<span class="fc" id="L183">                }</span>
+<span class="fc" id="L184">            }</span>
+<span class="fc" id="L185">            frontier = next;</span>
+        }
+        // evict (saving) regions outside the keep-set when we have a provider to reload them
+<span class="pc bpc" id="L188" title="1 of 2 branches missed.">        if (provider != null) {</span>
+<span class="nc" id="L189">            List&lt;String&gt; toEvict = new ArrayList&lt;String&gt;();</span>
+<span class="nc bnc" id="L190" title="All 2 branches missed.">            for (String id : regions.keySet()) {</span>
+<span class="nc bnc" id="L191" title="All 2 branches missed.">                if (!keep.containsKey(id)) {</span>
+<span class="nc" id="L192">                    toEvict.add(id);</span>
+                }
+<span class="nc" id="L194">            }</span>
+<span class="nc bnc" id="L195" title="All 2 branches missed.">            for (String id : toEvict) {</span>
+<span class="nc" id="L196">                Region r = regions.remove(id);</span>
+<span class="nc bnc" id="L197" title="All 2 branches missed.">                if (r != null) {</span>
+<span class="nc" id="L198">                    provider.saveRegion(r);</span>
+                }
+<span class="nc" id="L200">            }</span>
+        }
+<span class="fc" id="L202">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

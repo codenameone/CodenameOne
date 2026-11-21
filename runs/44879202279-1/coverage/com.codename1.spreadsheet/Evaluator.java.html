@@ -1,0 +1,1235 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Evaluator.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.spreadsheet</a> &gt; <span class="el_source">Evaluator.java</span></div><h1>Evaluator.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.spreadsheet;
+
+import com.codename1.util.MathUtil;
+import java.util.ArrayList;
+
+/// Evaluates formula trees.
+///
+/// A formula evaluates to a scalar (Double, String, Boolean, CellError, or null for an empty
+/// cell), to a reference (`Ref`) or to an array (`Object[][]` of scalars). Operators and the
+/// functions registered as scalar are applied element by element when an operand is an array
+/// or a range, which is what makes `SUMPRODUCT((A1:A9=&quot;x&quot;)*B1:B9)` work.
+///
+/// A range used where one value is expected, outside the arguments of a function and outside
+/// an array formula, stands for the cell of that range in the formula's own row or column.
+/// That is the meaning such a formula has in a file.
+final class Evaluator {
+    /// An argument that was left out, as the second one of `IF(A1,,0)`.
+<span class="fc" id="L40">    static final Object MISSING = new Object();</span>
+
+    final Workbook workbook;
+    Sheet sheet;
+    int row;
+    int col;
+    private boolean arrayFormula;
+    private int argDepth;
+    /// Whether the formula being evaluated took a range or an array element by element where
+    /// one value is wanted: Excel without dynamic arrays reads such a formula as an array
+    /// formula only when the file says so, so the writers mark it as one and Excel shows what
+    /// this evaluator calculated.
+    private boolean spread;
+    /// What spread was for the last formula evaluate finished.
+    boolean lastSpread;
+    /// The whole result of the last formula evaluate finished, when it was an array.
+    Object[][] lastMatrix;
+    private Object[][] matrixResult;
+    private int nameDepth;
+    boolean skipSubtotals;
+<span class="fc" id="L60">    private final ArrayList&lt;String&gt; letNames = new ArrayList&lt;String&gt;();</span>
+<span class="fc" id="L61">    private final ArrayList&lt;Object&gt; letValues = new ArrayList&lt;Object&gt;();</span>
+
+<span class="fc" id="L63">    Evaluator(Workbook workbook) {</span>
+<span class="fc" id="L64">        this.workbook = workbook;</span>
+<span class="fc" id="L65">    }</span>
+
+    /// Evaluates a formula as the content of a cell and answers the one scalar the cell shows.
+    Object evaluate(Node formula, Sheet inSheet, int inRow, int inCol, boolean asArrayFormula, boolean intersects) {
+<span class="fc" id="L69">        boolean savedImplicit = implicit;</span>
+<span class="fc" id="L70">        implicit = intersects;</span>
+        try {
+<span class="fc" id="L72">            return evaluate(formula, inSheet, inRow, inCol, asArrayFormula);</span>
+        } finally {
+<span class="fc" id="L74">            implicit = savedImplicit;</span>
+        }
+    }
+
+    /// Set while a formula read from an XLSX file without the array mark is evaluated.
+    private boolean implicit;
+
+    Object evaluate(Node formula, Sheet inSheet, int inRow, int inCol, boolean asArrayFormula) {
+<span class="fc" id="L82">        Sheet savedSheet = sheet;</span>
+<span class="fc" id="L83">        int savedRow = row;</span>
+<span class="fc" id="L84">        int savedCol = col;</span>
+<span class="fc" id="L85">        boolean savedArray = arrayFormula;</span>
+<span class="fc" id="L86">        int savedDepth = argDepth;</span>
+<span class="fc" id="L87">        boolean savedSpread = spread;</span>
+<span class="fc" id="L88">        spread = false;</span>
+<span class="fc" id="L89">        Object[][] savedMatrix = matrixResult;</span>
+<span class="fc" id="L90">        matrixResult = null;</span>
+<span class="fc" id="L91">        int savedLets = letNames.size();</span>
+<span class="fc" id="L92">        sheet = inSheet;</span>
+<span class="fc" id="L93">        row = inRow;</span>
+<span class="fc" id="L94">        col = inCol;</span>
+<span class="fc" id="L95">        arrayFormula = asArrayFormula;</span>
+<span class="fc" id="L96">        argDepth = 0;</span>
+        try {
+<span class="fc" id="L98">            return result(eval(formula));</span>
+<span class="nc" id="L99">        } catch (EvalError e) {</span>
+<span class="nc" id="L100">            return e.error; //NOPMD UnnecessaryLocalBeforeReturn - the caught error carries the value</span>
+        } finally {
+<span class="fc" id="L102">            sheet = savedSheet;</span>
+<span class="fc" id="L103">            row = savedRow;</span>
+<span class="fc" id="L104">            col = savedCol;</span>
+<span class="fc" id="L105">            arrayFormula = savedArray;</span>
+<span class="fc" id="L106">            argDepth = savedDepth;</span>
+<span class="fc" id="L107">            lastSpread = spread;</span>
+<span class="fc" id="L108">            spread = savedSpread;</span>
+<span class="fc" id="L109">            lastMatrix = matrixResult;</span>
+<span class="fc" id="L110">            matrixResult = savedMatrix;</span>
+<span class="pc bpc" id="L111" title="1 of 2 branches missed.">            while (letNames.size() &gt; savedLets) {</span>
+<span class="nc" id="L112">                letNames.remove(letNames.size() - 1);</span>
+<span class="nc" id="L113">                letValues.remove(letValues.size() - 1);</span>
+            }
+        }
+    }
+
+    private Object result(Object v) {
+<span class="fc bfc" id="L119" title="All 2 branches covered.">        if (v instanceof Ref) {</span>
+<span class="fc" id="L120">            Ref r = (Ref) v;</span>
+<span class="fc bfc" id="L121" title="All 2 branches covered.">            if (r.isSingleCell()) {</span>
+<span class="fc" id="L122">                v = value(r.sheet, r.r1, r.c1);</span>
+<span class="pc bpc" id="L123" title="1 of 2 branches missed.">            } else if (!arrayFormula) {</span>
+<span class="fc" id="L124">                v = intersectImplicitly(r);</span>
+            } else {
+<span class="nc" id="L126">                matrixResult = matrix(r);</span>
+<span class="nc" id="L127">                v = value(r.sheet, r.r1, r.c1);</span>
+            }
+<span class="fc bfc" id="L129" title="All 2 branches covered.">        } else if (v instanceof Object[][]) {</span>
+<span class="fc" id="L130">            Object[][] m = (Object[][]) v;</span>
+<span class="fc" id="L131">            matrixResult = m;</span>
+<span class="fc" id="L132">            spread = true;</span>
+<span class="pc bpc" id="L133" title="2 of 4 branches missed.">            v = m.length == 0 || m[0].length == 0 ? null : m[0][0];</span>
+        }
+<span class="pc bpc" id="L135" title="1 of 4 branches missed.">        if (v == null || v == MISSING) {</span>
+<span class="fc" id="L136">            return Double.valueOf(0);</span>
+        }
+<span class="fc bfc" id="L138" title="All 2 branches covered.">        if (v instanceof Double) {</span>
+<span class="fc" id="L139">            double d = ((Double) v).doubleValue();</span>
+<span class="pc bpc" id="L140" title="1 of 4 branches missed.">            if (Double.isNaN(d) || Double.isInfinite(d)) {</span>
+<span class="fc" id="L141">                return CellError.NUM;</span>
+            }
+        }
+<span class="fc" id="L144">        return v;</span>
+    }
+
+    /// What @ answers: a range of several cells is met at the formula's own row or column,
+    /// and an array gives its first element, as Excel takes them.
+    private Object single(Object v) {
+<span class="fc bfc" id="L150" title="All 4 branches covered.">        if (v instanceof Ref &amp;&amp; !((Ref) v).isSingleCell()) {</span>
+<span class="fc" id="L151">            return intersectImplicitly((Ref) v);</span>
+        }
+<span class="pc bpc" id="L153" title="1 of 2 branches missed.">        if (v instanceof Object[][]) {</span>
+<span class="nc" id="L154">            Object[][] m = (Object[][]) v;</span>
+<span class="nc bnc" id="L155" title="All 4 branches missed.">            return m.length == 0 || m[0].length == 0 ? null : m[0][0];</span>
+        }
+<span class="fc" id="L157">        return v;</span>
+    }
+
+    private Object intersectImplicitly(Ref r) {
+<span class="pc bpc" id="L161" title="2 of 4 branches missed.">        if (r.next == null &amp;&amp; r.lastSheet == null) {</span>
+<span class="pc bpc" id="L162" title="2 of 6 branches missed.">            if (r.c1 == r.c2 &amp;&amp; row &gt;= r.r1 &amp;&amp; row &lt;= r.r2) {</span>
+<span class="fc" id="L163">                return value(r.sheet, row, r.c1);</span>
+            }
+<span class="pc bpc" id="L165" title="2 of 6 branches missed.">            if (r.r1 == r.r2 &amp;&amp; col &gt;= r.c1 &amp;&amp; col &lt;= r.c2) {</span>
+<span class="fc" id="L166">                return value(r.sheet, r.r1, col);</span>
+            }
+        }
+<span class="fc" id="L169">        return CellError.VALUE;</span>
+    }
+
+    /// The value of a cell, calculated first if an edit made it stale.
+    Object value(Sheet s, int r, int c) {
+<span class="fc" id="L174">        return workbook.valueOf(s.cell(r, c));</span>
+    }
+
+    // ------------------------------------------------------------------ the tree
+
+    /// The most characters the texts of one array result hold together.
+    static final long MAX_ARRAY_TEXT = 4L * 1024 * 1024;
+
+    /// How deep evaluation may go, defined names included. One formula is held to
+    /// FormulaParser.MAX_DEPTH, so a formula at its limit using a name at its limit fits;
+    /// names chained further could nest past any stack, and past this the result is #NUM!,
+    /// Excel's error for a calculation it cannot finish.
+    static final int MAX_EVAL_DEPTH = 2 * FormulaParser.MAX_DEPTH + 32;
+
+    private int evalDepth;
+
+    Object eval(Node n) {
+<span class="fc bfc" id="L191" title="All 2 branches covered.">        if (evalDepth &gt;= MAX_EVAL_DEPTH) {</span>
+<span class="fc" id="L192">            return CellError.NUM;</span>
+        }
+<span class="fc" id="L194">        evalDepth++;</span>
+        try {
+<span class="fc" id="L196">            return evalNode(n);</span>
+        } finally {
+<span class="fc" id="L198">            evalDepth--;</span>
+        }
+    }
+
+    private Object evalNode(Node n) {
+<span class="pc bpc" id="L203" title="1 of 11 branches missed.">        switch (n.kind) {</span>
+            case Node.NUM:
+            case Node.STR:
+            case Node.BOOL:
+            case Node.ERR:
+<span class="fc" id="L208">                return n.value;</span>
+            case Node.MISSING:
+<span class="fc" id="L210">                return MISSING;</span>
+            case Node.REF:
+<span class="fc" id="L212">                return reference(n);</span>
+            case Node.NAME:
+<span class="fc" id="L214">                return name(n.name());</span>
+            case Node.PAREN:
+<span class="fc" id="L216">                return eval(n.args[0]);</span>
+            case Node.ARRAY:
+<span class="fc" id="L218">                return n.array;</span>
+            case Node.UNARY:
+<span class="fc bfc" id="L220" title="All 2 branches covered.">                if (&quot;@&quot;.equals(n.value)) {</span>
+<span class="fc" id="L221">                    return single(eval(n.args[0]));</span>
+                }
+<span class="fc" id="L223">                Object u = operand(eval(n.args[0]));</span>
+<span class="fc bfc" id="L224" title="All 2 branches covered.">                return &quot;-&quot;.equals(n.value) ? lift('n', u, null) : u;</span>
+            case Node.PERCENT:
+<span class="fc" id="L226">                return lift('%', operand(eval(n.args[0])), null);</span>
+            case Node.BINARY:
+<span class="fc" id="L228">                return binary(n);</span>
+            case Node.FUNC:
+<span class="fc" id="L230">                return call(n);</span>
+            default:
+<span class="nc" id="L232">                return CellError.VALUE;</span>
+        }
+    }
+
+    private Object reference(Node n) {
+<span class="fc" id="L237">        Sheet s = sheet;</span>
+<span class="fc" id="L238">        Sheet last = null;</span>
+<span class="fc bfc" id="L239" title="All 2 branches covered.">        if (n.sheet != null) {</span>
+<span class="fc" id="L240">            s = workbook.getSheet(n.sheet);</span>
+<span class="fc bfc" id="L241" title="All 2 branches covered.">            if (s == null) {</span>
+<span class="fc" id="L242">                return CellError.REF;</span>
+            }
+<span class="fc bfc" id="L244" title="All 2 branches covered.">            if (n.sheet2 != null) {</span>
+<span class="fc" id="L245">                last = workbook.getSheet(n.sheet2);</span>
+<span class="pc bpc" id="L246" title="1 of 2 branches missed.">                if (last == null) {</span>
+<span class="nc" id="L247">                    return CellError.REF;</span>
+                }
+<span class="pc bpc" id="L249" title="1 of 2 branches missed.">                if (workbook.indexOf(last) &lt; workbook.indexOf(s)) {</span>
+<span class="nc" id="L250">                    Sheet swap = s;</span>
+<span class="nc" id="L251">                    s = last;</span>
+<span class="nc" id="L252">                    last = swap;</span>
+                }
+            }
+        }
+<span class="fc" id="L256">        return new Ref(s, last, n.r1, n.c1, n.r2, n.c2);</span>
+    }
+
+    private Object name(String name) {
+<span class="fc bfc" id="L260" title="All 2 branches covered.">        for (int i = letNames.size() - 1; i &gt;= 0; i--) {</span>
+<span class="fc bfc" id="L261" title="All 2 branches covered.">            if (letNames.get(i).equalsIgnoreCase(name)) {</span>
+<span class="fc" id="L262">                return letValues.get(i);</span>
+            }
+        }
+<span class="fc" id="L265">        Node definition = workbook.definedNameNode(name);</span>
+<span class="fc bfc" id="L266" title="All 4 branches covered.">        if (definition == null || nameDepth &gt; 32) {</span>
+<span class="fc" id="L267">            return CellError.NAME;</span>
+        }
+<span class="fc" id="L269">        nameDepth++;</span>
+        try {
+<span class="fc" id="L271">            return eval(FormulaParser.fromCell(definition, row, col));</span>
+        } finally {
+<span class="fc" id="L273">            nameDepth--;</span>
+        }
+    }
+
+    private Object binary(Node top) {
+<span class="fc bfc" id="L278" title="All 2 branches covered.">        if (top.args[0].kind != Node.BINARY) {</span>
+<span class="fc" id="L279">            return binary(top, eval(top.args[0]));</span>
+        }
+        // a chain, a+b+c+..., is walked and not recursed into: see Node.spine
+<span class="fc" id="L282">        Node[] spine = Node.spine(top);</span>
+<span class="fc" id="L283">        Object a = eval(spine[0].args[0]);</span>
+<span class="fc bfc" id="L284" title="All 2 branches covered.">        for (Node link : spine) {</span>
+<span class="fc" id="L285">            a = binary(link, a);</span>
+        }
+<span class="fc" id="L287">        return a;</span>
+    }
+
+    /// One operator, its left operand already evaluated.
+    private Object binary(Node n, Object a) {
+<span class="fc" id="L292">        String op = n.name();</span>
+<span class="fc" id="L293">        char c = op.charAt(0);</span>
+<span class="fc bfc" id="L294" title="All 6 branches covered.">        if (c == ':' || c == ' ' || c == ',') {</span>
+<span class="fc" id="L295">            Object b = eval(n.args[1]);</span>
+<span class="fc bfc" id="L296" title="All 2 branches covered.">            if (a instanceof CellError) {</span>
+<span class="fc" id="L297">                return a;</span>
+            }
+<span class="fc bfc" id="L299" title="All 2 branches covered.">            if (b instanceof CellError) {</span>
+<span class="fc" id="L300">                return b;</span>
+            }
+<span class="pc bpc" id="L302" title="2 of 4 branches missed.">            if (!(a instanceof Ref) || !(b instanceof Ref)) {</span>
+<span class="nc" id="L303">                return CellError.VALUE;</span>
+            }
+<span class="fc" id="L305">            Ref x = (Ref) a;</span>
+<span class="fc" id="L306">            Ref y = (Ref) b;</span>
+<span class="fc bfc" id="L307" title="All 2 branches covered.">            if (c == ',') {</span>
+<span class="fc" id="L308">                Ref head = new Ref(x.sheet, x.lastSheet, x.r1, x.c1, x.r2, x.c2);</span>
+<span class="fc" id="L309">                Ref tail = head;</span>
+<span class="fc bfc" id="L310" title="All 2 branches covered.">                for (Ref r = x.next; r != null; r = r.next) {</span>
+<span class="fc" id="L311">                    tail.next = new Ref(r.sheet, r.lastSheet, r.r1, r.c1, r.r2, r.c2);</span>
+<span class="fc" id="L312">                    tail = tail.next;</span>
+                }
+<span class="fc" id="L314">                tail.next = y;</span>
+<span class="fc" id="L315">                return head;</span>
+            }
+<span class="pc bpc" id="L317" title="2 of 6 branches missed.">            if (x.sheet != y.sheet || x.next != null || y.next != null) { //NOPMD CompareObjectsWithEquals - a sheet is an identity</span>
+<span class="fc" id="L318">                return CellError.VALUE;</span>
+            }
+<span class="fc bfc" id="L320" title="All 2 branches covered.">            if (c == ':') {</span>
+<span class="fc" id="L321">                return new Ref(x.sheet, x.lastSheet, Math.min(x.r1, y.r1), Math.min(x.c1, y.c1), Math.max(x.r2, y.r2),</span>
+<span class="fc" id="L322">                        Math.max(x.c2, y.c2));</span>
+            }
+<span class="fc" id="L324">            int r1 = Math.max(x.r1, y.r1);</span>
+<span class="fc" id="L325">            int c1 = Math.max(x.c1, y.c1);</span>
+<span class="fc" id="L326">            int r2 = Math.min(x.r2, y.r2);</span>
+<span class="fc" id="L327">            int c2 = Math.min(x.c2, y.c2);</span>
+<span class="pc bpc" id="L328" title="1 of 4 branches missed.">            if (r1 &gt; r2 || c1 &gt; c2) {</span>
+<span class="fc" id="L329">                return CellError.NULL;</span>
+            }
+<span class="fc" id="L331">            return new Ref(x.sheet, null, r1, c1, r2, c2);</span>
+        }
+<span class="fc" id="L333">        char code = c;</span>
+<span class="fc bfc" id="L334" title="All 2 branches covered.">        if (op.length() == 2) {</span>
+            // &lt;&gt; &lt;= &gt;=
+<span class="fc bfc" id="L336" title="All 4 branches covered.">            code = c == '&lt;' ? (op.charAt(1) == '&gt;' ? '!' : 'l') : 'g';</span>
+        }
+<span class="fc" id="L338">        Object left = operand(a);</span>
+<span class="fc" id="L339">        return lift(code, left, operand(eval(n.args[1])));</span>
+    }
+
+    /// Turns what an operand evaluated to into a scalar or an array.
+    Object operand(Object v) {
+<span class="fc bfc" id="L344" title="All 2 branches covered.">        if (v instanceof Ref) {</span>
+<span class="fc" id="L345">            Ref r = (Ref) v;</span>
+<span class="fc bfc" id="L346" title="All 2 branches covered.">            if (r.isSingleCell()) {</span>
+<span class="fc" id="L347">                return value(r.sheet, r.r1, r.c1);</span>
+            }
+<span class="fc bfc" id="L349" title="All 4 branches covered.">            if (argDepth == 0 &amp;&amp; !arrayFormula) {</span>
+<span class="fc" id="L350">                return intersectImplicitly(r);</span>
+            }
+<span class="fc" id="L352">            return elementsOf(r);</span>
+        }
+<span class="pc bpc" id="L354" title="1 of 2 branches missed.">        return v == MISSING ? null : v;</span>
+    }
+
+    /// Applies an operator, element by element when an operand is an array. A one row or one
+    /// column operand is repeated along the other dimension.
+    private Object lift(char op, Object a, Object b) {
+<span class="fc" id="L360">        boolean arrayA = a instanceof Object[][];</span>
+<span class="fc" id="L361">        boolean arrayB = b instanceof Object[][];</span>
+<span class="pc bpc" id="L362" title="1 of 4 branches missed.">        if (!arrayA &amp;&amp; !arrayB) {</span>
+<span class="fc" id="L363">            return apply(op, a, b);</span>
+        }
+<span class="fc" id="L365">        spread = true;</span>
+<span class="pc bpc" id="L366" title="1 of 2 branches missed.">        Object[][] x = arrayA ? (Object[][]) a : null;</span>
+<span class="fc bfc" id="L367" title="All 2 branches covered.">        Object[][] y = arrayB ? (Object[][]) b : null;</span>
+<span class="pc bpc" id="L368" title="1 of 4 branches missed.">        int rows = Math.max(x == null ? 1 : x.length, y == null ? 1 : y.length);</span>
+<span class="pc bpc" id="L369" title="1 of 4 branches missed.">        int cols = Math.max(x == null ? 1 : width(x), y == null ? 1 : width(y));</span>
+<span class="fc" id="L370">        Object[][] out = elements(rows, cols);</span>
+<span class="fc bfc" id="L371" title="All 2 branches covered.">        for (int r = 0; r &lt; rows; r++) {</span>
+<span class="fc bfc" id="L372" title="All 2 branches covered.">            for (int c = 0; c &lt; cols; c++) {</span>
+<span class="pc bpc" id="L373" title="1 of 4 branches missed.">                out[r][c] = apply(op, x == null ? a : element(x, r, c), y == null ? b : element(y, r, c));</span>
+            }
+        }
+<span class="fc" id="L376">        return out;</span>
+    }
+
+    static int width(Object[][] m) {
+<span class="pc bpc" id="L380" title="1 of 2 branches missed.">        return m.length == 0 ? 0 : m[0].length;</span>
+    }
+
+    static int width2(boolean[][] m) {
+<span class="pc bpc" id="L384" title="1 of 2 branches missed.">        return m.length == 0 ? 0 : m[0].length;</span>
+    }
+
+    /// The values of a range that go with a mask of another range: the same shape, counted
+    /// from the top left cell. A range of another shape is read as if it had the mask's.
+    Object[][] shaped(Object arg, int rows, int cols) {
+<span class="fc bfc" id="L390" title="All 2 branches covered.">        if (arg instanceof Ref) {</span>
+<span class="fc" id="L391">            Ref r = (Ref) arg;</span>
+<span class="fc" id="L392">            Object[][] out = elements(rows, cols);</span>
+<span class="fc bfc" id="L393" title="All 2 branches covered.">            for (int i = 0; i &lt; rows; i++) {</span>
+<span class="fc bfc" id="L394" title="All 2 branches covered.">                for (int j = 0; j &lt; cols; j++) {</span>
+<span class="fc" id="L395">                    out[i][j] = value(r.sheet, r.r1 + i, r.c1 + j);</span>
+                }
+            }
+<span class="fc" id="L398">            return out;</span>
+        }
+<span class="fc" id="L400">        Object[][] m = matrix(arg);</span>
+<span class="pc bpc" id="L401" title="1 of 4 branches missed.">        if (m.length != rows || width(m) != cols) {</span>
+<span class="fc" id="L402">            throw EvalError.VALUE;</span>
+        }
+<span class="fc" id="L404">        return m;</span>
+    }
+
+    /// The results XLOOKUP picks from: as many rows, or columns, as there are keys.
+    Object[][] shaped2(Object arg, boolean down, int count) {
+<span class="pc bpc" id="L409" title="1 of 2 branches missed.">        if (arg instanceof CellError) {</span>
+<span class="nc" id="L410">            throw EvalError.of((CellError) arg);</span>
+        }
+<span class="fc bfc" id="L412" title="All 2 branches covered.">        if (arg instanceof Ref) {</span>
+<span class="fc" id="L413">            Ref r = (Ref) arg;</span>
+            // Excel answers #VALUE! when the results are not as long as the keys
+<span class="pc bpc" id="L415" title="1 of 4 branches missed.">            if ((down ? r.rows() : r.cols()) != count) {</span>
+<span class="fc" id="L416">                throw EvalError.VALUE;</span>
+            }
+<span class="pc bpc" id="L418" title="1 of 2 branches missed.">            return down ? shaped(r, count, Math.min(r.cols(), Math.max(1, r.clip().cols())))</span>
+<span class="nc" id="L419">                    : shaped(r, Math.min(r.rows(), Math.max(1, r.clip().rows())), count);</span>
+        }
+<span class="fc" id="L421">        Object[][] m = matrix(arg);</span>
+<span class="fc bfc" id="L422" title="All 4 branches covered.">        if ((down ? m.length : width(m)) != count) {</span>
+<span class="fc" id="L423">            throw EvalError.VALUE;</span>
+        }
+<span class="fc" id="L425">        return m;</span>
+    }
+
+    /// The element of an array at a position of a larger array it is combined with.
+    static Object element(Object[][] m, int r, int c) {
+<span class="pc bpc" id="L430" title="1 of 2 branches missed.">        if (m.length == 0) {</span>
+<span class="nc" id="L431">            return CellError.NA;</span>
+        }
+<span class="fc bfc" id="L433" title="All 2 branches covered.">        if (m.length == 1) {</span>
+<span class="fc" id="L434">            r = 0;</span>
+        }
+<span class="fc bfc" id="L436" title="All 2 branches covered.">        if (m[0].length == 1) {</span>
+<span class="fc" id="L437">            c = 0;</span>
+        }
+<span class="pc bpc" id="L439" title="1 of 4 branches missed.">        if (r &gt;= m.length || c &gt;= m[r].length) {</span>
+<span class="fc" id="L440">            return CellError.NA;</span>
+        }
+<span class="fc" id="L442">        return m[r][c];</span>
+    }
+
+    private static Object apply(char op, Object a, Object b) {
+<span class="fc bfc" id="L446" title="All 2 branches covered.">        if (a instanceof CellError) {</span>
+<span class="fc" id="L447">            return a;</span>
+        }
+<span class="fc bfc" id="L449" title="All 2 branches covered.">        if (b instanceof CellError) {</span>
+<span class="fc" id="L450">            return b;</span>
+        }
+        try {
+<span class="pc bpc" id="L453" title="1 of 15 branches missed.">            switch (op) {</span>
+                case '+':
+<span class="fc" id="L455">                    return number(Values.num(a) + Values.num(b));</span>
+                case '-':
+<span class="fc" id="L457">                    return number(Values.num(a) - Values.num(b));</span>
+                case '*':
+<span class="fc" id="L459">                    return number(Values.num(a) * Values.num(b));</span>
+                case '/': {
+<span class="fc" id="L461">                    double x = Values.num(a);</span>
+<span class="fc" id="L462">                    double y = Values.num(b);</span>
+<span class="fc bfc" id="L463" title="All 2 branches covered.">                    if (y == 0) {</span>
+<span class="fc" id="L464">                        return CellError.DIV0;</span>
+                    }
+<span class="fc" id="L466">                    return number(x / y);</span>
+                }
+                case '^':
+<span class="fc" id="L469">                    return number(power(Values.num(a), Values.num(b)));</span>
+                case 'n':
+<span class="fc" id="L471">                    return number(-Values.num(a));</span>
+                case '%':
+<span class="fc" id="L473">                    return number(Values.num(a) / 100);</span>
+                case '&amp;': {
+<span class="fc" id="L475">                    String x = Values.text(a);</span>
+<span class="fc" id="L476">                    String y = Values.text(b);</span>
+<span class="fc bfc" id="L477" title="All 2 branches covered.">                    if (x.length() + y.length() &gt; TextFunctions.MAX_TEXT) {</span>
+<span class="fc" id="L478">                        return CellError.VALUE;</span>
+                    }
+<span class="fc" id="L480">                    return x + y;</span>
+                }
+                case '=':
+<span class="fc bfc" id="L483" title="All 2 branches covered.">                    return Boolean.valueOf(Values.compare(a, b) == 0);</span>
+                case '!':
+<span class="fc bfc" id="L485" title="All 2 branches covered.">                    return Boolean.valueOf(Values.compare(a, b) != 0);</span>
+                case '&lt;':
+<span class="pc bpc" id="L487" title="1 of 2 branches missed.">                    return Boolean.valueOf(Values.compare(a, b) &lt; 0);</span>
+                case '&gt;':
+<span class="fc bfc" id="L489" title="All 2 branches covered.">                    return Boolean.valueOf(Values.compare(a, b) &gt; 0);</span>
+                case 'l':
+<span class="pc bpc" id="L491" title="1 of 2 branches missed.">                    return Boolean.valueOf(Values.compare(a, b) &lt;= 0);</span>
+                case 'g':
+<span class="fc bfc" id="L493" title="All 2 branches covered.">                    return Boolean.valueOf(Values.compare(a, b) &gt;= 0);</span>
+                default:
+<span class="nc" id="L495">                    return CellError.VALUE;</span>
+            }
+<span class="fc" id="L497">        } catch (EvalError e) {</span>
+<span class="fc" id="L498">            return e.error; //NOPMD UnnecessaryLocalBeforeReturn - the caught error carries the value</span>
+        }
+    }
+
+    static Object number(double d) {
+<span class="fc bfc" id="L503" title="All 4 branches covered.">        if (Double.isNaN(d) || Double.isInfinite(d)) {</span>
+<span class="fc" id="L504">            return CellError.NUM;</span>
+        }
+<span class="fc" id="L506">        return Double.valueOf(d);</span>
+    }
+
+    /// A power. Whole exponents are multiplied out, so that 2^10 is exactly 1024 and 10^-2
+    /// exactly what 1/100 is, whatever the platform's `pow` rounds to.
+    static double power(double x, double y) {
+<span class="fc bfc" id="L512" title="All 4 branches covered.">        if (x == 0 &amp;&amp; y == 0) {</span>
+<span class="fc" id="L513">            throw EvalError.NUM;</span>
+        }
+<span class="pc bpc" id="L515" title="1 of 4 branches missed.">        if (x == 0 &amp;&amp; y &lt; 0) {</span>
+<span class="nc" id="L516">            throw EvalError.DIV0;</span>
+        }
+<span class="pc bpc" id="L518" title="1 of 4 branches missed.">        if (y == Math.floor(y) &amp;&amp; Math.abs(y) &lt;= 1024) {</span>
+<span class="fc" id="L519">            int n = (int) Math.abs(y);</span>
+<span class="fc" id="L520">            double result = 1;</span>
+<span class="fc" id="L521">            double base = x;</span>
+<span class="fc bfc" id="L522" title="All 2 branches covered.">            while (n &gt; 0) {</span>
+<span class="fc bfc" id="L523" title="All 2 branches covered.">                if ((n &amp; 1) == 1) {</span>
+<span class="fc" id="L524">                    result *= base;</span>
+                }
+<span class="fc" id="L526">                base *= base;</span>
+<span class="fc" id="L527">                n &gt;&gt;= 1;</span>
+            }
+<span class="fc bfc" id="L529" title="All 2 branches covered.">            return y &lt; 0 ? 1 / result : result;</span>
+        }
+<span class="fc bfc" id="L531" title="All 2 branches covered.">        if (x &lt; 0) {</span>
+            // an odd root of a negative number is a real one: (-8)^(1/3) is -2
+<span class="fc" id="L533">            double root = 1 / y;</span>
+<span class="fc" id="L534">            double nearest = Math.floor(root + 0.5);</span>
+<span class="pc bpc" id="L535" title="1 of 6 branches missed.">            if (Math.abs(nearest) &lt; 1e9 &amp;&amp; Math.abs(root - nearest) &lt; 1e-9 * Math.abs(nearest) &amp;&amp; nearest % 2 != 0) {</span>
+<span class="fc" id="L536">                return -MathUtil.pow(-x, y);</span>
+            }
+<span class="fc" id="L538">            throw EvalError.NUM;</span>
+        }
+<span class="fc" id="L540">        return MathUtil.pow(x, y);</span>
+    }
+
+    // ------------------------------------------------------------------ functions
+
+    private Object call(Node n) {
+<span class="fc" id="L546">        String name = n.name();</span>
+<span class="fc" id="L547">        int info = Functions.info(name);</span>
+<span class="fc bfc" id="L548" title="All 2 branches covered.">        if (info &lt; 0) {</span>
+<span class="fc" id="L549">            return CellError.NAME;</span>
+        }
+<span class="fc" id="L551">        Node[] a = n.args;</span>
+<span class="fc" id="L552">        argDepth++;</span>
+        try {
+<span class="fc bfc" id="L554" title="All 2 branches covered.">            if ((info &amp; Functions.CATEGORY) == Functions.SPECIAL) {</span>
+<span class="fc" id="L555">                return special(name, a);</span>
+            }
+<span class="fc" id="L557">            Object[] args = new Object[a.length];</span>
+<span class="fc bfc" id="L558" title="All 2 branches covered.">            for (int i = 0; i &lt; a.length; i++) {</span>
+<span class="fc" id="L559">                args[i] = eval(a[i]);</span>
+            }
+<span class="fc bfc" id="L561" title="All 2 branches covered.">            if ((info &amp; Functions.SCALAR) != 0) {</span>
+<span class="fc" id="L562">                return liftCall(info, name, args);</span>
+            }
+<span class="fc" id="L564">            return callLifted(info, name, args);</span>
+<span class="fc" id="L565">        } catch (EvalError e) {</span>
+<span class="fc" id="L566">            return e.error; //NOPMD UnnecessaryLocalBeforeReturn - the caught error carries the value</span>
+        } finally {
+<span class="fc" id="L568">            argDepth--;</span>
+        }
+    }
+
+    /// Calls a function of scalars, once per element when an argument is an array. Such a
+    /// function never sees an error, an array or a reference: an error argument is the
+    /// result.
+    private Object liftCall(int info, String name, Object[] args) {
+<span class="fc" id="L576">        int rows = 0;</span>
+<span class="fc" id="L577">        int cols = 0;</span>
+<span class="fc bfc" id="L578" title="All 2 branches covered.">        for (int i = 0; i &lt; args.length; i++) {</span>
+<span class="fc" id="L579">            Object v = args[i];</span>
+<span class="fc bfc" id="L580" title="All 2 branches covered.">            if (v instanceof Ref) {</span>
+<span class="fc" id="L581">                Ref r = (Ref) v;</span>
+<span class="pc bpc" id="L582" title="3 of 10 branches missed.">                v = r.isSingleCell() ? value(r.sheet, r.r1, r.c1)</span>
+<span class="fc" id="L583">                        : implicit &amp;&amp; !arrayFormula &amp;&amp; r.next == null &amp;&amp; r.lastSheet == null ? intersectImplicitly(r) : (Object) elementsOf(r);</span>
+<span class="fc" id="L584">                args[i] = v;</span>
+            }
+<span class="fc bfc" id="L586" title="All 2 branches covered.">            if (v instanceof Object[][]) {</span>
+<span class="fc" id="L587">                Object[][] m = (Object[][]) v;</span>
+<span class="fc" id="L588">                spread = true;</span>
+<span class="fc" id="L589">                rows = Math.max(rows, m.length);</span>
+<span class="fc" id="L590">                cols = Math.max(cols, width(m));</span>
+            }
+        }
+<span class="fc bfc" id="L593" title="All 2 branches covered.">        if (rows == 0) {</span>
+<span class="fc" id="L594">            return callScalar(info, name, args);</span>
+        }
+<span class="fc" id="L596">        Object[][] out = elements(rows, cols);</span>
+<span class="fc" id="L597">        Object[] scalars = new Object[args.length];</span>
+        // Each element of REPT over a million-cell array may be the longest text there is;
+        // what the whole array holds is capped as a cell's text is.
+<span class="fc" id="L600">        long chars = 0;</span>
+<span class="fc bfc" id="L601" title="All 2 branches covered.">        for (int r = 0; r &lt; rows; r++) {</span>
+<span class="fc bfc" id="L602" title="All 2 branches covered.">            for (int c = 0; c &lt; cols; c++) {</span>
+<span class="fc bfc" id="L603" title="All 2 branches covered.">                for (int i = 0; i &lt; args.length; i++) {</span>
+<span class="fc" id="L604">                    Object v = args[i];</span>
+<span class="fc bfc" id="L605" title="All 2 branches covered.">                    scalars[i] = v instanceof Object[][] ? element((Object[][]) v, r, c) : v;</span>
+                }
+<span class="fc" id="L607">                Object v = callScalar(info, name, scalars);</span>
+<span class="fc bfc" id="L608" title="All 2 branches covered.">                if (v instanceof String) {</span>
+<span class="fc" id="L609">                    chars += ((String) v).length();</span>
+<span class="fc bfc" id="L610" title="All 2 branches covered.">                    if (chars &gt; MAX_ARRAY_TEXT) {</span>
+<span class="fc" id="L611">                        return CellError.VALUE;</span>
+                    }
+                }
+<span class="fc" id="L614">                out[r][c] = v;</span>
+            }
+        }
+<span class="fc" id="L617">        return out;</span>
+    }
+
+    private Object callScalar(int info, String name, Object[] args) {
+<span class="fc bfc" id="L621" title="All 2 branches covered.">        for (Object arg : args) {</span>
+<span class="fc bfc" id="L622" title="All 2 branches covered.">            if (arg instanceof CellError) {</span>
+<span class="fc" id="L623">                return arg;</span>
+            }
+        }
+        try {
+<span class="fc" id="L627">            Object v = Functions.call(info, name, this, args);</span>
+<span class="fc bfc" id="L628" title="All 2 branches covered.">            if (v instanceof Double) {</span>
+<span class="fc" id="L629">                return number(((Double) v).doubleValue());</span>
+            }
+<span class="fc" id="L631">            return v;</span>
+<span class="fc" id="L632">        } catch (EvalError e) {</span>
+<span class="fc" id="L633">            return e.error; //NOPMD UnnecessaryLocalBeforeReturn - the caught error carries the value</span>
+        }
+    }
+
+    /// The functions that decide which of their arguments to evaluate, or that need an
+    /// argument unevaluated.
+    private Object special(String name, Node[] a) {
+<span class="pc bpc" id="L640" title="1 of 9 branches missed.">        switch (Functions.index(SWITCH_1, name)) {</span>
+            case 0: // IF
+<span class="fc" id="L642">                return ifFunction(a);</span>
+            case 1: // IFERROR
+            case 2: { // IFNA
+<span class="pc bpc" id="L645" title="1 of 2 branches missed.">                if (a.length &lt; 1) {</span>
+<span class="nc" id="L646">                    return CellError.VALUE;</span>
+                }
+<span class="fc" id="L648">                Object v = operand(eval(a[0]));</span>
+<span class="fc" id="L649">                boolean onlyNa = &quot;IFNA&quot;.equals(name);</span>
+<span class="fc bfc" id="L650" title="All 2 branches covered.">                if (v instanceof Object[][]) {</span>
+<span class="fc" id="L651">                    Object[][] m = (Object[][]) v;</span>
+<span class="pc bpc" id="L652" title="1 of 2 branches missed.">                    Object other = a.length &gt; 1 ? operand(eval(a[1])) : null;</span>
+<span class="fc" id="L653">                    Object[][] out = new Object[m.length][width(m)];</span>
+<span class="fc bfc" id="L654" title="All 2 branches covered.">                    for (int r = 0; r &lt; m.length; r++) {</span>
+<span class="fc bfc" id="L655" title="All 2 branches covered.">                        for (int c = 0; c &lt; out[r].length; c++) {</span>
+<span class="fc" id="L656">                            Object e = m[r][c];</span>
+<span class="pc bpc" id="L657" title="1 of 4 branches missed.">                            boolean replace = onlyNa ? e == CellError.NA : e instanceof CellError; //NOPMD CompareObjectsWithEquals - an error value is a constant</span>
+<span class="pc bpc" id="L658" title="3 of 4 branches missed.">                            out[r][c] = !replace ? e : other instanceof Object[][] ? element((Object[][]) other, r, c)</span>
+                                    : other;
+                        }
+                    }
+<span class="fc" id="L662">                    return out;</span>
+                }
+<span class="fc bfc" id="L664" title="All 4 branches covered.">                boolean replace = onlyNa ? v == CellError.NA : v instanceof CellError; //NOPMD CompareObjectsWithEquals - an error value is a constant</span>
+<span class="fc bfc" id="L665" title="All 2 branches covered.">                if (!replace) {</span>
+<span class="fc" id="L666">                    return v;</span>
+                }
+<span class="pc bpc" id="L668" title="1 of 2 branches missed.">                return a.length &gt; 1 ? blankToEmpty(eval(a[1])) : &quot;&quot;;</span>
+            }
+            case 3: // IFS
+<span class="fc bfc" id="L671" title="All 2 branches covered.">                for (int i = 0; i + 1 &lt; a.length; i += 2) {</span>
+<span class="fc" id="L672">                    Object cond = operand(eval(a[i]));</span>
+<span class="fc bfc" id="L673" title="All 2 branches covered.">                    if (cond instanceof Object[][]) {</span>
+<span class="fc" id="L674">                        return perElement(3, a);</span>
+                    }
+<span class="pc bpc" id="L676" title="1 of 2 branches missed.">                    if (cond instanceof CellError) {</span>
+<span class="nc" id="L677">                        return cond;</span>
+                    }
+<span class="fc bfc" id="L679" title="All 2 branches covered.">                    if (Values.bool(cond)) {</span>
+<span class="fc" id="L680">                        return eval(a[i + 1]);</span>
+                    }
+                }
+<span class="fc" id="L683">                return CellError.NA;</span>
+            case 4: { // SWITCH
+<span class="pc bpc" id="L685" title="1 of 2 branches missed.">                if (a.length &lt; 3) {</span>
+<span class="nc" id="L686">                    return CellError.VALUE;</span>
+                }
+<span class="fc" id="L688">                Object subject = operand(eval(a[0]));</span>
+<span class="fc bfc" id="L689" title="All 2 branches covered.">                if (subject instanceof Object[][]) {</span>
+<span class="fc" id="L690">                    return perElement(4, a);</span>
+                }
+<span class="pc bpc" id="L692" title="1 of 2 branches missed.">                if (subject instanceof CellError) {</span>
+<span class="nc" id="L693">                    return subject;</span>
+                }
+<span class="fc" id="L695">                int i = 1;</span>
+<span class="fc bfc" id="L696" title="All 2 branches covered.">                for (; i + 1 &lt; a.length; i += 2) {</span>
+<span class="fc" id="L697">                    Object candidate = operand(eval(a[i]));</span>
+<span class="fc bfc" id="L698" title="All 2 branches covered.">                    if (candidate instanceof Object[][]) {</span>
+<span class="fc" id="L699">                        return perElement(4, a);</span>
+                    }
+<span class="pc bpc" id="L701" title="1 of 2 branches missed.">                    if (candidate instanceof CellError) {</span>
+<span class="nc" id="L702">                        return candidate;</span>
+                    }
+<span class="fc bfc" id="L704" title="All 2 branches covered.">                    if (Values.compare(subject, candidate) == 0) {</span>
+<span class="fc" id="L705">                        return eval(a[i + 1]);</span>
+                    }
+                }
+<span class="fc bfc" id="L708" title="All 2 branches covered.">                return i &lt; a.length ? eval(a[i]) : CellError.NA;</span>
+            }
+            case 5: { // CHOOSE
+<span class="pc bpc" id="L711" title="1 of 2 branches missed.">                if (a.length &lt; 2) {</span>
+<span class="nc" id="L712">                    return CellError.VALUE;</span>
+                }
+<span class="fc" id="L714">                Object first = operand(eval(a[0]));</span>
+<span class="fc bfc" id="L715" title="All 2 branches covered.">                if (first instanceof Object[][]) {</span>
+<span class="fc" id="L716">                    return perElement(5, a);</span>
+                }
+<span class="fc" id="L718">                Object index = first;</span>
+<span class="pc bpc" id="L719" title="1 of 2 branches missed.">                if (index instanceof CellError) {</span>
+<span class="nc" id="L720">                    return index;</span>
+                }
+<span class="fc" id="L722">                int i = (int) Math.floor(Values.num(index));</span>
+<span class="pc bpc" id="L723" title="1 of 4 branches missed.">                if (i &lt; 1 || i &gt;= a.length) {</span>
+<span class="fc" id="L724">                    return CellError.VALUE;</span>
+                }
+<span class="fc" id="L726">                return eval(a[i]);</span>
+            }
+            case 6: { // LET
+<span class="pc bpc" id="L729" title="1 of 4 branches missed.">                if (a.length &lt; 3 || (a.length &amp; 1) == 0) {</span>
+<span class="fc" id="L730">                    return CellError.VALUE;</span>
+                }
+<span class="fc" id="L732">                int mark = letNames.size();</span>
+                try {
+<span class="fc bfc" id="L734" title="All 2 branches covered.">                    for (int i = 0; i + 1 &lt; a.length; i += 2) {</span>
+<span class="fc bfc" id="L735" title="All 4 branches covered.">                        if (a[i].kind != Node.NAME &amp;&amp; a[i].kind != Node.REF) {</span>
+<span class="fc" id="L736">                            return CellError.VALUE;</span>
+                        }
+<span class="fc" id="L738">                        Object v = eval(a[i + 1]);</span>
+<span class="fc bfc" id="L739" title="All 2 branches covered.">                        letNames.add(a[i].kind == Node.NAME ? a[i].name() : FormulaParser.print(a[i], false));</span>
+<span class="fc" id="L740">                        letValues.add(v);</span>
+                    }
+<span class="fc" id="L742">                    return eval(a[a.length - 1]);</span>
+                } finally {
+<span class="fc bfc" id="L744" title="All 2 branches covered.">                    while (letNames.size() &gt; mark) {</span>
+<span class="fc" id="L745">                        letNames.remove(letNames.size() - 1);</span>
+<span class="fc" id="L746">                        letValues.remove(letValues.size() - 1);</span>
+                    }
+                }
+            }
+            case 7: // ROW
+            case 8: { // COLUMN
+<span class="fc" id="L752">                boolean rows = &quot;ROW&quot;.equals(name);</span>
+<span class="pc bpc" id="L753" title="1 of 4 branches missed.">                if (a.length == 0 || a[0].kind == Node.MISSING) {</span>
+<span class="fc bfc" id="L754" title="All 2 branches covered.">                    return Double.valueOf((rows ? row : col) + 1);</span>
+                }
+<span class="fc" id="L756">                Object v = eval(a[0]);</span>
+<span class="fc bfc" id="L757" title="All 2 branches covered.">                if (!(v instanceof Ref)) {</span>
+<span class="pc bpc" id="L758" title="1 of 2 branches missed.">                    return v instanceof CellError ? v : CellError.VALUE;</span>
+                }
+<span class="fc" id="L760">                Ref r = (Ref) v;</span>
+<span class="fc bfc" id="L761" title="All 2 branches covered.">                int count = rows ? r.rows() : r.cols();</span>
+<span class="fc bfc" id="L762" title="All 2 branches covered.">                int first = rows ? r.r1 : r.c1;</span>
+<span class="fc bfc" id="L763" title="All 2 branches covered.">                if (count == 1) {</span>
+<span class="fc" id="L764">                    return Double.valueOf(first + 1);</span>
+                }
+<span class="pc bpc" id="L766" title="1 of 2 branches missed.">                Object[][] out = rows ? new Object[count][1] : new Object[1][count];</span>
+<span class="fc bfc" id="L767" title="All 2 branches covered.">                for (int i = 0; i &lt; count; i++) {</span>
+<span class="pc bpc" id="L768" title="1 of 2 branches missed.">                    if (rows) {</span>
+<span class="fc" id="L769">                        out[i][0] = Double.valueOf(first + i + 1);</span>
+                    } else {
+<span class="nc" id="L771">                        out[0][i] = Double.valueOf(first + i + 1);</span>
+                    }
+                }
+<span class="fc" id="L774">                return out;</span>
+            }
+            case 9: // ISFORMULA
+            case 10: { // FORMULATEXT
+<span class="pc bpc" id="L778" title="1 of 2 branches missed.">                if (a.length != 1) {</span>
+<span class="nc" id="L779">                    return CellError.VALUE;</span>
+                }
+<span class="fc" id="L781">                Object v = eval(a[0]);</span>
+<span class="fc bfc" id="L782" title="All 2 branches covered.">                if (!(v instanceof Ref)) {</span>
+<span class="pc bpc" id="L783" title="1 of 2 branches missed.">                    return v instanceof CellError ? v : CellError.VALUE;</span>
+                }
+<span class="fc" id="L785">                Ref r = (Ref) v;</span>
+<span class="fc" id="L786">                Cell cell = r.sheet.cell(r.r1, r.c1);</span>
+<span class="pc bpc" id="L787" title="1 of 4 branches missed.">                boolean formula = cell != null &amp;&amp; cell.isFormula();</span>
+<span class="fc bfc" id="L788" title="All 2 branches covered.">                if (&quot;ISFORMULA&quot;.equals(name)) {</span>
+<span class="fc" id="L789">                    return Boolean.valueOf(formula);</span>
+                }
+<span class="fc bfc" id="L791" title="All 2 branches covered.">                return formula ? &quot;=&quot; + cell.formulaText : (Object) CellError.NA;</span>
+            }
+            default:
+<span class="nc" id="L794">                return CellError.NAME;</span>
+        }
+    }
+
+    private Object ifFunction(Node[] a) {
+<span class="pc bpc" id="L799" title="1 of 2 branches missed.">        if (a.length &lt; 2) {</span>
+<span class="nc" id="L800">            return CellError.VALUE;</span>
+        }
+<span class="fc" id="L802">        Object cond = operand(eval(a[0]));</span>
+<span class="fc bfc" id="L803" title="All 2 branches covered.">        if (cond instanceof Object[][]) {</span>
+<span class="fc" id="L804">            Object[][] m = (Object[][]) cond;</span>
+<span class="fc" id="L805">            spread = true;</span>
+<span class="fc" id="L806">            Object yes = operand(eval(a[1]));</span>
+<span class="fc bfc" id="L807" title="All 2 branches covered.">            Object no = a.length &gt; 2 ? operand(eval(a[2])) : Boolean.FALSE;</span>
+            // A row of conditions against columns of values is a table of both, as the
+            // operators make of them: IF({1,0},B1:B2,A1:A2) is two columns side by side.
+<span class="fc" id="L810">            int rows = m.length;</span>
+<span class="fc" id="L811">            int cols = width(m);</span>
+<span class="fc bfc" id="L812" title="All 2 branches covered.">            if (yes instanceof Object[][]) {</span>
+<span class="fc" id="L813">                rows = Math.max(rows, ((Object[][]) yes).length);</span>
+<span class="fc" id="L814">                cols = Math.max(cols, width((Object[][]) yes));</span>
+            }
+<span class="fc bfc" id="L816" title="All 2 branches covered.">            if (no instanceof Object[][]) {</span>
+<span class="fc" id="L817">                rows = Math.max(rows, ((Object[][]) no).length);</span>
+<span class="fc" id="L818">                cols = Math.max(cols, width((Object[][]) no));</span>
+            }
+<span class="fc" id="L820">            Object[][] out = elements(rows, cols);</span>
+<span class="fc bfc" id="L821" title="All 2 branches covered.">            for (int r = 0; r &lt; rows; r++) {</span>
+<span class="fc bfc" id="L822" title="All 2 branches covered.">                for (int c = 0; c &lt; cols; c++) {</span>
+<span class="fc" id="L823">                    Object e = element(m, r, c);</span>
+<span class="pc bpc" id="L824" title="1 of 2 branches missed.">                    if (e instanceof CellError) {</span>
+<span class="nc" id="L825">                        out[r][c] = e;</span>
+<span class="nc" id="L826">                        continue;</span>
+                    }
+                    boolean pick;
+                    try {
+<span class="fc" id="L830">                        pick = Values.bool(e);</span>
+<span class="nc" id="L831">                    } catch (EvalError err) {</span>
+<span class="nc" id="L832">                        out[r][c] = err.error;</span>
+<span class="nc" id="L833">                        continue;</span>
+<span class="fc" id="L834">                    }</span>
+<span class="fc bfc" id="L835" title="All 2 branches covered.">                    Object chosen = pick ? yes : no;</span>
+<span class="fc bfc" id="L836" title="All 2 branches covered.">                    out[r][c] = chosen instanceof Object[][] ? element((Object[][]) chosen, r, c) : chosen;</span>
+                }
+            }
+<span class="fc" id="L839">            return out;</span>
+        }
+<span class="pc bpc" id="L841" title="1 of 2 branches missed.">        if (cond instanceof CellError) {</span>
+<span class="nc" id="L842">            return cond;</span>
+        }
+<span class="fc bfc" id="L844" title="All 2 branches covered.">        if (Values.bool(cond)) {</span>
+<span class="fc" id="L845">            return blankToZero(eval(a[1]));</span>
+        }
+<span class="fc bfc" id="L847" title="All 2 branches covered.">        return a.length &gt; 2 ? blankToZero(eval(a[2])) : Boolean.FALSE;</span>
+    }
+
+    private static Object blankToZero(Object v) {
+<span class="fc bfc" id="L851" title="All 2 branches covered.">        return v == MISSING ? Double.valueOf(0) : v;</span>
+    }
+
+    private static Object blankToEmpty(Object v) {
+<span class="pc bpc" id="L855" title="1 of 2 branches missed.">        return v == MISSING ? &quot;&quot; : v;</span>
+    }
+
+    // ------------------------------------------------------------------ helpers for functions
+
+    /// IFS (3), SWITCH (4) or CHOOSE (5) answered once per element when one of the values
+    /// it decides on is an array, as Excel 365 answers: every argument is evaluated, and an
+    /// argument that is an array gives each position its own element.
+    private Object perElement(int kind, Node[] a) {
+<span class="fc" id="L864">        spread = true;</span>
+<span class="fc" id="L865">        Object[] v = new Object[a.length];</span>
+<span class="fc" id="L866">        int rows = 1;</span>
+<span class="fc" id="L867">        int cols = 1;</span>
+<span class="fc bfc" id="L868" title="All 2 branches covered.">        for (int i = 0; i &lt; a.length; i++) {</span>
+<span class="fc" id="L869">            v[i] = operand(eval(a[i]));</span>
+<span class="fc bfc" id="L870" title="All 2 branches covered.">            if (v[i] instanceof Object[][]) {</span>
+<span class="fc" id="L871">                Object[][] m = (Object[][]) v[i];</span>
+<span class="fc" id="L872">                rows = Math.max(rows, m.length);</span>
+<span class="fc" id="L873">                cols = Math.max(cols, width(m));</span>
+            }
+        }
+<span class="fc" id="L876">        Object[][] out = elements(rows, cols);</span>
+<span class="fc bfc" id="L877" title="All 2 branches covered.">        for (int r = 0; r &lt; rows; r++) {</span>
+<span class="fc bfc" id="L878" title="All 2 branches covered.">            for (int c = 0; c &lt; cols; c++) {</span>
+<span class="fc" id="L879">                out[r][c] = decide(kind, v, r, c);</span>
+            }
+        }
+<span class="fc" id="L882">        return out;</span>
+    }
+
+    private static Object at(Object v, int r, int c) {
+<span class="fc bfc" id="L886" title="All 2 branches covered.">        return v instanceof Object[][] ? element((Object[][]) v, r, c) : v;</span>
+    }
+
+    private static Object decide(int kind, Object[] v, int r, int c) {
+<span class="fc bfc" id="L890" title="All 2 branches covered.">        if (kind == 3) {</span>
+<span class="fc bfc" id="L891" title="All 2 branches covered.">            for (int i = 0; i + 1 &lt; v.length; i += 2) {</span>
+<span class="fc" id="L892">                Object cond = at(v[i], r, c);</span>
+<span class="fc bfc" id="L893" title="All 2 branches covered.">                if (cond instanceof CellError) {</span>
+<span class="fc" id="L894">                    return cond;</span>
+                }
+<span class="fc bfc" id="L896" title="All 2 branches covered.">                if (Values.bool(cond)) {</span>
+<span class="fc" id="L897">                    return at(v[i + 1], r, c);</span>
+                }
+            }
+<span class="fc" id="L900">            return CellError.NA;</span>
+        }
+<span class="fc bfc" id="L902" title="All 2 branches covered.">        if (kind == 4) {</span>
+<span class="fc" id="L903">            Object subject = at(v[0], r, c);</span>
+<span class="fc bfc" id="L904" title="All 2 branches covered.">            if (subject instanceof CellError) {</span>
+<span class="fc" id="L905">                return subject;</span>
+            }
+<span class="fc" id="L907">            int i = 1;</span>
+<span class="fc bfc" id="L908" title="All 2 branches covered.">            for (; i + 1 &lt; v.length; i += 2) {</span>
+<span class="fc" id="L909">                Object candidate = at(v[i], r, c);</span>
+<span class="fc bfc" id="L910" title="All 2 branches covered.">                if (candidate instanceof CellError) {</span>
+<span class="fc" id="L911">                    return candidate;</span>
+                }
+<span class="fc bfc" id="L913" title="All 2 branches covered.">                if (Values.compare(subject, candidate) == 0) {</span>
+<span class="fc" id="L914">                    return at(v[i + 1], r, c);</span>
+                }
+            }
+<span class="fc bfc" id="L917" title="All 2 branches covered.">            return i &lt; v.length ? at(v[i], r, c) : CellError.NA;</span>
+        }
+<span class="fc" id="L919">        Object index = at(v[0], r, c);</span>
+<span class="fc bfc" id="L920" title="All 2 branches covered.">        if (index instanceof CellError) {</span>
+<span class="fc" id="L921">            return index;</span>
+        }
+<span class="fc" id="L923">        int k = (int) Math.floor(Values.num(index));</span>
+<span class="fc bfc" id="L924" title="All 4 branches covered.">        return k &lt; 1 || k &gt;= v.length ? CellError.VALUE : at(v[k], r, c);</span>
+    }
+
+    /// Notes that the formula took an array where one value is wanted.
+    void spreads() {
+<span class="fc" id="L929">        spread = true;</span>
+<span class="fc" id="L930">    }</span>
+
+    /// The arguments of the function being called, so scalar can tell an argument that is an
+    /// array from an array the function made itself.
+    private Object[] callArgs;
+    private int liftArg;
+
+    /// Calls a function, and when it wants one value of an argument that holds several, calls
+    /// it once per element instead and answers the array of results.
+    private Object callLifted(int info, String name, Object[] args) {
+<span class="fc" id="L940">        Object[] saved = callArgs;</span>
+<span class="fc" id="L941">        callArgs = args;</span>
+        try {
+<span class="fc" id="L943">            return Functions.call(info, name, this, args);</span>
+<span class="fc" id="L944">        } catch (EvalError e) {</span>
+<span class="fc bfc" id="L945" title="All 2 branches covered.">            if (e != EvalError.LIFT) { //NOPMD CompareObjectsWithEquals - the signal is a constant</span>
+<span class="fc" id="L946">                throw e;</span>
+            }
+        } finally {
+<span class="fc" id="L949">            callArgs = saved;</span>
+        }
+<span class="fc" id="L951">        spread = true;</span>
+<span class="fc" id="L952">        int at = liftArg;</span>
+<span class="fc" id="L953">        Object[][] m = elementsOf(args[at]);</span>
+<span class="fc" id="L954">        Object[][] out = elements(m.length, width(m));</span>
+<span class="fc bfc" id="L955" title="All 2 branches covered.">        for (int r = 0; r &lt; m.length; r++) {</span>
+<span class="fc bfc" id="L956" title="All 2 branches covered.">            for (int c = 0; c &lt; out[r].length; c++) {</span>
+<span class="fc" id="L957">                Object[] one = new Object[args.length];</span>
+<span class="fc" id="L958">                System.arraycopy(args, 0, one, 0, args.length);</span>
+<span class="fc" id="L959">                one[at] = m[r][c];</span>
+                Object v;
+                try {
+<span class="fc" id="L962">                    v = callLifted(info, name, one);</span>
+<span class="fc" id="L963">                } catch (EvalError e) {</span>
+<span class="fc" id="L964">                    v = e.error;</span>
+<span class="fc" id="L965">                }</span>
+<span class="fc bfc" id="L966" title="All 2 branches covered.">                if (v instanceof Object[][]) {</span>
+<span class="fc" id="L967">                    Object[][] inner = (Object[][]) v;</span>
+<span class="pc bpc" id="L968" title="2 of 4 branches missed.">                    v = inner.length == 0 || inner[0].length == 0 ? null : inner[0][0];</span>
+<span class="fc bfc" id="L969" title="All 2 branches covered.">                } else if (v instanceof Ref) {</span>
+<span class="fc" id="L970">                    v = scalar(v);</span>
+                }
+<span class="fc" id="L972">                out[r][c] = v;</span>
+            }
+        }
+<span class="fc" id="L975">        return out;</span>
+    }
+
+    private boolean isArgument(Object v) {
+<span class="fc bfc" id="L979" title="All 2 branches covered.">        if (callArgs == null) {</span>
+<span class="fc" id="L980">            return false;</span>
+        }
+<span class="pc bpc" id="L982" title="1 of 2 branches missed.">        for (int i = 0; i &lt; callArgs.length; i++) {</span>
+<span class="fc bfc" id="L983" title="All 2 branches covered.">            if (callArgs[i] == v) { //NOPMD CompareObjectsWithEquals - which argument, by identity</span>
+<span class="fc" id="L984">                liftArg = i;</span>
+<span class="fc" id="L985">                return true;</span>
+            }
+        }
+<span class="nc" id="L988">        return false;</span>
+    }
+
+    /// One value out of whatever an argument evaluated to: the cell of a single cell
+    /// reference, the first element of an array or a range. An argument of several values
+    /// where the function wants one has the call made once per element instead.
+    Object scalar(Object v) {
+<span class="fc bfc" id="L995" title="All 2 branches covered.">        if (v instanceof Ref) {</span>
+<span class="fc" id="L996">            Ref r = (Ref) v;</span>
+<span class="pc bpc" id="L997" title="2 of 8 branches missed.">            if (!r.isSingleCell() &amp;&amp; r.next == null &amp;&amp; r.lastSheet == null &amp;&amp; isArgument(v)) {</span>
+<span class="pc bpc" id="L998" title="3 of 4 branches missed.">                if (implicit &amp;&amp; !arrayFormula) {</span>
+<span class="nc" id="L999">                    return intersectImplicitly(r);</span>
+                }
+<span class="fc" id="L1001">                throw EvalError.LIFT;</span>
+            }
+<span class="fc" id="L1003">            return value(r.sheet, r.r1, r.c1);</span>
+        }
+<span class="fc bfc" id="L1005" title="All 2 branches covered.">        if (v instanceof Object[][]) {</span>
+<span class="fc" id="L1006">            Object[][] m = (Object[][]) v;</span>
+<span class="pc bpc" id="L1007" title="3 of 8 branches missed.">            if ((m.length &gt; 1 || m.length == 1 &amp;&amp; m[0].length &gt; 1) &amp;&amp; isArgument(v)) {</span>
+<span class="fc" id="L1008">                throw EvalError.LIFT;</span>
+            }
+<span class="nc bnc" id="L1010" title="All 4 branches missed.">            return m.length == 0 || m[0].length == 0 ? null : m[0][0];</span>
+        }
+<span class="pc bpc" id="L1012" title="1 of 2 branches missed.">        return v == MISSING ? null : v;</span>
+    }
+
+    /// The values of an argument as one matrix per area: each part of a union and each
+    /// sheet of a 3D reference, for the functions that take several areas.
+    ArrayList&lt;Object[][]&gt; areas(Object v) {
+<span class="fc" id="L1018">        ArrayList&lt;Object[][]&gt; out = new ArrayList&lt;Object[][]&gt;();</span>
+<span class="fc bfc" id="L1019" title="All 2 branches covered.">        if (v instanceof Ref) {</span>
+<span class="fc bfc" id="L1020" title="All 2 branches covered.">            for (Ref r = (Ref) v; r != null; r = r.next) {</span>
+<span class="fc" id="L1021">                int first = workbook.indexOf(r.sheet);</span>
+<span class="fc bfc" id="L1022" title="All 2 branches covered.">                int last = r.lastSheet == null ? first : workbook.indexOf(r.lastSheet);</span>
+<span class="fc bfc" id="L1023" title="All 2 branches covered.">                for (int s = first; s &lt;= last; s++) {</span>
+<span class="fc" id="L1024">                    out.add(matrix(new Ref(workbook.getSheet(s), null, r.r1, r.c1, r.r2, r.c2)));</span>
+                }
+            }
+        } else {
+<span class="fc" id="L1028">            out.add(matrix(v));</span>
+        }
+<span class="fc" id="L1030">        return out;</span>
+    }
+
+    /// The values of an argument as rows and columns, a range at its full size.
+    /// A new array of the given size, refused with `#NUM!` past the most elements an array
+    /// holds: arithmetic over every cell of a sheet would otherwise allocate a value per cell.
+    static Object[][] elements(int rows, int cols) {
+<span class="pc bpc" id="L1037" title="1 of 2 branches missed.">        if ((long) rows * cols &gt; ArrayFunctions.MAX_CELLS) {</span>
+<span class="nc" id="L1038">            throw EvalError.NUM;</span>
+        }
+<span class="fc" id="L1040">        return new Object[rows][cols];</span>
+    }
+
+    Object[][] matrix(Object v) {
+<span class="fc" id="L1044">        return matrix(v, false);</span>
+    }
+
+    /// The elements of an operand of arithmetic or of a function applied element by element:
+    /// every cell of a range, empty ones included, so `SUMPRODUCT(--(A1:A100=0))` counts all
+    /// hundred however much of the sheet holds data. A function that reads a range, as
+    /// `COUNTIF` or `INDEX` does, takes `matrix`, cut down to the cells that hold data.
+    Object[][] elementsOf(Object v) {
+<span class="fc" id="L1052">        return matrix(v, true);</span>
+    }
+
+    private Object[][] matrix(Object v, boolean full) {
+<span class="fc bfc" id="L1056" title="All 2 branches covered.">        if (v instanceof Object[][]) {</span>
+<span class="fc" id="L1057">            return (Object[][]) v;</span>
+        }
+<span class="fc bfc" id="L1059" title="All 2 branches covered.">        if (v instanceof Ref) {</span>
+<span class="fc" id="L1060">            Ref whole = (Ref) v;</span>
+<span class="pc bpc" id="L1061" title="2 of 6 branches missed.">            if (whole.next != null || whole.lastSheet != null &amp;&amp; whole.lastSheet != whole.sheet) { //NOPMD CompareObjectsWithEquals - one sheet object per sheet</span>
+                // a union or a span of sheets is not rows and columns: Excel answers #VALUE!
+                // where a function wants them, and the functions that take several areas
+                // (SUM, COUNT and the like) walk them themselves
+<span class="fc" id="L1065">                throw EvalError.VALUE;</span>
+            }
+<span class="fc" id="L1067">            Ref r = whole.clip();</span>
+<span class="fc bfc" id="L1068" title="All 2 branches covered.">            Ref shape = full ? whole : r;</span>
+<span class="fc" id="L1069">            int rows = shape.rows();</span>
+<span class="fc" id="L1070">            int cols = shape.cols();</span>
+<span class="fc bfc" id="L1071" title="All 4 branches covered.">            if (full &amp;&amp; (long) rows * cols &gt; ArrayFunctions.MAX_CELLS) {</span>
+                // a whole column is an array; the whole sheet would be a value per cell
+<span class="fc" id="L1073">                throw EvalError.NUM;</span>
+            }
+            // Rows past the data share one row of empty cells, which nothing writes into.
+<span class="fc" id="L1076">            Object[][] out = new Object[rows][];</span>
+<span class="fc" id="L1077">            Object[] empty = null;</span>
+<span class="fc bfc" id="L1078" title="All 2 branches covered.">            for (int i = 0; i &lt; rows; i++) {</span>
+<span class="fc bfc" id="L1079" title="All 2 branches covered.">                if (shape.r1 + i &gt; r.r2) {</span>
+<span class="fc bfc" id="L1080" title="All 2 branches covered.">                    if (empty == null) {</span>
+<span class="fc" id="L1081">                        empty = new Object[cols];</span>
+                    }
+<span class="fc" id="L1083">                    out[i] = empty;</span>
+<span class="fc" id="L1084">                    continue;</span>
+                }
+<span class="fc" id="L1086">                Object[] line = new Object[cols];</span>
+<span class="pc bpc" id="L1087" title="1 of 4 branches missed.">                for (int j = 0; j &lt; cols &amp;&amp; shape.c1 + j &lt;= r.c2; j++) {</span>
+<span class="fc" id="L1088">                    line[j] = value(r.sheet, shape.r1 + i, shape.c1 + j);</span>
+                }
+<span class="fc" id="L1090">                out[i] = line;</span>
+            }
+<span class="fc" id="L1092">            return out;</span>
+        }
+<span class="pc bpc" id="L1094" title="1 of 2 branches missed.">        return new Object[][] {{v == MISSING ? null : v}};</span>
+    }
+
+    /// Gathers the numbers of an argument the way SUM reads it. Typed straight into the
+    /// formula, a logical value counts as 1 or 0 and text has to be a number; inside a range
+    /// or an array, text, logical values and empty cells are skipped. An error anywhere is
+    /// the result.
+    void numbers(Object arg, DoubleList out, boolean countTextAndLogicals) {
+<span class="fc bfc" id="L1102" title="All 2 branches covered.">        if (arg instanceof Ref) {</span>
+<span class="fc bfc" id="L1103" title="All 2 branches covered.">            for (Ref r = (Ref) arg; r != null; r = r.next) {</span>
+<span class="fc" id="L1104">                int first = workbook.indexOf(r.sheet);</span>
+<span class="fc bfc" id="L1105" title="All 2 branches covered.">                int last = r.lastSheet == null ? first : workbook.indexOf(r.lastSheet);</span>
+<span class="fc bfc" id="L1106" title="All 2 branches covered.">                for (int s = first; s &lt;= last; s++) {</span>
+<span class="fc" id="L1107">                    Sheet sh = workbook.getSheet(s);</span>
+<span class="fc" id="L1108">                    int maxRow = Math.min(r.r2, sh.usedRows() - 1);</span>
+<span class="fc bfc" id="L1109" title="All 2 branches covered.">                    for (int i = r.r1; i &lt;= maxRow; i++) {</span>
+<span class="fc" id="L1110">                        Cell[] cells = sh.rowCells(i);</span>
+<span class="fc bfc" id="L1111" title="All 2 branches covered.">                        if (cells == null) {</span>
+<span class="fc" id="L1112">                            continue;</span>
+                        }
+<span class="fc" id="L1114">                        int maxCol = Math.min(r.c2, cells.length - 1);</span>
+<span class="fc bfc" id="L1115" title="All 2 branches covered.">                        for (int j = r.c1; j &lt;= maxCol; j++) {</span>
+<span class="pc bpc" id="L1116" title="1 of 6 branches missed.">                            if (cells[j] != null &amp;&amp; !(skipSubtotals &amp;&amp; isSubtotal(cells[j]))) {</span>
+<span class="fc" id="L1117">                                addRangeValue(workbook.valueOf(cells[j]), out, countTextAndLogicals);</span>
+                            }
+                        }
+                    }
+                }
+            }
+<span class="fc bfc" id="L1123" title="All 2 branches covered.">        } else if (arg instanceof Object[][]) {</span>
+<span class="fc" id="L1124">            Object[][] m = (Object[][]) arg;</span>
+<span class="fc bfc" id="L1125" title="All 2 branches covered.">            for (Object[] line : m) {</span>
+<span class="fc bfc" id="L1126" title="All 2 branches covered.">                for (Object value : line) {</span>
+<span class="fc" id="L1127">                    addRangeValue(value, out, countTextAndLogicals);</span>
+                }
+            }
+<span class="pc bpc" id="L1130" title="1 of 2 branches missed.">        } else if (arg != MISSING) {</span>
+<span class="pc bpc" id="L1131" title="1 of 2 branches missed.">            if (arg == null) {</span>
+<span class="nc" id="L1132">                return;</span>
+            }
+<span class="fc" id="L1134">            out.add(Values.num(arg));</span>
+        }
+<span class="fc" id="L1136">    }</span>
+
+    /// SUBTOTAL leaves out the cells that are themselves subtotals, so that a grand total over
+    /// a column of sections does not count every row twice.
+    private static boolean isSubtotal(Cell cell) {
+<span class="fc" id="L1141">        Node f = cell.formula;</span>
+<span class="pc bpc" id="L1142" title="3 of 4 branches missed.">        while (f != null &amp;&amp; f.kind == Node.PAREN) {</span>
+<span class="nc" id="L1143">            f = f.args[0];</span>
+        }
+<span class="pc bpc" id="L1145" title="7 of 8 branches missed.">        return f != null &amp;&amp; f.kind == Node.FUNC &amp;&amp; (&quot;SUBTOTAL&quot;.equals(f.value) || &quot;AGGREGATE&quot;.equals(f.value));</span>
+    }
+
+    private static void addRangeValue(Object v, DoubleList out, boolean countTextAndLogicals) {
+<span class="fc bfc" id="L1149" title="All 2 branches covered.">        if (v instanceof Double) {</span>
+<span class="fc" id="L1150">            out.add(((Double) v).doubleValue());</span>
+<span class="pc bpc" id="L1151" title="1 of 2 branches missed.">        } else if (v instanceof CellError) {</span>
+<span class="nc" id="L1152">            throw EvalError.of((CellError) v);</span>
+<span class="pc bpc" id="L1153" title="3 of 4 branches missed.">        } else if (countTextAndLogicals &amp;&amp; v != null) {</span>
+<span class="nc bnc" id="L1154" title="All 4 branches missed.">            out.add(v instanceof Boolean &amp;&amp; ((Boolean) v).booleanValue() ? 1 : 0);</span>
+        }
+<span class="fc" id="L1156">    }</span>
+
+    DoubleList numbers(Object[] args, int from) {
+<span class="fc" id="L1159">        DoubleList list = new DoubleList();</span>
+<span class="fc bfc" id="L1160" title="All 2 branches covered.">        for (int i = from; i &lt; args.length; i++) {</span>
+<span class="fc" id="L1161">            numbers(args[i], list, false);</span>
+        }
+<span class="fc" id="L1163">        return list;</span>
+    }
+
+    /// The argument at an index, MISSING when the call has fewer.
+    static Object arg(Object[] a, int i) {
+<span class="fc bfc" id="L1168" title="All 2 branches covered.">        return i &lt; a.length ? a[i] : MISSING;</span>
+    }
+
+    static boolean has(Object[] a, int i) {
+<span class="fc bfc" id="L1172" title="All 4 branches covered.">        return i &lt; a.length &amp;&amp; a[i] != MISSING;</span>
+    }
+
+    /// A required numeric argument of a function of scalars.
+    static double num(Object[] a, int i) {
+<span class="pc bpc" id="L1177" title="1 of 2 branches missed.">        if (i &gt;= a.length) {</span>
+<span class="nc" id="L1178">            throw EvalError.VALUE;</span>
+        }
+<span class="fc" id="L1180">        return Values.num(a[i]);</span>
+    }
+
+    static double num(Object[] a, int i, double fallback) {
+<span class="fc bfc" id="L1184" title="All 2 branches covered.">        return has(a, i) ? Values.num(a[i]) : fallback;</span>
+    }
+
+    /// A numeric argument cut to a whole number, towards zero, as functions that take a count
+    /// or an index do.
+    static int integer(Object[] a, int i) {
+<span class="fc" id="L1190">        double d = num(a, i);</span>
+<span class="pc bpc" id="L1191" title="2 of 4 branches missed.">        if (d &gt; Integer.MAX_VALUE || d &lt; Integer.MIN_VALUE) {</span>
+<span class="nc" id="L1192">            throw EvalError.NUM;</span>
+        }
+<span class="fc" id="L1194">        return (int) d;</span>
+    }
+
+    static int integer(Object[] a, int i, int fallback) {
+<span class="fc bfc" id="L1198" title="All 2 branches covered.">        return has(a, i) ? integer(a, i) : fallback;</span>
+    }
+
+    static String text(Object[] a, int i) {
+<span class="pc bpc" id="L1202" title="1 of 2 branches missed.">        if (i &gt;= a.length) {</span>
+<span class="nc" id="L1203">            throw EvalError.VALUE;</span>
+        }
+<span class="fc" id="L1205">        return Values.text(a[i]);</span>
+    }
+
+    static boolean bool(Object[] a, int i, boolean fallback) {
+<span class="fc bfc" id="L1209" title="All 2 branches covered.">        return has(a, i) ? Values.bool(a[i]) : fallback;</span>
+    }
+
+    /// A numeric argument of a function that takes ranges: the one value of the argument.
+    double scalarNum(Object[] a, int i) {
+<span class="pc bpc" id="L1214" title="1 of 2 branches missed.">        if (i &gt;= a.length) {</span>
+<span class="nc" id="L1215">            throw EvalError.VALUE;</span>
+        }
+<span class="fc" id="L1217">        return Values.num(scalar(a[i]));</span>
+    }
+
+    double scalarNum(Object[] a, int i, double fallback) {
+<span class="fc bfc" id="L1221" title="All 2 branches covered.">        return has(a, i) ? Values.num(scalar(a[i])) : fallback;</span>
+    }
+
+    String scalarText(Object[] a, int i) {
+<span class="pc bpc" id="L1225" title="1 of 2 branches missed.">        if (i &gt;= a.length) {</span>
+<span class="nc" id="L1226">            throw EvalError.VALUE;</span>
+        }
+<span class="fc" id="L1228">        return Values.text(scalar(a[i]));</span>
+    }
+
+<span class="fc" id="L1231">    private static final java.util.HashMap&lt;String, Integer&gt; SWITCH_1 = Functions.switchTable(</span>
+            &quot;IF&quot;, &quot;IFERROR&quot;, &quot;IFNA&quot;, &quot;IFS&quot;, &quot;SWITCH&quot;, &quot;CHOOSE&quot;, &quot;LET&quot;, &quot;ROW&quot;, &quot;COLUMN&quot;, &quot;ISFORMULA&quot;,
+            &quot;FORMULATEXT&quot;);
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

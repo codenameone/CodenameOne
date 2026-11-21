@@ -1,0 +1,155 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ShortVec.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.crypto.solana</a> &gt; <span class="el_source">ShortVec.java</span></div><h1>ShortVec.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008-2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.crypto.solana;
+
+/// Solana's wire helpers: the compact-u16 length prefix (&quot;short vec&quot;) and a growable buffer.
+@com.codename1.impl.SharedWithBackend
+<span class="fc" id="L27">final class ShortVec {</span>
+<span class="fc" id="L28">    private byte[] buf = new byte[128];</span>
+    private int len;
+
+    ShortVec u8(int v) {
+<span class="fc" id="L32">        ensure(1);</span>
+<span class="fc" id="L33">        buf[len++] = (byte) v;</span>
+<span class="fc" id="L34">        return this;</span>
+    }
+
+    ShortVec u32(long v) {
+<span class="fc bfc" id="L38" title="All 2 branches covered.">        for (int i = 0; i &lt; 4; i++) {</span>
+<span class="fc" id="L39">            u8((int) (v &gt;&gt;&gt; (8 * i)));</span>
+        }
+<span class="fc" id="L41">        return this;</span>
+    }
+
+    ShortVec u64(long v) {
+<span class="fc bfc" id="L45" title="All 2 branches covered.">        for (int i = 0; i &lt; 8; i++) {</span>
+<span class="fc" id="L46">            u8((int) (v &gt;&gt;&gt; (8 * i)));</span>
+        }
+<span class="fc" id="L48">        return this;</span>
+    }
+
+    ShortVec length(int n) {
+<span class="pc bpc" id="L52" title="2 of 4 branches missed.">        if (n &lt; 0 || n &gt; 0xffff) {</span>
+<span class="nc" id="L53">            throw new IllegalArgumentException(&quot;a compact-u16 holds 0 to 65535&quot;);</span>
+        }
+<span class="fc" id="L55">        int rem = n;</span>
+        while (true) {
+<span class="fc" id="L57">            int b = rem &amp; 0x7f;</span>
+<span class="fc" id="L58">            rem &gt;&gt;&gt;= 7;</span>
+<span class="pc bpc" id="L59" title="1 of 2 branches missed.">            if (rem == 0) {</span>
+<span class="fc" id="L60">                u8(b);</span>
+<span class="fc" id="L61">                return this;</span>
+            }
+<span class="nc" id="L63">            u8(b | 0x80);</span>
+<span class="nc" id="L64">        }</span>
+    }
+
+    ShortVec bytes(byte[] b) {
+<span class="fc" id="L68">        ensure(b.length);</span>
+<span class="fc" id="L69">        System.arraycopy(b, 0, buf, len, b.length);</span>
+<span class="fc" id="L70">        len += b.length;</span>
+<span class="fc" id="L71">        return this;</span>
+    }
+
+    byte[] toBytes() {
+<span class="fc" id="L75">        byte[] out = new byte[len];</span>
+<span class="fc" id="L76">        System.arraycopy(buf, 0, out, 0, len);</span>
+<span class="fc" id="L77">        return out;</span>
+    }
+
+    private void ensure(int n) {
+<span class="fc bfc" id="L81" title="All 2 branches covered.">        if (len + n &gt; buf.length) {</span>
+<span class="fc" id="L82">            byte[] b = new byte[Math.max(buf.length * 2, len + n)];</span>
+<span class="fc" id="L83">            System.arraycopy(buf, 0, b, 0, len);</span>
+<span class="fc" id="L84">            buf = b;</span>
+        }
+<span class="fc" id="L86">    }</span>
+
+    static byte[] copy(byte[] b) {
+<span class="fc" id="L89">        byte[] out = new byte[b.length];</span>
+<span class="fc" id="L90">        System.arraycopy(b, 0, out, 0, b.length);</span>
+<span class="fc" id="L91">        return out;</span>
+    }
+
+    /// Reads the wire form.
+    static final class Reader {
+        private final byte[] data;
+        private int pos;
+
+<span class="fc" id="L99">        Reader(byte[] data) {</span>
+<span class="fc" id="L100">            this.data = data;</span>
+<span class="fc" id="L101">        }</span>
+
+        int u8() {
+<span class="pc bpc" id="L104" title="1 of 2 branches missed.">            if (pos &gt;= data.length) {</span>
+<span class="nc" id="L105">                throw new IllegalArgumentException(&quot;truncated Solana data&quot;);</span>
+            }
+<span class="fc" id="L107">            return data[pos++] &amp; 0xff;</span>
+        }
+
+        int peek() {
+<span class="pc bpc" id="L111" title="1 of 2 branches missed.">            if (pos &gt;= data.length) {</span>
+<span class="nc" id="L112">                throw new IllegalArgumentException(&quot;truncated Solana data&quot;);</span>
+            }
+<span class="fc" id="L114">            return data[pos] &amp; 0xff;</span>
+        }
+
+        // compact-u16, canonical: no redundant continuation byte, at most three bytes
+        int length() {
+<span class="fc" id="L119">            int value = 0;</span>
+<span class="pc bpc" id="L120" title="1 of 2 branches missed.">            for (int i = 0; i &lt; 3; i++) {</span>
+<span class="fc" id="L121">                int b = u8();</span>
+<span class="fc" id="L122">                value |= (b &amp; 0x7f) &lt;&lt; (7 * i);</span>
+<span class="pc bpc" id="L123" title="1 of 2 branches missed.">                if ((b &amp; 0x80) == 0) {</span>
+<span class="pc bpc" id="L124" title="3 of 4 branches missed.">                    if (i &gt; 0 &amp;&amp; b == 0) {</span>
+<span class="nc" id="L125">                        throw new IllegalArgumentException(&quot;non-canonical compact-u16&quot;);</span>
+                    }
+<span class="pc bpc" id="L127" title="1 of 2 branches missed.">                    if (value &gt; 0xffff) {</span>
+<span class="nc" id="L128">                        throw new IllegalArgumentException(&quot;compact-u16 overflow&quot;);</span>
+                    }
+<span class="fc" id="L130">                    return value;</span>
+                }
+            }
+<span class="nc" id="L133">            throw new IllegalArgumentException(&quot;compact-u16 overflow&quot;);</span>
+        }
+
+        byte[] read(int n) {
+<span class="pc bpc" id="L137" title="2 of 4 branches missed.">            if (n &lt; 0 || n &gt; data.length - pos) {</span>
+<span class="nc" id="L138">                throw new IllegalArgumentException(&quot;truncated Solana data&quot;);</span>
+            }
+<span class="fc" id="L140">            byte[] out = new byte[n];</span>
+<span class="fc" id="L141">            System.arraycopy(data, pos, out, 0, n);</span>
+<span class="fc" id="L142">            pos += n;</span>
+<span class="fc" id="L143">            return out;</span>
+        }
+
+        byte[] rest() {
+<span class="fc" id="L147">            return read(data.length - pos);</span>
+        }
+
+        boolean hasMore() {
+<span class="pc bpc" id="L151" title="1 of 2 branches missed.">            return pos &lt; data.length;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

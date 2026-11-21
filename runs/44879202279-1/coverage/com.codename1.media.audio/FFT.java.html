@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>FFT.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.media.audio</a> &gt; <span class="el_source">FFT.java</span></div><h1>FFT.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.media.audio;
+
+/// In-place iterative radix-2 complex FFT. Shared by the oscillator tables and
+/// (later) the analyser and convolver.
+final class FFT {
+    private FFT() {
+    }
+
+    /// Transforms `re`/`im` in place. Length must be a power of two. The inverse
+    /// is not scaled by 1/n.
+    static void transform(double[] re, double[] im, boolean inverse) {
+<span class="fc" id="L34">        int n = re.length;</span>
+<span class="fc bfc" id="L35" title="All 2 branches covered.">        for (int i = 1, j = 0; i &lt; n; i++) {</span>
+<span class="fc" id="L36">            int bit = n &gt;&gt; 1;</span>
+<span class="fc bfc" id="L37" title="All 2 branches covered.">            for (; (j &amp; bit) != 0; bit &gt;&gt;= 1) {</span>
+<span class="fc" id="L38">                j ^= bit;</span>
+            }
+<span class="fc" id="L40">            j ^= bit;</span>
+<span class="fc bfc" id="L41" title="All 2 branches covered.">            if (i &lt; j) {</span>
+<span class="fc" id="L42">                double t = re[i];</span>
+<span class="fc" id="L43">                re[i] = re[j];</span>
+<span class="fc" id="L44">                re[j] = t;</span>
+<span class="fc" id="L45">                t = im[i];</span>
+<span class="fc" id="L46">                im[i] = im[j];</span>
+<span class="fc" id="L47">                im[j] = t;</span>
+            }
+        }
+<span class="fc bfc" id="L50" title="All 2 branches covered.">        for (int len = 2; len &lt;= n; len &lt;&lt;= 1) {</span>
+<span class="fc bfc" id="L51" title="All 2 branches covered.">            double ang = 2 * Math.PI / len * (inverse ? 1 : -1);</span>
+<span class="fc" id="L52">            double wr = Math.cos(ang);</span>
+<span class="fc" id="L53">            double wi = Math.sin(ang);</span>
+<span class="fc" id="L54">            int half = len &gt;&gt; 1;</span>
+<span class="fc bfc" id="L55" title="All 2 branches covered.">            for (int i = 0; i &lt; n; i += len) {</span>
+<span class="fc" id="L56">                double cr = 1;</span>
+<span class="fc" id="L57">                double ci = 0;</span>
+<span class="fc bfc" id="L58" title="All 2 branches covered.">                for (int k = 0; k &lt; half; k++) {</span>
+<span class="fc" id="L59">                    int a = i + k;</span>
+<span class="fc" id="L60">                    int b = a + half;</span>
+<span class="fc" id="L61">                    double xr = re[b] * cr - im[b] * ci;</span>
+<span class="fc" id="L62">                    double xi = re[b] * ci + im[b] * cr;</span>
+<span class="fc" id="L63">                    re[b] = re[a] - xr;</span>
+<span class="fc" id="L64">                    im[b] = im[a] - xi;</span>
+<span class="fc" id="L65">                    re[a] += xr;</span>
+<span class="fc" id="L66">                    im[a] += xi;</span>
+<span class="fc" id="L67">                    double nr = cr * wr - ci * wi;</span>
+<span class="fc" id="L68">                    ci = cr * wi + ci * wr;</span>
+<span class="fc" id="L69">                    cr = nr;</span>
+                }
+            }
+        }
+<span class="fc" id="L73">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,417 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TreeRows.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.table</a> &gt; <span class="el_source">TreeRows.java</span></div><h1>TreeRows.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ui.table;
+
+import java.util.HashMap;
+import java.util.List;
+
+/// The open nodes of a `TreeTableModel`, flattened into rows in the order
+/// they are shown: the row engine of a tree `DataGrid`, for any other view
+/// of a tree that needs rows.
+///
+/// The rows are empty until `refresh()` reads the roots. Nodes are told
+/// apart by `equals` and `hashCode` (see `TreeTableModel`). A row is a node
+/// and its depth, 0 for a root; opening a row inserts the rows of its open
+/// descendants after it, and closing it removes them.
+///
+/// Children are asked of the model the first time a node is opened and
+/// kept; opening a node inserts its rows and closing one removes them, so
+/// either costs what the node shows and not what the tree holds. A filter is
+/// the exception: deciding which paths lead to a match reads the whole tree.
+public final class TreeRows extends GridRows {
+<span class="fc" id="L42">    private static final Object[] NONE = new Object[0];</span>
+
+    private final TreeTableModel model;
+<span class="fc" id="L45">    private Object[] nodes = new Object[16];</span>
+<span class="fc" id="L46">    private int[] depths = new int[16];</span>
+    private int size;
+    private HashMap&lt;Object, Integer&gt; index;
+
+<span class="fc" id="L50">    private final HashMap&lt;Object, Boolean&gt; expanded = new HashMap&lt;Object, Boolean&gt;();</span>
+    // What the model answered, in its own order.
+<span class="fc" id="L52">    private final HashMap&lt;Object, Object[]&gt; loaded = new HashMap&lt;Object, Object[]&gt;();</span>
+    // The same, sorted and filtered; cleared by every rebuild.
+<span class="fc" id="L54">    private final HashMap&lt;Object, Object[]&gt; shown = new HashMap&lt;Object, Object[]&gt;();</span>
+    // While a filter is set: the nodes that match or lead to a match.
+    private HashMap&lt;Object, Boolean&gt; visible;
+<span class="fc" id="L57">    private final Object rootKey = new Object();</span>
+
+    /// Rows over a tree model, empty until `refresh()`.
+<span class="fc" id="L60">    public TreeRows(TreeTableModel model) {</span>
+<span class="fc" id="L61">        this.model = model;</span>
+<span class="fc" id="L62">    }</span>
+
+    /// The model the rows show.
+    public TreeTableModel getModel() {
+<span class="nc" id="L66">        return model;</span>
+    }
+
+    /// How many rows there are.
+    public int getRowCount() {
+<span class="nc" id="L71">        return size;</span>
+    }
+
+    /// The node a row shows.
+    public Object getNode(int row) {
+<span class="nc" id="L76">        return nodes[row];</span>
+    }
+
+    /// How deep a row is: 0 for a root.
+    public int getDepth(int row) {
+<span class="nc" id="L81">        return depths[row];</span>
+    }
+
+    /// Whether a row can open: its node is not a leaf.
+    public boolean isRowExpandable(int row) {
+<span class="nc" id="L86">        return isExpandable(row);</span>
+    }
+
+    /// Whether a row is open.
+    public boolean isRowExpanded(int row) {
+<span class="nc" id="L91">        return isExpanded(row);</span>
+    }
+
+    /// Opens or closes a row.
+    ///
+    /// #### Returns
+    ///
+    /// how many rows were inserted after it, or removed after it when
+    /// negative; 0 when nothing moved
+    public int setRowExpanded(int row, boolean open) {
+<span class="nc" id="L101">        return setExpanded(row, open);</span>
+    }
+
+    /// The row showing a node, or -1 when it has none.
+    public int getRow(Object node) {
+<span class="nc" id="L106">        return find(node);</span>
+    }
+
+    /// Whether a node is open, shown or not.
+    public boolean isNodeExpanded(Object node) {
+<span class="nc" id="L111">        return expanded.containsKey(node);</span>
+    }
+
+    /// Opens or closes a node whether it is shown or not; one that is not
+    /// shown opens the next time it is.
+    ///
+    /// #### Returns
+    ///
+    /// the rows inserted or, when negative, removed after the node's row
+    public int setNodeExpanded(Object node, boolean open) {
+<span class="nc" id="L121">        int row = find(node);</span>
+<span class="nc bnc" id="L122" title="All 2 branches missed.">        if (row &gt;= 0) {</span>
+<span class="nc" id="L123">            return setExpanded(row, open);</span>
+        }
+<span class="nc bnc" id="L125" title="All 2 branches missed.">        if (open) {</span>
+<span class="nc" id="L126">            expanded.put(node, Boolean.TRUE);</span>
+        } else {
+<span class="nc" id="L128">            expanded.remove(node);</span>
+        }
+<span class="nc" id="L130">        return 0;</span>
+    }
+
+    /// Asks the model for the whole tree again and flattens it, keeping
+    /// which nodes are open.
+    public void refresh() {
+<span class="nc" id="L136">        forget(null);</span>
+<span class="nc" id="L137">    }</span>
+
+    /// Asks the model again for the children of one node and flattens the
+    /// tree, keeping which nodes are open.
+    public void refreshNode(Object node) {
+<span class="nc" id="L142">        forget(node);</span>
+<span class="nc" id="L143">    }</span>
+
+    TreeTableModel model() {
+<span class="nc" id="L146">        return model;</span>
+    }
+
+    @Override
+    int size() {
+<span class="fc" id="L151">        return size;</span>
+    }
+
+    @Override
+    int columnCount() {
+<span class="fc" id="L156">        return model.getColumnCount();</span>
+    }
+
+    @Override
+    String columnName(int modelColumn) {
+<span class="fc" id="L161">        return model.getColumnName(modelColumn);</span>
+    }
+
+    @Override
+    int depth(int row) {
+<span class="fc" id="L166">        return depths[row];</span>
+    }
+
+    @Override
+    boolean isExpandable(int row) {
+<span class="fc" id="L171">        Object n = nodes[row];</span>
+<span class="pc bpc" id="L172" title="1 of 2 branches missed.">        if (visible != null) {</span>
+<span class="nc bnc" id="L173" title="All 2 branches missed.">            return children(n).length &gt; 0;</span>
+        }
+<span class="fc bfc" id="L175" title="All 2 branches covered.">        return !model.isLeaf(n);</span>
+    }
+
+    @Override
+    boolean isExpanded(int row) {
+<span class="fc" id="L180">        return open(nodes[row]);</span>
+    }
+
+    private boolean open(Object n) {
+<span class="fc bfc" id="L184" title="All 2 branches covered.">        if (visible != null) {</span>
+            // A filter shows every path to a match open.
+<span class="fc bfc" id="L186" title="All 2 branches covered.">            return children(n).length &gt; 0;</span>
+        }
+<span class="fc" id="L188">        return expanded.containsKey(n);</span>
+    }
+
+    boolean isExpandedNode(Object n) {
+<span class="nc" id="L192">        return isNodeExpanded(n);</span>
+    }
+
+    @Override
+    int setExpanded(int row, boolean open) {
+<span class="fc" id="L197">        Object n = nodes[row];</span>
+<span class="pc bpc" id="L198" title="1 of 2 branches missed.">        if (open == expanded.containsKey(n)) {</span>
+<span class="nc" id="L199">            return 0;</span>
+        }
+<span class="fc bfc" id="L201" title="All 2 branches covered.">        if (open) {</span>
+<span class="fc" id="L202">            expanded.put(n, Boolean.TRUE);</span>
+        } else {
+<span class="fc" id="L204">            expanded.remove(n);</span>
+        }
+<span class="pc bpc" id="L206" title="2 of 4 branches missed.">        if (visible != null || model.isLeaf(n)) {</span>
+<span class="nc" id="L207">            return 0;</span>
+        }
+<span class="fc" id="L209">        index = null;</span>
+<span class="fc bfc" id="L210" title="All 2 branches covered.">        if (open) {</span>
+            // The rows after this one step aside while its children are
+            // appended, and come back after them.
+<span class="fc" id="L213">            int tail = size - row - 1;</span>
+<span class="fc" id="L214">            Object[] tn = new Object[tail];</span>
+<span class="fc" id="L215">            int[] td = new int[tail];</span>
+<span class="fc" id="L216">            System.arraycopy(nodes, row + 1, tn, 0, tail);</span>
+<span class="fc" id="L217">            System.arraycopy(depths, row + 1, td, 0, tail);</span>
+<span class="fc" id="L218">            size = row + 1;</span>
+<span class="fc" id="L219">            appendChildren(n, depths[row] + 1);</span>
+<span class="fc" id="L220">            int added = size - row - 1;</span>
+<span class="fc" id="L221">            ensure(size + tail);</span>
+<span class="fc" id="L222">            System.arraycopy(tn, 0, nodes, size, tail);</span>
+<span class="fc" id="L223">            System.arraycopy(td, 0, depths, size, tail);</span>
+<span class="fc" id="L224">            size += tail;</span>
+<span class="fc" id="L225">            return added;</span>
+        }
+<span class="fc" id="L227">        int d = depths[row];</span>
+<span class="fc" id="L228">        int end = row + 1;</span>
+<span class="pc bpc" id="L229" title="1 of 4 branches missed.">        while (end &lt; size &amp;&amp; depths[end] &gt; d) {</span>
+<span class="fc" id="L230">            end++;</span>
+        }
+<span class="fc" id="L232">        int removed = end - row - 1;</span>
+<span class="fc" id="L233">        System.arraycopy(nodes, end, nodes, row + 1, size - end);</span>
+<span class="fc" id="L234">        System.arraycopy(depths, end, depths, row + 1, size - end);</span>
+<span class="fc bfc" id="L235" title="All 2 branches covered.">        for (int i = size - removed; i &lt; size; i++) {</span>
+<span class="fc" id="L236">            nodes[i] = null;</span>
+        }
+<span class="fc" id="L238">        size -= removed;</span>
+<span class="fc" id="L239">        return -removed;</span>
+    }
+
+    private void ensure(int cap) {
+<span class="pc bpc" id="L243" title="1 of 2 branches missed.">        if (cap &gt; nodes.length) {</span>
+<span class="nc" id="L244">            int c = Math.max(cap, nodes.length * 2);</span>
+<span class="nc" id="L245">            Object[] n2 = new Object[c];</span>
+<span class="nc" id="L246">            System.arraycopy(nodes, 0, n2, 0, size);</span>
+<span class="nc" id="L247">            nodes = n2;</span>
+<span class="nc" id="L248">            int[] d2 = new int[c];</span>
+<span class="nc" id="L249">            System.arraycopy(depths, 0, d2, 0, size);</span>
+<span class="nc" id="L250">            depths = d2;</span>
+        }
+<span class="fc" id="L252">    }</span>
+
+    private void add(Object n, int d) {
+<span class="fc" id="L255">        ensure(size + 1);</span>
+<span class="fc" id="L256">        nodes[size] = n;</span>
+<span class="fc" id="L257">        depths[size] = d;</span>
+<span class="fc" id="L258">        size++;</span>
+<span class="fc" id="L259">    }</span>
+
+    private void appendChildren(Object parent, int depth) {
+<span class="fc" id="L262">        Object[] kids = children(parent);</span>
+<span class="fc bfc" id="L263" title="All 2 branches covered.">        for (Object kid : kids) {</span>
+<span class="fc" id="L264">            Object k = kid;</span>
+<span class="fc" id="L265">            add(k, depth);</span>
+<span class="fc bfc" id="L266" title="All 2 branches covered.">            if (open(k)) {</span>
+<span class="fc" id="L267">                appendChildren(k, depth + 1);</span>
+            }
+        }
+<span class="fc" id="L270">    }</span>
+
+    /// The children of a node as shown: sorted, and filtered to the paths
+    /// that lead to a match. `null` is the parent of the roots.
+    Object[] children(Object parent) {
+<span class="fc bfc" id="L275" title="All 2 branches covered.">        Object k = parent == null ? rootKey : parent;</span>
+<span class="fc" id="L276">        Object[] s = shown.get(k);</span>
+<span class="fc bfc" id="L277" title="All 2 branches covered.">        if (s != null) {</span>
+<span class="fc" id="L278">            return s;</span>
+        }
+<span class="fc" id="L280">        Object[] raw = load(parent);</span>
+<span class="fc bfc" id="L281" title="All 2 branches covered.">        if (visible != null) {</span>
+<span class="fc" id="L282">            int m = 0;</span>
+<span class="fc" id="L283">            Object[] f = new Object[raw.length];</span>
+<span class="fc bfc" id="L284" title="All 2 branches covered.">            for (Object n : raw) {</span>
+<span class="fc bfc" id="L285" title="All 2 branches covered.">                if (visible.containsKey(n)) {</span>
+<span class="fc" id="L286">                    f[m++] = n;</span>
+                }
+            }
+<span class="fc" id="L289">            s = new Object[m];</span>
+<span class="fc" id="L290">            System.arraycopy(f, 0, s, 0, m);</span>
+<span class="fc" id="L291">        } else {</span>
+<span class="fc" id="L292">            s = new Object[raw.length];</span>
+<span class="fc" id="L293">            System.arraycopy(raw, 0, s, 0, raw.length);</span>
+        }
+<span class="fc" id="L295">        sortSiblings(s);</span>
+<span class="fc" id="L296">        shown.put(k, s);</span>
+<span class="fc" id="L297">        return s;</span>
+    }
+
+    private Object[] load(Object parent) {
+<span class="fc bfc" id="L301" title="All 2 branches covered.">        Object k = parent == null ? rootKey : parent;</span>
+<span class="fc" id="L302">        Object[] raw = loaded.get(k);</span>
+<span class="fc bfc" id="L303" title="All 2 branches covered.">        if (raw == null) {</span>
+<span class="fc bfc" id="L304" title="All 4 branches covered.">            if (parent != null &amp;&amp; model.isLeaf(parent)) {</span>
+<span class="fc" id="L305">                raw = NONE;</span>
+            } else {
+<span class="fc" id="L307">                List&lt;?&gt; v = model.getChildren(parent);</span>
+<span class="pc bpc" id="L308" title="1 of 2 branches missed.">                raw = v == null ? NONE : v.toArray();</span>
+            }
+<span class="fc" id="L310">            loaded.put(k, raw);</span>
+        }
+<span class="fc" id="L312">        return raw;</span>
+    }
+
+    private void sortSiblings(final Object[] s) {
+<span class="fc" id="L316">        final GridColumn[] cols = sortColumns;</span>
+<span class="pc bpc" id="L317" title="1 of 4 branches missed.">        if (cols.length == 0 || s.length &lt; 2) {</span>
+<span class="fc" id="L318">            return;</span>
+        }
+<span class="fc" id="L320">        final boolean[] asc = sortAscending;</span>
+<span class="fc" id="L321">        final Object[][] keys = new Object[cols.length][s.length];</span>
+<span class="fc bfc" id="L322" title="All 2 branches covered.">        for (int c = 0; c &lt; cols.length; c++) {</span>
+<span class="fc bfc" id="L323" title="All 2 branches covered.">            for (int i = 0; i &lt; s.length; i++) {</span>
+<span class="fc" id="L324">                keys[c][i] = model.getValueAt(s[i], cols[c].getModelColumn());</span>
+            }
+        }
+<span class="fc" id="L327">        int[] pos = GridSorter.order(s.length, keys, comparators(cols), asc);</span>
+<span class="fc" id="L328">        Object[] copy = new Object[s.length];</span>
+<span class="fc" id="L329">        System.arraycopy(s, 0, copy, 0, s.length);</span>
+<span class="fc bfc" id="L330" title="All 2 branches covered.">        for (int i = 0; i &lt; pos.length; i++) {</span>
+<span class="fc" id="L331">            s[i] = copy[pos[i]];</span>
+        }
+<span class="fc" id="L333">    }</span>
+
+    /// Forgets what the model answered for a node's children, or for the
+    /// whole tree when `node` is null, and flattens again.
+    void forget(Object node) {
+<span class="pc bpc" id="L338" title="1 of 2 branches missed.">        if (node == null) {</span>
+<span class="nc" id="L339">            loaded.clear();</span>
+        } else {
+<span class="fc" id="L341">            loaded.remove(node);</span>
+        }
+<span class="fc" id="L343">        rebuild();</span>
+<span class="fc" id="L344">    }</span>
+
+    @Override
+    Object value(int row, int modelColumn) {
+<span class="fc" id="L348">        return model.getValueAt(nodes[row], modelColumn);</span>
+    }
+
+    @Override
+    boolean isEditable(int row, int modelColumn) {
+<span class="fc" id="L353">        return model.isCellEditable(nodes[row], modelColumn);</span>
+    }
+
+    @Override
+    void setValue(int row, int modelColumn, Object value) {
+<span class="fc" id="L358">        model.setValueAt(nodes[row], modelColumn, value);</span>
+<span class="fc" id="L359">    }</span>
+
+    @Override
+    Object node(int row) {
+<span class="fc" id="L363">        return nodes[row];</span>
+    }
+
+    @Override
+    Object key(int row) {
+<span class="fc" id="L368">        return nodes[row];</span>
+    }
+
+    @Override
+    int find(Object key) {
+<span class="pc bpc" id="L373" title="1 of 2 branches missed.">        if (index == null) {</span>
+<span class="fc" id="L374">            index = new HashMap&lt;Object, Integer&gt;();</span>
+<span class="fc bfc" id="L375" title="All 2 branches covered.">            for (int i = 0; i &lt; size; i++) {</span>
+<span class="fc" id="L376">                index.put(nodes[i], Integer.valueOf(i));</span>
+            }
+        }
+<span class="fc" id="L379">        Integer i = index.get(key);</span>
+<span class="pc bpc" id="L380" title="1 of 2 branches missed.">        return i == null ? -1 : i.intValue();</span>
+    }
+
+    @Override
+    void rebuild() {
+<span class="fc" id="L385">        shown.clear();</span>
+<span class="fc" id="L386">        visible = null;</span>
+<span class="fc bfc" id="L387" title="All 2 branches covered.">        if (filter != null) {</span>
+<span class="fc" id="L388">            HashMap&lt;Object, Boolean&gt; vis = new HashMap&lt;Object, Boolean&gt;();</span>
+<span class="fc" id="L389">            mark(null, 0, vis, filter);</span>
+<span class="fc" id="L390">            visible = vis;</span>
+        }
+<span class="fc bfc" id="L392" title="All 2 branches covered.">        for (int i = 0; i &lt; size; i++) {</span>
+<span class="fc" id="L393">            nodes[i] = null;</span>
+        }
+<span class="fc" id="L395">        size = 0;</span>
+<span class="fc" id="L396">        index = null;</span>
+<span class="fc" id="L397">        appendChildren(null, 0);</span>
+<span class="fc" id="L398">    }</span>
+
+    // Marks the nodes under `parent` that match or lead to a match, and
+    // answers whether any did.
+    private boolean mark(Object parent, int depth, HashMap&lt;Object, Boolean&gt; vis, GridFilter f) {
+<span class="fc" id="L403">        Object[] kids = load(parent);</span>
+<span class="fc" id="L404">        boolean any = false;</span>
+<span class="fc bfc" id="L405" title="All 2 branches covered.">        for (Object kid : kids) {</span>
+<span class="fc" id="L406">            Object k = kid;</span>
+<span class="fc bfc" id="L407" title="All 4 branches covered.">            boolean below = !model.isLeaf(k) &amp;&amp; mark(k, depth + 1, vis, f);</span>
+<span class="fc" id="L408">            probe.tree(model, k, depth);</span>
+<span class="fc bfc" id="L409" title="All 4 branches covered.">            if (below || f.accept(probe)) {</span>
+<span class="fc" id="L410">                vis.put(k, Boolean.TRUE);</span>
+<span class="fc" id="L411">                any = true;</span>
+            }
+        }
+<span class="fc" id="L414">        return any;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

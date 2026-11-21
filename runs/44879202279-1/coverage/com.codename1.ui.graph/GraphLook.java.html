@@ -1,0 +1,300 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>GraphLook.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.graph</a> &gt; <span class="el_source">GraphLook.java</span></div><h1>GraphLook.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ui.graph;
+
+import com.codename1.ui.Display;
+import com.codename1.ui.Font;
+import com.codename1.ui.Graphics;
+import com.codename1.ui.Stroke;
+import com.codename1.ui.plaf.Style;
+import com.codename1.ui.plaf.UIManager;
+
+import java.util.HashMap;
+
+/// The styles a `NodeGraph` paints with, looked up by UIID once per theme
+/// rather than once per node, and the drawing helpers the renderers share.
+///
+/// A UIID here is a source of colours and a font. Nodes have no component
+/// behind them, so a border or a padding in the theme is not drawn.
+///
+/// The defaults live here, not in the theme code: a UIID the installed theme
+/// says nothing about is painted from the palette below, light or dark to
+/// match the form. A theme that styles one UIID takes it over whole.
+final class GraphLook {
+    // uiid, light fg, light bg, dark fg, dark bg, bg opacity, font (0 plain, 1 small, 2 bold)
+<span class="fc" id="L45">    private static final Object[][] DEFAULTS = {</span>
+<span class="fc" id="L46">        {&quot;NodeGraph&quot;, 0x1d1b20, 0xf7f7fa, 0xe6e1e5, 0x141317, 255, 0},</span>
+<span class="fc" id="L47">        {&quot;NodeGraphGrid&quot;, 0xb4b0bb, 0xffffff, 0x5f5b66, 0x1c1b1f, 0, 0},</span>
+<span class="fc" id="L48">        {&quot;NodeGraphNode&quot;, 0x1d1b20, 0xffffff, 0xe6e1e5, 0x1c1b1f, 255, 0},</span>
+<span class="fc" id="L49">        {&quot;NodeGraphNodeSelected&quot;, 0x1a73e8, 0xffffff, 0x8ab4f8, 0x1c1b1f, 255, 0},</span>
+<span class="fc" id="L50">        {&quot;NodeGraphGroup&quot;, 0x49454f, 0xece6f0, 0xcac4d0, 0x26242b, 120, 2},</span>
+<span class="fc" id="L51">        {&quot;NodeGraphPort&quot;, 0x1a73e8, 0xffffff, 0x8ab4f8, 0x1c1b1f, 255, 1},</span>
+<span class="fc" id="L52">        {&quot;NodeGraphEdge&quot;, 0x79747e, 0xffffff, 0x938f99, 0x1c1b1f, 0, 0},</span>
+<span class="fc" id="L53">        {&quot;NodeGraphEdgeLabel&quot;, 0x49454f, 0xffffff, 0xcac4d0, 0x1c1b1f, 255, 1},</span>
+<span class="fc" id="L54">        {&quot;NodeGraphMinimap&quot;, 0x49454f, 0xf3edf7, 0xcac4d0, 0x2b2930, 255, 0},</span>
+<span class="fc" id="L55">        {&quot;NodeGraphLane&quot;, 0x79747e, 0xffffff, 0x938f99, 0x1c1b1f, 110, 0},</span>
+<span class="fc" id="L56">        {&quot;NodeGraphLaneHeader&quot;, 0x1d1b20, 0xe7e0ec, 0xe6e1e5, 0x36343b, 255, 2},</span>
+<span class="fc" id="L57">        {&quot;NodeGraphHandle&quot;, 0x1a73e8, 0xffffff, 0x8ab4f8, 0x1c1b1f, 255, 0},</span>
+<span class="fc" id="L58">        {&quot;NodeGraphPalette&quot;, 0x1d1b20, 0xf3edf7, 0xe6e1e5, 0x211f26, 255, 0},</span>
+<span class="fc" id="L59">        {&quot;NodeGraphPaletteItem&quot;, 0x1d1b20, 0xffffff, 0xe6e1e5, 0x2b2930, 255, 1},</span>
+    };
+
+<span class="fc" id="L62">    private static final HashMap&lt;String, Style&gt; STYLES = new HashMap&lt;String, Style&gt;();</span>
+    // per UIID, then per pixel size: asked once per node per frame, and an
+    // Integer of a font size is a cached one, so a lookup allocates nothing
+<span class="fc" id="L65">    private static final HashMap&lt;String, HashMap&lt;Integer, Font&gt;&gt; FONTS = new HashMap&lt;String, HashMap&lt;Integer, Font&gt;&gt;();</span>
+<span class="fc" id="L66">    private static int generation = -1;</span>
+    private static Boolean darkSeen;
+
+    private GraphLook() {
+    }
+
+    private static void check() {
+<span class="fc" id="L73">        int now = UIManager.getThemeGeneration();</span>
+        // dark mode can switch without a new theme generation, and both the
+        // fallbacks and the $Dark lookups depend on it
+<span class="fc" id="L76">        Boolean dark = Display.getInstance().isDarkMode();</span>
+<span class="pc bpc" id="L77" title="1 of 4 branches missed.">        boolean same = darkSeen == null ? dark == null : darkSeen.equals(dark);</span>
+<span class="pc bpc" id="L78" title="1 of 4 branches missed.">        if (now != generation || !same) {</span>
+<span class="fc" id="L79">            generation = now;</span>
+<span class="fc" id="L80">            darkSeen = dark;</span>
+<span class="fc" id="L81">            STYLES.clear();</span>
+<span class="fc" id="L82">            FONTS.clear();</span>
+        }
+<span class="fc" id="L84">    }</span>
+
+    /// The font of a UIID at a zoom. Text is part of the drawing, so it
+    /// scales with the cards it sits in: at the zoom `fitToView` picks for a
+    /// wide graph, a theme-sized label would be cut to a letter or two. A
+    /// font that cannot be derived (a bitmap or system font) is used as it
+    /// is. Sizes are whole pixels, so a pinch derives a few fonts, not one
+    /// per frame.
+    static Font font(String uiid, float zoom) {
+<span class="fc" id="L93">        Font base = style(uiid).getFont();</span>
+<span class="pc bpc" id="L94" title="2 of 4 branches missed.">        if (base == null || !base.isTTFNativeFont()) {</span>
+<span class="fc" id="L95">            return base;</span>
+        }
+<span class="nc" id="L97">        float px = base.getPixelSize();</span>
+<span class="nc bnc" id="L98" title="All 2 branches missed.">        if (px &lt;= 0) {</span>
+<span class="nc" id="L99">            px = base.getHeight();</span>
+        }
+<span class="nc" id="L101">        int size = Math.max(6, Math.round(px * Math.min(zoom, 1.5f)));</span>
+<span class="nc bnc" id="L102" title="All 2 branches missed.">        if (size == Math.round(px)) {</span>
+<span class="nc" id="L103">            return base;</span>
+        }
+<span class="nc" id="L105">        HashMap&lt;Integer, Font&gt; sizes = FONTS.get(uiid);</span>
+<span class="nc bnc" id="L106" title="All 2 branches missed.">        if (sizes == null) {</span>
+<span class="nc" id="L107">            sizes = new HashMap&lt;Integer, Font&gt;();</span>
+<span class="nc" id="L108">            FONTS.put(uiid, sizes);</span>
+        }
+<span class="nc" id="L110">        Integer key = Integer.valueOf(size);</span>
+<span class="nc" id="L111">        Font f = sizes.get(key);</span>
+<span class="nc bnc" id="L112" title="All 2 branches missed.">        if (f == null) {</span>
+<span class="nc" id="L113">            f = base.derive(size, base.getStyle());</span>
+<span class="nc" id="L114">            sizes.put(key, f);</span>
+        }
+<span class="nc" id="L116">        return f;</span>
+    }
+
+    static Style style(String uiid) {
+<span class="fc" id="L120">        check();</span>
+<span class="fc" id="L121">        Style s = STYLES.get(uiid);</span>
+<span class="fc bfc" id="L122" title="All 2 branches covered.">        if (s == null) {</span>
+<span class="fc" id="L123">            UIManager m = UIManager.getInstance();</span>
+<span class="pc bpc" id="L124" title="1 of 2 branches missed.">            s = m.isThemeStyleDefined(uiid) ? m.getComponentStyle(uiid) : fallback(uiid);</span>
+<span class="fc" id="L125">            STYLES.put(uiid, s);</span>
+        }
+<span class="fc" id="L127">        return s;</span>
+    }
+
+    /// The default style of a UIID the theme does not declare.
+    static Style fallback(String uiid) {
+<span class="fc" id="L132">        UIManager m = UIManager.getInstance();</span>
+<span class="fc" id="L133">        Object[] row = null;</span>
+<span class="pc bpc" id="L134" title="1 of 2 branches missed.">        for (int i = 0; i &lt; DEFAULTS.length; i++) { // NOPMD ForLoopCanBeForeach - indexed, as the rest of the class</span>
+<span class="fc bfc" id="L135" title="All 2 branches covered.">            if (DEFAULTS[i][0].equals(uiid)) {</span>
+<span class="fc" id="L136">                row = DEFAULTS[i];</span>
+<span class="fc" id="L137">                break;</span>
+            }
+        }
+<span class="fc" id="L140">        Style s = m.getComponentStyle(uiid);</span>
+<span class="pc bpc" id="L141" title="1 of 2 branches missed.">        if (row == null) {</span>
+<span class="nc" id="L142">            return s;</span>
+        }
+<span class="fc" id="L144">        boolean dark = isDark(m);</span>
+<span class="pc bpc" id="L145" title="1 of 2 branches missed.">        s.setFgColor(((Integer) row[dark ? 3 : 1]).intValue());</span>
+<span class="pc bpc" id="L146" title="1 of 2 branches missed.">        s.setBgColor(((Integer) row[dark ? 4 : 2]).intValue());</span>
+<span class="fc" id="L147">        s.setBgTransparency(((Integer) row[5]).intValue());</span>
+<span class="fc" id="L148">        int kind = ((Integer) row[6]).intValue();</span>
+<span class="fc" id="L149">        Font base = Font.getDefaultFont();</span>
+<span class="fc bfc" id="L150" title="All 2 branches covered.">        if (kind == 2) {</span>
+<span class="pc bpc" id="L151" title="1 of 2 branches missed.">            s.setFont(base.isTTFNativeFont() ? base.derive(base.getHeight(), Font.STYLE_BOLD)</span>
+<span class="fc" id="L152">                    : Font.createSystemFont(Font.FACE_SYSTEM, Font.STYLE_BOLD, Font.SIZE_MEDIUM));</span>
+<span class="fc bfc" id="L153" title="All 2 branches covered.">        } else if (kind == 1) {</span>
+<span class="pc bpc" id="L154" title="1 of 2 branches missed.">            s.setFont(base.isTTFNativeFont() ? base.derive(Display.getInstance().convertToPixels(2f), Font.STYLE_PLAIN)</span>
+<span class="fc" id="L155">                    : Font.createSystemFont(Font.FACE_SYSTEM, Font.STYLE_PLAIN, Font.SIZE_SMALL));</span>
+        } else {
+<span class="fc" id="L157">            s.setFont(base);</span>
+        }
+<span class="fc" id="L159">        return s;</span>
+    }
+
+    // Dark when the device says so or the theme's forms are dark: a theme
+    // can be dark without the dark mode switch.
+    private static boolean isDark(UIManager m) {
+<span class="fc" id="L165">        Style form = m.getComponentStyle(&quot;Form&quot;);</span>
+<span class="pc bpc" id="L166" title="1 of 2 branches missed.">        if ((form.getBgTransparency() &amp; 0xff) != 0) {</span>
+<span class="fc" id="L167">            int rgb = form.getBgColor();</span>
+<span class="fc" id="L168">            int luma = (((rgb &gt;&gt; 16) &amp; 0xff) * 299 + ((rgb &gt;&gt; 8) &amp; 0xff) * 587 + (rgb &amp; 0xff) * 114) / 1000;</span>
+<span class="pc bpc" id="L169" title="1 of 2 branches missed.">            return luma &lt; 96;</span>
+        }
+<span class="nc" id="L171">        Boolean d = Display.getInstance().isDarkMode();</span>
+<span class="nc bnc" id="L172" title="All 4 branches missed.">        return d != null &amp;&amp; d.booleanValue();</span>
+    }
+
+    /// Screen pixels per world unit at zoom 1: the node font's height over
+    /// the 20 pixels world sizes are designed for, never below 1.
+    static float unit() {
+<span class="fc" id="L178">        Font f = style(&quot;NodeGraphNode&quot;).getFont();</span>
+<span class="pc bpc" id="L179" title="1 of 2 branches missed.">        int h = f == null ? 0 : f.getHeight();</span>
+<span class="fc" id="L180">        return Math.max(1f, h / 20f);</span>
+    }
+
+    static int mm(float mm) {
+<span class="fc" id="L184">        return Math.max(1, Display.getInstance().convertToPixels(mm));</span>
+    }
+
+    /// A length in millimetres at a zoom, for the padding around text that
+    /// scales with the zoom.
+    static int mm(float mm, float zoom) {
+<span class="fc" id="L190">        return Math.max(1, Math.round(mm(mm) * Math.min(zoom, 1.5f)));</span>
+    }
+
+    // the last two strokes asked for, newest first: a frame asks for the
+    // same two widths for every node it paints. Painting is the EDT's alone.
+<span class="fc" id="L195">    private static final Stroke[] STROKES = new Stroke[2];</span>
+
+    /// A stroke for the outline of a shape. It is shared: do not change it.
+    static Stroke stroke(float width) {
+<span class="nc" id="L199">        Stroke s = STROKES[0];</span>
+<span class="nc bnc" id="L200" title="All 4 branches missed.">        if (s != null &amp;&amp; s.getLineWidth() == width) {</span>
+<span class="nc" id="L201">            return s;</span>
+        }
+<span class="nc" id="L203">        s = STROKES[1];</span>
+<span class="nc bnc" id="L204" title="All 4 branches missed.">        if (s == null || s.getLineWidth() != width) {</span>
+<span class="nc" id="L205">            s = new Stroke(width, Stroke.CAP_BUTT, Stroke.JOIN_ROUND, 4f);</span>
+        }
+<span class="nc" id="L207">        STROKES[1] = STROKES[0];</span>
+<span class="nc" id="L208">        STROKES[0] = s;</span>
+<span class="nc" id="L209">        return s;</span>
+    }
+
+    /// Mixes two RGB colours: 0 is all `a`, 255 all `b`.
+    static int mix(int a, int b, int amount) {
+<span class="fc" id="L214">        int inv = 255 - amount;</span>
+<span class="fc" id="L215">        int r = (((a &gt;&gt; 16) &amp; 0xff) * inv + ((b &gt;&gt; 16) &amp; 0xff) * amount) / 255;</span>
+<span class="fc" id="L216">        int g = (((a &gt;&gt; 8) &amp; 0xff) * inv + ((b &gt;&gt; 8) &amp; 0xff) * amount) / 255;</span>
+<span class="fc" id="L217">        int bl = ((a &amp; 0xff) * inv + (b &amp; 0xff) * amount) / 255;</span>
+<span class="fc" id="L218">        return (r &lt;&lt; 16) | (g &lt;&lt; 8) | bl;</span>
+    }
+
+    /// The background colour a style paints, or `fallback` when the style is
+    /// transparent: a transparent style's colour is usually black, which is
+    /// not what is under it.
+    static int bg(Style s, int fallback) {
+<span class="pc bpc" id="L225" title="1 of 2 branches missed.">        return (s.getBgTransparency() &amp; 0xff) == 0 ? fallback : s.getBgColor();</span>
+    }
+
+    /// A line `width` pixels wide, drawn as a filled quad so it is as thick
+    /// on every port; a width of one or less is a plain line.
+    static void line(Graphics g, double x1, double y1, double x2, double y2, float width) {
+<span class="pc bpc" id="L231" title="1 of 2 branches missed.">        if (width &lt;= 1.25f) {</span>
+<span class="fc" id="L232">            g.drawLine((int) Math.round(x1), (int) Math.round(y1), (int) Math.round(x2), (int) Math.round(y2));</span>
+<span class="fc" id="L233">            return;</span>
+        }
+<span class="nc" id="L235">        double dx = x2 - x1;</span>
+<span class="nc" id="L236">        double dy = y2 - y1;</span>
+<span class="nc" id="L237">        double len = Math.sqrt(dx * dx + dy * dy);</span>
+<span class="nc bnc" id="L238" title="All 2 branches missed.">        if (len &lt; 0.01) {</span>
+<span class="nc" id="L239">            return;</span>
+        }
+<span class="nc" id="L241">        double nx = -dy / len * width / 2;</span>
+<span class="nc" id="L242">        double ny = dx / len * width / 2;</span>
+        // new arrays per call, never shared scratch: Android's async view
+        // queues the arrays it is given and draws them after paint returns
+<span class="nc" id="L245">        int[] xs = new int[4];</span>
+<span class="nc" id="L246">        int[] ys = new int[4];</span>
+<span class="nc" id="L247">        xs[0] = (int) Math.round(x1 + nx);</span>
+<span class="nc" id="L248">        xs[1] = (int) Math.round(x2 + nx);</span>
+<span class="nc" id="L249">        xs[2] = (int) Math.round(x2 - nx);</span>
+<span class="nc" id="L250">        xs[3] = (int) Math.round(x1 - nx);</span>
+<span class="nc" id="L251">        ys[0] = (int) Math.round(y1 + ny);</span>
+<span class="nc" id="L252">        ys[1] = (int) Math.round(y2 + ny);</span>
+<span class="nc" id="L253">        ys[2] = (int) Math.round(y2 - ny);</span>
+<span class="nc" id="L254">        ys[3] = (int) Math.round(y1 - ny);</span>
+<span class="nc" id="L255">        g.fillPolygon(xs, ys, 4);</span>
+<span class="nc" id="L256">    }</span>
+
+    /// The longest start of `text` that fits `width`, ending in an ellipsis
+    /// when anything was cut. Empty when not even that fits.
+    static String fit(String text, Font f, int width) {
+<span class="pc bpc" id="L261" title="3 of 6 branches missed.">        if (text == null || text.length() == 0 || width &lt;= 0) {</span>
+<span class="nc" id="L262">            return &quot;&quot;;</span>
+        }
+<span class="fc bfc" id="L264" title="All 2 branches covered.">        if (f.stringWidth(text) &lt;= width) {</span>
+<span class="fc" id="L265">            return text;</span>
+        }
+<span class="fc" id="L267">        int dots = f.stringWidth(&quot;...&quot;);</span>
+<span class="fc bfc" id="L268" title="All 2 branches covered.">        if (dots &gt; width) {</span>
+<span class="fc" id="L269">            return &quot;&quot;;</span>
+        }
+<span class="fc" id="L271">        int lo = 0;</span>
+<span class="fc" id="L272">        int hi = text.length();</span>
+<span class="fc bfc" id="L273" title="All 2 branches covered.">        while (lo &lt; hi) {</span>
+<span class="fc" id="L274">            int mid = (lo + hi + 1) / 2;</span>
+<span class="fc bfc" id="L275" title="All 2 branches covered.">            if (f.substringWidth(text, 0, mid) + dots &lt;= width) {</span>
+<span class="fc" id="L276">                lo = mid;</span>
+            } else {
+<span class="fc" id="L278">                hi = mid - 1;</span>
+            }
+<span class="fc" id="L280">        }</span>
+<span class="fc bfc" id="L281" title="All 2 branches covered.">        return lo == 0 ? &quot;&quot; : text.substring(0, lo) + &quot;...&quot;;</span>
+    }
+
+    /// A soft shadow under a rounded box, `level` from 0 to 1.
+    static void shadow(Graphics g, int x, int y, int w, int h, int arc, float level) {
+<span class="pc bpc" id="L286" title="3 of 6 branches missed.">        if (level &lt;= 0 || w &lt;= 0 || h &lt;= 0) {</span>
+<span class="nc" id="L287">            return;</span>
+        }
+<span class="fc" id="L289">        int a = g.getAlpha();</span>
+<span class="fc" id="L290">        int reach = Math.max(2, mm(0.8f));</span>
+<span class="fc" id="L291">        int drop = Math.round(mm(0.5f) * level);</span>
+<span class="fc" id="L292">        g.setColor(0);</span>
+<span class="fc" id="L293">        g.setAlpha(Math.max(1, Math.round(a * 0.18f * level / reach)));</span>
+<span class="fc bfc" id="L294" title="All 2 branches covered.">        for (int i = reach; i &gt;= 1; i--) {</span>
+<span class="fc" id="L295">            g.fillRoundRect(x - i, y - i + drop, w + 2 * i, h + 2 * i, arc + 2 * i, arc + 2 * i);</span>
+        }
+<span class="fc" id="L297">        g.setAlpha(a);</span>
+<span class="fc" id="L298">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

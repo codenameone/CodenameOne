@@ -1,0 +1,239 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>BitcoinAddress.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.crypto.bitcoin</a> &gt; <span class="el_source">BitcoinAddress.java</span></div><h1>BitcoinAddress.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008-2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.crypto.bitcoin;
+
+import com.codename1.crypto.encoding.Base58Check;
+import com.codename1.crypto.encoding.Bech32;
+import com.codename1.security.Hash;
+import com.codename1.security.Secp256k1;
+
+/// A Bitcoin address of any standard type, tied to its network.
+///
+/// | Type | Starts with (mainnet) | Built from |
+/// |---|---|---|
+/// | [#P2PKH] | `1` | [#p2pkh] |
+/// | [#P2SH] | `3` | [#p2sh], [#p2shP2wpkh] (BIP-49) |
+/// | [#P2WPKH] | `bc1q` | [#p2wpkh] (BIP-84) |
+/// | [#P2WSH] | `bc1q` | [#p2wsh] |
+/// | [#P2TR] | `bc1p` | [#p2tr] (BIP-86) |
+///
+/// [#parse] reads any of them, refusing an address of another network and a Bech32 address
+/// with the wrong checksum variant; [#getScriptPubKey] is what a transaction pays to.
+@com.codename1.impl.SharedWithBackend
+public final class BitcoinAddress {
+    /// Pay to public key hash.
+    public static final int P2PKH = 0;
+    /// Pay to script hash.
+    public static final int P2SH = 1;
+    /// Native SegWit v0 key hash.
+    public static final int P2WPKH = 2;
+    /// Native SegWit v0 script hash.
+    public static final int P2WSH = 3;
+    /// Taproot, SegWit v1.
+    public static final int P2TR = 4;
+    /// A SegWit version this library knows no spending rules for (v2 to v16).
+    public static final int WITNESS_UNKNOWN = 5;
+
+    private final int type;
+    private final BitcoinNetwork network;
+    private final Script scriptPubKey;
+    private final String text;
+
+<span class="fc" id="L62">    private BitcoinAddress(int type, BitcoinNetwork network, Script scriptPubKey, String text) {</span>
+<span class="fc" id="L63">        this.type = type;</span>
+<span class="fc" id="L64">        this.network = network;</span>
+<span class="fc" id="L65">        this.scriptPubKey = scriptPubKey;</span>
+<span class="fc" id="L66">        this.text = text;</span>
+<span class="fc" id="L67">    }</span>
+
+    /// A legacy address of a public key (compressed or not; the form changes the address).
+    public static BitcoinAddress p2pkh(byte[] publicKey, BitcoinNetwork network) {
+<span class="fc" id="L71">        return fromScript(Script.p2pkh(Hash.hash160(publicKey)), network);</span>
+    }
+
+    /// A native SegWit address of a compressed public key.
+    public static BitcoinAddress p2wpkh(byte[] compressedPublicKey, BitcoinNetwork network) {
+<span class="fc" id="L76">        requireCompressed(compressedPublicKey);</span>
+<span class="fc" id="L77">        return fromScript(Script.p2wpkh(Hash.hash160(compressedPublicKey)), network);</span>
+    }
+
+    /// The BIP-49 nested SegWit address: P2WPKH wrapped in P2SH.
+    public static BitcoinAddress p2shP2wpkh(byte[] compressedPublicKey, BitcoinNetwork network) {
+<span class="fc" id="L82">        requireCompressed(compressedPublicKey);</span>
+<span class="fc" id="L83">        return p2sh(Script.p2wpkh(Hash.hash160(compressedPublicKey)), network);</span>
+    }
+
+    /// The P2SH address of a redeem script.
+    public static BitcoinAddress p2sh(Script redeemScript, BitcoinNetwork network) {
+<span class="fc" id="L88">        return fromScript(Script.p2sh(Hash.hash160(redeemScript.raw())), network);</span>
+    }
+
+    /// The P2WSH address of a witness script.
+    public static BitcoinAddress p2wsh(Script witnessScript, BitcoinNetwork network) {
+<span class="fc" id="L93">        return fromScript(Script.p2wsh(Hash.sha256(witnessScript.raw())), network);</span>
+    }
+
+    /// The Taproot address of an x-only internal key with no script tree, as BIP-86 wallets
+    /// derive it; a 33-byte compressed key is accepted and reduced to its x coordinate.
+    public static BitcoinAddress p2tr(byte[] internalKey, BitcoinNetwork network) {
+<span class="fc" id="L99">        return p2tr(internalKey, null, network);</span>
+    }
+
+    /// The Taproot address of an internal key committing to a script tree's Merkle root.
+    public static BitcoinAddress p2tr(byte[] internalKey, byte[] merkleRoot, BitcoinNetwork network) {
+<span class="fc" id="L104">        byte[] x = internalKey;</span>
+<span class="pc bpc" id="L105" title="1 of 2 branches missed.">        if (internalKey.length == 33) {</span>
+<span class="nc" id="L106">            x = new byte[32];</span>
+<span class="nc" id="L107">            System.arraycopy(internalKey, 1, x, 0, 32);</span>
+        }
+<span class="fc" id="L109">        return fromScript(Taproot.outputScript(x, merkleRoot), network);</span>
+    }
+
+    /// The address that a standard output script pays to.
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: for a script with no address form (bare multisig,
+    ///   `OP_RETURN`)
+    public static BitcoinAddress fromScript(Script script, BitcoinNetwork network) {
+<span class="fc bfc" id="L119" title="All 2 branches covered.">        if (script.isP2pkh()) {</span>
+<span class="fc" id="L120">            return new BitcoinAddress(P2PKH, network, script,</span>
+<span class="fc" id="L121">                    base58(network.getP2pkhVersion(), script.getDestinationHash()));</span>
+        }
+<span class="fc bfc" id="L123" title="All 2 branches covered.">        if (script.isP2sh()) {</span>
+<span class="fc" id="L124">            return new BitcoinAddress(P2SH, network, script,</span>
+<span class="fc" id="L125">                    base58(network.getP2shVersion(), script.getDestinationHash()));</span>
+        }
+<span class="fc" id="L127">        int version = script.getWitnessVersion();</span>
+<span class="pc bpc" id="L128" title="1 of 2 branches missed.">        if (version &lt; 0) {</span>
+<span class="nc" id="L129">            throw new IllegalArgumentException(&quot;script has no address form&quot;);</span>
+        }
+<span class="fc" id="L131">        byte[] program = script.getWitnessProgram();</span>
+        int type;
+<span class="fc bfc" id="L133" title="All 4 branches covered.">        if (version == 0 &amp;&amp; program.length == 20) {</span>
+<span class="fc" id="L134">            type = P2WPKH;</span>
+<span class="pc bpc" id="L135" title="1 of 4 branches missed.">        } else if (version == 0 &amp;&amp; program.length == 32) {</span>
+<span class="fc" id="L136">            type = P2WSH;</span>
+<span class="pc bpc" id="L137" title="1 of 2 branches missed.">        } else if (version == 0) {</span>
+<span class="nc" id="L138">            throw new IllegalArgumentException(&quot;bad v0 witness program length&quot;);</span>
+<span class="pc bpc" id="L139" title="2 of 4 branches missed.">        } else if (version == 1 &amp;&amp; program.length == 32) {</span>
+<span class="fc" id="L140">            type = P2TR;</span>
+        } else {
+<span class="nc" id="L142">            type = WITNESS_UNKNOWN;</span>
+        }
+<span class="fc" id="L144">        return new BitcoinAddress(type, network, script,</span>
+<span class="fc" id="L145">                Bech32.encodeSegwitAddress(network.getBech32Hrp(), version, program));</span>
+    }
+
+    /// Parses an address of the given network.
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: for a malformed address, a bad checksum or an address
+    ///   of another network
+    public static BitcoinAddress parse(String address, BitcoinNetwork network) {
+<span class="pc bpc" id="L155" title="2 of 4 branches missed.">        if (address == null || address.length() == 0) {</span>
+<span class="nc" id="L156">            throw new IllegalArgumentException(&quot;empty address&quot;);</span>
+        }
+<span class="fc" id="L158">        String hrp = network.getBech32Hrp();</span>
+<span class="pc bpc" id="L159" title="1 of 4 branches missed.">        if (address.length() &gt; hrp.length() &amp;&amp; address.regionMatches(true, 0, hrp + &quot;1&quot;, 0, hrp.length() + 1)) {</span>
+<span class="fc" id="L160">            Bech32.SegwitAddress s = Bech32.decodeSegwitAddress(hrp, address);</span>
+<span class="fc" id="L161">            return fromScript(Script.witness(s.getVersion(), s.getProgram()), network);</span>
+        }
+        byte[] payload;
+        try {
+<span class="fc" id="L165">            payload = Base58Check.decode(address);</span>
+<span class="fc" id="L166">        } catch (IllegalArgumentException bad) {</span>
+<span class="fc" id="L167">            throw new IllegalArgumentException(&quot;not a &quot; + network + &quot; address: &quot; + address, bad);</span>
+<span class="fc" id="L168">        }</span>
+<span class="pc bpc" id="L169" title="1 of 2 branches missed.">        if (payload.length != 21) {</span>
+<span class="nc" id="L170">            throw new IllegalArgumentException(&quot;not a &quot; + network + &quot; address: &quot; + address);</span>
+        }
+<span class="fc" id="L172">        byte[] hash = new byte[20];</span>
+<span class="fc" id="L173">        System.arraycopy(payload, 1, hash, 0, 20);</span>
+<span class="fc" id="L174">        int version = payload[0] &amp; 0xff;</span>
+<span class="fc bfc" id="L175" title="All 2 branches covered.">        if (version == network.getP2pkhVersion()) {</span>
+<span class="fc" id="L176">            return fromScript(Script.p2pkh(hash), network);</span>
+        }
+<span class="fc bfc" id="L178" title="All 2 branches covered.">        if (version == network.getP2shVersion()) {</span>
+<span class="fc" id="L179">            return fromScript(Script.p2sh(hash), network);</span>
+        }
+<span class="fc" id="L181">        throw new IllegalArgumentException(&quot;not a &quot; + network + &quot; address: &quot; + address);</span>
+    }
+
+    /// Tells whether [#parse] accepts the address for the network.
+    public static boolean isValid(String address, BitcoinNetwork network) {
+        try {
+<span class="fc" id="L187">            parse(address, network);</span>
+<span class="fc" id="L188">            return true;</span>
+<span class="fc" id="L189">        } catch (IllegalArgumentException invalid) {</span>
+<span class="fc" id="L190">            return false;</span>
+        }
+    }
+
+    /// The address type, [#P2PKH] to [#WITNESS_UNKNOWN].
+    public int getType() {
+<span class="nc" id="L196">        return type;</span>
+    }
+
+    /// The network.
+    public BitcoinNetwork getNetwork() {
+<span class="nc" id="L201">        return network;</span>
+    }
+
+    /// The output script that pays this address.
+    public Script getScriptPubKey() {
+<span class="fc" id="L206">        return scriptPubKey;</span>
+    }
+
+    /// The address text. Bech32 addresses are lowercase.
+    @Override
+    public String toString() {
+<span class="fc" id="L212">        return text;</span>
+    }
+
+    @Override
+    public boolean equals(Object o) {
+<span class="pc bpc" id="L217" title="3 of 6 branches missed.">        return o instanceof BitcoinAddress &amp;&amp; ((BitcoinAddress) o).text.equals(text)</span>
+                &amp;&amp; ((BitcoinAddress) o).network == network; // NOPMD CompareObjectsWithEquals - networks are singleton constants
+    }
+
+    @Override
+    public int hashCode() {
+<span class="nc" id="L223">        return text.hashCode();</span>
+    }
+
+    private static String base58(int version, byte[] hash) {
+<span class="fc" id="L227">        byte[] payload = new byte[21];</span>
+<span class="fc" id="L228">        payload[0] = (byte) version;</span>
+<span class="fc" id="L229">        System.arraycopy(hash, 0, payload, 1, 20);</span>
+<span class="fc" id="L230">        return Base58Check.encode(payload);</span>
+    }
+
+    private static void requireCompressed(byte[] key) {
+<span class="pc bpc" id="L234" title="3 of 6 branches missed.">        if (key == null || key.length != 33 || !Secp256k1.isValidPublicKey(key)) {</span>
+<span class="nc" id="L235">            throw new IllegalArgumentException(&quot;SegWit needs a 33-byte compressed public key&quot;);</span>
+        }
+<span class="fc" id="L237">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

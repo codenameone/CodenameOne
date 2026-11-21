@@ -1,0 +1,432 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ForceArrangement.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.graph.arrange</a> &gt; <span class="el_source">ForceArrangement.java</span></div><h1>ForceArrangement.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.graph.arrange;
+
+import com.codename1.graph.GraphModel;
+import com.codename1.graph.GraphNode;
+
+/// An organic arrangement for networks: edges pull like springs and every node
+/// pushes every other away, until the graph settles.
+///
+/// This is Fruchterman and Reingold's method with a cooling schedule. Repulsion
+/// is summed through a Barnes-Hut quadtree, so a step costs n log n rather than
+/// n squared, and a graph of thousands of nodes settles in well under a second.
+///
+/// `arrange` runs every iteration at once. A view that animates the graph
+/// settling, or keeps it live while the user drags a node, calls `start` and
+/// then `step` once a frame instead. Starting positions come from the model, so
+/// a graph that was laid out before moves only as much as its changes need;
+/// nodes that are all at one point are first spread on a circle. The run is
+/// deterministic: the same graph gives the same picture.
+<span class="fc" id="L41">public class ForceArrangement implements GraphArrangement {</span>
+<span class="fc" id="L42">    private double idealLength = 160;</span>
+<span class="fc" id="L43">    private int iterations = 300;</span>
+<span class="fc" id="L44">    private double theta = 0.8;</span>
+
+    private Graphs graph;
+    private double[] px;
+    private double[] py;
+    private double[] dx;
+    private double[] dy;
+    private double temperature;
+    private int remaining;
+
+    /// The length an edge settles at, in world units, between node centres.
+    public double getIdealLength() {
+<span class="nc" id="L56">        return idealLength;</span>
+    }
+
+    /// Sets the edge length.
+    public void setIdealLength(double idealLength) {
+<span class="nc" id="L61">        this.idealLength = Math.max(10, idealLength);</span>
+<span class="nc" id="L62">    }</span>
+
+    /// How many steps `arrange` runs, 300 by default.
+    public int getIterations() {
+<span class="nc" id="L66">        return iterations;</span>
+    }
+
+    /// Sets the number of steps.
+    public void setIterations(int iterations) {
+<span class="fc" id="L71">        this.iterations = Math.max(1, iterations);</span>
+<span class="fc" id="L72">    }</span>
+
+    @Override
+    public ArrangementResult arrange(GraphModel model) {
+<span class="fc" id="L76">        start(model);</span>
+<span class="fc" id="L77">        boolean more = true;</span>
+<span class="fc bfc" id="L78" title="All 2 branches covered.">        while (more) {</span>
+<span class="fc" id="L79">            more = step();</span>
+        }
+<span class="fc" id="L81">        removeOverlaps();</span>
+<span class="fc" id="L82">        return result();</span>
+    }
+
+    /// Prepares a stepwise run from the model's current positions.
+    public void start(GraphModel model) {
+<span class="fc" id="L87">        graph = new Graphs(model);</span>
+<span class="fc" id="L88">        int n = graph.size();</span>
+<span class="fc" id="L89">        px = new double[n];</span>
+<span class="fc" id="L90">        py = new double[n];</span>
+<span class="fc" id="L91">        dx = new double[n];</span>
+<span class="fc" id="L92">        dy = new double[n];</span>
+<span class="fc" id="L93">        boolean allSame = true;</span>
+<span class="fc bfc" id="L94" title="All 2 branches covered.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc" id="L95">            GraphNode node = graph.nodes[i];</span>
+<span class="fc" id="L96">            px[i] = node.getCenterX();</span>
+<span class="fc" id="L97">            py[i] = node.getCenterY();</span>
+<span class="pc bpc" id="L98" title="1 of 6 branches missed.">            if (i &gt; 0 &amp;&amp; (px[i] != px[0] || py[i] != py[0])) {</span>
+<span class="fc" id="L99">                allSame = false;</span>
+            }
+        }
+<span class="pc bpc" id="L102" title="1 of 4 branches missed.">        if (allSame &amp;&amp; n &gt; 1) {</span>
+<span class="nc" id="L103">            seed(graph, n);</span>
+        }
+<span class="fc" id="L105">        temperature = idealLength * Math.max(1, Math.sqrt(n)) / 4;</span>
+<span class="fc" id="L106">        remaining = iterations;</span>
+<span class="fc" id="L107">    }</span>
+
+    /// Spreads nodes that all start at one point on a sunflower spiral, in
+    /// breadth first order, so that neighbours start near each other. Placed
+    /// on a circle in the model's order instead, the graph's cycles start as
+    /// one ring around the circle, and the forces settle into a stretched loop
+    /// they cannot untangle.
+    private void seed(Graphs g, int n) {
+<span class="nc" id="L115">        int[] order = new int[n];</span>
+<span class="nc" id="L116">        boolean[] seen = new boolean[n];</span>
+<span class="nc" id="L117">        int head = 0;</span>
+<span class="nc" id="L118">        int tail = 0;</span>
+<span class="nc bnc" id="L119" title="All 2 branches missed.">        for (int s = 0; s &lt; n; s++) {</span>
+<span class="nc bnc" id="L120" title="All 2 branches missed.">            if (seen[s]) {</span>
+<span class="nc" id="L121">                continue;</span>
+            }
+<span class="nc" id="L123">            seen[s] = true;</span>
+<span class="nc" id="L124">            order[tail++] = s;</span>
+<span class="nc bnc" id="L125" title="All 2 branches missed.">            while (head &lt; tail) {</span>
+<span class="nc" id="L126">                int v = order[head++];</span>
+<span class="nc" id="L127">                tail = visit(g.out[v], seen, order, tail);</span>
+<span class="nc" id="L128">                tail = visit(g.in[v], seen, order, tail);</span>
+<span class="nc" id="L129">            }</span>
+        }
+<span class="nc" id="L131">        double golden = Math.PI * (3 - Math.sqrt(5));</span>
+<span class="nc bnc" id="L132" title="All 2 branches missed.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="nc" id="L133">            double r = idealLength * 0.5 * Math.sqrt(i + 0.5);</span>
+<span class="nc" id="L134">            double a = i * golden;</span>
+<span class="nc" id="L135">            px[order[i]] = Math.cos(a) * r;</span>
+<span class="nc" id="L136">            py[order[i]] = Math.sin(a) * r;</span>
+        }
+<span class="nc" id="L138">    }</span>
+
+    private static int visit(int[] next, boolean[] seen, int[] order, int tail) {
+<span class="nc bnc" id="L141" title="All 2 branches missed.">        for (int j = 0; j &lt; next.length; j++) { // NOPMD ForLoopCanBeForeach - indexed, like the rest of the pass</span>
+<span class="nc" id="L142">            int t = next[j];</span>
+<span class="nc bnc" id="L143" title="All 2 branches missed.">            if (!seen[t]) {</span>
+<span class="nc" id="L144">                seen[t] = true;</span>
+<span class="nc" id="L145">                order[tail++] = t;</span>
+            }
+        }
+<span class="nc" id="L148">        return tail;</span>
+    }
+
+    /// Moves every node one step towards rest.
+    ///
+    /// #### Returns
+    ///
+    /// false once the run has finished
+    public boolean step() {
+<span class="pc bpc" id="L157" title="2 of 4 branches missed.">        if (graph == null || remaining &lt;= 0) {</span>
+<span class="nc" id="L158">            return false;</span>
+        }
+<span class="fc" id="L160">        int n = graph.size();</span>
+<span class="fc" id="L161">        double k = idealLength;</span>
+<span class="fc" id="L162">        double k2 = k * k;</span>
+<span class="fc bfc" id="L163" title="All 2 branches covered.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc" id="L164">            dx[i] = 0;</span>
+<span class="fc" id="L165">            dy[i] = 0;</span>
+        }
+<span class="fc bfc" id="L167" title="All 2 branches covered.">        if (n &gt; 1) {</span>
+<span class="fc" id="L168">            Quad root = buildTree(n);</span>
+<span class="fc bfc" id="L169" title="All 2 branches covered.">            for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc" id="L170">                repel(root, i, k2);</span>
+            }
+        }
+<span class="fc bfc" id="L173" title="All 2 branches covered.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc" id="L174">            int[] out = graph.out[i];</span>
+<span class="fc bfc" id="L175" title="All 2 branches covered.">            for (int j = 0; j &lt; out.length; j++) { // NOPMD ForLoopCanBeForeach - indexed, like the rest of the pass</span>
+<span class="fc" id="L176">                int t = out[j];</span>
+<span class="fc" id="L177">                double ex = px[i] - px[t];</span>
+<span class="fc" id="L178">                double ey = py[i] - py[t];</span>
+<span class="fc" id="L179">                double d = Math.sqrt(ex * ex + ey * ey);</span>
+<span class="pc bpc" id="L180" title="1 of 2 branches missed.">                if (d &lt; 0.01) {</span>
+<span class="nc" id="L181">                    d = 0.01;</span>
+                }
+<span class="fc" id="L183">                double f = d / k;</span>
+<span class="fc" id="L184">                dx[i] -= ex * f;</span>
+<span class="fc" id="L185">                dy[i] -= ey * f;</span>
+<span class="fc" id="L186">                dx[t] += ex * f;</span>
+<span class="fc" id="L187">                dy[t] += ey * f;</span>
+            }
+        }
+<span class="fc bfc" id="L190" title="All 2 branches covered.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc bfc" id="L191" title="All 2 branches covered.">            if (graph.nodes[i].isPinned()) {</span>
+<span class="fc" id="L192">                continue;</span>
+            }
+            // a weak pull to the origin keeps disconnected parts from drifting
+<span class="fc" id="L195">            dx[i] -= px[i] * 0.01;</span>
+<span class="fc" id="L196">            dy[i] -= py[i] * 0.01;</span>
+<span class="fc" id="L197">            double d = Math.sqrt(dx[i] * dx[i] + dy[i] * dy[i]);</span>
+<span class="pc bpc" id="L198" title="1 of 2 branches missed.">            if (d &gt; 0) {</span>
+<span class="fc" id="L199">                double lim = Math.min(d, temperature);</span>
+<span class="fc" id="L200">                px[i] += dx[i] / d * lim;</span>
+<span class="fc" id="L201">                py[i] += dy[i] / d * lim;</span>
+            }
+        }
+<span class="fc" id="L204">        temperature *= 0.97;</span>
+<span class="fc bfc" id="L205" title="All 2 branches covered.">        if (temperature &lt; 0.5) {</span>
+<span class="fc" id="L206">            temperature = 0.5;</span>
+        }
+<span class="fc" id="L208">        remaining--;</span>
+<span class="fc bfc" id="L209" title="All 2 branches covered.">        return remaining &gt; 0;</span>
+    }
+
+    /// Keeps the run going for more steps, for instance while a node is
+    /// dragged, at a temperature that lets the graph follow.
+    public void reheat(int steps) {
+<span class="nc" id="L215">        remaining = Math.max(remaining, steps);</span>
+<span class="nc" id="L216">        temperature = Math.max(temperature, idealLength / 4);</span>
+<span class="nc" id="L217">    }</span>
+
+    /// Holds a node at a centre position for the next steps; the view calls it
+    /// while the user drags the node.
+    public void hold(String nodeId, double centerX, double centerY) {
+<span class="nc bnc" id="L222" title="All 2 branches missed.">        if (graph == null) {</span>
+<span class="nc" id="L223">            return;</span>
+        }
+<span class="nc bnc" id="L225" title="All 2 branches missed.">        for (int i = 0; i &lt; graph.size(); i++) {</span>
+<span class="nc bnc" id="L226" title="All 2 branches missed.">            if (graph.nodes[i].getId().equals(nodeId)) {</span>
+<span class="nc" id="L227">                px[i] = centerX;</span>
+<span class="nc" id="L228">                py[i] = centerY;</span>
+<span class="nc" id="L229">                return;</span>
+            }
+        }
+<span class="nc" id="L232">    }</span>
+
+    /// The positions the run has reached.
+    public ArrangementResult result() {
+<span class="fc" id="L236">        ArrangementResult r = new ArrangementResult();</span>
+<span class="pc bpc" id="L237" title="1 of 2 branches missed.">        if (graph == null) {</span>
+<span class="nc" id="L238">            return r;</span>
+        }
+<span class="fc bfc" id="L240" title="All 2 branches covered.">        for (int i = 0; i &lt; graph.size(); i++) {</span>
+<span class="fc" id="L241">            GraphNode node = graph.nodes[i];</span>
+<span class="fc bfc" id="L242" title="All 2 branches covered.">            if (node.isPinned()) {</span>
+<span class="fc" id="L243">                r.setPosition(node.getId(), node.getX(), node.getY());</span>
+            } else {
+<span class="fc" id="L245">                r.setPosition(node.getId(), px[i] - node.getWidth() / 2, py[i] - node.getHeight() / 2);</span>
+            }
+        }
+<span class="fc" id="L248">        return r;</span>
+    }
+
+    /// Pushes apart nodes that still overlap once the forces have settled,
+    /// along the axis where they overlap least. Neighbours are found through
+    /// a grid of cells as large as the largest node, so a pass is linear.
+    public void removeOverlaps() {
+<span class="pc bpc" id="L255" title="1 of 2 branches missed.">        if (graph == null) {</span>
+<span class="nc" id="L256">            return;</span>
+        }
+<span class="fc" id="L258">        int n = graph.size();</span>
+<span class="fc" id="L259">        double cell = 1;</span>
+<span class="fc bfc" id="L260" title="All 2 branches covered.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc" id="L261">            cell = Math.max(cell, Math.max(graph.nodes[i].getWidth(), graph.nodes[i].getHeight()));</span>
+        }
+<span class="fc" id="L263">        double pad = idealLength / 8;</span>
+<span class="fc" id="L264">        cell += pad;</span>
+<span class="fc" id="L265">        java.util.Map&lt;Long, java.util.List&lt;Integer&gt;&gt; grid = new java.util.HashMap&lt;Long, java.util.List&lt;Integer&gt;&gt;();</span>
+<span class="pc bpc" id="L266" title="1 of 2 branches missed.">        for (int pass = 0; pass &lt; 60; pass++) {</span>
+<span class="fc" id="L267">            grid.clear();</span>
+<span class="fc bfc" id="L268" title="All 2 branches covered.">            for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc" id="L269">                Long key = cellKey((long) Math.floor(px[i] / cell), (long) Math.floor(py[i] / cell));</span>
+<span class="fc" id="L270">                java.util.List&lt;Integer&gt; l = grid.get(key);</span>
+<span class="fc bfc" id="L271" title="All 2 branches covered.">                if (l == null) {</span>
+<span class="fc" id="L272">                    l = new java.util.ArrayList&lt;Integer&gt;();</span>
+<span class="fc" id="L273">                    grid.put(key, l);</span>
+                }
+<span class="fc" id="L275">                l.add(Integer.valueOf(i));</span>
+            }
+<span class="fc" id="L277">            boolean moved = false;</span>
+<span class="fc bfc" id="L278" title="All 2 branches covered.">            for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc" id="L279">                long gx = (long) Math.floor(px[i] / cell);</span>
+<span class="fc" id="L280">                long gy = (long) Math.floor(py[i] / cell);</span>
+<span class="fc bfc" id="L281" title="All 2 branches covered.">                for (long ox = -1; ox &lt;= 1; ox++) {</span>
+<span class="fc bfc" id="L282" title="All 2 branches covered.">                    for (long oy = -1; oy &lt;= 1; oy++) {</span>
+<span class="fc" id="L283">                        java.util.List&lt;Integer&gt; l = grid.get(cellKey(gx + ox, gy + oy));</span>
+<span class="fc bfc" id="L284" title="All 2 branches covered.">                        if (l == null) {</span>
+<span class="fc" id="L285">                            continue;</span>
+                        }
+<span class="fc bfc" id="L287" title="All 2 branches covered.">                        for (int li = 0; li &lt; l.size(); li++) {</span>
+<span class="fc" id="L288">                            int j = l.get(li).intValue();</span>
+<span class="fc bfc" id="L289" title="All 4 branches covered.">                            if (j &gt; i &amp;&amp; separate(graph.nodes, i, j, pad)) {</span>
+<span class="fc" id="L290">                                moved = true;</span>
+                            }
+                        }
+                    }
+                }
+            }
+<span class="fc bfc" id="L296" title="All 2 branches covered.">            if (!moved) {</span>
+<span class="fc" id="L297">                return;</span>
+            }
+        }
+<span class="nc" id="L300">    }</span>
+
+    private static Long cellKey(long x, long y) {
+<span class="fc" id="L303">        return Long.valueOf((x &lt;&lt; 32) ^ (y &amp; 0xffffffffL));</span>
+    }
+
+    private boolean separate(GraphNode[] nodes, int i, int j, double pad) {
+<span class="fc" id="L307">        GraphNode a = nodes[i];</span>
+<span class="fc" id="L308">        GraphNode b = nodes[j];</span>
+<span class="fc" id="L309">        double ox = (a.getWidth() + b.getWidth()) / 2 + pad - Math.abs(px[i] - px[j]);</span>
+<span class="fc" id="L310">        double oy = (a.getHeight() + b.getHeight()) / 2 + pad - Math.abs(py[i] - py[j]);</span>
+<span class="fc bfc" id="L311" title="All 4 branches covered.">        if (ox &lt;= 0 || oy &lt;= 0) {</span>
+<span class="fc" id="L312">            return false;</span>
+        }
+<span class="fc" id="L314">        boolean pa = a.isPinned();</span>
+<span class="fc" id="L315">        boolean pb = b.isPinned();</span>
+<span class="pc bpc" id="L316" title="3 of 4 branches missed.">        if (pa &amp;&amp; pb) {</span>
+<span class="nc" id="L317">            return false;</span>
+        }
+<span class="pc bpc" id="L319" title="2 of 4 branches missed.">        double wa = pa ? 0 : pb ? 1 : 0.5;</span>
+<span class="fc" id="L320">        double wb = 1 - wa;</span>
+<span class="fc bfc" id="L321" title="All 2 branches covered.">        if (ox &lt; oy) {</span>
+<span class="pc bpc" id="L322" title="3 of 6 branches missed.">            double s = px[i] &lt; px[j] || px[i] == px[j] &amp;&amp; i &lt; j ? -1 : 1;</span>
+<span class="fc" id="L323">            px[i] += s * ox * wa;</span>
+<span class="fc" id="L324">            px[j] -= s * ox * wb;</span>
+<span class="fc" id="L325">        } else {</span>
+<span class="pc bpc" id="L326" title="3 of 6 branches missed.">            double s = py[i] &lt; py[j] || py[i] == py[j] &amp;&amp; i &lt; j ? -1 : 1;</span>
+<span class="fc" id="L327">            py[i] += s * oy * wa;</span>
+<span class="fc" id="L328">            py[j] -= s * oy * wb;</span>
+        }
+<span class="fc" id="L330">        return true;</span>
+    }
+
+    // ---- Barnes-Hut ----
+
+<span class="fc" id="L335">    private static final class Quad {</span>
+        double x0;
+        double y0;
+        double size;
+        double mass;
+        double cx;
+        double cy;
+<span class="fc" id="L342">        int body = -1;</span>
+        Quad[] kids;
+    }
+
+    private Quad newQuad(double x0, double y0, double size) {
+<span class="fc" id="L347">        Quad q = new Quad();</span>
+<span class="fc" id="L348">        q.x0 = x0;</span>
+<span class="fc" id="L349">        q.y0 = y0;</span>
+<span class="fc" id="L350">        q.size = size;</span>
+<span class="fc" id="L351">        return q;</span>
+    }
+
+    private Quad buildTree(int n) {
+<span class="fc" id="L355">        double minX = px[0];</span>
+<span class="fc" id="L356">        double minY = py[0];</span>
+<span class="fc" id="L357">        double maxX = minX;</span>
+<span class="fc" id="L358">        double maxY = minY;</span>
+<span class="fc bfc" id="L359" title="All 2 branches covered.">        for (int i = 1; i &lt; n; i++) {</span>
+<span class="fc" id="L360">            minX = Math.min(minX, px[i]);</span>
+<span class="fc" id="L361">            minY = Math.min(minY, py[i]);</span>
+<span class="fc" id="L362">            maxX = Math.max(maxX, px[i]);</span>
+<span class="fc" id="L363">            maxY = Math.max(maxY, py[i]);</span>
+        }
+<span class="fc" id="L365">        double size = Math.max(maxX - minX, maxY - minY) + 1;</span>
+<span class="fc" id="L366">        Quad root = newQuad(minX, minY, size);</span>
+<span class="fc bfc" id="L367" title="All 2 branches covered.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc" id="L368">            insert(root, i, 0);</span>
+        }
+<span class="fc" id="L370">        return root;</span>
+    }
+
+    private void insert(Quad q, int i, int depth) {
+<span class="fc" id="L374">        double m = q.mass;</span>
+<span class="fc" id="L375">        q.cx = (q.cx * m + px[i]) / (m + 1);</span>
+<span class="fc" id="L376">        q.cy = (q.cy * m + py[i]) / (m + 1);</span>
+<span class="fc" id="L377">        q.mass = m + 1;</span>
+<span class="fc bfc" id="L378" title="All 2 branches covered.">        if (m == 0) {</span>
+<span class="fc" id="L379">            q.body = i;</span>
+<span class="fc" id="L380">            return;</span>
+        }
+<span class="fc bfc" id="L382" title="All 2 branches covered.">        if (depth &gt; 40) {</span>
+            // coincident points: keep them in one leaf
+<span class="fc" id="L384">            return;</span>
+        }
+<span class="fc bfc" id="L386" title="All 2 branches covered.">        if (q.kids == null) {</span>
+<span class="fc" id="L387">            q.kids = new Quad[4];</span>
+<span class="fc" id="L388">            int old = q.body;</span>
+<span class="fc" id="L389">            q.body = -1;</span>
+<span class="pc bpc" id="L390" title="1 of 2 branches missed.">            if (old &gt;= 0) {</span>
+<span class="fc" id="L391">                place(q, old, depth);</span>
+            }
+        }
+<span class="fc" id="L394">        place(q, i, depth);</span>
+<span class="fc" id="L395">    }</span>
+
+    private void place(Quad q, int i, int depth) {
+<span class="fc" id="L398">        double h = q.size / 2;</span>
+<span class="fc bfc" id="L399" title="All 2 branches covered.">        int qx = px[i] &gt;= q.x0 + h ? 1 : 0;</span>
+<span class="fc bfc" id="L400" title="All 2 branches covered.">        int qy = py[i] &gt;= q.y0 + h ? 1 : 0;</span>
+<span class="fc" id="L401">        int idx = qy * 2 + qx;</span>
+<span class="fc bfc" id="L402" title="All 2 branches covered.">        if (q.kids[idx] == null) {</span>
+<span class="fc" id="L403">            q.kids[idx] = newQuad(q.x0 + qx * h, q.y0 + qy * h, h);</span>
+        }
+<span class="fc" id="L405">        insert(q.kids[idx], i, depth + 1);</span>
+<span class="fc" id="L406">    }</span>
+
+    private void repel(Quad q, int i, double k2) {
+<span class="pc bpc" id="L409" title="2 of 8 branches missed.">        if (q == null || q.mass == 0 || q.body == i &amp;&amp; q.kids == null) {</span>
+<span class="fc" id="L410">            return;</span>
+        }
+<span class="fc" id="L412">        double ex = px[i] - q.cx;</span>
+<span class="fc" id="L413">        double ey = py[i] - q.cy;</span>
+<span class="fc" id="L414">        double d2 = ex * ex + ey * ey;</span>
+<span class="fc bfc" id="L415" title="All 4 branches covered.">        if (q.kids == null || q.size * q.size &lt; theta * theta * d2) {</span>
+<span class="fc bfc" id="L416" title="All 2 branches covered.">            if (d2 &lt; 0.0001) {</span>
+                // two nodes on one spot: push apart along a fixed direction
+<span class="fc" id="L418">                ex = (i % 7) - 3 + 0.5;</span>
+<span class="fc" id="L419">                ey = (i % 5) - 2 + 0.5;</span>
+<span class="fc" id="L420">                d2 = ex * ex + ey * ey;</span>
+            }
+<span class="fc" id="L422">            double f = k2 * q.mass / d2;</span>
+<span class="fc" id="L423">            dx[i] += ex * f;</span>
+<span class="fc" id="L424">            dy[i] += ey * f;</span>
+<span class="fc" id="L425">            return;</span>
+        }
+<span class="fc bfc" id="L427" title="All 2 branches covered.">        for (int j = 0; j &lt; 4; j++) {</span>
+<span class="fc" id="L428">            repel(q.kids[j], i, k2);</span>
+        }
+<span class="fc" id="L430">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

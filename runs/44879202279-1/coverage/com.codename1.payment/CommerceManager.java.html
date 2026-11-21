@@ -1,0 +1,1880 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CommerceManager.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.payment</a> &gt; <span class="el_source">CommerceManager.java</span></div><h1>CommerceManager.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Codename One in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.payment;
+
+import com.codename1.analytics.Analytics;
+import com.codename1.analytics.AnalyticsConsent;
+import com.codename1.analytics.ConsentMode;
+import com.codename1.io.JSONParser;
+import com.codename1.io.Log;
+import com.codename1.io.Preferences;
+import com.codename1.io.Storage;
+import com.codename1.io.NetworkEvent;
+import com.codename1.io.rest.ErrorCodeHandler;
+import com.codename1.io.rest.RequestBuilder;
+import com.codename1.io.rest.Response;
+import com.codename1.io.rest.Rest;
+import com.codename1.security.Ed25519;
+import com.codename1.security.SecureRandom;
+import com.codename1.ui.Display;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.util.EventDispatcher;
+import com.codename1.util.Base64;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Random;
+
+/// Client facade for the Codename One Commerce service. It does not replace
+/// the {@link Purchase} API -- it wraps it: purchases still go through the
+/// platform store, and this class adds server-side validation and a
+/// store-agnostic &lt;em&gt;entitlement&lt;/em&gt; check (&quot;does this user have pro?&quot;)
+/// instead of per-SKU receipt juggling.
+///
+/// &lt;p&gt;Typical use:
+/// &lt;pre&gt;
+///   CommerceManager cm = CommerceManager.getInstance();
+///   cm.setAppUserId(myAccountId);          // optional; stable per user
+///   cm.subscribe(&quot;pro_monthly&quot;);           // delegates to Purchase
+///   // later, off the EDT:
+///   cm.refresh();                          // validate receipts with the cloud
+///   if (cm.isEntitled(&quot;pro&quot;)) { ... }      // entitlement, not SKU
+/// &lt;/pre&gt;
+///
+/// &lt;p&gt;&lt;b&gt;Graceful degradation.&lt;/b&gt; When the cloud is unreachable, or the
+/// developer's account is over its monthly validated-volume cap, the cloud
+/// stops validating and {@link #isDegraded()} becomes true. Entitlement checks
+/// then fall back to the store-direct signal (the platform's own receipt), so
+/// a paying user is never locked out -- exactly the server-side behaviour,
+/// mirrored on the device.
+///
+/// &lt;p&gt;The cloud endpoint, build key and package are stamped into the build by
+/// the Codename One build server when commerce is enabled
+/// ({@code codename1.arg.commerce.cloud.enabled=true}); when they are absent
+/// this class is inert and every call is a safe no-op that defers to
+/// {@link Purchase}.
+public final class CommerceManager {
+
+    private static final String PROP_ENABLED = &quot;commerce.cloud.enabled&quot;;
+    private static final String PROP_ENDPOINT = &quot;commerce.cloud.endpoint&quot;;
+    private static final String DEFAULT_ENDPOINT = &quot;https://cloud.codenameone.com/api/v2/commerce&quot;;
+
+    // Standard build-stamped properties, shared with crash/analytics: every
+    // cloud build bakes these, so commerce needs no build-daemon wiring of its
+    // own (it works off the same build_key the analytics provider sends).
+    private static final String PROP_BUILD_KEY = &quot;build_key&quot;;
+    private static final String PROP_PACKAGE = &quot;package_name&quot;;
+
+    private static final String PREF_APP_USER_ID = &quot;cn1$commerce$appUserId&quot;;
+
+    // Display property holding the service's Ed25519 public key, base64 of
+    // the raw 32 bytes. It wins over DEFAULT_PUBLIC_KEY, so a self-hosted or
+    // staging service can be verified with its own key.
+    private static final String PROP_PUBLIC_KEY = &quot;commerce.cloud.publicKey&quot;;
+
+    // The production key of the Codename One Commerce service, base64 of the
+    // raw 32 byte Ed25519 key. This constant is the one place it goes. With
+    // no key at all (a PROP_PUBLIC_KEY set to the empty string), no
+    // signed-envelope answer of the cloud is trusted: they are ignored,
+    // nothing is cached, the manager reports itself degraded and answers
+    // from the store directly. An unsigned answer is never taken, since
+    // anything between the device and the service could have written it.
+    private static final String DEFAULT_PUBLIC_KEY = &quot;pIKY0AoLYMj6RbBSqTyDIlW7TQAlS6su/djHXTmoMP4=&quot;;
+
+    // The key used when PROP_PUBLIC_KEY is unset or empty. Always
+    // DEFAULT_PUBLIC_KEY in an application; the unit tests clear it to
+    // exercise the no-key path, which no shipped build can reach any more.
+<span class="fc" id="L109">    static String defaultPublicKey = DEFAULT_PUBLIC_KEY;</span>
+
+    // Storage entry holding the last accepted customer payload, one per app
+    // user id.
+    private static final String STORAGE_CUSTOMER_PREFIX = &quot;CN1CommerceCustomer_&quot;;
+
+    // Storage entry holding the last accepted offerings payload, one per app
+    // user id and placement.
+    private static final String STORAGE_OFFERINGS_PREFIX = &quot;CN1CommerceOfferings_&quot;;
+
+    private static final String HEX = &quot;0123456789abcdef&quot;;
+
+    // Seeded with the time, and with an object's identity so two installs
+    // started in the same millisecond still draw different ids.
+<span class="fc" id="L123">    private static final Random RANDOM =</span>
+<span class="fc" id="L124">            new Random(System.currentTimeMillis() ^ ((long) new Object().hashCode() &lt;&lt; 32));</span>
+
+    /// The category of every analytics event commerce emits; the one
+    /// [Purchase] uses for `purchase` and `purchase_initiated`.
+    private static final String ANALYTICS_CATEGORY = &quot;commerce&quot;;
+    /// The experiment and variant last reported as an exposure.
+    private static final String PREF_EXPOSURE = &quot;cn1$commerce$experimentExposure&quot;;
+    /// How long the context of a started purchase waits for its receipt. A
+    /// receipt of the same product after this is taken to be another
+    /// purchase and is not labelled.
+    private static final long PURCHASE_CONTEXT_LIFETIME = 10L * 60L * 1000L;
+<span class="fc" id="L135">    private static final Runnable INVITE_OBSERVER = new Runnable() {</span>
+        @Override
+        public void run() {
+<span class="fc" id="L138">            getInstance().inviteArrived();</span>
+<span class="fc" id="L139">        }</span>
+    };
+
+    private static CommerceManager instance;
+    // Offering id to {placement, experiment, variant} of the last offerings
+    // answer that carried it. Replaced as a whole, never changed in place.
+<span class="fc" id="L145">    private Map offeringContext = new HashMap();</span>
+    private PurchaseContext pendingPurchase;
+    private boolean invitesHooked;
+    private boolean hookingInvites;
+    private boolean refreshing;
+
+<span class="fc" id="L151">    private final Map entitlementCache = new HashMap();</span>
+<span class="fc" id="L152">    private final EventDispatcher customerInfoListeners = new EventDispatcher();</span>
+    // Store products by SKU, as the store last listed them.
+<span class="fc" id="L154">    private final Map productCache = new HashMap();</span>
+    // Paywall events not sent yet, each a JSON object as text. Touched on the
+    // EDT only.
+<span class="fc" id="L157">    private final List pendingEvents = new ArrayList();</span>
+    private boolean eventFlushScheduled;
+    private boolean degraded;
+
+    // Set once the missing public key was logged, so it is said once.
+    private boolean noKeyLogged;
+
+    // The billing portal last fetched, and the customer it was fetched for.
+    private String portalUrl;
+    private String portalUser;
+    private String appUserId;
+
+    // The last customer the cloud answered with, or the stored one.
+<span class="fc" id="L170">    private CustomerInfo customerInfo = new CustomerInfo(null);</span>
+    // The app user id customerInfo was loaded for; null before first use.
+    private String customerLoadedFor;
+
+<span class="fc" id="L174">    private CommerceManager() {</span>
+<span class="fc" id="L175">        appUserId = Preferences.get(PREF_APP_USER_ID, null);</span>
+<span class="fc" id="L176">    }</span>
+
+    /// The shared instance.
+    public static synchronized CommerceManager getInstance() {
+<span class="fc bfc" id="L180" title="All 2 branches covered.">        if (instance == null) {</span>
+<span class="fc" id="L181">            instance = new CommerceManager();</span>
+        }
+<span class="fc" id="L183">        return instance;</span>
+    }
+
+    /// Whether cloud commerce is active in this build. True for any cloud build
+    /// (one that carries a {@code build_key}) unless the developer explicitly
+    /// disabled it with {@code codename1.commerce.cloud.enabled=false}. In the
+    /// simulator / a local build there is no build key, so this is false and
+    /// every call safely defers to {@link Purchase}.
+    public boolean isCloudEnabled() {
+<span class="fc bfc" id="L192" title="All 2 branches covered.">        if (&quot;false&quot;.equalsIgnoreCase(Display.getInstance().getProperty(PROP_ENABLED, &quot;true&quot;))) {</span>
+<span class="fc" id="L193">            return false;</span>
+        }
+<span class="fc" id="L195">        String key = Display.getInstance().getProperty(PROP_BUILD_KEY, &quot;&quot;);</span>
+<span class="pc bpc" id="L196" title="2 of 6 branches missed.">        return key != null &amp;&amp; key.length() &gt; 0 &amp;&amp; endpoint() != null;</span>
+    }
+
+    /// True after a {@link #refresh()} that could not get a server-validated
+    /// answer -- the cloud was unreachable or the account is over its monthly
+    /// cap. Entitlement checks fall back to the store-direct signal while this
+    /// is true.
+    public boolean isDegraded() {
+<span class="fc" id="L204">        return degraded;</span>
+    }
+
+    /// Sets the stable per-user id the cloud keys entitlements on. Pass your
+    /// own account id once the user signs in; if never set, an anonymous id is
+    /// generated and persisted so entitlements survive restarts on the device.
+    public void setAppUserId(String id) {
+<span class="fc" id="L211">        appUserId = id;</span>
+<span class="pc bpc" id="L212" title="1 of 2 branches missed.">        if (id != null) {</span>
+<span class="fc" id="L213">            Preferences.set(PREF_APP_USER_ID, id);</span>
+        }
+<span class="fc" id="L215">    }</span>
+
+    /// The current (explicit or generated-anonymous) app user id.
+    public String getAppUserId() {
+<span class="fc bfc" id="L219" title="All 2 branches covered.">        if (appUserId == null) {</span>
+            // The &quot;anon-&quot; prefix is a contract with the service: grants of an
+            // id that starts with it always move to the account the user
+            // later logs in to. The random part keeps two installs made in
+            // the same millisecond apart, which the identity hash of this
+            // object -- the same on every launch of some VMs -- did not.
+<span class="fc" id="L225">            appUserId = &quot;anon-&quot; + Long.toString(System.currentTimeMillis(), 36)</span>
+<span class="fc" id="L226">                    + &quot;-&quot; + Long.toString(RANDOM.nextLong() &amp; Long.MAX_VALUE, 36);</span>
+<span class="fc" id="L227">            Preferences.set(PREF_APP_USER_ID, appUserId);</span>
+        }
+<span class="fc" id="L229">        return appUserId;</span>
+    }
+
+    // ---- identity --------------------------------------------------------------
+
+    /// Tells the cloud that the current customer is now known as
+    /// `newAppUserId`, typically when the user signs in to the application's
+    /// own account. Purchases made under an anonymous id move to the account,
+    /// so a subscription bought before signing in, or on another platform
+    /// under the same account, unlocks here.
+    ///
+    /// Blocking network call -- invoke off the EDT. The id is switched only
+    /// when the cloud accepted the change; on failure the manager is
+    /// [degraded][#isDegraded()], the previous id stays, and the call can be
+    /// repeated. When the cloud is not enabled in this build the id is
+    /// switched locally and nothing else happens.
+    ///
+    /// This id is commerce's own. It is independent of the user id of
+    /// `Analytics.setUserId`, which stays whatever the application set:
+    /// logging in or out here never changes it, and an application that
+    /// wants its analytics under the same id sets it there as well.
+    ///
+    /// #### Parameters
+    ///
+    /// - `newAppUserId`: the application's stable id for the user
+    ///
+    /// #### Returns
+    ///
+    /// true if the id was switched
+    public boolean logIn(String newAppUserId) {
+<span class="pc bpc" id="L259" title="2 of 4 branches missed.">        if (newAppUserId == null || newAppUserId.length() == 0) {</span>
+<span class="nc" id="L260">            return false;</span>
+        }
+<span class="fc bfc" id="L262" title="All 2 branches covered.">        if (!isCloudEnabled()) {</span>
+<span class="fc" id="L263">            setAppUserId(newAppUserId);</span>
+<span class="fc" id="L264">            return true;</span>
+        }
+<span class="fc" id="L266">        ensureCustomerLoaded();</span>
+<span class="fc" id="L267">        String previous = getAppUserId();</span>
+<span class="pc bpc" id="L268" title="1 of 2 branches missed.">        if (newAppUserId.equals(previous)) {</span>
+<span class="nc" id="L269">            return fetchCustomer(false);</span>
+        }
+<span class="fc" id="L271">        StringBuilder extra = new StringBuilder();</span>
+<span class="fc" id="L272">        appendField(extra, &quot;newAppUserId&quot;, newAppUserId);</span>
+<span class="fc" id="L273">        SignedAnswer answer = postSignedAnswer(&quot;/identify&quot;, extra.toString(), newAppUserId);</span>
+<span class="fc bfc" id="L274" title="All 2 branches covered.">        Map payload = answer == null ? null : answer.payload;</span>
+<span class="pc bpc" id="L275" title="1 of 4 branches missed.">        if (payload == null || !accepted(payload)) {</span>
+<span class="fc" id="L276">            degraded = true;</span>
+<span class="fc" id="L277">            return false;</span>
+        }
+<span class="fc" id="L279">        deleteStoredCustomer(previous);</span>
+<span class="fc" id="L280">        setAppUserId(newAppUserId);</span>
+<span class="fc" id="L281">        customerLoadedFor = newAppUserId;</span>
+<span class="fc" id="L282">        adoptCustomer(answer, newAppUserId, true);</span>
+<span class="fc" id="L283">        degraded = asBoolean(payload.get(&quot;degraded&quot;));</span>
+<span class="fc" id="L284">        return true;</span>
+    }
+
+    /// Forgets the current customer: a new anonymous id is generated and the
+    /// customer information becomes empty, so the next user of the device
+    /// does not inherit the previous one's entitlements. Listeners are told.
+    /// Nothing is sent to the cloud; call [#refresh()] afterwards to pick up
+    /// what the store account on the device still owns.
+    public void logOut() {
+<span class="pc bpc" id="L293" title="1 of 2 branches missed.">        if (appUserId != null) {</span>
+<span class="fc" id="L294">            deleteStoredCustomer(appUserId);</span>
+        }
+<span class="fc" id="L296">        appUserId = null;</span>
+<span class="fc" id="L297">        customerLoadedFor = getAppUserId();</span>
+<span class="fc" id="L298">        customerInfo = new CustomerInfo(null);</span>
+<span class="fc" id="L299">        entitlementCache.clear();</span>
+<span class="fc" id="L300">        degraded = false;</span>
+<span class="fc" id="L301">        fireCustomerInfoChanged();</span>
+<span class="fc" id="L302">    }</span>
+
+    /// Attaches attributes to the current customer in the cloud, where
+    /// targeting rules and the console can read them. A null value deletes
+    /// the attribute; any other value is sent as its string form.
+    ///
+    /// Blocking network call -- invoke off the EDT. Safe no-op when the cloud
+    /// is not enabled in this build.
+    ///
+    /// #### Parameters
+    ///
+    /// - `attributes`: attribute names to values
+    ///
+    /// #### Returns
+    ///
+    /// true if the cloud accepted the attributes
+    public boolean setAttributes(Map attributes) {
+<span class="pc bpc" id="L319" title="1 of 4 branches missed.">        if (!isCloudEnabled() || attributes == null) {</span>
+<span class="fc" id="L320">            return false;</span>
+        }
+<span class="fc" id="L322">        String url = endpoint();</span>
+<span class="fc" id="L323">        StringBuilder extra = new StringBuilder();</span>
+<span class="fc" id="L324">        extra.append(&quot;\&quot;attributes\&quot;:{&quot;);</span>
+<span class="fc" id="L325">        boolean first = true;</span>
+<span class="fc bfc" id="L326" title="All 2 branches covered.">        for (Object o : attributes.entrySet()) {</span>
+<span class="fc" id="L327">            Map.Entry e = (Map.Entry) o;</span>
+<span class="pc bpc" id="L328" title="1 of 2 branches missed.">            if (e.getKey() == null) {</span>
+<span class="nc" id="L329">                continue;</span>
+            }
+<span class="fc bfc" id="L331" title="All 2 branches covered.">            if (!first) {</span>
+<span class="fc" id="L332">                extra.append(',');</span>
+            }
+<span class="fc" id="L334">            first = false;</span>
+<span class="fc" id="L335">            Object v = e.getValue();</span>
+<span class="fc bfc" id="L336" title="All 2 branches covered.">            appendField(extra, String.valueOf(e.getKey()), v == null ? null : v.toString());</span>
+<span class="fc" id="L337">        }</span>
+<span class="fc" id="L338">        extra.append('}');</span>
+        try {
+<span class="fc" id="L340">            Response resp = quiet(Rest.post(url + &quot;/attributes&quot;))</span>
+<span class="fc" id="L341">                    .body(baseRequest(newNonce(), extra.toString())).getAsString();</span>
+<span class="pc bpc" id="L342" title="1 of 4 branches missed.">            return resp.getResponseCode() &gt;= 200 &amp;&amp; resp.getResponseCode() &lt; 300;</span>
+<span class="nc" id="L343">        } catch (Throwable t) {</span>
+<span class="nc" id="L344">            Log.p(&quot;CommerceManager.setAttributes failed: &quot; + t);</span>
+<span class="nc" id="L345">            return false;</span>
+        }
+    }
+
+    /// Asks the store to restore the purchases of the store account on this
+    /// device, when the platform supports that. The restored receipts reach
+    /// the cloud through the receipt synchronization that follows, which
+    /// refreshes this manager by itself.
+    public void restore() {
+<span class="fc" id="L354">        Purchase p = Purchase.getInAppPurchase();</span>
+<span class="pc bpc" id="L355" title="2 of 4 branches missed.">        if (p != null &amp;&amp; p.isRestoreSupported()) {</span>
+<span class="nc" id="L356">            p.restore();</span>
+        }
+<span class="fc" id="L358">    }</span>
+
+    // ---- customer information --------------------------------------------------
+
+    /// The last customer information the cloud answered with. Never null:
+    /// before any answer it is an empty customer.
+    ///
+    /// The last accepted answer is stored on the device, so this answers
+    /// after a cold start and with no network. A stored entitlement is
+    /// reported exactly as it was stored, even when its expiry date has
+    /// passed by the device's clock: the device clock is the user's to set,
+    /// so only the service's clock decides when an entitlement ends, and it
+    /// does so on the next [#refresh()].
+    public CustomerInfo getCustomerInfo() {
+<span class="fc" id="L372">        ensureCustomerLoaded();</span>
+<span class="fc" id="L373">        return customerInfo;</span>
+    }
+
+    /// Adds a listener that is called on the EDT whenever the customer
+    /// information changes. The event's source is the new [CustomerInfo].
+    public void addCustomerInfoListener(ActionListener l) {
+<span class="fc" id="L379">        customerInfoListeners.addListener(l);</span>
+<span class="fc" id="L380">    }</span>
+
+    /// Removes a listener added with [#addCustomerInfoListener(ActionListener)].
+    public void removeCustomerInfoListener(ActionListener l) {
+<span class="fc" id="L384">        customerInfoListeners.removeListener(l);</span>
+<span class="fc" id="L385">    }</span>
+
+    private void fireCustomerInfoChanged() {
+<span class="fc bfc" id="L388" title="All 2 branches covered.">        if (customerInfoListeners.hasListeners()) {</span>
+            // The dispatcher moves the call to the EDT when this is another
+            // thread, which it normally is: refresh() blocks on the network.
+<span class="fc" id="L391">            customerInfoListeners.fireActionEvent(new ActionEvent(customerInfo));</span>
+        }
+<span class="fc" id="L393">    }</span>
+
+    /// Called by [Purchase] when a receipt synchronization completed
+    /// successfully: the stores' receipts have changed, so the cloud is
+    /// asked again. The refresh blocks on the network and therefore runs on
+    /// a background thread, never on the EDT this is called from.
+    static void receiptsSynchronized() {
+<span class="fc" id="L400">        final CommerceManager cm = getInstance();</span>
+<span class="pc bpc" id="L401" title="1 of 2 branches missed.">        if (!cm.isCloudEnabled()) {</span>
+<span class="fc" id="L402">            return;</span>
+        }
+<span class="nc" id="L404">        Display.getInstance().scheduleBackgroundTask(new Runnable() {</span>
+            @Override
+            public void run() {
+<span class="nc" id="L407">                cm.refresh();</span>
+<span class="nc" id="L408">            }</span>
+        });
+<span class="nc" id="L410">    }</span>
+
+    /// Drops the shared instance so a test starts from a cold one.
+    static synchronized void resetForTests() {
+<span class="fc" id="L414">        defaultPublicKey = DEFAULT_PUBLIC_KEY;</span>
+<span class="fc" id="L415">        instance = null;</span>
+<span class="fc" id="L416">        Analytics.setAttributionObserver(null);</span>
+<span class="fc" id="L417">    }</span>
+
+    // ---- purchase delegation (thin pass-through to Purchase) ----------------
+
+    public void purchase(String sku) {
+<span class="fc" id="L422">        Purchase.getInAppPurchase().purchase(sku);</span>
+<span class="fc" id="L423">    }</span>
+
+    public void subscribe(String sku) {
+<span class="fc" id="L426">        Purchase.getInAppPurchase().subscribe(sku);</span>
+<span class="fc" id="L427">    }</span>
+
+    public void unsubscribe(String sku) {
+<span class="nc" id="L430">        Purchase.getInAppPurchase().unsubscribe(sku);</span>
+<span class="nc" id="L431">    }</span>
+
+    // ---- entitlement checks --------------------------------------------------
+
+    /// Whether the user currently holds {@code entitlementId}. Uses the last
+    /// cloud-validated answer when available; otherwise (cloud disabled or
+    /// degraded) falls back to the store-direct signal, treating the
+    /// entitlement id as a subscription SKU so a paying user keeps access.
+    public boolean isEntitled(String entitlementId) {
+<span class="pc bpc" id="L440" title="1 of 2 branches missed.">        if (entitlementId == null) {</span>
+<span class="nc" id="L441">            return false;</span>
+        }
+<span class="fc" id="L443">        ensureCustomerLoaded();</span>
+        // A receipt validated after the last customer answer is newer than
+        // that answer; an accepted customer answer empties this cache.
+<span class="fc" id="L446">        Object cached = entitlementCache.get(entitlementId);</span>
+<span class="fc bfc" id="L447" title="All 2 branches covered.">        if (cached instanceof Boolean) {</span>
+<span class="fc" id="L448">            return ((Boolean) cached).booleanValue();</span>
+        }
+<span class="fc" id="L450">        EntitlementInfo known = customerInfo.getEntitlement(entitlementId);</span>
+<span class="fc bfc" id="L451" title="All 2 branches covered.">        if (known != null) {</span>
+<span class="fc" id="L452">            return known.isActive();</span>
+        }
+        // Store-direct fallback: the platform's own receipt is authoritative
+        // enough to keep a paying user unlocked when we have no cloud answer.
+        try {
+<span class="fc" id="L457">            return Purchase.getInAppPurchase().isSubscribed(entitlementId);</span>
+<span class="nc" id="L458">        } catch (Throwable t) {</span>
+<span class="nc" id="L459">            return false;</span>
+        }
+    }
+
+    /// Snapshot of the entitlement ids currently considered active.
+    public List getActiveEntitlements() {
+<span class="fc" id="L465">        ensureCustomerLoaded();</span>
+<span class="fc" id="L466">        List out = new ArrayList();</span>
+<span class="pc bpc" id="L467" title="1 of 2 branches missed.">        for (Object o : entitlementCache.entrySet()) {</span>
+<span class="nc" id="L468">            Map.Entry e = (Map.Entry) o;</span>
+<span class="nc" id="L469">            Object v = e.getValue();</span>
+<span class="nc bnc" id="L470" title="All 4 branches missed.">            if (v instanceof Boolean &amp;&amp; ((Boolean) v).booleanValue()) {</span>
+<span class="nc" id="L471">                out.add(e.getKey());</span>
+            }
+<span class="nc" id="L473">        }</span>
+<span class="fc bfc" id="L474" title="All 2 branches covered.">        for (EntitlementInfo e : customerInfo.getActiveEntitlements()) {</span>
+<span class="pc bpc" id="L475" title="1 of 2 branches missed.">            if (!entitlementCache.containsKey(e.getId())) {</span>
+<span class="fc" id="L476">                out.add(e.getId());</span>
+            }
+<span class="fc" id="L478">        }</span>
+<span class="fc" id="L479">        return out;</span>
+    }
+
+    // ---- offerings ----------------------------------------------------------------
+
+    /// The offerings the cloud configured for this customer. Same as
+    /// [#getOfferings(String)] with no placement.
+    ///
+    /// #### Returns
+    ///
+    /// the offerings; never null, and empty when there is nothing to answer
+    /// from
+    public Offerings getOfferings() {
+<span class="fc" id="L492">        return getOfferings(null);</span>
+    }
+
+    /// The offerings the cloud configured for this customer at a placement,
+    /// a named place in the application (`&quot;onboarding&quot;`, `&quot;settings&quot;`) that
+    /// the console can give an offering of its own.
+    ///
+    /// Blocking network call -- invoke off the EDT. The last accepted answer
+    /// is stored on the device and is what this returns when the cloud
+    /// cannot be reached. After a fresh answer the store is asked for the
+    /// products of the packages, when the platform lists products, and each
+    /// is attached to its [CommercePackage].
+    ///
+    /// #### Parameters
+    ///
+    /// - `placement`: the placement, or null for the default offerings
+    ///
+    /// #### Returns
+    ///
+    /// the offerings; never null, and empty when the cloud is not enabled in
+    /// this build or there is nothing to answer from
+    public Offerings getOfferings(String placement) {
+<span class="pc bpc" id="L514" title="1 of 2 branches missed.">        if (!isCloudEnabled()) {</span>
+<span class="nc" id="L515">            return new Offerings(null);</span>
+        }
+<span class="fc" id="L517">        hookInvites();</span>
+<span class="fc" id="L518">        String key = storageKey(STORAGE_OFFERINGS_PREFIX,</span>
+<span class="fc bfc" id="L519" title="All 2 branches covered.">                getAppUserId() + &quot;/&quot; + (placement == null ? &quot;&quot; : placement));</span>
+<span class="fc" id="L520">        Display d = Display.getInstance();</span>
+<span class="fc" id="L521">        StringBuilder extra = new StringBuilder();</span>
+<span class="fc" id="L522">        appendField(extra, &quot;platform&quot;, d.getPlatformName());</span>
+<span class="fc" id="L523">        String language = null;</span>
+<span class="fc" id="L524">        String country = null;</span>
+        try {
+<span class="fc" id="L526">            language = d.getLocalizationManager().getLanguage();</span>
+<span class="fc" id="L527">            country = d.getLocalizationManager().getLocale();</span>
+<span class="nc" id="L528">        } catch (Throwable t) {</span>
+            // a port with no localization answers the default offerings
+<span class="fc" id="L530">        }</span>
+<span class="fc" id="L531">        extra.append(',');</span>
+<span class="fc" id="L532">        appendField(extra, &quot;country&quot;, country);</span>
+<span class="fc" id="L533">        extra.append(',');</span>
+<span class="fc" id="L534">        appendField(extra, &quot;appVersion&quot;, d.getProperty(&quot;AppVersion&quot;, null));</span>
+<span class="fc" id="L535">        extra.append(',');</span>
+<span class="fc" id="L536">        String locale = language;</span>
+<span class="pc bpc" id="L537" title="3 of 6 branches missed.">        if (language != null &amp;&amp; country != null &amp;&amp; country.length() &gt; 0) {</span>
+<span class="fc" id="L538">            locale = language + &quot;_&quot; + country;</span>
+        }
+<span class="fc" id="L540">        appendField(extra, &quot;locale&quot;, locale);</span>
+<span class="fc bfc" id="L541" title="All 2 branches covered.">        if (placement != null) {</span>
+<span class="fc" id="L542">            extra.append(',');</span>
+<span class="fc" id="L543">            appendField(extra, &quot;placement&quot;, placement);</span>
+        }
+<span class="fc" id="L545">        SignedAnswer answer = postSignedAnswer(&quot;/offerings&quot;, extra.toString(), null);</span>
+<span class="fc bfc" id="L546" title="All 2 branches covered.">        Map payload = answer == null ? null : answer.payload;</span>
+        Offerings result;
+<span class="fc bfc" id="L548" title="All 4 branches covered.">        if (payload != null &amp;&amp; accepted(payload)) {</span>
+<span class="fc" id="L549">            result = new Offerings(payload);</span>
+            try {
+<span class="fc" id="L551">                storeEnvelope(key, answer);</span>
+<span class="nc" id="L552">            } catch (Throwable t) {</span>
+<span class="nc" id="L553">                Log.p(&quot;CommerceManager: could not store the offerings: &quot; + t);</span>
+<span class="fc" id="L554">            }</span>
+<span class="fc" id="L555">            fetchProducts(result);</span>
+        } else {
+<span class="fc" id="L557">            result = new Offerings(null);</span>
+<span class="fc" id="L558">            Map stored = loadEnvelope(key, OFFERINGS_ENDPOINTS, null);</span>
+<span class="fc bfc" id="L559" title="All 2 branches covered.">            if (stored != null) {</span>
+<span class="fc" id="L560">                result = new Offerings(stored);</span>
+            }
+        }
+<span class="fc" id="L563">        attachProducts(result);</span>
+<span class="fc" id="L564">        rememberContext(result, placement);</span>
+<span class="fc" id="L565">        reportExposure(result);</span>
+<span class="fc" id="L566">        return result;</span>
+    }
+
+    /// Asks the store for the products of every package, when the platform
+    /// lists products. A store that fails to answer leaves the packages
+    /// without a product, and they are then shown with their own text.
+    private void fetchProducts(Offerings offerings) {
+<span class="fc" id="L573">        List skus = new ArrayList();</span>
+<span class="fc bfc" id="L574" title="All 2 branches covered.">        for (Offering o : offerings.getAll()) {</span>
+<span class="fc bfc" id="L575" title="All 2 branches covered.">            for (CommercePackage p : o.getPackages()) {</span>
+<span class="pc bpc" id="L576" title="2 of 4 branches missed.">                if (p.getProductId() != null &amp;&amp; !skus.contains(p.getProductId())) {</span>
+<span class="fc" id="L577">                    skus.add(p.getProductId());</span>
+                }
+<span class="fc" id="L579">            }</span>
+<span class="fc" id="L580">        }</span>
+<span class="fc bfc" id="L581" title="All 2 branches covered.">        if (skus.isEmpty()) {</span>
+<span class="fc" id="L582">            return;</span>
+        }
+        try {
+<span class="fc" id="L585">            Purchase store = Purchase.getInAppPurchase();</span>
+<span class="pc bpc" id="L586" title="1 of 4 branches missed.">            if (store == null || !store.isItemListingSupported()) {</span>
+<span class="fc" id="L587">                return;</span>
+            }
+<span class="fc" id="L589">            String[] arr = new String[skus.size()];</span>
+<span class="fc bfc" id="L590" title="All 2 branches covered.">            for (int i = 0; i &lt; arr.length; i++) {</span>
+<span class="fc" id="L591">                arr[i] = String.valueOf(skus.get(i));</span>
+            }
+            // A store that answers null lands in the catch below, like any
+            // other store failure.
+<span class="fc bfc" id="L595" title="All 2 branches covered.">            for (Product p : store.getProducts(arr)) {</span>
+<span class="pc bpc" id="L596" title="1 of 4 branches missed.">                if (p != null &amp;&amp; p.getSku() != null) {</span>
+<span class="fc" id="L597">                    productCache.put(p.getSku(), p);</span>
+                }
+            }
+<span class="nc" id="L600">        } catch (Throwable t) {</span>
+<span class="nc" id="L601">            Log.p(&quot;CommerceManager: the store did not list the products: &quot; + t);</span>
+<span class="fc" id="L602">        }</span>
+<span class="fc" id="L603">    }</span>
+
+    private void attachProducts(Offerings offerings) {
+<span class="fc bfc" id="L606" title="All 2 branches covered.">        for (Offering o : offerings.getAll()) {</span>
+<span class="fc bfc" id="L607" title="All 2 branches covered.">            for (CommercePackage p : o.getPackages()) {</span>
+<span class="fc" id="L608">                Object product = productCache.get(p.getProductId());</span>
+<span class="fc bfc" id="L609" title="All 2 branches covered.">                if (product instanceof Product) {</span>
+<span class="fc" id="L610">                    p.setProduct((Product) product);</span>
+                }
+<span class="fc" id="L612">            }</span>
+<span class="fc" id="L613">        }</span>
+<span class="fc" id="L614">    }</span>
+
+    /// Buys a package through the platform store: a subscription for every
+    /// package that [is one][CommercePackage#isSubscription()], a one time
+    /// purchase otherwise. The outcome arrives the way every store purchase
+    /// does, and through the customer information listeners once the cloud
+    /// validated it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `pkg`: the package to buy; null or a package with no product does
+    ///   nothing
+    public void purchase(CommercePackage pkg) {
+<span class="fc bfc" id="L627" title="All 2 branches covered.">        if (pkg == null) {</span>
+<span class="fc" id="L628">            return;</span>
+        }
+<span class="fc bfc" id="L630" title="All 2 branches covered.">        if (isWebPurchase(pkg)) {</span>
+<span class="fc" id="L631">            purchaseOnWeb(pkg);</span>
+<span class="fc" id="L632">            return;</span>
+        }
+<span class="pc bpc" id="L634" title="1 of 2 branches missed.">        if (pkg.getProductId() == null) {</span>
+<span class="nc" id="L635">            return;</span>
+        }
+        // Read by Purchase when it reports purchase_initiated and purchase,
+        // so those events say which offering and package were bought.
+<span class="fc" id="L639">        pendingPurchase = new PurchaseContext(pkg.getProductId(),</span>
+<span class="fc" id="L640">                contextParams(pkg.getOfferingId(), pkg.getId(), pkg.getProductId()));</span>
+<span class="fc bfc" id="L641" title="All 2 branches covered.">        if (pkg.isSubscription()) {</span>
+<span class="fc" id="L642">            subscribe(pkg.getProductId());</span>
+        } else {
+<span class="fc" id="L644">            purchase(pkg.getProductId());</span>
+        }
+<span class="fc" id="L646">    }</span>
+
+    /// Whether [#purchase(CommercePackage)] sells a package through a web
+    /// checkout: the package has no product of this platform's store, and
+    /// the platform has no store to sell one -- the browser and the desktop,
+    /// where [Purchase] supports neither managed payments nor subscriptions.
+    ///
+    /// #### Parameters
+    ///
+    /// - `pkg`: the package asked about
+    ///
+    /// #### Returns
+    ///
+    /// true when buying the package opens a hosted checkout page
+    public boolean isWebPurchase(CommercePackage pkg) {
+<span class="pc bpc" id="L661" title="1 of 4 branches missed.">        if (pkg == null || !isCloudEnabled()) {</span>
+<span class="fc" id="L662">            return false;</span>
+        }
+<span class="fc" id="L664">        String productId = pkg.getProductId();</span>
+<span class="pc bpc" id="L665" title="1 of 4 branches missed.">        if (productId != null &amp;&amp; productId.length() &gt; 0) {</span>
+<span class="fc" id="L666">            return false;</span>
+        }
+        try {
+<span class="fc" id="L669">            Purchase store = Purchase.getInAppPurchase();</span>
+<span class="pc bpc" id="L670" title="2 of 6 branches missed.">            return store == null || !(store.isManagedPaymentSupported() || store.isSubscriptionSupported());</span>
+<span class="nc" id="L671">        } catch (Throwable t) {</span>
+            // a port with no store object at all has no native store
+<span class="nc" id="L673">            return true;</span>
+        }
+    }
+
+    /// Asks the cloud for a hosted checkout page that sells a package for
+    /// its web price.
+    ///
+    /// Blocking network call -- invoke off the EDT.
+    ///
+    /// #### Parameters
+    ///
+    /// - `pkg`: the package to sell
+    ///
+    /// - `successUrl`: where the checkout sends the customer after paying,
+    ///   or null for the service's own page
+    ///
+    /// - `cancelUrl`: where the checkout sends a customer who gave up, or
+    ///   null for the service's own page
+    ///
+    /// #### Returns
+    ///
+    /// the address of the checkout page, or null when the cloud is not
+    /// enabled in this build, could not be reached, or has no web price for
+    /// the package
+    public String getWebPurchaseUrl(CommercePackage pkg, String successUrl, String cancelUrl) {
+<span class="pc bpc" id="L698" title="1 of 4 branches missed.">        if (pkg == null || !isCloudEnabled()) {</span>
+<span class="fc" id="L699">            return null;</span>
+        }
+<span class="fc" id="L701">        StringBuilder sb = new StringBuilder();</span>
+<span class="fc" id="L702">        appendField(sb, &quot;offeringId&quot;, pkg.getOfferingId());</span>
+<span class="fc" id="L703">        sb.append(',');</span>
+<span class="fc" id="L704">        appendField(sb, &quot;packageId&quot;, pkg.getId());</span>
+<span class="fc bfc" id="L705" title="All 2 branches covered.">        if (successUrl != null) {</span>
+<span class="fc" id="L706">            sb.append(',');</span>
+<span class="fc" id="L707">            appendField(sb, &quot;successUrl&quot;, successUrl);</span>
+        }
+<span class="fc bfc" id="L709" title="All 2 branches covered.">        if (cancelUrl != null) {</span>
+<span class="fc" id="L710">            sb.append(',');</span>
+<span class="fc" id="L711">            appendField(sb, &quot;cancelUrl&quot;, cancelUrl);</span>
+        }
+<span class="fc" id="L713">        return urlOf(postSigned(&quot;/web-purchase&quot;, sb.toString()));</span>
+    }
+
+    /// Sells a package through a hosted checkout page, opened with
+    /// [Display#execute(String)]. The customer pays outside the
+    /// application, so nothing reports the outcome here: once the
+    /// application is back in the foreground the caller runs [#refresh()]
+    /// off the EDT, and the customer information listeners hear what was
+    /// bought. [com.codename1.payment.paywall.PaywallView] does that itself.
+    ///
+    /// May be called on the EDT, which keeps dispatching events while the
+    /// cloud is asked for the page.
+    ///
+    /// #### Parameters
+    ///
+    /// - `pkg`: the package to sell
+    ///
+    /// #### Returns
+    ///
+    /// true when a checkout page was opened, false when there was none
+    public boolean purchaseOnWeb(final CommercePackage pkg) {
+<span class="fc" id="L734">        final String[] url = new String[1];</span>
+<span class="fc" id="L735">        blocking(new Runnable() {</span>
+            @Override
+            public void run() {
+<span class="fc" id="L738">                url[0] = getWebPurchaseUrl(pkg, null, null);</span>
+<span class="fc" id="L739">            }</span>
+        });
+<span class="fc bfc" id="L741" title="All 2 branches covered.">        if (url[0] == null) {</span>
+<span class="fc" id="L742">            return false;</span>
+        }
+<span class="fc" id="L744">        Display.getInstance().execute(url[0]);</span>
+<span class="pc bpc" id="L745" title="1 of 2 branches missed.">        if (pkg != null) {</span>
+            // Purchase has no part in a web checkout, so its start is
+            // reported here, under the same name and category.
+            try {
+<span class="fc" id="L749">                Map&lt;String, Object&gt; params = contextParams(pkg.getOfferingId(), pkg.getId(), pkg.getProductId());</span>
+<span class="fc" id="L750">                params.put(&quot;store&quot;, &quot;web&quot;);</span>
+<span class="fc bfc" id="L751" title="All 2 branches covered.">                if (pkg.getProductId() != null) {</span>
+<span class="fc" id="L752">                    params.put(&quot;sku&quot;, pkg.getProductId());</span>
+                }
+<span class="fc" id="L754">                Analytics.autoEvent(&quot;purchase_initiated&quot;, ANALYTICS_CATEGORY, params);</span>
+<span class="nc" id="L755">            } catch (Throwable t) {</span>
+<span class="nc" id="L756">                Log.e(t);</span>
+<span class="fc" id="L757">            }</span>
+        }
+<span class="fc" id="L759">        return true;</span>
+    }
+
+    /// Buys a subscription under one of its App Store promotional offers.
+    /// The cloud signs the offer for this customer and the store is then
+    /// asked to sell the product with that signature, as
+    /// [Purchase#purchase(String, PromotionalOffer)] does.
+    ///
+    /// May be called on the EDT, which keeps dispatching events while the
+    /// cloud is asked for the signature.
+    ///
+    /// #### Parameters
+    ///
+    /// - `productId`: the subscription product
+    ///
+    /// - `offerId`: the promotional offer of that product, as App Store
+    ///   Connect names it
+    ///
+    /// #### Returns
+    ///
+    /// true when the store was asked to sell the offer; false when no
+    /// signature is available -- the platform's store has no promotional
+    /// offers, the cloud is not enabled or it refused -- in which case
+    /// nothing was bought
+    public boolean purchaseWithPromotionalOffer(final String productId, final String offerId) {
+<span class="pc bpc" id="L784" title="2 of 8 branches missed.">        if (productId == null || offerId == null || !isCloudEnabled() || !promotionalOffersSupported()) {</span>
+<span class="fc" id="L785">            return false;</span>
+        }
+<span class="fc" id="L787">        final ApplePromotionalOffer[] offer = new ApplePromotionalOffer[1];</span>
+<span class="fc" id="L788">        blocking(new Runnable() {</span>
+            @Override
+            public void run() {
+<span class="fc" id="L791">                offer[0] = fetchPromotionalOffer(productId, offerId);</span>
+<span class="fc" id="L792">            }</span>
+        });
+<span class="fc bfc" id="L794" title="All 2 branches covered.">        if (offer[0] == null) {</span>
+<span class="fc" id="L795">            return false;</span>
+        }
+        try {
+<span class="fc" id="L798">            Purchase.getInAppPurchase().purchase(productId, offer[0]);</span>
+<span class="nc" id="L799">        } catch (RuntimeException e) {</span>
+            // thrown by a store that does not sell promotional offers
+<span class="nc" id="L801">            Log.p(&quot;CommerceManager: the store refused the promotional offer: &quot; + e);</span>
+<span class="nc" id="L802">            return false;</span>
+<span class="fc" id="L803">        }</span>
+<span class="fc" id="L804">        return true;</span>
+    }
+
+    /// Promotional offers are an App Store feature.
+    private static boolean promotionalOffersSupported() {
+<span class="fc" id="L809">        String platform = Display.getInstance().getPlatformName();</span>
+<span class="pc bpc" id="L810" title="1 of 4 branches missed.">        return &quot;ios&quot;.equalsIgnoreCase(platform) || &quot;mac&quot;.equalsIgnoreCase(platform);</span>
+    }
+
+    /// The signed promotional offer of a product, or null when the cloud
+    /// gave no usable signature. Blocking.
+    private ApplePromotionalOffer fetchPromotionalOffer(String productId, String offerId) {
+<span class="fc" id="L816">        StringBuilder sb = new StringBuilder();</span>
+<span class="fc" id="L817">        appendField(sb, &quot;productId&quot;, productId);</span>
+<span class="fc" id="L818">        sb.append(',');</span>
+<span class="fc" id="L819">        appendField(sb, &quot;offerId&quot;, offerId);</span>
+<span class="fc" id="L820">        Map payload = postSigned(&quot;/promo-offer-signature&quot;, sb.toString());</span>
+<span class="pc bpc" id="L821" title="1 of 4 branches missed.">        if (payload == null || !asBoolean(payload.get(&quot;accepted&quot;))) {</span>
+<span class="fc" id="L822">            return null;</span>
+        }
+<span class="fc" id="L824">        String keyId = CustomerInfo.asString(payload.get(&quot;keyId&quot;));</span>
+<span class="fc" id="L825">        String offerNonce = CustomerInfo.asString(payload.get(&quot;nonce&quot;));</span>
+<span class="fc" id="L826">        String signature = CustomerInfo.asString(payload.get(&quot;signature&quot;));</span>
+<span class="pc bpc" id="L827" title="2 of 6 branches missed.">        if (keyId == null || offerNonce == null || signature == null</span>
+<span class="pc bpc" id="L828" title="3 of 6 branches missed.">                || keyId.length() == 0 || offerNonce.length() == 0 || signature.length() == 0) {</span>
+<span class="fc" id="L829">            return null;</span>
+        }
+<span class="fc" id="L831">        ApplePromotionalOffer offer = new ApplePromotionalOffer();</span>
+<span class="fc" id="L832">        offer.setOfferIdentifier(offerId);</span>
+<span class="fc" id="L833">        offer.setKeyIdentifier(keyId);</span>
+<span class="fc" id="L834">        offer.setNonce(offerNonce);</span>
+<span class="fc" id="L835">        offer.setSignature(signature);</span>
+<span class="fc" id="L836">        offer.setTimestamp(CustomerInfo.asLong(payload.get(&quot;timestamp&quot;)));</span>
+<span class="fc" id="L837">        return offer;</span>
+    }
+
+    /// Runs a network call to its end: through `invokeAndBlock` on the EDT,
+    /// directly on any other thread.
+    private static void blocking(Runnable r) {
+<span class="fc" id="L843">        Display d = Display.getInstance();</span>
+<span class="pc bpc" id="L844" title="1 of 2 branches missed.">        if (d.isEdt()) {</span>
+<span class="fc" id="L845">            d.invokeAndBlock(r);</span>
+        } else {
+<span class="nc" id="L847">            r.run();</span>
+        }
+<span class="fc" id="L849">    }</span>
+
+    /// The `url` of an accepted answer, or null.
+    private static String urlOf(Map payload) {
+<span class="fc bfc" id="L853" title="All 4 branches covered.">        if (payload == null || !asBoolean(payload.get(&quot;accepted&quot;))) {</span>
+<span class="fc" id="L854">            return null;</span>
+        }
+<span class="fc" id="L856">        String url = CustomerInfo.asString(payload.get(&quot;url&quot;));</span>
+<span class="pc bpc" id="L857" title="1 of 4 branches missed.">        return url == null || url.length() == 0 ? null : url;</span>
+    }
+
+    /// The page where the customer manages the subscription, or null when
+    /// there is none. Never touches the network: for a subscription bought
+    /// on the web it is the billing portal [#fetchManagementUrl()] last
+    /// answered, and otherwise -- or before that was ever asked -- the
+    /// store's page from the last
+    /// [customer information][#getCustomerInfo()].
+    public String getManagementUrl() {
+<span class="fc" id="L867">        CustomerInfo info = getCustomerInfo();</span>
+<span class="fc" id="L868">        String user = getAppUserId();</span>
+<span class="pc bpc" id="L869" title="2 of 6 branches missed.">        if (portalUrl != null &amp;&amp; paidOnWeb(info) &amp;&amp; user.equals(portalUser)) {</span>
+<span class="fc" id="L870">            return portalUrl;</span>
+        }
+<span class="fc" id="L872">        return info.getManagementUrl();</span>
+    }
+
+    /// The page where the customer manages the subscription, asking the
+    /// cloud for a billing portal when the newest active entitlement -- the
+    /// one that expires last -- was bought on the web (`stripe` or
+    /// `paddle`). A portal address is short lived, so it is asked for when
+    /// it is about to be opened. For a store subscription this is
+    /// [#getManagementUrl()] and nothing is asked.
+    ///
+    /// Blocking network call -- invoke off the EDT.
+    ///
+    /// #### Returns
+    ///
+    /// the address, or null when there is none
+    public String fetchManagementUrl() {
+<span class="fc" id="L888">        CustomerInfo info = getCustomerInfo();</span>
+<span class="pc bpc" id="L889" title="1 of 4 branches missed.">        if (isCloudEnabled() &amp;&amp; paidOnWeb(info)) {</span>
+<span class="fc" id="L890">            String url = urlOf(postSigned(&quot;/web-portal&quot;, null));</span>
+<span class="fc bfc" id="L891" title="All 2 branches covered.">            if (url != null) {</span>
+<span class="fc" id="L892">                portalUrl = url;</span>
+<span class="fc" id="L893">                portalUser = getAppUserId();</span>
+<span class="fc" id="L894">                return url;</span>
+            }
+        }
+<span class="fc" id="L897">        return getManagementUrl();</span>
+    }
+
+    /// Whether the active entitlement that expires last was bought on the
+    /// web. One that never expires counts as the last only when no other is
+    /// active.
+    static boolean paidOnWeb(CustomerInfo info) {
+<span class="fc" id="L904">        EntitlementInfo newest = null;</span>
+<span class="fc bfc" id="L905" title="All 2 branches covered.">        for (EntitlementInfo e : info.getActiveEntitlements()) {</span>
+<span class="pc bpc" id="L906" title="1 of 4 branches missed.">            if (newest == null || e.getExpiresDate() &gt; newest.getExpiresDate()) {</span>
+<span class="fc" id="L907">                newest = e;</span>
+            }
+<span class="fc" id="L909">        }</span>
+<span class="fc bfc" id="L910" title="All 2 branches covered.">        if (newest == null) {</span>
+<span class="fc" id="L911">            return false;</span>
+        }
+<span class="fc" id="L913">        String store = newest.getStore();</span>
+<span class="pc bpc" id="L914" title="1 of 4 branches missed.">        return &quot;stripe&quot;.equalsIgnoreCase(store) || &quot;paddle&quot;.equalsIgnoreCase(store);</span>
+    }
+
+    /// The customer center the console configured for this application, as
+    /// parsed JSON: the `paths` to offer, the support address and the cancel
+    /// reasons. [com.codename1.payment.center.CustomerCenter] presents it.
+    ///
+    /// Blocking network call -- invoke off the EDT.
+    ///
+    /// #### Returns
+    ///
+    /// the configuration, or null when the cloud is not enabled in this
+    /// build, could not be reached or refused to answer
+    public Map getCustomerCenterConfiguration() {
+<span class="pc bpc" id="L928" title="1 of 2 branches missed.">        if (!isCloudEnabled()) {</span>
+<span class="nc" id="L929">            return null;</span>
+        }
+<span class="fc" id="L931">        Map payload = postSigned(&quot;/customer-center&quot;, null);</span>
+<span class="pc bpc" id="L932" title="1 of 4 branches missed.">        if (payload == null || !asBoolean(payload.get(&quot;accepted&quot;))) {</span>
+<span class="fc" id="L933">            return null;</span>
+        }
+<span class="fc" id="L935">        return payload;</span>
+    }
+
+    // ---- events --------------------------------------------------------------------
+
+    /// Reports a paywall event to the cloud, where the console charts the
+    /// funnel of each offering and paywall. Same as
+    /// [#logEvent(String, String, String, String, String)] with no reason.
+    ///
+    /// #### Parameters
+    ///
+    /// - `type`: the event, such as `IMPRESSION`, `PURCHASE_START`,
+    ///   `PURCHASE` or `CLOSE`
+    ///
+    /// - `offeringId`: the offering shown, or null
+    ///
+    /// - `paywallId`: the paywall shown, or null
+    ///
+    /// - `packageId`: the package concerned, or null
+    public void logEvent(String type, String offeringId, String paywallId, String packageId) {
+<span class="fc" id="L955">        logEvent(type, offeringId, paywallId, packageId, null);</span>
+<span class="fc" id="L956">    }</span>
+
+    /// Reports an event to the cloud. The call returns at once on any
+    /// thread: events are collected and sent together from a background
+    /// thread, and an event that cannot be sent is dropped. Reporting never
+    /// delays or fails a purchase. Safe no-op when the cloud is not enabled
+    /// in this build.
+    ///
+    /// #### Parameters
+    ///
+    /// - `type`: the event, such as `IMPRESSION` or `CANCEL_REASON`
+    ///
+    /// - `offeringId`: the offering shown, or null
+    ///
+    /// - `paywallId`: the paywall shown, or null
+    ///
+    /// - `packageId`: the package concerned, or null
+    ///
+    /// - `reason`: the id of the reason chosen, for a `CANCEL_REASON` event,
+    ///   or null
+    public void logEvent(String type, String offeringId, String paywallId, String packageId, String reason) {
+<span class="pc bpc" id="L977" title="1 of 4 branches missed.">        if (type == null || !isCloudEnabled()) {</span>
+<span class="fc" id="L978">            return;</span>
+        }
+<span class="fc" id="L980">        StringBuilder sb = new StringBuilder();</span>
+<span class="fc" id="L981">        sb.append('{');</span>
+<span class="fc" id="L982">        appendField(sb, &quot;type&quot;, type);</span>
+<span class="fc" id="L983">        sb.append(',');</span>
+<span class="fc" id="L984">        appendField(sb, &quot;offeringId&quot;, offeringId);</span>
+<span class="fc" id="L985">        sb.append(',');</span>
+<span class="fc" id="L986">        appendField(sb, &quot;paywallId&quot;, paywallId);</span>
+<span class="fc" id="L987">        sb.append(',');</span>
+<span class="fc" id="L988">        appendField(sb, &quot;packageId&quot;, packageId);</span>
+<span class="fc bfc" id="L989" title="All 2 branches covered.">        if (reason != null) {</span>
+<span class="fc" id="L990">            sb.append(',');</span>
+<span class="fc" id="L991">            appendField(sb, &quot;reason&quot;, reason);</span>
+        }
+<span class="fc" id="L993">        sb.append(&quot;,\&quot;time\&quot;:&quot;).append(System.currentTimeMillis()).append('}');</span>
+<span class="fc" id="L994">        final String event = sb.toString();</span>
+        // The queue belongs to the EDT, so no two threads ever touch it.
+<span class="pc bpc" id="L996" title="1 of 2 branches missed.">        if (Display.getInstance().isEdt()) {</span>
+<span class="fc" id="L997">            queueEvent(event);</span>
+        } else {
+<span class="nc" id="L999">            Display.getInstance().callSerially(new Runnable() {</span>
+                @Override
+                public void run() {
+<span class="nc" id="L1002">                    queueEvent(event);</span>
+<span class="nc" id="L1003">                }</span>
+            });
+        }
+<span class="fc" id="L1006">    }</span>
+
+    /// Reports a commerce event to the analytics providers the application
+    /// registered with `Analytics`, in the category `commerce`.
+    /// [com.codename1.payment.paywall.PaywallView]
+    /// and the customer center call this for what they show; an application
+    /// that draws its own paywall can call it with the same names so its
+    /// reports read the same.
+    ///
+    /// The event carries the parameters `offering`, `package` and `product`
+    /// for the values that are not null, `placement` when the offering was
+    /// fetched for a placement, and `experiment` and `variant` when the
+    /// offering was chosen by an experiment. Nothing is sent without the
+    /// user's analytics consent, and the call does nothing at all when no
+    /// provider is registered. It never throws and never blocks.
+    ///
+    /// #### Parameters
+    ///
+    /// - `name`: the event name, such as `paywall_view`
+    ///
+    /// - `offeringId`: the offering concerned, or null
+    ///
+    /// - `packageId`: the package concerned, or null
+    ///
+    /// - `productId`: the store product concerned, or null
+    ///
+    /// - `key`: the name of one more parameter, or null
+    ///
+    /// - `value`: the value of that parameter, or null to leave it out
+    public void analyticsEvent(String name, String offeringId, String packageId, String productId,
+            String key, String value) {
+<span class="fc bfc" id="L1037" title="All 2 branches covered.">        if (name == null) {</span>
+<span class="fc" id="L1038">            return;</span>
+        }
+        try {
+<span class="fc" id="L1041">            Map&lt;String, Object&gt; params = contextParams(offeringId, packageId, productId);</span>
+<span class="pc bpc" id="L1042" title="1 of 4 branches missed.">            if (key != null &amp;&amp; value != null) {</span>
+<span class="fc" id="L1043">                params.put(key, value);</span>
+            }
+<span class="fc" id="L1045">            Analytics.autoEvent(name, ANALYTICS_CATEGORY, params);</span>
+<span class="nc" id="L1046">        } catch (Throwable t) {</span>
+<span class="nc" id="L1047">            Log.e(t);</span>
+<span class="fc" id="L1048">        }</span>
+<span class="fc" id="L1049">    }</span>
+
+    private Map&lt;String, Object&gt; contextParams(String offeringId, String packageId, String productId) {
+<span class="fc" id="L1052">        Map&lt;String, Object&gt; params = new HashMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L1053">        putParam(params, &quot;offering&quot;, offeringId);</span>
+<span class="fc" id="L1054">        putParam(params, &quot;package&quot;, packageId);</span>
+<span class="fc" id="L1055">        putParam(params, &quot;product&quot;, productId);</span>
+<span class="fc bfc" id="L1056" title="All 2 branches covered.">        Object context = offeringId == null ? null : offeringContext.get(offeringId);</span>
+<span class="fc bfc" id="L1057" title="All 2 branches covered.">        if (context instanceof String[]) {</span>
+<span class="fc" id="L1058">            String[] c = (String[]) context;</span>
+<span class="fc" id="L1059">            putParam(params, &quot;placement&quot;, c[0]);</span>
+<span class="fc" id="L1060">            putParam(params, &quot;experiment&quot;, c[1]);</span>
+<span class="fc" id="L1061">            putParam(params, &quot;variant&quot;, c[2]);</span>
+        }
+<span class="fc" id="L1063">        return params;</span>
+    }
+
+    private static void putParam(Map&lt;String, Object&gt; params, String key, String value) {
+<span class="pc bpc" id="L1067" title="1 of 4 branches missed.">        if (value != null &amp;&amp; value.length() &gt; 0) {</span>
+<span class="fc" id="L1068">            params.put(key, value);</span>
+        }
+<span class="fc" id="L1070">    }</span>
+
+    /// Remembers which placement and experiment each offering of an answer
+    /// belongs to. The experiment chose the current offering, so only that
+    /// one is labelled with it.
+    private void rememberContext(Offerings result, String placement) {
+<span class="fc" id="L1076">        Map next = new HashMap(offeringContext);</span>
+<span class="fc" id="L1077">        Offering current = result.getCurrent();</span>
+<span class="fc bfc" id="L1078" title="All 2 branches covered.">        for (Offering o : result.getAll()) {</span>
+<span class="pc bpc" id="L1079" title="1 of 2 branches missed.">            if (o.getId() == null) {</span>
+<span class="nc" id="L1080">                continue;</span>
+            }
+<span class="pc bpc" id="L1082" title="1 of 4 branches missed.">            boolean chosen = current != null &amp;&amp; o.getId().equals(current.getId());</span>
+<span class="fc" id="L1083">            String[] context = new String[3];</span>
+<span class="fc" id="L1084">            context[0] = placement;</span>
+<span class="fc bfc" id="L1085" title="All 2 branches covered.">            if (chosen) {</span>
+<span class="fc" id="L1086">                context[1] = result.getExperimentId();</span>
+<span class="fc" id="L1087">                context[2] = result.getExperimentVariant();</span>
+            }
+<span class="fc" id="L1089">            next.put(o.getId(), context);</span>
+<span class="fc" id="L1090">        }</span>
+<span class="fc" id="L1091">        offeringContext = next;</span>
+<span class="fc" id="L1092">    }</span>
+
+    /// Reports `experiment_exposure` the first time this install is seen in
+    /// an experiment's variant. Remembered only once it could be sent, so an
+    /// exposure met before the user consented is reported after.
+    private static void reportExposure(Offerings result) {
+        try {
+<span class="fc" id="L1099">            String id = result.getExperimentId();</span>
+<span class="fc bfc" id="L1100" title="All 4 branches covered.">            if (id == null || !analyticsActive()) {</span>
+<span class="fc" id="L1101">                return;</span>
+            }
+<span class="fc" id="L1103">            String variant = result.getExperimentVariant();</span>
+<span class="pc bpc" id="L1104" title="1 of 2 branches missed.">            String pair = id + &quot;/&quot; + (variant == null ? &quot;&quot; : variant);</span>
+<span class="fc bfc" id="L1105" title="All 2 branches covered.">            if (pair.equals(Preferences.get(PREF_EXPOSURE, null))) {</span>
+<span class="fc" id="L1106">                return;</span>
+            }
+<span class="fc" id="L1108">            Preferences.set(PREF_EXPOSURE, pair);</span>
+<span class="fc" id="L1109">            Map&lt;String, Object&gt; params = new HashMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L1110">            params.put(&quot;experiment&quot;, id);</span>
+<span class="fc" id="L1111">            putParam(params, &quot;variant&quot;, variant);</span>
+<span class="fc" id="L1112">            Analytics.autoEvent(&quot;experiment_exposure&quot;, ANALYTICS_CATEGORY, params);</span>
+<span class="nc" id="L1113">        } catch (Throwable t) {</span>
+<span class="nc" id="L1114">            Log.e(t);</span>
+<span class="fc" id="L1115">        }</span>
+<span class="fc" id="L1116">    }</span>
+
+    /// Whether analytics would send an event now: a provider is registered
+    /// and the user's consent covers analytics.
+    private static boolean analyticsActive() {
+<span class="fc" id="L1121">        AnalyticsConsent c = Analytics.getConsent();</span>
+        boolean allowed;
+<span class="pc bpc" id="L1123" title="1 of 2 branches missed.">        if (Analytics.getConsentMode() == ConsentMode.OPT_OUT) {</span>
+<span class="nc bnc" id="L1124" title="All 4 branches missed.">            allowed = c == null || c.isAnalytics();</span>
+        } else {
+<span class="fc bfc" id="L1126" title="All 4 branches covered.">            allowed = c != null &amp;&amp; c.isAnalytics();</span>
+        }
+<span class="pc bpc" id="L1128" title="1 of 4 branches missed.">        return allowed &amp;&amp; !Analytics.getProviders().isEmpty();</span>
+    }
+
+    /// The analytics client id of this install, which the cloud uses to join
+    /// a customer to the install's analytics and invite records. Null -- and
+    /// then no request carries one -- when the application registered no
+    /// analytics provider or the user's consent does not cover analytics, so
+    /// an id is never created for an application that does not use analytics
+    /// and never sent for a user who opted out.
+    static String analyticsClientId() {
+        try {
+<span class="fc bfc" id="L1139" title="All 2 branches covered.">            if (!analyticsActive()) {</span>
+<span class="fc" id="L1140">                return null;</span>
+            }
+<span class="fc" id="L1142">            String id = Analytics.clientId();</span>
+<span class="pc bpc" id="L1143" title="2 of 4 branches missed.">            return id == null || id.length() == 0 ? null : id;</span>
+<span class="nc" id="L1144">        } catch (Throwable t) {</span>
+<span class="nc" id="L1145">            return null;</span>
+        }
+    }
+
+    private static void appendClientId(StringBuilder sb) {
+<span class="fc" id="L1150">        String id = analyticsClientId();</span>
+<span class="fc bfc" id="L1151" title="All 2 branches covered.">        if (id != null) {</span>
+<span class="fc" id="L1152">            sb.append(',');</span>
+<span class="fc" id="L1153">            appendField(sb, &quot;analyticsClientId&quot;, id);</span>
+        }
+<span class="fc" id="L1155">    }</span>
+
+    /// Adds the context of a purchase started by
+    /// [#purchase(CommercePackage)] to the parameters of the analytics event
+    /// [Purchase] is about to send for the same product. A context is used
+    /// for one purchase: the completing event takes it, and it lapses by
+    /// itself so a later purchase of the product is not labelled with it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `sku`: the product of the event
+    ///
+    /// - `params`: the parameters to add to
+    ///
+    /// - `consume`: true for the event that completes the purchase
+    static void addPurchaseContext(String sku, Map&lt;String, Object&gt; params, boolean consume) {
+        // No try block here: the loop below casts, and a cast must never
+        // sit under a handler that could be taken for its failure.
+<span class="fc" id="L1173">        CommerceManager cm = instance;</span>
+<span class="fc bfc" id="L1174" title="All 2 branches covered.">        if (cm == null) {</span>
+<span class="fc" id="L1175">            return;</span>
+        }
+<span class="fc" id="L1177">        PurchaseContext pending = cm.pendingPurchase;</span>
+<span class="pc bpc" id="L1178" title="2 of 8 branches missed.">        if (pending == null || sku == null || params == null || !sku.equals(pending.sku)) {</span>
+<span class="fc" id="L1179">            return;</span>
+        }
+<span class="fc bfc" id="L1181" title="All 2 branches covered.">        boolean lapsed = System.currentTimeMillis() - pending.time &gt; PURCHASE_CONTEXT_LIFETIME;</span>
+<span class="pc bpc" id="L1182" title="1 of 4 branches missed.">        if (consume || lapsed) {</span>
+<span class="fc" id="L1183">            cm.pendingPurchase = null;</span>
+        }
+<span class="fc bfc" id="L1185" title="All 2 branches covered.">        if (lapsed) {</span>
+<span class="fc" id="L1186">            return;</span>
+        }
+<span class="fc bfc" id="L1188" title="All 2 branches covered.">        for (Map.Entry&lt;String, Object&gt; e : pending.params.entrySet()) {</span>
+<span class="pc bpc" id="L1189" title="1 of 2 branches missed.">            if (!params.containsKey(e.getKey())) {</span>
+<span class="fc" id="L1190">                params.put(e.getKey(), e.getValue());</span>
+            }
+<span class="fc" id="L1192">        }</span>
+<span class="fc" id="L1193">    }</span>
+
+    /// Moves the start of the pending purchase context back in time.
+    static void agePurchaseContextForTests(long millis) {
+<span class="fc" id="L1197">        CommerceManager cm = instance;</span>
+<span class="pc bpc" id="L1198" title="2 of 4 branches missed.">        if (cm != null &amp;&amp; cm.pendingPurchase != null) {</span>
+<span class="fc" id="L1199">            cm.pendingPurchase = new PurchaseContext(cm.pendingPurchase.sku, cm.pendingPurchase.params,</span>
+                    cm.pendingPurchase.time - millis);
+        }
+<span class="fc" id="L1202">    }</span>
+
+    /// What [#purchase(CommercePackage)] knew about a purchase it started.
+    private static final class PurchaseContext {
+        final String sku;
+        final Map&lt;String, Object&gt; params;
+        final long time;
+
+        PurchaseContext(String sku, Map&lt;String, Object&gt; params) {
+<span class="fc" id="L1211">            this(sku, params, System.currentTimeMillis());</span>
+<span class="fc" id="L1212">        }</span>
+
+<span class="fc" id="L1214">        PurchaseContext(String sku, Map&lt;String, Object&gt; params, long time) {</span>
+<span class="fc" id="L1215">            this.sku = sku;</span>
+<span class="fc" id="L1216">            this.params = params;</span>
+<span class="fc" id="L1217">            this.time = time;</span>
+<span class="fc" id="L1218">        }</span>
+    }
+
+    /// Registers, once, for the invite attribution of this install. A
+    /// referral reward is granted by the cloud, so when the attribution is
+    /// known the customer is fetched again and the reward appears without the
+    /// application asking. The registration goes through `Analytics`, not
+    /// the invite package: it leaves the application's own invite listener
+    /// alone, and commerce does not make an application depend on invites.
+    private void hookInvites() {
+<span class="fc bfc" id="L1228" title="All 2 branches covered.">        if (invitesHooked) {</span>
+<span class="fc" id="L1229">            return;</span>
+        }
+<span class="fc" id="L1231">        invitesHooked = true;</span>
+<span class="fc" id="L1232">        hookingInvites = true;</span>
+        try {
+<span class="fc" id="L1234">            Analytics.setAttributionObserver(INVITE_OBSERVER);</span>
+<span class="nc" id="L1235">        } catch (Throwable t) {</span>
+<span class="nc" id="L1236">            Log.e(t);</span>
+        } finally {
+<span class="fc" id="L1238">            hookingInvites = false;</span>
+        }
+<span class="fc" id="L1240">    }</span>
+
+    private void inviteArrived() {
+        // Registering from inside a refresh answers at once when the
+        // attribution is already known, and that refresh is the fetch.
+<span class="pc bpc" id="L1245" title="4 of 6 branches missed.">        if (!isCloudEnabled() || (hookingInvites &amp;&amp; refreshing)) {</span>
+<span class="nc" id="L1246">            return;</span>
+        }
+<span class="fc" id="L1248">        Display.getInstance().scheduleBackgroundTask(new Runnable() {</span>
+            @Override
+            public void run() {
+<span class="fc" id="L1251">                refresh();</span>
+<span class="fc" id="L1252">            }</span>
+        });
+<span class="fc" id="L1254">    }</span>
+
+    private void queueEvent(String event) {
+<span class="fc" id="L1257">        pendingEvents.add(event);</span>
+<span class="fc bfc" id="L1258" title="All 2 branches covered.">        if (eventFlushScheduled) {</span>
+<span class="fc" id="L1259">            return;</span>
+        }
+<span class="fc" id="L1261">        eventFlushScheduled = true;</span>
+        // Sent on the next EDT cycle, so the events of one user action --
+        // a purchase start right after an impression -- travel together.
+<span class="fc" id="L1264">        Display.getInstance().callSerially(new Runnable() {</span>
+            @Override
+            public void run() {
+<span class="fc" id="L1267">                final String body = drainEvents();</span>
+<span class="fc bfc" id="L1268" title="All 2 branches covered.">                if (body == null) {</span>
+<span class="fc" id="L1269">                    return;</span>
+                }
+<span class="fc" id="L1271">                Display.getInstance().scheduleBackgroundTask(new Runnable() {</span>
+                    @Override
+                    public void run() {
+                        try {
+<span class="fc" id="L1275">                            quiet(Rest.post(endpoint() + &quot;/events&quot;)).body(body).getAsString();</span>
+<span class="nc" id="L1276">                        } catch (Throwable t) {</span>
+                            // analytics only: dropped
+<span class="fc" id="L1278">                        }</span>
+<span class="fc" id="L1279">                    }</span>
+                });
+<span class="fc" id="L1281">            }</span>
+        });
+<span class="fc" id="L1283">    }</span>
+
+    /// Empties the event queue into the body of one `/events` request.
+    ///
+    /// #### Returns
+    ///
+    /// the request body, or null when nothing is waiting
+    String drainEvents() {
+<span class="fc" id="L1291">        eventFlushScheduled = false;</span>
+<span class="pc bpc" id="L1292" title="1 of 4 branches missed.">        if (pendingEvents.isEmpty() || endpoint() == null) {</span>
+<span class="fc" id="L1293">            pendingEvents.clear();</span>
+<span class="fc" id="L1294">            return null;</span>
+        }
+<span class="fc" id="L1296">        StringBuilder events = new StringBuilder(&quot;\&quot;events\&quot;:[&quot;);</span>
+<span class="fc bfc" id="L1297" title="All 2 branches covered.">        for (int i = 0; i &lt; pendingEvents.size(); i++) {</span>
+<span class="fc bfc" id="L1298" title="All 2 branches covered.">            if (i &gt; 0) {</span>
+<span class="fc" id="L1299">                events.append(',');</span>
+            }
+<span class="fc" id="L1301">            events.append(pendingEvents.get(i));</span>
+        }
+<span class="fc" id="L1303">        events.append(']');</span>
+<span class="fc" id="L1304">        pendingEvents.clear();</span>
+<span class="fc" id="L1305">        return baseRequest(newNonce(), events.toString());</span>
+    }
+
+    // ---- cloud refresh -------------------------------------------------------
+
+    /// Validates the device's current receipts with the cloud, then asks the
+    /// cloud what the customer is entitled to and takes that answer as the
+    /// entitlement state. The customer is asked even when the device holds no
+    /// receipt at all, which is what unlocks a purchase made on another
+    /// platform or granted from the console.
+    ///
+    /// Blocking network call -- invoke off the EDT. Safe no-op when the cloud
+    /// is not enabled in this build. On any failure the manager flips to
+    /// {@link #isDegraded() degraded} and leaves the previous (or
+    /// store-direct) answers in place.
+    public void refresh() {
+<span class="fc bfc" id="L1321" title="All 2 branches covered.">        if (!isCloudEnabled()) {</span>
+<span class="fc" id="L1322">            return;</span>
+        }
+<span class="fc" id="L1324">        refreshing = true;</span>
+        try {
+<span class="fc" id="L1326">            refreshNow();</span>
+        } finally {
+<span class="fc" id="L1328">            refreshing = false;</span>
+        }
+<span class="fc" id="L1330">    }</span>
+
+    private void refreshNow() {
+<span class="fc" id="L1333">        ensureCustomerLoaded();</span>
+<span class="fc" id="L1334">        List receipts = null;</span>
+<span class="fc" id="L1335">        boolean receiptsFailed = false;</span>
+        try {
+<span class="fc" id="L1337">            receipts = Purchase.getInAppPurchase().getReceipts();</span>
+<span class="nc" id="L1338">        } catch (Throwable t) {</span>
+<span class="nc" id="L1339">            receiptsFailed = true;</span>
+<span class="fc" id="L1340">        }</span>
+<span class="fc" id="L1341">        boolean anyReceipt = false;</span>
+<span class="fc" id="L1342">        boolean anySuccess = false;</span>
+<span class="fc" id="L1343">        boolean anyDegraded = false;</span>
+<span class="pc bpc" id="L1344" title="1 of 2 branches missed.">        if (receipts != null) {</span>
+<span class="fc bfc" id="L1345" title="All 2 branches covered.">            for (Object o : receipts) {</span>
+<span class="pc bpc" id="L1346" title="1 of 2 branches missed.">                if (!(o instanceof Receipt)) {</span>
+<span class="nc" id="L1347">                    continue;</span>
+                }
+<span class="fc" id="L1349">                anyReceipt = true;</span>
+<span class="fc" id="L1350">                Boolean[] flags = validateReceipt((Receipt) o);</span>
+<span class="fc bfc" id="L1351" title="All 2 branches covered.">                if (flags != null) {</span>
+<span class="fc" id="L1352">                    anySuccess = true;</span>
+<span class="pc bpc" id="L1353" title="1 of 2 branches missed.">                    if (flags[0].booleanValue()) {</span>
+<span class="nc" id="L1354">                        anyDegraded = true;</span>
+                    }
+                }
+<span class="fc" id="L1357">            }</span>
+        }
+<span class="fc" id="L1359">        boolean customerOk = fetchCustomer(false);</span>
+<span class="pc bpc" id="L1360" title="6 of 12 branches missed.">        degraded = !customerOk || degraded || receiptsFailed || anyDegraded || (anyReceipt &amp;&amp; !anySuccess);</span>
+<span class="fc" id="L1361">    }</span>
+
+    /// Asks the cloud for the current customer and adopts the answer. Leaves
+    /// `degraded` as the answer itself reported it, or true when there was no
+    /// acceptable answer.
+    private boolean fetchCustomer(boolean forceEvent) {
+        // The id the request is for; it may change while the request is out.
+<span class="fc" id="L1368">        String forUser = getAppUserId();</span>
+<span class="fc" id="L1369">        SignedAnswer answer = postSignedAnswer(&quot;/customer&quot;, null, forUser);</span>
+<span class="fc bfc" id="L1370" title="All 2 branches covered.">        Map payload = answer == null ? null : answer.payload;</span>
+<span class="pc bpc" id="L1371" title="1 of 4 branches missed.">        if (payload == null || !accepted(payload)) {</span>
+<span class="fc" id="L1372">            degraded = true;</span>
+<span class="fc" id="L1373">            return false;</span>
+        }
+<span class="pc bpc" id="L1375" title="1 of 2 branches missed.">        if (!forUser.equals(getAppUserId())) {</span>
+            // The user changed while this was out; the answer is not theirs.
+<span class="nc" id="L1377">            return false;</span>
+        }
+<span class="fc" id="L1379">        adoptCustomer(answer, forUser, forceEvent);</span>
+<span class="fc" id="L1380">        degraded = asBoolean(payload.get(&quot;degraded&quot;));</span>
+<span class="fc" id="L1381">        return true;</span>
+    }
+
+    /// An answer the cloud explicitly refused to give (`accepted` false) is
+    /// not an entitlement state; one that does not say is taken as given.
+    private static boolean accepted(Map payload) {
+<span class="fc" id="L1387">        Object a = payload.get(&quot;accepted&quot;);</span>
+<span class="pc bpc" id="L1388" title="1 of 4 branches missed.">        return a == null || asBoolean(a);</span>
+    }
+
+    private void adoptCustomer(SignedAnswer answer, String forUser, boolean forceEvent) {
+<span class="fc" id="L1392">        CustomerInfo next = new CustomerInfo(answer.payload);</span>
+<span class="fc bfc" id="L1393" title="All 4 branches covered.">        boolean changed = forceEvent || !next.sameState(customerInfo);</span>
+<span class="fc" id="L1394">        customerInfo = next;</span>
+        // The customer answer is the entitlement state; what single receipts
+        // said before it is superseded.
+<span class="fc" id="L1397">        entitlementCache.clear();</span>
+        try {
+<span class="fc" id="L1399">            storeEnvelope(storageKey(STORAGE_CUSTOMER_PREFIX, forUser), answer);</span>
+<span class="nc" id="L1400">        } catch (Throwable t) {</span>
+<span class="nc" id="L1401">            Log.p(&quot;CommerceManager: could not store the customer: &quot; + t);</span>
+<span class="fc" id="L1402">        }</span>
+<span class="fc bfc" id="L1403" title="All 2 branches covered.">        if (changed) {</span>
+<span class="fc" id="L1404">            fireCustomerInfoChanged();</span>
+        }
+<span class="fc" id="L1406">    }</span>
+
+    /// Loads the stored customer of the current app user id the first time
+    /// it is needed, and again after the id changed under it, so a cold
+    /// start answers from the last accepted answer before any network call.
+    ///
+    /// Nothing is expired here. An entitlement whose `expiresDate` is behind
+    /// the device clock is still reported as stored: the service's clock
+    /// decides, at the next refresh, and the device's is not trusted to.
+    private void ensureCustomerLoaded() {
+<span class="fc bfc" id="L1416" title="All 2 branches covered.">        if (isCloudEnabled()) {</span>
+<span class="fc" id="L1417">            hookInvites();</span>
+        }
+<span class="fc" id="L1419">        String id = getAppUserId();</span>
+<span class="fc bfc" id="L1420" title="All 2 branches covered.">        if (id.equals(customerLoadedFor)) {</span>
+<span class="fc" id="L1421">            return;</span>
+        }
+<span class="fc bfc" id="L1423" title="All 2 branches covered.">        boolean hadCustomer = customerLoadedFor != null;</span>
+<span class="fc" id="L1424">        customerLoadedFor = id;</span>
+<span class="fc" id="L1425">        customerInfo = new CustomerInfo(null);</span>
+<span class="fc bfc" id="L1426" title="All 2 branches covered.">        if (hadCustomer) {</span>
+            // Another user's receipts answered these.
+<span class="fc" id="L1428">            entitlementCache.clear();</span>
+        }
+<span class="fc" id="L1430">        Map stored = loadEnvelope(storageKey(STORAGE_CUSTOMER_PREFIX, id), CUSTOMER_ENDPOINTS, id);</span>
+<span class="fc bfc" id="L1431" title="All 2 branches covered.">        if (stored != null) {</span>
+<span class="fc" id="L1432">            customerInfo = new CustomerInfo(stored);</span>
+        }
+<span class="fc" id="L1434">    }</span>
+
+    private void deleteStoredCustomer(String id) {
+        try {
+<span class="fc" id="L1438">            Storage.getInstance().deleteStorageFile(storageKey(STORAGE_CUSTOMER_PREFIX, id));</span>
+<span class="nc" id="L1439">        } catch (Throwable t) {</span>
+<span class="nc" id="L1440">            Log.p(&quot;CommerceManager: could not delete the stored customer: &quot; + t);</span>
+<span class="fc" id="L1441">        }</span>
+<span class="fc" id="L1442">    }</span>
+
+    /// A storage entry name for an app user id. The id is the application's
+    /// and may hold characters a file name cannot, so those are replaced and
+    /// the id's hash keeps two ids that then look alike apart.
+    private static String storageKey(String prefix, String id) {
+<span class="fc" id="L1448">        StringBuilder sb = new StringBuilder(prefix);</span>
+<span class="fc bfc" id="L1449" title="All 2 branches covered.">        for (int i = 0; i &lt; id.length(); i++) {</span>
+<span class="fc" id="L1450">            char c = id.charAt(i);</span>
+<span class="pc bpc" id="L1451" title="5 of 14 branches missed.">            boolean safe = (c &gt;= 'a' &amp;&amp; c &lt;= 'z') || (c &gt;= 'A' &amp;&amp; c &lt;= 'Z')</span>
+                    || (c &gt;= '0' &amp;&amp; c &lt;= '9') || c == '-';
+<span class="fc bfc" id="L1453" title="All 2 branches covered.">            sb.append(safe ? c : '_');</span>
+        }
+<span class="fc" id="L1455">        sb.append('_').append(Integer.toHexString(id.hashCode()));</span>
+<span class="fc" id="L1456">        return sb.toString();</span>
+    }
+
+    // ---- signed envelope -------------------------------------------------------
+
+    /// Posts a request to one of the endpoints that answer with a signed
+    /// envelope, `{&quot;payload&quot;: &quot;&lt;JSON text&gt;&quot;, &quot;signature&quot;: &quot;&lt;base64&gt;&quot;}`, and
+    /// returns the parsed payload, or null when there is no answer to trust.
+    ///
+    /// The signature is Ed25519 over the UTF-8 bytes of the request's nonce,
+    /// a line feed and the payload text, so an answer recorded earlier
+    /// cannot be replayed to a later request. An answer that is unsigned or
+    /// wrongly signed is ignored, and while no public key is known at all
+    /// every answer is: the request is not even sent.
+    private Map postSigned(String path, String extraFields) {
+<span class="fc" id="L1471">        SignedAnswer a = postSignedAnswer(path, extraFields, null);</span>
+<span class="fc bfc" id="L1472" title="All 2 branches covered.">        return a == null ? null : a.payload;</span>
+    }
+
+    /// A verified answer: its parsed payload and the envelope text that is
+    /// cached. Each call gets its own, because a request runs inside
+    /// invokeAndBlock and another commerce call can run while it is out.
+    static final class SignedAnswer {
+        final Map payload;
+        final String envelope;
+
+<span class="fc" id="L1482">        SignedAnswer(Map payload, String envelope) {</span>
+<span class="fc" id="L1483">            this.payload = payload;</span>
+<span class="fc" id="L1484">            this.envelope = envelope;</span>
+<span class="fc" id="L1485">        }</span>
+    }
+
+    // The endpoints whose answers may sit in each cache slot.
+<span class="fc" id="L1489">    private static final String[] OFFERINGS_ENDPOINTS = {&quot;/offerings&quot;};</span>
+<span class="fc" id="L1490">    private static final String[] CUSTOMER_ENDPOINTS = {&quot;/customer&quot;, &quot;/identify&quot;};</span>
+
+    /// [#postSigned(String, String)] keeping the envelope, and refusing an
+    /// answer bound to another request: one that names an `appUserId` other
+    /// than `forUser` (when it is not null), or a `packageName` or `endpoint`
+    /// other than this application's and `path`. A field the answer does not
+    /// carry is not checked, since older services do not send them.
+    private SignedAnswer postSignedAnswer(String path, String extraFields, String forUser) {
+<span class="fc" id="L1498">        String url = endpoint();</span>
+<span class="pc bpc" id="L1499" title="1 of 2 branches missed.">        if (url == null) {</span>
+<span class="nc" id="L1500">            return null;</span>
+        }
+<span class="fc" id="L1502">        byte[] key = publicKey();</span>
+<span class="fc bfc" id="L1503" title="All 2 branches covered.">        if (key == null) {</span>
+<span class="pc bpc" id="L1504" title="1 of 2 branches missed.">            if (!noKeyLogged) {</span>
+<span class="fc" id="L1505">                noKeyLogged = true;</span>
+<span class="fc" id="L1506">                Log.p(&quot;CommerceManager: no public key for the commerce service is known (&quot;</span>
+                        + PROP_PUBLIC_KEY + &quot;), so its answers cannot be verified and are not used;&quot;
+                        + &quot; answering from the store directly&quot;);
+            }
+<span class="fc" id="L1510">            return null;</span>
+        }
+<span class="fc" id="L1512">        String nonce = newNonce();</span>
+<span class="fc" id="L1513">        Object data = postForJson(url + path, baseRequest(nonce, extraFields));</span>
+        // The casts stay outside any try block: a failed cast does not throw
+        // on every platform, so each type is tested and never caught.
+<span class="fc bfc" id="L1516" title="All 2 branches covered.">        if (!(data instanceof Map)) {</span>
+<span class="fc" id="L1517">            return null;</span>
+        }
+<span class="fc" id="L1519">        Map envelope = (Map) data;</span>
+<span class="fc" id="L1520">        Object payload = envelope.get(&quot;payload&quot;);</span>
+<span class="fc bfc" id="L1521" title="All 2 branches covered.">        if (!(payload instanceof String)) {</span>
+<span class="fc" id="L1522">            return null;</span>
+        }
+<span class="fc" id="L1524">        String text = (String) payload;</span>
+<span class="fc" id="L1525">        Object signature = envelope.get(&quot;signature&quot;);</span>
+<span class="pc bpc" id="L1526" title="1 of 4 branches missed.">        if (!(signature instanceof String) || !verify(nonce, text, (String) signature, key)) {</span>
+<span class="fc" id="L1527">            Log.p(&quot;CommerceManager: ignored an answer of &quot; + path + &quot; with a missing or bad signature&quot;);</span>
+<span class="fc" id="L1528">            return null;</span>
+        }
+<span class="fc" id="L1530">        String sigText = (String) signature;</span>
+<span class="fc" id="L1531">        Object keyIdValue = envelope.get(&quot;keyId&quot;);</span>
+<span class="pc bpc" id="L1532" title="1 of 2 branches missed.">        String keyId = keyIdValue instanceof String ? (String) keyIdValue : null;</span>
+        try {
+<span class="fc" id="L1534">            Map parsed = JSONParser.parseJSON(text);</span>
+<span class="fc bfc" id="L1535" title="All 2 branches covered.">            if (!boundTo(parsed, new String[] {path}, forUser, packageName())) {</span>
+<span class="fc" id="L1536">                Log.p(&quot;CommerceManager: ignored an answer of &quot; + path + &quot; bound to another request&quot;);</span>
+<span class="fc" id="L1537">                return null;</span>
+            }
+<span class="fc" id="L1539">            StringBuilder sb = new StringBuilder(&quot;{&quot;);</span>
+<span class="fc" id="L1540">            appendField(sb, &quot;nonce&quot;, nonce);</span>
+<span class="fc" id="L1541">            sb.append(',');</span>
+<span class="fc" id="L1542">            appendField(sb, &quot;payload&quot;, text);</span>
+<span class="fc" id="L1543">            sb.append(',');</span>
+<span class="fc" id="L1544">            appendField(sb, &quot;signature&quot;, sigText);</span>
+<span class="pc bpc" id="L1545" title="1 of 2 branches missed.">            if (keyId != null) {</span>
+<span class="nc" id="L1546">                sb.append(',');</span>
+<span class="nc" id="L1547">                appendField(sb, &quot;keyId&quot;, keyId);</span>
+            }
+<span class="fc" id="L1549">            sb.append('}');</span>
+<span class="fc" id="L1550">            return new SignedAnswer(parsed, sb.toString());</span>
+<span class="nc" id="L1551">        } catch (Throwable t) {</span>
+<span class="nc" id="L1552">            Log.p(&quot;CommerceManager&quot; + path + &quot; answered an unreadable payload: &quot; + t);</span>
+<span class="nc" id="L1553">            return null;</span>
+        }
+    }
+
+    /// True when the payload's binding fields, where present, match the
+    /// request: `appUserId` against `forUser` (skipped when null),
+    /// `packageName` against this application's, `endpoint` against one of
+    /// `paths`.
+    private static boolean boundTo(Map payload, String[] paths, String forUser, String pkg) {
+<span class="fc" id="L1562">        Object user = payload.get(&quot;appUserId&quot;);</span>
+<span class="pc bpc" id="L1563" title="1 of 6 branches missed.">        if (forUser != null &amp;&amp; user != null &amp;&amp; !forUser.equals(String.valueOf(user))) {</span>
+<span class="fc" id="L1564">            return false;</span>
+        }
+<span class="fc" id="L1566">        Object p = payload.get(&quot;packageName&quot;);</span>
+<span class="fc bfc" id="L1567" title="All 4 branches covered.">        if (p != null &amp;&amp; !String.valueOf(p).equals(pkg)) {</span>
+<span class="fc" id="L1568">            return false;</span>
+        }
+<span class="fc" id="L1570">        Object e = payload.get(&quot;endpoint&quot;);</span>
+<span class="fc bfc" id="L1571" title="All 2 branches covered.">        if (e != null) {</span>
+<span class="fc" id="L1572">            String ep = String.valueOf(e);</span>
+<span class="fc bfc" id="L1573" title="All 2 branches covered.">            for (String path : paths) {</span>
+<span class="fc bfc" id="L1574" title="All 2 branches covered.">                if (path.equals(ep)) {</span>
+<span class="fc" id="L1575">                    return true;</span>
+                }
+            }
+<span class="fc" id="L1578">            return false;</span>
+        }
+<span class="fc" id="L1580">        return true;</span>
+    }
+
+    /// Stores the envelope of a verified answer under a storage entry name.
+    private void storeEnvelope(String name, SignedAnswer answer) {
+<span class="pc bpc" id="L1585" title="2 of 4 branches missed.">        if (answer == null || answer.envelope == null) {</span>
+<span class="nc" id="L1586">            return;</span>
+        }
+        try {
+<span class="fc" id="L1589">            Storage.getInstance().writeObject(name, answer.envelope);</span>
+<span class="nc" id="L1590">        } catch (Throwable t) {</span>
+<span class="nc" id="L1591">            Log.p(&quot;CommerceManager: could not store &quot; + name + &quot;: &quot; + t);</span>
+<span class="fc" id="L1592">        }</span>
+<span class="fc" id="L1593">    }</span>
+
+    /// The payload of a stored envelope whose signature still verifies
+    /// against the current key, or null. An entry that does not verify, was
+    /// written in an older format, cannot be read, or is bound to another
+    /// user, application or endpoint (see `boundTo`) is deleted.
+    private Map loadEnvelope(String name, String[] paths, String forUser) {
+<span class="fc" id="L1600">        Storage st = Storage.getInstance();</span>
+<span class="fc bfc" id="L1601" title="All 2 branches covered.">        if (!st.exists(name)) {</span>
+<span class="fc" id="L1602">            return null;</span>
+        }
+        try {
+<span class="fc" id="L1605">            Object stored = st.readObject(name);</span>
+<span class="fc" id="L1606">            byte[] key = publicKey();</span>
+<span class="pc bpc" id="L1607" title="2 of 4 branches missed.">            if (key != null &amp;&amp; stored instanceof String) {</span>
+<span class="fc" id="L1608">                Map env = JSONParser.parseJSON((String) stored);</span>
+<span class="fc" id="L1609">                Object nonce = env.get(&quot;nonce&quot;);</span>
+<span class="fc" id="L1610">                Object payload = env.get(&quot;payload&quot;);</span>
+<span class="fc" id="L1611">                Object signature = env.get(&quot;signature&quot;);</span>
+<span class="pc bpc" id="L1612" title="2 of 6 branches missed.">                if (nonce instanceof String &amp;&amp; payload instanceof String &amp;&amp; signature instanceof String</span>
+<span class="fc bfc" id="L1613" title="All 2 branches covered.">                        &amp;&amp; verify((String) nonce, (String) payload, (String) signature, key)) {</span>
+<span class="fc" id="L1614">                    Map parsed = JSONParser.parseJSON((String) payload);</span>
+<span class="fc bfc" id="L1615" title="All 2 branches covered.">                    if (boundTo(parsed, paths, forUser, packageName())) {</span>
+<span class="fc" id="L1616">                        return parsed;</span>
+                    }
+<span class="fc" id="L1618">                    Log.p(&quot;CommerceManager: dropped &quot; + name + &quot;, bound to another request&quot;);</span>
+                }
+            }
+<span class="nc" id="L1621">        } catch (Throwable t) {</span>
+<span class="nc" id="L1622">            Log.p(&quot;CommerceManager: could not read &quot; + name + &quot;: &quot; + t);</span>
+<span class="fc" id="L1623">        }</span>
+        try {
+<span class="fc" id="L1625">            st.deleteStorageFile(name);</span>
+<span class="nc" id="L1626">        } catch (Throwable t) {</span>
+<span class="nc" id="L1627">            Log.p(&quot;CommerceManager: could not delete &quot; + name + &quot;: &quot; + t);</span>
+<span class="fc" id="L1628">        }</span>
+<span class="fc" id="L1629">        return null;</span>
+    }
+
+    /// Posts a JSON body and returns the parsed JSON answer, or null for an
+    /// error status or no answer at all.
+    private static Object postForJson(String url, String body) {
+        try {
+<span class="fc" id="L1636">            Response resp = quiet(Rest.post(url)).body(body).getAsJsonMap();</span>
+<span class="pc bpc" id="L1637" title="1 of 4 branches missed.">            if (resp.getResponseCode() &lt; 200 || resp.getResponseCode() &gt;= 300) {</span>
+<span class="fc" id="L1638">                return null;</span>
+            }
+<span class="fc" id="L1640">            return resp.getResponseData();</span>
+<span class="nc" id="L1641">        } catch (Throwable t) {</span>
+<span class="nc" id="L1642">            Log.p(&quot;CommerceManager: &quot; + url + &quot; failed: &quot; + t);</span>
+<span class="nc" id="L1643">            return null;</span>
+        }
+    }
+
+    private static boolean verify(String nonce, String payload, String signature, byte[] key) {
+        try {
+<span class="pc bpc" id="L1649" title="1 of 2 branches missed.">            if (key.length != Ed25519.PUBLIC_KEY_LENGTH) {</span>
+<span class="nc" id="L1650">                return false;</span>
+            }
+<span class="fc" id="L1652">            byte[] sig = Base64.decode(signature.getBytes(&quot;UTF-8&quot;));</span>
+<span class="pc bpc" id="L1653" title="2 of 4 branches missed.">            if (sig == null || sig.length != Ed25519.SIGNATURE_LENGTH) {</span>
+<span class="nc" id="L1654">                return false;</span>
+            }
+<span class="fc" id="L1656">            return Ed25519.verify((nonce + &quot;\n&quot; + payload).getBytes(&quot;UTF-8&quot;), sig, key);</span>
+<span class="nc" id="L1657">        } catch (Throwable t) {</span>
+<span class="nc" id="L1658">            return false;</span>
+        }
+    }
+
+    /// The service's public key, or null when none is known. A key that is
+    /// configured but unreadable is returned as an empty array, which no
+    /// signature verifies against: a broken key must not quietly turn
+    /// verification off.
+    private static byte[] publicKey() {
+<span class="fc" id="L1667">        String k = Display.getInstance().getProperty(PROP_PUBLIC_KEY, DEFAULT_PUBLIC_KEY);</span>
+<span class="pc bpc" id="L1668" title="1 of 4 branches missed.">        if (k == null || k.length() == 0) {</span>
+<span class="fc" id="L1669">            k = defaultPublicKey;</span>
+        }
+<span class="fc bfc" id="L1671" title="All 2 branches covered.">        if (k.length() == 0) {</span>
+<span class="fc" id="L1672">            return null;</span>
+        }
+        try {
+<span class="fc" id="L1675">            byte[] decoded = Base64.decode(k.getBytes(&quot;UTF-8&quot;));</span>
+<span class="pc bpc" id="L1676" title="1 of 2 branches missed.">            return decoded == null ? new byte[0] : decoded;</span>
+<span class="nc" id="L1677">        } catch (Throwable t) {</span>
+<span class="nc" id="L1678">            return new byte[0];</span>
+        }
+    }
+
+    /// A JSON request that reports failure through its response and nothing
+    /// else. Left alone, a request that meets an error status or a dead
+    /// connection puts the framework's &quot;Retry / Cancel&quot; dialog on screen, and
+    /// these run in the background where the user asked for nothing.
+    private static RequestBuilder quiet(RequestBuilder request) {
+<span class="fc" id="L1687">        return request.jsonContent()</span>
+<span class="fc" id="L1688">                .onErrorCodeString(new ErrorCodeHandler&lt;String&gt;() {</span>
+                    @Override
+                    public void onError(Response&lt;String&gt; errorData) {
+                        // the caller reads the response code
+<span class="fc" id="L1692">                    }</span>
+                })
+<span class="fc" id="L1694">                .onError(new ActionListener&lt;NetworkEvent&gt;() {</span>
+                    @Override
+                    public void actionPerformed(NetworkEvent evt) {
+                        // the caller sees no response, or the exception
+<span class="nc" id="L1698">                    }</span>
+                });
+    }
+
+    /// A fresh nonce for one request, 128 random bits in hex.
+    private static String newNonce() {
+        byte[] b;
+        try {
+<span class="fc" id="L1706">            b = SecureRandom.bytes(16);</span>
+<span class="nc" id="L1707">        } catch (Throwable t) {</span>
+            // A port with no secure source still gets a nonce that differs
+            // per request, which is what tells answers apart.
+<span class="nc" id="L1710">            b = new byte[16];</span>
+<span class="nc" id="L1711">            RANDOM.nextBytes(b);</span>
+<span class="fc" id="L1712">        }</span>
+<span class="fc" id="L1713">        StringBuilder sb = new StringBuilder(32);</span>
+<span class="fc bfc" id="L1714" title="All 2 branches covered.">        for (byte v : b) {</span>
+<span class="fc" id="L1715">            sb.append(HEX.charAt((v &gt;&gt; 4) &amp; 0xf));</span>
+<span class="fc" id="L1716">            sb.append(HEX.charAt(v &amp; 0xf));</span>
+        }
+<span class="fc" id="L1718">        return sb.toString();</span>
+    }
+
+    /// The fields every request of the newer endpoints carries, plus the
+    /// caller's own, as a JSON object.
+    private String baseRequest(String nonce, String extraFields) {
+<span class="fc" id="L1724">        StringBuilder sb = new StringBuilder();</span>
+<span class="fc" id="L1725">        sb.append('{');</span>
+<span class="fc" id="L1726">        appendField(sb, &quot;buildKey&quot;, Display.getInstance().getProperty(PROP_BUILD_KEY, &quot;&quot;));</span>
+<span class="fc" id="L1727">        sb.append(',');</span>
+<span class="fc" id="L1728">        appendField(sb, &quot;packageName&quot;, packageName());</span>
+<span class="fc" id="L1729">        sb.append(',');</span>
+<span class="fc" id="L1730">        appendField(sb, &quot;appUserId&quot;, getAppUserId());</span>
+<span class="fc" id="L1731">        sb.append(',');</span>
+<span class="fc" id="L1732">        appendField(sb, &quot;nonce&quot;, nonce);</span>
+<span class="fc" id="L1733">        appendClientId(sb);</span>
+<span class="pc bpc" id="L1734" title="1 of 4 branches missed.">        if (extraFields != null &amp;&amp; extraFields.length() &gt; 0) {</span>
+<span class="fc" id="L1735">            sb.append(',').append(extraFields);</span>
+        }
+<span class="fc" id="L1737">        sb.append('}');</span>
+<span class="fc" id="L1738">        return sb.toString();</span>
+    }
+
+    /// Posts one receipt to the cloud /validate endpoint, folds the returned
+    /// entitlements into the cache, and returns {degraded} (or null when there
+    /// is no answer to trust).
+    ///
+    /// With a public key the request carries a nonce and the answer is the
+    /// signed envelope [#postSigned(String, String)] verifies, so an answer
+    /// forged on the network applies nothing. Without a key the request is
+    /// still sent, so the service records the purchase and the revenue of an
+    /// invite, but its unsigned answer is not used: the store-direct fallback
+    /// answers instead.
+    private Boolean[] validateReceipt(Receipt r) {
+<span class="fc" id="L1752">        String url = endpoint();</span>
+<span class="pc bpc" id="L1753" title="2 of 4 branches missed.">        if (url == null || r == null) {</span>
+<span class="nc" id="L1754">            return null;</span>
+        }
+<span class="fc bfc" id="L1756" title="All 2 branches covered.">        if (publicKey() == null) {</span>
+<span class="fc" id="L1757">            postForJson(url + &quot;/validate&quot;, buildRequest(r));</span>
+<span class="fc" id="L1758">            return null;</span>
+        }
+<span class="fc" id="L1760">        Map result = postSigned(&quot;/validate&quot;, receiptFields(r));</span>
+<span class="fc bfc" id="L1761" title="All 2 branches covered.">        if (result == null) {</span>
+<span class="fc" id="L1762">            return null;</span>
+        }
+<span class="fc" id="L1764">        applyEntitlements(result.get(&quot;entitlements&quot;));</span>
+<span class="fc" id="L1765">        boolean deg = asBoolean(result.get(&quot;degraded&quot;));</span>
+<span class="pc bpc" id="L1766" title="1 of 2 branches missed.">        return new Boolean[] { deg ? Boolean.TRUE : Boolean.FALSE };</span>
+    }
+
+    private void applyEntitlements(Object entitlements) {
+<span class="pc bpc" id="L1770" title="1 of 2 branches missed.">        if (!(entitlements instanceof Map)) {</span>
+<span class="nc" id="L1771">            return;</span>
+        }
+<span class="fc" id="L1773">        Map ents = (Map) entitlements;</span>
+<span class="fc bfc" id="L1774" title="All 2 branches covered.">        for (Object o : ents.entrySet()) {</span>
+<span class="fc" id="L1775">            Map.Entry e = (Map.Entry) o;</span>
+<span class="fc" id="L1776">            Object view = e.getValue();</span>
+<span class="fc" id="L1777">            boolean active = false;</span>
+<span class="pc bpc" id="L1778" title="1 of 2 branches missed.">            if (view instanceof Map) {</span>
+<span class="fc" id="L1779">                active = asBoolean(((Map) view).get(&quot;active&quot;));</span>
+            }
+<span class="pc bpc" id="L1781" title="1 of 2 branches missed.">            entitlementCache.put(String.valueOf(e.getKey()), active ? Boolean.TRUE : Boolean.FALSE);</span>
+<span class="fc" id="L1782">        }</span>
+<span class="fc" id="L1783">    }</span>
+
+    /// The unsigned request of a client that knows no public key: no nonce,
+    /// so the service answers in the old unsigned shape.
+    private String buildRequest(Receipt r) {
+<span class="fc" id="L1788">        StringBuilder sb = new StringBuilder();</span>
+<span class="fc" id="L1789">        sb.append('{');</span>
+<span class="fc" id="L1790">        appendField(sb, &quot;buildKey&quot;, Display.getInstance().getProperty(PROP_BUILD_KEY, &quot;&quot;));</span>
+<span class="fc" id="L1791">        sb.append(',');</span>
+<span class="fc" id="L1792">        appendField(sb, &quot;packageName&quot;, packageName());</span>
+<span class="fc" id="L1793">        sb.append(',');</span>
+<span class="fc" id="L1794">        appendField(sb, &quot;appUserId&quot;, getAppUserId());</span>
+<span class="fc" id="L1795">        sb.append(',');</span>
+<span class="fc" id="L1796">        sb.append(receiptFields(r));</span>
+<span class="fc" id="L1797">        appendClientId(sb);</span>
+<span class="fc" id="L1798">        sb.append('}');</span>
+<span class="fc" id="L1799">        return sb.toString();</span>
+    }
+
+    /// The fields that describe one receipt, without the enclosing braces.
+    private static String receiptFields(Receipt r) {
+<span class="fc" id="L1804">        StringBuilder sb = new StringBuilder();</span>
+<span class="fc" id="L1805">        appendField(sb, &quot;store&quot;, storeOf(r));</span>
+<span class="fc" id="L1806">        sb.append(',');</span>
+        // On StoreKit 2 the order data carries the signed transaction JWS; the
+        // server decodes/normalizes it. Other stores send their own receipt.
+<span class="fc" id="L1809">        appendField(sb, &quot;signedTransaction&quot;, r.getOrderData());</span>
+<span class="fc" id="L1810">        sb.append(',');</span>
+<span class="fc" id="L1811">        appendField(sb, &quot;productId&quot;, r.getSku());</span>
+<span class="fc" id="L1812">        return sb.toString();</span>
+    }
+
+    /// The store name the service knows a receipt's store code by. Package
+    /// private so the mapping can be tested without a network round trip.
+    static String storeOf(Receipt r) {
+<span class="fc" id="L1818">        String code = r.getStoreCode();</span>
+<span class="fc bfc" id="L1819" title="All 2 branches covered.">        if (Receipt.STORE_CODE_ITUNES.equals(code)) {</span>
+            // The Mac App Store reports the same store code and is a store
+            // of its own to the service, with its own products and keys.
+<span class="fc bfc" id="L1822" title="All 2 branches covered.">            return &quot;mac&quot;.equalsIgnoreCase(Display.getInstance().getPlatformName()) ? &quot;mac&quot; : &quot;apple&quot;;</span>
+        }
+<span class="fc bfc" id="L1824" title="All 2 branches covered.">        if (Receipt.STORE_CODE_PLAY.equals(code)) {</span>
+<span class="fc" id="L1825">            return &quot;google&quot;;</span>
+        }
+<span class="fc bfc" id="L1827" title="All 2 branches covered.">        if (Receipt.STORE_CODE_AMAZON.equals(code)) {</span>
+            // Named rather than left to the fall through below: the service
+            // routes on this word, so it must not move if the code ever does.
+<span class="fc" id="L1830">            return &quot;amazon&quot;;</span>
+        }
+<span class="pc bpc" id="L1832" title="1 of 2 branches missed.">        return code == null ? &quot;&quot; : code;</span>
+    }
+
+    private String packageName() {
+<span class="fc" id="L1836">        return Display.getInstance().getProperty(PROP_PACKAGE, &quot;&quot;);</span>
+    }
+
+    private String endpoint() {
+<span class="fc" id="L1840">        String e = Display.getInstance().getProperty(PROP_ENDPOINT, DEFAULT_ENDPOINT);</span>
+<span class="pc bpc" id="L1841" title="2 of 4 branches missed.">        return e == null || e.length() == 0 ? null : e;</span>
+    }
+
+    private static boolean asBoolean(Object o) {
+<span class="pc bpc" id="L1845" title="1 of 2 branches missed.">        if (o instanceof Boolean) {</span>
+<span class="nc" id="L1846">            return ((Boolean) o).booleanValue();</span>
+        }
+<span class="fc bfc" id="L1848" title="All 4 branches covered.">        return o != null &amp;&amp; &quot;true&quot;.equalsIgnoreCase(o.toString());</span>
+    }
+
+    private static void appendField(StringBuilder sb, String key, String value) {
+<span class="fc" id="L1852">        sb.append('&quot;').append(key).append('&quot;').append(':');</span>
+<span class="fc bfc" id="L1853" title="All 2 branches covered.">        if (value == null) {</span>
+<span class="fc" id="L1854">            sb.append(&quot;null&quot;);</span>
+<span class="fc" id="L1855">            return;</span>
+        }
+<span class="fc" id="L1857">        sb.append('&quot;');</span>
+<span class="fc bfc" id="L1858" title="All 2 branches covered.">        for (int i = 0; i &lt; value.length(); i++) {</span>
+<span class="fc" id="L1859">            char c = value.charAt(i);</span>
+<span class="pc bpc" id="L1860" title="4 of 6 branches missed.">            switch (c) {</span>
+<span class="fc" id="L1861">                case '&quot;': sb.append(&quot;\\\&quot;&quot;); break;</span>
+<span class="nc" id="L1862">                case '\\': sb.append(&quot;\\\\&quot;); break;</span>
+<span class="nc" id="L1863">                case '\n': sb.append(&quot;\\n&quot;); break;</span>
+<span class="nc" id="L1864">                case '\r': sb.append(&quot;\\r&quot;); break;</span>
+<span class="nc" id="L1865">                case '\t': sb.append(&quot;\\t&quot;); break;</span>
+                default:
+<span class="pc bpc" id="L1867" title="1 of 2 branches missed.">                    if (c &lt; 0x20) {</span>
+                        // Any other control character is illegal raw in JSON.
+<span class="nc" id="L1869">                        sb.append('\\').append('u').append(&quot;00&quot;)</span>
+<span class="nc" id="L1870">                                .append(HEX.charAt((c &gt;&gt; 4) &amp; 0xf))</span>
+<span class="nc" id="L1871">                                .append(HEX.charAt(c &amp; 0xf));</span>
+                    } else {
+<span class="fc" id="L1873">                        sb.append(c);</span>
+                    }
+            }
+        }
+<span class="fc" id="L1877">        sb.append('&quot;');</span>
+<span class="fc" id="L1878">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

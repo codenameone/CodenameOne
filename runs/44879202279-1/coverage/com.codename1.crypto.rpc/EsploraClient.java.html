@@ -1,0 +1,203 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EsploraClient.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.crypto.rpc</a> &gt; <span class="el_source">EsploraClient.java</span></div><h1>EsploraClient.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008-2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.crypto.rpc;
+
+import com.codename1.crypto.bitcoin.BitcoinAddress;
+import com.codename1.crypto.bitcoin.BitcoinTransaction;
+import com.codename1.io.JSONParser;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+/// A Bitcoin client for the Esplora REST API, which Blockstream and mempool.space run in public
+/// and anyone can self-host: unspent outputs, balances, fee estimates and broadcasting.
+///
+/// ```java
+/// EsploraClient btc = new EsploraClient(new NetworkTransport(), EsploraClient.MEMPOOL_TESTNET);
+/// BitcoinAddress address = BitcoinAddress.parse(&quot;tb1qw508d6qejxtdg4y5r3zarvary0c5xw7kxpjzsx&quot;,
+///         BitcoinNetwork.TESTNET);
+/// List&lt;EsploraClient.Utxo&gt; coins = btc.getUtxos(address);
+/// double satPerVbyte = btc.getFeeEstimates().get(&quot;6&quot;);
+/// BitcoinTransaction signed = new BitcoinTransaction();   // signed through a Psbt
+/// String txid = btc.broadcast(signed);
+/// ```
+@com.codename1.impl.SharedWithBackend
+public class EsploraClient {
+    /// mempool.space, mainnet.
+    public static final String MEMPOOL_MAINNET = &quot;https://mempool.space/api&quot;;
+    /// mempool.space, testnet4.
+    public static final String MEMPOOL_TESTNET = &quot;https://mempool.space/testnet4/api&quot;;
+    /// mempool.space, signet.
+    public static final String MEMPOOL_SIGNET = &quot;https://mempool.space/signet/api&quot;;
+    /// Blockstream, mainnet.
+    public static final String BLOCKSTREAM_MAINNET = &quot;https://blockstream.info/api&quot;;
+
+    private final RpcTransport transport;
+    private final String base;
+
+    /// A client for an Esplora base URL, such as [#MEMPOOL_MAINNET].
+<span class="fc" id="L61">    public EsploraClient(RpcTransport transport, String baseUrl) {</span>
+<span class="pc bpc" id="L62" title="2 of 4 branches missed.">        if (transport == null || baseUrl == null) {</span>
+<span class="nc" id="L63">            throw new IllegalArgumentException(&quot;transport and baseUrl are required&quot;);</span>
+        }
+<span class="fc" id="L65">        this.transport = transport;</span>
+<span class="pc bpc" id="L66" title="1 of 2 branches missed.">        this.base = baseUrl.endsWith(&quot;/&quot;) ? baseUrl.substring(0, baseUrl.length() - 1) : baseUrl;</span>
+<span class="fc" id="L67">    }</span>
+
+    private String get(String path) throws IOException {
+<span class="fc" id="L70">        return transport.send(&quot;GET&quot;, base + path, null, null);</span>
+    }
+
+    private Object getJson(String path) throws IOException {
+<span class="fc" id="L74">        String body = get(path);</span>
+        try {
+<span class="fc" id="L76">            return JSONParser.parseStrict(body, true);</span>
+<span class="nc" id="L77">        } catch (IOException e) {</span>
+<span class="nc" id="L78">            throw new IOException(&quot;not JSON from &quot; + base + path, e);</span>
+        }
+    }
+
+    /// The unspent outputs paying an address, confirmed and in the mempool.
+    public List&lt;Utxo&gt; getUtxos(BitcoinAddress address) throws IOException {
+<span class="fc" id="L84">        List&lt;?&gt; list = JsonRpc.asList(getJson(&quot;/address/&quot; + address + &quot;/utxo&quot;), &quot;utxo&quot;);</span>
+<span class="fc" id="L85">        List&lt;Utxo&gt; out = new ArrayList&lt;Utxo&gt;();</span>
+<span class="fc bfc" id="L86" title="All 2 branches covered.">        for (Object listItem : list) {</span>
+<span class="fc" id="L87">            Map&lt;?, ?&gt; u = JsonRpc.asMap(listItem, &quot;utxo&quot;);</span>
+<span class="pc bpc" id="L88" title="1 of 2 branches missed.">            Map&lt;?, ?&gt; status = u.get(&quot;status&quot;) instanceof Map ? (Map&lt;?, ?&gt;) u.get(&quot;status&quot;) : null;</span>
+<span class="pc bpc" id="L89" title="1 of 4 branches missed.">            boolean confirmed = status != null &amp;&amp; Boolean.TRUE.equals(status.get(&quot;confirmed&quot;));</span>
+<span class="pc bpc" id="L90" title="1 of 4 branches missed.">            long height = confirmed &amp;&amp; status.get(&quot;block_height&quot;) instanceof Long</span>
+<span class="fc" id="L91">                    ? ((Long) status.get(&quot;block_height&quot;)).longValue() : -1;</span>
+<span class="fc" id="L92">            out.add(new Utxo(JsonRpc.asString(u.get(&quot;txid&quot;), &quot;txid&quot;), JsonRpc.asLong(u.get(&quot;vout&quot;), &quot;vout&quot;),</span>
+<span class="fc" id="L93">                    JsonRpc.asLong(u.get(&quot;value&quot;), &quot;value&quot;), confirmed, height, address));</span>
+<span class="fc" id="L94">        }</span>
+<span class="fc" id="L95">        return out;</span>
+    }
+
+    /// The balance of an address in satoshis: `{confirmed, unconfirmed}`, the second the net
+    /// effect of mempool transactions and possibly negative.
+    public long[] getBalance(BitcoinAddress address) throws IOException {
+<span class="fc" id="L101">        Map&lt;?, ?&gt; a = JsonRpc.asMap(getJson(&quot;/address/&quot; + address), &quot;address&quot;);</span>
+<span class="fc" id="L102">        return new long[] {net(a.get(&quot;chain_stats&quot;)), net(a.get(&quot;mempool_stats&quot;))};</span>
+    }
+
+    private static long net(Object stats) throws IOException {
+<span class="fc" id="L106">        Map&lt;?, ?&gt; s = JsonRpc.asMap(stats, &quot;stats&quot;);</span>
+<span class="fc" id="L107">        return JsonRpc.asLong(s.get(&quot;funded_txo_sum&quot;), &quot;funded_txo_sum&quot;)</span>
+<span class="fc" id="L108">                - JsonRpc.asLong(s.get(&quot;spent_txo_sum&quot;), &quot;spent_txo_sum&quot;);</span>
+    }
+
+    /// Fee estimates in sat/vB keyed by confirmation target in blocks (`&quot;1&quot;`, `&quot;3&quot;`, `&quot;6&quot;`,
+    /// `&quot;144&quot;` and the others the server answers).
+    public Map&lt;String, Double&gt; getFeeEstimates() throws IOException {
+<span class="fc" id="L114">        Map&lt;?, ?&gt; m = JsonRpc.asMap(getJson(&quot;/fee-estimates&quot;), &quot;fee-estimates&quot;);</span>
+<span class="fc" id="L115">        Map&lt;String, Double&gt; out = new LinkedHashMap&lt;String, Double&gt;();</span>
+<span class="fc bfc" id="L116" title="All 2 branches covered.">        for (Map.Entry&lt;?, ?&gt; e : m.entrySet()) {</span>
+<span class="pc bpc" id="L117" title="1 of 2 branches missed.">            if (e.getValue() instanceof Number) {</span>
+<span class="fc" id="L118">                out.put(String.valueOf(e.getKey()), Double.valueOf(((Number) e.getValue()).doubleValue()));</span>
+            }
+<span class="fc" id="L120">        }</span>
+<span class="fc" id="L121">        return out;</span>
+    }
+
+    /// The height of the chain tip.
+    public long getTipHeight() throws IOException {
+<span class="fc" id="L126">        String s = get(&quot;/blocks/tip/height&quot;).trim();</span>
+        try {
+<span class="fc" id="L128">            return Long.parseLong(s);</span>
+<span class="nc" id="L129">        } catch (NumberFormatException e) {</span>
+<span class="nc" id="L130">            throw new IOException(&quot;not a height: &quot; + s, e);</span>
+        }
+    }
+
+    /// A transaction by id.
+    public BitcoinTransaction getTransaction(String txid) throws IOException {
+<span class="nc" id="L136">        return BitcoinTransaction.fromHex(get(&quot;/tx/&quot; + txid + &quot;/hex&quot;).trim());</span>
+    }
+
+    /// Whether a transaction is confirmed, and at what height: `-1` while it is in the
+    /// mempool.
+    public long getConfirmationHeight(String txid) throws IOException {
+<span class="nc" id="L142">        Map&lt;?, ?&gt; s = JsonRpc.asMap(getJson(&quot;/tx/&quot; + txid + &quot;/status&quot;), &quot;status&quot;);</span>
+<span class="nc bnc" id="L143" title="All 2 branches missed.">        if (!Boolean.TRUE.equals(s.get(&quot;confirmed&quot;))) {</span>
+<span class="nc" id="L144">            return -1;</span>
+        }
+<span class="nc" id="L146">        return JsonRpc.asLong(s.get(&quot;block_height&quot;), &quot;block_height&quot;);</span>
+    }
+
+    /// Broadcasts a signed transaction, answering its txid.
+    public String broadcast(BitcoinTransaction signed) throws IOException {
+<span class="nc" id="L151">        return transport.send(&quot;POST&quot;, base + &quot;/tx&quot;, &quot;text/plain&quot;, signed.toHex()).trim();</span>
+    }
+
+    /// An unspent output.
+    public static final class Utxo {
+        private final String txid;
+        private final long vout;
+        private final long value;
+        private final boolean confirmed;
+        private final long height;
+        private final BitcoinAddress address;
+
+<span class="fc" id="L163">        Utxo(String txid, long vout, long value, boolean confirmed, long height, BitcoinAddress address) {</span>
+<span class="fc" id="L164">            this.txid = txid;</span>
+<span class="fc" id="L165">            this.vout = vout;</span>
+<span class="fc" id="L166">            this.value = value;</span>
+<span class="fc" id="L167">            this.confirmed = confirmed;</span>
+<span class="fc" id="L168">            this.height = height;</span>
+<span class="fc" id="L169">            this.address = address;</span>
+<span class="fc" id="L170">        }</span>
+
+        /// The id of the transaction that created the output.
+        public String getTxid() {
+<span class="nc" id="L174">            return txid;</span>
+        }
+
+        /// The output's index in that transaction.
+        public long getVout() {
+<span class="nc" id="L179">            return vout;</span>
+        }
+
+        /// The value in satoshis.
+        public long getValue() {
+<span class="nc" id="L184">            return value;</span>
+        }
+
+        /// Whether the creating transaction is in a block.
+        public boolean isConfirmed() {
+<span class="fc" id="L189">            return confirmed;</span>
+        }
+
+        /// The block height, or `-1` while unconfirmed.
+        public long getHeight() {
+<span class="fc" id="L194">            return height;</span>
+        }
+
+        /// The output as a PSBT's witness UTXO wants it.
+        public BitcoinTransaction.Output toOutput() {
+<span class="fc" id="L199">            return new BitcoinTransaction.Output(value, address.getScriptPubKey());</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

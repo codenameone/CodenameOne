@@ -1,0 +1,390 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>IdTokenVerifier.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.io.oidc</a> &gt; <span class="el_source">IdTokenVerifier.java</span></div><h1>IdTokenVerifier.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012-2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ *
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation. Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.io.oidc;
+
+import com.codename1.security.CryptoException;
+import com.codename1.security.Hash;
+import com.codename1.security.Jwt;
+import com.codename1.security.PublicKey;
+import com.codename1.util.Base64;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+
+/// What [OidcClient] asks of an ID token before it hands one to the application: that its
+/// claims are for this client from this issuer, now, and that the provider signed it.
+///
+/// The claims are checked as OpenID Connect Core 3.1.3.7 lists them. The signature is
+/// checked against a key of the provider's JWK Set, built here from the JWK's own numbers
+/// into the X.509 form [PublicKey] takes: `n` and `e` for RSA, `x` and `y` for a P-256 or
+/// P-384 curve.
+final class IdTokenVerifier {
+    /// `1.2.840.113549.1.1.1`, rsaEncryption, with its NULL parameters.
+<span class="fc" id="L45">    private static final byte[] RSA_ALGORITHM = {0x30, 0x0d, 0x06, 0x09, 0x2a, (byte) 0x86, 0x48,</span>
+        (byte) 0x86, (byte) 0xf7, 0x0d, 0x01, 0x01, 0x01, 0x05, 0x00};
+    /// id-ecPublicKey with the curve prime256v1.
+<span class="fc" id="L48">    private static final byte[] P256_ALGORITHM = {0x30, 0x13, 0x06, 0x07, 0x2a, (byte) 0x86, 0x48,</span>
+        (byte) 0xce, 0x3d, 0x02, 0x01, 0x06, 0x08, 0x2a, (byte) 0x86, 0x48, (byte) 0xce, 0x3d,
+        0x03, 0x01, 0x07};
+    /// id-ecPublicKey with the curve secp384r1.
+<span class="fc" id="L52">    private static final byte[] P384_ALGORITHM = {0x30, 0x10, 0x06, 0x07, 0x2a, (byte) 0x86, 0x48,</span>
+        (byte) 0xce, 0x3d, 0x02, 0x01, 0x06, 0x05, 0x2b, (byte) 0x81, 0x04, 0x00, 0x22};
+
+    private IdTokenVerifier() {
+    }
+
+    private static OidcException invalid(String why) {
+<span class="fc" id="L59">        return new OidcException(OidcException.INVALID_ID_TOKEN, why);</span>
+    }
+
+    /// Checks the claims of an ID token.
+    ///
+    /// #### Parameters
+    ///
+    /// - `jwt`: the parsed ID token
+    ///
+    /// - `issuer`: the provider's expected issuer; required to accept an ID token
+    ///
+    /// - `clientId`: this client
+    ///
+    /// - `nonce`: the nonce the authorization request carried, or null when the token did not
+    ///   come from one -- a refresh, a device grant
+    ///
+    /// - `accessToken`: the access token that arrived with it, for `at_hash`
+    ///
+    /// - `skewSeconds`: how far the device's clock may be from the provider's
+    ///
+    /// - `nowMillis`: the time
+    ///
+    /// #### Returns
+    ///
+    /// null when the claims are good; otherwise why they are not
+    static OidcException checkClaims(Jwt jwt, String issuer, String clientId, String nonce,
+            String accessToken, int skewSeconds, long nowMillis) {
+<span class="fc" id="L86">        Map&lt;String, Object&gt; claims = jwt.getClaims();</span>
+<span class="fc" id="L87">        Object iss = claims.get(&quot;iss&quot;);</span>
+<span class="pc bpc" id="L88" title="1 of 4 branches missed.">        if (issuer == null || issuer.length() == 0) {</span>
+<span class="fc" id="L89">            return invalid(&quot;An expected issuer is required to accept an ID token&quot;);</span>
+        }
+<span class="fc bfc" id="L91" title="All 2 branches covered.">        if (!sameIssuer(issuer, iss, claims.get(&quot;tid&quot;))) {</span>
+<span class="fc" id="L92">            return invalid(&quot;The ID token was issued by &quot; + iss + &quot;, not by &quot; + issuer);</span>
+        }
+<span class="fc" id="L94">        Object aud = claims.get(&quot;aud&quot;);</span>
+<span class="fc" id="L95">        boolean ours = false;</span>
+<span class="fc" id="L96">        int audiences = 0;</span>
+<span class="fc bfc" id="L97" title="All 2 branches covered.">        if (aud instanceof String) {</span>
+<span class="fc" id="L98">            audiences = 1;</span>
+<span class="fc" id="L99">            ours = aud.equals(clientId);</span>
+<span class="pc bpc" id="L100" title="1 of 2 branches missed.">        } else if (aud instanceof List) {</span>
+<span class="fc bfc" id="L101" title="All 2 branches covered.">            for (Object one : (List) aud) {</span>
+<span class="fc" id="L102">                audiences++;</span>
+<span class="pc bpc" id="L103" title="1 of 4 branches missed.">                ours |= one != null &amp;&amp; one.equals(clientId);</span>
+<span class="fc" id="L104">            }</span>
+        }
+<span class="fc bfc" id="L106" title="All 2 branches covered.">        if (!ours) {</span>
+<span class="fc" id="L107">            return invalid(&quot;The ID token is not for this client: its audience is &quot; + aud);</span>
+        }
+<span class="fc" id="L109">        Object azp = claims.get(&quot;azp&quot;);</span>
+<span class="fc bfc" id="L110" title="All 8 branches covered.">        if ((audiences &gt; 1 || azp != null) &amp;&amp; (azp == null || !azp.equals(clientId))) {</span>
+<span class="fc" id="L111">            return invalid(&quot;The ID token was issued to another party: azp is &quot; + azp);</span>
+        }
+        // Who the token is about is the one thing every ID token must say (OpenID Connect
+        // Core section 2), and it is what OidcTokens.getSubject() hands the application.
+        // A token without it used to pass, and a sign-in completed for nobody in particular.
+<span class="fc" id="L116">        Object sub = claims.get(&quot;sub&quot;);</span>
+<span class="fc bfc" id="L117" title="All 4 branches covered.">        if (!(sub instanceof String) || ((String) sub).length() == 0) {</span>
+<span class="fc" id="L118">            return invalid(&quot;The ID token names no subject&quot;);</span>
+        }
+<span class="fc" id="L120">        Object exp = claims.get(&quot;exp&quot;);</span>
+<span class="fc bfc" id="L121" title="All 2 branches covered.">        if (!(exp instanceof Number)) {</span>
+<span class="fc" id="L122">            return invalid(&quot;The ID token has no expiry&quot;);</span>
+        }
+<span class="fc" id="L124">        long skew = skewSeconds * 1000L;</span>
+<span class="fc bfc" id="L125" title="All 2 branches covered.">        if (((Number) exp).longValue() * 1000L + skew &lt; nowMillis) {</span>
+<span class="fc" id="L126">            return invalid(&quot;The ID token has expired&quot;);</span>
+        }
+<span class="fc bfc" id="L128" title="All 2 branches covered.">        if (!(claims.get(&quot;iat&quot;) instanceof Number)) {</span>
+<span class="fc" id="L129">            return invalid(&quot;The ID token has no numeric issuance time&quot;);</span>
+        }
+<span class="fc" id="L131">        Object nbf = claims.get(&quot;nbf&quot;);</span>
+<span class="pc bpc" id="L132" title="1 of 4 branches missed.">        if (nbf instanceof Number &amp;&amp; ((Number) nbf).longValue() * 1000L - skew &gt; nowMillis) {</span>
+<span class="fc" id="L133">            return invalid(&quot;The ID token is not valid yet&quot;);</span>
+        }
+<span class="fc bfc" id="L135" title="All 2 branches covered.">        if (nonce != null) {</span>
+<span class="fc" id="L136">            Object sent = claims.get(&quot;nonce&quot;);</span>
+<span class="fc bfc" id="L137" title="All 4 branches covered.">            if (sent == null || !nonce.equals(sent.toString())) {</span>
+<span class="fc bfc" id="L138" title="All 2 branches covered.">                return new OidcException(OidcException.NONCE_MISMATCH,</span>
+                        sent == null ? &quot;The ID token carries no nonce&quot;
+                                : &quot;ID token nonce did not match&quot;);
+            }
+        }
+<span class="fc" id="L143">        Object atHash = claims.get(&quot;at_hash&quot;);</span>
+<span class="pc bpc" id="L144" title="1 of 4 branches missed.">        if (atHash != null &amp;&amp; accessToken != null) {</span>
+<span class="fc" id="L145">            String expected = leftHalfHash(jwt.getAlgorithm(), accessToken);</span>
+<span class="pc bpc" id="L146" title="1 of 4 branches missed.">            if (expected != null &amp;&amp; !expected.equals(atHash.toString())) {</span>
+<span class="fc" id="L147">                return invalid(&quot;The ID token does not belong to the access token it came &quot;</span>
+                        + &quot;with: at_hash does not match&quot;);
+            }
+        }
+<span class="fc" id="L151">        return null;</span>
+    }
+
+    /// Whether a token's `iss` is the configured issuer. Two providers write it in a way
+    /// that is not the text of their discovery document: Microsoft's multi-tenant document
+    /// has `{tenantid}` where a token has the tenant, and Google's tokens may leave the
+    /// `https://` out.
+    private static boolean sameIssuer(String issuer, Object iss, Object tenant) {
+<span class="pc bpc" id="L159" title="1 of 2 branches missed.">        if (!(iss instanceof String)) {</span>
+<span class="nc" id="L160">            return false;</span>
+        }
+<span class="fc bfc" id="L162" title="All 4 branches covered.">        if (issuer.equals(iss) || (&quot;https://accounts.google.com&quot;.equals(issuer)</span>
+<span class="pc bpc" id="L163" title="1 of 2 branches missed.">                &amp;&amp; &quot;accounts.google.com&quot;.equals(iss))) {</span>
+<span class="fc" id="L164">            return true;</span>
+        }
+<span class="fc" id="L166">        int at = issuer.indexOf(&quot;{tenantid}&quot;);</span>
+<span class="pc bpc" id="L167" title="2 of 6 branches missed.">        return at &gt;= 0 &amp;&amp; tenant instanceof String &amp;&amp; ((String) tenant).length() &gt; 0</span>
+<span class="fc bfc" id="L168" title="All 2 branches covered.">                &amp;&amp; (issuer.substring(0, at) + tenant + issuer.substring(at + 10)).equals(iss);</span>
+    }
+
+    /// The `at_hash` of an access token under a signature algorithm: the left half of the
+    /// algorithm's own hash, in base64url. Null for an algorithm whose hash is not known.
+    static String leftHalfHash(String algorithm, String accessToken) {
+<span class="pc bpc" id="L174" title="2 of 4 branches missed.">        if (algorithm == null || algorithm.length() != 5) {</span>
+<span class="nc" id="L175">            return null;</span>
+        }
+<span class="fc" id="L177">        byte[] ascii = new byte[accessToken.length()];</span>
+<span class="fc bfc" id="L178" title="All 2 branches covered.">        for (int i = 0; i &lt; ascii.length; i++) {</span>
+<span class="fc" id="L179">            ascii[i] = (byte) accessToken.charAt(i);</span>
+        }
+        byte[] digest;
+<span class="fc bfc" id="L182" title="All 2 branches covered.">        if (algorithm.endsWith(&quot;256&quot;)) {</span>
+<span class="fc" id="L183">            digest = Hash.sha256(ascii);</span>
+<span class="pc bpc" id="L184" title="1 of 2 branches missed.">        } else if (algorithm.endsWith(&quot;384&quot;)) {</span>
+<span class="fc" id="L185">            digest = Hash.sha384(ascii);</span>
+<span class="nc bnc" id="L186" title="All 2 branches missed.">        } else if (algorithm.endsWith(&quot;512&quot;)) {</span>
+<span class="nc" id="L187">            digest = Hash.sha512(ascii);</span>
+        } else {
+<span class="nc" id="L189">            return null;</span>
+        }
+<span class="fc" id="L191">        byte[] half = new byte[digest.length / 2];</span>
+<span class="fc" id="L192">        System.arraycopy(digest, 0, half, 0, half.length);</span>
+<span class="fc" id="L193">        return unpadded(Base64.encodeUrlSafe(half));</span>
+    }
+
+    private static String unpadded(String base64) {
+<span class="fc" id="L197">        int end = base64.length();</span>
+<span class="pc bpc" id="L198" title="2 of 4 branches missed.">        while (end &gt; 0 &amp;&amp; base64.charAt(end - 1) == '=') {</span>
+<span class="nc" id="L199">            end--;</span>
+        }
+<span class="fc" id="L201">        return base64.substring(0, end);</span>
+    }
+
+    /// The kind of key that signs under `algorithm`: `RSA` or `EC`. Null for an algorithm an
+    /// ID token is not accepted under -- `none`, and the HMAC ones, whose key would be the
+    /// client secret.
+    static String keyType(String algorithm) {
+<span class="pc bpc" id="L208" title="1 of 6 branches missed.">        if (&quot;RS256&quot;.equals(algorithm) || &quot;RS384&quot;.equals(algorithm) || &quot;RS512&quot;.equals(algorithm)) {</span>
+<span class="fc" id="L209">            return &quot;RSA&quot;;</span>
+        }
+<span class="fc bfc" id="L211" title="All 4 branches covered.">        if (&quot;ES256&quot;.equals(algorithm) || &quot;ES384&quot;.equals(algorithm)) {</span>
+<span class="fc" id="L212">            return &quot;EC&quot;;</span>
+        }
+<span class="fc" id="L214">        return null;</span>
+    }
+
+    /// The keys of a JWK Set that could have signed `jwt`: of the algorithm's kind, for
+    /// signing, and with the token's key id when it names one.
+    static List&lt;Map&lt;String, Object&gt;&gt; candidates(Jwt jwt, List&lt;Map&lt;String, Object&gt;&gt; keys) {
+<span class="fc" id="L220">        List&lt;Map&lt;String, Object&gt;&gt; out = new ArrayList&lt;Map&lt;String, Object&gt;&gt;();</span>
+<span class="fc" id="L221">        String type = keyType(jwt.getAlgorithm());</span>
+<span class="fc" id="L222">        Object kid = jwt.getHeader().get(&quot;kid&quot;);</span>
+<span class="pc bpc" id="L223" title="1 of 4 branches missed.">        if (type == null || keys == null) {</span>
+<span class="fc" id="L224">            return out;</span>
+        }
+<span class="fc bfc" id="L226" title="All 2 branches covered.">        for (Map&lt;String, Object&gt; key : keys) {</span>
+<span class="fc bfc" id="L227" title="All 2 branches covered.">            if (!type.equals(key.get(&quot;kty&quot;))) {</span>
+<span class="fc" id="L228">                continue;</span>
+            }
+<span class="fc" id="L230">            Object use = key.get(&quot;use&quot;);</span>
+<span class="pc bpc" id="L231" title="1 of 4 branches missed.">            if (use != null &amp;&amp; !&quot;sig&quot;.equals(use)) {</span>
+<span class="nc" id="L232">                continue;</span>
+            }
+<span class="fc" id="L234">            Object alg = key.get(&quot;alg&quot;);</span>
+<span class="pc bpc" id="L235" title="3 of 4 branches missed.">            if (alg != null &amp;&amp; !alg.equals(jwt.getAlgorithm())) {</span>
+<span class="nc" id="L236">                continue;</span>
+            }
+<span class="fc bfc" id="L238" title="All 4 branches covered.">            if (kid != null &amp;&amp; !kid.equals(key.get(&quot;kid&quot;))) {</span>
+<span class="fc" id="L239">                continue;</span>
+            }
+<span class="fc" id="L241">            out.add(key);</span>
+<span class="fc" id="L242">        }</span>
+<span class="fc" id="L243">        return out;</span>
+    }
+
+    /// Verifies the signature of `jwt` against the candidate keys.
+    ///
+    /// #### Returns
+    ///
+    /// null when one of them verifies it; otherwise why none did. A platform that cannot
+    /// check a signature of this kind is such a reason: the token is refused, not waved
+    /// through
+    static OidcException verifySignature(Jwt jwt, List&lt;Map&lt;String, Object&gt;&gt; candidates) {
+<span class="fc" id="L254">        String algorithm = jwt.getAlgorithm();</span>
+<span class="fc bfc" id="L255" title="All 2 branches covered.">        if (keyType(algorithm) == null) {</span>
+<span class="fc" id="L256">            return invalid(&quot;The ID token is signed with &quot; + algorithm + &quot;, which is not &quot;</span>
+                    + &quot;accepted: an ID token is signed with RS256, RS384, RS512, ES256 or &quot;
+                    + &quot;ES384&quot;);
+        }
+<span class="fc bfc" id="L260" title="All 2 branches covered.">        if (candidates.isEmpty()) {</span>
+<span class="fc" id="L261">            return invalid(&quot;The provider's keys hold none for this ID token (alg &quot; + algorithm</span>
+<span class="fc" id="L262">                    + &quot;, kid &quot; + jwt.getHeader().get(&quot;kid&quot;) + &quot;)&quot;);</span>
+        }
+<span class="fc bfc" id="L264" title="All 2 branches covered.">        for (Map&lt;String, Object&gt; jwk : candidates) {</span>
+            PublicKey key;
+            try {
+<span class="fc" id="L267">                key = publicKey(jwk);</span>
+<span class="nc" id="L268">            } catch (RuntimeException malformed) {</span>
+<span class="nc" id="L269">                continue;</span>
+<span class="fc" id="L270">            }</span>
+            try {
+<span class="fc bfc" id="L272" title="All 2 branches covered.">                if (jwt.verify(key)) {</span>
+<span class="fc" id="L273">                    return null;</span>
+                }
+<span class="fc" id="L275">            } catch (CryptoException unsupported) {</span>
+<span class="fc" id="L276">                return new OidcException(OidcException.INVALID_ID_TOKEN, &quot;This platform could &quot;</span>
+<span class="fc" id="L277">                        + &quot;not verify an &quot; + algorithm + &quot; signature (&quot; + unsupported.getMessage()</span>
+                        + &quot;), so the ID token was not accepted. If this provider's ID tokens &quot;
+                        + &quot;cannot be verified on this platform, call &quot;
+                        + &quot;OidcClient.setVerifyIdTokenSignature(false) and verify the token on &quot;
+                        + &quot;your server before trusting what it says.&quot;, unsupported);
+<span class="fc" id="L282">            }</span>
+<span class="fc" id="L283">        }</span>
+<span class="fc" id="L284">        return invalid(&quot;The ID token's signature does not verify against the provider's keys&quot;);</span>
+    }
+
+    /// A [PublicKey] from a JWK.
+    ///
+    /// - `CryptoException`: when the JWK is not an RSA key or a P-256 or P-384 one, or lacks
+    ///   its numbers
+    static PublicKey publicKey(Map&lt;String, Object&gt; jwk) {
+<span class="fc" id="L292">        Object kty = jwk.get(&quot;kty&quot;);</span>
+<span class="fc bfc" id="L293" title="All 2 branches covered.">        if (&quot;RSA&quot;.equals(kty)) {</span>
+<span class="fc" id="L294">            return PublicKey.fromX509(PublicKey.RSA, rsaSpki(number(jwk, &quot;n&quot;), number(jwk, &quot;e&quot;)));</span>
+        }
+<span class="pc bpc" id="L296" title="1 of 2 branches missed.">        if (&quot;EC&quot;.equals(kty)) {</span>
+<span class="fc" id="L297">            Object crv = jwk.get(&quot;crv&quot;);</span>
+<span class="fc" id="L298">            byte[] x = number(jwk, &quot;x&quot;);</span>
+<span class="fc" id="L299">            byte[] y = number(jwk, &quot;y&quot;);</span>
+<span class="fc bfc" id="L300" title="All 2 branches covered.">            if (&quot;P-256&quot;.equals(crv)) {</span>
+<span class="fc" id="L301">                return PublicKey.fromX509(PublicKey.EC, ecSpki(P256_ALGORITHM, 32, x, y));</span>
+            }
+<span class="pc bpc" id="L303" title="1 of 2 branches missed.">            if (&quot;P-384&quot;.equals(crv)) {</span>
+<span class="fc" id="L304">                return PublicKey.fromX509(PublicKey.EC, ecSpki(P384_ALGORITHM, 48, x, y));</span>
+            }
+<span class="nc" id="L306">            throw new CryptoException(&quot;Unsupported curve: &quot; + crv);</span>
+        }
+<span class="nc" id="L308">        throw new CryptoException(&quot;Unsupported key type: &quot; + kty);</span>
+    }
+
+    private static byte[] number(Map&lt;String, Object&gt; jwk, String name) {
+<span class="fc" id="L312">        Object value = jwk.get(name);</span>
+<span class="pc bpc" id="L313" title="1 of 2 branches missed.">        byte[] decoded = value instanceof String ? Base64.decodeUrlSafe((String) value) : null;</span>
+<span class="pc bpc" id="L314" title="2 of 4 branches missed.">        if (decoded == null || decoded.length == 0) {</span>
+<span class="nc" id="L315">            throw new CryptoException(&quot;The JWK has no &quot; + name);</span>
+        }
+<span class="fc" id="L317">        return decoded;</span>
+    }
+
+    /// SubjectPublicKeyInfo for an RSA key: the algorithm, then a BIT STRING holding the
+    /// SEQUENCE of the modulus and the exponent.
+    static byte[] rsaSpki(byte[] modulus, byte[] exponent) {
+<span class="fc" id="L323">        byte[] key = sequence(concat(integer(modulus), integer(exponent)));</span>
+<span class="fc" id="L324">        byte[] bits = new byte[key.length + 1];</span>
+<span class="fc" id="L325">        System.arraycopy(key, 0, bits, 1, key.length);</span>
+<span class="fc" id="L326">        return sequence(concat(RSA_ALGORITHM, tagged(0x03, bits)));</span>
+    }
+
+    /// SubjectPublicKeyInfo for a point on a curve: the algorithm with its curve, then a BIT
+    /// STRING holding the uncompressed point, each coordinate at the curve's width.
+    static byte[] ecSpki(byte[] algorithm, int width, byte[] x, byte[] y) {
+<span class="fc" id="L332">        byte[] bits = new byte[2 + 2 * width];</span>
+<span class="fc" id="L333">        bits[1] = 0x04;</span>
+<span class="fc" id="L334">        fixed(x, bits, 2, width);</span>
+<span class="fc" id="L335">        fixed(y, bits, 2 + width, width);</span>
+<span class="fc" id="L336">        return sequence(concat(algorithm, tagged(0x03, bits)));</span>
+    }
+
+    /// Copies an unsigned number into `width` bytes at `at`, dropping leading zeros it has
+    /// too many of and adding the ones it lacks.
+    private static void fixed(byte[] number, byte[] out, int at, int width) {
+<span class="fc" id="L342">        int from = 0;</span>
+<span class="pc bpc" id="L343" title="3 of 4 branches missed.">        while (number.length - from &gt; width &amp;&amp; number[from] == 0) {</span>
+<span class="nc" id="L344">            from++;</span>
+        }
+<span class="fc" id="L346">        int length = number.length - from;</span>
+<span class="pc bpc" id="L347" title="1 of 2 branches missed.">        if (length &gt; width) {</span>
+<span class="nc" id="L348">            throw new CryptoException(&quot;A coordinate is wider than its curve&quot;);</span>
+        }
+<span class="fc" id="L350">        System.arraycopy(number, from, out, at + width - length, length);</span>
+<span class="fc" id="L351">    }</span>
+
+    /// A DER INTEGER for an unsigned number: no leading zeros but the one that keeps it
+    /// positive.
+    private static byte[] integer(byte[] unsigned) {
+<span class="fc" id="L356">        int from = 0;</span>
+<span class="pc bpc" id="L357" title="2 of 4 branches missed.">        while (from &lt; unsigned.length - 1 &amp;&amp; unsigned[from] == 0) {</span>
+<span class="nc" id="L358">            from++;</span>
+        }
+<span class="fc bfc" id="L360" title="All 2 branches covered.">        boolean pad = (unsigned[from] &amp; 0x80) != 0;</span>
+<span class="fc bfc" id="L361" title="All 2 branches covered.">        byte[] value = new byte[unsigned.length - from + (pad ? 1 : 0)];</span>
+<span class="fc bfc" id="L362" title="All 2 branches covered.">        System.arraycopy(unsigned, from, value, pad ? 1 : 0, unsigned.length - from);</span>
+<span class="fc" id="L363">        return tagged(0x02, value);</span>
+    }
+
+    private static byte[] sequence(byte[] content) {
+<span class="fc" id="L367">        return tagged(0x30, content);</span>
+    }
+
+    private static byte[] tagged(int tag, byte[] content) {
+<span class="fc" id="L371">        int length = content.length;</span>
+        byte[] header;
+<span class="fc bfc" id="L373" title="All 2 branches covered.">        if (length &lt; 0x80) {</span>
+<span class="fc" id="L374">            header = new byte[] {(byte) tag, (byte) length};</span>
+<span class="pc bpc" id="L375" title="1 of 2 branches missed.">        } else if (length &lt; 0x100) {</span>
+<span class="nc" id="L376">            header = new byte[] {(byte) tag, (byte) 0x81, (byte) length};</span>
+        } else {
+<span class="fc" id="L378">            header = new byte[] {(byte) tag, (byte) 0x82, (byte) (length &gt;&gt; 8), (byte) length};</span>
+        }
+<span class="fc" id="L380">        return concat(header, content);</span>
+    }
+
+    private static byte[] concat(byte[] a, byte[] b) {
+<span class="fc" id="L384">        byte[] out = new byte[a.length + b.length];</span>
+<span class="fc" id="L385">        System.arraycopy(a, 0, out, 0, a.length);</span>
+<span class="fc" id="L386">        System.arraycopy(b, 0, out, a.length, b.length);</span>
+<span class="fc" id="L387">        return out;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

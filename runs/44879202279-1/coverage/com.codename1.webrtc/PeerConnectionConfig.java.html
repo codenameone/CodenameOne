@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PeerConnectionConfig.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.webrtc</a> &gt; <span class="el_source">PeerConnectionConfig.java</span></div><h1>PeerConnectionConfig.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.webrtc;
+
+import java.util.ArrayList;
+import java.util.List;
+
+/// How a [PeerConnection] looks for a path to the other side.
+<span class="fc" id="L29">public final class PeerConnectionConfig {</span>
+<span class="fc" id="L30">    private final List&lt;IceServer&gt; servers = new ArrayList&lt;IceServer&gt;();</span>
+    private boolean relayOnly;
+
+    /// Adds a STUN or TURN server.
+    public PeerConnectionConfig addIceServer(IceServer server) {
+<span class="pc bpc" id="L35" title="1 of 2 branches missed.">        if (server == null) {</span>
+<span class="nc" id="L36">            throw new IllegalArgumentException(&quot;null ICE server&quot;);</span>
+        }
+<span class="fc" id="L38">        servers.add(server);</span>
+<span class="fc" id="L39">        return this;</span>
+    }
+
+    /// Uses only paths through a TURN relay. The other side then never learns
+    /// this device's own addresses, at the cost of every call going through
+    /// the relay. Off by default.
+    public PeerConnectionConfig setRelayOnly(boolean relayOnly) {
+<span class="fc" id="L46">        this.relayOnly = relayOnly;</span>
+<span class="fc" id="L47">        return this;</span>
+    }
+
+    public boolean isRelayOnly() {
+<span class="fc" id="L51">        return relayOnly;</span>
+    }
+
+    public List&lt;IceServer&gt; getIceServers() {
+<span class="nc" id="L55">        return new ArrayList&lt;IceServer&gt;(servers);</span>
+    }
+
+    /// The servers in the form [com.codename1.webrtc.spi.WebRtcBridge] takes.
+    String wire() {
+<span class="fc" id="L60">        StringBuilder out = new StringBuilder();</span>
+<span class="fc bfc" id="L61" title="All 2 branches covered.">        for (int iter = 0; iter &lt; servers.size(); iter++) {</span>
+<span class="fc" id="L62">            IceServer each = servers.get(iter);</span>
+<span class="pc bpc" id="L63" title="1 of 2 branches missed.">            if (iter &gt; 0) {</span>
+<span class="nc" id="L64">                out.append('\n');</span>
+            }
+<span class="fc" id="L66">            String[] urls = each.getUrls();</span>
+<span class="fc bfc" id="L67" title="All 2 branches covered.">            for (int u = 0; u &lt; urls.length; u++) {</span>
+<span class="pc bpc" id="L68" title="1 of 2 branches missed.">                if (u &gt; 0) {</span>
+<span class="nc" id="L69">                    out.append(',');</span>
+                }
+<span class="fc" id="L71">                out.append(clean(urls[u]));</span>
+            }
+<span class="fc" id="L73">            out.append('\t').append(clean(each.getUsername()));</span>
+<span class="fc" id="L74">            out.append('\t').append(clean(each.getCredential()));</span>
+        }
+<span class="fc" id="L76">        return out.toString();</span>
+    }
+
+    // A tab, comma or line break inside a value would split it in the wire
+    // form. None is legal in a URL, and a TURN credential is base64 or hex.
+    private static String clean(String value) {
+<span class="fc bfc" id="L82" title="All 2 branches covered.">        if (value == null) {</span>
+<span class="fc" id="L83">            return &quot;&quot;;</span>
+        }
+<span class="fc" id="L85">        StringBuilder out = new StringBuilder(value.length());</span>
+<span class="fc bfc" id="L86" title="All 2 branches covered.">        for (int iter = 0; iter &lt; value.length(); iter++) {</span>
+<span class="fc" id="L87">            char c = value.charAt(iter);</span>
+<span class="pc bpc" id="L88" title="3 of 6 branches missed.">            if (c != '\t' &amp;&amp; c != '\n' &amp;&amp; c != '\r') {</span>
+<span class="fc" id="L89">                out.append(c);</span>
+            }
+        }
+<span class="fc" id="L92">        return out.toString();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

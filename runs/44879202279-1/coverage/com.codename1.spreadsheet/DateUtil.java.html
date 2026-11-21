@@ -1,0 +1,185 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DateUtil.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.spreadsheet</a> &gt; <span class="el_source">DateUtil.java</span></div><h1>DateUtil.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.spreadsheet;
+
+import java.util.Calendar;
+import java.util.Date;
+
+/// Converts between the day numbers spreadsheets store dates as and calendar dates.
+///
+/// A date in a spreadsheet is a number of days, with the time of day as its fraction. In the
+/// usual system day 1 is the first of January 1900 and day 60 is the 29th of February 1900,
+/// a day that never was: the first spreadsheets treated 1900 as a leap year and every file
+/// since keeps the numbering. The other system counts from the first of January 1904.
+///
+/// The arithmetic is done on plain integers: the device class library has no
+/// `GregorianCalendar`.
+final class DateUtil {
+    private static final int EPOCH_1900 = 25569;
+    private static final int EPOCH_1904 = 24107;
+
+    private DateUtil() {
+    }
+
+    static long floorDiv(long a, long b) {
+<span class="fc" id="L45">        long q = a / b;</span>
+<span class="pc bpc" id="L46" title="1 of 8 branches missed.">        if ((a % b != 0) &amp;&amp; ((a &lt; 0) != (b &lt; 0))) {</span>
+<span class="fc" id="L47">            q--;</span>
+        }
+<span class="fc" id="L49">        return q;</span>
+    }
+
+    /// Days from the first of January 1970 to a date of the Gregorian calendar.
+    static long daysFromCivil(long y, int m, int d) {
+<span class="fc bfc" id="L54" title="All 2 branches covered.">        if (m &lt;= 2) {</span>
+<span class="fc" id="L55">            y--;</span>
+        }
+<span class="fc" id="L57">        long era = floorDiv(y, 400);</span>
+<span class="fc" id="L58">        long yoe = y - era * 400;</span>
+<span class="fc bfc" id="L59" title="All 2 branches covered.">        long doy = (153 * (m + (m &gt; 2 ? -3 : 9)) + 2) / 5 + d - 1;</span>
+<span class="fc" id="L60">        long doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;</span>
+<span class="fc" id="L61">        return era * 146097 + doe - 719468;</span>
+    }
+
+    /// The year, month (1 to 12) and day of a number of days from the first of January 1970.
+    static int[] civilFromDays(long z) {
+<span class="fc" id="L66">        z += 719468;</span>
+<span class="fc" id="L67">        long era = floorDiv(z, 146097);</span>
+<span class="fc" id="L68">        long doe = z - era * 146097;</span>
+<span class="fc" id="L69">        long yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;</span>
+<span class="fc" id="L70">        long y = yoe + era * 400;</span>
+<span class="fc" id="L71">        long doy = doe - (365 * yoe + yoe / 4 - yoe / 100);</span>
+<span class="fc" id="L72">        long mp = (5 * doy + 2) / 153;</span>
+<span class="fc" id="L73">        int d = (int) (doy - (153 * mp + 2) / 5 + 1);</span>
+<span class="fc bfc" id="L74" title="All 2 branches covered.">        int m = (int) (mp &lt; 10 ? mp + 3 : mp - 9);</span>
+<span class="fc bfc" id="L75" title="All 2 branches covered.">        if (m &lt;= 2) {</span>
+<span class="fc" id="L76">            y++;</span>
+        }
+<span class="fc" id="L78">        return new int[] {(int) y, m, d};</span>
+    }
+
+    /// The day number of a date. The month and the day may be out of range, as the DATE
+    /// function allows: month 14 is February of the next year, day 0 the last day of the
+    /// month before.
+    static double serial(long year, long month, long day, boolean date1904) {
+<span class="fc" id="L85">        long y = year + floorDiv(month - 1, 12);</span>
+<span class="fc" id="L86">        int m = (int) (month - 1 - floorDiv(month - 1, 12) * 12) + 1;</span>
+<span class="fc" id="L87">        long first = daysFromCivil(y, m, 1);</span>
+<span class="fc bfc" id="L88" title="All 2 branches covered.">        if (date1904) {</span>
+<span class="fc" id="L89">            return first + day - 1 + EPOCH_1904;</span>
+        }
+        // The first of the month is numbered, then the days are counted on from it in the
+        // spreadsheet's own numbering: DATE(1900,2,29) and DATE(1900,3,0) are both day 60.
+<span class="fc" id="L93">        long s = first + EPOCH_1900;</span>
+<span class="fc bfc" id="L94" title="All 2 branches covered.">        if (s &lt; 61) {</span>
+<span class="fc" id="L95">            s--;</span>
+        }
+<span class="fc" id="L97">        return s + day - 1;</span>
+    }
+
+    /// The year, month and day of a day number. Day 60 of the 1900 system answers the 29th
+    /// of February 1900, as a spreadsheet does.
+    static int[] fields(double serial, boolean date1904) {
+<span class="fc" id="L103">        long n = (long) Math.floor(serial);</span>
+<span class="fc bfc" id="L104" title="All 2 branches covered.">        if (date1904) {</span>
+<span class="fc" id="L105">            return civilFromDays(n - EPOCH_1904);</span>
+        }
+<span class="fc bfc" id="L107" title="All 2 branches covered.">        if (n == 60) {</span>
+<span class="fc" id="L108">            return new int[] {1900, 2, 29};</span>
+        }
+<span class="fc bfc" id="L110" title="All 2 branches covered.">        if (n == 0) {</span>
+            // day 0, where a time with no date is, is the zeroth of January to a spreadsheet
+<span class="fc" id="L112">            return new int[] {1900, 1, 0};</span>
+        }
+<span class="fc bfc" id="L114" title="All 2 branches covered.">        if (n &lt; 60) {</span>
+<span class="fc" id="L115">            return civilFromDays(n - EPOCH_1900 + 1);</span>
+        }
+<span class="fc" id="L117">        return civilFromDays(n - EPOCH_1900);</span>
+    }
+
+    /// The second of the day, 0 to 86399, of a day number, rounded the way a spreadsheet
+    /// displays it.
+    static int secondOfDay(double serial) {
+<span class="fc" id="L123">        double frac = serial - Math.floor(serial);</span>
+<span class="fc" id="L124">        int seconds = (int) Math.floor(frac * 86400 + 0.5);</span>
+<span class="pc bpc" id="L125" title="1 of 2 branches missed.">        return seconds &gt;= 86400 ? 86399 : seconds;</span>
+    }
+
+    /// Day of the week, 1 for Sunday to 7 for Saturday.
+    static int weekday(double serial, boolean date1904) {
+<span class="fc" id="L130">        long n = (long) Math.floor(serial);</span>
+        // Days 1 to 59 of the 1900 system are not corrected for the phantom leap day here, on
+        // purpose: a spreadsheet says the first of January 1900 was a Sunday, and it was not.
+<span class="fc bfc" id="L133" title="All 2 branches covered.">        long days = n - (date1904 ? EPOCH_1904 : EPOCH_1900);</span>
+        // the first of January 1970 was a Thursday
+<span class="fc" id="L135">        long w = days + 4;</span>
+<span class="fc" id="L136">        return (int) (w - floorDiv(w, 7) * 7) + 1;</span>
+    }
+
+    static boolean isLeapYear(long y) {
+<span class="pc bpc" id="L140" title="1 of 6 branches missed.">        return y % 4 == 0 &amp;&amp; (y % 100 != 0 || y % 400 == 0);</span>
+    }
+
+    static int daysInMonth(long y, int m) {
+<span class="fc bfc" id="L144" title="All 3 branches covered.">        switch (m) {</span>
+            case 2:
+<span class="fc bfc" id="L146" title="All 2 branches covered.">                return isLeapYear(y) ? 29 : 28;</span>
+            case 4:
+            case 6:
+            case 9:
+            case 11:
+<span class="fc" id="L151">                return 30;</span>
+            default:
+<span class="fc" id="L153">                return 31;</span>
+        }
+    }
+
+    /// The moment a day number stands for, read as local time: a spreadsheet date has no
+    /// time zone, and &quot;the third of March at nine&quot; means nine on the wall clock.
+    static Date toDate(double serial, boolean date1904) {
+<span class="fc" id="L160">        int[] f = fields(serial, date1904);</span>
+<span class="fc" id="L161">        double frac = serial - Math.floor(serial);</span>
+<span class="fc" id="L162">        long millis = (long) Math.floor(frac * 86400000d + 0.5);</span>
+<span class="fc" id="L163">        Calendar cal = Calendar.getInstance();</span>
+<span class="fc" id="L164">        cal.set(Calendar.YEAR, f[0]);</span>
+<span class="fc" id="L165">        cal.set(Calendar.MONTH, f[1] - 1);</span>
+        // the phantom 29th of February 1900 lands on the first of March
+<span class="fc" id="L167">        cal.set(Calendar.DAY_OF_MONTH, f[2]);</span>
+<span class="fc" id="L168">        cal.set(Calendar.HOUR_OF_DAY, (int) (millis / 3600000));</span>
+<span class="fc" id="L169">        cal.set(Calendar.MINUTE, (int) (millis / 60000 % 60));</span>
+<span class="fc" id="L170">        cal.set(Calendar.SECOND, (int) (millis / 1000 % 60));</span>
+<span class="fc" id="L171">        cal.set(Calendar.MILLISECOND, (int) (millis % 1000));</span>
+<span class="fc" id="L172">        return cal.getTime();</span>
+    }
+
+    /// The day number of a moment, read as local time.
+    static double toSerial(Date date, boolean date1904) {
+<span class="fc" id="L177">        Calendar cal = Calendar.getInstance();</span>
+<span class="fc" id="L178">        cal.setTime(date);</span>
+<span class="fc" id="L179">        double day = serial(cal.get(Calendar.YEAR), cal.get(Calendar.MONTH) + 1, cal.get(Calendar.DAY_OF_MONTH), date1904);</span>
+<span class="fc" id="L180">        double millis = cal.get(Calendar.HOUR_OF_DAY) * 3600000d + cal.get(Calendar.MINUTE) * 60000d</span>
+<span class="fc" id="L181">                + cal.get(Calendar.SECOND) * 1000d + cal.get(Calendar.MILLISECOND);</span>
+<span class="fc" id="L182">        return day + millis / 86400000d;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

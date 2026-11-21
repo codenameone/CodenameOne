@@ -1,0 +1,214 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>GridSelection.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.table</a> &gt; <span class="el_source">GridSelection.java</span></div><h1>GridSelection.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ui.table;
+
+/// The selected view rows of a grid, as sorted, disjoint, inclusive ranges,
+/// so that selecting every row of a million costs one range.
+<span class="fc" id="L27">final class GridSelection {</span>
+    // start, end pairs
+<span class="fc" id="L29">    private int[] ranges = new int[8];</span>
+    private int count;
+
+    void clear() {
+<span class="fc" id="L33">        count = 0;</span>
+<span class="fc" id="L34">    }</span>
+
+    boolean isEmpty() {
+<span class="pc bpc" id="L37" title="1 of 2 branches missed.">        return count == 0;</span>
+    }
+
+    int rangeCount() {
+<span class="fc" id="L41">        return count;</span>
+    }
+
+    int rangeStart(int i) {
+<span class="nc" id="L45">        return ranges[i * 2];</span>
+    }
+
+    int rangeEnd(int i) {
+<span class="nc" id="L49">        return ranges[i * 2 + 1];</span>
+    }
+
+    boolean contains(int row) {
+<span class="fc" id="L53">        int lo = 0;</span>
+<span class="fc" id="L54">        int hi = count - 1;</span>
+<span class="fc bfc" id="L55" title="All 2 branches covered.">        while (lo &lt;= hi) {</span>
+<span class="fc" id="L56">            int mid = (lo + hi) &gt;&gt;&gt; 1;</span>
+<span class="fc bfc" id="L57" title="All 2 branches covered.">            if (row &lt; ranges[mid * 2]) {</span>
+<span class="fc" id="L58">                hi = mid - 1;</span>
+<span class="fc bfc" id="L59" title="All 2 branches covered.">            } else if (row &gt; ranges[mid * 2 + 1]) {</span>
+<span class="fc" id="L60">                lo = mid + 1;</span>
+            } else {
+<span class="fc" id="L62">                return true;</span>
+            }
+<span class="fc" id="L64">        }</span>
+<span class="fc" id="L65">        return false;</span>
+    }
+
+    /// How many rows are selected.
+    int size() {
+<span class="fc" id="L70">        int n = 0;</span>
+<span class="fc bfc" id="L71" title="All 2 branches covered.">        for (int i = 0; i &lt; count; i++) {</span>
+<span class="fc" id="L72">            n += ranges[i * 2 + 1] - ranges[i * 2] + 1;</span>
+        }
+<span class="fc" id="L74">        return n;</span>
+    }
+
+    int first() {
+<span class="nc bnc" id="L78" title="All 2 branches missed.">        return count == 0 ? -1 : ranges[0];</span>
+    }
+
+    int[] toArray() {
+<span class="fc" id="L82">        int[] out = new int[size()];</span>
+<span class="fc" id="L83">        int k = 0;</span>
+<span class="fc bfc" id="L84" title="All 2 branches covered.">        for (int i = 0; i &lt; count; i++) {</span>
+<span class="fc bfc" id="L85" title="All 2 branches covered.">            for (int r = ranges[i * 2]; r &lt;= ranges[i * 2 + 1]; r++) {</span>
+<span class="fc" id="L86">                out[k++] = r;</span>
+            }
+        }
+<span class="fc" id="L89">        return out;</span>
+    }
+
+    void set(int from, int to) {
+<span class="fc" id="L93">        count = 0;</span>
+<span class="fc" id="L94">        add(from, to);</span>
+<span class="fc" id="L95">    }</span>
+
+    void add(int from, int to) {
+<span class="pc bpc" id="L98" title="1 of 2 branches missed.">        if (from &gt; to) {</span>
+<span class="nc" id="L99">            int t = from;</span>
+<span class="nc" id="L100">            from = to;</span>
+<span class="nc" id="L101">            to = t;</span>
+        }
+<span class="pc bpc" id="L103" title="1 of 2 branches missed.">        if (from &lt; 0) {</span>
+<span class="nc" id="L104">            from = 0;</span>
+        }
+<span class="pc bpc" id="L106" title="1 of 2 branches missed.">        if (to &lt; from) {</span>
+<span class="nc" id="L107">            return;</span>
+        }
+<span class="fc" id="L109">        int[] out = new int[(count + 1) * 2];</span>
+<span class="fc" id="L110">        int k = 0;</span>
+<span class="fc" id="L111">        boolean placed = false;</span>
+<span class="fc bfc" id="L112" title="All 2 branches covered.">        for (int i = 0; i &lt; count; i++) {</span>
+<span class="fc" id="L113">            int s = ranges[i * 2];</span>
+<span class="fc" id="L114">            int e = ranges[i * 2 + 1];</span>
+<span class="fc bfc" id="L115" title="All 2 branches covered.">            if (e &lt; from - 1) {</span>
+<span class="fc" id="L116">                out[k++] = s;</span>
+<span class="fc" id="L117">                out[k++] = e;</span>
+<span class="pc bpc" id="L118" title="1 of 2 branches missed.">            } else if (s &gt; to + 1) {</span>
+<span class="nc bnc" id="L119" title="All 2 branches missed.">                if (!placed) {</span>
+<span class="nc" id="L120">                    out[k++] = from;</span>
+<span class="nc" id="L121">                    out[k++] = to;</span>
+<span class="nc" id="L122">                    placed = true;</span>
+                }
+<span class="nc" id="L124">                out[k++] = s;</span>
+<span class="nc" id="L125">                out[k++] = e;</span>
+            } else {
+<span class="fc" id="L127">                from = Math.min(from, s);</span>
+<span class="fc" id="L128">                to = Math.max(to, e);</span>
+            }
+        }
+<span class="pc bpc" id="L131" title="1 of 2 branches missed.">        if (!placed) {</span>
+<span class="fc" id="L132">            out[k++] = from;</span>
+<span class="fc" id="L133">            out[k++] = to;</span>
+        }
+<span class="pc bpc" id="L135" title="1 of 2 branches missed.">        ranges = out.length &lt; 8 ? grow(out, 8) : out;</span>
+<span class="fc" id="L136">        count = k / 2;</span>
+<span class="fc" id="L137">    }</span>
+
+    void remove(int from, int to) {
+<span class="pc bpc" id="L140" title="1 of 2 branches missed.">        if (from &gt; to) {</span>
+<span class="nc" id="L141">            int t = from;</span>
+<span class="nc" id="L142">            from = to;</span>
+<span class="nc" id="L143">            to = t;</span>
+        }
+<span class="fc" id="L145">        int[] out = new int[(count + 1) * 2];</span>
+<span class="fc" id="L146">        int k = 0;</span>
+<span class="fc bfc" id="L147" title="All 2 branches covered.">        for (int i = 0; i &lt; count; i++) {</span>
+<span class="fc" id="L148">            int s = ranges[i * 2];</span>
+<span class="fc" id="L149">            int e = ranges[i * 2 + 1];</span>
+<span class="fc bfc" id="L150" title="All 4 branches covered.">            if (e &lt; from || s &gt; to) {</span>
+<span class="fc" id="L151">                out[k++] = s;</span>
+<span class="fc" id="L152">                out[k++] = e;</span>
+<span class="fc" id="L153">                continue;</span>
+            }
+<span class="fc bfc" id="L155" title="All 2 branches covered.">            if (s &lt; from) {</span>
+<span class="fc" id="L156">                out[k++] = s;</span>
+<span class="fc" id="L157">                out[k++] = from - 1;</span>
+            }
+<span class="fc bfc" id="L159" title="All 2 branches covered.">            if (e &gt; to) {</span>
+<span class="pc bpc" id="L160" title="1 of 2 branches missed.">                if (k + 2 &gt; out.length) {</span>
+<span class="nc" id="L161">                    out = grow(out, out.length + 4);</span>
+                }
+<span class="fc" id="L163">                out[k++] = to + 1;</span>
+<span class="fc" id="L164">                out[k++] = e;</span>
+            }
+        }
+<span class="pc bpc" id="L167" title="1 of 2 branches missed.">        ranges = out.length &lt; 8 ? grow(out, 8) : out;</span>
+<span class="fc" id="L168">        count = k / 2;</span>
+<span class="fc" id="L169">    }</span>
+
+    void toggle(int row) {
+<span class="pc bpc" id="L172" title="1 of 2 branches missed.">        if (contains(row)) {</span>
+<span class="fc" id="L173">            remove(row, row);</span>
+        } else {
+<span class="nc" id="L175">            add(row, row);</span>
+        }
+<span class="fc" id="L177">    }</span>
+
+    /// Moves the selection for rows inserted or removed at `at`: a positive
+    /// `delta` rows were inserted before `at`, a negative one removed from
+    /// `at` on.
+    void shift(int at, int delta) {
+<span class="pc bpc" id="L183" title="1 of 4 branches missed.">        if (delta == 0 || count == 0) {</span>
+<span class="fc" id="L184">            return;</span>
+        }
+<span class="fc bfc" id="L186" title="All 2 branches covered.">        if (delta &lt; 0) {</span>
+<span class="fc" id="L187">            remove(at, at - delta - 1);</span>
+        }
+<span class="fc bfc" id="L189" title="All 2 branches covered.">        for (int i = 0; i &lt; count * 2; i++) {</span>
+<span class="fc bfc" id="L190" title="All 2 branches covered.">            if (ranges[i] &gt;= at) {</span>
+<span class="fc" id="L191">                ranges[i] += delta;</span>
+            }
+        }
+<span class="fc bfc" id="L194" title="All 2 branches covered.">        if (delta &gt; 0) {</span>
+            // A range that held `at` was split by the insertion; the new rows
+            // are not selected.
+<span class="fc bfc" id="L197" title="All 2 branches covered.">            for (int i = 0; i &lt; count; i++) {</span>
+<span class="fc" id="L198">                int s = ranges[i * 2];</span>
+<span class="fc" id="L199">                int e = ranges[i * 2 + 1];</span>
+<span class="fc bfc" id="L200" title="All 4 branches covered.">                if (s &lt; at &amp;&amp; e &gt;= at + delta) {</span>
+<span class="fc" id="L201">                    remove(at, at + delta - 1);</span>
+<span class="fc" id="L202">                    break;</span>
+                }
+            }
+        }
+<span class="fc" id="L206">    }</span>
+
+    private static int[] grow(int[] a, int n) {
+<span class="fc" id="L209">        int[] b = new int[n];</span>
+<span class="fc" id="L210">        System.arraycopy(a, 0, b, 0, Math.min(a.length, n));</span>
+<span class="fc" id="L211">        return b;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

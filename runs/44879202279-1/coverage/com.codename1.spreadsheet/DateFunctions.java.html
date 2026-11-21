@@ -1,0 +1,456 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DateFunctions.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.spreadsheet</a> &gt; <span class="el_source">DateFunctions.java</span></div><h1>DateFunctions.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.spreadsheet;
+
+import java.util.Date;
+
+/// The date and time functions. A date is a day number, and the time of day its fraction.
+final class DateFunctions {
+    static final String SCALAR_NAMES = &quot;DATE DATEDIF DATEVALUE DAY DAYS DAYS360 EDATE EOMONTH HOUR ISOWEEKNUM MINUTE&quot;
+            + &quot; MONTH NOW SECOND TIME TIMEVALUE TODAY WEEKDAY WEEKNUM YEAR YEARFRAC&quot;;
+
+    static final String RANGE_NAMES = &quot;NETWORKDAYS NETWORKDAYS.INTL WORKDAY WORKDAY.INTL&quot;;
+
+    /// The weekend patterns NETWORKDAYS.INTL names by number, Monday first.
+<span class="fc" id="L35">    private static final String[] WEEKENDS = {&quot;0000011&quot;, &quot;1000001&quot;, &quot;1100000&quot;, &quot;0110000&quot;, &quot;0011000&quot;, &quot;0001100&quot;,</span>
+        &quot;0000110&quot;};
+
+    private DateFunctions() {
+    }
+
+    private static Double d(double v) {
+<span class="fc" id="L42">        return Double.valueOf(v);</span>
+    }
+
+    private static double date(Object[] a, int i) {
+<span class="fc" id="L46">        double v = Evaluator.num(a, i);</span>
+<span class="pc bpc" id="L47" title="1 of 4 branches missed.">        if (v &lt; 0 || v &gt;= 2958466) {</span>
+<span class="fc" id="L48">            throw EvalError.NUM;</span>
+        }
+<span class="fc" id="L50">        return v;</span>
+    }
+
+    private static final int DAYS_TO_1904 = 1462;
+    static final double LAST_DAY = 2958465;
+
+    /// Text that names a day is read in the 1900 numbering; a workbook that counts from 1904
+    /// has to have it in its own, or `YEAR(&quot;2024-03-15&quot;)` answers 2028. Only the date
+    /// functions do this: text added to a number in such a workbook is still read in the
+    /// 1900 numbering.
+    private static Object[] in1904(Object[] a) {
+<span class="fc" id="L61">        Object[] out = a;</span>
+<span class="fc bfc" id="L62" title="All 2 branches covered.">        for (int i = 0; i &lt; a.length; i++) {</span>
+<span class="pc bpc" id="L63" title="1 of 4 branches missed.">            if (a[i] instanceof String &amp;&amp; Values.isDateText((String) a[i])) {</span>
+<span class="fc" id="L64">                Double d = Values.parseDateTime(((String) a[i]).trim());</span>
+<span class="pc bpc" id="L65" title="1 of 2 branches missed.">                if (d != null) {</span>
+<span class="fc bfc" id="L66" title="All 2 branches covered.">                    if (out == a) { //NOPMD CompareObjectsWithEquals - whether the copy was made yet</span>
+<span class="fc" id="L67">                        out = new Object[a.length];</span>
+<span class="fc" id="L68">                        System.arraycopy(a, 0, out, 0, a.length);</span>
+                    }
+<span class="fc" id="L70">                    out[i] = Double.valueOf(d.doubleValue() - DAYS_TO_1904);</span>
+                }
+            }
+        }
+<span class="fc" id="L74">        return out;</span>
+    }
+
+    static Object call(String name, Evaluator ev, Object[] a) {
+<span class="fc" id="L78">        boolean d1904 = ev.workbook.isDate1904();</span>
+<span class="fc bfc" id="L79" title="All 6 branches covered.">        if (d1904 &amp;&amp; !&quot;DATEVALUE&quot;.equals(name) &amp;&amp; !&quot;TIMEVALUE&quot;.equals(name)) {</span>
+<span class="fc" id="L80">            a = in1904(a);</span>
+        }
+<span class="pc bpc" id="L82" title="1 of 21 branches missed.">        switch (Functions.index(SWITCH_1, name)) {</span>
+            case 0: { // DATE
+<span class="fc" id="L84">                double year = Math.floor(Evaluator.num(a, 0));</span>
+<span class="pc bpc" id="L85" title="1 of 4 branches missed.">                if (year &lt; 0 || year &gt; 9999) {</span>
+<span class="fc" id="L86">                    throw EvalError.NUM;</span>
+                }
+<span class="fc bfc" id="L88" title="All 2 branches covered.">                if (year &lt; 1900) {</span>
+<span class="fc" id="L89">                    year += 1900;</span>
+                }
+<span class="fc" id="L91">                double s = DateUtil.serial((long) year, (long) Math.floor(Evaluator.num(a, 1)),</span>
+<span class="fc" id="L92">                        (long) Math.floor(Evaluator.num(a, 2)), d1904);</span>
+<span class="pc bpc" id="L93" title="2 of 4 branches missed.">                if (s &lt; 0 || s &gt;= 2958466) {</span>
+<span class="nc" id="L94">                    throw EvalError.NUM;</span>
+                }
+<span class="fc" id="L96">                return d(s);</span>
+            }
+            case 1: // DATEVALUE
+            case 2: { // TIMEVALUE
+<span class="fc" id="L100">                Double v = Values.parseDateTime(Evaluator.text(a, 0).trim());</span>
+<span class="fc bfc" id="L101" title="All 2 branches covered.">                if (v == null) {</span>
+<span class="fc" id="L102">                    throw EvalError.VALUE;</span>
+                }
+<span class="fc" id="L104">                double s = v.doubleValue();</span>
+<span class="fc bfc" id="L105" title="All 4 branches covered.">                if (d1904 &amp;&amp; Values.isDateText(Evaluator.text(a, 0))) {</span>
+<span class="fc" id="L106">                    s -= DAYS_TO_1904;</span>
+                }
+<span class="fc bfc" id="L108" title="All 2 branches covered.">                return d(&quot;DATEVALUE&quot;.equals(name) ? Math.floor(s) : s - Math.floor(s));</span>
+            }
+            case 3: // YEAR
+<span class="fc" id="L111">                return d(DateUtil.fields(date(a, 0), d1904)[0]);</span>
+            case 4: // MONTH
+<span class="fc" id="L113">                return d(DateUtil.fields(date(a, 0), d1904)[1]);</span>
+            case 5: // DAY
+<span class="fc" id="L115">                return d(DateUtil.fields(date(a, 0), d1904)[2]);</span>
+            case 6: // HOUR
+<span class="fc" id="L117">                return d(Math.floor(DateUtil.secondOfDay(date(a, 0)) / 3600d));</span>
+            case 7: // MINUTE
+<span class="fc" id="L119">                return d(DateUtil.secondOfDay(date(a, 0)) / 60 % 60);</span>
+            case 8: // SECOND
+<span class="fc" id="L121">                return d(DateUtil.secondOfDay(date(a, 0)) % 60);</span>
+            case 9: { // TIME
+<span class="fc" id="L123">                double seconds = Math.floor(Evaluator.num(a, 0)) * 3600 + Math.floor(Evaluator.num(a, 1)) * 60</span>
+<span class="fc" id="L124">                        + Math.floor(Evaluator.num(a, 2));</span>
+<span class="pc bpc" id="L125" title="1 of 2 branches missed.">                if (seconds &lt; 0) {</span>
+<span class="nc" id="L126">                    throw EvalError.NUM;</span>
+                }
+<span class="fc" id="L128">                double days = seconds / 86400;</span>
+<span class="fc" id="L129">                return d(days - Math.floor(days));</span>
+            }
+            case 10: // NOW
+<span class="fc" id="L132">                return d(DateUtil.toSerial(new Date(), d1904));</span>
+            case 11: // TODAY
+<span class="fc" id="L134">                return d(Math.floor(DateUtil.toSerial(new Date(), d1904)));</span>
+            case 12: // DAYS
+<span class="fc" id="L136">                return d(Math.floor(date(a, 0)) - Math.floor(date(a, 1)));</span>
+            case 13: { // DAYS360
+<span class="fc" id="L138">                int[] s = DateUtil.fields(date(a, 0), d1904);</span>
+<span class="fc" id="L139">                int[] e = DateUtil.fields(date(a, 1), d1904);</span>
+<span class="fc" id="L140">                return d(days360(s, e, Evaluator.bool(a, 2, false)));</span>
+            }
+            case 14: // EDATE
+            case 15: { // EOMONTH
+<span class="fc" id="L144">                int[] f = DateUtil.fields(date(a, 0), d1904);</span>
+<span class="fc" id="L145">                long months = (long) Evaluator.num(a, 1);</span>
+<span class="fc bfc" id="L146" title="All 2 branches covered.">                if (&quot;EOMONTH&quot;.equals(name)) {</span>
+<span class="fc" id="L147">                    double end = DateUtil.serial(f[0], f[1] + months + 1, 0, d1904);</span>
+<span class="pc bpc" id="L148" title="1 of 4 branches missed.">                    if (end &lt; 0 || end &gt; LAST_DAY) {</span>
+<span class="fc" id="L149">                        throw EvalError.NUM;</span>
+                    }
+<span class="fc" id="L151">                    return d(end);</span>
+                }
+<span class="fc" id="L153">                long index = (long) f[0] * 12 + f[1] - 1 + months;</span>
+<span class="fc" id="L154">                long y = DateUtil.floorDiv(index, 12);</span>
+<span class="fc" id="L155">                int m = (int) (index - y * 12) + 1;</span>
+<span class="fc" id="L156">                double result = DateUtil.serial(y, m, Math.min(f[2], DateUtil.daysInMonth(y, m)), d1904);</span>
+<span class="fc bfc" id="L157" title="All 4 branches covered.">                if (result &lt; 0 || result &gt; LAST_DAY) {</span>
+<span class="fc" id="L158">                    throw EvalError.NUM;</span>
+                }
+<span class="fc" id="L160">                return d(result);</span>
+            }
+            case 16: { // WEEKDAY
+<span class="fc" id="L163">                int w = DateUtil.weekday(date(a, 0), d1904);</span>
+<span class="fc" id="L164">                int type = Evaluator.integer(a, 1, 1);</span>
+<span class="fc bfc" id="L165" title="All 4 branches covered.">                if (type == 1 || type == 17) {</span>
+<span class="fc" id="L166">                    return d(w);</span>
+                }
+<span class="fc bfc" id="L168" title="All 4 branches covered.">                if (type == 2 || type == 11) {</span>
+<span class="fc" id="L169">                    return d((w + 5) % 7 + 1);</span>
+                }
+<span class="fc bfc" id="L171" title="All 2 branches covered.">                if (type == 3) {</span>
+<span class="fc" id="L172">                    return d((w + 5) % 7);</span>
+                }
+<span class="pc bpc" id="L174" title="3 of 4 branches missed.">                if (type &gt;= 12 &amp;&amp; type &lt;= 16) {</span>
+                    // 12 starts the week on Tuesday, 16 on Saturday
+<span class="nc" id="L176">                    return d((w + 16 - type) % 7 + 1);</span>
+                }
+<span class="fc" id="L178">                throw EvalError.NUM;</span>
+            }
+            case 17: { // WEEKNUM
+<span class="fc" id="L181">                double s = Math.floor(date(a, 0));</span>
+<span class="fc" id="L182">                int type = Evaluator.integer(a, 1, 1);</span>
+<span class="fc bfc" id="L183" title="All 2 branches covered.">                if (type == 21) {</span>
+<span class="fc" id="L184">                    return d(isoWeek(s, d1904));</span>
+                }
+                int first;
+<span class="pc bpc" id="L187" title="1 of 4 branches missed.">                if (type == 1 || type == 17) {</span>
+<span class="fc" id="L188">                    first = 1;</span>
+<span class="pc bpc" id="L189" title="1 of 4 branches missed.">                } else if (type == 2 || type == 11) {</span>
+<span class="fc" id="L190">                    first = 2;</span>
+<span class="pc bpc" id="L191" title="3 of 4 branches missed.">                } else if (type &gt;= 12 &amp;&amp; type &lt;= 16) {</span>
+<span class="nc" id="L192">                    first = type - 9;</span>
+                } else {
+<span class="fc" id="L194">                    throw EvalError.NUM;</span>
+                }
+<span class="fc" id="L196">                int year = DateUtil.fields(s, d1904)[0];</span>
+<span class="fc" id="L197">                double jan1 = DateUtil.serial(year, 1, 1, d1904);</span>
+<span class="fc" id="L198">                int offset = (DateUtil.weekday(jan1, d1904) - first + 7) % 7;</span>
+<span class="fc" id="L199">                return d(Math.floor((s - jan1 + offset) / 7) + 1);</span>
+            }
+            case 18: // ISOWEEKNUM
+<span class="fc" id="L202">                return d(isoWeek(Math.floor(date(a, 0)), d1904));</span>
+            case 19: // YEARFRAC
+<span class="fc" id="L204">                return d(yearFrac(Math.floor(date(a, 0)), Math.floor(date(a, 1)), Evaluator.integer(a, 2, 0), d1904));</span>
+            case 20: // DATEDIF
+<span class="fc" id="L206">                return dateDif(Math.floor(date(a, 0)), Math.floor(date(a, 1)), Evaluator.text(a, 2), d1904);</span>
+            case 21: // NETWORKDAYS
+            case 22: // NETWORKDAYS.INTL
+            case 23: // WORKDAY
+            case 24: // WORKDAY.INTL
+<span class="fc" id="L211">                return workdays(name, ev, a, d1904);</span>
+            default:
+<span class="nc" id="L213">                return CellError.NAME;</span>
+        }
+    }
+
+    static double days360(int[] s, int[] e, boolean european) {
+<span class="fc" id="L218">        int sd = s[2];</span>
+<span class="fc" id="L219">        int ed = e[2];</span>
+<span class="fc" id="L220">        int sm = s[1];</span>
+<span class="fc" id="L221">        int em = e[1];</span>
+<span class="fc" id="L222">        int sy = s[0];</span>
+<span class="fc" id="L223">        int ey = e[0];</span>
+<span class="fc bfc" id="L224" title="All 2 branches covered.">        if (european) {</span>
+<span class="fc" id="L225">            sd = Math.min(sd, 30);</span>
+<span class="fc" id="L226">            ed = Math.min(ed, 30);</span>
+        } else {
+<span class="fc bfc" id="L228" title="All 2 branches covered.">            boolean startIsLast = sd == DateUtil.daysInMonth(sy, sm);</span>
+<span class="fc bfc" id="L229" title="All 2 branches covered.">            if (startIsLast) {</span>
+<span class="fc" id="L230">                sd = 30;</span>
+            }
+            // Only the 31st is moved. The rule is written as &quot;the last day of a month&quot;, but
+            // spreadsheets leave the end of February where it is, and files hold their answer.
+<span class="fc bfc" id="L234" title="All 2 branches covered.">            if (ed == 31) {</span>
+<span class="fc bfc" id="L235" title="All 2 branches covered.">                if (sd &lt; 30) {</span>
+<span class="fc" id="L236">                    ed = 1;</span>
+<span class="fc" id="L237">                    em++;</span>
+                } else {
+<span class="fc" id="L239">                    ed = 30;</span>
+                }
+            }
+        }
+<span class="fc" id="L243">        return (ey - sy) * 360d + (em - sm) * 30d + (ed - sd);</span>
+    }
+
+    private static double isoWeek(double serial, boolean d1904) {
+        // the week belongs to the year of its Thursday
+<span class="fc" id="L248">        int monday0 = (DateUtil.weekday(serial, d1904) + 5) % 7;</span>
+<span class="fc" id="L249">        double thursday = serial - monday0 + 3;</span>
+<span class="fc" id="L250">        int year = DateUtil.fields(thursday, d1904)[0];</span>
+<span class="fc" id="L251">        double jan1 = DateUtil.serial(year, 1, 1, d1904);</span>
+<span class="fc" id="L252">        return Math.floor((thursday - jan1) / 7) + 1;</span>
+    }
+
+    static double yearFrac(double start, double end, int basis, boolean d1904) {
+<span class="fc bfc" id="L256" title="All 2 branches covered.">        if (start &gt; end) {</span>
+<span class="fc" id="L257">            double t = start;</span>
+<span class="fc" id="L258">            start = end;</span>
+<span class="fc" id="L259">            end = t;</span>
+        }
+<span class="fc" id="L261">        int[] s = DateUtil.fields(start, d1904);</span>
+<span class="fc" id="L262">        int[] e = DateUtil.fields(end, d1904);</span>
+<span class="fc bfc" id="L263" title="All 6 branches covered.">        switch (basis) {</span>
+            case 0:
+<span class="fc" id="L265">                return days360(s, e, false) / 360;</span>
+            case 1: {
+<span class="fc" id="L267">                double days = end - start;</span>
+<span class="pc bpc" id="L268" title="9 of 10 branches missed.">                if (s[0] == e[0] || s[0] + 1 == e[0] &amp;&amp; (e[1] &lt; s[1] || e[1] == s[1] &amp;&amp; e[2] &lt;= s[2])) {</span>
+                    // no more than a year apart: a leap day inside the span makes it a 366 day year
+<span class="fc" id="L270">                    boolean leap = false;</span>
+<span class="pc bpc" id="L271" title="1 of 2 branches missed.">                    if (s[0] == e[0]) {</span>
+<span class="fc" id="L272">                        leap = DateUtil.isLeapYear(s[0]);</span>
+                    } else {
+<span class="nc bnc" id="L274" title="All 8 branches missed.">                        if (DateUtil.isLeapYear(s[0]) &amp;&amp; (s[1] &lt; 2 || s[1] == 2 &amp;&amp; s[2] &lt;= 29)) {</span>
+<span class="nc" id="L275">                            leap = true;</span>
+                        }
+<span class="nc bnc" id="L277" title="All 8 branches missed.">                        if (DateUtil.isLeapYear(e[0]) &amp;&amp; (e[1] &gt; 2 || e[1] == 2 &amp;&amp; e[2] == 29)) {</span>
+<span class="nc" id="L278">                            leap = true;</span>
+                        }
+                    }
+<span class="fc bfc" id="L281" title="All 2 branches covered.">                    return days / (leap ? 366 : 365);</span>
+                }
+<span class="nc" id="L283">                double total = 0;</span>
+<span class="nc bnc" id="L284" title="All 2 branches missed.">                for (int y = s[0]; y &lt;= e[0]; y++) {</span>
+<span class="nc bnc" id="L285" title="All 2 branches missed.">                    total += DateUtil.isLeapYear(y) ? 366 : 365;</span>
+                }
+<span class="nc" id="L287">                return days / (total / (e[0] - s[0] + 1));</span>
+            }
+            case 2:
+<span class="fc" id="L290">                return (end - start) / 360;</span>
+            case 3:
+<span class="fc" id="L292">                return (end - start) / 365;</span>
+            case 4:
+<span class="fc" id="L294">                return days360(s, e, true) / 360;</span>
+            default:
+<span class="fc" id="L296">                throw EvalError.NUM;</span>
+        }
+    }
+
+    private static Object dateDif(double start, double end, String unit, boolean d1904) {
+<span class="fc bfc" id="L301" title="All 2 branches covered.">        if (start &gt; end) {</span>
+<span class="fc" id="L302">            throw EvalError.NUM;</span>
+        }
+<span class="fc" id="L304">        int[] s = DateUtil.fields(start, d1904);</span>
+<span class="fc" id="L305">        int[] e = DateUtil.fields(end, d1904);</span>
+<span class="fc" id="L306">        int months = (e[0] - s[0]) * 12 + e[1] - s[1];</span>
+<span class="fc bfc" id="L307" title="All 2 branches covered.">        if (e[2] &lt; s[2]) {</span>
+<span class="fc" id="L308">            months--;</span>
+        }
+<span class="fc" id="L310">        String u = FormulaParser.asciiUpper(unit);</span>
+<span class="fc bfc" id="L311" title="All 7 branches covered.">        switch (Functions.index(SWITCH_2, u)) {</span>
+            case 0: // D
+<span class="fc" id="L313">                return d(end - start);</span>
+            case 1: // M
+<span class="fc" id="L315">                return d(months);</span>
+            case 2: // Y
+<span class="fc" id="L317">                return d(Math.floor(months / 12d));</span>
+            case 3: // YM
+<span class="fc" id="L319">                return d(months % 12);</span>
+            case 4: { // MD
+<span class="fc bfc" id="L321" title="All 2 branches covered.">                if (e[2] &gt;= s[2]) {</span>
+<span class="fc" id="L322">                    return d(e[2] - s[2]);</span>
+                }
+                // counted from the start day in the month before the end
+<span class="fc" id="L325">                return d(end - DateUtil.serial(e[0], e[1] - 1, s[2], d1904));</span>
+            }
+            case 5: { // YD
+<span class="fc" id="L328">                double anniversary = DateUtil.serial(e[0], s[1], s[2], d1904);</span>
+<span class="pc bpc" id="L329" title="1 of 2 branches missed.">                if (anniversary &gt; end) {</span>
+<span class="nc" id="L330">                    anniversary = DateUtil.serial(e[0] - 1, s[1], s[2], d1904);</span>
+                }
+<span class="fc" id="L332">                return d(end - anniversary);</span>
+            }
+            default:
+<span class="fc" id="L335">                throw EvalError.NUM;</span>
+        }
+    }
+
+    /// The days of the week that are not worked, Monday first.
+    private static boolean[] weekend(Evaluator ev, Object arg) {
+<span class="fc" id="L341">        String mask = WEEKENDS[0];</span>
+<span class="fc bfc" id="L342" title="All 2 branches covered.">        Object v = arg == Evaluator.MISSING ? null : ev.scalar(arg); //NOPMD CompareObjectsWithEquals - the marker of an omitted argument is one object</span>
+<span class="fc bfc" id="L343" title="All 2 branches covered.">        if (v instanceof String) {</span>
+<span class="fc" id="L344">            mask = (String) v;</span>
+<span class="pc bpc" id="L345" title="1 of 4 branches missed.">            if (mask.length() != 7 || &quot;1111111&quot;.equals(mask)) {</span>
+<span class="fc" id="L346">                throw EvalError.VALUE;</span>
+            }
+<span class="fc bfc" id="L348" title="All 2 branches covered.">        } else if (v != null) {</span>
+<span class="fc" id="L349">            int code = (int) Values.num(v);</span>
+<span class="fc bfc" id="L350" title="All 4 branches covered.">            if (code &gt;= 1 &amp;&amp; code &lt;= 7) {</span>
+<span class="fc" id="L351">                mask = WEEKENDS[code - 1];</span>
+<span class="pc bpc" id="L352" title="1 of 4 branches missed.">            } else if (code &gt;= 11 &amp;&amp; code &lt;= 17) {</span>
+                // one day off: 11 is Sunday, 12 Monday
+<span class="fc" id="L354">                int day = (code - 12 + 7) % 7;</span>
+<span class="fc" id="L355">                StringBuilder sb = new StringBuilder(&quot;0000000&quot;);</span>
+<span class="fc" id="L356">                sb.setCharAt(day, '1');</span>
+<span class="fc" id="L357">                mask = sb.toString();</span>
+<span class="fc" id="L358">            } else {</span>
+<span class="fc" id="L359">                throw EvalError.NUM;</span>
+            }
+        }
+<span class="fc" id="L362">        boolean[] off = new boolean[7];</span>
+<span class="fc bfc" id="L363" title="All 2 branches covered.">        for (int i = 0; i &lt; 7; i++) {</span>
+<span class="fc" id="L364">            char c = mask.charAt(i);</span>
+<span class="pc bpc" id="L365" title="1 of 4 branches missed.">            if (c != '0' &amp;&amp; c != '1') {</span>
+<span class="nc" id="L366">                throw EvalError.VALUE;</span>
+            }
+<span class="fc bfc" id="L368" title="All 2 branches covered.">            off[i] = c == '1';</span>
+        }
+<span class="fc" id="L370">        return off;</span>
+    }
+
+    private static Object workdays(String name, Evaluator ev, Object[] a, boolean d1904) {
+<span class="fc" id="L374">        boolean intl = name.endsWith(&quot;.INTL&quot;);</span>
+<span class="fc" id="L375">        double start = Math.floor(ev.scalarNum(a, 0));</span>
+<span class="fc" id="L376">        double second = ev.scalarNum(a, 1);</span>
+        // Past the last day there is, the 31st of December 9999, adding one to a day number
+        // is lost in rounding and a loop over the days never ends.
+<span class="pc bpc" id="L379" title="1 of 10 branches missed.">        if (start &lt; 0 || start &gt; LAST_DAY || name.startsWith(&quot;NETWORKDAYS&quot;) &amp;&amp; (second &lt; 0 || second &gt; LAST_DAY)) {</span>
+<span class="fc" id="L380">            throw EvalError.NUM;</span>
+        }
+<span class="fc bfc" id="L382" title="All 2 branches covered.">        boolean[] off = weekend(ev, intl ? Evaluator.arg(a, 2) : Evaluator.MISSING);</span>
+<span class="fc" id="L383">        DoubleList holidays = new DoubleList();</span>
+<span class="fc bfc" id="L384" title="All 2 branches covered.">        int h = intl ? 3 : 2;</span>
+<span class="fc bfc" id="L385" title="All 4 branches covered.">        if (Evaluator.has(a, h) &amp;&amp; a[h] instanceof Object[][]) {</span>
+            // An array written into the formula lists its holidays as text as often as as
+            // numbers, {&quot;2026-01-01&quot;,&quot;2026-12-25&quot;}, and a spreadsheet reads each one as the
+            // date it spells. A range is different: text in a cell is skipped there.
+<span class="fc bfc" id="L389" title="All 2 branches covered.">            for (Object[] line : (Object[][]) a[h]) {</span>
+<span class="fc bfc" id="L390" title="All 2 branches covered.">                for (Object value : line) {</span>
+<span class="pc bpc" id="L391" title="1 of 2 branches missed.">                    if (value != null) {</span>
+<span class="fc" id="L392">                        holidays.add(Values.num(value));</span>
+                    }
+                }
+            }
+<span class="fc bfc" id="L396" title="All 2 branches covered.">        } else if (Evaluator.has(a, h)) {</span>
+<span class="fc" id="L397">            ev.numbers(a[h], holidays, false);</span>
+        }
+<span class="fc" id="L399">        double[] days = holidays.sorted();</span>
+<span class="fc bfc" id="L400" title="All 2 branches covered.">        for (int i = 0; i &lt; days.length; i++) {</span>
+<span class="fc" id="L401">            days[i] = Math.floor(days[i]);</span>
+        }
+<span class="fc bfc" id="L403" title="All 2 branches covered.">        if (name.startsWith(&quot;NETWORKDAYS&quot;)) {</span>
+<span class="fc" id="L404">            double end = Math.floor(second);</span>
+<span class="fc" id="L405">            double from = Math.min(start, end);</span>
+<span class="fc" id="L406">            double to = Math.max(start, end);</span>
+<span class="pc bpc" id="L407" title="1 of 2 branches missed.">            if (to - from &gt; 3660000) {</span>
+<span class="nc" id="L408">                throw EvalError.NUM;</span>
+            }
+<span class="fc" id="L410">            int count = 0;</span>
+<span class="fc bfc" id="L411" title="All 2 branches covered.">            for (double day = from; day &lt;= to; day++) {</span>
+<span class="fc bfc" id="L412" title="All 2 branches covered.">                if (isWorked(day, off, days, d1904)) {</span>
+<span class="fc" id="L413">                    count++;</span>
+                }
+            }
+<span class="fc bfc" id="L416" title="All 2 branches covered.">            return d(start &lt;= end ? count : -count);</span>
+        }
+<span class="fc" id="L418">        int remaining = (int) second;</span>
+<span class="fc bfc" id="L419" title="All 2 branches covered.">        int step = remaining &lt; 0 ? -1 : 1;</span>
+<span class="fc" id="L420">        double day = start;</span>
+<span class="fc" id="L421">        int guard = 0;</span>
+<span class="fc bfc" id="L422" title="All 2 branches covered.">        while (remaining != 0) {</span>
+<span class="fc" id="L423">            day += step;</span>
+<span class="fc bfc" id="L424" title="All 2 branches covered.">            if (isWorked(day, off, days, d1904)) {</span>
+<span class="fc" id="L425">                remaining -= step;</span>
+            }
+<span class="fc" id="L427">            guard++;</span>
+<span class="pc bpc" id="L428" title="1 of 4 branches missed.">            if (guard &gt; 4000000 || day &lt; 0) {</span>
+<span class="fc" id="L429">                throw EvalError.NUM;</span>
+            }
+        }
+<span class="fc" id="L432">        return d(day);</span>
+    }
+
+    private static boolean isWorked(double day, boolean[] off, double[] holidays, boolean d1904) {
+<span class="fc bfc" id="L436" title="All 2 branches covered.">        if (off[(DateUtil.weekday(day, d1904) + 5) % 7]) {</span>
+<span class="fc" id="L437">            return false;</span>
+        }
+<span class="fc bfc" id="L439" title="All 2 branches covered.">        for (double holiday : holidays) {</span>
+<span class="fc bfc" id="L440" title="All 2 branches covered.">            if (holiday == day) {</span>
+<span class="fc" id="L441">                return false;</span>
+            }
+        }
+<span class="fc" id="L444">        return true;</span>
+    }
+
+<span class="fc" id="L447">    private static final java.util.HashMap&lt;String, Integer&gt; SWITCH_1 = Functions.switchTable(</span>
+            &quot;DATE&quot;, &quot;DATEVALUE&quot;, &quot;TIMEVALUE&quot;, &quot;YEAR&quot;, &quot;MONTH&quot;, &quot;DAY&quot;, &quot;HOUR&quot;, &quot;MINUTE&quot;, &quot;SECOND&quot;,
+            &quot;TIME&quot;, &quot;NOW&quot;, &quot;TODAY&quot;, &quot;DAYS&quot;, &quot;DAYS360&quot;, &quot;EDATE&quot;, &quot;EOMONTH&quot;, &quot;WEEKDAY&quot;, &quot;WEEKNUM&quot;,
+            &quot;ISOWEEKNUM&quot;, &quot;YEARFRAC&quot;, &quot;DATEDIF&quot;, &quot;NETWORKDAYS&quot;, &quot;NETWORKDAYS.INTL&quot;, &quot;WORKDAY&quot;,
+            &quot;WORKDAY.INTL&quot;);
+
+<span class="fc" id="L453">    private static final java.util.HashMap&lt;String, Integer&gt; SWITCH_2 = Functions.switchTable(</span>
+            &quot;D&quot;, &quot;M&quot;, &quot;Y&quot;, &quot;YM&quot;, &quot;MD&quot;, &quot;YD&quot;);
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,320 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DefaultKanbanModel.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.kanban</a> &gt; <span class="el_source">DefaultKanbanModel.java</span></div><h1>DefaultKanbanModel.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.kanban;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/// A board kept in memory that accepts every edit.
+///
+/// ```java
+/// DefaultKanbanModel model = new DefaultKanbanModel();
+/// model.addColumn(new KanbanColumn(&quot;todo&quot;, &quot;To do&quot;));
+/// model.addColumn(new KanbanColumn(&quot;doing&quot;, &quot;Doing&quot;).setWipLimit(3));
+/// model.addColumn(new KanbanColumn(&quot;done&quot;, &quot;Done&quot;));
+/// model.addCard(&quot;todo&quot;, new KanbanCard(&quot;c1&quot;, &quot;Write the release notes&quot;));
+/// ```
+///
+/// Override a mutator to refuse an edit, or to send it to a server and
+/// accept it.
+<span class="fc" id="L43">public class DefaultKanbanModel extends AbstractKanbanModel {</span>
+<span class="fc" id="L44">    private final List&lt;KanbanColumn&gt; columns = new ArrayList&lt;KanbanColumn&gt;();</span>
+<span class="fc" id="L45">    private final List&lt;KanbanLane&gt; lanes = new ArrayList&lt;KanbanLane&gt;();</span>
+<span class="fc" id="L46">    private final List&lt;KanbanColumn&gt; columnsView = Collections.unmodifiableList(columns);</span>
+<span class="fc" id="L47">    private final List&lt;KanbanLane&gt; lanesView = Collections.unmodifiableList(lanes);</span>
+    // per column id, its cards in order, of every lane together
+<span class="fc" id="L49">    private final Map&lt;String, List&lt;KanbanCard&gt;&gt; byColumn = new HashMap&lt;String, List&lt;KanbanCard&gt;&gt;();</span>
+<span class="fc" id="L50">    private final Map&lt;String, KanbanCard&gt; cards = new HashMap&lt;String, KanbanCard&gt;();</span>
+    private boolean enforceWipLimits;
+    private int cardCounter;
+
+    @Override
+    public List&lt;KanbanColumn&gt; getColumns() {
+        // read only: a column added here would bypass the index addColumn keeps
+<span class="fc" id="L57">        return columnsView;</span>
+    }
+
+    @Override
+    public List&lt;KanbanLane&gt; getLanes() {
+<span class="fc" id="L62">        return lanesView;</span>
+    }
+
+    /// True when a card that would take a column past its limit is refused.
+    public boolean isEnforceWipLimits() {
+<span class="fc" id="L67">        return enforceWipLimits;</span>
+    }
+
+    /// Makes `moveCard` and `insertCard` refuse a card that would take a
+    /// column past its limit. Off by default, when a column over its limit
+    /// is only drawn as such.
+    public void setEnforceWipLimits(boolean enforceWipLimits) {
+<span class="fc" id="L74">        this.enforceWipLimits = enforceWipLimits;</span>
+<span class="fc" id="L75">    }</span>
+
+    /// Adds a column after the others.
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: when a column has that id already
+    public KanbanColumn addColumn(KanbanColumn column) {
+<span class="pc bpc" id="L83" title="1 of 2 branches missed.">        if (byColumn.containsKey(column.getId())) {</span>
+<span class="nc" id="L84">            throw new IllegalArgumentException(&quot;Duplicate column id: &quot; + column.getId());</span>
+        }
+<span class="fc" id="L86">        columns.add(column);</span>
+<span class="fc" id="L87">        byColumn.put(column.getId(), new ArrayList&lt;KanbanCard&gt;());</span>
+<span class="fc" id="L88">        fireChanged();</span>
+<span class="fc" id="L89">        return column;</span>
+    }
+
+    /// Removes a column and the cards in it.
+    public boolean removeColumn(KanbanColumn column) {
+<span class="nc bnc" id="L94" title="All 2 branches missed.">        if (!columns.remove(column)) {</span>
+<span class="nc" id="L95">            return false;</span>
+        }
+<span class="nc" id="L97">        List&lt;KanbanCard&gt; gone = byColumn.remove(column.getId());</span>
+<span class="nc bnc" id="L98" title="All 4 branches missed.">        for (int i = 0; gone != null &amp;&amp; i &lt; gone.size(); i++) {</span>
+<span class="nc" id="L99">            cards.remove(gone.get(i).getId());</span>
+        }
+<span class="nc" id="L101">        fireChanged();</span>
+<span class="nc" id="L102">        return true;</span>
+    }
+
+    /// Adds a swimlane after the others. A board has lanes once it has one;
+    /// a card in no lane, or in one that is gone, shows in the first.
+    public KanbanLane addLane(KanbanLane lane) {
+<span class="pc bpc" id="L108" title="1 of 2 branches missed.">        if (getLane(lane.getId()) != null) {</span>
+<span class="nc" id="L109">            throw new IllegalArgumentException(&quot;Duplicate lane id: &quot; + lane.getId());</span>
+        }
+<span class="fc" id="L111">        lanes.add(lane);</span>
+<span class="fc" id="L112">        fireChanged();</span>
+<span class="fc" id="L113">        return lane;</span>
+    }
+
+    /// Removes a lane. Its cards stay, and show in the first lane left.
+    public boolean removeLane(KanbanLane lane) {
+<span class="nc bnc" id="L118" title="All 2 branches missed.">        if (!lanes.remove(lane)) {</span>
+<span class="nc" id="L119">            return false;</span>
+        }
+<span class="nc" id="L121">        fireChanged();</span>
+<span class="nc" id="L122">        return true;</span>
+    }
+
+    /// Adds a card at the end of a column, in the lane the card names.
+    /// Unlike `insertCard`, this is the application filling the model, and no
+    /// limit refuses it.
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: when there is no such column, or a card
+    ///   has that id already
+    public KanbanCard addCard(String columnId, KanbanCard card) {
+<span class="fc" id="L134">        List&lt;KanbanCard&gt; list = byColumn.get(columnId);</span>
+<span class="pc bpc" id="L135" title="1 of 2 branches missed.">        if (list == null) {</span>
+<span class="nc" id="L136">            throw new IllegalArgumentException(&quot;No column &quot; + columnId);</span>
+        }
+<span class="pc bpc" id="L138" title="1 of 2 branches missed.">        if (cards.containsKey(card.getId())) {</span>
+<span class="nc" id="L139">            throw new IllegalArgumentException(&quot;Duplicate card id: &quot; + card.getId());</span>
+        }
+<span class="fc" id="L141">        card.setColumnId(columnId);</span>
+<span class="fc" id="L142">        list.add(card);</span>
+<span class="fc" id="L143">        cards.put(card.getId(), card);</span>
+<span class="fc" id="L144">        fireChanged();</span>
+<span class="fc" id="L145">        return card;</span>
+    }
+
+    /// Removes every column, lane and card.
+    public void clear() {
+<span class="nc" id="L150">        columns.clear();</span>
+<span class="nc" id="L151">        lanes.clear();</span>
+<span class="nc" id="L152">        byColumn.clear();</span>
+<span class="nc" id="L153">        cards.clear();</span>
+<span class="nc" id="L154">        fireChanged();</span>
+<span class="nc" id="L155">    }</span>
+
+    /// An id no card of the model has, for a card the user adds.
+    public String newCardId() {
+        String id;
+        do {
+<span class="fc" id="L161">            cardCounter++;</span>
+<span class="fc" id="L162">            id = &quot;card&quot; + cardCounter;</span>
+<span class="pc bpc" id="L163" title="1 of 2 branches missed.">        } while (cards.containsKey(id));</span>
+<span class="fc" id="L164">        return id;</span>
+    }
+
+    // The lane a card shows in: its own, or the first when it names none
+    // that exists.
+    private boolean inLane(KanbanCard card, KanbanLane lane) {
+<span class="fc bfc" id="L170" title="All 2 branches covered.">        if (lane == null) {</span>
+<span class="fc" id="L171">            return true;</span>
+        }
+<span class="fc" id="L173">        String id = card.getLaneId();</span>
+<span class="fc bfc" id="L174" title="All 2 branches covered.">        if (lane.getId().equals(id)) {</span>
+<span class="fc" id="L175">            return true;</span>
+        }
+<span class="pc bpc" id="L177" title="2 of 8 branches missed.">        return !lanes.isEmpty() &amp;&amp; lanes.get(0) == lane &amp;&amp; (id == null || getLane(id) == null); // NOPMD CompareObjectsWithEquals - the first lane itself</span>
+    }
+
+    @Override
+    public List&lt;KanbanCard&gt; getCards(KanbanColumn column, KanbanLane lane) {
+<span class="fc" id="L182">        List&lt;KanbanCard&gt; all = byColumn.get(column.getId());</span>
+<span class="pc bpc" id="L183" title="1 of 2 branches missed.">        if (all == null) {</span>
+<span class="nc" id="L184">            return new ArrayList&lt;KanbanCard&gt;();</span>
+        }
+<span class="pc bpc" id="L186" title="1 of 4 branches missed.">        if (lane == null || lanes.isEmpty()) {</span>
+            // a view of the model's own list: a caller changing it would change
+            // the board without an event
+<span class="fc" id="L189">            return Collections.unmodifiableList(all);</span>
+        }
+<span class="fc" id="L191">        List&lt;KanbanCard&gt; out = new ArrayList&lt;KanbanCard&gt;();</span>
+<span class="fc bfc" id="L192" title="All 2 branches covered.">        for (KanbanCard kc : all) {</span>
+<span class="fc bfc" id="L193" title="All 2 branches covered.">            if (inLane(kc, lane)) {</span>
+<span class="fc" id="L194">                out.add(kc);</span>
+            }
+<span class="fc" id="L196">        }</span>
+<span class="fc" id="L197">        return out;</span>
+    }
+
+    @Override
+    public int getCardCount(KanbanColumn column) {
+<span class="fc" id="L202">        List&lt;KanbanCard&gt; all = byColumn.get(column.getId());</span>
+<span class="pc bpc" id="L203" title="1 of 2 branches missed.">        return all == null ? 0 : all.size();</span>
+    }
+
+    @Override
+    public KanbanCard getCard(String id) {
+<span class="pc bpc" id="L208" title="1 of 2 branches missed.">        return id == null ? null : cards.get(id);</span>
+    }
+
+    @Override
+    public boolean canMoveCard(KanbanCard card, KanbanColumn column, KanbanLane lane) {
+<span class="fc bfc" id="L213" title="All 6 branches covered.">        if (!enforceWipLimits || column.getWipLimit() &lt;= 0 || column.getId().equals(card.getColumnId())</span>
+<span class="pc bpc" id="L214" title="1 of 2 branches missed.">                &amp;&amp; cards.get(card.getId()) == card) { // NOPMD CompareObjectsWithEquals - the card of the model itself</span>
+<span class="fc" id="L215">            return true;</span>
+        }
+<span class="pc bpc" id="L217" title="1 of 2 branches missed.">        return getCardCount(column) &lt; column.getWipLimit();</span>
+    }
+
+    // Puts a card that is in no list into a column's, at an index among the
+    // cards of its cell.
+    private void place(KanbanCard card, KanbanColumn column, KanbanLane lane, int index) {
+<span class="fc" id="L223">        List&lt;KanbanCard&gt; all = byColumn.get(column.getId());</span>
+<span class="fc" id="L224">        card.setColumnId(column.getId());</span>
+<span class="fc bfc" id="L225" title="All 2 branches covered.">        if (lane != null) {</span>
+<span class="fc" id="L226">            card.setLaneId(lane.getId());</span>
+        }
+<span class="fc" id="L228">        int seen = 0;</span>
+<span class="fc" id="L229">        int at = all.size();</span>
+<span class="fc" id="L230">        int afterLast = -1;</span>
+<span class="fc bfc" id="L231" title="All 2 branches covered.">        for (int i = 0; i &lt; all.size(); i++) {</span>
+<span class="fc bfc" id="L232" title="All 2 branches covered.">            if (inLane(all.get(i), lane)) {</span>
+<span class="fc bfc" id="L233" title="All 2 branches covered.">                if (seen == index) {</span>
+<span class="fc" id="L234">                    at = i;</span>
+<span class="fc" id="L235">                    afterLast = -1;</span>
+<span class="fc" id="L236">                    break;</span>
+                }
+<span class="fc" id="L238">                seen++;</span>
+<span class="fc" id="L239">                afterLast = i + 1;</span>
+            }
+        }
+<span class="fc bfc" id="L242" title="All 2 branches covered.">        if (afterLast &gt;= 0) {</span>
+<span class="fc" id="L243">            at = afterLast;</span>
+        }
+<span class="fc" id="L245">        all.add(Math.max(0, Math.min(at, all.size())), card);</span>
+<span class="fc" id="L246">    }</span>
+
+    @Override
+    public boolean insertCard(KanbanCard card, KanbanColumn column, KanbanLane lane, int index) {
+<span class="pc bpc" id="L250" title="3 of 6 branches missed.">        if (card == null || column == null || !byColumn.containsKey(column.getId())</span>
+<span class="pc bpc" id="L251" title="1 of 4 branches missed.">                || cards.containsKey(card.getId()) || !canMoveCard(card, column, lane)) {</span>
+<span class="fc" id="L252">            return false;</span>
+        }
+<span class="fc" id="L254">        place(card, column, lane, Math.max(0, index));</span>
+<span class="fc" id="L255">        cards.put(card.getId(), card);</span>
+<span class="fc" id="L256">        fireChanged();</span>
+<span class="fc" id="L257">        return true;</span>
+    }
+
+    @Override
+    public boolean removeCard(KanbanCard card) {
+<span class="pc bpc" id="L262" title="1 of 4 branches missed.">        if (card == null || cards.get(card.getId()) != card) { // NOPMD CompareObjectsWithEquals - the card of the model itself</span>
+<span class="fc" id="L263">            return false;</span>
+        }
+<span class="fc" id="L265">        cards.remove(card.getId());</span>
+<span class="fc" id="L266">        List&lt;KanbanCard&gt; all = byColumn.get(card.getColumnId());</span>
+<span class="pc bpc" id="L267" title="1 of 2 branches missed.">        if (all != null) {</span>
+<span class="fc" id="L268">            all.remove(card);</span>
+        }
+<span class="fc" id="L270">        fireChanged();</span>
+<span class="fc" id="L271">        return true;</span>
+    }
+
+    @Override
+    public boolean renameCard(KanbanCard card, String title) {
+<span class="fc" id="L276">        card.setTitle(title);</span>
+<span class="fc" id="L277">        fireChanged();</span>
+<span class="fc" id="L278">        return true;</span>
+    }
+
+    @Override
+    public boolean moveCard(KanbanCard card, KanbanColumn column, KanbanLane lane, int index) {
+<span class="pc bpc" id="L283" title="3 of 6 branches missed.">        if (card == null || column == null || cards.get(card.getId()) != card // NOPMD CompareObjectsWithEquals - the card of the model itself</span>
+<span class="pc bpc" id="L284" title="1 of 4 branches missed.">                || !byColumn.containsKey(column.getId()) || !canMoveCard(card, column, lane)) {</span>
+<span class="fc" id="L285">            return false;</span>
+        }
+<span class="fc" id="L287">        List&lt;KanbanCard&gt; from = byColumn.get(card.getColumnId());</span>
+<span class="pc bpc" id="L288" title="1 of 2 branches missed.">        if (from != null) {</span>
+<span class="fc" id="L289">            from.remove(card);</span>
+        }
+<span class="fc" id="L291">        place(card, column, lane, Math.max(0, index));</span>
+<span class="fc" id="L292">        fireChanged();</span>
+<span class="fc" id="L293">        return true;</span>
+    }
+
+    @Override
+    public boolean moveColumn(KanbanColumn column, int index) {
+<span class="pc bpc" id="L298" title="1 of 2 branches missed.">        if (!columns.remove(column)) {</span>
+<span class="nc" id="L299">            return false;</span>
+        }
+<span class="fc" id="L301">        columns.add(Math.max(0, Math.min(index, columns.size())), column);</span>
+<span class="fc" id="L302">        fireChanged();</span>
+<span class="fc" id="L303">        return true;</span>
+    }
+
+    @Override
+    public boolean setCollapsed(KanbanColumn column, boolean collapsed) {
+<span class="fc" id="L308">        column.setCollapsed(collapsed);</span>
+<span class="fc" id="L309">        fireChanged();</span>
+<span class="fc" id="L310">        return true;</span>
+    }
+
+    @Override
+    public boolean setLaneCollapsed(KanbanLane lane, boolean collapsed) {
+<span class="fc" id="L315">        lane.setCollapsed(collapsed);</span>
+<span class="fc" id="L316">        fireChanged();</span>
+<span class="fc" id="L317">        return true;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

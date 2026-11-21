@@ -1,0 +1,347 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>GraphicsPdfDevice.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.pdf.ui</a> &gt; <span class="el_source">GraphicsPdfDevice.java</span></div><h1>GraphicsPdfDevice.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.pdf.ui;
+
+import com.codename1.impl.pdf.PdfDevice;
+import com.codename1.impl.pdf.PdfPath;
+import com.codename1.ui.EncodedImage;
+import com.codename1.ui.Font;
+import com.codename1.ui.Graphics;
+import com.codename1.ui.Image;
+import com.codename1.ui.Stroke;
+import com.codename1.ui.Transform;
+import com.codename1.ui.geom.GeneralPath;
+import com.codename1.ui.geom.Rectangle;
+import java.util.ArrayList;
+import java.util.List;
+
+/// Draws a page on a Codename One [Graphics], in device pixels. The
+/// graphics clip is replaced, not intersected, by a shape clip, so the
+/// device keeps the current clip itself: a rectangular clip is
+/// intersected exactly and a non-rectangular one replaces the clip
+/// within its bounds.
+final class GraphicsPdfDevice implements PdfDevice {
+    private Graphics g;
+    private Image surface;
+    private int originX;
+    private int originY;
+<span class="nc" id="L48">    private final List&lt;Object[]&gt; layers = new ArrayList&lt;Object[]&gt;();</span>
+    private final boolean shapes;
+    private final boolean shapeClip;
+    private final boolean transforms;
+<span class="nc" id="L52">    private final List&lt;Object&gt; stack = new ArrayList&lt;Object&gt;();</span>
+    private Object clip;
+
+    /// A device drawing on `g`. `surface` is the image `g` draws on, when
+    /// there is one, so blend modes can read back the backdrop.
+<span class="nc" id="L57">    GraphicsPdfDevice(Graphics g, Image surface, int width, int height) {</span>
+<span class="nc" id="L58">        this.g = g;</span>
+<span class="nc" id="L59">        this.surface = surface;</span>
+<span class="nc" id="L60">        shapes = g.isShapeSupported();</span>
+<span class="nc" id="L61">        shapeClip = g.isShapeClipSupported();</span>
+<span class="nc" id="L62">        transforms = g.isTransformSupported();</span>
+<span class="nc" id="L63">        int[] full = new int[] {0, 0, width, height};</span>
+<span class="nc" id="L64">        clip = full;</span>
+<span class="nc" id="L65">        g.setAntiAliased(true);</span>
+<span class="nc" id="L66">        g.setAntiAliasedText(true);</span>
+<span class="nc" id="L67">    }</span>
+
+    @Override
+    public void beginLayer(int x, int y, int width, int height) {
+<span class="nc" id="L71">        layers.add(new Object[] {g, surface, Integer.valueOf(originX), Integer.valueOf(originY)});</span>
+<span class="nc" id="L72">        Image layer = Image.createImage(Math.max(1, width), Math.max(1, height), 0);</span>
+<span class="nc" id="L73">        surface = layer;</span>
+<span class="nc" id="L74">        g = layer.getGraphics();</span>
+<span class="nc" id="L75">        g.setAntiAliased(true);</span>
+<span class="nc" id="L76">        g.setAntiAliasedText(true);</span>
+<span class="nc" id="L77">        originX = x;</span>
+<span class="nc" id="L78">        originY = y;</span>
+<span class="nc" id="L79">        g.translate(-x, -y);</span>
+<span class="nc" id="L80">        apply();</span>
+<span class="nc" id="L81">    }</span>
+
+    @Override
+    public int[] endLayer() {
+<span class="nc" id="L85">        int[] px = surface.getRGB();</span>
+<span class="nc" id="L86">        Object[] top = layers.remove(layers.size() - 1);</span>
+<span class="nc" id="L87">        g = (Graphics) top[0];</span>
+<span class="nc" id="L88">        surface = (Image) top[1];</span>
+<span class="nc" id="L89">        originX = ((Integer) top[2]).intValue();</span>
+<span class="nc" id="L90">        originY = ((Integer) top[3]).intValue();</span>
+<span class="nc" id="L91">        apply();</span>
+<span class="nc" id="L92">        return px;</span>
+    }
+
+    @Override
+    public int[] pixels(int x, int y, int width, int height) {
+<span class="nc bnc" id="L97" title="All 2 branches missed.">        if (surface == null) {</span>
+<span class="nc" id="L98">            return null;</span>
+        }
+<span class="nc" id="L100">        int sw = surface.getWidth();</span>
+<span class="nc" id="L101">        int sh = surface.getHeight();</span>
+<span class="nc" id="L102">        int[] all = surface.getRGB();</span>
+<span class="nc" id="L103">        int[] out = new int[width * height];</span>
+<span class="nc bnc" id="L104" title="All 2 branches missed.">        for (int row = 0; row &lt; height; row++) {</span>
+<span class="nc" id="L105">            int sy = y - originY + row;</span>
+<span class="nc bnc" id="L106" title="All 4 branches missed.">            if (sy &lt; 0 || sy &gt;= sh) {</span>
+<span class="nc" id="L107">                continue;</span>
+            }
+<span class="nc bnc" id="L109" title="All 2 branches missed.">            for (int col = 0; col &lt; width; col++) {</span>
+<span class="nc" id="L110">                int sx = x - originX + col;</span>
+<span class="nc bnc" id="L111" title="All 4 branches missed.">                if (sx &gt;= 0 &amp;&amp; sx &lt; sw) {</span>
+<span class="nc" id="L112">                    out[row * width + col] = all[sy * sw + sx];</span>
+                }
+            }
+        }
+<span class="nc" id="L116">        return out;</span>
+    }
+
+    @Override
+    public void save() {
+<span class="nc" id="L121">        stack.add(clip);</span>
+<span class="nc" id="L122">    }</span>
+
+    @Override
+    public void restore() {
+<span class="nc bnc" id="L126" title="All 2 branches missed.">        if (!stack.isEmpty()) {</span>
+<span class="nc" id="L127">            clip = stack.remove(stack.size() - 1);</span>
+<span class="nc" id="L128">            apply();</span>
+        }
+<span class="nc" id="L130">    }</span>
+
+    private void apply() {
+<span class="nc bnc" id="L133" title="All 2 branches missed.">        if (clip instanceof int[]) {</span>
+<span class="nc" id="L134">            int[] c = (int[]) clip;</span>
+<span class="nc" id="L135">            g.setClip(c[0], c[1], c[2], c[3]);</span>
+<span class="nc" id="L136">        } else {</span>
+<span class="nc" id="L137">            g.setClip((GeneralPath) clip);</span>
+        }
+<span class="nc" id="L139">    }</span>
+
+    private int[] bounds() {
+<span class="nc bnc" id="L142" title="All 2 branches missed.">        if (clip instanceof int[]) {</span>
+<span class="nc" id="L143">            return (int[]) clip;</span>
+        }
+<span class="nc" id="L145">        Rectangle r = ((GeneralPath) clip).getBounds();</span>
+<span class="nc" id="L146">        return new int[] {r.getX(), r.getY(), r.getWidth(), r.getHeight()};</span>
+    }
+
+    @Override
+    public void clip(PdfPath path, boolean evenOdd) {
+<span class="nc" id="L151">        float[] b = path.getBounds();</span>
+<span class="nc bnc" id="L152" title="All 2 branches missed.">        if (b == null) {</span>
+<span class="nc" id="L153">            clip = new int[] {0, 0, 0, 0};</span>
+<span class="nc" id="L154">            apply();</span>
+<span class="nc" id="L155">            return;</span>
+        }
+<span class="nc" id="L157">        int[] cur = bounds();</span>
+<span class="nc" id="L158">        int x0 = Math.max(cur[0], (int) Math.floor(b[0]));</span>
+<span class="nc" id="L159">        int y0 = Math.max(cur[1], (int) Math.floor(b[1]));</span>
+<span class="nc" id="L160">        int x1 = Math.min(cur[0] + cur[2], (int) Math.ceil(b[2]));</span>
+<span class="nc" id="L161">        int y1 = Math.min(cur[1] + cur[3], (int) Math.ceil(b[3]));</span>
+<span class="nc" id="L162">        int[] rect = {x0, y0, Math.max(0, x1 - x0), Math.max(0, y1 - y0)};</span>
+<span class="nc bnc" id="L163" title="All 6 branches missed.">        if (isRectangle(path) || !shapeClip || !(clip instanceof int[])) {</span>
+<span class="nc" id="L164">            clip = rect;</span>
+        } else {
+<span class="nc" id="L166">            GeneralPath p = toPath(path, evenOdd);</span>
+<span class="nc" id="L167">            clip = p;</span>
+        }
+<span class="nc" id="L169">        apply();</span>
+<span class="nc" id="L170">    }</span>
+
+    private static boolean isRectangle(PdfPath p) {
+<span class="nc" id="L173">        int n = p.getOpCount();</span>
+<span class="nc bnc" id="L174" title="All 6 branches missed.">        if (n &lt; 4 || n &gt; 6 || p.getOp(0) != PdfPath.MOVE) {</span>
+<span class="nc" id="L175">            return false;</span>
+        }
+<span class="nc bnc" id="L177" title="All 2 branches missed.">        for (int i = 1; i &lt; n; i++) {</span>
+<span class="nc" id="L178">            int op = p.getOp(i);</span>
+<span class="nc bnc" id="L179" title="All 4 branches missed.">            if (op != PdfPath.LINE &amp;&amp; op != PdfPath.CLOSE) {</span>
+<span class="nc" id="L180">                return false;</span>
+            }
+        }
+<span class="nc" id="L183">        float[] pt = p.getPoints();</span>
+<span class="nc" id="L184">        int points = 0;</span>
+<span class="nc bnc" id="L185" title="All 2 branches missed.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="nc bnc" id="L186" title="All 2 branches missed.">            if (p.getOp(i) != PdfPath.CLOSE) {</span>
+<span class="nc" id="L187">                points++;</span>
+            }
+        }
+<span class="nc bnc" id="L190" title="All 2 branches missed.">        for (int i = 0; i &lt; points; i++) {</span>
+<span class="nc" id="L191">            int j = (i + 1) % points;</span>
+<span class="nc bnc" id="L192" title="All 4 branches missed.">            if (pt[i * 2] != pt[j * 2] &amp;&amp; pt[i * 2 + 1] != pt[j * 2 + 1]) {</span>
+<span class="nc" id="L193">                return false;</span>
+            }
+        }
+<span class="nc" id="L196">        return true;</span>
+    }
+
+    private static GeneralPath toPath(PdfPath p, boolean evenOdd) {
+<span class="nc" id="L200">        GeneralPath gp = new GeneralPath();</span>
+<span class="nc bnc" id="L201" title="All 2 branches missed.">        gp.setWindingRule(evenOdd ? GeneralPath.WIND_EVEN_ODD : GeneralPath.WIND_NON_ZERO);</span>
+<span class="nc" id="L202">        float[] pt = p.getPoints();</span>
+<span class="nc" id="L203">        int pi = 0;</span>
+<span class="nc" id="L204">        int n = p.getOpCount();</span>
+<span class="nc bnc" id="L205" title="All 2 branches missed.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="nc bnc" id="L206" title="All 5 branches missed.">            switch (p.getOp(i)) {</span>
+                case PdfPath.MOVE:
+<span class="nc" id="L208">                    gp.moveTo(pt[pi], pt[pi + 1]);</span>
+<span class="nc" id="L209">                    pi += 2;</span>
+<span class="nc" id="L210">                    break;</span>
+                case PdfPath.LINE:
+<span class="nc" id="L212">                    gp.lineTo(pt[pi], pt[pi + 1]);</span>
+<span class="nc" id="L213">                    pi += 2;</span>
+<span class="nc" id="L214">                    break;</span>
+                case PdfPath.QUAD:
+<span class="nc" id="L216">                    gp.quadTo(pt[pi], pt[pi + 1], pt[pi + 2], pt[pi + 3]);</span>
+<span class="nc" id="L217">                    pi += 4;</span>
+<span class="nc" id="L218">                    break;</span>
+                case PdfPath.CUBIC:
+<span class="nc" id="L220">                    gp.curveTo(pt[pi], pt[pi + 1], pt[pi + 2], pt[pi + 3], pt[pi + 4], pt[pi + 5]);</span>
+<span class="nc" id="L221">                    pi += 6;</span>
+<span class="nc" id="L222">                    break;</span>
+                default:
+<span class="nc" id="L224">                    gp.closePath();</span>
+                    break;
+            }
+        }
+<span class="nc" id="L228">        return gp;</span>
+    }
+
+    private void color(int argb) {
+<span class="nc" id="L232">        g.setColor(argb &amp; 0xffffff);</span>
+<span class="nc" id="L233">        g.setAlpha(argb &gt;&gt;&gt; 24);</span>
+<span class="nc" id="L234">    }</span>
+
+    @Override
+    public void fill(PdfPath path, boolean evenOdd, int argb) {
+<span class="nc bnc" id="L238" title="All 2 branches missed.">        if ((argb &gt;&gt;&gt; 24) == 0) {</span>
+<span class="nc" id="L239">            return;</span>
+        }
+<span class="nc" id="L241">        color(argb);</span>
+<span class="nc bnc" id="L242" title="All 2 branches missed.">        if (shapes) {</span>
+<span class="nc" id="L243">            g.fillShape(toPath(path, evenOdd));</span>
+        } else {
+<span class="nc" id="L245">            float[] b = path.getBounds();</span>
+<span class="nc bnc" id="L246" title="All 2 branches missed.">            if (b != null) {</span>
+<span class="nc" id="L247">                g.fillRect((int) b[0], (int) b[1], (int) Math.ceil(b[2] - b[0]), (int) Math.ceil(b[3] - b[1]));</span>
+            }
+        }
+<span class="nc" id="L250">        g.setAlpha(255);</span>
+<span class="nc" id="L251">    }</span>
+
+    @Override
+    public void stroke(PdfPath path, float width, int cap, int join, float miterLimit, int argb) {
+<span class="nc bnc" id="L255" title="All 2 branches missed.">        if ((argb &gt;&gt;&gt; 24) == 0) {</span>
+<span class="nc" id="L256">            return;</span>
+        }
+<span class="nc" id="L258">        color(argb);</span>
+<span class="nc bnc" id="L259" title="All 2 branches missed.">        if (shapes) {</span>
+            // The PDF and Stroke cap/join constants are numbered alike.
+<span class="nc" id="L261">            g.drawShape(toPath(path, false), new Stroke(width, cap, join, Math.max(1, miterLimit)));</span>
+        } else {
+<span class="nc" id="L263">            float[] b = path.getBounds();</span>
+<span class="nc bnc" id="L264" title="All 2 branches missed.">            if (b != null) {</span>
+<span class="nc" id="L265">                g.drawRect((int) b[0], (int) b[1], (int) (b[2] - b[0]), (int) (b[3] - b[1]));</span>
+            }
+        }
+<span class="nc" id="L268">        g.setAlpha(255);</span>
+<span class="nc" id="L269">    }</span>
+
+    @Override
+    public void image(int[] argb, int w, int h, double[] m) {
+<span class="nc" id="L273">        Image img = Image.createImage(argb, w, h);</span>
+<span class="nc bnc" id="L274" title="All 10 branches missed.">        if (transforms &amp;&amp; (m[1] != 0 || m[2] != 0 || m[0] &lt; 0 || m[3] &lt; 0)) {</span>
+<span class="nc" id="L275">            Transform old = g.getTransform();</span>
+<span class="nc" id="L276">            Transform t = old.copy();</span>
+<span class="nc" id="L277">            t.concatenate(Transform.makeAffine(m[0], m[1], m[2], m[3], m[4], m[5]));</span>
+<span class="nc" id="L278">            g.setTransform(t);</span>
+<span class="nc" id="L279">            g.drawImage(img, 0, 0);</span>
+<span class="nc" id="L280">            g.setTransform(old);</span>
+<span class="nc" id="L281">            return;</span>
+        }
+<span class="nc" id="L283">        double x0 = m[4];</span>
+<span class="nc" id="L284">        double y0 = m[5];</span>
+<span class="nc" id="L285">        double x1 = m[0] * w + m[2] * h + m[4];</span>
+<span class="nc" id="L286">        double y1 = m[1] * w + m[3] * h + m[5];</span>
+<span class="nc" id="L287">        int x = (int) Math.floor(Math.min(x0, x1));</span>
+<span class="nc" id="L288">        int y = (int) Math.floor(Math.min(y0, y1));</span>
+<span class="nc" id="L289">        int dw = (int) Math.ceil(Math.max(x0, x1)) - x;</span>
+<span class="nc" id="L290">        int dh = (int) Math.ceil(Math.max(y0, y1)) - y;</span>
+<span class="nc bnc" id="L291" title="All 4 branches missed.">        if (dw &gt; 0 &amp;&amp; dh &gt; 0) {</span>
+<span class="nc" id="L292">            g.drawImage(img, x, y, dw, dh);</span>
+        }
+<span class="nc" id="L294">    }</span>
+
+    @Override
+    public int[] decodeJpeg(byte[] data, int[] size) {
+        try {
+<span class="nc" id="L299">            EncodedImage e = EncodedImage.create(data);</span>
+<span class="nc" id="L300">            size[0] = e.getWidth();</span>
+<span class="nc" id="L301">            size[1] = e.getHeight();</span>
+<span class="nc bnc" id="L302" title="All 4 branches missed.">            if (size[0] &lt;= 0 || size[1] &lt;= 0) {</span>
+<span class="nc" id="L303">                return null;</span>
+            }
+<span class="nc" id="L305">            return e.getRGB();</span>
+<span class="nc" id="L306">        } catch (RuntimeException ex) {</span>
+<span class="nc" id="L307">            return null;</span>
+        }
+    }
+
+    @Override
+    public void text(String text, int family, boolean bold, boolean italic, double[] m, int argb) {
+<span class="nc" id="L313">        double sx = Math.sqrt(m[0] * m[0] + m[1] * m[1]);</span>
+<span class="nc" id="L314">        double sy = Math.sqrt(m[2] * m[2] + m[3] * m[3]);</span>
+<span class="nc bnc" id="L315" title="All 2 branches missed.">        if (sy &lt; 1) {</span>
+<span class="nc" id="L316">            return;</span>
+        }
+<span class="nc bnc" id="L318" title="All 4 branches missed.">        int style = (bold ? Font.STYLE_BOLD : 0) | (italic ? Font.STYLE_ITALIC : 0);</span>
+<span class="nc bnc" id="L319" title="All 4 branches missed.">        int face = family == 2 ? Font.FACE_MONOSPACE : family == 1 ? Font.FACE_PROPORTIONAL : Font.FACE_SYSTEM;</span>
+        Font f;
+<span class="nc" id="L321">        float px = (float) sy;</span>
+<span class="nc bnc" id="L322" title="All 4 branches missed.">        if (Font.isNativeFontSchemeSupported() &amp;&amp; family != 2) {</span>
+<span class="nc bnc" id="L323" title="All 6 branches missed.">            String name = bold ? (italic ? &quot;native:ItalicBold&quot; : &quot;native:MainBold&quot;)</span>
+                    : italic ? &quot;native:ItalicRegular&quot; : &quot;native:MainRegular&quot;;
+<span class="nc" id="L325">            f = Font.createTrueTypeFont(name, name).derive(px, style);</span>
+<span class="nc" id="L326">        } else {</span>
+<span class="nc" id="L327">            f = Font.createSystemFont(face, style, Font.SIZE_MEDIUM);</span>
+        }
+<span class="nc" id="L329">        color(argb);</span>
+<span class="nc" id="L330">        g.setFont(f);</span>
+<span class="nc" id="L331">        int ascent = f.getAscent();</span>
+<span class="nc bnc" id="L332" title="All 8 branches missed.">        boolean axis = m[1] == 0 &amp;&amp; m[2] == 0 &amp;&amp; m[0] &gt; 0 &amp;&amp; m[3] &lt; 0;</span>
+<span class="nc bnc" id="L333" title="All 4 branches missed.">        if (axis || !transforms) {</span>
+<span class="nc" id="L334">            g.drawString(text, (int) Math.round(m[4]), (int) Math.round(m[5]) - ascent);</span>
+        } else {
+<span class="nc" id="L336">            Transform old = g.getTransform();</span>
+<span class="nc" id="L337">            Transform t = old.copy();</span>
+            // m maps a 1-unit em, y up; draw the font at its pixel size, y down.
+<span class="nc" id="L339">            t.concatenate(Transform.makeAffine(m[0] / sx, m[1] / sx, -m[2] / sy, -m[3] / sy, m[4], m[5]));</span>
+<span class="nc" id="L340">            g.setTransform(t);</span>
+<span class="nc" id="L341">            g.drawString(text, 0, -ascent);</span>
+<span class="nc" id="L342">            g.setTransform(old);</span>
+        }
+<span class="nc" id="L344">        g.setAlpha(255);</span>
+<span class="nc" id="L345">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

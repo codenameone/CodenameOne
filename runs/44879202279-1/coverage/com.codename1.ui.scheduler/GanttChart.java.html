@@ -1,0 +1,1152 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>GanttChart.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.scheduler</a> &gt; <span class="el_source">GanttChart.java</span></div><h1>GanttChart.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ui.scheduler;
+
+import com.codename1.scheduling.GanttTask;
+import com.codename1.scheduling.ProjectModel;
+import com.codename1.scheduling.ResourceAssignment;
+import com.codename1.scheduling.ScheduleResource;
+import com.codename1.scheduling.TaskDependency;
+import com.codename1.scheduling.TimeMath;
+import com.codename1.scheduling.WorkCalendar;
+import com.codename1.ui.ScrollSurface;
+import com.codename1.ui.ScrollSurface.EditTrigger;
+import com.codename1.ui.Font;
+import com.codename1.ui.Graphics;
+import com.codename1.ui.plaf.Style;
+import com.codename1.ui.plaf.UIManager;
+
+import java.time.ZoneId;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+
+/// The chart of a `Gantt`: the table of tasks pinned on the left, and beside
+/// it a row per task under a time axis, with the links between them.
+final class GanttChart extends ScrollSurface {
+    private static final int MOVE = 1;
+    private static final int RESIZE_END = 2;
+    private static final int PROGRESS = 3;
+    private static final int LINK = 4;
+    private static final int REFLOW_MS = 260;
+
+    private final Gantt owner;
+    private final TimeAxis axis;
+<span class="fc" id="L55">    private final ArrayList&lt;GanttTask&gt; rows = new ArrayList&lt;GanttTask&gt;();</span>
+<span class="fc" id="L56">    private final HashMap&lt;GanttTask, Integer&gt; rowOf = new HashMap&lt;GanttTask, Integer&gt;();</span>
+    private GanttTask linkProbe;
+<span class="fc" id="L58">    private boolean dirty = true;</span>
+    private boolean scaled;
+    private boolean fit;
+<span class="fc" id="L61">    private int laidW = -1;</span>
+<span class="fc" id="L62">    private int laidH = -1;</span>
+<span class="fc" id="L63">    private int laidGen = -1;</span>
+    private int rowH;
+    private int barH;
+    private int nameW;
+<span class="fc" id="L67">    private int[] colW = new int[0];</span>
+<span class="fc" id="L68">    private Gantt.Column[] cols = new Gantt.Column[0];</span>
+<span class="fc" id="L69">    private final int[] rect = new int[4];</span>
+<span class="fc" id="L70">    private final int[] rect2 = new int[4];</span>
+    private ResourceLoadView load;
+
+    // Where the bars were before the project was last scheduled, while they
+    // slide to where they are now.
+    private HashMap&lt;GanttTask, long[]&gt; reflowFrom;
+    private long reflowStart;
+
+    private int mode;
+    private GanttTask editTask;
+    private long editStart;
+    private long editEnd;
+    private int editPercent;
+    private long grabTime;
+    private int linkX;
+    private int linkY;
+    private GanttTask linkTarget;
+
+<span class="fc" id="L88">    GanttChart(Gantt owner) {</span>
+<span class="fc" id="L89">        this.owner = owner;</span>
+<span class="fc" id="L90">        axis = new TimeAxis(ZoneId.systemDefault());</span>
+<span class="fc" id="L91">        setUIID(&quot;Gantt&quot;);</span>
+<span class="fc" id="L92">    }</span>
+
+    void setLoadView(ResourceLoadView v) {
+<span class="fc" id="L95">        load = v;</span>
+<span class="fc" id="L96">    }</span>
+
+    TimeAxis axis() {
+<span class="fc" id="L99">        return axis;</span>
+    }
+
+    List&lt;GanttTask&gt; rows() {
+<span class="fc" id="L103">        return rows;</span>
+    }
+
+    void modelChanged() {
+        // What could be linked a moment ago is asked again.
+<span class="fc" id="L108">        linkProbe = null;</span>
+<span class="pc bpc" id="L109" title="1 of 2 branches missed.">        if (mode == LINK) {</span>
+<span class="nc" id="L110">            linkTarget = null;</span>
+        }
+<span class="fc" id="L112">        dirty = true;</span>
+<span class="fc" id="L113">        repaint();</span>
+<span class="fc" id="L114">    }</span>
+
+    /// Remembers where every bar is, so that the next layout slides them to
+    /// their new dates and does not jump.
+    void beginReflow() {
+<span class="fc" id="L119">        beginReflow(null, 0, 0);</span>
+<span class="fc" id="L120">    }</span>
+
+    /// As `beginReflow()`, with one bar starting from where a hand left it
+    /// and not from its dates: the project may put it somewhere else again,
+    /// and it slides there from under the hand, not from where it was.
+    void beginReflow(GanttTask held, long heldStart, long heldEnd) {
+<span class="fc" id="L126">        HashMap&lt;GanttTask, long[]&gt; from = new HashMap&lt;GanttTask, long[]&gt;();</span>
+<span class="fc bfc" id="L127" title="All 2 branches covered.">        for (GanttTask t : rows) {</span>
+<span class="fc bfc" id="L128" title="All 2 branches covered.">            if (t == held) { //NOPMD CompareObjectsWithEquals - the very task that was dragged</span>
+<span class="fc" id="L129">                from.put(t, new long[]{heldStart, heldEnd});</span>
+            } else {
+<span class="fc" id="L131">                from.put(t, new long[]{t.getStart(), t.getEnd()});</span>
+            }
+<span class="fc" id="L133">        }</span>
+<span class="fc" id="L134">        reflowFrom = from;</span>
+<span class="fc" id="L135">        reflowStart = currentTime();</span>
+<span class="fc" id="L136">        requestAnimation();</span>
+<span class="fc" id="L137">    }</span>
+
+    /// Ends the slide at once, leaving every bar at its date.
+    void reflowDone() {
+<span class="fc" id="L141">        reflowFrom = null;</span>
+<span class="fc" id="L142">    }</span>
+
+    @Override
+    protected boolean animateSurface() {
+<span class="fc bfc" id="L146" title="All 2 branches covered.">        if (reflowFrom == null) {</span>
+<span class="fc" id="L147">            return false;</span>
+        }
+<span class="pc bpc" id="L149" title="1 of 2 branches missed.">        if (currentTime() - reflowStart &gt;= REFLOW_MS) {</span>
+<span class="nc" id="L150">            reflowFrom = null;</span>
+        }
+<span class="fc" id="L152">        repaint();</span>
+<span class="pc bpc" id="L153" title="1 of 2 branches missed.">        return reflowFrom != null;</span>
+    }
+
+    private long shown(GanttTask t, boolean end) {
+<span class="fc bfc" id="L157" title="All 2 branches covered.">        long now = end ? t.getEnd() : t.getStart();</span>
+<span class="fc bfc" id="L158" title="All 2 branches covered.">        if (reflowFrom == null) {</span>
+<span class="fc" id="L159">            return now;</span>
+        }
+<span class="fc" id="L161">        long[] from = reflowFrom.get(t);</span>
+<span class="pc bpc" id="L162" title="1 of 2 branches missed.">        if (from == null) {</span>
+<span class="nc" id="L163">            return now;</span>
+        }
+<span class="fc" id="L165">        float p = Math.min(1f, (currentTime() - reflowStart) / (float) REFLOW_MS);</span>
+        // Ease out: fast at first, settling at the end.
+<span class="fc" id="L167">        p = 1 - (1 - p) * (1 - p);</span>
+<span class="fc bfc" id="L168" title="All 2 branches covered.">        long was = from[end ? 1 : 0];</span>
+<span class="fc" id="L169">        return was + (long) ((now - was) * p);</span>
+    }
+
+    void zoomToFit() {
+<span class="fc" id="L173">        fit = true;</span>
+<span class="fc" id="L174">        scaled = false;</span>
+<span class="fc" id="L175">        laidW = -1;</span>
+<span class="fc" id="L176">        repaint();</span>
+<span class="fc" id="L177">    }</span>
+
+    void zoom(float factor) {
+<span class="fc" id="L180">        zoomBy(factor, getHeaderWidth() + getBodyWidth() / 2, getHeaderHeight());</span>
+<span class="fc" id="L181">    }</span>
+
+    void scrollToTime(long time) {
+<span class="nc" id="L184">        refreshLayout();</span>
+<span class="nc" id="L185">        scrollTo(axis.x(time) - getBodyWidth() / 4, getOffsetY());</span>
+<span class="nc" id="L186">    }</span>
+
+    void scrollToTask(GanttTask t) {
+<span class="fc" id="L189">        refreshLayout();</span>
+<span class="fc" id="L190">        Integer row = rowOf.get(t);</span>
+<span class="fc" id="L191">        int y = getOffsetY();</span>
+<span class="pc bpc" id="L192" title="1 of 2 branches missed.">        if (row != null) {</span>
+<span class="fc" id="L193">            int top = row.intValue() * rowH;</span>
+<span class="pc bpc" id="L194" title="2 of 4 branches missed.">            if (top &lt; y || top + rowH &gt; y + getBodyHeight()) {</span>
+<span class="nc" id="L195">                y = top - getBodyHeight() / 3;</span>
+            }
+        }
+<span class="fc" id="L198">        scrollTo(axis.x(t.getStart()) - getBodyWidth() / 4, y);</span>
+<span class="fc" id="L199">    }</span>
+
+    // ------------------------------------------------------------- layout
+
+    private void addRows(List&lt;GanttTask&gt; tasks) {
+<span class="fc bfc" id="L204" title="All 2 branches covered.">        for (GanttTask t : tasks) {</span>
+<span class="fc" id="L205">            rowOf.put(t, Integer.valueOf(rows.size()));</span>
+<span class="fc" id="L206">            rows.add(t);</span>
+<span class="fc bfc" id="L207" title="All 4 branches covered.">            if (t.isSummary() &amp;&amp; !owner.isCollapsed(t)) {</span>
+<span class="fc" id="L208">                addRows(t.getChildren());</span>
+            }
+<span class="fc" id="L210">        }</span>
+<span class="fc" id="L211">    }</span>
+
+    @Override
+    protected void layoutSurface(int width, int height) {
+<span class="fc" id="L215">        int gen = UIManager.getThemeGeneration();</span>
+<span class="fc bfc" id="L216" title="All 8 branches covered.">        if (!dirty &amp;&amp; width == laidW &amp;&amp; height == laidH &amp;&amp; gen == laidGen) {</span>
+<span class="fc" id="L217">            return;</span>
+        }
+<span class="fc" id="L219">        laidW = width;</span>
+<span class="fc" id="L220">        laidH = height;</span>
+<span class="fc" id="L221">        laidGen = gen;</span>
+<span class="fc" id="L222">        dirty = false;</span>
+<span class="fc" id="L223">        ProjectModel model = owner.getModel();</span>
+<span class="fc" id="L224">        Style header = Look.style(&quot;GanttHeader&quot;);</span>
+<span class="fc" id="L225">        Style rowStyle = Look.style(&quot;GanttRow&quot;);</span>
+<span class="fc" id="L226">        Font f = rowStyle.getFont();</span>
+<span class="fc" id="L227">        rows.clear();</span>
+<span class="fc" id="L228">        rowOf.clear();</span>
+<span class="fc" id="L229">        long first = Long.MAX_VALUE;</span>
+<span class="fc" id="L230">        long last = Long.MIN_VALUE;</span>
+<span class="fc" id="L231">        ZoneId zone = ZoneId.systemDefault();</span>
+<span class="pc bpc" id="L232" title="1 of 2 branches missed.">        if (model != null) {</span>
+<span class="fc" id="L233">            zone = model.getCalendar().getZone();</span>
+<span class="fc" id="L234">            addRows(model.getRootTasks());</span>
+<span class="fc" id="L235">            first = model.getStart();</span>
+<span class="fc" id="L236">            last = model.getStart();</span>
+<span class="fc bfc" id="L237" title="All 2 branches covered.">            for (GanttTask t : model.getTasks()) {</span>
+<span class="fc" id="L238">                first = Math.min(first, t.getStart());</span>
+<span class="fc" id="L239">                last = Math.max(last, t.getEnd());</span>
+<span class="pc bpc" id="L240" title="1 of 2 branches missed.">                if (t.hasBaseline()) {</span>
+<span class="nc" id="L241">                    first = Math.min(first, t.getBaselineStart());</span>
+<span class="nc" id="L242">                    last = Math.max(last, t.getBaselineEnd());</span>
+                }
+<span class="fc" id="L244">            }</span>
+        }
+<span class="pc bpc" id="L246" title="1 of 2 branches missed.">        if (first == Long.MAX_VALUE) {</span>
+<span class="nc" id="L247">            first = owner.now();</span>
+<span class="nc" id="L248">            last = first;</span>
+        }
+        // Room on both sides: to drag a task earlier, and for the labels
+        // after the last bar.
+<span class="fc" id="L252">        long from = TimeMath.startOfDay(first, zone) - 3 * TimeMath.DAY;</span>
+<span class="fc" id="L253">        long to = TimeMath.startOfDay(last, zone) + 12 * TimeMath.DAY;</span>
+        // What fitting shows: the project's own days, not the room around
+        // them, or a week's plan fits as three weeks.
+<span class="fc" id="L256">        long fitFrom = TimeMath.startOfDay(first, zone);</span>
+<span class="fc" id="L257">        long fitTo = Math.max(fitFrom + TimeMath.DAY,</span>
+<span class="fc" id="L258">                TimeMath.startOfDay(last - 1, zone) + TimeMath.DAY);</span>
+<span class="fc bfc" id="L259" title="All 2 branches covered.">        long keep = scaled ? axis.time(getOffsetX()) : Long.MIN_VALUE;</span>
+<span class="fc" id="L260">        axis.setZone(zone);</span>
+<span class="fc" id="L261">        axis.setFirstDayOfWeek(owner.getFirstDayOfWeek());</span>
+<span class="fc" id="L262">        axis.set24Hours(owner.is24Hours());</span>
+<span class="fc" id="L263">        axis.setRange(from, to);</span>
+
+<span class="fc" id="L265">        rowH = Math.max(Look.mm(6.5f), f.getHeight() + Look.mm(2.6f));</span>
+<span class="fc" id="L266">        barH = Math.max(4, rowH * 11 / 20);</span>
+<span class="fc" id="L267">        setHeaderSize(getHeaderWidth(), axis.headerHeight(header));</span>
+
+        // The table: the names, then as many of the columns as fit.
+<span class="fc" id="L270">        int indent = Look.mm(3);</span>
+<span class="fc" id="L271">        int widest = header.getFont().stringWidth(owner.localize(&quot;gantt.task&quot;, &quot;Task&quot;));</span>
+<span class="fc bfc" id="L272" title="All 2 branches covered.">        for (GanttTask t : rows) {</span>
+<span class="fc" id="L273">            widest = Math.max(widest, f.stringWidth(t.getName()) + t.getLevel() * indent);</span>
+<span class="fc" id="L274">        }</span>
+<span class="fc" id="L275">        nameW = Math.max(Look.mm(20), Math.min(Look.mm(52), widest + Look.mm(7)));</span>
+<span class="fc" id="L276">        int cap = Math.max(Look.mm(18), width * 45 / 100);</span>
+<span class="fc" id="L277">        nameW = Math.min(nameW, cap);</span>
+<span class="fc" id="L278">        Gantt.Column[] wanted = owner.columns();</span>
+<span class="fc" id="L279">        ArrayList&lt;Gantt.Column&gt; shownCols = new ArrayList&lt;Gantt.Column&gt;();</span>
+<span class="fc" id="L280">        int[] widths = new int[wanted.length];</span>
+<span class="fc" id="L281">        int total = nameW;</span>
+<span class="fc bfc" id="L282" title="All 2 branches covered.">        for (Gantt.Column c : wanted) {</span>
+<span class="fc" id="L283">            int w = Math.max(f.stringWidth(sample(c)), header.getFont().stringWidth(columnTitle(c))) + Look.mm(3);</span>
+<span class="pc bpc" id="L284" title="1 of 2 branches missed.">            if (total + w &gt; cap) {</span>
+<span class="nc" id="L285">                break;</span>
+            }
+<span class="fc" id="L287">            widths[shownCols.size()] = w;</span>
+<span class="fc" id="L288">            shownCols.add(c);</span>
+<span class="fc" id="L289">            total += w;</span>
+        }
+<span class="fc" id="L291">        cols = new Gantt.Column[shownCols.size()];</span>
+<span class="fc" id="L292">        shownCols.toArray(cols);</span>
+<span class="fc" id="L293">        colW = widths;</span>
+<span class="pc bpc" id="L294" title="1 of 2 branches missed.">        setHeaderSize(owner.isTableVisible() ? total : 0, getHeaderHeight());</span>
+
+<span class="fc" id="L296">        int bodyW = Math.max(1, width - getHeaderWidth());</span>
+<span class="fc" id="L297">        long span = to - from;</span>
+<span class="fc" id="L298">        double dayScale = (double) TimeMath.DAY / Look.mm(7);</span>
+<span class="fc" id="L299">        axis.setScaleLimits((double) TimeMath.HOUR / Look.mm(9), Math.max((double) span / bodyW, dayScale));</span>
+<span class="pc bpc" id="L300" title="1 of 4 branches missed.">        if (!scaled &amp;&amp; width &gt; 0) {</span>
+<span class="fc" id="L301">            scaled = true;</span>
+<span class="fc bfc" id="L302" title="All 2 branches covered.">            if (fit) {</span>
+                // The axis clamps this to its coarsest scale: a chart too
+                // narrow for the project and its names shows what fits.
+<span class="fc" id="L305">                axis.setMillisPerPixel(fitScale(model, rows, f, fitFrom, fitTo, bodyW, barH));</span>
+            } else {
+<span class="fc" id="L307">                axis.setMillisPerPixel(Math.min(dayScale, Math.max((double) span / bodyW,</span>
+<span class="fc" id="L308">                        (double) TimeMath.DAY / Look.mm(14))));</span>
+            }
+<span class="fc bfc" id="L310" title="All 2 branches covered.">            setOffsets(fit ? axis.x(fitFrom) - Look.mm(2) : 0, getOffsetY());</span>
+<span class="fc" id="L311">            fit = false;</span>
+<span class="pc bpc" id="L312" title="1 of 2 branches missed.">        } else if (keep != Long.MIN_VALUE) {</span>
+            // The range may have grown at its start: what was at the left
+            // edge stays there.
+<span class="fc" id="L315">            setOffsets(axis.x(keep), getOffsetY());</span>
+        }
+<span class="fc" id="L317">        axis.pickUnits(header.getFont().stringWidth(&quot;Www 00&quot;) + Look.mm(2));</span>
+<span class="pc bpc" id="L318" title="1 of 2 branches missed.">        if (load != null) {</span>
+<span class="fc" id="L319">            load.chartChanged();</span>
+        }
+<span class="fc" id="L321">    }</span>
+
+    private String sample(Gantt.Column c) {
+<span class="pc bpc" id="L324" title="2 of 3 branches missed.">        switch (c) {</span>
+            case START:
+            case END:
+<span class="fc" id="L327">                return &quot;Www 00&quot;;</span>
+            case DURATION:
+<span class="nc" id="L329">                return &quot;000d&quot;;</span>
+            default:
+<span class="nc" id="L331">                return &quot;100%&quot;;</span>
+        }
+    }
+
+    private String columnTitle(Gantt.Column c) {
+<span class="pc bpc" id="L336" title="2 of 4 branches missed.">        switch (c) {</span>
+            case START:
+<span class="fc" id="L338">                return owner.localize(&quot;gantt.start&quot;, &quot;Start&quot;);</span>
+            case END:
+<span class="fc" id="L340">                return owner.localize(&quot;gantt.end&quot;, &quot;End&quot;);</span>
+            case DURATION:
+<span class="nc" id="L342">                return owner.localize(&quot;gantt.duration&quot;, &quot;Days&quot;);</span>
+            default:
+<span class="nc" id="L344">                return &quot;%&quot;;</span>
+        }
+    }
+
+    private String columnText(Gantt.Column c, GanttTask t) {
+<span class="fc" id="L349">        ZoneId zone = axis.getZone();</span>
+<span class="pc bpc" id="L350" title="2 of 4 branches missed.">        switch (c) {</span>
+            case START:
+<span class="fc" id="L352">                return Dates.monthDay(TimeMath.epochDay(t.getStart(), zone));</span>
+            case END:
+<span class="fc" id="L354">                return Dates.monthDay(TimeMath.epochDay(Math.max(t.getStart(), t.getEnd() - 1), zone));</span>
+            case DURATION: {
+<span class="nc" id="L356">                WorkCalendar cal = owner.getModel().getCalendar();</span>
+<span class="nc bnc" id="L357" title="All 2 branches missed.">                long work = t.isSummary() ? cal.workingTimeBetween(t.getStart(), t.getEnd()) : t.getDuration();</span>
+<span class="nc" id="L358">                long perDay = Math.max(1, cal.getMillisPerDay());</span>
+<span class="nc" id="L359">                long tenths = work * 10 / perDay;</span>
+<span class="nc bnc" id="L360" title="All 2 branches missed.">                return tenths % 10 == 0 ? String.valueOf(tenths / 10) : tenths / 10 + &quot;.&quot; + tenths % 10;</span>
+            }
+            default:
+<span class="nc" id="L363">                return t.getPercentComplete() + &quot;%&quot;;</span>
+        }
+    }
+
+    @Override
+    protected Object saveZoomState() {
+<span class="fc" id="L369">        return new double[]{axis.getMillisPerPixel()};</span>
+    }
+
+    @Override
+    protected void restoreZoomState(Object state) {
+<span class="pc bpc" id="L374" title="1 of 2 branches missed.">        if (!(state instanceof double[])) {</span>
+<span class="nc" id="L375">            return;</span>
+        }
+<span class="fc" id="L377">        double[] saved = (double[]) state;</span>
+<span class="fc" id="L378">        axis.setMillisPerPixel(saved[0]);</span>
+<span class="fc" id="L379">    }</span>
+
+    @Override
+    protected int getContentWidth() {
+<span class="fc" id="L383">        return axis.width();</span>
+    }
+
+    @Override
+    protected int getContentHeight() {
+<span class="fc" id="L388">        return rows.size() * rowH;</span>
+    }
+
+    @Override
+    protected void scrollChanged() {
+<span class="pc bpc" id="L393" title="1 of 2 branches missed.">        if (load != null) {</span>
+<span class="fc" id="L394">            load.chartScrolled();</span>
+        }
+<span class="fc" id="L396">    }</span>
+
+    /// The rectangle of a task's bar in the content's coordinates.
+    void barRect(GanttTask t, int row, int[] out) {
+<span class="fc" id="L400">        int x0 = axis.x(shown(t, false));</span>
+<span class="fc" id="L401">        int x1 = axis.x(shown(t, true));</span>
+<span class="fc" id="L402">        int top = row * rowH + (rowH - barH) / 2;</span>
+<span class="fc bfc" id="L403" title="All 2 branches covered.">        if (t.isMilestone()) {</span>
+<span class="fc" id="L404">            out[0] = x0 - barH / 2;</span>
+<span class="fc" id="L405">            out[2] = barH;</span>
+        } else {
+<span class="fc" id="L407">            out[0] = x0;</span>
+<span class="fc" id="L408">            out[2] = Math.max(2, x1 - x0);</span>
+        }
+<span class="fc" id="L410">        out[1] = top;</span>
+<span class="fc" id="L411">        out[3] = barH;</span>
+<span class="fc" id="L412">    }</span>
+
+    // -------------------------------------------------------------- paint
+
+    @Override
+    protected void paintContent(Graphics g, int x, int y) {
+<span class="fc" id="L418">        Style rowStyle = Look.style(&quot;GanttRow&quot;);</span>
+<span class="fc" id="L419">        Style rowSel = Look.selected(&quot;GanttRow&quot;);</span>
+<span class="fc" id="L420">        Style summaryRow = Look.style(&quot;GanttSummaryRow&quot;);</span>
+<span class="fc" id="L421">        int cx = g.getClipX();</span>
+<span class="fc" id="L422">        int cy = g.getClipY();</span>
+<span class="fc" id="L423">        int cw = g.getClipWidth();</span>
+<span class="fc" id="L424">        int ch = g.getClipHeight();</span>
+<span class="fc" id="L425">        Look.fill(g, rowStyle, cx, cy, cw, ch);</span>
+<span class="fc" id="L426">        ProjectModel model = owner.getModel();</span>
+<span class="pc bpc" id="L427" title="1 of 2 branches missed.">        if (model == null) {</span>
+<span class="nc" id="L428">            return;</span>
+        }
+<span class="fc" id="L430">        int firstRow = Math.max(0, (cy - y) / rowH);</span>
+<span class="fc" id="L431">        int lastRow = Math.min(rows.size() - 1, (cy + ch - y) / rowH);</span>
+        // A page shows the project, not what a hand was doing to it.
+<span class="fc bfc" id="L433" title="All 2 branches covered.">        GanttTask selected = isPrinting() ? null : owner.getSelectedTask();</span>
+<span class="fc bfc" id="L434" title="All 2 branches covered.">        for (int r = firstRow; r &lt;= lastRow; r++) {</span>
+<span class="fc" id="L435">            GanttTask t = rows.get(r);</span>
+<span class="fc bfc" id="L436" title="All 2 branches covered.">            if (t == selected) { //NOPMD CompareObjectsWithEquals - the selection is this very object</span>
+<span class="fc" id="L437">                Look.fill(g, rowSel, cx, y + r * rowH, cw, rowH);</span>
+<span class="fc bfc" id="L438" title="All 2 branches covered.">            } else if (t.isSummary()) {</span>
+<span class="fc" id="L439">                Look.fill(g, summaryRow, cx, y + r * rowH, cw, rowH);</span>
+            }
+        }
+<span class="fc" id="L442">        paintRowHover(g, cx, y, cw, rowStyle.getFgColor());</span>
+<span class="fc" id="L443">        axis.paintOffHours(g, model.getCalendar(), Look.style(&quot;SchedulerOffHours&quot;), x, cy, ch, cx, cx + cw);</span>
+<span class="fc" id="L444">        int lineColor = Look.mix(rowStyle.getBgColor(), rowStyle.getFgColor(), 45);</span>
+<span class="fc" id="L445">        axis.paintGrid(g, lineColor, rowStyle.getBgColor(), x, cy, ch, cx, cx + cw);</span>
+<span class="fc" id="L446">        g.setColor(Look.mix(rowStyle.getBgColor(), rowStyle.getFgColor(), 25));</span>
+<span class="fc bfc" id="L447" title="All 2 branches covered.">        for (int r = firstRow; r &lt;= lastRow + 1; r++) {</span>
+<span class="fc" id="L448">            g.drawLine(cx, y + r * rowH, cx + cw, y + r * rowH);</span>
+        }
+<span class="fc" id="L450">        long now = owner.now();</span>
+<span class="pc bpc" id="L451" title="2 of 4 branches missed.">        if (now &gt;= axis.getStart() &amp;&amp; now &lt; axis.getEnd()) {</span>
+<span class="fc" id="L452">            g.setColor(Look.style(&quot;SchedulerNow&quot;).getFgColor());</span>
+<span class="fc" id="L453">            g.fillRect(x + axis.x(now) - 1, cy, 2, ch);</span>
+        }
+
+<span class="pc bpc" id="L456" title="1 of 2 branches missed.">        if (owner.isShowBaseline()) {</span>
+<span class="nc" id="L457">            Style base = Look.style(&quot;GanttBaseline&quot;);</span>
+<span class="nc" id="L458">            int h = Math.max(2, barH / 3);</span>
+<span class="nc bnc" id="L459" title="All 2 branches missed.">            for (int r = firstRow; r &lt;= lastRow; r++) {</span>
+<span class="nc" id="L460">                GanttTask t = rows.get(r);</span>
+<span class="nc bnc" id="L461" title="All 4 branches missed.">                if (t.hasBaseline() &amp;&amp; !t.isSummary()) {</span>
+<span class="nc" id="L462">                    int x0 = x + axis.x(t.getBaselineStart());</span>
+<span class="nc" id="L463">                    int x1 = x + axis.x(t.getBaselineEnd());</span>
+<span class="nc" id="L464">                    Look.fill(g, base, x0, y + r * rowH + rowH - h - 1, Math.max(2, x1 - x0), h);</span>
+                }
+            }
+        }
+<span class="pc bpc" id="L468" title="1 of 2 branches missed.">        if (owner.isShowLinks()) {</span>
+<span class="fc" id="L469">            paintLinks(g, model, x, y, firstRow, lastRow);</span>
+        }
+
+<span class="fc" id="L472">        GanttBarRenderer renderer = owner.getBarRenderer();</span>
+<span class="fc" id="L473">        Font f = rowStyle.getFont();</span>
+<span class="fc" id="L474">        boolean showCritical = owner.isShowCriticalPath();</span>
+<span class="fc" id="L475">        int alpha = g.getAlpha();</span>
+<span class="fc" id="L476">        boolean lit = hasHoverFeedback();</span>
+<span class="pc bpc" id="L477" title="2 of 4 branches missed.">        float lift = mode == MOVE || mode == RESIZE_END ? getLiftLevel() : 0;</span>
+<span class="fc bfc" id="L478" title="All 2 branches covered.">        for (int r = firstRow; r &lt;= lastRow; r++) {</span>
+<span class="fc" id="L479">            GanttTask t = rows.get(r);</span>
+<span class="fc" id="L480">            barRect(t, r, rect);</span>
+<span class="fc bfc" id="L481" title="All 2 branches covered.">            if (x + rect[0] &gt; cx + cw) {</span>
+<span class="fc" id="L482">                continue;</span>
+            }
+<span class="fc" id="L484">            int state = 0;</span>
+<span class="fc bfc" id="L485" title="All 2 branches covered.">            float over = lit ? getHoverLevel(t) : 0;</span>
+<span class="pc bpc" id="L486" title="1 of 2 branches missed.">            if (over &gt; 0) {</span>
+<span class="nc" id="L487">                state |= GanttBarRenderer.HOVERED;</span>
+            }
+<span class="pc bpc" id="L489" title="3 of 4 branches missed.">            boolean held = lift &gt; 0 &amp;&amp; t == editTask; //NOPMD CompareObjectsWithEquals - the very task that is held</span>
+<span class="pc bpc" id="L490" title="1 of 2 branches missed.">            if (held) {</span>
+                // What is left behind while the bar is carried.
+<span class="nc" id="L492">                g.setAlpha(Math.round(alpha * (1 - 0.6f * lift)));</span>
+            }
+<span class="fc bfc" id="L494" title="All 2 branches covered.">            if (t == selected) { //NOPMD CompareObjectsWithEquals - the selection is this very object</span>
+<span class="fc" id="L495">                state |= GanttBarRenderer.SELECTED;</span>
+            }
+<span class="pc bpc" id="L497" title="5 of 6 branches missed.">            if (showCritical &amp;&amp; t.isCritical() &amp;&amp; !t.isSummary()) {</span>
+<span class="nc" id="L498">                state |= GanttBarRenderer.CRITICAL;</span>
+            }
+<span class="fc bfc" id="L500" title="All 2 branches covered.">            if (x + rect[0] + rect[2] &gt;= cx) {</span>
+<span class="fc" id="L501">                renderer.paintBar(g, owner, t, x + rect[0], y + rect[1], rect[2], rect[3], state);</span>
+<span class="pc bpc" id="L502" title="1 of 4 branches missed.">                if (!held &amp;&amp; !t.isMilestone()) {</span>
+<span class="fc" id="L503">                    Look.glow(g, rowStyle.getFgColor(), x + rect[0], y + rect[1], rect[2], rect[3], over);</span>
+                }
+            }
+<span class="fc" id="L506">            g.setAlpha(alpha);</span>
+<span class="fc" id="L507">            String label = labelOf(model, t);</span>
+<span class="fc bfc" id="L508" title="All 2 branches covered.">            if (label != null) {</span>
+<span class="fc" id="L509">                g.setFont(f);</span>
+<span class="fc" id="L510">                g.setColor(rowStyle.getFgColor());</span>
+<span class="fc" id="L511">                g.setAlpha(alpha * 170 / 255);</span>
+<span class="pc bpc" id="L512" title="1 of 2 branches missed.">                g.drawString(label, x + rect[0] + rect[2] + Look.mm(2.2f) + (t == selected ? Look.mm(3) : 0), //NOPMD CompareObjectsWithEquals</span>
+<span class="fc" id="L513">                        y + r * rowH + (rowH - f.getHeight()) / 2);</span>
+<span class="fc" id="L514">                g.setAlpha(alpha);</span>
+            }
+        }
+<span class="pc bpc" id="L517" title="2 of 8 branches missed.">        if (selected != null &amp;&amp; owner.isEditable() &amp;&amp; !selected.isSummary() &amp;&amp; mode == 0) {</span>
+<span class="fc" id="L518">            Integer row = rowOf.get(selected);</span>
+<span class="pc bpc" id="L519" title="1 of 2 branches missed.">            if (row != null) {</span>
+<span class="fc" id="L520">                paintHandles(g, selected, row.intValue(), x, y);</span>
+            }
+        }
+<span class="pc bpc" id="L523" title="3 of 4 branches missed.">        if (mode != 0 &amp;&amp; !isPrinting()) {</span>
+<span class="nc" id="L524">            paintEdit(g, x, y);</span>
+        }
+<span class="fc" id="L526">    }</span>
+
+    // A page ends between two rows, so that no row is cut in half by it.
+    @Override
+    protected int getPageStep(int bodyH) {
+<span class="pc bpc" id="L531" title="2 of 4 branches missed.">        return rowH &gt; 0 &amp;&amp; bodyH &gt;= rowH ? bodyH - bodyH % rowH : bodyH;</span>
+    }
+
+    // A drag is of a task that is in the project and on a row. One that was
+    // removed, or whose parent was folded, while it was held has no bar left
+    // to follow the pointer.
+    private boolean editGone() {
+<span class="fc" id="L538">        ProjectModel model = owner.getModel();</span>
+<span class="pc bpc" id="L539" title="3 of 8 branches missed.">        return editTask == null || model == null || !model.contains(editTask) || rowOf.get(editTask) == null;</span>
+    }
+
+    // The start a move by `delta` gives. The distance is what snaps, not the
+    // start: a task that begins at one in the afternoon stays at one, and a
+    // press that goes nowhere moves nothing.
+    private long movedStart(GanttTask t, long delta) {
+<span class="fc" id="L546">        ProjectModel model = owner.getModel();</span>
+<span class="fc" id="L547">        ZoneId zone = axis.getZone();</span>
+<span class="fc" id="L548">        long start = t.getStart();</span>
+        long to;
+<span class="pc bpc" id="L550" title="1 of 2 branches missed.">        if (axis.snapsToDays()) {</span>
+<span class="fc" id="L551">            long days = Math.round((double) delta / TimeMath.DAY);</span>
+<span class="fc bfc" id="L552" title="All 2 branches covered.">            if (days == 0) {</span>
+<span class="fc" id="L553">                return start;</span>
+            }
+<span class="fc" id="L555">            to = TimeMath.at(TimeMath.epochDay(start, zone) + days, TimeMath.minuteOfDay(start, zone), zone);</span>
+<span class="fc" id="L556">        } else {</span>
+<span class="nc" id="L557">            long step = 15 * TimeMath.MINUTE;</span>
+<span class="nc" id="L558">            long steps = Math.round((double) delta / step);</span>
+<span class="nc bnc" id="L559" title="All 2 branches missed.">            if (steps == 0) {</span>
+<span class="nc" id="L560">                return start;</span>
+            }
+<span class="nc" id="L562">            to = start + steps * step;</span>
+        }
+<span class="fc" id="L564">        return model.getCalendar().nextWorkingTime(to);</span>
+    }
+
+    // The scale that fits the project's days into the body with a margin on
+    // either side, and with the name written after each bar still in view:
+    // fitting the bars alone clipped the last bar's label and its milestone.
+    private static double fitScale(ProjectModel model, List&lt;GanttTask&gt; rows, Font f,
+            long fitFrom, long fitTo, int bodyW, int barH) {
+<span class="fc" id="L572">        int pad = Look.mm(2);</span>
+<span class="fc" id="L573">        int floor = Math.max(1, bodyW / 3);</span>
+<span class="fc" id="L574">        double scale = (double) (fitTo - fitFrom) / Math.max(floor, bodyW - 2 * pad);</span>
+<span class="pc bpc" id="L575" title="1 of 2 branches missed.">        if (model == null) {</span>
+<span class="nc" id="L576">            return scale;</span>
+        }
+        // As painted: the gap, the selected row's extra step, and a
+        // milestone's diamond reaching half a bar past its time.
+<span class="fc" id="L580">        int gap = Look.mm(2.2f) + Look.mm(3);</span>
+<span class="fc bfc" id="L581" title="All 2 branches covered.">        for (int i = 0; i &lt; rows.size(); i++) { //NOPMD ForLoopCanBeForeach - matches the paint loops over rows</span>
+<span class="fc" id="L582">            GanttTask t = rows.get(i);</span>
+<span class="fc" id="L583">            String label = labelOf(model, t);</span>
+<span class="pc bpc" id="L584" title="1 of 4 branches missed.">            if (label != null &amp;&amp; t.getEnd() &gt; fitFrom) {</span>
+<span class="pc bpc" id="L585" title="1 of 2 branches missed.">                int reach = t.isMilestone() ? barH / 2 : 0;</span>
+<span class="fc" id="L586">                int room = Math.max(floor, bodyW - 2 * pad - gap - reach - f.stringWidth(label));</span>
+<span class="fc" id="L587">                scale = Math.max(scale, (double) (t.getEnd() - fitFrom) / room);</span>
+            }
+        }
+<span class="fc" id="L590">        return scale;</span>
+    }
+
+    // Who a task is assigned to, written after its bar.
+    private static String labelOf(ProjectModel model, GanttTask t) {
+<span class="fc" id="L595">        List&lt;ResourceAssignment&gt; as = t.getAssignments();</span>
+<span class="fc bfc" id="L596" title="All 2 branches covered.">        if (as.isEmpty()) {</span>
+<span class="fc" id="L597">            return null;</span>
+        }
+<span class="fc" id="L599">        StringBuilder sb = new StringBuilder();</span>
+<span class="fc bfc" id="L600" title="All 2 branches covered.">        for (int i = 0; i &lt; as.size(); i++) { //NOPMD ForLoopCanBeForeach - painted for every row of every frame; a for-each allocates an iterator</span>
+<span class="fc" id="L601">            ScheduleResource r = model.getResource(as.get(i).getResourceId());</span>
+<span class="pc bpc" id="L602" title="1 of 2 branches missed.">            if (r == null) {</span>
+<span class="nc" id="L603">                continue;</span>
+            }
+<span class="pc bpc" id="L605" title="1 of 2 branches missed.">            if (sb.length() &gt; 0) {</span>
+<span class="nc" id="L606">                sb.append(&quot;, &quot;);</span>
+            }
+<span class="fc" id="L608">            sb.append(r.getName());</span>
+<span class="fc" id="L609">            float units = as.get(i).getUnits();</span>
+<span class="pc bpc" id="L610" title="1 of 2 branches missed.">            if (Math.abs(units - 1f) &gt; 0.001f) {</span>
+<span class="nc" id="L611">                sb.append(&quot; (&quot;).append(Math.round(units * 100)).append(&quot;%)&quot;);</span>
+            }
+        }
+<span class="pc bpc" id="L614" title="1 of 2 branches missed.">        return sb.length() == 0 ? null : sb.toString();</span>
+    }
+
+    private void paintHandles(Graphics g, GanttTask t, int row, int x, int y) {
+<span class="fc" id="L618">        barRect(t, row, rect);</span>
+<span class="fc" id="L619">        Style st = Look.style(&quot;GanttBar&quot;);</span>
+<span class="fc" id="L620">        boolean aa = g.isAntiAliased();</span>
+<span class="fc" id="L621">        g.setAntiAliased(true);</span>
+        // The dot a link is dragged from.
+<span class="fc" id="L623">        int r = Look.mm(1.1f);</span>
+<span class="fc" id="L624">        int lx = x + rect[0] + rect[2] + Look.mm(2.2f);</span>
+<span class="fc" id="L625">        int ly = y + rect[1] + rect[3] / 2;</span>
+<span class="fc" id="L626">        g.setColor(Look.style(&quot;GanttRow&quot;).getBgColor());</span>
+<span class="fc" id="L627">        g.fillArc(lx - r, ly - r, 2 * r, 2 * r, 0, 360);</span>
+<span class="fc" id="L628">        g.setColor(Look.style(&quot;GanttLink&quot;).getFgColor());</span>
+<span class="fc" id="L629">        g.drawArc(lx - r, ly - r, 2 * r, 2 * r, 0, 360);</span>
+<span class="pc bpc" id="L630" title="1 of 2 branches missed.">        if (!t.isMilestone()) {</span>
+            // The marker progress is dragged by.
+<span class="fc" id="L632">            int px = x + rect[0] + rect[2] * t.getPercentComplete() / 100;</span>
+<span class="fc" id="L633">            int py = y + rect[1] + rect[3];</span>
+<span class="fc" id="L634">            int s = Look.mm(1.2f);</span>
+<span class="fc" id="L635">            g.setColor(st.getFgColor());</span>
+<span class="fc" id="L636">            g.fillPolygon(new int[]{px, px + s, px - s}, new int[]{py - s, py + s, py + s}, 3);</span>
+        }
+<span class="fc" id="L638">        g.setAntiAliased(aa);</span>
+<span class="fc" id="L639">    }</span>
+
+    private void paintEdit(Graphics g, int x, int y) {
+<span class="nc" id="L642">        Integer rowI = rowOf.get(editTask);</span>
+<span class="nc bnc" id="L643" title="All 2 branches missed.">        if (rowI == null) {</span>
+<span class="nc" id="L644">            return;</span>
+        }
+<span class="nc" id="L646">        int row = rowI.intValue();</span>
+<span class="nc" id="L647">        Style rowStyle = Look.style(&quot;GanttRow&quot;);</span>
+<span class="nc bnc" id="L648" title="All 2 branches missed.">        if (mode == LINK) {</span>
+<span class="nc" id="L649">            barRect(editTask, row, rect);</span>
+<span class="nc" id="L650">            g.setColor(Look.style(&quot;GanttLink&quot;).getFgColor());</span>
+<span class="nc" id="L651">            g.drawLine(x + rect[0] + rect[2], y + rect[1] + rect[3] / 2, linkX, linkY);</span>
+<span class="nc bnc" id="L652" title="All 2 branches missed.">            if (linkTarget != null) {</span>
+<span class="nc" id="L653">                Integer tr = rowOf.get(linkTarget);</span>
+<span class="nc bnc" id="L654" title="All 2 branches missed.">                if (tr != null) {</span>
+<span class="nc" id="L655">                    barRect(linkTarget, tr.intValue(), rect);</span>
+<span class="nc" id="L656">                    g.drawRect(x + rect[0] - 2, y + rect[1] - 2, rect[2] + 3, rect[3] + 3);</span>
+                }
+            }
+<span class="nc" id="L659">            return;</span>
+        }
+<span class="nc bnc" id="L661" title="All 2 branches missed.">        if (mode == PROGRESS) {</span>
+<span class="nc" id="L662">            barRect(editTask, row, rect);</span>
+<span class="nc" id="L663">            Font f = rowStyle.getFont();</span>
+<span class="nc" id="L664">            g.setFont(f);</span>
+<span class="nc" id="L665">            g.setColor(rowStyle.getFgColor());</span>
+<span class="nc" id="L666">            int px = x + rect[0] + rect[2] * editPercent / 100;</span>
+<span class="nc" id="L667">            g.fillRect(px - 1, y + rect[1] - 2, 2, rect[3] + 4);</span>
+<span class="nc" id="L668">            g.drawString(editPercent + &quot;%&quot;, px + Look.mm(1), y + rect[1] - f.getHeight());</span>
+<span class="nc" id="L669">            return;</span>
+        }
+<span class="nc" id="L671">        int x0 = x + axis.x(editStart);</span>
+<span class="nc" id="L672">        int x1 = x + axis.x(editEnd);</span>
+<span class="nc" id="L673">        int top = y + row * rowH + (rowH - barH) / 2;</span>
+<span class="nc bnc" id="L674" title="All 2 branches missed.">        if (editTask.isMilestone()) {</span>
+<span class="nc" id="L675">            Look.shadow(g, x0 - barH / 2, top, barH, barH, getLiftLevel());</span>
+<span class="nc" id="L676">            owner.getBarRenderer().paintBar(g, owner, editTask, x0 - barH / 2, top, barH, barH,</span>
+                    GanttBarRenderer.DRAGGED);
+        } else {
+<span class="nc" id="L679">            Look.shadow(g, x0, top, Math.max(2, x1 - x0), barH, getLiftLevel());</span>
+<span class="nc" id="L680">            owner.getBarRenderer().paintBar(g, owner, editTask, x0, top, Math.max(2, x1 - x0), barH,</span>
+                    GanttBarRenderer.DRAGGED);
+        }
+<span class="nc" id="L683">        Font f = rowStyle.getFont();</span>
+<span class="nc" id="L684">        g.setFont(f);</span>
+<span class="nc" id="L685">        g.setColor(rowStyle.getFgColor());</span>
+<span class="nc" id="L686">        ZoneId zone = axis.getZone();</span>
+<span class="nc" id="L687">        String s = Dates.monthDay(TimeMath.epochDay(editStart, zone)) + &quot; - &quot;</span>
+<span class="nc" id="L688">                + Dates.monthDay(TimeMath.epochDay(Math.max(editStart, editEnd - 1), zone));</span>
+<span class="nc bnc" id="L689" title="All 2 branches missed.">        g.drawString(s, x0, top - f.getHeight() &gt; y + getOffsetY() ? top - f.getHeight() : top + barH);</span>
+<span class="nc" id="L690">    }</span>
+
+    // A link leaves its predecessor, turns once or twice, and arrives at its
+    // successor from outside it, never across a bar it belongs to.
+    private void paintLinks(Graphics g, ProjectModel model, int x, int y, int firstRow, int lastRow) {
+<span class="fc" id="L695">        List&lt;TaskDependency&gt; all = model.getDependencies();</span>
+<span class="fc" id="L696">        int plain = Look.style(&quot;GanttLink&quot;).getFgColor();</span>
+<span class="fc" id="L697">        int hot = Look.style(&quot;GanttLinkCritical&quot;).getFgColor();</span>
+<span class="fc" id="L698">        boolean showCritical = owner.isShowCriticalPath();</span>
+<span class="fc" id="L699">        int stub = Look.mm(1.8f);</span>
+<span class="fc" id="L700">        int head = Math.max(3, Look.mm(1));</span>
+<span class="fc bfc" id="L701" title="All 2 branches covered.">        Object over = isPrinting() ? null : getHoverTarget();</span>
+<span class="fc" id="L702">        int strong = Look.style(&quot;GanttRow&quot;).getFgColor();</span>
+<span class="fc bfc" id="L703" title="All 2 branches covered.">        for (TaskDependency d : all) {</span>
+<span class="fc" id="L704">            Integer pr = rowOf.get(d.getPredecessor());</span>
+<span class="fc" id="L705">            Integer sr = rowOf.get(d.getSuccessor());</span>
+<span class="pc bpc" id="L706" title="2 of 4 branches missed.">            if (pr == null || sr == null) {</span>
+<span class="nc" id="L707">                continue;</span>
+            }
+<span class="fc" id="L709">            int p = pr.intValue();</span>
+<span class="fc" id="L710">            int s = sr.intValue();</span>
+<span class="pc bpc" id="L711" title="6 of 8 branches missed.">            if ((p &lt; firstRow &amp;&amp; s &lt; firstRow) || (p &gt; lastRow &amp;&amp; s &gt; lastRow)) {</span>
+<span class="nc" id="L712">                continue;</span>
+            }
+<span class="fc" id="L714">            barRect(d.getPredecessor(), p, rect);</span>
+<span class="fc" id="L715">            barRect(d.getSuccessor(), s, rect2);</span>
+<span class="pc bpc" id="L716" title="1 of 2 branches missed.">            int dirF = d.fromFinish() ? 1 : -1;</span>
+<span class="pc bpc" id="L717" title="1 of 2 branches missed.">            int dirT = d.constrainsStart() ? 1 : -1;</span>
+<span class="pc bpc" id="L718" title="1 of 2 branches missed.">            int fx = x + (d.fromFinish() ? rect[0] + rect[2] : rect[0]);</span>
+<span class="fc" id="L719">            int fy = y + rect[1] + rect[3] / 2;</span>
+<span class="pc bpc" id="L720" title="1 of 2 branches missed.">            int tx = x + (d.constrainsStart() ? rect2[0] : rect2[0] + rect2[2]);</span>
+<span class="fc" id="L721">            int ty = y + rect2[1] + rect2[3] / 2;</span>
+<span class="fc" id="L722">            int out = fx + dirF * stub;</span>
+<span class="fc" id="L723">            int in = tx - dirT * stub;</span>
+<span class="pc bpc" id="L724" title="5 of 6 branches missed.">            g.setColor(showCritical &amp;&amp; d.getPredecessor().isCritical() &amp;&amp; d.getSuccessor().isCritical() ? hot : plain);</span>
+<span class="pc bpc" id="L725" title="5 of 6 branches missed.">            if (over != null &amp;&amp; (over == d.getPredecessor() || over == d.getSuccessor())) { //NOPMD CompareObjectsWithEquals - the very task the pointer is on</span>
+                // What the task under the pointer waits for, and what waits for it.
+<span class="nc" id="L727">                g.setColor(strong);</span>
+            }
+<span class="pc bpc" id="L729" title="1 of 4 branches missed.">            if (dirF == dirT &amp;&amp; (in - out) * dirF &gt;= 0) {</span>
+<span class="fc" id="L730">                g.drawLine(fx, fy, in, fy);</span>
+<span class="fc" id="L731">                g.drawLine(in, fy, in, ty);</span>
+            } else {
+<span class="pc bpc" id="L733" title="1 of 2 branches missed.">                int mid = y + (s &gt; p ? (p + 1) * rowH : p * rowH);</span>
+<span class="fc" id="L734">                g.drawLine(fx, fy, out, fy);</span>
+<span class="fc" id="L735">                g.drawLine(out, fy, out, mid);</span>
+<span class="fc" id="L736">                g.drawLine(out, mid, in, mid);</span>
+<span class="fc" id="L737">                g.drawLine(in, mid, in, ty);</span>
+            }
+<span class="fc" id="L739">            g.drawLine(in, ty, tx, ty);</span>
+<span class="fc" id="L740">            g.fillPolygon(new int[]{tx, tx - dirT * head, tx - dirT * head}, new int[]{ty, ty - head, ty + head}, 3);</span>
+<span class="fc" id="L741">        }</span>
+<span class="fc" id="L742">    }</span>
+
+    @Override
+    protected void paintTopHeader(Graphics g, int x, int y) {
+<span class="fc" id="L746">        axis.paintHeader(g, Look.style(&quot;GanttHeader&quot;), x, y, g.getClipX(), g.getClipX() + g.getClipWidth());</span>
+<span class="fc" id="L747">    }</span>
+
+    @Override
+    protected void paintLeftHeader(Graphics g, int x, int y) {
+<span class="fc" id="L751">        Style rowStyle = Look.style(&quot;GanttRow&quot;);</span>
+<span class="fc" id="L752">        Style rowSel = Look.selected(&quot;GanttRow&quot;);</span>
+<span class="fc" id="L753">        Style summaryRow = Look.style(&quot;GanttSummaryRow&quot;);</span>
+<span class="fc" id="L754">        int cy = g.getClipY();</span>
+<span class="fc" id="L755">        int ch = g.getClipHeight();</span>
+<span class="fc" id="L756">        Look.fill(g, rowStyle, x, cy, getHeaderWidth(), ch);</span>
+<span class="fc" id="L757">        int firstRow = Math.max(0, (cy - y) / rowH);</span>
+<span class="fc" id="L758">        int lastRow = Math.min(rows.size() - 1, (cy + ch - y) / rowH);</span>
+<span class="fc" id="L759">        int indent = Look.mm(3);</span>
+<span class="fc" id="L760">        int pad = Look.mm(1.2f);</span>
+<span class="fc" id="L761">        int arrow = Look.mm(1.1f);</span>
+        // A page shows the project, not what a hand was doing to it.
+<span class="fc bfc" id="L763" title="All 2 branches covered.">        GanttTask selected = isPrinting() ? null : owner.getSelectedTask();</span>
+<span class="fc" id="L764">        int line = Look.mix(rowStyle.getBgColor(), rowStyle.getFgColor(), 25);</span>
+<span class="fc" id="L765">        boolean aa = g.isAntiAliased();</span>
+<span class="fc" id="L766">        boolean lit = hasHoverFeedback();</span>
+<span class="fc bfc" id="L767" title="All 2 branches covered.">        int hot = lit ? hoverRow(getHoverTarget()) : -1;</span>
+<span class="fc bfc" id="L768" title="All 2 branches covered.">        int cold = lit ? hoverRow(getFadingHoverTarget()) : -1;</span>
+<span class="fc bfc" id="L769" title="All 2 branches covered.">        for (int r = firstRow; r &lt;= lastRow; r++) {</span>
+<span class="fc" id="L770">            GanttTask t = rows.get(r);</span>
+<span class="fc" id="L771">            int top = y + r * rowH;</span>
+<span class="fc bfc" id="L772" title="All 2 branches covered.">            Style st = t.isSummary() ? summaryRow : rowStyle;</span>
+<span class="fc bfc" id="L773" title="All 2 branches covered.">            if (t == selected) { //NOPMD CompareObjectsWithEquals - the selection is this very object</span>
+<span class="fc" id="L774">                Look.fill(g, rowSel, x, top, getHeaderWidth(), rowH);</span>
+<span class="fc bfc" id="L775" title="All 2 branches covered.">            } else if (t.isSummary()) {</span>
+<span class="fc" id="L776">                Look.fill(g, summaryRow, x, top, getHeaderWidth(), rowH);</span>
+            }
+<span class="pc bpc" id="L778" title="1 of 2 branches missed.">            if (r == hot) {</span>
+<span class="nc" id="L779">                Look.wash(g, rowStyle.getFgColor(), x, top, getHeaderWidth(), rowH, getHoverLevel(getHoverTarget()));</span>
+<span class="fc bfc" id="L780" title="All 2 branches covered.">            } else if (r == cold) {</span>
+<span class="fc" id="L781">                Look.wash(g, rowStyle.getFgColor(), x, top, getHeaderWidth(), rowH, getHoverLevel(getFadingHoverTarget()));</span>
+            }
+<span class="fc" id="L783">            Font f = st.getFont();</span>
+<span class="fc" id="L784">            int tx = x + pad + t.getLevel() * indent;</span>
+<span class="fc" id="L785">            int mid = top + rowH / 2;</span>
+<span class="fc" id="L786">            g.setColor(st.getFgColor());</span>
+<span class="fc bfc" id="L787" title="All 2 branches covered.">            if (t.isSummary()) {</span>
+<span class="fc" id="L788">                g.setAntiAliased(true);</span>
+<span class="pc bpc" id="L789" title="1 of 2 branches missed.">                if (owner.isCollapsed(t)) {</span>
+<span class="nc" id="L790">                    g.fillPolygon(new int[]{tx, tx + arrow, tx}, new int[]{mid - arrow, mid, mid + arrow}, 3);</span>
+                } else {
+<span class="fc" id="L792">                    g.fillPolygon(new int[]{tx - arrow / 2, tx + arrow + arrow / 2, tx + arrow / 2},</span>
+                            new int[]{mid - arrow / 2, mid - arrow / 2, mid + arrow}, 3);
+                }
+<span class="fc" id="L795">                g.setAntiAliased(aa);</span>
+            }
+<span class="fc" id="L797">            tx += arrow + Look.mm(1.4f);</span>
+<span class="fc" id="L798">            g.setFont(f);</span>
+<span class="fc" id="L799">            g.drawString(Look.fit(t.getName(), f, x + nameW - tx - pad), tx, top + (rowH - f.getHeight()) / 2);</span>
+<span class="fc" id="L800">            int cxp = x + nameW;</span>
+<span class="fc bfc" id="L801" title="All 2 branches covered.">            for (int c = 0; c &lt; cols.length; c++) {</span>
+<span class="fc" id="L802">                String s = columnText(cols[c], t);</span>
+<span class="fc" id="L803">                g.drawString(s, cxp + colW[c] - f.stringWidth(s) - pad, top + (rowH - f.getHeight()) / 2);</span>
+<span class="fc" id="L804">                cxp += colW[c];</span>
+            }
+<span class="fc" id="L806">            g.setColor(line);</span>
+<span class="fc" id="L807">            g.drawLine(x, top + rowH, x + getHeaderWidth(), top + rowH);</span>
+        }
+<span class="fc" id="L809">        g.setColor(Look.mix(rowStyle.getBgColor(), rowStyle.getFgColor(), 60));</span>
+<span class="fc" id="L810">        g.drawLine(x + getHeaderWidth() - 1, cy, x + getHeaderWidth() - 1, cy + ch);</span>
+<span class="fc" id="L811">    }</span>
+
+    @Override
+    protected void paintCorner(Graphics g, int x, int y) {
+<span class="fc" id="L815">        Style header = Look.style(&quot;GanttHeader&quot;);</span>
+<span class="fc" id="L816">        Font f = header.getFont();</span>
+<span class="fc" id="L817">        Look.fill(g, header, x, y, getHeaderWidth(), getHeaderHeight());</span>
+<span class="fc" id="L818">        g.setFont(f);</span>
+<span class="fc" id="L819">        g.setColor(header.getFgColor());</span>
+<span class="fc" id="L820">        int pad = Look.mm(1.2f);</span>
+<span class="fc" id="L821">        int ty = y + getHeaderHeight() - f.getHeight() - Look.mm(0.7f);</span>
+<span class="fc" id="L822">        g.drawString(Look.fit(owner.localize(&quot;gantt.task&quot;, &quot;Task&quot;), f, nameW - 2 * pad), x + pad, ty);</span>
+<span class="fc" id="L823">        int cxp = x + nameW;</span>
+<span class="fc bfc" id="L824" title="All 2 branches covered.">        for (int c = 0; c &lt; cols.length; c++) {</span>
+<span class="fc" id="L825">            String s = columnTitle(cols[c]);</span>
+<span class="fc" id="L826">            g.drawString(s, cxp + colW[c] - f.stringWidth(s) - pad, ty);</span>
+<span class="fc" id="L827">            cxp += colW[c];</span>
+        }
+<span class="fc" id="L829">        g.setColor(Look.mix(header.getBgColor(), header.getFgColor(), 50));</span>
+<span class="fc" id="L830">        g.drawLine(x, y + getHeaderHeight() - 1, x + getHeaderWidth(), y + getHeaderHeight() - 1);</span>
+<span class="fc" id="L831">        g.drawLine(x + getHeaderWidth() - 1, y, x + getHeaderWidth() - 1, y + getHeaderHeight());</span>
+<span class="fc" id="L832">    }</span>
+
+    // ------------------------------------------------------------ pointer
+
+    // The row the pointer is in, whether it is on the bar or beside it.
+    private int hoverRow(Object key) {
+<span class="pc bpc" id="L838" title="1 of 2 branches missed.">        if (key instanceof Integer) {</span>
+<span class="nc" id="L839">            return ((Integer) key).intValue();</span>
+        }
+<span class="fc bfc" id="L841" title="All 2 branches covered.">        if (key instanceof GanttTask) {</span>
+<span class="fc" id="L842">            Integer r = rowOf.get(key);</span>
+<span class="pc bpc" id="L843" title="1 of 2 branches missed.">            return r == null ? -1 : r.intValue();</span>
+        }
+<span class="fc" id="L845">        return -1;</span>
+    }
+
+    // That row lit from edge to edge: the table and the chart are one row.
+    private void paintRowHover(Graphics g, int x, int y, int w, int rgb) {
+<span class="fc bfc" id="L850" title="All 2 branches covered.">        if (!hasHoverFeedback()) {</span>
+<span class="fc" id="L851">            return;</span>
+        }
+<span class="fc" id="L853">        Object now = getHoverTarget();</span>
+<span class="fc" id="L854">        Object was = getFadingHoverTarget();</span>
+<span class="fc" id="L855">        int r = hoverRow(now);</span>
+<span class="pc bpc" id="L856" title="3 of 4 branches missed.">        if (r &gt;= 0 &amp;&amp; r &lt; rows.size()) {</span>
+<span class="nc" id="L857">            Look.wash(g, rgb, x, y + r * rowH, w, rowH, getHoverLevel(now));</span>
+        }
+<span class="fc" id="L859">        int old = hoverRow(was);</span>
+<span class="pc bpc" id="L860" title="3 of 6 branches missed.">        if (old &gt;= 0 &amp;&amp; old &lt; rows.size() &amp;&amp; old != r) {</span>
+<span class="fc" id="L861">            Look.wash(g, rgb, x, y + old * rowH, w, rowH, getHoverLevel(was));</span>
+        }
+<span class="fc" id="L863">    }</span>
+
+    @Override
+    protected void hoverAt(int x, int y) {
+<span class="fc" id="L867">        int r = rowAt(y);</span>
+<span class="pc bpc" id="L868" title="3 of 6 branches missed.">        if (r &lt; 0 || x &lt; 0 || x &gt;= getWidth()) {</span>
+<span class="nc" id="L869">            setHoverTarget(null, DEFAULT_CURSOR);</span>
+<span class="nc" id="L870">            return;</span>
+        }
+<span class="pc bpc" id="L872" title="1 of 2 branches missed.">        if (x &lt; getHeaderWidth()) {</span>
+            // A click on the table picks the task or folds its children.
+<span class="nc" id="L874">            setHoverTarget(Integer.valueOf(r), HAND_CURSOR);</span>
+<span class="nc" id="L875">            return;</span>
+        }
+<span class="fc" id="L877">        int cx = x - getHeaderWidth() + getOffsetX();</span>
+<span class="fc" id="L878">        int cy = y - getHeaderHeight() + getOffsetY();</span>
+<span class="fc" id="L879">        boolean edits = owner.isEditable();</span>
+<span class="fc" id="L880">        GanttTask sel = owner.getSelectedTask();</span>
+<span class="fc bfc" id="L881" title="All 2 branches covered.">        Integer selRow = sel == null ? null : rowOf.get(sel);</span>
+<span class="pc bpc" id="L882" title="3 of 8 branches missed.">        if (edits &amp;&amp; sel != null &amp;&amp; selRow != null &amp;&amp; !sel.isSummary()) {</span>
+            // The two handles of the selected task, as beginEdit reads them.
+<span class="fc" id="L884">            barRect(sel, selRow.intValue(), rect);</span>
+<span class="fc" id="L885">            int reach = Look.mm(2.6f);</span>
+<span class="pc bpc" id="L886" title="1 of 2 branches missed.">            if (Math.abs(cx - (rect[0] + rect[2] + Look.mm(2.2f))) &lt;= reach</span>
+<span class="pc bpc" id="L887" title="1 of 2 branches missed.">                    &amp;&amp; Math.abs(cy - (rect[1] + rect[3] / 2)) &lt;= reach) {</span>
+<span class="fc" id="L888">                setHoverTarget(sel, CROSSHAIR_CURSOR);</span>
+<span class="fc" id="L889">                return;</span>
+            }
+<span class="nc" id="L891">            int px = rect[0] + rect[2] * sel.getPercentComplete() / 100;</span>
+<span class="nc bnc" id="L892" title="All 8 branches missed.">            if (!sel.isMilestone() &amp;&amp; Math.abs(cx - px) &lt;= reach &amp;&amp; cy &gt;= rect[1] + rect[3] / 2</span>
+                    &amp;&amp; cy &lt;= rect[1] + rect[3] + reach) {
+<span class="nc" id="L894">                setHoverTarget(sel, E_RESIZE_CURSOR);</span>
+<span class="nc" id="L895">                return;</span>
+            }
+        }
+<span class="fc" id="L898">        GanttTask t = barAt(x, y);</span>
+<span class="fc bfc" id="L899" title="All 2 branches covered.">        if (t == null) {</span>
+<span class="fc" id="L900">            setHoverTarget(Integer.valueOf(r), DEFAULT_CURSOR);</span>
+<span class="fc" id="L901">            setHoverTooltip(null);</span>
+<span class="fc" id="L902">            return;</span>
+        }
+<span class="fc" id="L904">        ZoneId zone = axis.getZone();</span>
+<span class="fc" id="L905">        setHoverTooltip(t.getName() + &quot;, &quot; + Dates.monthDay(TimeMath.epochDay(t.getStart(), zone)) + &quot; - &quot;</span>
+<span class="fc" id="L906">                + Dates.monthDay(TimeMath.epochDay(Math.max(t.getStart(), t.getEnd() - 1), zone)) + &quot;, &quot;</span>
+<span class="fc" id="L907">                + t.getPercentComplete() + &quot;%&quot;);</span>
+<span class="fc" id="L908">        int cursor = HAND_CURSOR;</span>
+<span class="pc bpc" id="L909" title="2 of 6 branches missed.">        if (edits &amp;&amp; isDragEdits() &amp;&amp; !t.isSummary()) {</span>
+<span class="fc" id="L910">            barRect(t, r, rect);</span>
+<span class="fc" id="L911">            int edge = Math.min(rect[2] / 3, Look.mm(1.6f));</span>
+<span class="pc bpc" id="L912" title="1 of 4 branches missed.">            cursor = !t.isMilestone() &amp;&amp; rect[0] + rect[2] - cx &lt;= edge ? E_RESIZE_CURSOR : MOVE_CURSOR;</span>
+        }
+<span class="fc" id="L914">        setHoverTarget(t, cursor);</span>
+<span class="fc" id="L915">    }</span>
+
+    private int rowAt(int py) {
+<span class="fc" id="L918">        int r = (py - getHeaderHeight() + getOffsetY()) / Math.max(1, rowH);</span>
+<span class="pc bpc" id="L919" title="3 of 6 branches missed.">        return py &lt; getHeaderHeight() || r &lt; 0 || r &gt;= rows.size() ? -1 : r;</span>
+    }
+
+    /// The task whose bar is at a point of the component, or null.
+    GanttTask barAt(int px, int py) {
+<span class="fc" id="L924">        int r = rowAt(py);</span>
+<span class="pc bpc" id="L925" title="2 of 4 branches missed.">        if (r &lt; 0 || px &lt; getHeaderWidth()) {</span>
+<span class="nc" id="L926">            return null;</span>
+        }
+<span class="fc" id="L928">        GanttTask t = rows.get(r);</span>
+<span class="fc" id="L929">        barRect(t, r, rect);</span>
+<span class="fc" id="L930">        int cx = px - getHeaderWidth() + getOffsetX();</span>
+<span class="fc" id="L931">        int slack = Math.max(0, (Look.mm(2.5f) - rect[2]) / 2);</span>
+<span class="pc bpc" id="L932" title="1 of 4 branches missed.">        return cx &gt;= rect[0] - slack &amp;&amp; cx &lt; rect[0] + rect[2] + slack ? t : null;</span>
+    }
+
+    private long snapEnd(long time) {
+<span class="fc" id="L936">        ProjectModel model = owner.getModel();</span>
+<span class="fc" id="L937">        ZoneId zone = axis.getZone();</span>
+        long t;
+<span class="pc bpc" id="L939" title="1 of 2 branches missed.">        if (axis.snapsToDays()) {</span>
+<span class="fc" id="L940">            t = TimeMath.startOfDay(time + TimeMath.DAY / 2, zone);</span>
+        } else {
+<span class="nc" id="L942">            long day = TimeMath.epochDay(time, zone);</span>
+<span class="nc" id="L943">            int m = (TimeMath.minuteOfDay(time, zone) + 7) / 15 * 15;</span>
+<span class="nc" id="L944">            t = TimeMath.at(day, Math.min(TimeMath.MINUTES_PER_DAY, m), zone);</span>
+        }
+<span class="fc" id="L946">        return model.getCalendar().previousWorkingTime(t);</span>
+    }
+
+    @Override
+    protected boolean editStarted(int x, int y, EditTrigger trigger) {
+<span class="pc bpc" id="L951" title="1 of 2 branches missed.">        boolean handlesOnly = trigger == EditTrigger.HANDLE_DRAG;</span>
+<span class="fc" id="L952">        ProjectModel model = owner.getModel();</span>
+<span class="pc bpc" id="L953" title="3 of 8 branches missed.">        if (!owner.isEditable() || model == null || x &lt; getHeaderWidth() || y &lt; getHeaderHeight()) {</span>
+<span class="fc" id="L954">            return false;</span>
+        }
+<span class="fc" id="L956">        int cx = x - getHeaderWidth() + getOffsetX();</span>
+<span class="fc" id="L957">        int cy = y - getHeaderHeight() + getOffsetY();</span>
+<span class="fc" id="L958">        GanttTask sel = owner.getSelectedTask();</span>
+<span class="fc bfc" id="L959" title="All 2 branches covered.">        Integer selRow = sel == null ? null : rowOf.get(sel);</span>
+<span class="pc bpc" id="L960" title="2 of 6 branches missed.">        if (sel != null &amp;&amp; selRow != null &amp;&amp; !sel.isSummary()) {</span>
+<span class="fc" id="L961">            barRect(sel, selRow.intValue(), rect);</span>
+<span class="fc" id="L962">            int reach = Look.mm(2.6f);</span>
+<span class="fc" id="L963">            int lx = rect[0] + rect[2] + Look.mm(2.2f);</span>
+<span class="fc" id="L964">            int ly = rect[1] + rect[3] / 2;</span>
+<span class="pc bpc" id="L965" title="1 of 4 branches missed.">            if (Math.abs(cx - lx) &lt;= reach &amp;&amp; Math.abs(cy - ly) &lt;= reach) {</span>
+<span class="fc" id="L966">                mode = LINK;</span>
+<span class="fc" id="L967">                editTask = sel;</span>
+<span class="fc" id="L968">                linkTarget = null;</span>
+<span class="fc" id="L969">                linkProbe = null;</span>
+<span class="fc" id="L970">                return true;</span>
+            }
+<span class="fc" id="L972">            int px = rect[0] + rect[2] * sel.getPercentComplete() / 100;</span>
+<span class="pc bpc" id="L973" title="3 of 8 branches missed.">            if (!sel.isMilestone() &amp;&amp; Math.abs(cx - px) &lt;= reach &amp;&amp; cy &gt;= rect[1] + rect[3] / 2</span>
+                    &amp;&amp; cy &lt;= rect[1] + rect[3] + reach) {
+<span class="fc" id="L975">                mode = PROGRESS;</span>
+<span class="fc" id="L976">                editTask = sel;</span>
+<span class="fc" id="L977">                editPercent = sel.getPercentComplete();</span>
+<span class="fc" id="L978">                return true;</span>
+            }
+        }
+<span class="fc" id="L981">        GanttTask t = barAt(x, y);</span>
+<span class="pc bpc" id="L982" title="2 of 4 branches missed.">        if (t == null || t.isSummary()) {</span>
+<span class="nc" id="L983">            return false;</span>
+        }
+<span class="fc" id="L985">        barRect(t, rowOf.get(t).intValue(), rect);</span>
+<span class="pc bpc" id="L986" title="1 of 2 branches missed.">        int edge = Math.min(rect[2] / 3, Look.mm(handlesOnly ? 3f : 1.6f));</span>
+<span class="pc bpc" id="L987" title="1 of 4 branches missed.">        boolean right = !t.isMilestone() &amp;&amp; rect[0] + rect[2] - cx &lt;= edge;</span>
+<span class="pc bpc" id="L988" title="5 of 6 branches missed.">        if (handlesOnly &amp;&amp; (t != sel || !right)) { //NOPMD CompareObjectsWithEquals - the selection is this very object</span>
+<span class="nc" id="L989">            return false;</span>
+        }
+<span class="fc bfc" id="L991" title="All 2 branches covered.">        mode = right ? RESIZE_END : MOVE;</span>
+<span class="fc" id="L992">        editTask = t;</span>
+<span class="fc" id="L993">        editStart = t.getStart();</span>
+<span class="fc" id="L994">        editEnd = t.getEnd();</span>
+<span class="fc" id="L995">        grabTime = axis.time(cx);</span>
+<span class="fc" id="L996">        owner.viewSelected(t);</span>
+<span class="fc" id="L997">        return true;</span>
+    }
+
+    @Override
+    protected void editMoved(int x, int y) {
+<span class="pc bpc" id="L1002" title="1 of 2 branches missed.">        if (mode == 0) {</span>
+<span class="nc" id="L1003">            return;</span>
+        }
+<span class="fc bfc" id="L1005" title="All 2 branches covered.">        if (editGone()) {</span>
+<span class="fc" id="L1006">            cancelEdit();</span>
+<span class="fc" id="L1007">            return;</span>
+        }
+<span class="fc" id="L1009">        ProjectModel model = owner.getModel();</span>
+<span class="fc" id="L1010">        int cx = Math.max(0, Math.min(getContentWidth(), x - getHeaderWidth() + getOffsetX()));</span>
+<span class="fc" id="L1011">        long pointer = axis.time(cx);</span>
+<span class="fc bfc" id="L1012" title="All 2 branches covered.">        if (mode == MOVE) {</span>
+<span class="fc" id="L1013">            editStart = movedStart(editTask, pointer - grabTime);</span>
+            // A task with dates of its own keeps the span it was given; it
+            // has no duration the calendar could lay out again.
+<span class="fc bfc" id="L1016" title="All 2 branches covered.">            editEnd = editStart == editTask.getStart() ? editTask.getEnd()</span>
+<span class="fc bfc" id="L1017" title="All 2 branches covered.">                    : editTask.isManuallyScheduled() ? editStart + (editTask.getEnd() - editTask.getStart())</span>
+<span class="fc" id="L1018">                    : model.getCalendar().addWorkingTime(editStart, editTask.getDuration());</span>
+<span class="fc bfc" id="L1019" title="All 2 branches covered.">        } else if (mode == RESIZE_END) {</span>
+<span class="pc bpc" id="L1020" title="1 of 2 branches missed.">            long least = model.getCalendar().addWorkingTime(editStart, axis.snapsToDays()</span>
+<span class="pc" id="L1021">                    ? Math.min(model.getCalendar().getMillisPerDay(), TimeMath.DAY) : 15 * TimeMath.MINUTE);</span>
+<span class="fc" id="L1022">            editEnd = Math.max(least, snapEnd(pointer));</span>
+<span class="fc bfc" id="L1023" title="All 2 branches covered.">        } else if (mode == PROGRESS) {</span>
+<span class="fc" id="L1024">            barRect(editTask, rowOf.get(editTask).intValue(), rect);</span>
+<span class="fc" id="L1025">            editPercent = Math.max(0, Math.min(100, (cx - rect[0]) * 100 / Math.max(1, rect[2])));</span>
+            // Whole fives are what a hand means.
+<span class="fc" id="L1027">            editPercent = (editPercent + 2) / 5 * 5;</span>
+        } else {
+<span class="fc" id="L1029">            linkX = getX() + x;</span>
+<span class="fc" id="L1030">            linkY = getY() + y;</span>
+<span class="fc" id="L1031">            GanttTask t = barAt(x, y);</span>
+            // Asking whether a link would close a loop orders the whole
+            // project, so it is asked once for each bar the pointer comes to.
+<span class="fc bfc" id="L1034" title="All 2 branches covered.">            if (t != linkProbe) { //NOPMD CompareObjectsWithEquals - the bar under the pointer last time</span>
+<span class="fc" id="L1035">                linkProbe = t;</span>
+<span class="pc bpc" id="L1036" title="1 of 6 branches missed.">                linkTarget = t != null &amp;&amp; t != editTask &amp;&amp; model.canLink(editTask, t) ? t : null; //NOPMD CompareObjectsWithEquals</span>
+            }
+        }
+<span class="fc" id="L1039">    }</span>
+
+    @Override
+    protected void editEnded(boolean commit) {
+<span class="fc" id="L1043">        int m = mode;</span>
+<span class="fc" id="L1044">        GanttTask t = editTask;</span>
+<span class="fc" id="L1045">        mode = 0;</span>
+<span class="fc" id="L1046">        editTask = null;</span>
+<span class="fc" id="L1047">        ProjectModel model = owner.getModel();</span>
+<span class="pc bpc" id="L1048" title="3 of 8 branches missed.">        if (!commit || t == null || model == null || !model.contains(t)) {</span>
+<span class="fc" id="L1049">            linkTarget = null;</span>
+<span class="fc" id="L1050">            return;</span>
+        }
+<span class="fc bfc" id="L1052" title="All 2 branches covered.">        if (m == LINK) {</span>
+            // Asked once more, and before the listeners are: the project
+            // changing under the pointer may have made the link one that
+            // cannot be, and a listener is not asked about one of those.
+<span class="pc bpc" id="L1056" title="2 of 6 branches missed.">            if (linkTarget != null &amp;&amp; model.canLink(t, linkTarget) &amp;&amp; owner.viewLinking(t, linkTarget)) {</span>
+<span class="fc" id="L1057">                beginReflow();</span>
+<span class="fc" id="L1058">                model.link(t, linkTarget);</span>
+<span class="fc" id="L1059">                model.update();</span>
+            }
+<span class="fc" id="L1061">            linkTarget = null;</span>
+<span class="fc bfc" id="L1062" title="All 2 branches covered.">        } else if (m == PROGRESS) {</span>
+            // Progress is a change like a new date, so it is offered the
+            // same way, with the dates the task keeps.
+<span class="pc bpc" id="L1065" title="1 of 4 branches missed.">            if (editPercent != t.getPercentComplete() &amp;&amp; owner.viewChanging(t, t.getStart(), t.getEnd())) {</span>
+<span class="fc" id="L1066">                t.setPercentComplete(editPercent);</span>
+<span class="fc" id="L1067">                model.update();</span>
+<span class="fc" id="L1068">                owner.viewChanged(t);</span>
+            }
+<span class="fc bfc" id="L1070" title="All 2 branches covered.">        } else if (m == MOVE) {</span>
+<span class="fc bfc" id="L1071" title="All 4 branches covered.">            if (editStart != t.getStart() &amp;&amp; owner.viewChanging(t, editStart, editEnd)) {</span>
+<span class="fc" id="L1072">                beginReflow(t, editStart, editEnd);</span>
+<span class="fc bfc" id="L1073" title="All 2 branches covered.">                if (t.isManuallyScheduled()) {</span>
+<span class="fc" id="L1074">                    t.setDates(editStart, editEnd);</span>
+                } else {
+                    // A task that is scheduled goes where it is put only as
+                    // far as its links allow, so the drag is a constraint.
+                    // A constraint that places the task keeps its kind and
+                    // takes the new date. One that only says how late the
+                    // task may be places nothing, so a task that has it, or
+                    // none, is held from starting earlier: the bar has to
+                    // end up where it was put.
+<span class="fc" id="L1083">                    GanttTask.Constraint c = t.getConstraint();</span>
+<span class="fc bfc" id="L1084" title="All 2 branches covered.">                    if (c == GanttTask.Constraint.MUST_START_ON) {</span>
+<span class="fc" id="L1085">                        t.setConstraint(c, editStart);</span>
+<span class="pc bpc" id="L1086" title="2 of 4 branches missed.">                    } else if (c == GanttTask.Constraint.MUST_FINISH_ON</span>
+                            || c == GanttTask.Constraint.FINISH_NO_EARLIER_THAN) {
+<span class="nc" id="L1088">                        t.setConstraint(c, editEnd);</span>
+                    } else {
+<span class="fc" id="L1090">                        t.setConstraint(GanttTask.Constraint.START_NO_EARLIER_THAN, editStart);</span>
+                    }
+                }
+<span class="fc" id="L1093">                model.update();</span>
+<span class="fc" id="L1094">                owner.viewChanged(t);</span>
+            }
+<span class="pc bpc" id="L1096" title="2 of 4 branches missed.">        } else if (editEnd != t.getEnd() &amp;&amp; owner.viewChanging(t, editStart, editEnd)) {</span>
+<span class="fc" id="L1097">            beginReflow(t, t.getStart(), editEnd);</span>
+<span class="fc" id="L1098">            long work = Math.max(TimeMath.MINUTE, model.getCalendar().workingTimeBetween(t.getStart(), editEnd));</span>
+<span class="pc bpc" id="L1099" title="1 of 2 branches missed.">            if (t.isManuallyScheduled()) {</span>
+<span class="nc" id="L1100">                t.setDates(t.getStart(), editEnd);</span>
+            }
+<span class="fc" id="L1102">            t.setDuration(work);</span>
+<span class="fc" id="L1103">            model.update();</span>
+<span class="fc" id="L1104">            owner.viewChanged(t);</span>
+        }
+<span class="fc" id="L1106">    }</span>
+
+    @Override
+    protected void tapped(int x, int y, boolean doubleTap) {
+<span class="fc" id="L1110">        int r = rowAt(y);</span>
+<span class="pc bpc" id="L1111" title="1 of 2 branches missed.">        if (r &lt; 0) {</span>
+<span class="nc" id="L1112">            return;</span>
+        }
+<span class="fc" id="L1114">        GanttTask t = rows.get(r);</span>
+<span class="fc bfc" id="L1115" title="All 2 branches covered.">        if (x &lt; getHeaderWidth()) {</span>
+<span class="fc" id="L1116">            int toggle = Look.mm(1.2f) + t.getLevel() * Look.mm(3) + Look.mm(4.5f);</span>
+<span class="pc bpc" id="L1117" title="1 of 4 branches missed.">            if (t.isSummary() &amp;&amp; x &lt;= toggle) {</span>
+<span class="pc bpc" id="L1118" title="1 of 2 branches missed.">                owner.setCollapsed(t, !owner.isCollapsed(t));</span>
+<span class="fc" id="L1119">                return;</span>
+            }
+<span class="fc" id="L1121">            owner.viewSelected(t);</span>
+<span class="pc bpc" id="L1122" title="1 of 2 branches missed.">            if (doubleTap) {</span>
+<span class="nc" id="L1123">                scrollToTask(t);</span>
+<span class="nc" id="L1124">                owner.viewOpened(t);</span>
+            }
+<span class="fc" id="L1126">            return;</span>
+        }
+<span class="fc" id="L1128">        GanttTask bar = barAt(x, y);</span>
+<span class="fc" id="L1129">        owner.viewSelected(bar);</span>
+<span class="pc bpc" id="L1130" title="1 of 4 branches missed.">        if (bar != null &amp;&amp; doubleTap) {</span>
+<span class="fc" id="L1131">            owner.viewOpened(bar);</span>
+        }
+<span class="fc" id="L1133">    }</span>
+
+    @Override
+    protected boolean zoomBy(float factor, int x, int y) {
+<span class="fc" id="L1137">        double before = axis.getMillisPerPixel();</span>
+<span class="fc" id="L1138">        long t = axis.time(x - getHeaderWidth() + getOffsetX());</span>
+<span class="fc" id="L1139">        axis.setMillisPerPixel(before / factor);</span>
+<span class="pc bpc" id="L1140" title="1 of 2 branches missed.">        if (Math.abs(axis.getMillisPerPixel() - before) &lt; before * 0.0001) {</span>
+<span class="nc" id="L1141">            return false;</span>
+        }
+<span class="fc" id="L1143">        axis.pickUnits(Look.style(&quot;GanttHeader&quot;).getFont().stringWidth(&quot;Www 00&quot;) + Look.mm(2));</span>
+<span class="fc" id="L1144">        setOffsets(axis.x(t) - (x - getHeaderWidth()), getOffsetY());</span>
+<span class="pc bpc" id="L1145" title="1 of 2 branches missed.">        if (load != null) {</span>
+<span class="fc" id="L1146">            load.chartChanged();</span>
+        }
+<span class="fc" id="L1148">        repaint();</span>
+<span class="fc" id="L1149">        return true;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

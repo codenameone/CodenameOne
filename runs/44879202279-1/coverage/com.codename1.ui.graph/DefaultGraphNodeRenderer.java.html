@@ -1,0 +1,234 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DefaultGraphNodeRenderer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.graph</a> &gt; <span class="el_source">DefaultGraphNodeRenderer.java</span></div><h1>DefaultGraphNodeRenderer.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ui.graph;
+
+import com.codename1.graph.GraphNode;
+import com.codename1.graph.GraphPort;
+import com.codename1.ui.Font;
+import com.codename1.ui.Graphics;
+import com.codename1.ui.geom.GeneralPath;
+import com.codename1.ui.plaf.Style;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/// Paints a node as a rounded card: a coloured strip on the leading edge,
+/// the label, the description under it, and the ports on the sides with
+/// their labels inside the card.
+///
+/// Colours come from the `NodeGraphNode` UIID (background, text) and
+/// `NodeGraphNodeSelected` (the outline of a selected node), ports from
+/// `NodeGraphPort`. A node's style key picks its strip colour from
+/// `setAccent`; a node without one uses the selection colour.
+<span class="fc" id="L44">public class DefaultGraphNodeRenderer implements GraphNodeRenderer {</span>
+<span class="fc" id="L45">    private final Map&lt;String, Integer&gt; accents = new HashMap&lt;String, Integer&gt;();</span>
+<span class="fc" id="L46">    private final GeneralPath path = new GeneralPath();</span>
+
+    /// Maps a node style key to the colour of its strip and its ports.
+    public void setAccent(String styleKey, int rgb) {
+<span class="nc" id="L50">        accents.put(styleKey, Integer.valueOf(rgb));</span>
+<span class="nc" id="L51">    }</span>
+
+    /// The colour of a style key, or `fallback` when none was set.
+    public int getAccent(String styleKey, int fallback) {
+<span class="fc bfc" id="L55" title="All 2 branches covered.">        Integer c = styleKey == null ? null : accents.get(styleKey);</span>
+<span class="pc bpc" id="L56" title="1 of 2 branches missed.">        return c == null ? fallback : c.intValue();</span>
+    }
+
+    @Override
+    public void paintNode(Graphics g, NodeGraph graph, GraphNode node, int x, int y, int w, int h, boolean selected) {
+<span class="fc" id="L61">        Style s = GraphLook.style(&quot;NodeGraphNode&quot;);</span>
+<span class="fc" id="L62">        Style sel = GraphLook.style(&quot;NodeGraphNodeSelected&quot;);</span>
+<span class="fc" id="L63">        int bg = GraphLook.bg(s, 0xffffff);</span>
+<span class="fc" id="L64">        int fg = s.getFgColor();</span>
+<span class="fc" id="L65">        int primary = sel.getFgColor();</span>
+<span class="fc" id="L66">        int accent = getAccent(node.getStyleKey(), primary);</span>
+<span class="fc" id="L67">        float zoom = graph.getZoom();</span>
+<span class="fc" id="L68">        int arc = Math.max(2, Math.round(GraphLook.mm(1.6f) * Math.min(zoom, 1.5f)));</span>
+<span class="pc bpc" id="L69" title="1 of 2 branches missed.">        boolean detail = zoom &gt;= graph.getDetailZoom();</span>
+<span class="fc" id="L70">        GraphShape shape = GraphShapeRegistry.get(node.getShape());</span>
+<span class="pc bpc" id="L71" title="1 of 4 branches missed.">        if (shape != null &amp;&amp; g.isShapeSupported()) {</span>
+<span class="nc" id="L72">            paintShape(g, graph, node, shape, x, y, w, h, selected);</span>
+<span class="nc" id="L73">            return;</span>
+        }
+<span class="pc bpc" id="L75" title="1 of 2 branches missed.">        if (detail) {</span>
+<span class="fc bfc" id="L76" title="All 2 branches covered.">            GraphLook.shadow(g, x, y, w, h, arc, selected ? 1f : 0.6f);</span>
+        }
+<span class="fc" id="L78">        g.setColor(bg);</span>
+<span class="fc" id="L79">        g.fillRoundRect(x, y, w, h, arc, arc);</span>
+<span class="fc" id="L80">        int strip = Math.max(2, Math.round(GraphLook.mm(0.8f) * Math.min(zoom, 1.5f)));</span>
+<span class="fc" id="L81">        g.setColor(accent);</span>
+<span class="fc" id="L82">        g.fillRoundRect(x, y, strip * 2, h, arc, arc);</span>
+<span class="fc" id="L83">        g.setColor(bg);</span>
+<span class="fc" id="L84">        g.fillRect(x + strip, y, strip, h);</span>
+<span class="fc bfc" id="L85" title="All 2 branches covered.">        g.setColor(selected ? primary : GraphLook.mix(bg, fg, 50));</span>
+<span class="fc" id="L86">        g.drawRoundRect(x, y, w - 1, h - 1, arc, arc);</span>
+<span class="fc bfc" id="L87" title="All 2 branches covered.">        if (selected) {</span>
+<span class="fc" id="L88">            g.drawRoundRect(x + 1, y + 1, w - 3, h - 3, arc, arc);</span>
+        }
+<span class="pc bpc" id="L90" title="1 of 2 branches missed.">        if (detail) {</span>
+<span class="fc" id="L91">            paintText(g, graph, node, x + strip * 2, y, w - strip * 2, h, fg, bg);</span>
+        }
+<span class="fc bfc" id="L93" title="All 2 branches covered.">        if (node.hasPorts()) {</span>
+<span class="fc" id="L94">            paintPorts(g, graph, node, bg, fg, detail);</span>
+        }
+<span class="fc" id="L96">    }</span>
+
+    /// Paints a node that has an outline of its own: the outline filled, a
+    /// tint of the node's accent when its style key has one, and the label in
+    /// the middle.
+    private void paintShape(Graphics g, NodeGraph graph, GraphNode node, GraphShape shape,
+            int x, int y, int w, int h, boolean selected) {
+<span class="nc" id="L103">        Style s = GraphLook.style(&quot;NodeGraphNode&quot;);</span>
+<span class="nc" id="L104">        int bg = GraphLook.bg(s, 0xffffff);</span>
+<span class="nc" id="L105">        int fg = s.getFgColor();</span>
+<span class="nc" id="L106">        int primary = GraphLook.style(&quot;NodeGraphNodeSelected&quot;).getFgColor();</span>
+<span class="nc bnc" id="L107" title="All 2 branches missed.">        Integer accent = node.getStyleKey() == null ? null : accents.get(node.getStyleKey());</span>
+<span class="nc" id="L108">        float zoom = graph.getZoom();</span>
+<span class="nc bnc" id="L109" title="All 2 branches missed.">        boolean detail = zoom &gt;= graph.getDetailZoom();</span>
+<span class="nc bnc" id="L110" title="All 2 branches missed.">        int fill = accent == null ? bg : GraphLook.mix(bg, accent.intValue(), 45);</span>
+<span class="nc bnc" id="L111" title="All 4 branches missed.">        int line = selected ? primary : accent == null ? GraphLook.mix(bg, fg, 130) : accent.intValue();</span>
+<span class="nc bnc" id="L112" title="All 2 branches missed.">        float width = Math.max(1f, GraphLook.mm(0.3f) * Math.min(zoom, 1.5f)) * (selected ? 1.8f : 1f);</span>
+<span class="nc" id="L113">        path.reset();</span>
+<span class="nc" id="L114">        shape.outline(path, x, y, w - 1, h - 1);</span>
+<span class="nc" id="L115">        g.setColor(fill);</span>
+<span class="nc" id="L116">        g.fillShape(path);</span>
+<span class="nc" id="L117">        g.setColor(line);</span>
+<span class="nc" id="L118">        g.drawShape(path, GraphLook.stroke(width));</span>
+<span class="nc" id="L119">        path.reset();</span>
+<span class="nc" id="L120">        shape.detail(path, x, y, w - 1, h - 1);</span>
+<span class="nc bnc" id="L121" title="All 2 branches missed.">        if (path.getPointsSize() &gt; 0) {</span>
+<span class="nc bnc" id="L122" title="All 2 branches missed.">            g.drawShape(path, GraphLook.stroke(Math.max(1f, width / (selected ? 1.8f : 1f))));</span>
+        }
+<span class="nc bnc" id="L124" title="All 4 branches missed.">        if (detail &amp;&amp; node.getLabel() != null) {</span>
+<span class="nc" id="L125">            Font f = GraphLook.font(&quot;NodeGraphNode&quot;, zoom);</span>
+<span class="nc" id="L126">            g.setFont(f);</span>
+            // a diamond or an ellipse is narrower than its bounds where the text is
+<span class="nc" id="L128">            int room = Math.max(1, w * 3 / 4);</span>
+<span class="nc" id="L129">            String label = GraphLook.fit(node.getLabel(), f, room);</span>
+<span class="nc bnc" id="L130" title="All 4 branches missed.">            String more = node.hasPorts() || node.getDescription() == null ? null</span>
+<span class="nc" id="L131">                    : GraphLook.fit(node.getDescription(), f, room);</span>
+<span class="nc bnc" id="L132" title="All 2 branches missed.">            int th = more == null ? f.getHeight() : f.getHeight() * 2;</span>
+<span class="nc" id="L133">            int ty = y + (h - th) / 2;</span>
+<span class="nc" id="L134">            g.setColor(fg);</span>
+<span class="nc" id="L135">            g.drawString(label, x + (w - f.stringWidth(label)) / 2, ty);</span>
+<span class="nc bnc" id="L136" title="All 2 branches missed.">            if (more != null) {</span>
+<span class="nc" id="L137">                g.setColor(GraphLook.mix(fill, fg, 150));</span>
+<span class="nc" id="L138">                g.drawString(more, x + (w - f.stringWidth(more)) / 2, ty + f.getHeight());</span>
+            }
+        }
+<span class="nc bnc" id="L141" title="All 2 branches missed.">        if (node.hasPorts()) {</span>
+<span class="nc" id="L142">            paintPorts(g, graph, node, bg, fg, detail);</span>
+        }
+<span class="nc" id="L144">    }</span>
+
+    private void paintText(Graphics g, NodeGraph graph, GraphNode node, int x, int y, int w, int h, int fg, int bg) {
+<span class="fc" id="L147">        Font f = GraphLook.font(&quot;NodeGraphNode&quot;, graph.getZoom());</span>
+<span class="fc" id="L148">        int pad = GraphLook.mm(1.2f, graph.getZoom());</span>
+<span class="fc" id="L149">        int titleH = graph.headerHeightOnScreen();</span>
+        int ty;
+<span class="fc bfc" id="L151" title="All 2 branches covered.">        if (node.hasPorts()) {</span>
+<span class="fc" id="L152">            ty = y + (titleH - f.getHeight()) / 2;</span>
+<span class="pc bpc" id="L153" title="1 of 2 branches missed.">        } else if (node.getDescription() != null) {</span>
+<span class="nc" id="L154">            ty = y + (h - f.getHeight() * 2) / 2;</span>
+        } else {
+<span class="fc" id="L156">            ty = y + (h - f.getHeight()) / 2;</span>
+        }
+<span class="fc" id="L158">        g.setFont(f);</span>
+<span class="fc" id="L159">        g.setColor(fg);</span>
+<span class="fc" id="L160">        g.drawString(GraphLook.fit(node.getLabel(), f, w - pad * 2), x + pad, ty);</span>
+<span class="pc bpc" id="L161" title="3 of 4 branches missed.">        if (node.getDescription() != null &amp;&amp; !node.hasPorts()) {</span>
+<span class="nc" id="L162">            g.setColor(GraphLook.mix(bg, fg, 150));</span>
+<span class="nc" id="L163">            g.drawString(GraphLook.fit(node.getDescription(), f, w - pad * 2), x + pad, ty + f.getHeight());</span>
+        }
+<span class="fc bfc" id="L165" title="All 2 branches covered.">        if (node.hasPorts()) {</span>
+<span class="fc" id="L166">            g.setColor(GraphLook.mix(bg, fg, 40));</span>
+<span class="fc" id="L167">            g.drawLine(x, y + titleH, x + w - pad, y + titleH);</span>
+        }
+<span class="fc" id="L169">    }</span>
+
+    private void paintPorts(Graphics g, NodeGraph graph, GraphNode node, int bg, int fg, boolean detail) {
+<span class="fc" id="L172">        Style ps = GraphLook.style(&quot;NodeGraphPort&quot;);</span>
+<span class="fc" id="L173">        int portColor = ps.getFgColor();</span>
+<span class="fc" id="L174">        int r = graph.portRadiusOnScreen();</span>
+<span class="fc" id="L175">        Font f = GraphLook.font(&quot;NodeGraphPort&quot;, graph.getZoom());</span>
+<span class="fc" id="L176">        int pad = GraphLook.mm(1.5f, graph.getZoom()) + r;</span>
+<span class="fc" id="L177">        List&lt;GraphPort&gt; ins = node.getInputs();</span>
+<span class="fc" id="L178">        List&lt;GraphPort&gt; outs = node.getOutputs();</span>
+<span class="fc bfc" id="L179" title="All 2 branches covered.">        for (int pass = 0; pass &lt; 2; pass++) {</span>
+<span class="fc bfc" id="L180" title="All 2 branches covered.">            List&lt;GraphPort&gt; ports = pass == 0 ? ins : outs;</span>
+<span class="fc bfc" id="L181" title="All 2 branches covered.">            for (int i = 0; i &lt; ports.size(); i++) { // NOPMD ForLoopCanBeForeach - indexed: painted every frame, no iterator</span>
+<span class="fc" id="L182">                GraphPort p = ports.get(i);</span>
+<span class="fc" id="L183">                int px = graph.worldToScreenX(graph.portX(node, p));</span>
+<span class="fc" id="L184">                int py = graph.worldToScreenY(graph.portY(node, p));</span>
+<span class="fc" id="L185">                boolean connected = graph.isPortConnected(node, p);</span>
+<span class="fc" id="L186">                g.setColor(bg);</span>
+<span class="fc" id="L187">                g.fillArc(px - r - 1, py - r - 1, r * 2 + 2, r * 2 + 2, 0, 360);</span>
+<span class="pc bpc" id="L188" title="1 of 2 branches missed.">                g.setColor(p.getType() == null ? portColor : getAccent(p.getType(), portColor));</span>
+<span class="fc bfc" id="L189" title="All 2 branches covered.">                if (connected) {</span>
+<span class="fc" id="L190">                    g.fillArc(px - r, py - r, r * 2, r * 2, 0, 360);</span>
+                } else {
+<span class="fc" id="L192">                    g.drawArc(px - r, py - r, r * 2 - 1, r * 2 - 1, 0, 360);</span>
+<span class="fc" id="L193">                    g.drawArc(px - r + 1, py - r + 1, r * 2 - 3, r * 2 - 3, 0, 360);</span>
+                }
+<span class="pc bpc" id="L195" title="2 of 4 branches missed.">                if (detail &amp;&amp; p.getLabel() != null) {</span>
+<span class="fc" id="L196">                    g.setFont(f);</span>
+<span class="fc" id="L197">                    g.setColor(GraphLook.mix(bg, fg, 190));</span>
+<span class="fc bfc" id="L198" title="All 2 branches covered.">                    int room = labelRoom(graph, node, py, f, pad, pass == 0 ? outs : ins);</span>
+<span class="fc" id="L199">                    String text = GraphLook.fit(p.getLabel(), f, room);</span>
+<span class="fc" id="L200">                    int ly = py - f.getHeight() / 2;</span>
+<span class="fc bfc" id="L201" title="All 2 branches covered.">                    if (p.isInput()) {</span>
+<span class="fc" id="L202">                        g.drawString(text, px + pad, ly);</span>
+                    } else {
+<span class="fc" id="L204">                        g.drawString(text, px - pad - f.stringWidth(text), ly);</span>
+                    }
+                }
+            }
+        }
+<span class="fc" id="L209">    }</span>
+
+    // The width a port label may take: the whole card when nothing faces it,
+    // otherwise what the label across the same row leaves, but never less
+    // than half the card, so the two share a crowded row evenly.
+    private static int labelRoom(NodeGraph graph, GraphNode node, int py,
+            Font f, int pad, List&lt;GraphPort&gt; across) {
+<span class="fc" id="L216">        int full = graph.worldToScreenLength(node.getWidth()) - pad * 2;</span>
+<span class="fc" id="L217">        int half = full / 2 - pad;</span>
+<span class="fc" id="L218">        int taken = 0;</span>
+<span class="fc bfc" id="L219" title="All 2 branches covered.">        for (int i = 0; i &lt; across.size(); i++) { // NOPMD ForLoopCanBeForeach - indexed: painted every frame, no iterator</span>
+<span class="fc" id="L220">            GraphPort o = across.get(i);</span>
+<span class="fc" id="L221">            int oy = graph.worldToScreenY(graph.portY(node, o));</span>
+<span class="pc bpc" id="L222" title="2 of 4 branches missed.">            if (o.getLabel() != null &amp;&amp; Math.abs(oy - py) &lt; f.getHeight()) {</span>
+<span class="fc" id="L223">                taken = Math.max(taken, f.stringWidth(o.getLabel()));</span>
+            }
+        }
+<span class="fc bfc" id="L226" title="All 2 branches covered.">        if (taken == 0) {</span>
+<span class="fc" id="L227">            return full;</span>
+        }
+        // full already leaves the inset on both edges; only a gap between
+        // the two labels is left to take.
+<span class="fc" id="L231">        return Math.max(half, full - taken - GraphLook.mm(2));</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

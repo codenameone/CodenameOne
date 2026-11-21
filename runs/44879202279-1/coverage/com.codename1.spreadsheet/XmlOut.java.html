@@ -1,0 +1,179 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>XmlOut.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.spreadsheet</a> &gt; <span class="el_source">XmlOut.java</span></div><h1>XmlOut.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.spreadsheet;
+
+import java.io.IOException;
+import java.io.OutputStream;
+
+/// Writes XML as UTF-8 bytes, straight into the entry of an archive.
+final class XmlOut {
+    private final OutputStream out;
+<span class="fc" id="L31">    private final byte[] buffer = new byte[8192];</span>
+    private int size;
+
+<span class="fc" id="L34">    XmlOut(OutputStream out) {</span>
+<span class="fc" id="L35">        this.out = out;</span>
+<span class="fc" id="L36">    }</span>
+
+    private void put(int b) throws IOException {
+<span class="fc bfc" id="L39" title="All 2 branches covered.">        if (size == buffer.length) {</span>
+<span class="fc" id="L40">            out.write(buffer, 0, size);</span>
+<span class="fc" id="L41">            size = 0;</span>
+        }
+<span class="fc" id="L43">        buffer[size++] = (byte) b;</span>
+<span class="fc" id="L44">    }</span>
+
+    private void putChar(String s, int i) throws IOException {
+<span class="fc" id="L47">        char c = s.charAt(i);</span>
+<span class="fc bfc" id="L48" title="All 2 branches covered.">        if (c &lt; 0x80) {</span>
+<span class="fc" id="L49">            put(c);</span>
+<span class="fc bfc" id="L50" title="All 2 branches covered.">        } else if (c &lt; 0x800) {</span>
+<span class="fc" id="L51">            put(0xc0 | c &gt;&gt; 6);</span>
+<span class="fc" id="L52">            put(0x80 | c &amp; 0x3f);</span>
+<span class="pc bpc" id="L53" title="7 of 8 branches missed.">        } else if (c &gt;= 0xd800 &amp;&amp; c &lt;= 0xdbff &amp;&amp; i + 1 &lt; s.length() &amp;&amp; s.charAt(i + 1) &gt;= 0xdc00</span>
+<span class="nc bnc" id="L54" title="All 2 branches missed.">                &amp;&amp; s.charAt(i + 1) &lt;= 0xdfff) {</span>
+<span class="nc" id="L55">            int code = 0x10000 + (c - 0xd800 &lt;&lt; 10) + (s.charAt(i + 1) - 0xdc00);</span>
+<span class="nc" id="L56">            put(0xf0 | code &gt;&gt; 18);</span>
+<span class="nc" id="L57">            put(0x80 | code &gt;&gt; 12 &amp; 0x3f);</span>
+<span class="nc" id="L58">            put(0x80 | code &gt;&gt; 6 &amp; 0x3f);</span>
+<span class="nc" id="L59">            put(0x80 | code &amp; 0x3f);</span>
+<span class="pc bpc" id="L60" title="3 of 4 branches missed.">        } else if (c &gt;= 0xd800 &amp;&amp; c &lt;= 0xdfff) {</span>
+            // half of a pair by itself is not a character
+<span class="nc" id="L62">            put('?');</span>
+        } else {
+<span class="fc" id="L64">            put(0xe0 | c &gt;&gt; 12);</span>
+<span class="fc" id="L65">            put(0x80 | c &gt;&gt; 6 &amp; 0x3f);</span>
+<span class="fc" id="L66">            put(0x80 | c &amp; 0x3f);</span>
+        }
+<span class="fc" id="L68">    }</span>
+
+    private static boolean isLowSurrogateOfPair(String s, int i) {
+<span class="pc bpc" id="L71" title="5 of 8 branches missed.">        return i &gt; 0 &amp;&amp; s.charAt(i) &gt;= 0xdc00 &amp;&amp; s.charAt(i) &lt;= 0xdfff &amp;&amp; s.charAt(i - 1) &gt;= 0xd800</span>
+<span class="pc bnc" id="L72" title="All 2 branches missed.">                &amp;&amp; s.charAt(i - 1) &lt;= 0xdbff;</span>
+    }
+
+    /// Writes markup as it is.
+    XmlOut raw(String s) throws IOException {
+<span class="fc" id="L77">        int n = s.length();</span>
+<span class="fc bfc" id="L78" title="All 2 branches covered.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="pc bpc" id="L79" title="1 of 2 branches missed.">            if (!isLowSurrogateOfPair(s, i)) {</span>
+<span class="fc" id="L80">                putChar(s, i);</span>
+            }
+        }
+<span class="fc" id="L83">        return this;</span>
+    }
+
+    XmlOut raw(int value) throws IOException {
+<span class="fc" id="L87">        return raw(Integer.toString(value));</span>
+    }
+
+    /// Writes text or an attribute value, with what XML reserves escaped. A character XML
+    /// cannot hold at all -- most of the control characters -- is written `_x0008_`, the
+    /// convention of the Excel format, when `excel` is set and is left out otherwise.
+    XmlOut text(String s, boolean excel) throws IOException {
+<span class="fc" id="L94">        int n = s.length();</span>
+<span class="fc bfc" id="L95" title="All 2 branches covered.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc" id="L96">            char c = s.charAt(i);</span>
+<span class="fc bfc" id="L97" title="All 7 branches covered.">            switch (c) {</span>
+                case '&amp;':
+<span class="fc" id="L99">                    raw(&quot;&amp;amp;&quot;);</span>
+<span class="fc" id="L100">                    break;</span>
+                case '&lt;':
+<span class="fc" id="L102">                    raw(&quot;&amp;lt;&quot;);</span>
+<span class="fc" id="L103">                    break;</span>
+                case '&gt;':
+<span class="fc" id="L105">                    raw(&quot;&amp;gt;&quot;);</span>
+<span class="fc" id="L106">                    break;</span>
+                case '&quot;':
+<span class="fc" id="L108">                    raw(&quot;&amp;quot;&quot;);</span>
+<span class="fc" id="L109">                    break;</span>
+                case '\n':
+<span class="fc" id="L111">                    raw(&quot;&amp;#10;&quot;);</span>
+<span class="fc" id="L112">                    break;</span>
+                case '\t':
+<span class="fc" id="L114">                    raw(&quot;&amp;#9;&quot;);</span>
+<span class="fc" id="L115">                    break;</span>
+                default:
+<span class="pc bpc" id="L117" title="2 of 6 branches missed.">                    if (c &lt; 0x20 || c == 0xfffe || c == 0xffff) {</span>
+<span class="fc bfc" id="L118" title="All 2 branches covered.">                        if (excel) {</span>
+<span class="fc" id="L119">                            raw(&quot;_x&quot;);</span>
+<span class="fc" id="L120">                            String hex = Integer.toHexString(c);</span>
+<span class="fc bfc" id="L121" title="All 2 branches covered.">                            for (int k = hex.length(); k &lt; 4; k++) {</span>
+<span class="fc" id="L122">                                put('0');</span>
+                            }
+<span class="fc" id="L124">                            raw(hex);</span>
+<span class="fc" id="L125">                            put('_');</span>
+<span class="fc" id="L126">                        }</span>
+<span class="pc bpc" id="L127" title="1 of 6 branches missed.">                    } else if (excel &amp;&amp; c == '_' &amp;&amp; isEscape(s, i)) {</span>
+                        // text that happens to look like an escape is escaped itself
+<span class="nc" id="L129">                        raw(&quot;_x005F_&quot;);</span>
+<span class="pc bpc" id="L130" title="1 of 2 branches missed.">                    } else if (!isLowSurrogateOfPair(s, i)) {</span>
+<span class="fc" id="L131">                        putChar(s, i);</span>
+                    }
+                    break;
+            }
+        }
+<span class="fc" id="L136">        return this;</span>
+    }
+
+    /// Whether text at a position reads as `_xHHHH_`.
+    static boolean isEscape(String s, int i) {
+<span class="pc bpc" id="L141" title="3 of 8 branches missed.">        if (i + 7 &gt; s.length() || s.charAt(i) != '_' || s.charAt(i + 1) != 'x' || s.charAt(i + 6) != '_') {</span>
+<span class="fc" id="L142">            return false;</span>
+        }
+<span class="fc bfc" id="L144" title="All 2 branches covered.">        for (int k = i + 2; k &lt; i + 6; k++) {</span>
+<span class="fc" id="L145">            char c = s.charAt(k);</span>
+<span class="pc bpc" id="L146" title="10 of 12 branches missed.">            if (!(c &gt;= '0' &amp;&amp; c &lt;= '9' || c &gt;= 'a' &amp;&amp; c &lt;= 'f' || c &gt;= 'A' &amp;&amp; c &lt;= 'F')) {</span>
+<span class="nc" id="L147">                return false;</span>
+            }
+        }
+<span class="fc" id="L150">        return true;</span>
+    }
+
+    /// Writes ` name=&quot;value&quot;`.
+    XmlOut attr(String name, String value) throws IOException {
+<span class="fc" id="L155">        put(' ');</span>
+<span class="fc" id="L156">        raw(name);</span>
+<span class="fc" id="L157">        raw(&quot;=\&quot;&quot;);</span>
+<span class="fc" id="L158">        text(value, false);</span>
+<span class="fc" id="L159">        put('&quot;');</span>
+<span class="fc" id="L160">        return this;</span>
+    }
+
+    XmlOut attr(String name, int value) throws IOException {
+<span class="fc" id="L164">        put(' ');</span>
+<span class="fc" id="L165">        raw(name);</span>
+<span class="fc" id="L166">        raw(&quot;=\&quot;&quot;);</span>
+<span class="fc" id="L167">        raw(Integer.toString(value));</span>
+<span class="fc" id="L168">        put('&quot;');</span>
+<span class="fc" id="L169">        return this;</span>
+    }
+
+    void flush() throws IOException {
+<span class="pc bpc" id="L173" title="1 of 2 branches missed.">        if (size &gt; 0) {</span>
+<span class="fc" id="L174">            out.write(buffer, 0, size);</span>
+<span class="fc" id="L175">            size = 0;</span>
+        }
+<span class="fc" id="L177">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

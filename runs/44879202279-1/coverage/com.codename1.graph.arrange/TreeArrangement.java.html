@@ -1,0 +1,211 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TreeArrangement.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.graph.arrange</a> &gt; <span class="el_source">TreeArrangement.java</span></div><h1>TreeArrangement.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.graph.arrange;
+
+import com.codename1.graph.GraphModel;
+import com.codename1.graph.GraphNode;
+
+/// An arrangement for hierarchies, such as an org chart or a file tree: every node
+/// below its parent, parents centred over their children, and no subtree
+/// overlapping another.
+///
+/// A graph that is not a tree is laid out by a spanning tree found breadth
+/// first from the root (`setRootId`, or every node no edge enters); the other
+/// edges are drawn straight between wherever their ends land. Several roots
+/// make a forest, laid out side by side.
+<span class="fc" id="L36">public class TreeArrangement implements GraphArrangement {</span>
+    /// Children below their parent.
+    public static final int TOP_TO_BOTTOM = 0;
+
+    /// Children to the right of their parent, as in a mind map or file tree.
+    public static final int LEFT_TO_RIGHT = 1;
+
+<span class="fc" id="L43">    private int direction = TOP_TO_BOTTOM;</span>
+<span class="fc" id="L44">    private double levelGap = 60;</span>
+<span class="fc" id="L45">    private double siblingGap = 24;</span>
+    private String rootId;
+
+    /// `TOP_TO_BOTTOM`, the default, or `LEFT_TO_RIGHT`.
+    public int getDirection() {
+<span class="nc" id="L50">        return direction;</span>
+    }
+
+    /// Sets the direction the tree grows.
+    public void setDirection(int direction) {
+<span class="fc" id="L55">        this.direction = direction;</span>
+<span class="fc" id="L56">    }</span>
+
+    /// The space between a parent and its children in world units.
+    public double getLevelGap() {
+<span class="nc" id="L60">        return levelGap;</span>
+    }
+
+    /// Sets the space between levels.
+    public void setLevelGap(double levelGap) {
+<span class="nc" id="L65">        this.levelGap = levelGap;</span>
+<span class="nc" id="L66">    }</span>
+
+    /// The space between neighbouring subtrees in world units.
+    public double getSiblingGap() {
+<span class="nc" id="L70">        return siblingGap;</span>
+    }
+
+    /// Sets the space between neighbouring subtrees.
+    public void setSiblingGap(double siblingGap) {
+<span class="nc" id="L75">        this.siblingGap = siblingGap;</span>
+<span class="nc" id="L76">    }</span>
+
+    /// The id of the root, or null to start from every node no edge enters.
+    public String getRootId() {
+<span class="nc" id="L80">        return rootId;</span>
+    }
+
+    /// Sets the root.
+    public void setRootId(String rootId) {
+<span class="nc" id="L85">        this.rootId = rootId;</span>
+<span class="nc" id="L86">    }</span>
+
+    @Override
+    public ArrangementResult arrange(GraphModel model) {
+<span class="fc" id="L90">        Forest f = new Forest(model, rootId);</span>
+<span class="fc" id="L91">        int n = f.graph.size();</span>
+<span class="fc" id="L92">        ArrangementResult r = new ArrangementResult();</span>
+<span class="fc bfc" id="L93" title="All 2 branches covered.">        if (n == 0) {</span>
+<span class="fc" id="L94">            return r;</span>
+        }
+<span class="fc bfc" id="L96" title="All 2 branches covered.">        boolean tb = direction == TOP_TO_BOTTOM;</span>
+<span class="fc" id="L97">        int levels = f.maxDepth() + 1;</span>
+<span class="fc" id="L98">        double[] levelDepth = new double[levels];</span>
+<span class="fc bfc" id="L99" title="All 2 branches covered.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc" id="L100">            GraphNode node = f.graph.nodes[i];</span>
+<span class="fc bfc" id="L101" title="All 2 branches covered.">            levelDepth[f.depth[i]] = Math.max(levelDepth[f.depth[i]], tb ? node.getHeight() : node.getWidth());</span>
+        }
+<span class="fc" id="L103">        double[] levelStart = new double[levels];</span>
+<span class="fc" id="L104">        double at = 0;</span>
+<span class="fc bfc" id="L105" title="All 2 branches covered.">        for (int l = 0; l &lt; levels; l++) {</span>
+<span class="fc" id="L106">            levelStart[l] = at;</span>
+<span class="fc" id="L107">            at += levelDepth[l] + levelGap;</span>
+        }
+<span class="fc" id="L109">        double[] center = new double[n];</span>
+<span class="fc" id="L110">        double cursor = 0;</span>
+<span class="fc bfc" id="L111" title="All 2 branches covered.">        for (int i = 0; i &lt; f.roots.length; i++) {</span>
+<span class="fc" id="L112">            cursor = place(f, f.roots[i], cursor, center, tb) + siblingGap * 2;</span>
+        }
+<span class="fc bfc" id="L114" title="All 2 branches covered.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc" id="L115">            GraphNode node = f.graph.nodes[i];</span>
+<span class="fc" id="L116">            double along = levelStart[f.depth[i]];</span>
+<span class="fc bfc" id="L117" title="All 2 branches covered.">            if (tb) {</span>
+<span class="fc" id="L118">                r.setPosition(node.getId(), center[i] - node.getWidth() / 2, along);</span>
+            } else {
+<span class="fc" id="L120">                r.setPosition(node.getId(), along, center[i] - node.getHeight() / 2);</span>
+            }
+        }
+<span class="fc" id="L123">        return r;</span>
+    }
+
+    /// Places a subtree starting at `start` on the breadth axis, iteratively
+    /// so a deep chain cannot overflow the stack.
+    ///
+    /// #### Returns
+    ///
+    /// where the subtree ends
+    private double place(Forest f, int root, double start, double[] center, boolean tb) {
+<span class="fc" id="L133">        int n = center.length;</span>
+<span class="fc" id="L134">        double[] left = new double[n];</span>
+<span class="fc" id="L135">        double[] right = new double[n];</span>
+<span class="fc" id="L136">        int[] stack = new int[n];</span>
+<span class="fc" id="L137">        int[] next = new int[n];</span>
+<span class="fc" id="L138">        double[] cursor = new double[n];</span>
+<span class="fc" id="L139">        double[] startAt = new double[n];</span>
+<span class="fc" id="L140">        int top = 0;</span>
+<span class="fc" id="L141">        stack[0] = root;</span>
+<span class="fc" id="L142">        next[0] = 0;</span>
+<span class="fc" id="L143">        cursor[0] = start;</span>
+<span class="fc" id="L144">        startAt[0] = start;</span>
+<span class="fc bfc" id="L145" title="All 2 branches covered.">        while (top &gt;= 0) {</span>
+<span class="fc" id="L146">            int v = stack[top];</span>
+<span class="fc" id="L147">            int[] kids = f.children[v];</span>
+<span class="fc bfc" id="L148" title="All 2 branches covered.">            if (next[top] &lt; kids.length) {</span>
+<span class="fc" id="L149">                int c = kids[next[top]++];</span>
+<span class="fc" id="L150">                double childStart = cursor[top];</span>
+<span class="fc" id="L151">                top++;</span>
+<span class="fc" id="L152">                stack[top] = c;</span>
+<span class="fc" id="L153">                next[top] = 0;</span>
+<span class="fc" id="L154">                cursor[top] = childStart;</span>
+<span class="fc" id="L155">                startAt[top] = childStart;</span>
+<span class="fc" id="L156">                continue;</span>
+            }
+<span class="fc" id="L158">            GraphNode node = f.graph.nodes[v];</span>
+<span class="fc bfc" id="L159" title="All 2 branches covered.">            double b = tb ? node.getWidth() : node.getHeight();</span>
+<span class="fc" id="L160">            double subStart = startAt[top];</span>
+            double c;
+            double end;
+<span class="fc bfc" id="L163" title="All 2 branches covered.">            if (kids.length == 0) {</span>
+<span class="fc" id="L164">                c = subStart + b / 2;</span>
+<span class="fc" id="L165">                end = subStart + b;</span>
+            } else {
+<span class="fc" id="L167">                double first = center[kids[0]];</span>
+<span class="fc" id="L168">                double last = center[kids[kids.length - 1]];</span>
+<span class="fc" id="L169">                c = (first + last) / 2;</span>
+<span class="fc" id="L170">                double kidsRight = right[kids[kids.length - 1]];</span>
+                // a wide parent pushes its children right
+<span class="fc" id="L172">                double mine = c - b / 2;</span>
+<span class="fc bfc" id="L173" title="All 2 branches covered.">                if (mine &lt; subStart) {</span>
+<span class="fc" id="L174">                    double shift = subStart - mine;</span>
+<span class="fc" id="L175">                    shift(f, v, shift, center, left, right);</span>
+<span class="fc" id="L176">                    c += shift;</span>
+<span class="fc" id="L177">                    kidsRight += shift;</span>
+                }
+<span class="fc" id="L179">                end = Math.max(kidsRight, c + b / 2);</span>
+            }
+<span class="fc" id="L181">            center[v] = c;</span>
+<span class="fc" id="L182">            left[v] = Math.min(c - b / 2, subStart);</span>
+<span class="fc" id="L183">            right[v] = end;</span>
+<span class="fc" id="L184">            top--;</span>
+<span class="fc bfc" id="L185" title="All 2 branches covered.">            if (top &gt;= 0) {</span>
+<span class="fc" id="L186">                cursor[top] = end + siblingGap;</span>
+            }
+<span class="fc" id="L188">        }</span>
+<span class="fc" id="L189">        return right[root];</span>
+    }
+
+    private static void shift(Forest f, int v, double by, double[] center, double[] left, double[] right) {
+<span class="fc" id="L193">        int[] kids = f.children[v];</span>
+<span class="fc" id="L194">        int[] stack = new int[center.length];</span>
+<span class="fc" id="L195">        int top = -1;</span>
+<span class="fc bfc" id="L196" title="All 2 branches covered.">        for (int i = 0; i &lt; kids.length; i++) { // NOPMD ForLoopCanBeForeach - indexed, like the rest of the pass</span>
+<span class="fc" id="L197">            stack[++top] = kids[i];</span>
+        }
+<span class="fc bfc" id="L199" title="All 2 branches covered.">        while (top &gt;= 0) {</span>
+<span class="fc" id="L200">            int u = stack[top--];</span>
+<span class="fc" id="L201">            center[u] += by;</span>
+<span class="fc" id="L202">            left[u] += by;</span>
+<span class="fc" id="L203">            right[u] += by;</span>
+<span class="fc" id="L204">            int[] k = f.children[u];</span>
+<span class="fc bfc" id="L205" title="All 2 branches covered.">            for (int i = 0; i &lt; k.length; i++) { // NOPMD ForLoopCanBeForeach - indexed, like the rest of the pass</span>
+<span class="fc" id="L206">                stack[++top] = k[i];</span>
+            }
+<span class="fc" id="L208">        }</span>
+<span class="fc" id="L209">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

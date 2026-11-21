@@ -1,0 +1,198 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EcKeys.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.security</a> &gt; <span class="el_source">EcKeys.java</span></div><h1>EcKeys.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.security;
+
+import com.codename1.impl.EcP256Codec;
+import com.codename1.util.BigInteger;
+
+/// Completes a P-256 PKCS#8 private key with its public point.
+///
+/// RFC 5915 makes the `publicKey` field of ECPrivateKey optional, and
+/// java.security leaves it out -- so a key generated on a server or on the
+/// JavaSE port has none. Apple's SecKey cannot import an EC private key
+/// without the point, and cannot derive it, so [Signature#sign] hands the
+/// port this completed form. The point is computed once per key (see
+/// [PrivateKey]) with a fixed-length Montgomery ladder, see [#multiply].
+final class EcKeys {
+<span class="fc" id="L37">    private static final BigInteger P = new BigInteger(</span>
+            &quot;ffffffff00000001000000000000000000000000ffffffffffffffffffffffff&quot;, 16);
+<span class="fc" id="L39">    private static final BigInteger GX = new BigInteger(</span>
+            &quot;6b17d1f2e12c4247f8bce6e563a440f277037d812deb33a0f4a13945d898c296&quot;, 16);
+<span class="fc" id="L41">    private static final BigInteger GY = new BigInteger(</span>
+            &quot;4fe342e2fe1a7f9b8ee7eb4a7c0f9e162bce33576b315ececbb6406837bf51f5&quot;, 16);
+
+    private EcKeys() {}
+
+    /// Returns `pkcs8` itself when it already carries the point or is not a
+    /// P-256 key [EcP256Codec] understands, otherwise the same key re-encoded
+    /// with the point.
+    static byte[] withPublicPoint(byte[] pkcs8) {
+        byte[][] parts;
+        try {
+<span class="fc" id="L52">            parts = EcP256Codec.fromPkcs8(pkcs8);</span>
+<span class="nc" id="L53">        } catch (RuntimeException notP256) {</span>
+<span class="nc" id="L54">            return pkcs8;</span>
+<span class="fc" id="L55">        }</span>
+<span class="fc bfc" id="L56" title="All 2 branches covered.">        if (parts[1] != null) {</span>
+<span class="fc" id="L57">            return pkcs8;</span>
+        }
+<span class="fc" id="L59">        BigInteger[] q = multiply(new BigInteger(1, parts[0]));</span>
+<span class="pc bpc" id="L60" title="1 of 2 branches missed.">        if (q == null) {</span>
+<span class="nc" id="L61">            return pkcs8;</span>
+        }
+<span class="fc" id="L63">        byte[] point = new byte[EcP256Codec.POINT_LENGTH];</span>
+<span class="fc" id="L64">        point[0] = 0x04;</span>
+<span class="fc" id="L65">        putFixed(q[0], point, 1);</span>
+<span class="fc" id="L66">        putFixed(q[1], point, 33);</span>
+<span class="fc" id="L67">        return EcP256Codec.pkcs8FromScalar(parts[0], point);</span>
+    }
+
+    private static void putFixed(BigInteger v, byte[] out, int off) {
+<span class="fc" id="L71">        byte[] b = v.toByteArray();</span>
+<span class="fc bfc" id="L72" title="All 2 branches covered.">        int start = b.length &gt; 32 ? b.length - 32 : 0;</span>
+<span class="fc" id="L73">        int len = b.length - start;</span>
+<span class="fc" id="L74">        System.arraycopy(b, start, out, off + 32 - len, len);</span>
+<span class="fc" id="L75">    }</span>
+
+    /// `k * G` in affine coordinates, or null for the point at infinity.
+    ///
+    /// A Montgomery ladder over all 256 bits of the scalar, on projective
+    /// points with the complete addition formulas of Renes, Costello and
+    /// Batina (&quot;Complete addition formulas for prime order elliptic curves&quot;,
+    /// 2016, algorithm 4 for a = -3). Every bit costs the same: one addition
+    /// and one doubling, both through the one formula, which has no special
+    /// case for the identity or for equal points, and no field inversion until
+    /// the single one at the end. The two ladder points trade places by array
+    /// index, never by a branch on the bit. What the private scalar decides is
+    /// therefore not which operations run, nor how many, nor whether a short
+    /// key ends early.
+    ///
+    /// It is not constant time end to end: the big-integer arithmetic
+    /// underneath (`multiply`, `mod`) takes time that depends on its operands'
+    /// values and lengths, so the timing of a derivation still leaks something
+    /// about the scalar to an observer who can measure it closely and many
+    /// times. That is acceptable for its one use here -- deriving a stored
+    /// key's public point once, on the device -- and is why a port with a
+    /// native derivation should prefer it.
+    ///
+    /// A scalar outside `[1, n - 1]` is no private key: zero and `n` give the
+    /// point at infinity, and anything larger, or negative, would alias a
+    /// smaller key or fall outside the 256 bits the ladder walks. It answers
+    /// null, as the point at infinity does.
+    static BigInteger[] multiply(BigInteger k) {
+<span class="pc bpc" id="L103" title="1 of 6 branches missed.">        if (k == null || k.signum() &lt;= 0 || k.compareTo(N) &gt;= 0) {</span>
+<span class="fc" id="L104">            return null;</span>
+        }
+<span class="fc" id="L106">        BigInteger[][] r = {{BigInteger.ZERO, BigInteger.ONE, BigInteger.ZERO},</span>
+            {GX, GY, BigInteger.ONE}};
+<span class="fc bfc" id="L108" title="All 2 branches covered.">        for (int i = 255; i &gt;= 0; i--) {</span>
+<span class="fc bfc" id="L109" title="All 2 branches covered.">            int bit = k.testBit(i) ? 1 : 0;</span>
+            // With bit = 1 the roles swap: r[1] is doubled and r[0] gets the sum.
+<span class="fc" id="L111">            BigInteger[] lo = r[bit];</span>
+<span class="fc" id="L112">            BigInteger[] hi = r[1 - bit];</span>
+<span class="fc" id="L113">            BigInteger[] sum = add(lo, hi);</span>
+<span class="fc" id="L114">            BigInteger[] twice = add(lo, lo);</span>
+<span class="fc" id="L115">            r[bit] = twice;</span>
+<span class="fc" id="L116">            r[1 - bit] = sum;</span>
+        }
+<span class="fc" id="L118">        BigInteger[] q = r[0];</span>
+<span class="pc bpc" id="L119" title="1 of 2 branches missed.">        if (q[2].signum() == 0) {</span>
+<span class="nc" id="L120">            return null;</span>
+        }
+        // P is prime and 0 &lt; z &lt; P, so the inverse exists (BigIntegerModInverseTest
+        // holds modInverse to 256-bit operands).
+<span class="fc" id="L124">        BigInteger zInv = q[2].mod(P).modInverse(P);</span>
+<span class="fc" id="L125">        return new BigInteger[]{q[0].multiply(zInv).mod(P), q[1].multiply(zInv).mod(P)};</span>
+    }
+
+    /// The order of the base point.
+<span class="fc" id="L129">    private static final BigInteger N = new BigInteger(</span>
+            &quot;ffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc632551&quot;, 16);
+
+    /// The curve's `b`.
+<span class="fc" id="L133">    private static final BigInteger B = new BigInteger(</span>
+            &quot;5ac635d8aa3a93e7b3ebbd55769886bc651d06b0cc53b0f63bce3c3e27d2604b&quot;, 16);
+
+    private static BigInteger m(BigInteger a, BigInteger b) {
+<span class="fc" id="L137">        return a.multiply(b).mod(P);</span>
+    }
+
+    private static BigInteger p(BigInteger a, BigInteger b) {
+<span class="fc" id="L141">        return a.add(b).mod(P);</span>
+    }
+
+    private static BigInteger s(BigInteger a, BigInteger b) {
+<span class="fc" id="L145">        return a.subtract(b).mod(P);</span>
+    }
+
+    /// Complete projective addition, `u + v`, for a = -3 (RCB algorithm 4).
+    /// Valid for every pair of points, the identity (0:1:0) and `u == v`
+    /// included.
+    private static BigInteger[] add(BigInteger[] u, BigInteger[] v) {
+<span class="fc" id="L152">        BigInteger x1 = u[0];</span>
+<span class="fc" id="L153">        BigInteger y1 = u[1];</span>
+<span class="fc" id="L154">        BigInteger z1 = u[2];</span>
+<span class="fc" id="L155">        BigInteger x2 = v[0];</span>
+<span class="fc" id="L156">        BigInteger y2 = v[1];</span>
+<span class="fc" id="L157">        BigInteger z2 = v[2];</span>
+<span class="fc" id="L158">        BigInteger t0 = m(x1, x2);</span>
+<span class="fc" id="L159">        BigInteger t1 = m(y1, y2);</span>
+<span class="fc" id="L160">        BigInteger t2 = m(z1, z2);</span>
+<span class="fc" id="L161">        BigInteger t3 = m(p(x1, y1), p(x2, y2));</span>
+<span class="fc" id="L162">        BigInteger t4 = p(t0, t1);</span>
+<span class="fc" id="L163">        t3 = s(t3, t4);</span>
+<span class="fc" id="L164">        t4 = m(p(y1, z1), p(y2, z2));</span>
+<span class="fc" id="L165">        BigInteger x3 = p(t1, t2);</span>
+<span class="fc" id="L166">        t4 = s(t4, x3);</span>
+<span class="fc" id="L167">        x3 = m(p(x1, z1), p(x2, z2));</span>
+<span class="fc" id="L168">        BigInteger y3 = p(t0, t2);</span>
+<span class="fc" id="L169">        y3 = s(x3, y3);</span>
+<span class="fc" id="L170">        BigInteger z3 = m(B, t2);</span>
+<span class="fc" id="L171">        x3 = s(y3, z3);</span>
+<span class="fc" id="L172">        z3 = p(x3, x3);</span>
+<span class="fc" id="L173">        x3 = p(x3, z3);</span>
+<span class="fc" id="L174">        z3 = s(t1, x3);</span>
+<span class="fc" id="L175">        x3 = p(t1, x3);</span>
+<span class="fc" id="L176">        y3 = m(B, y3);</span>
+<span class="fc" id="L177">        t1 = p(t2, t2);</span>
+<span class="fc" id="L178">        t2 = p(t1, t2);</span>
+<span class="fc" id="L179">        y3 = s(y3, t2);</span>
+<span class="fc" id="L180">        y3 = s(y3, t0);</span>
+<span class="fc" id="L181">        t1 = p(y3, y3);</span>
+<span class="fc" id="L182">        y3 = p(t1, y3);</span>
+<span class="fc" id="L183">        t1 = p(t0, t0);</span>
+<span class="fc" id="L184">        t0 = p(t1, t0);</span>
+<span class="fc" id="L185">        t0 = s(t0, t2);</span>
+<span class="fc" id="L186">        t1 = m(t4, y3);</span>
+<span class="fc" id="L187">        t2 = m(t0, y3);</span>
+<span class="fc" id="L188">        y3 = m(x3, z3);</span>
+<span class="fc" id="L189">        y3 = p(y3, t2);</span>
+<span class="fc" id="L190">        x3 = m(t3, x3);</span>
+<span class="fc" id="L191">        x3 = s(x3, t1);</span>
+<span class="fc" id="L192">        z3 = m(t4, z3);</span>
+<span class="fc" id="L193">        t1 = m(t3, t0);</span>
+<span class="fc" id="L194">        z3 = p(z3, t1);</span>
+<span class="fc" id="L195">        return new BigInteger[]{x3, y3, z3};</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,229 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Gamepad.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.gaming</a> &gt; <span class="el_source">Gamepad.java</span></div><h1>Gamepad.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.gaming;
+
+/// One connected game controller.
+///
+/// Buttons and axes use the standard layout every modern controller is mapped
+/// to -- the Xbox layout, which is also what Steam Input presents for a Steam
+/// Deck, a Steam Controller or a PlayStation pad. Query it with
+/// `#isButtonDown(int)` and `#getAxis(int)`, or be told about changes through a
+/// `GamepadListener` registered with `Gamepads`.
+///
+/// Instances are owned by `Gamepads` and live for as long as the controller is
+/// connected; `#isConnected()` turns false once it is gone. All state is written
+/// and read on the EDT.
+public final class Gamepad {
+    /// The bottom face button (A on Xbox, Cross on PlayStation).
+    public static final int BUTTON_A = 0;
+    /// The right face button (B on Xbox, Circle on PlayStation).
+    public static final int BUTTON_B = 1;
+    /// The left face button (X on Xbox, Square on PlayStation).
+    public static final int BUTTON_X = 2;
+    /// The top face button (Y on Xbox, Triangle on PlayStation).
+    public static final int BUTTON_Y = 3;
+    /// The left shoulder button.
+    public static final int BUTTON_LEFT_SHOULDER = 4;
+    /// The right shoulder button.
+    public static final int BUTTON_RIGHT_SHOULDER = 5;
+    /// The back / view / select button.
+    public static final int BUTTON_BACK = 6;
+    /// The start / menu button.
+    public static final int BUTTON_START = 7;
+    /// The guide / home button. Steam keeps this one for itself while a game runs
+    /// under it, so do not rely on receiving it.
+    public static final int BUTTON_GUIDE = 8;
+    /// Pressing the left stick.
+    public static final int BUTTON_LEFT_STICK = 9;
+    /// Pressing the right stick.
+    public static final int BUTTON_RIGHT_STICK = 10;
+    /// D-pad up.
+    public static final int BUTTON_DPAD_UP = 11;
+    /// D-pad down.
+    public static final int BUTTON_DPAD_DOWN = 12;
+    /// D-pad left.
+    public static final int BUTTON_DPAD_LEFT = 13;
+    /// D-pad right.
+    public static final int BUTTON_DPAD_RIGHT = 14;
+    /// The left trigger, reported as a button once pulled past halfway.
+    public static final int BUTTON_LEFT_TRIGGER = 15;
+    /// The right trigger, reported as a button once pulled past halfway.
+    public static final int BUTTON_RIGHT_TRIGGER = 16;
+    /// The number of buttons.
+    public static final int BUTTON_COUNT = 17;
+
+    /// The left stick, -1 (left) to 1 (right).
+    public static final int AXIS_LEFT_X = 0;
+    /// The left stick, -1 (up) to 1 (down).
+    public static final int AXIS_LEFT_Y = 1;
+    /// The right stick, -1 (left) to 1 (right).
+    public static final int AXIS_RIGHT_X = 2;
+    /// The right stick, -1 (up) to 1 (down).
+    public static final int AXIS_RIGHT_Y = 3;
+    /// The left trigger, 0 (released) to 1 (fully pulled).
+    public static final int AXIS_LEFT_TRIGGER = 4;
+    /// The right trigger, 0 (released) to 1 (fully pulled).
+    public static final int AXIS_RIGHT_TRIGGER = 5;
+    /// The number of axes.
+    public static final int AXIS_COUNT = 6;
+
+    private final int index;
+    private final String name;
+<span class="fc" id="L92">    private final boolean[] buttons = new boolean[BUTTON_COUNT];</span>
+<span class="fc" id="L93">    private final float[] axes = new float[AXIS_COUNT];</span>
+<span class="fc" id="L94">    private boolean connected = true;</span>
+<span class="fc" id="L95">    private float deadZone = 0.15f;</span>
+
+<span class="fc" id="L97">    Gamepad(int index, String name) {</span>
+<span class="fc" id="L98">        this.index = index;</span>
+<span class="pc bpc" id="L99" title="1 of 2 branches missed.">        this.name = name == null ? &quot;&quot; : name;</span>
+<span class="fc" id="L100">    }</span>
+
+    /// The slot this controller occupies, 0 for the first one connected. A slot
+    /// freed by a disconnect is reused by the next controller.
+    public int getIndex() {
+<span class="nc" id="L105">        return index;</span>
+    }
+
+    /// The name the device reports, for display only; it may be empty.
+    public String getName() {
+<span class="fc" id="L110">        return name;</span>
+    }
+
+    /// False once the controller has been disconnected.
+    public boolean isConnected() {
+<span class="fc" id="L115">        return connected;</span>
+    }
+
+    void setConnected(boolean connected) {
+<span class="fc" id="L119">        this.connected = connected;</span>
+<span class="fc" id="L120">    }</span>
+
+    /// True while the button is held.
+    ///
+    /// #### Parameters
+    ///
+    /// - `button`: one of the `BUTTON_*` constants
+    public boolean isButtonDown(int button) {
+<span class="pc bpc" id="L128" title="2 of 6 branches missed.">        return button &gt;= 0 &amp;&amp; button &lt; BUTTON_COUNT &amp;&amp; buttons[button];</span>
+    }
+
+    /// The axis value with the dead zone applied: a stick inside the dead zone
+    /// reads exactly 0, and the remaining travel is rescaled so the value still
+    /// reaches 1 at the edge. Triggers are not subject to the dead zone.
+    ///
+    /// #### Parameters
+    ///
+    /// - `axis`: one of the `AXIS_*` constants
+    public float getAxis(int axis) {
+<span class="pc bpc" id="L139" title="2 of 4 branches missed.">        if (axis &lt; 0 || axis &gt;= AXIS_COUNT) {</span>
+<span class="nc" id="L140">            return 0;</span>
+        }
+<span class="fc" id="L142">        float v = axes[axis];</span>
+<span class="pc bpc" id="L143" title="1 of 4 branches missed.">        if (axis == AXIS_LEFT_TRIGGER || axis == AXIS_RIGHT_TRIGGER) {</span>
+<span class="fc" id="L144">            return v;</span>
+        }
+<span class="fc" id="L146">        return applyDeadZone(v, deadZone);</span>
+    }
+
+    /// The axis value exactly as the device reported it, with no dead zone.
+    public float getRawAxis(int axis) {
+<span class="pc bpc" id="L151" title="2 of 4 branches missed.">        if (axis &lt; 0 || axis &gt;= AXIS_COUNT) {</span>
+<span class="nc" id="L152">            return 0;</span>
+        }
+<span class="fc" id="L154">        return axes[axis];</span>
+    }
+
+    /// The stick dead zone, 0.15 by default.
+    public float getDeadZone() {
+<span class="nc" id="L159">        return deadZone;</span>
+    }
+
+    /// Sets the stick dead zone, clamped to 0 .. 0.9. Worn sticks rest a little
+    /// off center; the dead zone stops that from reading as movement.
+    public void setDeadZone(float deadZone) {
+<span class="nc bnc" id="L165" title="All 2 branches missed.">        if (deadZone &lt; 0) {</span>
+<span class="nc" id="L166">            deadZone = 0;</span>
+<span class="nc bnc" id="L167" title="All 2 branches missed.">        } else if (deadZone &gt; 0.9f) {</span>
+<span class="nc" id="L168">            deadZone = 0.9f;</span>
+        }
+<span class="nc" id="L170">        this.deadZone = deadZone;</span>
+<span class="nc" id="L171">    }</span>
+
+    /// Rumbles the controller, on ports and controllers that support it; it is
+    /// silently ignored everywhere else.
+    ///
+    /// #### Parameters
+    ///
+    /// - `strong`: the low frequency (heavy) motor, 0 to 1
+    ///
+    /// - `weak`: the high frequency (light) motor, 0 to 1
+    ///
+    /// - `durationMillis`: how long the rumble lasts
+    public void rumble(float strong, float weak, int durationMillis) {
+<span class="nc bnc" id="L184" title="All 2 branches missed.">        if (connected) {</span>
+<span class="nc" id="L185">            com.codename1.ui.Display.getInstance().rumbleGamepad(index,</span>
+<span class="nc" id="L186">                    clamp01(strong), clamp01(weak), durationMillis);</span>
+        }
+<span class="nc" id="L188">    }</span>
+
+    boolean setButton(int button, boolean down) {
+<span class="pc bpc" id="L191" title="2 of 6 branches missed.">        if (button &lt; 0 || button &gt;= BUTTON_COUNT || buttons[button] == down) {</span>
+<span class="fc" id="L192">            return false;</span>
+        }
+<span class="fc" id="L194">        buttons[button] = down;</span>
+<span class="fc" id="L195">        return true;</span>
+    }
+
+    void setAxis(int axis, float value) {
+<span class="pc bpc" id="L199" title="2 of 4 branches missed.">        if (axis &lt; 0 || axis &gt;= AXIS_COUNT) {</span>
+<span class="nc" id="L200">            return;</span>
+        }
+<span class="fc bfc" id="L202" title="All 2 branches covered.">        if (value &gt; 1) {</span>
+<span class="fc" id="L203">            value = 1;</span>
+<span class="pc bpc" id="L204" title="1 of 2 branches missed.">        } else if (value &lt; -1) {</span>
+<span class="nc" id="L205">            value = -1;</span>
+        }
+<span class="fc" id="L207">        axes[axis] = value;</span>
+<span class="fc" id="L208">    }</span>
+
+    static float applyDeadZone(float v, float deadZone) {
+<span class="fc bfc" id="L211" title="All 2 branches covered.">        float mag = v &lt; 0 ? -v : v;</span>
+<span class="fc bfc" id="L212" title="All 2 branches covered.">        if (mag &lt;= deadZone) {</span>
+<span class="fc" id="L213">            return 0;</span>
+        }
+<span class="fc" id="L215">        float scaled = (mag - deadZone) / (1 - deadZone);</span>
+<span class="pc bpc" id="L216" title="1 of 2 branches missed.">        if (scaled &gt; 1) {</span>
+<span class="nc" id="L217">            scaled = 1;</span>
+        }
+<span class="fc bfc" id="L219" title="All 2 branches covered.">        return v &lt; 0 ? -scaled : scaled;</span>
+    }
+
+    private static float clamp01(float v) {
+<span class="nc bnc" id="L223" title="All 2 branches missed.">        if (v &lt; 0) {</span>
+<span class="nc" id="L224">            return 0;</span>
+        }
+<span class="nc bnc" id="L226" title="All 2 branches missed.">        return v &gt; 1 ? 1 : v;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

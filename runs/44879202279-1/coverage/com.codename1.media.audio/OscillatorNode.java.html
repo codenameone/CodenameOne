@@ -1,0 +1,154 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>OscillatorNode.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.media.audio</a> &gt; <span class="el_source">OscillatorNode.java</span></div><h1>OscillatorNode.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.media.audio;
+
+import com.codename1.util.MathUtil;
+
+/// A band-limited periodic waveform, the Web Audio `OscillatorNode`. Mono.
+///
+/// ```java
+/// OfflineAudioContext audio = new OfflineAudioContext(2, 44100, 44100);
+/// OscillatorNode osc = audio.createOscillator();
+/// osc.setType(OscillatorType.SAWTOOTH);
+/// osc.getFrequency().setValue(220);
+/// osc.connect(audio.getDestination());
+/// osc.start();
+/// osc.stop(audio.getCurrentTime() + 1);
+/// ```
+public final class OscillatorNode extends AudioScheduledSourceNode {
+    private final AudioParam frequency;
+    private final AudioParam detune;
+<span class="fc" id="L41">    private OscillatorType type = OscillatorType.SINE;</span>
+
+    // ---- render side ----
+    private PeriodicWave rWave;
+    private double rPhase;
+
+    OscillatorNode(BaseAudioContext context) {
+<span class="fc" id="L48">        super(context, 1);</span>
+<span class="fc" id="L49">        float nyquist = context.getSampleRate() / 2;</span>
+<span class="fc" id="L50">        frequency = new AudioParam(context, &quot;frequency&quot;, 440f, -nyquist, nyquist,</span>
+                AutomationRate.A_RATE, false);
+<span class="fc" id="L52">        detune = new AudioParam(context, &quot;detune&quot;, 0f, -153600f, 153600f, AutomationRate.A_RATE, false);</span>
+<span class="fc" id="L53">        rWave = context.standardWave(OscillatorType.SINE);</span>
+<span class="fc" id="L54">    }</span>
+
+    /// The frequency in Hz, 440 by default; an audio rate parameter.
+    ///
+    /// #### Returns
+    ///
+    /// the parameter
+    public AudioParam getFrequency() {
+<span class="fc" id="L62">        return frequency;</span>
+    }
+
+    /// A detune in cents applied on top of the frequency, 0 by default; an
+    /// audio rate parameter.
+    ///
+    /// #### Returns
+    ///
+    /// the parameter
+    public AudioParam getDetune() {
+<span class="nc" id="L72">        return detune;</span>
+    }
+
+    /// The waveform.
+    ///
+    /// #### Returns
+    ///
+    /// the type, `CUSTOM` after [#setPeriodicWave(PeriodicWave)]
+    public OscillatorType getType() {
+<span class="nc" id="L81">        return type;</span>
+    }
+
+    /// Selects a standard waveform.
+    ///
+    /// #### Parameters
+    ///
+    /// - `type`: any type but `CUSTOM`
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: for `CUSTOM`; use [#setPeriodicWave(PeriodicWave)]
+    public void setType(OscillatorType type) {
+<span class="pc bpc" id="L94" title="2 of 4 branches missed.">        if (type == null || type == OscillatorType.CUSTOM) {</span>
+<span class="nc" id="L95">            throw new IllegalArgumentException(&quot;Use setPeriodicWave for a custom waveform&quot;);</span>
+        }
+<span class="fc" id="L97">        this.type = type;</span>
+<span class="fc" id="L98">        publishWave(context.standardWave(type));</span>
+<span class="fc" id="L99">    }</span>
+
+    /// Plays a custom waveform; the type becomes `CUSTOM`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `wave`: the waveform
+    public void setPeriodicWave(PeriodicWave wave) {
+<span class="nc bnc" id="L107" title="All 2 branches missed.">        if (wave == null) {</span>
+<span class="nc" id="L108">            throw new IllegalArgumentException(&quot;wave is null&quot;);</span>
+        }
+<span class="nc" id="L110">        type = OscillatorType.CUSTOM;</span>
+<span class="nc" id="L111">        publishWave(wave);</span>
+<span class="nc" id="L112">    }</span>
+
+    private void publishWave(final PeriodicWave w) {
+<span class="fc" id="L115">        context.post(new Runnable() {</span>
+            @Override
+            public void run() {
+<span class="fc" id="L118">                rWave = w;</span>
+<span class="fc" id="L119">            }</span>
+        });
+<span class="fc" id="L121">    }</span>
+
+    @Override
+    void render(long q, int from, int to) {
+<span class="fc" id="L125">        float[] f = frequency.compute(q);</span>
+<span class="fc" id="L126">        float[] dt = detune.compute(q);</span>
+<span class="pc bpc" id="L127" title="1 of 4 branches missed.">        boolean fixed = frequency.isConstant() &amp;&amp; detune.isConstant();</span>
+<span class="fc" id="L128">        float sr = context.getSampleRate();</span>
+<span class="fc" id="L129">        double nyquist = sr / 2.0;</span>
+<span class="fc" id="L130">        float[] d = outBuses[0].data[0];</span>
+<span class="fc" id="L131">        double phase = rPhase;</span>
+<span class="fc" id="L132">        double freq = 0;</span>
+<span class="fc" id="L133">        float[] table = null;</span>
+<span class="fc bfc" id="L134" title="All 2 branches covered.">        for (int i = from; i &lt; to; i++) {</span>
+<span class="fc bfc" id="L135" title="All 4 branches covered.">            if (i == from || !fixed) {</span>
+<span class="fc" id="L136">                freq = f[i];</span>
+<span class="pc bpc" id="L137" title="1 of 2 branches missed.">                if (dt[i] != 0f) {</span>
+<span class="nc" id="L138">                    freq *= MathUtil.pow(2, dt[i] / 1200.0);</span>
+                }
+<span class="fc" id="L140">                table = rWave.tableFor(freq, nyquist);</span>
+            }
+<span class="pc bpc" id="L142" title="1 of 2 branches missed.">            if (table != null) {</span>
+<span class="fc" id="L143">                double pos = phase * PeriodicWave.TABLE_SIZE;</span>
+<span class="fc" id="L144">                int idx = (int) pos;</span>
+<span class="fc" id="L145">                double frac = pos - idx;</span>
+<span class="fc" id="L146">                d[i] = (float) (table[idx] + (table[idx + 1] - table[idx]) * frac);</span>
+            }
+<span class="fc" id="L148">            phase += freq / sr;</span>
+<span class="fc" id="L149">            phase -= Math.floor(phase);</span>
+        }
+<span class="fc" id="L151">        rPhase = phase;</span>
+<span class="fc" id="L152">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,346 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>JsonValues.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.mapping</a> &gt; <span class="el_source">JsonValues.java</span></div><h1>JsonValues.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.mapping;
+
+import java.util.Date;
+
+/// Conversions the generated `@Mapped` mappers share: the lenient readers for
+/// `@JsonFormat` fields, ISO-8601 dates computed by arithmetic, and the path
+/// prefixing of a nested failure. Called only from generated code.
+///
+/// Nothing here consults a locale or a time zone: neither is guaranteed on a
+/// device, and a wire format must not depend on the phone's settings. Dates are
+/// always written in UTC.
+public final class JsonValues {
+    private JsonValues() {
+    }
+
+    /// A JSON number, or a string holding one, as a `long`.
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: when the value is neither
+    public static long toLong(Object v) {
+<span class="nc bnc" id="L44" title="All 2 branches missed.">        if (v instanceof Number) {</span>
+<span class="nc" id="L45">            return ((Number) v).longValue();</span>
+        }
+<span class="nc bnc" id="L47" title="All 2 branches missed.">        if (v instanceof String) {</span>
+<span class="nc" id="L48">            String s = ((String) v).trim();</span>
+            try {
+<span class="nc" id="L50">                return Long.parseLong(s);</span>
+<span class="nc" id="L51">            } catch (NumberFormatException e) {</span>
+<span class="nc" id="L52">                return (long) parseDouble(s);</span>
+            }
+        }
+<span class="nc" id="L55">        throw new IllegalArgumentException(&quot;expected a number&quot;);</span>
+    }
+
+    /// A JSON whole number in `[min, max]`, for an array element of an
+    /// integral type: a fraction or a value out of range is refused rather
+    /// than truncated, as the server's codec refuses it.
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: when the value is not such a number
+    public static long toIntegral(Object v, long min, long max) {
+        long l;
+<span class="nc bnc" id="L67" title="All 4 branches missed.">        if (v instanceof Double || v instanceof Float) {</span>
+<span class="nc" id="L68">            double d = ((Number) v).doubleValue();</span>
+            // max + 1.0, not max: (double) Long.MAX_VALUE rounds up to 2^63,
+            // which would pass a plain d &gt; max and then clamp in the cast.
+<span class="nc bnc" id="L71" title="All 6 branches missed.">            if (d != Math.floor(d) || d &lt; min || d &gt;= max + 1.0) {</span>
+<span class="nc" id="L72">                throw new IllegalArgumentException(&quot;expected a whole number in range, found &quot; + v);</span>
+            }
+<span class="nc" id="L74">            l = (long) d;</span>
+<span class="nc bnc" id="L75" title="All 2 branches missed.">        } else if (v instanceof String) {</span>
+<span class="nc" id="L76">            String s = ((String) v).trim();</span>
+            try {
+<span class="nc" id="L78">                l = Long.parseLong(s);</span>
+<span class="nc" id="L79">            } catch (NumberFormatException e) {</span>
+<span class="nc" id="L80">                return toIntegral(Double.valueOf(parseDouble(s)), min, max);</span>
+<span class="nc" id="L81">            }</span>
+<span class="nc bnc" id="L82" title="All 2 branches missed.">        } else if (v instanceof Number) {</span>
+<span class="nc" id="L83">            l = ((Number) v).longValue();</span>
+        } else {
+<span class="nc" id="L85">            throw new IllegalArgumentException(&quot;expected a number&quot;);</span>
+        }
+<span class="nc bnc" id="L87" title="All 4 branches missed.">        if (l &lt; min || l &gt; max) {</span>
+<span class="nc" id="L88">            throw new IllegalArgumentException(&quot;expected a whole number in range, found &quot; + v);</span>
+        }
+<span class="nc" id="L90">        return l;</span>
+    }
+
+    /// `json` read by `mapper`, which must be a JSON object.
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: when `json` is not an object
+    public static Object object(Mapper mapper, Object json) {
+<span class="nc bnc" id="L99" title="All 4 branches missed.">        if (!(json instanceof java.util.Map) || mapper == null) {</span>
+<span class="nc" id="L100">            throw new IllegalArgumentException(&quot;expected a JSON object&quot;);</span>
+        }
+<span class="nc" id="L102">        return mapper.fromMap((java.util.Map) json);</span>
+    }
+
+    /// A JSON number, or a string holding one, as a `double`.
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: when the value is neither
+    public static double toDouble(Object v) {
+<span class="nc bnc" id="L111" title="All 2 branches missed.">        if (v instanceof Number) {</span>
+<span class="nc" id="L112">            return ((Number) v).doubleValue();</span>
+        }
+<span class="nc bnc" id="L114" title="All 2 branches missed.">        if (v instanceof String) {</span>
+<span class="nc" id="L115">            return parseDouble(((String) v).trim());</span>
+        }
+<span class="nc" id="L117">        throw new IllegalArgumentException(&quot;expected a number&quot;);</span>
+    }
+
+    private static double parseDouble(String s) {
+        try {
+<span class="nc" id="L122">            return Double.parseDouble(s);</span>
+<span class="nc" id="L123">        } catch (NumberFormatException e) {</span>
+<span class="nc" id="L124">            throw new IllegalArgumentException(&quot;expected a number, found \&quot;&quot; + s + &quot;\&quot;&quot;, e);</span>
+        }
+    }
+
+    /// A JSON date in either shape: epoch milliseconds (a number or a numeric
+    /// string) or an ISO-8601 string -- a date alone, or a date and time with
+    /// optional fraction and `Z` or numeric offset.
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: when the value is neither
+    public static Date toDate(Object v) {
+<span class="nc bnc" id="L136" title="All 2 branches missed.">        if (v instanceof Number) {</span>
+<span class="nc" id="L137">            return new Date(((Number) v).longValue());</span>
+        }
+<span class="nc bnc" id="L139" title="All 2 branches missed.">        if (v instanceof String) {</span>
+<span class="nc" id="L140">            String s = ((String) v).trim();</span>
+<span class="nc bnc" id="L141" title="All 4 branches missed.">            if (s.length() &gt; 0 &amp;&amp; s.indexOf('-', 1) &lt; 0) {</span>
+<span class="nc" id="L142">                return new Date(toLong(s));</span>
+            }
+<span class="nc" id="L144">            return new Date(parseIso(s));</span>
+        }
+<span class="nc" id="L146">        throw new IllegalArgumentException(&quot;expected a date&quot;);</span>
+    }
+
+    /// Formats `d` as `yyyy-MM-ddTHH:mm:ss.SSSZ` in UTC.
+    public static String formatIso(Date d) {
+<span class="nc" id="L151">        long millis = d.getTime();</span>
+<span class="nc" id="L152">        long days = floorDiv(millis, 86400000L);</span>
+<span class="nc" id="L153">        long ms = millis - days * 86400000L;</span>
+        // Civil-from-days (Howard Hinnant's algorithm), proleptic Gregorian.
+<span class="nc" id="L155">        long z = days + 719468;</span>
+<span class="nc bnc" id="L156" title="All 2 branches missed.">        long era = (z &gt;= 0 ? z : z - 146096) / 146097;</span>
+<span class="nc" id="L157">        long doe = z - era * 146097;</span>
+<span class="nc" id="L158">        long yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;</span>
+<span class="nc" id="L159">        long y = yoe + era * 400;</span>
+<span class="nc" id="L160">        long doy = doe - (365 * yoe + yoe / 4 - yoe / 100);</span>
+<span class="nc" id="L161">        long mp = (5 * doy + 2) / 153;</span>
+<span class="nc" id="L162">        long day = doy - (153 * mp + 2) / 5 + 1;</span>
+<span class="nc bnc" id="L163" title="All 2 branches missed.">        long month = mp &lt; 10 ? mp + 3 : mp - 9;</span>
+<span class="nc bnc" id="L164" title="All 2 branches missed.">        if (month &lt;= 2) {</span>
+<span class="nc" id="L165">            y++;</span>
+        }
+<span class="nc" id="L167">        StringBuilder b = new StringBuilder(24);</span>
+<span class="nc" id="L168">        pad(b, y, 4);</span>
+<span class="nc" id="L169">        b.append('-');</span>
+<span class="nc" id="L170">        pad(b, month, 2);</span>
+<span class="nc" id="L171">        b.append('-');</span>
+<span class="nc" id="L172">        pad(b, day, 2);</span>
+<span class="nc" id="L173">        b.append('T');</span>
+<span class="nc" id="L174">        pad(b, ms / 3600000L, 2);</span>
+<span class="nc" id="L175">        b.append(':');</span>
+<span class="nc" id="L176">        pad(b, (ms / 60000L) % 60, 2);</span>
+<span class="nc" id="L177">        b.append(':');</span>
+<span class="nc" id="L178">        pad(b, (ms / 1000L) % 60, 2);</span>
+<span class="nc" id="L179">        b.append('.');</span>
+<span class="nc" id="L180">        pad(b, ms % 1000L, 3);</span>
+<span class="nc" id="L181">        b.append('Z');</span>
+<span class="nc" id="L182">        return b.toString();</span>
+    }
+
+    private static void pad(StringBuilder b, long v, int width) {
+<span class="nc bnc" id="L186" title="All 2 branches missed.">        if (v &lt; 0) {</span>
+<span class="nc" id="L187">            b.append('-');</span>
+<span class="nc" id="L188">            v = -v;</span>
+        }
+<span class="nc" id="L190">        String s = String.valueOf(v);</span>
+<span class="nc bnc" id="L191" title="All 2 branches missed.">        for (int i = s.length(); i &lt; width; i++) {</span>
+<span class="nc" id="L192">            b.append('0');</span>
+        }
+<span class="nc" id="L194">        b.append(s);</span>
+<span class="nc" id="L195">    }</span>
+
+    private static long floorDiv(long a, long b) {
+<span class="nc" id="L198">        long q = a / b;</span>
+<span class="nc bnc" id="L199" title="All 8 branches missed.">        if ((a % b != 0) &amp;&amp; ((a &lt; 0) != (b &lt; 0))) {</span>
+<span class="nc" id="L200">            q--;</span>
+        }
+<span class="nc" id="L202">        return q;</span>
+    }
+
+    /// Days in `month` (1-12) of the proleptic Gregorian `year`.
+    private static int daysIn(long year, int month) {
+<span class="nc bnc" id="L207" title="All 2 branches missed.">        if (month == 2) {</span>
+<span class="nc bnc" id="L208" title="All 6 branches missed.">            boolean leap = year % 4 == 0 &amp;&amp; (year % 100 != 0 || year % 400 == 0);</span>
+<span class="nc bnc" id="L209" title="All 2 branches missed.">            return leap ? 29 : 28;</span>
+        }
+<span class="nc bnc" id="L211" title="All 8 branches missed.">        return month == 4 || month == 6 || month == 9 || month == 11 ? 30 : 31;</span>
+    }
+
+    /// Parses an ISO-8601 date or date-time to epoch milliseconds. A value with
+    /// no offset is read as UTC.
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: when `s` is not ISO-8601
+    public static long parseIso(String s) {
+        try {
+<span class="nc" id="L222">            int len = s.length();</span>
+<span class="nc" id="L223">            int p = 0;</span>
+<span class="nc" id="L224">            boolean negYear = false;</span>
+<span class="nc bnc" id="L225" title="All 6 branches missed.">            if (len &gt; 0 &amp;&amp; (s.charAt(0) == '-' || s.charAt(0) == '+')) {</span>
+<span class="nc bnc" id="L226" title="All 2 branches missed.">                negYear = s.charAt(0) == '-';</span>
+<span class="nc" id="L227">                p = 1;</span>
+            }
+<span class="nc" id="L229">            int dash = s.indexOf('-', p);</span>
+<span class="nc" id="L230">            long year = Long.parseLong(s.substring(p, dash));</span>
+<span class="nc bnc" id="L231" title="All 2 branches missed.">            if (negYear) {</span>
+<span class="nc" id="L232">                year = -year;</span>
+            }
+<span class="nc" id="L234">            int month = Integer.parseInt(s.substring(dash + 1, dash + 3));</span>
+<span class="nc" id="L235">            int day = Integer.parseInt(s.substring(dash + 4, dash + 6));</span>
+<span class="nc bnc" id="L236" title="All 8 branches missed.">            if (s.charAt(dash + 3) != '-' || month &lt; 1 || month &gt; 12 || day &lt; 1</span>
+<span class="nc bnc" id="L237" title="All 2 branches missed.">                    || day &gt; daysIn(year, month)) {</span>
+<span class="nc" id="L238">                throw new IllegalArgumentException();</span>
+            }
+<span class="nc" id="L240">            p = dash + 6;</span>
+<span class="nc" id="L241">            long ms = 0;</span>
+<span class="nc" id="L242">            long offsetMs = 0;</span>
+<span class="nc bnc" id="L243" title="All 2 branches missed.">            if (p &lt; len) {</span>
+<span class="nc" id="L244">                char t = s.charAt(p);</span>
+<span class="nc bnc" id="L245" title="All 6 branches missed.">                if (t != 'T' &amp;&amp; t != 't' &amp;&amp; t != ' ') {</span>
+<span class="nc" id="L246">                    throw new IllegalArgumentException();</span>
+                }
+<span class="nc" id="L248">                p++;</span>
+<span class="nc" id="L249">                int hh = Integer.parseInt(s.substring(p, p + 2));</span>
+<span class="nc bnc" id="L250" title="All 2 branches missed.">                if (s.charAt(p + 2) != ':') {</span>
+<span class="nc" id="L251">                    throw new IllegalArgumentException();</span>
+                }
+<span class="nc" id="L253">                int mm = Integer.parseInt(s.substring(p + 3, p + 5));</span>
+<span class="nc" id="L254">                p += 5;</span>
+<span class="nc" id="L255">                int ss = 0;</span>
+<span class="nc" id="L256">                int frac = 0;</span>
+<span class="nc bnc" id="L257" title="All 4 branches missed.">                if (p &lt; len &amp;&amp; s.charAt(p) == ':') {</span>
+<span class="nc" id="L258">                    ss = Integer.parseInt(s.substring(p + 1, p + 3));</span>
+<span class="nc" id="L259">                    p += 3;</span>
+<span class="nc bnc" id="L260" title="All 6 branches missed.">                    if (p &lt; len &amp;&amp; (s.charAt(p) == '.' || s.charAt(p) == ',')) {</span>
+<span class="nc" id="L261">                        p++;</span>
+<span class="nc" id="L262">                        int digits = 0;</span>
+<span class="nc bnc" id="L263" title="All 4 branches missed.">                        while (p &lt; len &amp;&amp; Character.isDigit(s.charAt(p))) {</span>
+<span class="nc bnc" id="L264" title="All 2 branches missed.">                            if (digits &lt; 3) {</span>
+<span class="nc" id="L265">                                frac = frac * 10 + (s.charAt(p) - '0');</span>
+                            }
+<span class="nc" id="L267">                            digits++;</span>
+<span class="nc" id="L268">                            p++;</span>
+                        }
+<span class="nc bnc" id="L270" title="All 2 branches missed.">                        if (digits == 0) {</span>
+<span class="nc" id="L271">                            throw new IllegalArgumentException();</span>
+                        }
+<span class="nc bnc" id="L273" title="All 2 branches missed.">                        for (int i = digits; i &lt; 3; i++) {</span>
+<span class="nc" id="L274">                            frac *= 10;</span>
+                        }
+                    }
+                }
+                // The same bounds the server's reader holds: no 24:00, no leap second.
+<span class="nc bnc" id="L279" title="All 6 branches missed.">                if (hh &gt; 23 || mm &gt; 59 || ss &gt; 59) {</span>
+<span class="nc" id="L280">                    throw new IllegalArgumentException();</span>
+                }
+<span class="nc" id="L282">                ms = hh * 3600000L + mm * 60000L + ss * 1000L + frac;</span>
+<span class="nc bnc" id="L283" title="All 2 branches missed.">                if (p &lt; len) {</span>
+<span class="nc" id="L284">                    char z = s.charAt(p);</span>
+<span class="nc bnc" id="L285" title="All 6 branches missed.">                    if ((z == 'Z' || z == 'z') &amp;&amp; p + 1 == len) {</span>
+<span class="nc" id="L286">                        p++;</span>
+<span class="nc bnc" id="L287" title="All 4 branches missed.">                    } else if (z == '+' || z == '-') {</span>
+<span class="nc" id="L288">                        String off = s.substring(p + 1);</span>
+                        int oh;
+<span class="nc" id="L290">                        int om = 0;</span>
+<span class="nc bnc" id="L291" title="All 2 branches missed.">                        if (off.length() == 2) {</span>
+<span class="nc" id="L292">                            oh = Integer.parseInt(off);</span>
+<span class="nc bnc" id="L293" title="All 2 branches missed.">                        } else if (off.length() == 4) {</span>
+<span class="nc" id="L294">                            oh = Integer.parseInt(off.substring(0, 2));</span>
+<span class="nc" id="L295">                            om = Integer.parseInt(off.substring(2));</span>
+<span class="nc bnc" id="L296" title="All 4 branches missed.">                        } else if (off.length() == 5 &amp;&amp; off.charAt(2) == ':') {</span>
+<span class="nc" id="L297">                            oh = Integer.parseInt(off.substring(0, 2));</span>
+<span class="nc" id="L298">                            om = Integer.parseInt(off.substring(3));</span>
+                        } else {
+<span class="nc" id="L300">                            throw new IllegalArgumentException();</span>
+                        }
+<span class="nc bnc" id="L302" title="All 8 branches missed.">                        if (oh &lt; 0 || oh &gt; 23 || om &lt; 0 || om &gt; 59) {</span>
+<span class="nc" id="L303">                            throw new IllegalArgumentException();</span>
+                        }
+<span class="nc" id="L305">                        offsetMs = (oh * 60L + om) * 60000L;</span>
+<span class="nc bnc" id="L306" title="All 2 branches missed.">                        if (z == '-') {</span>
+<span class="nc" id="L307">                            offsetMs = -offsetMs;</span>
+                        }
+<span class="nc" id="L309">                        p = len;</span>
+                    }
+                }
+<span class="nc bnc" id="L312" title="All 2 branches missed.">                if (p != len) {</span>
+<span class="nc" id="L313">                    throw new IllegalArgumentException();</span>
+                }
+            }
+<span class="nc" id="L316">            return daysFromCivil(year, month, day) * 86400000L + ms - offsetMs;</span>
+<span class="nc" id="L317">        } catch (RuntimeException e) {</span>
+            // NumberFormatException and StringIndexOutOfBoundsException are
+            // thrown explicitly by the parsers, never by a cast.
+<span class="nc" id="L320">            throw new IllegalArgumentException(&quot;expected an ISO-8601 date, found \&quot;&quot; + s + &quot;\&quot;&quot;, e);</span>
+        }
+    }
+
+    private static long daysFromCivil(long y, int m, int d) {
+<span class="nc bnc" id="L325" title="All 2 branches missed.">        if (m &lt;= 2) {</span>
+<span class="nc" id="L326">            y--;</span>
+        }
+<span class="nc bnc" id="L328" title="All 2 branches missed.">        long era = (y &gt;= 0 ? y : y - 399) / 400;</span>
+<span class="nc" id="L329">        long yoe = y - era * 400;</span>
+<span class="nc bnc" id="L330" title="All 2 branches missed.">        long doy = (153L * (m &gt; 2 ? m - 3 : m + 9) + 2) / 5 + d - 1;</span>
+<span class="nc" id="L331">        long doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;</span>
+<span class="nc" id="L332">        return era * 146097 + doe - 719468;</span>
+    }
+
+    /// Prefixes a nested failure with the location it happened at. A message
+    /// that already starts with a `$` path is joined to it, so a failure three
+    /// levels down reads `$.order.items[2].due: required member is missing`.
+    public static IllegalArgumentException at(String path, IllegalArgumentException e) {
+<span class="nc" id="L339">        String msg = e.getMessage();</span>
+<span class="nc bnc" id="L340" title="All 4 branches missed.">        if (msg != null &amp;&amp; msg.startsWith(&quot;$&quot;)) {</span>
+<span class="nc" id="L341">            return new IllegalArgumentException(path + msg.substring(1));</span>
+        }
+<span class="nc bnc" id="L343" title="All 2 branches missed.">        return new IllegalArgumentException(path + &quot;: &quot; + (msg == null ? &quot;invalid value&quot; : msg));</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,530 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PdfParagraph.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.pdf</a> &gt; <span class="el_source">PdfParagraph.java</span></div><h1>PdfParagraph.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.pdf;
+
+import com.codename1.util.Bidi;
+import java.util.ArrayList;
+import java.util.List;
+
+/// A block of text for [PdfLayout], wrapped to the available width. It is
+/// made of runs, each with its own font, size, color and optional link:
+///
+/// ```java
+/// PdfDocument doc = new PdfDocument();
+/// PdfLayout layout = new PdfLayout(doc, PdfPageSize.A4, 54);
+/// layout.add(new PdfParagraph()
+///         .append(&quot;Total due: &quot;, PdfFont.HELVETICA, 11)
+///         .append(&quot;$1,240.00&quot;, PdfFont.HELVETICA_BOLD, 11)
+///         .setAlignment(PdfParagraph.ALIGN_RIGHT));
+/// ```
+///
+/// Lines break at spaces and after hyphens; a word wider than the line is
+/// broken between characters. A `\n` in the text forces a line break.
+///
+/// Text is given in reading order. Each line is ordered for display by the
+/// Unicode bidirectional algorithm, so Hebrew and Arabic read right to left
+/// with numbers and Latin words inside them kept left to right, and Arabic
+/// letters are joined. The paragraph direction comes from its first strong
+/// character unless set with [#setDirection(int)]; it decides which side
+/// lines start from when no alignment is set and which side the first-line
+/// indent is on.
+@com.codename1.impl.SharedWithBackend
+public final class PdfParagraph {
+    /// Lines start at the left edge.
+    public static final int ALIGN_LEFT = 0;
+    /// Lines are centered.
+    public static final int ALIGN_CENTER = 1;
+    /// Lines end at the right edge.
+    public static final int ALIGN_RIGHT = 2;
+    /// Lines fill the width by widening the spaces, except the last.
+    public static final int ALIGN_JUSTIFY = 3;
+    /// Lines start at the side the paragraph direction reads from: the
+    /// left for left-to-right text, the right for right-to-left. The
+    /// default.
+    public static final int ALIGN_START = 4;
+
+    /// The direction comes from the first strong character. The default.
+    public static final int DIRECTION_AUTO = -1;
+    /// Left to right.
+    public static final int DIRECTION_LTR = 0;
+    /// Right to left.
+    public static final int DIRECTION_RTL = 1;
+
+<span class="pc" id="L73">    final List&lt;Run&gt; runs = new ArrayList&lt;Run&gt;();</span>
+<span class="pc" id="L74">    int alignment = ALIGN_START;</span>
+<span class="pc" id="L75">    int direction = DIRECTION_AUTO;</span>
+<span class="pc" id="L76">    float lineSpacing = 1.15f;</span>
+    float spaceBefore;
+<span class="pc" id="L78">    float spaceAfter = 6;</span>
+    float indent;
+
+    /// An empty paragraph; add text with the `append` methods.
+<span class="nc" id="L82">    public PdfParagraph() {</span>
+<span class="nc" id="L83">    }</span>
+
+    /// A paragraph of `text` in one font.
+<span class="fc" id="L86">    public PdfParagraph(String text, PdfFont font, float size) {</span>
+<span class="fc" id="L87">        append(text, font, size);</span>
+<span class="fc" id="L88">    }</span>
+
+    /// Adds black text.
+    public PdfParagraph append(String text, PdfFont font, float size) {
+<span class="fc" id="L92">        return append(text, font, size, 0);</span>
+    }
+
+    /// Adds text in color `rgb` (`0xRRGGBB`).
+    public PdfParagraph append(String text, PdfFont font, float size, int rgb) {
+<span class="fc" id="L97">        runs.add(new Run(text, font, size, rgb, null));</span>
+<span class="fc" id="L98">        return this;</span>
+    }
+
+    /// Adds text that opens `uri` when clicked, in color `rgb`.
+    public PdfParagraph appendLink(String text, String uri, PdfFont font, float size, int rgb) {
+<span class="nc" id="L103">        runs.add(new Run(text, font, size, rgb, uri));</span>
+<span class="nc" id="L104">        return this;</span>
+    }
+
+    /// Sets the alignment, one of the `ALIGN_` constants.
+    public PdfParagraph setAlignment(int alignment) {
+<span class="nc" id="L109">        this.alignment = alignment;</span>
+<span class="nc" id="L110">        return this;</span>
+    }
+
+    /// Sets the paragraph direction, one of the `DIRECTION_` constants.
+    public PdfParagraph setDirection(int direction) {
+<span class="nc" id="L115">        this.direction = direction;</span>
+<span class="nc" id="L116">        return this;</span>
+    }
+
+    /// The direction the paragraph resolves to, [#DIRECTION_LTR] or
+    /// [#DIRECTION_RTL].
+    int resolvedDirection() {
+<span class="pc bpc" id="L122" title="1 of 2 branches missed.">        if (direction != DIRECTION_AUTO) {</span>
+<span class="nc" id="L123">            return direction;</span>
+        }
+<span class="fc bfc" id="L125" title="All 2 branches covered.">        for (int i = 0; i &lt; runs.size(); i++) { // NOPMD ForLoopCanBeForeach - indexed like the surrounding decoder loops</span>
+<span class="fc" id="L126">            int d = Bidi.direction(runs.get(i).text);</span>
+<span class="fc bfc" id="L127" title="All 2 branches covered.">            if (d &gt;= 0) {</span>
+<span class="fc" id="L128">                return d;</span>
+            }
+        }
+<span class="fc" id="L131">        return DIRECTION_LTR;</span>
+    }
+
+    /// Sets the distance between baselines as a multiple of the largest
+    /// font's natural line height; 1.15 by default.
+    public PdfParagraph setLineSpacing(float multiple) {
+<span class="nc" id="L137">        this.lineSpacing = multiple;</span>
+<span class="nc" id="L138">        return this;</span>
+    }
+
+    /// Sets the space above the paragraph in points; 0 by default.
+    public PdfParagraph setSpaceBefore(float points) {
+<span class="nc" id="L143">        this.spaceBefore = points;</span>
+<span class="nc" id="L144">        return this;</span>
+    }
+
+    /// Sets the space below the paragraph in points; 6 by default.
+    public PdfParagraph setSpaceAfter(float points) {
+<span class="nc" id="L149">        this.spaceAfter = points;</span>
+<span class="nc" id="L150">        return this;</span>
+    }
+
+    /// Indents the first line by `points`.
+    public PdfParagraph setFirstLineIndent(float points) {
+<span class="nc" id="L155">        this.indent = points;</span>
+<span class="nc" id="L156">        return this;</span>
+    }
+
+    static final class Run {
+        final String text;
+        final PdfFont font;
+        final float size;
+        final int rgb;
+        final String uri;
+
+<span class="fc" id="L166">        Run(String text, PdfFont font, float size, int rgb, String uri) {</span>
+<span class="pc bpc" id="L167" title="1 of 2 branches missed.">            this.text = text == null ? &quot;&quot; : text;</span>
+<span class="fc" id="L168">            this.font = font;</span>
+<span class="fc" id="L169">            this.size = size;</span>
+<span class="fc" id="L170">            this.rgb = rgb;</span>
+<span class="fc" id="L171">            this.uri = uri;</span>
+<span class="fc" id="L172">        }</span>
+    }
+
+    /// A piece of one run on one line.
+    static final class Fragment {
+        final Run run;
+        final String text;
+        final float width;
+        final int spaces;
+
+<span class="fc" id="L182">        Fragment(Run run, String text) {</span>
+<span class="fc" id="L183">            this.run = run;</span>
+<span class="fc" id="L184">            this.text = text;</span>
+<span class="fc" id="L185">            this.width = run.font.getStringWidth(text, run.size);</span>
+<span class="fc" id="L186">            int n = 0;</span>
+<span class="fc bfc" id="L187" title="All 2 branches covered.">            for (int i = 0; i &lt; text.length(); i++) {</span>
+<span class="fc bfc" id="L188" title="All 2 branches covered.">                if (text.charAt(i) == ' ') {</span>
+<span class="fc" id="L189">                    n++;</span>
+                }
+            }
+<span class="fc" id="L192">            this.spaces = n;</span>
+<span class="fc" id="L193">        }</span>
+    }
+
+<span class="fc" id="L196">    static final class Line {</span>
+<span class="fc" id="L197">        final List&lt;Fragment&gt; fragments = new ArrayList&lt;Fragment&gt;();</span>
+        float width;
+        float ascent;
+        float height;
+        boolean last;
+        float offset;
+    }
+
+    /// Breaks the paragraph into lines no wider than `width`.
+    List&lt;Line&gt; lines(float width) {
+<span class="fc" id="L207">        List&lt;Line&gt; lines = new ArrayList&lt;Line&gt;();</span>
+<span class="fc" id="L208">        Line line = new Line();</span>
+<span class="fc" id="L209">        line.offset = indent;</span>
+<span class="fc" id="L210">        float avail = width - indent;</span>
+<span class="fc bfc" id="L211" title="All 2 branches covered.">        for (int r = 0; r &lt; runs.size(); r++) { // NOPMD ForLoopCanBeForeach - indexed like the surrounding decoder loops</span>
+<span class="fc" id="L212">            Run run = runs.get(r);</span>
+<span class="fc" id="L213">            String t = run.text;</span>
+<span class="fc" id="L214">            int pos = 0;</span>
+<span class="fc bfc" id="L215" title="All 2 branches covered.">            while (pos &lt; t.length()) {</span>
+<span class="fc" id="L216">                char c = t.charAt(pos);</span>
+<span class="pc bpc" id="L217" title="1 of 2 branches missed.">                if (c == '\n') {</span>
+<span class="nc" id="L218">                    line.last = true;</span>
+<span class="nc" id="L219">                    finish(lines, line, run);</span>
+<span class="nc" id="L220">                    line = new Line();</span>
+<span class="nc" id="L221">                    avail = width;</span>
+<span class="nc" id="L222">                    pos++;</span>
+<span class="nc" id="L223">                    continue;</span>
+                }
+<span class="fc" id="L225">                int end = pos;</span>
+<span class="pc bpc" id="L226" title="1 of 8 branches missed.">                while (end &lt; t.length() &amp;&amp; t.charAt(end) != ' ' &amp;&amp; t.charAt(end) != '\n'</span>
+<span class="pc bpc" id="L227" title="1 of 2 branches missed.">                        &amp;&amp; !(end &gt; pos &amp;&amp; t.charAt(end - 1) == '-')) {</span>
+<span class="fc" id="L228">                    end++;</span>
+                }
+<span class="fc" id="L230">                int withSpace = end;</span>
+<span class="fc bfc" id="L231" title="All 4 branches covered.">                while (withSpace &lt; t.length() &amp;&amp; t.charAt(withSpace) == ' ') {</span>
+<span class="fc" id="L232">                    withSpace++;</span>
+                }
+<span class="fc" id="L234">                String word = t.substring(pos, end);</span>
+<span class="fc" id="L235">                float ww = run.font.getStringWidth(word, run.size);</span>
+<span class="pc bpc" id="L236" title="1 of 4 branches missed.">                if (line.width + ww &gt; avail &amp;&amp; !line.fragments.isEmpty()) {</span>
+<span class="nc" id="L237">                    trimTrailingSpace(line);</span>
+<span class="nc" id="L238">                    finish(lines, line, run);</span>
+<span class="nc" id="L239">                    line = new Line();</span>
+<span class="nc" id="L240">                    avail = width;</span>
+                }
+<span class="fc bfc" id="L242" title="All 2 branches covered.">                if (ww &gt; avail) {</span>
+                    // A word wider than a whole line: break between characters.
+                    // Breaks fall only between clusters (never inside a
+                    // surrogate pair or before a combining mark), and the
+                    // width is summed cluster by cluster so a 100k character
+                    // token costs linear time.
+<span class="fc" id="L248">                    int start = pos;</span>
+<span class="fc" id="L249">                    float w = 0;</span>
+<span class="fc" id="L250">                    int i = pos;</span>
+<span class="fc" id="L251">                    int last = pos;</span>
+<span class="fc bfc" id="L252" title="All 2 branches covered.">                    while (i &lt; end) {</span>
+<span class="fc" id="L253">                        int next = nextCluster(t, i, end);</span>
+<span class="fc" id="L254">                        float cw = run.font.getStringWidth(t.substring(i, next), run.size);</span>
+<span class="pc bpc" id="L255" title="1 of 4 branches missed.">                        if (w + cw &gt; avail - line.width &amp;&amp; i &gt; start) {</span>
+                            // The sum leaves out kerning and joined forms;
+                            // the fragment as drawn is measured once, and
+                            // gives back a cluster when it is wider.
+<span class="pc bpc" id="L259" title="2 of 4 branches missed.">                            if (last &gt; start &amp;&amp; run.font.getStringWidth(t.substring(start, i), run.size)</span>
+                                    &gt; avail - line.width) {
+<span class="nc" id="L261">                                i = last;</span>
+                            }
+<span class="fc" id="L263">                            add(line, run, t.substring(start, i));</span>
+<span class="fc" id="L264">                            finish(lines, line, run);</span>
+<span class="fc" id="L265">                            line = new Line();</span>
+<span class="fc" id="L266">                            avail = width;</span>
+<span class="fc" id="L267">                            start = i;</span>
+<span class="fc" id="L268">                            last = i;</span>
+<span class="fc" id="L269">                            w = 0;</span>
+                            // Measure the cluster at i again on the new line.
+<span class="fc" id="L271">                            continue;</span>
+                        }
+<span class="fc" id="L273">                        w += cw;</span>
+<span class="fc" id="L274">                        last = i;</span>
+<span class="fc" id="L275">                        i = next;</span>
+<span class="fc" id="L276">                    }</span>
+<span class="fc" id="L277">                    add(line, run, t.substring(start, withSpace));</span>
+<span class="fc" id="L278">                } else {</span>
+<span class="fc" id="L279">                    add(line, run, t.substring(pos, withSpace));</span>
+                }
+<span class="fc" id="L281">                pos = withSpace;</span>
+<span class="fc" id="L282">            }</span>
+        }
+<span class="pc bpc" id="L284" title="3 of 4 branches missed.">        if (!line.fragments.isEmpty() || lines.isEmpty()) {</span>
+<span class="fc" id="L285">            line.last = true;</span>
+<span class="pc bpc" id="L286" title="1 of 2 branches missed.">            finish(lines, line, runs.isEmpty() ? null : runs.get(runs.size() - 1));</span>
+<span class="nc bnc" id="L287" title="All 2 branches missed.">        } else if (!lines.isEmpty()) {</span>
+<span class="nc" id="L288">            lines.get(lines.size() - 1).last = true;</span>
+        }
+<span class="fc" id="L290">        return lines;</span>
+    }
+
+    private static void add(Line line, Run run, String text) {
+<span class="pc bpc" id="L294" title="1 of 2 branches missed.">        if (text.length() == 0) {</span>
+<span class="nc" id="L295">            return;</span>
+        }
+<span class="fc" id="L297">        int n = line.fragments.size();</span>
+<span class="pc bpc" id="L298" title="1 of 4 branches missed.">        if (n &gt; 0 &amp;&amp; line.fragments.get(n - 1).run == run) { // NOPMD CompareObjectsWithEquals - identity of a sentinel object is intended</span>
+<span class="fc" id="L299">            Fragment prev = line.fragments.remove(n - 1);</span>
+<span class="fc" id="L300">            line.width -= prev.width;</span>
+<span class="fc" id="L301">            text = prev.text + text;</span>
+        }
+<span class="fc" id="L303">        Fragment f = new Fragment(run, text);</span>
+<span class="fc" id="L304">        line.fragments.add(f);</span>
+<span class="fc" id="L305">        line.width += f.width;</span>
+<span class="fc" id="L306">    }</span>
+
+    private static void trimTrailingSpace(Line line) {
+<span class="nc" id="L309">        int n = line.fragments.size();</span>
+<span class="nc bnc" id="L310" title="All 2 branches missed.">        if (n == 0) {</span>
+<span class="nc" id="L311">            return;</span>
+        }
+<span class="nc" id="L313">        Fragment f = line.fragments.get(n - 1);</span>
+<span class="nc" id="L314">        String t = f.text;</span>
+<span class="nc" id="L315">        int end = t.length();</span>
+<span class="nc bnc" id="L316" title="All 4 branches missed.">        while (end &gt; 0 &amp;&amp; t.charAt(end - 1) == ' ') {</span>
+<span class="nc" id="L317">            end--;</span>
+        }
+<span class="nc bnc" id="L319" title="All 2 branches missed.">        if (end != t.length()) {</span>
+<span class="nc" id="L320">            line.fragments.remove(n - 1);</span>
+<span class="nc" id="L321">            line.width -= f.width;</span>
+<span class="nc bnc" id="L322" title="All 2 branches missed.">            if (end &gt; 0) {</span>
+<span class="nc" id="L323">                Fragment g = new Fragment(f.run, t.substring(0, end));</span>
+<span class="nc" id="L324">                line.fragments.add(g);</span>
+<span class="nc" id="L325">                line.width += g.width;</span>
+            }
+        }
+<span class="nc" id="L328">    }</span>
+
+    private void finish(List&lt;Line&gt; lines, Line line, Run fallback) {
+<span class="fc" id="L331">        float asc = 0;</span>
+<span class="fc" id="L332">        float h = 0;</span>
+<span class="fc bfc" id="L333" title="All 2 branches covered.">        for (int i = 0; i &lt; line.fragments.size(); i++) {</span>
+<span class="fc" id="L334">            Run r = line.fragments.get(i).run;</span>
+<span class="fc" id="L335">            asc = Math.max(asc, r.font.getAscent(r.size));</span>
+<span class="fc" id="L336">            h = Math.max(h, r.font.getLineHeight(r.size) / 1.15f * lineSpacing);</span>
+        }
+<span class="pc bpc" id="L338" title="3 of 4 branches missed.">        if (line.fragments.isEmpty() &amp;&amp; fallback != null) {</span>
+<span class="nc" id="L339">            asc = fallback.font.getAscent(fallback.size);</span>
+<span class="nc" id="L340">            h = fallback.font.getLineHeight(fallback.size) / 1.15f * lineSpacing;</span>
+        }
+<span class="fc" id="L342">        line.ascent = asc;</span>
+<span class="fc" id="L343">        line.height = h;</span>
+<span class="fc" id="L344">        lines.add(line);</span>
+<span class="fc" id="L345">    }</span>
+
+    /// A piece of a line in one run and one direction.
+    private static final class Piece {
+        Run run;
+        String text;
+        boolean rtl;
+    }
+
+    /// The pieces of `line` from left to right.
+    private static List&lt;Piece&gt; visual(Line line, int dir) {
+<span class="fc" id="L356">        StringBuilder sb = new StringBuilder();</span>
+<span class="fc bfc" id="L357" title="All 2 branches covered.">        for (int i = 0; i &lt; line.fragments.size(); i++) {</span>
+<span class="fc" id="L358">            sb.append(line.fragments.get(i).text);</span>
+        }
+<span class="fc" id="L360">        String text = sb.toString();</span>
+<span class="fc" id="L361">        List&lt;Piece&gt; out = new ArrayList&lt;Piece&gt;();</span>
+<span class="pc bpc" id="L362" title="1 of 4 branches missed.">        if (dir == DIRECTION_LTR &amp;&amp; Bidi.isLeftToRight(text, false)) {</span>
+<span class="fc bfc" id="L363" title="All 2 branches covered.">            for (int i = 0; i &lt; line.fragments.size(); i++) {</span>
+<span class="fc" id="L364">                Piece p = new Piece();</span>
+<span class="fc" id="L365">                p.run = line.fragments.get(i).run;</span>
+<span class="fc" id="L366">                p.text = line.fragments.get(i).text;</span>
+<span class="fc" id="L367">                out.add(p);</span>
+            }
+<span class="fc" id="L369">            return out;</span>
+        }
+<span class="pc bpc" id="L371" title="1 of 2 branches missed.">        byte[] levels = Bidi.levels(text, dir == DIRECTION_RTL);</span>
+<span class="fc" id="L372">        int[] frag = new int[text.length()];</span>
+<span class="fc" id="L373">        int pos = 0;</span>
+<span class="fc bfc" id="L374" title="All 2 branches covered.">        for (int i = 0; i &lt; line.fragments.size(); i++) {</span>
+<span class="fc" id="L375">            int len = line.fragments.get(i).text.length();</span>
+<span class="fc bfc" id="L376" title="All 2 branches covered.">            for (int k = 0; k &lt; len; k++) {</span>
+<span class="fc" id="L377">                frag[pos++] = i;</span>
+            }
+        }
+        // Split into runs of one fragment and one level, then order them.
+<span class="fc" id="L381">        List&lt;int[]&gt; spans = new ArrayList&lt;int[]&gt;();</span>
+<span class="fc" id="L382">        int start = 0;</span>
+<span class="fc bfc" id="L383" title="All 2 branches covered.">        for (int i = 1; i &lt;= text.length(); i++) {</span>
+<span class="pc bpc" id="L384" title="1 of 6 branches missed.">            if (i == text.length() || levels[i] != levels[start] || frag[i] != frag[start]) {</span>
+<span class="fc" id="L385">                spans.add(new int[] {start, i});</span>
+<span class="fc" id="L386">                start = i;</span>
+            }
+        }
+<span class="fc" id="L389">        byte[] sl = new byte[spans.size()];</span>
+<span class="fc bfc" id="L390" title="All 2 branches covered.">        for (int i = 0; i &lt; sl.length; i++) {</span>
+<span class="fc" id="L391">            sl[i] = levels[spans.get(i)[0]];</span>
+        }
+<span class="fc" id="L393">        int[] order = Bidi.visualOrder(sl);</span>
+<span class="fc bfc" id="L394" title="All 2 branches covered.">        for (int i = 0; i &lt; order.length; i++) { // NOPMD ForLoopCanBeForeach - indexed like the surrounding decoder loops</span>
+<span class="fc" id="L395">            int[] sp = spans.get(order[i]);</span>
+<span class="fc" id="L396">            Piece p = new Piece();</span>
+<span class="fc" id="L397">            p.run = line.fragments.get(frag[sp[0]]).run;</span>
+<span class="fc" id="L398">            p.text = text.substring(sp[0], sp[1]);</span>
+<span class="fc bfc" id="L399" title="All 2 branches covered.">            p.rtl = (levels[sp[0]] &amp; 1) != 0;</span>
+<span class="fc" id="L400">            out.add(p);</span>
+        }
+<span class="fc" id="L402">        return out;</span>
+    }
+
+    /// Draws `line` with its top at `y` inside `[x, x + width]`.
+    void draw(PdfPage page, Line line, float x, float y, float width) {
+<span class="fc" id="L407">        PdfCanvas c = page.getCanvas();</span>
+<span class="fc" id="L408">        int dir = resolvedDirection();</span>
+<span class="fc bfc" id="L409" title="All 2 branches covered.">        boolean rtlPara = dir == DIRECTION_RTL;</span>
+<span class="fc" id="L410">        float slack = width - line.offset - line.width;</span>
+<span class="fc bfc" id="L411" title="All 2 branches covered.">        float cx = rtlPara ? x : x + line.offset;</span>
+<span class="fc" id="L412">        float wordSpace = 0;</span>
+<span class="fc" id="L413">        int align = alignment;</span>
+<span class="pc bpc" id="L414" title="5 of 6 branches missed.">        if (align == ALIGN_START || align == ALIGN_JUSTIFY &amp;&amp; line.last) {</span>
+<span class="fc bfc" id="L415" title="All 2 branches covered.">            align = rtlPara ? ALIGN_RIGHT : ALIGN_LEFT;</span>
+        }
+<span class="pc bpc" id="L417" title="1 of 2 branches missed.">        if (align == ALIGN_CENTER) {</span>
+<span class="nc" id="L418">            cx += slack / 2;</span>
+<span class="fc bfc" id="L419" title="All 2 branches covered.">        } else if (align == ALIGN_RIGHT) {</span>
+<span class="fc" id="L420">            cx += slack;</span>
+<span class="pc bpc" id="L421" title="3 of 4 branches missed.">        } else if (align == ALIGN_JUSTIFY &amp;&amp; slack &gt; 0) {</span>
+<span class="nc" id="L422">            int spaces = 0;</span>
+<span class="nc bnc" id="L423" title="All 2 branches missed.">            for (int i = 0; i &lt; line.fragments.size(); i++) {</span>
+<span class="nc" id="L424">                spaces += line.fragments.get(i).spaces;</span>
+            }
+<span class="nc bnc" id="L426" title="All 2 branches missed.">            if (spaces &gt; 0) {</span>
+<span class="nc" id="L427">                wordSpace = slack / spaces;</span>
+<span class="nc bnc" id="L428" title="All 2 branches missed.">            } else if (rtlPara) {</span>
+<span class="nc" id="L429">                cx += slack;</span>
+            }
+        }
+<span class="fc" id="L432">        float baseline = y + line.ascent + (line.height - line.ascent - descent(line)) / 2;</span>
+<span class="fc" id="L433">        List&lt;Piece&gt; pieces = visual(line, dir);</span>
+<span class="fc bfc" id="L434" title="All 2 branches covered.">        for (int i = 0; i &lt; pieces.size(); i++) { // NOPMD ForLoopCanBeForeach - indexed like the surrounding decoder loops</span>
+<span class="fc" id="L435">            Piece f = pieces.get(i);</span>
+<span class="fc" id="L436">            c.setFillColor(f.run.rgb);</span>
+<span class="fc" id="L437">            c.setFont(f.run.font, f.run.size);</span>
+            float w;
+<span class="pc bpc" id="L439" title="1 of 2 branches missed.">            if (wordSpace &gt; 0) {</span>
+                // Draw word by word so justification works with any font
+                // encoding (Tw only applies to single-byte code 32). A
+                // right-to-left piece places its words from the right.
+<span class="nc" id="L443">                List&lt;String&gt; words = new ArrayList&lt;String&gt;();</span>
+<span class="nc" id="L444">                String t = f.text;</span>
+<span class="nc" id="L445">                int start = 0;</span>
+<span class="nc bnc" id="L446" title="All 2 branches missed.">                for (int k = 0; k &lt;= t.length(); k++) {</span>
+<span class="nc bnc" id="L447" title="All 4 branches missed.">                    if (k == t.length() || t.charAt(k) == ' ') {</span>
+<span class="nc" id="L448">                        words.add(t.substring(start, k));</span>
+<span class="nc bnc" id="L449" title="All 2 branches missed.">                        if (k &lt; t.length()) {</span>
+<span class="nc" id="L450">                            words.add(&quot; &quot;);</span>
+                        }
+<span class="nc" id="L452">                        start = k + 1;</span>
+                    }
+                }
+<span class="nc" id="L455">                float wx = cx;</span>
+<span class="nc" id="L456">                float space = f.run.font.getStringWidth(&quot; &quot;, f.run.size);</span>
+<span class="nc bnc" id="L457" title="All 2 branches missed.">                for (int k = 0; k &lt; words.size(); k++) { // NOPMD ForLoopCanBeForeach - indexed like the surrounding decoder loops</span>
+<span class="nc bnc" id="L458" title="All 2 branches missed.">                    String word = words.get(f.rtl ? words.size() - 1 - k : k);</span>
+<span class="nc bnc" id="L459" title="All 2 branches missed.">                    if (&quot; &quot;.equals(word)) {</span>
+<span class="nc" id="L460">                        wx += space + wordSpace;</span>
+<span class="nc bnc" id="L461" title="All 2 branches missed.">                    } else if (word.length() &gt; 0) {</span>
+<span class="nc" id="L462">                        c.drawRun(word, wx, baseline, f.rtl);</span>
+<span class="nc" id="L463">                        wx += f.run.font.getStringWidth(word, f.run.size);</span>
+                    }
+                }
+<span class="nc" id="L466">                w = wx - cx;</span>
+<span class="nc" id="L467">            } else {</span>
+<span class="fc" id="L468">                c.drawRun(f.text, cx, baseline, f.rtl);</span>
+<span class="fc" id="L469">                w = f.run.font.getStringWidth(f.text, f.run.size);</span>
+            }
+<span class="pc bpc" id="L471" title="1 of 2 branches missed.">            if (f.run.uri != null) {</span>
+<span class="nc" id="L472">                page.addLink(cx, y, w, line.height, f.run.uri);</span>
+            }
+<span class="fc" id="L474">            cx += w;</span>
+        }
+<span class="fc" id="L476">    }</span>
+
+    private static float descent(Line line) {
+<span class="fc" id="L479">        float d = 0;</span>
+<span class="fc bfc" id="L480" title="All 2 branches covered.">        for (int i = 0; i &lt; line.fragments.size(); i++) {</span>
+<span class="fc" id="L481">            Run r = line.fragments.get(i).run;</span>
+<span class="fc" id="L482">            d = Math.max(d, r.font.getDescent(r.size));</span>
+        }
+<span class="fc" id="L484">        return d;</span>
+    }
+
+    /// The index after the cluster starting at `i`: a character with its
+    /// low surrogate, and any combining marks, joiners and variation
+    /// selectors after it.
+    static int nextCluster(String t, int i, int end) {
+<span class="fc" id="L491">        int j = i + 1;</span>
+<span class="pc bpc" id="L492" title="2 of 6 branches missed.">        if (j &lt; end &amp;&amp; isHigh(t.charAt(i)) &amp;&amp; isLow(t.charAt(j))) {</span>
+<span class="fc" id="L493">            j++;</span>
+        }
+<span class="fc bfc" id="L495" title="All 2 branches covered.">        while (j &lt; end) {</span>
+<span class="fc" id="L496">            char c = t.charAt(j);</span>
+<span class="pc bpc" id="L497" title="17 of 50 branches missed.">            boolean extend = c &gt;= 0x0300 &amp;&amp; c &lt;= 0x036f || c &gt;= 0x0483 &amp;&amp; c &lt;= 0x0489 || c &gt;= 0x0591 &amp;&amp; c &lt;= 0x05bd || c == 0x05bf || c == 0x05c1 || c == 0x05c2 || c == 0x05c4 || c == 0x05c5 || c == 0x05c7</span>
+                    || c &gt;= 0x0610 &amp;&amp; c &lt;= 0x061a || c &gt;= 0x064b &amp;&amp; c &lt;= 0x065f || c == 0x0670
+                    || c &gt;= 0x06d6 &amp;&amp; c &lt;= 0x06ed || c == 0x200c || c == 0x200d || c &gt;= 0xfe00 &amp;&amp; c &lt;= 0xfe0f
+                    || c &gt;= 0x20d0 &amp;&amp; c &lt;= 0x20ff;
+<span class="pc bpc" id="L501" title="1 of 4 branches missed.">            if (c == 0x200d &amp;&amp; j + 1 &lt; end) {</span>
+                // A joiner glues the next character (and its own low
+                // surrogate) onto this cluster, as in emoji sequences.
+<span class="fc" id="L504">                j++;</span>
+<span class="pc bpc" id="L505" title="2 of 4 branches missed.">                if (j + 1 &lt; end &amp;&amp; isHigh(t.charAt(j))) {</span>
+<span class="fc" id="L506">                    j++;</span>
+                }
+<span class="fc" id="L508">                j++;</span>
+<span class="fc" id="L509">                continue;</span>
+            }
+<span class="pc bpc" id="L511" title="1 of 2 branches missed.">            if (isLow(c)) {</span>
+<span class="nc" id="L512">                extend = true;</span>
+            }
+<span class="fc bfc" id="L514" title="All 2 branches covered.">            if (!extend) {</span>
+<span class="fc" id="L515">                break;</span>
+            }
+<span class="fc" id="L517">            j++;</span>
+<span class="fc" id="L518">        }</span>
+<span class="fc" id="L519">        return Math.min(j, end);</span>
+    }
+
+    private static boolean isHigh(char c) {
+<span class="pc bpc" id="L523" title="1 of 4 branches missed.">        return c &gt;= 0xd800 &amp;&amp; c &lt;= 0xdbff;</span>
+    }
+
+    private static boolean isLow(char c) {
+<span class="pc bpc" id="L527" title="1 of 4 branches missed.">        return c &gt;= 0xdc00 &amp;&amp; c &lt;= 0xdfff;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

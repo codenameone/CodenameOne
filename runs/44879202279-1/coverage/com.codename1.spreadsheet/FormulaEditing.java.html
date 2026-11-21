@@ -1,0 +1,963 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>FormulaEditing.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.spreadsheet</a> &gt; <span class="el_source">FormulaEditing.java</span></div><h1>FormulaEditing.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.spreadsheet;
+
+import com.codename1.ui.CodeDiagnostic;
+import com.codename1.ui.CodeEditor;
+import com.codename1.ui.Component;
+import com.codename1.ui.Container;
+import com.codename1.ui.Font;
+import com.codename1.ui.Form;
+import com.codename1.ui.Graphics;
+import com.codename1.ui.Painter;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.geom.Dimension;
+import com.codename1.ui.geom.Rectangle;
+import com.codename1.ui.layouts.Layout;
+import com.codename1.ui.events.FocusListener;
+import com.codename1.ui.Display;
+import com.codename1.ui.plaf.Style;
+import com.codename1.ui.plaf.UIManager;
+import com.codename1.ui.table.DataGrid;
+import com.codename1.ui.table.GridCellPicker;
+import com.codename1.ui.table.GridColumn;
+import com.codename1.util.SuccessCallback;
+
+import java.util.ArrayList;
+import java.util.List;
+
+/// What editing a formula is like, in a cell or in a `FormulaBar`: the references colored in
+/// the text and outlined in the grid, a list of the functions and names that start with what
+/// is typed, the arguments of the function the caret is in, and a tap on a cell putting its
+/// address into the formula. One is attached to an editor while it is shown.
+final class FormulaEditing implements GridCellPicker, Painter, ActionListener {
+    private static final int VISIBLE_ITEMS = 8;
+
+    private final Sheet sheet;
+    private final DataGrid grid;
+    private final CodeEditor editor;
+    private final Runnable commit;
+    private final Runnable cancel;
+<span class="fc" id="L62">    private final Popup popup = new Popup();</span>
+    private PopupLayer layer;
+
+<span class="fc" id="L65">    private String text = &quot;&quot;;</span>
+    private int caret;
+    private boolean focusWatched;
+<span class="fc" id="L68">    private List&lt;FormulaLexer.Token&gt; tokens = new ArrayList&lt;FormulaLexer.Token&gt;();</span>
+    private boolean dark;
+
+    // the completion list: what is shown, what is inserted, and the description
+<span class="fc" id="L72">    private final List&lt;String&gt; items = new ArrayList&lt;String&gt;();</span>
+<span class="fc" id="L73">    private final List&lt;String&gt; inserts = new ArrayList&lt;String&gt;();</span>
+<span class="fc" id="L74">    private final List&lt;String&gt; details = new ArrayList&lt;String&gt;();</span>
+    private int selected;
+<span class="fc" id="L76">    private int wordStart = -1;</span>
+    private boolean dismissed;
+    // set while this class puts text into the editor, whose change events are then its own
+    private boolean applying;
+    // a cell's editor is always being typed into; a formula bar only after a key
+<span class="fc" id="L81">    private boolean active = true;</span>
+    private boolean onlyWhileTyped;
+
+    // the argument hint
+    private String hintName;
+    private String[] hintArgs;
+    private String hintDescription;
+    private int hintIndex;
+
+    private String error;
+
+    // the reference the last tap on a cell put in, and the cell it started from
+<span class="fc" id="L93">    private int pickedStart = -1;</span>
+<span class="fc" id="L94">    private int pickedEnd = -1;</span>
+    private int anchorRow;
+    private int anchorColumn;
+
+<span class="fc" id="L98">    FormulaEditing(Sheet sheet, DataGrid grid, CodeEditor editor, String text, Runnable commit, Runnable cancel) {</span>
+<span class="pc bpc" id="L99" title="1 of 2 branches missed.">        this.text = text == null ? &quot;&quot; : text;</span>
+<span class="fc" id="L100">        this.caret = this.text.length();</span>
+<span class="fc" id="L101">        this.sheet = sheet;</span>
+<span class="fc" id="L102">        this.grid = grid;</span>
+<span class="fc" id="L103">        this.editor = editor;</span>
+<span class="fc" id="L104">        this.commit = commit;</span>
+<span class="fc" id="L105">        this.cancel = cancel;</span>
+<span class="fc" id="L106">        FormulaHighlighter.register();</span>
+<span class="fc" id="L107">        editor.setLanguage(FormulaHighlighter.LANGUAGE);</span>
+<span class="fc" id="L108">        editor.setSingleLine(true);</span>
+<span class="fc" id="L109">        editor.addChangeListener(new ActionListener() {</span>
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+<span class="fc" id="L112">                textChanged();</span>
+<span class="fc" id="L113">            }</span>
+        });
+<span class="fc" id="L115">        editor.addKeyListener(this);</span>
+<span class="fc" id="L116">    }</span>
+
+    /// Makes the editing wait for a key before it takes the grid's taps and outlines anything,
+    /// as a formula bar that shows the selected cell does.
+    void setOnlyWhileTyped(boolean only) {
+<span class="fc" id="L121">        onlyWhileTyped = only;</span>
+<span class="pc bpc" id="L122" title="1 of 2 branches missed.">        active = !only;</span>
+<span class="fc" id="L123">    }</span>
+
+    /// Whether the text was typed into, for a formula bar, or the editor is a cell's.
+    boolean isActive() {
+<span class="fc" id="L127">        return active;</span>
+    }
+
+    /// Stops the editing taking taps and outlining, until the next key, for a formula bar.
+    void deactivate() {
+<span class="pc bpc" id="L132" title="1 of 2 branches missed.">        if (onlyWhileTyped) {</span>
+<span class="fc" id="L133">            active = false;</span>
+<span class="fc" id="L134">            pickedStart = -1;</span>
+<span class="fc" id="L135">            pickedEnd = -1;</span>
+<span class="fc" id="L136">            error = null;</span>
+<span class="fc" id="L137">            items.clear();</span>
+<span class="fc" id="L138">            hintName = null;</span>
+<span class="fc" id="L139">            release();</span>
+<span class="fc" id="L140">            changed();</span>
+        }
+<span class="fc" id="L142">    }</span>
+
+    private void claim() {
+<span class="fc" id="L145">        grid.setCellPicker(this);</span>
+<span class="fc" id="L146">        grid.setOverlayPainter(this);</span>
+<span class="fc" id="L147">    }</span>
+
+    private void release() {
+<span class="fc bfc" id="L150" title="All 2 branches covered.">        if (grid.getCellPicker() == this) { //NOPMD CompareObjectsWithEquals - this picker, not an equal one</span>
+<span class="fc" id="L151">            grid.setCellPicker(null);</span>
+        }
+<span class="fc bfc" id="L153" title="All 2 branches covered.">        if (grid.getOverlayPainter() == this) { //NOPMD CompareObjectsWithEquals - this painter, not an equal one</span>
+<span class="fc" id="L154">            grid.setOverlayPainter(null);</span>
+        }
+<span class="fc" id="L156">    }</span>
+
+    /// Takes over the grid's taps and overlay and shows the popup, while the editor is shown.
+    void attach() {
+<span class="fc" id="L160">        Style row = grid.getUnselectedStyle();</span>
+<span class="fc" id="L161">        int bg = row.getBgColor();</span>
+<span class="pc bpc" id="L162" title="3 of 4 branches missed.">        dark = (((bg &gt;&gt; 16) &amp; 0xff) * 3 + ((bg &gt;&gt; 8) &amp; 0xff) * 6 + (bg &amp; 0xff)) / 10 &lt; 110 &amp;&amp; row.getBgTransparency() != 0;</span>
+<span class="pc bpc" id="L163" title="1 of 2 branches missed.">        editor.setTheme(dark ? &quot;dark&quot; : &quot;light&quot;);</span>
+<span class="fc" id="L164">        final Font cellFont = cellFont();</span>
+<span class="fc" id="L165">        editor.onReady(new Runnable() {</span>
+            @Override
+            public void run() {
+                // a formula is edited in the font of the cells, as a spreadsheet does
+<span class="fc bfc" id="L169" title="All 2 branches covered.">                for (int i = 0; i &lt; editor.getComponentCount(); i++) {</span>
+<span class="fc" id="L170">                    Component inner = editor.getComponentAt(i);</span>
+<span class="fc" id="L171">                    inner.getAllStyles().setFont(cellFont);</span>
+<span class="pc bpc" id="L172" title="1 of 4 branches missed.">                    if (editor instanceof CellEditor &amp;&amp; !focusWatched) {</span>
+<span class="fc" id="L173">                        focusWatched = true;</span>
+<span class="fc" id="L174">                        inner.addFocusListener(new LeaveListener());</span>
+                    }
+                }
+<span class="fc" id="L177">                editor.revalidateLater();</span>
+<span class="fc" id="L178">            }</span>
+        });
+<span class="fc bfc" id="L180" title="All 2 branches covered.">        if (active) {</span>
+<span class="fc" id="L181">            claim();</span>
+        }
+<span class="fc" id="L183">        Form form = editor.getComponentForm();</span>
+<span class="pc bpc" id="L184" title="2 of 4 branches missed.">        if (form != null &amp;&amp; layer == null) {</span>
+<span class="fc" id="L185">            layer = new PopupLayer(popup, editor);</span>
+<span class="fc" id="L186">            Container pane = form.getFormLayeredPane(FormulaEditing.class, true);</span>
+<span class="fc" id="L187">            pane.add(layer);</span>
+<span class="fc" id="L188">            pane.revalidate();</span>
+        }
+<span class="fc" id="L190">        refresh();</span>
+<span class="fc" id="L191">    }</span>
+
+    /// Focus leaving a cell's editor for something that is neither it nor the grid enters the
+    /// formula, as a spreadsheet does when another control is clicked; one that does not read
+    /// stays in the cell with its error shown. A tap in the grid is the grid's to handle: it
+    /// either points at a cell or ends the edit itself.
+<span class="fc" id="L197">    private final class LeaveListener implements FocusListener {</span>
+        @Override
+        public void focusGained(Component cmp) {
+<span class="fc" id="L200">        }</span>
+
+        @Override
+        public void focusLost(Component cmp) {
+<span class="fc" id="L204">            Display.getInstance().callSerially(new Runnable() {</span>
+                @Override
+                public void run() {
+<span class="fc" id="L207">                    Form form = editor.getComponentForm();</span>
+<span class="pc bpc" id="L208" title="2 of 4 branches missed.">                    if (form == null || !grid.isEditing()) {</span>
+<span class="nc" id="L209">                        return;</span>
+                    }
+<span class="fc" id="L211">                    Component now = form.getFocused();</span>
+<span class="pc bpc" id="L212" title="3 of 6 branches missed.">                    if (now != null &amp;&amp; (isInside(now, editor) || isInside(now, grid))) {</span>
+<span class="nc" id="L213">                        return;</span>
+                    }
+<span class="fc" id="L215">                    read();</span>
+<span class="fc" id="L216">                    String problem = problem(text);</span>
+<span class="fc bfc" id="L217" title="All 2 branches covered.">                    if (problem != null) {</span>
+<span class="fc" id="L218">                        error = problem;</span>
+<span class="fc" id="L219">                        changed();</span>
+<span class="fc" id="L220">                        return;</span>
+                    }
+<span class="fc" id="L222">                    commit.run();</span>
+<span class="fc" id="L223">                }</span>
+            });
+<span class="fc" id="L225">        }</span>
+    }
+
+    private static boolean isInside(Component c, Component parent) {
+<span class="fc bfc" id="L229" title="All 2 branches covered.">        for (Component p = c; p != null; p = p.getParent()) {</span>
+<span class="pc bpc" id="L230" title="1 of 2 branches missed.">            if (p == parent) { // NOPMD CompareObjectsWithEquals - identity: the same component</span>
+<span class="nc" id="L231">                return true;</span>
+            }
+        }
+<span class="fc" id="L234">        return false;</span>
+    }
+
+    /// Gives the grid back what `#attach()` took.
+    void detach() {
+<span class="fc" id="L239">        release();</span>
+<span class="pc bpc" id="L240" title="1 of 2 branches missed.">        if (layer != null) {</span>
+<span class="fc" id="L241">            Container pane = layer.getParent();</span>
+<span class="fc" id="L242">            layer.remove();</span>
+<span class="fc" id="L243">            layer = null;</span>
+<span class="pc bpc" id="L244" title="1 of 2 branches missed.">            if (pane != null) {</span>
+<span class="fc" id="L245">                pane.revalidate();</span>
+            }
+        }
+<span class="fc" id="L248">        grid.repaint();</span>
+<span class="fc" id="L249">    }</span>
+
+    /// What the completion list shows now, empty when it is not shown.
+    List&lt;String&gt; shownItems() {
+<span class="fc bfc" id="L253" title="All 2 branches covered.">        return listShown() ? items : new ArrayList&lt;String&gt;();</span>
+    }
+
+    /// The function whose arguments are shown, or null.
+    String hintName() {
+<span class="fc" id="L258">        return hintName;</span>
+    }
+
+    /// The argument shown in bold, or -1.
+    int hintArgument() {
+<span class="pc bpc" id="L263" title="3 of 6 branches missed.">        return hintName == null || listShown() || error != null ? -1 : popup.current();</span>
+    }
+
+    /// Why the formula was not entered, or null.
+    String error() {
+<span class="fc" id="L268">        return error;</span>
+    }
+
+    /// Acts on a key the editor reported, as `CodeEditor.KEY_ENTER` and the others.
+    void press(int key) {
+<span class="fc" id="L273">        key(key);</span>
+<span class="fc" id="L274">    }</span>
+
+    /// The text in the editor now.
+    String text() {
+<span class="fc" id="L278">        read();</span>
+<span class="fc" id="L279">        return text;</span>
+    }
+
+    private void read() {
+<span class="fc bfc" id="L283" title="All 2 branches covered.">        if (!editor.isEditorReady()) {</span>
+            // the editor answers once its backend is up; until then it holds what it was given
+<span class="fc" id="L285">            return;</span>
+        }
+<span class="fc" id="L287">        editor.getText(new SuccessCallback&lt;String&gt;() {</span>
+            @Override
+            public void onSucess(String value) {
+<span class="pc bpc" id="L290" title="1 of 2 branches missed.">                text = value == null ? &quot;&quot; : value;</span>
+<span class="fc" id="L291">            }</span>
+        });
+<span class="fc" id="L293">        editor.getCursorPosition(new SuccessCallback&lt;Integer&gt;() {</span>
+            @Override
+            public void onSucess(Integer value) {
+<span class="pc bpc" id="L296" title="1 of 2 branches missed.">                caret = value == null ? 0 : value.intValue();</span>
+<span class="fc" id="L297">            }</span>
+        });
+<span class="fc" id="L299">        caret = Math.max(0, Math.min(caret, text.length()));</span>
+<span class="fc" id="L300">    }</span>
+
+    @Override
+    public void actionPerformed(ActionEvent evt) {
+<span class="nc" id="L304">        key(evt.getKeyEvent());</span>
+<span class="nc" id="L305">    }</span>
+
+    /// What a key in the editor does to the editing: wakes a formula bar and works out what to
+    /// show.
+    void textChangedByUser() {
+<span class="fc" id="L310">        textChanged();</span>
+<span class="fc" id="L311">    }</span>
+
+    private void textChanged() {
+<span class="fc bfc" id="L314" title="All 2 branches covered.">        if (applying) {</span>
+<span class="fc" id="L315">            return;</span>
+        }
+<span class="fc bfc" id="L317" title="All 2 branches covered.">        if (!active) {</span>
+<span class="fc" id="L318">            active = true;</span>
+<span class="fc" id="L319">            claim();</span>
+        }
+<span class="fc" id="L321">        dismissed = false;</span>
+<span class="pc bpc" id="L322" title="1 of 2 branches missed.">        if (error != null) {</span>
+<span class="nc" id="L323">            error = null;</span>
+<span class="nc" id="L324">            editor.setDiagnostics(null);</span>
+        }
+<span class="fc" id="L326">        refresh();</span>
+<span class="pc bpc" id="L327" title="3 of 4 branches missed.">        if (pickedEnd &gt;= 0 &amp;&amp; caret != pickedEnd) {</span>
+            // typed past the reference a tap put in: the next tap inserts a new one
+<span class="nc" id="L329">            pickedStart = -1;</span>
+<span class="nc" id="L330">            pickedEnd = -1;</span>
+        }
+<span class="fc" id="L332">    }</span>
+
+    private boolean listShown() {
+<span class="pc bpc" id="L335" title="1 of 4 branches missed.">        return !items.isEmpty() &amp;&amp; !dismissed;</span>
+    }
+
+    private void key(int key) {
+<span class="fc bfc" id="L339" title="All 2 branches covered.">        if (listShown()) {</span>
+<span class="pc bpc" id="L340" title="2 of 5 branches missed.">            switch (key) {</span>
+                case CodeEditor.KEY_ENTER:
+                case CodeEditor.KEY_TAB:
+<span class="fc" id="L343">                    accept(selected);</span>
+<span class="fc" id="L344">                    return;</span>
+                case CodeEditor.KEY_ESCAPE:
+<span class="nc" id="L346">                    dismissed = true;</span>
+<span class="nc" id="L347">                    changed();</span>
+<span class="nc" id="L348">                    return;</span>
+                case CodeEditor.KEY_UP:
+<span class="fc" id="L350">                    selected = (selected + items.size() - 1) % items.size();</span>
+<span class="fc" id="L351">                    changed();</span>
+<span class="fc" id="L352">                    return;</span>
+                case CodeEditor.KEY_DOWN:
+<span class="fc" id="L354">                    selected = (selected + 1) % items.size();</span>
+<span class="fc" id="L355">                    changed();</span>
+<span class="fc" id="L356">                    return;</span>
+                default:
+                    break;
+            }
+        }
+<span class="fc bfc" id="L361" title="All 2 branches covered.">        if (key == CodeEditor.KEY_ESCAPE) {</span>
+<span class="fc" id="L362">            cancel.run();</span>
+<span class="fc bfc" id="L363" title="All 2 branches covered.">        } else if (key == CodeEditor.KEY_F4) {</span>
+<span class="fc" id="L364">            cycleAbsolute();</span>
+<span class="pc bpc" id="L365" title="5 of 6 branches missed.">        } else if (key == CodeEditor.KEY_ENTER || key == CodeEditor.KEY_TAB || key == CodeEditor.KEY_BACK_TAB) {</span>
+<span class="fc" id="L366">            read();</span>
+<span class="fc" id="L367">            String problem = problem(text);</span>
+<span class="fc bfc" id="L368" title="All 2 branches covered.">            if (problem != null) {</span>
+                // as a spreadsheet does, a formula that cannot be read is not entered
+<span class="fc" id="L370">                error = problem;</span>
+<span class="fc" id="L371">                changed();</span>
+<span class="fc" id="L372">                return;</span>
+            }
+<span class="fc" id="L374">            commit.run();</span>
+        }
+<span class="fc" id="L376">    }</span>
+
+    /// What is wrong with a formula, marked in the editor, or null when it reads.
+    private String problem(String formula) {
+<span class="pc bpc" id="L380" title="1 of 4 branches missed.">        if (formula.length() &lt; 2 || formula.charAt(0) != '=') {</span>
+<span class="fc" id="L381">            return null;</span>
+        }
+        try {
+<span class="fc" id="L384">            FormulaParser.parse(formula.substring(1), false);</span>
+<span class="fc" id="L385">            return null;</span>
+<span class="fc" id="L386">        } catch (FormulaSyntaxException e) {</span>
+<span class="pc bpc" id="L387" title="1 of 2 branches missed.">            int at = e.position &lt; 0 ? 0 : e.position + 1;</span>
+<span class="fc" id="L388">            List&lt;CodeDiagnostic&gt; marks = new ArrayList&lt;CodeDiagnostic&gt;();</span>
+<span class="fc" id="L389">            marks.add(new CodeDiagnostic(1, Math.min(at, formula.length() - 1) + 1, 1,</span>
+<span class="fc" id="L390">                    Math.max(at + 1, formula.length()) + 1, e.getMessage()));</span>
+<span class="fc" id="L391">            editor.setDiagnostics(marks);</span>
+<span class="pc bpc" id="L392" title="1 of 2 branches missed.">            return at &gt;= formula.length() ? &quot;The formula is not finished&quot; : &quot;There is a problem with this formula at \&quot;&quot;</span>
+<span class="nc" id="L393">                    + formula.substring(at, Math.min(formula.length(), at + 12)) + &quot;\&quot;&quot;;</span>
+        }
+    }
+
+    /// Reads the text again and works out what to show.
+    void refresh() {
+<span class="fc" id="L399">        read();</span>
+<span class="fc bfc" id="L400" title="All 2 branches covered.">        tokens = active ? FormulaLexer.lex(text) : new ArrayList&lt;FormulaLexer.Token&gt;();</span>
+<span class="fc" id="L401">        items.clear();</span>
+<span class="fc" id="L402">        hintName = null;</span>
+<span class="fc bfc" id="L403" title="All 2 branches covered.">        if (active) {</span>
+<span class="fc" id="L404">            completions();</span>
+<span class="fc" id="L405">            hint();</span>
+        }
+<span class="fc" id="L407">        changed();</span>
+<span class="fc" id="L408">    }</span>
+
+    private void changed() {
+<span class="pc bpc" id="L411" title="1 of 4 branches missed.">        if (editor instanceof CellEditor &amp;&amp; editor.getParent() != null) {</span>
+            // the cell's editor widens with its text
+<span class="fc" id="L413">            editor.getParent().revalidateLater();</span>
+        }
+<span class="fc bfc" id="L415" title="All 2 branches covered.">        if (layer != null) {</span>
+<span class="fc" id="L416">            popup.setShouldCalcPreferredSize(true);</span>
+<span class="fc" id="L417">            layer.revalidate();</span>
+<span class="fc" id="L418">            layer.repaint();</span>
+        }
+<span class="fc" id="L420">        grid.repaint();</span>
+<span class="fc" id="L421">    }</span>
+
+    private void completions() {
+<span class="fc" id="L424">        items.clear();</span>
+<span class="fc" id="L425">        inserts.clear();</span>
+<span class="fc" id="L426">        details.clear();</span>
+<span class="fc" id="L427">        selected = 0;</span>
+<span class="fc" id="L428">        wordStart = FormulaLexer.wordAt(tokens, caret);</span>
+<span class="pc bpc" id="L429" title="3 of 6 branches missed.">        if (wordStart &lt; 0 || caret &lt; text.length() &amp;&amp; text.charAt(caret) == '(') {</span>
+<span class="fc" id="L430">            return;</span>
+        }
+<span class="fc" id="L432">        String prefix = FormulaParser.asciiUpper(text.substring(wordStart, caret));</span>
+<span class="pc bpc" id="L433" title="2 of 6 branches missed.">        if (prefix.length() == 0 || prefix.charAt(0) == '$' || FormulaParser.isDigit(prefix.charAt(0))) {</span>
+<span class="fc" id="L434">            return;</span>
+        }
+<span class="fc bfc" id="L436" title="All 2 branches covered.">        for (String name : FormulaHelp.names()) {</span>
+<span class="fc bfc" id="L437" title="All 2 branches covered.">            if (name.startsWith(prefix)) {</span>
+<span class="fc" id="L438">                String[] help = FormulaHelp.of(name);</span>
+<span class="fc" id="L439">                items.add(name);</span>
+<span class="fc" id="L440">                inserts.add(name + &quot;(&quot;);</span>
+<span class="fc" id="L441">                details.add(help[1]);</span>
+            }
+        }
+<span class="fc" id="L444">        Workbook book = sheet.getWorkbook();</span>
+<span class="fc bfc" id="L445" title="All 2 branches covered.">        for (String name : book.getDefinedNames()) {</span>
+<span class="fc bfc" id="L446" title="All 2 branches covered.">            if (FormulaParser.asciiUpper(name).startsWith(prefix)) {</span>
+<span class="fc" id="L447">                items.add(name);</span>
+<span class="fc" id="L448">                inserts.add(name);</span>
+<span class="fc" id="L449">                details.add(&quot;A name defined in this workbook.&quot;);</span>
+            }
+        }
+<span class="fc bfc" id="L452" title="All 2 branches covered.">        for (int i = 0; i &lt; book.getSheetCount(); i++) {</span>
+<span class="fc" id="L453">            String name = book.getSheet(i).getName();</span>
+<span class="pc bpc" id="L454" title="1 of 2 branches missed.">            if (FormulaParser.asciiUpper(name).startsWith(prefix)) {</span>
+<span class="nc" id="L455">                StringBuilder sb = new StringBuilder();</span>
+<span class="nc" id="L456">                FormulaParser.appendSheetName(sb, name);</span>
+<span class="nc" id="L457">                items.add(name);</span>
+<span class="nc" id="L458">                inserts.add(sb.append('!').toString());</span>
+<span class="nc" id="L459">                details.add(&quot;A sheet of this workbook.&quot;);</span>
+            }
+        }
+<span class="pc bpc" id="L462" title="5 of 6 branches missed.">        if (items.size() == 1 &amp;&amp; FormulaParser.asciiUpper(items.get(0)).equals(prefix) &amp;&amp; !inserts.get(0).endsWith(&quot;(&quot;)) {</span>
+            // typed out already
+<span class="nc" id="L464">            items.clear();</span>
+<span class="nc" id="L465">            inserts.clear();</span>
+<span class="nc" id="L466">            details.clear();</span>
+        }
+<span class="fc" id="L468">    }</span>
+
+    private void hint() {
+<span class="fc" id="L471">        hintName = null;</span>
+<span class="fc" id="L472">        Object[] call = FormulaLexer.call(tokens, text, caret);</span>
+<span class="fc bfc" id="L473" title="All 2 branches covered.">        if (call == null) {</span>
+<span class="fc" id="L474">            return;</span>
+        }
+<span class="fc" id="L476">        String name = (String) call[0];</span>
+<span class="pc bpc" id="L477" title="1 of 2 branches missed.">        String[] help = FormulaHelp.of(name.startsWith(&quot;_XLFN.&quot;) ? name.substring(6) : name);</span>
+<span class="pc bpc" id="L478" title="1 of 2 branches missed.">        if (help == null) {</span>
+<span class="nc" id="L479">            return;</span>
+        }
+<span class="fc" id="L481">        hintName = name;</span>
+<span class="fc" id="L482">        hintArgs = FormulaHelp.arguments(help[0]);</span>
+<span class="fc" id="L483">        hintDescription = help[1];</span>
+<span class="fc" id="L484">        hintIndex = ((Integer) call[1]).intValue();</span>
+<span class="fc" id="L485">    }</span>
+
+    private void accept(int index) {
+<span class="pc bpc" id="L488" title="3 of 6 branches missed.">        if (index &lt; 0 || index &gt;= inserts.size() || wordStart &lt; 0) {</span>
+<span class="nc" id="L489">            return;</span>
+        }
+<span class="fc" id="L491">        String insert = inserts.get(index);</span>
+<span class="fc" id="L492">        replace(wordStart, caret, insert);</span>
+<span class="fc" id="L493">    }</span>
+
+    /// F4: the reference the caret is in or just after goes from relative to absolute, to an
+    /// absolute row, to an absolute column and back, as a spreadsheet does.
+    private void cycleAbsolute() {
+<span class="fc" id="L498">        read();</span>
+<span class="fc" id="L499">        tokens = FormulaLexer.lex(text);</span>
+<span class="pc bpc" id="L500" title="1 of 2 branches missed.">        for (FormulaLexer.Token t : tokens) {</span>
+<span class="pc bpc" id="L501" title="2 of 6 branches missed.">            if (t.kind == FormulaLexer.REFERENCE &amp;&amp; t.start &lt;= caret &amp;&amp; caret &lt;= t.end) {</span>
+<span class="fc" id="L502">                String ref = text.substring(t.start, t.end);</span>
+<span class="fc" id="L503">                int bang = ref.lastIndexOf('!') + 1;</span>
+<span class="fc" id="L504">                String cycled = ref.substring(0, bang) + FormulaLexer.cycleAbsolute(ref.substring(bang));</span>
+<span class="fc" id="L505">                pickedEnd = -1;</span>
+<span class="fc" id="L506">                replace(t.start, t.end, cycled);</span>
+<span class="fc" id="L507">                return;</span>
+            }
+<span class="fc" id="L509">        }</span>
+<span class="nc" id="L510">    }</span>
+
+    /// Replaces the whole text, as typing it would, with the caret at its end.
+    void setText(String value) {
+<span class="pc bpc" id="L514" title="1 of 2 branches missed.">        text = value == null ? &quot;&quot; : value;</span>
+<span class="fc" id="L515">        caret = text.length();</span>
+<span class="fc" id="L516">        apply();</span>
+<span class="fc" id="L517">        refresh();</span>
+<span class="fc" id="L518">    }</span>
+
+    private void apply() {
+<span class="fc" id="L521">        applying = true;</span>
+        try {
+<span class="fc" id="L523">            editor.setText(text);</span>
+<span class="fc" id="L524">            editor.setCursorPosition(caret);</span>
+        } finally {
+<span class="fc" id="L526">            applying = false;</span>
+        }
+<span class="fc" id="L528">    }</span>
+
+    private void replace(int from, int to, String insert) {
+<span class="fc" id="L531">        String next = text.substring(0, from) + insert + text.substring(to);</span>
+<span class="fc" id="L532">        text = next;</span>
+<span class="fc" id="L533">        caret = from + insert.length();</span>
+<span class="fc" id="L534">        apply();</span>
+<span class="fc" id="L535">        dismissed = false;</span>
+<span class="fc" id="L536">        refresh();</span>
+<span class="fc" id="L537">        editor.focusEditor();</span>
+<span class="fc" id="L538">    }</span>
+
+    // ---------------------------------------------------------------- picking cells
+
+    @Override
+    public boolean isPicking(DataGrid g) {
+<span class="pc bpc" id="L544" title="2 of 4 branches missed.">        if (!active || editor.getComponentForm() == null) {</span>
+<span class="nc" id="L545">            return false;</span>
+        }
+<span class="fc" id="L547">        read();</span>
+<span class="fc" id="L548">        tokens = FormulaLexer.lex(text);</span>
+<span class="pc bpc" id="L549" title="5 of 6 branches missed.">        if (pickedEnd &gt;= 0 &amp;&amp; pickedEnd == caret &amp;&amp; pickedEnd &lt;= text.length()) {</span>
+<span class="nc" id="L550">            return true;</span>
+        }
+<span class="fc" id="L552">        return FormulaLexer.takesReference(tokens, caret);</span>
+    }
+
+    @Override
+    public void cellPicked(DataGrid g, int row, int column, boolean extend) {
+<span class="fc" id="L557">        int sheetRow = SheetCells.sheetRow(sheet, g, row);</span>
+<span class="fc" id="L558">        GridColumn[] visible = g.getVisibleColumns();</span>
+<span class="pc bpc" id="L559" title="3 of 6 branches missed.">        if (sheetRow &lt; 0 || column &lt; 0 || column &gt;= visible.length) {</span>
+<span class="nc" id="L560">            return;</span>
+        }
+<span class="fc" id="L562">        int sheetColumn = visible[column].getModelColumn();</span>
+<span class="pc bpc" id="L563" title="1 of 4 branches missed.">        boolean replacing = pickedEnd &gt;= 0 &amp;&amp; pickedEnd == caret;</span>
+<span class="pc bpc" id="L564" title="1 of 4 branches missed.">        if (!(extend &amp;&amp; replacing)) {</span>
+<span class="fc" id="L565">            anchorRow = sheetRow;</span>
+<span class="fc" id="L566">            anchorColumn = sheetColumn;</span>
+        }
+<span class="fc" id="L568">        StringBuilder sb = new StringBuilder();</span>
+<span class="fc" id="L569">        address(sb, Math.min(anchorRow, sheetRow), Math.min(anchorColumn, sheetColumn));</span>
+<span class="pc bpc" id="L570" title="1 of 4 branches missed.">        if (anchorRow != sheetRow || anchorColumn != sheetColumn) {</span>
+<span class="fc" id="L571">            sb.append(':');</span>
+<span class="fc" id="L572">            address(sb, Math.max(anchorRow, sheetRow), Math.max(anchorColumn, sheetColumn));</span>
+        }
+<span class="fc bfc" id="L574" title="All 2 branches covered.">        int from = replacing ? pickedStart : caret;</span>
+<span class="fc bfc" id="L575" title="All 2 branches covered.">        int to = replacing ? pickedEnd : caret;</span>
+<span class="fc" id="L576">        pickedStart = from;</span>
+<span class="fc" id="L577">        pickedEnd = from + sb.length();</span>
+<span class="fc" id="L578">        replace(from, to, sb.toString());</span>
+<span class="fc" id="L579">    }</span>
+
+    private static void address(StringBuilder sb, int row, int column) {
+<span class="fc" id="L582">        FormulaParser.appendColumn(sb, column);</span>
+<span class="fc" id="L583">        sb.append(row + 1);</span>
+<span class="fc" id="L584">    }</span>
+
+    // ---------------------------------------------------------------- outlines in the grid
+
+    @Override
+    public void paint(Graphics g, Rectangle rect) {
+<span class="fc bfc" id="L590" title="All 2 branches covered.">        if (tokens.isEmpty()) {</span>
+<span class="fc" id="L591">            return;</span>
+        }
+<span class="fc" id="L593">        int header = grid.getHeaderHeight();</span>
+<span class="fc" id="L594">        int clipX = g.getClipX();</span>
+<span class="fc" id="L595">        int clipY = g.getClipY();</span>
+<span class="fc" id="L596">        int clipW = g.getClipWidth();</span>
+<span class="fc" id="L597">        int clipH = g.getClipHeight();</span>
+<span class="fc" id="L598">        g.clipRect(rect.getX(), rect.getY() + header, rect.getWidth(), rect.getHeight() - header);</span>
+<span class="fc" id="L599">        int alpha = g.getAlpha();</span>
+<span class="fc" id="L600">        int[] box = new int[4];</span>
+<span class="fc" id="L601">        int[] a = new int[4];</span>
+<span class="fc" id="L602">        int[] b = new int[4];</span>
+<span class="fc bfc" id="L603" title="All 2 branches covered.">        for (FormulaLexer.Token t : tokens) {</span>
+<span class="pc bpc" id="L604" title="3 of 6 branches missed.">            if (t.kind != FormulaLexer.REFERENCE || t.sheet != null &amp;&amp; !t.sheet.equalsIgnoreCase(sheet.getName())</span>
+<span class="pc bpc" id="L605" title="1 of 2 branches missed.">                    || !box(t, box)) {</span>
+<span class="nc" id="L606">                continue;</span>
+            }
+<span class="fc" id="L608">            grid.getCellBounds(box[0], box[2], a);</span>
+<span class="fc" id="L609">            grid.getCellBounds(box[1], box[3], b);</span>
+<span class="fc" id="L610">            int x = rect.getX() + a[0];</span>
+<span class="fc" id="L611">            int y = rect.getY() + a[1];</span>
+<span class="fc" id="L612">            int w = b[0] + b[2] - a[0];</span>
+<span class="fc" id="L613">            int h = b[1] + b[3] - a[1];</span>
+<span class="fc" id="L614">            g.setColor(FormulaLexer.referenceColor(t.color, dark));</span>
+<span class="fc" id="L615">            g.setAlpha(36);</span>
+<span class="fc" id="L616">            g.fillRect(x, y, w, h);</span>
+<span class="fc" id="L617">            g.setAlpha(255);</span>
+<span class="fc" id="L618">            g.drawRect(x, y, w - 1, h - 1);</span>
+<span class="fc" id="L619">            g.drawRect(x + 1, y + 1, w - 3, h - 3);</span>
+<span class="fc" id="L620">        }</span>
+<span class="fc" id="L621">        g.setAlpha(alpha);</span>
+<span class="fc" id="L622">        g.setClip(clipX, clipY, clipW, clipH);</span>
+<span class="fc" id="L623">    }</span>
+
+    /// The view rows and visible columns a reference covers: top, bottom, left, right. False
+    /// when none of it is shown.
+    private boolean box(FormulaLexer.Token t, int[] out) {
+<span class="fc" id="L628">        int rows = sheet.getRowCount();</span>
+<span class="fc" id="L629">        int first = Math.max(0, t.r1 - sheet.headerRows());</span>
+<span class="fc" id="L630">        int last = Math.min(rows - 1, t.r2 - sheet.headerRows());</span>
+<span class="pc bpc" id="L631" title="1 of 2 branches missed.">        if (first &gt; last) {</span>
+<span class="nc" id="L632">            return false;</span>
+        }
+<span class="fc" id="L634">        int top = Integer.MAX_VALUE;</span>
+<span class="fc" id="L635">        int bottom = -1;</span>
+        // a sorted grid can show the rows of a range anywhere; outline the rows its corners are on
+<span class="fc bfc" id="L637" title="All 2 branches covered.">        for (int m = first; m &lt;= last; m++) {</span>
+<span class="fc" id="L638">            int v = grid.getViewRow(m);</span>
+<span class="pc bpc" id="L639" title="1 of 2 branches missed.">            if (v &gt;= 0) {</span>
+<span class="fc" id="L640">                top = Math.min(top, v);</span>
+<span class="fc" id="L641">                bottom = Math.max(bottom, v);</span>
+            }
+<span class="pc bpc" id="L643" title="3 of 4 branches missed.">            if (m == first + 64 &amp;&amp; last &gt; m) {</span>
+<span class="nc" id="L644">                m = Math.max(m, last - 64);</span>
+            }
+        }
+<span class="pc bpc" id="L647" title="1 of 2 branches missed.">        if (bottom &lt; 0) {</span>
+<span class="nc" id="L648">            return false;</span>
+        }
+<span class="fc" id="L650">        GridColumn[] visible = grid.getVisibleColumns();</span>
+<span class="fc" id="L651">        int left = -1;</span>
+<span class="fc" id="L652">        int right = -1;</span>
+<span class="fc bfc" id="L653" title="All 2 branches covered.">        for (int i = 0; i &lt; visible.length; i++) {</span>
+<span class="fc" id="L654">            int c = visible[i].getModelColumn();</span>
+<span class="fc bfc" id="L655" title="All 4 branches covered.">            if (c &gt;= t.c1 &amp;&amp; c &lt;= t.c2) {</span>
+<span class="pc bpc" id="L656" title="1 of 2 branches missed.">                if (left &lt; 0) {</span>
+<span class="fc" id="L657">                    left = i;</span>
+                }
+<span class="fc" id="L659">                right = i;</span>
+            }
+        }
+<span class="pc bpc" id="L662" title="1 of 2 branches missed.">        if (left &lt; 0) {</span>
+<span class="nc" id="L663">            return false;</span>
+        }
+<span class="fc" id="L665">        out[0] = top;</span>
+<span class="fc" id="L666">        out[1] = bottom;</span>
+<span class="fc" id="L667">        out[2] = left;</span>
+<span class="fc" id="L668">        out[3] = right;</span>
+<span class="fc" id="L669">        return true;</span>
+    }
+
+    // ---------------------------------------------------------------- the popup
+
+    /// Text drawn twice, a pixel apart: bold at the exact size of the text around it, on every
+    /// port, where a bold font derived from a theme font can come out another size.
+    private static void drawBold(Graphics g, String s, int x, int y) {
+<span class="nc" id="L677">        g.drawString(s, x, y);</span>
+<span class="nc" id="L678">        g.drawString(s, x + 1, y);</span>
+<span class="nc" id="L679">    }</span>
+
+    /// The font the grid draws its cells in, which is the row style's and not the grid's own.
+    static Font cellFont() {
+<span class="fc" id="L683">        Font f = UIManager.getInstance().getComponentStyle(&quot;DataGridRow&quot;).getFont();</span>
+<span class="pc bpc" id="L684" title="1 of 2 branches missed.">        return f == null ? Font.getDefaultFont() : f;</span>
+    }
+
+    private static String fit(Font font, String s, int width) {
+<span class="pc bpc" id="L688" title="1 of 2 branches missed.">        if (font.stringWidth(s) &lt;= width) {</span>
+<span class="fc" id="L689">            return s;</span>
+        }
+<span class="nc" id="L691">        int n = s.length();</span>
+<span class="nc bnc" id="L692" title="All 4 branches missed.">        while (n &gt; 0 &amp;&amp; font.stringWidth(s.substring(0, n) + &quot;...&quot;) &gt; width) {</span>
+<span class="nc" id="L693">            n--;</span>
+        }
+<span class="nc" id="L695">        return s.substring(0, n) + &quot;...&quot;;</span>
+    }
+
+    /// The list of completions, or the arguments of the function the caret is in, or why the
+    /// formula cannot be entered: under the editor, in the form's layered pane, so a cell
+    /// does not clip it.
+    private final class Popup extends Component {
+<span class="fc" id="L702">        Popup() {</span>
+<span class="fc" id="L703">            setFocusable(false);</span>
+<span class="fc" id="L704">            getAllStyles().setBgTransparency(0);</span>
+<span class="fc" id="L705">            getAllStyles().setPadding(0, 0, 0, 0);</span>
+<span class="fc" id="L706">            getAllStyles().setMargin(0, 0, 0, 0);</span>
+<span class="fc" id="L707">        }</span>
+
+        private Font font() {
+<span class="fc" id="L710">            return cellFont();</span>
+        }
+
+        private int lines() {
+<span class="fc bfc" id="L714" title="All 2 branches covered.">            if (listShown()) {</span>
+<span class="fc" id="L715">                return Math.min(VISIBLE_ITEMS, items.size()) + 1;</span>
+            }
+<span class="fc bfc" id="L717" title="All 2 branches covered.">            if (error != null) {</span>
+<span class="fc" id="L718">                return 1;</span>
+            }
+<span class="fc bfc" id="L720" title="All 2 branches covered.">            return hintName != null ? 2 : 0;</span>
+        }
+
+        private int pad() {
+<span class="fc" id="L724">            return Math.max(2, font().getHeight() / 3);</span>
+        }
+
+        @Override
+        protected Dimension calcPreferredSize() {
+<span class="fc" id="L729">            int lines = lines();</span>
+<span class="fc bfc" id="L730" title="All 2 branches covered.">            if (lines == 0) {</span>
+<span class="fc" id="L731">                return new Dimension(0, 0);</span>
+            }
+<span class="fc" id="L733">            Font f = font();</span>
+<span class="fc" id="L734">            int w = 0;</span>
+<span class="fc bfc" id="L735" title="All 2 branches covered.">            if (listShown()) {</span>
+<span class="pc bpc" id="L736" title="1 of 4 branches missed.">                for (int i = 0; i &lt; items.size() &amp;&amp; i &lt; 64; i++) {</span>
+<span class="fc" id="L737">                    w = Math.max(w, f.stringWidth(items.get(i)) + 1);</span>
+                }
+<span class="fc" id="L739">                w = Math.max(w, Math.min(f.stringWidth(details.get(selected)), f.getHeight() * 28));</span>
+<span class="fc bfc" id="L740" title="All 2 branches covered.">            } else if (error != null) {</span>
+<span class="fc" id="L741">                w = f.stringWidth(error);</span>
+            } else {
+<span class="fc" id="L743">                w = Math.max(f.stringWidth(signature()) + f.stringWidth(&quot;  &quot;), Math.min(f.stringWidth(hintDescription),</span>
+<span class="fc" id="L744">                        f.getHeight() * 28));</span>
+            }
+<span class="fc" id="L746">            Form form = getComponentForm();</span>
+<span class="pc bpc" id="L747" title="1 of 2 branches missed.">            int max = form == null ? w : form.getWidth() - 4 * pad();</span>
+<span class="fc" id="L748">            return new Dimension(Math.min(w, max) + 2 * pad(), lines * (f.getHeight() + pad()) + pad());</span>
+        }
+
+        private String signature() {
+<span class="fc" id="L752">            StringBuilder sb = new StringBuilder(hintName).append('(');</span>
+<span class="fc bfc" id="L753" title="All 2 branches covered.">            for (int i = 0; i &lt; hintArgs.length; i++) {</span>
+<span class="fc bfc" id="L754" title="All 2 branches covered.">                if (i &gt; 0) {</span>
+<span class="fc" id="L755">                    sb.append(&quot;, &quot;);</span>
+                }
+<span class="fc" id="L757">                sb.append(hintArgs[i]);</span>
+            }
+<span class="fc" id="L759">            return sb.append(')').toString();</span>
+        }
+
+        private int current() {
+<span class="pc bpc" id="L763" title="1 of 2 branches missed.">            if (hintArgs.length == 0) {</span>
+<span class="nc" id="L764">                return -1;</span>
+            }
+<span class="fc bfc" id="L766" title="All 2 branches covered.">            if (hintIndex &lt; hintArgs.length) {</span>
+                // past &quot;...&quot; the argument repeats: the one before it is the current one
+<span class="pc bpc" id="L768" title="1 of 2 branches missed.">                return &quot;...&quot;.equals(hintArgs[hintIndex]) ? hintIndex - 1 : hintIndex;</span>
+            }
+<span class="pc bpc" id="L770" title="1 of 2 branches missed.">            return &quot;...&quot;.equals(hintArgs[hintArgs.length - 1]) ? hintArgs.length - 2 : -1;</span>
+        }
+
+        private int first() {
+<span class="nc" id="L774">            return Math.max(0, Math.min(selected - VISIBLE_ITEMS / 2, items.size() - VISIBLE_ITEMS));</span>
+        }
+
+        @Override
+        public void paint(Graphics g) {
+<span class="fc" id="L779">            int lines = lines();</span>
+<span class="pc bpc" id="L780" title="1 of 2 branches missed.">            if (lines == 0) {</span>
+<span class="nc" id="L781">                return;</span>
+            }
+<span class="fc" id="L783">            Style st = grid.getUnselectedStyle();</span>
+<span class="fc" id="L784">            Font f = font();</span>
+<span class="fc" id="L785">            int fg = st.getFgColor();</span>
+<span class="pc bpc" id="L786" title="3 of 4 branches missed.">            int bg = st.getBgTransparency() == 0 ? (dark ? 0x202124 : 0xffffff) : st.getBgColor();</span>
+<span class="fc" id="L787">            int x = getX();</span>
+<span class="fc" id="L788">            int y = getY();</span>
+<span class="fc" id="L789">            int w = getWidth();</span>
+<span class="fc" id="L790">            int h = getHeight();</span>
+<span class="fc" id="L791">            int p = pad();</span>
+<span class="fc" id="L792">            int lh = f.getHeight() + p;</span>
+<span class="fc" id="L793">            int alpha = g.getAlpha();</span>
+<span class="fc" id="L794">            g.setAlpha(255);</span>
+<span class="fc" id="L795">            g.setColor(bg);</span>
+<span class="fc" id="L796">            g.fillRect(x, y, w, h);</span>
+<span class="pc bpc" id="L797" title="1 of 2 branches missed.">            g.setColor(dark ? 0x5f6368 : 0xc0c4c8);</span>
+<span class="fc" id="L798">            g.drawRect(x, y, w - 1, h - 1);</span>
+<span class="fc" id="L799">            int ty = y + p;</span>
+<span class="pc bpc" id="L800" title="1 of 2 branches missed.">            if (listShown()) {</span>
+<span class="nc" id="L801">                int start = first();</span>
+<span class="nc bnc" id="L802" title="All 4 branches missed.">                for (int i = start; i &lt; items.size() &amp;&amp; i &lt; start + VISIBLE_ITEMS; i++) {</span>
+<span class="nc bnc" id="L803" title="All 2 branches missed.">                    if (i == selected) {</span>
+<span class="nc bnc" id="L804" title="All 2 branches missed.">                        g.setColor(dark ? 0x264f78 : 0xcfe2ff);</span>
+<span class="nc" id="L805">                        g.fillRect(x + 1, ty - p / 2, w - 2, lh);</span>
+                    }
+<span class="nc" id="L807">                    g.setColor(fg);</span>
+<span class="nc" id="L808">                    g.setFont(f);</span>
+<span class="nc" id="L809">                    String item = fit(f, items.get(i), w - 2 * p - 1);</span>
+<span class="nc bnc" id="L810" title="All 2 branches missed.">                    if (i == selected) {</span>
+<span class="nc" id="L811">                        drawBold(g, item, x + p, ty);</span>
+                    } else {
+<span class="nc" id="L813">                        g.drawString(item, x + p, ty);</span>
+                    }
+<span class="nc" id="L815">                    ty += lh;</span>
+                }
+<span class="nc bnc" id="L817" title="All 2 branches missed.">                g.setColor(dark ? 0x9aa0a6 : 0x5f6368);</span>
+<span class="nc" id="L818">                g.setFont(f);</span>
+<span class="nc" id="L819">                g.drawString(fit(f, details.get(selected), w - 2 * p), x + p, ty);</span>
+<span class="pc bpc" id="L820" title="1 of 2 branches missed.">            } else if (error != null) {</span>
+<span class="pc bpc" id="L821" title="1 of 2 branches missed.">                g.setColor(dark ? 0xff7b72 : 0xc4302b);</span>
+<span class="fc" id="L822">                g.setFont(f);</span>
+<span class="fc" id="L823">                g.drawString(fit(f, error, w - 2 * p), x + p, ty);</span>
+            } else {
+<span class="nc" id="L825">                int cx = x + p;</span>
+<span class="nc" id="L826">                int limit = x + w - p;</span>
+<span class="nc" id="L827">                int bolded = current();</span>
+<span class="nc" id="L828">                g.setColor(fg);</span>
+<span class="nc" id="L829">                g.setFont(f);</span>
+<span class="nc" id="L830">                cx = draw(g, f, hintName + &quot;(&quot;, cx, ty, limit, false);</span>
+<span class="nc bnc" id="L831" title="All 2 branches missed.">                for (int i = 0; i &lt; hintArgs.length; i++) {</span>
+<span class="nc bnc" id="L832" title="All 2 branches missed.">                    if (i &gt; 0) {</span>
+<span class="nc" id="L833">                        cx = draw(g, f, &quot;, &quot;, cx, ty, limit, false);</span>
+                    }
+<span class="nc bnc" id="L835" title="All 2 branches missed.">                    cx = draw(g, f, hintArgs[i], cx, ty, limit, i == bolded);</span>
+                }
+<span class="nc" id="L837">                draw(g, f, &quot;)&quot;, cx, ty, limit, false);</span>
+<span class="nc bnc" id="L838" title="All 2 branches missed.">                g.setColor(dark ? 0x9aa0a6 : 0x5f6368);</span>
+<span class="nc" id="L839">                g.setFont(f);</span>
+<span class="nc" id="L840">                g.drawString(fit(f, hintDescription, w - 2 * p), x + p, ty + lh);</span>
+            }
+<span class="fc" id="L842">            g.setAlpha(alpha);</span>
+<span class="fc" id="L843">        }</span>
+
+        private int draw(Graphics g, Font font, String s, int x, int y, int limit, boolean bold) {
+<span class="nc bnc" id="L846" title="All 2 branches missed.">            if (x &gt;= limit) {</span>
+<span class="nc" id="L847">                return x;</span>
+            }
+<span class="nc bnc" id="L849" title="All 2 branches missed.">            String shown = fit(font, s, limit - x - (bold ? 1 : 0));</span>
+<span class="nc bnc" id="L850" title="All 2 branches missed.">            if (bold) {</span>
+<span class="nc" id="L851">                drawBold(g, shown, x, y);</span>
+<span class="nc" id="L852">                return x + font.stringWidth(shown) + 1;</span>
+            }
+<span class="nc" id="L854">            g.drawString(shown, x, y);</span>
+<span class="nc" id="L855">            return x + font.stringWidth(shown);</span>
+        }
+
+        @Override
+        public void pointerReleased(int x, int y) {
+<span class="nc bnc" id="L860" title="All 2 branches missed.">            if (!listShown()) {</span>
+<span class="nc" id="L861">                return;</span>
+            }
+<span class="nc" id="L863">            int lh = font().getHeight() + pad();</span>
+<span class="nc" id="L864">            int index = first() + (y - getAbsoluteY() - pad() / 2) / lh;</span>
+<span class="nc bnc" id="L865" title="All 6 branches missed.">            if (index &gt;= first() &amp;&amp; index &lt; items.size() &amp;&amp; index &lt; first() + VISIBLE_ITEMS) {</span>
+<span class="nc" id="L866">                accept(index);</span>
+            }
+<span class="nc" id="L868">        }</span>
+    }
+
+    /// The layer the popup is laid in. It covers the form, so only the popup takes the pointer.
+    private static final class PopupLayer extends Container {
+        private final Popup popup;
+
+        PopupLayer(final Popup popup, final Component editor) {
+<span class="fc" id="L876">            super(new Layout() {</span>
+                @Override
+                public void layoutContainer(Container parent) {
+<span class="fc" id="L879">                    Dimension d = popup.getPreferredSize();</span>
+<span class="fc" id="L880">                    int x = editor.getAbsoluteX() - parent.getAbsoluteX();</span>
+<span class="fc" id="L881">                    int y = editor.getAbsoluteY() + editor.getHeight() - parent.getAbsoluteY() + 1;</span>
+<span class="pc bpc" id="L882" title="3 of 4 branches missed.">                    if (y + d.getHeight() &gt; parent.getHeight() &amp;&amp; editor.getAbsoluteY() - parent.getAbsoluteY() &gt; d.getHeight()) {</span>
+<span class="nc" id="L883">                        y = editor.getAbsoluteY() - parent.getAbsoluteY() - d.getHeight() - 1;</span>
+                    }
+<span class="fc" id="L885">                    x = Math.max(0, Math.min(x, parent.getWidth() - d.getWidth()));</span>
+<span class="fc" id="L886">                    popup.setX(x);</span>
+<span class="fc" id="L887">                    popup.setY(y);</span>
+<span class="fc" id="L888">                    popup.setWidth(d.getWidth());</span>
+<span class="fc" id="L889">                    popup.setHeight(d.getHeight());</span>
+<span class="fc" id="L890">                }</span>
+
+                @Override
+                public Dimension getPreferredSize(Container parent) {
+                    // the size of the pane: a container clips what it paints to itself
+<span class="fc" id="L895">                    Container pane = parent.getParent();</span>
+<span class="pc bpc" id="L896" title="1 of 2 branches missed.">                    return pane == null ? new Dimension(0, 0) : new Dimension(pane.getWidth(), pane.getHeight());</span>
+                }
+            });
+<span class="fc" id="L899">            this.popup = popup;</span>
+<span class="fc" id="L900">            add(popup);</span>
+<span class="fc" id="L901">        }</span>
+
+        @Override
+        public boolean contains(int x, int y) {
+<span class="nc bnc" id="L905" title="All 4 branches missed.">            return popup.getWidth() &gt; 0 &amp;&amp; popup.contains(x, y);</span>
+        }
+    }
+
+    /// The editor a cell of a sheet is edited in: a `CodeEditor` of one line that brings the
+    /// formula editing along while it is shown.
+<span class="fc" id="L911">    static final class CellEditor extends CodeEditor {</span>
+        private FormulaEditing editing;
+
+        FormulaEditing getEditing() {
+<span class="fc" id="L915">            return editing;</span>
+        }
+
+        void setEditing(FormulaEditing editing) {
+<span class="fc" id="L919">            this.editing = editing;</span>
+<span class="fc" id="L920">        }</span>
+
+        String currentText() {
+<span class="pc bpc" id="L923" title="1 of 2 branches missed.">            return editing == null ? &quot;&quot; : editing.text();</span>
+        }
+
+        @Override
+        protected void initComponent() {
+<span class="fc" id="L928">            super.initComponent();</span>
+<span class="pc bpc" id="L929" title="1 of 2 branches missed.">            if (editing != null) {</span>
+<span class="fc" id="L930">                editing.attach();</span>
+            }
+<span class="fc" id="L932">        }</span>
+
+        @Override
+        protected void deinitialize() {
+<span class="pc bpc" id="L936" title="1 of 2 branches missed.">            if (editing != null) {</span>
+<span class="fc" id="L937">                editing.detach();</span>
+            }
+<span class="fc" id="L939">            super.deinitialize();</span>
+<span class="fc" id="L940">        }</span>
+
+        @Override
+        public void startEditingAsync() {
+<span class="fc" id="L944">            focusEditor();</span>
+<span class="fc" id="L945">        }</span>
+
+        /// As wide as the cell, or wider while the text does not fit, up to the form's edge,
+        /// as a spreadsheet lets what is typed run over the cells to its right.
+        @Override
+        public void setWidth(int width) {
+<span class="fc" id="L951">            int wanted = width;</span>
+<span class="fc" id="L952">            Form form = getComponentForm();</span>
+<span class="pc bpc" id="L953" title="1 of 4 branches missed.">            if (editing != null &amp;&amp; form != null) {</span>
+<span class="fc" id="L954">                Font font = cellFont();</span>
+<span class="fc" id="L955">                int text = font.stringWidth(editing.text) + font.getHeight() * 4;</span>
+<span class="fc" id="L956">                int room = form.getAbsoluteX() + form.getWidth() - getAbsoluteX();</span>
+<span class="fc" id="L957">                wanted = Math.max(width, Math.min(text, room));</span>
+            }
+<span class="fc" id="L959">            super.setWidth(wanted);</span>
+<span class="fc" id="L960">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

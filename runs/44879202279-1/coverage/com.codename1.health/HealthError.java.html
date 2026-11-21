@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>HealthError.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.health</a> &gt; <span class="el_source">HealthError.java</span></div><h1>HealthError.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.health;
+
+/// Typed failure reasons carried by [HealthException]. Ports map their
+/// platform error codes onto these so cross-platform code can branch on a
+/// stable value instead of parsing messages.
+<span class="fc" id="L28">public enum HealthError {</span>
+
+    /// The port, device or OS version has no health support at all, or the
+    /// requested capability is unavailable on this platform. Returned by
+    /// every operation on the fallback [Health] base class.
+<span class="fc" id="L33">    NOT_SUPPORTED,</span>
+
+    /// The requested data type is not available on this platform, even
+    /// though health support in general is.
+<span class="fc" id="L37">    TYPE_NOT_SUPPORTED,</span>
+
+    /// The Health Connect provider app is not installed. Recoverable by
+    /// sending the user to [Health#openProviderSetup()].
+<span class="fc" id="L41">    PROVIDER_UNAVAILABLE,</span>
+
+    /// The installed Health Connect provider is too old. Also recoverable
+    /// via [Health#openProviderSetup()].
+<span class="fc" id="L45">    PROVIDER_UPDATE_REQUIRED,</span>
+
+    /// The operation was refused for lack of authorization.
+    ///
+    /// Note that a **read** denial does not reliably produce this error:
+    /// HealthKit reports a denied read as an empty result, by design. See
+    /// [HealthStore#getReadAuthorizationStatus(HealthDataType)].
+<span class="fc" id="L52">    UNAUTHORIZED,</span>
+
+    /// The user dismissed a platform authorization or setup flow. Only
+    /// reported where the platform distinguishes cancellation from denial.
+<span class="fc" id="L56">    USER_CANCELED,</span>
+
+    /// A query or write was rejected before reaching the platform because
+    /// the request itself was malformed -- an inverted time range, an
+    /// instantaneous write of a cumulative type, a negative limit.
+<span class="fc" id="L61">    INVALID_ARGUMENT,</span>
+
+    /// A unit was supplied that measures a different dimension than the
+    /// data type requires.
+<span class="fc" id="L65">    UNIT_MISMATCH,</span>
+
+    /// A payload could not be decoded -- a truncated or malformed GATT
+    /// characteristic value, or a platform record the port could not map.
+    /// Never surfaces as an unchecked exception from a parser.
+<span class="fc" id="L70">    INVALID_DATA,</span>
+
+    /// The platform's health database could not be opened. On iOS this is
+    /// `HKErrorDatabaseInaccessible`, raised while the device is locked --
+    /// which is exactly when a background observer fires. **Retryable**:
+    /// callers should try again once the device is unlocked rather than
+    /// treating it as &quot;no data&quot;.
+<span class="fc" id="L77">    DATABASE_INACCESSIBLE,</span>
+
+    /// A stored anchor or change token was rejected by the platform,
+    /// usually because it aged out. The caller must resynchronize with a
+    /// full time-range read; see [HealthChangeBatch#isResyncRequired()].
+<span class="fc" id="L82">    ANCHOR_EXPIRED,</span>
+
+    /// The operation would return or write more data than the platform
+    /// permits in one call. Use paging or a smaller batch.
+<span class="fc" id="L86">    QUOTA_EXCEEDED,</span>
+
+    /// The platform rate-limited the request.
+<span class="fc" id="L89">    RATE_LIMITED,</span>
+
+    /// A workout session method was called in a state that does not allow
+    /// it -- pausing a session that never started, ending one twice.
+<span class="fc" id="L93">    SESSION_STATE,</span>
+
+    /// A live BLE sensor dropped its connection mid-session.
+<span class="fc" id="L96">    SENSOR_DISCONNECTED,</span>
+
+    /// The operation did not complete within its safety timeout.
+<span class="fc" id="L99">    TIMEOUT,</span>
+
+    /// Anything the port could not classify. The message carries the
+    /// platform's own text.
+<span class="fc" id="L103">    UNKNOWN</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

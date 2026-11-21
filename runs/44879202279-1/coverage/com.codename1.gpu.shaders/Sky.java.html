@@ -1,0 +1,156 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Sky.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.gpu.shaders</a> &gt; <span class="el_source">Sky.java</span></div><h1>Sky.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.gpu.shaders;
+
+import com.codename1.gpu.shader.ShaderMaterial;
+import com.codename1.gpu.shader.ShaderNode;
+import com.codename1.gpu.shader.ShaderType;
+
+import static com.codename1.gpu.shader.ShaderNode.*;
+
+/// Sky domes: draw an inside-out sphere (`Primitives.sphere(r, 24, 32, true)`)
+/// around the camera with a `Material.Type.UNLIT` material and `setFogged(false)`. The
+/// colour depends only on the direction from the camera, so the dome's size
+/// and position do not matter. The sun follows the scene's light.
+///
+/// For the sky to light the scene as well, give the `Environment` matching
+/// hemisphere colours; `ScenePresets` does both.
+public final class Sky {
+    /// `VEC3` the colour straight up.
+    public static final String ZENITH = &quot;skyZenith&quot;;
+    /// `VEC3` the colour at the horizon.
+    public static final String HORIZON = &quot;skyHorizon&quot;;
+    /// `VEC3` the colour below the horizon.
+    public static final String GROUND = &quot;skyGround&quot;;
+    /// `VEC3` the glow around the sun, scattered into the haze.
+    public static final String GLOW = &quot;skyGlow&quot;;
+    /// `FLOAT` cloud cover, 0 to 1.
+    public static final String CLOUDS = &quot;skyClouds&quot;;
+    /// `FLOAT` star brightness, 0 for none.
+    public static final String STARS = &quot;skyStars&quot;;
+
+    private Sky() {
+    }
+
+    /// A clear or hazy sky with a sun disc, a wide glow around it, the
+    /// horizon band and drifting clouds.
+    ///
+    /// #### Returns
+    ///
+    /// a new shader material
+    public static ShaderMaterial gradient() {
+<span class="fc" id="L62">        ShaderMaterial m = new ShaderMaterial()</span>
+<span class="fc" id="L63">                .declareUniform(ZENITH, ShaderType.VEC3).declareUniform(HORIZON, ShaderType.VEC3)</span>
+<span class="fc" id="L64">                .declareUniform(GROUND, ShaderType.VEC3).declareUniform(GLOW, ShaderType.VEC3)</span>
+<span class="fc" id="L65">                .declareUniform(CLOUDS, ShaderType.FLOAT).declareUniform(STARS, ShaderType.FLOAT);</span>
+<span class="fc" id="L66">        ShaderNode dir = normalize(worldPos().sub(cameraPos()));</span>
+<span class="fc" id="L67">        ShaderNode y = dir.y();</span>
+<span class="fc" id="L68">        ShaderNode up = pow(saturate(y), 0.45f);</span>
+<span class="fc" id="L69">        ShaderNode sky = mix(uniform(HORIZON, ShaderType.VEC3), uniform(ZENITH, ShaderType.VEC3), up);</span>
+<span class="fc" id="L70">        ShaderNode rgb = mix(sky, uniform(GROUND, ShaderType.VEC3), smoothstep(0f, -0.08f, y));</span>
+<span class="fc" id="L71">        ShaderNode sd = saturate(dot(dir, sunDir()));</span>
+        // Mie-like forward scattering: a broad glow and a tight halo
+<span class="fc" id="L73">        ShaderNode glow = pow(sd, 6f).mul(0.6f).add(pow(sd, 48f).mul(0.8f));</span>
+<span class="fc" id="L74">        rgb = rgb.add(uniform(GLOW, ShaderType.VEC3).mul(glow).mul(smoothstep(-0.1f, 0.2f, y).mul(0.7f).add(0.3f)));</span>
+<span class="fc" id="L75">        rgb = rgb.add(sunColor().mul(smoothstep(0.9994f, 0.9997f, sd).mul(3f)));</span>
+        // clouds on a plane above: project the ray, thin out toward the horizon
+<span class="fc" id="L77">        ShaderNode cp = dir.xz().div(max(y, f(0.05f))).mul(0.6f).add(vec2(0.02f, 0.01f).mul(time()));</span>
+<span class="fc" id="L78">        ShaderNode c = Noise.fbm(cp, 5);</span>
+<span class="fc" id="L79">        ShaderNode cover = uniform(CLOUDS, ShaderType.FLOAT);</span>
+<span class="fc" id="L80">        ShaderNode cl = smoothstep(f(1f).sub(cover), f(1.35f).sub(cover), c).mul(smoothstep(0.02f, 0.25f, y));</span>
+<span class="fc" id="L81">        ShaderNode cloudRgb = mix(uniform(HORIZON, ShaderType.VEC3).mul(0.85f), vec3(1f, 1f, 1f), c)</span>
+<span class="fc" id="L82">                .add(uniform(GLOW, ShaderType.VEC3).mul(pow(sd, 4f).mul(0.8f)));</span>
+<span class="fc" id="L83">        rgb = mix(rgb, cloudRgb, cl);</span>
+        // stars, hidden behind clouds and the horizon haze
+<span class="fc" id="L85">        ShaderNode cell = floor(dir.mul(220f));</span>
+<span class="fc" id="L86">        ShaderNode star = step(f(0.9975f), Noise.hash(cell.xy().add(cell.z().mul(31.7f))));</span>
+<span class="fc" id="L87">        ShaderNode twinkle = sin(time().mul(3f).add(Noise.hash(cell.swizzle(&quot;zx&quot;)).mul(40f))).mul(0.3f).add(0.7f);</span>
+<span class="fc" id="L88">        rgb = rgb.add(vec3(1f, 1f, 1f).mul(star.mul(twinkle).mul(uniform(STARS, ShaderType.FLOAT))</span>
+<span class="fc" id="L89">                .mul(f(1f).sub(cl)).mul(smoothstep(0.05f, 0.3f, y))));</span>
+<span class="fc" id="L90">        m.set(ShaderMaterial.Hook.BASE_COLOR, vec(rgb, f(1f)));</span>
+<span class="fc" id="L91">        day(m);</span>
+<span class="fc" id="L92">        return m;</span>
+    }
+
+    /// Sets a `gradient` sky to a clear midday.
+    ///
+    /// #### Parameters
+    ///
+    /// - `sky`: a material from `gradient`
+    ///
+    /// #### Returns
+    ///
+    /// the material
+    public static ShaderMaterial day(ShaderMaterial sky) {
+<span class="fc" id="L105">        return sky.setColorUniform(ZENITH, 0x2f6fc4).setColorUniform(HORIZON, 0xbcd8ec)</span>
+<span class="fc" id="L106">                .setColorUniform(GROUND, 0x5d6a72).setColorUniform(GLOW, 0xfff2d8)</span>
+<span class="fc" id="L107">                .setUniform(CLOUDS, 0.35f).setUniform(STARS, 0f);</span>
+    }
+
+    /// Sets a `gradient` sky to a warm dusk: deep blue overhead, apricot at
+    /// the horizon, a big rose glow around a low sun, first stars.
+    ///
+    /// #### Parameters
+    ///
+    /// - `sky`: a material from `gradient`
+    ///
+    /// #### Returns
+    ///
+    /// the material
+    public static ShaderMaterial dusk(ShaderMaterial sky) {
+<span class="fc" id="L121">        return sky.setColorUniform(ZENITH, 0x1c2a52).setColorUniform(HORIZON, 0xf0a46a)</span>
+<span class="fc" id="L122">                .setColorUniform(GROUND, 0x2a2730).setColorUniform(GLOW, 0xff8a5a)</span>
+<span class="fc" id="L123">                .setUniform(CLOUDS, 0.3f).setUniform(STARS, 0.6f);</span>
+    }
+
+    /// Sets a `gradient` sky to night: dark blue, a cold moon glow, stars.
+    ///
+    /// #### Parameters
+    ///
+    /// - `sky`: a material from `gradient`
+    ///
+    /// #### Returns
+    ///
+    /// the material
+    public static ShaderMaterial night(ShaderMaterial sky) {
+<span class="fc" id="L136">        return sky.setColorUniform(ZENITH, 0x03060f).setColorUniform(HORIZON, 0x16233a)</span>
+<span class="fc" id="L137">                .setColorUniform(GROUND, 0x05070b).setColorUniform(GLOW, 0x6f88b0)</span>
+<span class="fc" id="L138">                .setUniform(CLOUDS, 0.2f).setUniform(STARS, 1.2f);</span>
+    }
+
+    /// Sets a `gradient` sky to a grey overcast.
+    ///
+    /// #### Parameters
+    ///
+    /// - `sky`: a material from `gradient`
+    ///
+    /// #### Returns
+    ///
+    /// the material
+    public static ShaderMaterial overcast(ShaderMaterial sky) {
+<span class="fc" id="L151">        return sky.setColorUniform(ZENITH, 0x7d8690).setColorUniform(HORIZON, 0xb4b9bd)</span>
+<span class="fc" id="L152">                .setColorUniform(GROUND, 0x4e5257).setColorUniform(GLOW, 0x404040)</span>
+<span class="fc" id="L153">                .setUniform(CLOUDS, 0.95f).setUniform(STARS, 0f);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

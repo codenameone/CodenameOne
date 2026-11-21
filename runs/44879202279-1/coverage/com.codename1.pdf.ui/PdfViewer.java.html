@@ -1,0 +1,440 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PdfViewer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.pdf.ui</a> &gt; <span class="el_source">PdfViewer.java</span></div><h1>PdfViewer.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.pdf.ui;
+
+import com.codename1.impl.pdf.PdfContent;
+import com.codename1.impl.pdf.PdfDict;
+import com.codename1.impl.pdf.PdfFile;
+import com.codename1.impl.pdf.PdfRenderer;
+import com.codename1.io.Util;
+import com.codename1.ui.CN;
+import com.codename1.ui.Component;
+import com.codename1.ui.Graphics;
+import com.codename1.ui.Image;
+import com.codename1.ui.geom.Dimension;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.List;
+
+/// Displays a PDF document: pages stacked vertically and scrolled
+/// continuously, fitted to the width of the component and zoomed by pinch
+/// or double tap.
+///
+/// Pages are drawn by a pure-Java renderer, so a document looks the same
+/// on every platform and needs no native viewer:
+///
+/// ```java
+/// PdfDocument doc = new PdfDocument();
+/// for (int i = 1; i &lt;= 5; i++) {
+///     doc.addPage(PdfPageSize.A4).getCanvas().drawText(&quot;Page &quot; + i, 72, 72);
+/// }
+/// byte[] pdfBytes = doc.toByteArray();
+/// Form form = new Form(&quot;Document&quot;, new BorderLayout());
+/// PdfViewer viewer = new PdfViewer(pdfBytes);
+/// form.add(BorderLayout.CENTER, viewer);
+/// viewer.setPage(3);
+/// ```
+///
+/// Pages render one at a time on the EDT, interleaved with other events,
+/// and only the pages near the view are kept as images. A page that is
+/// not drawn yet shows as a blank sheet.
+///
+/// The renderer covers vector graphics with dashes, blend modes,
+/// transparency and knockout groups and soft masks; every shading type;
+/// embedded TrueType, OpenType, CFF, Type 1 and Type 3 fonts, horizontal
+/// and vertical; images in every PDF filter, JPEG 2000, JBIG2 and CCITT
+/// fax included; and annotation appearances. Fonts that are not embedded
+/// are drawn with a platform font of the same family, so their shapes
+/// differ from the original.
+public class PdfViewer extends Component {
+    private static final int GAP = 8;
+    private static final int CACHED_PAGES = 6;
+    // The most pixels one cached page image may hold (about 64 MB of ARGB).
+    // A zoomed page past it is rendered at this size and scaled up on
+    // screen, softer but without running the device out of memory.
+    private static final double MAX_PAGE_PIXELS = 16.0 * 1024 * 1024;
+    // The most pixels all cached page images may hold together.
+    private static final double MAX_CACHED_PIXELS = 3 * MAX_PAGE_PIXELS;
+    private static final float MAX_ZOOM = 5f;
+
+    private final PdfFile file;
+    private final List&lt;PdfDict&gt; pages;
+    private final double[] widths;
+    private final double[] heights;
+    private double maxWidth;
+<span class="nc" id="L85">    private float zoom = 1f;</span>
+<span class="nc" id="L86">    private float pinchStart = -1;</span>
+    private final Image[] cache;
+    private final double[] cacheScale;
+    private final long[] cacheUse;
+    private long useCounter;
+    private boolean renderQueued;
+    private long lastRelease;
+<span class="nc" id="L93">    private int lastWidth = -1;</span>
+
+    /// A viewer for the PDF in `data`.
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: when the data is not a PDF, or it is encrypted
+    ///   with a user password.
+    public PdfViewer(byte[] data) throws IOException {
+<span class="nc" id="L102">        this(data, &quot;&quot;);</span>
+<span class="nc" id="L103">    }</span>
+
+    /// A viewer for the PDF in `data`, opened with `password` (the user or
+    /// the owner password) when it is encrypted.
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: when the data is not a PDF or the password is wrong.
+<span class="nc" id="L111">    public PdfViewer(byte[] data, String password) throws IOException {</span>
+<span class="nc bnc" id="L112" title="All 2 branches missed.">        file = new PdfFile(data, password == null ? &quot;&quot; : password);</span>
+<span class="nc" id="L113">        pages = file.getPages();</span>
+<span class="nc" id="L114">        int n = pages.size();</span>
+<span class="nc" id="L115">        widths = new double[n];</span>
+<span class="nc" id="L116">        heights = new double[n];</span>
+<span class="nc bnc" id="L117" title="All 2 branches missed.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="nc" id="L118">            PdfDict p = pages.get(i);</span>
+<span class="nc" id="L119">            double[] b = PdfContent.box(p);</span>
+<span class="nc bnc" id="L120" title="All 2 branches missed.">            boolean swap = PdfContent.rotation(p) % 180 != 0;</span>
+<span class="nc bnc" id="L121" title="All 2 branches missed.">            widths[i] = swap ? b[3] : b[2];</span>
+<span class="nc bnc" id="L122" title="All 2 branches missed.">            heights[i] = swap ? b[2] : b[3];</span>
+<span class="nc" id="L123">            maxWidth = Math.max(maxWidth, widths[i]);</span>
+        }
+<span class="nc" id="L125">        cache = new Image[n];</span>
+<span class="nc" id="L126">        cacheScale = new double[n];</span>
+<span class="nc" id="L127">        cacheUse = new long[n];</span>
+<span class="nc" id="L128">        setFocusable(true);</span>
+<span class="nc" id="L129">        setUIID(&quot;PdfViewer&quot;);</span>
+<span class="nc" id="L130">    }</span>
+
+    /// A viewer for the PDF read from `in`, which is closed.
+    ///
+    /// #### Throws
+    ///
+    /// - `IOException`: when reading fails or the data is not a PDF.
+    public static PdfViewer open(InputStream in) throws IOException {
+        try {
+<span class="nc" id="L139">            return new PdfViewer(Util.readInputStream(in));</span>
+        } finally {
+<span class="nc" id="L141">            Util.cleanup(in);</span>
+        }
+    }
+
+    /// The number of pages.
+    public int getPageCount() {
+<span class="nc" id="L147">        return pages.size();</span>
+    }
+
+    /// The zoom factor, 1 when a page fits the width.
+    public float getZoom() {
+<span class="nc" id="L152">        return zoom;</span>
+    }
+
+    /// Sets the zoom factor, clamped to 1..5, keeping the middle of the
+    /// view in place.
+    public void setZoom(float z) {
+<span class="nc" id="L158">        float nz = Math.max(1f, Math.min(MAX_ZOOM, z));</span>
+<span class="nc bnc" id="L159" title="All 2 branches missed.">        if (Math.abs(nz - zoom) &lt; 1e-4f) {</span>
+<span class="nc" id="L160">            return;</span>
+        }
+<span class="nc" id="L162">        int h = Math.max(1, getHeight());</span>
+<span class="nc" id="L163">        int w = Math.max(1, getWidth());</span>
+<span class="nc" id="L164">        double cy = (getScrollY() + h / 2.0) / zoom;</span>
+<span class="nc" id="L165">        double cx = (getScrollX() + w / 2.0) / zoom;</span>
+<span class="nc" id="L166">        zoom = nz;</span>
+<span class="nc" id="L167">        setShouldCalcPreferredSize(true);</span>
+<span class="nc" id="L168">        Dimension pref = getPreferredSize();</span>
+<span class="nc" id="L169">        int maxY = Math.max(0, pref.getHeight() - h);</span>
+<span class="nc" id="L170">        int maxX = Math.max(0, pref.getWidth() - w);</span>
+<span class="nc" id="L171">        setScrollY(clamp((int) (cy * zoom - h / 2.0), 0, maxY));</span>
+<span class="nc" id="L172">        setScrollX(clamp((int) (cx * zoom - w / 2.0), 0, maxX));</span>
+<span class="nc" id="L173">        repaint();</span>
+<span class="nc" id="L174">    }</span>
+
+    private static int clamp(int v, int lo, int hi) {
+<span class="nc bnc" id="L177" title="All 4 branches missed.">        return v &lt; lo ? lo : v &gt; hi ? hi : v;</span>
+    }
+
+    /// The page at the middle of the view, zero based.
+    public int getPage() {
+<span class="nc" id="L182">        double s = scale();</span>
+<span class="nc" id="L183">        int mid = getScrollY() + getHeight() / 2;</span>
+<span class="nc" id="L184">        int y = GAP;</span>
+<span class="nc bnc" id="L185" title="All 2 branches missed.">        for (int i = 0; i &lt; pages.size(); i++) {</span>
+<span class="nc" id="L186">            y += (int) (heights[i] * s) + GAP;</span>
+<span class="nc bnc" id="L187" title="All 2 branches missed.">            if (y &gt; mid) {</span>
+<span class="nc" id="L188">                return i;</span>
+            }
+        }
+<span class="nc" id="L191">        return Math.max(0, pages.size() - 1);</span>
+    }
+
+    /// Scrolls so that page `index` (zero based) is at the top of the view.
+    public void setPage(int index) {
+<span class="nc bnc" id="L196" title="All 4 branches missed.">        if (index &lt; 0 || index &gt;= pages.size()) {</span>
+<span class="nc" id="L197">            return;</span>
+        }
+<span class="nc" id="L199">        int y = pageTop(index, scale()) - GAP;</span>
+<span class="nc" id="L200">        int max = Math.max(0, getPreferredSize().getHeight() - getHeight());</span>
+<span class="nc" id="L201">        setScrollY(clamp(y, 0, max));</span>
+<span class="nc" id="L202">        repaint();</span>
+<span class="nc" id="L203">    }</span>
+
+    /// Renders page `index` (zero based) to an image at `scale` pixels per
+    /// point, white background, annotations included. Usable without
+    /// showing the viewer, for a thumbnail or a share sheet.
+    public Image renderPage(int index, double scale) {
+<span class="nc" id="L209">        int w = Math.max(1, (int) Math.ceil(widths[index] * scale));</span>
+<span class="nc" id="L210">        int h = Math.max(1, (int) Math.ceil(heights[index] * scale));</span>
+        // The page is drawn on a transparent surface and put on white
+        // paper afterwards: in PDF the page is a transparency group whose
+        // backdrop is transparent, which blend modes can tell apart from
+        // white.
+<span class="nc" id="L215">        Image img = Image.createImage(w, h, 0);</span>
+<span class="nc" id="L216">        Graphics g = img.getGraphics();</span>
+<span class="nc" id="L217">        new PdfRenderer(file, new GraphicsPdfDevice(g, img, w, h)).render(pages.get(index), scale, true);</span>
+<span class="nc" id="L218">        Image paper = Image.createImage(w, h, 0xffffffff);</span>
+<span class="nc" id="L219">        paper.getGraphics().drawImage(img, 0, 0);</span>
+<span class="nc" id="L220">        return paper;</span>
+    }
+
+    /// Pixels per point at the current width and zoom. One scale for the
+    /// whole document, fitted to its widest page, keeps pages in proportion
+    /// to each other as a reader expects; a narrow page beside a very wide
+    /// one is zoomed into rather than enlarged on its own.
+    private double scale() {
+<span class="nc" id="L228">        int w = getWidth();</span>
+<span class="nc bnc" id="L229" title="All 2 branches missed.">        if (w &lt;= 0) {</span>
+<span class="nc" id="L230">            w = CN.getDisplayWidth();</span>
+        }
+<span class="nc" id="L232">        double avail = Math.max(1, w - GAP * 2);</span>
+<span class="nc bnc" id="L233" title="All 2 branches missed.">        return maxWidth &lt;= 0 ? 1 : avail / maxWidth * zoom;</span>
+    }
+
+    private int pageTop(int index, double s) {
+<span class="nc" id="L237">        int y = GAP;</span>
+<span class="nc bnc" id="L238" title="All 2 branches missed.">        for (int i = 0; i &lt; index; i++) {</span>
+<span class="nc" id="L239">            y += (int) (heights[i] * s) + GAP;</span>
+        }
+<span class="nc" id="L241">        return y;</span>
+    }
+
+    @Override
+    public boolean isScrollableY() {
+        // Only when the pages are taller than the view: a viewer that
+        // claims to scroll with nothing to scroll paints a scroll thumb
+        // filling the whole track.
+<span class="nc bnc" id="L249" title="All 2 branches missed.">        return getPreferredH() &gt; getHeight();</span>
+    }
+
+    @Override
+    public boolean isScrollableX() {
+<span class="nc bnc" id="L254" title="All 4 branches missed.">        return zoom &gt; 1f &amp;&amp; getPreferredW() &gt; getWidth();</span>
+    }
+
+    @Override
+    protected Dimension calcPreferredSize() {
+<span class="nc" id="L259">        double s = scale();</span>
+<span class="nc" id="L260">        int h = pageTop(pages.size(), s);</span>
+<span class="nc" id="L261">        int w = (int) (maxWidth * s) + GAP * 2;</span>
+<span class="nc" id="L262">        return new Dimension(w, h);</span>
+    }
+
+    @Override
+    protected void laidOut() {
+<span class="nc" id="L267">        super.laidOut();</span>
+<span class="nc bnc" id="L268" title="All 2 branches missed.">        if (getWidth() != lastWidth) {</span>
+<span class="nc" id="L269">            lastWidth = getWidth();</span>
+<span class="nc" id="L270">            setShouldCalcPreferredSize(true);</span>
+        }
+<span class="nc" id="L272">    }</span>
+
+    @Override
+    public void paint(Graphics g) {
+<span class="nc" id="L276">        double s = scale();</span>
+<span class="nc" id="L277">        int top = getScrollY();</span>
+<span class="nc" id="L278">        int bottom = top + getHeight();</span>
+<span class="nc" id="L279">        int contentW = (int) (maxWidth * s) + GAP * 2;</span>
+<span class="nc" id="L280">        int baseX = getX() + Math.max(0, (getWidth() - contentW) / 2);</span>
+<span class="nc" id="L281">        int y = getY() + GAP;</span>
+<span class="nc" id="L282">        int first = -1;</span>
+<span class="nc" id="L283">        int last = -1;</span>
+<span class="nc bnc" id="L284" title="All 2 branches missed.">        for (int i = 0; i &lt; pages.size(); i++) {</span>
+<span class="nc" id="L285">            int pw = (int) (widths[i] * s);</span>
+<span class="nc" id="L286">            int ph = (int) (heights[i] * s);</span>
+<span class="nc" id="L287">            int rel = y - getY();</span>
+<span class="nc bnc" id="L288" title="All 4 branches missed.">            if (rel + ph &gt;= top &amp;&amp; rel &lt;= bottom) {</span>
+<span class="nc bnc" id="L289" title="All 2 branches missed.">                if (first &lt; 0) {</span>
+<span class="nc" id="L290">                    first = i;</span>
+                }
+<span class="nc" id="L292">                last = i;</span>
+<span class="nc" id="L293">                int x = baseX + GAP + ((int) (maxWidth * s) - pw) / 2;</span>
+<span class="nc" id="L294">                g.setColor(0xffffff);</span>
+<span class="nc" id="L295">                g.fillRect(x, y, pw, ph);</span>
+<span class="nc" id="L296">                Image img = cache[i];</span>
+<span class="nc bnc" id="L297" title="All 2 branches missed.">                if (img != null) {</span>
+<span class="nc" id="L298">                    cacheUse[i] = ++useCounter;</span>
+<span class="nc bnc" id="L299" title="All 2 branches missed.">                    if (img.getWidth() == pw) {</span>
+<span class="nc" id="L300">                        g.drawImage(img, x, y);</span>
+                    } else {
+<span class="nc" id="L302">                        g.drawImage(img, x, y, pw, ph);</span>
+                    }
+                }
+<span class="nc" id="L305">                g.setColor(0xc0c0c0);</span>
+<span class="nc" id="L306">                g.drawRect(x, y, pw - 1, ph - 1);</span>
+            }
+<span class="nc" id="L308">            y += ph + GAP;</span>
+        }
+<span class="nc bnc" id="L310" title="All 2 branches missed.">        if (first &gt;= 0) {</span>
+<span class="nc" id="L311">            scheduleRender(first, last, s);</span>
+        }
+<span class="nc" id="L313">    }</span>
+
+    private void scheduleRender(final int first, final int last, final double s) {
+<span class="nc bnc" id="L316" title="All 2 branches missed.">        if (renderQueued) {</span>
+<span class="nc" id="L317">            return;</span>
+        }
+<span class="nc" id="L319">        int target = -1;</span>
+<span class="nc bnc" id="L320" title="All 2 branches missed.">        for (int i = first; i &lt;= last; i++) {</span>
+<span class="nc bnc" id="L321" title="All 4 branches missed.">            if (cache[i] == null || Math.abs(cacheScale[i] - s) &gt; 1e-6) {</span>
+<span class="nc" id="L322">                target = i;</span>
+<span class="nc" id="L323">                break;</span>
+            }
+        }
+<span class="nc bnc" id="L326" title="All 4 branches missed.">        if (target &lt; 0 || pinchStart &gt; 0) {</span>
+<span class="nc" id="L327">            return;</span>
+        }
+<span class="nc" id="L329">        renderQueued = true;</span>
+<span class="nc" id="L330">        final int page = target;</span>
+<span class="nc" id="L331">        CN.callSerially(new Runnable() {</span>
+            @Override
+            public void run() {
+<span class="nc" id="L334">                renderQueued = false;</span>
+<span class="nc bnc" id="L335" title="All 2 branches missed.">                if (!isInitialized()) {</span>
+<span class="nc" id="L336">                    return;</span>
+                }
+<span class="nc" id="L338">                double now = scale();</span>
+<span class="nc" id="L339">                double area = widths[page] * heights[page] * now * now;</span>
+<span class="nc bnc" id="L340" title="All 2 branches missed.">                double drawn = area &gt; MAX_PAGE_PIXELS ? now * Math.sqrt(MAX_PAGE_PIXELS / area) : now;</span>
+                Image img;
+                try {
+<span class="nc" id="L343">                    img = renderPage(page, drawn);</span>
+<span class="nc" id="L344">                } catch (OutOfMemoryError e) {</span>
+                    // Memory may have been held by the other pages: drop
+                    // them and try this one once more.
+<span class="nc bnc" id="L347" title="All 2 branches missed.">                    for (int i = 0; i &lt; cache.length; i++) {</span>
+<span class="nc" id="L348">                        cache[i] = null;</span>
+                    }
+                    try {
+<span class="nc" id="L351">                        img = renderPage(page, drawn);</span>
+<span class="nc" id="L352">                    } catch (Throwable again) { // NOPMD AvoidCatchingThrowable - a page that fails twice is not retried on every paint</span>
+<span class="nc" id="L353">                        img = null;</span>
+<span class="nc" id="L354">                    }</span>
+<span class="nc" id="L355">                } catch (Throwable e) { // NOPMD AvoidCatchingThrowable - a failing page must not be retried on every paint</span>
+<span class="nc" id="L356">                    img = null;</span>
+<span class="nc" id="L357">                }</span>
+<span class="nc bnc" id="L358" title="All 2 branches missed.">                if (img == null) {</span>
+                    // A page that fails is stored as blank paper, so the
+                    // next paint does not schedule it again.
+<span class="nc" id="L361">                    img = Image.createImage(1, 1, 0xffffffff);</span>
+                }
+<span class="nc" id="L363">                store(page, img, now);</span>
+<span class="nc" id="L364">                repaint();</span>
+<span class="nc" id="L365">            }</span>
+        });
+<span class="nc" id="L367">    }</span>
+
+    private double cachedPixels() {
+<span class="nc" id="L370">        double total = 0;</span>
+<span class="nc bnc" id="L371" title="All 2 branches missed.">        for (int i = 0; i &lt; cache.length; i++) { // NOPMD ForLoopCanBeForeach - indexed like the surrounding loops</span>
+<span class="nc bnc" id="L372" title="All 2 branches missed.">            if (cache[i] != null) {</span>
+<span class="nc" id="L373">                total += (double) cache[i].getWidth() * cache[i].getHeight();</span>
+            }
+        }
+<span class="nc" id="L376">        return total;</span>
+    }
+
+    private void store(int page, Image img, double s) {
+<span class="nc" id="L380">        cache[page] = img;</span>
+<span class="nc" id="L381">        cacheScale[page] = s;</span>
+<span class="nc" id="L382">        cacheUse[page] = ++useCounter;</span>
+<span class="nc" id="L383">        int count = 0;</span>
+<span class="nc bnc" id="L384" title="All 2 branches missed.">        for (int i = 0; i &lt; cache.length; i++) { // NOPMD ForLoopCanBeForeach - indexed like the surrounding decoder loops</span>
+<span class="nc bnc" id="L385" title="All 2 branches missed.">            if (cache[i] != null) {</span>
+<span class="nc" id="L386">                count++;</span>
+            }
+        }
+<span class="nc bnc" id="L389" title="All 6 branches missed.">        while (count &gt; CACHED_PAGES || count &gt; 1 &amp;&amp; cachedPixels() &gt; MAX_CACHED_PIXELS) {</span>
+<span class="nc" id="L390">            int oldest = -1;</span>
+<span class="nc bnc" id="L391" title="All 2 branches missed.">            for (int i = 0; i &lt; cache.length; i++) {</span>
+<span class="nc bnc" id="L392" title="All 8 branches missed.">                if (cache[i] != null &amp;&amp; i != page &amp;&amp; (oldest &lt; 0 || cacheUse[i] &lt; cacheUse[oldest])) {</span>
+<span class="nc" id="L393">                    oldest = i;</span>
+                }
+            }
+<span class="nc bnc" id="L396" title="All 2 branches missed.">            if (oldest &lt; 0) {</span>
+<span class="nc" id="L397">                break;</span>
+            }
+<span class="nc" id="L399">            cache[oldest] = null;</span>
+<span class="nc" id="L400">            count--;</span>
+<span class="nc" id="L401">        }</span>
+<span class="nc" id="L402">    }</span>
+
+    @Override
+    protected boolean pinch(float scale) {
+<span class="nc bnc" id="L406" title="All 2 branches missed.">        if (pinchStart &lt; 0) {</span>
+<span class="nc" id="L407">            pinchStart = zoom;</span>
+        }
+<span class="nc" id="L409">        setZoom(pinchStart * scale);</span>
+<span class="nc" id="L410">        return true;</span>
+    }
+
+    @Override
+    protected void pinchReleased(int x, int y) {
+<span class="nc" id="L415">        super.pinchReleased(x, y);</span>
+<span class="nc" id="L416">        pinchStart = -1;</span>
+<span class="nc" id="L417">        repaint();</span>
+<span class="nc" id="L418">    }</span>
+
+    @Override
+    public void pointerReleased(int x, int y) {
+<span class="nc" id="L422">        super.pointerReleased(x, y);</span>
+<span class="nc" id="L423">        long now = System.currentTimeMillis();</span>
+<span class="nc bnc" id="L424" title="All 2 branches missed.">        if (now - lastRelease &lt; 300) {</span>
+<span class="nc bnc" id="L425" title="All 2 branches missed.">            setZoom(zoom &gt; 1.01f ? 1f : 2f);</span>
+<span class="nc" id="L426">            lastRelease = 0;</span>
+        } else {
+<span class="nc" id="L428">            lastRelease = now;</span>
+        }
+<span class="nc" id="L430">    }</span>
+
+    @Override
+    protected void deinitialize() {
+<span class="nc bnc" id="L434" title="All 2 branches missed.">        for (int i = 0; i &lt; cache.length; i++) {</span>
+<span class="nc" id="L435">            cache[i] = null;</span>
+        }
+<span class="nc" id="L437">        super.deinitialize();</span>
+<span class="nc" id="L438">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

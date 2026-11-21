@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Texture.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.gpu</a> &gt; <span class="el_source">Texture.java</span></div><h1>Texture.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ */
+package com.codename1.gpu;
+
+/// A GPU texture. Instances are created by a `GraphicsDevice` from a Codename
+/// One `Image` or from raw ARGB pixel data and then referenced by a `Material`.
+/// The class itself is a lightweight handle; the pixel storage lives on the GPU.
+public final class Texture {
+    /// The texture coordinate wrapping behavior outside the 0..1 range.
+<span class="fc" id="L17">    public enum Wrap {</span>
+        /// Clamp coordinates to the edge texels.
+<span class="fc" id="L19">        CLAMP,</span>
+        /// Tile the texture by repeating it.
+<span class="fc" id="L21">        REPEAT</span>
+    }
+
+    /// The sampling filter applied when the texture is scaled.
+<span class="fc" id="L25">    public enum Filter {</span>
+        /// Nearest texel sampling (blocky, sharp).
+<span class="fc" id="L27">        NEAREST,</span>
+        /// Bilinear sampling (smooth).
+<span class="fc" id="L29">        LINEAR</span>
+    }
+
+    private final int width;
+    private final int height;
+<span class="fc" id="L34">    private Wrap wrap = Wrap.CLAMP;</span>
+<span class="fc" id="L35">    private Filter filter = Filter.LINEAR;</span>
+    private Object handle;
+
+    /// Creates a texture handle of the given dimensions. Intended for backend
+    /// use; applications create textures via `GraphicsDevice`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `width`: the texture width in pixels
+    ///
+    /// - `height`: the texture height in pixels
+<span class="fc" id="L46">    public Texture(int width, int height) {</span>
+<span class="fc" id="L47">        this.width = width;</span>
+<span class="fc" id="L48">        this.height = height;</span>
+<span class="fc" id="L49">    }</span>
+
+    /// Returns the texture width in pixels.
+    public int getWidth() {
+<span class="fc" id="L53">        return width;</span>
+    }
+
+    /// Returns the texture height in pixels.
+    public int getHeight() {
+<span class="fc" id="L58">        return height;</span>
+    }
+
+    /// Returns the configured wrapping mode.
+    public Wrap getWrap() {
+<span class="fc" id="L63">        return wrap;</span>
+    }
+
+    /// Sets the wrapping mode. Takes effect on the next bind by the backend.
+    ///
+    /// #### Parameters
+    ///
+    /// - `wrap`: the wrapping mode
+    ///
+    /// #### Returns
+    ///
+    /// this texture for chaining
+    public Texture setWrap(Wrap wrap) {
+<span class="fc" id="L76">        this.wrap = wrap;</span>
+<span class="fc" id="L77">        return this;</span>
+    }
+
+    /// Returns the configured sampling filter.
+    public Filter getFilter() {
+<span class="fc" id="L82">        return filter;</span>
+    }
+
+    /// Sets the sampling filter. Takes effect on the next bind by the backend.
+    ///
+    /// #### Parameters
+    ///
+    /// - `filter`: the sampling filter
+    ///
+    /// #### Returns
+    ///
+    /// this texture for chaining
+    public Texture setFilter(Filter filter) {
+<span class="fc" id="L95">        this.filter = filter;</span>
+<span class="fc" id="L96">        return this;</span>
+    }
+
+    /// Returns the opaque backend GPU handle. Intended for backend use.
+    public Object getHandle() {
+<span class="fc" id="L101">        return handle;</span>
+    }
+
+    /// Stores the opaque backend GPU handle. Intended for backend use.
+    ///
+    /// #### Parameters
+    ///
+    /// - `handle`: the backend specific GPU resource handle
+    public void setHandle(Object handle) {
+<span class="fc" id="L110">        this.handle = handle;</span>
+<span class="fc" id="L111">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

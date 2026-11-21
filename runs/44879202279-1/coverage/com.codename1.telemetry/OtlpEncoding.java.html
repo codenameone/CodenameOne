@@ -1,0 +1,395 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>OtlpEncoding.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.telemetry</a> &gt; <span class="el_source">OtlpEncoding.java</span></div><h1>OtlpEncoding.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.telemetry;
+
+import com.codename1.util.StringUtil;
+
+import java.util.List;
+import java.util.Map;
+
+/// OTLP's `ExportTraceServiceRequest`, written from spans in either of its two
+/// encodings.
+///
+/// Hand written because a protobuf runtime is far larger than the dozen fields a
+/// trace export uses, and an app that turns telemetry on should not grow by a
+/// library to do it. The field numbers are opentelemetry-proto's `trace.proto`,
+/// `common.proto` and `resource.proto`; the tests decode both encodings with the
+/// classes generated from those files.
+final class OtlpEncoding {
+    static final String SCOPE_NAME = &quot;com.codename1.telemetry&quot;;
+
+    private OtlpEncoding() {
+    }
+
+    // ------------------------------------------------------------------
+    // JSON
+    // ------------------------------------------------------------------
+
+    static byte[] json(Map&lt;String, Object&gt; resource, List&lt;TelemetrySpan&gt; spans) {
+<span class="fc" id="L49">        StringBuilder b = new StringBuilder(256 + spans.size() * 256);</span>
+<span class="fc" id="L50">        b.append(&quot;{\&quot;resourceSpans\&quot;:[{\&quot;resource\&quot;:{\&quot;attributes\&quot;:&quot;);</span>
+<span class="fc" id="L51">        jsonAttributes(b, resource);</span>
+<span class="fc" id="L52">        b.append(&quot;},\&quot;scopeSpans\&quot;:[{\&quot;scope\&quot;:{\&quot;name\&quot;:\&quot;&quot;).append(SCOPE_NAME)</span>
+<span class="fc" id="L53">                .append(&quot;\&quot;},\&quot;spans\&quot;:[&quot;);</span>
+<span class="fc" id="L54">        boolean first = true;</span>
+<span class="fc bfc" id="L55" title="All 2 branches covered.">        for (TelemetrySpan span : spans) {</span>
+<span class="fc bfc" id="L56" title="All 2 branches covered.">            if (!first) {</span>
+<span class="fc" id="L57">                b.append(',');</span>
+            }
+<span class="fc" id="L59">            first = false;</span>
+<span class="fc" id="L60">            jsonSpan(b, span);</span>
+<span class="fc" id="L61">        }</span>
+<span class="fc" id="L62">        b.append(&quot;]}]}]}&quot;);</span>
+<span class="fc" id="L63">        return utf8(b.toString());</span>
+    }
+
+    private static void jsonSpan(StringBuilder b, TelemetrySpan span) {
+<span class="fc" id="L67">        b.append(&quot;{\&quot;traceId\&quot;:\&quot;&quot;).append(span.traceId)</span>
+<span class="fc" id="L68">                .append(&quot;\&quot;,\&quot;spanId\&quot;:\&quot;&quot;).append(span.spanId).append('&quot;');</span>
+<span class="pc bpc" id="L69" title="1 of 2 branches missed.">        if (span.parentSpanId != null) {</span>
+<span class="nc" id="L70">            b.append(&quot;,\&quot;parentSpanId\&quot;:\&quot;&quot;).append(span.parentSpanId).append('&quot;');</span>
+        }
+<span class="fc" id="L72">        b.append(&quot;,\&quot;flags\&quot;:&quot;).append(flags(span));</span>
+<span class="fc" id="L73">        b.append(&quot;,\&quot;name\&quot;:&quot;);</span>
+<span class="fc" id="L74">        jsonString(b, span.name);</span>
+<span class="fc" id="L75">        b.append(&quot;,\&quot;kind\&quot;:&quot;).append(span.kind);</span>
+        // Strings: proto3's JSON mapping writes 64-bit integers that way, since
+        // a nanosecond timestamp is past what a JavaScript number holds exactly.
+<span class="fc" id="L78">        b.append(&quot;,\&quot;startTimeUnixNano\&quot;:\&quot;&quot;).append(span.startEpochNanos).append('&quot;');</span>
+<span class="fc" id="L79">        b.append(&quot;,\&quot;endTimeUnixNano\&quot;:\&quot;&quot;).append(span.endEpochNanos).append('&quot;');</span>
+<span class="fc" id="L80">        b.append(&quot;,\&quot;attributes\&quot;:&quot;);</span>
+<span class="fc" id="L81">        jsonAttributes(b, span.attributes);</span>
+<span class="pc bpc" id="L82" title="1 of 2 branches missed.">        if (span.droppedAttributes &gt; 0) {</span>
+<span class="nc" id="L83">            b.append(&quot;,\&quot;droppedAttributesCount\&quot;:&quot;).append(span.droppedAttributes);</span>
+        }
+<span class="pc bpc" id="L85" title="2 of 4 branches missed.">        if (span.events != null &amp;&amp; !span.events.isEmpty()) {</span>
+<span class="nc" id="L86">            b.append(&quot;,\&quot;events\&quot;:[&quot;);</span>
+<span class="nc" id="L87">            boolean first = true;</span>
+<span class="nc bnc" id="L88" title="All 2 branches missed.">            for (Object[] event : span.events) {</span>
+<span class="nc bnc" id="L89" title="All 2 branches missed.">                if (!first) {</span>
+<span class="nc" id="L90">                    b.append(',');</span>
+                }
+<span class="nc" id="L92">                first = false;</span>
+<span class="nc" id="L93">                b.append(&quot;{\&quot;timeUnixNano\&quot;:\&quot;&quot;).append(event[0]).append(&quot;\&quot;,\&quot;name\&quot;:&quot;);</span>
+<span class="nc" id="L94">                jsonString(b, String.valueOf(event[1]));</span>
+<span class="nc" id="L95">                b.append(&quot;,\&quot;attributes\&quot;:&quot;);</span>
+<span class="nc" id="L96">                jsonAttributes(b, asMap(event[2]));</span>
+<span class="nc" id="L97">                b.append('}');</span>
+<span class="nc" id="L98">            }</span>
+<span class="nc" id="L99">            b.append(']');</span>
+        }
+<span class="pc bpc" id="L101" title="1 of 2 branches missed.">        if (span.droppedEvents &gt; 0) {</span>
+<span class="nc" id="L102">            b.append(&quot;,\&quot;droppedEventsCount\&quot;:&quot;).append(span.droppedEvents);</span>
+        }
+<span class="pc bpc" id="L104" title="1 of 2 branches missed.">        if (span.statusCode != 0) {</span>
+<span class="nc" id="L105">            b.append(&quot;,\&quot;status\&quot;:{&quot;);</span>
+<span class="nc bnc" id="L106" title="All 2 branches missed.">            if (span.statusMessage != null) {</span>
+<span class="nc" id="L107">                b.append(&quot;\&quot;message\&quot;:&quot;);</span>
+<span class="nc" id="L108">                jsonString(b, span.statusMessage);</span>
+<span class="nc" id="L109">                b.append(',');</span>
+            }
+<span class="nc" id="L111">            b.append(&quot;\&quot;code\&quot;:&quot;).append(span.statusCode).append('}');</span>
+        }
+<span class="fc" id="L113">        b.append('}');</span>
+<span class="fc" id="L114">    }</span>
+
+    private static void jsonAttributes(StringBuilder b, Map&lt;String, Object&gt; attributes) {
+<span class="fc" id="L117">        b.append('[');</span>
+<span class="pc bpc" id="L118" title="1 of 2 branches missed.">        if (attributes != null) {</span>
+<span class="fc" id="L119">            boolean first = true;</span>
+<span class="fc bfc" id="L120" title="All 2 branches covered.">            for (Map.Entry&lt;String, Object&gt; entry : attributes.entrySet()) {</span>
+<span class="fc bfc" id="L121" title="All 2 branches covered.">                if (!first) {</span>
+<span class="fc" id="L122">                    b.append(',');</span>
+                }
+<span class="fc" id="L124">                first = false;</span>
+<span class="fc" id="L125">                b.append(&quot;{\&quot;key\&quot;:&quot;);</span>
+<span class="fc" id="L126">                jsonString(b, entry.getKey());</span>
+<span class="fc" id="L127">                b.append(&quot;,\&quot;value\&quot;:{&quot;);</span>
+<span class="fc" id="L128">                Object v = entry.getValue();</span>
+<span class="pc bpc" id="L129" title="1 of 2 branches missed.">                if (v instanceof Boolean) {</span>
+<span class="nc" id="L130">                    b.append(&quot;\&quot;boolValue\&quot;:&quot;).append(v);</span>
+<span class="pc bpc" id="L131" title="1 of 4 branches missed.">                } else if (v instanceof Long || v instanceof Integer) {</span>
+<span class="fc" id="L132">                    b.append(&quot;\&quot;intValue\&quot;:\&quot;&quot;).append(v).append('&quot;');</span>
+<span class="pc bpc" id="L133" title="1 of 2 branches missed.">                } else if (v instanceof Double) {</span>
+<span class="nc" id="L134">                    b.append(&quot;\&quot;doubleValue\&quot;:&quot;).append(v);</span>
+                } else {
+<span class="fc" id="L136">                    b.append(&quot;\&quot;stringValue\&quot;:&quot;);</span>
+<span class="fc" id="L137">                    jsonString(b, String.valueOf(v));</span>
+                }
+<span class="fc" id="L139">                b.append(&quot;}}&quot;);</span>
+<span class="fc" id="L140">            }</span>
+        }
+<span class="fc" id="L142">        b.append(']');</span>
+<span class="fc" id="L143">    }</span>
+
+    private static void jsonString(StringBuilder b, String value) {
+<span class="fc" id="L146">        b.append('&quot;');</span>
+<span class="fc" id="L147">        int n = value.length();</span>
+<span class="fc bfc" id="L148" title="All 2 branches covered.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc" id="L149">            char c = value.charAt(i);</span>
+<span class="pc bpc" id="L150" title="5 of 6 branches missed.">            switch (c) {</span>
+                case '&quot;':
+<span class="nc" id="L152">                    b.append(&quot;\\\&quot;&quot;);</span>
+<span class="nc" id="L153">                    break;</span>
+                case '\\':
+<span class="nc" id="L155">                    b.append(&quot;\\\\&quot;);</span>
+<span class="nc" id="L156">                    break;</span>
+                case '\n':
+<span class="nc" id="L158">                    b.append(&quot;\\n&quot;);</span>
+<span class="nc" id="L159">                    break;</span>
+                case '\r':
+<span class="nc" id="L161">                    b.append(&quot;\\r&quot;);</span>
+<span class="nc" id="L162">                    break;</span>
+                case '\t':
+<span class="nc" id="L164">                    b.append(&quot;\\t&quot;);</span>
+<span class="nc" id="L165">                    break;</span>
+                default:
+<span class="pc bpc" id="L167" title="1 of 2 branches missed.">                    if (c &lt; 0x20) {</span>
+<span class="nc" id="L168">                        String hex = Integer.toHexString(c);</span>
+<span class="nc" id="L169">                        b.append(&quot;\\u&quot;);</span>
+<span class="nc bnc" id="L170" title="All 2 branches missed.">                        for (int pad = hex.length(); pad &lt; 4; pad++) {</span>
+<span class="nc" id="L171">                            b.append('0');</span>
+                        }
+<span class="nc" id="L173">                        b.append(hex);</span>
+<span class="nc" id="L174">                    } else {</span>
+<span class="fc" id="L175">                        b.append(c);</span>
+                    }
+                    break;
+            }
+        }
+<span class="fc" id="L180">        b.append('&quot;');</span>
+<span class="fc" id="L181">    }</span>
+
+    // ------------------------------------------------------------------
+    // Protobuf
+    // ------------------------------------------------------------------
+
+    static byte[] protobuf(Map&lt;String, Object&gt; resource, List&lt;TelemetrySpan&gt; spans) {
+<span class="fc" id="L188">        Sink scope = new Sink();</span>
+<span class="fc" id="L189">        Sink scopeName = new Sink();</span>
+<span class="fc" id="L190">        scopeName.string(1, SCOPE_NAME);</span>
+<span class="fc" id="L191">        scope.message(1, scopeName);                       // ScopeSpans.scope</span>
+<span class="fc bfc" id="L192" title="All 2 branches covered.">        for (TelemetrySpan span : spans) {</span>
+<span class="fc" id="L193">            scope.message(2, protoSpan(span));             // ScopeSpans.spans</span>
+<span class="fc" id="L194">        }</span>
+<span class="fc" id="L195">        Sink resourceMessage = new Sink();</span>
+<span class="fc" id="L196">        protoAttributes(resourceMessage, 1, resource);     // Resource.attributes</span>
+<span class="fc" id="L197">        Sink resourceSpans = new Sink();</span>
+<span class="fc" id="L198">        resourceSpans.message(1, resourceMessage);         // ResourceSpans.resource</span>
+<span class="fc" id="L199">        resourceSpans.message(2, scope);                   // ResourceSpans.scope_spans</span>
+<span class="fc" id="L200">        Sink request = new Sink();</span>
+<span class="fc" id="L201">        request.message(1, resourceSpans);                 // ExportTraceServiceRequest.resource_spans</span>
+<span class="fc" id="L202">        return request.toByteArray();</span>
+    }
+
+    private static Sink protoSpan(TelemetrySpan span) {
+<span class="fc" id="L206">        Sink out = new Sink();</span>
+<span class="fc" id="L207">        out.bytes(1, hex(span.traceId));</span>
+<span class="fc" id="L208">        out.bytes(2, hex(span.spanId));</span>
+<span class="fc bfc" id="L209" title="All 2 branches covered.">        if (span.parentSpanId != null) {</span>
+<span class="fc" id="L210">            out.bytes(4, hex(span.parentSpanId));</span>
+        }
+<span class="fc" id="L212">        out.string(5, span.name);</span>
+<span class="fc" id="L213">        out.varint(6, span.kind);</span>
+<span class="fc" id="L214">        out.fixed64(7, span.startEpochNanos);</span>
+<span class="fc" id="L215">        out.fixed64(8, span.endEpochNanos);</span>
+<span class="fc" id="L216">        protoAttributes(out, 9, span.attributes);</span>
+<span class="pc bpc" id="L217" title="1 of 2 branches missed.">        if (span.droppedAttributes &gt; 0) {</span>
+<span class="nc" id="L218">            out.varint(10, span.droppedAttributes);</span>
+        }
+<span class="pc bpc" id="L220" title="1 of 2 branches missed.">        if (span.events != null) {</span>
+<span class="fc bfc" id="L221" title="All 2 branches covered.">            for (Object[] event : span.events) {</span>
+<span class="fc" id="L222">                Sink e = new Sink();</span>
+<span class="fc" id="L223">                e.fixed64(1, ((Long) event[0]).longValue());</span>
+<span class="fc" id="L224">                e.string(2, String.valueOf(event[1]));</span>
+<span class="fc" id="L225">                protoAttributes(e, 3, asMap(event[2]));</span>
+<span class="fc" id="L226">                out.message(11, e);</span>
+<span class="fc" id="L227">            }</span>
+        }
+<span class="pc bpc" id="L229" title="1 of 2 branches missed.">        if (span.droppedEvents &gt; 0) {</span>
+<span class="nc" id="L230">            out.varint(12, span.droppedEvents);</span>
+        }
+<span class="fc bfc" id="L232" title="All 2 branches covered.">        if (span.statusCode != 0) {</span>
+<span class="fc" id="L233">            Sink status = new Sink();</span>
+<span class="pc bpc" id="L234" title="1 of 2 branches missed.">            if (span.statusMessage != null) {</span>
+<span class="fc" id="L235">                status.string(2, span.statusMessage);</span>
+            }
+<span class="fc" id="L237">            status.varint(3, span.statusCode);</span>
+<span class="fc" id="L238">            out.message(15, status);</span>
+        }
+<span class="fc" id="L240">        out.fixed32(16, flags(span));</span>
+<span class="fc" id="L241">        return out;</span>
+    }
+
+    private static void protoAttributes(Sink out, int field, Map&lt;String, Object&gt; attributes) {
+<span class="pc bpc" id="L245" title="1 of 2 branches missed.">        if (attributes == null) {</span>
+<span class="nc" id="L246">            return;</span>
+        }
+<span class="fc bfc" id="L248" title="All 2 branches covered.">        for (Map.Entry&lt;String, Object&gt; entry : attributes.entrySet()) {</span>
+<span class="fc" id="L249">            Sink value = new Sink();</span>
+<span class="fc" id="L250">            Object v = entry.getValue();</span>
+<span class="pc bpc" id="L251" title="1 of 2 branches missed.">            if (v instanceof Boolean) {</span>
+<span class="nc bnc" id="L252" title="All 2 branches missed.">                value.varint(2, ((Boolean) v).booleanValue() ? 1 : 0);</span>
+<span class="pc bpc" id="L253" title="1 of 4 branches missed.">            } else if (v instanceof Long || v instanceof Integer) {</span>
+<span class="fc" id="L254">                value.varint(3, ((Number) v).longValue());</span>
+<span class="pc bpc" id="L255" title="1 of 2 branches missed.">            } else if (v instanceof Double) {</span>
+<span class="nc" id="L256">                value.fixed64(4, Double.doubleToLongBits(((Double) v).doubleValue()));</span>
+            } else {
+<span class="fc" id="L258">                value.string(1, String.valueOf(v));</span>
+            }
+<span class="fc" id="L260">            Sink kv = new Sink();</span>
+<span class="fc" id="L261">            kv.string(1, entry.getKey());</span>
+<span class="fc" id="L262">            kv.message(2, value);</span>
+<span class="fc" id="L263">            out.message(field, kv);</span>
+<span class="fc" id="L264">        }</span>
+<span class="fc" id="L265">    }</span>
+
+    /// Trace flags in the low byte, then HAS_IS_REMOTE when there is a parent:
+    /// every parent the app has is local. A root has no parent context to
+    /// describe, so the bits stay clear (&quot;unknown&quot; in trace.proto) rather than
+    /// claiming a local parent it does not have.
+    private static int flags(TelemetrySpan span) {
+<span class="pc bpc" id="L272" title="1 of 2 branches missed.">        int flags = span.sampled ? 1 : 0;</span>
+<span class="fc bfc" id="L273" title="All 2 branches covered.">        if (span.parentSpanId != null) {</span>
+<span class="fc" id="L274">            flags |= 0x100;</span>
+        }
+<span class="fc" id="L276">        return flags;</span>
+    }
+
+    private static Map&lt;String, Object&gt; asMap(Object value) {
+<span class="pc bpc" id="L280" title="1 of 2 branches missed.">        if (value instanceof Map) {</span>
+            @SuppressWarnings(&quot;unchecked&quot;)
+<span class="fc" id="L282">            Map&lt;String, Object&gt; map = (Map&lt;String, Object&gt;) value;</span>
+<span class="fc" id="L283">            return map;</span>
+        }
+<span class="nc" id="L285">        return null;</span>
+    }
+
+    private static byte[] hex(String text) {
+<span class="fc" id="L289">        byte[] out = new byte[text.length() / 2];</span>
+<span class="fc bfc" id="L290" title="All 2 branches covered.">        for (int i = 0; i &lt; out.length; i++) {</span>
+<span class="fc" id="L291">            out[i] = (byte) ((digit(text.charAt(i * 2)) &lt;&lt; 4) | digit(text.charAt(i * 2 + 1)));</span>
+        }
+<span class="fc" id="L293">        return out;</span>
+    }
+
+    private static int digit(char c) {
+<span class="pc bpc" id="L297" title="1 of 4 branches missed.">        if (c &gt;= '0' &amp;&amp; c &lt;= '9') {</span>
+<span class="fc" id="L298">            return c - '0';</span>
+        }
+<span class="pc bpc" id="L300" title="2 of 4 branches missed.">        if (c &gt;= 'a' &amp;&amp; c &lt;= 'f') {</span>
+<span class="fc" id="L301">            return c - 'a' + 10;</span>
+        }
+<span class="nc" id="L303">        return c - 'A' + 10;</span>
+    }
+
+    /// UTF-8 through `String.getBytes`, which on ParparVM is the VM's native
+    /// vectorized encoder rather than a loop in Java.
+    static byte[] utf8(String value) {
+<span class="fc" id="L309">        return StringUtil.getBytes(value);</span>
+    }
+
+    /// A protobuf message being written. Nested messages are written into a sink
+    /// of their own first, because a length-delimited field needs its length
+    /// before its bytes.
+<span class="fc" id="L315">    static final class Sink {</span>
+<span class="fc" id="L316">        private byte[] data = new byte[64];</span>
+        private int length;
+
+        private void ensure(int extra) {
+<span class="fc bfc" id="L320" title="All 2 branches covered.">            if (length + extra &gt; data.length) {</span>
+<span class="fc" id="L321">                int size = data.length * 2;</span>
+<span class="fc bfc" id="L322" title="All 2 branches covered.">                while (size &lt; length + extra) {</span>
+<span class="fc" id="L323">                    size *= 2;</span>
+                }
+<span class="fc" id="L325">                byte[] grown = new byte[size];</span>
+<span class="fc" id="L326">                System.arraycopy(data, 0, grown, 0, length);</span>
+<span class="fc" id="L327">                data = grown;</span>
+            }
+<span class="fc" id="L329">        }</span>
+
+        void tag(int field, int wireType) {
+<span class="fc" id="L332">            rawVarint(((long) field &lt;&lt; 3) | wireType);</span>
+<span class="fc" id="L333">        }</span>
+
+        void rawVarint(long value) {
+<span class="fc" id="L336">            long v = value;</span>
+<span class="fc" id="L337">            ensure(10);</span>
+<span class="fc bfc" id="L338" title="All 2 branches covered.">            while ((v &amp; ~0x7fL) != 0) {</span>
+<span class="fc" id="L339">                data[length++] = (byte) ((v &amp; 0x7f) | 0x80);</span>
+<span class="fc" id="L340">                v &gt;&gt;&gt;= 7;</span>
+            }
+<span class="fc" id="L342">            data[length++] = (byte) v;</span>
+<span class="fc" id="L343">        }</span>
+
+        void varint(int field, long value) {
+<span class="fc" id="L346">            tag(field, 0);</span>
+<span class="fc" id="L347">            rawVarint(value);</span>
+<span class="fc" id="L348">        }</span>
+
+        void fixed64(int field, long value) {
+<span class="fc" id="L351">            tag(field, 1);</span>
+<span class="fc" id="L352">            ensure(8);</span>
+<span class="fc bfc" id="L353" title="All 2 branches covered.">            for (int i = 0; i &lt; 8; i++) {</span>
+<span class="fc" id="L354">                data[length++] = (byte) (value &gt;&gt; (8 * i));</span>
+            }
+<span class="fc" id="L356">        }</span>
+
+        void fixed32(int field, int value) {
+<span class="fc" id="L359">            tag(field, 5);</span>
+<span class="fc" id="L360">            ensure(4);</span>
+<span class="fc bfc" id="L361" title="All 2 branches covered.">            for (int i = 0; i &lt; 4; i++) {</span>
+<span class="fc" id="L362">                data[length++] = (byte) (value &gt;&gt; (8 * i));</span>
+            }
+<span class="fc" id="L364">        }</span>
+
+        void bytes(int field, byte[] value) {
+<span class="fc" id="L367">            bytes(field, value, value.length);</span>
+<span class="fc" id="L368">        }</span>
+
+        private void bytes(int field, byte[] value, int count) {
+<span class="fc" id="L371">            tag(field, 2);</span>
+<span class="fc" id="L372">            rawVarint(count);</span>
+<span class="fc" id="L373">            ensure(count);</span>
+<span class="fc" id="L374">            System.arraycopy(value, 0, data, length, count);</span>
+<span class="fc" id="L375">            length += count;</span>
+<span class="fc" id="L376">        }</span>
+
+        void string(int field, String value) {
+<span class="fc" id="L379">            bytes(field, utf8(value));</span>
+<span class="fc" id="L380">        }</span>
+
+        /// A nested message, copied straight out of the child's buffer: its
+        /// length has to precede it, so it is written once the child is complete.
+        void message(int field, Sink child) {
+<span class="fc" id="L385">            bytes(field, child.data, child.length);</span>
+<span class="fc" id="L386">        }</span>
+
+        byte[] toByteArray() {
+<span class="fc" id="L389">            byte[] out = new byte[length];</span>
+<span class="fc" id="L390">            System.arraycopy(data, 0, out, 0, length);</span>
+<span class="fc" id="L391">            return out;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

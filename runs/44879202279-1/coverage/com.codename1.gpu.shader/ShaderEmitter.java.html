@@ -1,0 +1,401 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ShaderEmitter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.gpu.shader</a> &gt; <span class="el_source">ShaderEmitter.java</span></div><h1>ShaderEmitter.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.gpu.shader;
+
+import java.util.HashMap;
+import java.util.Map;
+
+/// Prints `ShaderNode` graphs as statements of one shading language. This is
+/// the part of a backend's shader generator that custom materials need;
+/// applications do not call it.
+///
+/// A backend creates one emitter per shader stage, calls `emit` for each hook
+/// it splices in, and uses the returned expression where the engine's own
+/// value would have gone. Every node that is not a constant or an input
+/// becomes one temporary, so a node shared by several hooks is computed once.
+public final class ShaderEmitter {
+    /// The shading languages a graph prints as.
+<span class="fc" id="L38">    public enum Dialect {</span>
+        /// GLSL ES 1.00: OpenGL ES 2, WebGL 1 and desktop GL.
+<span class="fc" id="L40">        GLSL,</span>
+        /// The Metal Shading Language.
+<span class="fc" id="L42">        MSL,</span>
+        /// HLSL shader model 4 and later.
+<span class="fc" id="L44">        HLSL</span>
+    }
+
+    /// Supplies the backend's spelling of the inputs a graph reads.
+    public interface Inputs {
+        /// Returns the expression for a built-in input such as `worldPos`, or
+        /// null when the stage being emitted does not have it.
+        ///
+        /// #### Parameters
+        ///
+        /// - `name`: the built-in's name, as the `ShaderNode` factories use it
+        ///
+        /// #### Returns
+        ///
+        /// the expression, or null
+        String builtin(String name);
+
+        /// Returns the expression for slot `slot` of the material's uniform
+        /// array, a four float value of which the graph reads the first
+        /// `components`.
+        ///
+        /// #### Parameters
+        ///
+        /// - `slot`: the uniform slot
+        ///
+        /// #### Returns
+        ///
+        /// the expression of the whole vec4
+        String uniform(int slot);
+
+        /// Returns the expression sampling custom texture `slot` at `uv`, or
+        /// null when the stage cannot sample.
+        ///
+        /// #### Parameters
+        ///
+        /// - `slot`: the texture slot
+        ///
+        /// - `uv`: the coordinate expression
+        ///
+        /// #### Returns
+        ///
+        /// the expression, or null
+        String sample(int slot, String uv);
+    }
+
+    private final Dialect dialect;
+    private final ShaderMaterial material;
+    private final Inputs inputs;
+    private final StringBuilder out; // NOPMD AvoidStringBufferField - the caller's source buffer; an emitter lives for one generation
+    private final String indent;
+    private final String prefix;
+<span class="fc" id="L95">    private final Map&lt;ShaderNode, String&gt; emitted = new HashMap&lt;ShaderNode, String&gt;();</span>
+    private int next;
+
+    /// Creates an emitter that appends statements to `out`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `dialect`: the language to print
+    ///
+    /// - `material`: the material whose uniforms and textures the graphs read
+    ///
+    /// - `inputs`: the backend's spelling of the inputs
+    ///
+    /// - `out`: where the temporaries are declared
+    ///
+    /// - `indent`: the indentation of each statement
+    ///
+    /// - `prefix`: a prefix for temporary names, distinct per stage
+    public ShaderEmitter(Dialect dialect, ShaderMaterial material, Inputs inputs, StringBuilder out,
+<span class="fc" id="L114">            String indent, String prefix) {</span>
+<span class="fc" id="L115">        this.dialect = dialect;</span>
+<span class="fc" id="L116">        this.material = material;</span>
+<span class="fc" id="L117">        this.inputs = inputs;</span>
+<span class="fc" id="L118">        this.out = out;</span>
+<span class="fc" id="L119">        this.indent = indent;</span>
+<span class="fc" id="L120">        this.prefix = prefix;</span>
+<span class="fc" id="L121">    }</span>
+
+    /// Declares whatever temporaries `node` needs and returns the expression
+    /// that holds its value.
+    ///
+    /// #### Parameters
+    ///
+    /// - `node`: the graph
+    ///
+    /// #### Returns
+    ///
+    /// an expression of the node's type
+    public String emit(ShaderNode node) {
+<span class="fc" id="L134">        String done = emitted.get(node);</span>
+<span class="fc bfc" id="L135" title="All 2 branches covered.">        if (done != null) {</span>
+<span class="fc" id="L136">            return done;</span>
+        }
+<span class="fc" id="L138">        String expr = expression(node);</span>
+<span class="fc" id="L139">        int kind = node.getKind();</span>
+<span class="fc bfc" id="L140" title="All 6 branches covered.">        if (kind == ShaderNode.CONST || kind == ShaderNode.BUILTIN || kind == ShaderNode.UNIFORM) {</span>
+<span class="fc" id="L141">            emitted.put(node, expr);</span>
+<span class="fc" id="L142">            return expr;</span>
+        }
+<span class="fc" id="L144">        String name = prefix + (next++);</span>
+<span class="fc" id="L145">        out.append(indent).append(typeName(node.getType())).append(' ').append(name)</span>
+<span class="fc" id="L146">                .append(&quot; = &quot;).append(expr).append(&quot;;\n&quot;);</span>
+<span class="fc" id="L147">        emitted.put(node, name);</span>
+<span class="fc" id="L148">        return name;</span>
+    }
+
+    private String expression(ShaderNode n) {
+<span class="pc bpc" id="L152" title="1 of 11 branches missed.">        switch (n.getKind()) {</span>
+            case ShaderNode.CONST:
+<span class="fc" id="L154">                return constant(n.getType(), n.getValues());</span>
+            case ShaderNode.BUILTIN: {
+<span class="fc" id="L156">                String b = inputs.builtin(n.getName());</span>
+<span class="pc bpc" id="L157" title="1 of 2 branches missed.">                if (b == null) {</span>
+<span class="nc" id="L158">                    throw new IllegalArgumentException(&quot;ShaderNode.&quot; + n.getName()</span>
+                            + &quot;() is not available in this stage&quot;);
+                }
+<span class="fc" id="L161">                return b;</span>
+            }
+            case ShaderNode.UNIFORM: {
+<span class="fc" id="L164">                int slot = material.getUniformSlot(n.getName());</span>
+<span class="pc bpc" id="L165" title="1 of 2 branches missed.">                if (slot &lt; 0) {</span>
+<span class="nc" id="L166">                    throw new IllegalArgumentException(&quot;Uniform &quot; + n.getName()</span>
+                            + &quot; is not declared on the material&quot;);
+                }
+<span class="pc bpc" id="L169" title="1 of 2 branches missed.">                if (material.getUniformType(n.getName()) != n.getType()) {</span>
+<span class="nc" id="L170">                    throw new IllegalArgumentException(&quot;Uniform &quot; + n.getName() + &quot; is declared as a &quot;</span>
+<span class="nc" id="L171">                            + material.getUniformType(n.getName()) + &quot; but read as a &quot; + n.getType());</span>
+                }
+<span class="fc" id="L173">                String all = inputs.uniform(slot);</span>
+<span class="fc bfc" id="L174" title="All 2 branches covered.">                return n.getType() == ShaderType.VEC4 ? all : all + &quot;.&quot; + &quot;xyzw&quot;.substring(0, n.getType().getComponents());</span>
+            }
+            case ShaderNode.SAMPLE: {
+<span class="fc" id="L177">                int slot = material.getTextureSlot(n.getName());</span>
+<span class="pc bpc" id="L178" title="1 of 2 branches missed.">                if (slot &lt; 0) {</span>
+<span class="nc" id="L179">                    throw new IllegalArgumentException(&quot;Texture &quot; + n.getName()</span>
+                            + &quot; is not declared on the material&quot;);
+                }
+<span class="fc" id="L182">                String s = inputs.sample(slot, emit(n.getArg(0)));</span>
+<span class="fc bfc" id="L183" title="All 2 branches covered.">                if (s == null) {</span>
+<span class="fc" id="L184">                    throw new IllegalArgumentException(&quot;Textures cannot be sampled in this stage&quot;);</span>
+                }
+<span class="fc" id="L186">                return s;</span>
+            }
+            case ShaderNode.BINARY:
+<span class="fc" id="L189">                return &quot;(&quot; + emit(n.getArg(0)) + &quot; &quot; + n.getName() + &quot; &quot; + emit(n.getArg(1)) + &quot;)&quot;;</span>
+            case ShaderNode.NEGATE:
+<span class="fc" id="L191">                return &quot;(-&quot; + emit(n.getArg(0)) + &quot;)&quot;;</span>
+            case ShaderNode.SWIZZLE:
+<span class="fc" id="L193">                return emit(n.getArg(0)) + &quot;.&quot; + n.getName();</span>
+            case ShaderNode.SELECT:
+<span class="fc" id="L195">                return &quot;(&quot; + emit(n.getArg(0)) + &quot; &gt; 0.5 ? &quot; + emit(n.getArg(1)) + &quot; : &quot; + emit(n.getArg(2)) + &quot;)&quot;;</span>
+            case ShaderNode.CONSTRUCT: {
+<span class="fc" id="L197">                StringBuilder sb = new StringBuilder(typeName(n.getType())).append('(');</span>
+<span class="fc bfc" id="L198" title="All 2 branches covered.">                for (int i = 0; i &lt; n.getArgCount(); i++) {</span>
+<span class="fc bfc" id="L199" title="All 2 branches covered.">                    if (i &gt; 0) {</span>
+<span class="fc" id="L200">                        sb.append(&quot;, &quot;);</span>
+                    }
+<span class="fc" id="L202">                    sb.append(emit(n.getArg(i)));</span>
+                }
+<span class="fc" id="L204">                return sb.append(')').toString();</span>
+            }
+            case ShaderNode.CALL: {
+<span class="fc" id="L207">                StringBuilder sb = new StringBuilder(function(n.getName())).append('(');</span>
+<span class="fc bfc" id="L208" title="All 2 branches covered.">                for (int i = 0; i &lt; n.getArgCount(); i++) {</span>
+<span class="fc bfc" id="L209" title="All 2 branches covered.">                    if (i &gt; 0) {</span>
+<span class="fc" id="L210">                        sb.append(&quot;, &quot;);</span>
+                    }
+<span class="fc" id="L212">                    sb.append(emit(n.getArg(i)));</span>
+                }
+<span class="fc" id="L214">                return sb.append(')').toString();</span>
+            }
+            default:
+<span class="nc" id="L217">                throw new IllegalStateException(&quot;Unknown node kind &quot; + n.getKind());</span>
+        }
+    }
+
+    private String constant(ShaderType t, float[] v) {
+<span class="fc bfc" id="L222" title="All 2 branches covered.">        if (t == ShaderType.FLOAT) {</span>
+<span class="fc" id="L223">            return literal(v[0]);</span>
+        }
+<span class="fc" id="L225">        StringBuilder sb = new StringBuilder(typeName(t)).append('(');</span>
+<span class="fc bfc" id="L226" title="All 2 branches covered.">        for (int i = 0; i &lt; v.length; i++) {</span>
+<span class="fc bfc" id="L227" title="All 2 branches covered.">            if (i &gt; 0) {</span>
+<span class="fc" id="L228">                sb.append(&quot;, &quot;);</span>
+            }
+<span class="fc" id="L230">            sb.append(literal(v[i]));</span>
+        }
+<span class="fc" id="L232">        return sb.append(')').toString();</span>
+    }
+
+    /// Returns a float literal every dialect reads the same way.
+    ///
+    /// #### Parameters
+    ///
+    /// - `v`: a finite value
+    ///
+    /// #### Returns
+    ///
+    /// the literal
+    public static String literal(float v) {
+<span class="pc bpc" id="L245" title="2 of 4 branches missed.">        if (Float.isNaN(v) || Float.isInfinite(v)) {</span>
+<span class="nc" id="L246">            throw new IllegalArgumentException(&quot;A shader constant must be finite: &quot; + v);</span>
+        }
+<span class="fc" id="L248">        String s = Float.toString(v);</span>
+<span class="pc bpc" id="L249" title="3 of 4 branches missed.">        if (s.indexOf('.') &lt; 0 &amp;&amp; s.indexOf('E') &lt; 0) {</span>
+<span class="nc" id="L250">            s = s + &quot;.0&quot;;</span>
+        }
+<span class="fc bfc" id="L252" title="All 2 branches covered.">        return v &lt; 0 ? &quot;(&quot; + s + &quot;)&quot; : s;</span>
+    }
+
+    /// Returns the dialect's name of a type.
+    ///
+    /// #### Parameters
+    ///
+    /// - `t`: the type
+    ///
+    /// #### Returns
+    ///
+    /// the type name
+    public String typeName(ShaderType t) {
+<span class="fc" id="L265">        return typeName(dialect, t);</span>
+    }
+
+    /// Returns a dialect's name of a type.
+    ///
+    /// #### Parameters
+    ///
+    /// - `d`: the dialect
+    ///
+    /// - `t`: the type
+    ///
+    /// #### Returns
+    ///
+    /// the type name
+    public static String typeName(Dialect d, ShaderType t) {
+<span class="fc bfc" id="L280" title="All 2 branches covered.">        if (t == ShaderType.FLOAT) {</span>
+<span class="fc" id="L281">            return &quot;float&quot;;</span>
+        }
+<span class="fc bfc" id="L283" title="All 2 branches covered.">        return (d == Dialect.GLSL ? &quot;vec&quot; : &quot;float&quot;) + t.getComponents();</span>
+    }
+
+    private String function(String fn) {
+<span class="fc bfc" id="L287" title="All 2 branches covered.">        if (dialect == Dialect.HLSL) {</span>
+<span class="fc bfc" id="L288" title="All 2 branches covered.">            if (&quot;fract&quot;.equals(fn)) {</span>
+<span class="fc" id="L289">                return &quot;frac&quot;;</span>
+            }
+<span class="fc bfc" id="L291" title="All 2 branches covered.">            if (&quot;mix&quot;.equals(fn)) {</span>
+<span class="fc" id="L292">                return &quot;lerp&quot;;</span>
+            }
+        }
+<span class="fc bfc" id="L295" title="All 4 branches covered.">        if (dialect == Dialect.GLSL &amp;&amp; &quot;atan2&quot;.equals(fn)) {</span>
+<span class="fc" id="L296">            return &quot;atan&quot;;</span>
+        }
+<span class="fc" id="L298">        return fn;</span>
+    }
+
+    /// Returns true if any hook of the given stage reads the built-in input.
+    ///
+    /// #### Parameters
+    ///
+    /// - `material`: the material, or null
+    ///
+    /// - `fragment`: true for the fragment stage
+    ///
+    /// - `builtin`: the built-in's name, such as `worldPos`
+    ///
+    /// #### Returns
+    ///
+    /// true if it is read
+    public static boolean uses(ShaderMaterial material, boolean fragment, String builtin) {
+<span class="pc bpc" id="L315" title="1 of 2 branches missed.">        if (material == null) {</span>
+<span class="nc" id="L316">            return false;</span>
+        }
+<span class="fc" id="L318">        ShaderMaterial.Hook[] all = ShaderMaterial.Hook.values();</span>
+<span class="fc bfc" id="L319" title="All 2 branches covered.">        for (ShaderMaterial.Hook h : all) {</span>
+<span class="fc" id="L320">            ShaderNode g = material.get(h);</span>
+<span class="fc bfc" id="L321" title="All 6 branches covered.">            if (g != null &amp;&amp; h.isFragment() == fragment &amp;&amp; reads(g, builtin, new HashMap&lt;ShaderNode, Boolean&gt;())) {</span>
+<span class="fc" id="L322">                return true;</span>
+            }
+        }
+<span class="fc" id="L325">        return false;</span>
+    }
+
+    /// Returns true if any hook of either stage reads the built-in input.
+    ///
+    /// #### Parameters
+    ///
+    /// - `material`: the material, or null
+    ///
+    /// - `builtin`: the built-in's name
+    ///
+    /// #### Returns
+    ///
+    /// true if it is read
+    public static boolean uses(ShaderMaterial material, String builtin) {
+<span class="fc bfc" id="L340" title="All 4 branches covered.">        return uses(material, true, builtin) || uses(material, false, builtin);</span>
+    }
+
+    private static boolean reads(ShaderNode n, String builtin, Map&lt;ShaderNode, Boolean&gt; seen) {
+<span class="fc bfc" id="L344" title="All 2 branches covered.">        if (seen.containsKey(n)) {</span>
+<span class="fc" id="L345">            return false;</span>
+        }
+<span class="fc" id="L347">        seen.put(n, Boolean.TRUE);</span>
+<span class="fc bfc" id="L348" title="All 4 branches covered.">        if (n.getKind() == ShaderNode.BUILTIN &amp;&amp; builtin.equals(n.getName())) {</span>
+<span class="fc" id="L349">            return true;</span>
+        }
+<span class="fc bfc" id="L351" title="All 2 branches covered.">        for (int i = 0; i &lt; n.getArgCount(); i++) {</span>
+<span class="fc bfc" id="L352" title="All 2 branches covered.">            if (reads(n.getArg(i), builtin, seen)) {</span>
+<span class="fc" id="L353">                return true;</span>
+            }
+        }
+<span class="fc" id="L356">        return false;</span>
+    }
+
+    /// Appends a structural description of a graph: equal for two graphs
+    /// that print the same program. Shared nodes are written once and then
+    /// referred to by number.
+    ///
+    /// #### Parameters
+    ///
+    /// - `root`: the graph
+    ///
+    /// - `sb`: where to append
+    public static void describe(ShaderNode root, StringBuilder sb) {
+<span class="fc" id="L369">        describe(root, sb, new HashMap&lt;ShaderNode, Integer&gt;());</span>
+<span class="fc" id="L370">    }</span>
+
+    private static void describe(ShaderNode n, StringBuilder sb, Map&lt;ShaderNode, Integer&gt; ids) {
+<span class="fc" id="L373">        Integer id = ids.get(n);</span>
+<span class="fc bfc" id="L374" title="All 2 branches covered.">        if (id != null) {</span>
+<span class="fc" id="L375">            sb.append('#').append(id.intValue());</span>
+<span class="fc" id="L376">            return;</span>
+        }
+<span class="fc" id="L378">        ids.put(n, Integer.valueOf(ids.size()));</span>
+<span class="fc" id="L379">        sb.append(n.getKind()).append(n.getType().getComponents());</span>
+<span class="fc bfc" id="L380" title="All 2 branches covered.">        if (n.getName() != null) {</span>
+<span class="fc" id="L381">            sb.append(n.getName());</span>
+        }
+<span class="fc" id="L383">        float[] v = n.getValues();</span>
+<span class="fc bfc" id="L384" title="All 2 branches covered.">        if (v != null) {</span>
+<span class="fc bfc" id="L385" title="All 2 branches covered.">            for (float x : v) {</span>
+<span class="fc" id="L386">                sb.append(',').append(x);</span>
+            }
+        }
+<span class="fc bfc" id="L389" title="All 2 branches covered.">        if (n.getArgCount() &gt; 0) {</span>
+<span class="fc" id="L390">            sb.append('(');</span>
+<span class="fc bfc" id="L391" title="All 2 branches covered.">            for (int i = 0; i &lt; n.getArgCount(); i++) {</span>
+<span class="fc bfc" id="L392" title="All 2 branches covered.">                if (i &gt; 0) {</span>
+<span class="fc" id="L393">                    sb.append(' ');</span>
+                }
+<span class="fc" id="L395">                describe(n.getArg(i), sb, ids);</span>
+            }
+<span class="fc" id="L397">            sb.append(')');</span>
+        }
+<span class="fc" id="L399">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

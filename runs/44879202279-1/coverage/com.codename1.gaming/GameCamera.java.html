@@ -1,0 +1,243 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>GameCamera.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.gaming</a> &gt; <span class="el_source">GameCamera.java</span></div><h1>GameCamera.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.gaming;
+
+import com.codename1.gpu.Camera;
+
+/// The camera a `GameView` renders through. It has two modes:
+///
+/// - **`#MODE_ORTHO_2D`** (the default) is the classic 2D mode: an orthographic
+///   camera mapping one world unit to one screen pixel, origin at the top left with
+///   y pointing down. Sprites are flat, positioned in pixels, and the camera scrolls
+///   via `Scene#setCamera(int, int)`. You never need to touch `GameCamera` for a 2D
+///   game.
+///
+/// - **`#MODE_PERSPECTIVE`** turns the same scene into a 3D world: sprites become
+///   camera-facing **billboards** positioned in 3D space (`Sprite#setPosition(double,
+///   double, double)`), and 3D meshes can be drawn alongside them. You drive the view
+///   with `#setPerspective(float, float, float)`, `#setPosition(float, float, float)`
+///   and `#setTarget(float, float, float)` -- e.g. an over-the-shoulder or top-down
+///   perspective camera that moves with the player.
+///
+/// ```java
+/// // switch a GameView into 3D and place the camera
+/// getCamera()
+///     .setPerspective(60, 0.1f, 500f)
+///     .setPosition(0, 6, 12)
+///     .setTarget(0, 0, 0);
+/// ```
+///
+/// In 3D mode world coordinates are right-handed with y up (the convention the
+/// `com.codename1.gpu` package uses), and sprite sizes are world units rather than
+/// pixels -- use `Sprite#setSize(float, float)` or `Sprite#setScale(float)` to pick a
+/// world-space size.
+<span class="fc" id="L54">public class GameCamera {</span>
+    /// Orthographic, pixel-space 2D rendering (the default).
+    public static final int MODE_ORTHO_2D = 0;
+    /// Perspective 3D rendering with billboarded sprites.
+    public static final int MODE_PERSPECTIVE = 1;
+
+<span class="fc" id="L60">    private int mode = MODE_ORTHO_2D;</span>
+
+<span class="fc" id="L62">    private float fov = 60f;</span>
+<span class="fc" id="L63">    private float near = 0.1f;</span>
+<span class="fc" id="L64">    private float far = 1000f;</span>
+
+    private float eyeX;
+    private float eyeY;
+<span class="fc" id="L68">    private float eyeZ = 10f;</span>
+    private float targetX;
+    private float targetY;
+    private float targetZ;
+    private float upX;
+<span class="fc" id="L73">    private float upY = 1f;</span>
+    private float upZ;
+
+    // billboard basis, recomputed by #updateBasis(); columns right | up | toCamera
+<span class="fc" id="L77">    private final float[] basis = new float[16];</span>
+
+    public int getMode() {
+<span class="fc" id="L80">        return mode;</span>
+    }
+
+    /// Switches to perspective 3D rendering and sets the lens.
+    ///
+    /// #### Parameters
+    ///
+    /// - `fovYDegrees`: vertical field of view in degrees (e.g. 60)
+    ///
+    /// - `near`: near clip distance (&gt; 0)
+    ///
+    /// - `far`: far clip distance
+    public GameCamera setPerspective(float fovYDegrees, float near, float far) {
+<span class="fc" id="L93">        this.mode = MODE_PERSPECTIVE;</span>
+<span class="fc" id="L94">        this.fov = fovYDegrees;</span>
+<span class="fc" id="L95">        this.near = near;</span>
+<span class="fc" id="L96">        this.far = far;</span>
+<span class="fc" id="L97">        return this;</span>
+    }
+
+    /// Switches back to the default orthographic 2D mode.
+    public GameCamera setOrthographic2D() {
+<span class="fc" id="L102">        this.mode = MODE_ORTHO_2D;</span>
+<span class="fc" id="L103">        return this;</span>
+    }
+
+    /// The eye position in world space (perspective mode).
+    public GameCamera setPosition(float x, float y, float z) {
+<span class="fc" id="L108">        eyeX = x;</span>
+<span class="fc" id="L109">        eyeY = y;</span>
+<span class="fc" id="L110">        eyeZ = z;</span>
+<span class="fc" id="L111">        return this;</span>
+    }
+
+    /// The point the camera looks at, in world space (perspective mode).
+    public GameCamera setTarget(float x, float y, float z) {
+<span class="fc" id="L116">        targetX = x;</span>
+<span class="fc" id="L117">        targetY = y;</span>
+<span class="fc" id="L118">        targetZ = z;</span>
+<span class="fc" id="L119">        return this;</span>
+    }
+
+    /// The camera up vector (defaults to 0,1,0).
+    public GameCamera setUp(float x, float y, float z) {
+<span class="fc" id="L124">        upX = x;</span>
+<span class="fc" id="L125">        upY = y;</span>
+<span class="fc" id="L126">        upZ = z;</span>
+<span class="fc" id="L127">        return this;</span>
+    }
+
+    public float getEyeX() {
+<span class="fc" id="L131">        return eyeX;</span>
+    }
+
+    public float getEyeY() {
+<span class="fc" id="L135">        return eyeY;</span>
+    }
+
+    public float getEyeZ() {
+<span class="fc" id="L139">        return eyeZ;</span>
+    }
+
+    public float getTargetX() {
+<span class="fc" id="L143">        return targetX;</span>
+    }
+
+    public float getTargetY() {
+<span class="fc" id="L147">        return targetY;</span>
+    }
+
+    public float getTargetZ() {
+<span class="fc" id="L151">        return targetZ;</span>
+    }
+
+    public float getFov() {
+<span class="fc" id="L155">        return fov;</span>
+    }
+
+    /// Configures the underlying `com.codename1.gpu.Camera` from this camera's
+    /// current state. In 2D mode it sets up the pixel-space orthographic projection
+    /// the `SpriteRenderer` expects; in 3D mode it sets the perspective lens and
+    /// view. Called by the renderer each frame.
+    void apply(Camera cam, int viewWidth, int viewHeight) {
+<span class="fc" id="L163">        float aspect = (float) viewWidth / Math.max(1, viewHeight);</span>
+<span class="fc bfc" id="L164" title="All 2 branches covered.">        if (mode == MODE_PERSPECTIVE) {</span>
+<span class="fc" id="L165">            cam.setPerspective(fov, near, far)</span>
+<span class="fc" id="L166">                    .setAspect(aspect)</span>
+<span class="fc" id="L167">                    .setPosition(eyeX, eyeY, eyeZ)</span>
+<span class="fc" id="L168">                    .setTarget(targetX, targetY, targetZ)</span>
+<span class="fc" id="L169">                    .setUp(upX, upY, upZ);</span>
+<span class="fc" id="L170">            updateBasis();</span>
+        } else {
+            // pixel-space orthographic: 1 world unit == 1 pixel, y up internally;
+            // the SpriteRenderer flips y when it places sprites.
+<span class="fc" id="L174">            cam.setOrthographic(viewHeight, -1000f, 1000f)</span>
+<span class="fc" id="L175">                    .setAspect(aspect)</span>
+<span class="fc" id="L176">                    .setPosition(0f, 0f, 1f)</span>
+<span class="fc" id="L177">                    .setTarget(0f, 0f, 0f)</span>
+<span class="fc" id="L178">                    .setUp(0f, 1f, 0f);</span>
+        }
+<span class="fc" id="L180">    }</span>
+
+    /// Recomputes the billboard basis (camera right/up/toward-camera axes) from the
+    /// current eye, target and up vectors.
+    private void updateBasis() {
+<span class="fc" id="L185">        float fx = targetX - eyeX;</span>
+<span class="fc" id="L186">        float fy = targetY - eyeY;</span>
+<span class="fc" id="L187">        float fz = targetZ - eyeZ;</span>
+<span class="fc" id="L188">        float fl = (float) Math.sqrt(fx * fx + fy * fy + fz * fz);</span>
+<span class="pc bpc" id="L189" title="1 of 2 branches missed.">        if (fl &lt; 1e-6f) {</span>
+<span class="nc" id="L190">            fz = -1f;</span>
+<span class="nc" id="L191">            fl = 1f;</span>
+        }
+<span class="fc" id="L193">        fx /= fl;</span>
+<span class="fc" id="L194">        fy /= fl;</span>
+<span class="fc" id="L195">        fz /= fl;</span>
+
+        // right = normalize(forward x up)
+<span class="fc" id="L198">        float rx = fy * upZ - fz * upY;</span>
+<span class="fc" id="L199">        float ry = fz * upX - fx * upZ;</span>
+<span class="fc" id="L200">        float rz = fx * upY - fy * upX;</span>
+<span class="fc" id="L201">        float rl = (float) Math.sqrt(rx * rx + ry * ry + rz * rz);</span>
+<span class="pc bpc" id="L202" title="1 of 2 branches missed.">        if (rl &lt; 1e-6f) {</span>
+<span class="nc" id="L203">            rx = 1f;</span>
+<span class="nc" id="L204">            ry = 0f;</span>
+<span class="nc" id="L205">            rz = 0f;</span>
+<span class="nc" id="L206">            rl = 1f;</span>
+        }
+<span class="fc" id="L208">        rx /= rl;</span>
+<span class="fc" id="L209">        ry /= rl;</span>
+<span class="fc" id="L210">        rz /= rl;</span>
+
+        // up' = right x forward
+<span class="fc" id="L213">        float ux = ry * fz - rz * fy;</span>
+<span class="fc" id="L214">        float uy = rz * fx - rx * fz;</span>
+<span class="fc" id="L215">        float uz = rx * fy - ry * fx;</span>
+
+        // columns: right | up' | toCamera(-forward)
+<span class="fc" id="L218">        basis[0] = rx;</span>
+<span class="fc" id="L219">        basis[1] = ry;</span>
+<span class="fc" id="L220">        basis[2] = rz;</span>
+<span class="fc" id="L221">        basis[3] = 0f;</span>
+<span class="fc" id="L222">        basis[4] = ux;</span>
+<span class="fc" id="L223">        basis[5] = uy;</span>
+<span class="fc" id="L224">        basis[6] = uz;</span>
+<span class="fc" id="L225">        basis[7] = 0f;</span>
+<span class="fc" id="L226">        basis[8] = -fx;</span>
+<span class="fc" id="L227">        basis[9] = -fy;</span>
+<span class="fc" id="L228">        basis[10] = -fz;</span>
+<span class="fc" id="L229">        basis[11] = 0f;</span>
+<span class="fc" id="L230">        basis[12] = 0f;</span>
+<span class="fc" id="L231">        basis[13] = 0f;</span>
+<span class="fc" id="L232">        basis[14] = 0f;</span>
+<span class="fc" id="L233">        basis[15] = 1f;</span>
+<span class="fc" id="L234">    }</span>
+
+    /// The billboard orientation matrix (column-major float[16]) that makes a quad in
+    /// the XY plane face the camera. Valid after `#apply` in perspective mode. The
+    /// returned array is reused -- copy it if you need to keep it.
+    float[] getBillboardBasis() {
+<span class="nc" id="L240">        return basis;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

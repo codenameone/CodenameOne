@@ -1,0 +1,641 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>GraphicsDevice.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.gpu</a> &gt; <span class="el_source">GraphicsDevice.java</span></div><h1>GraphicsDevice.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.gpu;
+
+import com.codename1.gpu.shader.ShaderMaterial;
+import com.codename1.ui.Image;
+
+/// The low level command surface of the 3D API, bound to a single `RenderView`
+/// and its GPU context. A concrete subclass is provided by each platform
+/// backend (OpenGL ES on Android, WebGL on the browser, Metal on iOS, desktop GL
+/// on the simulator). Applications obtain the device from the `Renderer`
+/// callbacks and never construct it directly.
+///
+/// The device owns shader generation and caching: when `draw` is called it looks
+/// at the `Material` and the mesh `VertexFormat`, generates (once) the matching
+/// platform shader, uploads any dirty buffers and issues the draw call.
+<span class="fc" id="L37">public abstract class GraphicsDevice {</span>
+<span class="fc" id="L38">    private final Texture[] passTargets = new Texture[2];</span>
+<span class="fc" id="L39">    private final int[] passSizes = new int[4];</span>
+    private PostProcess passFrame;
+    private PostProcess passRest;
+    private int passWidth;
+    private int passHeight;
+    private Mesh passQuad;
+    private Material passMaterial;
+    private Camera passCamera;
+    private boolean passWarned;
+
+    private Camera camera;
+    private boolean shadowMapCurrent;
+<span class="fc" id="L51">    private Light light = new Light();</span>
+<span class="fc" id="L52">    private Environment environment = new Environment();</span>
+
+    /// Returns the capabilities and limits of the underlying GPU.
+    public abstract GpuCapabilities getCapabilities();
+
+    /// Allocates a vertex buffer. The backing array is SIMD aligned so it can be
+    /// uploaded to the GPU without an intermediate copy on ParparVM.
+    ///
+    /// #### Parameters
+    ///
+    /// - `format`: the interleaved vertex layout
+    ///
+    /// - `vertexCount`: the number of vertices
+    ///
+    /// #### Returns
+    ///
+    /// a new vertex buffer tracked by this device
+    public VertexBuffer createVertexBuffer(VertexFormat format, int vertexCount) {
+<span class="fc" id="L70">        return new VertexBuffer(format, vertexCount);</span>
+    }
+
+    /// Allocates an index buffer.
+    ///
+    /// #### Parameters
+    ///
+    /// - `indexCount`: the number of indices
+    ///
+    /// #### Returns
+    ///
+    /// a new index buffer tracked by this device
+    public IndexBuffer createIndexBuffer(int indexCount) {
+<span class="fc" id="L83">        return new IndexBuffer(indexCount);</span>
+    }
+
+    /// Creates a GPU texture from a Codename One image.
+    ///
+    /// #### Parameters
+    ///
+    /// - `image`: the source image
+    ///
+    /// #### Returns
+    ///
+    /// a new texture
+    public abstract Texture createTexture(Image image);
+
+    /// Creates a GPU texture from raw ARGB pixel data.
+    ///
+    /// #### Parameters
+    ///
+    /// - `width`: the texture width in pixels
+    ///
+    /// - `height`: the texture height in pixels
+    ///
+    /// - `argb`: `width * height` packed ARGB pixels in row major order
+    ///
+    /// #### Returns
+    ///
+    /// a new texture
+    public abstract Texture createTexture(int width, int height, int[] argb);
+
+    /// Clears the framebuffer.
+    ///
+    /// #### Parameters
+    ///
+    /// - `argbColor`: the packed ARGB clear color
+    ///
+    /// - `color`: true to clear the color buffer
+    ///
+    /// - `depth`: true to clear the depth buffer
+    public abstract void clear(int argbColor, boolean color, boolean depth);
+
+    /// Sets the viewport rectangle in pixels.
+    public abstract void setViewport(int x, int y, int width, int height);
+
+    /// Sets the active camera supplying the view and projection matrices used by
+    /// subsequent draws.
+    ///
+    /// Setting the camera starts a new frame as far as shadows go: a shadow map
+    /// rendered before it is not used again, so set the camera first and then
+    /// run `beginShadowPass`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `camera`: the camera
+    public void setCamera(Camera camera) {
+<span class="fc" id="L137">        this.camera = camera;</span>
+<span class="fc" id="L138">        shadowMapCurrent = false;</span>
+<span class="fc" id="L139">    }</span>
+
+    /// For a backend: true once a shadow pass has ended since the camera was
+    /// last set, so the map belongs to this frame. A frame that skipped the pass
+    /// must not sample the one before it.
+    protected final boolean isShadowMapCurrent() {
+<span class="nc" id="L145">        return shadowMapCurrent;</span>
+    }
+
+    /// For a backend: records that a shadow pass of this frame has ended.
+    protected final void shadowMapRendered() {
+<span class="nc" id="L150">        shadowMapCurrent = true;</span>
+<span class="nc" id="L151">    }</span>
+
+    /// Returns the active camera, or null if none was set.
+    public Camera getCamera() {
+<span class="fc" id="L155">        return camera;</span>
+    }
+
+    /// Sets the active directional light used by lit materials.
+    ///
+    /// #### Parameters
+    ///
+    /// - `light`: the light
+    public void setLight(Light light) {
+<span class="fc" id="L164">        this.light = light;</span>
+<span class="fc" id="L165">    }</span>
+
+    /// Returns the active light.
+    public Light getLight() {
+<span class="nc" id="L169">        return light;</span>
+    }
+
+    /// Sets the environment (fog, hemisphere ambient, tone mapping) used by
+    /// subsequent draws.
+    ///
+    /// #### Parameters
+    ///
+    /// - `environment`: the environment; null restores the default, which
+    ///   changes nothing
+    public void setEnvironment(Environment environment) {
+<span class="pc bpc" id="L180" title="1 of 2 branches missed.">        this.environment = environment == null ? new Environment() : environment;</span>
+<span class="fc" id="L181">    }</span>
+
+    /// Returns the active environment.
+    public Environment getEnvironment() {
+<span class="nc" id="L185">        return environment;</span>
+    }
+
+    private float time;
+
+    /// Sets the clock that custom shaders read with
+    /// `com.codename1.gpu.shader.ShaderNode.time()`, in seconds. Call it once
+    /// per frame before drawing; animated library shaders such as water move
+    /// with it.
+    ///
+    /// #### Parameters
+    ///
+    /// - `seconds`: the time
+    public void setTime(float seconds) {
+<span class="fc" id="L199">        this.time = seconds;</span>
+<span class="fc" id="L200">    }</span>
+
+    /// Returns the clock set with `setTime`.
+    ///
+    /// #### Returns
+    ///
+    /// seconds
+    public float getTime() {
+<span class="nc" id="L208">        return time;</span>
+    }
+
+    /// Starts rendering the light's shadow map. Until `endShadowPass`, `draw`
+    /// writes only depth as seen from the light, and skips materials that do
+    /// not cast shadows. Draws after `endShadowPass` that receive shadows
+    /// sample the map.
+    ///
+    /// The default implementation supports no shadows and returns false; the
+    /// caller then skips the pass and draws as usual.
+    ///
+    /// Render the shadow pass before `beginPostProcess`, never inside it: both
+    /// passes return to the target that was active when they began, so a
+    /// shadow pass started offscreen would hand the post process its own
+    /// image to draw into.
+    ///
+    /// #### Parameters
+    ///
+    /// - `light`: the light whose shadows to render; it must have shadows on
+    ///
+    /// #### Returns
+    ///
+    /// true if the pass started and the shadow casters should be drawn now
+    public boolean beginShadowPass(Light light) {
+<span class="nc" id="L232">        return false;</span>
+    }
+
+    /// Ends the shadow pass started by `beginShadowPass`, and restores the
+    /// viewport and target that were active before it.
+    public void endShadowPass() {
+<span class="nc" id="L238">    }</span>
+
+    /// Creates an offscreen image the scene can be drawn into with
+    /// `beginRenderTarget` and then sampled like any other texture: a mirror,
+    /// a security camera screen, a minimap, the refraction behind glass.
+    ///
+    /// The result is an ordinary `Texture`; hand it to a material or to a
+    /// `ShaderMaterial` texture slot, and release it with `dispose(Texture)`.
+    /// It has a depth buffer of its own while it is drawn into.
+    ///
+    /// The default implementation cannot draw offscreen and returns null, as
+    /// the software simulator device does.
+    ///
+    /// #### Parameters
+    ///
+    /// - `width`: the width in pixels
+    ///
+    /// - `height`: the height in pixels
+    ///
+    /// #### Returns
+    ///
+    /// the target, or null when this device has no offscreen drawing
+    public Texture createRenderTarget(int width, int height) {
+<span class="nc" id="L261">        return null;</span>
+    }
+
+    /// True if this device skins meshes on the GPU: it draws a mesh in
+    /// `VertexFormat.SKINNED` with a material given `Material.setSkinning`
+    /// by moving each vertex in its vertex stage. Where it answers false,
+    /// as the software simulator device does, skin on the CPU and draw the
+    /// result as an ordinary mesh; `com.codename1.gaming.AnimatedModel`
+    /// picks the path by itself.
+    ///
+    /// #### Returns
+    ///
+    /// false by default
+    public boolean isGpuSkinning() {
+<span class="fc" id="L275">        return false;</span>
+    }
+
+    /// Sends the draws that follow into `target` until `endRenderTarget`,
+    /// clearing its colour to `clearArgb` and its depth first. The viewport
+    /// covers the whole target, and the camera, light and environment are the
+    /// device's as usual, so set a camera for the view the target shows.
+    ///
+    /// Draw render targets first in a frame: before the shadow pass, before
+    /// `beginPostProcess` and before the scene itself. They do not nest, and
+    /// on some devices the depth of scene draws made earlier in the frame is
+    /// not kept across one.
+    ///
+    /// #### Parameters
+    ///
+    /// - `target`: a texture from `createRenderTarget` on this device
+    ///
+    /// - `clearArgb`: the colour the target starts from
+    ///
+    /// #### Returns
+    ///
+    /// true if drawing now goes into the target
+    public boolean beginRenderTarget(Texture target, int clearArgb) {
+<span class="nc" id="L298">        return false;</span>
+    }
+
+    /// Ends the pass `beginRenderTarget` started; drawing returns to the
+    /// target and viewport that were active before it.
+    public void endRenderTarget() {
+<span class="nc" id="L304">    }</span>
+
+    /// Redirects drawing into an offscreen image so `endPostProcess` can apply
+    /// `effects` to it on its way to the screen. When `effects` has custom
+    /// passes (`PostProcess.addPass`) and this device can draw into a render
+    /// target, the scene goes into one, and `endPostProcess` runs the passes
+    /// before the built-in effects.
+    ///
+    /// Draw the shadow pass and any render targets before this call.
+    ///
+    /// #### Parameters
+    ///
+    /// - `effects`: the effects to apply
+    ///
+    /// - `width`: the width of the frame in pixels
+    ///
+    /// - `height`: the height of the frame in pixels
+    ///
+    /// #### Returns
+    ///
+    /// true if drawing now goes offscreen; false means the caller draws
+    /// straight to the screen
+    public final boolean beginPostProcess(PostProcess effects, int width, int height) {
+<span class="fc" id="L327">        passFrame = null;</span>
+<span class="pc bpc" id="L328" title="2 of 6 branches missed.">        if (effects != null &amp;&amp; effects.getPassCount() &gt; 0 &amp;&amp; passTarget(0, width, height)</span>
+<span class="pc bpc" id="L329" title="1 of 2 branches missed.">                &amp;&amp; beginRenderTarget(passTargets[0], 0xff000000)) {</span>
+<span class="fc" id="L330">            passFrame = effects;</span>
+<span class="fc" id="L331">            passWidth = width;</span>
+<span class="fc" id="L332">            passHeight = height;</span>
+<span class="fc" id="L333">            return true;</span>
+        }
+<span class="pc bpc" id="L335" title="2 of 4 branches missed.">        if (effects != null &amp;&amp; effects.getPassCount() &gt; 0) {</span>
+<span class="fc" id="L336">            passesDropped(&quot;this device cannot draw offscreen&quot;);</span>
+        }
+<span class="fc" id="L338">        return beginPostEffects(effects, width, height);</span>
+    }
+
+    /// Applies the effects passed to `beginPostProcess` and draws the result
+    /// to the screen. Drawing goes to the screen again afterwards.
+    ///
+    /// #### Parameters
+    ///
+    /// - `timeSeconds`: a running clock, which animates the film grain
+    public final void endPostProcess(float timeSeconds) {
+<span class="fc" id="L348">        PostProcess effects = passFrame;</span>
+<span class="fc bfc" id="L349" title="All 2 branches covered.">        if (effects == null) {</span>
+<span class="fc" id="L350">            endPostEffects(timeSeconds);</span>
+<span class="fc" id="L351">            return;</span>
+        }
+<span class="fc" id="L353">        passFrame = null;</span>
+<span class="fc" id="L354">        endRenderTarget();</span>
+<span class="fc" id="L355">        int src = 0;</span>
+<span class="fc" id="L356">        int last = effects.getPassCount() - 1;</span>
+<span class="fc bfc" id="L357" title="All 2 branches covered.">        for (int i = 0; i &lt; last; i++) {</span>
+<span class="fc" id="L358">            int dst = 1 - src;</span>
+<span class="pc bpc" id="L359" title="2 of 4 branches missed.">            if (!passTarget(dst, passWidth, passHeight) || !beginRenderTarget(passTargets[dst], 0xff000000)) {</span>
+<span class="nc" id="L360">                passesDropped(&quot;a second render target is not available, so only the last pass runs&quot;);</span>
+<span class="nc" id="L361">                break;</span>
+            }
+<span class="fc" id="L363">            drawPass(effects.getPass(i), passTargets[src]);</span>
+<span class="fc" id="L364">            endRenderTarget();</span>
+<span class="fc" id="L365">            src = dst;</span>
+        }
+<span class="fc bfc" id="L367" title="All 2 branches covered.">        if (passRest == null) {</span>
+<span class="fc" id="L368">            passRest = new PostProcess();</span>
+        }
+<span class="fc" id="L370">        passRest.copyWithoutDepth(effects);</span>
+<span class="fc" id="L371">        boolean chain = beginPostEffects(passRest, passWidth, passHeight);</span>
+<span class="fc" id="L372">        drawPass(effects.getPass(last), passTargets[src]);</span>
+<span class="pc bpc" id="L373" title="1 of 2 branches missed.">        if (chain) {</span>
+<span class="fc" id="L374">            endPostEffects(timeSeconds);</span>
+        }
+<span class="fc" id="L376">    }</span>
+
+    /// The device's own post processing: redirects drawing into an offscreen
+    /// image so `endPostEffects` can apply the built-in effects of `effects`.
+    /// Custom passes are handled by `beginPostProcess` and never reach this.
+    ///
+    /// The default implementation supports no post processing and returns
+    /// false; the caller then draws straight to the screen.
+    ///
+    /// #### Parameters
+    ///
+    /// - `effects`: the effects to apply
+    ///
+    /// - `width`: the width of the frame in pixels
+    ///
+    /// - `height`: the height of the frame in pixels
+    ///
+    /// #### Returns
+    ///
+    /// true if drawing now goes offscreen
+    protected boolean beginPostEffects(PostProcess effects, int width, int height) {
+<span class="nc" id="L397">        return false;</span>
+    }
+
+    /// Applies the effects passed to `beginPostEffects` and draws the result
+    /// to the screen.
+    ///
+    /// #### Parameters
+    ///
+    /// - `timeSeconds`: a running clock, which animates the film grain
+    protected void endPostEffects(float timeSeconds) {
+<span class="nc" id="L407">    }</span>
+
+    // Says once per device that custom passes were left out, so a pass that
+    // never shows is not a silent mystery.
+    private void passesDropped(String why) {
+<span class="pc bpc" id="L412" title="1 of 2 branches missed.">        if (!passWarned) {</span>
+<span class="fc" id="L413">            passWarned = true;</span>
+<span class="fc" id="L414">            com.codename1.io.Log.p(&quot;PostProcess: custom passes skipped: &quot; + why);</span>
+        }
+<span class="fc" id="L416">    }</span>
+
+    // Makes sure render target `index` exists at the frame size.
+    private boolean passTarget(int index, int width, int height) {
+<span class="pc bpc" id="L420" title="2 of 6 branches missed.">        if (passTargets[index] != null &amp;&amp; passSizes[index * 2] == width &amp;&amp; passSizes[index * 2 + 1] == height) {</span>
+<span class="fc" id="L421">            return true;</span>
+        }
+<span class="pc bpc" id="L423" title="1 of 2 branches missed.">        if (passTargets[index] != null) {</span>
+<span class="nc" id="L424">            dispose(passTargets[index]);</span>
+<span class="nc" id="L425">            passTargets[index] = null;</span>
+        }
+<span class="fc" id="L427">        Texture t = createRenderTarget(Math.max(1, width), Math.max(1, height));</span>
+<span class="fc bfc" id="L428" title="All 2 branches covered.">        if (t == null) {</span>
+<span class="fc" id="L429">            return false;</span>
+        }
+<span class="fc" id="L431">        passTargets[index] = t;</span>
+<span class="fc" id="L432">        passSizes[index * 2] = width;</span>
+<span class="fc" id="L433">        passSizes[index * 2 + 1] = height;</span>
+<span class="fc" id="L434">        return true;</span>
+    }
+
+    // Draws one custom pass over the whole of the current target: a quad
+    // filling clip space under an orthographic camera, depth off.
+    private void drawPass(ShaderMaterial pass, Texture source) {
+<span class="fc bfc" id="L440" title="All 2 branches covered.">        if (passQuad == null) {</span>
+<span class="fc" id="L441">            passQuad = Primitives.quad(this, 2f);</span>
+<span class="fc" id="L442">            RenderState rs = RenderState.opaque();</span>
+<span class="fc" id="L443">            rs.setDepthTest(false);</span>
+<span class="fc" id="L444">            rs.setDepthWrite(false);</span>
+<span class="fc" id="L445">            rs.setCullMode(RenderState.CullMode.NONE);</span>
+<span class="fc" id="L446">            passMaterial = new Material(Material.Type.UNLIT).setFogged(false);</span>
+<span class="fc" id="L447">            passMaterial.setRenderState(rs);</span>
+<span class="fc" id="L448">            passCamera = new Camera().setOrthographic(2f, 0.1f, 10f).setAspect(1f)</span>
+<span class="fc" id="L449">                    .setPosition(0f, 0f, 1f).setTarget(0f, 0f, 0f);</span>
+        }
+<span class="fc" id="L451">        pass.setTexture(PostProcess.SCENE_COLOR, source);</span>
+<span class="fc" id="L452">        passMaterial.setShader(pass);</span>
+<span class="fc" id="L453">        Camera saved = getCamera();</span>
+<span class="fc" id="L454">        setCamera(passCamera);</span>
+<span class="fc" id="L455">        draw(passQuad, passMaterial, Matrix4.identity());</span>
+<span class="fc" id="L456">        setCamera(saved);</span>
+<span class="fc" id="L457">    }</span>
+
+    /// Draws a mesh with the supplied material and model matrix. The device
+    /// composes `camera.getViewProjection() * modelMatrix`, binds the generated
+    /// shader for the material, applies the material render state and issues the
+    /// draw call.
+    ///
+    /// #### Parameters
+    ///
+    /// - `mesh`: the geometry to draw
+    ///
+    /// - `material`: how to shade the geometry
+    ///
+    /// - `modelMatrix`: the 16 element column-major model transform, or null for
+    ///   the identity
+    public abstract void draw(Mesh mesh, Material material, float[] modelMatrix);
+
+<span class="fc" id="L474">    private final float[] instanceMatrix = new float[16];</span>
+
+    /// Draws `count` copies of a mesh, each with its own transform and,
+    /// optionally, colour: crates along a quay, a field of grass, a flock.
+    /// The material's shader tells the copies apart with
+    /// `ShaderNode.instanceId`, `instanceRandom` and `instanceColor`, so
+    /// one material varies size, tint and motion across thousands of
+    /// copies.
+    ///
+    /// Every device draws the copies one after another from a single
+    /// compiled pipeline, changing only the transform and the per copy
+    /// uniforms between them, which is what makes it cheaper than a model
+    /// per copy: no state is looked up or rebound and the scene walks one
+    /// node.
+    ///
+    /// #### Parameters
+    ///
+    /// - `mesh`: the mesh
+    ///
+    /// - `material`: the material shared by every copy
+    ///
+    /// - `matrices`: 16 column-major floats per copy
+    ///
+    /// - `colors`: an ARGB colour per copy, or null for white
+    ///
+    /// - `count`: how many copies to draw
+    public void drawInstanced(Mesh mesh, Material material, float[] matrices, int[] colors, int count) {
+<span class="fc" id="L501">        ShaderMaterial sm = material.getShader();</span>
+<span class="fc bfc" id="L502" title="All 2 branches covered.">        int idSlot = sm == null ? -1 : sm.getUniformSlot(ShaderMaterial.INSTANCE);</span>
+<span class="fc bfc" id="L503" title="All 2 branches covered.">        int colorSlot = sm == null ? -1 : sm.getUniformSlot(ShaderMaterial.INSTANCE_COLOR);</span>
+<span class="fc bfc" id="L504" title="All 2 branches covered.">        float[] u = sm == null ? null : sm.getUniformValues();</span>
+<span class="fc" id="L505">        float[] m = instanceMatrix;</span>
+        // A material without a shader has no instanceColor uniform to carry
+        // the copy's colour, so it reaches the copy through the material's
+        // base colour instead (modulated by it, then restored). Without this
+        // every copy of a plain PBR material drew in its base colour alone.
+<span class="pc bpc" id="L510" title="1 of 4 branches missed.">        boolean tintBase = colorSlot &lt; 0 &amp;&amp; colors != null;</span>
+<span class="fc" id="L511">        int base = material.getColor();</span>
+<span class="fc bfc" id="L512" title="All 2 branches covered.">        for (int i = 0; i &lt; count; i++) {</span>
+<span class="fc" id="L513">            System.arraycopy(matrices, i * 16, m, 0, 16);</span>
+<span class="fc bfc" id="L514" title="All 2 branches covered.">            if (tintBase) {</span>
+<span class="fc" id="L515">                material.setColor(modulate(base, colors[i]));</span>
+            }
+<span class="fc bfc" id="L517" title="All 2 branches covered.">            if (idSlot &gt;= 0) {</span>
+<span class="fc" id="L518">                u[idSlot * 4] = i;</span>
+                // a cheap integer hash, the same copy always gets the same number
+<span class="fc" id="L520">                int h = i * 0x27d4eb2d;</span>
+<span class="fc" id="L521">                h ^= h &gt;&gt;&gt; 15;</span>
+<span class="fc" id="L522">                h *= 0x165667b1;</span>
+<span class="fc" id="L523">                h ^= h &gt;&gt;&gt; 13;</span>
+<span class="fc" id="L524">                u[idSlot * 4 + 1] = (h &amp; 0xffff) / 65535f;</span>
+            }
+<span class="fc bfc" id="L526" title="All 2 branches covered.">            if (colorSlot &gt;= 0) {</span>
+<span class="pc bpc" id="L527" title="1 of 2 branches missed.">                int c = colors == null ? 0xffffffff : colors[i];</span>
+<span class="fc" id="L528">                u[colorSlot * 4] = ((c &gt;&gt; 16) &amp; 0xff) / 255f;</span>
+<span class="fc" id="L529">                u[colorSlot * 4 + 1] = ((c &gt;&gt; 8) &amp; 0xff) / 255f;</span>
+<span class="fc" id="L530">                u[colorSlot * 4 + 2] = (c &amp; 0xff) / 255f;</span>
+<span class="fc" id="L531">                u[colorSlot * 4 + 3] = ((c &gt;&gt;&gt; 24) &amp; 0xff) / 255f;</span>
+            }
+<span class="fc" id="L533">            draw(mesh, material, m);</span>
+        }
+<span class="fc bfc" id="L535" title="All 2 branches covered.">        if (idSlot &gt;= 0) {</span>
+<span class="fc" id="L536">            u[idSlot * 4] = 0f;</span>
+<span class="fc" id="L537">            u[idSlot * 4 + 1] = 0f;</span>
+        }
+<span class="fc bfc" id="L539" title="All 2 branches covered.">        if (tintBase) {</span>
+<span class="fc" id="L540">            material.setColor(base);</span>
+        }
+<span class="fc" id="L542">    }</span>
+
+    /// The channel-wise product of two ARGB colours.
+    static int modulate(int a, int b) {
+<span class="fc" id="L546">        int r = (((a &gt;&gt; 16) &amp; 0xff) * ((b &gt;&gt; 16) &amp; 0xff) + 127) / 255;</span>
+<span class="fc" id="L547">        int g = (((a &gt;&gt; 8) &amp; 0xff) * ((b &gt;&gt; 8) &amp; 0xff) + 127) / 255;</span>
+<span class="fc" id="L548">        int bl = ((a &amp; 0xff) * (b &amp; 0xff) + 127) / 255;</span>
+<span class="fc" id="L549">        int al = (((a &gt;&gt;&gt; 24) &amp; 0xff) * ((b &gt;&gt;&gt; 24) &amp; 0xff) + 127) / 255;</span>
+<span class="fc" id="L550">        return (al &lt;&lt; 24) | (r &lt;&lt; 16) | (g &lt;&lt; 8) | bl;</span>
+    }
+
+    /// Releases the GPU resources backing a vertex buffer.
+    public abstract void dispose(VertexBuffer buffer);
+
+    /// Releases the GPU resources backing an index buffer.
+    public abstract void dispose(IndexBuffer buffer);
+
+    /// Releases the GPU resources backing a texture.
+    public abstract void dispose(Texture texture);
+
+    /// Writes the parameters of the post effects added after grain into
+    /// `out` from `offset`: chromatic aberration, FXAA (0 or 1), god ray
+    /// strength scaled by how visible the sun is, and the sun's position in
+    /// texture space (0, 0 is the top left). Every device packs them in this
+    /// order, so the composite passes of every shading language agree.
+    ///
+    /// #### Parameters
+    ///
+    /// - `effects`: the post process being composited
+    ///
+    /// - `out`: the parameter array
+    ///
+    /// - `offset`: where to write the six floats
+    protected final void packPostEffects(PostProcess effects, float[] out, int offset) {
+<span class="nc" id="L576">        out[offset] = effects.getChromaticAberration();</span>
+<span class="nc bnc" id="L577" title="All 2 branches missed.">        out[offset + 1] = effects.isFxaa() ? 1f : 0f;</span>
+<span class="nc" id="L578">        out[offset + 2] = 0f;</span>
+<span class="nc" id="L579">        out[offset + 3] = 0.5f;</span>
+<span class="nc" id="L580">        out[offset + 4] = 0.5f;</span>
+<span class="nc" id="L581">        out[offset + 5] = 0f;</span>
+<span class="nc" id="L582">        Camera cam = getCamera();</span>
+<span class="nc" id="L583">        Light light = getLight();</span>
+<span class="nc bnc" id="L584" title="All 6 branches missed.">        if (effects.getGodRays() &lt;= 0f || cam == null || light == null) {</span>
+<span class="nc" id="L585">            return;</span>
+        }
+        // the sun is far along the reverse of the light's direction
+<span class="nc" id="L588">        float sx = cam.getEyeX() - light.getDirectionX() * 1000f;</span>
+<span class="nc" id="L589">        float sy = cam.getEyeY() - light.getDirectionY() * 1000f;</span>
+<span class="nc" id="L590">        float sz = cam.getEyeZ() - light.getDirectionZ() * 1000f;</span>
+<span class="nc" id="L591">        float[] m = cam.getViewProjection();</span>
+<span class="nc" id="L592">        float cx = m[0] * sx + m[4] * sy + m[8] * sz + m[12];</span>
+<span class="nc" id="L593">        float cy = m[1] * sx + m[5] * sy + m[9] * sz + m[13];</span>
+<span class="nc" id="L594">        float cw = m[3] * sx + m[7] * sy + m[11] * sz + m[15];</span>
+<span class="nc bnc" id="L595" title="All 2 branches missed.">        if (cw &lt;= 0.0001f) {</span>
+<span class="nc" id="L596">            return;</span>
+        }
+<span class="nc" id="L598">        float u = cx / cw * 0.5f + 0.5f;</span>
+<span class="nc" id="L599">        float v = 0.5f - cy / cw * 0.5f;</span>
+        // full strength on screen, fading to nothing half a screen outside it
+<span class="nc" id="L601">        float du = Math.max(0f, Math.abs(u - 0.5f) - 0.5f);</span>
+<span class="nc" id="L602">        float dv = Math.max(0f, Math.abs(v - 0.5f) - 0.5f);</span>
+<span class="nc" id="L603">        float fade = Math.max(0f, 1f - (du + dv) * 2f);</span>
+<span class="nc" id="L604">        out[offset + 2] = effects.getGodRays() * fade;</span>
+<span class="nc" id="L605">        out[offset + 3] = u;</span>
+<span class="nc" id="L606">        out[offset + 4] = v;</span>
+<span class="nc" id="L607">    }</span>
+
+    /// Writes the parameters of the depth effects and the colour lookup into
+    /// `out` from `offset`, twelve floats: ambient occlusion strength and
+    /// radius in pixels, focus distance, depth of field blur in pixels,
+    /// outline strength, the camera's near and far planes, lookup strength,
+    /// and the outline colour as red, green, blue (0 to 1) and a zero. Every
+    /// device packs them in this order, so the composite passes of every
+    /// shading language agree.
+    ///
+    /// #### Parameters
+    ///
+    /// - `effects`: the post process being composited
+    ///
+    /// - `out`: the parameter array
+    ///
+    /// - `offset`: where to write the twelve floats
+    protected final void packDepthEffects(PostProcess effects, float[] out, int offset) {
+<span class="fc" id="L625">        Camera cam = getCamera();</span>
+<span class="fc" id="L626">        out[offset] = effects.getAmbientOcclusion();</span>
+<span class="fc" id="L627">        out[offset + 1] = effects.getAmbientOcclusionRadius();</span>
+<span class="fc" id="L628">        out[offset + 2] = effects.getFocusDistance();</span>
+<span class="fc" id="L629">        out[offset + 3] = effects.getDepthOfFieldBlur();</span>
+<span class="fc" id="L630">        out[offset + 4] = effects.getOutline();</span>
+<span class="pc bpc" id="L631" title="1 of 2 branches missed.">        out[offset + 5] = cam == null ? 0.1f : cam.getNear();</span>
+<span class="pc bpc" id="L632" title="1 of 2 branches missed.">        out[offset + 6] = cam == null ? 100f : cam.getFar();</span>
+<span class="fc" id="L633">        out[offset + 7] = effects.getColorLutStrength();</span>
+<span class="fc" id="L634">        int c = effects.getOutlineColor();</span>
+<span class="fc" id="L635">        out[offset + 8] = ((c &gt;&gt; 16) &amp; 0xff) / 255f;</span>
+<span class="fc" id="L636">        out[offset + 9] = ((c &gt;&gt; 8) &amp; 0xff) / 255f;</span>
+<span class="fc" id="L637">        out[offset + 10] = (c &amp; 0xff) / 255f;</span>
+<span class="fc" id="L638">        out[offset + 11] = 0f;</span>
+<span class="fc" id="L639">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

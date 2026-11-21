@@ -1,0 +1,194 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MqttOptions.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.io.mqtt</a> &gt; <span class="el_source">MqttOptions.java</span></div><h1>MqttOptions.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.io.mqtt;
+
+/// Everything an [MqttClient] needs to open and identify a connection.
+/// The setters return `this`.
+public final class MqttOptions {
+    private final String uri;
+    private final String clientId;
+<span class="fc" id="L30">    private boolean cleanSession = true;</span>
+<span class="fc" id="L31">    private int keepAliveSeconds = 60;</span>
+    private String username;
+    private byte[] password;
+    private String willTopic;
+    private byte[] willPayload;
+    private int willQos;
+    private boolean willRetain;
+<span class="fc" id="L38">    private int connectTimeoutMillis = 15000;</span>
+<span class="fc" id="L39">    private int maxPacketSize = 1048576;</span>
+
+    /// Creates options.
+    ///
+    /// #### Parameters
+    ///
+    /// - `uri`: `tcp://host[:port]` (default port 1883), `ws://host[:port]/path`
+    ///   or `wss://host[:port]/path`, the last two over a WebSocket with the
+    ///   `mqtt` subprotocol
+    ///
+    /// - `clientId`: the client identifier; may be empty only with a clean
+    ///   session, in which case the broker assigns one
+<span class="fc" id="L51">    public MqttOptions(String uri, String clientId) {</span>
+<span class="pc bpc" id="L52" title="1 of 2 branches missed.">        if (uri == null) {</span>
+<span class="nc" id="L53">            throw new IllegalArgumentException(&quot;uri&quot;);</span>
+        }
+<span class="fc" id="L55">        this.uri = uri;</span>
+<span class="pc bpc" id="L56" title="1 of 2 branches missed.">        this.clientId = clientId == null ? &quot;&quot; : clientId;</span>
+<span class="fc" id="L57">    }</span>
+
+    /// The broker URI.
+    public String getUri() {
+<span class="fc" id="L61">        return uri;</span>
+    }
+
+    /// The client identifier.
+    public String getClientId() {
+<span class="fc" id="L66">        return clientId;</span>
+    }
+
+    /// Whether the broker should discard any session state of this client id.
+    public boolean isCleanSession() {
+<span class="fc" id="L71">        return cleanSession;</span>
+    }
+
+    /// Sets the clean session flag (default true). With false, the client keeps
+    /// unacknowledged QoS 1 publishes across a reconnect and re-sends them with
+    /// the DUP flag.
+    public MqttOptions cleanSession(boolean cleanSession) {
+<span class="fc" id="L78">        this.cleanSession = cleanSession;</span>
+<span class="fc" id="L79">        return this;</span>
+    }
+
+    /// The keep alive interval in seconds; 0 disables it.
+    public int getKeepAliveSeconds() {
+<span class="fc" id="L84">        return keepAliveSeconds;</span>
+    }
+
+    /// Sets the keep alive interval in seconds (default 60, 0 to 65535).
+    public MqttOptions keepAliveSeconds(int seconds) {
+<span class="pc bpc" id="L89" title="2 of 4 branches missed.">        if (seconds &lt; 0 || seconds &gt; 65535) {</span>
+<span class="nc" id="L90">            throw new IllegalArgumentException(&quot;keep alive out of range: &quot; + seconds);</span>
+        }
+<span class="fc" id="L92">        this.keepAliveSeconds = seconds;</span>
+<span class="fc" id="L93">        return this;</span>
+    }
+
+    /// The user name, or null.
+    public String getUsername() {
+<span class="fc" id="L98">        return username;</span>
+    }
+
+    /// The password bytes, or null. The array is not copied.
+    public byte[] getPassword() {
+<span class="fc" id="L103">        return password;</span>
+    }
+
+    /// Sets the credentials. MQTT 3.1.1 allows a password only with a user name.
+    ///
+    /// #### Parameters
+    ///
+    /// - `username`: the user name, or null for none
+    ///
+    /// - `password`: the password, or null for none
+    public MqttOptions credentials(String username, byte[] password) {
+<span class="pc bpc" id="L114" title="3 of 4 branches missed.">        if (username == null &amp;&amp; password != null) {</span>
+<span class="nc" id="L115">            throw new IllegalArgumentException(&quot;A password needs a user name&quot;);</span>
+        }
+<span class="fc" id="L117">        this.username = username;</span>
+<span class="fc" id="L118">        this.password = password;</span>
+<span class="fc" id="L119">        return this;</span>
+    }
+
+    /// Sets the will the broker publishes if this client vanishes.
+    ///
+    /// #### Parameters
+    ///
+    /// - `topic`: the will topic, or null to clear the will
+    ///
+    /// - `payload`: the will message
+    ///
+    /// - `qos`: 0 or 1
+    ///
+    /// - `retain`: whether the broker retains the will
+    public MqttOptions will(String topic, byte[] payload, int qos, boolean retain) {
+<span class="pc bpc" id="L134" title="1 of 2 branches missed.">        if (topic != null) {</span>
+<span class="fc" id="L135">            MqttTopic.validateName(topic);</span>
+        }
+<span class="pc bpc" id="L137" title="2 of 4 branches missed.">        if (qos &lt; 0 || qos &gt; 1) {</span>
+<span class="nc" id="L138">            throw new IllegalArgumentException(&quot;will qos must be 0 or 1&quot;);</span>
+        }
+<span class="fc" id="L140">        this.willTopic = topic;</span>
+<span class="pc bpc" id="L141" title="1 of 2 branches missed.">        this.willPayload = payload == null ? new byte[0] : payload;</span>
+<span class="fc" id="L142">        this.willQos = qos;</span>
+<span class="fc" id="L143">        this.willRetain = retain;</span>
+<span class="fc" id="L144">        return this;</span>
+    }
+
+    /// The will topic, or null.
+    public String getWillTopic() {
+<span class="fc" id="L149">        return willTopic;</span>
+    }
+
+    /// The will payload, or null when there is no will.
+    public byte[] getWillPayload() {
+<span class="fc bfc" id="L154" title="All 2 branches covered.">        return willTopic == null ? null : willPayload;</span>
+    }
+
+    /// The will QoS.
+    public int getWillQos() {
+<span class="fc" id="L159">        return willQos;</span>
+    }
+
+    /// The will retain flag.
+    public boolean isWillRetain() {
+<span class="fc" id="L164">        return willRetain;</span>
+    }
+
+    /// The time allowed for the transport to open and the broker to answer the
+    /// CONNECT, in milliseconds.
+    public int getConnectTimeoutMillis() {
+<span class="fc" id="L170">        return connectTimeoutMillis;</span>
+    }
+
+    /// Sets the connect timeout in milliseconds (default 15000).
+    public MqttOptions connectTimeoutMillis(int millis) {
+<span class="fc" id="L175">        this.connectTimeoutMillis = millis;</span>
+<span class="fc" id="L176">        return this;</span>
+    }
+
+    /// The largest packet, in bytes after the fixed header, the client accepts.
+    public int getMaxPacketSize() {
+<span class="fc" id="L181">        return maxPacketSize;</span>
+    }
+
+    /// Sets the largest incoming packet accepted (default 1 MiB, at most the
+    /// protocol's 268435455). A larger one fails the connection.
+    public MqttOptions maxPacketSize(int bytes) {
+<span class="pc bpc" id="L187" title="2 of 4 branches missed.">        if (bytes &lt; 1 || bytes &gt; MqttCodec.MAX_REMAINING_LENGTH) {</span>
+<span class="nc" id="L188">            throw new IllegalArgumentException(&quot;max packet size out of range: &quot; + bytes);</span>
+        }
+<span class="fc" id="L190">        this.maxPacketSize = bytes;</span>
+<span class="fc" id="L191">        return this;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

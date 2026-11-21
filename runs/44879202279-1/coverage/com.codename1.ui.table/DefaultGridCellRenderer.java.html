@@ -1,0 +1,139 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DefaultGridCellRenderer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.table</a> &gt; <span class="el_source">DefaultGridCellRenderer.java</span></div><h1>DefaultGridCellRenderer.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ui.table;
+
+import com.codename1.ui.Component;
+import com.codename1.ui.Font;
+import com.codename1.ui.Graphics;
+import com.codename1.ui.Image;
+import com.codename1.ui.plaf.Style;
+
+/// The renderer a `DataGrid` uses for a column that has none: text aligned
+/// by kind, a check box for a boolean, and an image scaled to the row.
+///
+/// Subclass it to change one thing, such as the colour of a value, without
+/// repainting the rest.
+<span class="fc" id="L36">public class DefaultGridCellRenderer implements GridCellRenderer {</span>
+
+    @Override
+    public void paint(Graphics g, GridCell cell, int x, int y, int width, int height) {
+<span class="fc" id="L40">        Object v = cell.getValue();</span>
+<span class="fc" id="L41">        Style st = cell.getStyle();</span>
+<span class="fc" id="L42">        int padL = st.getPaddingLeftNoRTL();</span>
+<span class="fc" id="L43">        int padR = st.getPaddingRightNoRTL();</span>
+<span class="fc" id="L44">        GridColumn c = cell.getColumn();</span>
+<span class="fc" id="L45">        int align = c.resolveAlignment(v);</span>
+<span class="pc bpc" id="L46" title="1 of 2 branches missed.">        if (v instanceof Image) {</span>
+<span class="nc" id="L47">            Image img = (Image) v;</span>
+<span class="nc" id="L48">            int ih = Math.max(1, height - st.getPaddingTop() - st.getPaddingBottom());</span>
+<span class="nc bnc" id="L49" title="All 2 branches missed.">            int iw = img.getHeight() &lt;= 0 ? ih : img.getWidth() * ih / img.getHeight();</span>
+<span class="nc" id="L50">            int ix = place(align, x + padL, width - padL - padR, iw);</span>
+<span class="nc" id="L51">            g.drawImage(img, ix, y + (height - ih) / 2, iw, ih);</span>
+<span class="nc" id="L52">            return;</span>
+        }
+<span class="fc bfc" id="L54" title="All 4 branches covered.">        if (!cell.isGroupRow() &amp;&amp; c.resolveKind(v) == GridColumn.Kind.BOOLEAN) {</span>
+<span class="pc bpc" id="L55" title="1 of 4 branches missed.">            boolean on = v instanceof Boolean &amp;&amp; ((Boolean) v).booleanValue();</span>
+<span class="fc" id="L56">            int box = Math.min(height - 2, GridLook.mm(3.4f));</span>
+<span class="fc" id="L57">            int bx = place(align, x + padL, width - padL - padR, box);</span>
+<span class="fc" id="L58">            paintCheck(g, cell, bx, y + (height - box) / 2, box, on);</span>
+<span class="fc" id="L59">            return;</span>
+        }
+<span class="fc" id="L61">        String text = text(cell);</span>
+<span class="fc bfc" id="L62" title="All 2 branches covered.">        if (text.length() == 0) {</span>
+<span class="fc" id="L63">            return;</span>
+        }
+<span class="fc" id="L65">        Font f = font(cell);</span>
+<span class="fc" id="L66">        int avail = width - padL - padR;</span>
+<span class="fc" id="L67">        String shown = GridLook.fit(text, f, avail);</span>
+<span class="fc" id="L68">        g.setFont(f);</span>
+<span class="fc" id="L69">        g.setColor(textColor(cell, st.getFgColor()));</span>
+<span class="fc" id="L70">        int tx = place(align, x + padL, avail, f.stringWidth(shown));</span>
+<span class="fc" id="L71">        g.drawString(shown, tx, y + (height - f.getHeight()) / 2);</span>
+<span class="fc" id="L72">    }</span>
+
+    @Override
+    public int getPreferredWidth(GridCell cell) {
+<span class="fc" id="L76">        Object v = cell.getValue();</span>
+<span class="fc" id="L77">        Style st = cell.getStyle();</span>
+<span class="fc" id="L78">        int pad = st.getPaddingLeftNoRTL() + st.getPaddingRightNoRTL();</span>
+<span class="pc bpc" id="L79" title="1 of 2 branches missed.">        if (v instanceof Image) {</span>
+<span class="nc" id="L80">            return pad + GridLook.mm(6);</span>
+        }
+<span class="fc bfc" id="L82" title="All 2 branches covered.">        if (cell.getColumn().resolveKind(v) == GridColumn.Kind.BOOLEAN) {</span>
+<span class="fc" id="L83">            return pad + GridLook.mm(3.4f);</span>
+        }
+<span class="fc" id="L85">        return pad + font(cell).stringWidth(text(cell));</span>
+    }
+
+    /// The text a cell shows; by default its column's format of the value.
+    protected String text(GridCell cell) {
+<span class="fc" id="L90">        return cell.getColumn().format(cell.getValue());</span>
+    }
+
+    /// The colour of a cell's text, given the row style's.
+    protected int textColor(GridCell cell, int defaultColor) {
+<span class="fc" id="L95">        return defaultColor;</span>
+    }
+
+    /// The font of a cell's text; by default the row style's.
+    protected Font font(GridCell cell) {
+<span class="fc" id="L100">        return cell.getStyle().getFont();</span>
+    }
+
+    /// Paints a check box of side `size` at `x`, `y`.
+    protected void paintCheck(Graphics g, GridCell cell, int x, int y, int size, boolean on) {
+<span class="fc" id="L105">        Style check = GridLook.style(&quot;DataGridCheck&quot;);</span>
+<span class="fc" id="L106">        int arc = Math.max(2, size / 4);</span>
+<span class="fc" id="L107">        int a = g.getAlpha();</span>
+<span class="pc bpc" id="L108" title="1 of 2 branches missed.">        if (!cell.isEditable()) {</span>
+<span class="nc" id="L109">            g.setAlpha(a * 3 / 5);</span>
+        }
+<span class="fc bfc" id="L111" title="All 2 branches covered.">        if (on) {</span>
+<span class="fc" id="L112">            g.setColor(check.getBgColor());</span>
+<span class="fc" id="L113">            g.fillRoundRect(x, y, size, size, arc, arc);</span>
+<span class="fc" id="L114">            g.setColor(check.getFgColor());</span>
+<span class="fc" id="L115">            int s = size;</span>
+            // The tick, two strokes a pixel apart so it reads at any density.
+<span class="fc bfc" id="L117" title="All 2 branches covered.">            for (int d = 0; d &lt; Math.max(1, s / 10); d++) {</span>
+<span class="fc" id="L118">                g.drawLine(x + s / 4, y + s / 2 + d, x + s * 5 / 12, y + s * 7 / 10 + d);</span>
+<span class="fc" id="L119">                g.drawLine(x + s * 5 / 12, y + s * 7 / 10 + d, x + s * 3 / 4, y + s * 3 / 10 + d);</span>
+            }
+<span class="fc" id="L121">        } else {</span>
+<span class="fc" id="L122">            g.setColor(GridLook.mix(GridLook.under(cell.getStyle()), cell.getStyle().getFgColor(), 150));</span>
+<span class="fc" id="L123">            g.drawRoundRect(x, y, size - 1, size - 1, arc, arc);</span>
+        }
+<span class="fc" id="L125">        g.setAlpha(a);</span>
+<span class="fc" id="L126">    }</span>
+
+    /// Where something `w` wide starts in a span from `x`, `avail` wide.
+    protected static int place(int align, int x, int avail, int w) {
+<span class="fc bfc" id="L130" title="All 2 branches covered.">        if (align == Component.RIGHT) {</span>
+<span class="fc" id="L131">            return x + avail - w;</span>
+        }
+<span class="fc bfc" id="L133" title="All 2 branches covered.">        if (align == Component.CENTER) {</span>
+<span class="fc" id="L134">            return x + (avail - w) / 2;</span>
+        }
+<span class="fc" id="L136">        return x;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,637 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AudioParam.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.media.audio</a> &gt; <span class="el_source">AudioParam.java</span></div><h1>AudioParam.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.media.audio;
+
+import com.codename1.util.MathUtil;
+import java.util.ArrayList;
+
+/// A value of an [AudioNode] that can be scheduled ahead of time and modulated
+/// by other nodes, the Web Audio `AudioParam`.
+///
+/// The value at any moment is the automation timeline (or the default value
+/// when nothing is scheduled), plus the sum of every node output connected to
+/// the parameter with [AudioNode#connect(AudioParam)], clamped to
+/// [#getMinValue()] and [#getMaxValue()]. Scheduling methods return the
+/// parameter so calls can be chained:
+///
+/// ```java
+/// OfflineAudioContext audio = new OfflineAudioContext(2, 44100, 44100);
+/// GainNode gain = audio.createGain();
+/// double now = audio.getCurrentTime();
+/// gain.getGain().setValueAtTime(0, now)
+///         .linearRampToValueAtTime(1, now + 0.05)
+///         .setTargetAtTime(0.2f, now + 0.05, 0.1);
+/// ```
+///
+/// Times are in the context's time base, [BaseAudioContext#getCurrentTime()].
+/// Every method may be called from any thread; changes reach the renderer at
+/// its next render quantum.
+public final class AudioParam {
+    static final int SET = 0;
+    static final int LINEAR = 1;
+    static final int EXPONENTIAL = 2;
+    static final int TARGET = 3;
+    static final int CURVE = 4;
+
+<span class="fc" id="L56">    private static final Event[] NO_EVENTS = new Event[0];</span>
+
+    private final BaseAudioContext context;
+    private final String name;
+    private final float defaultValue;
+    private final float minValue;
+    private final float maxValue;
+    private final boolean rateFixed;
+    private AutomationRate automationRate;
+<span class="fc" id="L65">    private Event[] events = NO_EVENTS;</span>
+
+    // ---- render side ----
+<span class="fc" id="L68">    Event[] rEvents = NO_EVENTS;</span>
+<span class="fc" id="L69">    private int rCursor = -1;</span>
+    boolean rKRate;
+<span class="fc" id="L71">    final ArrayList&lt;Connection&gt; rInputs = new ArrayList&lt;Connection&gt;();</span>
+<span class="fc" id="L72">    private final float[] rValues = new float[BaseAudioContext.RENDER_QUANTUM];</span>
+<span class="fc" id="L73">    private final AudioBus rMono = new AudioBus(1);</span>
+<span class="fc" id="L74">    private long rQuantum = -1;</span>
+    private boolean rConstant;
+
+    AudioParam(BaseAudioContext context, String name, float defaultValue, float minValue,
+<span class="fc" id="L78">               float maxValue, AutomationRate rate, boolean rateFixed) {</span>
+<span class="fc" id="L79">        this.context = context;</span>
+<span class="fc" id="L80">        this.name = name;</span>
+<span class="fc" id="L81">        this.defaultValue = defaultValue;</span>
+<span class="fc" id="L82">        this.minValue = minValue;</span>
+<span class="fc" id="L83">        this.maxValue = maxValue;</span>
+<span class="fc" id="L84">        this.automationRate = rate;</span>
+<span class="fc" id="L85">        this.rateFixed = rateFixed;</span>
+<span class="fc bfc" id="L86" title="All 2 branches covered.">        this.rKRate = rate == AutomationRate.K_RATE;</span>
+<span class="fc" id="L87">    }</span>
+
+    /// The value used when nothing is scheduled.
+    ///
+    /// #### Returns
+    ///
+    /// the default value
+    public float getDefaultValue() {
+<span class="nc" id="L95">        return defaultValue;</span>
+    }
+
+    /// The lowest value the parameter can take.
+    ///
+    /// #### Returns
+    ///
+    /// the nominal minimum
+    public float getMinValue() {
+<span class="nc" id="L104">        return minValue;</span>
+    }
+
+    /// The highest value the parameter can take.
+    ///
+    /// #### Returns
+    ///
+    /// the nominal maximum
+    public float getMaxValue() {
+<span class="nc" id="L113">        return maxValue;</span>
+    }
+
+    /// The automation rate.
+    ///
+    /// #### Returns
+    ///
+    /// whether the value is computed per sample or per render quantum
+    public AutomationRate getAutomationRate() {
+<span class="nc" id="L122">        return automationRate;</span>
+    }
+
+    /// Sets the automation rate.
+    ///
+    /// #### Parameters
+    ///
+    /// - `rate`: the new rate
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalStateException`: for a parameter whose rate the specification
+    ///   fixes, such as `AudioBufferSourceNode.playbackRate`
+    public void setAutomationRate(AutomationRate rate) {
+<span class="nc bnc" id="L136" title="All 2 branches missed.">        if (rate == null) {</span>
+<span class="nc" id="L137">            throw new IllegalArgumentException(&quot;rate is null&quot;);</span>
+        }
+<span class="nc bnc" id="L139" title="All 4 branches missed.">        if (rateFixed &amp;&amp; rate != automationRate) {</span>
+<span class="nc" id="L140">            throw new IllegalStateException(name + &quot; has a fixed automation rate of &quot; + automationRate);</span>
+        }
+<span class="nc" id="L142">        automationRate = rate;</span>
+<span class="nc bnc" id="L143" title="All 2 branches missed.">        final boolean k = rate == AutomationRate.K_RATE;</span>
+<span class="nc" id="L144">        context.post(new Runnable() {</span>
+            @Override
+            public void run() {
+<span class="nc" id="L147">                rKRate = k;</span>
+<span class="nc" id="L148">            }</span>
+        });
+<span class="nc" id="L150">    }</span>
+
+    /// The intrinsic value at the context's current time: the automation
+    /// timeline, without the contribution of connected nodes.
+    ///
+    /// #### Returns
+    ///
+    /// the value
+    public float getValue() {
+<span class="fc" id="L159">        return clamp(evaluate(events, events.length, context.getCurrentTime(), defaultValue));</span>
+    }
+
+    /// Sets the value now, the same as
+    /// `setValueAtTime(value, context.getCurrentTime())`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `value`: the new value
+    public void setValue(float value) {
+<span class="fc" id="L169">        setValueAtTime(value, context.getCurrentTime());</span>
+<span class="fc" id="L170">    }</span>
+
+    /// Changes the value at `startTime`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `value`: the new value
+    ///
+    /// - `startTime`: when, in context seconds
+    ///
+    /// #### Returns
+    ///
+    /// this parameter
+    public AudioParam setValueAtTime(float value, double startTime) {
+<span class="fc" id="L184">        checkFinite(value);</span>
+<span class="fc" id="L185">        checkTime(startTime);</span>
+<span class="fc" id="L186">        insert(new Event(SET, startTime, value, 0, null, 0));</span>
+<span class="fc" id="L187">        return this;</span>
+    }
+
+    /// Ramps linearly from the previous scheduled value to `value`, reaching it
+    /// at `endTime`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `value`: the value to reach
+    ///
+    /// - `endTime`: when it is reached
+    ///
+    /// #### Returns
+    ///
+    /// this parameter
+    public AudioParam linearRampToValueAtTime(float value, double endTime) {
+<span class="fc" id="L203">        checkFinite(value);</span>
+<span class="fc" id="L204">        checkTime(endTime);</span>
+<span class="fc" id="L205">        insert(new Event(LINEAR, endTime, value, 0, null, 0));</span>
+<span class="fc" id="L206">        return this;</span>
+    }
+
+    /// Ramps exponentially from the previous scheduled value to `value`,
+    /// reaching it at `endTime`. If the previous value is 0 or of the other
+    /// sign the value holds until `endTime`, as the specification requires.
+    ///
+    /// #### Parameters
+    ///
+    /// - `value`: the value to reach; must not be 0
+    ///
+    /// - `endTime`: when it is reached
+    ///
+    /// #### Returns
+    ///
+    /// this parameter
+    public AudioParam exponentialRampToValueAtTime(float value, double endTime) {
+<span class="fc" id="L223">        checkFinite(value);</span>
+<span class="fc bfc" id="L224" title="All 2 branches covered.">        if (value == 0f) {</span>
+<span class="fc" id="L225">            throw new IllegalArgumentException(&quot;An exponential ramp cannot reach 0&quot;);</span>
+        }
+<span class="fc" id="L227">        checkTime(endTime);</span>
+<span class="fc" id="L228">        insert(new Event(EXPONENTIAL, endTime, value, 0, null, 0));</span>
+<span class="fc" id="L229">        return this;</span>
+    }
+
+    /// Starts an exponential approach to `target` at `startTime`. After
+    /// `timeConstant` seconds about 63% of the distance has been covered.
+    ///
+    /// #### Parameters
+    ///
+    /// - `target`: the value approached
+    ///
+    /// - `startTime`: when the approach starts
+    ///
+    /// - `timeConstant`: the time constant in seconds, 0 or more; 0 jumps
+    ///
+    /// #### Returns
+    ///
+    /// this parameter
+    public AudioParam setTargetAtTime(float target, double startTime, double timeConstant) {
+<span class="fc" id="L247">        checkFinite(target);</span>
+<span class="fc" id="L248">        checkTime(startTime);</span>
+<span class="pc bpc" id="L249" title="1 of 2 branches missed.">        if (!BaseAudioContext.nonNegativeFinite(timeConstant)) {</span>
+<span class="nc" id="L250">            throw new IllegalArgumentException(&quot;timeConstant must be 0 or more: &quot; + timeConstant);</span>
+        }
+<span class="fc" id="L252">        insert(new Event(TARGET, startTime, target, timeConstant, null, 0));</span>
+<span class="fc" id="L253">        return this;</span>
+    }
+
+    /// Follows `values` from `startTime` for `duration` seconds, linearly
+    /// interpolating between them, then holds the last one.
+    ///
+    /// #### Parameters
+    ///
+    /// - `values`: at least two values; copied
+    ///
+    /// - `startTime`: when the curve starts
+    ///
+    /// - `duration`: how long it lasts, more than 0
+    ///
+    /// #### Returns
+    ///
+    /// this parameter
+    public AudioParam setValueCurveAtTime(float[] values, double startTime, double duration) {
+<span class="pc bpc" id="L271" title="2 of 4 branches missed.">        if (values == null || values.length &lt; 2) {</span>
+<span class="nc" id="L272">            throw new IllegalArgumentException(&quot;A value curve needs at least two values&quot;);</span>
+        }
+<span class="fc bfc" id="L274" title="All 2 branches covered.">        for (float v : values) {</span>
+<span class="fc" id="L275">            checkFinite(v);</span>
+        }
+<span class="fc" id="L277">        checkTime(startTime);</span>
+<span class="pc bpc" id="L278" title="1 of 2 branches missed.">        if (!BaseAudioContext.positiveFinite(duration)) {</span>
+<span class="nc" id="L279">            throw new IllegalArgumentException(&quot;duration must be more than 0: &quot; + duration);</span>
+        }
+<span class="fc" id="L281">        float[] copy = new float[values.length];</span>
+<span class="fc" id="L282">        System.arraycopy(values, 0, copy, 0, values.length);</span>
+<span class="fc" id="L283">        insert(new Event(CURVE, startTime, copy[copy.length - 1], 0, copy, duration));</span>
+<span class="fc" id="L284">        return this;</span>
+    }
+
+    /// Removes every event scheduled at or after `cancelTime`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cancelTime`: the first time to clear
+    ///
+    /// #### Returns
+    ///
+    /// this parameter
+    public AudioParam cancelScheduledValues(double cancelTime) {
+<span class="nc" id="L297">        checkTime(cancelTime);</span>
+<span class="nc" id="L298">        Event[] ev = events;</span>
+<span class="nc" id="L299">        int n = 0;</span>
+<span class="nc bnc" id="L300" title="All 4 branches missed.">        while (n &lt; ev.length &amp;&amp; ev[n].time &lt; cancelTime) {</span>
+<span class="nc" id="L301">            n++;</span>
+        }
+<span class="nc" id="L303">        Event[] next = new Event[n];</span>
+<span class="nc" id="L304">        System.arraycopy(ev, 0, next, 0, n);</span>
+<span class="nc" id="L305">        publish(next);</span>
+<span class="nc" id="L306">        return this;</span>
+    }
+
+    /// Like [#cancelScheduledValues(double)], but the value the timeline would
+    /// have had at `cancelTime` is held from then on, so a ramp in progress
+    /// stops where it was rather than jumping back.
+    ///
+    /// #### Parameters
+    ///
+    /// - `cancelTime`: when to hold
+    ///
+    /// #### Returns
+    ///
+    /// this parameter
+    public AudioParam cancelAndHoldAtTime(double cancelTime) {
+<span class="fc" id="L321">        checkTime(cancelTime);</span>
+<span class="fc" id="L322">        Event[] ev = events;</span>
+<span class="fc" id="L323">        float held = evaluate(ev, ev.length, cancelTime, defaultValue);</span>
+<span class="fc" id="L324">        int n = 0;</span>
+<span class="pc bpc" id="L325" title="1 of 4 branches missed.">        while (n &lt; ev.length &amp;&amp; ev[n].time &lt;= cancelTime) {</span>
+<span class="fc" id="L326">            n++;</span>
+        }
+<span class="fc" id="L328">        ArrayList&lt;Event&gt; keep = new ArrayList&lt;Event&gt;();</span>
+<span class="fc bfc" id="L329" title="All 2 branches covered.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc" id="L330">            Event e = ev[i];</span>
+<span class="pc bpc" id="L331" title="3 of 4 branches missed.">            if (e.type == CURVE &amp;&amp; e.time + e.duration &gt; cancelTime) {</span>
+<span class="nc" id="L332">                break;</span>
+            }
+<span class="fc" id="L334">            keep.add(e);</span>
+        }
+<span class="pc bpc" id="L336" title="5 of 8 branches missed.">        if (n &lt; ev.length &amp;&amp; (ev[n].type == LINEAR || ev[n].type == EXPONENTIAL)</span>
+                &amp;&amp; ev[n].t0 &lt; cancelTime) {
+<span class="fc" id="L338">            keep.add(new Event(ev[n].type, cancelTime, held, 0, null, 0));</span>
+        } else {
+<span class="nc" id="L340">            keep.add(new Event(SET, cancelTime, held, 0, null, 0));</span>
+        }
+<span class="fc" id="L342">        publish(keep.toArray(new Event[keep.size()]));</span>
+<span class="fc" id="L343">        return this;</span>
+    }
+
+    // ---------------------------------------------------------------- control
+
+    private void insert(Event e) {
+<span class="fc" id="L349">        Event[] ev = events;</span>
+<span class="fc bfc" id="L350" title="All 2 branches covered.">        for (Event o : ev) {</span>
+<span class="pc bpc" id="L351" title="5 of 6 branches missed.">            if (o.type == CURVE &amp;&amp; e.time &gt; o.time &amp;&amp; e.time &lt; o.time + o.duration) {</span>
+<span class="nc" id="L352">                throw new IllegalStateException(&quot;An event cannot be scheduled inside a value curve&quot;);</span>
+            }
+<span class="pc bpc" id="L354" title="3 of 6 branches missed.">            if (e.type == CURVE &amp;&amp; o.time &gt; e.time &amp;&amp; o.time &lt; e.time + e.duration) {</span>
+<span class="nc" id="L355">                throw new IllegalStateException(&quot;A value curve cannot overlap a scheduled event&quot;);</span>
+            }
+        }
+<span class="fc" id="L358">        e.callTime = context.getCurrentTime();</span>
+<span class="fc" id="L359">        int pos = ev.length;</span>
+<span class="fc bfc" id="L360" title="All 4 branches covered.">        while (pos &gt; 0 &amp;&amp; ev[pos - 1].time &gt; e.time) {</span>
+<span class="fc" id="L361">            pos--;</span>
+        }
+<span class="fc" id="L363">        Event[] next = new Event[ev.length + 1];</span>
+<span class="fc" id="L364">        System.arraycopy(ev, 0, next, 0, pos);</span>
+<span class="fc" id="L365">        next[pos] = e;</span>
+<span class="fc" id="L366">        System.arraycopy(ev, pos, next, pos + 1, ev.length - pos);</span>
+<span class="fc" id="L367">        publish(next);</span>
+<span class="fc" id="L368">    }</span>
+
+    /// Drops events the timeline can no longer reach, fills in each event's
+    /// start state and hands the new array to the renderer.
+    private void publish(Event[] ev) {
+<span class="pc bpc" id="L373" title="1 of 2 branches missed.">        if (ev == events) { // NOPMD CompareObjectsWithEquals - identity: the published array itself</span>
+<span class="nc" id="L374">            Event[] fresh = new Event[ev.length];</span>
+<span class="nc" id="L375">            System.arraycopy(ev, 0, fresh, 0, ev.length);</span>
+<span class="nc" id="L376">            ev = fresh;</span>
+        }
+<span class="fc" id="L378">        double now = context.getCurrentTime();</span>
+<span class="fc" id="L379">        int last = -1;</span>
+<span class="fc bfc" id="L380" title="All 2 branches covered.">        for (int i = 0; i &lt; ev.length; i++) {</span>
+<span class="fc bfc" id="L381" title="All 2 branches covered.">            if (ev[i].time &lt;= now) {</span>
+<span class="fc" id="L382">                last = i;</span>
+            }
+        }
+<span class="fc bfc" id="L385" title="All 2 branches covered.">        if (last &gt; 0) {</span>
+<span class="fc" id="L386">            Event[] pruned = new Event[ev.length - last];</span>
+<span class="fc" id="L387">            System.arraycopy(ev, last, pruned, 0, pruned.length);</span>
+<span class="fc" id="L388">            ev = pruned;</span>
+        }
+<span class="fc bfc" id="L390" title="All 2 branches covered.">        for (int k = 0; k &lt; ev.length; k++) {</span>
+<span class="fc" id="L391">            Event e = ev[k];</span>
+            // An event's start follows its predecessor, so it is worked out
+            // again whenever one is inserted before it. Only the first
+            // event keeps what it had: its predecessor may have been pruned
+            // as past, and the start it gave is what the ramp still needs.
+<span class="fc bfc" id="L396" title="All 4 branches covered.">            if (k == 0 &amp;&amp; e.t0Fixed) {</span>
+<span class="fc" id="L397">                continue;</span>
+            }
+<span class="fc bfc" id="L399" title="All 2 branches covered.">            if (e.t0Fixed) {</span>
+                // Published events are read by the render thread as they
+                // are, so a start worked out again goes into a copy rather
+                // than into the shared one, which never changes once out.
+<span class="fc" id="L403">                Event c = new Event(e.type, e.time, e.value, e.timeConstant, e.curve, e.duration);</span>
+<span class="fc" id="L404">                c.callTime = e.callTime;</span>
+<span class="fc" id="L405">                ev[k] = c;</span>
+<span class="fc" id="L406">                e = c;</span>
+            }
+<span class="fc bfc" id="L408" title="All 2 branches covered.">            if (k == 0) {</span>
+<span class="fc" id="L409">                e.t0 = Math.min(e.callTime, e.time);</span>
+<span class="fc" id="L410">                e.v0 = defaultValue;</span>
+            } else {
+<span class="fc" id="L412">                Event p = ev[k - 1];</span>
+<span class="pc bpc" id="L413" title="1 of 3 branches missed.">                switch (p.type) {</span>
+                    case TARGET:
+<span class="fc" id="L415">                        e.t0 = Math.max(p.time, Math.min(e.callTime, e.time));</span>
+<span class="fc" id="L416">                        e.v0 = evaluate(ev, k, e.t0, defaultValue);</span>
+<span class="fc" id="L417">                        break;</span>
+                    case CURVE:
+<span class="nc" id="L419">                        e.t0 = p.time + p.duration;</span>
+<span class="nc" id="L420">                        e.v0 = p.curve[p.curve.length - 1];</span>
+<span class="nc" id="L421">                        break;</span>
+                    default:
+<span class="fc" id="L423">                        e.t0 = p.time;</span>
+<span class="fc" id="L424">                        e.v0 = p.value;</span>
+                        break;
+                }
+            }
+<span class="fc bfc" id="L428" title="All 2 branches covered.">            if (e.type == TARGET) {</span>
+<span class="fc" id="L429">                e.v0 = evaluate(ev, k, e.time, defaultValue);</span>
+            }
+<span class="fc" id="L431">            e.t0Fixed = true;</span>
+        }
+<span class="fc" id="L433">        events = ev;</span>
+<span class="fc" id="L434">        final Event[] snapshot = ev;</span>
+<span class="fc" id="L435">        context.post(new Runnable() {</span>
+            @Override
+            public void run() {
+<span class="fc" id="L438">                rEvents = snapshot;</span>
+<span class="fc" id="L439">                rCursor = -1;</span>
+<span class="fc" id="L440">            }</span>
+        });
+<span class="fc" id="L442">    }</span>
+
+    /// The timeline value at `t`, considering only the first `count` events.
+    static float evaluate(Event[] ev, int count, double t, float def) {
+<span class="fc" id="L446">        int i = -1;</span>
+<span class="fc bfc" id="L447" title="All 4 branches covered.">        while (i + 1 &lt; count &amp;&amp; ev[i + 1].time &lt;= t) {</span>
+<span class="fc" id="L448">            i++;</span>
+        }
+<span class="fc" id="L450">        return valueAt(ev, count, i, t, def);</span>
+    }
+
+    private static float valueAt(Event[] ev, int count, int i, double t, float def) {
+<span class="fc bfc" id="L454" title="All 2 branches covered.">        if (i + 1 &lt; count) {</span>
+<span class="fc" id="L455">            Event n = ev[i + 1];</span>
+<span class="fc bfc" id="L456" title="All 6 branches covered.">            if ((n.type == LINEAR || n.type == EXPONENTIAL) &amp;&amp; t &gt;= n.t0) {</span>
+<span class="fc" id="L457">                double span = n.time - n.t0;</span>
+<span class="pc bpc" id="L458" title="1 of 2 branches missed.">                if (span &lt;= 0) {</span>
+<span class="nc" id="L459">                    return n.value;</span>
+                }
+<span class="fc" id="L461">                double f = (t - n.t0) / span;</span>
+<span class="fc bfc" id="L462" title="All 2 branches covered.">                if (n.type == LINEAR) {</span>
+<span class="fc" id="L463">                    return (float) (n.v0 + (n.value - n.v0) * f);</span>
+                }
+<span class="pc bpc" id="L465" title="4 of 8 branches missed.">                if (n.v0 == 0f || (n.v0 &lt; 0) != (n.value &lt; 0)) {</span>
+<span class="nc" id="L466">                    return n.v0;</span>
+                }
+<span class="fc" id="L468">                return (float) (n.v0 * MathUtil.pow(n.value / (double) n.v0, f));</span>
+            }
+        }
+<span class="fc bfc" id="L471" title="All 2 branches covered.">        if (i &lt; 0) {</span>
+<span class="fc" id="L472">            return def;</span>
+        }
+<span class="fc" id="L474">        Event e = ev[i];</span>
+<span class="fc bfc" id="L475" title="All 3 branches covered.">        switch (e.type) {</span>
+            case TARGET:
+<span class="pc bpc" id="L477" title="1 of 2 branches missed.">                if (e.timeConstant == 0) {</span>
+<span class="nc" id="L478">                    return e.value;</span>
+                }
+<span class="fc" id="L480">                return (float) (e.value + (e.v0 - e.value)</span>
+<span class="fc" id="L481">                        * MathUtil.exp(-(t - e.time) / e.timeConstant));</span>
+            case CURVE: {
+<span class="fc" id="L483">                double end = e.time + e.duration;</span>
+<span class="fc" id="L484">                float[] c = e.curve;</span>
+<span class="fc bfc" id="L485" title="All 2 branches covered.">                if (t &gt;= end) {</span>
+<span class="fc" id="L486">                    return c[c.length - 1];</span>
+                }
+<span class="fc" id="L488">                double k = (c.length - 1) * (t - e.time) / e.duration;</span>
+<span class="fc" id="L489">                int idx = (int) Math.floor(k);</span>
+<span class="pc bpc" id="L490" title="1 of 2 branches missed.">                if (idx &gt;= c.length - 1) {</span>
+<span class="nc" id="L491">                    return c[c.length - 1];</span>
+                }
+<span class="fc" id="L493">                double frac = k - idx;</span>
+<span class="fc" id="L494">                return (float) (c[idx] + (c[idx + 1] - c[idx]) * frac);</span>
+            }
+            default:
+<span class="fc" id="L497">                return e.value;</span>
+        }
+    }
+
+    private float clamp(float v) {
+<span class="pc bpc" id="L502" title="1 of 2 branches missed.">        if (v &lt; minValue) {</span>
+<span class="nc" id="L503">            return minValue;</span>
+        }
+<span class="pc bpc" id="L505" title="1 of 2 branches missed.">        if (v &gt; maxValue) {</span>
+<span class="nc" id="L506">            return maxValue;</span>
+        }
+<span class="fc" id="L508">        return v;</span>
+    }
+
+    private static void checkFinite(float v) {
+<span class="pc bpc" id="L512" title="2 of 4 branches missed.">        if (Float.isNaN(v) || Float.isInfinite(v)) {</span>
+<span class="nc" id="L513">            throw new IllegalArgumentException(&quot;Value must be finite: &quot; + v);</span>
+        }
+<span class="fc" id="L515">    }</span>
+
+    private static void checkTime(double t) {
+<span class="pc bpc" id="L518" title="1 of 2 branches missed.">        if (!BaseAudioContext.nonNegativeFinite(t)) {</span>
+<span class="nc" id="L519">            throw new IllegalArgumentException(&quot;Time must be 0 or more and finite: &quot; + t);</span>
+        }
+<span class="fc" id="L521">    }</span>
+
+    // ---------------------------------------------------------------- render
+
+    /// The parameter's values for render quantum `q`. Render thread only.
+    float[] compute(long q) {
+<span class="fc bfc" id="L527" title="All 2 branches covered.">        if (rQuantum == q) {</span>
+<span class="fc" id="L528">            return rValues;</span>
+        }
+<span class="fc" id="L530">        rQuantum = q;</span>
+<span class="fc" id="L531">        float sr = context.getSampleRate();</span>
+<span class="fc" id="L532">        long frame0 = q * BaseAudioContext.RENDER_QUANTUM;</span>
+        // An event lands on the frame it names even when its float time is a
+        // hair late; see BaseAudioContext.snapFrames.
+<span class="fc" id="L535">        double tol = 1e-3 / sr;</span>
+<span class="fc" id="L536">        Event[] ev = rEvents;</span>
+<span class="fc" id="L537">        int n = ev.length;</span>
+<span class="fc" id="L538">        int cur = rCursor;</span>
+<span class="pc bpc" id="L539" title="1 of 2 branches missed.">        if (cur &gt;= n) {</span>
+<span class="nc" id="L540">            cur = -1;</span>
+        }
+<span class="fc" id="L542">        float[] out = rValues;</span>
+<span class="fc bfc" id="L543" title="All 2 branches covered.">        if (n == 0) {</span>
+<span class="fc bfc" id="L544" title="All 2 branches covered.">            for (int i = 0; i &lt; out.length; i++) {</span>
+<span class="fc" id="L545">                out[i] = defaultValue;</span>
+            }
+<span class="fc bfc" id="L547" title="All 2 branches covered.">        } else if (rKRate) {</span>
+<span class="fc" id="L548">            double t = frame0 / (double) sr;</span>
+<span class="pc bpc" id="L549" title="1 of 4 branches missed.">            while (cur + 1 &lt; n &amp;&amp; ev[cur + 1].time &lt;= t + tol) {</span>
+<span class="fc" id="L550">                cur++;</span>
+            }
+<span class="fc" id="L552">            float v = valueAt(ev, n, cur, t, defaultValue);</span>
+<span class="fc bfc" id="L553" title="All 2 branches covered.">            for (int i = 0; i &lt; out.length; i++) {</span>
+<span class="fc" id="L554">                out[i] = v;</span>
+            }
+<span class="fc" id="L556">        } else {</span>
+<span class="fc bfc" id="L557" title="All 2 branches covered.">            for (int i = 0; i &lt; out.length; i++) {</span>
+<span class="fc" id="L558">                double t = (frame0 + i) / (double) sr;</span>
+<span class="fc bfc" id="L559" title="All 4 branches covered.">                while (cur + 1 &lt; n &amp;&amp; ev[cur + 1].time &lt;= t + tol) {</span>
+<span class="fc" id="L560">                    cur++;</span>
+                }
+<span class="fc" id="L562">                out[i] = valueAt(ev, n, cur, t, defaultValue);</span>
+            }
+        }
+<span class="fc" id="L565">        rCursor = cur;</span>
+<span class="fc" id="L566">        int inputs = rInputs.size();</span>
+<span class="fc bfc" id="L567" title="All 2 branches covered.">        if (inputs &gt; 0) {</span>
+<span class="fc" id="L568">            AudioBus mono = rMono;</span>
+<span class="fc" id="L569">            mono.setChannels(1);</span>
+<span class="fc bfc" id="L570" title="All 2 branches covered.">            for (int c = 0; c &lt; inputs; c++) {</span>
+<span class="fc" id="L571">                Connection con = rInputs.get(c);</span>
+<span class="fc" id="L572">                AudioBus.sumInto(con.source.pull(con.output, q), mono, ChannelInterpretation.SPEAKERS);</span>
+            }
+<span class="fc" id="L574">            float[] m = mono.data[0];</span>
+<span class="pc bpc" id="L575" title="1 of 2 branches missed.">            if (rKRate) {</span>
+<span class="nc" id="L576">                float add = m[0];</span>
+<span class="nc bnc" id="L577" title="All 2 branches missed.">                for (int i = 0; i &lt; out.length; i++) {</span>
+<span class="nc" id="L578">                    out[i] += add;</span>
+                }
+<span class="nc" id="L580">            } else {</span>
+<span class="fc bfc" id="L581" title="All 2 branches covered.">                for (int i = 0; i &lt; out.length; i++) {</span>
+<span class="fc" id="L582">                    out[i] += m[i];</span>
+                }
+            }
+        }
+<span class="fc bfc" id="L586" title="All 2 branches covered.">        for (int i = 0; i &lt; out.length; i++) {</span>
+<span class="fc" id="L587">            float v = out[i];</span>
+<span class="pc bpc" id="L588" title="1 of 2 branches missed.">            if (Float.isNaN(v)) {</span>
+<span class="nc" id="L589">                v = defaultValue;</span>
+            }
+<span class="pc bpc" id="L591" title="1 of 2 branches missed.">            if (v &lt; minValue) {</span>
+<span class="nc" id="L592">                v = minValue;</span>
+<span class="pc bpc" id="L593" title="1 of 2 branches missed.">            } else if (v &gt; maxValue) {</span>
+<span class="nc" id="L594">                v = maxValue;</span>
+            }
+<span class="fc" id="L596">            out[i] = v;</span>
+        }
+<span class="fc" id="L598">        boolean constant = true;</span>
+<span class="fc" id="L599">        float first = out[0];</span>
+<span class="fc bfc" id="L600" title="All 2 branches covered.">        for (int i = 1; i &lt; out.length; i++) {</span>
+<span class="fc bfc" id="L601" title="All 2 branches covered.">            if (out[i] != first) {</span>
+<span class="fc" id="L602">                constant = false;</span>
+<span class="fc" id="L603">                break;</span>
+            }
+        }
+<span class="fc" id="L606">        rConstant = constant;</span>
+<span class="fc" id="L607">        return out;</span>
+    }
+
+    /// Whether every value of the last computed quantum is the same.
+    boolean isConstant() {
+<span class="fc" id="L612">        return rConstant;</span>
+    }
+
+    static final class Event {
+        final int type;
+        final double time;
+        final float value;
+        final double timeConstant;
+        final float[] curve;
+        final double duration;
+        double callTime;
+        double t0;
+        float v0;
+        boolean t0Fixed;
+
+<span class="fc" id="L627">        Event(int type, double time, float value, double timeConstant, float[] curve, double duration) {</span>
+<span class="fc" id="L628">            this.type = type;</span>
+<span class="fc" id="L629">            this.time = time;</span>
+<span class="fc" id="L630">            this.value = value;</span>
+<span class="fc" id="L631">            this.timeConstant = timeConstant;</span>
+<span class="fc" id="L632">            this.curve = curve;</span>
+<span class="fc" id="L633">            this.duration = duration;</span>
+<span class="fc" id="L634">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>
