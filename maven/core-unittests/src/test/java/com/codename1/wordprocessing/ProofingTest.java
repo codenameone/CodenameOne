@@ -43,8 +43,8 @@ class ProofingTest extends UITestBase {
             + "SFX S Y 1\nSFX S 0 s .\n"
             + "SFX D Y 2\nSFX D 0 ed [^e]\nSFX D 0 d e\n"
             + "PFX U Y 1\nPFX U 0 un .\n"
-            + "REP 1\nREP f ph\nMAP 1\nMAP eé\nFORBIDDENWORD !\n";
-    static final String DIC = "9\nhello/S\nworld/S\nwalk/DSU\nlike/DU\ncafé\nParis\n"
+            + "REP 1\nREP f ph\nMAP 1\nMAP e\u00e9\nFORBIDDENWORD !\n";
+    static final String DIC = "9\nhello/S\nworld/S\nwalk/DSU\nlike/DU\ncaf\u00e9\nParis\n"
             + "phone/S\nwrong/S\nwrongs/!\nsee\n";
 
     static HunspellDictionary dict() throws Exception {
@@ -74,7 +74,7 @@ class ProofingTest extends UITestBase {
         assertTrue(d.suggest("helo", 5).contains("hello"));
         assertEquals("World", d.suggest("Wrold", 5).get(0));
         assertTrue(d.suggest("fone", 5).contains("phone"));
-        assertEquals("café", d.suggest("cafe", 5).get(0));
+        assertEquals("caf\u00e9", d.suggest("cafe", 5).get(0));
         assertEquals("hello world", d.suggest("helloworld", 5).get(0));
     }
 

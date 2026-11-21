@@ -90,6 +90,9 @@ public class DocumentView extends ScrollSurface implements TextInputClient {
     private final Map<String, String> paintTexts = new HashMap<String, String>();
     private static final int SPELLING_COLOR = 0xe03131;
     private static final int GRAMMAR_COLOR = 0x1c7ed6;
+    private static final int COMMENT_COLOR = 0xffe8a3;
+    private static final int RESOLVED_COMMENT_COLOR = 0xf1f3f5;
+    private List<String> paintOrder;
 
     /// A view of an empty document.
     public DocumentView() {
@@ -538,6 +541,11 @@ public class DocumentView extends ScrollSurface implements TextInputClient {
     @Override
     protected void paintContent(Graphics g, int x, int y) {
         paintTexts.clear();
+        paintOrder = null;
+        if (!model.getDocument().comments.isEmpty()) {
+            paintOrder = new java.util.ArrayList<String>();
+            DocumentModel.collectIds(model.getDocument().blocks, paintOrder);
+        }
         g.setColor(DESK);
         g.fillRect(x, y, getContentWidth(), getContentHeight());
         DocumentLayout l = getLayout();
@@ -660,6 +668,9 @@ public class DocumentView extends ScrollSurface implements TextInputClient {
         Font f = font(st, px);
         Revision r = st.revision;
         int color = r == null ? st.color : r.isDeletion() ? DELETE_COLOR : INSERT_COLOR;
+        if (paintOrder != null && it.paragraphId != null) {
+            paintComments(g, it, f, x, baseline - f.getAscent(), f.getHeight());
+        }
         g.setColor(color);
         g.setFont(f);
         g.drawString(s, x, baseline - f.getAscent());
@@ -697,6 +708,47 @@ public class DocumentView extends ScrollSurface implements TextInputClient {
             g.setColor(i.isSpelling() ? SPELLING_COLOR : GRAMMAR_COLOR);
             wave(g, x0, x1, y, amp);
         }
+    }
+
+    private void paintComments(Graphics g, LayoutItem it, Font f, int x, int y, int h) {
+        int p = paintOrder.indexOf(it.paragraphId);
+        int from = it.start;
+        int to = from + it.text.length();
+        for (Comment c : model.getDocument().comments) {
+            int[] r = DocumentModel.commentRange(c, paintOrder, p, Integer.MAX_VALUE);
+            if (r == null || r[1] <= from || r[0] >= to) {
+                continue;
+            }
+            int a = Math.max(r[0], from) - from;
+            int b = Math.min(r[1], to) - from;
+            int x0 = x + f.stringWidth(it.text.substring(0, a));
+            int x1 = x + f.stringWidth(it.text.substring(0, b));
+            g.setColor(c.resolved ? RESOLVED_COMMENT_COLOR : COMMENT_COLOR);
+            g.fillRect(x0, y, Math.max(1, x1 - x0), h);
+        }
+    }
+
+    /// The review comments over the caret.
+    ///
+    /// #### Returns
+    ///
+    /// the comments, empty when there is no caret
+    public List<Comment> getCommentsAtCaret() {
+        return caret == null ? new java.util.ArrayList<Comment>() : model.commentsAt(caret);
+    }
+
+    /// Adds a review comment over the selection, by the model's author.
+    ///
+    /// #### Parameters
+    ///
+    /// - `text`: the comment
+    ///
+    /// #### Returns
+    ///
+    /// the comment, or null when nothing is selected
+    public Comment commentSelection(String text) {
+        TextPosition[] sel = getSelection();
+        return sel == null ? null : model.addComment(sel[0], sel[1], text);
     }
 
     private static void wave(Graphics g, int x0, int x1, int y, int amp) {
@@ -963,7 +1015,12 @@ public class DocumentView extends ScrollSurface implements TextInputClient {
         }
         Paragraph p = model.findParagraph(caret.paragraphId);
         if (p != null && caret.offset < p.text.length()) {
-            setCaret(model.delete(caret, new TextPosition(caret.paragraphId, caret.offset + 1)));
+            TextPosition at = model.delete(caret,
+                    new TextPosition(caret.paragraphId, caret.offset + 1));
+            Paragraph after = model.findParagraph(caret.paragraphId);
+            // a tracked deletion stays in the text: step over it
+            boolean kept = after != null && after.text.length() == p.text.length();
+            setCaret(kept ? new TextPosition(at.paragraphId, at.offset + 1) : at);
         } else if (p != null) {
             List<String> ids = new java.util.ArrayList<String>();
             DocumentModel.collectIds(model.getDocument().blocks, ids);

@@ -52,6 +52,9 @@ public class DocumentModel {
     private int groupDepth;
     private boolean groupRecorded;
     private String typing;
+    private String author = "";
+    private Revision insertion;
+    private Revision deletion;
     private boolean autoRecalculate = true;
 
     /// A model holding a new empty document.
@@ -486,6 +489,9 @@ public class DocumentModel {
         Paragraph p = paragraph(at);
         int offset = clamp(at.offset, p);
         TextStyle s = style != null ? style : typingStyle(p, offset);
+        if (document.trackChanges) {
+            s = s.withRevision(revision(Revision.INSERT));
+        }
         RichText t = p.text.insert(offset, RichText.of(text, s));
         boolean wordEnd = text.indexOf(' ') >= 0 || text.indexOf('\n') >= 0 || text.length() > 1;
         replace(p.withText(t), wordEnd ? null : "type:" + p.id);
@@ -509,7 +515,11 @@ public class DocumentModel {
     public TextPosition insertObject(TextPosition at, Inline object) {
         Paragraph p = paragraph(at);
         int offset = clamp(at.offset, p);
-        RichText t = p.text.insert(offset, RichText.of(object, typingStyle(p, offset)));
+        TextStyle s = typingStyle(p, offset);
+        if (document.trackChanges) {
+            s = s.withRevision(revision(Revision.INSERT));
+        }
+        RichText t = p.text.insert(offset, RichText.of(object, s));
         replace(p.withText(t), null);
         return new TextPosition(p.id, offset + 1);
     }
@@ -551,6 +561,10 @@ public class DocumentModel {
         final TextPosition[] ends = order(from, to);
         final Paragraph a = paragraph(ends[0]);
         final int start = clamp(ends[0].offset, a);
+        if (document.trackChanges) {
+            trackedDelete(ends);
+            return new TextPosition(a.id, start);
+        }
         if (ends[0].paragraphId.equals(ends[1].paragraphId)) {
             int end = clamp(ends[1].offset, a);
             if (end > start) {
@@ -626,6 +640,296 @@ public class DocumentModel {
             replace(p.withText(p.text.restyle(a, b, mapper)), null);
             typing = null;
         }
+    }
+
+    // ------------------------------------------------------------------ revisions
+
+    /// The author recorded on tracked changes and new comments.
+    ///
+    /// #### Parameters
+    ///
+    /// - `value`: the author's name
+    public void setAuthor(String value) {
+        author = value == null ? "" : value;
+        insertion = null;
+        deletion = null;
+    }
+
+    /// The author recorded on tracked changes and new comments.
+    ///
+    /// #### Returns
+    ///
+    /// the name, possibly empty
+    public String getAuthor() {
+        return author;
+    }
+
+    /// Turns change tracking on or off. While it is on, inserted text is marked as an
+    /// insertion and deleted text stays in the document marked as a deletion, until the
+    /// revisions are accepted or rejected.
+    ///
+    /// #### Parameters
+    ///
+    /// - `value`: true to track changes
+    public void setTrackChanges(boolean value) {
+        if (value != document.trackChanges) {
+            setDocument(document.withTrackChanges(value));
+        }
+    }
+
+    private Revision revision(String kind) {
+        boolean insert = Revision.INSERT.equals(kind);
+        Revision r = insert ? insertion : deletion;
+        if (r == null) {
+            r = new Revision(newId('r'), kind, author, null);
+            if (insert) {
+                insertion = r;
+            } else {
+                deletion = r;
+            }
+        }
+        return r;
+    }
+
+    private void trackedDelete(TextPosition[] ends) {
+        List<String> order = new ArrayList<String>();
+        collectIds(document.blocks, order);
+        int ia = order.indexOf(ends[0].paragraphId);
+        int ib = order.indexOf(ends[1].paragraphId);
+        Revision del = revision(Revision.DELETE);
+        beginGroup();
+        try {
+            for (int i = ia; i <= ib && i >= 0; i++) {
+                Paragraph p = findParagraph(order.get(i));
+                int a = i == ia ? clamp(ends[0].offset, p) : 0;
+                int b = i == ib ? clamp(ends[1].offset, p) : p.text.length();
+                RichText t = markDeleted(p.text, a, b, del);
+                if (!t.equals(p.text)) {
+                    replaceParagraph(p.withText(t));
+                }
+            }
+        } finally {
+            endGroup();
+        }
+        typing = null;
+    }
+
+    /// Marks a range deleted: text inserted under tracking simply goes, other text is kept
+    /// marked as a deletion.
+    private static RichText markDeleted(RichText text, int start, int end, Revision del) {
+        RichText t = text;
+        for (int i = end - 1; i >= start; i--) {
+            Revision r = t.styleAt(i).revision;
+            if (r != null && !r.isDeletion()) {
+                t = t.delete(i, i + 1);
+            } else if (r == null) {
+                t = t.restyle(i, i + 1, new SetRevision(del));
+            }
+        }
+        return t;
+    }
+
+    private static final class SetRevision implements RichText.StyleMapper {
+        private final Revision revision;
+
+        SetRevision(Revision revision) {
+            this.revision = revision;
+        }
+
+        @Override
+        public TextStyle map(TextStyle s) {
+            return s.withRevision(revision);
+        }
+    }
+
+    /// Accepts tracked changes: insertions become ordinary text and deleted text goes.
+    ///
+    /// #### Parameters
+    ///
+    /// - `revisionId`: the revision to accept, or null for all of them
+    ///
+    /// #### Returns
+    ///
+    /// the number of characters changed
+    public int acceptRevisions(String revisionId) {
+        return resolveRevisions(revisionId, true);
+    }
+
+    /// Rejects tracked changes: inserted text goes and deletions become ordinary text again.
+    ///
+    /// #### Parameters
+    ///
+    /// - `revisionId`: the revision to reject, or null for all of them
+    ///
+    /// #### Returns
+    ///
+    /// the number of characters changed
+    public int rejectRevisions(String revisionId) {
+        return resolveRevisions(revisionId, false);
+    }
+
+    private int resolveRevisions(String revisionId, boolean accept) {
+        List<String> ids = new ArrayList<String>();
+        collectIds(document.blocks, ids);
+        int changed = 0;
+        beginGroup();
+        try {
+            for (String id : ids) {
+                Paragraph p = findParagraph(id);
+                RichText t = p.text;
+                for (int i = t.length() - 1; i >= 0; i--) {
+                    Revision r = t.styleAt(i).revision;
+                    if (r == null || revisionId != null && !revisionId.equals(r.id)) {
+                        continue;
+                    }
+                    changed++;
+                    if (accept == r.isDeletion()) {
+                        t = t.delete(i, i + 1);
+                    } else {
+                        t = t.restyle(i, i + 1, new SetRevision(null));
+                    }
+                }
+                if (!t.equals(p.text)) {
+                    replaceParagraph(p.withText(t));
+                }
+            }
+        } finally {
+            endGroup();
+        }
+        typing = null;
+        return changed;
+    }
+
+    /// The distinct tracked changes in the document, in document order.
+    ///
+    /// #### Returns
+    ///
+    /// the revisions
+    public List<Revision> getRevisions() {
+        List<String> ids = new ArrayList<String>();
+        collectIds(document.blocks, ids);
+        List<Revision> out = new ArrayList<Revision>();
+        for (String id : ids) {
+            RichText t = findParagraph(id).text;
+            for (int i = 0; i < t.runCount(); i++) {
+                Revision r = t.runStyle(i).revision;
+                if (r != null && !out.contains(r)) {
+                    out.add(r);
+                }
+            }
+        }
+        return out;
+    }
+
+    // ------------------------------------------------------------------ comments
+
+    /// Adds a review comment over a range, by the current author.
+    ///
+    /// #### Parameters
+    ///
+    /// - `from`: one end of the range
+    ///
+    /// - `to`: the other end
+    ///
+    /// - `text`: the comment
+    ///
+    /// #### Returns
+    ///
+    /// the new comment
+    public Comment addComment(TextPosition from, TextPosition to, String text) {
+        TextPosition[] ends = order(from, to);
+        Comment c = new Comment(newId('c'), author, null, text, false, ends[0].paragraphId,
+                ends[0].offset, ends[1].paragraphId, ends[1].offset);
+        List<Comment> list = new ArrayList<Comment>(document.comments);
+        list.add(c);
+        setDocument(document.withComments(list));
+        typing = null;
+        return c;
+    }
+
+    /// Removes a review comment.
+    ///
+    /// #### Parameters
+    ///
+    /// - `id`: the comment's id
+    ///
+    /// #### Returns
+    ///
+    /// true when there was one
+    public boolean removeComment(String id) {
+        List<Comment> list = new ArrayList<Comment>(document.comments);
+        for (int i = 0; i < list.size(); i++) {
+            if (list.get(i).id.equals(id)) {
+                list.remove(i);
+                setDocument(document.withComments(list));
+                typing = null;
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// Marks a review comment resolved or open again.
+    ///
+    /// #### Parameters
+    ///
+    /// - `id`: the comment's id
+    ///
+    /// - `resolved`: the new state
+    ///
+    /// #### Returns
+    ///
+    /// true when there was such a comment
+    public boolean setCommentResolved(String id, boolean resolved) {
+        List<Comment> list = new ArrayList<Comment>(document.comments);
+        for (int i = 0; i < list.size(); i++) {
+            Comment c = list.get(i);
+            if (c.id.equals(id)) {
+                if (c.resolved != resolved) {
+                    list.set(i, c.withResolved(resolved));
+                    setDocument(document.withComments(list));
+                    typing = null;
+                }
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// The comments whose range holds a position.
+    ///
+    /// #### Parameters
+    ///
+    /// - `at`: the position
+    ///
+    /// #### Returns
+    ///
+    /// the comments, in document order
+    public List<Comment> commentsAt(TextPosition at) {
+        List<Comment> out = new ArrayList<Comment>();
+        if (document.comments.isEmpty()) {
+            return out;
+        }
+        List<String> ids = new ArrayList<String>();
+        collectIds(document.blocks, ids);
+        int p = ids.indexOf(at.paragraphId);
+        for (Comment c : document.comments) {
+            int[] r = commentRange(c, ids, p, Integer.MAX_VALUE);
+            if (r != null && at.offset >= r[0] && at.offset <= r[1]) {
+                out.add(c);
+            }
+        }
+        return out;
+    }
+
+    /// The part of a comment's range inside the paragraph at an index of the document order.
+    static int[] commentRange(Comment c, List<String> ids, int p, int length) {
+        int s = ids.indexOf(c.startId);
+        int e = ids.indexOf(c.endId);
+        if (p < 0 || s < 0 || e < 0 || p < s || p > e) {
+            return null;
+        }
+        return new int[] {p == s ? c.start : 0, p == e ? c.end : length};
     }
 
     private String nextId() {

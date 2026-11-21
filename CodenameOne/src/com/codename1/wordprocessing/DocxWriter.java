@@ -320,7 +320,7 @@ final class DocxWriter {
                 esc(b, c.author);
                 b.append('"');
             }
-            if (c.date != null) {
+            if (c.date != null && c.date.length() > 0) {
                 b.append(" w:date=\"");
                 esc(b, c.date);
                 b.append('"');
@@ -491,7 +491,7 @@ final class DocxWriter {
                 esc(b, rev.author);
                 b.append('"');
             }
-            if (rev.date != null) {
+            if (rev.date != null && rev.date.length() > 0) {
                 b.append(" w:date=\"");
                 esc(b, rev.date);
                 b.append('"');
