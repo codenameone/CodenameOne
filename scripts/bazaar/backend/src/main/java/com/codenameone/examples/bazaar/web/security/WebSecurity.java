@@ -34,7 +34,9 @@ import com.codename1.backend.security.SecurityExchange;
 import com.codename1.backend.security.SecurityFilter;
 import com.codename1.backend.security.SecurityFilterChain;
 import com.codename1.backend.security.SessionCreationPolicy;
+import com.codename1.backend.security.mfa.JdbcRecoveryCodeRepository;
 import com.codename1.backend.security.mfa.JdbcTotpRepository;
+import com.codename1.backend.security.mfa.RecoveryCodeService;
 import com.codename1.backend.security.mfa.TotpService;
 import com.codename1.backend.security.ratelimit.RateLimitKeys;
 import com.codenameone.examples.bazaar.Roles;
@@ -76,6 +78,14 @@ public class WebSecurity {
         return new TotpService(JdbcTotpRepository.fromConfig(db, config), "Bazaar");
     }
 
+    /// Ten single-use codes for a lost authenticator app, hashed in the security
+    /// schema's table. The second-factor page accepts one in place of a code;
+    /// the account's security page makes them.
+    @Bean
+    public RecoveryCodeService recoveryCodes(DataSource db) {
+        return new RecoveryCodeService(new JdbcRecoveryCodeRepository(db));
+    }
+
     @Bean
     @Order(0)
     public SecurityFilterChain assetChain(HttpSecurity http) throws IOException {
@@ -89,7 +99,8 @@ public class WebSecurity {
 
     @Bean
     @Order(3)
-    public SecurityFilterChain webAppChain(HttpSecurity http, TotpService totp, final Throttle throttle,
+    public SecurityFilterChain webAppChain(HttpSecurity http, TotpService totp,
+            RecoveryCodeService recoveryCodes, final Throttle throttle,
             @Value("${bazaar.web.hsts:true}") boolean hsts) throws IOException {
         final SavedRequestAwareAuthenticationSuccessHandler saved =
                 new SavedRequestAwareAuthenticationSuccessHandler();
@@ -130,7 +141,7 @@ public class WebSecurity {
                                 .header("Location", SIGN_IN + "?error=1")
                                 .header("Cache-Control", "no-store");
                     }))
-            .mfa(mfa -> mfa.totpService(totp)
+            .mfa(mfa -> mfa.totpService(totp).recoveryCodeService(recoveryCodes)
                     .secondFactorPage(SECOND_FACTOR)
                     .processingUrl(SECOND_FACTOR)
                     .defaultSuccessUrl("/account"))

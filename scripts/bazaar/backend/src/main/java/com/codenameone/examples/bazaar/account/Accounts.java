@@ -471,6 +471,16 @@ public class Accounts {
         }
     }
 
+    /// Whether `password` is `username`'s current one: the re-authentication
+    /// the web account asks for before turning off a second factor.
+    public boolean checkPassword(String username, String password) {
+        if (password == null || password.length() == 0 || username == null
+                || !users.userExists(username)) {
+            return false;
+        }
+        return encoder.matches(password, users.loadUserByUsername(username).getPassword());
+    }
+
     private UserDetails load(String username) {
         if (username == null || !users.userExists(username)) {
             throw new ResponseStatusException(404, "No such account");

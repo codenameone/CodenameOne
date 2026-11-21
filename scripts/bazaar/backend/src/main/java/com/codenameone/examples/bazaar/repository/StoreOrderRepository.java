@@ -19,6 +19,7 @@
 
 package com.codenameone.examples.bazaar.repository;
 
+import com.codename1.orm.repository.PageRequest;
 import com.codename1.orm.repository.CrudRepository;
 import com.codename1.orm.repository.Query;
 import com.codename1.orm.repository.Param;
@@ -60,4 +61,6 @@ public interface StoreOrderRepository extends CrudRepository<StoreOrder, String>
     List<StoreOrder> findByStoreIdAndCreatedAtGreaterThanEqual(String storeId, Instant since);
 
     List<StoreOrder> findByCreatedAtGreaterThanEqual(Instant since);
+    /// A page of a shopper's orders, newest first (index `store_order_username_created_at`).
+    List<StoreOrder> findByUsernameOrderByCreatedAtDesc(String username, PageRequest page);
 }

@@ -110,7 +110,7 @@ public class SiteUrls {
     }
 
     /// Percent-encodes everything but unreserved ASCII.
-    static String encode(String value) {
+    public static String encode(String value) {
         StringBuilder out = new StringBuilder();
         byte[] bytes;
         try {

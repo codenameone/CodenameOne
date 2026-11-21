@@ -47,4 +47,6 @@ public interface StockAlertRepository extends CrudRepository<StockAlert, String>
     @Query("update StockAlert a set a.status = 'READY' where a.variantId = :variantId "
             + "and a.status = 'WAITING'")
     int ready(@Param("variantId") String variantId);
+    /// A shopper's own alerts, newest first (index `stock_alert_username_created_at`).
+    List<StockAlert> findByUsernameOrderByCreatedAtDesc(String username);
 }

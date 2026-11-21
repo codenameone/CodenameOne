@@ -32,4 +32,6 @@ public interface ReviewRepository extends CrudRepository<Review, String> {
     List<Review> findByStoreIdOrderByCreatedAtDesc(String storeId);
 
     Review findByProductIdAndUsername(String productId, String username);
+    /// A shopper's own reviews, newest first (index `review_username_created_at`).
+    List<Review> findByUsernameOrderByCreatedAtDesc(String username);
 }

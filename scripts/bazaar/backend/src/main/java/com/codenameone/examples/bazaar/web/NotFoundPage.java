@@ -24,11 +24,11 @@ import java.io.IOException;
 
 /// The storefront's 404 page: [ErrorPages]'s, a constant that shows nothing of
 /// the request.
-final class NotFoundPage {
+public final class NotFoundPage {
     private NotFoundPage() {
     }
 
-    static HttpServer.Response response() throws IOException {
+    public static HttpServer.Response response() throws IOException {
         return ErrorPages.response(404);
     }
 }

@@ -28,6 +28,7 @@ import com.codenameone.examples.bazaar.Roles;
 import com.codenameone.examples.bazaar.account.Accounts;
 import com.codenameone.examples.bazaar.api.StoreRoleDto;
 import com.codenameone.examples.bazaar.store.Stores;
+import com.codenameone.examples.bazaar.web.account.WebSessions;
 import com.codenameone.examples.bazaar.web.security.WebHeaders;
 
 import java.io.IOException;
@@ -58,6 +59,10 @@ public class WebPages {
         {"Addresses", "/account/addresses", "a"},
         {"Wishlist", "/account/wishlist", "w"},
         {"Reviews", "/account/reviews", "r"},
+        {"Loyalty", "/account/loyalty", "l"},
+        {"Clubs", "/account/clubs", "c"},
+        {"Stock alerts", "/account/alerts", "k"},
+        {"Marketing", "/account/marketing", "m"},
         {"Security", "/account/security", "s"},
     };
     /// Platform sections.
@@ -69,10 +74,12 @@ public class WebPages {
 
     private final Accounts accounts;
     private final Stores stores;
+    private final WebSessions sessions;
 
-    public WebPages(Accounts accounts, Stores stores) {
+    public WebPages(Accounts accounts, Stores stores, WebSessions sessions) {
         this.accounts = accounts;
         this.stores = stores;
+        this.sessions = sessions;
     }
 
     /// A shell for a page nobody needs to be signed in to see (signing in).
@@ -94,6 +101,9 @@ public class WebPages {
         s.heading = title;
         s.nonce = WebHeaders.currentNonce();
         String me = Caller.name();
+        // Every signed-in page records its session, and refuses one that was
+        // signed out from the security page.
+        sessions.touch(request, me);
         s.signedIn = true;
         s.user = accounts.describe(me).displayName();
         s.merchant = Caller.hasRole(Roles.MERCHANT);

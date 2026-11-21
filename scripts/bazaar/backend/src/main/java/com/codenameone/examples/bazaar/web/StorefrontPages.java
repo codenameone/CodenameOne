@@ -618,7 +618,7 @@ public class StorefrontPages {
         return "relevance";
     }
 
-    static String storeUrl(String handle) {
+    public static String storeUrl(String handle) {
         return "/s/" + SiteUrls.encode(handle);
     }
 
