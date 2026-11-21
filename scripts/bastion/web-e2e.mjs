@@ -666,6 +666,10 @@ async function guideTour() {
     await waitFor(section, stepSeconds, textOnScreen(pattern));
     await page.waitForTimeout(500);
     await shot(name);
+    // The audit events are a DataGrid; the guide shows it by its own name.
+    if (name === 'bastion-console-audit-chain') {
+      await shot('bastion-audit-grid');
+    }
   }
   await press('General ledger');
   // Maker: an adjustment over the four-eyes threshold waits for a second
@@ -716,9 +720,28 @@ async function guideTour() {
   await shot('bastion-console-phone');
 }
 
+/// BASTION_WEB_AUDIT_ONLY=1 (with BASTION_WEB_TOUR) retakes the audit grid's
+/// picture alone: an administrator opens the audit chain page. It needs no
+/// customer onboarding, so it does not depend on the rest of the run.
+async function auditGridOnly() {
+  fs.mkdirSync(tour, { recursive: true });
+  await signInStaff('admin@bastion.example', { width: 1440, height: 900 });
+  await waitFor('the console', stepSeconds, textOnScreen(/Awaiting approval/));
+  await press('Audit chain');
+  await waitFor('the audit chain', stepSeconds, textOnScreen(/Links checked/));
+  await page.waitForTimeout(1000);
+  await shot('bastion-audit-grid');
+}
+
 let failed = null;
 try {
   say('opening ' + url);
+  if (process.env.BASTION_WEB_AUDIT_ONLY) {
+    await auditGridOnly();
+    await browser.close();
+    say('passed');
+    process.exit(0);
+  }
   await newPage();
   const first = await page.goto(url, { waitUntil: 'load' });
   if (!first || first.status() !== 200) {
