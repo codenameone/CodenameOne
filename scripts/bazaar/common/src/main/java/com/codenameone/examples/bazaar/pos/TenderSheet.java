@@ -165,7 +165,53 @@ final class TenderSheet {
     }
 
     /// A simulated terminal: "present the card", a moment, approved.
+    /// The tip presets of the store's policy, or 15, 18 and 20%.
+    static long[] tipPresets() {
+        long[] bp = PosState.tipPresets();
+        return bp == null || bp.length == 0 ? new long[] {1500, 1800, 2000} : bp;
+    }
+
+    /// Asks for a tip before the card is charged: a preset share of the
+    /// total, a typed amount, or none.
     private void card() {
+        if (tenders.remaining() <= 0) {
+            return;
+        }
+        final Sheet ask = new Sheet(sheet, Lang.tr("Add a tip?"));
+        ask.setName("pos-tip");
+        Container c = ask.getContentPane();
+        c.setLayout(BoxLayout.y());
+        long[] presets = tipPresets();
+        Container row = new Container(new GridLayout(1, presets.length));
+        for (int iter = 0; iter < presets.length; iter++) {
+            final long cents = PosCart.tipFor(totals.totalCents, presets[iter]);
+            row.add(PosUi.key(presets[iter] / 100 + "% " + PosState.money(cents),
+                    "pos-tip-" + presets[iter], "PosKey", e -> {
+                        ask.back();
+                        charge(cents);
+                    }));
+        }
+        c.add(row);
+        c.add(PosUi.key(Lang.tr("Custom tip"), "pos-tip-custom", "PosChoice",
+                e -> SellScreen.askAmount("Tip", false, cents -> {
+                    ask.back();
+                    charge(cents);
+                })));
+        c.add(PosUi.key(Lang.tr("No tip"), "pos-tip-none", "PosChoice", e -> {
+            ask.back();
+            charge(0);
+        }));
+        ask.show();
+    }
+
+    private void charge(long tipCents) {
+        String refused = tenders.tip(tipCents);
+        if (refused != null) {
+            Ui.say(refused);
+            return;
+        }
+        PosState.cart().setTipCents(tipCents);
+        refresh();
         final long amount = tenders.remaining();
         if (amount <= 0) {
             return;
@@ -251,7 +297,7 @@ final class TenderSheet {
         PosSaleDto sale = new PosSaleDto(UUID.randomUUID().toString(), PosState.shiftId(),
                 cu == null ? "" : cu.id(), cu == null || cu.email() == null ? "" : cu.email(),
                 cart.code(), cart.note(), System.currentTimeMillis(), cart.uploadLines(),
-                tenders.list());
+                tenders.list(), PosState.staffUsername(), cart.tipCents(), cart.approvalId());
         Receipt receipt = Receipt.of(sale, cart, totals, tenders.change());
         PosState.recordSale(sale);
         cart.clear();

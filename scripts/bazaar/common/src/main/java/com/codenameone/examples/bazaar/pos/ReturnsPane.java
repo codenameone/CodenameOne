@@ -186,7 +186,7 @@ final class ReturnsPane {
             return;
         }
         Api.pos().counterReturn(PosState.storeId(), PosState.registerId(), o.id(),
-                new PosReturnDto(PosState.shiftId(), picked, to, "Counter return", restock),
+                new PosReturnDto(PosState.shiftId(), picked, to, "Counter return", restock, ""),
                 Net.to(r -> {
                     result.removeAll();
                     result.add(PosUi.data(Lang.tr("Refunded {0}", PosState.money(r.refundCents())),

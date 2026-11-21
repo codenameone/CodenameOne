@@ -212,8 +212,8 @@ class PosLogicTest {
 
     private static PosSaleDto sale(String id, String variant, int q) {
         return new PosSaleDto(id, "shift", "", "", "", "", 1L,
-                Arrays.asList(new PosLineDto(variant, q, 1000)),
-                Arrays.asList(new PosTenderDto("CASH", 2000, "")));
+                Arrays.asList(new PosLineDto(variant, q, 1000, "", true, false)),
+                Arrays.asList(new PosTenderDto("CASH", 2000, "")), "", 0L, "");
     }
 
     private static PosSaleResultDto result(String id, String status) {
@@ -292,8 +292,8 @@ class PosLogicTest {
         PosCatalogDto merged = Snapshot.merge(held, fresh, unsynced);
         assertEquals(2, Snapshot.item(merged, "1").available());
         assertEquals(1100, Snapshot.item(merged, "1").priceCents());
-        PosCatalogDto after = Snapshot.sold(held, Arrays.asList(new PosLineDto("1", 7, 0),
-                new PosLineDto("2", 3, 0)));
+        PosCatalogDto after = Snapshot.sold(held, Arrays.asList(new PosLineDto("1", 7, 0, "", true, false),
+                new PosLineDto("2", 3, 0, "", true, false)));
         assertEquals(-2, Snapshot.item(after, "1").available());
         assertEquals(0, Snapshot.item(after, "2").available());
         assertEquals(1, Snapshot.products(after.items()).size());

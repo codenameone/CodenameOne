@@ -151,6 +151,7 @@ public class OrderEdits {
         long total;
         long delta;
         String settlement = NONE;
+        boolean capture;
         String reference = "";
         final StringBuilder summary = new StringBuilder();
     }
@@ -159,6 +160,10 @@ public class OrderEdits {
             OrderEditDto edit) throws IOException {
         Plan plan = plan(username, storeId, orderId, edit);
         String editId = Ids.next();
+        if (plan.capture
+                && !Orders.PAID.equals(orderService.capturePayment(orderId, username))) {
+            throw new ResponseStatusException(402, "The card hold could not be taken");
+        }
         settle(plan, edit, editId, username);
         write(plan, edit, editId, username);
         orderService.publish(orders.findById(orderId));
@@ -212,7 +217,8 @@ public class OrderEdits {
         if (plan.layaway != null && !Layaways.OPEN.equals(plan.layaway.getStatus())) {
             throw new ResponseStatusException(409, "That layaway is " + plan.layaway.getStatus());
         }
-        boolean paid = Orders.PAID.equals(o.getFinancial())
+        boolean held = Orders.AUTHORIZED.equals(o.getFinancial());
+        boolean paid = held || Orders.PAID.equals(o.getFinancial())
                 || Orders.PARTIALLY_REFUNDED.equals(o.getFinancial());
         plan.counter = Orders.POS.equals(o.getChannel()) && Orders.CLOSED.equals(o.getStatus());
         plan.store = stores.findById(storeId);
@@ -292,9 +298,6 @@ public class OrderEdits {
                             "More was paid toward the layaway than the new total");
                 }
                 plan.settlement = LAYAWAY;
-            } else if (Orders.AUTHORIZED.equals(o.getFinancial())) {
-                throw new ResponseStatusException(409,
-                        "Capture or release the card hold before changing the total");
             } else if (paid && plan.delta > 0) {
                 PosTenderDto c = edit.collect();
                 if (c == null || c.kind() == null) {
@@ -311,11 +314,16 @@ public class OrderEdits {
             } else if (paid) {
                 Payment p = paymentRows.findById(orderId);
                 boolean refundable = p != null && (Payments.PAID.equals(p.getStatus())
+                        || held && Payments.AUTHORIZED.equals(p.getStatus())
                         || Payments.PARTIALLY_REFUNDED.equals(p.getStatus()))
                         && p.getAmountCents() - p.getRefundedCents() >= -plan.delta;
                 plan.settlement = refundable ? ORIGINAL : CASH;
             }
         }
+        // A card still on hold is taken first, at the amount it was held for,
+        // and the difference then moves like any paid order's: the provider
+        // has no way to change a hold's amount.
+        plan.capture = held && plan.delta != 0 && plan.layaway == null;
         return plan;
     }
 

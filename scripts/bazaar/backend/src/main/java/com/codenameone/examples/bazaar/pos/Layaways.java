@@ -293,7 +293,7 @@ public class Layaways {
     public LayawayDto pay(String username, String storeId, String layawayId, PosTenderDto t)
             throws IOException {
         payTx(username, storeId, layawayId, t);
-        return read(layaway(storeId, layawayId).getId());
+        return layaway(username, storeId, layawayId);
     }
 
     @Transactional(rollbackFor = IOException.class)
@@ -322,7 +322,7 @@ public class Layaways {
     public LayawayDto cancel(String username, String storeId, String layawayId,
             LayawayCancelDto req) throws IOException {
         cancelTx(username, storeId, layawayId, req);
-        return read(layaway(storeId, layawayId).getId());
+        return layaway(username, storeId, layawayId);
     }
 
     @Transactional(rollbackFor = IOException.class)

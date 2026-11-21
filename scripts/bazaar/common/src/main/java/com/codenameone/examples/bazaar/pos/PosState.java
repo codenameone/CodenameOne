@@ -25,6 +25,7 @@ import com.codename1.mapping.Mappers;
 import com.codenameone.examples.bazaar.api.CollectionDto;
 import com.codenameone.examples.bazaar.api.PosCatalogDto;
 import com.codenameone.examples.bazaar.api.PosSaleDto;
+import com.codenameone.examples.bazaar.api.PosPolicyDto;
 import com.codenameone.examples.bazaar.api.PosSessionDto;
 import com.codenameone.examples.bazaar.api.ShiftDto;
 import com.codenameone.examples.bazaar.merchant.MerchantState;
@@ -138,6 +139,13 @@ public final class PosState {
     }
 
     // ---------------------------------------------------------------- session
+
+    /// Who made the sale: the cashier signed in with their PIN, or "" for
+    /// the device's own account.
+    public static String staffUsername() {
+        PosSessionDto s = session();
+        return s == null || s.username() == null ? "" : s.username();
+    }
 
     /// The cashier signed in at this register, or null.
     public static PosSessionDto session() {
@@ -412,6 +420,55 @@ public final class PosState {
         for (int iter = 0; iter < copy.size(); iter++) {
             copy.get(iter).run();
         }
+    }
+
+    // ----------------------------------------------------------------- policy
+
+    /// The tip presets of the store's policy as last fetched, in basis
+    /// points; empty when never fetched.
+    public static long[] tipPresets() {
+        Object stored = read(key("tips"));
+        return parseBp(stored instanceof String ? (String) stored : "");
+    }
+
+    /// Keeps the store's point-of-sale policy for offline use.
+    public static void policy(PosPolicyDto p) {
+        if (p == null) {
+            return;
+        }
+        StringBuilder b = new StringBuilder();
+        long[] all = {p.tip1Bp(), p.tip2Bp(), p.tip3Bp()};
+        for (int iter = 0; iter < all.length; iter++) {
+            if (all[iter] > 0) {
+                b.append(b.length() > 0 ? "," : "").append(all[iter]);
+            }
+        }
+        write(key("tips"), b.toString());
+    }
+
+    /// Basis points separated by commas; anything else is skipped.
+    static long[] parseBp(String text) {
+        List<Long> out = new ArrayList<Long>();
+        long n = 0;
+        boolean digits = false;
+        for (int iter = 0; iter <= text.length(); iter++) {
+            char ch = iter == text.length() ? ',' : text.charAt(iter);
+            if (ch >= '0' && ch <= '9' && n < 100000) {
+                n = n * 10 + (ch - '0');
+                digits = true;
+            } else if (ch == ',') {
+                if (digits && n > 0 && n <= 10000) {
+                    out.add(Long.valueOf(n));
+                }
+                n = 0;
+                digits = false;
+            }
+        }
+        long[] bp = new long[out.size()];
+        for (int iter = 0; iter < bp.length; iter++) {
+            bp[iter] = out.get(iter).longValue();
+        }
+        return bp;
     }
 
     // ---------------------------------------------------------------- storage

@@ -35,11 +35,30 @@ public final class Tenders {
     public static final String GIFT_CARD = "GIFT_CARD";
     public static final String STORE_CREDIT = "STORE_CREDIT";
 
-    private final long due;
+    private long due;
+    private long tip;
     private final List<PosTenderDto> tenders = new ArrayList<PosTenderDto>();
 
     public Tenders(long dueCents) {
         this.due = Math.max(0, dueCents);
+    }
+
+    /// Adds a tip to what is due. The server takes a tip only on the card,
+    /// so it is set just before the card is charged, once.
+    public String tip(long cents) {
+        if (cents < 0) {
+            return "A tip cannot be negative";
+        }
+        if (has(CARD)) {
+            return "The card was charged already";
+        }
+        due += cents - tip;
+        tip = cents;
+        return null;
+    }
+
+    public long tipCents() {
+        return tip;
     }
 
     public long due() {

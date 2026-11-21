@@ -74,6 +74,8 @@ public final class PosCart {
     private String code = "";
     private PosCustomerDto customer;
     private String note = "";
+    private long tipCents;
+    private String approvalId = "";
 
     public List<Item> items() {
         return items;
@@ -99,7 +101,7 @@ public final class PosCart {
         }
         for (int iter = 0; iter < items.size(); iter++) {
             Item i = items.get(iter);
-            if (i.item.variantId().equals(item.variantId()) && !i.discounted()) {
+            if (!custom(item) && i.item.variantId().equals(item.variantId()) && !i.discounted()) {
                 i.quantity += quantity;
                 return i;
             }
@@ -191,8 +193,54 @@ public final class PosCart {
         this.note = note == null ? "" : note;
     }
 
+    /// A tip taken on the card, on top of the total.
+    public long tipCents() {
+        return tipCents;
+    }
+
+    public void setTipCents(long tipCents) {
+        this.tipCents = Math.max(0, tipCents);
+    }
+
+    /// The tip for a preset: `bp` basis points of `totalCents`, half even.
+    public static long tipFor(long totalCents, long bp) {
+        return PosPricing.basisPoints(totalCents, bp);
+    }
+
+    /// A manager's approval for this sale, or "".
+    public String approvalId() {
+        return approvalId;
+    }
+
+    public void setApprovalId(String approvalId) {
+        this.approvalId = approvalId == null ? "" : approvalId;
+    }
+
+    /// A line with no catalog variant: a title and a price typed at the
+    /// register.
+    public static boolean custom(PosItemDto item) {
+        return item.variantId() == null || item.variantId().length() == 0;
+    }
+
+    /// A custom sale item: not in the catalog, never counted against stock.
+    public static PosItemDto customItem(String title, long priceCents, boolean taxable) {
+        return new PosItemDto("", "", title, "", "", "", priceCents, 0, taxable, false, 0, "");
+    }
+
+    /// Whether a line's price was changed or discounted by hand.
+    public boolean overridden() {
+        for (int iter = 0; iter < items.size(); iter++) {
+            if (items.get(iter).discounted()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     public void clear() {
         items.clear();
+        tipCents = 0;
+        approvalId = "";
         orderPercentBp = 0;
         orderAmountCents = 0;
         code = "";
@@ -266,8 +314,9 @@ public final class PosCart {
         long[] units = unitPrices();
         List<PosLineDto> out = new ArrayList<PosLineDto>();
         for (int iter = 0; iter < items.size(); iter++) {
-            out.add(new PosLineDto(items.get(iter).item.variantId(), items.get(iter).quantity,
-                    units[iter]));
+            Item it = items.get(iter);
+            out.add(new PosLineDto(it.item.variantId(), it.quantity, units[iter],
+                    custom(it.item) ? it.item.title() : "", it.item.taxable(), it.discounted()));
         }
         return out;
     }

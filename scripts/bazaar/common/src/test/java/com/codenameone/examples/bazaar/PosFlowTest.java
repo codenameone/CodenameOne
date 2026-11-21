@@ -87,11 +87,11 @@ public class PosFlowTest extends E2e {
             }
         });
         List<PosLineDto> lines = new ArrayList<PosLineDto>();
-        lines.add(new PosLineDto(Actor.text(item, "variantId"), 1, price));
+        lines.add(new PosLineDto(Actor.text(item, "variantId"), 1, price, "", true, false));
         List<PosTenderDto> tenders = new ArrayList<PosTenderDto>();
         tenders.add(new PosTenderDto("CASH", price * 2 + 1000, ""));
         PosSaleDto sale = new PosSaleDto("e2e-" + System.currentTimeMillis(), shiftId, null, null,
-                null, "", System.currentTimeMillis(), lines, tenders);
+                null, "", System.currentTimeMillis(), lines, tenders, "", 0L, "");
         outbox.add(sale);
         assertEqual(1, outbox.pending(), "the offline sale waits in the outbox");
 
