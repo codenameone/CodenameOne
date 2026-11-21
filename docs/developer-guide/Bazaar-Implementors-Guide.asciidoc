@@ -313,8 +313,162 @@ pages and the per-visitor pages out of indexes, and `/sitemap.xml` lists every
 active store, published collection and active product with when it last changed.
 Pages that are the same for every visitor are sent with
 `Cache-Control: public, max-age=60, stale-while-revalidate=600`, so a cache in
-front of the server can absorb a crawl. Checkout hands over to the app hosted on
-the same server, which picks up the same cart.
+front of the server can absorb a crawl. Checkout runs on the same pages; see <<bazaar-web>>.
+
+[[bazaar-web]]
+=== The web application
+
+Beside the server-rendered storefront, the backend serves a full web version of
+the account area, the back office and checkout. The code is under
+`backend/src/main/java/.../bazaar/web`: `account` (the shopper's account), `admin`
+(the back office, one `*Pages` controller per area: commerce, B2B accounts,
+marketing, global selling, online store, operations), `auth` (sign-in and sign-up),
+`slots` (app slots and consent), `table` (the sortable, exportable data table) and
+`security`. Pages are compiled templates; small interactions, such as moving a
+card on a board or refreshing delivery rates, use htmx and fall back to a plain
+form post. Every page calls the same services the app's REST endpoints call, so a
+rule is enforced once.
+
+*Security.* `WebSecurity` adds three filter chains beside the app's own:
+fingerprinted assets under `/static/**` cached as immutable; signed-in pages with
+a session cookie, CSRF tokens, session id rotation at sign-in, an optional TOTP
+second step, sign-out by POST only, and rate limits per address plus a lockout per
+account (`Throttle`); and the public storefront. Signed-in pages carry a
+per-request CSP nonce. Public pages carry none, so they can be cached: their one
+inline style is allowed by its hash, which the build writes into `InlineHashes`.
+`ErrorPages` answers every failure, including a CSRF refusal or a rate limit, with
+a constant page that echoes nothing of the request. `Uploads` sniffs an image's
+format from its bytes, caps size and dimensions before decoding, and keeps only
+the re-encoded pixels. `UrlGuard` refuses webhook targets on private or loopback
+addresses.
+
+*Bot guard.* `BotGuard` protects sign-in and placing an order without a
+third-party CAPTCHA: a hidden honeypot field, a form timestamp signed with a
+per-process key that must be older than `bazaar.bot.min-fill-ms` and younger
+than six hours, and the throttle.
+
+*App slots.* `Slots` lets the store owner, and only the owner, place script
+snippets and widgets at named places of the storefront. A page widens its CSP by
+exactly the hosts of the snippets it prints, never a wildcard or
+`'unsafe-inline'`, and mixes the slot version into its ETag. A widget's HTML is
+framed from `/w/{id}` in a sandbox, never in the storefront's origin. Each slot
+names a consent category, and `Consent` (the `bz_consent` cookie) decides whether
+it loads. Every edit is audited.
+
+*Checkout.* `/s/{handle}/checkout` calls `Checkouts.place` with an idempotency key
+from the page, so a double submit places one order. The confirmation page opens
+for the account that placed the order, or with a link token derived from the
+order, which is how a guest returns to it. A cart reminder links back with a
+recovery token that `Carts.recover` turns into that cart in the new session.
+
+[[bazaar-online-store]]
+=== The online store
+
+The `content` package holds what a merchant edits about the storefront itself:
+
+* `Themes`: a draft and a live theme. Every value is a key from a safe list or a
+  checked `#rrggbb` color, mapped to classes in `web-src/shop.css`, because the
+  public pages allow no inline style; nothing a merchant types reaches CSS. A
+  preview is an address signed with the store and an expiry, valid for an hour.
+* `Pages` and `RichText`: pages, the four policies and blog posts, sanitized when
+  saved, so what is stored is already clean.
+* `Navigation`: the `main` and `footer` menus, two levels deep, and the redirect
+  table. `web.StorefrontRedirects` follows a redirect only where the storefront
+  would answer 404, so a redirect never hides a live page, and only within the
+  store named in the path. Chains and loops are refused when saved.
+* `Metafields`: typed fields on products, variants, collections, customers and
+  orders, and metaobject types whose entries a field can reference. Values are
+  checked when written and stored as text plus a number, so they sort without
+  parsing.
+
+`web.StorefrontFeeds` serves product feeds per market as Google Merchant RSS and
+CSV, priced exactly as that market's storefront, and the blog as Atom and RSS,
+each with an ETag. `web.StorefrontMarkets` chooses the market from `?market=`
+(a cacheable address of its own, advertised with `hreflang`) or the shopper's
+cookie (which makes the page private), and the language from the market or
+`Accept-Language`.
+
+[[bazaar-markets]]
+=== Markets, tax and risk
+
+`market.Markets` prices a variant for a market from a fixed price, or else the
+store price at the merchant's own exchange rate plus an adjustment in basis
+points, rounded as the market asks, all in integer cents. Only two-decimal
+currencies are supported. When a shopper checks out in a market, prices are
+worked out in the store's currency and the amount due is converted at the rate
+the page showed, locked for the order. The order keeps both its totals in the
+store's currency and the presentment currency, total and rate, and refunds go
+back in what was charged. `market.Translations` answers each field from the exact
+locale, then its language, then the original. Duty estimates come from customs
+codes and the longest matching prefix in the merchant's duty table.
+
+`taxes.TaxExemptions` removes tax from a quote to a region a customer's
+certificate covers, and records the certificate on the order for the tax report.
+A store whose prices include tax refunds the tax portion instead, so lines and
+totals still agree.
+
+`risk.Fraud` scores each online order once its payment is held: order value,
+velocity, recent refused payments, an unusual delivery country, and a mismatch
+between delivery country and the client's country, read from a header a trusted
+proxy sets (`bazaar.risk.country-header`). Sixty points or more holds the order,
+and `RiskHolds` makes fulfilment refuse it until a manager approves or cancels.
+No single rule holds an order. `dispute.Disputes` takes the processor's signed,
+idempotent webhook events and moves a dispute from needs-response through review
+to won or lost, refusing evidence after the deadline.
+
+[[bazaar-growth]]
+=== Marketing, subscriptions and B2B
+
+The jobs in these packages share one pattern: each step is a conditional update
+on the state it starts from, so a restart or a second server never repeats one.
+
+* `marketing.Campaigns` writes one send row per consenting member of a segment,
+  claims each before it sends, and runs an optional A/B subject test before
+  sending the winner to the rest. `marketing.Audiences` builds a segment's SQL from
+  a fixed list of rules. Consent is a row per customer and store; a confirmed
+  signup sets it and unsubscribing clears it.
+* `journey.Journeys` keeps one enrollment per customer and journey pointing at its
+  next step, and counts the customers passing each node for the flowchart.
+* `loyalty.Loyalty` records every movement of points in a ledger whose reference
+  is unique per store, so an event told twice moves nothing. `club.Clubs` derives
+  each renewal's charge id from the member and period, so a renewal run twice
+  charges once.
+* `sale.SaleEvents` snapshots the prices a sale replaces and puts them back when
+  it ends.
+* `subscribe.Subscriptions` charges the first delivery and every renewal the same
+  way, retries a failed renewal after one day and then three, and pauses on the
+  third failure. Resuming starts a fresh schedule.
+* `trade.Trade` covers companies, price lists with quantity rules, quotes and net
+  terms; `trade.LineOrders` places orders priced by the caller, reserving stock
+  all or nothing. `trade.VatIds` checks the format of EU VAT numbers only.
+
+Pre-orders are decided in `cart.Quoter`: a line short of stock on a variant that
+allows pre-orders is sold ahead of stock and reserves nothing, counted against
+the variant's pre-order allowance.
+
+[[bazaar-ops]]
+=== Operations and the register's tools
+
+The `ops` package holds the warehouse board (`Warehouse`, stage moves checked by
+`WarehouseFlow` and made conditionally), transfer and purchase order timelines
+(`Timelines`, written by `Stock`), forecasts (`Forecasts`, whose drafts go through
+`Stock`), the report builder and cohorts (`Reports`, where every dimension and
+metric is matched against a fixed list and never written into SQL), UTM and
+referral attribution (`Attribution`, first and last touch carried from the landing
+page through the cart to the order, held in the session only when there is a
+touch so plain visits stay cacheable), permission sets (`Permissions`, per area
+and per location; the owner is never restricted), the chat inbox (`ChatInbox`,
+rate limited before anything is stored or mailed) and combined listings with
+marketplace import (`Listings`, which validates every row before making any
+product).
+
+On the register side, `pos.PosTools` holds the store's register policy (tip
+presets, approval thresholds), commissions, manager approvals, parked carts and
+the product grid. An approval is a manager's PIN, checked with the sign-in
+lockout, exchanged for a single-use approval id; the sale carries the id, never
+the PIN, because it may wait offline. `pos.Layaways` keeps a layaway as an open
+order with its units reserved, and `order.OrderEdits` recomputes totals and tax,
+moves reservations and settles the difference.
 
 === Tests
 
@@ -342,7 +496,8 @@ business contracts for. Plan for these before taking real orders:
   VAT depend on the product category, the destination, thresholds per
   jurisdiction and filing obligations, which a tax service tracks.
 * *Carrier contracts.* Shipping rates are the merchant's own table and labels are
-  rendered locally. Live rates, purchased labels and tracking updates need
+  rendered locally, and the carrier the back office buys labels from is
+  simulated, tracking events included. Live rates, purchased labels and tracking updates need
   accounts with carriers or a shipping aggregator.
 * *PCI scope.* Keep card entry on the provider's hosted page or SDK so card data
   never touches the app or the server, and confirm the deployment's
@@ -357,3 +512,23 @@ business contracts for. Plan for these before taking real orders:
   currency. The platform console adds store totals unconverted, which is only
   right while every store uses the same currency; reporting gross merchandise
   value across currencies needs exchange rates recorded at the time of each sale.
+* *VAT number verification.* Only the format of an EU VAT number is checked. A
+  production store calls the European Commission's VIES service when a company
+  is saved, handles its outages, and keeps the consultation number.
+* *Tax for B2B orders.* Quotes and B2B orders are priced net of tax. Reverse
+  charge and per-company tax treatment need the tax engine above.
+* *Exchange rates.* Market rates are entered by the merchant; there is no rate
+  feed. Only two-decimal currencies are supported.
+* *Geolocation.* The fraud rule on the client's country reads a header from a
+  proxy or CDN. There is no IP database in the server, so without such a proxy
+  that rule adds nothing, and the storefront does not pick a market by location.
+* *Marketplace sync.* Marketplace listings are imported once from a CSV file.
+  Keeping stock, prices and orders in step with a live marketplace needs that
+  marketplace's API.
+* *Translated navigation.* Products, collections, pages and posts are translated;
+  menu labels and the storefront's own interface text are not.
+* *Fraud scoring.* The fraud rules are a fixed point table. A store with real
+  volume would add the payment provider's risk signals or a fraud service.
+* *Form signing keys.* The bot guard's and the theme preview's signing keys are
+  held per process, so a restart invalidates open forms and preview links, and
+  several servers behind a load balancer need a shared key.

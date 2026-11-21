@@ -206,8 +206,138 @@ payments screen lists payments and payouts across the stores.
 
 The server can host the app itself, so the whole platform runs in a browser with
 nothing installed; `backend/server.sh run --web` builds it and serves it at
-`http://localhost:8080/`. The same server also serves each store as plain HTML
-pages at `/s/<handle>`, for search engines and for visitors who arrive from a
-link: home, collections, search, product pages, a cart, and order tracking at
-`/track/<number>`. Checking out from those pages continues in the app with the
-same cart.
+`http://localhost:8080/`. Beside the app, the same server serves a complete web
+version of every side of the platform as ordinary HTML pages, which work without
+JavaScript and load quickly on any device. The rest of this chapter describes
+those pages; most of what they do is also on the app's screens.
+
+[[bazaar-web-shop]]
+==== Shopping on the web
+
+Each store lives at `/s/<handle>`: home, collections, search, product pages, the
+store's own pages and blog, and a cart. A shopper who picks a country from the
+market selector sees prices in that market's currency and, when the store has
+translated them, product names and descriptions in its language.
+
+Checkout happens on the page. A guest gives an email address and a delivery
+address; a signed-in shopper picks one of the saved addresses. Delivery options
+refresh as the address changes, discount and gift card codes are applied in
+place, and the card is held when the order is placed. A shopper who chose a
+market is charged in that market's currency, at the rate the page showed. The
+confirmation page and its invoice open from a link in the confirmation email,
+so a guest can come back to them without an account.
+
+A product that's out of stock but on pre-order can still be bought; the cart
+and the confirmation say the item ships when stock arrives. An item that isn't
+on pre-order offers a form to be emailed when it's back. A shopper who left a
+cart gets a reminder whose link restores that cart on any device.
+
+The chat button opens a conversation with the store; replies arrive by email
+and on the same page. The cookie banner asks once which optional cookies the
+shopper accepts, and the privacy page changes the answer later.
+
+A visitor can create an account at `/signup` and sign in with a password. Once
+signed in, `/account` holds:
+
+* orders, with tracking, invoices and a return form once an order is delivered;
+* saved addresses, the wishlist and the reviews they wrote;
+* loyalty points, the member card as a QR code, and clubs they belong to;
+* back-in-stock alerts and, per store, whether they receive marketing;
+* subscriptions, which can be paused, resumed, skipped or cancelled;
+* security: an authenticator app for two-step sign-in, recovery codes, and
+  signing out every other session.
+
+[[bazaar-web-b2b]]
+==== Buying for a company
+
+A buyer the merchant has added to a company sees the company's prices in the
+store and a company section in the account. From there the buyer orders by SKU
+on a quick-order form or by uploading a CSV file of SKUs and quantities, asks
+for a quote, accepts or declines a quote the store sent, and downloads the
+invoices of orders placed on net terms. Quantities follow the price list's
+rules, such as a minimum or cases of six.
+
+[[bazaar-web-back-office]]
+==== The back office on the web
+
+A merchant who signs in at `/auth/signin` reaches the back office at
+`/admin/<store>`. Staff whose account has two-step sign-in enrolled enter their
+authenticator code too. The dashboard shows the day's sales and charts; the
+sections below are reached from the menu.
+
+*Orders and stock.* Orders can be searched, refunded or cancelled, and fulfilled
+from the order page: pack a parcel, buy a label at one of the carrier's rates,
+then mark it shipped, with the packing slip and label as PDFs. The fulfilment
+board moves orders a column at a time. Products, inventory and customers have
+tables that sort, filter and export to CSV.
+
+*Warehouse.* The warehouse board of a location shows purchase orders arriving
+(receiving, put away) and orders leaving (pick, pack, dispatch), with the bins and
+a pick list that walks them in order. Each transfer and purchase order has a
+timeline of when it was sent and received. The forecast page shows how long
+each item's stock will last at each location at its recent rate of sale, and
+drafts the purchase orders and transfers that would cover the shortfall.
+
+*Selling.* Discounts and sales have editors; a sale changes prices when it starts
+and puts them back when it ends. The promotions calendar shows a month of sales,
+campaigns and launches, and an event can be moved to another day. Subscriptions
+are set up as selling plans on a product, with renewals and failed payments
+listed. Companies hold sites, buyers, a price list and payment terms; quotes
+move across a board from draft to ordered, and unpaid net-terms invoices can be
+marked paid.
+
+*Marketing.* A segment is built from rules (spent more than, ordered in the last,
+lives in) with a live count of who matches. A campaign sends an email or text to
+a segment, with a test send to yourself first and an optional A/B test of two
+subjects. Journeys are flowcharts that walk each customer through waits,
+messages and branches, with the number of customers at each step. The loyalty
+page sets how points are earned and the tiers; clubs are paid memberships that
+unlock member prices, members-only products and early access. Signup forms collect
+email addresses, and only people who agreed receive marketing.
+
+*Markets and tax.* A market groups countries under a currency and language, with
+an exchange rate the merchant enters, a price adjustment, rounding and, where
+wanted, fixed prices. The translations page edits product, collection and page
+text per language. Products can carry customs codes, and duty rates per
+destination give the shopper an estimate of import duties at checkout. The tax
+page reports tax collected by region for a period, as a CSV for filing, and
+records customers' tax exemption certificates.
+
+*Risk.* Each online order is scored for fraud. A high score holds the order:
+it can't be fulfilled until a manager approves or cancels it from the risk page.
+Payment disputes reported by the processor appear with their deadline; the
+merchant attaches evidence (the order's own details are one click), submits it,
+or accepts the dispute.
+
+*Online store.* The theme page picks colors, font, corner style and logo, shows
+the result on a preview link that can be shared for an hour, and publishes it.
+Pages and policies, blog posts, the header and footer menus, and redirects from
+old addresses are edited here too. Metafields add typed fields to products,
+customers and orders (a care note, a material from a list), and those marked
+for the storefront show in the product's specifications. Each store also has
+product feeds for shopping engines, per market, and an Atom and RSS feed of its
+blog; the online store page lists their addresses.
+
+*Apps.* The store owner can place third-party scripts and widgets at named places
+on the storefront. Each one says which cookie category it needs, and it loads
+only for shoppers who accepted that category.
+
+*Operations.* The report builder groups sales by up to two dimensions (day,
+product, channel, source) and saves the result. The cohort grid shows how many
+customers of each month came back, and the attribution page shows sales by the
+campaign or site the customer came from. Permission sets give a staff member
+access to only some areas, at one location or all of them. The inbox answers
+chat messages, with saved replies. The listings page imports a marketplace CSV
+as draft products, combining the colors of one item into a single listing.
+
+==== The register's extras
+
+At the register, a card payment can offer tip presets. A discount past the
+store's threshold, a price override or a refund asks a manager to enter their
+PIN; the approval travels with the sale, so it also works offline.
+A cart can be parked and resumed later with its customer, and an item not in the
+catalog can be rung up by name and price. A layaway puts goods aside on a deposit
+and hands them over when the last payment is made; cancelling refunds what was
+paid less the store's fee. A completed sale can be edited, adding or removing
+items with the difference charged or refunded, and shelf price labels can be
+printed for any products.

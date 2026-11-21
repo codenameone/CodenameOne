@@ -123,6 +123,16 @@ The same server also renders each store as plain HTML at `/s/<handle>`, with a
 sitemap at `/sitemap.xml`, so search engines can index the catalog that the app
 shows.
 
+It also serves a web version of the rest of the platform that needs no
+JavaScript: checkout on the store's own pages (in the shopper's market currency,
+with pre-orders and cart recovery links), the shopper's account at `/account`,
+and the merchant back office at `/admin/<store>`, which covers orders and
+fulfilment, the warehouse board, forecasting, reports, marketing, subscriptions,
+B2B companies and quotes, markets and translations, tax, fraud review, disputes,
+the online store (theme, pages, blog, menus, redirects, metafields, feeds) and
+app slots. The user's guide walks through each, and the implementor's guide
+says where the code lives.
+
 == What is real and what is simulated
 
 Text messages go through the provider `bazaar.sms.provider` names: `twilio`,
