@@ -59,9 +59,11 @@ public class Navigation {
     private final UrlRedirectRepository redirects;
     private final StoreAccess access;
     private final StoreRepository stores;
+    private final com.codenameone.examples.bazaar.market.Translations translations;
 
     public Navigation(MenuLinkRepository links, UrlRedirectRepository redirects,
-            StoreAccess access, StoreRepository stores) {
+            StoreAccess access, StoreRepository stores, com.codenameone.examples.bazaar.market.Translations translations) {
+        this.translations = translations;
         this.stores = stores;
         this.links = links;
         this.redirects = redirects;
@@ -182,9 +184,11 @@ public class Navigation {
         for (int iter = 0; iter < all.size(); iter++) {
             if (row.getId().equals(all.get(iter).getParentId())) {
                 links.delete(all.get(iter));
+                translations.forget(storeId, com.codenameone.examples.bazaar.market.Translations.MENU_LINK, all.get(iter).getId());
             }
         }
         links.delete(row);
+        translations.forget(storeId, com.codenameone.examples.bazaar.market.Translations.MENU_LINK, row.getId());
         return dtos(ordered(storeId));
     }
 

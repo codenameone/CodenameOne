@@ -400,7 +400,7 @@ public class StorefrontPages {
                 view.preorder = true;
             }
             java.util.List<com.codenameone.examples.bazaar.api.MetafieldValueDto> fields =
-                    metafields.storefront(store.getId(), "PRODUCT", p.id());
+                    metafields.storefront(store.getId(), "PRODUCT", p.id(), market.locale);
             for (int iter = 0; iter < fields.size(); iter++) {
                 view.specs.add(new String[] {fields.get(iter).name(), fields.get(iter).value()});
             }
@@ -752,7 +752,7 @@ public class StorefrontPages {
         page.chatUrl = "/s/" + store.getHandle() + "/chat";
         page.description = describe(store.getTagline());
         try {
-            decorate(page, store, request);
+            decorate(page, store, request, path);
             slots.decorate(page, store, request);
         } catch (IOException e) {
             throw new java.io.UncheckedIOException(e);
@@ -762,7 +762,7 @@ public class StorefrontPages {
 
     /// The theme (or a signed preview of the draft), the logo, the menus and
     /// the policy links every storefront page carries.
-    private void decorate(PageMeta page, Store store, HttpServer.Request request)
+    private void decorate(PageMeta page, Store store, HttpServer.Request request, String path)
             throws IOException {
         com.codenameone.examples.bazaar.domain.StoreTheme theme = null;
         String token = param(request, "preview");
@@ -792,9 +792,20 @@ public class StorefrontPages {
         page.sections = com.codenameone.examples.bazaar.content.Themes.sectionList(theme);
         List<com.codenameone.examples.bazaar.domain.MenuLink> links =
                 navigation.ordered(store.getId());
+        // Menu labels in the market's language: only a store that translated
+        // a label asks, so the others' pages vary by nothing new. choose()
+        // records the Vary / personal headers the language now needs.
+        java.util.Map<String, java.util.Map<String, String>> labels =
+                new java.util.HashMap<String, java.util.Map<String, String>>();
+        if (!links.isEmpty() && translations.has(store.getId(), com.codenameone.examples.bazaar.market.Translations.MENU_LINK)) {
+            StorefrontMarkets.Choice market = StorefrontMarkets.choose(store, path, request,
+                    markets, translations, urls);
+            labels = translations.allOf(store.getId(),
+                    com.codenameone.examples.bazaar.market.Translations.MENU_LINK, market.locale);
+        }
         MenuView top = null;
         for (int iter = 0; iter < links.size(); iter++) {
-            com.codenameone.examples.bazaar.domain.MenuLink l = links.get(iter);
+            com.codenameone.examples.bazaar.domain.MenuLink l = label(links.get(iter), labels);
             if (com.codenameone.examples.bazaar.content.Navigation.FOOTER.equals(l.getMenu())) {
                 page.footerLinks.add(new LinkView(l.getTitle(), l.getUrl(), false));
             } else if (l.getParentId().length() == 0) {
@@ -813,6 +824,26 @@ public class StorefrontPages {
             page.footerLinks.add(new LinkView(c.getTitle(),
                     storeUrl(store.getHandle()) + "/policies/" + c.getHandle(), false));
         }
+    }
+
+    /// `l` with its title translated where `labels` has one; a copy, never
+    /// the row itself.
+    static com.codenameone.examples.bazaar.domain.MenuLink label(
+            com.codenameone.examples.bazaar.domain.MenuLink l,
+            java.util.Map<String, java.util.Map<String, String>> labels) {
+        java.util.Map<String, String> tr = labels.get(l.getId());
+        String t = tr == null ? null : tr.get("title");
+        if (t == null || t.length() == 0) {
+            return l;
+        }
+        com.codenameone.examples.bazaar.domain.MenuLink copy =
+                new com.codenameone.examples.bazaar.domain.MenuLink();
+        copy.setId(l.getId());
+        copy.setMenu(l.getMenu());
+        copy.setParentId(l.getParentId());
+        copy.setUrl(l.getUrl());
+        copy.setTitle(t);
+        return copy;
     }
 
     static String param(HttpServer.Request request, String name) {

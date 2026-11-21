@@ -327,9 +327,13 @@ public class GlobalData {
         pick.add("kind", "What", "select", kind == null ? Translations.PRODUCT : kind)
                 .option(Translations.PRODUCT, "Product").option(Translations.COLLECTION,
                 "Collection").option(Translations.PAGE, "Page").option(Translations.CONTENT,
-                "Online store page").option(Translations.POST, "Blog post");
+                "Online store page").option(Translations.POST, "Blog post")
+                .option(Translations.MENU_LINK, "Menu link").option(Translations.METAFIELD,
+                "Metafield name").option(Translations.METAOBJECT_TYPE, "Metaobject type")
+                .option(Translations.METAOBJECT_ENTRY, "Metaobject entry");
         pick.add("refId", "Id", "text", refId == null ? "" : refId)
-                .hint("The product, collection, page or post id, or privacy");
+                .hint("The id of the product, collection, page, post, menu link, metafield or "
+                + "metaobject, or privacy");
         pick.add("locale", "Language", "text", locale == null ? "" : locale)
                 .hint(locales.isEmpty() ? "e.g. de or fr-CA" : "In use: " + join(locales));
         CommerceData.selectChosen(pick);

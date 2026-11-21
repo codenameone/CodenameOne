@@ -54,6 +54,15 @@ public class Translations {
     public static final String CONTENT = "CONTENT";
     /// A blog post.
     public static final String POST = "POST";
+    /// A navigation menu link's label (`content.Navigation`).
+    public static final String MENU_LINK = "MENU_LINK";
+    /// A metafield definition's name, shown to shoppers as a spec label.
+    public static final String METAFIELD = "METAFIELD";
+    /// A metaobject type's name.
+    public static final String METAOBJECT_TYPE = "METAOBJECT_TYPE";
+    /// A metaobject entry's title: what a shopper reads as the value of a
+    /// reference metafield.
+    public static final String METAOBJECT_ENTRY = "METAOBJECT_ENTRY";
     /// The translatable fields of each kind.
     static final String[][] FIELDS = {
         {PRODUCT, "title", "description", "seoTitle", "seoDescription"},
@@ -61,6 +70,10 @@ public class Translations {
         {PAGE, "body"},
         {CONTENT, "title", "body"},
         {POST, "title", "excerpt", "body"},
+        {MENU_LINK, "title"},
+        {METAFIELD, "name"},
+        {METAOBJECT_TYPE, "name"},
+        {METAOBJECT_ENTRY, "title"},
     };
     /// The pages a store has: the privacy and cookie policy.
     public static final String[] PAGES = {"privacy"};
@@ -73,10 +86,14 @@ public class Translations {
     private final com.codenameone.examples.bazaar.repository.ContentPageRepository pages;
     private final com.codenameone.examples.bazaar.repository.BlogPostRepository posts;
 
+    private final com.codename1.backend.DataSource db;
+
     public Translations(TranslationRepository rows, ProductRepository products,
             CollectionRepository collections, StoreAccess access,
             com.codenameone.examples.bazaar.repository.ContentPageRepository pages,
-            com.codenameone.examples.bazaar.repository.BlogPostRepository posts) {
+            com.codenameone.examples.bazaar.repository.BlogPostRepository posts,
+            com.codename1.backend.DataSource db) {
+        this.db = db;
         this.pages = pages;
         this.posts = posts;
         this.rows = rows;
@@ -96,7 +113,8 @@ public class Translations {
                 return out;
             }
         }
-        throw new ResponseStatusException(400, "Translations are of a PRODUCT, COLLECTION, PAGE, CONTENT or POST");
+        throw new ResponseStatusException(400, "Translations are of a PRODUCT, COLLECTION, PAGE, CONTENT, POST, "
+                + "MENU_LINK, METAFIELD, METAOBJECT_TYPE or METAOBJECT_ENTRY");
     }
 
     /// Every translation of one thing, for the editor.
@@ -206,10 +224,75 @@ public class Translations {
             out.put("title", b.getTitle());
             out.put("excerpt", b.getExcerpt());
             out.put("body", b.getBody());
+        } else if (NAMED.containsKey(kind)) {
+            String[] t = NAMED.get(kind);
+            Map row = db.queryOne("SELECT " + t[1] + " AS v FROM " + t[0] + " WHERE id = ?",
+                    new Object[] {refId});
+            out.put(fieldsOf(kind).get(0), row == null ? "" : com.codenameone.examples.bazaar.Rows
+                    .text(row.get("v")));
         } else {
             out.put("body", privacyText == null ? "" : privacyText);
         }
         return out;
+    }
+
+    /// The table and column holding the original of each single-field kind.
+    private static final Map<String, String[]> NAMED = new HashMap<String, String[]>();
+
+    static {
+        NAMED.put(MENU_LINK, new String[] {"menu_link", "title"});
+        NAMED.put(METAFIELD, new String[] {"metafield_def", "name"});
+        NAMED.put(METAOBJECT_TYPE, new String[] {"metaobject_type", "name"});
+        NAMED.put(METAOBJECT_ENTRY, new String[] {"metaobject_entry", "title"});
+    }
+
+    /// Every translation of every thing of `kind` in a store for `locale`,
+    /// with the language fallback of [#fields]: ref id to field to text.
+    /// One query, for lists such as a menu of many links.
+    @Transactional(readOnly = true)
+    public Map<String, Map<String, String>> allOf(String storeId, String kind, String locale)
+            throws IOException {
+        Map<String, Map<String, String>> out = new HashMap<String, Map<String, String>>();
+        if (locale == null || locale.length() == 0) {
+            return out;
+        }
+        String language = Locales.language(locale);
+        List rs = db.query("SELECT ref_id, locale, field, body FROM translation WHERE store_id = ? "
+                + "AND kind = ? AND (locale = ? OR locale = ?)", new Object[] {storeId, kind, locale,
+                    language});
+        for (int pass = 0; pass < 2; pass++) {
+            for (int iter = 0; iter < rs.size(); iter++) {
+                Map r = (Map) rs.get(iter);
+                String l = com.codenameone.examples.bazaar.Rows.text(r.get("locale"));
+                if (!l.equals(pass == 0 ? language : locale)) {
+                    continue;
+                }
+                String ref = com.codenameone.examples.bazaar.Rows.text(r.get("ref_id"));
+                Map<String, String> m = out.get(ref);
+                if (m == null) {
+                    m = new HashMap<String, String>();
+                    out.put(ref, m);
+                }
+                m.put(com.codenameone.examples.bazaar.Rows.text(r.get("field")),
+                        com.codenameone.examples.bazaar.Rows.text(r.get("body")));
+            }
+        }
+        return out;
+    }
+
+    /// Whether a store has any translation of `kind`.
+    @Transactional(readOnly = true)
+    public boolean has(String storeId, String kind) throws IOException {
+        return db.queryOne("SELECT id FROM translation WHERE store_id = ? AND kind = ? LIMIT 1",
+                new Object[] {storeId, kind}) != null;
+    }
+
+    /// Removes every translation of one thing; called when it is deleted,
+    /// so [#pick] never chooses a locale that only orphans are in.
+    @Transactional(rollbackFor = IOException.class)
+    public void forget(String storeId, String kind, String refId) throws IOException {
+        db.execute("DELETE FROM translation WHERE store_id = ? AND kind = ? AND ref_id = ?",
+                new Object[] {storeId, kind, refId});
     }
 
     private void requireRef(String storeId, String kind, String refId) throws IOException {
@@ -230,6 +313,11 @@ public class Translations {
             com.codenameone.examples.bazaar.domain.BlogPost b =
                     refId.length() > 32 ? null : posts.findById(refId);
             ok = b != null && storeId.equals(b.getStoreId());
+        } else if (NAMED.containsKey(kind)) {
+            Map row = refId.length() > 32 ? null : db.queryOne("SELECT store_id FROM "
+                    + NAMED.get(kind)[0] + " WHERE id = ?", new Object[] {refId});
+            ok = row != null && storeId.equals(com.codenameone.examples.bazaar.Rows.text(
+                    row.get("store_id")));
         } else {
             ok = false;
             for (int iter = 0; iter < PAGES.length; iter++) {

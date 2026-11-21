@@ -65,10 +65,12 @@ public class Metafields {
     private final MetaobjectEntryRepository entries;
     private final StoreAccess access;
     private final MetafieldOwners owners;
+    private final com.codenameone.examples.bazaar.market.Translations translations;
 
     public Metafields(MetafieldDefRepository defs, MetafieldValueRepository values,
             MetaobjectTypeRepository types, MetaobjectEntryRepository entries,
-            StoreAccess access, MetafieldOwners owners) {
+            StoreAccess access, MetafieldOwners owners, com.codenameone.examples.bazaar.market.Translations translations) {
+        this.translations = translations;
         this.defs = defs;
         this.values = values;
         this.types = types;
@@ -141,6 +143,7 @@ public class Metafields {
             values.delete(vs.get(iter));
         }
         defs.delete(d);
+        translations.forget(storeId, com.codenameone.examples.bazaar.market.Translations.METAFIELD, d.getId());
     }
 
     // ================================================================= values
@@ -203,6 +206,46 @@ public class Metafields {
             }
         }
         return out;
+    }
+
+    /// [#storefront] in `locale`: each field's name and each reference's
+    /// entry title translated where the store has a translation (the exact
+    /// locale, then its language), else as written. A null locale is the
+    /// original.
+    @Transactional(readOnly = true)
+    public List<MetafieldValueDto> storefront(String storeId, String ownerKind, String ownerId,
+            String locale) throws IOException {
+        List<MetafieldValueDto> plain = storefront(storeId, ownerKind, ownerId);
+        if (locale == null || plain.isEmpty()) {
+            return plain;
+        }
+        java.util.Map<String, java.util.Map<String, String>> names = translations.allOf(storeId,
+                com.codenameone.examples.bazaar.market.Translations.METAFIELD, locale);
+        java.util.Map<String, java.util.Map<String, String>> titles = translations.allOf(storeId,
+                com.codenameone.examples.bazaar.market.Translations.METAOBJECT_ENTRY, locale);
+        List<MetafieldValue> vs = values.findByStoreIdAndOwnerId(storeId, ownerId);
+        List<MetafieldValueDto> out = new ArrayList<MetafieldValueDto>();
+        for (int iter = 0; iter < plain.size(); iter++) {
+            MetafieldValueDto f = plain.get(iter);
+            String name = pickText(names.get(f.defId()), "name", f.name());
+            String value = f.value();
+            if ("reference".equals(f.type())) {
+                for (int v = 0; v < vs.size(); v++) {
+                    if (vs.get(v).getDefId().equals(f.defId())) {
+                        value = pickText(titles.get(vs.get(v).getTextValue()), "title", value);
+                    }
+                }
+            }
+            out.add(new MetafieldValueDto(f.defId(), f.ownerKind(), f.ownerId(), f.key(),
+                    name, f.type(), value));
+        }
+        return out;
+    }
+
+    private static String pickText(java.util.Map<String, String> tr, String field,
+            String original) {
+        String t = tr == null ? null : tr.get(field);
+        return t == null || t.length() == 0 ? original : t;
     }
 
     private List<MetafieldValueDto> fields(String storeId, String owner, String ownerId,
@@ -445,6 +488,7 @@ public class Metafields {
             }
         }
         entries.delete(e);
+        translations.forget(storeId, com.codenameone.examples.bazaar.market.Translations.METAOBJECT_ENTRY, e.getId());
         return e.getTypeId();
     }
 

@@ -82,8 +82,11 @@ public final class StorefrontMarkets {
         return c;
     }
 
+    static final String CHOICE = "bazaar.market.choice";
+
     /// What a product page needs: the pricer (or null), the locale (or null).
     public static final class Choice {
+        String storeId;
         public Markets.Pricer pricer;
         public String locale;
         public final List<LinkView> picker = new ArrayList<LinkView>();
@@ -92,8 +95,18 @@ public final class StorefrontMarkets {
     /// Chooses for `path` (no query) at `store`, and records the headers.
     public static Choice choose(Store store, String path, HttpServer.Request request,
             Markets markets, Translations translations, SiteUrls urls) throws IOException {
-        Choice c = new Choice();
         SecurityExchange ex = SecurityExchange.current();
+        // Once per request: the page body and the menus every page carries
+        // ask the same question, and the headers are recorded once.
+        Object made = ex == null ? null : ex.getAttribute(CHOICE);
+        if (made instanceof Choice && store.getId().equals(((Choice) made).storeId)) {
+            return (Choice) made;
+        }
+        Choice c = new Choice();
+        c.storeId = store.getId();
+        if (ex != null) {
+            ex.setAttribute(CHOICE, c);
+        }
         String code = query(request);
         boolean fromCookie = false;
         if (code == null) {

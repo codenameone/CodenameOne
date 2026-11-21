@@ -418,6 +418,8 @@ public class OnlineStorePages {
             boolean child = d.parentId() != null && d.parentId().length() > 0;
             ActionCard k = card((child ? "-- " : "") + d.title(), d.url());
             k.meta = d.menu();
+            k.extraUrl = "/admin/" + storeId + "/translations?kind=" + com.codenameone.examples.bazaar.market.Translations.MENU_LINK + "&refId=" + d.id();
+            k.extraLabel = "Translate";
             k.buttons.add(button("Up", b + "/" + d.id() + "/up", false));
             k.buttons.add(button("Down", b + "/" + d.id() + "/down", false));
             k.buttons.add(button("Remove", b + "/" + d.id() + "/remove", true));
@@ -517,6 +519,8 @@ public class OnlineStorePages {
             MetafieldDefDto d = all.get(iter);
             ActionCard k = card(d.name(), d.ownerKind() + "." + d.key() + " (" + d.type() + ")");
             k.status = d.storefront() ? "Storefront" : "";
+            k.extraUrl = "/admin/" + storeId + "/translations?kind=" + com.codenameone.examples.bazaar.market.Translations.METAFIELD + "&refId=" + d.id();
+            k.extraLabel = "Translate";
             k.buttons.add(button("Remove", b + "/" + d.id() + "/remove", true));
             v.cards.add(k);
         }
@@ -599,6 +603,8 @@ public class OnlineStorePages {
             for (int e = 0; e < entries.size(); e++) {
                 MetaobjectEntryDto d = entries.get(e);
                 ActionCard k = card(d.title(), t.name() + " /" + d.handle() + " - id " + d.id());
+                k.extraUrl = "/admin/" + storeId + "/translations?kind=" + com.codenameone.examples.bazaar.market.Translations.METAOBJECT_ENTRY + "&refId=" + d.id();
+                k.extraLabel = "Translate";
                 k.buttons.add(button("Remove", b + "/" + d.id() + "/remove", true));
                 v.cards.add(k);
             }
