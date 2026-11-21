@@ -69,7 +69,12 @@ public final class Document {
 
         /// OpenDocument text, the format of LibreOffice Writer. Reads and writes styles,
         /// lists, tables with spans, pictures, notes, annotations and tracked changes.
-        ODT("odt");
+        ODT("odt"),
+
+        /// Rich Text Format. Reads and writes character formatting, styles, lists, tables
+        /// with merged cells, links, fields, notes, PNG and JPEG pictures, annotations and
+        /// tracked changes; nested tables are written as tab separated lines.
+        RTF("rtf");
 
         private final String extension;
 
@@ -508,6 +513,9 @@ public final class Document {
         if (format == Format.ODT) {
             return OdtReader.read(in);
         }
+        if (format == Format.RTF) {
+            return RtfReader.read(readAll(in));
+        }
         String text = new String(readAll(in), "UTF-8");
         if (text.length() > 0 && text.charAt(0) == 0xfeff) {
             text = text.substring(1);
@@ -542,6 +550,8 @@ public final class Document {
             DocxWriter.write(this, out);
         } else if (format == Format.ODT) {
             OdtWriter.write(this, out);
+        } else if (format == Format.RTF) {
+            RtfWriter.write(this, out);
         } else {
             String s;
             switch (format) {
