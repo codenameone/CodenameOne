@@ -997,13 +997,22 @@ public class DocumentView extends ScrollSurface implements TextInputClient {
         if (getSelection() != null) {
             setCaret(deleteSelection());
         } else if (caret.offset > 0) {
-            setCaret(model.delete(new TextPosition(caret.paragraphId, caret.offset - 1), caret));
+            Paragraph p = model.findParagraph(caret.paragraphId);
+            int n = p != null && isPair(p.text.plainText(), caret.offset - 2) ? 2 : 1;
+            setCaret(model.delete(new TextPosition(caret.paragraphId, caret.offset - n), caret));
         } else {
             TextPosition joined = model.joinWithPrevious(caret.paragraphId);
             if (joined != null) {
                 setCaret(joined);
             }
         }
+    }
+
+    /// Whether the two chars at `i` are one character (a surrogate pair, such as an emoji),
+    /// which must never be split.
+    private static boolean isPair(String s, int i) {
+        return i >= 0 && i + 1 < s.length() && s.charAt(i) >= '\ud800' && s.charAt(i) <= '\udbff'
+                && s.charAt(i + 1) >= '\udc00' && s.charAt(i + 1) <= '\udfff';
     }
 
     /// Deletes the selection, or the character after the caret.
@@ -1017,12 +1026,13 @@ public class DocumentView extends ScrollSurface implements TextInputClient {
         }
         Paragraph p = model.findParagraph(caret.paragraphId);
         if (p != null && caret.offset < p.text.length()) {
+            int n = isPair(p.text.plainText(), caret.offset) ? 2 : 1;
             TextPosition at = model.delete(caret,
-                    new TextPosition(caret.paragraphId, caret.offset + 1));
+                    new TextPosition(caret.paragraphId, caret.offset + n));
             Paragraph after = model.findParagraph(caret.paragraphId);
             // a tracked deletion stays in the text: step over it
             boolean kept = after != null && after.text.length() == p.text.length();
-            setCaret(kept ? new TextPosition(at.paragraphId, at.offset + 1) : at);
+            setCaret(kept ? new TextPosition(at.paragraphId, at.offset + n) : at);
         } else if (p != null) {
             List<String> ids = new java.util.ArrayList<String>();
             DocumentModel.collectIds(model.getDocument().blocks, ids);

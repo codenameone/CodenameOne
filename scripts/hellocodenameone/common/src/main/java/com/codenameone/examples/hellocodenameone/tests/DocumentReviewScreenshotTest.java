@@ -152,6 +152,12 @@ public class DocumentReviewScreenshotTest extends DualAppearanceBaseTest {
     }
 
     @Override
+    protected void restoreAfterCapture() {
+        // later tests in the runner must not see this test's component type
+        EmbeddedComponents.register("cn1ss-slider", null);
+    }
+
+    @Override
     protected void populate(Form form, String suffix) {
         EmbeddedComponents.register("cn1ss-slider", new EmbeddedComponents.Factory() {
             @Override

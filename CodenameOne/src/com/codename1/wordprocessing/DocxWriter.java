@@ -27,6 +27,7 @@ import com.codename1.io.zip.ZipArchiveOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -75,8 +76,14 @@ final class DocxWriter {
 
     private void write(OutputStream out) throws IOException {
         int n = 0;
+        // a comment whose anchor paragraph is gone would be half a range, which Word rejects
+        List<String> paragraphIds = new ArrayList<String>();
+        DocumentModel.collectIds(doc.blocks, paragraphIds);
+        Set<String> present = new HashSet<String>(paragraphIds);
         for (Comment c : doc.comments) {
-            commentIds.put(c.id, Integer.valueOf(n++));
+            if (present.contains(c.startId) && present.contains(c.endId)) {
+                commentIds.put(c.id, Integer.valueOf(n++));
+            }
         }
         StringBuilder body = new StringBuilder();
         body.append(XML).append("<w:document").append(NS).append("><w:body>");
@@ -113,7 +120,7 @@ final class DocxWriter {
                 + "w:val=\"15\"/></w:compat></w:settings>");
         entry(zip, "word/footnotes.xml", notesPart("footnotes", "footnote", footnotes));
         entry(zip, "word/endnotes.xml", notesPart("endnotes", "endnote", endnotes));
-        if (!doc.comments.isEmpty()) {
+        if (!commentIds.isEmpty()) {
             entry(zip, "word/comments.xml", comments());
         }
         entry(zip, "word/_rels/document.xml.rels", documentRels());
@@ -157,7 +164,7 @@ final class DocxWriter {
         override(b, "/word/settings.xml", wp + "settings+xml");
         override(b, "/word/footnotes.xml", wp + "footnotes+xml");
         override(b, "/word/endnotes.xml", wp + "endnotes+xml");
-        if (!doc.comments.isEmpty()) {
+        if (!commentIds.isEmpty()) {
             override(b, "/word/comments.xml", wp + "comments+xml");
         }
         override(b, "/docProps/core.xml", "application/vnd.openxmlformats-package.core-properties+xml");
@@ -190,7 +197,7 @@ final class DocxWriter {
         rel(b, "rIdSettings", "settings", "settings.xml", false);
         rel(b, "rIdFootnotes", "footnotes", "footnotes.xml", false);
         rel(b, "rIdEndnotes", "endnotes", "endnotes.xml", false);
-        if (!doc.comments.isEmpty()) {
+        if (!commentIds.isEmpty()) {
             rel(b, "rIdComments", "comments", "comments.xml", false);
         }
         for (String[] r : rels) {
@@ -314,6 +321,9 @@ final class DocxWriter {
         StringBuilder b = new StringBuilder(XML);
         b.append("<w:comments").append(NS).append('>');
         for (Comment c : doc.comments) {
+            if (!commentIds.containsKey(c.id)) {
+                continue;
+            }
             b.append("<w:comment w:id=\"").append(commentIds.get(c.id)).append('"');
             if (c.author != null) {
                 b.append(" w:author=\"");
@@ -412,6 +422,9 @@ final class DocxWriter {
         Map<Integer, StringBuilder> out = new LinkedHashMap<Integer, StringBuilder>();
         for (Comment c : doc.comments) {
             Integer id = commentIds.get(c.id);
+            if (id == null) {
+                continue;
+            }
             if (paragraphId.equals(c.startId)) {
                 marker(out, c.start).append("<w:commentRangeStart w:id=\"").append(id)
                         .append("\"/>");

@@ -60,6 +60,7 @@ import java.util.Map;
 /// Formats that cannot carry a component -- DOCX, ODT, RTF, PDF -- get its snapshot, which
 /// `snapshot` renders.
 public final class EmbeddedComponents {
+    private static final int MAX_PIXELS = 4096;
     /// The image source scheme that names a component in a `RichTextArea`.
     public static final String SCHEME = "cn1-component";
 
@@ -104,12 +105,19 @@ public final class EmbeddedComponents {
         if (type == null || type.length() == 0 || type.indexOf(';') >= 0) {
             throw new IllegalArgumentException("Invalid component type " + type);
         }
+        boolean none;
         synchronized (FACTORIES) {
             if (factory == null) {
                 FACTORIES.remove(type);
             } else {
                 FACTORIES.put(type, factory);
             }
+            none = FACTORIES.isEmpty();
+        }
+        if (none) {
+            // the last type is gone: rich text areas no longer resolve component images
+            RichTextArea.setImageSource(SCHEME, null);
+            return;
         }
         RichTextArea.setImageSource(SCHEME, new RichTextArea.ImageSource() {
             @Override
@@ -168,6 +176,8 @@ public final class EmbeddedComponents {
     ///
     /// the image
     public static Image render(EmbeddedComponent e, int w, int h) {
+        w = Math.max(1, Math.min(w, MAX_PIXELS));
+        h = Math.max(1, Math.min(h, MAX_PIXELS));
         Component c = create(e);
         if (c != null) {
             return paint(c, w, h);
@@ -201,6 +211,8 @@ public final class EmbeddedComponents {
     ///
     /// the image
     public static Image paint(Component c, int w, int h) {
+        w = Math.max(1, Math.min(w, MAX_PIXELS));
+        h = Math.max(1, Math.min(h, MAX_PIXELS));
         Image img = Image.createImage(w, h, 0x00ffffff);
         c.setX(0);
         c.setY(0);

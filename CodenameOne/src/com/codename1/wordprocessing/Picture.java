@@ -70,10 +70,26 @@ public final class Picture implements Block, Inline {
         }
         this.id = id;
         this.data = copy(data);
-        this.mimeType = mimeType == null || mimeType.length() == 0 ? sniff(data) : mimeType;
+        // the type is read from files and written into markup (a data: URL, a content type):
+        // anything but a plain token is replaced by what the bytes say
+        this.mimeType = isToken(mimeType) ? mimeType : sniff(data);
         this.width = width;
         this.height = height;
         this.description = description == null ? "" : description;
+    }
+
+    private static boolean isToken(String s) {
+        if (s == null || s.length() == 0 || s.length() > 100) {
+            return false;
+        }
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            if (!(c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9'
+                    || c == '/' || c == '.' || c == '+' || c == '-')) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static byte[] copy(byte[] b) {

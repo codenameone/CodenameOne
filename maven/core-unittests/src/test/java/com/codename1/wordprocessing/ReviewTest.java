@@ -157,4 +157,60 @@ class ReviewTest extends UITestBase {
         Image img = Image.createImage(400, 300);
         v.paintComponent(img.getGraphics());
     }
+
+    @Test
+    void commentsFollowEdits() {
+        DocumentModel m = model("one two three", "four");
+        Comment c = m.addComment(new TextPosition("p0", 4), new TextPosition("p0", 7), "x");
+        m.insertText(new TextPosition("p0", 0), "zero ", null);
+        Comment d = m.getDocument().comments.get(0);
+        assertEquals("two", text(m, "p0").substring(d.start, d.end));
+        // typing right at either edge stays outside the comment
+        m.insertText(new TextPosition("p0", d.end), "s", null);
+        d = m.getDocument().comments.get(0);
+        assertEquals("two", text(m, "p0").substring(d.start, d.end));
+        TextPosition n = m.splitParagraph(new TextPosition("p0", 5));
+        d = m.getDocument().comments.get(0);
+        assertEquals(n.paragraphId, d.startId);
+        assertEquals("two", text(m, n.paragraphId).substring(d.start, d.end));
+        m.joinWithPrevious(n.paragraphId);
+        d = m.getDocument().comments.get(0);
+        assertEquals("p0", d.endId);
+        assertEquals("two", text(m, "p0").substring(d.start, d.end));
+        m.delete(new TextPosition("p0", 0), new TextPosition("p1", 2));
+        d = m.getDocument().comments.get(0);
+        assertEquals(c.id, d.id);
+        assertEquals("p0", d.startId);
+        assertTrue(d.start <= d.end && d.end <= text(m, "p0").length());
+    }
+
+    @Test
+    void eachTypingRunIsItsOwnRevisionAndOthersInsertionsSurviveADelete() {
+        DocumentModel m = model("");
+        m.setAuthor("Ann");
+        m.setTrackChanges(true);
+        TextPosition at = m.insertText(new TextPosition("p0", 0), "a", null);
+        at = m.insertText(at, "b", null);
+        at = m.insertText(at, " ", null);
+        // the word ended: the next one is a revision of its own
+        m.insertText(at, "c", null);
+        assertEquals(2, m.getRevisions().size());
+        m.setAuthor("Bob");
+        m.delete(new TextPosition("p0", 0), new TextPosition("p0", 1));
+        assertEquals("ab c", text(m, "p0"));
+        assertTrue(m.findParagraph("p0").text.styleAt(0).revision.isDeletion());
+    }
+
+    @Test
+    void backspaceRemovesAWholeSurrogatePair() {
+        DocumentModel m = model("a\ud83d\ude00");
+        DocumentView v = new DocumentView(m);
+        v.setCaret(new TextPosition("p0", 3));
+        v.deleteBackward();
+        assertEquals("a", text(m, "p0"));
+        m.reset(new Document(new ArrayList<Block>(Arrays.asList((Block) DocumentLayoutTest.para("q", "\ud83d\ude00b"))), null, null, 100));
+        v.setCaret(new TextPosition("q", 0));
+        v.deleteForward();
+        assertEquals("b", text(m, "q"));
+    }
 }

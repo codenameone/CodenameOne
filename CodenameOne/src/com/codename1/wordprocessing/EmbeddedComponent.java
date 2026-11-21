@@ -46,6 +46,9 @@ public final class EmbeddedComponent implements Inline {
 
     private final byte[] snapshot;
 
+    /// The largest width or height, in points; a larger one is reduced to it.
+    public static final float MAX_SIZE = 2000;
+
     /// Creates an embedded component.
     ///
     /// #### Parameters
@@ -69,8 +72,10 @@ public final class EmbeddedComponent implements Inline {
         }
         this.type = type;
         this.state = state == null ? "" : state;
-        this.width = width;
-        this.height = height;
+        // sizes come from files and markup: bound them so a hostile one cannot ask for an
+        // image the size of the address space
+        this.width = Math.min(width, MAX_SIZE);
+        this.height = Math.min(height, MAX_SIZE);
         this.snapshot = snapshot == null || snapshot.length == 0 ? null : copy(snapshot);
     }
 

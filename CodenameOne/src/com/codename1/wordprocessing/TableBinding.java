@@ -135,7 +135,7 @@ public final class TableBinding {
         Document d = model.getDocument();
         Table t = table(d);
         if (t == null) {
-            dispose();
+            // the table was deleted; an undo can bring it back, so keep listening
             return;
         }
         Table u;
@@ -162,7 +162,7 @@ public final class TableBinding {
         }
         Table t = table(after);
         if (t == null) {
-            dispose();
+            // the table was deleted; an undo can bring it back, so keep listening
             return;
         }
         if (t.equals(table(before))) {
