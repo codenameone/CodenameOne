@@ -20,7 +20,9 @@ package com.codenameone.examples.brickyard.studio;
 
 import com.codename1.components.SpanLabel;
 import com.codename1.graph.DefaultGraphModel;
+import com.codename1.graph.GraphEdge;
 import com.codename1.graph.GraphNode;
+import com.codename1.graph.GraphPort;
 import com.codename1.ui.Button;
 import com.codename1.ui.CN;
 import com.codename1.ui.Component;
@@ -103,7 +105,7 @@ final class LogicPanel {
 
     private void render(boolean unsaved) {
         root.removeAll();
-        DefaultGraphModel model = new DefaultGraphModel();
+        DefaultGraphModel model = new LockedModel();
         double w = 200;
         double h = 52;
         double gap = 34;
@@ -143,14 +145,48 @@ final class LogicPanel {
     }
 
     private Button step(String label, final String kind) {
-        Button b = Ui.secondary("+ " + label, "logicAdd-" + kind, ev -> {
+        return Ui.secondary("+ " + label, "logicAdd-" + kind, ev -> {
             if (graph.add(kind)) {
                 render(true);
             } else {
                 Ui.toast("A behavior holds up to eight steps");
             }
         });
-        return b;
+    }
+
+    /// The view's model refuses every structural edit made on the canvas --
+    /// renaming, deleting, wiring, pasting -- so what is drawn is always what
+    /// [LogicGraph#toLuau()] compiles. Moving a node is allowed; it is layout.
+    static final class LockedModel extends DefaultGraphModel {
+        @Override
+        public GraphEdge connect(GraphNode source, GraphPort sourcePort, GraphNode target, GraphPort targetPort) {
+            return null;
+        }
+
+        @Override
+        public boolean removeEdge(GraphEdge edge) {
+            return false;
+        }
+
+        @Override
+        public boolean removeNode(GraphNode node) {
+            return false;
+        }
+
+        @Override
+        public boolean renameNode(GraphNode node, String label) {
+            return false;
+        }
+
+        @Override
+        public boolean insertNode(GraphNode node, int index) {
+            return false;
+        }
+
+        @Override
+        public boolean insertEdge(GraphEdge edge, int index) {
+            return false;
+        }
     }
 
     private void apply() {

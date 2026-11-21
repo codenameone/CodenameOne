@@ -57,6 +57,7 @@ The application source is licensed under [MIT-0](https://github.com/codenameone/
 | Multiplayer | An authoritative server that keeps server scripts to itself, replicates snapshots, property deltas and remote calls, and checks every move against the character's speed |
 | Game types | Templates for an obby, survival, a roleplay town, a tycoon, a simulator, racing and a fighting arena |
 | Studio | Explorer, properties, a Luau editor with syntax checks and completion, templates, inserted models, scripts and effects, lighting presets, undo, play test, `.rbxlx` export and publishing, laid out for phone, tablet and desktop |
+| Visual logic (experimental) | A Logic tab beside the Luau editor where a part's touch behavior is wired from a small node palette and compiled to an ordinary Luau script saved in the place; the text editor stays available |
 | Agentic creation | The studio's tools on the app's MCP server, so an AI agent can build, play test and publish an experience |
 | Engagement | Levels, daily streaks, a season pass with free and Plus tracks, daily and weekly quests, an avatar shop priced in Bricks, the Brickyard Plus subscription and leaderboards fed by the server |
 | Social | Friends, live "playing" counts, joining a friend's server, invites that pay both sides and chat filtered by the reader's age |

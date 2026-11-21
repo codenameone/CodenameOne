@@ -216,10 +216,21 @@ public final class LogicGraph {
             return null;
         }
         LogicGraph g = parse(source.substring(HEADER.length(), end));
-        if (g == null || !g.toLuau().equals(source)) {
+        if (g == null || !normalized(g.toLuau()).equals(normalized(source))) {
             return null;
         }
         return g;
+    }
+
+    /// Line endings and trailing blank space are what an editor round trip
+    /// may change without the creator editing anything; neither detaches.
+    private static String normalized(String s) {
+        String t = s.replace("\r\n", "\n");
+        int end = t.length();
+        while (end > 0 && Character.isWhitespace(t.charAt(end - 1))) {
+            end--;
+        }
+        return t.substring(0, end);
     }
 
     /// True when `source` starts with a graph header but no longer matches

@@ -58,6 +58,10 @@ class LogicGraphTest {
         assertEquals(g.serialize(), back.serialize());
         assertEquals(g.toLuau(), back.toLuau());
         assertNotNull(LogicGraph.fromSource(g.toLuau()));
+        // Saving the generated text unchanged from the Script tab must not
+        // detach it, even if the editor rewrote line endings or the tail.
+        assertNotNull(LogicGraph.fromSource(g.toLuau().replace("\n", "\r\n")));
+        assertNotNull(LogicGraph.fromSource(g.toLuau().trim()));
     }
 
     @Test
