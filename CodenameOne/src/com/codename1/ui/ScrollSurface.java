@@ -223,8 +223,6 @@ public abstract class ScrollSurface extends Component {
     protected void paintOverlay(Graphics g, int x, int y) {
     }
 
-    /// Sets the width of the pinned left column and the height of the pinned
-    /// top row, in pixels. Called from `layoutSurface`.
     /// True when the surface is laid out right to left: the left header is
     /// painted at the right edge, the body to its left, and the start of the
     /// content (offset 0) is at the body's right edge. A subclass that turns
@@ -261,6 +259,8 @@ public abstract class ScrollSurface extends Component {
         return headerWidth - offX;
     }
 
+    /// Sets the width of the pinned left column and the height of the pinned
+    /// top row, in pixels. Called from `layoutSurface`.
     protected final void setHeaderSize(int width, int height) {
         headerWidth = Math.max(0, width);
         headerHeight = Math.max(0, height);

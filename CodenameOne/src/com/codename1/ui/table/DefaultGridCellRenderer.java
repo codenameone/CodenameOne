@@ -125,7 +125,6 @@ public class DefaultGridCellRenderer implements GridCellRenderer {
         g.setAlpha(a);
     }
 
-    /// Where something `w` wide starts in a span from `x`, `avail` wide.
     /// `align` as it reads in the grid's direction: right to left, LEFT is
     /// the right edge and RIGHT the left one, so text starts and numbers end
     /// where the language puts them.
@@ -139,6 +138,7 @@ public class DefaultGridCellRenderer implements GridCellRenderer {
         return align == Component.RIGHT ? Component.LEFT : align;
     }
 
+    /// Where something `w` wide starts in a span from `x`, `avail` wide.
     protected static int place(int align, int x, int avail, int w) {
         if (align == Component.RIGHT) {
             return x + avail - w;
