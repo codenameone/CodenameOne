@@ -278,13 +278,13 @@ on a row.
 |===
 | Feature | Bazaar | Shopify | WooCommerce | BigCommerce | Square | Notes
 
-| Company accounts with locations/buyers | &#8211; | core | app/plugin | core |  | 
-| Price lists / catalogs per company | &#8211; | core | app/plugin | core |  | 
-| Net payment terms | &#8211; | core | app/plugin |  |  | 
-| Quantity rules / min order | &#8211; | core | app/plugin | core |  | 
-| Quotes / draft-to-order for B2B | &#9681; |  |  |  |  | Draft orders only.
+| Company accounts with locations/buyers | &#10003; | core | app/plugin | core |  | Companies with sites and buyer customers.
+| Price lists / catalogs per company | &#10003; | core | app/plugin | core |  | Fixed price per variant or a percentage off, applied in buyer quotes.
+| Net payment terms | &#10003; | core | app/plugin |  |  | Net 15, 30 or 60 with a due date, an invoice PDF and mark-paid.
+| Quantity rules / min order | &#10003; | core | app/plugin | core |  | Minimum, maximum and step per variant.
+| Quotes / draft-to-order for B2B | &#10003; |  |  |  |  | Quotes move from draft to sent, accepted, then ordered or declined.
 | B2B storefront / customer-specific catalog | &#8211; |  |  |  |  | 
-| Vaulted card / pay on account | &#8211; |  |  |  |  | 
+| Vaulted card / pay on account | &#9681; |  |  |  |  | Pay on account through net terms; no card vault. 
 |===
 
 === Subscriptions and pre-orders
@@ -293,7 +293,7 @@ on a row.
 |===
 | Feature | Bazaar | Shopify | WooCommerce | BigCommerce | Square | Notes
 
-| Subscriptions / selling plans | &#8211; | app/plugin | app/plugin | app/plugin | core | 
+| Subscriptions / selling plans | &#10003; | app/plugin | app/plugin | app/plugin | core | Daily, weekly or monthly plans at a discount; failed renewals retry, then pause.
 | Pre-orders | &#10003; | app/plugin | app/plugin |  |  | Per variant, with a ship date and a choice to charge now or later.
 | Back-in-stock alerts to shoppers | &#10003; | app/plugin | app/plugin |  |  | Shoppers subscribe on the product page; the alert is sent once when stock returns.
 | Try before you buy / deferred payment | &#8211; | app/plugin |  |  |  | 
