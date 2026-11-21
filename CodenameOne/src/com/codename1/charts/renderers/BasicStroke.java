@@ -17,6 +17,9 @@ import com.codename1.ui.Stroke;
 
 
 /// A descriptor for the stroke style.
+///
+/// @deprecated Use the `com.codename1.ui.chart` package instead.
+@Deprecated
 public class BasicStroke {
     /// The solid line style.
     public static final BasicStroke SOLID = new BasicStroke(Stroke.CAP_BUTT, Stroke.JOIN_MITER, 4, null, 0);

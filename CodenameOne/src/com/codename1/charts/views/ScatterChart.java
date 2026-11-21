@@ -30,6 +30,9 @@ import java.util.List;
 /// related options on the `XYMultipleSeriesRenderer`. As with other
 /// charts, wrap the instance in a `com.codename1.charts.ChartComponent` to
 /// place it on a form.
+///
+/// @deprecated Use `com.codename1.ui.chart.series.ScatterSeries` in a `Chart`; the `com.codename1.ui.chart` package replaces this one.
+@Deprecated
 public class ScatterChart extends XYChart {
     /// The constant to identify this chart type.
     public static final String TYPE = "Scatter";

@@ -14,6 +14,9 @@
 package com.codename1.charts.views;
 
 /// The chart point style enumerator.
+///
+/// @deprecated Use the `com.codename1.ui.chart` package instead.
+@Deprecated
 public enum PointStyle {
     X("x"), CIRCLE("circle"), TRIANGLE("triangle"), SQUARE("square"), DIAMOND("diamond"), POINT(
             "point");

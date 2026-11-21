@@ -20,6 +20,9 @@ import java.util.List;
 
 /// An extension of the XY series which adds a third dimension. It is used for XY
 /// charts like bubble.
+///
+/// @deprecated Use the `com.codename1.ui.chart` package instead.
+@Deprecated
 public class XYValueSeries extends XYSeries {
     /// A list to contain the series values.
     private final List<Double> mValue = new ArrayList<Double>();

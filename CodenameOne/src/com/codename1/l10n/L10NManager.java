@@ -155,9 +155,12 @@ public class L10NManager {
     public String getLongMonthName(Date date) {
         String fmt = formatDateLongStyle(date);
         try {
-            return extractMonthName(fmt);
+            return extractMonthName(fmt, formatDateLongStyle(neighbourInMonth(date)));
         } catch (ParseException ex) {
-            int v = java.util.Calendar.getInstance().get(java.util.Calendar.MONTH) - java.util.Calendar.JANUARY;
+            // the month of the date asked about, not of today
+            java.util.Calendar c = java.util.Calendar.getInstance();
+            c.setTime(date);
+            int v = c.get(java.util.Calendar.MONTH) - java.util.Calendar.JANUARY;
 
             return getSymbols().getMonths()[v];
         }
@@ -170,13 +173,75 @@ public class L10NManager {
         return s;
     }
 
-    private String extractMonthName(String dateStr) throws ParseException {
+    /// The day next to `date` in the same month, at noon so a daylight saving shift cannot
+    /// carry it into another day: formatted with the same style it differs from `date` only in
+    /// the day number and the weekday name.
+    private static Date neighbourInMonth(Date date) {
+        java.util.Calendar c = java.util.Calendar.getInstance();
+        c.setTime(date);
+        c.set(java.util.Calendar.HOUR_OF_DAY, 12);
+        long noon = c.getTime().getTime();
+        long day = 24L * 60 * 60 * 1000;
+        return new Date(c.get(java.util.Calendar.DAY_OF_MONTH) == 1 ? noon + day : noon - day);
+    }
+
+    /// The device-independent fallback for a style that names no weekday differently on two
+    /// neighbouring days (a constant or custom format): the English names that
+    /// `Date.toString()` uses, which is the only text that symbol table describes.
+    private boolean isWeekdayName(String part) {
+        DateFormatSymbols sym = getSymbols();
+        return contains(sym.getShortWeekdays(), part) || contains(sym.getWeekdays(), part);
+    }
+
+    private static boolean contains(String[] names, String part) {
+        for (String n : names) {
+            if (n != null && n.length() > 0 && part.equalsIgnoreCase(n)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean containsWord(String[] words, String part) {
+        for (String w : words) {
+            if (part.equals(trimPunctuation(w))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static String trimPunctuation(String s) {
+        int end = s.length();
+        // only separators: an abbreviation's own period ("janv.", "Jan.") is part of the name
+        while (end > 0 && ",;".indexOf(s.charAt(end - 1)) >= 0) {
+            end--;
+        }
+        return s.substring(0, end);
+    }
+
+    /// Picks the month out of a long-style date. The weekday is found structurally: the same
+    /// style applied to a neighbouring day of the same month keeps the month word and changes
+    /// the weekday word, in whatever language the device formats in ("lundi" / "mardi",
+    /// "Montag," / "Dienstag,"), so a word that differs between the two is never the month.
+    private String extractMonthName(String dateStr, String neighbour) throws ParseException {
         String[] parts = Util.split(dateStr, " ");
-        for (String part : parts) {
+        String[] other = neighbour == null ? new String[0] : Util.split(neighbour, " ");
+        boolean first = true;
+        for (String raw : parts) {
+            // long styles punctuate their words ("lundi," "Montag,"): compare the bare word
+            String part = trimPunctuation(raw);
             if (part.length() == 0) {
                 continue;
             }
-            if ("de".equalsIgnoreCase(part)) {
+            boolean leading = first;
+            first = false;
+            // a word that changes on the neighbouring day is the weekday, wherever it sits. The
+            // English symbol fallback applies only to the LEADING word (Date.toString() opens
+            // with one): a short weekday can equal a short month (Spanish "mar" is both martes
+            // and marzo), so a later word is never matched against a name table
+            if ("de".equalsIgnoreCase(part) || !containsWord(other, part)
+                    || leading && isWeekdayName(part)) {
                 continue;
             }
             String firstChar = part.substring(0, 1);
