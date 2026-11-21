@@ -29,4 +29,6 @@ public interface CompanyBuyerRepository extends CrudRepository<CompanyBuyer, Str
     List<CompanyBuyer> findByCompanyId(String companyId);
 
     List<CompanyBuyer> findByStoreIdAndUsername(String storeId, String username);
+
+    List<CompanyBuyer> findByUsername(String username);
 }

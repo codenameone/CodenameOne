@@ -55,6 +55,7 @@ import com.codenameone.examples.bazaar.store.Stores;
 
 import java.io.IOException;
 import java.security.MessageDigest;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -103,11 +104,13 @@ public class CheckoutPages {
     private final Orders orders;
     private final Documents documents;
     private final StorefrontPages pages;
+    private final com.codenameone.examples.bazaar.trade.Trade trade;
 
     public CheckoutPages(Stores stores, Carts carts, Checkouts checkouts, Payments payments,
             CustomerAddressRepository addresses, StoreOrderRepository orderRows,
             FulfillmentRepository fulfillments, Orders orders, Documents documents,
-            StorefrontPages pages) {
+            StorefrontPages pages, com.codenameone.examples.bazaar.trade.Trade trade) {
+        this.trade = trade;
         this.stores = stores;
         this.carts = carts;
         this.checkouts = checkouts;
@@ -304,6 +307,70 @@ public class CheckoutPages {
         }
     }
 
+    /// Places the cart on the buyer company's net terms ([Trade#placeOnTerms]):
+    /// at the company's prices, held to its quantity rules, unpaid with a due
+    /// date. Answers the order page, or null when the page was drawn again
+    /// with the reason it was refused (a quantity rule, stock).
+    public String terms(String handle, CheckoutForm form, Model model, HttpServer.Request request)
+            throws IOException {
+        Store store = stores.activeStore(handle);
+        CheckoutForm f = clean(form);
+        String me = signedIn();
+        if (me == null) {
+            throw new ResponseStatusException(401, "Sign in first");
+        }
+        String token = StorefrontPages.token(request, store, false);
+        CartDto dto = token == null ? null : carts.get(store.getId(), null, token);
+        List<com.codenameone.examples.bazaar.api.CartLineChangeDto> lines =
+                new ArrayList<com.codenameone.examples.bazaar.api.CartLineChangeDto>();
+        for (int iter = 0; dto != null && dto.lines() != null && iter < dto.lines().size();
+                iter++) {
+            lines.add(new com.codenameone.examples.bazaar.api.CartLineChangeDto(
+                    dto.lines().get(iter).variantId(), dto.lines().get(iter).quantity()));
+        }
+        com.codenameone.examples.bazaar.trade.LineOrders.Buyer ship =
+                new com.codenameone.examples.bazaar.trade.LineOrders.Buyer();
+        ship.email = f.email.indexOf('@') > 0 ? f.email : me.indexOf('@') > 0 ? me : "";
+        ship.shipName = f.name;
+        ship.shipLine1 = f.line1;
+        ship.shipCity = f.city;
+        ship.shipRegion = f.region;
+        ship.shipPostal = f.postal;
+        ship.shipCountry = f.country;
+        if (f.addressId.length() > 0 && f.line1.length() == 0) {
+            List<CustomerAddress> mine = addresses.findByUsername(me);
+            for (int iter = 0; iter < mine.size(); iter++) {
+                CustomerAddress a = mine.get(iter);
+                if (a.getId().equals(f.addressId)) {
+                    ship.shipName = a.getName();
+                    ship.shipLine1 = a.getLine1();
+                    ship.shipCity = a.getCity();
+                    ship.shipRegion = a.getRegion();
+                    ship.shipPostal = a.getPostal();
+                    ship.shipCountry = a.getCountry();
+                }
+            }
+        }
+        StoreOrder placed;
+        try {
+            placed = trade.placeOnTerms(me, store.getId(), lines, ship, "terms-"
+                    + f.idempotencyKey);
+        } catch (ResponseStatusException refused) {
+            int st = refused.getStatus();
+            if (st == 401 || st == 403 || st == 404 || st == 429) {
+                throw refused;
+            }
+            CheckoutView again = new CheckoutView();
+            again.problems.add(reason(refused, "The order could not be placed on terms"));
+            render(store, f, again, model, request);
+            return null;
+        }
+        if (dto != null) {
+            carts.clear(dto.id());
+        }
+        return SiteUrls.order(store.getHandle(), placed.getNumber(), linkToken(placed));
+    }
+
     private Cart cart(Store store, HttpServer.Request request) throws IOException {
         String token = StorefrontPages.token(request, store, false);
         Cart cart = carts.cart(store.getId(), null, token);
@@ -378,6 +445,17 @@ public class CheckoutPages {
         view.action = base;
         view.codesAction = base + "/codes";
         view.placeAction = base + "/place";
+        if (me != null && trade.buyerStores(me).contains(store.getId())) {
+            com.codenameone.examples.bazaar.trade.Trade.BuyerTerms t = trade.myTerms(me,
+                    store.getId());
+            if (t.termsDays > 0) {
+                view.netTerms = true;
+                view.termsAction = base + "/terms";
+                view.termsLabel = "Buy for " + t.companyName + " on net " + t.termsDays
+                        + ": your company's prices and quantity rules apply, and the invoice "
+                        + "is due " + t.termsDays + " days after the order.";
+            }
+        }
         view.cartUrl = "/s/" + SiteUrls.encode(store.getHandle()) + "/cart";
         view.signedIn = me != null;
         if (f.idempotencyKey.length() < 16 || f.idempotencyKey.length() > 64) {

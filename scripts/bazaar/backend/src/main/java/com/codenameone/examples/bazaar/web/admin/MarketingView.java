@@ -28,7 +28,9 @@ import java.util.List;
 public class MarketingView {
     /// "board", "sales", "sale", "calendar", "discounts", "discount",
     /// "loyalty", "clubs", "club", "segments", "segment", "campaigns",
-    /// "campaign", "journeys" or "journey".
+    /// "campaign", "journeys" or "journey"; and for subscriptions and B2B
+    /// ([CommercePages], [CommerceAccountPages]) "quotes" (the quote board)
+    /// and any name that only uses the generic parts below.
     public String page = "";
     public String base = "";
     public String heading = "";
@@ -51,6 +53,10 @@ public class MarketingView {
     public String headC = "";
     public String headD = "";
     public List<AdminRow> rows = new ArrayList<AdminRow>();
+
+    /// A list whose entries carry their own buttons, under `cardsTitle`.
+    public String cardsTitle = "";
+    public List<ActionCard> cards = new ArrayList<ActionCard>();
 
     // ---------------------------------------------------------------- board
     public List<BoardColumn> columns = new ArrayList<BoardColumn>();

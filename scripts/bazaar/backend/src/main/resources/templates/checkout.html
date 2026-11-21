@@ -28,6 +28,8 @@
 <button class="quiet" type="submit" th:attr="formaction=${checkout.action}" formnovalidate>Update delivery options</button>
 </fieldset>
 
+<fieldset th:if="${checkout.netTerms}"><legend>Company account</legend><p th:text="${checkout.termsLabel}">Net 30</p><button class="button" type="submit" th:attr="formaction=${checkout.termsAction}" formnovalidate>Place on net terms</button></fieldset>
+
 <fieldset><legend>Payment</legend>
 <p th:if="${checkout.nothingDue}">Nothing is left to pay.</p>
 <div th:unless="${checkout.nothingDue}">

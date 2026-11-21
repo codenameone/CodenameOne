@@ -59,12 +59,18 @@ public class WebPages {
         {"Segments", "/segments", "s"},
         {"Campaigns", "/campaigns", "e"},
         {"Journeys", "/journeys", "j"},
+        {"Subscriptions", "/subscriptions", "u"},
+        {"Companies", "/companies", "n"},
+        {"Price lists", "/price-lists", "k"},
+        {"Quotes", "/quotes", "q"},
+        {"Invoices", "/invoices", "v"},
         {"Apps", "/apps", "a"},
     };
     /// Account sections: label, path, shortcut.
     public static final String[][] ACCOUNT = {
         {"Overview", "/account", "h"},
         {"Orders", "/account/orders", "o"},
+        {"Subscriptions", "/account/subscriptions", "u"},
         {"Addresses", "/account/addresses", "a"},
         {"Wishlist", "/account/wishlist", "w"},
         {"Reviews", "/account/reviews", "r"},
@@ -74,6 +80,8 @@ public class WebPages {
         {"Marketing", "/account/marketing", "m"},
         {"Security", "/account/security", "s"},
     };
+    /// The account section only a company buyer sees: label, path, shortcut.
+    public static final String[] BUYER = {"Company", "/account/company", "n"};
     /// Platform sections.
     public static final String[][] PLATFORM = {
         {"Overview", "/platform", "h"},
@@ -84,8 +92,11 @@ public class WebPages {
     private final Accounts accounts;
     private final Stores stores;
     private final WebSessions sessions;
+    private final com.codenameone.examples.bazaar.trade.Trade trade;
 
-    public WebPages(Accounts accounts, Stores stores, WebSessions sessions) {
+    public WebPages(Accounts accounts, Stores stores, WebSessions sessions,
+            com.codenameone.examples.bazaar.trade.Trade trade) {
+        this.trade = trade;
         this.accounts = accounts;
         this.stores = stores;
         this.sessions = sessions;
@@ -129,6 +140,11 @@ public class WebPages {
                 } else {
                     n.activeIf(path);
                 }
+                s.nav.add(n);
+            }
+            if ("account".equals(area) && !trade.buyerStores(me).isEmpty()) {
+                NavItem n = new NavItem(BUYER[0], BUYER[1], BUYER[2]);
+                n.activeIf(path);
                 s.nav.add(n);
             }
             s.home = table[0][1];

@@ -42,6 +42,10 @@ public final class ProductView {
     public String stars = "";
     public java.util.List<Art> gallery = new java.util.ArrayList<Art>();
     public java.util.List<VariantView> variants = new java.util.ArrayList<VariantView>();
+    /// The selling plans the product can be subscribed on: `id` the plan,
+    /// `title` its cadence and saving, `price` the chosen variant's price on
+    /// it. Empty when it is sold only once.
+    public java.util.List<VariantView> plans = new java.util.ArrayList<VariantView>();
     public java.util.List<ReviewView> reviews = new java.util.ArrayList<ReviewView>();
     public java.util.List<CardView> related = new java.util.ArrayList<CardView>();
 }

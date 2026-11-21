@@ -87,6 +87,15 @@ public class CheckoutController {
         return placed == null ? "checkout" : "redirect:" + placed;
     }
 
+    /// A company buyer's "place on net terms": see [CheckoutPages#terms].
+    @PostMapping("/s/{handle}/checkout/terms")
+    public String terms(@PathVariable("handle") String handle,
+            @ModelAttribute("form") CheckoutForm form, Model model, HttpServer.Request request)
+            throws IOException {
+        String placed = pages.terms(handle, form, model, request);
+        return placed == null ? "checkout" : "redirect:" + placed;
+    }
+
     @GetMapping("/s/{handle}/orders/{number}")
     public String order(@PathVariable("handle") String handle,
             @PathVariable("number") String number,

@@ -660,7 +660,7 @@ public class Trade {
     /// `from` to `to`. The merchant sends a draft, takes a sent one back to
     /// revise it, declines it, and orders an accepted one; the buyer accepts
     /// or declines what was sent and orders what they accepted.
-    static boolean allowed(String from, String to, boolean merchant) {
+    public static boolean allowed(String from, String to, boolean merchant) {
         if (merchant) {
             return (DRAFT.equals(from) && SENT.equals(to))
                     || (SENT.equals(from) && DRAFT.equals(to))
@@ -739,6 +739,12 @@ public class Trade {
         q.setOrderId(order.getId());
         q.setUpdatedAt(Instant.now());
         quotes.save(q);
+        terms(order, c, actor);
+    }
+
+    /// Keeps the due date of an order placed for a company on net terms.
+    @Transactional(rollbackFor = IOException.class)
+    void terms(StoreOrder order, Company c, String actor) throws IOException {
         if (c.getTermsDays() > 0) {
             NetTerm t = new NetTerm();
             t.setId(order.getId());
@@ -999,5 +1005,142 @@ public class Trade {
             n = n * 10 + (ch - '0');
         }
         return n > MAX_LINE_QTY ? 0 : n;
+    }
+
+    // ------------------------------------------------------ web storefront
+
+    /// One line of a buyer's price sheet: the list price, the company's
+    /// price and the quantity rule in words (empty when there is none).
+    public static final class BuyerPrice {
+        public String variantId = "";
+        public String sku = "";
+        public String title = "";
+        public long listCents;
+        public long unitCents;
+        public String rule = "";
+    }
+
+    /// What a company buyer sees of their terms in one store.
+    public static final class BuyerTerms {
+        public String storeId = "";
+        public String companyId = "";
+        public String companyName = "";
+        public int termsDays;
+        public String priceListName = "";
+        /// Basis points off list for anything without an entry.
+        public int percentOffBps;
+        public List<BuyerPrice> prices = new ArrayList<BuyerPrice>();
+    }
+
+    /// The stores `username` buys in for a company, for pages that span
+    /// every store (the account).
+    @Transactional(readOnly = true)
+    public List<String> buyerStores(String username) {
+        List<String> out = new ArrayList<String>();
+        if (username == null) {
+            return out;
+        }
+        List<CompanyBuyer> rows = buyers.findByUsername(username);
+        for (int iter = 0; iter < rows.size(); iter++) {
+            if (!out.contains(rows.get(iter).getStoreId())) {
+                out.add(rows.get(iter).getStoreId());
+            }
+        }
+        return out;
+    }
+
+    /// The buyer's company, terms and price sheet; 403 for anybody who does
+    /// not buy for a company of the store. The sheet lists the variants the
+    /// price list has an entry for; everything else sells at
+    /// [BuyerTerms#percentOffBps] off.
+    @Transactional(readOnly = true)
+    public BuyerTerms myTerms(String username, String storeId) {
+        CompanyBuyer b = buyer(username, storeId);
+        Company c = companies.findById(b.getCompanyId());
+        BuyerTerms out = new BuyerTerms();
+        out.storeId = storeId;
+        out.companyId = c.getId();
+        out.companyName = c.getName();
+        out.termsDays = c.getTermsDays();
+        PriceList list = listOf(c);
+        if (list == null) {
+            return out;
+        }
+        out.priceListName = list.getName();
+        out.percentOffBps = list.getPercentOffBps();
+        List<PriceListEntry> rows = entries.findByPriceListId(list.getId());
+        for (int iter = 0; iter < rows.size() && iter < 200; iter++) {
+            PriceListEntry e = rows.get(iter);
+            Variant v = variants.findById(e.getVariantId());
+            if (v == null || !storeId.equals(v.getStoreId())) {
+                continue;
+            }
+            Product p = products.findById(v.getProductId());
+            BuyerPrice bp = new BuyerPrice();
+            bp.variantId = v.getId();
+            bp.sku = v.getSku();
+            bp.title = (p == null ? "" : p.getTitle())
+                    + (v.getTitle().length() > 0 ? " - " + v.getTitle() : "");
+            bp.listCents = v.getPriceCents();
+            bp.unitCents = unitPrice(v, list, e);
+            bp.rule = ruleText(e.getMinQty(), e.getMaxQty(), e.getStepQty());
+            out.prices.add(bp);
+        }
+        return out;
+    }
+
+    /// A quantity rule in words: "min 6, max 600, in steps of 6".
+    /// Empty when there is no rule.
+    public static String ruleText(int min, int max, int step) {
+        StringBuilder sb = new StringBuilder();
+        if (min > 0) {
+            sb.append("min ").append(min);
+        }
+        if (max > 0) {
+            sb.append(sb.length() > 0 ? ", " : "").append("max ").append(max);
+        }
+        if (step > 1) {
+            sb.append(sb.length() > 0 ? ", " : "").append("in steps of ").append(step);
+        }
+        return sb.toString();
+    }
+
+    /// Places a cart's lines as an order on the buyer company's net terms,
+    /// at the company's prices and held to its quantity rules: the checkout's
+    /// "buy on account" choice. A company not on terms answers 409, a line a
+    /// rule refuses 400 naming the item. `clientId` is the checkout's
+    /// idempotency key.
+    public StoreOrder placeOnTerms(String username, String storeId, List<CartLineChangeDto> lines,
+            LineOrders.Buyer ship, String clientId) throws IOException {
+        CompanyBuyer b = buyer(username, storeId);
+        Company c = companies.findById(b.getCompanyId());
+        if (c.getTermsDays() <= 0) {
+            throw new ResponseStatusException(409, c.getName() + " is not on net terms");
+        }
+        if (lines == null || lines.isEmpty()) {
+            throw new ResponseStatusException(400, "The cart is empty");
+        }
+        PriceList list = listOf(c);
+        List<LineOrders.Item> items = new ArrayList<LineOrders.Item>();
+        for (int iter = 0; iter < lines.size(); iter++) {
+            CartLineChangeDto l = lines.get(iter);
+            Variant v = l.variantId() == null ? null : variants.findById(l.variantId());
+            Priced p = price(storeId, c, list, v, l.quantity());
+            if (p.problem != null) {
+                String name = v == null || v.getSku().length() == 0 ? "An item" : v.getSku();
+                throw new ResponseStatusException(400, name + ": " + p.problem);
+            }
+            items.add(new LineOrders.Item(v.getId(), l.quantity(), p.line.getListCents(),
+                    p.line.getUnitCents()));
+        }
+        LineOrders.Buyer who = ship == null ? new LineOrders.Buyer() : ship;
+        who.username = username;
+        if (who.shipName == null || who.shipName.length() == 0) {
+            who.shipName = c.getName();
+        }
+        StoreOrder order = lineOrders.place(storeId, CHANNEL, who, items, clientId, username,
+                "Ordered on net " + c.getTermsDays());
+        terms(order, c, username);
+        return order;
     }
 }

@@ -27,6 +27,11 @@ public final class CheckoutView {
     public String action = "";
     public String codesAction = "";
     public String placeAction = "";
+    /// A company buyer on net terms may place the cart on account instead:
+    /// what that means in words, and where the button posts.
+    public boolean netTerms;
+    public String termsLabel = "";
+    public String termsAction = "";
     public String cartUrl = "";
     public boolean empty = true;
     public boolean signedIn;

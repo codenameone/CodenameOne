@@ -119,6 +119,32 @@ public class Returns {
         return read(id);
     }
 
+    /// Units of each order line the shopper may still ask back: what arrived
+    /// within the window, less refunds and earlier requests. Empty when
+    /// nothing arrived yet or the window closed. The same arithmetic
+    /// [#request] holds a request to, so a page that offers the return form
+    /// only for these lines offers it exactly when it would be accepted.
+    @Transactional(readOnly = true)
+    public Map<String, Integer> returnable(String orderId) throws IOException {
+        Map<String, Integer> out = new HashMap<String, Integer>();
+        long delivered = fulfillments.deliveredAt(orderId);
+        if (delivered == 0 || System.currentTimeMillis() - delivered > WINDOW_MILLIS) {
+            return out;
+        }
+        Map<String, Integer> arrived = fulfillments.deliveredUnits(orderId);
+        Map<String, Integer> asked = askedBefore(orderId);
+        List<OrderLine> ls = lines.findByOrderId(orderId);
+        for (int iter = 0; iter < ls.size(); iter++) {
+            OrderLine line = ls.get(iter);
+            int left = count(arrived, line.getId()) - line.getRefundedQty()
+                    - count(asked, line.getId());
+            if (left > 0) {
+                out.put(line.getId(), Integer.valueOf(left));
+            }
+        }
+        return out;
+    }
+
     @Transactional(rollbackFor = IOException.class)
     private String requestTx(String username, String orderId, ReturnRequestDto req,
             Map<String, Integer> arrived) throws IOException {

@@ -223,6 +223,7 @@ public class AccountData {
             v.shipTo = to.toString();
         }
         boolean shipped = false;
+        Map<String, Integer> canSendBack = returns.returnable(o.id());
         for (int iter = 0; iter < o.lines().size(); iter++) {
             OrderLineDto l = o.lines().get(iter);
             AccountItem i = new AccountItem();
@@ -230,7 +231,11 @@ public class AccountData {
             i.title = l.title();
             i.detail = l.variantTitle() == null ? "" : l.variantTitle();
             i.quantity = Integer.toString(l.quantity());
-            int returnable = Math.max(0, l.fulfilledQty() - l.refundedQty());
+            // Shipped is not enough: only delivered units, within the return
+            // window, may come back (Returns#returnable, the rule the
+            // request itself is held to).
+            Integer left = canSendBack.get(l.id());
+            int returnable = left == null ? 0 : left.intValue();
             i.max = Integer.toString(returnable);
             i.flag = returnable > 0;
             shipped |= returnable > 0;

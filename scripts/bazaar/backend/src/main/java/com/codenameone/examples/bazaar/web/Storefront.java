@@ -108,6 +108,20 @@ public class Storefront {
             @ModelAttribute("form") CartForm form, HttpServer.Request request)
             throws IOException {
         sameSite(request);
+        String plan;
+        try {
+            plan = request.param("plan");
+        } catch (RuntimeException malformed) {
+            plan = null;
+        }
+        if (plan != null && plan.length() > 0) {
+            // Subscribing goes to its own checkout in the account (signed in,
+            // CSRF, a saved card); the plan, item and quantity go with it.
+            return "redirect:/account/subscriptions/start?shop=" + SiteUrls.encode(handle)
+                    + "&plan=" + SiteUrls.encode(plan) + "&variant="
+                    + SiteUrls.encode(form.variantId) + "&quantity="
+                    + Math.max(1, Math.min(100, form.quantity));
+        }
         pages.add(handle, form, request);
         return "redirect:" + StorefrontPages.storeUrl(handle) + "/cart";
     }

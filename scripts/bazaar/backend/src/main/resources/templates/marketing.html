@@ -20,7 +20,7 @@
 <form th:unless="${c.next.empty}" method="post" th:action="${view.base + '/fulfilment/move'}" hx-target="#board" hx-select="#board" hx-swap="outerHTML"><input type="hidden" name="order" th:value="${o.id}"><input type="hidden" name="to" th:value="${c.next}"><button type="submit" th:text="${c.nextLabel}" th:attr="aria-label=${c.nextLabel + ': ' + o.title}">Next</button></form></li></ul></div>
 </section>
 
-<section th:if="${view.page == 'calendar'}" class="card" aria-labelledby="cal-t">
+<section th:unless="${view.weeks.empty}" class="card" aria-labelledby="cal-t">
 <p class="row"><a class="button" th:href="${view.prevUrl}">Previous month</a> <b id="cal-t" th:text="${view.month}">January 2026</b> <a class="button" th:href="${view.nextUrl}">Next month</a></p>
 <div class="table-wrap"><table class="cal"><caption class="sr" th:text="${view.month}">Month</caption><thead><tr><th scope="col">Mon</th><th scope="col">Tue</th><th scope="col">Wed</th><th scope="col">Thu</th><th scope="col">Fri</th><th scope="col">Sat</th><th scope="col">Sun</th></tr></thead><tbody>
 <tr th:each="w : ${view.weeks}"><td th:each="d : ${w.days}" th:classappend="${(d.inMonth ? '' : 'out') + (d.today ? ' today' : '')}"><span class="day" th:text="${d.day}" th:attr="aria-label=${d.iso}">1</span>
@@ -48,6 +48,17 @@
 <text class="title" th:attr="x=${n.textX}, y=${n.titleY}" th:text="${n.title}">Step</text><text th:attr="x=${n.textX}, y=${n.detailY}" th:text="${n.detail}">Step</text><text th:attr="x=${n.textX}, y=${n.countsY}" th:text="${n.counts}">0 passed</text>
 <circle th:if="${n.hasIn}" class="port" r="4" th:attr="cx=${n.inX}, cy=${n.portY}"></circle><circle th:if="${n.hasOut}" class="port" r="4" th:attr="cx=${n.outX}, cy=${n.portY}"></circle></g>
 </svg></figure>
+
+<section th:if="${view.page == 'quotes'}" id="board" class="board" aria-label="Quote pipeline">
+<div class="kanban" th:each="c : ${view.columns}"><h2><span th:text="${c.title}">Draft</span> <span class="pill" th:text="${c.count}">0</span></h2>
+<p th:if="${c.cards.empty}" class="muted">Nothing here.</p>
+<ul><li class="item" th:each="o : ${c.cards}"><a th:href="${o.url}" th:text="${o.title}">Quote</a> <small class="muted" th:text="${o.detail}">Company</small> <small th:text="${o.amount}">$1</small>
+<form method="post" th:action="${view.base + '/quotes/move'}" hx-target="#board" hx-select="#board" hx-swap="outerHTML"><input type="hidden" name="quote" th:value="${o.id}"><select name="to" th:attr="aria-label=${'Move ' + o.title + ' to'}"><option th:each="t : ${view.columns}" th:value="${t.id}" th:selected="${t.id == c.next}" th:text="${t.title}">Sent</option></select><button type="submit">Move</button></form></li></ul></div>
+</section>
+
+<section th:unless="${view.cards.empty}" class="card" aria-label="Items"><h2 th:unless="${view.cardsTitle.empty}" th:text="${view.cardsTitle}">Items</h2>
+<ul><li class="item" th:each="k : ${view.cards}"><a th:unless="${k.url.empty}" th:href="${k.url}" th:text="${k.title}">Item</a><b th:if="${k.url.empty}" th:text="${k.title}">Item</b> <span class="pill" th:unless="${k.status.empty}" th:text="${k.status}">ACTIVE</span> <span th:text="${k.detail}">Detail</span> <small class="muted" th:text="${k.meta}">Meta</small> <b th:text="${k.amount}">$1</b> <a th:unless="${k.extraUrl.empty}" th:href="${k.extraUrl}" th:text="${k.extraLabel}">PDF</a>
+<span class="row"><form th:each="btn : ${k.buttons}" method="post" th:action="${btn.action}"><button type="submit" th:classappend="${btn.flag ? 'danger' : ''}" th:text="${btn.title}" th:attr="aria-label=${btn.title + ': ' + k.title}">Go</button></form></span></li></ul></section>
 
 <section th:unless="${view.rowsTitle.empty}" class="card"><h2 th:text="${view.rowsTitle}">Rows</h2><p th:if="${view.rows.empty}" class="muted" th:text="${view.rowsEmpty}">Nothing yet.</p>
 <div class="table-wrap" th:unless="${view.rows.empty}"><table class="data"><thead><tr><th scope="col" th:text="${view.headA}">A</th><th scope="col" th:text="${view.headB}">B</th><th scope="col" th:text="${view.headC}">C</th><th scope="col" class="num" th:text="${view.headD}">D</th></tr></thead><tbody>

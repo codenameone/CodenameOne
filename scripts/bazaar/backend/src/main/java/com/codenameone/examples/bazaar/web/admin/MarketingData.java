@@ -238,7 +238,7 @@ public class MarketingData {
     }
 
     /// Every variant of the store once: id and "product - variant (sku)".
-    private List<String[]> variants(String storeId) throws IOException {
+    List<String[]> variants(String storeId) throws IOException {
         List<LevelDto> levels;
         try {
             levels = inventory.levels(storeId, null, null, null);
@@ -361,17 +361,26 @@ public class MarketingData {
 
     /// A month grid, Monday first, of everything [SaleEvents] puts on the
     /// calendar, and a move form per event that can move.
-    void calendar(String storeId, String month, MarketingView v) throws IOException {
+    /// The month `month` names ("2026-11"), or this month when it names none.
+    static String monthOf(String month) {
+        return month != null && month.length() == 7 && Days.isIso(month + "-01") ? month
+                : Days.iso(System.currentTimeMillis()).substring(0, 7);
+    }
+
+    /// Lays out a month grid, Monday first, of empty days in `v` -- its
+    /// heading and the links to the months either side under `base` -- and
+    /// answers the grid's first day and the day after its last (epoch
+    /// millis), for the caller to put its events in. The promotions calendar
+    /// and the renewal calendar share it.
+    static long[] monthGrid(String month, String base, MarketingView v) {
         long now = System.currentTimeMillis();
-        String m = month != null && month.length() == 7 && Days.isIso(month + "-01") ? month
-                : Days.iso(now).substring(0, 7);
+        String m = monthOf(month);
         long first = AdminForms.dayStart(m + "-01");
         int y = Integer.parseInt(m.substring(0, 4));
         int mo = Integer.parseInt(m.substring(5, 7));
         String next = mo == 12 ? (y + 1) + "-01" : y + "-" + two(mo + 1);
         String prev = mo == 1 ? (y - 1) + "-12" : y + "-" + two(mo - 1);
         long end = AdminForms.dayStart(next + "-01");
-        String base = "/admin/" + storeId + "/calendar";
         v.month = MONTHS[mo - 1] + " " + y;
         v.prevUrl = base + "?month=" + prev;
         v.nextUrl = base + "?month=" + next;
@@ -382,8 +391,6 @@ public class MarketingData {
         while ((gridEnd / Days.MILLIS + 3) % 7 != 0) {
             gridEnd += Days.MILLIS;
         }
-        List<PromoEventDto> events = sales.calendar(me(), storeId, Long.toString(gridStart),
-                Long.toString(gridEnd));
         String today = Days.iso(now);
         CalendarWeek week = null;
         for (long d = gridStart; d < gridEnd; d += Days.MILLIS) {
@@ -396,18 +403,36 @@ public class MarketingData {
             cell.day = cell.iso.charAt(8) == '0' ? cell.iso.substring(9) : cell.iso.substring(8);
             cell.inMonth = d >= first && d < end;
             cell.today = cell.iso.equals(today);
-            for (int iter = 0; iter < events.size(); iter++) {
-                PromoEventDto e = events.get(iter);
-                if (e.startsAt() < d + Days.MILLIS && e.endsAt() > d) {
-                    AdminRow r = new AdminRow();
-                    r.title = e.title();
-                    r.status = AdminData.words(e.kind());
-                    r.url = eventUrl(storeId, e);
-                    r.detail = "promo " + kindClass(e.kind());
-                    cell.events.add(r);
+            week.days.add(cell);
+        }
+        return new long[] {gridStart, gridEnd};
+    }
+
+    void calendar(String storeId, String month, MarketingView v) throws IOException {
+        String base = "/admin/" + storeId + "/calendar";
+        long[] grid = monthGrid(month, base, v);
+        long gridStart = grid[0];
+        long gridEnd = grid[1];
+        String m = monthOf(month);
+        List<PromoEventDto> events = sales.calendar(me(), storeId, Long.toString(gridStart),
+                Long.toString(gridEnd));
+        for (int w = 0; w < v.weeks.size(); w++) {
+            List<CalendarDay> days = v.weeks.get(w).days;
+            for (int dd = 0; dd < days.size(); dd++) {
+                CalendarDay cell = days.get(dd);
+                long d = gridStart + (w * 7L + dd) * Days.MILLIS;
+                for (int iter = 0; iter < events.size(); iter++) {
+                    PromoEventDto e = events.get(iter);
+                    if (e.startsAt() < d + Days.MILLIS && e.endsAt() > d) {
+                        AdminRow r = new AdminRow();
+                        r.title = e.title();
+                        r.status = AdminData.words(e.kind());
+                        r.url = eventUrl(storeId, e);
+                        r.detail = "promo " + kindClass(e.kind());
+                        cell.events.add(r);
+                    }
                 }
             }
-            week.days.add(cell);
         }
         for (int iter = 0; iter < events.size(); iter++) {
             PromoEventDto e = events.get(iter);

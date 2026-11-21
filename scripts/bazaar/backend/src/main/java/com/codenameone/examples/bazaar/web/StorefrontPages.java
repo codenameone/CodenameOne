@@ -86,11 +86,14 @@ public class StorefrontPages {
     private final TrackingEventRepository tracking;
     private final SiteUrls urls;
     private final Slots slots;
+    private final com.codenameone.examples.bazaar.subscribe.Subscriptions subscriptions;
 
     public StorefrontPages(Stores stores, Catalog catalog, Carts carts, StoreRepository storeRows,
             ProductRepository products, CollectionRepository collections,
             ReviewRepository reviews, FulfillmentRepository fulfillments,
-            TrackingEventRepository tracking, SiteUrls urls, Slots slots) {
+            TrackingEventRepository tracking, SiteUrls urls, Slots slots,
+            com.codenameone.examples.bazaar.subscribe.Subscriptions subscriptions) {
+        this.subscriptions = subscriptions;
         this.stores = stores;
         this.catalog = catalog;
         this.carts = carts;
@@ -317,6 +320,21 @@ public class StorefrontPages {
             view.compareAt = chosen.compareAtCents() > chosen.priceCents()
                     ? Money.format(chosen.compareAtCents(), store.getCurrency()) : "";
             view.available = sellable(chosen);
+            // The same for every visitor, so the page stays public and cached.
+            java.util.List<com.codenameone.examples.bazaar.api.SellingPlanDto> plans =
+                    subscriptions.productPlans(store.getId(), p.id());
+            for (int iter = 0; iter < plans.size(); iter++) {
+                com.codenameone.examples.bazaar.api.SellingPlanDto sp = plans.get(iter);
+                VariantView pv = new VariantView();
+                pv.id = sp.id();
+                pv.title = "Subscribe, " + planWords(sp.unit(), sp.cadence()) + ", save "
+                        + com.codenameone.examples.bazaar.web.admin.CommerceData.percent(
+                        sp.discountBps()) + "%";
+                pv.price = Money.format(chosen.priceCents() - chosen.priceCents()
+                        * sp.discountBps() / 10000, store.getCurrency());
+                pv.available = view.available;
+                view.plans.add(pv);
+            }
         }
         view.availability = view.available ? "https://schema.org/InStock"
                 : "https://schema.org/OutOfStock";
@@ -343,6 +361,12 @@ public class StorefrontPages {
         }
         meta.jsonLd = productLd(p, view, meta, images, rs);
         model.addAttribute("page", meta).addAttribute("product", view);
+    }
+
+    /// "every month", "every 2 weeks".
+    public static String planWords(String unit, int n) {
+        String u = "DAY".equals(unit) ? "day" : "WEEK".equals(unit) ? "week" : "month";
+        return n <= 1 ? "every " + u : "every " + n + " " + u + "s";
     }
 
     private static String productLd(ProductDto p, ProductView view, PageMeta meta,
