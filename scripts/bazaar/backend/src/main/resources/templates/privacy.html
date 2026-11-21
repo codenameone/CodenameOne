@@ -1,0 +1,10 @@
+<!-- cn1:model page com.codenameone.examples.bazaar.web.PageMeta -->
+<!-- cn1:model privacy com.codenameone.examples.bazaar.web.slots.PrivacyView -->
+<!doctype html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org"><head th:replace="~{layout :: head}"></head><body th:attr="data-accent=${page.accent}"><header th:replace="~{layout :: header}"></header>
+<main class="wrap"><h1>Privacy and cookies</h1><p class="policy" th:unless="${privacy.policies.empty}" th:text="${privacy.policies}">Policies</p>
+<h2>Cookies and apps</h2><p>Necessary cookies keep your cart and checkout working and always load. Analytics and marketing apps load only if you accept them, and never at checkout.</p>
+<p th:if="${privacy.apps.empty}">This shop uses no third-party apps.</p><ul th:unless="${privacy.apps.empty}"><li th:each="a : ${privacy.apps}"><span th:text="${a.title}">App</span> (<span th:text="${a.kind}">analytics</span>)</li></ul>
+<h2>Your choice</h2><p th:text="${privacy.current}">You have not chosen yet.</p>
+<form method="post" action="/consent"><input type="hidden" name="back" th:value="${page.consentBack}"><label><input type="checkbox" name="analytics" value="1" th:checked="${privacy.analytics}"> Analytics</label> <label><input type="checkbox" name="marketing" value="1" th:checked="${privacy.marketing}"> Marketing</label> <button type="submit" name="choice" value="custom">Save choices</button> <button type="submit" name="choice" value="none">Decline all</button></form></main>
+<footer th:replace="~{layout :: footer}"></footer></body></html>

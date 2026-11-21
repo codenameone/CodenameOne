@@ -77,9 +77,16 @@ public class StorefrontCaching implements HandlerInterceptor {
         // ETag; this marks the page as one a shared cache may keep. It carries
         // no nonce (the shop chain allows its inline style by hash) and reads
         // no session, so every visitor gets the same bytes.
-        response.header("Cache-Control", PageEtags.PUBLIC_POLICY);
         com.codename1.backend.security.SecurityExchange current =
                 com.codename1.backend.security.SecurityExchange.current();
+        if (current != null && current.getAttribute(
+                com.codenameone.examples.bazaar.web.slots.Slots.PERSONAL) != null) {
+            // The visitor's consent put snippets on this copy that the shared
+            // one leaves out: theirs alone (PageEtags keeps it private).
+            response.header("Cache-Control", "private, no-cache");
+            return;
+        }
+        response.header("Cache-Control", PageEtags.PUBLIC_POLICY);
         if (current != null) {
             current.setAttribute(PageEtags.PUBLIC_CACHE, "1");
         }

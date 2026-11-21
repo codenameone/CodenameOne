@@ -79,4 +79,13 @@ public class AdminView {
     public List<AdminRow> facts = new ArrayList<AdminRow>();
     public List<AdminRow> orders = new ArrayList<AdminRow>();
     public List<AdminRow> addresses = new ArrayList<AdminRow>();
+
+    // ------------------------------------------------------------------ app
+    public com.codenameone.examples.bazaar.web.slots.AppSlot app =
+            new com.codenameone.examples.bazaar.web.slots.AppSlot();
+    public boolean appNew;
+    public String appAction = "";
+    public String deleteAction = "";
+    public List<AdminRow> places = new ArrayList<AdminRow>();
+    public List<AdminRow> categories = new ArrayList<AdminRow>();
 }

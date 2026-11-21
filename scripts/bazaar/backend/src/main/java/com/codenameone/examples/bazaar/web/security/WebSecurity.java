@@ -97,6 +97,19 @@ public class WebSecurity {
         return http.build();
     }
 
+    /// App slot widgets (`/w/{id}`): stateless, so the framed document never
+    /// reads or makes a session and no cookie is set on its response. The
+    /// route writes its own policy (a sandbox), so no page headers filter here.
+    @Bean
+    @Order(0)
+    public SecurityFilterChain widgetChain(HttpSecurity http) throws IOException {
+        http.securityMatcher("/w/**")
+            .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            .csrf(c -> c.disable())
+            .authorizeHttpRequests(auth -> auth.anyRequest().permitAll());
+        return http.build();
+    }
+
     @Bean
     @Order(3)
     public SecurityFilterChain webAppChain(HttpSecurity http, TotpService totp,

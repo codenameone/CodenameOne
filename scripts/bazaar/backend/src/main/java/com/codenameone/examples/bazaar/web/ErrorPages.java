@@ -53,7 +53,7 @@ import java.io.IOException;
 @ControllerAdvice(basePackages = "com.codenameone.examples.bazaar.web")
 public class ErrorPages {
     private static final Logger LOG = Logger.getLogger(ErrorPages.class);
-    private static final String CSS = "/static/shop.dc953916.css";
+    private static final String CSS = "/static/shop.46baf561.css";
 
     private static String page(String code, String title, String text) {
         return "<!doctype html><html lang=\"en\"><head>"

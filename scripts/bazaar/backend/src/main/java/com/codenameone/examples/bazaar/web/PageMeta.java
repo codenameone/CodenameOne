@@ -49,4 +49,23 @@ public final class PageMeta {
     public String jsonLd = "";
     /// Whether search engines should leave the page out of their index.
     public boolean noindex;
+    /// App slot snippets by place ([com.codenameone.examples.bazaar.web.slots.Slots]):
+    /// only what this visitor consented to and this page allows.
+    public java.util.List<com.codenameone.examples.bazaar.web.slots.SlotView> headSlots =
+            new java.util.ArrayList<com.codenameone.examples.bazaar.web.slots.SlotView>();
+    public java.util.List<com.codenameone.examples.bazaar.web.slots.SlotView> bodySlots =
+            new java.util.ArrayList<com.codenameone.examples.bazaar.web.slots.SlotView>();
+    public java.util.List<com.codenameone.examples.bazaar.web.slots.SlotView> priceSlots =
+            new java.util.ArrayList<com.codenameone.examples.bazaar.web.slots.SlotView>();
+    public java.util.List<com.codenameone.examples.bazaar.web.slots.SlotView> cartSlots =
+            new java.util.ArrayList<com.codenameone.examples.bazaar.web.slots.SlotView>();
+    public java.util.List<com.codenameone.examples.bazaar.web.slots.SlotView> thanksSlots =
+            new java.util.ArrayList<com.codenameone.examples.bazaar.web.slots.SlotView>();
+    /// Whether to show the cookie consent banner: the store has optional
+    /// snippets and the visitor has not answered.
+    public boolean consentAsk;
+    /// Where the consent form returns to (this page's path).
+    public String consentBack = "/";
+    /// The store's privacy and cookie policy page, or empty.
+    public String privacyUrl = "";
 }

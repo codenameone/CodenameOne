@@ -36,4 +36,6 @@ public class SlotView {
     public boolean script;
     public boolean pixel;
     public boolean frame;
+    /// A script of the `head` place: the loader appends it to the head.
+    public boolean head;
 }

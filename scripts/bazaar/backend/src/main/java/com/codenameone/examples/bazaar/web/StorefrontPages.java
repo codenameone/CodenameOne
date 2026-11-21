@@ -49,6 +49,8 @@ import com.codenameone.examples.bazaar.repository.StoreRepository;
 import com.codenameone.examples.bazaar.repository.TrackingEventRepository;
 import com.codenameone.examples.bazaar.store.Stores;
 
+import com.codenameone.examples.bazaar.web.slots.Slots;
+
 import java.io.IOException;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -83,11 +85,12 @@ public class StorefrontPages {
     private final FulfillmentRepository fulfillments;
     private final TrackingEventRepository tracking;
     private final SiteUrls urls;
+    private final Slots slots;
 
     public StorefrontPages(Stores stores, Catalog catalog, Carts carts, StoreRepository storeRows,
             ProductRepository products, CollectionRepository collections,
             ReviewRepository reviews, FulfillmentRepository fulfillments,
-            TrackingEventRepository tracking, SiteUrls urls) {
+            TrackingEventRepository tracking, SiteUrls urls, Slots slots) {
         this.stores = stores;
         this.catalog = catalog;
         this.carts = carts;
@@ -98,6 +101,7 @@ public class StorefrontPages {
         this.fulfillments = fulfillments;
         this.tracking = tracking;
         this.urls = urls;
+        this.slots = slots;
     }
 
     // ---------------------------------------------------------------- pages
@@ -566,6 +570,20 @@ public class StorefrontPages {
         return out.toString();
     }
 
+    /// A store's privacy and cookie page: its policies, the apps that may load
+    /// and a form to change the consent choice.
+    @Transactional(readOnly = true)
+    public void privacy(String handle, Model model, HttpServer.Request request)
+            throws IOException {
+        Store store = stores.activeStore(handle);
+        String path = "/s/" + store.getHandle() + "/privacy";
+        PageMeta meta = meta(store, request, path);
+        meta.title = "Privacy and cookies - " + store.getName();
+        meta.consentAsk = false;
+        meta.consentBack = path;
+        model.addAttribute("page", meta).addAttribute("privacy", slots.privacy(store, request));
+    }
+
     // -------------------------------------------------------------- helpers
 
     PageMeta meta(Store store, HttpServer.Request request, String path) {
@@ -577,6 +595,11 @@ public class StorefrontPages {
         page.cartUrl = "/s/" + store.getHandle() + "/cart";
         page.searchUrl = "/s/" + store.getHandle() + "/search";
         page.description = describe(store.getTagline());
+        try {
+            slots.decorate(page, store, request);
+        } catch (IOException e) {
+            throw new java.io.UncheckedIOException(e);
+        }
         return page;
     }
 

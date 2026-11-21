@@ -25,6 +25,17 @@
 <th:block th:if="${view.page == 'products'}"><h1>Products</h1><section th:replace="~{table :: grid}"></section></th:block>
 <th:block th:if="${view.page == 'inventory'}"><h1>Inventory</h1><section th:replace="~{table :: grid}"></section></th:block>
 <th:block th:if="${view.page == 'customers'}"><h1>Customers</h1><section th:replace="~{table :: grid}"></section></th:block>
+<th:block th:if="${view.page == 'apps'}"><h1>Apps</h1><p class="muted">Third-party scripts and widgets on your storefront. A script loads only from the hosts you allow here; a widget runs in a sandboxed frame; analytics and marketing apps wait for the visitor's consent and never load at checkout.</p><p><a class="button" th:href="${view.base + '/new-app'}">Add an app</a></p><section th:replace="~{table :: grid}"></section></th:block>
+<th:block th:if="${view.page == 'app'}"><p><a th:href="${view.base + '/apps'}">Apps</a></p><h1 th:text="${shell.heading}">App</h1>
+<form method="post" class="card" th:action="${view.appAction}"><div class="stack"><label for="a-name">Name</label><input id="a-name" name="name" required maxlength="100" th:value="${view.app.name}">
+<label for="a-slot">Place</label><select id="a-slot" name="slot"><option th:each="s : ${view.places}" th:value="${s.id}" th:selected="${s.flag}" th:text="${s.title}">Head</option></select>
+<label for="a-script">Script address (https only)</label><input id="a-script" name="scriptUrl" type="url" maxlength="500" placeholder="https://cdn.example.com/app.js" th:value="${view.app.scriptUrl}">
+<label for="a-html">Widget HTML (runs in a sandboxed frame, never in your pages)</label><textarea id="a-html" name="widgetHtml" rows="6" maxlength="20000" th:text="${view.app.widgetHtml}">HTML</textarea>
+<label for="a-origins">Allowed origins (the hosts it loads from and talks to, separated by spaces)</label><input id="a-origins" name="origins" maxlength="1000" placeholder="https://api.example.com" th:value="${view.app.origins}">
+<label for="a-category">Consent category</label><select id="a-category" name="category"><option th:each="c : ${view.categories}" th:value="${c.id}" th:selected="${c.flag}" th:text="${c.title}">Necessary</option></select>
+<label><input type="checkbox" name="enabled" value="1" th:checked="${view.app.enabled}"> Enabled</label></div>
+<p><button type="submit">Save app</button></p></form>
+<form method="post" class="card" th:unless="${view.appNew}" th:action="${view.deleteAction}" hx-confirm="Delete this app?"><h2>Delete</h2><p>The app leaves every page at once.</p><button class="danger" type="submit">Delete app</button></form></th:block>
 
 <th:block th:if="${view.page == 'order'}"><p><a th:href="${view.base + '/orders'}">Orders</a></p><h1 th:text="${view.order.title}">Order #1</h1>
 <p><span class="pill" th:text="${view.order.status}">Open</span> <span class="muted" th:text="${view.order.detail + ' - placed ' + view.order.meta}">Paid</span></p>

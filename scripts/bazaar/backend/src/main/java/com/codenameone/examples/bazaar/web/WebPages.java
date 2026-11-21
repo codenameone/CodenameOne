@@ -50,7 +50,7 @@ public class WebPages {
         {"Products", "/products", "p"},
         {"Inventory", "/inventory", "i"},
         {"Customers", "/customers", "c"},
-        {"App slots", "/slots", "s"},
+        {"Apps", "/apps", "a"},
     };
     /// Account sections: label, path, shortcut.
     public static final String[][] ACCOUNT = {

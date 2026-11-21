@@ -47,6 +47,10 @@ public final class PageEtags implements SecurityFilter {
     public static final String PUBLIC_CACHE = "bazaar.publicCache";
     /// What a public page is cached for: a minute fresh, ten more served stale
     /// while a cache refetches.
+    /// An exchange attribute: text mixed into the page's tag besides its bytes
+    /// -- the store's app slot version, which also changes the policy header,
+    /// so a copy is never revalidated against a policy it was not served with.
+    public static final String SALT = "bazaar.etagSalt";
     public static final String PUBLIC_POLICY = "public, max-age=60, stale-while-revalidate=600";
 
     @Override
@@ -73,7 +77,9 @@ public final class PageEtags implements SecurityFilter {
             return response;
         }
         Object nonce = exchange.getAttribute(WebHeaders.NONCE);
-        String tag = "W/\"" + hash(body, nonce == null ? null : (String) nonce) + "\"";
+        Object salt = exchange.getAttribute(SALT);
+        String tag = "W/\"" + hash(body, nonce == null ? null : (String) nonce,
+                salt == null ? "" : salt.toString()) + "\"";
         // A signed-in page carries a per-response CSP nonce and a session's
         // CSRF token, so no shared cache may keep one. A public page has
         // neither (its policy allows its inline style by hash), and only a
@@ -110,7 +116,12 @@ public final class PageEtags implements SecurityFilter {
     /// session's CSRF token cut out, so a page that did not change keeps its
     /// tag across responses of one session.
     static String hash(byte[] body, String nonce) throws Exception {
-        String text = new String(body, "ISO-8859-1");
+        return hash(body, nonce, "");
+    }
+
+    /// [#hash(byte[], String)] with `salt` mixed in.
+    static String hash(byte[] body, String nonce, String salt) throws Exception {
+        String text = salt + new String(body, "ISO-8859-1");
         if (nonce != null && nonce.length() > 0) {
             text = text.replace(nonce, "");
         }

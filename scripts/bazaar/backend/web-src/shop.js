@@ -22,4 +22,34 @@
       document.head.appendChild(s);
     } catch (e) { /* malformed data is simply not published */ }
   }
+  // App slot scripts the owner placed. The server printed only those this
+  // visitor consented to (and the page's policy allows only their hosts); a
+  // compiled view never prints a dynamic script element, so they load here.
+  var slots = document.querySelectorAll('.slot-script[data-src]');
+  for (var i = 0; i < slots.length; i++) {
+    var el = document.createElement('script');
+    el.src = slots[i].getAttribute('data-src');
+    el.async = true;
+    el.referrerPolicy = 'strict-origin';
+    (slots[i].getAttribute('data-head') === '1' ? document.head : body).appendChild(el);
+  }
+  // The consent banner posts and reloads without a navigation round trip;
+  // with scripts off it is an ordinary form post that redirects back.
+  var consent = document.querySelector('form[data-consent]');
+  if (consent && window.fetch && window.FormData) {
+    consent.addEventListener('submit', function (e) {
+      var data = new FormData(consent);
+      if (e.submitter && e.submitter.name) {
+        data.append(e.submitter.name, e.submitter.value);
+      }
+      e.preventDefault();
+      var banner = consent.closest('.consent');
+      if (banner) { banner.hidden = true; }
+      fetch(consent.action, { method: 'POST', body: new URLSearchParams(data),
+          credentials: 'same-origin', redirect: 'manual' })
+        .then(function () {
+          if (data.get('choice') !== 'none') { window.location.reload(); }
+        });
+    });
+  }
 })();

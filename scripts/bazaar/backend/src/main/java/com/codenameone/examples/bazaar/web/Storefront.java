@@ -130,6 +130,14 @@ public class Storefront {
         return "redirect:" + StorefrontPages.storeUrl(handle) + "/cart";
     }
 
+    /// The store's privacy and cookie policy, with the consent choice.
+    @GetMapping("/s/{handle}/privacy")
+    public String privacy(@PathVariable("handle") String handle, Model model,
+            HttpServer.Request request) throws IOException {
+        pages.privacy(handle, model, request);
+        return "privacy";
+    }
+
     @GetMapping("/track/{number}")
     public String track(@PathVariable("number") String number, Model model,
             HttpServer.Request request) {
@@ -152,7 +160,7 @@ public class Storefront {
     /// form was posted from in `Sec-Fetch-Site` and `Origin`; a request with
     /// neither is a script or a test, which a session cookie does not follow
     /// across sites anyway.
-    static void sameSite(HttpServer.Request request) {
+    public static void sameSite(HttpServer.Request request) {
         String site = request.getHeader("Sec-Fetch-Site");
         if (site != null && "cross-site".equalsIgnoreCase(site.trim())) {
             throw new ResponseStatusException(403, "Posted from another site");

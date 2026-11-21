@@ -81,3 +81,12 @@ h1{font-size:clamp(1.6rem,4vw,2.4rem);line-height:1.15;margin:24px 0 8px}
 .summary{position:sticky;top:72px;background:var(--soft);border-radius:12px;padding:16px}.summary .totals{max-width:none}.summary ul{list-style:none;margin:0 0 12px;padding:0}.summary li{display:flex;justify-content:space-between;gap:8px;padding:4px 0}
 .codes{display:flex;gap:8px;margin:0 0 8px}.codes input{flex:1}.place{width:100%;margin-top:12px;font-size:1.05rem}.alert{border-left:4px solid #c0362c;background:var(--soft);padding:8px 16px;margin:0 0 16px}
 .confirm dl{display:grid;grid-template-columns:auto 1fr;gap:4px 16px}
+/* App slots and the cookie consent banner. */
+.foot .wrap a+a{margin-left:12px}
+.slot-place{margin:12px 0}
+.slot-frame{display:block;width:100%;border:0}
+.consent{position:fixed;left:16px;right:16px;bottom:16px;max-width:40rem;margin:auto;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:16px;box-shadow:0 8px 32px #0004;z-index:30}
+.consent p{margin:0 0 12px}
+.consent button{font:inherit;padding:6px 14px;border-radius:8px;border:1px solid var(--line);background:var(--soft);color:inherit;cursor:pointer}
+.consent details{margin-top:10px}
+.consent label{margin-right:12px}
