@@ -139,7 +139,7 @@ public class WebSecurity {
             @Value("${bazaar.web.hsts:true}") boolean hsts) throws IOException {
         http.securityMatcher("/", "/s/**", "/track/**", "/consent", "/consent/**")
             .csrf(c -> c.disable())
-            .addFilterBefore(new WebHeaders(hsts), CsrfFilter.class)
+            .addFilterBefore(new WebHeaders(hsts, true), CsrfFilter.class)
             .addFilterBefore(new PageEtags(), CsrfFilter.class)
             .authorizeHttpRequests(auth -> auth.anyRequest().permitAll());
         return http.build();

@@ -224,10 +224,30 @@ class StorefrontTest {
     void publicPagesAreCachedAndRevalidated() throws Exception {
         shop("sf-cache");
         MockResponse first = fetch("/s/sf-cache");
-        // Pages carry a per-response CSP nonce, so they are private and
-        // revalidated by ETag rather than shared for a minute.
-        assertEquals("private, no-cache", first.getHeader("Cache-Control"));
-        assertNotNull(first.getHeader("ETag"));
+        // No nonce on a public page: its inline style is allowed by hash, so
+        // one copy serves everybody and a shared cache may keep it.
+        assertEquals("public, max-age=60, stale-while-revalidate=600",
+                first.getHeader("Cache-Control"));
+        String tag = first.getHeader("ETag");
+        assertNotNull(tag);
+        assertEquals(304, mvc.perform(get("/s/sf-cache").header("If-None-Match", tag))
+                .andReturn().getResponse().getStatus());
+        String csp = first.getHeader("Content-Security-Policy");
+        assertFalse(csp.contains("nonce-"), csp);
+        assertFalse(csp.contains("unsafe-inline"), csp);
+        // The hash in the policy is the hash of the style the page carries.
+        String html = first.getContentAsString();
+        int open = html.indexOf("<style");
+        String style = html.substring(html.indexOf('>', open) + 1, html.indexOf("</style>", open));
+        String hash = "'sha256-" + com.codename1.backend.Base64.encode(
+                java.security.MessageDigest.getInstance("SHA-256").digest(style.getBytes("UTF-8")))
+                + "'";
+        assertTrue(csp.contains("style-src 'self' " + hash), csp + " / " + hash);
+        // The same bytes with a session as without one, and no cookie set.
+        MockResponse withSession = mvc.perform(get("/s/sf-cache").cookie("CN1SESSION", "abc"))
+                .andReturn().getResponse();
+        assertEquals(tag, withSession.getHeader("ETag"));
+        assertEquals(null, first.getHeader("Set-Cookie"));
         MockResponse map = fetch("/sitemap.xml");
         assertNotNull(map.getHeader("ETag"));
         assertEquals(304, mvc.perform(get("/sitemap.xml")

@@ -22,6 +22,7 @@ import com.codename1.backend.HttpServer;
 import com.codename1.backend.annotations.Component;
 import com.codename1.backend.web.HandlerInterceptor;
 import com.codename1.backend.web.HandlerMethod;
+import com.codenameone.examples.bazaar.web.security.PageEtags;
 
 /// Caching and canonical headers for the storefront's compiled pages.
 ///
@@ -32,14 +33,10 @@ import com.codename1.backend.web.HandlerMethod;
 ///   element addresses, and search engines read the header as they read the
 ///   element.
 /// - Public pages -- the same bytes for everyone, since none of them reads the
-///   session -- get `Cache-Control: public` for a minute, and a cache may serve
-///   a stale copy for ten more while it refetches. They carry no `ETag`: an
-///   interceptor cannot turn the view's 200 into a 304 (the response is
-///   immutable here and `ResponseStatusException` takes error statuses only),
-///   and a validator the server never honours would only make every
-///   revalidation a full download that looks like a cache bug. The sitemap and
-///   the photos, which are answered by code that holds the bytes, do answer
-///   conditional requests (see [Conditional]).
+///   session -- are marked so, and [PageEtags] gives them `Cache-Control:
+///   public` for a minute (a cache may serve a stale copy for ten more while it
+///   refetches) and an `ETag` it answers with 304. They carry no CSP nonce: the
+///   shop chain allows their inline style by hash.
 /// - The cart is one visitor's: `private, no-store`.
 ///
 /// Requests outside the storefront pass untouched.
@@ -74,10 +71,16 @@ public class StorefrontCaching implements HandlerInterceptor {
             }
             return;
         }
-        // The page security filter (web.security.PageEtags) replaces this with
-        // "private, no-cache" and an ETag: every page now carries a per-response
-        // CSP nonce, which a shared cache must not hand to a second visitor.
-        response.header("Cache-Control", "public, max-age=60, stale-while-revalidate=600");
+        // The page filter (web.security.PageEtags) writes the header and an
+        // ETag; this marks the page as one a shared cache may keep. It carries
+        // no nonce (the shop chain allows its inline style by hash) and reads
+        // no session, so every visitor gets the same bytes.
+        response.header("Cache-Control", PageEtags.PUBLIC_POLICY);
+        com.codename1.backend.security.SecurityExchange current =
+                com.codename1.backend.security.SecurityExchange.current();
+        if (current != null) {
+            current.setAttribute(PageEtags.PUBLIC_CACHE, "1");
+        }
     }
 
     /// The page's address without the query, except a (zero-based) page number past the

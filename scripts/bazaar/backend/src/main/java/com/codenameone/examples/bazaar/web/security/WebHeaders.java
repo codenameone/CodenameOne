@@ -51,17 +51,35 @@ public final class WebHeaders implements SecurityFilter {
     private static final char[] B64 =
             "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_".toCharArray();
 
+    /// Set on the exchange of a public page: no nonce, the policy allows the
+    /// public templates' inline elements by hash ([InlineHashes]).
+    public static final String PUBLIC = "bazaar.cspPublic";
+
     private final boolean hsts;
+    private final boolean publicPages;
 
     /// @param hsts whether to send Strict-Transport-Security
     public WebHeaders(boolean hsts) {
+        this(hsts, false);
+    }
+
+    /// @param hsts whether to send Strict-Transport-Security
+    /// @param publicPages whether the pages are public -- one copy for every
+    ///        visitor, which a shared cache may keep -- and so carry no nonce
+    public WebHeaders(boolean hsts, boolean publicPages) {
         this.hsts = hsts;
+        this.publicPages = publicPages;
     }
 
     /// The nonce of the request being served, or a fresh one outside a chain
     /// (a page rendered by a test without the filter still gets a valid one).
     public static String currentNonce() {
         SecurityExchange exchange = SecurityExchange.current();
+        if (exchange != null && exchange.getAttribute(PUBLIC) != null) {
+            // A public page is cached and shared: a nonce in it would be one
+            // visitor's, and the policy allows its inline style by hash.
+            return "";
+        }
         Object n = exchange == null ? null : exchange.getAttribute(NONCE);
         return n == null ? newNonce() : (String) n;
     }
@@ -84,8 +102,13 @@ public final class WebHeaders implements SecurityFilter {
     public HttpServer.Response doFilter(HttpServer.Request request, FilterChain chain)
             throws Exception {
         SecurityExchange exchange = SecurityExchange.current();
-        String nonce = newNonce();
-        exchange.setAttribute(NONCE, nonce);
+        String nonce = null;
+        if (publicPages) {
+            exchange.setAttribute(PUBLIC, "1");
+        } else {
+            nonce = newNonce();
+            exchange.setAttribute(NONCE, nonce);
+        }
         HttpServer.Response response = chain.doFilter(request);
         exchange.setResponseHeader("X-Content-Type-Options", "nosniff");
         exchange.setResponseHeader("Referrer-Policy", "strict-origin-when-cross-origin");
@@ -105,12 +128,25 @@ public final class WebHeaders implements SecurityFilter {
         return response;
     }
 
-    /// The policy for a page with `nonce` and the slot sources `extra` (may be null).
+    /// The policy for a page with `nonce` and the slot sources `extra` (may be
+    /// null). A null `nonce` is a public page's policy: no inline script at
+    /// all, and inline style only as the public templates have it
+    /// ([InlineHashes]).
     public static String policy(String nonce, CspSources extra) {
         StringBuilder b = new StringBuilder();
-        b.append("default-src 'self'; script-src 'self' 'nonce-").append(nonce).append('\'');
+        b.append("default-src 'self'; script-src 'self'");
+        if (nonce != null) {
+            b.append(" 'nonce-").append(nonce).append('\'');
+        }
         CspSources.append(extra, b, CspSources.SCRIPT);
-        b.append("; style-src 'self' 'nonce-").append(nonce).append('\'');
+        b.append("; style-src 'self'");
+        if (nonce != null) {
+            b.append(" 'nonce-").append(nonce).append('\'');
+        } else {
+            for (int iter = 0; iter < InlineHashes.PUBLIC_STYLES.length; iter++) {
+                b.append(' ').append(InlineHashes.PUBLIC_STYLES[iter]);
+            }
+        }
         b.append("; img-src 'self' data:");
         CspSources.append(extra, b, CspSources.IMG);
         b.append("; connect-src 'self'");

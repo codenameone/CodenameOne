@@ -35,11 +35,19 @@ import java.security.MessageDigest;
 /// nonce of the policy it was served with. The CSRF token is per session and
 /// stays in the hash, so another visitor's copy never validates.
 ///
-/// Pages are `private, no-cache`: a shared cache must not hand one visitor's
-/// copy -- nonce, token, cart -- to another, and revalidating costs a 304.
+/// Signed-in pages are `private, no-cache`: a shared cache must not hand one
+/// visitor's copy -- nonce, token, cart -- to another, and revalidating costs a
+/// 304. Public storefront pages carry no nonce ([WebHeaders] in public mode)
+/// and are `public, max-age=60, stale-while-revalidate=600`, with the same tag.
 public final class PageEtags implements SecurityFilter {
     /// An exchange attribute: this page is one visitor's and is never stored.
     public static final String NO_STORE = "bazaar.noStore";
+    /// An exchange attribute: this page is the same for every visitor and a
+    /// shared cache may keep it (set by the storefront's caching interceptor).
+    public static final String PUBLIC_CACHE = "bazaar.publicCache";
+    /// What a public page is cached for: a minute fresh, ten more served stale
+    /// while a cache refetches.
+    public static final String PUBLIC_POLICY = "public, max-age=60, stale-while-revalidate=600";
 
     @Override
     public HttpServer.Response doFilter(HttpServer.Request request, FilterChain chain)
@@ -66,9 +74,13 @@ public final class PageEtags implements SecurityFilter {
         }
         Object nonce = exchange.getAttribute(WebHeaders.NONCE);
         String tag = "W/\"" + hash(body, nonce == null ? null : (String) nonce) + "\"";
-        // Every page carries a per-response CSP nonce, so no shared cache may
-        // keep one; this replaces whatever the controller set.
-        exchange.setResponseHeader("Cache-Control", "private, no-cache");
+        // A signed-in page carries a per-response CSP nonce and a session's
+        // CSRF token, so no shared cache may keep one. A public page has
+        // neither (its policy allows its inline style by hash), and only a
+        // page the storefront marked as the same for everyone is public.
+        boolean shared = exchange.getAttribute(WebHeaders.PUBLIC) != null
+                && exchange.getAttribute(PUBLIC_CACHE) != null;
+        exchange.setResponseHeader("Cache-Control", shared ? PUBLIC_POLICY : "private, no-cache");
         exchange.setResponseHeader("ETag", tag);
         String sent = request.getHeader("If-None-Match");
         if (sent != null && matches(sent, tag)) {
