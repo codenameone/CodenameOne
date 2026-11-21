@@ -349,11 +349,10 @@ public class CommerceData {
         v.backLabel = "Companies";
         v.facts.add(fact("Terms", terms(c.termsDays())));
         if (c.vatId() != null && c.vatId().length() > 0) {
-            VatCheckDto vat = trade.checkVat(me(), storeId, new VatCheckDto(c.vatId(), false, null,
-                    null));
-            v.facts.add(fact("VAT check", (vat.valid() ? "Valid format" : "Not valid")
-                    + (vat.message() == null || vat.message().length() == 0 ? ""
-                    : ": " + vat.message())));
+            VatCheckDto vat = trade.storedVat(me(), storeId, c.id());
+            v.facts.add(fact("VAT check", vat.message() + (vat.name().length() > 0
+                    ? " (" + vat.name() + ")" : "") + (vat.checkedAt() > 0
+                    ? ", " + com.codenameone.examples.bazaar.Days.iso(vat.checkedAt()) : "")));
         }
         v.forms.add(companyForm("company", "Company", base, "Save", c, trade.priceLists(me(), storeId)));
         List<CompanySiteDto> sites = trade.sites(me(), storeId, c.id());

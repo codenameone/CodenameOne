@@ -168,6 +168,10 @@ public class StoreOrder {
     @Column(nullable = false)
     private long fxRateMicros;
 
+    /// Where the order's rate came from: `manual`, `ecb`, or empty for none.
+    @Column(nullable = false, type = "VARCHAR(16)")
+    private String fxSource = "";
+
     public StoreOrder() {
     }
 
@@ -528,5 +532,13 @@ public class StoreOrder {
 
     public void setFxRateMicros(long fxRateMicros) {
         this.fxRateMicros = fxRateMicros;
+    }
+
+    public String getFxSource() {
+        return fxSource;
+    }
+
+    public void setFxSource(String fxSource) {
+        this.fxSource = fxSource;
     }
 }

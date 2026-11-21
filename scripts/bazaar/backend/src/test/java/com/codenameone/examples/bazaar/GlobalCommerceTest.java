@@ -139,9 +139,9 @@ class GlobalCommerceTest {
     }
 
     private MarketDto euro(Shop s) throws Exception {
-        markets.putRate(s.owner, s.storeId, new FxRateDto("EUR", 920000));
+        markets.putRate(s.owner, s.storeId, new FxRateDto("EUR", 920000, 0, "", 0));
         return markets.save(s.owner, s.storeId, null, new MarketDto(null, "eu", "Europe", "EUR",
-                Arrays.asList("DE", "FR"), "de", Markets.NONE, 0, true));
+                Arrays.asList("DE", "FR"), "de", Markets.NONE, 0, true, Markets.MANUAL));
     }
 
     // =============================================================== markets
@@ -200,10 +200,10 @@ class GlobalCommerceTest {
         String packer = People.customer(accounts, "gc-mk-packer");
         addStaff(b, packer, "FULFILMENT");
         assertEquals(403, status(() -> markets.save(packer, b.storeId, null, new MarketDto(null,
-                "uk", "UK", "USD", Arrays.asList("GB"), "", Markets.NONE, 0, true))));
+                "uk", "UK", "USD", Arrays.asList("GB"), "", Markets.NONE, 0, true, Markets.MANUAL))));
         // A currency without a rate is refused.
         assertEquals(400, status(() -> markets.save(b.owner, b.storeId, null, new MarketDto(null,
-                "jp", "Japan", "GBP", Arrays.asList("JP"), "", Markets.NONE, 0, true))));
+                "jp", "Japan", "GBP", Arrays.asList("JP"), "", Markets.NONE, 0, true, Markets.MANUAL))));
         // Duties are estimated by the longest HS prefix.
         markets.addDuty(b.owner, b.storeId, new com.codenameone.examples.bazaar.api.DutyRateDto(
                 null, "DE", "", 500));

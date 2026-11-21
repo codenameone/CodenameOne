@@ -150,9 +150,9 @@ class OnlineStoreTest {
     }
 
     private void euro(Shop s) throws Exception {
-        markets.putRate(s.owner, s.storeId, new FxRateDto("EUR", 920000));
+        markets.putRate(s.owner, s.storeId, new FxRateDto("EUR", 920000, 0, "", 0));
         markets.save(s.owner, s.storeId, null, new MarketDto(null, "eu", "Europe", "EUR",
-                Arrays.asList("DE", "FR"), "de", Markets.NONE, 0, true));
+                Arrays.asList("DE", "FR"), "de", Markets.NONE, 0, true, Markets.MANUAL));
     }
 
     // ============================================================ rich text

@@ -117,6 +117,7 @@ public class Trade {
     private final Shoppers shoppers;
     private final Orders orders;
     private final LineOrders lineOrders;
+    private final VatVerification vat;
 
     public Trade(CompanyRepository companies, CompanySiteRepository sites,
             CompanyBuyerRepository buyers, PriceListRepository priceLists,
@@ -124,7 +125,7 @@ public class Trade {
             TradeQuoteLineRepository quoteLines, NetTermRepository netTerms,
             VariantRepository variants, ProductRepository products,
             StoreOrderRepository orderRows, StoreAccess access, Shoppers shoppers, Orders orders,
-            LineOrders lineOrders) {
+            LineOrders lineOrders, VatVerification vat) {
         this.companies = companies;
         this.sites = sites;
         this.buyers = buyers;
@@ -140,6 +141,7 @@ public class Trade {
         this.shoppers = shoppers;
         this.orders = orders;
         this.lineOrders = lineOrders;
+        this.vat = vat;
     }
 
     // ------------------------------------------------------------ companies
@@ -160,25 +162,45 @@ public class Trade {
                 c.getPriceListId());
     }
 
-    @Transactional(rollbackFor = IOException.class)
+    /// Saves a company after asking VIES about its VAT id ([VatVerification]),
+    /// outside the transaction: a number VIES says is not issued is refused, and
+    /// one it could not check is saved as `unverified`.
     public CompanyDto saveCompany(String username, String storeId, String companyId,
             CompanyDto in) throws IOException {
         access.requireStaff(username, storeId, StoreAccess.MANAGERS);
-        return writeCompany(storeId, companyId, in);
+        String typed = in == null ? "" : VatIds.normalize(in.vatId());
+        VatCheckDto check = typed.length() == 0 ? null : vat.verify(typed);
+        if (check != null && !check.valid()) {
+            throw new ResponseStatusException(400, check.message());
+        }
+        return saveTx(storeId, companyId, in, check);
+    }
+
+    @Transactional(rollbackFor = IOException.class)
+    private CompanyDto saveTx(String storeId, String companyId, CompanyDto in,
+            VatCheckDto check) throws IOException {
+        return writeCompany(storeId, companyId, in, check);
     }
 
     /// Creates the company (`companyId` null) or updates it. A VAT id, when
     /// given, has to have a valid EU format ([VatIds]).
     public CompanyDto writeCompany(String storeId, String companyId, CompanyDto in)
             throws IOException {
+        return writeCompany(storeId, companyId, in, null);
+    }
+
+    /// [#writeCompany] recording `check`, the VIES outcome for its VAT id (null
+    /// for the format alone).
+    CompanyDto writeCompany(String storeId, String companyId, CompanyDto in,
+            VatCheckDto check) throws IOException {
         if (in == null || Codes.cut(in.name(), 120).length() == 0) {
             throw new ResponseStatusException(400, "Name the company");
         }
         String vat = VatIds.normalize(in.vatId());
         if (vat.length() > 0) {
-            VatCheckDto check = VatIds.check(vat);
-            if (!check.valid()) {
-                throw new ResponseStatusException(400, check.message());
+            VatCheckDto format = VatIds.check(vat);
+            if (!format.valid()) {
+                throw new ResponseStatusException(400, format.message());
             }
         }
         int terms = in.termsDays();
@@ -198,6 +220,13 @@ public class Trade {
             c.setCreatedAt(Instant.now());
         }
         c.setName(Codes.cut(in.name(), 120));
+        if (!vat.equals(c.getVatId()) || check != null) {
+            c.setVatStatus(vat.length() == 0 ? "" : check == null ? VatIds.FORMAT
+                    : check.status());
+            c.setVatName(check == null ? "" : Codes.cut(check.name(), 200));
+            c.setVatCheckedAt(check == null ? 0 : check.checkedAt());
+            c.setVatReference(check == null ? "" : Codes.cut(this.vat.reference(vat), 64));
+        }
         c.setVatId(vat);
         c.setTermsDays(terms);
         c.setPriceListId(listId);
@@ -834,7 +863,24 @@ public class Trade {
     public VatCheckDto checkVat(String username, String storeId, VatCheckDto in)
             throws IOException {
         access.requireStaff(username, storeId, StoreAccess.ANYONE);
-        return VatIds.check(in == null ? "" : in.vatId());
+        return vat.verify(in == null ? "" : in.vatId());
+    }
+
+    /// What was recorded for a company's VAT id when it was last saved: the
+    /// VIES outcome, name and date, without asking VIES again.
+    @Transactional(readOnly = true)
+    public VatCheckDto storedVat(String username, String storeId, String companyId)
+            throws IOException {
+        access.requireStaff(username, storeId, StoreAccess.ANYONE);
+        Company c = company(storeId, companyId);
+        String status = c.getVatStatus().length() == 0 ? VatIds.FORMAT : c.getVatStatus();
+        String message = VatIds.VERIFIED.equals(status) ? "Confirmed by VIES"
+                : VatIds.INVALID.equals(status) ? "VIES did not know the number"
+                : VatIds.UNVERIFIED.equals(status) ? "Valid format; VIES was unavailable"
+                : "Valid format";
+        return new VatCheckDto(c.getVatId(), !VatIds.INVALID.equals(status),
+                c.getVatId().length() >= 2 ? c.getVatId().substring(0, 2) : "", message, status,
+                c.getVatName(), c.getVatCheckedAt());
     }
 
     // ---------------------------------------------------------------- buyer

@@ -21,7 +21,8 @@ package com.codenameone.examples.bazaar.api;
 import com.codename1.annotations.Mapped;
 import java.util.List;
 
-/// A market: `countries` two-letter codes, `rounding` NONE, WHOLE or NINETY_NINE, `adjustBps` added to every converted price.
+/// A market: `countries` two-letter codes, `rounding` NONE, WHOLE or NINETY_NINE, `adjustBps` added to every converted price;
+/// `fxSource` is the rate it is priced at: `manual` (the merchant's) or `ecb` (the feed's).
 @Mapped
 public record MarketDto(
         String id,
@@ -32,5 +33,6 @@ public record MarketDto(
         String locale,
         String rounding,
         int adjustBps,
-        boolean active) {
+        boolean active,
+        String fxSource) {
 }

@@ -20,9 +20,16 @@ package com.codenameone.examples.bazaar.api;
 
 import com.codename1.annotations.Mapped;
 
-/// Units of `currency` per unit of the store currency, in millionths (1.08 is 1080000).
+/// Units of `currency` per unit of the store currency, in millionths (1.08 is 1080000):
+/// `rateMicros` is the merchant's own rate, `feedMicros` the last one a feed
+/// published (0 before the first), `feedSource` that feed (`ecb`) and `feedAt`
+/// the day it was published, in epoch milliseconds. Only the first two are read
+/// when a rate is saved.
 @Mapped
 public record FxRateDto(
         String currency,
-        long rateMicros) {
+        long rateMicros,
+        long feedMicros,
+        String feedSource,
+        long feedAt) {
 }

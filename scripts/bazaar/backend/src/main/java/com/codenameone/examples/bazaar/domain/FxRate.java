@@ -42,6 +42,18 @@ public class FxRate {
     @Column(nullable = false)
     private Instant updatedAt = Instant.EPOCH;
 
+    /// The feed's rate, in the same millionths, or 0 before the first fetch.
+    @Column(nullable = false)
+    private long feedMicros;
+
+    /// Which feed set the feed rate (`ecb`), or empty.
+    @Column(nullable = false, type = "VARCHAR(16)")
+    private String feedSource = "";
+
+    /// The day the feed published that rate, in epoch milliseconds.
+    @Column(nullable = false)
+    private long feedAt;
+
     public FxRate() {
     }
 
@@ -83,5 +95,29 @@ public class FxRate {
 
     public void setUpdatedAt(Instant updatedAt) {
         this.updatedAt = updatedAt;
+    }
+
+    public long getFeedMicros() {
+        return feedMicros;
+    }
+
+    public void setFeedMicros(long feedMicros) {
+        this.feedMicros = feedMicros;
+    }
+
+    public String getFeedSource() {
+        return feedSource;
+    }
+
+    public void setFeedSource(String feedSource) {
+        this.feedSource = feedSource;
+    }
+
+    public long getFeedAt() {
+        return feedAt;
+    }
+
+    public void setFeedAt(long feedAt) {
+        this.feedAt = feedAt;
     }
 }

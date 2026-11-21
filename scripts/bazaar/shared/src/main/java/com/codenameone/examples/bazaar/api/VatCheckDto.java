@@ -20,11 +20,19 @@ package com.codenameone.examples.bazaar.api;
 
 import com.codename1.annotations.Mapped;
 
-/// A VAT id checked for its EU format; `country` is its two-letter prefix.
+/// A VAT id checked for its EU format and, where the server can reach it, the
+/// European Commission's VIES service. `country` is its two-letter prefix;
+/// `status` is `format` (only the format was checked), `verified` (VIES knows
+/// the number), `invalid` (it does not) or `unverified` (VIES or the member
+/// state's service was down, and the format is valid); `name` is the trader
+/// VIES names, `checkedAt` when it was asked, in epoch milliseconds.
 @Mapped
 public record VatCheckDto(
         String vatId,
         boolean valid,
         String country,
-        String message) {
+        String message,
+        String status,
+        String name,
+        long checkedAt) {
 }

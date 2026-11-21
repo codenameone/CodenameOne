@@ -80,6 +80,10 @@ import java.util.Map;
 public class Markets {
     public static final String NONE = "NONE";
     public static final String WHOLE = "WHOLE";
+    /// A market priced at the merchant's own rate.
+    public static final String MANUAL = "manual";
+    /// A market priced at the European Central Bank's daily rate ([FxFeed]).
+    public static final String ECB = "ecb";
     public static final String NINETY_NINE = "NINETY_NINE";
     static final long MICROS = 1000000L;
     /// The highest rate accepted: a million units per unit of the store's.
@@ -145,7 +149,13 @@ public class Markets {
     public static MarketDto dto(Market m) {
         return new MarketDto(m.getId(), m.getCode(), m.getName(), m.getCurrency(),
                 countries(m.getCountries()), m.getLocale(), m.getRounding(), m.getAdjustBps(),
-                m.isActive());
+                m.isActive(), fxSource(m.getFxSource()));
+    }
+
+    /// A stored choice as [#MANUAL] or [#ECB]: rows from before there was a
+    /// choice say nothing, and are manual.
+    static String fxSource(String stored) {
+        return ECB.equals(stored) ? ECB : MANUAL;
     }
 
     /// "DE,FR" as a list, without a regular expression.
@@ -192,7 +202,14 @@ public class Markets {
             throw new ResponseStatusException(400, "Name the market");
         }
         String currency = currency(in.currency());
-        if (!currency.equals(store.getCurrency()) && rates.findByStoreIdAndCurrency(storeId,
+        String fxSource = in.fxSource() == null || in.fxSource().trim().length() == 0 ? MANUAL
+                : in.fxSource().trim();
+        if (!MANUAL.equals(fxSource) && !ECB.equals(fxSource)) {
+            throw new ResponseStatusException(400, "The exchange rate is manual or ecb");
+        }
+        // A market on the feed needs no rate of the merchant's: until the feed has
+        // one it shows the store's own prices, as a market whose rate is gone does.
+        if (MANUAL.equals(fxSource) && !currency.equals(store.getCurrency()) && rates.findByStoreIdAndCurrency(storeId,
                 currency) == null) {
             throw new ResponseStatusException(400, "Add an exchange rate for " + currency
                     + " first");
@@ -253,6 +270,7 @@ public class Markets {
         m.setRounding(rounding);
         m.setAdjustBps(in.adjustBps());
         m.setActive(in.active());
+        m.setFxSource(fxSource);
         if (fresh) {
             markets.insert(m);
         } else {
@@ -377,7 +395,9 @@ public class Markets {
         List<FxRate> rows = rates.findByStoreIdOrderByCurrencyAsc(storeId);
         List<FxRateDto> out = new ArrayList<FxRateDto>();
         for (int iter = 0; iter < rows.size(); iter++) {
-            out.add(new FxRateDto(rows.get(iter).getCurrency(), rows.get(iter).getRateMicros()));
+            FxRate r = rows.get(iter);
+            out.add(new FxRateDto(r.getCurrency(), r.getRateMicros(), r.getFeedMicros(),
+                    r.getFeedSource(), r.getFeedAt()));
         }
         return out;
     }
@@ -521,11 +541,18 @@ public class Markets {
     public static final class Pricer {
         final Market market;
         final long rateMicros;
+        final String source;
         final Map<String, Long> fixed = new HashMap<String, Long>();
 
-        Pricer(Market market, long rateMicros) {
+        Pricer(Market market, long rateMicros, String source) {
             this.market = market;
             this.rateMicros = rateMicros;
+            this.source = source;
+        }
+
+        /// Where [#rateMicros] came from: [#MANUAL] or [#ECB]; kept on the order.
+        public String source() {
+            return source;
         }
 
         public String currency() {
@@ -563,14 +590,15 @@ public class Markets {
             return null;
         }
         long rate = MICROS;
+        String source = fxSource(m.getFxSource());
         if (!m.getCurrency().equals(store.getCurrency())) {
             FxRate r = rates.findByStoreIdAndCurrency(store.getId(), m.getCurrency());
-            if (r == null || r.getRateMicros() <= 0) {
+            rate = r == null ? 0 : ECB.equals(source) ? r.getFeedMicros() : r.getRateMicros();
+            if (rate <= 0) {
                 return null;
             }
-            rate = r.getRateMicros();
         }
-        Pricer p = new Pricer(m, rate);
+        Pricer p = new Pricer(m, rate, source);
         List<MarketPrice> rows = prices.findByMarketId(m.getId());
         for (int iter = 0; iter < rows.size(); iter++) {
             p.fixed.put(rows.get(iter).getVariantId(), Long.valueOf(rows.get(iter).getPriceCents()));

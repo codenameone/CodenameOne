@@ -35,6 +35,8 @@ import com.codenameone.examples.bazaar.pay.MisconfiguredPayments;
 import com.codenameone.examples.bazaar.pay.PaymentProvider;
 import com.codenameone.examples.bazaar.pay.SimulatedPayments;
 import com.codenameone.examples.bazaar.pay.StripePayments;
+import com.codenameone.examples.bazaar.trade.VatRegistry;
+import com.codenameone.examples.bazaar.trade.ViesRegistry;
 import com.codename1.appkit.server.push.CloudPushSender;
 import com.codename1.appkit.server.push.ConsolePushSender;
 import com.codename1.appkit.server.push.MisconfiguredPushSender;
@@ -131,6 +133,18 @@ public class Services {
             return new StubGeocoder();
         }
         return new PhotonGeocoder(address);
+    }
+
+    /// `bazaar.vat.registry` is `vies` -- the European Commission's service at
+    /// `bazaar.vat.vies.url` -- or `none`, which checks the format only. Unset, it
+    /// is `none` under the `test` profile and `vies` otherwise. VIES needs no key.
+    @Bean
+    public VatRegistry vatRegistry(Config config,
+            @Value("${bazaar.vat.registry:}") String chosen,
+            @Value("${bazaar.vat.vies.url:" + ViesRegistry.BASE + "}") String address) {
+        String kind = chosen.trim().length() > 0 ? chosen.trim()
+                : "test".equals(config.getProfile()) ? "none" : "vies";
+        return "none".equalsIgnoreCase(kind) ? VatRegistry.NONE : new ViesRegistry(address);
     }
 
     // tag::bazaar-payment-choice[]

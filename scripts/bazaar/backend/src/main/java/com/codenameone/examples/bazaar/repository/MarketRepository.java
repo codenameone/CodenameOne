@@ -27,5 +27,6 @@ import java.util.List;
 @Repository(entity = Market.class, key = String.class)
 public interface MarketRepository extends CrudRepository<Market, String> {
     List<Market> findByStoreIdOrderByPositionAsc(String storeId);
+    List<Market> findByFxSource(String fxSource);
     Market findByStoreIdAndCode(String storeId, String code);
 }

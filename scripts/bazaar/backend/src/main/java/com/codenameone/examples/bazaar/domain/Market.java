@@ -60,6 +60,10 @@ public class Market {
     @Column(nullable = false)
     private int position;
 
+    /// Which rate prices the market: `manual` (the merchant's, also when empty) or `ecb` (the feed's).
+    @Column(nullable = false, type = "VARCHAR(16)")
+    private String fxSource = "";
+
     @Column(nullable = false)
     private Instant createdAt = Instant.EPOCH;
 
@@ -160,5 +164,13 @@ public class Market {
 
     public void setCreatedAt(Instant createdAt) {
         this.createdAt = createdAt;
+    }
+
+    public String getFxSource() {
+        return fxSource;
+    }
+
+    public void setFxSource(String fxSource) {
+        this.fxSource = fxSource;
     }
 }

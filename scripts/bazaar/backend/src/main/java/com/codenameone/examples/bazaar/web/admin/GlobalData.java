@@ -161,13 +161,16 @@ public class GlobalData {
         for (int iter = 0; iter < rates.size(); iter++) {
             ActionCard k = new ActionCard();
             k.title = rates.get(iter).currency();
-            k.detail = rate(rates.get(iter).rateMicros());
+            FxRateDto r = rates.get(iter);
+            k.detail = rate(r.rateMicros()) + (r.feedMicros() > 0 ? ", ECB " + rate(r.feedMicros())
+                    + " on " + com.codenameone.examples.bazaar.Days.iso(r.feedAt()) : "");
             v.cards.add(k);
         }
         FormView fx = new FormView("fx", "Set an exchange rate", "/admin/" + storeId
                 + "/fx-rates", "Save rate");
-        fx.text = "You keep these: there is no live feed. A market in another currency needs "
-                + "its rate first.";
+        fx.text = "Your own rates. A market can use them or the European Central Bank's "
+                + "daily rates instead, fetched by the server; a manual market in another "
+                + "currency needs its rate first.";
         fx.add("currency", "Currency", "text", "").required = true;
         fx.add("rate", "Rate", "text", "").hint("How much 1 " + currency + " is, e.g. 0.9200");
         v.forms.add(fx);
@@ -240,6 +243,10 @@ public class GlobalData {
                 .option(Markets.NINETY_NINE, "Up to .99");
         form.add("adjustBps", "Price adjustment (basis points)", "text",
                 m == null ? "0" : Integer.toString(m.adjustBps())).hint("500 is 5% more");
+        form.add("fxSource", "Exchange rate", "select", m == null ? Markets.MANUAL
+                : m.fxSource())
+                .option(Markets.MANUAL, "The rate you set")
+                .option(Markets.ECB, "European Central Bank, daily");
         form.add("active", "Active", "checkbox", m == null || m.active() ? "true" : "");
         CommerceData.selectChosen(form);
         return form;
@@ -250,7 +257,7 @@ public class GlobalData {
         MarketDto in = new MarketDto(marketId, f(request, "code"), f(request, "name"),
                 f(request, "currency"), list(f(request, "countries")), f(request, "locale"),
                 f(request, "rounding"), intField(f(request, "adjustBps"), 0),
-                f(request, "active").length() > 0);
+                f(request, "active").length() > 0, f(request, "fxSource"));
         return markets.save(me(), storeId, marketId, in).id();
     }
 
@@ -298,7 +305,7 @@ public class GlobalData {
 
     void putRate(String storeId, HttpServer.Request request) throws IOException {
         markets.putRate(me(), storeId, new FxRateDto(f(request, "currency"),
-                micros(f(request, "rate"))));
+                micros(f(request, "rate")), 0, "", 0));
     }
 
     void addDuty(String storeId, HttpServer.Request request) throws IOException {

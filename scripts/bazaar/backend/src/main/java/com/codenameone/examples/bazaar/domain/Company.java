@@ -48,6 +48,22 @@ public class Company {
     @Column(nullable = false)
     private Instant createdAt = Instant.EPOCH;
 
+    /// The last VIES outcome for the VAT id: format, verified, invalid or unverified.
+    @Column(nullable = false, type = "VARCHAR(16)")
+    private String vatStatus = "";
+
+    /// The trader VIES named, or empty.
+    @Column(nullable = false, type = "VARCHAR(200)")
+    private String vatName = "";
+
+    /// The consultation reference VIES gave, or empty.
+    @Column(nullable = false, type = "VARCHAR(64)")
+    private String vatReference = "";
+
+    /// When VIES was asked, in epoch milliseconds; 0 for never.
+    @Column(nullable = false)
+    private long vatCheckedAt;
+
     public Company() {
     }
 
@@ -105,5 +121,37 @@ public class Company {
 
     public void setCreatedAt(Instant createdAt) {
         this.createdAt = createdAt;
+    }
+
+    public String getVatStatus() {
+        return vatStatus;
+    }
+
+    public void setVatStatus(String vatStatus) {
+        this.vatStatus = vatStatus;
+    }
+
+    public String getVatName() {
+        return vatName;
+    }
+
+    public void setVatName(String vatName) {
+        this.vatName = vatName;
+    }
+
+    public String getVatReference() {
+        return vatReference;
+    }
+
+    public void setVatReference(String vatReference) {
+        this.vatReference = vatReference;
+    }
+
+    public long getVatCheckedAt() {
+        return vatCheckedAt;
+    }
+
+    public void setVatCheckedAt(long vatCheckedAt) {
+        this.vatCheckedAt = vatCheckedAt;
     }
 }

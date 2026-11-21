@@ -287,7 +287,8 @@ public class Checkouts {
         }
         StoreOrder done = finish(orderId, quote, due, reference, username);
         if (rate > 0) {
-            done = presentment(orderId, chargeCurrency, presentmentTotal, rate);
+            done = presentment(orderId, chargeCurrency, presentmentTotal, rate,
+                    pricer.source());
         }
         if (quote.exemptCertificate != null) {
             exemptions.recordUse(storeId, orderId, quote.exemptCertificate);
@@ -381,12 +382,14 @@ public class Checkouts {
     }
 
     @Transactional(rollbackFor = IOException.class)
-    private StoreOrder presentment(String orderId, String currency, long total, long rate)
+    private StoreOrder presentment(String orderId, String currency, long total, long rate,
+            String origin)
             throws IOException {
         StoreOrder order = orderRows.findById(orderId);
         order.setPresentmentCurrency(currency);
         order.setPresentmentTotalCents(total);
         order.setFxRateMicros(rate);
+        order.setFxSource(origin);
         orderRows.save(order);
         return order;
     }
