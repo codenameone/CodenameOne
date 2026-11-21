@@ -99,6 +99,18 @@ final class BackendWiringWriter {
           .append(" implements com.codename1.impl.backend.BackendApplication")
           .append(testBeans ? ", com.codename1.impl.backend.test.TestBeans" : "").append(" {\n");
         fields(sb);
+        // The database engines the module names, registered when the class is
+        // initialised: the server opens its pool from the configuration before
+        // it calls create(), and it holds an instance of this class by then.
+        List<String> engines = BackendEngineRegistration.connectors(model.ctx);
+        if (!engines.isEmpty()) {
+            sb.append("    static {\n");
+            for (String connector : engines) {
+                sb.append("        com.codename1.backend.Database.useEngine(").append(connector)
+                  .append(".CONNECTOR);\n");
+            }
+            sb.append("    }\n");
+        }
         create(sb, routers);
         webSockets(sb, sockets);
         started(sb);
@@ -221,12 +233,6 @@ final class BackendWiringWriter {
             }
         }
         sb.append("        }\n");
-        // The database engines the module names, registered before the data
-        // source -- or anything else -- can open a connection.
-        for (String connector : BackendEngineRegistration.connectors(model.ctx)) {
-            sb.append("        com.codename1.backend.Database.useEngine(").append(connector)
-              .append(".CONNECTOR);\n");
-        }
         sb.append("        config = environment.getConfig();\n");
         sb.append("        dataSource = environment.getDataSource();\n");
         if (model.usesMessaging()) {
