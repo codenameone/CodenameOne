@@ -44,6 +44,14 @@ Generate a complete application from Initializr, then make it your own. These te
 
 [Generate your application](https://www.codenameone.com/initializr/?utm_source=github&utm_medium=oss&utm_campaign=repo-readme&utm_content=template-start) · [Explore the complete templates](https://www.codenameone.com/demos/?utm_source=github&utm_medium=oss&utm_campaign=repo-readme&utm_content=fullstack-samples)
 
+## A game platform you can build on
+
+[Brickyard](https://www.codenameone.com/brickyard/?utm_source=github&utm_medium=oss&utm_campaign=repo-readme&utm_content=brickyard) is a complete game-platform sample with a pure-Java Luau runtime, GPU game engine, authoritative multiplayer backend, and a creator studio for phone, tablet and desktop. It reads and writes Roblox place files (`.rbxl` and `.rbxlx`) and reports compatibility for each place. The application source is MIT-0; running the platform requires your own hosting and configured services.
+
+<a href="https://www.codenameone.com/brickyard/?utm_source=github&utm_medium=oss&utm_campaign=repo-readme&utm_content=brickyard"><img src="docs/developer-guide/img/brickyard-desktop-studio.png" alt="Brickyard creator studio editing a game world on desktop" width="480"></a>
+
+[Explore Brickyard, the source and the guide](https://www.codenameone.com/brickyard/?utm_source=github&utm_medium=oss&utm_campaign=repo-readme&utm_content=brickyard).
+
 | What do you want to build? | Start here |
 | --- | --- |
 | A new Java app | [Generate a project](https://www.codenameone.com/initializr/?utm_source=github&utm_medium=oss&utm_campaign=repo-readme&utm_content=app-start) or [try the browser playground](https://www.codenameone.com/playground/?utm_source=github&utm_medium=oss&utm_campaign=repo-readme&utm_content=playground) |
