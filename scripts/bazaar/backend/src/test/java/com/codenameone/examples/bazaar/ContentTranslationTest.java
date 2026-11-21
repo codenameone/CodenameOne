@@ -97,7 +97,7 @@ class ContentTranslationTest {
         translations.put(s.owner, s.storeId, new TranslationDto(Translations.METAFIELD,
                 material.id(), "de", "name", "Werkstoff"));
         markets.save(s.owner, s.storeId, null, new MarketDto(null, "ch", "Switzerland", "USD",
-                Arrays.asList("CH"), "de-CH", Markets.NONE, 0, true));
+                Arrays.asList("CH"), "de-CH", Markets.NONE, 0, true, Markets.MANUAL));
 
         String page = "/s/ct-menu/products/ct-menu-mug";
         String ch = body(page + "?market=ch");
