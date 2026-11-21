@@ -46,6 +46,8 @@ import java.util.List;
 /// chart.addSeries(new RadarSeries("Alice", skills).setValues(8, 6, 7, 5, 9));
 /// chart.addSeries(new RadarSeries("Bob", skills).setValues(5, 9, 4, 8, 6));
 /// ```
+///
+/// ![A radar chart](https://www.codenameone.com/developer-guide/img/generated/chart-radar.png)
 public class RadarSeries extends Series {
     private String[] spokes;
     private double[] values = new double[0];

@@ -26,7 +26,7 @@
 ///   `BarSeries`, `ScatterSeries`, `RangeBarSeries`, `ErrorBarSeries`, `BoxPlotSeries`,
 ///   `HistogramSeries`, `WaterfallSeries` and `HeatmapSeries`.
 /// - Financial: `CandlestickSeries` (candles, OHLC bars or Heikin-Ashi) and `VolumeSeries`.
-/// - Parts of a whole: `PieSeries` (and doughnut), `FunnelSeries`, `TreemapSeries` and
-///   `SunburstSeries`.
+/// - Parts of a whole: `PieSeries` (and doughnut), `FunnelSeries`, `TreemapSeries`,
+///   `SunburstSeries` and `FlameGraphSeries`.
 /// - Others: `SankeySeries`, `GaugeSeries` and `RadarSeries`.
 package com.codename1.ui.chart.series;

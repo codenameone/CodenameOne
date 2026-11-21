@@ -32,6 +32,10 @@ import java.util.List;
 
 /// Vertical columns, or horizontal bars when the chart is rotated. Several bar series side
 /// by side form groups; bar series sharing a stack group stack instead.
+///
+/// ![Grouped bars](https://www.codenameone.com/developer-guide/img/generated/chart-grouped-bars.png)
+/// ![Stacked bars](https://www.codenameone.com/developer-guide/img/generated/chart-stacked-bars.png)
+/// ![Horizontal bars](https://www.codenameone.com/developer-guide/img/generated/chart-horizontal-bars.png)
 public class BarSeries extends XYSeries {
     private float barFraction = 0.75f;
     private float cornerMm = 0.6f;

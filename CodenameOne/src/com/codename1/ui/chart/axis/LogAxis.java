@@ -26,6 +26,8 @@ import com.codename1.util.MathUtil;
 
 /// A base 10 logarithmic axis for data spanning orders of magnitude. Values at or below
 /// zero cannot be placed and are clamped to the bottom of the axis.
+///
+/// ![A log axis](https://www.codenameone.com/developer-guide/img/generated/chart-log-axis.png)
 public class LogAxis extends Axis {
     /// Creates a logarithmic axis.
     ///

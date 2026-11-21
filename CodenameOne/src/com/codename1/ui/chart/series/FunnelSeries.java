@@ -36,6 +36,8 @@ import com.codename1.ui.geom.GeneralPath;
 /// ```java
 /// new FunnelSeries("Signup").setData(new String[]{"Visited", "Signed up", "Paid"}, new double[]{1000, 300, 45});
 /// ```
+///
+/// ![A funnel](https://www.codenameone.com/developer-guide/img/generated/chart-funnel.png)
 public class FunnelSeries extends CategoricalSeries {
     private float[] lastTop = new float[0];
     private float[] lastH = new float[0];

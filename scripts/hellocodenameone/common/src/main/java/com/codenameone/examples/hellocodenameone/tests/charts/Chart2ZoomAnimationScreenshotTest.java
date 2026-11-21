@@ -69,4 +69,10 @@ public class Chart2ZoomAnimationScreenshotTest extends AbstractChart2AnimationSc
     protected int getAnimationDurationMillis() {
         return 300;
     }
+
+    @Override
+    protected int framesThatMustMove() {
+        // the zoom runs the whole 300 ms strip: every frame moves
+        return 5;
+    }
 }

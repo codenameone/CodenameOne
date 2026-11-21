@@ -37,6 +37,8 @@ import com.codename1.ui.chart.layout.Shapes;
 /// GaugeSeries cpu = new GaugeSeries("CPU", 0, 100).setValue(72);
 /// cpu.addBand(0, 60, 0x009E73).addBand(60, 85, 0xE69F00).addBand(85, 100, 0xD55E00);
 /// ```
+///
+/// ![A gauge](https://www.codenameone.com/developer-guide/img/generated/chart-gauge.png)
 public class GaugeSeries extends Series {
     // reused by every paint: a sector path is rebuilt and filled before the next is made
     private final com.codename1.ui.geom.GeneralPath sectorPath = new com.codename1.ui.geom.GeneralPath();

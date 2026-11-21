@@ -144,6 +144,19 @@ import com.codenameone.examples.hellocodenameone.tests.charts.Chart2BrushScreens
 import com.codenameone.examples.hellocodenameone.tests.charts.Chart2GrowInAnimationScreenshotTest;
 import com.codenameone.examples.hellocodenameone.tests.charts.Chart2DataChangeAnimationScreenshotTest;
 import com.codenameone.examples.hellocodenameone.tests.charts.Chart2ZoomAnimationScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.charts.Chart2FlameGraphScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.charts.Chart2LineStylesScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.charts.Chart2BarStylesScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.charts.Chart2PointStylesScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.charts.Chart2FinancialStylesScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.charts.Chart2LinesGrowInAnimationScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.charts.Chart2BarsGrowInAnimationScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.charts.Chart2PointsGrowInAnimationScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.charts.Chart2FinancialGrowInAnimationScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.charts.Chart2PartsGrowInAnimationScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.charts.Chart2HierarchyGrowInAnimationScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.charts.Chart2PartsDataChangeAnimationScreenshotTest;
+import com.codenameone.examples.hellocodenameone.tests.charts.Chart2LegendToggleAnimationScreenshotTest;
 import com.codenameone.examples.hellocodenameone.tests.accessibility.AccessibilityTest;
 
 
@@ -466,9 +479,22 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new Chart2SparklinesScreenshotTest(),
             new Chart2SharedTooltipScreenshotTest(),
             new Chart2BrushScreenshotTest(),
+            new Chart2FlameGraphScreenshotTest(),
+            new Chart2LineStylesScreenshotTest(),
+            new Chart2BarStylesScreenshotTest(),
+            new Chart2PointStylesScreenshotTest(),
+            new Chart2FinancialStylesScreenshotTest(),
             new Chart2GrowInAnimationScreenshotTest(),
             new Chart2DataChangeAnimationScreenshotTest(),
             new Chart2ZoomAnimationScreenshotTest(),
+            new Chart2LinesGrowInAnimationScreenshotTest(),
+            new Chart2BarsGrowInAnimationScreenshotTest(),
+            new Chart2PointsGrowInAnimationScreenshotTest(),
+            new Chart2FinancialGrowInAnimationScreenshotTest(),
+            new Chart2PartsGrowInAnimationScreenshotTest(),
+            new Chart2HierarchyGrowInAnimationScreenshotTest(),
+            new Chart2PartsDataChangeAnimationScreenshotTest(),
+            new Chart2LegendToggleAnimationScreenshotTest(),
             new BrowserComponentScreenshotTest(),
             new RichTextAreaScreenshotTest(),
             new CodeEditorScreenshotTest(),

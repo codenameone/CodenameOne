@@ -40,6 +40,8 @@ import com.codename1.ui.chart.ChartPoint;
 /// ```java
 /// new WaterfallSeries("Profit").setSteps(new double[]{120, -30, -25, 40, 0}, new boolean[]{false, false, false, false, true});
 /// ```
+///
+/// ![A waterfall](https://www.codenameone.com/developer-guide/img/generated/chart-waterfall.png)
 public class WaterfallSeries extends BarSeries {
     // channel 0 is each bar's base; channel 1 is 1 for a total bar, kept as a channel (not a
     // parallel array) so every row mutation -- a slide, a setMaxPoints trim, a removed or replaced

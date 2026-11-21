@@ -121,8 +121,9 @@ public class ChartReviewRound22Test extends UITestBase {
         s.setValues(50, 60).setStackGroup("g");
         new Chart().addSeries(bar).addSeries(s);
         double[] yb = s.getYBounds();
-        assertEquals(50, yb[0], 1e-9, "zero is not folded into a scatter's bounds");
-        assertEquals(60, yb[1], 1e-9);
+        // a scatter pads its range by 4% so the extreme dots are drawn whole
+        assertEquals(50 - 10 * 0.04, yb[0], 1e-9, "zero is not folded into a scatter's bounds");
+        assertEquals(60 + 10 * 0.04, yb[1], 1e-9);
     }
 
     @FormTest

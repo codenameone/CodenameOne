@@ -43,6 +43,8 @@ import com.codename1.ui.chart.layout.Squarify;
 /// root.add(new TreeNode("Music", 20));
 /// chart.addSeries(new TreemapSeries("Portfolio", root));
 /// ```
+///
+/// ![A treemap](https://www.codenameone.com/developer-guide/img/generated/chart-treemap.png)
 public class TreemapSeries extends HierarchySeries {
     /// Creates a treemap.
     ///
@@ -112,14 +114,20 @@ public class TreemapSeries extends HierarchySeries {
             if (rw < 1 || rh < 1) {
                 continue;
             }
-            int color = colorOf(ctx, c);
-            g.setColor(color);
-            g.fillRect(Math.round(rx), Math.round(ry), Math.round(rw), Math.round(rh));
             float[] cell = nextCell(4);
             cell[0] = rx;
             cell[1] = ry;
             cell[2] = rw;
             cell[3] = rh;
+            // a data change moves every cell from where it was to where it now belongs
+            tween(ctx, c, cell);
+            rx = cell[0];
+            ry = cell[1];
+            rw = cell[2];
+            rh = cell[3];
+            int color = colorOf(ctx, c);
+            g.setColor(color);
+            g.fillRect(Math.round(rx), Math.round(ry), Math.round(rw), Math.round(rh));
             record(c, cell);
             boolean nest = c.getChildCount() > 0 && depth < getMaxDepth() && rw > fh * 4 && rh > fh * 3;
             if (labels && rw > pad * 2 + fh && rh > fh + pad) {
@@ -178,6 +186,11 @@ public class TreemapSeries extends HierarchySeries {
     private final java.util.HashMap<TreeNode, CachedLayout> layouts = new java.util.HashMap<TreeNode, CachedLayout>();
     private int layoutVersion = -1;
     private double[] valueBuf = new double[0];
+
+    @Override
+    protected float[] collapsed(float[] r) {
+        return new float[]{r[0] + r[2] / 2, r[1] + r[3] / 2, 0, 0};
+    }
 
     @Override
     protected boolean contains(float[] r, float x, float y) {

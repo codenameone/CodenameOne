@@ -37,6 +37,8 @@ import com.codename1.ui.chart.ChartPoint;
 /// s.addSamples(0, mondaySamples);
 /// s.addSamples(1, tuesdaySamples);
 /// ```
+///
+/// ![A box plot](https://www.codenameone.com/developer-guide/img/generated/chart-box-plot.png)
 public class BoxPlotSeries extends XYSeries {
     private static final int MIN = 0;
     private static final int Q1 = 1;

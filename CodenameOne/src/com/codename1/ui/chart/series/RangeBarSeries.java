@@ -32,6 +32,8 @@ import com.codename1.ui.chart.ChartPoint;
 /// double[] lows = {4, 6, 9}, highs = {12, 15, 19};
 /// new RangeBarSeries("Temperature").setRanges(null, lows, highs);
 /// ```
+///
+/// ![Range bars](https://www.codenameone.com/developer-guide/img/generated/chart-range-bars.png)
 public class RangeBarSeries extends BarSeries {
     /// Creates an empty series.
     ///

@@ -44,6 +44,8 @@ import com.codename1.ui.chart.layout.Shapes;
 /// root.add(new TreeNode("Music", 20));
 /// chart.addSeries(new SunburstSeries("Disk usage", root).setMaxDepth(3));
 /// ```
+///
+/// ![A sunburst](https://www.codenameone.com/developer-guide/img/generated/chart-sunburst.png)
 public class SunburstSeries extends HierarchySeries {
     private final com.codename1.ui.geom.GeneralPath sectorPath = new com.codename1.ui.geom.GeneralPath();
     private float cx;
@@ -189,18 +191,24 @@ public class SunburstSeries extends HierarchySeries {
             }
             int color = colorOf(ctx, c);
             g.setColor(color);
-            double pad = s > 1 ? 0.4 : 0;
-            g.fillShape(Shapes.sector(sectorPath, cx, cy, outer, inner, a + pad, s - pad * 2));
             float[] cell = nextCell(4);
             cell[0] = inner;
             cell[1] = outer;
             cell[2] = (float) a;
             cell[3] = (float) s;
+            // a data change turns every sector from the angles it had to its new ones
+            tween(ctx, c, cell);
+            double da = cell[2];
+            double ds = cell[3];
+            double pad = ds > 1 ? 0.4 : 0;
+            if (ds > 0) {
+                g.fillShape(Shapes.sector(sectorPath, cx, cy, outer, inner, da + pad, ds - pad * 2));
+            }
             record(c, cell);
             if (labels) {
-                double mid = a + s / 2;
+                double mid = da + ds / 2;
                 float mr = (inner + outer) / 2;
-                double arc = Math.toRadians(s) * mr;
+                double arc = Math.toRadians(ds) * mr;
                 String txt = LabelLayout.ellipsize(f, c.getLabel(), (int) Math.min(arc - ctx.mm(1), ring * 1.6f));
                 int w = f.stringWidth(txt);
                 if (txt.length() > 0 && !"...".equals(txt) && arc > w + ctx.mm(1) && ring > fh) {
@@ -215,6 +223,11 @@ public class SunburstSeries extends HierarchySeries {
             paintRing(ctx, c, a, s, level + 1, levels, ring, labels);
             a += s;
         }
+    }
+
+    @Override
+    protected float[] collapsed(float[] r) {
+        return new float[]{r[0], r[1], r[2] + r[3] / 2, 0};
     }
 
     @Override

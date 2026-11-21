@@ -148,6 +148,8 @@ public abstract class AbstractAnimationScreenshotTest extends BaseTest {
         cg.fillRect(0, 0, width, height);
         prepareCapture(frameWidth, frameHeight);
         int blankFrames = 0;
+        int mustMove = framesThatMustMove();
+        long previousHash = 0;
         try {
             for (int i = 0; i < FRAME_COUNT; i++) {
                 double progress = (double) i / (double) (FRAME_COUNT - 1);
@@ -165,6 +167,14 @@ public abstract class AbstractAnimationScreenshotTest extends BaseTest {
                 }
                 if (isSingleColour(frame, frameWidth, frameHeight)) {
                     blankFrames++;
+                }
+                if (i <= mustMove) {
+                    long hash = pixelHash(frame);
+                    if (i > 0 && hash == previousHash) {
+                        failAfterCapture("frame F" + (i + 1) + " is identical to F" + i
+                                + ": the animation stood still where it should be moving");
+                    }
+                    previousHash = hash;
                 }
                 int row = i / GRID_COLS;
                 int col = i % GRID_COLS;
@@ -310,6 +320,28 @@ public abstract class AbstractAnimationScreenshotTest extends BaseTest {
 
     /// Tear-down hook invoked after all frames have been rendered.
     protected void finishCapture() {
+    }
+
+    /// How many frames after the first must each differ from the frame before them. A
+    /// filmstrip whose animation never moves still passes every pixel comparison against a
+    /// golden that recorded the same stillness, so a test whose animation runs through the
+    /// first frames returns how many of them it covers, and an identical pair fails the test.
+    /// The double tap zoom stood still for five frames and jumped on the sixth this way.
+    ///
+    /// #### Returns
+    ///
+    /// 0 (no check) by default, at most 5
+    protected int framesThatMustMove() {
+        return 0;
+    }
+
+    private static long pixelHash(Image img) {
+        int[] rgb = img.getRGB();
+        long h = 1125899906842597L;
+        for (int i = 0; i < rgb.length; i++) {
+            h = 31 * h + rgb[i];
+        }
+        return h;
     }
 
     /// Paint a single animation frame. Subclasses using the default per-frame

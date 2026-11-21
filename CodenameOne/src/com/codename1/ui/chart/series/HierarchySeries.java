@@ -253,8 +253,72 @@ public abstract class HierarchySeries extends Series {
         entering = true;
     }
 
+    // where each node was drawn when the data started to change, so the change animates
+    private java.util.HashMap<TreeNode, float[]> fromCells;
+
     @Override
     protected void captureTransitionStart() {
+        if (nodes.isEmpty()) {
+            fromCells = null;
+            return;
+        }
+        java.util.HashMap<TreeNode, float[]> m = new java.util.HashMap<TreeNode, float[]>();
+        for (int i = 0; i < nodes.size(); i++) {
+            float[] c = cells.get(i);
+            float[] copy = new float[c.length];
+            System.arraycopy(c, 0, copy, 0, c.length);
+            m.put(nodes.get(i), copy);
+        }
+        fromCells = m;
+    }
+
+    @Override
+    protected void transitionEnded() {
+        fromCells = null;
+    }
+
+    /// Moves a node's geometry, in place, part of the way from where the node was drawn before
+    /// the data changed to `geometry`, by the progress of the change. A node the change added
+    /// starts from `collapsed(geometry)`. Does nothing when no change is animating.
+    ///
+    /// #### Parameters
+    ///
+    /// - `ctx`: the paint context
+    ///
+    /// - `n`: the node
+    ///
+    /// - `geometry`: the node's geometry after the change, replaced by this frame's
+    protected final void tween(ChartContext ctx, TreeNode n, float[] geometry) {
+        if (fromCells == null) {
+            return;
+        }
+        float p = ctx.getProgress();
+        if (p >= 1) {
+            return;
+        }
+        float[] from = fromCells.get(n);
+        if (from == null || from.length != geometry.length) {
+            from = collapsed(geometry);
+        }
+        for (int i = 0; i < geometry.length; i++) {
+            geometry[i] = from[i] + (geometry[i] - from[i]) * p;
+        }
+    }
+
+    /// The geometry a node added by a data change grows from: by default the geometry itself,
+    /// so the node appears in place.
+    ///
+    /// #### Parameters
+    ///
+    /// - `geometry`: the node's geometry after the change
+    ///
+    /// #### Returns
+    ///
+    /// a new array of the same length
+    protected float[] collapsed(float[] geometry) {
+        float[] r = new float[geometry.length];
+        System.arraycopy(geometry, 0, r, 0, geometry.length);
+        return r;
     }
 
     /// The fraction of the zoom or entry animation done, 1 when idle.

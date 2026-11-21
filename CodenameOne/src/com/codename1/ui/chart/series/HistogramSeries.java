@@ -30,6 +30,8 @@ import com.codename1.util.MathUtil;
 /// double[] latencies = {120, 135, 150, 180, 240, 95, 160};
 /// new HistogramSeries("Response time").setSamples(latencies, 0);
 /// ```
+///
+/// ![A histogram](https://www.codenameone.com/developer-guide/img/generated/chart-histogram.png)
 public class HistogramSeries extends BarSeries {
     private static final int MAX_BINS = 10000;
     private double binWidth;

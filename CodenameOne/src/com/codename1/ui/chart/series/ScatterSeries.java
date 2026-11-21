@@ -30,6 +30,9 @@ import java.util.Arrays;
 /// Unconnected points. Giving the points sizes turns it into a bubble chart: the bubble's
 /// *area*, not its radius, is proportional to the size value, so big values do not look
 /// quadratically bigger than they are.
+///
+/// ![A scatter chart](https://www.codenameone.com/developer-guide/img/generated/chart-scatter.png)
+/// ![A bubble chart](https://www.codenameone.com/developer-guide/img/generated/chart-bubble.png)
 public class ScatterSeries extends XYSeries {
     // the bubble size is aux channel 0, so slide(), removeRow(), setMaxPoints() and the
     // transitions keep it aligned with its point; NaN is "no size", drawn as a plain dot
@@ -262,5 +265,31 @@ public class ScatterSeries extends XYSeries {
     public int getSelectablePointCount() {
         // not aligned for the shared tooltip, but every point can still be selected
         return size();
+    }
+
+    // A point at the edge of the data would sit on the plot's border with half of it clipped
+    // away, and a bubble there could lose most of itself. The bounds are pixels-free, so the
+    // margin is a share of the range: wide enough for a dot, and for the largest bubble on a
+    // plot of phone width.
+    private double[] padded(double[] b) {
+        if (b == null) {
+            return null;
+        }
+        double span = b[1] - b[0];
+        if (!(span > 0) || Double.isInfinite(span)) { //NOPMD LogicInversion - also true for a NaN span
+            return b;
+        }
+        double m = span * (bubbles ? 0.08 : 0.04);
+        return new double[]{b[0] - m, b[1] + m};
+    }
+
+    @Override
+    public double[] getXBounds() {
+        return padded(super.getXBounds());
+    }
+
+    @Override
+    public double[] getYBounds() {
+        return padded(super.getYBounds());
     }
 }

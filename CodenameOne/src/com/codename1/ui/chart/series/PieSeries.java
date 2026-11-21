@@ -43,6 +43,9 @@ import com.codename1.ui.chart.layout.Shapes;
 /// pie.setInnerRadius(0.6f).setCenterText("2.1B");
 /// chart.addSeries(pie);
 /// ```
+///
+/// ![A pie](https://www.codenameone.com/developer-guide/img/generated/chart-pie.png)
+/// ![A doughnut](https://www.codenameone.com/developer-guide/img/generated/chart-doughnut.png)
 public class PieSeries extends CategoricalSeries {
     /// Reused by every slice of every frame, so painting allocates no path.
     private final com.codename1.ui.geom.GeneralPath sectorPath = new com.codename1.ui.geom.GeneralPath();
@@ -181,6 +184,15 @@ public class PieSeries extends CategoricalSeries {
         percentBaseScans++;
     }
 
+    // true while this paint stacks each outside label's name over its percentage: chosen when the
+    // one line labels leave the pie too small, which is every pie on a phone held upright
+    private boolean twoLineLabels;
+
+    private String pctText(int i) {
+        double p = percentOf(i);
+        return p >= 0 ? Axis.formatNumber(p, p < 10 ? 1 : 0) + "%" : "";
+    }
+
     private String labelText(int i) {
         double p = percentOf(i);
         String pct = p >= 0 ? Axis.formatNumber(p, p < 10 ? 1 : 0) + "%" : "";
@@ -222,22 +234,34 @@ public class PieSeries extends CategoricalSeries {
         }
         boolean outside = labelMode == LABELS_OUTSIDE;
         int maxLabel = 0;
+        twoLineLabels = false;
         if (outside) {
+            int maxStacked = 0;
             for (int i = 0; i < n; i++) {
                 // only a slice paintOutsideLabels can label is worth formatting and measuring
                 double v = displayValue(ctx, i);
                 if (total > 0 && v > 0 && v < Double.POSITIVE_INFINITY && 360 * (v / maxPart / total) > OUTSIDE_LABEL_SWEEP) {
                     labelMeasures++;
                     maxLabel = Math.max(maxLabel, f.stringWidth(labelText(i)));
+                    maxStacked = Math.max(maxStacked, Math.max(f.stringWidth(labels[i]), f.stringWidth(pctText(i))));
                 }
             }
-            maxLabel = Math.min(maxLabel, (int) (ctx.getPlotWidth() * 0.3f));
+            int cap = (int) (ctx.getPlotWidth() * 0.3f);
+            maxLabel = Math.min(maxLabel, cap);
+            // a stacked name may be shortened with an ellipsis rather than lose the pie its labels
+            maxStacked = Math.min(maxStacked, (int) (ctx.getPlotWidth() * 0.22f));
             float rr = Math.min(ctx.getPlotHeight() / 2f - fh, ctx.getPlotWidth() / 2f - maxLabel - gap * 3);
-            if (rr < minDim * 0.22f) {
+            float stacked = Math.min(ctx.getPlotHeight() / 2f - 2 * fh, ctx.getPlotWidth() / 2f - maxStacked - gap * 3);
+            if (rr >= minDim * 0.22f) {
+                r = rr;
+            } else if (stacked >= minDim * 0.2f) {
+                // narrow plot: the name over its percentage takes half the width of one line
+                twoLineLabels = true;
+                maxLabel = maxStacked;
+                r = stacked;
+            } else {
                 // too cramped for outside labels: give the pie the room and rely on legend/tooltip
                 outside = false;
-            } else {
-                r = rr;
             }
         }
         r = Math.max(4, r);
@@ -330,6 +354,7 @@ public class PieSeries extends CategoricalSeries {
         Graphics g = ctx.getGraphics();
         Font f = ctx.getFont();
         int fh = f.getHeight();
+        int lh = twoLineLabels ? 2 * fh : fh;
         int n = size();
         int top = ctx.getPlotY();
         int bottom = ctx.getPlotY() + ctx.getPlotHeight();
@@ -354,11 +379,11 @@ public class PieSeries extends CategoricalSeries {
                     continue;
                 }
                 idx[m] = i;
-                want[m] = Shapes.py(cy, r + gap, mid) - fh / 2f;
+                want[m] = Shapes.py(cy, r + gap, mid) - lh / 2f;
                 m++;
             }
             // one pixel more than the label layout's own gap so resolved labels are never rejected
-            float[] y = resolve(idx, want, m, fh + 3, top, bottom);
+            float[] y = resolve(idx, want, m, lh + 3, top, bottom);
             for (int k = 0; k < m; k++) {
                 // NaN here is resolve()'s own "label rejected" marker, not data: NaN-only is right
                 if (y[k] != y[k]) {
@@ -369,19 +394,27 @@ public class PieSeries extends CategoricalSeries {
                 float ax = Shapes.px(cx, r, mid);
                 float ay = Shapes.py(cy, r, mid);
                 float ex = Shapes.px(cx, r + gap, mid);
-                float ly = y[k] + fh / 2f;
+                float ly = y[k] + lh / 2f;
                 float tx = side == 0 ? cx + r + gap * 2 : cx - r - gap * 2;
-                String t = LabelLayout.ellipsize(f, labelText(i), maxLabel);
-                int w = f.stringWidth(t);
+                String t = LabelLayout.ellipsize(f, twoLineLabels ? labels[i] : labelText(i), maxLabel);
+                String t2 = twoLineLabels ? pctText(i) : null;
+                int w1 = f.stringWidth(t);
+                int w = t2 == null ? w1 : Math.max(w1, f.stringWidth(t2));
                 int lx = side == 0 ? Math.round(tx + gap / 2f) : Math.round(tx - gap / 2f - w);
-                if (!ctx.getLabels().placeAt(lx, Math.round(y[k]), w, fh)) {
+                if (!ctx.getLabels().placeAt(lx, Math.round(y[k]), w, lh)) {
                     continue;
                 }
                 g.setColor(ctx.getTheme().getSecondaryTextColor());
                 g.drawLine(Math.round(ax), Math.round(ay), Math.round(ex), Math.round(ly));
                 g.drawLine(Math.round(ex), Math.round(ly), Math.round(tx), Math.round(ly));
                 g.setColor(ctx.getTheme().getTextColor());
-                g.drawString(t, lx, Math.round(y[k]));
+                // each line hugs the pie: left aligned on the right side, right aligned on the left
+                g.drawString(t, side == 0 ? lx : lx + w - w1, Math.round(y[k]));
+                if (t2 != null) {
+                    int w2 = f.stringWidth(t2);
+                    g.setColor(ctx.getTheme().getSecondaryTextColor());
+                    g.drawString(t2, side == 0 ? lx : lx + w - w2, Math.round(y[k]) + fh);
+                }
             }
         }
     }
@@ -416,27 +449,77 @@ public class PieSeries extends CategoricalSeries {
             drop[worst] = true;
             kept--;
         }
+        // Labels that would overlap are gathered into clusters, and each cluster is centred on
+        // the slices it labels, so a run of thin slices at the top of the pie stacks its labels
+        // above and below them. Pushing labels only downward sent their leader lines back
+        // across the pie.
         float[] y = labelY;
-        float prev = top - fh;
+        float maxTop = bottom - fh + 3;
+        int[] start = clusterStart(m);
+        int clusters = 0;
         for (int k = 0; k < m; k++) {
             if (drop[k]) {
                 y[k] = Float.NaN;
                 continue;
             }
-            y[k] = Math.max(Math.max(want[k], top), prev + fh);
-            prev = y[k];
-        }
-        float limit = bottom - fh + 3;
-        for (int k = m - 1; k >= 0; k--) {
-            if (drop[k]) {
-                continue;
+            start[clusters] = k;
+            clusters++;
+            placeCluster(want, drop, y, start[clusters - 1], k, fh, top, maxTop);
+            // merge with the clusters above while they overlap
+            while (clusters > 1) {
+                int prevStart = start[clusters - 2];
+                int prevEnd = lastKept(drop, prevStart, start[clusters - 1] - 1);
+                if (y[prevEnd] + fh <= y[start[clusters - 1]]) {
+                    break;
+                }
+                clusters--;
+                placeCluster(want, drop, y, prevStart, k, fh, top, maxTop);
             }
-            if (y[k] > limit) {
-                y[k] = limit;
-            }
-            limit = y[k] - fh;
         }
         return y;
+    }
+
+    private int[] clusterStarts = new int[0];
+
+    private int[] clusterStart(int m) {
+        if (clusterStarts.length < m) {
+            clusterStarts = new int[m];
+        }
+        return clusterStarts;
+    }
+
+    private static int lastKept(boolean[] drop, int from, int to) {
+        for (int k = to; k > from; k--) {
+            if (!drop[k]) {
+                return k;
+            }
+        }
+        return from;
+    }
+
+    // lays the kept labels from..to out one under another, centred on where they want to be and
+    // kept inside [top, maxTop]
+    private static void placeCluster(float[] want, boolean[] drop, float[] y, int from, int to, int fh,
+                                     float top, float maxTop) {
+        float sum = 0;
+        int n = 0;
+        for (int k = from; k <= to; k++) {
+            if (!drop[k]) {
+                // each label wants the cluster to start n rows above it
+                sum += want[k] - n * fh;
+                n++;
+            }
+        }
+        float first = sum / n;
+        first = Math.min(first, maxTop - (n - 1) * fh);
+        first = Math.max(first, top);
+        int i = 0;
+        for (int k = from; k <= to; k++) {
+            if (!drop[k]) {
+                y[k] = first + i * fh;
+                i++;
+            }
+        }
     }
 
     @Override

@@ -42,6 +42,8 @@ import java.util.HashMap;
 /// SankeySeries s = new SankeySeries("Energy");
 /// s.addLink("Solar", "Grid", 40).addLink("Gas", "Grid", 60).addLink("Grid", "Homes", 55).addLink("Grid", "Industry", 45);
 /// ```
+///
+/// ![A Sankey diagram](https://www.codenameone.com/developer-guide/img/generated/chart-sankey.png)
 public class SankeySeries extends Series {
     private final ArrayList<String> nodeNames = new ArrayList<String>();
     // name to index, so adding links is linear rather than a scan of every name per link

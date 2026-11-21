@@ -74,4 +74,10 @@ public class Chart2DataChangeAnimationScreenshotTest extends AbstractChart2Anima
         target = null;
         super.finishCapture();
     }
+
+    @Override
+    protected int framesThatMustMove() {
+        // the 600 ms change spans the strip; the last frame may equal the fifth once easing settles
+        return 4;
+    }
 }

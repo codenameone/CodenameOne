@@ -40,6 +40,8 @@ import com.codename1.ui.chart.axis.LogAxis;
 /// chart.setYAxis(new CategoryAxis(Axis.LEFT, "Morning", "Noon", "Evening"));
 /// chart.addSeries(new HeatmapSeries("Visits").setMatrix(values));
 /// ```
+///
+/// ![A heatmap](https://www.codenameone.com/developer-guide/img/generated/chart-heatmap.png)
 public class HeatmapSeries extends Series {
     // reused by every paint, so painting allocates nothing per cell
     private final float[] cellBuf = new float[4];

@@ -39,4 +39,10 @@ public class Chart2GrowInAnimationScreenshotTest extends AbstractChart2Animation
     protected int getAnimationDurationMillis() {
         return 1000;
     }
+
+    @Override
+    protected int framesThatMustMove() {
+        // the 625 ms entry spans the first four frames of the 1000 ms strip
+        return 3;
+    }
 }

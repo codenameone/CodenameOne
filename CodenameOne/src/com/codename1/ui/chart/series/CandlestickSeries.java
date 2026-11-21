@@ -42,6 +42,10 @@ import com.codename1.ui.chart.ChartPoint;
 /// chart.setXAxis(new SessionTimeAxis(Axis.BOTTOM, timestamps));
 /// chart.addSeries(prices);
 /// ```
+///
+/// ![Candles](https://www.codenameone.com/developer-guide/img/generated/chart-candlestick.png)
+/// ![OHLC bars](https://www.codenameone.com/developer-guide/img/generated/chart-ohlc.png)
+/// ![Heikin-Ashi candles](https://www.codenameone.com/developer-guide/img/generated/chart-heikin-ashi.png)
 public class CandlestickSeries extends XYSeries {
     /// Filled bodies with wicks.
     public static final int CANDLES = 0;

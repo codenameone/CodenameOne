@@ -30,6 +30,8 @@ import java.util.List;
 ///
 /// When labels do not fit side by side the chart first rotates them, then shows every
 /// n-th one, and finally truncates with an ellipsis; it never draws them over each other.
+///
+/// ![Long category names, rotated to fit](https://www.codenameone.com/developer-guide/img/generated/chart-dense-labels.png)
 public class CategoryAxis extends Axis {
     private final List<String> categories = new ArrayList<String>();
 

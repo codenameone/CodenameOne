@@ -38,6 +38,8 @@ import com.codename1.ui.plaf.Style;
 /// Sparkline s = new Sparkline(3, 5, 4, 8, 7, 9).setType(Sparkline.AREA);
 /// row.add(BorderLayout.EAST, s);
 /// ```
+///
+/// ![Sparklines in list rows](https://www.codenameone.com/developer-guide/img/generated/chart-sparkline.png)
 public class Sparkline extends Component {
     /// A line.
     public static final int LINE = 0;

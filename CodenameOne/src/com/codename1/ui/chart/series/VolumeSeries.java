@@ -35,6 +35,8 @@ import com.codename1.ui.chart.ChartContext;
 /// double[] volumes = {1200, 1800};
 /// VolumeSeries volume = new VolumeSeries("Volume", prices, volumes);
 /// ```
+///
+/// ![A volume pane under a price pane](https://www.codenameone.com/developer-guide/img/generated/chart-financial.png)
 public class VolumeSeries extends BarSeries {
     private final CandlestickSeries prices;
 

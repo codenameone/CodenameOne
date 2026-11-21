@@ -37,6 +37,8 @@ import com.codename1.ui.geom.GeneralPath;
 /// chart.addAnnotation(Annotation.valueLine(100, "Target"));
 /// chart.addAnnotation(Annotation.xBand(start, end, "Outage").setColor(0xEF5350));
 /// ```
+///
+/// ![A value line, a value band and an x band](https://www.codenameone.com/developer-guide/img/generated/chart-annotations.png)
 public final class Annotation {
     private static final int VALUE_LINE = 0;
     private static final int VALUE_BAND = 1;

@@ -35,6 +35,11 @@ import com.codename1.ui.geom.PathIterator;
 /// between two of them, so a smoothed line cannot invent a peak the data does not have.
 /// Dense data is reduced to the minimum and maximum of each pixel column before drawing,
 /// which keeps every spike while painting a constant number of segments.
+///
+/// ![Lines with markers](https://www.codenameone.com/developer-guide/img/generated/chart-line.png)
+/// ![A spline](https://www.codenameone.com/developer-guide/img/generated/chart-spline.png)
+/// ![A step line](https://www.codenameone.com/developer-guide/img/generated/chart-step.png)
+/// ![Stacked areas](https://www.codenameone.com/developer-guide/img/generated/chart-stacked-area.png)
 public class LineSeries extends XYSeries {
     /// Straight segments between points.
     public static final int STRAIGHT = 0;

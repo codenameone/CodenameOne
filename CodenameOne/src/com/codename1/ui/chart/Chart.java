@@ -69,6 +69,8 @@ import java.util.List;
 ///
 /// Style the component with the `Chart` UIID; its padding surrounds the plot, its font is
 /// the label font and its background shows through. Colours come from `ChartTheme`.
+///
+/// ![The parts of a chart](https://www.codenameone.com/developer-guide/img/generated/chart-anatomy.png)
 public class Chart extends Component {
     /// No legend.
     public static final int LEGEND_NONE = 0;
@@ -161,6 +163,12 @@ public class Chart extends Component {
     private double[] viewportFrom;
     private double[] viewportTo;
     private long viewportStart;
+    // the range one frame of a viewport animation shows, min and max per axis of allAxes();
+    // paint recomputes every axis's bounds from the data, which puts an unzoomed axis back at
+    // its full range, so the frame is applied again after that rather than only in animate()
+    private double[] viewportFrame;
+    // the same for a chart following another through syncWith: the leader's x range this frame
+    private double[] linkedFrame;
 
     /// Creates an empty chart with numeric axes.
     public Chart() {
@@ -1130,6 +1138,7 @@ public class Chart extends Component {
         if (cartesian) {
             prepareAxes();
             applyAxisTransition(p);
+            applyViewportFrame();
             Axis horizontal = rotated ? yAxis : xAxis;
             Axis vertical = rotated ? xAxis : yAxis;
             Axis secondary = rotated ? null : secondaryYAxis;
@@ -1270,6 +1279,19 @@ public class Chart extends Component {
         g.setAlpha(alpha);
         g.setColor(getTheme().getTextColor());
         g.drawString(loadingText, x + (w - font.stringWidth(loadingText)) / 2, y + (h - font.getHeight()) / 2);
+    }
+
+    private void applyViewportFrame() {
+        if (viewportFrame != null) {
+            Axis[] axes = allAxes();
+            int n = Math.min(axes.length, viewportFrame.length / 2);
+            for (int i = 0; i < n; i++) {
+                axes[i].setDisplayRange(viewportFrame[i * 2], viewportFrame[i * 2 + 1]);
+            }
+        }
+        if (linkedFrame != null) {
+            xAxis.setDisplayRange(linkedFrame[0], linkedFrame[1]);
+        }
     }
 
     private void applyAxisTransition(float p) {
@@ -2071,7 +2093,18 @@ public class Chart extends Component {
     public void pointerPressed(int x, int y) {
         flinging = false;
         // a touch takes over from a running zoom animation, keeping the range shown right now
-        viewportTo = null;
+        if (viewportTo != null) {
+            viewportTo = null;
+            if (viewportFrame != null) {
+                Axis[] axes = allAxes();
+                int n = Math.min(axes.length, viewportFrame.length / 2);
+                for (int i = 0; i < n; i++) {
+                    axes[i].setVisibleRange(viewportFrame[i * 2], viewportFrame[i * 2 + 1]);
+                }
+                viewportFrame = null;
+                fireViewportChanged();
+            }
+        }
         // a brush whose release never arrived (the chart left its form mid-drag) is abandoned
         brushing = false;
         brushMoved = false;
@@ -2541,16 +2574,21 @@ public class Chart extends Component {
         if (t >= 1 || viewportFrom.length != viewportTo.length || viewportTo.length != axes.length * 3) {
             restore(axes, viewportTo);
             viewportTo = null;
+            viewportFrame = null;
             fireViewportChanged();
             return;
         }
         float u = 1 - t;
         double e = 1 - u * u * u;
+        double[] frame = new double[axes.length * 2];
         for (int i = 0; i < axes.length; i++) {
             double lo = viewportFrom[i * 3] + (viewportTo[i * 3] - viewportFrom[i * 3]) * e;
             double hi = viewportFrom[i * 3 + 1] + (viewportTo[i * 3 + 1] - viewportFrom[i * 3 + 1]) * e;
             axes[i].setDisplayRange(lo, hi);
+            frame[i * 2] = lo;
+            frame[i * 2 + 1] = hi;
         }
+        viewportFrame = frame;
         // linked charts follow every frame, as they do a pan or pinch, not just the last one
         fireViewportFrame();
     }
@@ -2776,6 +2814,7 @@ public class Chart extends Component {
                 continue;
             }
             c.xAxis.setDisplayRange(xAxis.getVisibleMin(), xAxis.getVisibleMax());
+            c.linkedFrame = new double[]{xAxis.getVisibleMin(), xAxis.getVisibleMax()};
             c.repaint();
         }
     }
@@ -2789,6 +2828,7 @@ public class Chart extends Component {
                 continue;
             }
             c.syncing = true;
+            c.linkedFrame = null;
             try {
                 if (xAxis.isZoomed()) {
                     c.xAxis.setVisibleRange(xAxis.getVisibleMin(), xAxis.getVisibleMax());

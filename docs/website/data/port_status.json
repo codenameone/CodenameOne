@@ -392,7 +392,20 @@
         "Chart2SunburstScreenshotTest",
         "Chart2TreemapScreenshotTest",
         "Chart2WaterfallScreenshotTest",
-        "Chart2ZoomAnimationScreenshotTest"
+        "Chart2ZoomAnimationScreenshotTest",
+        "Chart2BarStylesScreenshotTest",
+        "Chart2BarsGrowInAnimationScreenshotTest",
+        "Chart2FinancialGrowInAnimationScreenshotTest",
+        "Chart2FinancialStylesScreenshotTest",
+        "Chart2FlameGraphScreenshotTest",
+        "Chart2HierarchyGrowInAnimationScreenshotTest",
+        "Chart2LegendToggleAnimationScreenshotTest",
+        "Chart2LineStylesScreenshotTest",
+        "Chart2LinesGrowInAnimationScreenshotTest",
+        "Chart2PartsDataChangeAnimationScreenshotTest",
+        "Chart2PartsGrowInAnimationScreenshotTest",
+        "Chart2PointStylesScreenshotTest",
+        "Chart2PointsGrowInAnimationScreenshotTest"
       ]
     },
     {
@@ -1001,7 +1014,8 @@
       "description": "Checks image pixel readback with and without active clips.",
       "tests": [
         "MutableImageClipReadbackTest",
-        "MutableImageReadbackTest"
+        "MutableImageReadbackTest",
+        "MutableImageDisposeWhileDrawingTest"
       ]
     },
     {
@@ -1528,6 +1542,58 @@
     {
       "pattern": "Chart2ZoomAnimationScreenshotTest",
       "test": "Chart2ZoomAnimationScreenshotTest"
+    },
+    {
+      "pattern": "Chart2BarStylesScreenshotTest",
+      "test": "Chart2BarStylesScreenshotTest"
+    },
+    {
+      "pattern": "Chart2BarsGrowInAnimationScreenshotTest",
+      "test": "Chart2BarsGrowInAnimationScreenshotTest"
+    },
+    {
+      "pattern": "Chart2FinancialGrowInAnimationScreenshotTest",
+      "test": "Chart2FinancialGrowInAnimationScreenshotTest"
+    },
+    {
+      "pattern": "Chart2FinancialStylesScreenshotTest",
+      "test": "Chart2FinancialStylesScreenshotTest"
+    },
+    {
+      "pattern": "Chart2FlameGraphScreenshotTest",
+      "test": "Chart2FlameGraphScreenshotTest"
+    },
+    {
+      "pattern": "Chart2HierarchyGrowInAnimationScreenshotTest",
+      "test": "Chart2HierarchyGrowInAnimationScreenshotTest"
+    },
+    {
+      "pattern": "Chart2LegendToggleAnimationScreenshotTest",
+      "test": "Chart2LegendToggleAnimationScreenshotTest"
+    },
+    {
+      "pattern": "Chart2LineStylesScreenshotTest",
+      "test": "Chart2LineStylesScreenshotTest"
+    },
+    {
+      "pattern": "Chart2LinesGrowInAnimationScreenshotTest",
+      "test": "Chart2LinesGrowInAnimationScreenshotTest"
+    },
+    {
+      "pattern": "Chart2PartsDataChangeAnimationScreenshotTest",
+      "test": "Chart2PartsDataChangeAnimationScreenshotTest"
+    },
+    {
+      "pattern": "Chart2PartsGrowInAnimationScreenshotTest",
+      "test": "Chart2PartsGrowInAnimationScreenshotTest"
+    },
+    {
+      "pattern": "Chart2PointStylesScreenshotTest",
+      "test": "Chart2PointStylesScreenshotTest"
+    },
+    {
+      "pattern": "Chart2PointsGrowInAnimationScreenshotTest",
+      "test": "Chart2PointsGrowInAnimationScreenshotTest"
     },
     {
       "pattern": "BrowserComponent",

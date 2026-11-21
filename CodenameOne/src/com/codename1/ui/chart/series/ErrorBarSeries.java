@@ -33,6 +33,8 @@ import com.codename1.ui.chart.ChartPoint;
 /// double[] mean = {5, 7, 6}, low = {4, 6, 4.5}, high = {6, 8.5, 7};
 /// new ErrorBarSeries("Mean").setIntervals(null, mean, low, high);
 /// ```
+///
+/// ![Error bars](https://www.codenameone.com/developer-guide/img/generated/chart-error-bars.png)
 public class ErrorBarSeries extends XYSeries {
     private boolean markers = true;
 
