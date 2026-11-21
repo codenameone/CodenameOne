@@ -533,6 +533,64 @@ WARNING: `strict` mode blocks touches where only part of the window is covered, 
 
 NOTE: This family is Android-only. iOS gives no application a way to draw over another app, so there is nothing to detect: `isScreenObscured()` is always false and the policy has no effect. Screen recording and mirroring are a different threat, covered by `ios.disableScreenshots=true`. In the simulator, *Simulate > App Shield > Screen Overlay (Tapjacking)* fakes an overlay so you can exercise your listener on the desktop.
 
+==== Defending against keylogging keyboards
+
+On Android and iOS the keyboard can be an app the user installs, and the system hands it what's typed into other apps. A malicious keyboard is therefore a keylogger: a penetration test typically installs one, types a password into your app and reads it back out of the keyboard's own files. Native apps have the same exposure. The two platforms differ in how far it reaches and in what an app can do about it.
+
+===== Password fields versus sensitive fields
+
+`TextArea.PASSWORD` masks the text and tells the platform it's a secret. `TextArea.SENSITIVE` is for data that the user should see while typing but that's still nobody else's business: a card number, an account number, a one-time code, an ID number. It keeps the text out of the keyboard's suggestions and learned words without masking it.
+
+The difference matters on iOS. iOS always switches to Apple's own keyboard for a password field, whatever keyboard the user picked, so a third-party keyboard never sees a password. It doesn't do that for any other field, so a card number typed into a `SENSITIVE` field still goes through the user's keyboard. Use `PASSWORD` only for secrets the user shouldn't see on screen, and protect `SENSITIVE` fields with the measures below.
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/SecurityJava047Snippet.java[tag=security-java-047,indent=0]
+----
+
+===== Refusing third-party keyboards on iOS
+
+`DeviceIntegrity.setThirdPartyKeyboardsAllowed(false)` makes the app use only Apple's keyboards, in every field. It's what banking apps do. Call it from `init()`, before any field is edited: iOS may remember the answer for the rest of the launch, so turning it off for one screen and back on isn't dependable. The method returns `true` where the platform enforces the choice, which is iOS only.
+
+===== Incognito input, detection and the secure keyboard on Android
+
+On Android the selected keyboard receives every keystroke in every app, password fields included, and no app can refuse it. There are three layers of defense, from free to complete.
+
+*Password and sensitive fields ask for incognito input.* A field with the `TextArea.PASSWORD` or `TextArea.SENSITIVE` constraint asks the keyboard not to learn, store or sync what's typed (`IME_FLAG_NO_PERSONALIZED_LEARNING`). Gboard, Samsung's keyboard and SwiftKey honor it. A keylogger ignores it, so treat it as hygiene rather than protection.
+
+*Detect a user-installed keyboard.* `DeviceIntegrity.isThirdPartyKeyboardActive()` returns `true` when the selected keyboard didn't ship with the device and isn't on the allow-list you pass, and `getActiveKeyboard()` names it. Pass `DeviceIntegrity.wellKnownKeyboards()` to accept Gboard, Microsoft SwiftKey and Samsung Keyboard even when the user installed one from a store, or your own list, or nothing to accept only preinstalled keyboards. Check it before a credential screen to warn the user or to switch to the next layer.
+
+*Type with the app's own keyboard.* `SecureKeyboard` is an on-screen keyboard Codename One draws itself. Installing it makes the field uneditable, so the platform editor never opens on it, and a tap shows the secure keyboard instead, which writes into the field directly. Pressed keys aren't magnified for a screen recorder to catch.
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/SecurityJava046Snippet.java[tag=security-java-046,indent=0]
+----
+
+The layout follows the field's constraint. Letters for a password:
+
+image::img/generated/secure-keyboard-text.png["A Password field showing six dots above a dark keyboard with three rows of letters, shift and backspace, and a bottom row with a ?123 key, space, a period and a key that closes the keyboard",scaledwidth=50%]
+
+The same keyboard in dark mode:
+
+image::img/generated/secure-keyboard-text-dark.png["The password screen and keyboard drawn on a dark background",scaledwidth=50%]
+
+A number pad for a `NUMERIC` field such as a PIN:
+
+image::img/generated/secure-keyboard-number.png["A PIN field above a keyboard of large keys: the digits 1 to 9 in a three by three grid, then 0 between a key that closes the keyboard and backspace",scaledwidth=50%]
+
+`setScrambled(true)` moves the digits every time the keyboard opens, so recorded touch positions don't map back to a PIN:
+
+image::img/generated/secure-keyboard-scrambled.png["The same number pad with its digits in a shuffled order",scaledwidth=50%]
+
+An email field gets an `@` key beside the space bar:
+
+image::img/generated/secure-keyboard-email.png["An Email field above a letter keyboard whose bottom row carries an at sign before the space bar and a period after it",scaledwidth=50%]
+
+The secure keyboard types ASCII only, with no dictation, autofill or other scripts, which is why it suits PINs, passwords and codes rather than free text. It works on every platform, iOS included. Pair it with `setSecureScreen(true)` and tapjacking protection on the same screen.
+
+NOTE: iOS gives apps no way to see which keyboard is selected, so `isThirdPartyKeyboardActive()` is always `false` there; use `setThirdPartyKeyboardsAllowed(false)` instead. In the simulator, *Simulate > App Shield > Third-Party Keyboard* makes the check report a user-installed keyboard.
+
 === Strong Android certificates
 
 When Android launched RSA1024 with SHA1 was considered strong enough for the foreseeable future, this hasn't changed completely but the recommendation today is to use stronger ciphers for signing & encrypting as those can be compromised.

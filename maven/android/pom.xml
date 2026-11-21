@@ -220,6 +220,49 @@
                                 </configuration>
                             </execution>
 
+                            <execution>
+                                <!-- The cn1-binaries jars the uber artifact (src/main/assembly/distribution.xml)
+                                     unpacks. Unzipped here rather than through a dependencySet because the
+                                     assembly plugin asks every remote repository for the POM of each dependency
+                                     it packs. These system-scoped jars have no POM anywhere, so each lookup ends
+                                     in a 404 from Google's mirror and then waits out Central, which throttles CI
+                                     runners and is retried for minutes per artifact (.mvn/maven.config): twenty
+                                     of them once used up a job's whole hour. A file on disk needs no lookup. -->
+                                <id>unpack-cn1-binaries</id>
+                                <phase>prepare-package</phase>
+                                <goals>
+                                    <goal>run</goal>
+                                </goals>
+                                <configuration>
+                                    <target>
+                                        <delete dir="${project.build.directory}/cn1-binaries-unpacked"/>
+                                        <unzip dest="${project.build.directory}/cn1-binaries-unpacked">
+                                            <fileset dir="${cn1.binaries}/android">
+                                            <include name="android-support-v7-appcompat.jar"/>
+                                            <include name="android-support-v7-cardview.jar"/>
+                                            <include name="android-support-v7-gridlayout.jar"/>
+                                            <include name="google-services-3.0.0.jar"/>
+                                            <include name="play-services-auth-12.0.0.jar"/>
+                                            <include name="play-services-base-12.0.0.jar"/>
+                                            <include name="play-services-basement-12.0.0.jar"/>
+                                            <include name="play-services-location-12.0.0.jar"/>
+                                            <include name="android.jar"/>
+                                            <include name="facebook.jar"/>
+                                            <include name="google-play-services.jar"/>
+                                            <include name="zooz_iap.jar"/>
+                                            <include name="support-v4-26.1.0.jar"/>
+                                            <include name="support-compat-v4-26.1.0.jar"/>
+                                            <include name="support-media-compat-26.1.0.jar"/>
+                                            <include name="support-core-utils-26.1.0.jar"/>
+                                            <include name="support-annotations-26.0.0-alpha1.jar"/>
+                                            <include name="support-core-ui-26.1.0.jar"/>
+                                            <include name="support-fragment-26.1.0.jar"/>
+                                            <include name="play-services-tasks-12.0.0.jar"/>
+                                            </fileset>
+                                        </unzip>
+                                    </target>
+                                </configuration>
+                            </execution>
 
                         </executions>
                     </plugin>

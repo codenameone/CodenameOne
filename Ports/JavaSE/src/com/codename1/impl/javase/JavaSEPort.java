@@ -11471,6 +11471,13 @@ public class JavaSEPort extends CodenameOneImplementation {
                         JavaSEShield.simUntrustedAccessibility = v;
                     }
                 }));
+        shieldMenu.add(shieldToggle(pref, "Third-Party Keyboard",
+                "ShieldSim.keyboard", new ShieldToggleSink() {
+                    @Override
+                    public void set(boolean v) {
+                        JavaSEShield.simThirdPartyKeyboard = v;
+                    }
+                }));
         shieldMenu.add(shieldToggle(pref, "Screen Overlay (Tapjacking)",
                 "ShieldSim.tapjack", new ShieldToggleSink() {
                     @Override
@@ -25264,6 +25271,17 @@ public class JavaSEPort extends CodenameOneImplementation {
     @Override
     public String[] getEnabledAccessibilityServices() {
         return JavaSEShield.simAccessibility();
+    }
+
+    @Override
+    public String getActiveInputMethod() {
+        // Null with the toggle off, as on iOS: the simulator has no keyboard of its own to report.
+        return JavaSEShield.simThirdPartyKeyboard ? JavaSEShield.SIM_THIRD_PARTY_KEYBOARD : null;
+    }
+
+    @Override
+    public boolean isActiveInputMethodPreinstalled() {
+        return !JavaSEShield.simThirdPartyKeyboard;
     }
 
     @Override
