@@ -921,7 +921,13 @@ DataGridRow {
     font-size: 2.3mm;
     padding: 1.2mm 1.4mm 1.2mm 1.4mm;
 }
-DataGridRowAlt { background-color: var(--surface-alt); color: var(--text); }
+DataGridRowAlt {
+    background-color: var(--surface-alt);
+    color: var(--text);
+    font-family: "native:MainRegular";
+    font-size: 2.3mm;
+    padding: 1.2mm 1.4mm 1.2mm 1.4mm;
+}
 DataGridLine { color: var(--line); }
 
 BnTableRowBad {
