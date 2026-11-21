@@ -19,6 +19,7 @@
 package com.codenameone.examples.bazaar.pos;
 
 import com.codename1.appkit.Net;
+import com.codename1.mapping.Mappers;
 import com.codename1.ui.Command;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
@@ -30,6 +31,7 @@ import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.layouts.GridLayout;
 import com.codenameone.examples.bazaar.api.ParkedCartDto;
 import com.codenameone.examples.bazaar.api.PosCatalogDto;
+import com.codenameone.examples.bazaar.api.PosCustomerDto;
 import com.codenameone.examples.bazaar.api.PosItemDto;
 import com.codenameone.examples.bazaar.api.PosLineDto;
 import com.codenameone.examples.bazaar.net.Api;
@@ -70,7 +72,8 @@ final class ParkedPane {
                 cut(text, 80), cart.customer() == null ? "" : cart.customer().id(),
                 PosState.staffUsername(), cut(cart.note(), 500), cart.uploadLines(),
                 ParkedCarts.PARKED, System.currentTimeMillis());
-        PosState.parked().park(dto);
+        PosState.parked().park(dto, cart.customer() == null ? null
+                : Mappers.toJson(cart.customer()));
         cart.clear();
         PosState.fireCart();
         PosState.fireStatus();
@@ -140,6 +143,7 @@ final class ParkedPane {
             return;
         }
         restore(cart, c, PosState.catalog());
+        cart.setCustomer(customerOf(PosState.parked().customerOf(c.clientId())));
         PosState.fireCart();
         PosState.fireStatus();
         sync();
@@ -165,6 +169,19 @@ final class ParkedPane {
             if (l.overridden() && cart.items().size() > before) {
                 cart.linePrice(cart.items().size() - 1, l.unitCents());
             }
+        }
+    }
+
+    /// The customer stored with a hold, or null when it was for nobody or
+    /// was parked by a register that did not store one.
+    static PosCustomerDto customerOf(String text) {
+        if (text == null || text.length() == 0) {
+            return null;
+        }
+        try {
+            return Mappers.fromJson(text, PosCustomerDto.class);
+        } catch (RuntimeException bad) {
+            return null;
         }
     }
 

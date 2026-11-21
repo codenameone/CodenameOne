@@ -29,6 +29,7 @@ import com.codenameone.examples.bazaar.api.FormSubmitDto;
 import com.codenameone.examples.bazaar.api.MarketingApiServer;
 import com.codenameone.examples.bazaar.api.ScheduleDto;
 import com.codenameone.examples.bazaar.api.SignupFormDto;
+import com.codenameone.examples.bazaar.api.TestSendDto;
 
 import java.time.Instant;
 import java.util.List;
@@ -92,6 +93,13 @@ public class MarketingEndpoint implements MarketingApiServer {
     public CampaignDto schedule(String storeId, String campaignId, ScheduleDto body)
             throws Exception {
         return campaigns.schedule(Caller.name(), storeId, campaignId, body == null ? 0 : body.at());
+    }
+
+    @Override
+    public CampaignDto sendTest(String storeId, String campaignId, TestSendDto body)
+            throws Exception {
+        return campaigns.sendTest(Caller.name(), storeId, campaignId,
+                body == null ? null : body.to());
     }
 
     @Override

@@ -31,6 +31,7 @@ import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.layouts.GridLayout;
 import com.codenameone.examples.bazaar.ui.Lang;
 import com.codenameone.examples.bazaar.ui.Layouts;
+import com.codenameone.examples.bazaar.ui.Ui;
 
 /// Pieces every register screen shares: the header with the sync pill, big
 /// touch keys and a number pad.
@@ -101,7 +102,11 @@ final class PosUi {
                 uiid = "PosPill";
                 icon = FontImage.MATERIAL_CLOUD_DONE;
             }
-            if (errors > 0) {
+            int approvals = PosState.hasRegister() ? PosState.outbox().awaitingApproval() : 0;
+            if (approvals > 0) {
+                text = text + Ui.DOT + Lang.tr("{0} need approval", approvals);
+                uiid = "PosPillOffline";
+            } else if (errors > 0) {
                 text = text + "  !" + errors;
                 uiid = "PosPillOffline";
             }

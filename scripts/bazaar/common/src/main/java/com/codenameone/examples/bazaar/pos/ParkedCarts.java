@@ -21,7 +21,9 @@ package com.codenameone.examples.bazaar.pos;
 
 import com.codenameone.examples.bazaar.api.ParkedCartDto;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /// Carts put on hold at this register, kept on the device so holding and
 /// resuming work offline.
@@ -37,6 +39,9 @@ public final class ParkedCarts {
     public static final String RESUMED = "RESUMED";
     public static final String DISCARDED = "DISCARDED";
     static final String KEY = "pos.parked";
+    /// Who each hold was for, as the register showed them: kept apart from
+    /// the holds, whose stored lines older registers wrote without it.
+    static final String CUSTOMERS_KEY = "pos.parked.customers";
     /// Finished holds kept after the server has them, newest last.
     static final int KEEP_DONE = 50;
 
@@ -80,11 +85,14 @@ public final class ParkedCarts {
     private final Outbox.Persist persist;
     private final Codec codec;
     private final List<Entry> entries = new ArrayList<Entry>();
+    /// clientId to the encoded customer the hold was for.
+    private final Map<String, String> customers = new HashMap<String, String>();
 
     public ParkedCarts(Outbox.Persist persist, Codec codec) {
         this.persist = persist;
         this.codec = codec;
         load();
+        loadCustomers();
     }
 
     public Entry find(String clientId) {
@@ -106,6 +114,25 @@ public final class ParkedCarts {
         entries.add(e);
         save();
         return e;
+    }
+
+    /// Puts a cart on hold for the customer `customerText` describes (the
+    /// register's own encoding; null or empty for none), so resuming it
+    /// offline brings the customer back with their name, not just an id.
+    public Entry park(ParkedCartDto cart, String customerText) {
+        Entry e = park(cart);
+        if (customerText != null && customerText.length() > 0
+                && !customers.containsKey(cart.clientId())) {
+            customers.put(cart.clientId(), flat(customerText));
+            saveCustomers();
+        }
+        return e;
+    }
+
+    /// The customer a hold was parked for, as given to
+    /// [#park(ParkedCartDto, String)], or null.
+    public String customerOf(String clientId) {
+        return clientId == null ? null : customers.get(clientId);
     }
 
     /// Takes a hold back into the cart; null when it is not on hold any
@@ -196,14 +223,50 @@ public final class ParkedCarts {
 
     private void trim() {
         int done = 0;
+        boolean dropped = false;
         for (int iter = entries.size() - 1; iter >= 0; iter--) {
             Entry e = entries.get(iter);
             if (e.due() == null && !PARKED.equals(e.status)) {
                 done++;
                 if (done > KEEP_DONE) {
+                    dropped |= customers.remove(e.clientId()) != null;
                     entries.remove(iter);
                 }
             }
+        }
+        if (dropped) {
+            saveCustomers();
+        }
+    }
+
+    private static String flat(String s) {
+        return s.replace('\t', ' ').replace('\n', ' ').replace('\r', ' ');
+    }
+
+    private void saveCustomers() {
+        StringBuilder b = new StringBuilder();
+        for (Map.Entry<String, String> c : customers.entrySet()) {
+            b.append(c.getKey()).append('\t').append(c.getValue()).append('\n');
+        }
+        persist.write(CUSTOMERS_KEY, b.toString());
+    }
+
+    private void loadCustomers() {
+        String text = persist.read(CUSTOMERS_KEY);
+        if (text == null) {
+            return;
+        }
+        int start = 0;
+        while (start < text.length()) {
+            int end = text.indexOf('\n', start);
+            if (end < 0) {
+                end = text.length();
+            }
+            int tab = text.indexOf('\t', start);
+            if (tab > start && tab < end) {
+                customers.put(text.substring(start, tab), text.substring(tab + 1, end));
+            }
+            start = end + 1;
         }
     }
 

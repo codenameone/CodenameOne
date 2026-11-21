@@ -80,6 +80,23 @@ class ParkedCartsTest {
     }
 
     @Test
+    void aHoldKeepsWhoItWasForAcrossARestart() {
+        ParkedCarts carts = new ParkedCarts(persist, codec());
+        carts.park(hold("c1", 1), "{\"id\":\"cust-1\",\"firstName\":\"Grace\"}");
+        carts.park(hold("c2", 1), null);
+        ParkedCarts again = new ParkedCarts(persist, codec());
+        assertEquals("{\"id\":\"cust-1\",\"firstName\":\"Grace\"}", again.customerOf("c1"));
+        assertNull(again.customerOf("c2"));
+        assertNotNull(again.resume("c1"));
+        assertNotNull(again.customerOf("c1"), "still there when the hold is resumed");
+        // A store written before customers were kept still loads its holds.
+        disk.remove(ParkedCarts.CUSTOMERS_KEY);
+        ParkedCarts old = new ParkedCarts(persist, codec());
+        assertEquals(2, old.due().size());
+        assertNull(old.customerOf("c1"));
+    }
+
+    @Test
     void aHoldMadeOfflineIsReplayedOnceAndInOrder() {
         ParkedCarts carts = new ParkedCarts(persist, codec());
         ParkedCarts.Entry first = carts.park(hold("h1", 2));

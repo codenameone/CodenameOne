@@ -36,6 +36,15 @@ public final class MerchantSections {
     /// Review moderation.
     public static final String REVIEWS = "reviews";
 
+    public static final String LOYALTY = "loyalty";
+    public static final String CLUBS = "clubs";
+    public static final String PROMOTIONS = "promotions";
+    public static final String CAMPAIGNS = "campaigns";
+    public static final String JOURNEYS = "journeys";
+    public static final String SUBSCRIPTIONS = "subscriptions";
+    public static final String QUOTES = "quotes";
+    public static final String COMPANIES = "companies";
+
     private static boolean installed;
 
     private MerchantSections() {
@@ -71,5 +80,21 @@ public final class MerchantSections {
                 FontImage.MATERIAL_LOCAL_SHIPPING, ShippingPane::new));
         Sections.register(Nav.MERCHANT, new Section(TAXES, "Taxes", manage,
                 FontImage.MATERIAL_RECEIPT, TaxesPane::new));
+        Sections.register(Nav.MERCHANT, new Section(LOYALTY, "Loyalty", grow,
+                FontImage.MATERIAL_LOYALTY, LoyaltyPane::new));
+        Sections.register(Nav.MERCHANT, new Section(CLUBS, "Clubs", grow,
+                FontImage.MATERIAL_GROUPS, ClubsPane::new));
+        Sections.register(Nav.MERCHANT, new Section(PROMOTIONS, "Promotions", grow,
+                FontImage.MATERIAL_EVENT, PromotionsPane::new));
+        Sections.register(Nav.MERCHANT, new Section(CAMPAIGNS, "Campaigns", grow,
+                FontImage.MATERIAL_EMAIL, MarketingPane::new));
+        Sections.register(Nav.MERCHANT, new Section(JOURNEYS, "Journeys", grow,
+                FontImage.MATERIAL_ROUTE, JourneysPane::new));
+        Sections.register(Nav.MERCHANT, new Section(SUBSCRIPTIONS, "Subscriptions", store,
+                FontImage.MATERIAL_AUTORENEW, SubscriptionsPane::new));
+        Sections.register(Nav.MERCHANT, new Section(QUOTES, "Quotes", store,
+                FontImage.MATERIAL_REQUEST_QUOTE, QuotesPane::new));
+        Sections.register(Nav.MERCHANT, new Section(COMPANIES, "Companies", manage,
+                FontImage.MATERIAL_BUSINESS, CompaniesPane::new));
     }
 }

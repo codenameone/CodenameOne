@@ -99,6 +99,9 @@ public class PosSales {
     public static final String OK = "OK";
     public static final String DUPLICATE = "DUPLICATE";
     public static final String ERROR = "ERROR";
+    /// A sale refused only for want of a manager's approval: the register
+    /// can ask for one and send the same sale again.
+    public static final String APPROVAL = "APPROVAL";
     /// Sales in one upload.
     static final int MAX_BATCH = 200;
     static final int MAX_LINES = 100;
@@ -177,8 +180,8 @@ public class PosSales {
             try {
                 out.add(sale(username, storeId, register, sale));
             } catch (ResponseStatusException refused) {
-                out.add(new PosSaleResultDto(clientId, ERROR, "", 0, 0, 0, false,
-                        refused.getMessage()));
+                out.add(new PosSaleResultDto(clientId, approvalRefusal(refused) ? APPROVAL : ERROR,
+                        "", 0, 0, 0, false, refused.getMessage()));
             }
         }
         return new PosSyncResultDto(out);
@@ -551,7 +554,8 @@ public class PosSales {
     /// sale needs one, unless its seller is an owner or a manager, when the
     /// store's policy says so: a hand-changed price under
     /// `approvePriceOverrides`, or more off the list price than
-    /// `discountApprovalBp` (hand-changed prices and discounts together).
+    /// `discountApprovalBp` (hand-changed prices, the sale-wide percent or
+    /// amount spread over the lines, and discounts together).
     private PosApproval approvalFor(String storeId, StoreStaff seller, PosSaleDto sale,
             Quote quote) {
         if (PosTools.approvesItself(seller)) {
@@ -566,9 +570,15 @@ public class PosSales {
             PosLineDto sent = sale.lines().get(iter);
             long catalog = custom(sent) ? l.price.unitCents : l.variant.getPriceCents();
             list += catalog * l.price.quantity;
+            // Every line sold under its list price counts towards the
+            // threshold, flagged or not: a percent or an amount off the
+            // whole sale reaches the server only as lower unit prices on
+            // lines the register never flagged, and ignoring them let a
+            // clerk give any discount without a manager. The flag still
+            // decides `approvePriceOverrides`, which is about typed prices.
+            byHand += Math.max(0, (catalog - l.price.unitCents) * l.price.quantity);
             if (sent.overridden()) {
                 overridden = true;
-                byHand += Math.max(0, (catalog - l.price.unitCents) * l.price.quantity);
             }
         }
         boolean needs = overridden && policy.isApprovePriceOverrides();
@@ -580,8 +590,28 @@ public class PosSales {
         if (!needs) {
             return null;
         }
-        return tools.requireApproval(storeId, sale.approvalId(), PosTools.DISCOUNT,
-                PosTools.PRICE_OVERRIDE);
+        try {
+            return tools.requireApproval(storeId, sale.approvalId(), PosTools.DISCOUNT,
+                    PosTools.PRICE_OVERRIDE);
+        } catch (ResponseStatusException refused) {
+            throw new ApprovalRefused(refused.getStatus(), refused.getMessage());
+        }
+    }
+
+    /// Whether `refused` says the sale lacks a usable approval, and nothing else.
+    static boolean approvalRefusal(ResponseStatusException refused) {
+        return refused instanceof ApprovalRefused;
+    }
+
+    /// The refusal of a sale whose discounts need an approval it does not
+    /// carry (or carries spent or for something else). Kept apart from every
+    /// other refusal so the upload answers [#APPROVAL] for it.
+    static final class ApprovalRefused extends ResponseStatusException {
+        private static final long serialVersionUID = 1L;
+
+        ApprovalRefused(int status, String reason) {
+            super(status, reason);
+        }
     }
 
     /// Everything a sale writes, inside the transaction that inserts its order.

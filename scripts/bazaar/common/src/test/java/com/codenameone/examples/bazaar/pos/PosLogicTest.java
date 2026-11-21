@@ -221,6 +221,44 @@ class PosLogicTest {
     }
 
     @Test
+    void aSaleRefusedForAnApprovalWaitsAndGoesAgainUnderItsOwnId() {
+        final Map<String, String> disk = new HashMap<String, String>();
+        Outbox.Persist persist = new Outbox.Persist() {
+            @Override
+            public String read(String key) {
+                return disk.get(key);
+            }
+
+            @Override
+            public void write(String key, String value) {
+                disk.put(key, value);
+            }
+        };
+        Outbox box = new Outbox(persist, codec());
+        box.add(sale("q", "v1", 1));
+        List<Outbox.Entry> batch = box.due(0);
+        box.sending(batch);
+        box.answered(batch, Arrays.asList(result("q", "APPROVAL")), 10);
+        assertEquals(Outbox.APPROVAL, box.find("q").state);
+        assertEquals(1, box.awaitingApproval());
+        assertEquals(1, box.errors());
+        assertTrue(box.find("q").open(), "the server does not have it");
+        assertTrue(box.due(1000).isEmpty(), "it waits for a manager, not a timer");
+        assertFalse(box.retry("q"), "a plain retry would only be refused again");
+        // The waiting survives a restart.
+        Outbox reloaded = new Outbox(persist, codec());
+        assertEquals(Outbox.APPROVAL, reloaded.find("q").state);
+        assertFalse(reloaded.reapprove("q", ""));
+        assertTrue(reloaded.reapprove("q", "appr-1"));
+        assertEquals("q", reloaded.find("q").sale.clientId());
+        assertEquals("appr-1", reloaded.find("q").sale.approvalId());
+        assertEquals(1, reloaded.find("q").sale.lines().size());
+        assertEquals(1, reloaded.due(0).size());
+        assertEquals("appr-1", new Outbox(persist, codec()).find("q").sale.approvalId());
+        assertFalse(reloaded.reapprove("q", "appr-2"), "only a waiting sale is re-approved");
+    }
+
+    @Test
     void outboxStateMachine() {
         final Map<String, String> disk = new HashMap<String, String>();
         Outbox.Persist persist = new Outbox.Persist() {

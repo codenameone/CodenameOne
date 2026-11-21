@@ -200,7 +200,7 @@ class PosWaveTest {
                 + "\",\"quantity\":1,\"unitCents\":500,\"overridden\":true}";
         String seller = "\"staffUsername\":\"" + t.cashier + "\",";
         Map refused = t.sync(t.sale("ov-1", cheap, tender("CASH", 1000), seller));
-        assertEquals("ERROR", refused.get("status"));
+        assertEquals("APPROVAL", refused.get("status"));
         String ask = "{\"managerUsername\":\"" + t.manager + "\",\"pin\":\"%s\","
                 + "\"kind\":\"PRICE_OVERRIDE\",\"amountCents\":500,\"reason\":\"dent\"}";
         assertEquals(401, t.status(post(t.reg() + "/approvals"),
@@ -215,10 +215,37 @@ class PosWaveTest {
         assertEquals("OK", sold.get("status"), String.valueOf(sold.get("message")));
         assertEquals(520, ((Number) sold.get("totalCents")).intValue());
         Map again = t.sync(t.sale("ov-3", cheap, tender("CASH", 1000), seller + approval));
-        assertEquals("ERROR", again.get("status"));
+        assertEquals("APPROVAL", again.get("status"));
         Map byManager = t.sync(t.sale("ov-4", cheap, tender("CASH", 1000),
                 "\"staffUsername\":\"" + t.manager + "\","));
         assertEquals("OK", byManager.get("status"));
+    }
+
+    /// A percent or an amount off the whole sale reaches the server only as
+    /// lower unit prices on lines the register did not flag; they count
+    /// towards the discount threshold all the same.
+    @Test
+    void aSaleWideDiscountCountsTowardsTheApprovalThreshold() throws Exception {
+        Till t = new Till("pw-wide", 10);
+        t.owner(post(t.base + "/policy"), "{\"discountApprovalBp\":1000,"
+                + "\"approvePriceOverrides\":false,\"approveRefunds\":false,"
+                + "\"approveOrderEdits\":false,\"tip1Bp\":1500,\"tip2Bp\":1800,\"tip3Bp\":2000,"
+                + "\"layawayDepositBp\":2000,\"layawayCancelFeeBp\":0}");
+        String seller = "\"staffUsername\":\"" + t.cashier + "\",";
+        String fifthOff = "{\"variantId\":\"" + t.shop.variantId
+                + "\",\"quantity\":1,\"unitCents\":800,\"overridden\":false}";
+        Map refused = t.sync(t.sale("wd-1", fifthOff, tender("CASH", 1000), seller));
+        assertEquals("APPROVAL", refused.get("status"), String.valueOf(refused.get("message")));
+        String littleOff = "{\"variantId\":\"" + t.shop.variantId
+                + "\",\"quantity\":1,\"unitCents\":950,\"overridden\":false}";
+        Map under = t.sync(t.sale("wd-2", littleOff, tender("CASH", 1000), seller));
+        assertEquals("OK", under.get("status"), String.valueOf(under.get("message")));
+        String ask = "{\"managerUsername\":\"" + t.manager + "\",\"pin\":\"4321\","
+                + "\"kind\":\"DISCOUNT\",\"amountCents\":200,\"reason\":\"loyal\"}";
+        Map ok = Rest.json(mvc, t.as(post(t.reg() + "/approvals"), ask, t.cashier));
+        Map sold = t.sync(t.sale("wd-1", fifthOff, tender("CASH", 1000),
+                seller + "\"approvalId\":\"" + ok.get("id") + "\","));
+        assertEquals("OK", sold.get("status"), String.valueOf(sold.get("message")));
     }
 
     @Test

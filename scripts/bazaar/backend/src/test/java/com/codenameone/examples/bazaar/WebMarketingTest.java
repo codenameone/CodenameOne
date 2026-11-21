@@ -290,6 +290,9 @@ class WebMarketingTest {
         String c = base + "/campaigns/" + all.get(0).id();
         b.assertPage(b.get(c), "Send a test");
         redirected(b.post(c + "/test", "to", "tester@example.com"));
+        // The REST twin of the form answers the campaign, unmoved.
+        assertEquals(Campaigns.DRAFT, campaigns.sendTest(s.owner, s.storeId, all.get(0).id(),
+                "tester@example.com").status());
         redirected(b.post(c + "/schedule", "day", day(3)));
         assertEquals(Campaigns.SCHEDULED, campaigns.list(s.owner, s.storeId).get(0).status());
         b.assertPage(b.get(base + "/campaigns"), "Launch");

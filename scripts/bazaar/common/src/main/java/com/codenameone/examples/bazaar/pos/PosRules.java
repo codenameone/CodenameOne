@@ -101,8 +101,12 @@ public final class PosRules {
     }
 
     /// The approval kind a sale of `lines` needs, or null when it needs none.
-    /// `catalogUnits` are the list prices of the lines, index for index, and
-    /// `discountCents` what automatic discounts and codes take off.
+    /// `catalogUnits` are the list prices of the lines, index for index (for
+    /// a custom line, the price it is uploaded at, as the server has no other),
+    /// and `discountCents` what automatic discounts and codes take off. Any
+    /// line sold under its list price counts towards the threshold, so the
+    /// sale-wide percent or amount does; only the price-override rule reads
+    /// the lines' `overridden` flag.
     public static String saleApproval(PosPolicyDto p, String role, List<PosLineDto> lines,
             long[] catalogUnits, long discountCents) {
         if (p == null || approvesItself(role) || lines == null || catalogUnits == null) {
@@ -114,9 +118,11 @@ public final class PosRules {
         for (int iter = 0; iter < lines.size() && iter < catalogUnits.length; iter++) {
             PosLineDto l = lines.get(iter);
             list += catalogUnits[iter] * l.quantity();
+            // Flagged or not: the sale's own percent or amount off lowers
+            // the unit prices of lines it never flags, and counts all the same.
+            byHand += Math.max(0, (catalogUnits[iter] - l.unitCents()) * l.quantity());
             if (l.overridden()) {
                 overridden = true;
-                byHand += Math.max(0, (catalogUnits[iter] - l.unitCents()) * l.quantity());
             }
         }
         long off = byHand + Math.max(0, discountCents);

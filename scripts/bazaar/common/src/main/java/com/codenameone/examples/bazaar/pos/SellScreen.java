@@ -41,6 +41,7 @@ import com.codenameone.examples.bazaar.docs.Pdfs;
 import com.codenameone.examples.bazaar.api.PosCatalogDto;
 import com.codenameone.examples.bazaar.api.PosCustomerDto;
 import com.codenameone.examples.bazaar.api.PosItemDto;
+import com.codenameone.examples.bazaar.api.PosLineDto;
 import com.codenameone.examples.bazaar.net.Api;
 import com.codenameone.examples.bazaar.shop.Money;
 import com.codenameone.examples.bazaar.ui.Lang;
@@ -852,13 +853,17 @@ final class SellScreen {
     static void tender() {
         final PosCart cart = PosState.cart();
         if (cart.approvalId().length() == 0) {
+            List<PosLineDto> lines = cart.uploadLines();
             long[] list = new long[cart.items().size()];
             for (int iter = 0; iter < list.length; iter++) {
-                list[iter] = cart.items().get(iter).item.priceCents();
+                // A custom line has no list price but the one it goes up at,
+                // which is what the server compares it with too.
+                list[iter] = PosCart.custom(cart.items().get(iter).item)
+                        ? lines.get(iter).unitCents() : cart.items().get(iter).item.priceCents();
             }
             PosPricing.Totals t = PosState.totals();
             String kind = PosRules.saleApproval(PosState.policy(), PosState.role(),
-                    cart.uploadLines(), list, t.discountCents);
+                    lines, list, t.discountCents);
             if (kind != null) {
                 ManagerApproval.ask(kind, t.totalCents, "Sale", id -> {
                     cart.setApprovalId(id);

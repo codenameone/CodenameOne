@@ -47,6 +47,13 @@ import com.codenameone.examples.bazaar.api.PlatformApi;
 import com.codenameone.examples.bazaar.api.ReviewApi;
 import com.codenameone.examples.bazaar.api.WishlistApi;
 import com.codenameone.examples.bazaar.api.AddressApi;
+import com.codenameone.examples.bazaar.api.TradeApi;
+import com.codenameone.examples.bazaar.api.SubscriptionApi;
+import com.codenameone.examples.bazaar.api.JourneyApi;
+import com.codenameone.examples.bazaar.api.MarketingApi;
+import com.codenameone.examples.bazaar.api.SaleApi;
+import com.codenameone.examples.bazaar.api.ClubApi;
+import com.codenameone.examples.bazaar.api.LoyaltyApi;
 
 /// The server, as the app calls it.
 ///
@@ -83,6 +90,13 @@ public final class Api {
     private static ReviewApi reviews;
     private static WishlistApi wishlist;
     private static AddressApi addresses;
+    private static TradeApi trade;
+    private static SubscriptionApi subscriptions;
+    private static JourneyApi journeys;
+    private static MarketingApi marketing;
+    private static SaleApi sales;
+    private static ClubApi clubs;
+    private static LoyaltyApi loyalty;
 
     private Api() {
     }
@@ -116,6 +130,13 @@ public final class Api {
         reviews = RestClients.create(ReviewApi.class, baseUrl);
         wishlist = RestClients.create(WishlistApi.class, baseUrl);
         addresses = RestClients.create(AddressApi.class, baseUrl);
+        trade = RestClients.create(TradeApi.class, baseUrl);
+        subscriptions = RestClients.create(SubscriptionApi.class, baseUrl);
+        journeys = RestClients.create(JourneyApi.class, baseUrl);
+        marketing = RestClients.create(MarketingApi.class, baseUrl);
+        sales = RestClients.create(SaleApi.class, baseUrl);
+        clubs = RestClients.create(ClubApi.class, baseUrl);
+        loyalty = RestClients.create(LoyaltyApi.class, baseUrl);
     }
 
     public static AccountApi account() {
@@ -231,5 +252,33 @@ public final class Api {
 
     public static AddressApi addresses() {
         return addresses;
+    }
+
+    public static TradeApi trade() {
+        return trade;
+    }
+
+    public static SubscriptionApi subscriptions() {
+        return subscriptions;
+    }
+
+    public static JourneyApi journeys() {
+        return journeys;
+    }
+
+    public static MarketingApi marketing() {
+        return marketing;
+    }
+
+    public static SaleApi sales() {
+        return sales;
+    }
+
+    public static ClubApi clubs() {
+        return clubs;
+    }
+
+    public static LoyaltyApi loyalty() {
+        return loyalty;
     }
 }

@@ -49,6 +49,9 @@ public final class Outbox {
     public static final String SYNCED = "SYNCED";
     public static final String DUPLICATE = "DUPLICATE";
     public static final String ERROR = "ERROR";
+    /// Refused only for want of a manager's approval: waits until a manager
+    /// approves it at this register, then goes again under the same client id.
+    public static final String APPROVAL = "APPROVAL";
 
     /// Most sales sent in one request.
     public static final int BATCH = 20;
@@ -72,7 +75,8 @@ public final class Outbox {
 
     /// One sale and its fate.
     public static final class Entry {
-        public final PosSaleDto sale;
+        /// Replaced, never edited, when a manager re-approves the sale.
+        public PosSaleDto sale;
         public String state = PENDING;
         public int attempts;
         public long nextAt;
@@ -93,7 +97,8 @@ public final class Outbox {
 
         /// Whether the server does not have it yet.
         public boolean open() {
-            return PENDING.equals(state) || SYNCING.equals(state) || ERROR.equals(state);
+            return PENDING.equals(state) || SYNCING.equals(state) || ERROR.equals(state)
+                    || APPROVAL.equals(state);
         }
     }
 
@@ -146,14 +151,48 @@ public final class Outbox {
         return n;
     }
 
+    /// Refused sales, those waiting for an approval among them.
     public int errors() {
         int n = 0;
         for (int iter = 0; iter < entries.size(); iter++) {
-            if (ERROR.equals(entries.get(iter).state)) {
+            String st = entries.get(iter).state;
+            if (ERROR.equals(st) || APPROVAL.equals(st)) {
                 n++;
             }
         }
         return n;
+    }
+
+    /// Sales waiting for a manager's approval.
+    public int awaitingApproval() {
+        int n = 0;
+        for (int iter = 0; iter < entries.size(); iter++) {
+            if (APPROVAL.equals(entries.get(iter).state)) {
+                n++;
+            }
+        }
+        return n;
+    }
+
+    /// Gives an APPROVAL sale the approval a manager just granted and sends
+    /// it again now, under the same client id, so the server still keeps it
+    /// once. False when the sale is not waiting for one.
+    public boolean reapprove(String clientId, String approvalId) {
+        Entry e = find(clientId);
+        if (e == null || !APPROVAL.equals(e.state) || approvalId == null
+                || approvalId.length() == 0) {
+            return false;
+        }
+        PosSaleDto s = e.sale;
+        e.sale = new PosSaleDto(s.clientId(), s.shiftId(), s.customerId(), s.email(),
+                s.discountCode(), s.note(), s.createdAt(), s.lines(), s.tenders(),
+                s.staffUsername(), s.tipCents(), approvalId);
+        e.state = PENDING;
+        e.attempts = 0;
+        e.nextAt = 0;
+        e.message = "";
+        save();
+        return true;
     }
 
     /// The PENDING sales whose time has come, oldest first, at most [#BATCH].
@@ -209,6 +248,8 @@ public final class Outbox {
                 e.state = SYNCED;
             } else if (DUPLICATE.equalsIgnoreCase(status)) {
                 e.state = DUPLICATE;
+            } else if (APPROVAL.equalsIgnoreCase(status)) {
+                e.state = APPROVAL;
             } else {
                 e.state = ERROR;
             }

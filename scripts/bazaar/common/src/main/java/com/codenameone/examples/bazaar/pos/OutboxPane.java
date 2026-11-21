@@ -18,6 +18,7 @@
  */
 package com.codenameone.examples.bazaar.pos;
 
+import com.codename1.ui.Button;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.FontImage;
@@ -95,6 +96,12 @@ final class OutboxPane {
         row.add(BorderLayout.CENTER, text);
         Container east = new Container(BoxLayout.x());
         east.add(Ui.badge(e.state, "PosBadge" + e.state));
+        if (Outbox.APPROVAL.equals(e.state)) {
+            text.add(PosUi.label("Needs a manager's approval", "PosError"));
+            Button again = Ui.secondary(Lang.tr("Re-approve"), "pos-outbox-reapprove-"
+                    + e.clientId(), ev -> reapprove(e));
+            east.add(again);
+        }
         if (Outbox.ERROR.equals(e.state)) {
             east.add(Ui.flat(FontImage.MATERIAL_REFRESH, "pos-outbox-retry-" + e.clientId(), ev -> {
                 PosState.outbox().retry(e.clientId());
@@ -104,5 +111,22 @@ final class OutboxPane {
         }
         row.add(BorderLayout.EAST, east);
         return row;
+    }
+
+    /// A manager approves the queued sale at this register; it then goes
+    /// again with that approval, under its own client id.
+    private static void reapprove(final Outbox.Entry e) {
+        long total = e.totalCents;
+        if (total <= 0 && e.sale.tenders() != null) {
+            for (int iter = 0; iter < e.sale.tenders().size(); iter++) {
+                total += e.sale.tenders().get(iter).amountCents();
+            }
+        }
+        ManagerApproval.ask(PosRules.DISCOUNT, total, "Queued sale", id -> {
+            if (PosState.outbox().reapprove(e.clientId(), id)) {
+                PosState.fireStatus();
+                PosSync.kick();
+            }
+        });
     }
 }

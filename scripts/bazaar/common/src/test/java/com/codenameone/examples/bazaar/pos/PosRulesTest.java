@@ -71,6 +71,22 @@ class PosRulesTest {
     }
 
     @Test
+    void aSaleWideDiscountCountsThoughNoLineIsFlagged() {
+        PosPolicyDto p = policy(1000, false, false, false);
+        long[] list = {1000, 1000};
+        // 20% off the whole sale, spread into the unit prices, nothing flagged.
+        List<PosLineDto> fifth = Arrays.asList(new PosLineDto("a", 1, 800, "", true, false),
+                new PosLineDto("b", 1, 800, "", true, false));
+        assertEquals(PosRules.DISCOUNT, PosRules.saleApproval(p, "CASHIER", fifth, list, 0));
+        List<PosLineDto> twentieth = Arrays.asList(new PosLineDto("a", 1, 950, "", true, false),
+                new PosLineDto("b", 1, 950, "", true, false));
+        assertNull(PosRules.saleApproval(p, "CASHIER", twentieth, list, 0));
+        // Unflagged lines never trigger the price-override rule.
+        assertNull(PosRules.saleApproval(policy(0, true, false, false), "CASHIER", fifth, list,
+                0));
+    }
+
+    @Test
     void aChangedPriceNeedsAManagerWhenThePolicySays() {
         long[] list = {1000};
         List<PosLineDto> raised = Arrays.asList(new PosLineDto("a", 1, 1200, "", true, true));

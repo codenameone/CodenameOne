@@ -82,6 +82,14 @@ public interface MarketingApi {
             @Body ScheduleDto when,
             OnComplete<Response<CampaignDto>> callback);
 
+    /// Mails one test copy of an e-mail campaign, subject marked as a test,
+    /// to `body.to`. Records nothing: no send, no stats.
+    @POST("/api/merchant/stores/{storeId}/campaigns/{campaignId}/test")
+    void sendTest(@Path("storeId") String storeId,
+            @Path("campaignId") String campaignId,
+            @Body TestSendDto body,
+            OnComplete<Response<CampaignDto>> callback);
+
     @POST("/api/merchant/stores/{storeId}/campaigns/{campaignId}/cancel")
     void cancelCampaign(@Path("storeId") String storeId,
             @Path("campaignId") String campaignId,
