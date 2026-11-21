@@ -461,6 +461,16 @@
       ]
     },
     {
+      "id": "documents",
+      "category": "Rich components",
+      "name": "Word processing documents",
+      "description": "Checks a reviewed document with lists, a formula table, a footnote, an embedded slider, tracked changes, a comment and proofing squiggles, and HTML read back through DOCX and ODT beside Markdown.",
+      "tests": [
+        "DocumentFormatsScreenshotTest",
+        "DocumentReviewScreenshotTest"
+      ]
+    },
+    {
       "id": "spreadsheet",
       "category": "Rich components",
       "name": "Spreadsheet files and formulas",
@@ -1544,6 +1554,14 @@
     {
       "pattern": "TreeGridTheme*",
       "test": "TreeGridThemeScreenshotTest"
+    },
+    {
+      "pattern": "DocumentReview*",
+      "test": "DocumentReviewScreenshotTest"
+    },
+    {
+      "pattern": "DocumentFormats*",
+      "test": "DocumentFormatsScreenshotTest"
     },
     {
       "pattern": "NodeGraphTheme*",
