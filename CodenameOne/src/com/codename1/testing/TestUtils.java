@@ -100,80 +100,252 @@ public final class TestUtils {
         if (verbose) {
             log("findByName(" + componentName + ")");
         }
-        Component c = (Component) lookupOnEdt(new Lookup() {
+        Lookup byName = new Lookup() {
+            @Override
             Object find(Form root) {
                 return findByName(root, componentName);
             }
-        });
+        };
+        Component c = (Component) callOnEdt(byName);
         if (c == null) {
             waitFor(30);
-            return (Component) lookupOnEdt(new Lookup() {
-            Object find(Form root) {
-                return findByName(root, componentName);
-            }
-        });
+            return (Component) callOnEdt(byName);
         }
         return c;
     }
 
-    /// A walk of the current form, run by `lookupOnEdt`.
-    private abstract static class Lookup {
-        abstract Object find(Form root);
+    /// Work that touches the UI and therefore has to run on the EDT.
+    private abstract static class EdtCall {
+        abstract Object call();
     }
 
-    /// Walks the current form on the EDT. A test runs off the EDT while the
-    /// application keeps rebuilding its forms there, so a walk from the test
+    /// A walk of the current form, which is skipped when no form is showing.
+    private abstract static class Lookup extends EdtCall {
+        abstract Object find(Form root);
+
+        @Override
+        Object call() {
+            Form root = Display.getInstance().getCurrent();
+            return root == null ? null : find(root);
+        }
+    }
+
+    /// Runs an `EdtCall` and records how it ended, so that the outcome can be
+    /// read on the thread that asked for it. `RunnableWrapper` has no finally,
+    /// so without this a throw on the EDT would leave the caller polling to the
+    /// timeout and reporting a stuck EDT instead of the real failure.
+    private static final class EdtTask implements Runnable {
+        private final EdtCall work;
+        private Object result;
+        private Throwable failure;
+        private boolean done;
+
+        EdtTask(EdtCall work) {
+            this.work = work;
+        }
+
+        @Override
+        public void run() {
+            try {
+                result = work.call();
+            } catch (Throwable t) {
+                failure = t;
+            } finally {
+                done = true;
+            }
+        }
+
+        Object outcome() {
+            if (failure instanceof RuntimeException) {
+                throw (RuntimeException) failure;
+            }
+            if (failure instanceof Error) {
+                throw (Error) failure;
+            }
+            if (failure != null) {
+                throw new RuntimeException(failure.toString());
+            }
+            return result;
+        }
+    }
+
+    /// True when the work can run on the calling thread: it is the EDT, or no
+    /// Codename One is running and so no other thread is mutating the UI.
+    private static boolean runHere() {
+        return Display.getInstance().isEdt() || !Display.isInitialized();
+    }
+
+    /// Reads UI state on the EDT and returns it. A test runs off the EDT while
+    /// the application keeps rebuilding its forms there, so a walk from the test
     /// thread read a child count and then indexed a container the EDT had
     /// emptied in between (IndexOutOfBoundsException from
     /// `Container.getComponentAt`). The component tree is EDT-only state, so the
-    /// walk is marshalled rather than guarded.
-    private static Object lookupOnEdt(final Lookup lookup) {
-        final Object[] result = new Object[2];
-        final boolean[] done = new boolean[1];
-        Runnable r = new Runnable() {
-            public void run() {
-                // Caught here and rethrown on the caller: RunnableWrapper has no
-                // finally, so a throw would leave the waiter polling to the timeout
-                // and report a stuck EDT instead of the real failure.
-                try {
-                    Form root = Display.getInstance().getCurrent();
-                    result[0] = root == null ? null : lookup.find(root);
-                } catch (Throwable t) {
-                    result[1] = t;
-                } finally {
-                    done[0] = true;
-                }
-            }
-        };
-        Display d = Display.getInstance();
-        if (d.isEdt() || !Display.isInitialized()) {
-            // On the EDT already, or no Codename One running at all: no other
-            // thread is mutating the tree, so the walk is safe where it stands.
-            r.run();
-        } else {
-            // Never the unbounded callSeriallyAndWait(Runnable): it polls forever,
-            // so an EDT that died, or is blocked waiting on this very thread, would
-            // hang the whole test run instead of failing the one test. The bound
-            // is generous so a slow form build on a CI runner is not mistaken for it.
-            d.callSeriallyAndWait(r, EDT_LOOKUP_TIMEOUT);
-            if (!done[0]) {
-                throw new RuntimeException("The EDT did not run a component lookup within "
-                        + EDT_LOOKUP_TIMEOUT + "ms; it is blocked or no longer running");
-            }
+    /// access is marshalled rather than guarded.
+    ///
+    /// Never the unbounded `callSeriallyAndWait(Runnable)`: it polls forever, so
+    /// an EDT that died, or is blocked waiting on this very thread, would hang the
+    /// whole test run instead of failing the one test. The bound is generous so a
+    /// slow form build on a CI runner is not mistaken for it.
+    ///
+    /// Only for work that cannot block in a nested event loop; anything that can
+    /// show a modal dialog goes through `actOnEdt`.
+    private static Object callOnEdt(EdtCall work) {
+        EdtTask task = new EdtTask(work);
+        if (runHere()) {
+            task.run();
+            return task.outcome();
         }
-        if (result[1] instanceof RuntimeException) {
-            throw (RuntimeException) result[1];
+        Display.getInstance().callSeriallyAndWait(task, edtTimeout);
+        if (!task.done) {
+            throw new RuntimeException(edtStuck());
         }
-        if (result[1] instanceof Error) {
-            throw (Error) result[1];
-        }
-        if (result[1] != null) {
-            throw new RuntimeException(result[1].toString());
-        }
-        return result[0];
+        return task.outcome();
     }
 
-    private static final int EDT_LOOKUP_TIMEOUT = 60000;
+    /// Performs an interaction on the EDT -- an event, a command, a press --
+    /// which may legitimately not return for as long as the test likes: a click
+    /// that opens a modal dialog blocks inside its own handler until the dialog
+    /// is dismissed, and dismissing it is the test's next step. Waiting for the
+    /// action itself would time out on every such click.
+    ///
+    /// So a marker is queued behind the action and the wait is for the marker.
+    /// It runs once the action has finished, or once the action has entered a
+    /// nested event loop (a modal dialog's `invokeAndBlock` keeps serving the
+    /// serial queue). Either way the EDT is alive and the test may go on; only an
+    /// EDT that is dead or wedged fails. A failure the action raises before the
+    /// marker runs is rethrown here; one raised later, after a dialog it opened
+    /// closes, goes to the EDT's own error handling.
+    private static void actOnEdt(EdtCall work) {
+        EdtTask task = new EdtTask(work);
+        if (runHere()) {
+            task.run();
+            task.outcome();
+            return;
+        }
+        final boolean[] reached = new boolean[1];
+        Display d = Display.getInstance();
+        d.callSerially(task);
+        d.callSeriallyAndWait(new Runnable() {
+            @Override
+            public void run() {
+                reached[0] = true;
+            }
+        }, edtTimeout);
+        if (!reached[0]) {
+            throw new RuntimeException(edtStuck());
+        }
+        if (task.done) {
+            task.outcome();
+        }
+    }
+
+    private static String edtStuck() {
+        return "The EDT did not respond within " + edtTimeout
+                + "ms; it is blocked or no longer running";
+    }
+
+    /// How long a helper waits for the EDT before failing. Package private so the
+    /// tests of this class can shorten it instead of waiting a minute.
+    static int edtTimeout = 60000; //NOPMD MutableStaticState - test-only bound, set from the same package
+
+    /// Fails the test unless `isKind` holds for the component `c`. Every cast below is
+    /// guarded by this: ParparVM's CHECKCAST is unchecked, so a wrong cast on iOS
+    /// reads the wrong object instead of throwing ClassCastException.
+    private static void assertKind(Object c, boolean isKind, String kind, String what) {
+        assertBool(c != null, "No component found for " + what);
+        assertBool(isKind, what + " is not a " + kind + ": " + c);
+    }
+
+    /// The text of a label or text area, read on the EDT.
+    private static String textOf(final Component c) {
+        return (String) callOnEdt(new EdtCall() {
+            @Override
+            Object call() {
+                if (c instanceof Label) {
+                    return ((Label) c).getText();
+                }
+                if (c instanceof TextArea) {
+                    return ((TextArea) c).getText();
+                }
+                return null;
+            }
+        });
+    }
+
+    /// A point inside `c`, given as fractions of its size, read on the EDT.
+    private static int[] pointIn(final Component c, final float x, final float y, final String what) {
+        assertBool(c != null, "No component found for " + what);
+        return (int[]) callOnEdt(new EdtCall() {
+            @Override
+            Object call() {
+                return new int[]{c.getAbsoluteX() + (int) (x * c.getWidth()),
+                        c.getAbsoluteY() + (int) (y * c.getHeight())};
+            }
+        });
+    }
+
+    private static final int POINTER_PRESS = 0;
+    private static final int POINTER_RELEASE = 1;
+    private static final int POINTER_DRAG = 2;
+
+    /// Delivers a pointer event to the current form on the EDT.
+    private static void pointerEvent(final int kind, final int x, final int y) {
+        actOnEdt(new EdtCall() {
+            @Override
+            Object call() {
+                Form f = Display.getInstance().getCurrent();
+                assertBool(f != null, "No form is showing");
+                if (kind == POINTER_PRESS) {
+                    f.pointerPressed(x, y);
+                } else if (kind == POINTER_RELEASE) {
+                    f.pointerReleased(x, y);
+                } else {
+                    f.pointerDragged(x, y);
+                }
+                return null;
+            }
+        });
+    }
+
+    /// Delivers a key event to the current form on the EDT.
+    private static void keyEvent(final boolean press, final int keyCode) {
+        actOnEdt(new EdtCall() {
+            @Override
+            Object call() {
+                Form f = Display.getInstance().getCurrent();
+                assertBool(f != null, "No form is showing");
+                if (press) {
+                    f.keyPressed(keyCode);
+                } else {
+                    f.keyReleased(keyCode);
+                }
+                return null;
+            }
+        });
+    }
+
+    /// Presses and releases a button on the EDT, with the pauses the helpers
+    /// always had between the two.
+    private static void click(Component c, String what, int pause) {
+        assertKind(c, c instanceof Button, "Button", what);
+        final Button b = (Button) c;
+        actOnEdt(new EdtCall() {
+            @Override
+            Object call() {
+                b.pressed();
+                return null;
+            }
+        });
+        waitFor(pause);
+        actOnEdt(new EdtCall() {
+            @Override
+            Object call() {
+                b.released();
+                return null;
+            }
+        });
+        waitFor(pause);
+    }
 
     /// Selects the given offset in a list
     ///
@@ -183,24 +355,26 @@ public final class TestUtils {
     ///
     /// - `offset`: the offset to select
     public static void selectInList(String listName, int offset) {
-        selectListOffset(findByName(listName), offset);
+        selectListOffset(findByName(listName), offset, listName);
     }
 
-    private static void selectListOffset(Component c, int offset) {
-        assertBool(c != null, "List not found");
-        if (c instanceof List) {
-            ((List) c).setSelectedIndex(offset);
-            return;
-        }
-        if (c instanceof ContainerList) {
-            ((ContainerList) c).setSelectedIndex(offset);
-            return;
-        }
-        if (c instanceof GenericSpinner) {
-            ((GenericSpinner) c).getModel().setSelectedIndex(offset);
-            return;
-        }
-        assertBool(false, "Unsupported list type: " + c.getName());
+    private static void selectListOffset(final Component c, final int offset, String what) {
+        assertBool(c != null, "List not found: " + what);
+        assertBool(c instanceof List || c instanceof ContainerList || c instanceof GenericSpinner,
+                "Unsupported list type: " + c.getName());
+        actOnEdt(new EdtCall() {
+            @Override
+            Object call() {
+                if (c instanceof List) {
+                    ((List) c).setSelectedIndex(offset);
+                } else if (c instanceof ContainerList) {
+                    ((ContainerList) c).setSelectedIndex(offset);
+                } else {
+                    ((GenericSpinner) c).getModel().setSelectedIndex(offset);
+                }
+                return null;
+            }
+        });
     }
 
     /// Selects the given offset in a list
@@ -209,7 +383,7 @@ public final class TestUtils {
     ///
     /// - `offset`: the offset to select
     public static void selectInList(int[] path, int offset) {
-        selectListOffset(getComponentByPath(path), offset);
+        selectListOffset(getComponentByPath(path), offset, toString(path));
     }
 
     /// Finds a component with the given name, works even with UI's that weren't created with the GUI builder
@@ -255,7 +429,8 @@ public final class TestUtils {
         if (verbose) {
             log("findLabelText(" + text + ")");
         }
-        return (Label) lookupOnEdt(new Lookup() {
+        return (Label) callOnEdt(new Lookup() {
+            @Override
             Object find(Form root) {
                 return findLabelText(root, text);
             }
@@ -311,12 +486,9 @@ public final class TestUtils {
         if (verbose) {
             log("clickButtonByLabel(" + text + ")");
         }
-        Button b = (Button) findLabelText(text);
+        Component c = findLabelText(text);
         waitFor(20);
-        b.pressed();
-        waitFor(20);
-        b.released();
-        waitFor(20);
+        click(c, "label " + text, 20);
     }
 
     /// Clicks the button with the given label
@@ -328,12 +500,9 @@ public final class TestUtils {
         if (verbose) {
             log("clickButtonByName(" + name + ")");
         }
-        Button b = (Button) findByName(name);
+        Component c = findByName(name);
         waitFor(20);
-        b.pressed();
-        waitFor(20);
-        b.released();
-        waitFor(20);
+        click(c, "name " + name, 20);
     }
 
     private static String toString(int[] p) {
@@ -360,11 +529,7 @@ public final class TestUtils {
         if (verbose) {
             log("clickButtonByPath(" + toString(path) + ")");
         }
-        Button b = (Button) getComponentByPath(path);
-        b.pressed();
-        waitFor(10);
-        b.released();
-        waitFor(10);
+        click(getComponentByPath(path), "path " + toString(path), 10);
     }
 
     /// Executes the back command for the current form, similarly to pressing the back button
@@ -372,10 +537,17 @@ public final class TestUtils {
         if (verbose) {
             log("goBack()");
         }
-        Form f = Display.getInstance().getCurrent();
-        Command c = f.getBackCommand();
-        assertBool(c != null, "The current form doesn't have a back command at this moment! for form name " + f.getName());
-        f.dispatchCommand(c, new ActionEvent(c, ActionEvent.Type.Command));
+        actOnEdt(new EdtCall() {
+            @Override
+            Object call() {
+                Form f = Display.getInstance().getCurrent();
+                assertBool(f != null, "No form is showing");
+                Command c = f.getBackCommand();
+                assertBool(c != null, "The current form doesn't have a back command at this moment! for form name " + f.getName());
+                f.dispatchCommand(c, new ActionEvent(c, ActionEvent.Type.Command));
+                return null;
+            }
+        });
         waitFor(20);
     }
 
@@ -384,19 +556,25 @@ public final class TestUtils {
     /// #### Parameters
     ///
     /// - `name`: the name of the command
-    public static void clickMenuItem(String name) {
+    public static void clickMenuItem(final String name) {
         if (verbose) {
             log("clickMenuItem(" + name + ")");
         }
-        Form f = Display.getInstance().getCurrent();
-        for (int iter = 0; iter < f.getCommandCount(); iter++) {
-            Command c = f.getCommand(iter);
-            if (name.equals(c.getCommandName())) {
-                f.dispatchCommand(c, new ActionEvent(c, ActionEvent.Type.Command));
-                return;
+        actOnEdt(new EdtCall() {
+            @Override
+            Object call() {
+                Form f = Display.getInstance().getCurrent();
+                assertBool(f != null, "No form is showing");
+                for (int iter = 0; iter < f.getCommandCount(); iter++) {
+                    Command c = f.getCommand(iter);
+                    if (name.equals(c.getCommandName())) {
+                        f.dispatchCommand(c, new ActionEvent(c, ActionEvent.Type.Command));
+                        return null;
+                    }
+                }
+                throw new RuntimeException("Command not found: " + name);
             }
-        }
-        throw new RuntimeException("Command not found: " + name);
+        });
     }
 
     /// Returns all the command objects from the toolbar in the order of left, right, overflow & sidemenu
@@ -405,8 +583,19 @@ public final class TestUtils {
     ///
     /// the set of commands
     public static Command[] getToolbarCommands() {
+        return (Command[]) callOnEdt(new EdtCall() {
+            @Override
+            Object call() {
+                return toolbarCommands();
+            }
+        });
+    }
+
+    private static Command[] toolbarCommands() {
         Form f = Display.getInstance().getCurrent();
+        assertBool(f != null, "No form is showing");
         Toolbar tb = f.getToolbar();
+        assertBool(tb != null, "The current form has no toolbar");
         ArrayList<Command> result = new ArrayList<Command>();
         addAllCommands(tb.getLeftBarCommands(), result);
         addAllCommands(tb.getRightBarCommands(), result);
@@ -427,13 +616,22 @@ public final class TestUtils {
 
     /// Shows the sidemenu UI
     public static void showSidemenu() {
-        Form f = Display.getInstance().getCurrent();
-        Toolbar tb = f.getToolbar();
-        if (tb != null) {
-            tb.openSideMenu();
-        } else {
-            ((SideMenuBar) f.getMenuBar()).openMenu(null);
-        }
+        actOnEdt(new EdtCall() {
+            @Override
+            Object call() {
+                Form f = Display.getInstance().getCurrent();
+                assertBool(f != null, "No form is showing");
+                Toolbar tb = f.getToolbar();
+                if (tb != null) {
+                    tb.openSideMenu();
+                } else {
+                    Object bar = f.getMenuBar();
+                    assertBool(bar instanceof SideMenuBar, "The current form has no side menu");
+                    ((SideMenuBar) bar).openMenu(null);
+                }
+                return null;
+            }
+        });
     }
 
     /// Executes a command from the offset returned by `#getToolbarCommands()`
@@ -442,18 +640,17 @@ public final class TestUtils {
     ///
     /// - `offset`: the offset of the command we want to execute
     public static void executeToolbarCommandAtOffset(final int offset) {
-        Form f = Display.getInstance().getCurrent();
-        if (!Display.getInstance().isEdt()) {
-            Display.getInstance().callSerially(new Runnable() {
-                @Override
-                public void run() {
-                    executeToolbarCommandAtOffset(offset);
-                }
-            });
-            return;
-        }
-        Command cmd = getToolbarCommands()[offset];
-        f.dispatchCommand(cmd, new ActionEvent(cmd));
+        actOnEdt(new EdtCall() {
+            @Override
+            Object call() {
+                Command[] commands = toolbarCommands();
+                assertBool(offset >= 0 && offset < commands.length, "No toolbar command at offset " + offset
+                        + "; the toolbar has " + commands.length);
+                Command cmd = commands[offset];
+                Display.getInstance().getCurrent().dispatchCommand(cmd, new ActionEvent(cmd));
+                return null;
+            }
+        });
     }
 
     /// Scrolls to show the component in case it is invisible currently
@@ -461,12 +658,20 @@ public final class TestUtils {
     /// #### Parameters
     ///
     /// - `c`: the component
-    public static void ensureVisible(Component c) {
+    public static void ensureVisible(final Component c) {
         if (verbose) {
             log("ensureVisible(" + c + ")");
         }
-        Form f = Display.getInstance().getCurrent();
-        f.scrollComponentToVisible(c);
+        assertBool(c != null, "ensureVisible: no component");
+        actOnEdt(new EdtCall() {
+            @Override
+            Object call() {
+                Form f = Display.getInstance().getCurrent();
+                assertBool(f != null, "No form is showing");
+                f.scrollComponentToVisible(c);
+                return null;
+            }
+        });
     }
 
     /// Scrolls to show the component in case it is invisible currently
@@ -526,6 +731,24 @@ public final class TestUtils {
         waitForFormTitle(title, 90000);
     }
 
+    private static String currentFormTitle() {
+        return (String) callOnEdt(new Lookup() {
+            @Override
+            Object find(Form root) {
+                return getFormTitle(root);
+            }
+        });
+    }
+
+    private static String currentFormName() {
+        return (String) callOnEdt(new Lookup() {
+            @Override
+            Object find(Form root) {
+                return root.getName();
+            }
+        });
+    }
+
     private static String getFormTitle(Form f) {
         if (f.getToolbar() != null) {
             Component c = f.getToolbar().getTitleComponent();
@@ -540,13 +763,13 @@ public final class TestUtils {
 
     private static void waitForFormTitleImpl(String title, long timeout) {
         long t = System.currentTimeMillis() + timeout;
-        while (!title.equals(getFormTitle(Display.getInstance().getCurrent()))) {
+        while (!title.equals(currentFormTitle())) {
             try {
                 Thread.sleep(50);
-                if (System.currentTimeMillis() > t) {
-                    assertBool(false, "Waiting for form " + title + " timed out! Current form title is: " + Display.getInstance().getCurrent().getTitle());
-                }
             } catch (InterruptedException ex) {
+            }
+            if (System.currentTimeMillis() > t) {
+                assertBool(false, "Waiting for form " + title + " timed out! Current form title is: " + currentFormTitle());
             }
         }
     }
@@ -586,13 +809,13 @@ public final class TestUtils {
 
     private static void waitForFormNameImpl(String title, long timeout) {
         long t = System.currentTimeMillis() + timeout;
-        while (!title.equals(Display.getInstance().getCurrent().getName())) {
+        while (!title.equals(currentFormName())) {
             try {
                 Thread.sleep(50);
             } catch (InterruptedException ex) {
             }
             if (System.currentTimeMillis() > t) {
-                assertBool(false, "Waiting for form " + title + " timed out! Current form name is: " + Display.getInstance().getCurrent().getName());
+                assertBool(false, "Waiting for form " + title + " timed out! Current form name is: " + currentFormName());
             }
         }
     }
@@ -627,13 +850,13 @@ public final class TestUtils {
 
     private static void waitForUnnamedFormImpl(long timeout) {
         long t = System.currentTimeMillis() + timeout;
-        while (Display.getInstance().getCurrent().getName() != null) {
+        while (currentFormName() != null) {
             try {
                 Thread.sleep(50);
             } catch (InterruptedException ex) {
             }
             if (System.currentTimeMillis() > t) {
-                assertBool(false, "Waiting for form unnamed form timed out! Current form name is: " + Display.getInstance().getCurrent().getName());
+                assertBool(false, "Waiting for form unnamed form timed out! Current form name is: " + currentFormName());
             }
         }
     }
@@ -671,8 +894,16 @@ public final class TestUtils {
             }
 
 
-            Image mute = Display.getInstance().captureScreen();
-            Display.getInstance().getCurrent().paintComponent(mute.getGraphics(), true);
+            Image mute = (Image) callOnEdt(new EdtCall() {
+                @Override
+                Object call() {
+                    Image img = Display.getInstance().captureScreen();
+                    Form f = Display.getInstance().getCurrent();
+                    assertBool(f != null, "No form is showing");
+                    f.paintComponent(img.getGraphics(), true);
+                    return img;
+                }
+            });
             screenshotName = screenshotName + ".png";
             if (Storage.getInstance().exists(screenshotName)) {
                 Image orig = Image.createImage(Storage.getInstance().createInputStream(screenshotName));
@@ -779,7 +1010,7 @@ public final class TestUtils {
         if (verbose) {
             log("keyPress(" + keyCode + ")");
         }
-        Display.getInstance().getCurrent().keyPressed(keyCode);
+        keyEvent(true, keyCode);
         waitFor(10);
     }
 
@@ -792,7 +1023,7 @@ public final class TestUtils {
         if (verbose) {
             log("keyRelease(" + keyCode + ")");
         }
-        Display.getInstance().getCurrent().keyReleased(keyCode);
+        keyEvent(false, keyCode);
         waitFor(10);
     }
 
@@ -805,7 +1036,7 @@ public final class TestUtils {
         if (verbose) {
             log("gameKeyPress(" + gameKey + ")");
         }
-        Display.getInstance().getCurrent().keyPressed(Display.getInstance().getKeyCode(gameKey));
+        keyEvent(true, Display.getInstance().getKeyCode(gameKey));
         waitFor(10);
     }
 
@@ -818,7 +1049,7 @@ public final class TestUtils {
         if (verbose) {
             log("gameKeyRelease(" + gameKey + ")");
         }
-        Display.getInstance().getCurrent().keyReleased(Display.getInstance().getKeyCode(gameKey));
+        keyEvent(false, Display.getInstance().getKeyCode(gameKey));
         waitFor(10);
     }
 
@@ -835,20 +1066,14 @@ public final class TestUtils {
     /// - `componentName`: the name of the component
     public static void pointerPress(float x, float y, String componentName) {
         if (verbose) {
-            if (componentName == null) {
-                log("pointerPress(" + x + ", " + y + ", null)");
-            } else {
-                log("pointerPress(" + x + ", " + y + ", " + componentName + ")");
-            }
+            log("pointerPress(" + x + ", " + y + ", " + componentName + ")");
         }
         waitFor(20);
         if (componentName != null) {
-            Component c = findByName(componentName);
-            int actualX = c.getAbsoluteX() + (int) (x * c.getWidth());
-            int actualY = c.getAbsoluteY() + (int) (y * c.getHeight());
-            Display.getInstance().getCurrent().pointerPressed(actualX, actualY);
+            int[] p = pointIn(findByName(componentName), x, y, componentName);
+            pointerEvent(POINTER_PRESS, p[0], p[1]);
         } else {
-            Display.getInstance().getCurrent().pointerPressed((int) (x * Display.getInstance().getDisplayWidth()),
+            pointerEvent(POINTER_PRESS, (int) (x * Display.getInstance().getDisplayWidth()),
                     (int) (y * Display.getInstance().getDisplayHeight()));
         }
         waitFor(10);
@@ -869,10 +1094,8 @@ public final class TestUtils {
         if (verbose) {
             log("pointerRelease(" + x + ", " + y + ", " + componentName + ")");
         }
-        Component c = findByName(componentName);
-        int actualX = c.getAbsoluteX() + (int) (x * c.getWidth());
-        int actualY = c.getAbsoluteY() + (int) (y * c.getHeight());
-        Display.getInstance().getCurrent().pointerReleased(actualX, actualY);
+        int[] p = pointIn(findByName(componentName), x, y, componentName);
+        pointerEvent(POINTER_RELEASE, p[0], p[1]);
         waitFor(30);
     }
 
@@ -891,10 +1114,8 @@ public final class TestUtils {
         if (verbose) {
             log("pointerDrag(" + x + ", " + y + ", " + componentName + ")");
         }
-        Component c = findByName(componentName);
-        int actualX = c.getAbsoluteX() + (int) (x * c.getWidth());
-        int actualY = c.getAbsoluteY() + (int) (y * c.getHeight());
-        Display.getInstance().getCurrent().pointerDragged(actualX, actualY);
+        int[] p = pointIn(findByName(componentName), x, y, componentName);
+        pointerEvent(POINTER_DRAG, p[0], p[1]);
     }
 
     /// A component press on a given named component at x/y where x and y are **NOT pixels**
@@ -912,10 +1133,8 @@ public final class TestUtils {
         if (verbose) {
             log("pointerPress(" + x + ", " + y + ", " + toString(path) + ")");
         }
-        Component c = getComponentByPath(path);
-        int actualX = c.getAbsoluteX() + (int) (x * c.getWidth());
-        int actualY = c.getAbsoluteY() + (int) (y * c.getHeight());
-        Display.getInstance().getCurrent().pointerPressed(actualX, actualY);
+        int[] p = pointIn(getComponentByPath(path), x, y, toString(path));
+        pointerEvent(POINTER_PRESS, p[0], p[1]);
         waitFor(10);
     }
 
@@ -934,10 +1153,8 @@ public final class TestUtils {
         if (verbose) {
             log("pointerRelease(" + x + ", " + y + ", " + toString(path) + ")");
         }
-        Component c = getComponentByPath(path);
-        int actualX = c.getAbsoluteX() + (int) (x * c.getWidth());
-        int actualY = c.getAbsoluteY() + (int) (y * c.getHeight());
-        Display.getInstance().getCurrent().pointerReleased(actualX, actualY);
+        int[] p = pointIn(getComponentByPath(path), x, y, toString(path));
+        pointerEvent(POINTER_RELEASE, p[0], p[1]);
         waitFor(10);
     }
 
@@ -956,10 +1173,8 @@ public final class TestUtils {
         if (verbose) {
             log("pointerDrag(" + x + ", " + y + ", " + toString(path) + ")");
         }
-        Component c = getComponentByPath(path);
-        int actualX = c.getAbsoluteX() + (int) (x * c.getWidth());
-        int actualY = c.getAbsoluteY() + (int) (y * c.getHeight());
-        Display.getInstance().getCurrent().pointerDragged(actualX, actualY);
+        int[] p = pointIn(getComponentByPath(path), x, y, toString(path));
+        pointerEvent(POINTER_DRAG, p[0], p[1]);
     }
 
     /// Gets the component from the current form based on its path. A path is a
@@ -976,10 +1191,15 @@ public final class TestUtils {
     ///
     /// a component
     public static Component getComponentByPath(final int[] path) {
-        return (Component) lookupOnEdt(new Lookup() {
+        return (Component) callOnEdt(new Lookup() {
+            @Override
             Object find(Form root) {
                 Component current = root.getContentPane();
                 for (int offset : path) {
+                    if (!(current instanceof Container)
+                            || offset < 0 || offset >= ((Container) current).getComponentCount()) {
+                        return null;
+                    }
                     current = ((Container) current).getComponentAt(offset);
                 }
                 return current;
@@ -995,18 +1215,24 @@ public final class TestUtils {
     /// - `name`: the name of the component
     ///
     /// - `text`: the text to set
-    public static void setText(String name, String text) {
+    public static void setText(String name, final String text) {
         if (verbose) {
             log("setText(" + name + ", " + text + ")");
         }
-        Component c = findByName(name);
-        if (c instanceof Label) {
-            ((Label) c).setText(text);
-            return;
-        }
-        ((TextArea) c).setText(text);
-        Display.getInstance().onEditingComplete(c, text);
-
+        final Component c = findByName(name);
+        assertBool(c instanceof Label || c instanceof TextArea, "No label or text area found for " + name);
+        actOnEdt(new EdtCall() {
+            @Override
+            Object call() {
+                if (c instanceof Label) {
+                    ((Label) c).setText(text);
+                    return null;
+                }
+                ((TextArea) c).setText(text);
+                Display.getInstance().onEditingComplete(c, text);
+                return null;
+            }
+        });
     }
 
     /// Sets the text for the given component
@@ -1016,16 +1242,23 @@ public final class TestUtils {
     /// - `path`: the path to the component
     ///
     /// - `text`: the text to set
-    public static void setText(int[] path, String text) {
+    public static void setText(int[] path, final String text) {
         if (verbose) {
             log("setText(" + toString(path) + ", " + text + ")");
         }
-        Component c = getComponentByPath(path);
-        if (c instanceof Label) {
-            ((Label) c).setText(text);
-            return;
-        }
-        ((TextArea) c).setText(text);
+        final Component c = getComponentByPath(path);
+        assertBool(c instanceof Label || c instanceof TextArea, "No label or text area found for " + toString(path));
+        actOnEdt(new EdtCall() {
+            @Override
+            Object call() {
+                if (c instanceof Label) {
+                    ((Label) c).setText(text);
+                    return null;
+                }
+                ((TextArea) c).setText(text);
+                return null;
+            }
+        });
     }
 
     /// Assertions allow for simpler test code
@@ -2020,7 +2253,13 @@ public final class TestUtils {
         if (verbose) {
             log("assertTitle(" + title + ")");
         }
-        assertBool(Display.getInstance().getCurrent().getTitle().equals(title), title);
+        String current = (String) callOnEdt(new Lookup() {
+            @Override
+            Object find(Form root) {
+                return root.getTitle();
+            }
+        });
+        assertBool(title != null && title.equals(current), title);
     }
 
     /// Asserts that we have a label with the given text baring the given name
@@ -2034,9 +2273,9 @@ public final class TestUtils {
         if (verbose) {
             log("assertLabel(" + name + ", " + text + ")");
         }
-        Label l = (Label) findByName(name);
-        assertBool(l != null, "Null label" + text);
-        assertBool(Objects.equals(text, l.getText()), name + " != " + text);
+        Component l = findByName(name);
+        assertKind(l, l instanceof Label, "Label", name);
+        assertBool(Objects.equals(text, textOf(l)), name + " != " + text);
     }
 
     /// Asserts that we have a label with the given text baring the given name
@@ -2050,9 +2289,10 @@ public final class TestUtils {
         if (verbose) {
             log("assertLabel(" + toString(path) + ", " + text + ")");
         }
-        Label l = (Label) getComponentByPath(path);
-        assertBool(l != null, "Null label" + text);
-        assertBool(Objects.equals(text, l.getText()), (l.getText()) + " != " + text);
+        Component l = getComponentByPath(path);
+        assertKind(l, l instanceof Label, "Label", toString(path));
+        String actual = textOf(l);
+        assertBool(Objects.equals(text, actual), actual + " != " + text);
     }
 
     /// Asserts that we have a label with the given text baring the given name
@@ -2079,9 +2319,10 @@ public final class TestUtils {
         if (verbose) {
             log("assertTextArea(" + name + ", " + text + ")");
         }
-        TextArea l = (TextArea) findByName(name);
-        assertBool(l != null, "Null area " + text);
-        assertBool(l.getText().equals(text), "assertTextArea: " + l.getText() + " != " + text);
+        Component l = findByName(name);
+        assertKind(l, l instanceof TextArea, "TextArea", name);
+        String actual = textOf(l);
+        assertBool(actual != null && actual.equals(text), "assertTextArea: " + actual + " != " + text);
     }
 
     /// Asserts that we have a TextArea with the a text contains the given text and with the given name
@@ -2095,9 +2336,10 @@ public final class TestUtils {
         if (verbose) {
             log("assertTextAreaContaining(" + name + ", " + text + ")");
         }
-        TextArea l = (TextArea) findByName(name);
-        assertBool(l != null, "Null area " + text);
-        assertBool(l.getText().indexOf(text) > -1, "assertTextArea: \"" + l.getText() + "\" is not containing: \"" + text + "\"");
+        Component l = findByName(name);
+        assertKind(l, l instanceof TextArea, "TextArea", name);
+        String actual = textOf(l);
+        assertBool(actual != null && actual.indexOf(text) > -1, "assertTextArea: \"" + actual + "\" is not containing: \"" + text + "\"");
     }
 
 
@@ -2112,9 +2354,10 @@ public final class TestUtils {
         if (verbose) {
             log("assertTextAreaStartingWith(" + name + ", " + text + ")");
         }
-        TextArea l = (TextArea) findByName(name);
-        assertBool(l != null, "Null area " + text);
-        assertBool(l.getText().startsWith(text), "assertTextArea: \"" + l.getText() + "\" is not starting with: \"" + text + "\"");
+        Component l = findByName(name);
+        assertKind(l, l instanceof TextArea, "TextArea", name);
+        String actual = textOf(l);
+        assertBool(actual != null && actual.startsWith(text), "assertTextArea: \"" + actual + "\" is not starting with: \"" + text + "\"");
     }
 
     /// Asserts that we have a TextArea with the a text ending with the given text and with the given name
@@ -2128,9 +2371,10 @@ public final class TestUtils {
         if (verbose) {
             log("assertTextAreaEndingWith(" + name + ", " + text + ")");
         }
-        TextArea l = (TextArea) findByName(name);
-        assertBool(l != null, "Null area " + text);
-        assertBool(l.getText().endsWith(text), "assertTextArea: \"" + l.getText() + "\" is not ending with: \"" + text + "\"");
+        Component l = findByName(name);
+        assertKind(l, l instanceof TextArea, "TextArea", name);
+        String actual = textOf(l);
+        assertBool(actual != null && actual.endsWith(text), "assertTextArea: \"" + actual + "\" is not ending with: \"" + text + "\"");
     }
 
     /// Asserts that we have a label with the given text baring the given name
@@ -2144,9 +2388,10 @@ public final class TestUtils {
         if (verbose) {
             log("assertTextArea(" + toString(path) + ", " + text + ")");
         }
-        TextArea l = (TextArea) getComponentByPath(path);
-        assertBool(l != null, "Null area " + text);
-        assertBool(l.getText().equals(text), "assertTextArea: " + l.getText() + " != " + text);
+        Component l = getComponentByPath(path);
+        assertKind(l, l instanceof TextArea, "TextArea", toString(path));
+        String actual = textOf(l);
+        assertBool(actual != null && actual.equals(text), "assertTextArea: " + actual + " != " + text);
     }
 
     /// Asserts that we have a label with the given text baring the given name
@@ -2172,7 +2417,8 @@ public final class TestUtils {
     ///
     /// the component with the given TextArea text within the tree
     public static TextArea findTextAreaText(final String text) {
-        return (TextArea) lookupOnEdt(new Lookup() {
+        return (TextArea) callOnEdt(new Lookup() {
+            @Override
             Object find(Form root) {
                 return findTextAreaText(root, text);
             }
