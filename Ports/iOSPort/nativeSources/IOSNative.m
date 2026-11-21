@@ -4621,10 +4621,9 @@ void com_codename1_impl_ios_IOSNative_unlockScreen__(CN1_THREAD_STATE_MULTI_ARG 
 void com_codename1_impl_ios_IOSNative_setThirdPartyKeyboardsAllowed___boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_BOOLEAN allowed)
 {
     BOOL value = allowed ? YES : NO;
-    // The delegate reads it on the main thread, when a keyboard is about to appear.
-    dispatch_async(dispatch_get_main_queue(), ^{
-        cn1_allowThirdPartyKeyboards = value;
-    });
+    // Stored directly rather than queued to the main thread: an aligned BOOL store is atomic, and
+    // a queued store could land after the field the caller is about to focus asked for a keyboard.
+    cn1_allowThirdPartyKeyboards = value;
 }
 
 void com_codename1_impl_ios_IOSNative_setDisableScreenshots___boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_BOOLEAN disable)

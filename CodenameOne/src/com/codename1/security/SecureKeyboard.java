@@ -33,7 +33,9 @@ import com.codename1.ui.Form;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.TextArea;
 import com.codename1.ui.VirtualInputDevice;
+import com.codename1.ui.animations.Motion;
 import com.codename1.ui.geom.Dimension;
+import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.layouts.BorderLayout;
 
 import java.util.ArrayList;
@@ -69,8 +71,9 @@ import java.util.List;
 ///
 /// The layout follows the field's constraint: a number pad for [TextArea#NUMERIC], [TextArea#DECIMAL]
 /// and [TextArea#PHONENUMBER], letters with `@` or `/` for [TextArea#EMAILADDR] and [TextArea#URL],
-/// and letters otherwise. It is styled by the `SecureKeyboard` UIID for its background, and follows
-/// the theme's dark mode.
+/// and letters otherwise. It draws its own keys in the style of the platform keyboards, light or
+/// dark following the theme's dark mode, under a strip with a lock icon that tells the user this is
+/// not their usual keyboard.
 ///
 /// It types ASCII only: no accented letters, no other scripts, no dictation, no autofill. That is
 /// the price of keeping input away from the platform, and why it suits credentials and codes rather
@@ -144,6 +147,31 @@ public final class SecureKeyboard extends Component {
     private Font textFont;
     private Font iconFont;
     private int fontForHeight = -1;
+    private Font headerFont;
+    private Font modeFont;
+    private int laidOutHeader;
+    private int bottomInset;
+    private boolean showDeferred;
+    private boolean pressAccepted;
+    private Form hostForm;
+    private Form slideForm;
+    private int fontForHeader = -1;
+    /// Rotation or a window resize: every size show() docked by is stale, so dock again.
+    private final com.codename1.ui.events.ActionListener sizeListener = new com.codename1.ui.events.ActionListener() {
+        @Override
+        public void actionPerformed(com.codename1.ui.events.ActionEvent evt) {
+            if (dialog != null) {
+                dismiss(false);
+                CN.callSerially(new Runnable() {
+                    @Override
+                    public void run() {
+                        show();
+                    }
+                });
+            }
+        }
+    };
+    private Motion slide;
 
     private SecureKeyboard(TextArea field) {
         this.field = field;
@@ -353,18 +381,41 @@ public final class SecureKeyboard extends Component {
         if (f == null) {
             return;
         }
+        if (f.getContentPane().getHeight() == 0) {
+            // Not laid out yet (show() from a show listener): every size below would be zero and
+            // the keyboard would dock at the top. Try again once the form has a size.
+            if (!showDeferred) {
+                showDeferred = true;
+                CN.callSerially(new Runnable() {
+                    @Override
+                    public void run() {
+                        showDeferred = false;
+                        if (f.getContentPane().getHeight() > 0) {
+                            show();
+                        }
+                    }
+                });
+            }
+            return;
+        }
         if (scrambled) {
             digitOrder = shuffledDigits();
         }
         shift = false;
         symbols = false;
-        invalidateKeys();
         final InteractionDialog dlg = new InteractionDialog(new BorderLayout());
         // Docked to the bottom of the form like the system keyboard it replaces, never a window.
         dlg.setNativeWindowMode(false);
+        // The dialog's own animation grows it out of the middle of the screen, which squashes
+        // every key while it runs. The keyboard slides up from the bottom edge instead (animate()).
+        dlg.setAnimateShow(false);
         dlg.setUIID("Container");
         dlg.getContentPane().setUIID("Container");
         dlg.getTitleComponent().setHidden(true);
+        // Edge to edge, as a system keyboard is: no theme padding or border around the tray.
+        flatten(dlg.getAllStyles());
+        flatten(dlg.getContentPane().getAllStyles());
+        flatten(getAllStyles());
         if (getParent() != null) {
             // Still inside a dialog that was removed behind our back.
             remove();
@@ -372,7 +423,15 @@ public final class SecureKeyboard extends Component {
         dlg.add(BorderLayout.CENTER, this);
         dialog = dlg;
         landed = false;
+        Rectangle safe = f.getSafeArea();
+        // Keys stay above a home indicator; the tray runs on underneath it, as system keyboards do.
+        bottomInset = Math.max(0, f.getHeight() - (safe.getY() + safe.getHeight()));
         int h = keyboardHeight(f.getWidth(), f.getHeight());
+        setPreferredH(h);
+        // After the inset: the key rectangles depend on it as well as on the size.
+        invalidateKeys();
+        hostForm = f;
+        f.addSizeChangedListener(sizeListener);
         try {
             f.setCurrentInputDevice(new VirtualInputDevice() { //NOPMD CloseResource - managed by Form#setCurrentInputDevice
                 @Override
@@ -387,7 +446,9 @@ public final class SecureKeyboard extends Component {
             // The previous input device would not give up control; show anyway, as Picker does.
             Log.e(ex);
         }
-        dlg.show(Math.max(0, f.getHeight() - h), 0, 0, 0);
+        // The dialog lives in the layered pane over the content pane, below the title bar, so the
+        // margin is measured from the content pane's height and not the form's.
+        dlg.show(Math.max(0, f.getContentPane().getHeight() - h), 0, 0, 0);
         f.scrollComponentToVisible(field);
     }
 
@@ -402,6 +463,14 @@ public final class SecureKeyboard extends Component {
         super.initComponent();
         // On screen at last: from here a dialog with no parent was removed, not still pending.
         landed = true;
+        Form f = getComponentForm();
+        if (f != null && dialog != null) {
+            int from = getPreferredH();
+            slide = Motion.createEaseOutMotion(from, 0, 180);
+            slide.start();
+            slideForm = f;
+            f.registerAnimated(this);
+        }
     }
 
     @Override
@@ -412,6 +481,14 @@ public final class SecureKeyboard extends Component {
     }
 
     private void forget() {
+        stopSlide();
+        if (hostForm != null) {
+            hostForm.removeSizeChangedListener(sizeListener);
+            hostForm = null;
+        }
+        // Recomputed by the next show; a fixed height would outlive a rotation.
+        setPreferredSize(null);
+        pressAccepted = false;
         dialog = null;
         landed = false;
         pressed = null;
@@ -431,6 +508,12 @@ public final class SecureKeyboard extends Component {
         }
     }
 
+    private static void flatten(com.codename1.ui.plaf.Style s) {
+        s.setPadding(0, 0, 0, 0);
+        s.setMargin(0, 0, 0, 0);
+        s.setBorder(null);
+    }
+
     private static String shuffledDigits() {
         StringBuilder sb = new StringBuilder(DIGITS);
         for (int i = sb.length() - 1; i > 0; i--) {
@@ -446,19 +529,16 @@ public final class SecureKeyboard extends Component {
         return layout == Layout.NUMBER || layout == Layout.DECIMAL || layout == Layout.PHONE;
     }
 
-    /// Proportions of the system keyboards on current phones: about three quarters of the width in
-    /// portrait for letters, less for a number pad, a little over half the height in landscape.
+    /// Height in the physical proportions of the platform keyboards: rows about 10mm apart under
+    /// a slim strip, whatever the density or the tablet flag. Never more than about half the screen,
+    /// so the field stays visible in landscape.
     int keyboardHeight(int width, int height) {
-        int h;
-        if (height >= width) {
-            h = Math.round(width * (isPad() ? 0.6f : 0.72f));
-        } else {
-            h = Math.round(height * 0.55f);
-        }
-        if (Display.getInstance().isTablet()) {
-            h = h * 6 / 10;
-        }
-        return Math.min(h, height * 2 / 3);
+        Display d = Display.getInstance();
+        int rows = rows().size();
+        int rowMm = isPad() ? 95 : 105;
+        int h = d.convertToPixels(rows * rowMm / 10f) + d.convertToPixels(rowMm / 20f);
+        int cap = height >= width ? height * 55 / 100 : height / 2;
+        return Math.max(1, Math.min(h, cap)) + bottomInset;
     }
 
     @Override
@@ -473,16 +553,27 @@ public final class SecureKeyboard extends Component {
         repaint();
     }
 
+    /// Height of the strip above the keys that shows the lock.
+    private static int headerHeight(int height, int rowCount) {
+        return height / (rowCount * 2 + 1);
+    }
+
     void layoutKeys(int width, int height) {
         if (width == laidOutWidth && height == laidOutHeight) {
             return;
         }
         laidOutWidth = width;
         laidOutHeight = height;
+        height = Math.max(1, height - bottomInset);
         keys.clear();
         List<List<Key>> rows = rows();
-        int pad = Math.max(2, width / 130);
-        int rowH = (height - pad) / rows.size();
+        int header = headerHeight(height, rows.size());
+        laidOutHeader = header;
+        // Gaps in the proportions of the platform keyboards: narrow between keys, wider between
+        // rows, so each key reads as its own cap.
+        int hgap = Math.max(2, width / 68);
+        int rowH = (height - header - hgap) / rows.size();
+        int vgap = Math.max(2, rowH / 6);
         for (int r = 0; r < rows.size(); r++) {
             List<Key> row = rows.get(r);
             float total = 0;
@@ -490,14 +581,14 @@ public final class SecureKeyboard extends Component {
                 total += k.weight;
             }
             float units = isPad() ? total : Math.max(total, 10f);
-            float unit = (width - pad) / units;
-            float x = (width - total * unit) / 2f + pad / 2f;
-            int y = r * rowH + pad / 2;
+            float unit = (width - hgap) / units;
+            float x = (width - total * unit) / 2f + hgap / 2f;
+            int y = header + r * rowH;
             for (Key k : row) {
-                k.x = Math.round(x + pad / 2f);
-                k.width = Math.max(1, Math.round(k.weight * unit) - pad);
-                k.y = y + pad / 2;
-                k.height = Math.max(1, rowH - pad);
+                k.x = Math.round(x + hgap / 2f);
+                k.width = Math.max(1, Math.round(k.weight * unit) - hgap);
+                k.y = y + vgap / 2;
+                k.height = Math.max(1, rowH - vgap);
                 x += k.weight * unit;
                 keys.add(k);
             }
@@ -517,14 +608,14 @@ public final class SecureKeyboard extends Component {
             } else if (layout == Layout.PHONE) {
                 last.add(new Key("+", '\0', KIND_CHAR, 1));
             } else {
-                last.add(new Key(null, FontImage.MATERIAL_KEYBOARD_HIDE, KIND_RETURN, 1));
+                last.add(new Key(null, FontImage.MATERIAL_CHECK, KIND_RETURN, 1));
             }
             last.add(new Key(d.substring(9), '\0', KIND_CHAR, 1));
             last.add(new Key(null, FontImage.MATERIAL_BACKSPACE, KIND_BACKSPACE, 1));
             rows.add(last);
             if (layout != Layout.NUMBER) {
                 List<Key> action = new ArrayList<Key>();
-                action.add(new Key(null, FontImage.MATERIAL_KEYBOARD_HIDE, KIND_RETURN, 1));
+                action.add(new Key(null, FontImage.MATERIAL_CHECK, KIND_RETURN, 1));
                 rows.add(action);
             }
             return rows;
@@ -555,7 +646,7 @@ public final class SecureKeyboard extends Component {
         }
         bottom.add(new Key(" ", '\0', KIND_SPACE, layout == Layout.TEXT ? 5f : 4f));
         bottom.add(new Key(".", '\0', KIND_CHAR, 1));
-        bottom.add(new Key(null, FontImage.MATERIAL_KEYBOARD_HIDE, KIND_RETURN, 2f));
+        bottom.add(new Key(null, FontImage.MATERIAL_CHECK, KIND_RETURN, 2f));
         rows.add(bottom);
         return rows;
     }
@@ -592,6 +683,11 @@ public final class SecureKeyboard extends Component {
 
     @Override
     public void pointerPressed(int x, int y) {
+        pressAccepted = slide == null;
+        if (!pressAccepted) {
+            // Keys are still moving under the finger.
+            return;
+        }
         layoutKeys(getWidth(), getHeight());
         pressed = keyAt(x - getAbsoluteX(), y - getAbsoluteY());
         repaint();
@@ -599,6 +695,10 @@ public final class SecureKeyboard extends Component {
 
     @Override
     public void pointerDragged(int x, int y) {
+        if (!pressAccepted) {
+            // A press that began during the slide must not pick a key the finger never saw.
+            return;
+        }
         Key k = keyAt(x - getAbsoluteX(), y - getAbsoluteY());
         if (k != pressed) { //NOPMD CompareObjectsWithEquals
             pressed = k;
@@ -611,6 +711,10 @@ public final class SecureKeyboard extends Component {
         Key k = keyAt(x - getAbsoluteX(), y - getAbsoluteY());
         Key p = pressed;
         pressed = null;
+        if (!pressAccepted) {
+            return;
+        }
+        pressAccepted = false;
         repaint();
         if (k != null && k == p) { //NOPMD CompareObjectsWithEquals
             press(k);
@@ -686,70 +790,115 @@ public final class SecureKeyboard extends Component {
         field.setText(t + s);
     }
 
-    private void updateFonts(int keyHeight) {
-        if (keyHeight == fontForHeight) {
+    private void stopSlide() {
+        if (slide != null) {
+            slide = null;
+            // The form it was registered with, not getComponentForm(): on removal the parent
+            // chain may already be gone, which would leave this in the form's animation list.
+            if (slideForm != null) {
+                slideForm.deregisterAnimated(this);
+                slideForm = null;
+            }
+        }
+    }
+
+    @Override
+    public boolean animate() {
+        if (slide == null) {
+            return false;
+        }
+        if (slide.isFinished()) {
+            stopSlide();
+        }
+        return true;
+    }
+
+    private void updateFonts(int keyHeight, int header) {
+        if (keyHeight == fontForHeight && header == fontForHeader) {
             return;
         }
         fontForHeight = keyHeight;
-        int px = Math.max(8, keyHeight * 45 / 100);
-        if (Font.isTrueTypeFileSupported()) {
-            textFont = Font.createTrueTypeFont("native:MainRegular").derive(px, Font.STYLE_PLAIN);
-        } else {
-            textFont = Font.getDefaultFont();
-        }
+        fontForHeader = header;
+        int px = Math.max(8, keyHeight * 48 / 100);
+        Font base = Font.isTrueTypeFileSupported() ? Font.createTrueTypeFont("native:MainRegular") : null;
+        textFont = base == null ? Font.getDefaultFont() : base.derive(px, Font.STYLE_PLAIN);
         Font material = FontImage.getMaterialDesignFont();
-        iconFont = material == null ? textFont : material.derive(px * 1.2f, Font.STYLE_PLAIN);
+        modeFont = base == null ? textFont : base.derive(px * 0.72f, Font.STYLE_PLAIN);
+        iconFont = material == null ? textFont : material.derive(px * 1.1f, Font.STYLE_PLAIN);
+        headerFont = material == null ? textFont : material.derive(Math.max(8, header * 55 / 100), Font.STYLE_PLAIN);
     }
+
+    /// The palette, modelled on the platform keyboards: white caps on a grey tray in light mode,
+    /// grey caps on near black in dark mode, darker caps for the function keys.
+    private static final int[] LIGHT = {0xe4e6eb, 0xffffff, 0xc5cad3, 0xa9aeb8, 0x9aa0a8, 0x1f1f1f, 0x5f6368};
+    private static final int[] DARK = {0x1b1c1e, 0x46474b, 0x2f3033, 0x5e6066, 0x0e0e0f, 0xf1f1f1, 0x9aa0a6};
+    private static final int TRAY = 0;
+    private static final int CAP = 1;
+    private static final int FUNCTION = 2;
+    private static final int PRESSED = 3;
+    private static final int SHADOW = 4;
+    private static final int LABEL = 5;
+    private static final int HINT = 6;
+    private static final int ACTION = 0x0b57d0;
 
     @Override
     public void paint(Graphics g) {
         int w = getWidth();
         int h = getHeight();
         layoutKeys(w, h);
-        boolean dark = Boolean.TRUE.equals(CN.isDarkMode());
-        int keyBg = dark ? 0x3c3c3c : 0xffffff;
-        int specialBg = dark ? 0x2e2e2e : 0xd6dbe6;
-        int pressedBg = dark ? 0x5a5a5a : 0xb8bfcc;
-        int actionBg = 0x0b57d0;
-        int fg = dark ? 0xffffff : 0x000000;
-        if (getStyle().getBgTransparency() == 0) {
-            g.setColor(dark ? 0x1f1f1f : 0xeef0f6);
-            g.fillRect(getX(), getY(), w, h);
-        }
+        int[] p = Boolean.TRUE.equals(CN.isDarkMode()) ? DARK : LIGHT;
+        int oy = slide == null ? 0 : Math.max(0, Math.min(h, slide.getValue()));
+        int x0 = getX();
+        int y0 = getY() + oy;
+        g.setColor(p[TRAY]);
+        g.fillRect(x0, y0, w, h - oy);
         int keyH = keys.isEmpty() ? 20 : keys.get(0).height;
-        updateFonts(keyH);
-        int arc = Math.max(4, keyH / 5);
+        int header = laidOutHeader;
+        updateFonts(keyH, header);
         boolean aa = g.isAntiAliased();
         g.setAntiAliased(true);
+        if (header > 0) {
+            g.setFont(headerFont);
+            g.setColor(p[HINT]);
+            String lock = String.valueOf(FontImage.MATERIAL_LOCK);
+            g.drawString(lock, x0 + (w - headerFont.stringWidth(lock)) / 2,
+                    y0 + (header - headerFont.getHeight()) / 2 + header / 8);
+        }
+        int arc = Math.max(4, keyH / 4);
+        int drop = Math.max(1, keyH / 40);
         for (Key k : keys) {
             if (k.kind == KIND_BLANK) {
                 continue;
             }
-            boolean special = k.kind != KIND_CHAR && k.kind != KIND_SPACE;
+            boolean function = k.kind != KIND_CHAR && k.kind != KIND_SPACE;
+            boolean down = k == pressed; //NOPMD CompareObjectsWithEquals
             int c;
-            if (k == pressed) { //NOPMD CompareObjectsWithEquals
-                c = pressedBg;
+            if (down) {
+                c = p[PRESSED];
             } else if (k.kind == KIND_RETURN) {
-                c = actionBg;
+                c = ACTION;
             } else if (k.kind == KIND_SHIFT && shift) {
-                c = keyBg;
+                c = p[CAP];
             } else {
-                c = special ? specialBg : keyBg;
+                c = function ? p[FUNCTION] : p[CAP];
             }
-            int kx = getX() + k.x;
-            int ky = getY() + k.y;
+            int kx = x0 + k.x;
+            int ky = y0 + k.y;
+            g.setColor(p[SHADOW]);
+            g.fillRoundRect(kx, ky + drop, k.width, k.height, arc, arc);
             g.setColor(c);
             g.fillRoundRect(kx, ky, k.width, k.height, arc, arc);
-            g.setColor(k.kind == KIND_RETURN && k != pressed ? 0xffffff : fg); //NOPMD CompareObjectsWithEquals
+            g.setColor(k.kind == KIND_RETURN && !down ? 0xffffff : p[LABEL]);
             String s;
+            Font f;
             if (k.icon != '\0') {
-                g.setFont(iconFont);
+                f = iconFont;
                 s = String.valueOf(k.icon);
             } else {
-                g.setFont(textFont);
+                f = k.kind == KIND_MODE ? modeFont : textFont;
                 s = k.label;
             }
-            Font f = g.getFont();
+            g.setFont(f);
             g.drawString(s, kx + (k.width - f.stringWidth(s)) / 2, ky + (k.height - f.getHeight()) / 2);
         }
         g.setAntiAliased(aa);

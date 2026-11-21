@@ -155,8 +155,8 @@ extern BOOL cn1_allowThirdPartyKeyboards;
 #if !TARGET_OS_TV && !TARGET_OS_MACCATALYST
 // A third-party keyboard sees everything typed outside a secure (password) field, and with
 // "Allow Full Access" can send it anywhere. Answering NO for the keyboard extension point makes
-// iOS use only its own keyboards in this app. iOS asks again each time a keyboard is about to
-// appear, so the app can turn this on for a screen and off again.
+// iOS use only its own keyboards in this app. iOS may cache the answer for the launch, so the
+// Java side documents calling it from init(), before any field is edited.
 - (BOOL)application:(UIApplication *)application shouldAllowExtensionPointIdentifier:(UIApplicationExtensionPointIdentifier)extensionPointIdentifier
 {
     if ([extensionPointIdentifier isEqualToString:UIApplicationKeyboardExtensionPointIdentifier]) {

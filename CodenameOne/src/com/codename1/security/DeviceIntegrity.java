@@ -314,8 +314,8 @@ public final class DeviceIntegrity {
     /// On iOS, refusing makes the app use only Apple's keyboards: a third-party keyboard sees
     /// everything typed outside a password field (including [com.codename1.ui.TextArea#SENSITIVE]
     /// fields such as card numbers and one-time codes), and with "Allow Full Access" it can send that
-    /// anywhere. iOS asks each time a keyboard is about to appear, so this can be turned on for a
-    /// sensitive screen and off again after it. Call it before the field is edited.
+    /// anywhere. Call it from `init()`, before any field is edited: iOS may remember its answer
+    /// for the rest of the launch, so switching it for one screen is not dependable.
     ///
     /// Android cannot refuse the user's keyboard; there, use [#isThirdPartyKeyboardActive(String...)]
     /// and [SecureKeyboard].

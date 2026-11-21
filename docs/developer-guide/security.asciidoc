@@ -550,7 +550,7 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 
 ===== Refusing third-party keyboards on iOS
 
-`DeviceIntegrity.setThirdPartyKeyboardsAllowed(false)` makes the app use only Apple's keyboards, in every field. It's what banking apps do. iOS asks the app each time a keyboard is about to appear, so you can call it from `init()` for the whole app, or turn it off when a sensitive screen opens and back on when it closes. The method returns `true` where the platform enforces the choice, which is iOS only.
+`DeviceIntegrity.setThirdPartyKeyboardsAllowed(false)` makes the app use only Apple's keyboards, in every field. It's what banking apps do. Call it from `init()`, before any field is edited: iOS may remember the answer for the rest of the launch, so turning it off for one screen and back on isn't dependable. The method returns `true` where the platform enforces the choice, which is iOS only.
 
 ===== Incognito input, detection and the secure keyboard on Android
 

@@ -189,6 +189,45 @@ class SecureKeyboardTest extends UITestBase {
     }
 
     @Test
+    void showBeforeLayoutWaitsForTheFormAndDocksAtTheBottom() {
+        Form f = new Form("t", BoxLayout.y());
+        TextField tf = new TextField("", "", 6, TextArea.NUMERIC);
+        f.add(tf);
+        SecureKeyboard kb = SecureKeyboard.install(tf);
+        f.show();
+        // Straight after show(), as a show listener would: nothing is laid out yet.
+        kb.show();
+        flushSerialCalls();
+        assertTrue(kb.isShowing(), "a show before layout is retried once the form has a size");
+        assertEquals(f.getContentPane().getAbsoluteY() + f.getContentPane().getHeight(),
+                kb.getAbsoluteY() + kb.getHeight(), "docked to the bottom, not the top");
+        kb.hide();
+        flushSerialCalls();
+    }
+
+    @Test
+    void aPressDuringTheSlideTypesNothing() {
+        Form f = new Form("t", BoxLayout.y());
+        TextField tf = new TextField("", "", 6, TextArea.NUMERIC);
+        f.add(tf);
+        f.show();
+        flushSerialCalls();
+        SecureKeyboard kb = SecureKeyboard.install(tf);
+        kb.setDigitOrder("1234567890");
+        kb.show();
+        flushSerialCalls();
+        // Still sliding: initComponent started the motion and nothing has advanced it to the end.
+        int x = kb.getAbsoluteX() + kb.getWidth() / 6;
+        int y = kb.getAbsoluteY() + kb.getHeight() / 3;
+        kb.pointerPressed(x, y);
+        kb.pointerDragged(x + 1, y);
+        kb.pointerReleased(x + 1, y);
+        assertEquals("", tf.getText(), "keys moving under the finger must not type");
+        kb.hide();
+        flushSerialCalls();
+    }
+
+    @Test
     void uninstallAndRemovalDoNotFireOrStick() {
         Form f = new Form("t", BoxLayout.y());
         TextField tf = new TextField("", "", 6, TextArea.NUMERIC);
