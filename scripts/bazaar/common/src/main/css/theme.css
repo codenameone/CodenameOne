@@ -530,6 +530,12 @@ BackCommand {
     background-color: transparent;
 }
 
+/* The toolbar's overflow menu: a list whose focused row is CommandFocus.
+   Left to the native theme it drew white text on a white popup. */
+CommandList { background-color: var(--surface); padding: 0; margin: 0; }
+Command { color: var(--text); background-color: var(--surface); padding: 2.4mm 4mm 2.4mm 4mm; margin: 0; font-family: "native:MainRegular"; font-size: 3.2mm; }
+CommandFocus { color: var(--text); background-color: var(--brand-tint); padding: 2.4mm 4mm 2.4mm 4mm; margin: 0; font-family: "native:MainRegular"; font-size: 3.2mm; }
+
 /* The switch: the thumb is the colour, the track the background. */
 Switch {
     color: #ffffff;
@@ -1278,7 +1284,7 @@ SvTotal { color: var(--text); font-family: "native:MainBold"; font-size: 3.5mm; 
 ShopStoreHeader { background-color: var(--brand); padding: 3mm 3.6mm 3mm 3.6mm; margin: 0; }
 ShopStoreName { color: var(--brand-contrast); font-family: "native:MainBold"; font-size: 4.4mm; padding: 0; margin: 0; background-color: transparent; }
 ShopStoreTagline { color: var(--brand-contrast); font-family: "native:MainRegular"; font-size: 2.5mm; padding: 0.4mm 0 0 0; margin: 0; background-color: transparent; }
-ShopHeaderButton { color: var(--brand-contrast); background-color: transparent; padding: 1.2mm; margin: 0; }
+ShopHeaderButton { color: var(--on-scrim); background: cn1-pill-border; background-color: var(--scrim-soft); padding: 1.2mm; margin: 2mm; }
 ShopHeaderButton.pressed { background: cn1-pill-border; background-color: var(--brand-pressed); }
 ShopHero { background-color: var(--surface-alt); padding: 0; margin: 0 0 2mm 0; }
 ShopHeroArt { background-color: transparent; padding: 0; margin: 0; }
@@ -1444,6 +1450,9 @@ MeAccentTagline { color: var(--brand-contrast); background-color: transparent; f
     Title { color: var(--text-dark); }
     TitleCommand { color: var(--text-dark); }
     BackCommand { color: var(--text-dark); }
+    CommandList { background-color: var(--surface-alt-dark); }
+    Command { color: var(--text-dark); background-color: var(--surface-alt-dark); }
+    CommandFocus { color: var(--text-dark); background-color: var(--brand-tint-dark); }
     SvChip { background: cn1-pill-border; color: var(--text-dark); background-color: var(--surface-alt-dark); }
     SvSheet { background-color: var(--surface-dark); }
     SvGrip { color: var(--line-strong-dark); }
@@ -1581,7 +1590,6 @@ MeAccentTagline { color: var(--brand-contrast); background-color: transparent; f
     ShopStoreHeader { background-color: var(--brand-dark); }
     ShopStoreName { color: var(--brand-contrast-dark); }
     ShopStoreTagline { color: var(--brand-contrast-dark); }
-    ShopHeaderButton { color: var(--brand-contrast-dark); }
     ShopHeaderButton.pressed { background-color: var(--brand-pressed-dark); }
     ShopHero { background-color: var(--surface-alt-dark); }
     ShopSectionTitle { color: var(--text-dark); }

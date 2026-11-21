@@ -105,7 +105,10 @@ final class StorePicker {
             Container lines = new Container(BoxLayout.y());
             lines.add(Ui.plain(s.name(), "SvRowTitle"));
             if (s.tagline() != null) {
-                lines.add(Ui.plain(s.tagline(), "SvRowDetail"));
+                // Wrapped, not ellipsized, at phone width.
+                com.codename1.components.SpanLabel tag = Ui.text(s.tagline(), "SvRowDetail");
+                tag.setShouldLocalize(false);
+                lines.add(tag);
             }
             row.add(BorderLayout.CENTER, lines);
             Label go = new Label("", "SvRowIcon");

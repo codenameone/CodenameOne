@@ -206,6 +206,104 @@ async function noErrorDialog() {
 /// The website's purchase path, by ordinary page navigation: a product of the
 /// seeded store into the cart, the checkout form filled as a guest, the order
 /// placed, and the confirmation page with its invoice.
+// The storefront's own forms, each in a fresh browser context: a shopper
+// signs up on the web (the bot guard refuses a form sent in under its minimum
+// fill time, so the test waits it out like a person would), picks Spanish in
+// the footer, and buys in a market's currency.
+async function storefrontExtras() {
+  const store = process.env.BAZAAR_WEB_STORE || 'northwind';
+  const context = await browser.newContext({ viewport: { width: 1100, height: 900 } });
+  const shop = await context.newPage();
+  try {
+    // Sign up.
+    await shop.goto(origin + '/auth/signup', { waitUntil: 'load' });
+    if (await shop.locator('input[name=_ft]').count() !== 1) {
+      throw new Error('the sign-up form carries no timing token');
+    }
+    const email = 'web-e2e-' + Date.now() + '@example.com';
+    await shop.fill('#email', email);
+    await shop.fill('#displayName', 'Web Shopper');
+    await shop.fill('#phone', '+1 555 010 4477');
+    await shop.fill('#password', 'longenough1');
+    await shop.fill('#confirm', 'longenough1');
+    await shop.waitForTimeout(2000);
+    await shop.locator('form[action="/auth/signup"] button[type=submit]').click();
+    await shop.waitForURL(/\/auth\/signin\?created=1$/, { timeout: stepSeconds * 1000 });
+    await shop.screenshot({ path: path.join(out, '9-signed-up.png') });
+    say('signed up on the web as ' + email);
+
+    // The language picker: Spanish labels, and the page says so.
+    await shop.goto(origin + '/s/' + store, { waitUntil: 'load' });
+    await shop.locator('form[action="/lang"] button[value=es]').first().click();
+    await shop.waitForLoadState('load');
+    const lang = await shop.locator('html').getAttribute('lang');
+    const dir = await shop.locator('html').getAttribute('dir');
+    const words = await shop.locator('body').innerText();
+    if (lang !== 'es' || dir !== 'ltr' || !/Idioma/.test(words)) {
+      throw new Error('after picking Spanish the page has lang=' + lang + ' dir=' + dir);
+    }
+    await shop.screenshot({ path: path.join(out, '10-spanish.png') });
+    await shop.locator('form[action="/lang"] button[value=en]').first().click();
+    await shop.waitForLoadState('load');
+    say('the language picker switched the storefront to Spanish (lang=es dir=ltr)');
+
+    // A market: the owner adds a euro market, a shopper browses it and the
+    // checkout says it charges euros.
+    await shop.goto(origin + '/auth/signin', { waitUntil: 'load' });
+    await shop.fill('input[name=username]', 'owner@bazaar.example');
+    await shop.fill('input[name=password]', 'bazaar-demo');
+    await shop.waitForTimeout(2000);
+    await shop.locator('form button[type=submit]').first().click();
+    await shop.waitForLoadState('load');
+    await shop.goto(origin + '/admin', { waitUntil: 'load' });
+    const links = await shop.locator('a[href^="/admin/"]').evaluateAll(as => as.map(a => a.getAttribute('href')));
+    const storeId = (links.map(h => (h.match(/^\/admin\/([^/?#]+)/) || [])[1])
+        .find(id => id && id.length > 8));
+    if (!storeId) {
+      throw new Error('the owner\'s admin lists no store: ' + links.slice(0, 5).join(', '));
+    }
+    await shop.goto(origin + '/admin/' + storeId + '/markets', { waitUntil: 'load' });
+    const csrf = await shop.locator('input[name=_csrf]').first().getAttribute('value');
+    const post = async (where, form) => {
+      const r = await shop.request.post(origin + where, { form: { ...form, _csrf: csrf },
+          maxRedirects: 0, headers: { Origin: origin, Referer: origin + where } });
+      if (r.status() !== 303 && r.status() !== 302 && r.status() !== 200) {
+        throw new Error(where + ' answered ' + r.status());
+      }
+    };
+    await post('/admin/' + storeId + '/fx-rates', { currency: 'EUR', rate: '0.92' });
+    await post('/admin/' + storeId + '/markets', { code: 'e2e', name: 'Europe', currency: 'EUR',
+        countries: 'DE, FR', locale: 'de', rounding: 'NONE', adjustBps: '0', active: 'true',
+        fxSource: 'manual' });
+    const buyer = await browser.newContext({ viewport: { width: 1100, height: 900 } });
+    // ?market= prices one page; the checkout reads the `market` cookie a
+    // shopper's earlier pick left (StorefrontMarkets), so the buyer holds it.
+    await buyer.addCookies([{ name: 'market', value: 'e2e', url: origin }]);
+    const b = await buyer.newPage();
+    try {
+      await b.goto(origin + '/s/' + store + '?market=e2e', { waitUntil: 'load' });
+      await b.locator('a[href*="/products/"]').first().click();
+      await b.waitForLoadState('load');
+      await b.locator('form.add button[type=submit]').click();
+      await b.waitForURL(/\/cart$/);
+      await b.locator('a.checkout').click();
+      await b.waitForURL(/\/checkout$/);
+      await b.waitForSelector('#summary', { timeout: stepSeconds * 1000 });
+      await b.waitForTimeout(1500);
+      const text = await b.locator('body').innerText();
+      if (!/This order is charged in EUR/.test(text)) {
+        throw new Error('the market checkout does not charge EUR');
+      }
+      await b.screenshot({ path: path.join(out, '11-market-checkout.png') });
+    } finally {
+      await buyer.close();
+    }
+    say('a shopper in the euro market is charged in EUR at checkout');
+  } finally {
+    await context.close();
+  }
+}
+
 async function htmlCheckout() {
   const store = process.env.BAZAAR_WEB_STORE || 'northwind';
   const context = await browser.newContext({ viewport: { width: 1100, height: 900 } });
@@ -346,6 +444,13 @@ try {
   await page.waitForTimeout(3000);
   await noErrorDialog();
   await page.screenshot({ path: path.join(out, '4-settled.png') });
+  // The title bar's overflow menu, for its picture only: its rows are not in
+  // the accessibility tree, so it is opened by position and closed by Escape.
+  await page.mouse.click(408, 21);
+  await page.waitForTimeout(1500);
+  await page.screenshot({ path: path.join(out, '4-menu.png') });
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(800);
 
   // 5. The session that carried the sign-in is over: the app ended it when it
   //    had its tokens, so the cookie the browser still holds is worth nothing.
@@ -394,6 +499,9 @@ try {
   // 8. A guest buys on the website: the server-rendered storefront and its
   //    HTML checkout, in a browser of its own (no app, no account).
   await htmlCheckout();
+
+  // 9. The storefront's sign-up, language picker and markets.
+  await storefrontExtras();
 } catch (err) {
   failed = err;
   try {

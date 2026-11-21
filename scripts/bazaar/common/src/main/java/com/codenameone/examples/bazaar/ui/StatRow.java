@@ -132,7 +132,11 @@ public final class StatRow extends Container {
         float value = 1f;
         float caption = 1f;
         for (Tile tile : tiles) {
-            value = Math.min(value, share(room - tile.value.sides(), tile.value.width(tile.number)));
+            // A millimetre of slack: a scaled font's glyphs do not shrink exactly
+            // in proportion (the browser build hints them), and a value that
+            // fits to the pixel on paper came out ellipsized ("$4952....").
+            value = Math.min(value, share(room - tile.value.sides() - CN.convertToPixels(1),
+                    tile.value.width(tile.number)));
             tile.split(room - tile.upper.sides());
             caption = Math.min(caption, share(room - tile.upper.sides(), tile.widest()));
         }

@@ -19,7 +19,6 @@
 package com.codenameone.examples.bazaar.ui;
 
 import com.codename1.appkit.Net;
-import com.codename1.ui.CN;
 import com.codename1.ui.EncodedImage;
 import com.codename1.ui.Font;
 import com.codename1.ui.FontImage;
@@ -37,8 +36,8 @@ import java.util.Map;
 ///
 /// Sample products have no photos, and a grid of grey boxes looks broken, so
 /// a product without one is drawn: a gradient whose colours come from its id,
-/// a soft disc, the icon of its kind (a mug, a shirt, a book) and its
-/// initials. The same product is the same picture everywhere ([ArtPalette]
+/// a soft disc and the icon of its kind (a mug, a shirt, a book). The
+/// same product is the same picture everywhere ([ArtPalette]
 /// makes it deterministic). A product with a photo shows the art first and
 /// the photo as soon as it has been fetched.
 ///
@@ -120,17 +119,8 @@ public final class ProductArt {
         g.drawString(glyph, (w - material.stringWidth(glyph)) / 2,
                 (h - material.getHeight()) / 2 - side / 14);
 
-        String initials = ArtPalette.initials(title);
-        if (initials.length() > 0 && side > CN.convertToPixels(9)) {
-            Font bold = Font.isTrueTypeFileSupported()
-                    ? Font.createTrueTypeFont("native:MainBold", "native:MainBold")
-                            .derive(side * 0.11f, Font.STYLE_BOLD)
-                    : Font.createSystemFont(Font.FACE_SYSTEM, Font.STYLE_BOLD, Font.SIZE_SMALL);
-            g.setFont(bold);
-            g.setAlpha(dark ? 170 : 220);
-            g.drawString(initials, (w - bold.stringWidth(initials)) / 2,
-                    h - bold.getHeight() - side / 10);
-        }
+        // No initials: cards lay their caption over the bottom of the art,
+        // and letters there read as stray text under the scrim.
         g.setAlpha(255);
         remember(CACHE, ORDER, key, image);
         return image;

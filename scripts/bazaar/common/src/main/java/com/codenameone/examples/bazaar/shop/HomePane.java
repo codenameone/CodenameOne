@@ -19,6 +19,7 @@
 package com.codenameone.examples.bazaar.shop;
 
 import com.codename1.appkit.Net;
+import com.codename1.components.SpanLabel;
 import com.codename1.ui.Button;
 import com.codename1.ui.CN;
 import com.codename1.ui.Container;
@@ -26,11 +27,14 @@ import com.codename1.ui.FontImage;
 import com.codename1.ui.Label;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
+import com.codename1.ui.layouts.FlowLayout;
 import com.codename1.ui.layouts.LayeredLayout;
 import com.codenameone.examples.bazaar.api.CollectionDto;
 import com.codenameone.examples.bazaar.api.StoreDto;
 import com.codenameone.examples.bazaar.net.Api;
+import com.codenameone.examples.bazaar.ui.ArtPalette;
 import com.codenameone.examples.bazaar.ui.Lang;
+import com.codenameone.examples.bazaar.ui.Look;
 import com.codenameone.examples.bazaar.ui.Layouts;
 import com.codenameone.examples.bazaar.ui.ProductArt;
 import com.codenameone.examples.bazaar.ui.Ui;
@@ -92,8 +96,9 @@ final class HomePane extends ShopPane {
         change.addActionListener(e -> pick(true));
 
         Container top = new Container(BoxLayout.y());
-        top.add(ShopUi.storeHeader(store, change));
-        top.add(hero(store));
+        // One header: the hero carries the store's name, wrapped rather than
+        // ellipsized, and the switch-store action sits on its top corner.
+        top.add(hero(store, change));
         final Container collections = new Container(BoxLayout.x());
         collections.setUIID("ShopCarousel");
         collections.setName("collections");
@@ -109,17 +114,24 @@ final class HomePane extends ShopPane {
         Ui.relayout(this);
     }
 
-    private Container hero(final StoreDto store) {
+    private Container hero(final StoreDto store, Button change) {
         int width = Math.min(CN.getDisplayWidth(), Layouts.column() * 2);
-        int height = CN.convertToPixels(Layouts.wide() ? 46 : 38);
+        int height = CN.convertToPixels(Layouts.wide() ? 46 : 52);
         Container hero = new Container(new LayeredLayout());
         hero.setUIID("ShopHero");
+        // A long name or description makes the hero taller than its art; the
+        // art's own deeper colour fills what it does not cover, not a grey band.
+        int[] colors = ArtPalette.colors(store.id() + "-hero", Look.dark());
+        hero.getAllStyles().setBgColor(colors[1]);
+        hero.getAllStyles().setBgTransparency(255);
         Label picture = ProductArt.label(store.id() + "-hero", store.name(), "gift",
                 store.heroPhotoId(), width, height, "ShopHeroArt");
         hero.add(picture);
         Container words = new Container(BoxLayout.y());
         words.setUIID("ShopHeroWords");
-        words.add(Ui.plain(store.name(), "ShopHeroTitle"));
+        SpanLabel name = Ui.text(store.name(), "ShopHeroTitle");
+        name.setShouldLocalize(false);
+        words.add(name);
         String about = store.description() != null && store.description().length() > 0
                 ? store.description() : store.tagline();
         if (about != null) {
@@ -127,6 +139,7 @@ final class HomePane extends ShopPane {
         }
         words.add(Ui.primary("Shop all", "shop-all", e -> ShopSections.search(null)));
         hero.add(BorderLayout.south(words));
+        hero.add(FlowLayout.encloseRight(change));
         return hero;
     }
 
