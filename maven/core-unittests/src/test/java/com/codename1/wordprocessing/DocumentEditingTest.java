@@ -146,6 +146,7 @@ class DocumentEditingTest extends UITestBase {
         Form f = new Form();
         f.add(v);
         f.show();
+        flushSerialCalls();
         v.setCaret(new TextPosition("a", 3));
         v.typeText("X\nY");
         assertEquals("abcX", text(m, "a"));

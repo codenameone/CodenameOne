@@ -52,6 +52,7 @@ public class DocumentModel {
     private int groupDepth;
     private boolean groupRecorded;
     private String typing;
+    private boolean autoRecalculate = true;
 
     /// A model holding a new empty document.
     public DocumentModel() {
@@ -89,7 +90,8 @@ public class DocumentModel {
         if (value == null) {
             throw new IllegalArgumentException("document");
         }
-        if (value.equals(document) && value.nextId == document.nextId) {
+        Document next = recalculated(value);
+        if (next.equals(document) && next.nextId == document.nextId) {
             return;
         }
         if (groupDepth == 0 || !groupRecorded) {
@@ -98,7 +100,30 @@ public class DocumentModel {
         }
         redo.clear();
         typing = null;
-        replace(value);
+        replace(next);
+    }
+
+    /// Whether table formulas are calculated again after every edit.
+    ///
+    /// #### Returns
+    ///
+    /// true by default
+    public boolean isAutoRecalculate() {
+        return autoRecalculate;
+    }
+
+    /// Calculates table formulas again after every edit, so a formula field always shows the
+    /// value of the cells it reads; or leaves them as they are until `TableSheets.recalculate`.
+    ///
+    /// #### Parameters
+    ///
+    /// - `value`: true to calculate after every edit
+    public void setAutoRecalculate(boolean value) {
+        autoRecalculate = value;
+    }
+
+    private Document recalculated(Document value) {
+        return autoRecalculate ? TableSheets.recalculate(value) : value;
     }
 
     /// Replaces the document and forgets the history, as when a different file is opened.
@@ -334,6 +359,32 @@ public class DocumentModel {
                         Paragraph q = find(t.cell(r, c), id);
                         if (q != null) {
                             return q;
+                        }
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
+    /// The id of the top-level table a paragraph is in, for opening a `TableBinding` on the
+    /// table under the caret.
+    ///
+    /// #### Parameters
+    ///
+    /// - `paragraphId`: the paragraph
+    ///
+    /// #### Returns
+    ///
+    /// the table id, or null when the paragraph is not in a table
+    public String tableOf(String paragraphId) {
+        for (Block b : document.blocks) {
+            if (b instanceof Table) {
+                Table t = (Table) b;
+                for (int r = 0; r < t.rows(); r++) {
+                    for (int c = 0; c < t.columns(); c++) {
+                        if (find(t.cell(r, c), paragraphId) != null) {
+                            return t.id;
                         }
                     }
                 }
@@ -585,7 +636,7 @@ public class DocumentModel {
         if (group != null && group.equals(typing) && groupDepth == 0 && !undo.isEmpty()) {
             // the next keystroke of the same word: no new undo step
             redo.clear();
-            replace(value);
+            replace(recalculated(value));
         } else {
             setDocument(value);
         }
