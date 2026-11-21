@@ -132,6 +132,20 @@ class MerchantIdorTest {
         "POST /promotions/calendar/reschedule", "POST /sales", "POST /sales/{saleId}/cancel",
         "POST /segments", "POST /segments-preview", "POST /segments/{segmentId}",
         "POST /signup-forms", "POST /signup-forms/{formId}", "POST /variants/{variantId}/preorder",
+        // Commerce depth: subscriptions and B2B.
+        "DELETE /companies/{companyId}/buyers/{buyerId}",
+        "DELETE /price-lists/{priceListId}/entries/{entryId}", "GET /companies",
+        "GET /companies/{companyId}/buyers", "GET /companies/{companyId}/sites", "GET /net-terms",
+        "GET /price-lists", "GET /price-lists/{priceListId}/entries", "GET /quotes",
+        "GET /quotes/{quoteId}", "GET /selling-plans", "GET /subscription-calendar",
+        "GET /subscriptions", "GET /subscriptions/{subscriptionId}", "POST /companies",
+        "POST /companies/{companyId}", "POST /companies/{companyId}/buyers",
+        "POST /companies/{companyId}/sites", "POST /net-terms/{orderId}/paid", "POST /price-lists",
+        "POST /price-lists/{priceListId}", "POST /price-lists/{priceListId}/entries",
+        "POST /quotes", "POST /quotes/{quoteId}/move", "POST /selling-plans",
+        "POST /selling-plans/{planId}", "POST /subscriptions/{subscriptionId}/cancel",
+        "POST /subscriptions/{subscriptionId}/pause", "POST /subscriptions/{subscriptionId}/resume",
+        "POST /subscriptions/{subscriptionId}/skip", "POST /vat-check",
     };
 
     /// The table an id placeholder names, by the path segment before it.
@@ -148,6 +162,9 @@ class MerchantIdorTest {
         {"clubs", "club"}, {"items", "club_item"}, {"segments", "audience"},
         {"campaigns", "campaign"}, {"journeys", "journey"}, {"members", "loyalty_member"},
         {"sales", "sale_event"}, {"signup-forms", "signup_form"}, {"variants", "variant"},
+        {"selling-plans", "selling_plan"}, {"subscriptions", "subscription"},
+        {"companies", "company"}, {"buyers", "company_buyer"}, {"price-lists", "price_list"},
+        {"entries", "price_list_entry"}, {"quotes", "trade_quote"}, {"net-terms", "net_term"},
     };
 
     private static final String NO_SUCH = "no-such-id";
@@ -170,6 +187,10 @@ class MerchantIdorTest {
     private Checkouts checkouts;
     @Autowired
     private com.codenameone.examples.bazaar.marketing.DemoMarketing marketing;
+    @Autowired
+    private com.codenameone.examples.bazaar.subscribe.Subscriptions subscriptions;
+    @Autowired
+    private com.codenameone.examples.bazaar.trade.Trade trade;
 
     private final Map<String, String> found = new HashMap<String, String>();
     private final List<String> fake = new ArrayList<String>();
@@ -269,6 +290,7 @@ class MerchantIdorTest {
         }
         // B's loyalty programme, club, segments, campaigns, form and journey.
         marketing.seed(b.storeId);
+        new CommerceSeed(b, "idorcd", accounts, mvc, subscriptions, trade);
         // A manager of A: the merchant role and a place on A's staff, not the owner.
         String manager = People.customer(accounts, "idor-manager");
         Rest.json(mvc, People.asMerchant(Rest.body(post("/api/merchant/stores/" + a.storeId

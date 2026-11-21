@@ -127,6 +127,13 @@ public class Documents {
     /// what was refunded and whether it is paid.
     @Transactional(readOnly = true)
     public byte[] invoice(String storeId, String orderId) throws IOException {
+        return invoice(storeId, orderId, null);
+    }
+
+    /// [#invoice] with a line of payment terms (`Net 30, due 2026-12-21`)
+    /// under the date, for an order placed on net terms; null for none.
+    @Transactional(readOnly = true)
+    public byte[] invoice(String storeId, String orderId, String terms) throws IOException {
         StoreOrder o = order(storeId, orderId);
         Store s = stores.findById(storeId);
         String cur = o.getCurrency();
@@ -136,6 +143,7 @@ public class Documents {
             "Invoice #" + o.getNumber(),
             "Date " + Sheet.date(millis(o.getCreatedAt())),
             "Status " + paymentStatus(o.getFinancial()),
+            terms == null ? "" : terms,
             o.getShippingTitle().length() > 0 ? "Delivery " + o.getShippingTitle() : "",
         });
         Sheet.Table t = sheet.table(new float[] {4.2f, 1.6f, 0.7f, 1.2f, 1.3f},
