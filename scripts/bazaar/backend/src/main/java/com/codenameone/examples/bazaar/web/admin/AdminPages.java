@@ -27,7 +27,11 @@ import com.codename1.backend.annotations.PathVariable;
 import com.codename1.backend.annotations.PostMapping;
 import com.codename1.backend.mvc.Model;
 import com.codename1.backend.security.SecurityExchange;
+import com.codenameone.examples.bazaar.api.LabelRequestDto;
+import com.codenameone.examples.bazaar.api.PackDto;
 import com.codenameone.examples.bazaar.api.StoreRoleDto;
+import com.codenameone.examples.bazaar.docs.DocumentPages;
+import com.codenameone.examples.bazaar.fulfil.Fulfillments;
 import com.codenameone.examples.bazaar.store.Stores;
 import com.codenameone.examples.bazaar.web.Shell;
 import com.codenameone.examples.bazaar.web.WebPages;
@@ -55,12 +59,19 @@ public class AdminPages {
     private final AdminData data;
     private final WebSessions sessions;
     private final Stores stores;
+    private final Parcels parcels;
+    private final Fulfillments fulfillments;
+    private final DocumentPages documents;
 
-    public AdminPages(WebPages pages, AdminData data, WebSessions sessions, Stores stores) {
+    public AdminPages(WebPages pages, AdminData data, WebSessions sessions, Stores stores,
+            Parcels parcels, Fulfillments fulfillments, DocumentPages documents) {
         this.pages = pages;
         this.data = data;
         this.sessions = sessions;
         this.stores = stores;
+        this.parcels = parcels;
+        this.fulfillments = fulfillments;
+        this.documents = documents;
     }
 
     private String render(Model model, HttpServer.Request request, String storeId, String title,
@@ -168,6 +179,7 @@ public class AdminPages {
             throws Exception {
         AdminView v = view("order");
         data.order(storeId, orderId, v);
+        parcels.fill(storeId, orderId, v, data.currency(storeId));
         return render(model, request, storeId, v.order.title, v, null);
     }
 
@@ -193,6 +205,61 @@ public class AdminPages {
         member(request, storeId);
         return change(request, "/admin/" + storeId + "/orders/" + orderId, "Order cancelled",
                 () -> data.cancel(storeId, orderId));
+    }
+
+    // ------------------------------------------------------------ fulfilment
+
+    /// Packs a parcel; the weight (grams) is optional and prices its label.
+    @PostMapping("/admin/{storeId}/orders/{orderId}/parcels/{id}/pack")
+    public String pack(@PathVariable("storeId") String storeId,
+            @PathVariable("orderId") String orderId, @PathVariable("id") String id,
+            HttpServer.Request request) throws Exception {
+        member(request, storeId);
+        int grams = AdminForms.number(AdminForms.field(request, "weight"), 0, "the weight");
+        return change(request, "/admin/" + storeId + "/orders/" + orderId, "Parcel packed",
+                () -> fulfillments.pack(Caller.name(), storeId, id, new PackDto(grams)));
+    }
+
+    /// Buys the label for the carrier service picked from the rates shown.
+    @PostMapping("/admin/{storeId}/orders/{orderId}/parcels/{id}/label")
+    public String label(@PathVariable("storeId") String storeId,
+            @PathVariable("orderId") String orderId, @PathVariable("id") String id,
+            HttpServer.Request request) throws Exception {
+        member(request, storeId);
+        String service = AdminForms.field(request, "service");
+        return change(request, "/admin/" + storeId + "/orders/" + orderId, "Label bought",
+                () -> fulfillments.buyLabel(Caller.name(), storeId, id,
+                        new LabelRequestDto(service)));
+    }
+
+    @PostMapping("/admin/{storeId}/orders/{orderId}/parcels/{id}/ship")
+    public String ship(@PathVariable("storeId") String storeId,
+            @PathVariable("orderId") String orderId, @PathVariable("id") String id,
+            HttpServer.Request request) throws Exception {
+        member(request, storeId);
+        return change(request, "/admin/" + storeId + "/orders/" + orderId, "Marked shipped",
+                () -> fulfillments.ship(Caller.name(), storeId, id));
+    }
+
+    /// The packing slip, through the same document service as the app's
+    /// (which checks the role and that the order is the store's).
+    @GetMapping("/admin/{storeId}/orders/{orderId}/packing-slip.pdf")
+    public HttpServer.Response packingSlip(@PathVariable("storeId") String storeId,
+            @PathVariable("orderId") String orderId, HttpServer.Request request)
+            throws Exception {
+        member(request, storeId);
+        String parcel = AdminForms.field(request, "fulfillment");
+        SecurityExchange.current().setAttribute(PageEtags.NO_STORE, "1");
+        return documents.packingSlip(storeId, orderId, parcel.length() == 0 ? null : parcel);
+    }
+
+    @GetMapping("/admin/{storeId}/orders/{orderId}/parcels/{id}/label.pdf")
+    public HttpServer.Response labelPdf(@PathVariable("storeId") String storeId,
+            @PathVariable("orderId") String orderId, @PathVariable("id") String id,
+            HttpServer.Request request) throws Exception {
+        member(request, storeId);
+        SecurityExchange.current().setAttribute(PageEtags.NO_STORE, "1");
+        return documents.label(storeId, id);
     }
 
     // ------------------------------------------------------------- products

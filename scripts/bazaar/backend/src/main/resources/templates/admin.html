@@ -47,6 +47,12 @@
 <h2>Timeline</h2><p th:if="${view.events.empty}" class="muted">Nothing yet.</p>
 <ol class="timeline" th:unless="${view.events.empty}"><li th:each="e : ${view.events}"><time th:text="${e.meta}">2026-01-01</time> <span th:text="${e.title}">Placed</span> <span class="muted" th:text="${e.detail}">who</span></li></ol></section>
 </div>
+<section class="card" th:unless="${view.parcels.empty}"><h2>Parcels</h2><p><a th:href="${view.slipUrl}">Packing slip (PDF)</a></p>
+<article class="parcel" th:each="p : ${view.parcels}"><h3><span th:text="${p.title}">Parcel 1</span> <span class="pill" th:classappend="${p.tone}" th:text="${p.status}">Pending</span></h3><p class="muted" th:text="${p.detail}">1 x Mug</p>
+<p><a th:href="${p.slipUrl}">Packing slip</a><th:block th:if="${p.hasLabel}"> - <a th:href="${p.labelUrl}">Label (PDF)</a> - tracking <code th:text="${p.tracking}">TRK1</code></th:block></p>
+<form method="post" class="row" th:if="${p.canPack}" th:action="${p.packAction}"><label th:attr="for=${'w-' + p.id}">Weight (grams)</label><input type="number" min="0" step="1" name="weight" th:attr="id=${'w-' + p.id}"><button type="submit">Pack</button></form>
+<form method="post" class="stack" th:if="${p.canLabel}" th:action="${p.labelAction}"><fieldset><legend>Buy a label</legend><label th:each="r : ${p.rates}"><input type="radio" name="service" th:value="${r.id}" th:checked="${r.flag}"> <span th:text="${r.title}">Ground</span></label></fieldset><button type="submit">Buy label</button></form>
+<form method="post" th:if="${p.canShip}" th:action="${p.shipAction}"><button type="submit">Mark shipped</button></form></article></section>
 <section class="card" th:if="${view.canFulfil}"><h2 id="fulfil-t">Fulfil</h2>
 <form method="post" class="stack" th:action="${view.fulfilAction}" aria-labelledby="fulfil-t">
 <label for="f-location">Ship from</label><select id="f-location" name="location"><option th:each="p : ${view.locations}" th:value="${p.id}" th:text="${p.title}">Warehouse</option></select>

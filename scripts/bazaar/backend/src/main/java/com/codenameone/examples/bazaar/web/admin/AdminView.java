@@ -62,6 +62,9 @@ public class AdminView {
     public boolean canFulfil;
     public boolean canRefund;
     public boolean canCancel;
+    /// The order's fulfilments ([Parcels]) and its packing slip.
+    public List<ParcelView> parcels = new ArrayList<ParcelView>();
+    public String slipUrl = "";
 
     // -------------------------------------------------------------- product
     public String saveAction = "";

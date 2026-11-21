@@ -49,3 +49,21 @@ iframe.widget{width:100%;border:1px solid var(--line);border-radius:var(--r);bac
 .htmx-request{opacity:.6;transition:opacity .2s}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 @media print{.top,.side,.toolbar,.pager,.toasts{display:none}main{padding:0}}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+/* Fulfilment board, promotions calendar, segment builder, journey flowchart. */
+.board{display:grid;grid-template-columns:repeat(auto-fit,minmax(13rem,1fr));gap:12px}
+.kanban{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:10px}.kanban h2{margin:0 0 8px}
+.kanban ul{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.kanban .item{border:1px solid var(--line);border-radius:var(--r);padding:8px;background:var(--bg)}.kanban .item form{margin-top:6px}
+.cal{width:100%;table-layout:fixed;border-collapse:collapse}.cal th,.cal td{border:1px solid var(--line);vertical-align:top;padding:4px}
+.cal td{height:5.5rem}.cal td.out{color:var(--muted);background:var(--bg)}.cal td.today .day{font-weight:700;color:var(--accent)}
+.cal .day{display:block;font-size:.8rem}.promo{display:block;font-size:.75rem;border-radius:4px;padding:1px 4px;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-decoration:none;color:var(--fg)}
+.promo.sale{background:color-mix(in srgb,var(--accent) 22%,transparent)}.promo.discount{background:color-mix(in srgb,#2e9d5b 22%,transparent)}.promo.campaign{background:color-mix(in srgb,#c58b00 24%,transparent)}
+.facts{display:grid;grid-template-columns:max-content 1fr;gap:4px 16px}.facts dt{color:var(--muted)}.facts dd{margin:0}
+.rule{border:1px solid var(--line);border-radius:var(--r);margin:8px 0;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.count .error,.problems{color:var(--danger)}form.danger{border-color:var(--danger)}button.danger{background:var(--danger);color:#fff}
+.check{display:flex;gap:6px;align-items:center}
+.flow{overflow-x:auto;margin:0 0 16px}.flow svg{min-width:100%;height:auto}
+.flow .node rect{fill:var(--card);stroke:var(--line);stroke-width:1.5}.flow .node.entry rect{stroke:var(--accent)}.flow .node.split rect{stroke:#c58b00}.flow .node.end rect{stroke:var(--muted)}
+.flow text{fill:var(--fg);font-size:12px}.flow .title{font-weight:700}.flow .edge{fill:none;stroke:var(--muted);stroke-width:1.5}.flow marker path,.flow .port{fill:var(--muted)}.flow .edge-label{fill:var(--muted);font-size:11px}
+.parcel{border-top:1px solid var(--line);padding-top:10px;margin-top:10px}

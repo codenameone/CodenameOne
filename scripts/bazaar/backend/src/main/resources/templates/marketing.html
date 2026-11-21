@@ -1,0 +1,71 @@
+<!-- cn1:model shell com.codenameone.examples.bazaar.web.Shell -->
+<!-- cn1:model view com.codenameone.examples.bazaar.web.admin.MarketingView -->
+<!-- cn1:model table com.codenameone.examples.bazaar.web.table.DataTable -->
+<!doctype html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org"><head th:replace="~{shell :: head}"></head>
+<body hx-boost="true"><header th:replace="~{shell :: topbar}"></header><div class="frame"><nav th:replace="~{shell :: sidebar}"></nav>
+<main id="main" tabindex="-1">
+
+<p th:unless="${view.back.empty}"><a th:href="${view.back}" th:text="${view.backLabel}">Back</a></p>
+<h1 th:text="${view.heading}">Marketing</h1>
+<p th:unless="${view.intro.empty}" class="muted" th:text="${view.intro}">About this page.</p>
+<p th:unless="${view.links.empty}" class="row"><a class="button" th:each="l : ${view.links}" th:href="${l.url}" th:text="${l.title}">Link</a></p>
+<ul th:unless="${view.problems.empty}" class="card problems" aria-label="Problems"><li th:each="p : ${view.problems}" th:text="${p.title}">Problem</li></ul>
+<dl th:unless="${view.facts.empty}" class="card facts"><th:block th:each="f : ${view.facts}"><dt th:text="${f.title}">Status</dt><dd th:text="${f.detail}">Draft</dd></th:block></dl>
+
+<section th:if="${view.page == 'board'}" id="board" class="board" aria-label="Fulfilment board">
+<div class="kanban" th:each="c : ${view.columns}"><h2><span th:text="${c.title}">To pack</span> <span class="pill" th:text="${c.count}">0</span></h2>
+<p th:if="${c.cards.empty}" class="muted">Nothing here.</p>
+<ul><li class="item" th:each="o : ${c.cards}"><a th:href="${o.url}" th:text="${o.title}">#1</a> <small class="muted" th:text="${o.detail}">1 item</small>
+<form th:unless="${c.next.empty}" method="post" th:action="${view.base + '/fulfilment/move'}" hx-target="#board" hx-select="#board" hx-swap="outerHTML"><input type="hidden" name="order" th:value="${o.id}"><input type="hidden" name="to" th:value="${c.next}"><button type="submit" th:text="${c.nextLabel}" th:attr="aria-label=${c.nextLabel + ': ' + o.title}">Next</button></form></li></ul></div>
+</section>
+
+<section th:if="${view.page == 'calendar'}" class="card" aria-labelledby="cal-t">
+<p class="row"><a class="button" th:href="${view.prevUrl}">Previous month</a> <b id="cal-t" th:text="${view.month}">January 2026</b> <a class="button" th:href="${view.nextUrl}">Next month</a></p>
+<div class="table-wrap"><table class="cal"><caption class="sr" th:text="${view.month}">Month</caption><thead><tr><th scope="col">Mon</th><th scope="col">Tue</th><th scope="col">Wed</th><th scope="col">Thu</th><th scope="col">Fri</th><th scope="col">Sat</th><th scope="col">Sun</th></tr></thead><tbody>
+<tr th:each="w : ${view.weeks}"><td th:each="d : ${w.days}" th:classappend="${(d.inMonth ? '' : 'out') + (d.today ? ' today' : '')}"><span class="day" th:text="${d.day}" th:attr="aria-label=${d.iso}">1</span>
+<a th:each="e : ${d.events}" th:href="${e.url}" th:attr="class=${e.detail}, title=${e.status}" th:text="${e.title}">Sale</a></td></tr>
+</tbody></table></div></section>
+
+<form th:if="${view.page == 'segment'}" method="post" class="card" th:action="${view.segAction}">
+<input type="hidden" name="rows" th:value="${view.segRows}"><input type="hidden" name="keep" th:value="${view.segKeep}">
+<div class="stack"><label for="seg-name">Name</label><input id="seg-name" name="name" required maxlength="100" th:value="${view.segName}">
+<label for="seg-op">Customers who match</label><select id="seg-op" name="op"><option value="AND" th:selected="${view.segOp == 'AND'}">all of the conditions</option><option value="OR" th:selected="${view.segOp == 'OR'}">any of the conditions</option></select></div>
+<fieldset class="rule" th:each="r : ${view.rules}"><legend th:text="${r.label}">Condition</legend>
+<select th:attr="name=${r.fieldName}, aria-label=${r.label + ' field'}"><option th:each="o : ${r.fields}" th:value="${o.id}" th:selected="${o.flag}" th:text="${o.title}">Field</option></select>
+<select th:attr="name=${r.opName}, aria-label=${r.label + ' test'}"><option th:each="o : ${r.ops}" th:value="${o.id}" th:selected="${o.flag}" th:text="${o.title}">equals</option></select>
+<input th:attr="name=${r.valueName}, aria-label=${r.label + ' value'}" th:value="${r.value}">
+<label><input type="checkbox" value="1" th:attr="name=${r.removeName}"> Remove</label></fieldset>
+<p class="count" aria-live="polite"><b th:text="${view.segCount}">0 customers match</b> <span th:unless="${view.segError.empty}" class="error" th:text="${view.segError}">Error</span></p>
+<ul th:unless="${view.sample.empty}" class="muted"><li th:each="m : ${view.sample}" th:text="${m.title}">Customer</li></ul>
+<p class="row"><button type="submit" name="add" value="1" th:attr="formaction=${view.segUrl}">Add condition</button><button type="submit" th:attr="formaction=${view.segUrl}">Count again</button><button type="submit" class="primary">Save segment</button></p>
+</form>
+
+<figure th:if="${view.page == 'journey'}" class="card flow"><svg role="img" aria-labelledby="flow-t" th:attr="viewbox=${view.flowBox}"><title id="flow-t">Journey steps</title>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0 L10 5 L0 10 z"></path></marker></defs>
+<g th:each="e : ${view.edges}"><path class="edge" marker-end="url(#arrow)" th:attr="d=${e.path}"></path><text class="edge-label" th:attr="x=${e.labelX}, y=${e.labelY}" th:text="${e.label}">yes</text></g>
+<g th:each="n : ${view.nodes}" class="node" th:classappend="${n.kind}"><rect rx="8" th:attr="x=${n.x}, y=${n.y}, width=${n.width}, height=${n.height}"></rect>
+<text class="title" th:attr="x=${n.textX}, y=${n.titleY}" th:text="${n.title}">Step</text><text th:attr="x=${n.textX}, y=${n.detailY}" th:text="${n.detail}">Step</text><text th:attr="x=${n.textX}, y=${n.countsY}" th:text="${n.counts}">0 passed</text>
+<circle th:if="${n.hasIn}" class="port" r="4" th:attr="cx=${n.inX}, cy=${n.portY}"></circle><circle th:if="${n.hasOut}" class="port" r="4" th:attr="cx=${n.outX}, cy=${n.portY}"></circle></g>
+</svg></figure>
+
+<section th:unless="${view.rowsTitle.empty}" class="card"><h2 th:text="${view.rowsTitle}">Rows</h2><p th:if="${view.rows.empty}" class="muted" th:text="${view.rowsEmpty}">Nothing yet.</p>
+<div class="table-wrap" th:unless="${view.rows.empty}"><table class="data"><thead><tr><th scope="col" th:text="${view.headA}">A</th><th scope="col" th:text="${view.headB}">B</th><th scope="col" th:text="${view.headC}">C</th><th scope="col" class="num" th:text="${view.headD}">D</th></tr></thead><tbody>
+<tr th:each="r : ${view.rows}"><td th:text="${r.title}">A</td><td th:text="${r.detail}">B</td><td th:text="${r.meta}">C</td><td class="num" th:text="${r.amount}">D</td></tr></tbody></table></div></section>
+
+<form th:each="fm : ${view.forms}" method="post" class="card" th:classappend="${fm.danger ? 'danger' : ''}" th:action="${fm.action}" th:attr="hx-confirm=${fm.confirm}"><h2 th:text="${fm.title}">Form</h2><p th:unless="${fm.text.empty}" class="muted" th:text="${fm.text}">About it.</p>
+<div class="stack"><th:block th:each="f : ${fm.fields}">
+<input th:if="${f.type == 'hidden'}" type="hidden" th:attr="name=${f.name}" th:value="${f.value}">
+<label th:if="${f.type == 'checkbox'}" class="check"><input type="checkbox" value="1" th:attr="name=${f.name}" th:checked="${f.checked}"> <span th:text="${f.label}">On</span></label>
+<th:block th:unless="${f.type == 'hidden' or f.type == 'checkbox'}"><label th:attr="for=${'f-' + fm.id + '-' + f.name}" th:text="${f.label}">Field</label>
+<select th:if="${f.type == 'select'}" th:attr="id=${'f-' + fm.id + '-' + f.name}, name=${f.name}"><option th:each="o : ${f.options}" th:value="${o.id}" th:selected="${o.flag}" th:text="${o.title}">Choice</option></select>
+<textarea th:if="${f.type == 'textarea'}" rows="4" th:attr="id=${'f-' + fm.id + '-' + f.name}, name=${f.name}" th:text="${f.value}"></textarea>
+<input th:unless="${f.type == 'select' or f.type == 'textarea'}" th:attr="type=${f.type}, id=${'f-' + fm.id + '-' + f.name}, name=${f.name}" th:value="${f.value}">
+<small th:unless="${f.hint.empty}" class="muted" th:text="${f.hint}">Hint</small></th:block>
+</th:block></div>
+<p><button type="submit" th:classappend="${fm.danger ? 'danger' : 'primary'}" th:text="${fm.submit}">Save</button></p></form>
+
+<section th:if="${view.hasTable}" th:replace="~{table :: grid}"></section>
+
+</main></div>
+<div th:replace="~{shell :: toasts}"></div><div th:replace="~{shell :: help}"></div></body></html>

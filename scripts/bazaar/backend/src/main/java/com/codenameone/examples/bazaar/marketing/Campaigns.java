@@ -252,6 +252,22 @@ public class Campaigns {
         return dto(c);
     }
 
+    /// Sends one copy of an e-mail campaign to `to` (the merchant's own
+    /// address), subject marked as a test. Nothing is recorded: no send row,
+    /// no tracked links, no stats, and the campaign's state does not move.
+    public void sendTest(String username, String storeId, String id, String to)
+            throws IOException {
+        access.requireStaff(username, storeId, StoreAccess.MANAGERS);
+        Campaign c = campaign(storeId, id);
+        if (!EMAIL.equals(c.getChannel())) {
+            throw new ResponseStatusException(409, "Only an e-mail campaign sends a test");
+        }
+        if (to == null || !com.codename1.backend.mail.Mail.isAddress(to.trim())) {
+            throw new ResponseStatusException(400, "Write the address to send the test to");
+        }
+        emails.custom(storeId, to.trim(), "[Test] " + c.getSubjectA(), c.getBody());
+    }
+
     @Transactional(rollbackFor = IOException.class)
     public CampaignDto cancel(String username, String storeId, String id) throws IOException {
         access.requireStaff(username, storeId, StoreAccess.MANAGERS);

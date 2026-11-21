@@ -153,8 +153,12 @@ public class RateSettings {
         d.setUsageLimit(w.usageLimit());
         d.setOncePerCustomer(w.oncePerCustomer());
         d.setCombinable(w.combinable());
-        d.setStartsAt(w.startsAt() > 0 ? Instant.ofEpochMilli(w.startsAt()) : null);
-        d.setEndsAt(w.endsAt() > 0 ? Instant.ofEpochMilli(w.endsAt()) : null);
+        // Both columns are NOT NULL: "no start" and "no end" are the epoch
+        // (the entity's own default, read back as 0 and treated as unset by
+        // DiscountEngine), never null, which failed the flush for every
+        // discount saved without dates.
+        d.setStartsAt(w.startsAt() > 0 ? Instant.ofEpochMilli(w.startsAt()) : Instant.EPOCH);
+        d.setEndsAt(w.endsAt() > 0 ? Instant.ofEpochMilli(w.endsAt()) : Instant.EPOCH);
         d.setActive(w.active());
         if (fresh) {
             discounts.insert(d);

@@ -50,6 +50,15 @@ public class WebPages {
         {"Products", "/products", "p"},
         {"Inventory", "/inventory", "i"},
         {"Customers", "/customers", "c"},
+        {"Fulfilment", "/fulfilment", "f"},
+        {"Sales", "/sales", "r"},
+        {"Discounts", "/discounts", "t"},
+        {"Calendar", "/calendar", "l"},
+        {"Loyalty", "/loyalty", "y"},
+        {"Clubs", "/clubs", "b"},
+        {"Segments", "/segments", "s"},
+        {"Campaigns", "/campaigns", "e"},
+        {"Journeys", "/journeys", "j"},
         {"Apps", "/apps", "a"},
     };
     /// Account sections: label, path, shortcut.
