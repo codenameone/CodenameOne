@@ -50,6 +50,7 @@ import com.codenameone.examples.bazaar.api.AddressApi;
 import com.codenameone.examples.bazaar.api.TradeApi;
 import com.codenameone.examples.bazaar.api.SubscriptionApi;
 import com.codenameone.examples.bazaar.api.JourneyApi;
+import com.codenameone.examples.bazaar.api.MarketApi;
 import com.codenameone.examples.bazaar.api.MarketingApi;
 import com.codenameone.examples.bazaar.api.SaleApi;
 import com.codenameone.examples.bazaar.api.ClubApi;
@@ -96,6 +97,7 @@ public final class Api {
     private static SubscriptionApi subscriptions;
     private static JourneyApi journeys;
     private static MarketingApi marketing;
+    private static MarketApi markets;
     private static SaleApi sales;
     private static ClubApi clubs;
     private static LoyaltyApi loyalty;
@@ -138,6 +140,7 @@ public final class Api {
         subscriptions = RestClients.create(SubscriptionApi.class, baseUrl);
         journeys = RestClients.create(JourneyApi.class, baseUrl);
         marketing = RestClients.create(MarketingApi.class, baseUrl);
+        markets = RestClients.create(MarketApi.class, baseUrl);
         sales = RestClients.create(SaleApi.class, baseUrl);
         clubs = RestClients.create(ClubApi.class, baseUrl);
         loyalty = RestClients.create(LoyaltyApi.class, baseUrl);
@@ -274,6 +277,12 @@ public final class Api {
 
     public static MarketingApi marketing() {
         return marketing;
+    }
+
+    /// Markets and translations; the app uses it for a campaign message's
+    /// translations.
+    public static MarketApi markets() {
+        return markets;
     }
 
     public static SaleApi sales() {

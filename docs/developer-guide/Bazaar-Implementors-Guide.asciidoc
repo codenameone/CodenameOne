@@ -657,11 +657,23 @@ business contracts for. Plan for these before taking real orders:
   Hebrew mail is drawn right to left. That covers the order confirmation,
   shipping and delivery notices, review requests, returns and refunds,
   receipts, cart reminders, gift cards, back-in-stock alerts, signup
-  confirmations and codes, phone verification codes and shipment pushes.
-  Text a merchant writes (campaign, journey and automation messages) has one
-  version and goes out as written; only its frame (the unsubscribe link, the
-  default subject, the page direction) follows the shopper. Staff mail stays
-  English.
+  confirmations and codes, phone verification codes, shipment pushes and the
+  till receipt texted from the POS (the till's own copy stays English).
+  Text a merchant writes can be translated per language. A campaign's
+  subject, A/B subject and body are translations of kind `CAMPAIGN`
+  (`market.Translations`), edited on the back office's translations page
+  (linked from the campaign) and in the app's campaign editor; a campaign's
+  translations never decide a storefront's language. A journey or automation
+  message step keeps its translations in the step itself, as `body@es` beside
+  `body`, edited in the app's journey and automation editors and, for
+  journeys, on the back office journey page. The reader gets their language's
+  version only when every text the message needs is translated (body, plus
+  that recipient's A or B subject for e-mail), else the whole original, so a
+  translated body never goes out under an untranslated subject; the frame
+  (the unsubscribe link, the default subject, the page direction) follows the
+  shopper either way. Staff messages (the low-stock mail, automation pushes to
+  staff) follow the staff member's account language, else English; the
+  store's own address gets English.
 * *Fraud scoring.* The fraud rules are a fixed point table. A store with real
   volume would add the payment provider's risk signals or a fraud service.
 * *Form signing keys.* The bot guard's and the theme preview's signing keys are

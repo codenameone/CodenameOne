@@ -276,6 +276,14 @@ final class MarketingPane extends MerchantPane {
                         Net.to(done, Ui::fail));
             }
         };
+        if (c != null && c.id() != null) {
+            Container variants = new Container(BoxLayout.y());
+            variants.setUIID("MeCard");
+            variants.add(Ui.plain(Lang.tr("Translations"), "SvRowTitle"));
+            MessageVariants.campaign(variants, c.id(), c.subjectB() != null
+                    && c.subjectB().length() > 0);
+            page.add(variants);
+        }
         Container actions = new Container(BoxLayout.y());
         actions.setUIID("MeCard");
         if (c != null && c.id() != null) {

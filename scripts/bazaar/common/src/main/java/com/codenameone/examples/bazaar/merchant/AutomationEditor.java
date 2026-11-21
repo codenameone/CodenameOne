@@ -366,6 +366,7 @@ final class AutomationEditor extends Container {
         for (int iter = 0; t != null && t.params() != null && iter < t.params().size(); iter++) {
             param(to, node, t.params().get(iter));
         }
+        MessageVariants.step(to, node, AutomationCodec.type(node), this::changed);
         List<String> mine = errorsOf(node);
         for (int iter = 0; iter < mine.size(); iter++) {
             to.add(Ui.text(mine.get(iter), "SvError"));

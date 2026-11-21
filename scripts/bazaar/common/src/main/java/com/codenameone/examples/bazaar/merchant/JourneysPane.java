@@ -212,6 +212,7 @@ final class JourneysPane extends MerchantPane {
                 f.addDataChangedListener((type, index) ->
                         AutomationCodec.setParam(n, p.name(), f.getText().trim()));
             }
+            MessageVariants.step(inspector, n, AutomationCodec.type(n), null);
             Ui.relayout(inspector);
         }
 
