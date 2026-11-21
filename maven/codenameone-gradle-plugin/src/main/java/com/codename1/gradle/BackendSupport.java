@@ -127,6 +127,11 @@ final class BackendSupport {
             // The URL's engine is compiled into the generated wiring, so another
             // URL is another output.
             compile.getInputs().property("cn1DatasourceUrl", datasourceUrl.orElse(""));
+            // The processor also reads these two at build time, so they are inputs too.
+            compile.getInputs().property("cn1DatasourceUrlEnv",
+                    project.getProviders().environmentVariable("CN1_DATASOURCE_URL").orElse(""));
+            compile.getInputs().property("cn1DatasourceUrlSystem",
+                    project.getProviders().systemProperty("cn1.datasource.url").orElse(""));
             compile.doLast("processCn1Annotations", new ProcessAnnotationsAction(
                     compile.getDestinationDirectory().getAsFile(), AppSupport.stubsDir(layout), layout.projectDir(),
                     layout.settingsFile(), project.provider(() -> AppSupport.sourceRoots(main, layout)),
@@ -155,12 +160,20 @@ final class BackendSupport {
                 project.getTasks().named("compileKotlin").configure(compile -> {
                     AppSupport.processingInputs(compile, layout, userProperties);
                     backendSettingsInputs(project, compile, layout);
+                    final Provider<String> kotlinDatasourceUrl =
+                            project.getProviders().gradleProperty("cn1.datasource.url");
+                    compile.getInputs().property("cn1DatasourceUrl", kotlinDatasourceUrl.orElse(""));
+                    compile.getInputs().property("cn1DatasourceUrlEnv",
+                            project.getProviders().environmentVariable("CN1_DATASOURCE_URL").orElse(""));
+                    compile.getInputs().property("cn1DatasourceUrlSystem",
+                            project.getProviders().systemProperty("cn1.datasource.url").orElse(""));
                     compile.doLast("processCn1Annotations", new ProcessAnnotationsAction(
                             AppSupport.kotlinDestinationProvider(compile, layout), AppSupport.stubsDir(layout),
                             layout.projectDir(), layout.settingsFile(),
                             project.provider(() -> AppSupport.sourceRoots(main, layout)),
                             "UTF-8", userProperties, main.getCompileClasspath())
                             .withPendingJavaSources(main.getJava().getSrcDirs())
+                            .withDatasourceUrl(kotlinDatasourceUrl)
                             .withSourceEncoding(AppSupport.javaEncoding(project, main)));
                 }));
 

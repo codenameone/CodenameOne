@@ -41,6 +41,22 @@ class OracleCodecTest {
     }
 
     @Test
+    void bcDatesPutTheSignBeforeThePadding() {
+        // 44 BC, March 15: century byte 100, year byte 100 - 44 = 56.
+        assertEquals("-0044-03-15 12:00:00",
+                Oracle.decodeDate(new byte[] {100, 56, 3, 15, 13, 1, 1}, false));
+        assertEquals("2024-02-29 00:00:00",
+                Oracle.decodeDate(new byte[] {120, 124, 2, 29, 1, 1, 1}, false));
+    }
+
+    @Test
+    void sessionEndingErrorsAreRecognised() {
+        org.junit.jupiter.api.Assertions.assertTrue(Oracle.endsSession(28));
+        org.junit.jupiter.api.Assertions.assertTrue(Oracle.endsSession(3113));
+        org.junit.jupiter.api.Assertions.assertFalse(Oracle.endsSession(1));
+    }
+
+    @Test
     void numberMatchesOracleDump() throws Exception {
         // SELECT DUMP(x) FROM DUAL, on any Oracle.
         Object[][] vectors = {

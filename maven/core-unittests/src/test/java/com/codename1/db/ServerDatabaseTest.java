@@ -120,16 +120,14 @@ class ServerDatabaseTest extends UITestBase {
     }
 
     @Test
-    void tlsModesAreRefusedAndPreferConnectsPlain() throws Exception {
+    void onlyAnExplicitDisableConnects() throws Exception {
         final StubConnector c = new StubConnector();
-        offEdt(() -> new StubDatabase(c, "prefer"));
+        offEdt(() -> new StubDatabase(c, "disable"));
         assertEquals("disable", c.sslMode);
-        offEdt(() -> new StubDatabase(c, null));
-        assertEquals("disable", c.sslMode);
-        for (final String mode : new String[] {"require", "verify-ca", "verify-full", "strict"}) {
+        for (final String mode : new String[] {null, "prefer", "require", "verify-ca", "verify-full", "strict"}) {
             final StubConnector refused = new StubConnector();
             IOException e = assertThrows(IOException.class, () -> offEdt(() -> new StubDatabase(refused, mode)));
-            assertTrue(e.getMessage().contains("demands TLS"), e.getMessage());
+            assertTrue(e.getMessage().contains("Pass \"disable\""), e.getMessage());
             assertNull(refused.sslMode, "never connected");
         }
     }

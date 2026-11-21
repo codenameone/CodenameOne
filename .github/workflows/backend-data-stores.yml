@@ -37,7 +37,7 @@ on:
       - 'CodenameOne/src/com/codename1/db/sql/**'
       - 'vm/backend/src/com/codename1/backend/Database.java'
       - 'vm/backend/src/com/codename1/impl/orm/**'
-      - 'vm/backend/impl/javase/com/codename1/db/sql/**'
+      - 'vm/backend/src/com/codename1/backend/BackendSqlPlatform.java'
       - 'maven/backend/src/test/java/com/codename1/backend/document/**'
       - 'maven/backend/src/test/java/com/codename1/backend/dynamo/**'
       - 'maven/backend/src/test/java/com/codename1/backend/mongo/**'

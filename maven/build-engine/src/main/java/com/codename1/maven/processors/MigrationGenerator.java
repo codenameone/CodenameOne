@@ -525,6 +525,13 @@ final class MigrationGenerator {
         sb.append("@com.codename1.backend.annotations.Generated\n");
         sb.append("public final class ").append(simple).append(" {\n");
         sb.append("    public static void main(String[] args) throws Exception {\n");
+        // Every engine: the goals run on the JVM and this class is never translated,
+        // so it strips nothing, and the URL is often given to the goal alone
+        // (-Dcn1.datasource.url) rather than declared where the build reads it.
+        for (String engine : new String[] {"Postgres", "MySql", "SqlServer", "Oracle"}) {
+            sb.append("        com.codename1.backend.Database.useEngine(com.codename1.db.sql.")
+                    .append(engine).append(".CONNECTOR);\n");
+        }
         if (securitySchema) {
             sb.append("        com.codename1.backend.Migrations.register(")
                     .append("com.codename1.backend.security.SecuritySchema.migrations());\n");

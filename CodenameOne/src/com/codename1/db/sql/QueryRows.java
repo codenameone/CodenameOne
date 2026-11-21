@@ -32,6 +32,7 @@ public final class QueryRows extends ArrayList {
     private static final long serialVersionUID = 1L;
     private int columnCount;
     private String[] columnTypes;
+    private String[] columnNames;
 
     public QueryRows(int columnCount) {
         this.columnCount = columnCount;
@@ -53,5 +54,16 @@ public final class QueryRows extends ArrayList {
 
     public void setColumnTypes(String[] columnTypes) {
         this.columnTypes = columnTypes == null ? null : (String[]) columnTypes.clone();
+    }
+
+    /// The label of each column, in projection order, or null when the driver did
+    /// not record them. Known even when no row came back, and listing a label twice
+    /// where the projection repeats one, which the row maps cannot.
+    public String[] getColumnNames() {
+        return columnNames == null ? null : (String[]) columnNames.clone();
+    }
+
+    public void setColumnNames(String[] columnNames) {
+        this.columnNames = columnNames == null ? null : (String[]) columnNames.clone();
     }
 }

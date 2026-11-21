@@ -869,6 +869,10 @@ public final class Oracle extends ServerSession {
         try {
             return statement(sql, values, rows);
         } catch (OracleError err) {
+            if (endsSession(err.number)) {
+                // The server ended this session; a pool must not hand it out again.
+                close();
+            }
             IOException failure = classify(err.number, err.getMessage() + " [" + sql + "]");
             failure.initCause(err);
             throw failure;
@@ -902,6 +906,25 @@ public final class Oracle extends ServerSession {
 
     /// An error the server reported for the statement, which leaves the
     /// session usable.
+    /// Errors after which the session is gone: killed (ORA-00028), logged off
+    /// (ORA-01012), shutdown in progress (ORA-01089, ORA-01092), the connection
+    /// lost (ORA-03113, ORA-03114, ORA-03135) or idle time exceeded (ORA-02396).
+    static boolean endsSession(int number) {
+        switch (number) {
+            case 28:
+            case 1012:
+            case 1089:
+            case 1092:
+            case 2396:
+            case 3113:
+            case 3114:
+            case 3135:
+                return true;
+            default:
+                return false;
+        }
+    }
+
     private static final class OracleError extends IOException {
         private static final long serialVersionUID = 1L;
         final int number;
@@ -1071,11 +1094,14 @@ public final class Oracle extends ServerSession {
         }
         rows.setColumnCount(columns.length);
         String[] kinds = new String[columns.length];
+        String[] labels = new String[columns.length];
         boolean anyKind = false;
         for (int iter = 0 ; iter < columns.length ; iter++) {
+            labels[iter] = columns[iter].name;
             kinds[iter] = kind(columns[iter]);
             anyKind |= kinds[iter] != null;
         }
+        rows.setColumnNames(labels);
         if (anyKind) {
             rows.setColumnTypes(kinds);
         }
@@ -2358,7 +2384,11 @@ public final class Oracle extends ServerSession {
         }
         int year = ((data[0] & 0xff) - 100) * 100 + (data[1] & 0xff) - 100;
         StringBuilder out = new StringBuilder(32);
-        pad(out, year, 4).append('-');
+        if (year < 0) {
+            // BC: the sign before the padding, -0044 rather than 0-44.
+            out.append('-');
+        }
+        pad(out, year < 0 ? -year : year, 4).append('-');
         pad(out, data[2] & 0xff, 2).append('-');
         pad(out, data[3] & 0xff, 2).append(' ');
         pad(out, (data[4] & 0xff) - 1, 2).append(':');

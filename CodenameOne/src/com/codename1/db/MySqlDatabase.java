@@ -31,11 +31,12 @@ public class MySqlDatabase extends ServerDatabase {
     /// The port MySQL or MariaDB listens on unless configured otherwise.
     public static final int DEFAULT_PORT = 3306;
 
-    /// Connects without TLS where the server allows it (`sslMode=prefer`), with a
-    /// 30 second limit on connecting and signing in.
+    /// Connects WITHOUT TLS (`sslMode=disable`): the password and the data cross the
+    /// network unencrypted. Connecting, and each wait for the server, may take 30
+    /// seconds.
     public MySqlDatabase(String host, int port, String database, String user, String password)
             throws IOException {
-        this(host, port, database, user, password, null, 30000);
+        this(host, port, database, user, password, "disable", 30000);
     }
 
     /// Connects and signs in; see [ServerDatabase] for `sslMode`.

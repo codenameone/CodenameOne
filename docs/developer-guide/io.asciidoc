@@ -734,9 +734,12 @@ background thread, as above.
 * *Parameters are `?` on every engine*. PostgreSQL's `$1` form is produced for you.
 * *Rows are read whole*. A query returns once every row has arrived, so a cursor moves in both
 directions and `getCount()` is exact. Page large results in SQL with `LIMIT` or its equivalent.
-* *No TLS*. Codename One's sockets are plain TCP. `sslMode` accepts `disable` and `prefer`, and
-`prefer` connects without TLS; a mode that demands TLS is refused rather than downgraded. Reach the
-server over a network you trust, or through a tunnel. A direct connection from a phone to a
+* *No TLS*. Codename One's sockets are plain TCP, so the password and every row cross the network
+unencrypted. The five-argument constructors connect that way; the seven-argument ones take
+`sslMode`, which must be `disable`, and refuse every other mode rather than downgrade it. Reach
+the server over a network you trust, or through a tunnel.
+* *Timeouts*. The timeout limits connecting and each wait for the server after it, so a query whose
+reply takes longer fails. Pass 0 to wait as long as the server takes. A direct connection from a phone to a
 production database is rarely a good design; an API server in between is usually the better one.
 
 

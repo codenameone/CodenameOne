@@ -1051,6 +1051,11 @@ public final class SqlServer extends ServerSession {
                 case TOKEN_COLMETADATA: {
                     columns = readColumns();
                     resultSets++;
+                    if (readingIdentity) {
+                        // SCOPE_IDENTITY() is the batch's LAST result set; a value
+                        // from an earlier one (an OUTPUT clause) is not the identity.
+                        lastIdentity = 0;
+                    }
                     if (rows != null && resultSets == 1) {
                         String[] kinds = new String[columns.length];
                         for (int iter = 0 ; iter < columns.length ; iter++) {
@@ -1058,6 +1063,11 @@ public final class SqlServer extends ServerSession {
                         }
                         rows.setColumnCount(columns.length);
                         rows.setColumnTypes(kinds);
+                        String[] labels = new String[columns.length];
+                        for (int iter = 0 ; iter < columns.length ; iter++) {
+                            labels[iter] = columns[iter].name;
+                        }
+                        rows.setColumnNames(labels);
                     }
                     break;
                 }
@@ -1094,6 +1104,16 @@ public final class SqlServer extends ServerSession {
                     // count is rows returned, not rows changed.
                     if ((status & 0x10) != 0 && command != 0xc1) {
                         affected = count;
+                    }
+                    if ((status & 0x20) != 0) {
+                        // An attention acknowledgement: this client sends no
+                        // attention, so the stream is not the answer it expects.
+                        fatal = true;
+                        if (failure == null) {
+                            failure = new IOException("SQL Server cancelled the request");
+                        }
+                    } else if ((status & 0x02) != 0 && failure == null) {
+                        failure = new IOException("SQL Server reported an error with no message");
                     }
                     break;
                 }

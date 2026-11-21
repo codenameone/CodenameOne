@@ -71,13 +71,16 @@ public final class BackendSqlPlatform extends SqlPlatform {
 
     @Override
     public IOException withMessage(IOException failure, String message) {
+        IOException out;
         if (failure instanceof ConcurrencyFailureException) {
-            return new ConcurrencyFailureException(message);
+            out = new ConcurrencyFailureException(message);
+        } else if (failure instanceof DataIntegrityViolationException) {
+            out = new DataIntegrityViolationException(message);
+        } else {
+            out = new IOException(message);
         }
-        if (failure instanceof DataIntegrityViolationException) {
-            return new DataIntegrityViolationException(message);
-        }
-        return new IOException(message);
+        out.initCause(failure);
+        return out;
     }
 
     private static final class TcpSocket extends SqlSocket {

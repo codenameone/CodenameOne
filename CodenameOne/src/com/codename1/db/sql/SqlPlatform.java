@@ -75,10 +75,11 @@ public abstract class SqlPlatform {
 
     /// `failure` again with `message`, keeping what kind of failure it is.
     public IOException withMessage(IOException failure, String message) {
-        if (failure instanceof SqlFailure) {
-            return new SqlFailure(((SqlFailure) failure).getKind(), message);
-        }
-        return new IOException(message);
+        IOException out = failure instanceof SqlFailure
+                ? new SqlFailure(((SqlFailure) failure).getKind(), message)
+                : new IOException(message);
+        out.initCause(failure);
+        return out;
     }
 
     /// PBKDF2 over HMAC with `digest`, [Hash#SHA256] or [Hash#SHA512].

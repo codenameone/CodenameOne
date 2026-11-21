@@ -659,6 +659,7 @@ public final class Postgres extends ServerSession {
                         kinds[iter] = kind(types[iter]);
                     }
                     result.rows.setColumnTypes(kinds);
+                    result.rows.setColumnNames(names);
                     break;
                 }
                 case DATA_ROW: {

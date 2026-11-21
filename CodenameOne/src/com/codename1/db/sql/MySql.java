@@ -678,6 +678,11 @@ public final class MySql extends ServerSession {
                 kinds[iter] = kind(resultDefinitions[iter].type);
             }
             rows.setColumnTypes(kinds);
+            String[] labels = new String[resultColumns];
+            for (int iter = 0 ; iter < resultColumns ; iter++) {
+                labels[iter] = resultDefinitions[iter].name;
+            }
+            rows.setColumnNames(labels);
         }
         while (true) {
             Packet packet = readPacket();

@@ -31,8 +31,9 @@ public class OracleDatabase extends ServerDatabase {
     /// The port Oracle Database listens on unless configured otherwise.
     public static final int DEFAULT_PORT = 1521;
 
-    /// Connects without TLS where the server allows it (`sslMode=prefer`), with a
-    /// 30 second limit on connecting and signing in.
+    /// Connects WITHOUT TLS (`sslMode=disable`): the password and the data cross the
+    /// network unencrypted. Connecting, and each wait for the server, may take 30
+    /// seconds.
     public OracleDatabase(String host, int port, String service, String user, String password)
             throws IOException {
         this(host, port, service, user, password, null, 30000);

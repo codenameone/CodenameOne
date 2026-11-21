@@ -23,6 +23,7 @@
 package com.codename1.db;
 
 import com.codename1.db.sql.Dialect;
+import com.codename1.db.sql.QueryRows;
 import com.codename1.db.sql.ServerSession;
 import com.codename1.ui.Display;
 
@@ -58,9 +59,9 @@ import java.util.Map;
 /// when the query returns, so a cursor can move in both directions.
 ///
 /// The connection is plain TCP. This platform's sockets have no TLS, so
-/// `sslMode` may be `disable` or `prefer` (which then connects without TLS); a
-/// mode that demands TLS -- `require`, `verify-ca`, `verify-full` -- is refused
-/// rather than quietly downgraded. Reach a server over a network you trust, or
+/// `sslMode` must be `disable`, written out: the password and every row cross the
+/// network unencrypted, so nothing chooses that for the caller. Any other mode,
+/// `prefer` included, is refused rather than quietly downgraded. Reach a server over a network you trust, or
 /// through a tunnel.
 public class ServerDatabase extends Database {
     private final ServerSession session;
@@ -71,29 +72,27 @@ public class ServerDatabase extends Database {
     ///
     /// - `connector`: the engine, for example `Postgres.CONNECTOR`
     ///
-    /// - `sslMode`: `disable` or `prefer`; null means `prefer`
+    /// - `sslMode`: `disable`; anything else is refused
     ///
-    /// - `timeoutMillis`: how long connecting and signing in may take, 0 for no limit
+    /// - `timeoutMillis`: how long connecting may take, and each wait for the server
+    ///   after it (signing in, a query's reply); 0 for no limit
     protected ServerDatabase(ServerSession.Connector connector, String host, int port,
                              String database, String user, String password, String sslMode,
                              int timeoutMillis) throws IOException {
         refuseEdt();
         ClientSqlPlatform.install();
         this.session = connector.connect(host, port, database, user, password,
-                plainMode(sslMode), null, timeoutMillis, 0);
+                plainMode(sslMode), null, timeoutMillis, timeoutMillis);
     }
 
     private static String plainMode(String sslMode) throws IOException {
-        if (sslMode == null || "prefer".equalsIgnoreCase(sslMode.trim())
-                || "preferred".equalsIgnoreCase(sslMode.trim())) {
+        if (sslMode != null && ("disable".equalsIgnoreCase(sslMode.trim())
+                || "disabled".equalsIgnoreCase(sslMode.trim()))) {
             return "disable";
         }
-        if ("disable".equalsIgnoreCase(sslMode.trim())
-                || "disabled".equalsIgnoreCase(sslMode.trim())) {
-            return "disable";
-        }
-        throw new IOException("sslMode=" + sslMode + " demands TLS, which this platform's "
-                + "sockets do not provide. Use disable or prefer over a network you trust.");
+        throw new IOException("sslMode=" + sslMode + " asks for TLS, which this platform's "
+                + "sockets do not provide. Pass \"disable\" to connect unencrypted, over a "
+                + "network you trust or a tunnel.");
     }
 
     private static void refuseEdt() throws IOException {
@@ -219,10 +218,20 @@ public class ServerDatabase extends Database {
         private int position = -1;
         private boolean closed;
 
-        ListCursor(List rows) {
+        ListCursor(List rows) throws IOException {
             this.rows = rows;
             List<String> columns = new ArrayList<String>();
-            if (!rows.isEmpty()) {
+            String[] labels = rows instanceof QueryRows ? ((QueryRows) rows).getColumnNames() : null;
+            if (labels != null) {
+                for (String label : labels) {
+                    if (columns.contains(label)) {
+                        // A row is a map by label, so a repeated label keeps one value.
+                        throw new IOException("The query returns two columns labelled "
+                                + label + "; give them distinct aliases");
+                    }
+                    columns.add(label);
+                }
+            } else if (!rows.isEmpty()) {
                 Iterator it = ((Map) rows.get(0)).keySet().iterator();
                 while (it.hasNext()) {
                     columns.add(String.valueOf(it.next()));

@@ -56,7 +56,15 @@ final class ClientSqlPlatform extends SqlPlatform {
             throw new IOException("This platform has no TCP sockets");
         }
         Pending pending = new Pending(timeoutMillis);
-        Socket.connect(host, port, pending);
+        try {
+            Socket.connect(host, port, pending);
+        } catch (IllegalArgumentException e) {
+            // Socket refuses a host holding both '.' and ':' (an IPv4-mapped IPv6
+            // literal); the engines handle IOException only.
+            IOException io = new IOException("Cannot connect to " + host + ": " + e.getMessage());
+            io.initCause(e);
+            throw io;
+        }
         return pending.await(host, port, timeoutMillis);
     }
 
@@ -65,12 +73,15 @@ final class ClientSqlPlatform extends SqlPlatform {
         return CryptoEngine.random(length);
     }
 
-    /// Waits for [Socket]'s callback on the connecting thread.
+    /// [Socket]'s callback, waited for on the connecting thread. Once connected it
+    /// keeps the first error the streams report: [Socket]'s output stream reports a
+    /// failed write here instead of throwing.
     private static final class Pending extends SocketConnection {
         private InputStream in;
         private OutputStream out;
         private String error;
         private boolean done;
+        private boolean abandoned;
 
         Pending(int timeoutMillis) {
             super(timeoutMillis);
@@ -78,17 +89,29 @@ final class ClientSqlPlatform extends SqlPlatform {
 
         @Override
         public synchronized void connectionError(int errorCode, String message) {
-            error = message == null ? "error " + errorCode : message;
+            if (error == null) {
+                error = message == null ? "error " + errorCode : message;
+            }
             done = true;
             notifyAll();
         }
 
         @Override
         public synchronized void connectionEstablished(InputStream is, OutputStream os) {
+            if (abandoned) {
+                // The caller timed out and left; nobody will ever close these.
+                Util.cleanup(is);
+                Util.cleanup(os);
+                return;
+            }
             in = is;
             out = os;
             done = true;
             notifyAll();
+        }
+
+        synchronized String failure() {
+            return in == null ? null : error;
         }
 
         synchronized SqlSocket await(String host, int port, int timeoutMillis)
@@ -105,44 +128,87 @@ final class ClientSqlPlatform extends SqlPlatform {
                 try {
                     wait(wait);
                 } catch (InterruptedException e) {
+                    abandoned = true;
                     IOException io = new IOException("Interrupted connecting to " + host + ":" + port);
                     io.initCause(e);
                     throw io;
                 }
             }
             if (!done) {
+                abandoned = true;
                 throw new IOException("Timed out connecting to " + host + ":" + port);
             }
             if (in == null) {
-                throw new IOException("Could not connect to " + host + ":" + port + ": " + error);
+                // The platform reports no reason: refused, unreachable or an unknown host.
+                throw new IOException("Could not connect to " + host + ":" + port
+                        + " (refused, unreachable or unknown host): " + error);
             }
-            return new StreamSocket(in, out);
+            return new StreamSocket(this, in, out, timeoutMillis);
         }
     }
 
     private static final class StreamSocket extends SqlSocket {
+        private final Pending connection;
         private final InputStream in;
         private final OutputStream out;
+        private int readTimeout;
+        private boolean closed;
 
-        StreamSocket(InputStream in, OutputStream out) {
+        /// Until the engine sets its own, a read waits no longer than connecting
+        /// may, so a peer that accepts and then says nothing cannot hang sign-in.
+        StreamSocket(Pending connection, InputStream in, OutputStream out, int timeoutMillis) {
+            this.connection = connection;
             this.in = in;
             this.out = out;
+            this.readTimeout = timeoutMillis;
+        }
+
+        private void check() throws IOException {
+            String failure = connection.failure();
+            if (failure != null) {
+                close();
+                throw new IOException("Connection failed: " + failure);
+            }
         }
 
         @Override
         public int read(byte[] buffer, int offset, int length) throws IOException {
+            check();
+            if (readTimeout > 0) {
+                long deadline = System.currentTimeMillis() + readTimeout;
+                while (!closed && in.available() <= 0) {
+                    check();
+                    if (System.currentTimeMillis() >= deadline) {
+                        close();
+                        throw new IOException("Timed out after " + readTimeout
+                                + "ms waiting for the server");
+                    }
+                    try {
+                        Thread.sleep(10);
+                    } catch (InterruptedException e) {
+                        close();
+                        IOException io = new IOException("Interrupted waiting for the server");
+                        io.initCause(e);
+                        throw io;
+                    }
+                }
+            }
             return in.read(buffer, offset, length);
         }
 
         @Override
         public void write(byte[] buffer, int offset, int length) throws IOException {
+            check();
             out.write(buffer, offset, length);
             out.flush();
+            check();
         }
 
-        /// These sockets have no per-read timeout; a read waits for the server.
+        /// A deadline on each wait for the server, polled: these sockets have no
+        /// timeout of their own. 0 waits as long as the server takes.
         @Override
         public void setReadTimeout(int millis) {
+            readTimeout = millis;
         }
 
         @Override
@@ -159,6 +225,7 @@ final class ClientSqlPlatform extends SqlPlatform {
 
         @Override
         public void close() {
+            closed = true;
             Util.cleanup(in);
             Util.cleanup(out);
         }
