@@ -145,7 +145,7 @@ public final class UrlGuard {
         }
         // Every label hexadecimal or decimal: a name like "cafe.bad" stays a name
         // only when some label is not a number.
-        String[] labels = host.split("\\.");
+        String[] labels = split(host, '.');
         for (int iter = 0; iter < labels.length; iter++) {
             String l = labels[iter];
             boolean num = l.length() > 0;
@@ -168,7 +168,7 @@ public final class UrlGuard {
         if (host.indexOf(':') >= 0) {
             return ipv6(host);
         }
-        String[] parts = host.split("\\.");
+        String[] parts = split(host, '.');
         if (parts.length != 4) {
             return null;
         }
@@ -210,8 +210,8 @@ public final class UrlGuard {
             return out;
         }
         int gap = h.indexOf("::");
-        String[] head = gap < 0 ? h.split(":") : h.substring(0, gap).split(":");
-        String[] tail = gap < 0 ? new String[0] : h.substring(gap + 2).split(":");
+        String[] head = gap < 0 ? split(h, ':') : split(h.substring(0, gap), ':');
+        String[] tail = gap < 0 ? new String[0] : split(h.substring(gap + 2), ':');
         int[] words = new int[8];
         int n = 0;
         for (int iter = 0; iter < head.length && n < 8; iter++) {
@@ -295,5 +295,18 @@ public final class UrlGuard {
                 || b0 == 100 && b1 >= 64 && b1 <= 127
                 || b0 == 192 && b1 == 0 && (a[2] & 0xff) == 0
                 || b0 == 198 && (b1 == 18 || b1 == 19));
+    }
+
+    /// String.split is a regex and not in the device's class library.
+    private static String[] split(String s, char sep) {
+        java.util.List<String> out = new java.util.ArrayList<String>();
+        int from = 0;
+        for (int iter = 0; iter <= s.length(); iter++) {
+            if (iter == s.length() || s.charAt(iter) == sep) {
+                out.add(s.substring(from, iter));
+                from = iter + 1;
+            }
+        }
+        return out.toArray(new String[out.size()]);
     }
 }
