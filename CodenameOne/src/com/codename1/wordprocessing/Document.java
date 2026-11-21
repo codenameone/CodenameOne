@@ -79,7 +79,10 @@ public final class Document {
         /// The binary format of Word 97 to 2003. Read only: styles, lists, tables with merged
         /// cells, pictures, fields, notes, comments and tracked changes are read; writing
         /// throws, since files should be saved as DOCX.
-        DOC("doc");
+        DOC("doc"),
+
+        /// PDF, laid out into pages as `DocumentView` shows them. Write only: reading throws.
+        PDF("pdf");
 
         private final String extension;
 
@@ -524,6 +527,9 @@ public final class Document {
         if (format == Format.DOC) {
             return DocReader.read(readAll(in));
         }
+        if (format == Format.PDF) {
+            throw new IOException("Reading PDF is not supported");
+        }
         String text = new String(readAll(in), "UTF-8");
         if (text.length() > 0 && text.charAt(0) == 0xfeff) {
             text = text.substring(1);
@@ -560,6 +566,8 @@ public final class Document {
             OdtWriter.write(this, out);
         } else if (format == Format.RTF) {
             RtfWriter.write(this, out);
+        } else if (format == Format.PDF) {
+            PdfExport.write(this, out);
         } else if (format == Format.DOC) {
             throw new IOException("Writing DOC is not supported; write DOCX instead");
         } else {
