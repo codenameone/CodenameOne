@@ -2165,7 +2165,8 @@ class CleanTargetIntegrationTest {
         // and it stayed silent past 15 and then 50 minutes on healthy Linux
         // builds (master's whole build takes about 76 minutes). So only a total
         // cap remains, kept under the job's 140-minute timeout so the test,
-        // not the runner, reports a build that never ends.
+        // not the runner, reports a build that never ends. This is a guard
+        // against a hang, not a performance budget: the perf gate judges speed.
         ProcessBuilder builder = new ProcessBuilder("cmake", "--build", buildDir.toString());
         builder.directory(workingDir.toFile());
         return runCommand(builder, BUILD_CAP_MINUTES, java.util.concurrent.TimeUnit.MINUTES);
@@ -2180,13 +2181,6 @@ class CleanTargetIntegrationTest {
     }
 
     static String runCommand(ProcessBuilder builder, long timeout, java.util.concurrent.TimeUnit unit) throws Exception {
-        return runCommand(builder, timeout, unit, 0);
-    }
-
-    /// Runs a command to completion. `stallMillis` above zero also stops it, as
-    /// a hang, once its output has not grown for that long.
-    static String runCommand(ProcessBuilder builder, long timeout, java.util.concurrent.TimeUnit unit,
-            long stallMillis) throws Exception {
         Path workingDir = builder.directory().toPath();
         Path log = Files.createTempFile(workingDir, "command-", ".log");
         String command = String.join(" ", builder.command());
@@ -2201,33 +2195,7 @@ class CleanTargetIntegrationTest {
             // None of these commands receives input. Supply EOF instead of keeping
             // a child that reads stdin waiting for the test runner indefinitely.
             process.getOutputStream().close();
-            boolean finished;
-            String stalled = null;
-            if (stallMillis <= 0) {
-                finished = process.waitFor(timeout, unit);
-            } else {
-                long deadline = System.currentTimeMillis() + unit.toMillis(timeout);
-                long lastSize = -1;
-                long lastGrowth = System.currentTimeMillis();
-                while (true) {
-                    finished = process.waitFor(30, java.util.concurrent.TimeUnit.SECONDS);
-                    if (finished) {
-                        break;
-                    }
-                    long now = System.currentTimeMillis();
-                    long size = Files.size(log);
-                    if (size != lastSize) {
-                        lastSize = size;
-                        lastGrowth = now;
-                    } else if (now - lastGrowth >= stallMillis) {
-                        stalled = "no output for " + (stallMillis / 60_000L) + " minutes";
-                        break;
-                    }
-                    if (now >= deadline) {
-                        break;
-                    }
-                }
-            }
+            boolean finished = process.waitFor(timeout, unit);
             if (!finished) {
                 process.destroyForcibly();
                 process.waitFor(10, java.util.concurrent.TimeUnit.SECONDS);
@@ -2235,8 +2203,7 @@ class CleanTargetIntegrationTest {
             String output = new String(Files.readAllBytes(log), StandardCharsets.UTF_8);
             String diagnostic = "Command: " + command + "\nFull output: " + log
                     + "\nOutput (tail):\n" + tailOf(output) + sourceRootSummary(workingDir);
-            assertTrue(finished, (stalled != null ? "Command hung (" + stalled + ")"
-                    : "Command timed out after " + timeout + " " + unit) + "\n" + diagnostic);
+            assertTrue(finished, "Command timed out after " + timeout + " " + unit + "\n" + diagnostic);
             assertEquals(0, process.exitValue(), diagnostic);
             succeeded = true;
             return output;

@@ -8,8 +8,8 @@
 # vm/backend/impl, its per-target classes). The backend is published as its own
 # API reference by the same doclet, so it is held to the same rule; before it
 # was, 77 of its files were classic javadoc and nothing noticed. The Rive
-# runtime (maven/rive-runtime) is part of the client API, published from outside
-# the core.
+# runtime (maven/rive-runtime) is an optional module, not part of the core
+# reference, held to the same documentation rule.
 set -euo pipefail
 cd "$(cd "$(dirname "$0")/../.." && pwd)"
 TREES=(CodenameOne Ports/CLDC11 maven/rive-runtime/src vm/backend/src vm/backend/impl)

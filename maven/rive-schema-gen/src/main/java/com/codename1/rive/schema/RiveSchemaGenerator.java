@@ -187,7 +187,6 @@ public final class RiveSchemaGenerator {
             RiveSchemaGenerator g = new RiveSchemaGenerator(load(new File(args[1])), src);
             Map<String, String> files = g.runtimeFiles();
             writeAll(out, files);
-            System.out.println("rive schema: " + g.keep.size() + " types, " + files.size() + " files");
         } else if (args.length == 3 && "transcoder".equals(args[0])) {
             RiveSchemaGenerator g = new RiveSchemaGenerator(load(new File(args[1])), null);
             Map<String, String> files = new TreeMap<String, String>();
