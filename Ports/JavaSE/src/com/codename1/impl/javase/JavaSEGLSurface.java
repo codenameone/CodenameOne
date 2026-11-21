@@ -99,7 +99,11 @@ class JavaSEGLSurface extends JComponent implements JavaSEGpuSurface {
 
     /// Run after each offscreen frame by the port, which copies the frame
     /// into the peer's buffer -- what a capture of the form draws.
-    Runnable afterOffscreenFrame;
+    private Runnable afterOffscreenFrame;
+
+    public void setAfterOffscreenFrame(Runnable afterFrame) {
+        afterOffscreenFrame = afterFrame;
+    }
 
     private void renderOffscreen() {
         if (disposed) {

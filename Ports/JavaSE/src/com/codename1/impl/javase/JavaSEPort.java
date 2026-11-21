@@ -23584,11 +23584,6 @@ public class JavaSEPort extends CodenameOneImplementation {
             // renderer so the simulator never fails to start over 3D.
             JavaSEGpuSurface surface;
             try {
-                if (JavaSEGLSurface.HIDDEN) {
-                    // A GL context needs a window on screen; the hidden
-                    // simulator has none, so it renders in software.
-                    throw new IllegalStateException("hidden simulator");
-                }
                 Class<?> joglSurface = Class.forName("com.codename1.impl.javase.JavaSEJoglSurface");
                 // JavaSEJoglSurface and its constructor are package-private, so
                 // getConstructor() (public-only) cannot see it; use the declared
@@ -23605,15 +23600,15 @@ public class JavaSEPort extends CodenameOneImplementation {
                 surface = new JavaSEGLSurface(view);
             }
             final com.codename1.ui.PeerComponent peer = createNativePeer(surface.getComponent());
-            if (peer instanceof Peer && surface instanceof JavaSEGLSurface && JavaSEGLSurface.HIDDEN) {
+            if (peer instanceof Peer && JavaSEGLSurface.HIDDEN) {
                 // No window paints the peer, so each frame fills its buffer
                 // here, and the form repaints it from there.
-                ((JavaSEGLSurface) surface).afterOffscreenFrame = new Runnable() {
+                surface.setAfterOffscreenFrame(new Runnable() {
                     public void run() {
                         ((Peer) peer).paintOnBuffer();
                         peer.repaint();
                     }
-                };
+                });
             }
             if (peer != null) {
                 peer.putClientProperty(GPU_SURFACE, surface);
