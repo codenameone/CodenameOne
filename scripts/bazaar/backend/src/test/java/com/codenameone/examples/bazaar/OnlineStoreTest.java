@@ -191,8 +191,10 @@ class OnlineStoreTest {
                 page.getHeader("Cache-Control"));
         String csp = page.getHeader("Content-Security-Policy");
         assertNotNull(csp);
-        assertFalse(csp.contains("unsafe-inline") && csp.contains("script-src 'unsafe-inline'"),
-                csp);
+        // Cached for everyone, so no per-response nonce; nothing inline either.
+        assertFalse(csp.contains("nonce-"), csp);
+        assertFalse(csp.contains("unsafe-inline"), csp);
+        assertTrue(csp.contains("script-src"), csp);
         assertEquals(404, visit("/s/os-page/pages/nope").getStatus());
         // A policy page.
         pages.save(s.owner, s.storeId, null, new ContentPageDto(null, Pages.POLICY, "refund",
@@ -378,6 +380,19 @@ class OnlineStoreTest {
         orders.refund(s.owner, s.storeId, o.id(), new RefundRequestDto(back, o.shippingCents(), false, "Rest"));
         Map end = db.queryOne("SELECT refunded_cents, amount_cents FROM payment WHERE order_id = ?",
                 new Object[] {o.id()});
+        // What is left on the card is what is left of the order, at its rate:
+        // the store-currency refunds did not cover all of it.
+        Map settledRow = db.queryOne("SELECT SUM(amount_cents) AS a FROM refund WHERE order_id = ?",
+                new Object[] {o.id()});
+        long settledLeft = total - ((Number) settledRow.get("a")).longValue();
+        long cardLeft = ((Number) end.get("amount_cents")).longValue()
+                - ((Number) end.get("refunded_cents")).longValue();
+        long expectLeft = (settledLeft * eurTotal + total / 2) / total;
+        assertTrue(Math.abs(cardLeft - expectLeft) <= 1, cardLeft + " left on the card, "
+                + settledLeft + " of the order's " + total + " unrefunded");
+        if (settledLeft == 0) {
+            assertEquals(0, cardLeft, "a full refund empties the card exactly");
+        }
         Map sum = db.queryOne("SELECT SUM(presentment_cents) AS p FROM refund WHERE order_id = ?",
                 new Object[] {o.id()});
         long refundedEur = ((Number) end.get("refunded_cents")).longValue();
@@ -442,5 +457,41 @@ class OnlineStoreTest {
         assertEquals(taxed.totalCents() - taxed.taxCents(), free.totalCents());
         assertEquals(taxed.discountCents() + taxed.taxCents(), free.discountCents());
         assertEquals("CERT-INCL", taxes.certificateOf(free.id()));
+        // Refunding everything gives back what the exempt buyer paid, no more.
+        Map line = db.queryOne("SELECT id FROM order_line WHERE order_id = ?",
+                new Object[] {free.id()});
+        List<RefundLineDto> back = new ArrayList<RefundLineDto>();
+        back.add(new RefundLineDto((String) line.get("id"), 1));
+        orders.refund(s.owner, s.storeId, free.id(), new RefundRequestDto(back,
+                free.shippingCents(), false, "All"));
+        Map refunded = db.queryOne("SELECT SUM(amount_cents) AS a FROM refund WHERE order_id = ?",
+                new Object[] {free.id()});
+        assertTrue(((Number) refunded.get("a")).longValue() <= free.totalCents(),
+                refunded.get("a") + " refunded of " + free.totalCents());
+    }
+
+    @Test
+    void theWebCheckoutChargesTheMarketCurrencyFromTheCookie() throws Exception {
+        Shop s = shop("os-webfx");
+        euro(s);
+        Browser b = new Browser(mvc);
+        b.market = "eu";
+        b.send(Browser.form("/s/os-webfx/cart/add", "variantId", s.variantId, "quantity", "1"));
+        MockResponse page = b.get("/s/os-webfx/checkout");
+        b.assertPage(page, "This order is charged in EUR");
+        String html = page.getContentAsString();
+        String marker = "name=\"idempotencyKey\" value=\"";
+        int at = html.indexOf(marker);
+        String key = html.substring(at + marker.length(), html.indexOf('"', at + marker.length()));
+        MockResponse placed = b.post("/s/os-webfx/checkout/place", "email", "ada@example.com",
+                "name", "Ada Lovelace", "line1", "1 Main St", "city", "Albany", "region", "NY",
+                "postal", "12207", "country", "US", "cardNumber", "4242 4242 4242 4242",
+                "cardExpiry", "12/39", "cardCvc", "123", "idempotencyKey", key);
+        assertEquals(303, placed.getStatus(), placed.getContentAsString());
+        Map row = db.queryOne("SELECT o.presentment_currency AS pc, p.currency AS cur FROM "
+                + "store_order o JOIN payment p ON p.order_id = o.id WHERE o.store_id = ?",
+                new Object[] {s.storeId});
+        assertEquals("EUR", row.get("pc"));
+        assertEquals("EUR", row.get("cur"));
     }
 }

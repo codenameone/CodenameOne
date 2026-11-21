@@ -38,6 +38,8 @@ final class Browser {
     /// sends it back (web.security.BotGuard).
     String fill;
     MockResponse last;
+    /// The storefront market cookie to send, or null.
+    String market;
 
     Browser(MockMvc mvc) {
         this.mvc = mvc;
@@ -51,6 +53,9 @@ final class Browser {
         b.header("Host", SignIn.HOST);
         if (session != null) {
             b.cookie("CN1SESSION", session);
+        }
+        if (market != null) {
+            b.cookie("market", market);
         }
         MockResponse r = mvc.perform(b).andReturn().getResponse();
         String s = r.getCookie("CN1SESSION");
