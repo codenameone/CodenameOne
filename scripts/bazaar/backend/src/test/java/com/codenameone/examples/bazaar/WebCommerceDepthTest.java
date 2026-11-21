@@ -24,6 +24,7 @@ import com.codename1.backend.test.BackendTest;
 import com.codename1.backend.test.MockMvc;
 import com.codename1.backend.test.MockResponse;
 import com.codenameone.examples.bazaar.account.Accounts;
+import com.codenameone.examples.bazaar.api.CompanyBuyerDto;
 import com.codenameone.examples.bazaar.api.CompanyDto;
 import com.codenameone.examples.bazaar.api.FulfilLineDto;
 import com.codenameone.examples.bazaar.api.NetTermDto;
@@ -283,8 +284,8 @@ class WebCommerceDepthTest {
         // Another company's buyer: the quote and the invoice are 404.
         Shop o = shop("wcd-quote-o");
         CommerceSeed other = seed(o, "wcd-quote-o");
-        trade.addBuyer(s.owner, s.storeId, makeCompany(s, "Rival"), new com.codenameone
-                .examples.bazaar.api.CompanyBuyerDto(null, other.buyer, ""));
+        trade.addBuyer(s.owner, s.storeId, makeCompany(s, "Rival"), 
+                new CompanyBuyerDto(null, other.buyer, ""));
         Browser rival = signedIn(other.buyer);
         assertEquals(404, rival.get(co + "/quotes/" + q.id()).getStatus());
         rival.get(co);

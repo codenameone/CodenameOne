@@ -24,11 +24,15 @@ import com.codename1.backend.test.BackendTest;
 import com.codename1.backend.test.MockMvc;
 import com.codename1.backend.test.MockRequestBuilder;
 import com.codenameone.examples.bazaar.account.Accounts;
+import com.codenameone.examples.bazaar.api.CompanyBuyerDto;
 import com.codenameone.examples.bazaar.cart.Carts;
 import com.codenameone.examples.bazaar.checkout.Checkouts;
 import com.codenameone.examples.bazaar.inventory.Inventory;
 import com.codenameone.examples.bazaar.pricing.DemoPricing;
 import com.codenameone.examples.bazaar.store.Stores;
+import com.codenameone.examples.bazaar.marketing.DemoMarketing;
+import com.codenameone.examples.bazaar.subscribe.Subscriptions;
+import com.codenameone.examples.bazaar.trade.Trade;
 import org.junit.jupiter.api.Test;
 
 import java.io.File;
@@ -245,11 +249,11 @@ class MerchantIdorTest {
     @Autowired
     private Checkouts checkouts;
     @Autowired
-    private com.codenameone.examples.bazaar.marketing.DemoMarketing marketing;
+    private DemoMarketing marketing;
     @Autowired
-    private com.codenameone.examples.bazaar.subscribe.Subscriptions subscriptions;
+    private Subscriptions subscriptions;
     @Autowired
-    private com.codenameone.examples.bazaar.trade.Trade trade;
+    private Trade trade;
 
     private final Map<String, String> found = new HashMap<String, String>();
     private final List<String> fake = new ArrayList<String>();
@@ -434,7 +438,8 @@ class MerchantIdorTest {
 
     @Test
     void theListIsEveryRouteTheInterfacesDeclare() throws Exception {
-        File dir = new File("../shared/src/main/java/com/codenameone/examples/bazaar/api");
+        File dir = new File("../shared/src/main/java/"
+                + CompanyBuyerDto.class.getPackage().getName().replace('.', '/'));
         String[] names = dir.list();
         if (names == null) {
             // A compiled test binary does not run beside the sources.

@@ -76,7 +76,7 @@ class ErrorPagesTest {
         MockResponse r = b.postWithoutToken("/account/addresses", "name", "x");
         plain(r, 403, "You cannot do that here");
         assertEquals("no-store", r.getHeader("Cache-Control"));
-        assertFalse(r.getContentAsString().toLowerCase().contains("csrf"));
+        assertFalse(r.getContentAsString().toLowerCase(java.util.Locale.ROOT).contains("csrf"));
     }
 
     @Test
