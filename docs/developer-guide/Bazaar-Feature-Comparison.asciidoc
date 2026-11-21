@@ -71,7 +71,7 @@ on a row.
 | Suppliers | &#10003; | core |  |  | core | 
 | Stocktakes / counts | &#10003; | core |  |  | core | 
 | Low-stock alerts / reorder points | &#10003; | core | core | core | core | 
-| Continue selling when out of stock (oversell) | &#9681; | core |  | core |  | Stock is reserved atomically and never oversold; there is no per-variant oversell switch.
+| Continue selling when out of stock (oversell) | &#9681; | core |  | core |  | Stock is reserved atomically and never oversold; an open pre-order sells past stock up to its limit.
 | Committed / unavailable / incoming states | &#9681; | core |  | core |  | Reserved and incoming (from purchase orders) are tracked.
 | Inventory value report | &#10003; | core |  |  | core | 
 | Barcode label printing | &#9681; | core |  | core |  | Code 128 barcodes are drawn; no label-sheet layout.
@@ -294,7 +294,7 @@ on a row.
 | Feature | Bazaar | Shopify | WooCommerce | BigCommerce | Square | Notes
 
 | Subscriptions / selling plans | &#10003; | app/plugin | app/plugin | app/plugin | core | Daily, weekly or monthly plans at a discount; failed renewals retry, then pause.
-| Pre-orders | &#10003; | app/plugin | app/plugin |  |  | Per variant, with a ship date and a choice to charge now or later.
+| Pre-orders | &#10003; | app/plugin | app/plugin |  |  | Per variant, with a ship date and a choice to charge now or later; checkout sells a short line as a pre-order up to the allowance.
 | Back-in-stock alerts to shoppers | &#10003; | app/plugin | app/plugin |  |  | Shoppers subscribe on the product page; the alert is sent once when stock returns.
 | Try before you buy / deferred payment | &#8211; | app/plugin |  |  |  | 
 |===
