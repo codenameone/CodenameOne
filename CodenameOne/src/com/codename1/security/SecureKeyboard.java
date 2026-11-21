@@ -299,6 +299,28 @@ public final class SecureKeyboard extends Component {
         invalidateKeys();
     }
 
+    /// Puts the digit keys in a fixed order, for documentation screenshots and tests that need the
+    /// same picture every time. A fixed order is exactly what scrambling exists to avoid, so do not
+    /// use this in place of [#setScrambled(boolean)]; it also turns scrambling off, since the next
+    /// [#show()] would otherwise replace the order.
+    ///
+    /// #### Parameters
+    ///
+    /// - `order`: the ten digits, each exactly once, in the order the keys show them
+    public void setDigitOrder(String order) {
+        if (order == null || order.length() != 10) {
+            throw new IllegalArgumentException("order must hold the ten digits");
+        }
+        for (int i = 0; i < 10; i++) {
+            if (order.indexOf((char) ('0' + i)) < 0) {
+                throw new IllegalArgumentException("order must hold each digit once: " + order);
+            }
+        }
+        scrambled = false;
+        digitOrder = order;
+        invalidateKeys();
+    }
+
     /// Whether the keyboard is on screen.
     ///
     /// #### Returns

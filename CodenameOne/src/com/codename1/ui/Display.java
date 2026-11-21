@@ -9343,6 +9343,12 @@ public final class Display extends CN1Constants {
         return impl.isActiveInputMethodPreinstalled();
     }
 
+    /// Allows or refuses user-installed keyboards in this app; true when the platform enforces it.
+    /// See `com.codename1.security.DeviceIntegrity#setThirdPartyKeyboardsAllowed(boolean)`.
+    public boolean setThirdPartyKeyboardsAllowed(boolean allowed) {
+        return impl.setThirdPartyKeyboardsAllowed(allowed);
+    }
+
     /// Discards cached platform attestation state, forcing the next attestation to start from a fresh
     /// hardware key. See `com.codename1.security.DeviceIntegrity#resetAttestation()`.
     public void resetAttestation() {

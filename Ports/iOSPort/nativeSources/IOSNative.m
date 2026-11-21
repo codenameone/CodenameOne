@@ -301,6 +301,9 @@ extern int popoverSupported();
 // that tells us when the screen is being captured (recorded or mirrored). We
 // use that signal to temporarily cover the app view with a black overlay.
 static BOOL cn1_disableScreenshots = NO;
+// Read by CodenameOne_GLAppDelegate's shouldAllowExtensionPointIdentifier. Not static: the
+// delegate declares it extern. Defined here because this file is in every Apple slice.
+BOOL cn1_allowThirdPartyKeyboards = YES;
 #if !TARGET_OS_WATCH
 static CN1View *cn1ScreenCaptureView = nil;
 static id cn1ScreenCaptureObserver = nil;
@@ -4613,6 +4616,15 @@ void com_codename1_impl_ios_IOSNative_unlockScreen__(CN1_THREAD_STATE_MULTI_ARG 
     });
 #endif // !TARGET_OS_WATCH
 #endif
+}
+
+void com_codename1_impl_ios_IOSNative_setThirdPartyKeyboardsAllowed___boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_BOOLEAN allowed)
+{
+    BOOL value = allowed ? YES : NO;
+    // The delegate reads it on the main thread, when a keyboard is about to appear.
+    dispatch_async(dispatch_get_main_queue(), ^{
+        cn1_allowThirdPartyKeyboards = value;
+    });
 }
 
 void com_codename1_impl_ios_IOSNative_setDisableScreenshots___boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject, JAVA_BOOLEAN disable)

@@ -83,7 +83,8 @@ class SecurityJava046Snippet {
         TextField pin = new TextField("", "PIN", 6, TextArea.NUMERIC | TextArea.PASSWORD);
         // A keyboard the user installed sees every keystroke typed into any app.
         // Route this field through the app's own keyboard instead.
-        if (DeviceIntegrity.isThirdPartyKeyboardActive("com.touchtype.swiftkey")) {
+        // Gboard, SwiftKey and Samsung Keyboard are accepted even when installed from a store.
+        if (DeviceIntegrity.isThirdPartyKeyboardActive(DeviceIntegrity.wellKnownKeyboards())) {
             SecureKeyboard keyboard = SecureKeyboard.install(pin);
             // Move the digits each time it opens, so logged touch positions reveal nothing.
             keyboard.setScrambled(true);

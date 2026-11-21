@@ -269,7 +269,14 @@ public final class DeviceIntegrity {
     /// }
     /// ```
     ///
-    /// Always false on iOS, where third-party keyboards are never used for password fields, and on
+    /// To accept the mainstream keyboards users commonly install, pass [#wellKnownKeyboards()]:
+    ///
+    /// ```java
+    /// boolean risky = DeviceIntegrity.isThirdPartyKeyboardActive(DeviceIntegrity.wellKnownKeyboards());
+    /// ```
+    ///
+    /// Always false on iOS, where an app cannot see which keyboard is selected; refuse third-party
+    /// keyboards there with [#setThirdPartyKeyboardsAllowed(boolean)] instead. Always false on the
     /// other ports.
     ///
     /// #### Parameters
@@ -282,6 +289,51 @@ public final class DeviceIntegrity {
     public static boolean isThirdPartyKeyboardActive(String... allowedPackages) {
         Display d = Display.getInstance();
         return isUntrustedKeyboard(d.getActiveInputMethod(), d.isActiveInputMethodPreinstalled(), allowedPackages);
+    }
+
+    /// Packages of widely used keyboards from large, accountable vendors, for the allow-list of
+    /// [#isThirdPartyKeyboardActive(String...)]: Gboard, Microsoft SwiftKey and Samsung Keyboard.
+    /// Most devices ship one of these preinstalled anyway; this list accepts them where the user
+    /// installed one from a store instead. It is a judgement about the vendor, not an audit of the
+    /// keyboard, so an app with stricter needs should pass its own list or none at all.
+    ///
+    /// #### Returns
+    ///
+    /// a new array each call, safe to modify or extend
+    public static String[] wellKnownKeyboards() {
+        return new String[] {
+            "com.google.android.inputmethod.latin",
+            "com.touchtype.swiftkey",
+            "com.samsung.android.honeyboard",
+            "com.sec.android.inputmethod"
+        };
+    }
+
+    /// Allows or refuses user-installed keyboards inside this app.
+    ///
+    /// On iOS, refusing makes the app use only Apple's keyboards: a third-party keyboard sees
+    /// everything typed outside a password field (including [com.codename1.ui.TextArea#SENSITIVE]
+    /// fields such as card numbers and one-time codes), and with "Allow Full Access" it can send that
+    /// anywhere. iOS asks each time a keyboard is about to appear, so this can be turned on for a
+    /// sensitive screen and off again after it. Call it before the field is edited.
+    ///
+    /// Android cannot refuse the user's keyboard; there, use [#isThirdPartyKeyboardActive(String...)]
+    /// and [SecureKeyboard].
+    ///
+    /// ```java
+    /// // Refuse third-party keyboards for the whole app, typically from init()
+    /// DeviceIntegrity.setThirdPartyKeyboardsAllowed(false);
+    /// ```
+    ///
+    /// #### Parameters
+    ///
+    /// - `allowed`: false to refuse user-installed keyboards
+    ///
+    /// #### Returns
+    ///
+    /// true when this platform enforces the choice (iOS), false where it cannot
+    public static boolean setThirdPartyKeyboardsAllowed(boolean allowed) {
+        return Display.getInstance().setThirdPartyKeyboardsAllowed(allowed);
     }
 
     /// Pure decision behind [#isThirdPartyKeyboardActive(String...)], separated for unit tests.

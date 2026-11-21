@@ -13153,6 +13153,13 @@ public abstract class CodenameOneImplementation {
         return true;
     }
 
+    /// Allows or refuses user-installed keyboards in this app. Returns true when the platform
+    /// enforces the choice (iOS); false where it cannot (Android lets the user's keyboard type
+    /// into every app, and the other ports have no third-party keyboards).
+    public boolean setThirdPartyKeyboardsAllowed(boolean allowed) {
+        return false;
+    }
+
     /// Discards cached platform attestation state so the next [#requestIntegrityToken(String)] starts
     /// from a fresh hardware key.
     ///

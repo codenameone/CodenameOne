@@ -41,6 +41,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class SecureKeyboardTest extends UITestBase {
@@ -127,6 +128,38 @@ class SecureKeyboardTest extends UITestBase {
         assertTrue(orders.size() > 1, "twenty shuffles produced one order");
         kb.setScrambled(false);
         assertEquals("1234567890", kb.keyLabels());
+    }
+
+    @Test
+    void fixedDigitOrderIsValidatedAndTurnsScramblingOff() {
+        TextField tf = new TextField("", "", 6, TextArea.NUMERIC);
+        SecureKeyboard kb = SecureKeyboard.install(tf);
+        kb.setScrambled(true);
+        kb.setDigitOrder("7302958164");
+        assertFalse(kb.isScrambled(), "a fixed order would be replaced by the next show otherwise");
+        assertEquals("7302958164", kb.keyLabels());
+        assertThrows(IllegalArgumentException.class, () -> kb.setDigitOrder("123"));
+        assertThrows(IllegalArgumentException.class, () -> kb.setDigitOrder("1123456789"));
+        assertThrows(IllegalArgumentException.class, () -> kb.setDigitOrder(null));
+    }
+
+    @Test
+    void wellKnownKeyboardsAreAcceptedAndTheListIsACopy() {
+        String gboard = "com.google.android.inputmethod.latin/com.android.inputmethod.latin.LatinIME";
+        String swiftkey = "com.touchtype.swiftkey/com.touchtype.KeyboardService";
+        String logger = "com.example.keylogger/.KeyboardService";
+        String lookalike = "com.google.android.inputmethod.latinx/.Ime";
+        String[] known = DeviceIntegrity.wellKnownKeyboards();
+        assertFalse(DeviceIntegrity.isUntrustedKeyboard(gboard, false, known));
+        assertFalse(DeviceIntegrity.isUntrustedKeyboard(swiftkey, false, known));
+        assertTrue(DeviceIntegrity.isUntrustedKeyboard(logger, false, known));
+        assertTrue(DeviceIntegrity.isUntrustedKeyboard(lookalike, false, known),
+                "the package must match exactly, not by prefix");
+        known[0] = "com.example.keylogger";
+        assertEquals("com.google.android.inputmethod.latin", DeviceIntegrity.wellKnownKeyboards()[0]);
+        // Only iOS can refuse a keyboard; the test port reports it cannot.
+        assertFalse(DeviceIntegrity.setThirdPartyKeyboardsAllowed(false));
+        DeviceIntegrity.setThirdPartyKeyboardsAllowed(true);
     }
 
     @Test
