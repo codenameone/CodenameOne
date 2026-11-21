@@ -62,8 +62,9 @@ class TestUtilsEdtTest extends UITestBase {
         return shown.get();
     }
 
+    /// Smoke test of the helpers from the test thread; the regression tests are below.
     @Test
-    void lookupsAndAssertsRunOffTheEdt() {
+    void helpersAnswerFromTheTestThread() {
         assertFalse(Display.getInstance().isEdt());
         Label label = new Label("Hello");
         label.setName("greeting");
@@ -97,10 +98,22 @@ class TestUtilsEdtTest extends UITestBase {
 
     @Test
     void failureOnTheEdtIsRethrownAtOnce() {
-        showOnEdt(new Label("x"));
+        // Throws only on the EDT: on the test thread (master) the lookup succeeds,
+        // and a failure on the EDT that was not handed back would surface as the
+        // timeout instead of this message.
+        Label edtOnlyFailure = new Label("x") {
+            @Override
+            public String getName() {
+                if (Display.getInstance().isEdt()) {
+                    throw new IllegalStateException("thrown on the EDT");
+                }
+                return "x";
+            }
+        };
+        showOnEdt(edtOnlyFailure);
         long start = System.currentTimeMillis();
-        RuntimeException e = assertThrows(RuntimeException.class, () -> TestUtils.clickMenuItem("missing"));
-        assertTrue(e.getMessage().contains("Command not found"), e.getMessage());
+        IllegalStateException e = assertThrows(IllegalStateException.class, () -> TestUtils.findByName("x"));
+        assertEquals("thrown on the EDT", e.getMessage());
         assertTrue(System.currentTimeMillis() - start < 5000, "waited for the timeout instead of rethrowing");
     }
 
@@ -166,6 +179,12 @@ class TestUtilsEdtTest extends UITestBase {
             assertSame(b, TestUtils.findByName("open"));
         } finally {
             leave.countDown();
+            // Do not hand the next test an EDT still inside this nested loop.
+            long deadline = System.currentTimeMillis() + 10000;
+            while (!handlerReturned.get() && System.currentTimeMillis() < deadline) {
+                Thread.sleep(10);
+            }
         }
+        assertTrue(handlerReturned.get(), "the handler never left its nested loop");
     }
 }

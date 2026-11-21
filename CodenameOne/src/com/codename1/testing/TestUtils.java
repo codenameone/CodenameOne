@@ -189,6 +189,11 @@ public final class TestUtils {
     ///
     /// Only for work that cannot block in a nested event loop; anything that can
     /// show a modal dialog goes through `actOnEdt`.
+    ///
+    /// Unlike the old inline call, a handler that runs synchronously for longer
+    /// than the bound now fails the helper, and the task stays queued and runs
+    /// when the EDT frees. A test that legitimately holds the EDT that long is
+    /// indistinguishable from a wedged one, and failing it is the point.
     private static Object callOnEdt(EdtCall work) {
         EdtTask task = new EdtTask(work);
         if (runHere()) {
