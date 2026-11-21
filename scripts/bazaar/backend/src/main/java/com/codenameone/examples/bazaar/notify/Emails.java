@@ -413,6 +413,118 @@ public class Emails {
         return builder(s, to, title, b).build();
     }
 
+    // ------------------------------------------------------------ marketing
+
+    /// Tells a shopper that a variant they asked about is back. Answers
+    /// false, sending nothing, for an address that is not one.
+    public boolean backInStock(String storeId, String to, String title, String path)
+            throws IOException {
+        Mail m = backInStockMail(storeId, to, title, path);
+        if (m == null) {
+            return false;
+        }
+        send(m);
+        return true;
+    }
+
+    @Transactional(readOnly = true)
+    private Mail backInStockMail(String storeId, String to, String title, String path) {
+        if (!Mail.isAddress(to)) {
+            return null;
+        }
+        Store s = stores.findById(storeId);
+        String subject = title + " is back in stock";
+        Body b = new Body(s, subject);
+        b.para("You asked us to tell you when " + title + " was back. It is, while it lasts.");
+        b.button("Shop now", urls.absolute(null, path));
+        b.para("This is the only message you will get about it.");
+        return builder(s, to, subject, b).build();
+    }
+
+    /// One campaign message: the merchant's text, the campaign's tracked
+    /// links, an open pixel and the unsubscribe link (also as a
+    /// `List-Unsubscribe` header). `links` holds label and URL pairs.
+    public boolean campaign(String storeId, String to, String subject, String message,
+            List<String[]> links, String pixelUrl, String unsubscribeUrl) throws IOException {
+        Mail m = campaignMail(storeId, to, subject, message, links, pixelUrl, unsubscribeUrl);
+        if (m == null) {
+            return false;
+        }
+        send(m);
+        return true;
+    }
+
+    @Transactional(readOnly = true)
+    private Mail campaignMail(String storeId, String to, String subject, String message,
+            List<String[]> links, String pixelUrl, String unsubscribeUrl) {
+        if (!Mail.isAddress(to)) {
+            return null;
+        }
+        Store s = stores.findById(storeId);
+        Body b = new Body(s, subject);
+        b.para(message == null ? "" : message);
+        for (int iter = 0; iter < links.size(); iter++) {
+            if (iter == 0) {
+                b.button(links.get(iter)[0], links.get(iter)[1]);
+            } else {
+                b.link(links.get(iter)[0], links.get(iter)[1]);
+            }
+        }
+        b.link("Unsubscribe", unsubscribeUrl);
+        b.pixel(pixelUrl);
+        return builder(s, to, subject, b).header("List-Unsubscribe", "<" + unsubscribeUrl + ">")
+                .build();
+    }
+
+    /// Asks a new subscriber to confirm the address they signed up with.
+    public boolean confirmSignup(String storeId, String to, String confirmUrl) throws IOException {
+        Mail m = confirmMail(storeId, to, confirmUrl);
+        if (m == null) {
+            return false;
+        }
+        send(m);
+        return true;
+    }
+
+    @Transactional(readOnly = true)
+    private Mail confirmMail(String storeId, String to, String confirmUrl) {
+        if (!Mail.isAddress(to)) {
+            return null;
+        }
+        Store s = stores.findById(storeId);
+        String subject = "Confirm your subscription to " + s.getName();
+        Body b = new Body(s, subject);
+        b.para("Someone, hopefully you, signed this address up for news from " + s.getName()
+                + ". Confirm it and we will start writing.");
+        b.button("Confirm", confirmUrl);
+        b.para("If it was not you, ignore this message and nothing more will come.");
+        return builder(s, to, subject, b).build();
+    }
+
+    /// Sends a subscriber the code their signup earned.
+    public boolean signupReward(String storeId, String to, String code) throws IOException {
+        Mail m = rewardMail(storeId, to, code);
+        if (m == null) {
+            return false;
+        }
+        send(m);
+        return true;
+    }
+
+    @Transactional(readOnly = true)
+    private Mail rewardMail(String storeId, String to, String code) {
+        if (!Mail.isAddress(to)) {
+            return null;
+        }
+        Store s = stores.findById(storeId);
+        String subject = "Your welcome code for " + s.getName();
+        Body b = new Body(s, subject);
+        b.para("Thanks for subscribing. Use this code at checkout:");
+        b.code(code);
+        b.button("Visit the store", urls.absolute(null, "/s/" + enc(s.getHandle())));
+        return builder(s, to, subject, b).build();
+    }
+
     // -------------------------------------------------------------- inside
 
     private void send(Mail m) throws IOException {
@@ -593,6 +705,12 @@ public class Emails {
                             + "text-decoration:none;font-weight:bold\">")
                     .append(esc(label)).append("</a></p>");
             text.append(label).append(": ").append(url).append("\n\n");
+        }
+
+        /// A 1x1 image whose fetch records the open.
+        void pixel(String url) {
+            html.append("<img src=\"").append(esc(url))
+                    .append("\" width=\"1\" height=\"1\" alt=\"\" style=\"display:block\">");
         }
 
         void link(String label, String url) {

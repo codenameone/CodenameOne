@@ -88,6 +88,28 @@ public class Discount {
     @Column(nullable = false)
     private Instant createdAt = Instant.EPOCH;
 
+    /// PRODUCT, ORDER or SHIPPING; empty keeps the older rule, where
+    /// `combinable` alone decides.
+    @Column(nullable = false, type = "VARCHAR(16)")
+    private String discountClass = "";
+
+    @Column(nullable = false)
+    private boolean combinesProduct;
+
+    @Column(nullable = false)
+    private boolean combinesOrder;
+
+    @Column(nullable = false)
+    private boolean combinesShipping;
+
+    /// Who may use it: empty for everyone, `TIER:<id>` or `CLUB:<id>`.
+    @Column(nullable = false, type = "VARCHAR(80)")
+    private String eligibility = "";
+
+    /// The parameters of TIERED, VOLUME and BUNDLE, as JSON.
+    @Column(nullable = false, type = "VARCHAR(2000)")
+    private String rules = "";
+
     public Discount() {
     }
 
@@ -249,5 +271,53 @@ public class Discount {
 
     public void setCreatedAt(Instant createdAt) {
         this.createdAt = createdAt;
+    }
+
+    public String getDiscountClass() {
+        return discountClass;
+    }
+
+    public void setDiscountClass(String discountClass) {
+        this.discountClass = discountClass;
+    }
+
+    public boolean isCombinesProduct() {
+        return combinesProduct;
+    }
+
+    public void setCombinesProduct(boolean combinesProduct) {
+        this.combinesProduct = combinesProduct;
+    }
+
+    public boolean isCombinesOrder() {
+        return combinesOrder;
+    }
+
+    public void setCombinesOrder(boolean combinesOrder) {
+        this.combinesOrder = combinesOrder;
+    }
+
+    public boolean isCombinesShipping() {
+        return combinesShipping;
+    }
+
+    public void setCombinesShipping(boolean combinesShipping) {
+        this.combinesShipping = combinesShipping;
+    }
+
+    public String getEligibility() {
+        return eligibility;
+    }
+
+    public void setEligibility(String eligibility) {
+        this.eligibility = eligibility;
+    }
+
+    public String getRules() {
+        return rules;
+    }
+
+    public void setRules(String rules) {
+        this.rules = rules;
     }
 }

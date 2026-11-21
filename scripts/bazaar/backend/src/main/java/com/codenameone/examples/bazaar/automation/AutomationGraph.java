@@ -195,6 +195,11 @@ public final class AutomationGraph {
         return t.isEmpty() ? "" : t.get(0).type;
     }
 
+    /// Every node, in document order.
+    public List<Node> nodes() {
+        return new ArrayList<Node>(nodes.values());
+    }
+
     public Node node(String id) {
         return nodes.get(id);
     }

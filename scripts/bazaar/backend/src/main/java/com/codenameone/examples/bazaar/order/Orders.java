@@ -68,6 +68,8 @@ import com.codenameone.examples.bazaar.repository.StoreStaffRepository;
 import com.codenameone.examples.bazaar.repository.TenderRepository;
 import com.codenameone.examples.bazaar.store.StoreAccess;
 
+import com.codenameone.examples.bazaar.sale.SaleEvents;
+
 import java.io.IOException;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -129,6 +131,7 @@ public class Orders {
     private final Quoter quoter;
     private final StoreEvents storeEvents;
     private final CustomerRepository customers;
+    private final SaleEvents saleEvents;
 
     public Orders(StoreOrderRepository orders, OrderLineRepository lines,
             OrderEventRepository events, TenderRepository tenders,
@@ -136,7 +139,8 @@ public class Orders {
             RefundLineRepository refundLines, PaymentRepository paymentRows,
             StoreRepository stores, StoreStaffRepository staff, Payments payments,
             Inventory inventory, GiftCards giftCards, StoreAccess access, LiveHub live,
-            Quoter quoter, StoreEvents storeEvents, CustomerRepository customers) {
+            Quoter quoter, StoreEvents storeEvents, CustomerRepository customers, SaleEvents saleEvents) {
+        this.saleEvents = saleEvents;
         this.orders = orders;
         this.lines = lines;
         this.events = events;
@@ -879,6 +883,9 @@ public class Orders {
     /// @param locations where each quote line's stock is held, by index, or
     ///     null when nothing is reserved yet
     public void insertLines(StoreOrder order, Quote quote, String[] locations) throws IOException {
+        // A capped flash sale counts these units now, in the order's own
+        // transaction, so the cap cannot be passed by two orders at once.
+        saleEvents.claim(order, quote);
         for (int iter = 0; iter < quote.lines.size(); iter++) {
             Quote.Line q = quote.lines.get(iter);
             OrderLine line = new OrderLine();

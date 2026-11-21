@@ -236,6 +236,7 @@ public class DemoStores {
     private final OrderLineRepository saleLines;
     private final com.codenameone.examples.bazaar.pricing.DemoPricing pricing;
     private final com.codenameone.examples.bazaar.automation.Automations automations;
+    private final com.codenameone.examples.bazaar.marketing.DemoMarketing marketing;
 
     public DemoStores(StoreRepository stores, StoreStaffRepository staff,
             LocationRepository locations, ProductRepository products,
@@ -247,7 +248,9 @@ public class DemoStores {
             com.codenameone.examples.bazaar.pricing.DemoPricing pricing,
             com.codenameone.examples.bazaar.automation.Automations automations,
             RegisterRepository registers, StoreOrderRepository sales,
-            OrderLineRepository saleLines) {
+            OrderLineRepository saleLines,
+            com.codenameone.examples.bazaar.marketing.DemoMarketing marketing) {
+        this.marketing = marketing;
         this.registers = registers;
         this.sales = sales;
         this.saleLines = saleLines;
@@ -284,8 +287,19 @@ public class DemoStores {
         seedPricing(LITTLE_CLAY);
         seedFloor(NORTHWIND, owner, cashier);
         seedFloor(LITTLE_CLAY, owner, owner);
+        seedMarketing(NORTHWIND);
+        seedMarketing(LITTLE_CLAY);
         accounts.setMerchant(owner, true);
         accounts.setMerchant(cashier, true);
+    }
+
+    /// Loyalty, a club, sales, segments, campaigns and a journey, once per
+    /// store; after the floor, so the campaigns have customers and orders.
+    private void seedMarketing(String handle) throws IOException {
+        Store store = stores.findByHandle(handle);
+        if (store != null) {
+            marketing.seed(store.getId());
+        }
     }
 
     /// Shipping zones, taxes, the demo discount codes and the demo

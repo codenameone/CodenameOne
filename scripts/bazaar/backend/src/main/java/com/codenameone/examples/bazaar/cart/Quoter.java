@@ -51,6 +51,8 @@ import com.codenameone.examples.bazaar.repository.StoreRepository;
 import com.codenameone.examples.bazaar.repository.TaxRateRepository;
 import com.codenameone.examples.bazaar.repository.VariantRepository;
 
+import com.codenameone.examples.bazaar.loyalty.Memberships;
+
 import java.io.IOException;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -84,13 +86,14 @@ public class Quoter {
     private final ShippingZoneRepository zones;
     private final ShippingRateRepository rates;
     private final GiftCardRepository giftCards;
+    private final Memberships memberships;
 
     public Quoter(StoreRepository stores, CartLineRepository cartLines, VariantRepository variants,
             ProductRepository products, CollectionProductRepository collections,
             InventoryLevelRepository levels, LocationRepository locations,
             DiscountRepository discounts, DiscountUseRepository uses, TaxRateRepository taxes,
             ShippingZoneRepository zones, ShippingRateRepository rates,
-            GiftCardRepository giftCards) {
+            GiftCardRepository giftCards, Memberships memberships) {
         this.stores = stores;
         this.cartLines = cartLines;
         this.variants = variants;
@@ -104,6 +107,7 @@ public class Quoter {
         this.zones = zones;
         this.rates = rates;
         this.giftCards = giftCards;
+        this.memberships = memberships;
     }
 
     /// One wanted variant and quantity, from a cart line or a draft.
@@ -237,8 +241,19 @@ public class Quoter {
                 }
             }
         }
+        // Member prices, free shipping and early access follow the shopper's
+        // loyalty tier and clubs (Memberships).
+        Set<String> member = memberships.of(cart.getStoreId(), username, now);
+        for (int iter = 0; iter < quote.lines.size(); iter++) {
+            Quote.Line line = quote.lines.get(iter);
+            String locked = memberships.restriction(cart.getStoreId(), line.product.getId(),
+                    new HashSet<String>(line.price.collectionIds), line.product.getTitle(), member, now);
+            if (locked != null) {
+                quote.problems.add(locked);
+            }
+        }
         quote.discounts = DiscountEngine.apply(priceLines, automatic, typed, code, now, used,
-                cheapest);
+                cheapest, member);
         if (quote.discounts.codeProblem != null) {
             quote.problems.add(quote.discounts.codeProblem);
         }

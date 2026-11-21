@@ -60,10 +60,13 @@ public class StoreEvents {
     private final InventoryLevelRepository levels;
     private final ProductRepository products;
     private final Emails emails;
+    private final GrowthEvents growth;
 
     public StoreEvents(Webhooks webhooks, Automations automations, StoreOrderRepository orders,
             OrderLineRepository lines, CustomerRepository customers,
-            InventoryLevelRepository levels, ProductRepository products, Emails emails) {
+            InventoryLevelRepository levels, ProductRepository products, Emails emails,
+            GrowthEvents growth) {
+        this.growth = growth;
         this.emails = emails;
         this.webhooks = webhooks;
         this.automations = automations;
@@ -101,6 +104,7 @@ public class StoreEvents {
                 // A register sale gets its receipt when the shopper asks for one.
                 emails.orderConfirmation(orderId);
             }
+            growth.placed(orderId, "PAID".equals(s.order.getFinancial()));
         } catch (IOException | RuntimeException failed) {
             log("orders/create", orderId, failed);
         }
@@ -109,6 +113,7 @@ public class StoreEvents {
     /// An order's payment was taken.
     public void orderPaid(String orderId) {
         orderEvent(orderId, Webhooks.ORDERS_PAID, NodeCatalog.ORDER_PAID);
+        growth.paid(orderId);
     }
 
     /// The last of an order shipped or was handed over.
@@ -119,6 +124,7 @@ public class StoreEvents {
     /// An order was cancelled. Webhooks only; no automation triggers on it.
     public void orderCancelled(String orderId) {
         orderEvent(orderId, Webhooks.ORDERS_CANCELLED, null);
+        growth.cancelled(orderId);
     }
 
     /// Money went back on an order.
@@ -131,6 +137,7 @@ public class StoreEvents {
                 webhooks.emit(s.order.getStoreId(), Webhooks.REFUNDS_CREATE, Json.write(payload));
                 emails.refundIssued(orderId);
             }
+            growth.refunded(orderId);
         } catch (IOException | RuntimeException failed) {
             log("refunds/create", orderId, failed);
         }
