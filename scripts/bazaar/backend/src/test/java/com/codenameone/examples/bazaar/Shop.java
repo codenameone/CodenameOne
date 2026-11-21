@@ -87,6 +87,11 @@ final class Shop {
 
     /// `qty` mugs bought by `user` with a card, shipped Express to Albany.
     OrderDto buy(String user, int qty) throws Exception {
+        return buy(user, qty, user + "@example.com");
+    }
+
+    /// [#buy] with the order's e-mail address given.
+    OrderDto buy(String user, int qty, String email) throws Exception {
         carts.add(storeId, user, null, new CartLineChangeDto(variantId, qty));
         CartDto c = carts.estimate(storeId, user, null, new EstimateDto(NY, null));
         String rate = null;
@@ -97,6 +102,6 @@ final class Shop {
         }
         Map card = Rest.addCard(mvc, user, Rest.VISA);
         return checkouts.place(user, storeId, Ids.next(), new PlaceOrderDto(NY, rate,
-                (String) card.get("id"), user + "@example.com", "", null));
+                (String) card.get("id"), email, "", null));
     }
 }

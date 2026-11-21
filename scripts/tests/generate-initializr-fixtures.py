@@ -105,6 +105,7 @@ FULL_STACK = {
     'PULSE': ('api/BookingApi.java', 'ui/WelcomeForm.java'),
     'SLATE': ('api/AppointmentApi.java', 'ui/WelcomeForm.java'),
     'FIELDLINE': ('api/FieldApi.java', 'field/TodayForm.java'),
+    'BAZAAR': ('api/OrderApi.java', 'shop/CheckoutForm.java'),
 }
 
 
@@ -121,6 +122,7 @@ TEMPLATE_HINT = {
     'PULSE': 'codename1.arg.ios.NSHealthShareUsageDescription=',
     'SLATE': 'codename1.arg.ios.NSCalendarsFullAccessUsageDescription=',
     'FIELDLINE': 'codename1.arg.ios.NSLocationWhenInUseUsageDescription=',
+    'BAZAAR': 'codename1.arg.ios.NSCameraUsageDescription=',
 }
 
 

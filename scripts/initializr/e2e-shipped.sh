@@ -12,7 +12,7 @@
 #
 #   e2e-shipped.sh [--require-latest] [--no-ui] [TEMPLATE ...]
 #
-# TEMPLATE is BAREBONES, KOTLIN, WAYLINE, SAVOR, SKIRMISH, DASH, SPLAT, PARLEY, BASTION, REEL, PULSE, SLATE or FIELDLINE; all of them
+# TEMPLATE is BAREBONES, KOTLIN, WAYLINE, SAVOR, SKIRMISH, DASH, SPLAT, PARLEY, BASTION, REEL, PULSE, SLATE, FIELDLINE or BAZAAR; all of them
 # by default. Every other check of the templates builds them against this
 # checkout's 8.0-SNAPSHOT, which no developer has: the generated pom names the
 # release the Initializr pins, and that is the only thing this script builds
@@ -69,7 +69,7 @@ for arg in "$@"; do
     *) TEMPLATES+=("$arg") ;;
   esac
 done
-[ ${#TEMPLATES[@]} -gt 0 ] || TEMPLATES=(BAREBONES KOTLIN WAYLINE SAVOR SKIRMISH DASH SPLAT PARLEY BASTION REEL PULSE SLATE FIELDLINE)
+[ ${#TEMPLATES[@]} -gt 0 ] || TEMPLATES=(BAREBONES KOTLIN WAYLINE SAVOR SKIRMISH DASH SPLAT PARLEY BASTION REEL PULSE SLATE FIELDLINE BAZAAR)
 
 log() { echo "[e2e-shipped] $*" >&2; }
 fail() { echo "[e2e-shipped] FAIL: $*" >&2; exit 1; }
@@ -87,12 +87,13 @@ REEL_SINCE="$(since REEL_SINCE)"
 SPLAT_SINCE="$(since SPLAT_SINCE)"
 SLATE_SINCE="$(since SLATE_SINCE)"
 FIELDLINE_SINCE="$(since FIELDLINE_SINCE)"
-[ -n "$FULL_STACK_SINCE" ] && [ -n "$BASTION_SINCE" ] && [ -n "$REEL_SINCE" ] && [ -n "$SPLAT_SINCE" ] && [ -n "$SLATE_SINCE" ] && [ -n "$FIELDLINE_SINCE" ] || fail "could not read the template floors from $GENERATOR"
+BAZAAR_SINCE="$(since BAZAAR_SINCE)"
+[ -n "$FULL_STACK_SINCE" ] && [ -n "$BASTION_SINCE" ] && [ -n "$REEL_SINCE" ] && [ -n "$SPLAT_SINCE" ] && [ -n "$SLATE_SINCE" ] && [ -n "$FIELDLINE_SINCE" ] && [ -n "$BAZAAR_SINCE" ] || fail "could not read the template floors from $GENERATOR"
 # The oldest release a template's generated code compiles against: Bastion
 # calls framework API that first shipped in BASTION_SINCE, Reel the protected
 # playback API of REEL_SINCE, Splat the 3D engine of SPLAT_SINCE,
 # Slate the scheduling views of SLATE_SINCE, Fieldline the resource timeline,
-# calendar and camera API of FIELDLINE_SINCE.
+# calendar and camera API of FIELDLINE_SINCE, Bazaar ships from BAZAAR_SINCE.
 template_since() {
   case "$1" in
     BASTION) echo "$BASTION_SINCE" ;;
@@ -100,6 +101,7 @@ template_since() {
     SPLAT) echo "$SPLAT_SINCE" ;;
     SLATE) echo "$SLATE_SINCE" ;;
     FIELDLINE) echo "$FIELDLINE_SINCE" ;;
+    BAZAAR) echo "$BAZAAR_SINCE" ;;
     *) echo "$FULL_STACK_SINCE" ;;
   esac
 }

@@ -27,6 +27,7 @@ import com.codename1.backend.annotations.Scheduled;
 import com.codename1.backend.annotations.Transactional;
 import com.codename1.backend.push.PushNotification;
 import com.codename1.backend.push.PushTarget;
+import com.codenameone.examples.bazaar.notify.Emails;
 import com.codenameone.examples.bazaar.Ids;
 import com.codenameone.examples.bazaar.api.AuditDto;
 import com.codenameone.examples.bazaar.api.AutomationDto;
@@ -110,6 +111,7 @@ public class Automations {
     private final PushDevices devices;
     private final Webhooks webhooks;
     private final StoreAccess access;
+    private final Emails emails;
 
     public Automations(AutomationRepository automations, AutomationRunRepository runs,
             AuditEventRepository audits, StoreOrderRepository orders,
@@ -117,7 +119,8 @@ public class Automations {
             InventoryLevelRepository levels, DiscountRepository discounts,
             SupplierRepository suppliers, PurchaseOrderRepository purchaseOrders,
             PurchaseLineRepository purchaseLines, StoreStaffRepository staff, PushSender push,
-            PushDevices devices, Webhooks webhooks, StoreAccess access) {
+            PushDevices devices, Webhooks webhooks, StoreAccess access, Emails emails) {
+        this.emails = emails;
         this.automations = automations;
         this.runs = runs;
         this.audits = audits;
@@ -396,8 +399,18 @@ public class Automations {
             if (c != null) {
                 to = c.getEmail();
             }
-            record(storeId, a.getId(), "EMAIL_CUSTOMER", to.length() == 0 ? "No address to write to"
-                    : "To " + to + ": " + AutomationGraph.param(n, "subject"));
+            String subject = AutomationGraph.param(n, "subject");
+            String sent = "To " + to + ": " + subject;
+            if (to.length() == 0) {
+                sent = "No address to write to";
+            } else {
+                try {
+                    emails.custom(storeId, to, subject, AutomationGraph.param(n, "message"));
+                } catch (IOException failed) {
+                    sent = "Not sent to " + to + ": " + failed.getMessage();
+                }
+            }
+            record(storeId, a.getId(), "EMAIL_CUSTOMER", sent);
         } else if (NodeCatalog.DISCOUNT_CODE.equals(type)) {
             createCode(a, n, ctx);
         } else if (NodeCatalog.INVENTORY_REORDER.equals(type)) {

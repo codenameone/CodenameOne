@@ -119,13 +119,18 @@ public class GeneratorModel {
     /// before then.
     static final String FIELDLINE_SINCE = "7.0.283";
 
+    /// The first release the commerce template is offered from. Before it the
+    /// template is neither offered nor generated.
+    static final String BAZAAR_SINCE = "7.0.284";
+
     /// The first release a template can be generated against.
     static String templateSince(Template template) {
         return template == Template.BASTION ? BASTION_SINCE
                 : template == Template.REEL ? REEL_SINCE
                 : template == Template.SPLAT ? SPLAT_SINCE
                 : template == Template.SLATE ? SLATE_SINCE
-                : template == Template.FIELDLINE ? FIELDLINE_SINCE : JAVA_TIME_ENTITIES_SINCE;
+                : template == Template.FIELDLINE ? FIELDLINE_SINCE
+                : template == Template.BAZAAR ? BAZAAR_SINCE : JAVA_TIME_ENTITIES_SINCE;
     }
 
     /// The brand colour of the full-stack template as it ships: the `--brand` its
@@ -163,6 +168,9 @@ public class GeneratorModel {
     /// The field service template's `--brand`, held to its theme.css the same way.
     public static final int FIELDLINE_BRAND = 0x4f46e5;
 
+    /// The commerce template's `--brand`, held to its theme.css the same way.
+    public static final int BAZAAR_BRAND = 0x4f46e5;
+
     /// The brand colour `template` ships with: the one its icon is painted with
     /// when the developer keeps the template's own scheme.
     public static int brandOf(Template template) {
@@ -180,6 +188,9 @@ public class GeneratorModel {
         }
         if (template == Template.FIELDLINE) {
             return FIELDLINE_BRAND;
+        }
+        if (template == Template.BAZAAR) {
+            return BAZAAR_BRAND;
         }
         if (template == Template.BASTION) {
             return BASTION_BRAND;
@@ -2185,13 +2196,17 @@ public class GeneratorModel {
             appendFieldSection(out, toLowerCaseInvariant(appName));
         } else if (template.isFullStack()) {
             boolean food = template == Template.SAVOR;
+            boolean shop = template == Template.BAZAAR;
             boolean chat = template == Template.PARLEY;
             boolean video = template == Template.REEL;
             boolean studio = template == Template.PULSE;
             boolean booking = template == Template.SLATE;
             String lower = toLowerCaseInvariant(appName);
             out.append("## The app and its server\n\n")
-                    .append(booking
+                    .append(shop
+                            ? "This project is a working commerce platform: a shopper, a merchant back office "
+                            + "with a point of sale, and an admin console in one "
+                            : booking
                             ? "This project is a working appointment booking app: a client, a provider and an "
                             + "owner mode in one "
                             : studio
@@ -2210,7 +2225,12 @@ public class GeneratorModel {
                     .append("app, chosen by the role of whoever signs in, and the server they talk to.\n\n")
                     .append("- `shared/` is the contract: the REST interfaces and the objects they carry. The app's ")
                     .append("client and the server's dispatcher are both generated from it, so the two cannot drift.\n")
-                    .append(booking
+                    .append(shop
+                            ? "- `backend/` is the server: accounts and roles, stores and their staff, the catalog, "
+                            + "inventory across locations, carts and checkout, orders and fulfilment, returns, "
+                            + "discounts and gift cards, the point of sale, analytics, email and the database "
+                            + "migrations.\n"
+                            : booking
                             ? "- `backend/` is the server: accounts and roles, the business and its services, the "
                             + "slot engine, holds and bookings, deposits, the waitlist, calendar sync, the live "
                             + "channel and the database migrations.\n"
@@ -2243,7 +2263,12 @@ public class GeneratorModel {
                     .append("Bash or WSL.\n\n")
                     .append("On the `dev` profile the server creates demonstration accounts, all with the ")
                     .append("password `").append(lower).append("-demo`: ")
-                    .append(booking
+                    .append(shop
+                            ? "`shopper@" + lower + ".example`, who has orders and a wishlist, `shopper2@" + lower
+                            + ".example`, `owner@" + lower + ".example`, who runs the demo stores, `cashier@" + lower
+                            + ".example`, who works the point of sale, `admin@" + lower + ".example` and `shopper3@"
+                            + lower + ".example`, who has been flagged "
+                            : booking
                             ? "`client@" + lower + ".example`, who has a card on file and a history, `client2@"
                             + lower + ".example`, `provider@" + lower + ".example`, `provider2@" + lower
                             + ".example`, `provider3@" + lower + ".example`, who works at both locations, `owner@"
@@ -2269,7 +2294,7 @@ public class GeneratorModel {
                             + ".example` and `applicant@" + lower + ".example`, who has applied to deliver "
                             : "`rider@" + lower + ".example`, `driver@" + lower + ".example`, `admin@" + lower
                             + ".example` and `applicant@" + lower + ".example`, who has applied to drive ")
-                    .append(studio || booking ? "for the owner to act on. " : chat || video ? "for the admin to act on. " : "and waits for the admin's decision. ")
+                    .append(studio || booking ? "for the owner to act on. " : chat || video || shop ? "for the admin to act on. " : "and waits for the admin's decision. ")
                     .append("Verification codes are written to the server's log until an SMS provider is ")
                     .append(chat
                             ? "configured. Calls use a public STUN server until the server is given a TURN "
@@ -2282,7 +2307,12 @@ public class GeneratorModel {
                     .append("serves it at `http://localhost:8080/`. In a desktop window or a desktop browser the ")
                     .append("admin mode becomes a console with the operating system's own look.\n\n")
                     .append("Two chapters of the developer guide, at https://www.codenameone.com/developer-guide/, ")
-                    .append(booking
+                    .append(shop
+                            ? "cover the sample this project started as: \"Bazaar: A commerce platform from four "
+                            + "sides\" shows it as a shopper, a merchant, a cashier and an admin see it, and the "
+                            + "implementor's guide explains how it is built and what to change: payments, "
+                            + "shipping, taxes, email and the database.\n\n"
+                            : booking
                             ? "cover the sample this project started as: \"An appointment booking app from every "
                             + "side\" shows it as a client, a provider and the owner see it, and \"Building on the "
                             + "sample\" explains how it is built and what to change: the slot engine, the gap "
@@ -3177,6 +3207,10 @@ public class GeneratorModel {
                 || path.endsWith(".md")
                 || path.endsWith(".txt")
                 || path.endsWith(".adoc")
+                // A server's page templates and scripts (Bazaar's storefront)
+                // name its model classes by package and the app by name.
+                || path.endsWith(".html")
+                || path.endsWith(".js")
                 || path.endsWith(".bat")
                 || path.endsWith(".cmd")
                 || path.endsWith(".sh")

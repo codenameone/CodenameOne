@@ -67,6 +67,7 @@ public final class CreateProject {
             case KOTLIN: return "Empty Kotlin app: one form, CSS theme.";
             case WAYLINE: return "Ride hailing (Uber-style): rider and driver apps, admin console, Java backend, live tracking, payments.";
             case SAVOR: return "Food delivery (Uber Eats-style): restaurants, menus, cart, checkout, order tracking, Java backend.";
+            case BAZAAR: return "Commerce platform (Shopify-style): storefront, merchant back office, point of sale, inventory, Java backend.";
             case SKIRMISH: return "Real-time card battle game (arena style) with matchmaking server.";
             case DASH: return "Endless runner game.";
             case SPLAT: return "3D first-person team paintball shooter with authoritative server, voice and replays.";

@@ -25,6 +25,7 @@ import com.codename1.backend.annotations.Scheduled;
 import com.codename1.backend.annotations.Transactional;
 import com.codename1.backend.push.PushNotification;
 import com.codename1.backend.push.PushTarget;
+import com.codenameone.examples.bazaar.notify.Emails;
 import com.codenameone.examples.bazaar.Ids;
 import com.codenameone.examples.bazaar.api.BoardColumnDto;
 import com.codenameone.examples.bazaar.api.BoardMoveDto;
@@ -128,12 +129,14 @@ public class Fulfillments {
     private final CarrierProvider carrier;
     private final PushSender push;
     private final PushDevices devices;
+    private final Emails emails;
 
     public Fulfillments(FulfillmentRepository fulfillments,
             FulfillmentLineRepository fulfillmentLines, TrackingEventRepository tracking,
             StoreOrderRepository orders, OrderLineRepository lines, LocationRepository locations,
             VariantRepository variants, Inventory inventory, Orders orderService,
-            StoreAccess access, CarrierProvider carrier, PushSender push, PushDevices devices) {
+            StoreAccess access, CarrierProvider carrier, PushSender push, PushDevices devices, Emails emails) {
+        this.emails = emails;
         this.fulfillments = fulfillments;
         this.fulfillmentLines = fulfillmentLines;
         this.tracking = tracking;
@@ -420,6 +423,7 @@ public class Fulfillments {
         notifyShopper(f.getOrderId(), "Your order has shipped", LOCAL.equals(method)
                 ? "It is on its way with our driver."
                 : "Tracking number " + f.getTrackingNumber() + ".");
+        emails.shipped(id);
         return published(id);
     }
 
@@ -449,6 +453,7 @@ public class Fulfillments {
             move(f, SHIPPED, DELIVERED, 0, "Delivered by the store", username);
         }
         notifyShopper(f.getOrderId(), "Delivered", "Your order was delivered.");
+        emails.delivered(id);
         return published(id);
     }
 
@@ -843,6 +848,7 @@ public class Fulfillments {
                                 "Your parcel arrives today.");
                     } else if (DELIVERED.equals(to)) {
                         notifyShopper(f.getOrderId(), "Delivered", "Your parcel was delivered.");
+                        emails.delivered(f.getId());
                     }
                     orderService.publish(orderRead(f.getStoreId(), f.getOrderId()));
                 }

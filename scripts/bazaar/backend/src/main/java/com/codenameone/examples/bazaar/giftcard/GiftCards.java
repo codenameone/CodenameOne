@@ -22,6 +22,7 @@ import com.codename1.backend.Crypto;
 import com.codename1.backend.ResponseStatusException;
 import com.codename1.backend.annotations.Component;
 import com.codename1.backend.annotations.Transactional;
+import com.codenameone.examples.bazaar.notify.Emails;
 import com.codenameone.examples.bazaar.Ids;
 import com.codenameone.examples.bazaar.api.GiftCardBalanceDto;
 import com.codenameone.examples.bazaar.api.GiftCardDto;
@@ -60,9 +61,11 @@ public class GiftCards {
     private final GiftCardTxRepository txs;
     private final StoreRepository stores;
     private final StoreAccess access;
+    private final Emails emails;
 
     public GiftCards(GiftCardRepository cards, GiftCardTxRepository txs, StoreRepository stores,
-            StoreAccess access) {
+            StoreAccess access, Emails emails) {
+        this.emails = emails;
         this.cards = cards;
         this.txs = txs;
         this.stores = stores;
@@ -115,6 +118,9 @@ public class GiftCards {
         card.setCreatedAt(Instant.now());
         cards.insert(card);
         record(card.getId(), "", wanted.initialCents(), "Issued by " + username);
+        Store owner = stores.findById(storeId);
+        emails.giftCard(storeId, card.getCustomerId(), code, wanted.initialCents(),
+                owner == null ? "" : owner.getCurrency());
         return dto(card, true);
     }
 

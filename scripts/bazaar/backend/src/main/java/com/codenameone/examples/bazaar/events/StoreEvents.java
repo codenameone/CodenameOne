@@ -21,6 +21,7 @@ package com.codenameone.examples.bazaar.events;
 import com.codename1.backend.Json;
 import com.codename1.backend.annotations.Component;
 import com.codename1.backend.annotations.Transactional;
+import com.codenameone.examples.bazaar.notify.Emails;
 import com.codenameone.examples.bazaar.automation.Automations;
 import com.codenameone.examples.bazaar.automation.NodeCatalog;
 import com.codenameone.examples.bazaar.domain.Cart;
@@ -43,8 +44,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-/// What happened in a store, told to its webhooks ([Webhooks#emit]) and its
-/// automations ([Automations#fire]).
+/// What happened in a store, told to its webhooks ([Webhooks#emit]), its
+/// automations ([Automations#fire]) and, by mail, the people it concerns ([Emails]).
 ///
 /// Every method is called after the change it reports committed, beside the
 /// live update the change already publishes, and never throws: a webhook or
@@ -58,10 +59,12 @@ public class StoreEvents {
     private final CustomerRepository customers;
     private final InventoryLevelRepository levels;
     private final ProductRepository products;
+    private final Emails emails;
 
     public StoreEvents(Webhooks webhooks, Automations automations, StoreOrderRepository orders,
             OrderLineRepository lines, CustomerRepository customers,
-            InventoryLevelRepository levels, ProductRepository products) {
+            InventoryLevelRepository levels, ProductRepository products, Emails emails) {
+        this.emails = emails;
         this.webhooks = webhooks;
         this.automations = automations;
         this.orders = orders;
@@ -94,6 +97,10 @@ public class StoreEvents {
                         context(s));
             }
             lowStock(s);
+            if (!"POS".equals(s.order.getChannel())) {
+                // A register sale gets its receipt when the shopper asks for one.
+                emails.orderConfirmation(orderId);
+            }
         } catch (IOException | RuntimeException failed) {
             log("orders/create", orderId, failed);
         }
@@ -122,6 +129,7 @@ public class StoreEvents {
                 Map<String, Object> payload = orderPayload(s);
                 payload.put("refundCents", Long.valueOf(amountCents));
                 webhooks.emit(s.order.getStoreId(), Webhooks.REFUNDS_CREATE, Json.write(payload));
+                emails.refundIssued(orderId);
             }
         } catch (IOException | RuntimeException failed) {
             log("refunds/create", orderId, failed);
@@ -161,6 +169,11 @@ public class StoreEvents {
         }
         try {
             automations.fire(cart.getStoreId(), NodeCatalog.CART_ABANDONED, ctx);
+        } catch (RuntimeException failed) {
+            log("cart.abandoned", cart.getId(), failed);
+        }
+        try {
+            emails.abandonedCart(cart, ctx.get("email"));
         } catch (RuntimeException failed) {
             log("cart.abandoned", cart.getId(), failed);
         }
@@ -251,6 +264,8 @@ public class StoreEvents {
             ctx.put("productIds", l[5]);
             ctx.put("orderId", s.order.getId());
             automations.fire(s.order.getStoreId(), NodeCatalog.INVENTORY_LOW, ctx);
+            emails.lowStock(s.order.getStoreId(), l[4], Integer.parseInt(l[2]),
+                    Integer.parseInt(l[3]));
         }
     }
 

@@ -467,7 +467,7 @@ public class Initializr extends Lifecycle {
         if (!GeneratorModel.isTemplateOffered(Template.WAYLINE)) {
             return empty;
         }
-        Template[] apps = {Template.WAYLINE, Template.SAVOR, Template.SKIRMISH, Template.DASH, Template.SPLAT, Template.PARLEY,
+        Template[] apps = {Template.WAYLINE, Template.SAVOR, Template.BAZAAR, Template.SKIRMISH, Template.DASH, Template.SPLAT, Template.PARLEY,
             Template.BASTION, Template.REEL, Template.PULSE,
             Template.SLATE, Template.FIELDLINE};
         int offered = 0;
@@ -519,6 +519,7 @@ public class Initializr extends Lifecycle {
                 : template == Template.PULSE ? "Fitness studio"
                 : template == Template.SLATE ? "Appointment booking"
                 : template == Template.FIELDLINE ? "Field service"
+                : template == Template.BAZAAR ? "Commerce platform"
                 : template.IS_KOTLIN ? "Empty app, Kotlin" : "Empty app, Java";
     }
 

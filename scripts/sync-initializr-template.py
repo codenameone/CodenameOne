@@ -59,7 +59,7 @@ resources = root / 'scripts/initializr/common/src/main/resources'
 # What the generator rewrites as text; the rest is copied as bytes.
 # Exactly the files the generator rewrites too (GeneratorModel.isTextFile): a
 # `myappname` written into any other would stay in the generated project.
-TEXT = ('.java', '.xml', '.properties', '.css', '.sh', '.md', '.json', '.txt', '.sql')
+TEXT = ('.java', '.xml', '.properties', '.css', '.sh', '.md', '.json', '.txt', '.sql', '.html', '.js')
 
 HEADER = re.compile(r'\A/\*\n \* Copyright \(c\) .*?\*/\n', re.S)
 HASH_HEADER = re.compile(r'\A((?:#!.*\n)?)(?:#\n)?# Copyright \(c\) .*?(?=^[^#]|\Z)', re.S | re.M)

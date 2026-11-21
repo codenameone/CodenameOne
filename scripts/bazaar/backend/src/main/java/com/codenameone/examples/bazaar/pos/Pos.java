@@ -23,6 +23,7 @@ import com.codename1.backend.ResponseStatusException;
 import com.codename1.backend.annotations.Component;
 import com.codename1.backend.annotations.Transactional;
 import com.codename1.backend.security.crypto.PasswordEncoder;
+import com.codenameone.examples.bazaar.notify.Emails;
 import com.codenameone.examples.bazaar.Ids;
 import com.codenameone.examples.bazaar.account.Accounts;
 import com.codenameone.examples.bazaar.api.CashMoveDto;
@@ -115,6 +116,7 @@ public class Pos {
     private final Documents documents;
     private final PasswordEncoder encoder;
     private final SmsSender sms;
+    private final Emails emails;
 
     public Pos(StoreAccess access, StoreRepository stores, RegisterRepository registers,
             ShiftRepository shifts, CashMoveRepository cashMoves, StoreStaffRepository staff,
@@ -122,7 +124,8 @@ public class Pos {
             InventoryLevelRepository levels, TaxRateRepository taxes,
             DiscountRepository discounts, CustomerRepository customers,
             StoreOrderRepository orderRows, Orders orders, Documents documents,
-            PasswordEncoder encoder, SmsSender sms) {
+            PasswordEncoder encoder, SmsSender sms, Emails emails) {
+        this.emails = emails;
         this.access = access;
         this.stores = stores;
         this.registers = registers;
@@ -655,9 +658,8 @@ public class Pos {
         return receiptOf(storeId, orderId, false, false);
     }
 
-    /// Texts the receipt to a phone and/or records it as e-mailed. There is
-    /// no mail transport in the sample: the e-mail is a recorded event, the
-    /// hook where one would be called with the same text and PDF.
+    /// Texts the receipt to a phone and/or e-mails it with the receipt PDF
+    /// ([Emails#posReceipt]), recording each on the order.
     public PosReceiptDto sendReceipt(String username, String storeId, String orderId,
             ReceiptSendDto to) throws IOException {
         access.requireStaff(username, storeId, StoreAccess.ANYONE);
@@ -673,6 +675,7 @@ public class Pos {
         }
         boolean emailed = false;
         if (!empty(to.email())) {
+            emails.posReceipt(storeId, orderId, to.email().trim());
             emailed = true;
             orders.event(orderId, "RECEIPT_EMAILED", "Receipt e-mailed to "
                     + Codes.cut(to.email().trim(), 190), username);

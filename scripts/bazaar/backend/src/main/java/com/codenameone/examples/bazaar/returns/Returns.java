@@ -21,6 +21,7 @@ package com.codenameone.examples.bazaar.returns;
 import com.codename1.backend.ResponseStatusException;
 import com.codename1.backend.annotations.Component;
 import com.codename1.backend.annotations.Transactional;
+import com.codenameone.examples.bazaar.notify.Emails;
 import com.codenameone.examples.bazaar.Ids;
 import com.codenameone.examples.bazaar.api.FulfilLineDto;
 import com.codenameone.examples.bazaar.api.RefundLineDto;
@@ -80,11 +81,13 @@ public class Returns {
     private final Fulfillments fulfillments;
     private final Inventory inventory;
     private final StoreAccess access;
+    private final Emails emails;
 
     public Returns(ReturnRequestRepository returns, ReturnLineRepository returnLines,
             StoreOrderRepository orders, OrderLineRepository lines, StoreRepository stores,
             Orders orderService, Fulfillments fulfillments, Inventory inventory,
-            StoreAccess access) {
+            StoreAccess access, Emails emails) {
+        this.emails = emails;
         this.returns = returns;
         this.returnLines = returnLines;
         this.orders = orders;
@@ -208,7 +211,9 @@ public class Returns {
 
     public ReturnDto approve(String username, String storeId, String id) throws IOException {
         access.requireStaff(username, storeId, StoreAccess.MANAGERS);
-        return step(storeId, id, REQUESTED, APPROVED, "Return approved", username);
+        ReturnDto approved = step(storeId, id, REQUESTED, APPROVED, "Return approved", username);
+        emails.returnApproved(id);
+        return approved;
     }
 
     public ReturnDto decline(String username, String storeId, String id) throws IOException {
