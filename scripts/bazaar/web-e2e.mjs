@@ -279,7 +279,7 @@ try {
   await waitFor('the welcome screen to offer an account', stepSeconds, button('Create an account'));
   await page.screenshot({ path: path.join(out, '1-welcome.png') });
   say('the welcome screen is up');
-  for (const file of ['/translated_app.js', '/port.js', '/worker.js']) {
+  for (const file of ['/app/translated_app.js', '/app/port.js', '/app/worker.js']) {
     if (!requests.includes('200 GET ' + file)) {
       throw new Error(file + ' was not served by this server: ' + requests.join(', '));
     }
@@ -295,7 +295,21 @@ try {
   await click(await waitFor('the usage statistics question', stepSeconds, button('Not now')));
   say('declined usage statistics');
 
-  // 3. The home screen.
+  // 3. The home screen. A shopper with more than one store to choose from is
+  //    first shown the directory; picking a store opens its home.
+  const landing = await waitFor('the home screen or the store directory', stepSeconds,
+      async () => {
+        const text = await screenText();
+        return text.includes('New arrivals') ? 'home'
+            : text.includes('Choose a store') ? 'directory' : null;
+      });
+  if (landing === 'directory') {
+    await settled();
+    await page.screenshot({ path: path.join(out, '2-stores.png') });
+    await click(await waitFor('a store in the directory', stepSeconds, async () =>
+        (await components()).find(c => c.text === 'Northwind Outfitters')));
+    say('chose Northwind Outfitters from the store directory');
+  }
   await waitFor('the home screen', stepSeconds, async () =>
       (await screenText()).includes('New arrivals'));
   // The store's hero, read from the server: one of the seeded stores.
@@ -347,15 +361,14 @@ try {
   }
   say('the sign-in session is over (asking for another code is answered ' + again + ')');
 
-  // 6. Signing out, from the menu. Its button is an icon with no words: the
-  //    one button at the top of the screen.
+  // 6. Signing out, from the Account tab. (The title bar's overflow menu has
+  //    the same entry, but its popup is not in the accessibility tree the
+  //    test reads, so it cannot be found by its words.)
   await settled();
-  const menu = await waitFor('the menu button', stepSeconds, async () =>
-      (await components()).filter(c => c.role === 'button' && c.y < 140 && c.width < 120
-          && c.width > 20).sort((a, b) => a.x - b.x)[0]);
-  await click(menu);
+  await click(await waitFor('the Account tab', stepSeconds, button('Account')));
   await settled();
-  await click(await waitFor('Sign out in the menu', stepSeconds, button('Sign out')));
+  await click(await waitFor('Sign out on the Account tab', stepSeconds, async () =>
+      (await components()).find(c => c.label === 'Sign out' || c.text === 'Sign out')));
   await waitFor('the welcome screen after signing out', stepSeconds, button('Create an account'));
   await settled();
   await noErrorDialog();
@@ -365,11 +378,10 @@ try {
   // 7. The admin, who lands in the console.
   await signInAs(admin);
   await waitFor('the admin console', stepSeconds, async () => {
-    // "Operations" on a screen this narrow; "Dashboard", down the side, on a
-    // wide one. The figures are the same.
+    // The console opens on its Overview tab, figures first.
     const text = await screenText();
     // A caption goes onto two lines where its tile is narrow.
-    return /Operations|Dashboard/.test(text) && /Orders\s+paid/.test(text);
+    return /Overview/.test(text) && /Gross\s+sales/.test(text);
   });
   await waitFor('the console to ask the server for its figures', stepSeconds, async () =>
       requests.some(r => /^200 GET \/api\/admin\//.test(r)));

@@ -140,12 +140,16 @@ public final class WebHeaders implements SecurityFilter {
         }
         CspSources.append(extra, b, CspSources.SCRIPT);
         b.append("; style-src 'self'");
+        // The public templates' stylesheet is allowed by its hash on a nonce
+        // page too. htmx swaps a part out of a whole page (hx-select, the
+        // checkout's summary), and parsing that page brings in its head's
+        // <style> carrying the nonce of ANOTHER response, which this page's
+        // policy refuses. The hash covers only the template's fixed text.
+        for (int iter = 0; iter < InlineHashes.PUBLIC_STYLES.length; iter++) {
+            b.append(' ').append(InlineHashes.PUBLIC_STYLES[iter]);
+        }
         if (nonce != null) {
             b.append(" 'nonce-").append(nonce).append('\'');
-        } else {
-            for (int iter = 0; iter < InlineHashes.PUBLIC_STYLES.length; iter++) {
-                b.append(' ').append(InlineHashes.PUBLIC_STYLES[iter]);
-            }
         }
         b.append("; img-src 'self' data:");
         CspSources.append(extra, b, CspSources.IMG);

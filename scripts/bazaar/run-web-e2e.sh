@@ -81,21 +81,28 @@ fail() {
   exit 1
 }
 
-# What no browser is needed to see: the app is at /, the API kept its paths, and
-# the script that is most of the download goes out compressed.
+# What no browser is needed to see: the storefront is at /, the app at /app/
+# (where the cart reminder mail links), the API kept its paths, and the script
+# that is most of the download goes out compressed.
 headers="$(curl -fsS -D - -o /dev/null "http://localhost:$PORT/")" \
   || fail "the server did not answer at /"
 echo "$headers" | grep -qi '^content-type: text/html' || fail "/ is not served as a page"
-echo "$headers" | grep -qi '^cache-control: no-cache' || fail "/ is not revalidated"
+headers="$(curl -fsS -D - -o /dev/null "http://localhost:$PORT/app/")" \
+  || fail "the server did not answer at /app/"
+echo "$headers" | grep -qi '^content-type: text/html' || fail "/app/ is not served as a page"
+echo "$headers" | grep -qi '^cache-control: no-cache' || fail "/app/ is not revalidated"
+# The cart reminder mail's link (SiteUrls.appCart) opens the app with a query.
+status="$(curl -s -o /dev/null -w '%{http_code}' "http://localhost:$PORT/app/?store=northwind&cart=x")"
+[ "$status" = "200" ] || fail "the cart recovery link /app/?store=... answered $status"
 headers="$(curl -fsS -H 'Accept-Encoding: gzip' -D - -o /dev/null \
-    "http://localhost:$PORT/translated_app.js")" || fail "translated_app.js is not served"
+    "http://localhost:$PORT/app/translated_app.js")" || fail "translated_app.js is not served"
 echo "$headers" | grep -qi '^content-encoding: gzip' \
   || fail "translated_app.js was not served compressed"
 status="$(curl -s -o /dev/null -w '%{http_code}' "http://localhost:$PORT/api/me")"
 [ "$status" = "401" ] || fail "/api/me answered $status without a token, not 401"
 
 set +e
-URL="http://localhost:$PORT/" OUT="$OUT" node "$HERE/web-e2e.mjs"
+URL="http://localhost:$PORT/app/" OUT="$OUT" node "$HERE/web-e2e.mjs"
 STATUS=$?
 set -e
 
