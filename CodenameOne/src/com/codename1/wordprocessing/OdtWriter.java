@@ -227,7 +227,7 @@ final class OdtWriter {
     }
 
     private static void listStyle(StringBuilder b, String name, boolean bullet) {
-        String[] bullets = {"•", "◦", "▪"};
+        String[] bullets = {"\u2022", "\u25e6", "\u25aa"};
         String[] formats = {"1", "a", "i"};
         b.append("<text:list-style style:name=\"").append(name).append("\">");
         for (int l = 1; l <= 10; l++) {

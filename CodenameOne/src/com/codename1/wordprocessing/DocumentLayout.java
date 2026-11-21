@@ -228,7 +228,7 @@ public final class DocumentLayout {
         }
         int level = Math.max(0, Math.min(8, p.listLevel));
         if (Paragraph.BULLET.equals(p.list)) {
-            return level % 3 == 0 ? "•" : level % 3 == 1 ? "o" : "-";
+            return level % 3 == 0 ? "\u2022" : level % 3 == 1 ? "o" : "-";
         }
         if (p.listStart > 0) {
             listCounters[level] = p.listStart;

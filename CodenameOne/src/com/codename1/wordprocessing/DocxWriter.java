@@ -287,7 +287,7 @@ final class DocxWriter {
     }
 
     private static void abstractNum(StringBuilder b, int id, boolean bullet) {
-        String[] bullets = {"•", "o", "▪"};
+        String[] bullets = {"\u2022", "o", "\u25aa"};
         String[] formats = {"decimal", "lowerLetter", "lowerRoman"};
         b.append("<w:abstractNum w:abstractNumId=\"").append(id)
                 .append("\"><w:multiLevelType w:val=\"hybridMultilevel\"/>");

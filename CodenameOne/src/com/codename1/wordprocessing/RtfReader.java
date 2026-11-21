@@ -40,9 +40,9 @@ final class RtfReader {
     private static final int MAX_COLUMNS = 64;
 
     /// The characters 0x80 to 0x9f of Windows code page 1252; zero where it has none.
-    private static final String CP1252 = "€\u0000‚ƒ„…†‡"
-            + "ˆ‰Š‹Œ\u0000Ž\u0000\u0000‘’“”"
-            + "•–—˜™š›œ\u0000žŸ";
+    private static final String CP1252 = "\u20ac\u0000\u201a\u0192\u201e\u2026\u2020\u2021"
+            + "\u02c6\u2030\u0160\u2039\u0152\u0000\u017d\u0000\u0000\u2018\u2019\u201c\u201d"
+            + "\u2022\u2013\u2014\u02dc\u2122\u0161\u203a\u0153\u0000\u017e\u0178";
 
     private final String src;
     private int pos;
@@ -623,9 +623,9 @@ final class RtfReader {
                 if ("\\".equals(w) || "{".equals(w) || "}".equals(w)) {
                     appendText(sink, w, chr, link);
                 } else if ("~".equals(w)) {
-                    appendText(sink, " ", chr, link);
+                    appendText(sink, "\u00a0", chr, link);
                 } else if ("-".equals(w)) {
-                    appendText(sink, "­", chr, link);
+                    appendText(sink, "\u00ad", chr, link);
                 } else if ("_".equals(w)) {
                     appendText(sink, "-", chr, link);
                 } else if ("*".equals(w) && first) {
@@ -670,19 +670,19 @@ final class RtfReader {
         } else if ("uc".equals(w)) {
             ucSkip = Math.max(0, Math.min(10, v));
         } else if ("emdash".equals(w)) {
-            appendText(sink, "—", c, link);
+            appendText(sink, "\u2014", c, link);
         } else if ("endash".equals(w)) {
-            appendText(sink, "–", c, link);
+            appendText(sink, "\u2013", c, link);
         } else if ("bullet".equals(w)) {
-            appendText(sink, "•", c, link);
+            appendText(sink, "\u2022", c, link);
         } else if ("lquote".equals(w)) {
-            appendText(sink, "‘", c, link);
+            appendText(sink, "\u2018", c, link);
         } else if ("rquote".equals(w)) {
-            appendText(sink, "’", c, link);
+            appendText(sink, "\u2019", c, link);
         } else if ("ldblquote".equals(w)) {
-            appendText(sink, "“", c, link);
+            appendText(sink, "\u201c", c, link);
         } else if ("rdblquote".equals(w)) {
-            appendText(sink, "”", c, link);
+            appendText(sink, "\u201d", c, link);
         } else if ("plain".equals(w)) {
             c.reset();
             c.font = defaultFont;

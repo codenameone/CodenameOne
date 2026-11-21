@@ -87,7 +87,7 @@ class EmbeddedComponentsTest extends UITestBase {
 
     @Test
     void sourceRoundTripsTypeSizeAndState() {
-        EmbeddedComponent c = new EmbeddedComponent("slider", "a;b é", 120.5f, 24, null);
+        EmbeddedComponent c = new EmbeddedComponent("slider", "a;b \u00e9", 120.5f, 24, null);
         String src = EmbeddedComponents.toSource(c);
         assertTrue(src.startsWith("cn1-component:slider;120.5x24;"), src);
         EmbeddedComponent back = EmbeddedComponents.fromSource(src);

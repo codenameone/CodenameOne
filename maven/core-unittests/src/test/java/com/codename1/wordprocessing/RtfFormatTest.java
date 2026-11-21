@@ -221,7 +221,7 @@ class RtfFormatTest extends UITestBase {
         assertEquals("SansSerif", h.text.styleAt(0).font);
         Paragraph p = (Paragraph) d.get(1);
         assertEquals(Paragraph.CENTER, p.align);
-        assertEquals("Café red € link", p.text.plainText());
+        assertEquals("Caf\u00e9 red \u20ac link", p.text.plainText());
         assertEquals(0xff0000, p.text.styleAt(5).color);
         assertEquals("http://x.y", p.text.styleAt(13).link);
         Paragraph item = (Paragraph) d.get(2);

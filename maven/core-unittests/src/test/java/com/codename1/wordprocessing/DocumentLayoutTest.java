@@ -165,7 +165,7 @@ class DocumentLayoutTest extends UITestBase {
                 markers.add(i.text);
             }
         }
-        assertEquals(Arrays.asList("1.", "2.", "a.", "7.", "•"), markers);
+        assertEquals(Arrays.asList("1.", "2.", "a.", "7.", "\u2022"), markers);
         assertEquals(10 + 18, texts(l.getPage(0)).get(1).x, 0.01);
     }
 
