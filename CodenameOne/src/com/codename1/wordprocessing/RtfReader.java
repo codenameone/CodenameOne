@@ -1313,8 +1313,7 @@ final class RtfReader {
     private static String hyperlink(String instruction) {
         int q = instruction.indexOf('"');
         if (q < 0) {
-            String[] parts = instruction.split(" ");
-            return parts.length > 1 ? parts[parts.length - 1] : "";
+            return DocxReader.lastWord(instruction);
         }
         int end = instruction.indexOf('"', q + 1);
         String url = end > q ? instruction.substring(q + 1, end) : instruction.substring(q + 1);

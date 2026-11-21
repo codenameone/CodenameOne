@@ -1047,8 +1047,18 @@ final class DocxReader {
             }
             return url;
         }
-        String[] parts = instr.split(" ");
-        return parts.length > 1 ? parts[parts.length - 1] : "";
+        return lastWord(instr);
+    }
+
+    /// The last space-separated word of a field instruction, or "" when it has only one.
+    /// Not `String.split`: the device's class library has no regular expressions there.
+    static String lastWord(String s) {
+        int end = s.length();
+        while (end > 0 && s.charAt(end - 1) == ' ') {
+            end--;
+        }
+        int i = s.lastIndexOf(' ', end - 1);
+        return i < 0 ? "" : s.substring(i + 1, end);
     }
 
     private void run(XmlScanner x, ParaState st) throws IOException {
