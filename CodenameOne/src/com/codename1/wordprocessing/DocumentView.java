@@ -85,6 +85,7 @@ public class DocumentView extends ScrollSurface implements TextInputClient {
     private final Map<String, Image> images = new HashMap<String, Image>();
     private final EventDispatcher caretListeners = new EventDispatcher();
     private int gapPx;
+    private Runnable viewportListener;
 
     /// A view of an empty document.
     public DocumentView() {
@@ -233,6 +234,7 @@ public class DocumentView extends ScrollSurface implements TextInputClient {
         zoom = Math.max(0.25f, Math.min(6, value));
         setShouldCalcPreferredSize(true);
         repaint();
+        viewportMoved();
     }
 
     /// Whether a page wider than the view is shrunk to fit its width.
@@ -366,6 +368,7 @@ public class DocumentView extends ScrollSurface implements TextInputClient {
         setShouldCalcPreferredSize(true);
         pushInputState();
         repaint();
+        viewportMoved();
     }
 
     // ------------------------------------------------------------------ geometry
@@ -402,6 +405,42 @@ public class DocumentView extends ScrollSurface implements TextInputClient {
 
     private int pageHeightPx() {
         return Math.round(getLayout().getPageSpec().height * getScale());
+    }
+
+    /// Told when what the view shows moves: a scroll, a zoom or a new layout.
+    void setViewportListener(Runnable l) {
+        viewportListener = l;
+    }
+
+    private void viewportMoved() {
+        if (viewportListener != null) {
+            viewportListener.run();
+        }
+    }
+
+    @Override
+    protected void scrollChanged() {
+        super.scrollChanged();
+        viewportMoved();
+    }
+
+    /// Where a laid out item is, in the view's own coordinates at the current scroll.
+    ///
+    /// #### Parameters
+    ///
+    /// - `page`: the item's page
+    ///
+    /// - `item`: the item
+    ///
+    /// #### Returns
+    ///
+    /// `{x, y, width, height}` in pixels
+    public int[] itemBounds(int page, LayoutItem item) {
+        float scale = getScale();
+        int x = pageLeft() + Math.round(item.x * scale) - getOffsetX();
+        int y = pageTop(page) + Math.round(item.y * scale) - getOffsetY();
+        return new int[] {x, y, Math.max(1, Math.round(item.width * scale)),
+            Math.max(1, Math.round(item.height * scale))};
     }
 
     private int pageLeft() {

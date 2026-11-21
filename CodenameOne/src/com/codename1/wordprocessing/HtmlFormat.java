@@ -159,6 +159,11 @@ final class HtmlFormat {
             return;
         }
         if ("img".equals(t)) {
+            EmbeddedComponent c = component(e, r);
+            if (c != null) {
+                r.text.append(c, style);
+                return;
+            }
             Picture p = picture(e, r);
             if (p != null) {
                 r.flush();
@@ -481,6 +486,27 @@ final class HtmlFormat {
         return new Picture(r.next('i'), data, mime, w, h, e.getAttribute("alt"));
     }
 
+    /// An image that stands for an embedded component: one with `data-cn1-component`, or a
+    /// `cn1-component:` source as a `RichTextArea` gives it back.
+    private static EmbeddedComponent component(Element e, Reader r) {
+        String src = e.getAttribute("src");
+        EmbeddedComponent fromSource = EmbeddedComponents.fromSource(src);
+        String type = e.getAttribute("data-cn1-component");
+        if (type == null || type.length() == 0) {
+            return fromSource;
+        }
+        String state = e.getAttribute("data-cn1-state");
+        Picture snap = picture(e, r);
+        float w = dimension(e, "width");
+        float h = dimension(e, "height");
+        if (w <= 0 || h <= 0) {
+            w = fromSource != null ? fromSource.width : snap != null ? snap.width : 144;
+            h = fromSource != null ? fromSource.height : snap != null ? snap.height : 72;
+        }
+        return new EmbeddedComponent(type, state == null ? "" : state, w, h,
+                snap == null ? null : snap.data());
+    }
+
     private static float dimension(Element e, String name) {
         String v = cssValue(e.getAttribute("style"), name);
         if (v == null) {
@@ -591,9 +617,25 @@ final class HtmlFormat {
 
     // ---------------------------------------------------------------- writing
 
+    /// Notes collected while writing, and how embedded components are written.
+    private static final class Notes extends ArrayList<Note> {
+        private static final long serialVersionUID = 1L;
+        final boolean componentSources;
+
+        Notes(boolean componentSources) {
+            this.componentSources = componentSources;
+        }
+    }
+
     static String write(Document d) {
+        return write(d, false);
+    }
+
+    /// Writes HTML; with `componentSources` an embedded component's image names it by a
+    /// `cn1-component:` source, which a `RichTextArea` keeps, instead of showing its snapshot.
+    static String write(Document d, boolean componentSources) {
         StringBuilder b = new StringBuilder();
-        List<Note> notes = new ArrayList<Note>();
+        List<Note> notes = new Notes(componentSources);
         b.append("<!DOCTYPE html>\n<html><head><meta charset=\"utf-8\"><title>");
         escape(b, d.title);
         b.append("</title></head>\n<body>\n");
@@ -604,7 +646,7 @@ final class HtmlFormat {
             }
             Note note = notes.get(n);
             b.append("<li id=\"note-").append(n + 1).append("\">");
-            List<Note> inner = new ArrayList<Note>();
+            List<Note> inner = new Notes(componentSources);
             blocks(b, note.blocks, inner);
             b.append("</li>\n");
             if (n == notes.size() - 1) {
@@ -687,10 +729,8 @@ final class HtmlFormat {
                 continue;
             }
             if (object instanceof EmbeddedComponent) {
-                Picture snap = ((EmbeddedComponent) object).toPicture("c");
-                if (snap != null) {
-                    picture(b, snap);
-                }
+                component(b, (EmbeddedComponent) object,
+                        notes instanceof Notes && ((Notes) notes).componentSources);
                 continue;
             }
             if (object instanceof Note) {
@@ -821,6 +861,22 @@ final class HtmlFormat {
             }
         }
         b.append("</table>\n");
+    }
+
+    private static void component(StringBuilder b, EmbeddedComponent c, boolean source) {
+        byte[] snap = c.snapshot();
+        b.append("<img src=\"");
+        if (source || snap == null) {
+            escape(b, EmbeddedComponents.toSource(c));
+        } else {
+            b.append("data:image/png;base64,").append(Base64.encodeNoNewline(snap));
+        }
+        b.append("\" data-cn1-component=\"");
+        escape(b, c.type);
+        b.append("\" data-cn1-state=\"");
+        escape(b, c.state);
+        b.append("\" style=\"width:").append(Ids.fmt(c.width)).append("pt;height:")
+                .append(Ids.fmt(c.height)).append("pt\" alt=\"\">");
     }
 
     private static void picture(StringBuilder b, Picture p) {
