@@ -699,10 +699,9 @@ public final class Oracle extends ServerSession {
             throw new IOException("The Oracle server sent a session key of " + serverKey.length
                     + " bytes for verifier 0x" + Integer.toHexString(verifier));
         }
-        byte[] serverPart = Aes.cbcDecrypt(passwordHash, new byte[16], serverKey);
+        byte[] serverPart = Aes.cbcDecryptZeroIv(passwordHash, serverKey);
         byte[] clientPart = SqlPlatform.get().randomBytes(serverPart.length);
-        byte[] encryptedClient = Aes.cbcEncrypt(passwordHash, new byte[16],
-                clientPart);
+        byte[] encryptedClient = Aes.cbcEncryptZeroIv(passwordHash, clientPart);
         String sessionKey;
         byte[] combined;
         if (serverPart.length == 48) {
@@ -758,7 +757,7 @@ public final class Oracle extends ServerSession {
         byte[] proof = response == null ? new byte[0] : unhex(response);
         if (proof.length < 32 || proof.length % 16 != 0
                 || !hex(Wire.utf8("SERVER_TO_CLIENT")).equals(hex(slice(
-                        Aes.cbcDecrypt(combined, new byte[16], proof), 16, 32)))) {
+                        Aes.cbcDecryptZeroIv(combined, proof), 16, 32)))) {
             throw new IOException("The Oracle server did not prove it knows the password "
                     + "verifier for " + user);
         }
@@ -798,7 +797,7 @@ public final class Oracle extends ServerSession {
         for (int iter = data.length ; iter < padded.length ; iter++) {
             padded[iter] = (byte) pad;
         }
-        return Aes.cbcEncrypt(key, new byte[16], padded);
+        return Aes.cbcEncryptZeroIv(key, padded);
     }
 
     /// Reads an authentication response into `session`, answering with the

@@ -27,13 +27,15 @@ import com.codename1.db.Database;
 import com.codename1.db.PostgresDatabase;
 import com.codename1.db.Row;
 import com.codename1.io.Log;
+import com.codename1.io.Preferences;
 import com.codename1.ui.CN;
 
 import java.io.IOException;
 
 public class ServerDatabaseSnippets {
-    public void listCheapItems(final String password) {
+    public void listCheapItems() {
         // tag::server-database-001[]
+        final String password = Preferences.get("dbPassword", "");
         CN.startThread(() -> {
             try {
                 Database db = new PostgresDatabase("db.example.com", 5432, "inventory",

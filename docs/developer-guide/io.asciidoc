@@ -740,7 +740,7 @@ unencrypted. The five-argument constructors connect that way; the seven-argument
 the server over a network you trust, or through a tunnel.
 * *Timeouts*. The timeout limits connecting and each wait for the server after it, so a query whose
 reply takes longer fails. Pass 0 to wait as long as the server takes. A direct connection from a phone to a
-production database is rarely a good design; an API server in between is usually the better one.
+production database is a poor design: put an API server between them.
 
 
 === Network manager & connection request

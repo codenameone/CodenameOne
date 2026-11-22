@@ -40,8 +40,9 @@ import java.io.IOException;
 /// renders them for whichever engine the connection turns out to be.
 ///
 /// ```java
-/// Dialect d = db.dialect();
-/// db.execute("INSERT INTO notes (title) VALUES (?)", new Object[] {title});
+/// ServerDatabase db = new PostgresDatabase("localhost", 5432, "app", "app", "secret");
+/// Dialect d = db.getDialect();
+/// db.execute("INSERT INTO notes (title) VALUES (?)", "A note");
 /// ```
 ///
 /// The rewrite happens inside Database, so the example above needs no dialect at
@@ -90,7 +91,7 @@ public abstract class Dialect {
     /// "a" are two keys and "token " keeps its space. Neither server has the
     /// other's. Measured, creating a key column under each name:
     ///
-    /// ```java
+    /// ```text
     ///                      mariadb 10.11   mariadb 11.8   mysql 8.0
     /// utf8mb4_0900_bin     unknown         ok             ok
     /// utf8mb4_nopad_bin    ok              ok             unknown
@@ -412,7 +413,7 @@ public abstract class Dialect {
     ///
     /// The engines disagree by default, measured over one null and two values:
     ///
-    /// ```java
+    /// ```text
     ///                 ASC       DESC
     /// sqlite          null,a,b  b,a,null
     /// postgresql      a,b,null  null,b,a
@@ -461,7 +462,7 @@ public abstract class Dialect {
     /// MEASURED on a database created the way the standard image creates one,
     /// with lc_collate en_US.utf8, against rows holding 'Z' and 'a':
     ///
-    /// ```java
+    /// ```text
     /// WHERE v > 'Z'    SQLite: a    MySQL: a    PostgreSQL: (none)
     /// ```
     ///
@@ -526,7 +527,7 @@ public abstract class Dialect {
     ///
     /// MEASURED on a fresh table, explicit id 1 then a generated insert:
     ///
-    /// ```java
+    /// ```text
     /// SQLite: 2   MySQL: 2   PostgreSQL: duplicate key value violates unique
     ///                                    constraint "idsync_pkey"
     /// ```

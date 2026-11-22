@@ -41,6 +41,7 @@ import java.util.Map;
 /// names are in it; there is no driver lookup and no URL to parse.
 ///
 /// ```java
+/// String password = Preferences.get("dbPassword", "");
 /// Database db = new PostgresDatabase("db.example.com", 5432, "inventory", "app", password);
 /// try {
 ///     Cursor c = db.executeQuery("SELECT id, name FROM item WHERE price < ?", 10.0);

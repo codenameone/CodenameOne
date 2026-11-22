@@ -30,7 +30,7 @@ import java.util.List;
 ///
 /// This is a base class, not a driver interface. Nothing looks an engine up by
 /// name: code that wants one names its class -- `Postgres.connect(...)`, or its
-/// [#CONNECTOR] field -- and an engine nothing names is stripped from the
+/// `CONNECTOR` field -- and an engine nothing names is stripped from the
 /// application.
 @com.codename1.impl.SharedWithBackend
 public abstract class ServerSession {
