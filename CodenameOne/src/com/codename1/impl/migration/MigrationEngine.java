@@ -115,10 +115,10 @@ public final class MigrationEngine {
                     specific = entry;
                 }
             }
-            if (specific != null && common != null) {
-                throw new MigrationException(MigrationException.INVALID_SET, label(all[i]) + " in set "
-                        + set.getName() + " has both a script for every engine and one for " + dialect);
-            }
+            // An engine's own script takes the place of the common one: Oracle,
+            // say, needs other column types than the script every other engine
+            // shares, and copying that script once per engine to say so would be
+            // worse.
             MigrationEntry pick = specific != null ? specific : common;
             if (pick == null) {
                 throw new MigrationException(MigrationException.INVALID_SET, label(all[i]) + " in set "

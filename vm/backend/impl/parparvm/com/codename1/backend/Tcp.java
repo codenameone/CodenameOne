@@ -97,6 +97,33 @@ public final class Tcp {
     /// a certificate for anybody.
     public void startTls(String host, String caFile, boolean verifyHost)
             throws IOException {
+        upgrade(host, caFile, verifyHost, -1, null);
+    }
+
+    /// [#startTls(String, String, boolean)] offering one ALPN protocol, which
+    /// TDS 8.0 asks for as `tds/8.0`.
+    public void startTls(String host, String caFile, boolean verifyHost, String alpn)
+            throws IOException {
+        upgrade(host, caFile, verifyHost, -1, alpn);
+    }
+
+    /// Starts TLS with the handshake carried INSIDE TDS packets, which is how
+    /// SQL Server negotiates encryption before TDS 8.0: every handshake flight
+    /// travels as the payload of packets of type `packetType` (PRELOGIN), each
+    /// under the eight-byte TDS header, and once the handshake completes the
+    /// connection is ordinary TLS with no framing at all.
+    ///
+    /// The certificate and host name rules are [#startTls(String, String, boolean)]'s.
+    /// The handshake is held to TLS 1.2: a server that tunnels it does not
+    /// speak 1.3 this way, and TDS 8.0, which does, starts TLS before anything
+    /// else and uses [#startTls(String, String, boolean)].
+    public void startTlsTunnelled(String host, String caFile, boolean verifyHost,
+                                  int packetType) throws IOException {
+        upgrade(host, caFile, verifyHost, packetType & 0xff, null);
+    }
+
+    private void upgrade(String host, String caFile, boolean verifyHost, int tunnelType, String alpn)
+            throws IOException {
         if (!verifyHost && caFile == null) {
             throw new IOException("Skipping the host name check needs a trust "
                     + "root of its own (sslrootcert)");
@@ -113,6 +140,7 @@ public final class Tcp {
         // The trust root is a file name that crosses to a native; see
         // Urls.requireNoNul for what a NUL in it loads instead.
         Urls.requireNoNul("An sslrootcert path", caFile);
+        Urls.requireNoNul("An ALPN protocol", alpn);
         checkOpen();
         if (tls != 0) {
             return;
@@ -132,7 +160,11 @@ public final class Tcp {
         long session;
         claim(claimed);
         try {
-            session = startTlsImpl(claimed[0], host, caFile, verifyHost);
+            session = alpn != null
+                    ? startTlsAlpnImpl(claimed[0], host, caFile, verifyHost, alpn)
+                    : tunnelType < 0
+                    ? startTlsImpl(claimed[0], host, caFile, verifyHost)
+                    : startTlsTunnelledImpl(claimed[0], host, caFile, verifyHost, tunnelType);
         } finally {
             release();
         }
@@ -440,6 +472,10 @@ public final class Tcp {
     private static native int closeImpl(long handle);
     private static native long startTlsImpl(long handle, String host, String caFile,
             boolean verifyHost);
+    private static native long startTlsAlpnImpl(long handle, String host, String caFile,
+            boolean verifyHost, String alpn);
+    private static native long startTlsTunnelledImpl(long handle, String host, String caFile,
+            boolean verifyHost, int packetType);
     private static native String tlsErrorImpl();
     private static native int tlsReadImpl(long session, byte[] buffer, int offset, int length);
     private static native int tlsWriteImpl(long session, byte[] buffer, int offset, int length);

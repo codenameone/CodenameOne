@@ -30,10 +30,12 @@ import java.io.UnsupportedEncodingException;
 import java.util.List;
 import java.util.Map;
 
-import com.codename1.backend.sql.Dialect;
-import com.codename1.backend.sql.MySql;
-import com.codename1.backend.sql.Postgres;
-import com.codename1.backend.sql.QueryRows;
+import com.codename1.db.sql.Dialect;
+import com.codename1.db.sql.Engines;
+import com.codename1.db.sql.QueryRows;
+import com.codename1.db.sql.ServerSession;
+import com.codename1.db.sql.TransactionIsolation;
+import java.util.HashMap;
 
 /// One database API over SQLite, PostgreSQL and MySQL, chosen by URL.
 ///
@@ -105,42 +107,65 @@ public final class Database {
     /// statement already running on it. HttpServer publishes its own `running` flag
     /// the same way.
     private volatile boolean sqliteClosed; //NOPMD AvoidUsingVolatile - read without the monitor, see above
-    private final Postgres postgres;
-    private final MySql mysql;
+    /// The server session, or null when this connection is SQLite.
+    private final ServerSession engine;
     private final String describedAs;
     /// WHICH ENGINE THIS IS, as the things that differ between them rather than as
     /// a name to branch on. Chosen from the URL before anything is connected, and
     /// immutable afterwards, so asking is free on the request path.
     private final Dialect dialect;
 
-    private Database(Db sqlite, Postgres postgres, MySql mysql, String describedAs,
+    private Database(Db sqlite, ServerSession engine, String describedAs,
                      Dialect dialect) throws IOException {
         this.sqlite = sqlite;
-        this.postgres = postgres;
-        this.mysql = mysql;
+        this.engine = engine;
         this.describedAs = describedAs;
         this.dialect = dialect;
+    }
+
+    /// The server engines this application can open, by canonical name. The
+    /// build fills it from the URLs the application declares (see
+    /// [#useEngine]); an engine nobody names is never referenced and is stripped.
+    private static final Map<String, ServerSession.Connector> ENGINES =
+            new HashMap<String, ServerSession.Connector>();
+
+    static {
+        BackendSqlPlatform.install();
+    }
+
+    /// Lets [#open] reach the engine `connector` serves, for example
+    /// `Database.useEngine(com.codename1.db.sql.Postgres.CONNECTOR)`.
+    ///
+    /// An application rarely calls this: the build calls it for every engine
+    /// named by a `cn1.datasource.url` in `application.properties` (or its
+    /// profile files). Code that opens other URLs of its own names their engines
+    /// here, which is also what puts each one in the binary.
+    public static void useEngine(ServerSession.Connector connector) {
+        synchronized (ENGINES) {
+            ENGINES.put(connector.engine(), connector);
+        }
+    }
+
+    private static ServerSession.Connector engineFor(String engine) throws IOException {
+        ServerSession.Connector connector;
+        synchronized (ENGINES) {
+            connector = ENGINES.get(engine);
+        }
+        if (connector == null) {
+            throw new IOException("The database URL names " + engine + ", which this "
+                    + "application was not built with. The build includes the engines named by "
+                    + "cn1.datasource.url in application.properties and its profile files -- a URL "
+                    + "supplied only at run time (CN1_DATASOURCE_URL) is not seen. Declare one, "
+                    + "for example cn1.datasource.url=${CN1_DATASOURCE_URL:" + engine
+                    + "://localhost/app} in application-prod.properties, or call "
+                    + "Database.useEngine with the engine's CONNECTOR.");
+        }
+        return connector;
     }
 
     /// A unit of work run inside [#transaction].
     public interface Work {
         Object run(Database db) throws Exception;
-    }
-
-    /// Whether the URL opens with this scheme, IGNORING CASE.
-    ///
-    /// RFC 3986 makes a scheme case-insensitive, and anything unrecognised here
-    /// is taken as a SQLite path -- so "PostgreSQL://user@host/db" was not a
-    /// mismatch that got reported, it was a file name. The caller ended up
-    /// creating or opening a local database, or failing on a pathname containing
-    /// "//", with nothing saying the server had never been contacted.
-    ///
-    /// regionMatches rather than toLowerCase: String.toLowerCase is locale
-    /// sensitive and this runtime has no Locale to ask for the root one, so on a
-    /// Turkish device the I of a scheme folds to a dotless i and stops matching.
-    private static boolean hasScheme(String url, String scheme) {
-        return url.length() >= scheme.length()
-                && url.regionMatches(true, 0, scheme, 0, scheme.length());
     }
 
     /// Opens the database the URL names. Anything that is not a recognised scheme
@@ -149,26 +174,17 @@ public final class Database {
         if (url == null) {
             throw new IOException("No database URL");
         }
-        if (hasScheme(url, "postgres://") || hasScheme(url, "postgresql://")) {
-            Url parsed = Url.parse(url, 5432);
-            return new Database(null, Postgres.connect(parsed.host, parsed.port,
-                    parsed.path, parsed.user, parsed.password, parsed.sslMode,
-                    parsed.caFile, parsed.timeoutMillis, parsed.socketTimeoutMillis),
-                    null, parsed.describe("postgres"), Dialect.POSTGRES);
-        }
-        if (hasScheme(url, "mysql://") || hasScheme(url, "mariadb://")) {
-            Url parsed = Url.parse(url, 3306);
-            // The DIALECT COMES FROM THE SERVER, not from the scheme: MariaDB
-            // and MySQL do not have the same collations, and a mysql:// URL
-            // points at a MariaDB server perfectly often. See Dialect.MARIADB.
-            MySql session = MySql.connect(parsed.host, parsed.port,
+        String wanted = Engines.named(url);
+        if (wanted != null) {
+            ServerSession.Connector connector = engineFor(wanted);
+            Url parsed = Url.parse(url, Engines.defaultPort(wanted));
+            ServerSession session = connector.connect(parsed.host, parsed.port,
                     parsed.path, parsed.user, parsed.password, parsed.sslMode,
                     parsed.caFile, parsed.timeoutMillis, parsed.socketTimeoutMillis);
-            return new Database(null, null, session, parsed.describe("mysql"),
-                    session.isMariaDb() ? Dialect.MARIADB : Dialect.MYSQL);
+            return new Database(null, session, parsed.describe(wanted), session.dialect());
         }
         refuseUnportableSqliteUri(url);
-        return new Database(Db.open(url), null, null, "sqlite:" + url, Dialect.SQLITE);
+        return new Database(Db.open(url), null, "sqlite:" + url, Dialect.SQLITE);
     }
 
     /// Refuses a SQLite file: URI, because only one of the two runtimes reads it.
@@ -234,7 +250,7 @@ public final class Database {
 
     /// Wraps an already-open SQLite handle, for code that opened one directly.
     public static Database of(Db db) throws IOException {
-        return new Database(db, null, null, "sqlite", Dialect.SQLITE);
+        return new Database(db, null, "sqlite", Dialect.SQLITE);
     }
 
     /// Synchronized, like the two below, because a shared session is not safe to
@@ -286,10 +302,7 @@ public final class Database {
             if (sqlite != null) {
                 return sqlite.execute(rendered, params);
             }
-            if (postgres != null) {
-                return postgres.execute(rendered, params);
-            }
-            return mysql.execute(rendered, params);
+            return engine.execute(rendered, params);
         } catch (IOException err) {
             throw DataAccessException.of(err);
         }
@@ -350,10 +363,7 @@ public final class Database {
             if (sqlite != null) {
                 return sqlite.query(rendered, params);
             }
-            if (postgres != null) {
-                return postgres.query(rendered, params);
-            }
-            return mysql.query(rendered, params);
+            return engine.query(rendered, params);
         } catch (IOException err) {
             throw DataAccessException.of(err);
         }
@@ -484,7 +494,7 @@ public final class Database {
                     + "every one). Use execute() for a multi-row insert, or insert the rows "
                     + "one at a time: [" + sql + "]");
         }
-        if (!dialect.generatedKeysThroughReturning() && dialect.updatesOnConflict(sql)) {
+        if (!dialect.upsertKeysThroughReturning() && dialect.updatesOnConflict(sql)) {
             // AN UPSERT HAS NO GENERATED KEY TO READ on these two. When the
             // UPDATE branch runs, SQLite leaves last_insert_rowid() holding
             // whatever this connection inserted before and MySQL's
@@ -503,7 +513,8 @@ public final class Database {
                     + dialect.getName() + " reports no generated key for the row it "
                     + "updated -- last_insert_rowid() and LAST_INSERT_ID() answer for the "
                     + "CONNECTION, so insert() would return a key belonging to some earlier "
-                    + "row. Use execute() and read the key back with a query: [" + sql + "]");
+                    + "row, and Oracle's MERGE takes no RETURNING. Use execute() and read the "
+                    + "key back with a query: [" + sql + "]");
         }
         if (!dialect.generatedKeysThroughReturning()) {
             // THE ROW COUNT DECIDES. last_insert_rowid() and LAST_INSERT_ID()
@@ -586,7 +597,7 @@ public final class Database {
     /// terminator still terminates and the comment still explains.
     private String withReturning(String sql, String idColumn) throws IOException {
         int end = dialect.endOfStatement(sql);
-        return sql.substring(0, end) + " RETURNING " + dialect.quote(idColumn)
+        return sql.substring(0, end) + dialect.returningClause(dialect.quote(idColumn))
                 + sql.substring(end);
     }
 
@@ -936,8 +947,8 @@ public final class Database {
             if (managedTransaction) {
                 throw new IOException("Transaction already active");
             }
-            if (mysql != null) {
-                mysql.beginReadOnly();
+            if (ownsTransactionControl()) {
+                engine.beginReadOnly();
             } else {
                 execute(sqlite == null ? "BEGIN READ ONLY" : "BEGIN DEFERRED", null);
             }
@@ -978,9 +989,9 @@ public final class Database {
                 beginTransaction(readOnly);
                 return;
             }
-            if (mysql != null) {
+            if (ownsTransactionControl()) {
                 try {
-                    mysql.begin(readOnly, isolation);
+                    engine.begin(readOnly, TransactionIsolation.valueOf(isolation.name()));
                 } catch (IOException err) {
                     // A failed START may leave the next-transaction setting armed.
                     // Discard the connection rather than lend that setting to another caller.
@@ -1039,8 +1050,8 @@ public final class Database {
             throw new IOException("No active transaction");
         }
         String checked = Dialect.checkIdentifier(name);
-        if (mysql != null) {
-            mysql.savepoint(verb, checked);
+        if (ownsTransactionControl()) {
+            engine.savepoint(verb, checked);
             return;
         }
         execute(verb + " " + checked, null);
@@ -1116,17 +1127,24 @@ public final class Database {
     /// strings are constants in this file, never a caller's, which is what keeps
     /// the text path from being an injection route.
     private void control(String sql) throws IOException {
-        if (mysql != null) {
+        if (ownsTransactionControl()) {
             if ("BEGIN".equals(sql)) {
-                mysql.begin();
+                engine.begin();
             } else if ("COMMIT".equals(sql)) {
-                mysql.commit();
+                engine.commit();
             } else {
-                mysql.rollback();
+                engine.rollback();
             }
             return;
         }
         execute(sql, null);
+    }
+
+    /// Whether the engine takes transaction control through its own calls rather
+    /// than as statements; see [ServerSession#ownsTransactionControl]. SQLite
+    /// never does.
+    private boolean ownsTransactionControl() {
+        return engine != null && engine.ownsTransactionControl();
     }
 
     /// The id the most recent insert produced, or 0 where the engine has no such
@@ -1143,10 +1161,7 @@ public final class Database {
             if (sqlite != null) {
                 return sqlite.lastInsertId();
             }
-            if (mysql != null) {
-                return mysql.lastInsertId();
-            }
-            return 0;
+            return engine.lastInsertId();
         } finally {
             exit();
         }
@@ -1189,10 +1204,8 @@ public final class Database {
                 if (sqlite != null) {
                     sqliteClosed = true;
                     sqlite.close();
-                } else if (postgres != null) {
-                    postgres.close();
                 } else {
-                    mysql.close();
+                    engine.close();
                 }
             } finally {
                 transactionFinished();
@@ -1204,11 +1217,8 @@ public final class Database {
 
     /// Whether this connection is still usable, which a pool has to know.
     public boolean isOpen() {
-        if (postgres != null) {
-            return !postgres.isClosed();
-        }
-        if (mysql != null) {
-            return !mysql.isClosed();
+        if (engine != null) {
+            return !engine.isClosed();
         }
         // The SQLite arm used to answer "yes" whatever had happened to it, so a
         // pool asking the documented usability question put a CLOSED connection
@@ -1338,7 +1348,11 @@ public final class Database {
                         || "ssl-mode".equals(key) || "sslMode".equals(key)) {
                     // Validated here, before any socket, and handed on as
                     // written so the drivers' errors name the user's spelling.
-                    canonicalSslMode(value);
+                    // strict is SQL Server's TDS 8.0 alone; every other driver
+                    // refuses it when it connects.
+                    if (!"strict".equals(value.trim())) {
+                        canonicalSslMode(value);
+                    }
                     out.sslMode = value.trim();
                 } else if ("user".equals(key)) {
                     out.user = value;

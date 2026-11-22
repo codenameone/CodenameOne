@@ -2474,7 +2474,7 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
         processClass(cls, ctx, false);
     }
 
-    /// The kind constants on `com.codename1.backend.sql.Dialect`, mirrored here
+    /// The kind constants on `com.codename1.db.sql.Dialect`, mirrored here
     /// because the plugin cannot depend on the backend runtime: it GENERATES
     /// against it. The generated source names the constants rather than these
     /// numbers, so a change on that side is a compile error in the generated
@@ -2549,13 +2549,13 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
     /// constant instead of the number behind it.
     private static String kindConstant(int kind) {
         switch (kind) {
-            case KIND_INTEGER: return "com.codename1.backend.sql.Dialect.INTEGER";
-            case KIND_BIGINT: return "com.codename1.backend.sql.Dialect.BIGINT";
-            case KIND_REAL: return "com.codename1.backend.sql.Dialect.REAL";
-            case KIND_BLOB: return "com.codename1.backend.sql.Dialect.BLOB";
-            case KIND_BOOLEAN: return "com.codename1.backend.sql.Dialect.BOOLEAN";
-            case KIND_TIMESTAMP: return "com.codename1.backend.sql.Dialect.TIMESTAMP";
-            default: return "com.codename1.backend.sql.Dialect.TEXT";
+            case KIND_INTEGER: return "com.codename1.db.sql.Dialect.INTEGER";
+            case KIND_BIGINT: return "com.codename1.db.sql.Dialect.BIGINT";
+            case KIND_REAL: return "com.codename1.db.sql.Dialect.REAL";
+            case KIND_BLOB: return "com.codename1.db.sql.Dialect.BLOB";
+            case KIND_BOOLEAN: return "com.codename1.db.sql.Dialect.BOOLEAN";
+            case KIND_TIMESTAMP: return "com.codename1.db.sql.Dialect.TIMESTAMP";
+            default: return "com.codename1.db.sql.Dialect.TEXT";
         }
     }
 
@@ -3733,7 +3733,7 @@ public final class OrmAnnotationProcessor extends AbstractAnnotationProcessor {
         /// @Column(type) as the developer wrote it, or null when absent.
         String explicitSqlType;
         /// The portable column kind, as one of the constants on
-        /// `com.codename1.backend.sql.Dialect`. Backend flavour only.
+        /// `com.codename1.db.sql.Dialect`. Backend flavour only.
         int dialectKind;
         /// Whether the field's type is a boxed reference rather than a
         /// primitive, which is what decides whether it can hold null.

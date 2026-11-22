@@ -372,7 +372,8 @@ final class BackendPackageSupport {
                 packager.javaLevel(getJavaSource().get(), getJavaTarget().get(), getJavaRelease().getOrNull());
                 packager.mainClass(getMainClass().getOrNull()).output(getBinary().get().getAsFile())
                         .target(getTarget().getOrNull()).jdk(getJdk().getOrNull(), null).cflags(getCflags().getOrNull())
-                        .sqlite(getSqlite().get()).checkedCasts(getCheckedCasts().get())
+                        .sqlite(getSqlite().get())
+                        .checkedCasts(getCheckedCasts().get())
                         .devTools(getDevTools().get()).execute();
                 if (getWebAppDirectory().isPresent()) {
                     webAppBesideTheBinary(log(), getWebAppDirectory().get().getAsFile(),

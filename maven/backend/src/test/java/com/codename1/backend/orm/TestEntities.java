@@ -25,7 +25,7 @@ package com.codename1.backend.orm;
 import com.codename1.impl.orm.Values;
 import java.util.Date;
 
-import com.codename1.backend.sql.Dialect;
+import com.codename1.db.sql.Dialect;
 
 /**
  * A test entity and the definition the build would generate for it.

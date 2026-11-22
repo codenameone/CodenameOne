@@ -31,7 +31,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-import com.codename1.backend.sql.Dialect;
+import com.codename1.db.sql.Dialect;
 
 /// A pool of connections to ONE database, whichever engine that database is.
 ///
@@ -726,12 +726,6 @@ public final class DataSource {
     /// case, because RFC 3986 says a scheme is case insensitive. Anything else is
     /// a SQLite path.
     private static boolean namesAServerEngine(String url) {
-        return hasScheme(url, "postgres://") || hasScheme(url, "postgresql://")
-                || hasScheme(url, "mysql://") || hasScheme(url, "mariadb://");
-    }
-
-    private static boolean hasScheme(String url, String scheme) {
-        return url.length() >= scheme.length()
-                && url.regionMatches(true, 0, scheme, 0, scheme.length());
+        return com.codename1.db.sql.Engines.named(url) != null;
     }
 }

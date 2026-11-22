@@ -22,6 +22,8 @@
  */
 package com.codename1.backend.security.mfa;
 
+import com.codename1.impl.backend.security.SecuritySupport;
+
 import com.codename1.backend.Base64;
 import com.codename1.backend.Config;
 import com.codename1.backend.Crypto;
@@ -238,8 +240,8 @@ public final class JdbcTotpRepository implements TotpRepository {
             if (row == null) {
                 return false;
             }
-            String sealed = String.valueOf(row.get("secret"));
-            String nonce = String.valueOf(row.get("nonce"));
+            String sealed = SecuritySupport.storedText(row.get("secret"));
+            String nonce = SecuritySupport.storedText(row.get("nonce"));
             byte[] secret = Crypto.aesGcmDecrypt(key, Base64.decode(nonce), utf8(user),
                     Base64.decode(sealed));
             if (secret == null || !Crypto.equalsConstantTime(secret, expectedSecret)) {

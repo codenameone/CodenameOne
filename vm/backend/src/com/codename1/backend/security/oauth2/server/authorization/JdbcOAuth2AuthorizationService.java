@@ -22,6 +22,8 @@
  */
 package com.codename1.backend.security.oauth2.server.authorization;
 
+import com.codename1.impl.backend.security.SecuritySupport;
+
 import com.codename1.backend.security.SecuritySchema;
 import com.codename1.backend.DataSource;
 import com.codename1.backend.Database;
@@ -107,17 +109,17 @@ public final class JdbcOAuth2AuthorizationService implements OAuth2Authorization
                 return null;
             }
             Map<String, Object> attributes = new LinkedHashMap<String, Object>();
-            Map parsed = Json.parseObject(String.valueOf(row.get("attributes")));
+            Map parsed = Json.parseObject(SecuritySupport.storedText(row.get("attributes")));
             for (Object entry : parsed.entrySet()) {
                 Map.Entry e = (Map.Entry) entry;
                 attributes.put(String.valueOf(e.getKey()), e.getValue());
             }
-            return new OAuth2Authorization(String.valueOf(row.get("id")),
-                    String.valueOf(row.get("registered_client_id")),
-                    String.valueOf(row.get("principal_name")),
-                    String.valueOf(row.get("grant_type")),
-                    OAuth2Parameters.scopes(String.valueOf(row.get("scopes"))),
-                    String.valueOf(row.get("status")), attributes, number(row.get("created_at")),
+            return new OAuth2Authorization(SecuritySupport.storedText(row.get("id")),
+                    SecuritySupport.storedText(row.get("registered_client_id")),
+                    SecuritySupport.storedText(row.get("principal_name")),
+                    SecuritySupport.storedText(row.get("grant_type")),
+                    OAuth2Parameters.scopes(SecuritySupport.storedText(row.get("scopes"))),
+                    SecuritySupport.storedText(row.get("status")), attributes, number(row.get("created_at")),
                     number(row.get("expires_at")));
         } catch (IOException err) {
             throw failed("read a grant", err);
@@ -228,7 +230,7 @@ public final class JdbcOAuth2AuthorizationService implements OAuth2Authorization
             Map row = dataSource.queryOne("SELECT authorization_id, used, expires_at, polled_at "
                     + "FROM " + SecuritySchema.table("cn1_oauth2_token") + " WHERE token_hash = ? AND kind = ?",
                     new Object[] {tokenHash, kind});
-            return row == null ? null : new StoredToken(String.valueOf(row.get("authorization_id")),
+            return row == null ? null : new StoredToken(SecuritySupport.storedText(row.get("authorization_id")),
                     number(row.get("used")) != 0, number(row.get("expires_at")),
                     number(row.get("polled_at")));
         } catch (IOException err) {
@@ -322,7 +324,7 @@ public final class JdbcOAuth2AuthorizationService implements OAuth2Authorization
             // Found by the index on expires_at, a bounded number at a time, and
             // deleted by key: a purge never holds more than one row.
             List tokens = dataSource.query("SELECT token_hash FROM " + SecuritySchema.table("cn1_oauth2_token") + " WHERE "
-                    + "expires_at < ? ORDER BY expires_at LIMIT " + bound,
+                    + "expires_at < ? ORDER BY expires_at " + dataSource.dialect().limit(bound, 0),
                     new Object[] {Long.valueOf(now)});
             for (Object row : tokens) {
                 purged += dataSource.execute("DELETE FROM " + SecuritySchema.table("cn1_oauth2_token") + " WHERE token_hash = ? "
@@ -330,7 +332,7 @@ public final class JdbcOAuth2AuthorizationService implements OAuth2Authorization
                             Long.valueOf(now)});
             }
             List grants = dataSource.query("SELECT id FROM " + SecuritySchema.table("cn1_oauth2_authorization") + " WHERE "
-                    + "expires_at < ? ORDER BY expires_at LIMIT " + bound,
+                    + "expires_at < ? ORDER BY expires_at " + dataSource.dialect().limit(bound, 0),
                     new Object[] {Long.valueOf(now)});
             for (Object row : grants) {
                 Object id = ((Map) row).get("id");

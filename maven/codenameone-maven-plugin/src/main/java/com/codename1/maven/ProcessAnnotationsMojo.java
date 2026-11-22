@@ -74,6 +74,12 @@ public class ProcessAnnotationsMojo extends AbstractCN1Mojo {
     @Parameter(defaultValue = "false")
     protected boolean skip;
 
+    /// A database URL given to this build (`-Dcn1.datasource.url=...`). Its
+    /// engine is registered by the generated backend wiring, beside the ones
+    /// the module's `application.properties` files name.
+    @Parameter(property = "cn1.datasource.url")
+    protected String datasourceUrl;
+
     @Override
     protected void executeImpl() throws MojoExecutionException, MojoFailureException {
         if (skip) {
@@ -95,6 +101,7 @@ public class ProcessAnnotationsMojo extends AbstractCN1Mojo {
                     compileClasspathOf(project))
                     // A server wires its backend libraries as its own classes.
                     .withBackendLibraries(BackendModules.dependsOnBackend(project))
+                    .withDatasourceUrl(datasourceUrl)
                     .run();
         } catch (com.codename1.build.BuildFailureException e) {
             throw new MojoFailureException(e.getMessage(), e.getCause() == null ? e : e.getCause());

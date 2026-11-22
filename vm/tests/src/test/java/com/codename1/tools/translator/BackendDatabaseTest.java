@@ -49,7 +49,7 @@ import static org.junit.jupiter.api.Assertions.fail;
  * that is what this does, on the translated binary AND on the local Java SE arm.
  *
  * SQLite always runs; it needs nothing installed. PostgreSQL and MySQL run when
- * CN1_DBCHECK_POSTGRES / CN1_DBCHECK_MYSQL name a server (CI supplies both as
+ * CN1_DBCHECK_POSTGRES / _MYSQL / _SQLSERVER / _ORACLE name a server (CI supplies both as
  * service containers). Their absence is a skip on a developer machine, and a
  * FAILURE where the backend is required, so a CI runner that quietly lost its
  * database cannot report green.
@@ -71,20 +71,27 @@ class BackendDatabaseTest {
         urls.add(":memory:");
         addIfSet(urls, "CN1_DBCHECK_POSTGRES");
         addIfSet(urls, "CN1_DBCHECK_MYSQL");
+        addIfSet(urls, "CN1_DBCHECK_SQLSERVER");
+        // SQL Server 2025 over TDS 8.0 (sslmode=strict): TLS first, ALPN tds/8.0.
+        addIfSet(urls, "CN1_DBCHECK_SQLSERVER_STRICT");
+        addIfSet(urls, "CN1_DBCHECK_ORACLE");
+        addIfSet(urls, "CN1_DBCHECK_ORACLE21");
         if (urls.size() == 1 && BackendTestSupport.isRequired()) {
-            fail("CN1_DBCHECK_POSTGRES and CN1_DBCHECK_MYSQL are unset, so only SQLite "
+            fail("No CN1_DBCHECK_POSTGRES, _MYSQL, _SQLSERVER or _ORACLE is set, so only SQLite "
                     + "was exercised; the server engines are the ones with a wire "
                     + "protocol to get wrong");
         }
 
         Path work = Files.createTempDirectory("backend-dbcheck");
-        Path binary = work.resolve("dbcheck");
-        String failure = BackendTestSupport.build("DbCheck", "demo/dbcheck", binary, jdk8);
-        if (failure != null) {
-            BackendTestSupport.skipOrFail(failure);
-        }
+        // One build, reused for every URL: a binary carries every wire client.
+        // The SQLite pass runs last.
+        List<String> ordered = new ArrayList<String>(urls.subList(1, urls.size()));
+        ordered.add(urls.get(0));
+        urls = ordered;
+        Map<String, Path> binaries = new java.util.LinkedHashMap<String, Path>();
 
         for (String url : urls) {
+            Path binary = BackendTestSupport.binaryFor(binaries, url, "DbCheck", "demo/dbcheck", work, jdk8);
             String translated = runTranslated(binary, url);
             assertOk("the translated runtime", url, translated);
             String local = runLocal(url, jdk8);

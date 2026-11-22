@@ -148,8 +148,9 @@ public final class GradleConversion {
 
     /// Whether a backend's pom is still what the archetype wrote, as far as the
     /// conversion carries anything over: no dependency, build plugin,
-    /// repository or profile beyond the generated ones. A missing pom counts
-    /// as generated. A changed one is someone's work, and the backend is kept.
+    /// repository or profile beyond the generated ones. A missing pom counts as
+    /// generated. A changed one
+    /// is someone's work, and the backend is kept.
     static boolean pomAsGenerated(File pom) {
         if (!pom.isFile()) {
             return true;

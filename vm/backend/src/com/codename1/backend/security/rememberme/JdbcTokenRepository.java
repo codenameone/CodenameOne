@@ -22,6 +22,8 @@
  */
 package com.codename1.backend.security.rememberme;
 
+import com.codename1.impl.backend.security.SecuritySupport;
+
 import com.codename1.backend.DataSource;
 import com.codename1.backend.security.AuthenticationServiceException;
 import com.codename1.backend.security.SecuritySchema;
@@ -127,8 +129,8 @@ public final class JdbcTokenRepository implements PersistentTokenRepository {
     /// @return how many were deleted
     private static PersistentRememberMeToken token(Map row, String series) {
         Object used = row.get("last_used");
-        return new PersistentRememberMeToken(String.valueOf(row.get("username")), series,
-                String.valueOf(row.get("token_hash")),
+        return new PersistentRememberMeToken(SecuritySupport.storedText(row.get("username")), series,
+                SecuritySupport.storedText(row.get("token_hash")),
                 used instanceof Number ? ((Number) used).longValue() : 0L,
                 text(row.get("previous_token_hash")), text(row.get("user_agent")),
                 text(row.get("ip_address")));

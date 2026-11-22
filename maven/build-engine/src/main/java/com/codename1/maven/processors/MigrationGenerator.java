@@ -65,7 +65,7 @@ final class MigrationGenerator {
     /// a name such as `V1.1__x.sql` is one iOS resource packaging mishandles.
     static final String CLIENT_LOCATION = "src/main/db/migration";
 
-    private static final String[] VENDORS = {"sqlite", "postgresql", "mysql"};
+    private static final String[] VENDORS = {"sqlite", "postgresql", "mysql", "sqlserver", "oracle"};
     /// Literals are cut well under the class file's 65535-byte constant limit: a character
     /// takes up to three bytes there.
     private static final int CHUNK = 8000;
@@ -156,7 +156,7 @@ final class MigrationGenerator {
             for (File child : children) {
                 if (child.isDirectory() && !Arrays.asList(VENDORS).contains(child.getName()) && hasSql(child)) {
                     ctx.error("Migration scripts found in " + child + ". Only the directories sqlite, "
-                            + "postgresql and mysql are read beside the common scripts; MariaDB uses mysql.");
+                            + "postgresql, mysql, sqlserver and oracle are read beside the common scripts; MariaDB uses mysql.");
                 }
             }
         }
@@ -342,7 +342,6 @@ final class MigrationGenerator {
 
     private static void checkDuplicates(ProcessorContext ctx, List<Item> items) {
         Map<String, Item> seen = new HashMap<String, Item>();
-        Map<String, Item> common = new HashMap<String, Item>();
         for (Item item : items) {
             String identity = item.version == null ? "R:" + item.description : "V:" + canonical(item.version);
             String key = identity + "@" + (item.dialect == null ? "" : item.dialect);
@@ -351,21 +350,9 @@ final class MigrationGenerator {
                 ctx.error("Two migrations share " + label(item) + ": " + where(earlier) + " and " + where(item)
                         + ".");
             }
-            if (item.dialect == null) {
-                common.put(identity, item);
-            }
         }
-        for (Item item : items) {
-            if (item.dialect == null) {
-                continue;
-            }
-            String identity = item.version == null ? "R:" + item.description : "V:" + canonical(item.version);
-            Item shared = common.get(identity);
-            if (shared != null) {
-                ctx.error(label(item) + " has a script for every engine (" + where(shared) + ") and one for "
-                        + item.dialect + " (" + where(item) + "). Keep one or the other.");
-            }
-        }
+        // A version may have a common script and an engine's own beside it: the
+        // engine's replaces the common one there (MigrationEngine.resolve).
     }
 
     private static String label(Item item) {
@@ -538,6 +525,13 @@ final class MigrationGenerator {
         sb.append("@com.codename1.backend.annotations.Generated\n");
         sb.append("public final class ").append(simple).append(" {\n");
         sb.append("    public static void main(String[] args) throws Exception {\n");
+        // Every engine: the goals run on the JVM and this class is never translated,
+        // so it strips nothing, and the URL is often given to the goal alone
+        // (-Dcn1.datasource.url) rather than declared where the build reads it.
+        for (String engine : new String[] {"Postgres", "MySql", "SqlServer", "Oracle"}) {
+            sb.append("        com.codename1.backend.Database.useEngine(com.codename1.db.sql.")
+                    .append(engine).append(".CONNECTOR);\n");
+        }
         if (securitySchema) {
             sb.append("        com.codename1.backend.Migrations.register(")
                     .append("com.codename1.backend.security.SecuritySchema.migrations());\n");
