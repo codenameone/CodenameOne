@@ -131,6 +131,11 @@ title, description, type, vendor, tags, photos and options; the variant matrix
 generates one variant per combination of options, each with its own price, SKU,
 barcode and weight. Photos can be dropped onto the editor from the desktop.
 Products can be duplicated, edited in bulk, and imported or exported as CSV.
+A product can be sold as a bundle: pick its component variants and how many of
+each go into one, and give the bundle its own price. Selling a bundle takes its
+components out of stock, and the storefront lists what it includes. A product
+can also be scheduled per channel (the online store, the register and each
+marketplace), with times to publish and unpublish it, in UTC.
 Collections are either chosen by hand or smart, defined by rules such as a tag or
 a price range.
 

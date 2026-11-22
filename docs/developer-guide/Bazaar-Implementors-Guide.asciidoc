@@ -147,6 +147,23 @@ owed.
 looks a key up there before the built-in text; a template may only use the
 placeholders the built-in text has, and is filled as plain text, never markup.
 
+A bundle has no level of its own. `Bundles` keeps its components (variant and
+quantity per unit, in `bundle_component`), and a product is a bundle exactly
+when it has component rows. Every stock call (reserve, release, ship, restock,
+the register's sale and a marketplace order) expands a bundle line into moves
+on its components, so the ledger stays the one record of stock. What a bundle
+can sell is the fewest bundles its components make at each location, summed
+over the locations; an untracked component never limits it. A product that is a
+component can't itself be a bundle, and a component variant can't be deleted.
+
+Each product also has a publishing window per channel in `channel_schedule`:
+`ONLINE`, `POS`, or a marketplace channel's id, with publish and unpublish times
+in UTC. `Schedules.set` applies a window at once, and a scheduled job flips the
+`visible` flag as times pass. The storefront (lists, search, the product page,
+the sitemap and the feeds), carts and checkout read `ONLINE`; the register's
+catalog reads `POS`; and marketplace sync pushes a hidden listing with no stock.
+A product with no window follows its status alone.
+
 [[bazaar-payments]]
 === Authorize at checkout, capture at shipping
 
