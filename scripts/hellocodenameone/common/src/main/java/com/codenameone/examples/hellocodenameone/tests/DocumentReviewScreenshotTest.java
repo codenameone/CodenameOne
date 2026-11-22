@@ -123,7 +123,8 @@ public class DocumentReviewScreenshotTest extends DualAppearanceBaseTest {
         RichText live = new RichText.Builder().append("Confidence: ", plain)
                 .append(new EmbeddedComponent("cn1ss-slider", "70", 140, 22, null), plain).build();
         List<Block> blocks = new ArrayList<Block>();
-        blocks.add(para("title", "Heading1", Paragraph.NO_LIST, RichText.of("Quarterly Review")));
+        blocks.add(para("title", "Heading1", Paragraph.NO_LIST, RichText.of("Quarterly Review",
+                plain.withBold(true).withSize(22))));
         blocks.add(para("intro", "Normal", Paragraph.NO_LIST, intro));
         blocks.add(para("b1", "Normal", Paragraph.BULLET, RichText.of("North led every month")));
         blocks.add(para("b2", "Normal", Paragraph.BULLET, RichText.of("West recovered after a slow start")));
@@ -140,7 +141,7 @@ public class DocumentReviewScreenshotTest extends DualAppearanceBaseTest {
         String words = "this quarterly compares revenue by region in detail with sources on the wiki "
                 + "growth was strong north led every month west recovered after a slow start confirm "
                 + "numbers publish summary confidence prepared finance team figures are thousands "
-                + "total review south";
+                + "total review south and reviewed";
         StringBuilder dic = new StringBuilder();
         String[] w = words.split(" ");
         dic.append(w.length).append('\n');
@@ -176,7 +177,7 @@ public class DocumentReviewScreenshotTest extends DualAppearanceBaseTest {
         DocumentModel model = new DocumentModel(document());
         model.setAuthor("Reviewer");
         model.setTrackChanges(true);
-        model.insertText(new TextPosition("end", 12), "and reviewed ", null);
+        model.insertText(new TextPosition("end", 9), "and reviewed ", null);
         model.delete(new TextPosition("b2", 4), new TextPosition("b2", 14));
         model.setTrackChanges(false);
         model.addComment(new TextPosition("k1", 12), new TextPosition("k1", 24), "Due Friday");

@@ -25,8 +25,8 @@ package com.codename1.wordprocessing;
 /// Measures text for `DocumentLayout`, in points.
 ///
 /// Pagination depends on every width, so the screen and a PDF only show the same pages when
-/// both are laid out with the same measurer. `PdfMeasurer` is the one `DocumentView` and the
-/// PDF export use by default.
+/// both are laid out with the same measurer. `DocumentView` uses `ScreenMeasurer` by default
+/// and the PDF export `PdfMeasurer`.
 public interface Measurer {
     /// The advance width of text drawn in a style.
     ///

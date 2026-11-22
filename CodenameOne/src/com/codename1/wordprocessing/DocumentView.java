@@ -52,7 +52,8 @@ import java.util.Map;
 /// The view subscribes to its model while it is on a form and lays the document out again on
 /// every change, so anything that edits the model -- the view itself, a toolbar, an undo button
 /// -- is shown at once. Pages are laid out by `DocumentLayout` with the view's `Measurer`
-/// (`PdfMeasurer` by default), so they break exactly where the PDF export breaks them.
+/// (`ScreenMeasurer` by default, the fonts the view draws in). Set a `PdfMeasurer` to break
+/// pages exactly where the PDF export does, at the cost of spacing set by the PDF's fonts.
 ///
 /// A tap places the caret, a drag or a double tap selects, and typing, Backspace, Delete and
 /// Enter edit through the model, which gives undo for free. Pinch or Control and the wheel
@@ -73,7 +74,7 @@ public class DocumentView extends ScrollSurface implements TextInputClient {
         }
     };
     private boolean listening;
-    private Measurer measurer = new PdfMeasurer();
+    private Measurer measurer = new ScreenMeasurer();
     private DocumentLayout layout;
     private float zoom = 1;
     private boolean fitWidth = true;
@@ -83,7 +84,9 @@ public class DocumentView extends ScrollSurface implements TextInputClient {
     private Object inputHandle;
     private boolean caretOn = true;
     private long lastBlink;
-    private final Map<String, Font> fonts = new HashMap<String, Font>();
+    private final ScreenMeasurer screenFonts = new ScreenMeasurer();
+    /// While painting: whether the item being painted ends its line.
+    private boolean paintLastOnLine = true;
     private final Map<String, Image> images = new HashMap<String, Image>();
     private final EventDispatcher caretListeners = new EventDispatcher();
     private int gapPx;
@@ -569,7 +572,12 @@ public class DocumentView extends ScrollSurface implements TextInputClient {
             g.fillRect(left + 1, top + 1, pw + 1, ph + 1);
             g.setColor(0xffffff);
             g.fillRect(left, top, pw, ph);
-            for (LayoutItem it : l.getPage(p).getItems()) {
+            List<LayoutItem> items = l.getPage(p).getItems();
+            for (int i = 0; i < items.size(); i++) {
+                LayoutItem it = items.get(i);
+                LayoutItem next = i + 1 < items.size() ? items.get(i + 1) : null;
+                paintLastOnLine = next == null || next.paragraphId == null
+                        || !next.paragraphId.equals(it.paragraphId) || Math.abs(next.baseline - it.baseline) > 0.5f;
                 paintItem(g, it, left, top, scale);
             }
             if (sel != null) {
@@ -671,12 +679,14 @@ public class DocumentView extends ScrollSurface implements TextInputClient {
         Revision r = st.revision;
         int color = r == null ? st.color : r.isDeletion() ? DELETE_COLOR : INSERT_COLOR;
         if (paintOrder != null && it.paragraphId != null) {
-            paintComments(g, it, f, x, baseline - f.getAscent(), f.getHeight());
+            paintComments(g, it, scale, x, baseline - f.getAscent(), f.getHeight());
         }
         g.setColor(color);
         g.setFont(f);
-        g.drawString(s, x, baseline - f.getAscent());
-        int textW = f.stringWidth(rtrim(s));
+        drawWords(g, it, x, baseline - f.getAscent(), scale);
+        // a space inside the run is the run's own, so a line under it carries on to the next
+        // word; only the line's last item stops at its last glyph
+        int textW = offset(it, paintLastOnLine ? rtrim(s).length() : s.length(), scale);
         int thick = Math.max(1, px / 14);
         if (st.underline || r != null && !r.isDeletion()
                 || st.link != null && st.link.length() > 0) {
@@ -686,11 +696,11 @@ public class DocumentView extends ScrollSurface implements TextInputClient {
             g.fillRect(x, baseline - px / 3, textW, thick);
         }
         if (proofreader != null && it.paragraphId != null) {
-            paintIssues(g, it, f, x, baseline + Math.max(2, px / 6), Math.max(2, px / 8));
+            paintIssues(g, it, scale, x, baseline + Math.max(2, px / 6), Math.max(2, px / 8));
         }
     }
 
-    private void paintIssues(Graphics g, LayoutItem it, Font f, int x, int y, int amp) {
+    private void paintIssues(Graphics g, LayoutItem it, float scale, int x, int y, int amp) {
         String text = paintTexts.get(it.paragraphId);
         if (text == null) {
             Paragraph p = model.findParagraph(it.paragraphId);
@@ -705,14 +715,45 @@ public class DocumentView extends ScrollSurface implements TextInputClient {
             }
             int a = Math.max(i.start, from) - from;
             int b = Math.min(i.end, to) - from;
-            int x0 = x + f.stringWidth(it.text.substring(0, a));
-            int x1 = x + f.stringWidth(it.text.substring(0, b));
+            int x0 = x + offset(it, a, scale);
+            int x1 = x + offset(it, b, scale);
             g.setColor(i.isSpelling() ? SPELLING_COLOR : GRAMMAR_COLOR);
             wave(g, x0, x1, y, amp);
         }
     }
 
-    private void paintComments(Graphics g, LayoutItem it, Font f, int x, int y, int h) {
+    /// Where the first `chars` characters of an item end, in pixels from its left edge, by
+    /// the measurer the page was laid out with.
+    private int offset(LayoutItem it, int chars, float scale) {
+        return chars <= 0 ? 0 : Math.round(getLayout().getMeasurer().width(it.text.substring(0, chars),
+                it.style) * scale);
+    }
+
+    /// Draws an item a word at a time, each where the layout put it. The font drawn at a
+    /// whole pixel size is never exactly the one measured, and drawn in one piece the
+    /// difference would add up along the run and over the next one; this way it stays
+    /// inside the space after each word.
+    private void drawWords(Graphics g, LayoutItem it, int x, int y, float scale) {
+        String s = it.text;
+        int n = s.length();
+        int start = 0;
+        while (start < n) {
+            while (start < n && s.charAt(start) == ' ') {
+                start++;
+            }
+            if (start >= n) {
+                break;
+            }
+            int end = s.indexOf(' ', start);
+            if (end < 0) {
+                end = n;
+            }
+            g.drawString(s.substring(start, end), x + offset(it, start, scale), y);
+            start = end;
+        }
+    }
+
+    private void paintComments(Graphics g, LayoutItem it, float scale, int x, int y, int h) {
         int p = paintOrder.indexOf(it.paragraphId);
         int from = it.start;
         int to = from + it.text.length();
@@ -723,8 +764,8 @@ public class DocumentView extends ScrollSurface implements TextInputClient {
             }
             int a = Math.max(r[0], from) - from;
             int b = Math.min(r[1], to) - from;
-            int x0 = x + f.stringWidth(it.text.substring(0, a));
-            int x1 = x + f.stringWidth(it.text.substring(0, b));
+            int x0 = x + offset(it, a, scale);
+            int x1 = x + offset(it, b, scale);
             g.setColor(c.resolved ? RESOLVED_COMMENT_COLOR : COMMENT_COLOR);
             g.fillRect(x0, y, Math.max(1, x1 - x0), h);
         }
@@ -782,23 +823,8 @@ public class DocumentView extends ScrollSurface implements TextInputClient {
     ///
     /// the font
     protected Font font(TextStyle style, int px) {
-        String key = style.font + (style.bold ? "|b" : "|") + (style.italic ? "i" : "") + px;
-        Font f = fonts.get(key);
-        if (f == null) {
-            int s = (style.bold ? Font.STYLE_BOLD : 0) | (style.italic ? Font.STYLE_ITALIC : 0);
-            String fam = style.font == null ? "" : Ids.asciiLower(style.font);
-            boolean mono = fam.indexOf("mono") >= 0 || fam.indexOf("courier") >= 0;
-            if (Font.isNativeFontSchemeSupported() && !mono) {
-                String name = style.italic ? style.bold ? "native:ItalicBold" : "native:ItalicRegular"
-                        : style.bold ? "native:MainBold" : "native:MainRegular";
-                f = Font.createTrueTypeFont(name, name).derive(px, s);
-            } else {
-                f = Font.createSystemFont(mono ? Font.FACE_MONOSPACE : Font.FACE_SYSTEM, s,
-                        Font.SIZE_MEDIUM);
-            }
-            fonts.put(key, f);
-        }
-        return f;
+        return measurer instanceof ScreenMeasurer ? ((ScreenMeasurer) measurer).font(style, px)
+                : screenFonts.font(style, px);
     }
 
     private void paintSelection(Graphics g, DocumentLayout l, int page, TextPosition[] sel,
