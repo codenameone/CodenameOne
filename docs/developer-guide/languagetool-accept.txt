@@ -925,3 +925,7 @@ worklet
 # PDF standard font names.
 Zapf
 Fieldline
+Papercut
+Gochi
+Pillow
+ffmpeg

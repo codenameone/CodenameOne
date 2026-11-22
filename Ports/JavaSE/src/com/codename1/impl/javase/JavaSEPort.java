@@ -23606,7 +23606,17 @@ public class JavaSEPort extends CodenameOneImplementation {
                         + cause + ")");
                 surface = new JavaSEGLSurface(view);
             }
-            com.codename1.ui.PeerComponent peer = createNativePeer(surface.getComponent());
+            final com.codename1.ui.PeerComponent peer = createNativePeer(surface.getComponent());
+            if (peer instanceof Peer && JavaSEGLSurface.HIDDEN) {
+                // No window paints the peer, so each frame fills its buffer
+                // here, and the form repaints it from there.
+                surface.setAfterOffscreenFrame(new Runnable() {
+                    public void run() {
+                        ((Peer) peer).paintOnBuffer();
+                        peer.repaint();
+                    }
+                });
+            }
             if (peer != null) {
                 peer.putClientProperty(GPU_SURFACE, surface);
                 glSurfaces.put(surface, Boolean.TRUE);
@@ -24595,7 +24605,14 @@ public class JavaSEPort extends CodenameOneImplementation {
             Graphics2D g2d = buf.createGraphics();
             g2d.scale(peerScale() / instance.zoomLevel, peerScale() / instance.zoomLevel);
 
-            cmp.paintAll(g2d);
+            if (!JavaSEGLSurface.HIDDEN || cmp.isShowing()) {
+                cmp.paintAll(g2d);
+            } else {
+                // A hidden simulator (cn1.simulator.hidden) never shows its
+                // window, and paintAll draws nothing for a component that is
+                // not showing; paint does, so the peer still reaches captures.
+                cmp.paint(g2d);
+            }
             g2d.dispose();
             Peer.this.putClientProperty("__buffer", buf);
         }

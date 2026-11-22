@@ -45,4 +45,9 @@ interface JavaSEGpuSurface {
 
     /// Releases the surface and its renderer resources.
     void disposeSurface();
+
+    /// Hidden simulator (`cn1.simulator.hidden`) only: run after each frame the
+    /// surface renders on its own timer, since no window paints it. The port
+    /// copies the frame into the peer buffer that captures and recordings read.
+    void setAfterOffscreenFrame(Runnable afterFrame);
 }
