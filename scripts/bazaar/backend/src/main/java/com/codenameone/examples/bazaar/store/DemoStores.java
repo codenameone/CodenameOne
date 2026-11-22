@@ -62,6 +62,8 @@ import com.codenameone.examples.bazaar.repository.StoreStaffRepository;
 import com.codenameone.examples.bazaar.repository.SupplierRepository;
 import com.codenameone.examples.bazaar.repository.PhotoRepository;
 import com.codenameone.examples.bazaar.repository.ProductPhotoRepository;
+import com.codenameone.examples.bazaar.repository.ReviewRepository;
+import com.codenameone.examples.bazaar.domain.Review;
 import com.codenameone.examples.bazaar.repository.VariantRepository;
 
 import java.io.ByteArrayOutputStream;
@@ -248,6 +250,17 @@ public class DemoStores {
     private final com.codenameone.examples.bazaar.marketing.DemoMarketing marketing;
     private final PhotoRepository photos;
     private final ProductPhotoRepository gallery;
+    private final ReviewRepository reviews;
+
+    private static final String[] REVIEWERS = {"Maya", "Daniel", "Priya", "Tom", "Lena",
+        "Omar", "Grace", "Kenji", "Sofia", "Ben", "Aisha", "Lucas"};
+    private static final String[][] REVIEW_TEXT = {
+        {"Exactly as pictured", "Lovely finish and it arrived well packed."},
+        {"Use it every day", "Feels solid and has held up beautifully."},
+        {"Great gift", "Bought one for my sister and ended up ordering another for me."},
+        {"Good, not perfect", "Nice quality, though a little smaller than I expected."},
+        {"Worth it", "You can tell it was made with care. Shipping was quick too."},
+    };
 
     public DemoStores(StoreRepository stores, StoreStaffRepository staff,
             LocationRepository locations, ProductRepository products,
@@ -261,7 +274,8 @@ public class DemoStores {
             RegisterRepository registers, StoreOrderRepository sales,
             OrderLineRepository saleLines,
             com.codenameone.examples.bazaar.marketing.DemoMarketing marketing,
-            PhotoRepository photos, ProductPhotoRepository gallery) {
+            PhotoRepository photos, ProductPhotoRepository gallery, ReviewRepository reviews) {
+        this.reviews = reviews;
         this.photos = photos;
         this.gallery = gallery;
         this.marketing = marketing;
@@ -700,12 +714,53 @@ public class DemoStores {
             }
         }
         pictures(store, made);
+        List<Review> reviewRows = reviews(made, now);
         products.saveAll(made);
+        reviews.saveAll(reviewRows);
         options.saveAll(optionRows);
         variants.saveAll(variantRows);
         levels.saveAll(levelRows);
         moves.saveAll(moveRows);
         return made;
+    }
+
+    /// The published reviews behind each product's seeded rating: as many as
+    /// its rating count, their stars spread so they add up to its rating
+    /// total (which is then set to exactly that sum), so the average on a
+    /// card and the reviews behind it agree.
+    private static List<Review> reviews(List<Product> made, long now) throws IOException {
+        List<Review> out = new ArrayList<Review>();
+        for (int p = 0; p < made.size(); p++) {
+            Product product = made.get(p);
+            int count = (int) product.getRatingCount();
+            if (count <= 0) {
+                continue;
+            }
+            long total = Math.max(count, Math.min(5L * count, product.getRatingTotal()));
+            int base = (int) (total / count);
+            int extra = (int) (total % count);
+            long sum = 0;
+            for (int r = 0; r < count; r++) {
+                int stars = Math.min(5, base + (r < extra ? 1 : 0));
+                sum += stars;
+                String[] text = REVIEW_TEXT[(p + r) % REVIEW_TEXT.length];
+                Review review = new Review();
+                review.setId(Ids.next());
+                review.setStoreId(product.getStoreId());
+                review.setProductId(product.getId());
+                review.setUsername("demo-reviewer-" + r + "@bazaar.example");
+                review.setAuthorName(REVIEWERS[(p * 3 + r) % REVIEWERS.length]);
+                review.setRating(stars);
+                review.setTitle(text[0]);
+                review.setBody(text[1]);
+                review.setStatus("PUBLISHED");
+                review.setVerified(r % 3 != 2);
+                review.setCreatedAt(Instant.ofEpochMilli(now - (r * 5L + p % 7 + 1) * 86400000L));
+                out.add(review);
+            }
+            product.setRatingTotal(sum);
+        }
+        return out;
     }
 
     /// Stores each product's seed photos and makes the first its main one.

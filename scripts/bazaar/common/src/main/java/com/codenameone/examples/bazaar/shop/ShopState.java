@@ -266,6 +266,15 @@ public final class ShopState {
         return token.length() == 0 ? null : token;
     }
 
+    /// Adopts a guest cart's `token` for the current store -- the cart
+    /// reminder mail's link carries it -- so the next [#loadCart] fetches
+    /// that cart, or merges it into the account's when someone is signed in.
+    static void adoptToken(String token) {
+        if (store != null && token != null && token.length() > 0) {
+            Preferences.set(TOKEN_KEY + store.id(), token);
+        }
+    }
+
     /// Takes what the server says the cart is now.
     public static void setCart(CartDto changed) {
         cart = changed;

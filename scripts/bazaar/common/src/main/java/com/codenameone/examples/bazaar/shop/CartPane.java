@@ -144,17 +144,19 @@ final class CartPane extends ShopPane {
                     : Lang.tr("Sold out"), "ShopStockOut"));
         }
         Container stepper = new Container(BoxLayout.x());
-        stepper.setUIID("SvStepper");
+        stepper.setUIID("ShopStepper");
         Button less = new Button("", "ShopStepButton");
         less.setName("line-less-" + line.id());
+        less.setAccessibilityText(Lang.tr(line.quantity() <= 1 ? "Remove" : "Decrease quantity"));
         FontImage.setMaterialIcon(less, line.quantity() <= 1 ? FontImage.MATERIAL_DELETE
                 : FontImage.MATERIAL_REMOVE, 2.8f);
         Button more = new Button("", "ShopStepButton");
         more.setName("line-more-" + line.id());
+        more.setAccessibilityText(Lang.tr("Increase quantity"));
         FontImage.setMaterialIcon(more, FontImage.MATERIAL_ADD, 2.8f);
         less.addActionListener(e -> change(line, line.quantity() - 1));
         more.addActionListener(e -> change(line, line.quantity() + 1));
-        stepper.add(less).add(new Label(String.valueOf(line.quantity()), "SvQuantity")).add(more);
+        stepper.add(less).add(new Label(String.valueOf(line.quantity()), "ShopStepValue")).add(more);
         words.add(FlowLayout.encloseIn(stepper));
         row.add(BorderLayout.CENTER, words);
         Container prices = new Container(BoxLayout.y());

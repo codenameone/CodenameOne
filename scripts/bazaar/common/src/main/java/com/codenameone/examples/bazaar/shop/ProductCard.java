@@ -91,7 +91,7 @@ final class ProductCard {
                 ProductForm.quickAdd(p.id());
             }),
             Command.create(Lang.tr("Copy link"), null, e -> {
-                Display.getInstance().copyToClipboard(ShopSections.link(p.handle()));
+                Display.getInstance().copyToClipboard(ShopSections.link(p.storeId(), p.handle()));
                 Ui.say("Link copied");
             })
         });

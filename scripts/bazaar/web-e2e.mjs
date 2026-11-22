@@ -448,6 +448,101 @@ async function appDeepLink() {
   }
 }
 
+/// The product page as a guest on a phone, in a browser of its own: a gallery
+/// dot jumps to its picture, a variant chip is selected, Share copies the link
+/// (plain http has no Web Share), the rating opens every review, and the link
+/// a cart reminder carries (`/app/?store=...&cart=...`) brings the cart back in
+/// a browser that never saw it.
+async function productControls() {
+  const context = await browser.newContext({ viewport: { width: 420, height: 860 } });
+  try {
+    const shop = await context.newPage();
+    const tokens = [];
+    // The guest token is in the cart the server answers (the path names
+    // the store, not the cart).
+    shop.on('response', async r => {
+      if (r.request().method() === 'POST' && /\/api\/shop\/cart\/[^/]+\/lines/.test(r.url())) {
+        try {
+          const token = (await r.json()).token;
+          if (token) {
+            tokens.push(token);
+          }
+        } catch (err) {
+          // not a cart: ignored
+        }
+      }
+    });
+    const all = () => shop.evaluate(() => Array.from(document.querySelectorAll(
+        '#cn1-accessibility-tree [data-cn1-accessibility-id]')).map(el => {
+      const box = el.getBoundingClientRect();
+      return { role: el.getAttribute('role'), label: el.getAttribute('aria-label'),
+        text: el.innerText, x: box.x, y: box.y, width: box.width, height: box.height };
+    }));
+    const wait = async (what, seconds, probe) => {
+      const end = Date.now() + seconds * 1000;
+      for (;;) {
+        const hit = probe(await all());
+        if (hit) {
+          return hit;
+        }
+        if (Date.now() > end) {
+          throw new Error(`timed out after ${seconds}s waiting for ${what}`);
+        }
+        await shop.waitForTimeout(250);
+      }
+    };
+    const tap = async c => {
+      await shop.mouse.click(c.x + c.width / 2, c.y + c.height / 2);
+      await shop.waitForTimeout(700);
+    };
+    const labelled = label => list => list.find(c => c.role === 'button' && c.label === label);
+    const shot = name => shop.screenshot({ path: path.join(out, name + '.png') });
+
+    await shop.goto(origin + '/app/?store=littleclay&product=speckled-morning-mug', { waitUntil: 'load' });
+    const add = await wait('the product page', startSeconds, labelled('Add to cart'));
+    await shop.waitForTimeout(1500);
+    await tap(await wait('the second gallery dot', stepSeconds, labelled('Picture 2 of 2')));
+    await wait('the second picture to show', stepSeconds, labelled('Picture 2 of 2, showing'));
+    await shot('16-gallery-dot');
+    await tap(await wait('the Sea glass chip', stepSeconds, labelled('Sea glass')));
+    await wait('Sea glass to be selected', stepSeconds, labelled('Sea glass, selected'));
+    await shot('17-variant-chip');
+    await tap(await wait('the Share button', stepSeconds, labelled('Share')));
+    await wait('the link to be copied', stepSeconds, list => list.some(c => c.text === 'Link copied'
+        || c.label === 'Link copied'));
+    say('a gallery dot, a variant chip and Share (copied over http) work on the product page');
+    await shop.waitForTimeout(3500);
+    await tap(add);
+    await wait('the guest cart on the server', stepSeconds, () => tokens.length > 0);
+    await tap(await wait('the rating row', stepSeconds, list => list.find(c => c.text === 'See reviews')));
+    await wait('the reviews list', stepSeconds, labelled('Write a review'));
+    await shot('18-reviews');
+    say('the rating opened every review of the product');
+
+    const fresh = await browser.newContext({ viewport: { width: 420, height: 860 } });
+    try {
+      const other = await fresh.newPage();
+      await other.goto(origin + '/app/?store=littleclay&cart=' + tokens[0], { waitUntil: 'load' });
+      const end = Date.now() + startSeconds * 1000;
+      while (!(await other.evaluate(() => Array.from(document.querySelectorAll(
+          '#cn1-accessibility-tree [data-cn1-accessibility-id]')).some(el =>
+          el.getAttribute('role') === 'button' && el.getAttribute('aria-label') === 'Checkout')
+          && document.body.innerText.includes('Speckled Morning Mug')))) {
+        if (Date.now() > end) {
+          throw new Error('the cart link did not bring the cart back');
+        }
+        await other.waitForTimeout(500);
+      }
+      await other.screenshot({ path: path.join(out, '19-cart-link.png') });
+      say('the cart reminder link restored the cart in a new browser');
+    } finally {
+      await fresh.close();
+    }
+  } finally {
+    await context.close();
+  }
+}
+
 let failed = null;
 try {
   say('opening ' + url);
@@ -627,8 +722,17 @@ try {
   await settled();
   await click(await waitFor('the Account tab', stepSeconds, button('Account')));
   await settled();
-  await click(await waitFor('Sign out on the Account tab', stepSeconds, async () =>
-      (await components()).find(c => c.label === 'Sign out' || c.text === 'Sign out')));
+  // Sign out is the last row, and on a phone it can sit under the tab bar:
+  // a click at its place would land on a tab. Scroll until it is clear.
+  const signOut = async () => (await components()).find(c => c.label === 'Sign out' || c.text === 'Sign out');
+  await waitFor('Sign out on the Account tab', stepSeconds, signOut);
+  for (let i = 0; i < 10 && (await signOut()).y + (await signOut()).height > page.viewportSize().height - 90; i++) {
+    await page.mouse.move(210, 400);
+    await page.mouse.wheel(0, 300);
+    await page.waitForTimeout(400);
+  }
+  await settled();
+  await click(await signOut());
   // Back to the guest shop, whose Account tab offers a sign-in again.
   await waitFor('the guest Account tab after signing out', stepSeconds, button('Create an account'));
   await settled();
@@ -661,6 +765,9 @@ try {
 
   // 10. The storefront's "Open the app" link, into the app on that product.
   await appDeepLink();
+
+  // 11. The product page's controls, and the cart reminder's link.
+  await productControls();
 } catch (err) {
   failed = err;
   try {

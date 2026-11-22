@@ -21,7 +21,10 @@ package com.codenameone.examples.bazaar.shop;
 import com.codename1.ui.CN;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
+import com.codename1.ui.Display;
 import com.codename1.ui.Form;
+import com.codename1.ui.geom.Rectangle;
+import com.codenameone.examples.bazaar.api.StoreDto;
 import com.codenameone.examples.bazaar.net.Session;
 import com.codenameone.examples.bazaar.ui.Nav;
 import com.codenameone.examples.bazaar.ui.Sections;
@@ -106,13 +109,38 @@ public final class ShopSections {
     }
 
     /// The address of a product on the web storefront, for sharing and for
-    /// "Copy link".
-    static String link(String productHandle) {
-        String store = ShopState.store() == null ? "" : ShopState.store().handle();
+    /// "Copy link": `/s/<store>/products/<product>`, the storefront's own
+    /// path. The store is the product's (`storeId`) when the app knows it --
+    /// a product opened from Discover need not be the current store's.
+    static String link(String storeId, String productHandle) {
+        StoreDto owner = storeId == null ? null : ShopState.known(storeId);
+        if (owner == null) {
+            owner = ShopState.store();
+        }
+        String store = owner == null ? "" : owner.handle();
         String base = Session.serverUrl();
         if (base.endsWith("/")) {
             base = base.substring(0, base.length() - 1);
         }
-        return base + "/shop/" + store + "/products/" + productHandle;
+        return base + "/s/" + store + "/products/" + productHandle;
+    }
+
+    /// Shares a product: the platform's share sheet where there is one (the
+    /// Web Share API in a browser that has it), otherwise the link is copied
+    /// and a toast says so.
+    static void share(Component from, String storeId, String title, String handle) {
+        String url = link(storeId, handle);
+        if (CN.isNativeShareSupported()) {
+            // The link first: the browser port splits "<url> <words>" into
+            // navigator.share's url and text, and a phone shares it as is.
+            // (Never the link as the image argument: Android reads that as a
+            // file.)
+            Display.getInstance().share(url + " " + title, null, null,
+                    new Rectangle(from.getAbsoluteX(), from.getAbsoluteY(),
+                            from.getWidth(), from.getHeight()));
+            return;
+        }
+        Display.getInstance().copyToClipboard(url);
+        Ui.say("Link copied");
     }
 }

@@ -1323,23 +1323,44 @@ ShopFilterSide { background-color: var(--surface-alt); border-right: 1px solid v
 ShopFilters { background-color: transparent; padding: 3mm; margin: 0; }
 ShopFilterTitle { color: var(--text-muted); font-family: "native:MainBold"; font-size: 2.3mm; padding: 2.4mm 0 0.8mm 0; margin: 0; background-color: transparent; }
 ShopChips { background-color: transparent; padding: 0; margin: 0; }
-ShopChip { color: var(--text); background: cn1-pill-border; background-color: var(--surface); border: 1px solid var(--line-strong); font-family: "native:MainRegular"; font-size: 2.5mm; padding: 1.2mm 2.6mm 1.2mm 2.6mm; margin: 0.6mm 1.2mm 0.6mm 0; }
-ShopChip.pressed { background-color: var(--surface-press); }
-ShopChip.selected { border: 1px solid var(--brand); }
-ShopChipOn { color: var(--brand-contrast); background: cn1-pill-border; background-color: var(--brand); font-family: "native:MainBold"; font-size: 2.5mm; padding: 1.2mm 2.6mm 1.2mm 2.6mm; margin: 0.6mm 1.2mm 0.6mm 0; }
-ShopChipOut { color: var(--text-muted); background: cn1-pill-border; background-color: var(--surface-alt); font-family: "native:MainRegular"; font-size: 2.5mm; text-decoration: line-through; padding: 1.2mm 2.6mm 1.2mm 2.6mm; margin: 0.6mm 1.2mm 0.6mm 0; }
+/* An option chip. ONE shape in every state: a rounded border with a 1px
+   outline and the same font size, padding and margin, so nothing moves or
+   changes shape when pressed, focused (a browser focuses what was clicked:
+   that is the .selected style) or picked. Unpicked is outlined, picked is
+   filled with the accent, a value with no variant left is greyed and struck.
+   The shape is a border-radius, not cn1-pill-border: a pill image with an
+   outline on top drew square in the states that did not repeat it. */
+ShopChip, ShopChip.selected { color: var(--text); background-color: var(--surface); border: 1px solid var(--line-strong); border-radius: 2.8mm; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; padding: 1.2mm 2.6mm 1.2mm 2.6mm; margin: 0.6mm 1.2mm 0.6mm 0; }
+ShopChip.pressed { color: var(--text); background-color: var(--surface-press); border: 1px solid var(--brand); border-radius: 2.8mm; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; padding: 1.2mm 2.6mm 1.2mm 2.6mm; margin: 0.6mm 1.2mm 0.6mm 0; }
+ShopChip.disabled { color: var(--text-muted); background-color: var(--surface-alt); border: 1px solid var(--line); border-radius: 2.8mm; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; padding: 1.2mm 2.6mm 1.2mm 2.6mm; margin: 0.6mm 1.2mm 0.6mm 0; }
+ShopChipOn, ShopChipOn.selected { color: var(--brand-contrast); background-color: var(--brand); border: 1px solid var(--brand); border-radius: 2.8mm; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; padding: 1.2mm 2.6mm 1.2mm 2.6mm; margin: 0.6mm 1.2mm 0.6mm 0; }
+ShopChipOn.pressed { color: var(--brand-contrast); background-color: var(--brand-pressed); border: 1px solid var(--brand-pressed); border-radius: 2.8mm; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; padding: 1.2mm 2.6mm 1.2mm 2.6mm; margin: 0.6mm 1.2mm 0.6mm 0; }
+ShopChipOut, ShopChipOut.selected, ShopChipOut.disabled { color: var(--text-muted); background-color: var(--surface-alt); border: 1px solid var(--line); border-radius: 2.8mm; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; text-decoration: line-through; padding: 1.2mm 2.6mm 1.2mm 2.6mm; margin: 0.6mm 1.2mm 0.6mm 0; }
+ShopChipOut.pressed { color: var(--text); background-color: var(--surface-press); border: 1px solid var(--line-strong); border-radius: 2.8mm; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; text-decoration: line-through; padding: 1.2mm 2.6mm 1.2mm 2.6mm; margin: 0.6mm 1.2mm 0.6mm 0; }
 ShopStock { color: var(--success); font-family: "native:MainRegular"; font-size: 2.5mm; padding: 1mm 0 1mm 0; margin: 0; background-color: transparent; }
 ShopStockLow { color: var(--warning); font-family: "native:MainBold"; font-size: 2.5mm; padding: 1mm 0 1mm 0; margin: 0; background-color: transparent; }
 ShopStockOut { color: var(--danger); font-family: "native:MainRegular"; font-size: 2.5mm; padding: 1mm 0 1mm 0; margin: 0; background-color: transparent; }
 ShopIconButton { color: var(--text); background-color: transparent; padding: 1.6mm; margin: 0; }
 ShopIconButton.pressed { background: cn1-pill-border; background-color: var(--surface-press); }
-ShopStepButton { color: var(--text); background-color: transparent; padding: 1.6mm 2mm 1.6mm 2mm; margin: 0; }
-ShopStepButton.pressed { color: var(--brand); }
+/* The quantity: "Quantity" on the left, centred on the stepper's height, and
+   an outlined box holding - value + whose buttons are square, transparent in
+   every state but pressed. */
+ShopQtyRow { background-color: transparent; padding: 1.6mm 0 0.8mm 0; margin: 0; }
+ShopQtyLabel { color: var(--text); font-family: "native:MainBold"; font-size: 2.75mm; padding: 0 3mm 0 0; margin: 0; background-color: transparent; }
+ShopStepper { background-color: var(--surface); border: 1px solid var(--line-strong); border-radius: var(--radius); padding: 0; margin: 0; }
+ShopStepButton, ShopStepButton.selected { color: var(--text); background-color: transparent; text-align: center; padding: 1.8mm 2.4mm 1.8mm 2.4mm; margin: 0; }
+ShopStepButton.pressed { color: var(--brand); background-color: var(--surface-press); text-align: center; padding: 1.8mm 2.4mm 1.8mm 2.4mm; margin: 0; }
+ShopStepButton.disabled { color: var(--line-strong); background-color: transparent; text-align: center; padding: 1.8mm 2.4mm 1.8mm 2.4mm; margin: 0; }
+ShopStepValue { color: var(--text); background-color: transparent; border-left: 1px solid var(--line); border-right: 1px solid var(--line); font-family: "native:MainBold"; font-size: 2.9mm; text-align: center; padding: 1.8mm 2mm 1.8mm 2mm; margin: 0; }
 ShopGallery { background-color: var(--surface-alt); padding: 0; margin: 0; }
 ShopGalleryImage { background-color: transparent; padding: 0; margin: 0; }
-ShopDots { background-color: transparent; padding: 0 0 1.6mm 0; margin: 0; }
-ShopDot { background: cn1-pill-border; background-color: var(--line-strong); padding: 0.6mm; margin: 0 0.6mm 0 0.6mm; }
-ShopDotOn { background: cn1-pill-border; background-color: var(--brand); padding: 0.6mm 1.4mm 0.6mm 1.4mm; margin: 0 0.6mm 0 0.6mm; }
+ShopDots { background-color: transparent; padding: 0 0 1mm 0; margin: 0; }
+/* A dot is a button: its padding is the place to tap, the round fill in the
+   middle (cn1-pill-border over the padding) the dot. */
+ShopDot, ShopDot.selected, ShopDot.pressed { background: cn1-pill-border; background-color: var(--line-strong); padding: 0.9mm; margin: 1.4mm 1mm 1.4mm 1mm; }
+ShopDotOn, ShopDotOn.selected, ShopDotOn.pressed { background: cn1-pill-border; background-color: var(--brand); padding: 0.9mm 2mm 0.9mm 2mm; margin: 1.4mm 1mm 1.4mm 1mm; }
+ShopGalleryArrow, ShopGalleryArrow.selected { color: var(--text); background: cn1-pill-border; background-color: var(--surface); padding: 1.4mm; margin: 0 2mm 0 2mm; }
+ShopGalleryArrow.pressed { color: var(--brand); background: cn1-pill-border; background-color: var(--surface-press); padding: 1.4mm; margin: 0 2mm 0 2mm; }
 /* Discover, the follow button, the sign-in prompt and the parcel timeline. */
 ShopDiscoverHead { background-color: var(--brand-tint); padding: 4mm 3.6mm 3.6mm 3.6mm; margin: 0 0 1mm 0; }
 ShopDiscoverTitle { color: var(--text); font-family: "native:MainBold"; font-size: 7mm; padding: 0; margin: 0; background-color: transparent; }
@@ -1364,7 +1385,7 @@ ShopHeroFollow.pressed { background-color: var(--surface-press); }
 ShopHeroFollowing { color: var(--brand-contrast); background-color: var(--brand); border-radius: var(--radius); font-family: "native:MainBold"; font-size: 2.9mm; text-align: center; padding: 2.75mm 4mm 2.75mm 4mm; margin: 1.6mm 0 0.8mm 2mm; }
 ShopHeroFollowing.pressed { background-color: var(--brand-pressed); }
 ShopGate { background-color: transparent; text-align: center; padding: 8mm 2mm 4mm 2mm; margin: 0; }
-ShopGateIcon { color: var(--brand); background: cn1-pill-border; background-color: var(--brand-tint); text-align: center; padding: 3mm; margin: 0 0 3mm 0; }
+ShopGateIcon { color: var(--brand); background-color: transparent; text-align: center; padding: 0; margin: 0 0 2mm 0; }
 ShopGateTitle { color: var(--text); font-family: "native:MainBold"; font-size: 4.4mm; text-align: center; padding: 0; margin: 0; background-color: transparent; }
 ShopGateText { color: var(--text-muted); font-family: "native:MainRegular"; font-size: 2.75mm; text-align: center; padding: 1.6mm 2mm 4mm 2mm; margin: 0; background-color: transparent; }
 ShopParcel { background-color: var(--surface-alt); border-radius: var(--radius); padding: 1.6mm 2.4mm 2mm 2.4mm; margin: 0 0 2mm 0; }
@@ -1647,21 +1668,29 @@ MeAccentTagline { color: var(--brand-contrast); background-color: transparent; f
     ShopFilterOn { background-color: var(--brand-tint-dark); }
     ShopFilterSide { background-color: var(--surface-alt-dark); border-right: 1px solid var(--line-dark); }
     ShopFilterTitle { color: var(--text-muted-dark); }
-    ShopChip { color: var(--text-dark); background-color: var(--surface-dark); border: 1px solid var(--line-strong-dark); }
-    ShopChip.pressed { background-color: var(--surface-press-dark); }
-    ShopChip.selected { border: 1px solid var(--brand-dark); }
-    ShopChipOn { color: var(--brand-contrast-dark); background-color: var(--brand-dark); }
-    ShopChipOut { color: var(--text-muted-dark); background-color: var(--surface-alt-dark); }
+    ShopChip, ShopChip.selected { color: var(--text-dark); background-color: var(--surface-dark); border: 1px solid var(--line-strong-dark); border-radius: 2.8mm; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; padding: 1.2mm 2.6mm 1.2mm 2.6mm; margin: 0.6mm 1.2mm 0.6mm 0; }
+    ShopChip.pressed { color: var(--text-dark); background-color: var(--surface-press-dark); border: 1px solid var(--brand-dark); border-radius: 2.8mm; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; padding: 1.2mm 2.6mm 1.2mm 2.6mm; margin: 0.6mm 1.2mm 0.6mm 0; }
+    ShopChip.disabled { color: var(--text-muted-dark); background-color: var(--surface-alt-dark); border: 1px solid var(--line-dark); border-radius: 2.8mm; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; padding: 1.2mm 2.6mm 1.2mm 2.6mm; margin: 0.6mm 1.2mm 0.6mm 0; }
+    ShopChipOn, ShopChipOn.selected { color: var(--brand-contrast-dark); background-color: var(--brand-dark); border: 1px solid var(--brand-dark); border-radius: 2.8mm; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; padding: 1.2mm 2.6mm 1.2mm 2.6mm; margin: 0.6mm 1.2mm 0.6mm 0; }
+    ShopChipOn.pressed { color: var(--brand-contrast-dark); background-color: var(--brand-pressed-dark); border: 1px solid var(--brand-pressed-dark); border-radius: 2.8mm; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; padding: 1.2mm 2.6mm 1.2mm 2.6mm; margin: 0.6mm 1.2mm 0.6mm 0; }
+    ShopChipOut, ShopChipOut.selected, ShopChipOut.disabled { color: var(--text-muted-dark); background-color: var(--surface-alt-dark); border: 1px solid var(--line-dark); border-radius: 2.8mm; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; text-decoration: line-through; padding: 1.2mm 2.6mm 1.2mm 2.6mm; margin: 0.6mm 1.2mm 0.6mm 0; }
+    ShopChipOut.pressed { color: var(--text-dark); background-color: var(--surface-press-dark); border: 1px solid var(--line-strong-dark); border-radius: 2.8mm; font-family: "native:MainRegular"; font-size: 2.5mm; text-align: center; text-decoration: line-through; padding: 1.2mm 2.6mm 1.2mm 2.6mm; margin: 0.6mm 1.2mm 0.6mm 0; }
     ShopStock { color: var(--success-dark); }
     ShopStockLow { color: var(--warning-dark); }
     ShopStockOut { color: var(--danger-dark); }
     ShopIconButton { color: var(--text-dark); }
     ShopIconButton.pressed { background-color: var(--surface-press-dark); }
-    ShopStepButton { color: var(--text-dark); }
-    ShopStepButton.pressed { color: var(--brand-dark); }
+    ShopQtyLabel { color: var(--text-dark); }
+    ShopStepper { background-color: var(--surface-dark); border: 1px solid var(--line-strong-dark); border-radius: var(--radius); padding: 0; margin: 0; }
+    ShopStepButton, ShopStepButton.selected { color: var(--text-dark); background-color: transparent; text-align: center; padding: 1.8mm 2.4mm 1.8mm 2.4mm; margin: 0; }
+    ShopStepButton.pressed { color: var(--brand-dark); background-color: var(--surface-press-dark); text-align: center; padding: 1.8mm 2.4mm 1.8mm 2.4mm; margin: 0; }
+    ShopStepButton.disabled { color: var(--line-strong-dark); background-color: transparent; text-align: center; padding: 1.8mm 2.4mm 1.8mm 2.4mm; margin: 0; }
+    ShopStepValue { color: var(--text-dark); background-color: transparent; border-left: 1px solid var(--line-dark); border-right: 1px solid var(--line-dark); font-family: "native:MainBold"; font-size: 2.9mm; text-align: center; padding: 1.8mm 2mm 1.8mm 2mm; margin: 0; }
     ShopGallery { background-color: var(--surface-alt-dark); }
-    ShopDot { background-color: var(--line-strong-dark); }
-    ShopDotOn { background-color: var(--brand-dark); }
+    ShopDot, ShopDot.selected, ShopDot.pressed { background: cn1-pill-border; background-color: var(--line-strong-dark); padding: 0.9mm; margin: 1.4mm 1mm 1.4mm 1mm; }
+    ShopDotOn, ShopDotOn.selected, ShopDotOn.pressed { background: cn1-pill-border; background-color: var(--brand-dark); padding: 0.9mm 2mm 0.9mm 2mm; margin: 1.4mm 1mm 1.4mm 1mm; }
+    ShopGalleryArrow, ShopGalleryArrow.selected { color: var(--text-dark); background: cn1-pill-border; background-color: var(--surface-dark); padding: 1.4mm; margin: 0 2mm 0 2mm; }
+    ShopGalleryArrow.pressed { color: var(--brand-dark); background: cn1-pill-border; background-color: var(--surface-press-dark); padding: 1.4mm; margin: 0 2mm 0 2mm; }
     ShopSummary { background-color: var(--surface-alt-dark); }
     ShopCheck { color: var(--brand-dark); }
     ShopPlacedIcon { color: var(--success-dark); }
@@ -2558,7 +2587,14 @@ ShopReviewSummary { padding: 1.6mm 0 2mm 0; margin: 0; }
 ShopReviewAverage { color: var(--text); font-family: "native:MainBold"; font-size: 6mm; padding: 0; margin: 0 3mm 0 0; }
 ShopReviewTrack { background-color: var(--surface-alt); border-radius: 0.6mm; padding: 0; margin: 0.8mm 1.4mm 0.8mm 1.4mm; }
 ShopReviewFill { background-color: #f59e0b; border-radius: 0.6mm; padding: 0.6mm 0 0.6mm 0; margin: 0; }
-ShopReview { border-top: 1px solid var(--line); padding: 2mm 0 2mm 0; margin: 0; }
+ShopReview { background-color: transparent; border-top: 1px solid var(--line); padding: 2mm 0 2mm 0; margin: 0; }
+ShopReviewAuthor { color: var(--text-muted); font-family: "native:MainRegular"; font-size: 2.3mm; padding: 0.8mm 0 0 0; margin: 0; background-color: transparent; }
+/* The product page's stars: one tappable row that opens the reviews. The
+   lead button is invisible; the row shows it is pressed. */
+ShopRatingRow { background-color: transparent; border-radius: var(--radius-small); padding: 0.6mm 0 0.6mm 0; margin: 0; }
+ShopRatingRow.pressed { background-color: var(--surface-press); border-radius: var(--radius-small); padding: 0.6mm 0 0.6mm 0; margin: 0; }
+ShopRatingLink, ShopRatingLink.selected, ShopRatingLink.pressed { background-color: transparent; padding: 0; margin: 0; }
+ShopRatingMore { color: var(--brand); font-family: "native:MainBold"; font-size: 2.5mm; padding: 0.4mm 0 0 2mm; margin: 0; background-color: transparent; }
 
 @media (prefers-color-scheme: dark) {
     MeAutoRoot { background-color: var(--surface-alt-dark); }
@@ -2600,7 +2636,10 @@ ShopReview { border-top: 1px solid var(--line); padding: 2mm 0 2mm 0; margin: 0;
     ShopReviewAverage { color: var(--text-dark); }
     ShopReviewTrack { background-color: var(--surface-alt-dark); }
     ShopReviewFill { background-color: #fbbf24; }
-    ShopReview { border-top: 1px solid var(--line-dark); }
+    ShopReview { background-color: transparent; border-top: 1px solid var(--line-dark); }
+    ShopReviewAuthor { color: var(--text-muted-dark); }
+    ShopRatingRow.pressed { background-color: var(--surface-press-dark); border-radius: var(--radius-small); padding: 0.6mm 0 0.6mm 0; margin: 0; }
+    ShopRatingMore { color: var(--brand-dark); }
     ShopDiscoverHead { background-color: var(--brand-tint-dark); }
     ShopDiscoverTitle { color: var(--text-dark); }
     ShopDiscoverText { color: var(--text-muted-dark); }
@@ -2619,7 +2658,7 @@ ShopReview { border-top: 1px solid var(--line); padding: 2mm 0 2mm 0; margin: 0;
     ShopHeroFollow.pressed { background-color: var(--surface-press-dark); }
     ShopHeroFollowing { color: var(--brand-contrast-dark); background-color: var(--brand-dark); }
     ShopHeroFollowing.pressed { background-color: var(--brand-pressed-dark); }
-    ShopGateIcon { color: var(--brand-dark); background-color: var(--brand-tint-dark); }
+    ShopGateIcon { color: var(--brand-dark); background-color: transparent; }
     ShopGateTitle { color: var(--text-dark); }
     ShopGateText { color: var(--text-muted-dark); }
     ShopParcel { background-color: var(--surface-alt-dark); }

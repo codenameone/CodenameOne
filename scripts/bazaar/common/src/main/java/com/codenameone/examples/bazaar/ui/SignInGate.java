@@ -18,6 +18,7 @@
  */
 package com.codenameone.examples.bazaar.ui;
 
+import com.codename1.ui.Button;
 import com.codename1.ui.Container;
 import com.codename1.ui.FontImage;
 import com.codename1.ui.Form;
@@ -65,14 +66,21 @@ public final class SignInGate {
     public static Container prompt(final Form form, String title, String why) {
         Container box = new Container(BoxLayout.y());
         box.setUIID("ShopGate");
+        // A plain glyph in the accent, centred at its own size: no badge
+        // behind it, and no gap reserved for text it does not have.
         Label icon = new Label("", "ShopGateIcon");
-        Ui.icon(icon, FontImage.MATERIAL_LOCK_OPEN, 7f);
-        // Centred at its own size: stretched across the column, the round
-        // badge became a wide pill.
+        FontImage.setMaterialIcon(icon, FontImage.MATERIAL_LOCK_OUTLINE, 9f);
         box.add(FlowLayout.encloseCenter(icon));
-        box.add(Ui.label(title, "ShopGateTitle"));
+        // Wrapped, not cut: a long title ("Your Bazaar account") ran past a
+        // phone's width into an ellipsis. The lines are centred by the
+        // styles' text-align; a centred text block (setTextBlockAlign) sits
+        // in a flow row that measures it as one line, and the buttons after
+        // it were squeezed to nothing.
+        box.add(Ui.text(title, "ShopGateTitle"));
         box.add(Ui.text(why, "ShopGateText"));
-        box.add(Ui.primary("Sign in", "signIn", e -> SignInForm.show(form)));
+        Button in = Ui.primary("Sign in", "signIn", e -> SignInForm.show(form));
+        FontImage.setMaterialIcon(in, FontImage.MATERIAL_LOGIN, 3.4f);
+        box.add(in);
         box.add(Ui.secondary("Create an account", "register", e -> RegisterForm.show(form)));
         if (AppConfig.serverSwitchable()) {
             box.add(Ui.link("Server address", "server", e -> ServerForm.show(form)));

@@ -393,7 +393,12 @@ public final class Ui {
     public static void relayout(Container changed) {
         Form form = changed.getComponentForm();
         if (form != null) {
+            // Two passes, as refresh does: new wrapping content (a row of
+            // chips, a review's text) is measured before it has a width, and
+            // one pass left the selected chip and the review's author
+            // clipped to nothing.
             form.revalidateLater();
+            CN.callSerially(() -> form.revalidateLater());
         } else {
             changed.revalidateLater();
         }
@@ -518,6 +523,25 @@ public final class Ui {
             }
             Layouts.centre(this, margin);
             super.layoutContainer();
+        }
+
+        /// The width the content's heights were last measured at.
+        private int measuredAt = -1;
+
+        @Override
+        protected void laidOut() {
+            super.laidOut();
+            if (getWidth() > 0 && getWidth() != measuredAt) {
+                // Wrapped text is measured before it has a width of its own,
+                // at the display's, so the first pass at a new width gives it
+                // too few lines -- and a box sized from that clipped whatever
+                // followed its text (the guest sign-in prompt lost both its
+                // buttons). Once per width, measure again now that every
+                // piece knows how wide it is.
+                measuredAt = getWidth();
+                setShouldCalcPreferredSize(true);
+                revalidateLater();
+            }
         }
     }
 

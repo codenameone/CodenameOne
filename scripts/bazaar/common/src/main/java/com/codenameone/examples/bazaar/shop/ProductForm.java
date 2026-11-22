@@ -24,7 +24,6 @@ import com.codename1.ui.Button;
 import com.codename1.ui.CN;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
-import com.codename1.ui.Display;
 import com.codename1.ui.FontImage;
 import com.codename1.ui.Form;
 import com.codename1.ui.Image;
@@ -71,7 +70,7 @@ final class ProductForm {
     private final Container options = new Container(BoxLayout.y());
     private final Container priceRow = new Container(new FlowLayout());
     private final Label stock = new Label("", "ShopStock");
-    private final Label count = new Label("1", "SvQuantity");
+    private final Label count = new Label("1", "ShopStepValue");
     private Button add;
     private Component gallery;
     private Image picture;
@@ -189,7 +188,7 @@ final class ProductForm {
             page.add(Ui.text(product.description(), "SvText"));
         }
         Ui.section(page, "Reviews");
-        page.add(ProductReviews.create(product.id()));
+        page.add(ProductReviews.create(product.id(), product.title()));
         root.add(BorderLayout.CENTER, page);
         Ui.relayout(root);
     }
@@ -224,23 +223,63 @@ final class ProductForm {
                 }
             }
         }
+        // The dots are buttons, one per picture, that jump to it -- a swipe
+        // is not the only way through, and a mouse cannot swipe. Each says
+        // which picture it is and whether it is the one showing, the way a
+        // radio button would.
         final Container dots = new Container(new FlowLayout(Component.CENTER));
         dots.setUIID("ShopDots");
         final int pages = tabs.getTabCount();
         for (int iter = 0; iter < pages && pages > 1; iter++) {
-            dots.add(new Label("", iter == 0 ? "ShopDotOn" : "ShopDot"));
+            final int index = iter;
+            Button dot = new Button("", iter == 0 ? "ShopDotOn" : "ShopDot");
+            dot.setName("gallery-dot-" + (iter + 1));
+            dot.addActionListener(e -> tabs.setSelectedIndex(index, true));
+            dots.add(dot);
         }
+        markDots(dots, 0);
         tabs.addSelectionListener((old, now) -> {
-            for (int iter = 0; iter < dots.getComponentCount(); iter++) {
-                dots.getComponentAt(iter).setUIID(iter == now ? "ShopDotOn" : "ShopDot");
-            }
+            markDots(dots, now);
             dots.repaint();
         });
         tabs.setPreferredH(height);
         Container g = new Container(new LayeredLayout());
         g.add(tabs);
         g.add(BorderLayout.south(dots));
+        if (pages > 1 && (wide || CN.isDesktop())) {
+            // A mouse gets arrows as well, either side of the picture.
+            Button back = arrow(FontImage.MATERIAL_CHEVRON_LEFT, "gallery-previous",
+                    Lang.tr("Previous picture"), e -> tabs.setSelectedIndex(
+                            (tabs.getSelectedIndex() + pages - 1) % pages, true));
+            Button next = arrow(FontImage.MATERIAL_CHEVRON_RIGHT, "gallery-next",
+                    Lang.tr("Next picture"), e -> tabs.setSelectedIndex(
+                            (tabs.getSelectedIndex() + 1) % pages, true));
+            Container sides = new Container(new BorderLayout(BorderLayout.CENTER_BEHAVIOR_CENTER));
+            sides.add(BorderLayout.WEST, FlowLayout.encloseCenterMiddle(back));
+            sides.add(BorderLayout.EAST, FlowLayout.encloseCenterMiddle(next));
+            g.add(sides);
+        }
         return g;
+    }
+
+    private static Button arrow(char icon, String name, String says,
+            ActionListener<ActionEvent> onClick) {
+        Button b = new Button("", "ShopGalleryArrow");
+        b.setName(name);
+        b.setAccessibilityText(says);
+        FontImage.setMaterialIcon(b, icon, 3.6f);
+        b.addActionListener(onClick);
+        return b;
+    }
+
+    private static void markDots(Container dots, int now) {
+        int pages = dots.getComponentCount();
+        for (int iter = 0; iter < pages; iter++) {
+            Component dot = dots.getComponentAt(iter);
+            dot.setUIID(iter == now ? "ShopDotOn" : "ShopDot");
+            dot.setAccessibilityText(Lang.tr(iter == now ? "Picture {0} of {1}, showing"
+                    : "Picture {0} of {1}", String.valueOf(iter + 1), String.valueOf(pages)));
+        }
     }
 
     private Label art(String seed, int width, int height) {
@@ -289,14 +328,28 @@ final class ProductForm {
         Button share = new Button("", "ShopIconButton");
         share.setName("share");
         FontImage.setMaterialIcon(share, FontImage.MATERIAL_SHARE, 3.8f);
-        share.addActionListener(e -> Display.getInstance().share(product.title() + " "
-                + ShopSections.link(product.handle()), null, null, new com.codename1.ui.geom.Rectangle(share.getAbsoluteX(),
-                share.getAbsoluteY(), share.getWidth(), share.getHeight())));
+        share.setAccessibilityText(Lang.tr("Share"));
+        share.addActionListener(e -> ShopSections.share(share, product.storeId(),
+                product.title(), product.handle()));
+        heart.setAccessibilityText(Lang.tr("Save to wishlist"));
         actions.add(heart).add(share);
         head.add(BorderLayout.EAST, actions);
         info.add(head);
         if (product.ratingCount() > 0) {
-            info.add(ShopUi.stars(product.rating(), product.ratingCount()));
+            // The stars open the reviews behind them.
+            Button rating = new Button("", "ShopRatingLink");
+            rating.setName("rating");
+            rating.setAccessibilityText(Lang.tr("{0} reviews", String.valueOf(product.ratingCount())));
+            Container row = ShopUi.stars(product.rating(), product.ratingCount());
+            Container tap = new Container(new BorderLayout());
+            tap.setUIID("ShopRatingRow");
+            tap.add(BorderLayout.CENTER, row);
+            Label more = new Label(Lang.tr("See reviews"), "ShopRatingMore");
+            tap.add(BorderLayout.EAST, more);
+            tap.setLeadComponent(rating);
+            tap.add(BorderLayout.WEST, rating);
+            rating.addActionListener(e -> ProductReviews.showAll(product.id(), product.title()));
+            info.add(tap);
         }
         priceRow.setUIID("ShopPriceRow");
         info.add(priceRow);
@@ -312,23 +365,38 @@ final class ProductForm {
     }
 
     private Container stepper() {
-        Container row = new Container(new FlowLayout(Component.LEFT, Component.CENTER));
-        row.add(Ui.label("Quantity", "SvLabel"));
-        Container stepper = new Container(BoxLayout.x());
-        stepper.setUIID("SvStepper");
-        Button less = new Button("", "ShopStepButton");
-        less.setName("qty-less");
-        FontImage.setMaterialIcon(less, FontImage.MATERIAL_REMOVE, 3f);
-        Button more = new Button("", "ShopStepButton");
-        more.setName("qty-more");
-        FontImage.setMaterialIcon(more, FontImage.MATERIAL_ADD, 3f);
-        count.setName("qty");
+        // The label sits on the stepper's middle line (a BorderLayout row
+        // with its centre centred), not at the top of a flow row.
+        Container row = new Container(new BorderLayout(BorderLayout.CENTER_BEHAVIOR_CENTER_ABSOLUTE));
+        row.setUIID("ShopQtyRow");
+        row.add(BorderLayout.WEST, Ui.label("Quantity", "ShopQtyLabel"));
+        Container stepper = stepper(count, "qty", e -> step(-1), e -> step(1));
+        row.add(BorderLayout.CENTER, FlowLayout.encloseMiddle(stepper));
         count.setText(String.valueOf(quantity));
-        less.addActionListener(e -> step(-1));
-        more.addActionListener(e -> step(1));
-        stepper.add(less).add(count).add(more);
-        row.add(stepper);
         return row;
+    }
+
+    /// An outlined `- value +` box: square buttons either side of `value`,
+    /// each named for a test and labelled for a screen reader. The cart's
+    /// lines use the same one.
+    static Container stepper(Label value, String name, ActionListener<ActionEvent> less,
+            ActionListener<ActionEvent> more) {
+        Container stepper = new Container(BoxLayout.x());
+        stepper.setUIID("ShopStepper");
+        Button down = new Button("", "ShopStepButton");
+        down.setName(name + "-less");
+        down.setAccessibilityText(Lang.tr("Decrease quantity"));
+        FontImage.setMaterialIcon(down, FontImage.MATERIAL_REMOVE, 3.2f);
+        Button up = new Button("", "ShopStepButton");
+        up.setName(name + "-more");
+        up.setAccessibilityText(Lang.tr("Increase quantity"));
+        FontImage.setMaterialIcon(up, FontImage.MATERIAL_ADD, 3.2f);
+        value.setUIID("ShopStepValue");
+        value.setName(name);
+        down.addActionListener(less);
+        up.addActionListener(more);
+        stepper.add(down).add(value).add(up);
+        return stepper;
     }
 
     private void step(int by) {
@@ -369,6 +437,9 @@ final class ProductForm {
                 Button chip = new Button(value, on ? "ShopChipOn"
                         : possible ? "ShopChip" : "ShopChipOut");
                 chip.setName("option-" + position + "-" + value);
+                // Said like a radio button: which value, and its state.
+                chip.setAccessibilityText(on ? Lang.tr("{0}, selected", value)
+                        : possible ? value : Lang.tr("{0}, unavailable", value));
                 chip.addActionListener(e -> {
                     chosen[at] = value;
                     if (Variants.resolve(product.options(), product.variants(), chosen) == null) {

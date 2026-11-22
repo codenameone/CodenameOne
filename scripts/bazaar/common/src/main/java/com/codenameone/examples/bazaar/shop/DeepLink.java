@@ -24,7 +24,8 @@ import com.codenameone.examples.bazaar.net.Api;
 import com.codenameone.examples.bazaar.ui.Sections;
 
 /// The page the app was opened on in a browser: `/app/?store=<handle>` opens
-/// that store, and `&product=<handle>` that product of it. The storefront's
+/// that store, `&product=<handle>` that product of it, and `&cart=<token>`
+/// that store's guest cart, on the Cart tab. The storefront's
 /// "Open the app" link and the cart reminder mail (`SiteUrls.appCart` on the
 /// server) both send it. Read once, on the first home screen; outside a
 /// browser the property is absent and nothing happens.
@@ -46,12 +47,20 @@ public final class DeepLink {
             return;
         }
         final String product = param(search, "product");
+        final String cart = param(search, "cart");
         Api.stores().store(store, Net.to(s -> {
             if (s == null) {
                 return;
             }
             ShopState.useStore(s);
             ShopState.setInStore(true);
+            if (cart != null) {
+                // The reminder mail's cart: adopt its token, fetch it and
+                // show it on the Cart tab.
+                ShopState.adoptToken(cart);
+                ShopState.loadCart(() -> ShopSections.show(Sections.CART));
+                return;
+            }
             ShopSections.show(Sections.HOME);
             if (product != null) {
                 Api.catalog().productByHandle(store, product, Net.to(p -> {

@@ -95,7 +95,7 @@ public final class Shell implements Nav.Home {
             overflow();
         }
         DesktopMenus.install(form, this);
-        Layouts.dress(form);
+        dress(form);
         Layouts.onChange(form, Nav::home);
     }
 
@@ -137,6 +137,18 @@ public final class Shell implements Nav.Home {
                 : sections.isEmpty() ? null : sections.get(0).id());
     }
 
+    /// Dresses `root` in the desktop theme for the staff consoles only. The
+    /// shop keeps the app's own look on every platform: a browser on a
+    /// desktop answers `isDesktop`, and dressing the shopper's tabs there gave
+    /// them the platform's grey page and controls -- the guest sign-in
+    /// prompt's buttons collapsed to nothing -- while the screens opened over
+    /// them (a product) kept the app's look.
+    private void dress(Container root) {
+        if (!Nav.SHOP.equals(mode)) {
+            Layouts.dress(root);
+        }
+    }
+
     /// Opens section `id` of this mode. Does nothing for an id it does not have.
     public void show(String id) {
         Section section = find(id);
@@ -158,7 +170,7 @@ public final class Shell implements Nav.Home {
         }
         mark();
         Ui.viewed(mode + "-" + id);
-        Layouts.dress(body);
+        dress(body);
         form.revalidateWithAnimationSafety();
     }
 
@@ -216,7 +228,7 @@ public final class Shell implements Nav.Home {
             Ui.icon(entry.getValue(), icon, wide ? 3.4f : 3.6f);
         }
         if (side != null) {
-            Layouts.dress(side);
+            dress(side);
         }
     }
 
