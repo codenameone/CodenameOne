@@ -72,11 +72,11 @@ on a row.
 | Suppliers | &#10003; | core | app/plugin | app/plugin | core | 
 | Stocktakes / counts | &#10003; | core | app/plugin | app/plugin | core | 
 | Low-stock alerts / reorder points | &#10003; | core | core | core | core | 
-| Continue selling when out of stock (oversell) | &#9681; | core | core | core | no | Stock is reserved atomically and never oversold; an open pre-order sells past stock up to its limit.
-| Committed / unavailable / incoming states | &#9681; | core | no | no | no | Reserved and incoming (from purchase orders) are tracked.
+| Continue selling when out of stock (oversell) | &#10003; | core | core | core | no | Per variant: a variant set to continue selling takes orders past zero, and the shortfall shows as backordered on the order.
+| Committed / unavailable / incoming states | &#10003; | core | no | no | no | Committed (reserved by orders), unavailable with a reason (damaged, quality control, safety stock) and incoming from purchase orders.
 | Inventory value report | &#10003; | core | app/plugin | app/plugin | core | 
-| Barcode label printing | &#9681; | app/plugin | app/plugin | app/plugin | core | Code 128 barcodes are drawn; no label-sheet layout.
-| Serial / lot tracking | &#8211; | app/plugin | app/plugin | app/plugin | no | 
+| Barcode label printing | &#10003; | app/plugin | app/plugin | app/plugin | core | Code 128 label sheets as PDF: Avery 30-up letter sheets and 2x1 inch thermal labels, from the product list or a received purchase order.
+| Serial / lot tracking | &#10003; | app/plugin | app/plugin | app/plugin | no | Serial numbers and lots with expiry dates; lots are picked first-expiring-first, and a serial can be looked up to its order.
 |===
 
 === Checkout and payments
@@ -128,24 +128,24 @@ on a row.
 | Edit order after placement | &#10003; | core | core | core | no | Add, remove and re-price lines; the difference is charged or refunded. 
 | Draft orders | &#10003; | core | core | core | core | 
 | Invoices (PDF) / send invoice | &#10003; | core | core | core | core | 
-| Payment links for drafts | &#9681; | core | core | core | core | Draft orders exist; there is no pay link for the buyer.
+| Payment links for drafts | &#10003; | core | core | core | core | A signed pay link with an expiry, sent by email and paid on the storefront.
 | Manual capture / authorize-only | &#10003; | core | core | core | core | Online orders are authorized at checkout and captured when paid in full.
 | Partial fulfillment | &#10003; | core | core | core | core | 
-| Order archiving / cancel | &#9681; | core | core | core | core | Orders can be cancelled; there is no archive.
+| Order archiving / cancel | &#10003; | core | core | core | core | Archive and unarchive, an archived filter, and optional auto-archive once an order is fulfilled and paid.
 | Order export CSV | &#10003; | core | core | core | core | 
 | Order status page for buyer | &#10003; | core | core | core | core | 
-| Bulk order actions (bulk fulfil/print) | &#9681; | core | core | core | core | Pick lists print for many orders.
+| Bulk order actions (bulk fulfil/print) | &#10003; | core | core | core | core | Fulfil, buy labels, print packing slips, mark paid, archive or tag many orders at once; each order reports its own result.
 | Kanban fulfilment board | &#10003; | app/plugin | app/plugin | no | no | Receiving to dispatch, per location, with bins and pick lists. 
 | Customer self-serve return requests | &#10003; | core | app/plugin | core | no | 
 | Return reasons | &#10003; | core | app/plugin | core | no | 
 | Receive & restock returns | &#10003; | core | core | core | core | 
-| Exchanges (online) | &#9681; | core | app/plugin | app/plugin | no | Exchanges at the register.
-| Return rules / windows / fees | &#8211; | core | app/plugin | app/plugin | no | 
+| Exchanges (online) | &#10003; | core | app/plugin | app/plugin | no | Shoppers choose a refund, store credit or an exchange for another variant; the price difference is charged through a pay link or refunded.
+| Return rules / windows / fees | &#10003; | core | app/plugin | app/plugin | no | Return window, final-sale products and collections, a restocking fee percentage and a return shipping fee, set per store.
 | Draft order creation | &#10003; | core | core | core | core | 
-| Send invoice / checkout link | &#9681; | core | core | core | core | PDF invoices; no pay link.
+| Send invoice / checkout link | &#10003; | core | core | core | core | The pay link is emailed and printed on the invoice PDF.
 | Transactional email notifications | &#10003; | core | core | core | core | 
 | SMS notifications | &#10003; | core | core | core | core | 
-| Editable notification templates | &#8211; | core | core | core | core | 
+| Editable notification templates | &#10003; | core | core | core | core | Every customer email and the SMS receipt, per language, with placeholders, preview and reset to the default.
 | Staff notifications | &#10003; | core | core | core | core | 
 |===
 

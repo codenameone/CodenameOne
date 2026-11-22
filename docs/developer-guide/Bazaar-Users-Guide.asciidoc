@@ -142,12 +142,29 @@ between locations with a transfer, and received against a purchase order sent to
 a supplier. A barcode scanner, the camera or a keyboard scanner on a desktop,
 finds a variant by its code. Every change is listed in the variant's history.
 
+A variant can keep selling when it runs out; the shortfall shows as backordered
+on the order. Stock that is on hand but cannot be sold is set aside as
+unavailable with a reason: damaged, in quality control or held as safety stock.
+Variants can be tracked by serial number or by lot with an expiry date, and
+lots are picked first-expiring-first. Barcode labels print as a PDF, on Avery
+30-up sheets or 2x1 inch thermal labels, for chosen variants or for everything
+a purchase order brought in.
+
 ==== Orders and fulfilment
 
 The orders list filters by status, channel and payment. An order shows its lines,
 payments, notes and timeline, and can be cancelled, refunded in part or in full,
 or marked paid. A draft order is an order the merchant builds by hand, for a phone
-sale.
+sale; a pay link emails the buyer a checkout page for it, and the link is printed
+on the invoice. Orders can be archived out of the list, by hand or automatically
+once fulfilled and paid, and many orders can be fulfilled, labelled, printed,
+marked paid, archived or tagged at once.
+
+The store's return rules set the return window, which products and collections
+are final sale, a restocking fee and a return shipping fee. A shopper asking for
+a return chooses a refund, store credit or an exchange for another variant; an
+exchange that costs more sends a pay link for the difference. Every email and the
+register's SMS receipt can be reworded per language, previewed and reset.
 
 The fulfilment board shows every open order as a card in To pack, Packed, Shipped
 or Delivered. Dragging a card to the next column packs it, buys a label and ships

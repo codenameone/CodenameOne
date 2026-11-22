@@ -119,6 +119,34 @@ already happened: the customer left with the goods. The sync records it with a
 `POS_SYNC` move even when that takes a level negative, marks the sale as
 oversold, and raises a low-stock alert for a person to sort out.
 
+Two more kinds of stock sit beside on hand. `inventory_unavailable` holds units
+set aside with a reason, which `InventoryStates` subtracts from available, and
+`Tracking` keeps serials and lots: a sale that takes a lot-tracked level down
+calls `pickLots`, which draws from the lot that expires first. A variant that
+continues selling reserves with `reserveCounted`, which answers how many units
+it could not cover; the order line keeps that as `backorderedQty`.
+
+[[bazaar-order-tools]]
+=== Pay links, returns and templates
+
+A pay link (`PayLinks`) is a row in `pay_link` holding a token of the link id,
+its expiry and an HMAC of both, so a link cannot be forged or extended and a new
+link replaces the old. Paying claims the link first and reverts the claim if the
+card fails, so two tabs cannot pay twice. The invoice reads the stored token
+rather than calling `PayLinks`, which keeps `Documents` free of a dependency on
+email.
+
+Returns read their rules from `OrderSettings`. `Resolutions` settles a received
+return by the resolution the shopper picked: every path goes through the order's
+own refund, with the fees and any exchange credit kept back, so the order's
+totals and the card agree. An exchange creates a replacement order, pays it with
+the credit as an `EXCHANGE` tender, and mails a pay link when money is still
+owed.
+
+`Templates` keeps a store's rewording of a `mail.*` key per language. `Emails`
+looks a key up there before the built-in text; a template may only use the
+placeholders the built-in text has, and is filled as plain text, never markup.
+
 [[bazaar-payments]]
 === Authorize at checkout, capture at shipping
 
