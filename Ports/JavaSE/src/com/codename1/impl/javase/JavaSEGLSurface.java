@@ -65,7 +65,11 @@ class JavaSEGLSurface extends JComponent implements JavaSEGpuSurface {
             if (timer == null) {
                 timer = new Timer(16, new ActionListener() {
                     public void actionPerformed(ActionEvent e) {
-                        view.repaint();
+                        if (HIDDEN) {
+                            renderOffscreen();
+                        } else {
+                            view.repaint();
+                        }
                     }
                 });
             }
@@ -76,10 +80,55 @@ class JavaSEGLSurface extends JComponent implements JavaSEGpuSurface {
     }
 
     public void requestRender() {
-        view.repaint();
+        if (HIDDEN) {
+            renderOffscreen();
+        } else {
+            view.repaint();
+        }
+    }
+
+    /// A hidden simulator (`cn1.simulator.hidden`) never shows its window, and
+    /// Swing does not paint a component that is not showing, so a repaint
+    /// would never reach [#paintComponent] and the view would sit on its first
+    /// frame. There the timer renders each frame itself, into the device's
+    /// image, and painting -- which a screen capture still does -- only draws
+    /// the last one, so a capture does not advance the view by a frame.
+    static final boolean HIDDEN = Boolean.getBoolean("cn1.simulator.hidden");
+    private boolean rendered;
+    private boolean disposed;
+
+    /// Run after each offscreen frame by the port, which copies the frame
+    /// into the peer's buffer -- what a capture of the form draws.
+    private Runnable afterOffscreenFrame;
+
+    public void setAfterOffscreenFrame(Runnable afterFrame) {
+        afterOffscreenFrame = afterFrame;
+    }
+
+    private void renderOffscreen() {
+        if (disposed) {
+            // A last tick or render request queued before the dispose.
+            return;
+        }
+        renderFrame(getWidth(), getHeight());
+        if (afterOffscreenFrame != null) {
+            afterOffscreenFrame.run();
+        }
     }
 
     public void disposeSurface() {
+        if (HIDDEN && !java.awt.EventQueue.isDispatchThread()) {
+            // Hidden, frames are rendered on the AWT thread by the timer, not
+            // by painting; disposing from another thread could free the
+            // renderer in the middle of one. Serialize with them instead.
+            java.awt.EventQueue.invokeLater(new Runnable() {
+                public void run() {
+                    disposeSurface();
+                }
+            });
+            return;
+        }
+        disposed = true;
         if (timer != null) {
             timer.stop();
             timer = null;
@@ -97,6 +146,20 @@ class JavaSEGLSurface extends JComponent implements JavaSEGpuSurface {
         if (w <= 0 || h <= 0) {
             return;
         }
+        if (!HIDDEN || !rendered) {
+            renderFrame(w, h);
+        }
+        BufferedImage img = device.getImage();
+        if (img != null) {
+            g.drawImage(img, 0, 0, null);
+        }
+    }
+
+    private void renderFrame(int w, int h) {
+        if (w <= 0 || h <= 0) {
+            return;
+        }
+        rendered = true;
         device.resize(w, h);
         if (!initialized) {
             try {
@@ -120,10 +183,6 @@ class JavaSEGLSurface extends JComponent implements JavaSEGpuSurface {
             renderer.onFrame(device);
         } catch (Throwable t) {
             t.printStackTrace();
-        }
-        BufferedImage img = device.getImage();
-        if (img != null) {
-            g.drawImage(img, 0, 0, null);
         }
     }
 

@@ -1,0 +1,285 @@
+/*
+ * The whole look of Papercut.
+ *
+ * Every screen is built from ordinary Codename One widgets, and this file
+ * makes them read like things cut out of paper and laid on a desk: kraft
+ * brown behind, cream cards with a soft shadow under them, hand lettering,
+ * felt-pen red for whatever you should press next and ballpoint blue for
+ * everything secondary. Change the palette below to re-skin the game.
+ *
+ * The page itself is not styled here: play/ArenaView.java draws it with
+ * com.codename1.gaming, and play/Hud.java writes over it.
+ */
+@font-face {
+    font-family: "Gochi Hand";
+    src: url("fonts/GochiHand-Regular.ttf");
+}
+@font-face {
+    font-family: "Patrick Hand";
+    src: url("fonts/PatrickHand-Regular.ttf");
+}
+#Constants {
+    includeNativeBool: true;
+    defaultSourceDPIInt: "0";
+    transitionSpeedInt: "250";
+    dialogTransitionIn: "fade";
+    dialogTransitionOut: "fade";
+    dlgCommandGridBool: false;
+    dlgButtonCommandUIID: "DialogAction";
+    tintColor: "a03a2a1a";
+    scrollVisibleBool: false;
+    tabsSelectionCapsuleBool: false;
+    tabsAnimatedIndicatorBool: false;
+    /* tag::papercut-palette[] */
+    --desk: #8f6e4c;
+    --desk-dark: #6e5238;
+    --card: #fbf7ec;
+    --card-edge: #e8dfc8;
+    --ink: #262c42;
+    --ink-muted: #6b6f7c;
+    --pen: #d4483c;
+    --pen-dark: #a8322a;
+    --ballpoint: #2f6fa0;
+    --rule: #6f9fd8;
+    --good: #3f8f5a;
+    /* end::papercut-palette[] */
+}
+
+Default {
+    font-family: "Patrick Hand";
+    font-size: 3.4mm;
+    color: var(--ink);
+}
+
+Form {
+    background-color: var(--desk);
+}
+Container {
+    background-color: transparent;
+}
+ContentPane {
+    background-color: transparent;
+}
+Toolbar {
+    background-color: var(--desk-dark);
+    padding: 1mm 2mm 1mm 2mm;
+    border: none;
+}
+Title {
+    font-family: "Gochi Hand";
+    font-size: 4.6mm;
+    color: var(--card);
+    background-color: transparent;
+}
+TitleCommand, BackCommand {
+    color: var(--card);
+    font-family: "Patrick Hand";
+    font-size: 3.6mm;
+    background-color: transparent;
+}
+
+Label {
+    font-family: "Patrick Hand";
+    font-size: 4mm;
+    color: var(--ink);
+    background-color: transparent;
+}
+SpanLabel, SpanLabelText {
+    color: var(--ink);
+    background-color: transparent;
+}
+
+/* The game's name on the home screen, felt pen on the desk. */
+Logo {
+    font-family: "Gochi Hand";
+    font-size: 13mm;
+    color: var(--card);
+    text-align: center;
+    background-color: transparent;
+}
+Tagline {
+    font-family: "Patrick Hand";
+    font-size: 3.6mm;
+    color: #f0e6cf;
+    text-align: center;
+    background-color: transparent;
+}
+
+/* A cut-out card: cream paper with a shadow, for groups of content. */
+Card {
+    background-color: var(--card);
+    border-radius: 1.2mm;
+    box-shadow: 0.4mm 0.8mm 1.2mm 0 rgba(40, 25, 10, 0.45);
+    padding: 2.5mm;
+    margin: 1.5mm 2mm 1.5mm 2mm;
+}
+CardTitle {
+    font-family: "Gochi Hand";
+    font-size: 5mm;
+    color: var(--ink);
+    background-color: transparent;
+}
+CardText {
+    color: var(--ink-muted);
+    background-color: transparent;
+}
+
+/* The main action: a red paper tab. */
+Button, RaisedButton {
+    font-family: "Gochi Hand";
+    font-size: 4.6mm;
+    color: #ffffff;
+    background-color: var(--pen);
+    border-radius: 1mm;
+    box-shadow: 0.3mm 0.7mm 0.8mm 0 rgba(40, 25, 10, 0.5);
+    padding: 1.8mm 4mm 1.8mm 4mm;
+    margin: 1mm;
+    text-align: center;
+}
+Button.pressed, RaisedButton.pressed {
+    background-color: var(--pen-dark);
+    box-shadow: 0.1mm 0.2mm 0.3mm 0 rgba(40, 25, 10, 0.35);
+}
+/* Everything secondary: cream paper, ballpoint lettering. */
+Secondary {
+    font-family: "Patrick Hand";
+    font-size: 3.8mm;
+    color: var(--ballpoint);
+    background-color: var(--card);
+    border-radius: 1mm;
+    box-shadow: 0.3mm 0.6mm 0.7mm 0 rgba(40, 25, 10, 0.45);
+    padding: 1.4mm 3mm 1.4mm 3mm;
+    margin: 1mm;
+    text-align: center;
+}
+Secondary.pressed {
+    background-color: var(--card-edge);
+    box-shadow: 0.1mm 0.2mm 0.3mm 0 rgba(40, 25, 10, 0.35);
+}
+/* A link-like button: just ink. */
+Plain {
+    font-family: "Patrick Hand";
+    font-size: 3.6mm;
+    color: var(--ballpoint);
+    background-color: transparent;
+    padding: 1mm 2mm 1mm 2mm;
+    margin: 0;
+    text-align: center;
+}
+Plain.pressed {
+    color: var(--pen);
+}
+/* The small round paper buttons over the game: pause. */
+HudButton {
+    font-size: 4.2mm;
+    color: var(--ink);
+    background-color: rgba(251, 247, 236, 0.85);
+    border-radius: 50%;
+    padding: 1.4mm;
+    margin: 1.5mm;
+}
+
+/* The overlay when a run ends or the game is paused. */
+Scrim {
+    background-color: rgba(38, 30, 20, 0.62);
+}
+BigScore {
+    font-family: "Gochi Hand";
+    font-size: 11mm;
+    color: var(--ink);
+    text-align: center;
+    background-color: transparent;
+}
+Accent {
+    font-family: "Patrick Hand";
+    font-size: 4mm;
+    color: var(--pen);
+    background-color: transparent;
+}
+Muted {
+    font-family: "Patrick Hand";
+    font-size: 3.4mm;
+    color: var(--ink-muted);
+    background-color: transparent;
+}
+OnDesk {
+    color: var(--card);
+    background-color: transparent;
+}
+
+TextField, TextHint {
+    font-family: "Patrick Hand";
+    font-size: 4mm;
+    color: var(--ink);
+    background-color: #ffffff;
+    border: 0.3mm solid var(--card-edge);
+    border-radius: 0.8mm;
+    padding: 1.6mm;
+    margin: 1mm 0 1mm 0;
+}
+TextHint {
+    color: #a0a3ad;
+    border: none;
+    background-color: transparent;
+}
+
+Dialog {
+    background-color: var(--card);
+    border-radius: 1.2mm;
+    padding: 3mm;
+}
+DialogTitle {
+    font-family: "Gochi Hand";
+    font-size: 5mm;
+    color: var(--ink);
+    background-color: transparent;
+}
+DialogBody {
+    color: var(--ink);
+    background-color: transparent;
+}
+DialogAction {
+    font-family: "Gochi Hand";
+    font-size: 4.2mm;
+    color: var(--pen);
+    background-color: transparent;
+    padding: 1.5mm 3mm 1.5mm 3mm;
+}
+
+/* Tabs are a strip of the card, so their ink reads on any page. */
+Tab, TabSelected {
+    font-family: "Patrick Hand";
+    font-size: 3.4mm;
+    color: var(--ink-muted);
+    background-color: var(--card);
+    padding: 1.5mm 1.2mm 1.5mm 1.2mm;
+}
+TabSelected {
+    color: var(--pen);
+    border-bottom: 0.6mm solid var(--pen);
+}
+Tabs {
+    background-color: transparent;
+}
+TabsContainer {
+    background-color: var(--card);
+}
+
+/* List rows (boards, shop, console): ruled lines on a strip of paper,
+   so the ink reads on the desk. */
+Row {
+    background-color: var(--card);
+    border-bottom: 0.2mm solid var(--rule);
+    padding: 1.4mm 2mm 1.4mm 2mm;
+}
+RowMe {
+    background-color: #f7dcd6;
+    border-bottom: 0.2mm solid var(--rule);
+    padding: 1.4mm 2mm 1.4mm 2mm;
+}
+Rank {
+    font-family: "Gochi Hand";
+    font-size: 4.2mm;
+    color: var(--pen);
+    background-color: transparent;
+}

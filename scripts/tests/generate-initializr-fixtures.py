@@ -99,6 +99,7 @@ FULL_STACK = {
     'SKIRMISH': ('api/AccountApi.java', 'ui/HomeForm.java'),
     'DASH': ('api/AccountApi.java', 'ui/HomeForm.java'),
     'SPLAT': ('api/AccountApi.java', 'ui/HomeForm.java'),
+    'PAPERCUT': ('api/RunApi.java', 'ui/HomeForm.java'),
     'PARLEY': ('api/ConversationApi.java', 'ui/CallScreen.java'),
     'REEL': ('api/CatalogApi.java', 'ui/WelcomeForm.java'),
     'BASTION': ('api/BankingApi.java', 'ui/HomeForm.java'),
@@ -115,6 +116,7 @@ TEMPLATE_HINT = {
     'SKIRMISH': None,
     'DASH': None,
     'SPLAT': None,
+    'PAPERCUT': None,
     'PARLEY': 'codename1.arg.ios.NSLocationWhenInUseUsageDescription=',
     'BASTION': 'codename1.arg.ios.detectJailbreak=true',
     'REEL': None,
@@ -148,8 +150,9 @@ def check_full_stack_fixture(archive, z, template):
     full = archive.name.split('-')[1] == 'FULL'
     root_pom = ''.join(z.read('pom.xml').decode().split())
     assert '<module>shared</module><module>common</module>' in root_pom, archive.name
-    # The games keep their rules in shared, beside the contract, as FIELDLINE keeps its engine.
-    game = template in ('SKIRMISH', 'DASH', 'SPLAT')
+    # The games keep their rules in shared, beside the contract, as FIELDLINE keeps its engine;
+    # PAPERCUT has none: its arena runs in the app, and the server bounds scores.
+    game = template in ('SKIRMISH', 'DASH', 'SPLAT', 'PAPERCUT')
     assert '<module>rules</module>' not in root_pom, archive.name
     for module in ('shared', 'common', 'backend'):
         assert module + '/pom.xml' in names, (archive.name, module)

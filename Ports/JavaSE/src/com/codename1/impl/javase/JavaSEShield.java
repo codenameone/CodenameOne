@@ -76,6 +76,12 @@ public final class JavaSEShield {
     public static boolean simRepackaged;
     public static boolean simUntrustedAccessibility;
 
+    /** True when the simulated device has a user-installed (possibly keylogging) keyboard selected. */
+    public static boolean simThirdPartyKeyboard;
+
+    /** The keyboard id the simulated device reports while {@link #simThirdPartyKeyboard} is on. */
+    public static final String SIM_THIRD_PARTY_KEYBOARD = "com.example.keylogger/.KeyboardService";
+
     /**
      * True when the simulated device reports that another app's window is drawn
      * over this one, i.e. a tapjacking attempt.
@@ -176,6 +182,7 @@ public final class JavaSEShield {
         simDebugger = false;
         simRepackaged = false;
         simUntrustedAccessibility = false;
+        simThirdPartyKeyboard = false;
         simScreenObscured = false;
         tokenTtlSeconds = 300;
         serveExpiredToken = false;
@@ -196,6 +203,8 @@ public final class JavaSEShield {
           .append(reasons.length == 0 ? "(none)" : String.join(", ", reasons)).append('\n');
         sb.append("Accessibility: ")
           .append(simUntrustedAccessibility ? "untrusted service enabled" : "clean").append('\n');
+        sb.append("Keyboard: ")
+          .append(simThirdPartyKeyboard ? "third-party " + SIM_THIRD_PARTY_KEYBOARD : "preinstalled").append('\n');
         sb.append("Token TTL: ").append(tokenTtlSeconds).append("s")
           .append(serveExpiredToken ? " (serving expired)" : "").append('\n');
         sb.append("Pinning: ")

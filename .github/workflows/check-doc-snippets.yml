@@ -20,6 +20,7 @@ on:
       - 'scripts/slate/**'
       - 'scripts/splat/**'
       - 'scripts/skirmish/**'
+      - 'scripts/papercut/**'
       - 'scripts/dash/**'
       - 'scripts/hellocodenameone/common/src/main/kmp/**'
       - 'docs/website/content/blog/**'

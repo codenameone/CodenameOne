@@ -92,4 +92,4 @@ Brickyard supplies the platform and its source. Running one also requires your o
 
 ## Looking for another kind of game?
 
-[Dash](/dash/) is the endless runner, [Skirmish](/skirmish/) the real-time card battler and [Splat](/splat/) the team paintball shooter.
+[Dash](/dash/) is the endless runner, [Skirmish](/skirmish/) the real-time card battler [Splat](/splat/) the team paintball shooter and [Papercut](/papercut/) the twin-stick arena shooter.
