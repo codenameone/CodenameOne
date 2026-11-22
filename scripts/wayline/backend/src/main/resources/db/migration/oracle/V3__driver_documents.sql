@@ -1,0 +1,19 @@
+-- The pictures a driving application is backed by -- an identity document, a
+-- licence, a selfie, the car's registration and its insurance -- one of each
+-- kind for an account, as base64 text.
+--
+-- In the database and not on a disk beside the server, so every instance of
+-- the server reads the same documents and a backup of the database is a backup
+-- of them. The server caps what it accepts well below what this column holds.
+--
+-- This is the one script written per engine: a document outgrows the 64 KB of
+-- MySQL's TEXT, and LONGTEXT is a type the other two do not have.
+CREATE TABLE driver_document (
+    username VARCHAR2(190 CHAR),
+    kind VARCHAR2(24 CHAR),
+    content_type VARCHAR2(32 CHAR),
+    status VARCHAR2(16 CHAR),
+    uploaded_at NUMBER(19) NOT NULL,
+    data CLOB,
+    PRIMARY KEY (username, kind)
+);

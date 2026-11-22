@@ -74,7 +74,9 @@ import java.util.Set;
 /// agent through the app's MCP server -- goes through the same
 /// [AgentTools], so what an agent can do and what a creator can do are one
 /// list. The tabs are Explorer (the instance tree), Properties (of the
-/// selection), Script (the selected script's source) and Output.
+/// selection), Script (the selected script's source), Output and the
+/// experimental Logic tab ([LogicPanel]), a node graph that compiles to a
+/// part's Luau.
 public final class Studio implements AgentTools.Studio {
     private static final int UNDO_DEPTH = 30;
     private static Studio current;
@@ -88,7 +90,7 @@ public final class Studio implements AgentTools.Studio {
     private String description = "Made in the Brickyard studio.";
     private final Container viewport = new Container(new BorderLayout());
     private final Container panel = new Container(new BorderLayout());
-    private final Container tabBar = new Container(new GridLayout(1, 4));
+    private final Container tabBar = new Container(new GridLayout(1, 5));
     private int tab;
     private PlayView view;
     private Engine engine;
@@ -103,6 +105,7 @@ public final class Studio implements AgentTools.Studio {
     private final Container explorer = new Container(BoxLayout.y());
     private final Container properties = new Container(BoxLayout.y());
     private final CodeEditor source = LuauLanguage.editor();
+    private final LogicPanel logic = new LogicPanel(this);
     private final TextArea output = new TextArea(12, 40);
     private final List<byte[]> redo = new ArrayList<byte[]>();
     /// Folders and models the creator opened in the Explorer; the rest stay
@@ -172,7 +175,7 @@ public final class Studio implements AgentTools.Studio {
         return e;
     }
 
-    private static final String[] TABS = {"Explorer", "Properties", "Script", "Output"};
+    private static final String[] TABS = {"Explorer", "Properties", "Script", "Output", "Logic"};
 
     private void show(final Form previous) {
         current = this;
@@ -384,7 +387,10 @@ public final class Studio implements AgentTools.Studio {
         if (shell != null) {
             // Explorer and Properties are always docked; only the bottom
             // pane switches, between the script and the output.
-            if (index >= 2) {
+            if (index == 4) {
+                logic.show(selected);
+                shell.showLogic(logic.view());
+            } else if (index >= 2) {
                 shell.showBottom(index == 2);
             }
             form.revalidate();
@@ -395,6 +401,12 @@ public final class Studio implements AgentTools.Studio {
             final int k = i;
             Button b = new Button(TABS[i], i == index ? "StudioTabSelected" : "StudioTab");
             // Words alone: four icons and four words did not fit a phone.
+            // Five equal cells on a phone are narrower than "Properties" at
+            // the tab font: the label shrinks to its cell rather than clip.
+            b.setAutoSizeMode(true);
+            // Never larger than the stylesheet's tab font (StudioTab, 2.5mm).
+            b.setMaxAutoSize(2.5f);
+            b.setMinAutoSize(1.6f);
             b.setName("tab" + TABS[i]);
             b.addActionListener(ev -> showTab(k));
             tabBar.add(b);
@@ -409,6 +421,9 @@ public final class Studio implements AgentTools.Studio {
             script.add(BorderLayout.CENTER, source);
             script.add(BorderLayout.SOUTH, Ui.primary("Save script", "saveScript", ev -> saveScript()));
             panel.add(BorderLayout.CENTER, script);
+        } else if (index == 4) {
+            logic.show(selected);
+            panel.add(BorderLayout.CENTER, logic.view());
         } else {
             panel.add(BorderLayout.CENTER, wrap(index == 0 ? explorer : index == 1 ? properties : output));
         }
@@ -1024,6 +1039,18 @@ public final class Studio implements AgentTools.Studio {
         });
     }
 
+    /// Writes `luau`, compiled by the Logic tab, as `part`'s Logic script:
+    /// the same undoable `write_script` edit the Script tab makes.
+    void writeLogic(Instance part, String luau) {
+        edit("write_script", "{\"parent\":" + q(part.fullName()) + ",\"name\":" + q(LogicGraph.SCRIPT_NAME)
+                + ",\"source\":" + q(luau) + "}");
+        Instance created = part.findFirstChild(LogicGraph.SCRIPT_NAME);
+        if (created != null && selected == created) { // NOPMD CompareObjectsWithEquals - tree identity
+            source.setText(luau);
+        }
+        log("Applied logic to " + part.getName());
+    }
+
     void playtest() {
         byte[] bytes = RbxlxWriter.writeBytes(PlaceSaver.save(engine));
         PlaySession.start(experienceId == null ? "draft" : experienceId, title + " (test)", bytes);
@@ -1374,6 +1401,9 @@ public final class Studio implements AgentTools.Studio {
         if (src == null && shell != null && tab == 2) {
             // Nothing to edit: an empty editor would read as a script lost.
             showTab(3);
+        }
+        if (tab == 4) {
+            logic.show(i);
         }
         refresh();
         if (!frameIt) {

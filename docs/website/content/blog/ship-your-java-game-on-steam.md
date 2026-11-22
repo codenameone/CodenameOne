@@ -73,7 +73,7 @@ flowchart LR
     S --> RP[Replays and leaderboards]
 {{< /mermaid >}}
 
-The rules module is fixed point and deterministic, and the same code runs on the phone and on the server. A golden corpus of recorded matches replays in CI, so a change that alters the outcome of a past match fails the build. Shots are lag compensated: the server rewinds to what the shooter saw, within a cap, so a hit that looked right on a slow connection counts.
+The shared simulation code is fixed point and deterministic, and the same code runs on the phone and on the server. A golden corpus of recorded matches replays in CI, so a change that alters the outcome of a past match fails the build. Shots are lag compensated: the server rewinds to what the shooter saw, within a cap, so a hit that looked right on a slow connection counts.
 
 Around the match there's matchmaking by skill, parties with lobby codes and WebRTC voice chat, instant replays, a shop with store receipts checked against Apple and Google, and an admin console with moderation. The sound effects, music and ambience are all synthesized in code, so no audio files ship at all.
 

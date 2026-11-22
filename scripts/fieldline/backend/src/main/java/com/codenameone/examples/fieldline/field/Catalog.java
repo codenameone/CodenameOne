@@ -36,6 +36,10 @@ public final class Catalog {
     public static final String ON_SITE = "ON_SITE";
     public static final String COMPLETED = "COMPLETED";
     public static final String CANCELLED = "CANCELLED";
+    /// Held at intake: the job cannot be planned until the parts arrive.
+    public static final String AWAITING_PARTS = "AWAITING_PARTS";
+    /// Held at intake for any other reason -- access, a permit, the customer.
+    public static final String BLOCKED = "BLOCKED";
 
     public static final String PASS = "PASS";
     public static final String FAIL = "FAIL";
@@ -302,6 +306,18 @@ public final class Catalog {
     /// Whether a job in this state is still the scheduler's to plan.
     public static boolean isOpen(String status) {
         return !COMPLETED.equals(status) && !CANCELLED.equals(status);
+    }
+
+    /// Whether a job in this state is held at intake. A held job is open but
+    /// the planner leaves it out, and the board refuses to place it, until a
+    /// dispatcher releases it to UNASSIGNED.
+    public static boolean isHeld(String status) {
+        return AWAITING_PARTS.equals(status) || BLOCKED.equals(status);
+    }
+
+    /// Whether the planner may place a job in this state.
+    public static boolean isPlannable(String status) {
+        return isOpen(status) && !isHeld(status);
     }
 
     /// Whether a job in this state has started: its technician and start are

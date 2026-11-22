@@ -3506,6 +3506,11 @@
         "tags_set": true,
         "canonical_set": true,
         "syndicated_at": "2026-11-22T01:01:10+00:00"
+      },
+      "devto": {
+        "id": 5094113,
+        "url": "https://dev.to/codenameone/subscriptions-paywalls-and-a-customer-center-and-we-dont-take-a-cut-199a",
+        "syndicated_at": "2026-11-22T14:05:08+00:00"
       }
     }
   }

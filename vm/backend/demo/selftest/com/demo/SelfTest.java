@@ -212,6 +212,11 @@ public class SelfTest {
     }
 
     public static void main(String[] args) throws Exception {
+        // Every engine: the checks below drive each wire client against stubs.
+        com.codename1.backend.Database.useEngine(com.codename1.db.sql.Postgres.CONNECTOR);
+        com.codename1.backend.Database.useEngine(com.codename1.db.sql.MySql.CONNECTOR);
+        com.codename1.backend.Database.useEngine(com.codename1.db.sql.SqlServer.CONNECTOR);
+        com.codename1.backend.Database.useEngine(com.codename1.db.sql.Oracle.CONNECTOR);
         threadLocalInitialization();
         crypto();
         jwt();
@@ -5507,7 +5512,7 @@ public class SelfTest {
      */
     private static String sslModeRefused(String mode) {
         try {
-            com.codename1.backend.sql.Postgres.connect("127.0.0.1", 1, "db", "u", "pw",
+            com.codename1.db.sql.Postgres.connect("127.0.0.1", 1, "db", "u", "pw",
                     mode, null, 1000, 0).close();
             return "accepted";
         } catch (Exception err) {

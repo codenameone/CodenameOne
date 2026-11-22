@@ -40,6 +40,7 @@
       both depend on, or by declaring a @RestClient contract: the same interface
       generates the app's client and this module's dispatcher.
     -->
+
     <dependencies>
         <dependency>
             <groupId>com.codenameone</groupId>
@@ -61,15 +62,6 @@
         <dependency>
             <groupId>${project.groupId}</groupId>
             <artifactId>skirmish-shared</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-        <!--
-             The rules of the game: the server runs the same simulation as the
-             app, and is the one whose result counts.
-        -->
-        <dependency>
-            <groupId>${project.groupId}</groupId>
-            <artifactId>skirmish-rules</artifactId>
             <version>${project.version}</version>
         </dependency>
         <!--

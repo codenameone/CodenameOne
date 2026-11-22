@@ -31,7 +31,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-import com.codename1.backend.sql.Dialect;
+import com.codename1.db.sql.Dialect;
 
 /// How a server keeps [HttpSession]s: the cookie, the lifetime and the
 /// store, read from configuration when the server starts.
@@ -1298,12 +1298,15 @@ final class Sessions {
         /// the row as it stands, as a plain save does.
         private void rotate(final HttpSession session, final String previousId)
                 throws IOException {
-            final String lock = "sqlite".equals(pool.dialect().getName()) ? "" : " FOR UPDATE";
+            // SQL Server locks with a table hint after the table instead.
+            String engine = pool.dialect().getName();
+            final String lock = "sqlite".equals(engine) || "sqlserver".equals(engine) ? "" : " FOR UPDATE";
+            final String hint = "sqlserver".equals(engine) ? " WITH (UPDLOCK, ROWLOCK)" : "";
             final java.util.Set changed = session.changedNames();
             final Map mine = session.attributesCopy();
             Object moved;
             try {
-                moved = pool.inTransaction(new Rotation(session, previousId, lock, changed, mine,
+                moved = pool.inTransaction(new Rotation(session, previousId, hint, lock, changed, mine,
                         namespace));
             } catch (IOException err) {
                 throw err;
@@ -1321,15 +1324,17 @@ final class Sessions {
         private static final class Rotation implements DataSource.Work {
             private final HttpSession session;
             private final String previousId;
+            private final String hint;
             private final String lock;
             private final java.util.Set changed;
             private final Map mine;
             private final String namespace;
 
-            Rotation(HttpSession session, String previousId, String lock, java.util.Set changed,
+            Rotation(HttpSession session, String previousId, String hint, String lock, java.util.Set changed,
                      Map mine, String namespace) {
                 this.session = session;
                 this.previousId = previousId;
+                this.hint = hint;
                 this.lock = lock;
                 this.changed = changed;
                 this.mine = mine;
@@ -1339,7 +1344,7 @@ final class Sessions {
             @Override
             public Object run(Database db) throws Exception {
                 Map row = db.queryOne("SELECT created, max_inactive, attributes FROM "
-                        + TABLE + " WHERE id = ? AND namespace = ?" + lock,
+                        + TABLE + hint + " WHERE id = ? AND namespace = ?" + lock,
                         new Object[] {previousId, namespace});
                 if (row == null) {
                     // Rotated or invalidated meanwhile by another request of this

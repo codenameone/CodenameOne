@@ -115,9 +115,17 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
         if (max == 0) {
             return result;
         }
-        List<Object[]> rows = session.read(bound.sql + session.limit(max, offset) + session.lockClause(lock), bound.args, plan.kinds);
+        String clause = session.lockClause(lock);
+        boolean followOn = plan.entity != null && session.followOnLock(clause, max, offset);
+        List<Object[]> rows = session.read(session.lockedPage(bound.sql, followOn ? "" : clause, max, offset),
+                bound.args, plan.kinds);
         if (plan.entity != null) {
             List entities = session.hydrateAll(plan.entity, rows, plan.fetches);
+            if (followOn) {
+                for (Object entity : entities) {
+                    session.lock(entity, lock);
+                }
+            }
             for (Object entity : entities) {
                 result.add(checked(entity));
             }
@@ -205,6 +213,15 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
         }
         List<Object> values = new ArrayList<Object>();
         clockMillis = System.currentTimeMillis();
+        // SQL Server matches a GROUP BY term against the SELECT list by its
+        // text, and @p1 and @p2 are different text even when equal; a named
+        // parameter repeated there reuses the first occurrence's @p name.
+        Map<String, Integer> reused = session.sqlServer() ? new LinkedHashMap<String, Integer>() : null;
+        // Oracle matches the same way, but positional binds cannot share a
+        // name, so a value repeated in a GROUP BY statement is written into
+        // the text as a literal at every occurrence (numbers and strings only).
+        Map<String, Integer> repeated = session.oracle() && template.indexOf(" GROUP BY ") >= 0
+                ? repeatedValues(template) : null;
         // Render each occurrence separately: dialect ordering and checked
         // arithmetic can repeat expressions containing the same bound value.
         StringBuilder statement = new StringBuilder();
@@ -261,15 +278,58 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                         count++;
                     }
                     statement.setLength(statement.length() - 1);
-                    statement.append(count == 0 ? "SELECT NULL WHERE 1=0" : SessionImpl.placeholders(count));
+                    // Oracle before 23ai has no SELECT without FROM.
+                    statement.append(count == 0 ? (session.oracle() ? "SELECT NULL FROM DUAL WHERE 1=0" : "SELECT NULL WHERE 1=0")
+                            : SessionImpl.placeholders(count));
                 } else {
                     if (value instanceof Iterable || value instanceof Object[]) {
                         throw new IllegalArgumentException("Collection parameter requires IN: " + parameter.name);
                     }
-                    values.add(parameter.convert(value));
+                    Object converted = parameter.convert(value);
+                    String literal = repeated == null || converted == null ? null
+                            : oracleLiteral(repeated, ":" + parameter.name + ":" + converted.getClass().getName() + ":" + converted, converted);
+                    if (literal != null) {
+                        statement.setLength(statement.length() - 1);
+                        statement.append(literal);
+                        continue;
+                    }
+                    // Each occurrence converts for its own context, so only an
+                    // occurrence that converts to the same value shares a name.
+                    String key = reused == null || converted == null ? null
+                            : ":" + parameter.name + ":" + converted.getClass().getName() + ":" + converted;
+                    Integer slot = key == null ? null : reused.get(key);
+                    if (slot != null) {
+                        statement.setLength(statement.length() - 1);
+                        statement.append("@p").append(slot.intValue());
+                        continue;
+                    }
+                    values.add(converted);
+                    if (key != null) {
+                        reused.put(key, Integer.valueOf(values.size()));
+                    }
                 }
             } else {
-                values.add(boundValue(binding));
+                Object value = boundValue(binding);
+                // An equal literal repeated is reused the same way, by value.
+                String key = reused != null && binding instanceof LiteralBinding && value != null
+                        ? "'" + value.getClass().getName() + ":" + value : null;
+                Integer slot = key == null ? null : reused.get(key);
+                if (slot != null) {
+                    statement.setLength(statement.length() - 1);
+                    statement.append("@p").append(slot.intValue());
+                    continue;
+                }
+                String literal = repeated != null && binding instanceof LiteralBinding && value != null
+                        ? oracleLiteral(repeated, "'" + value.getClass().getName() + ":" + value, value) : null;
+                if (literal != null) {
+                    statement.setLength(statement.length() - 1);
+                    statement.append(literal);
+                    continue;
+                }
+                values.add(value);
+                if (key != null) {
+                    reused.put(key, Integer.valueOf(values.size()));
+                }
             }
         }
         SessionImpl.checkParameterCount(values.size());
@@ -278,6 +338,76 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
     }
     /// The clock CURRENT_* reads, taken once per rendering of the statement.
     private long clockMillis;
+    /// How often each plain parameter or literal value occurs in `template`,
+    /// keyed as [#arguments()] keys them -- for values that occur inside the
+    /// GROUP BY clause only. A value repeated elsewhere (the null-aware text
+    /// comparison writes each parameter twice) keeps its bind.
+    private Map<String, Integer> repeatedValues(String template) {
+        Map<String, Integer> counts = new LinkedHashMap<String, Integer>();
+        java.util.Set<String> grouped = new java.util.HashSet<String>();
+        int groupStart = template.lastIndexOf(" GROUP BY ");
+        int groupEnd = template.length();
+        for (String next : new String[]{" HAVING ", " ORDER BY ", " OFFSET ", " FETCH FIRST "}) {
+            int at = template.indexOf(next, groupStart);
+            if (at >= 0 && at < groupEnd) {
+                groupEnd = at;
+            }
+        }
+        int position = 0;
+        int start;
+        while ((start = template.indexOf("/*cn1-bind-", position)) >= 0) {
+            int end = template.indexOf("*/?", start);
+            position = end + 3;
+            Object binding = plan.bindings.get(Integer.parseInt(template.substring(start + 11, end)));
+            String key = null;
+            if (binding instanceof Parameter && ((Parameter) binding).marker == null
+                    && parameters.containsKey(((Parameter) binding).name)) {
+                Parameter parameter = (Parameter) binding;
+                Object converted = parameter.convert(parameters.get(parameter.name));
+                key = converted == null ? null
+                        : ":" + parameter.name + ":" + converted.getClass().getName() + ":" + converted;
+            } else if (binding instanceof LiteralBinding) {
+                Object value = boundValue(binding);
+                key = value == null ? null : "'" + value.getClass().getName() + ":" + value;
+            }
+            if (key != null && start > groupStart && start < groupEnd) {
+                grouped.add(key);
+            }
+            if (key != null) {
+                Integer count = counts.get(key);
+                counts.put(key, Integer.valueOf(count == null ? 1 : count.intValue() + 1));
+            }
+        }
+        counts.keySet().retainAll(grouped);
+        return counts;
+    }
+    /// `value` as Oracle literal text when it occurs more than once, else null.
+    /// Integral numbers and strings only; a string doubles its quotes, which is
+    /// the whole of Oracle's literal escaping.
+    private static String oracleLiteral(Map<String, Integer> repeated, String key, Object value) {
+        Integer count = repeated.get(key);
+        if (count == null || count.intValue() < 2) {
+            return null;
+        }
+        if (value instanceof Long || value instanceof Integer || value instanceof Short || value instanceof Byte) {
+            return "(" + value + ")";
+        }
+        // A literal is capped at 4000 bytes (ORA-01704); a longer value keeps
+        // its bind, and Oracle then refuses the grouping by name.
+        if (value instanceof String && ((String) value).length() <= 1000 && ((String) value).indexOf('\0') < 0) {
+            String text = (String) value;
+            StringBuilder quoted = new StringBuilder(text.length() + 3).append("N'");
+            for (int i = 0; i < text.length(); i++) {
+                char c = text.charAt(i);
+                quoted.append(c);
+                if (c == '\'') {
+                    quoted.append('\'');
+                }
+            }
+            return quoted.append('\'').toString();
+        }
+        return null;
+    }
     private Object boundValue(Object binding) {
         if (binding instanceof LiteralBinding) {
             return ((LiteralBinding) binding).convert(clockMillis);
@@ -531,7 +661,11 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                     if (attribute.nullable && root.model.required(index)) {
                         requireNonNull(value);
                     }
-                    if (attribute.kind == Attribute.INTEGER) {
+                    // Oracle's NUMBER arithmetic never overflows 64 bits, and
+                    // NUMBER(19) stores 9223372036854775808, so a BIGINT is
+                    // range checked there too; elsewhere the arithmetic throws.
+                    if (attribute.kind == Attribute.INTEGER
+                            || attribute.kind == Attribute.BIGINT && attribute.temporal == 0 && session.oracle()) {
                         value.sql = session.checkedIntegralAssignment(value.sql,
                                 root.model.minimumIntegralValue(index), root.model.maximumIntegralValue(index));
                     }
@@ -547,7 +681,7 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                     where = where.length() == 0 ? " WHERE " + filter : where + " AND " + filter;
                 }
                 plan.sql = session.updateTable(root.model.table(), root.rootAlias) + " SET " + assignments +
-                           where;
+                           session.updateFrom(root.model.table(), root.rootAlias) + where;
                 refuseImplicitBulkJoins();
                 return plan;
             }
@@ -722,7 +856,10 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                             selectedPositions.append(i + 1);
                         }
                     }
-                    terms.append(selectedPositions.length() == 0 ? term.sql : selectedPositions.toString());
+                    // SQL Server and Oracle have no positions in GROUP BY; each is given the
+                    // expression, whose parameters arguments() names alike.
+                    terms.append(selectedPositions.length() == 0 || session.sqlServer() || session.oracle() ? term.sql
+                            : selectedPositions.toString());
                 } while (take(","));
                 group = " GROUP BY " + terms;
             }
@@ -1067,7 +1204,7 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                 bindType(left, right);
                 bindType(right, left);
                 if (left.kind == Attribute.BOOLEAN || right.kind == Attribute.BOOLEAN) {
-                    return node("(" + condition(left) + " " + op + " " + condition(right) + ")", Attribute.BOOLEAN, left, right);
+                    return node("(" + comparable(left) + " " + op + " " + comparable(right) + ")", Attribute.BOOLEAN, left, right);
                 }
                 if (numericKind(left.kind) && numericKind(right.kind)
                         && (left.kind == Attribute.REAL || right.kind == Attribute.REAL)) {
@@ -1078,9 +1215,47 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                     return node("(" + session.orderValue(left.sql, sqlKind(left, right.temporal)) + " " + op + " "
                             + session.orderValue(right.sql, sqlKind(right, left.temporal)) + ")", Attribute.BOOLEAN, left, right);
                 }
+                if (session.oracle()) {
+                    // Oracle stores '' as NULL, so `x <> ''` is never true and
+                    // `x = ''` never matches there; the empty string IS the null.
+                    Expr column = emptyText(right) ? left : emptyText(left) ? right : null;
+                    if (column != null) {
+                        return node("(" + column.sql + ("=".equals(op) ? " IS NULL)" : " IS NOT NULL)"),
+                                Attribute.BOOLEAN, column);
+                    }
+                    // A bound "" reaches Oracle as NULL too, so a text parameter
+                    // compares null-aware: "" matches the '' Oracle keeps as
+                    // NULL. On Oracle a null and an empty parameter are therefore
+                    // the same value, as they are in VARCHAR2 itself. Each
+                    // repeated marker binds the same value again (bind rendering
+                    // handles every occurrence separately).
+                    // A parameter's own kind is only known from the side it is
+                    // compared with, so the text side decides.
+                    if (left.entity == null && right.entity == null
+                            && !left.temporal && !right.temporal
+                            && (left.kind == Attribute.TEXT && right.parameter != null
+                                || right.kind == Attribute.TEXT && left.parameter != null)) {
+                        Expr text = left.kind == Attribute.TEXT && right.parameter != null ? left : right;
+                        String l = left.sql;
+                        String r = right.sql;
+                        // `<> 'bob'` keeps a NULL row only on a REQUIRED text
+                        // attribute, where NULL can only be the stored ''. A
+                        // nullable column's NULL may be a real null, which every
+                        // engine leaves out of `<>`; there the row is left out.
+                        String sql = "=".equals(op)
+                                ? "(" + l + " = " + r + " OR (" + l + " IS NULL AND " + r + " IS NULL))"
+                                : "(" + l + " <> " + r
+                                        + (text.nonNull ? " OR (" + l + " IS NULL AND " + r + " IS NOT NULL)" : "")
+                                        + " OR (" + l + " IS NOT NULL AND " + r + " IS NULL))";
+                        return node(sql, Attribute.BOOLEAN, left, right);
+                    }
+                }
                 return binary(left, op, right, Attribute.BOOLEAN);
             }
             return left;
+        }
+        private boolean emptyText(Expr e) {
+            return e.literal && "".equals(e.literalValue);
         }
         private Expr add() {
             Expr left = multiply();
@@ -1132,7 +1307,7 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                     String left = operand.sql;
                     String right = test.sql;
                     if (operand.kind == Attribute.BOOLEAN || test.kind == Attribute.BOOLEAN) {
-                        left = condition(operand); right = condition(test);
+                        left = comparable(operand); right = comparable(test);
                     } else if (numericKind(operand.kind) && numericKind(test.kind)
                             && (operand.kind == Attribute.REAL || test.kind == Attribute.REAL)) {
                         left = session.numericOperand(left, Attribute.REAL);
@@ -1326,8 +1501,11 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                         sql.append(arg.query.rootAlias)
                                 .append('.')
                                 .append(session.q(arg.entity.attributes()[arg.entity.idIndex()].column));
+                    } else if (session.sqlServer() && arg.literal && arg.literalValue == null) {
+                        // SQL Server refuses an untyped NULL as an aggregate's operand.
+                        sql.append("CAST(").append(arg.sql).append(" AS INT)");
                     } else {
-                        sql.append(arg.sql);
+                        sql.append("AVG".equals(function) ? session.averageOperand(arg.sql, arg.kind) : arg.sql);
                     }
                 }
                 if ("NULLIF".equals(function)) {
@@ -1344,6 +1522,8 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                     result.sql = session.integralSum(result.sql);
                 } else if ("AVG".equals(function)) {
                     result.sql = session.numericOperand(result.sql, Attribute.REAL);
+                } else if ("LENGTH".equals(function)) {
+                    result.sql = session.lengthResult(result.sql);
                 }
                 result.nonNull = "COUNT".equals(function);
                 result.coalesce = "COALESCE".equals(function);
@@ -1979,6 +2159,14 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                 value.parameter.logical = true;
             }
             return value.predicate ? value.sql : "(" + value.sql + " <> 0)";
+        }
+        /// A boolean as an operand of a comparison. T-SQL has no boolean values,
+        /// and neither has Oracle before 23ai, so a predicate cannot be compared
+        /// with another there; it is turned into 1 or 0 first.
+        private String comparable(Expr value) {
+            String predicate = condition(value);
+            return session.sqlServer() || session.oracle()
+                    ? "(CASE WHEN " + predicate + " THEN 1 ELSE 0 END)" : predicate;
         }
         private Expr logical(Expr left, String op, Expr right) {
             return node("(" + condition(left) + " " + op + " " + condition(right) + ")", Attribute.BOOLEAN, left, right);

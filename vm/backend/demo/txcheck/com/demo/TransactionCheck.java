@@ -37,6 +37,11 @@ public class TransactionCheck {
     private static int passed;
 
     public static void main(String[] args) throws Exception {
+        // This harness opens whatever URL it is given, so it carries every engine.
+        com.codename1.backend.Database.useEngine(com.codename1.db.sql.Postgres.CONNECTOR);
+        com.codename1.backend.Database.useEngine(com.codename1.db.sql.MySql.CONNECTOR);
+        com.codename1.backend.Database.useEngine(com.codename1.db.sql.SqlServer.CONNECTOR);
+        com.codename1.backend.Database.useEngine(com.codename1.db.sql.Oracle.CONNECTOR);
         String url = System.getenv("CN1_TXCHECK_URL");
         if (url == null || url.length() == 0) {
             url = ":memory:";
@@ -146,7 +151,8 @@ public class TransactionCheck {
             }
 
             // A deferred constraint makes COMMIT fail on both SQLite and PostgreSQL.
-            if (!"mysql".equals(engine)) {
+            // MySQL and SQL Server cannot defer a constraint at all.
+            if (!"mysql".equals(engine) && !"sqlserver".equals(engine)) {
                 pool.execute("DROP TABLE IF EXISTS cn1_sync_child", null);
                 pool.execute("DROP TABLE IF EXISTS cn1_sync_parent", null);
                 pool.execute("CREATE TABLE cn1_sync_parent (id INTEGER PRIMARY KEY)", null);

@@ -215,6 +215,19 @@ When something changes in the middle of a week, it repairs the plan instead of
 starting again, and moves as few jobs as it can. Work already started is never
 moved.
 
+==== Intake
+
+*Intake* in the menu shows the jobs by why they aren't on a route yet:
+ready to schedule, awaiting parts or blocked, with the scheduled jobs in a
+last column. Dragging a card to another column holds or releases the job. The
+server checks every move, and a move it refuses, or one made without a
+connection, puts the card back with the reason. Nothing is scheduled from
+here: a held job stays out of the planner's runs and can't be dragged onto the
+board, and *Schedule on board* opens the board to place a released one. On a
+phone the board shows one column at a time.
+
+image::img/fieldline-intake-board.png["The intake board on a phone: the jobs ready to schedule as cards, with a button to schedule them on the board",scaledwidth=40%]
+
 ==== Time off and absences
 
 A technician's time-off request waits under *Time-off requests*. A decision shows

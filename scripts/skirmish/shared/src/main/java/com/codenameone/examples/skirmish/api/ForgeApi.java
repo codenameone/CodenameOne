@@ -31,7 +31,7 @@ import java.util.List;
 /// The Forge: packs of characters, arenas, missions and campaigns that players
 /// build, share and play. A pack's content travels as the JSON
 /// `com.codenameone.examples.skirmish.rules.forge.PackCodec` writes, and the
-/// server validates it with the same rules module the app runs.
+/// server validates it with the same shared simulation code the app runs.
 @RestClient
 public interface ForgeApi {
     /// `scope` is official, popular, new or mine.

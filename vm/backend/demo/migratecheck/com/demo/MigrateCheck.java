@@ -59,6 +59,12 @@ public class MigrateCheck {
         "cn1_mc_schema_history", "mc_default_history", "cn1_mclib_schema_history"};
 
     public static void main(String[] args) throws Exception {
+        // A hand-written main has no generated wiring, so it registers the
+        // engines its URL may name itself.
+        com.codename1.backend.Database.useEngine(com.codename1.db.sql.Postgres.CONNECTOR);
+        com.codename1.backend.Database.useEngine(com.codename1.db.sql.MySql.CONNECTOR);
+        com.codename1.backend.Database.useEngine(com.codename1.db.sql.SqlServer.CONNECTOR);
+        com.codename1.backend.Database.useEngine(com.codename1.db.sql.Oracle.CONNECTOR);
         String url = System.getenv("CN1_MIGRATECHECK_URL");
         if(url == null || url.length() == 0) {
             url = ":memory:";
@@ -170,8 +176,8 @@ public class MigrateCheck {
                 + "INSERT INTO mc_no_such_table (id) VALUES (1)").build();
         check("a broken script fails the migration",
                 String.valueOf(MigrationException.SCRIPT_FAILED), codeOf(Migrations.of(pool, broken), "migrate"));
-        if(mysql) {
-            // MySQL committed the CREATE TABLE and cannot take it back.
+        if(mysql || "oracle".equals(pool.dialect().getName())) {
+            // MySQL and Oracle committed the CREATE TABLE and cannot take it back.
             check("mysql keeps what the failed script created", "true", String.valueOf(exists(pool, "mc_half")));
             check("mysql records the failure", "5", count(pool, "cn1_mc_schema_history"));
             check("a recorded failure blocks the next run", String.valueOf(

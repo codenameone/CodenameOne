@@ -173,6 +173,52 @@ class FieldTest {
     }
 
     @Test
+    void aHeldJobStaysOffThePlanUntilReleased() throws Exception {
+        Map job = jobOf("t106", "REPAIR");
+        String id = (String) job.get("id");
+        String path = "/api/dispatch/jobs/" + id + "/intake";
+
+        // Technicians do not run intake.
+        mvc.perform(People.asTechnician(Http.body(post(path), "{\"status\":\"BLOCKED\"}"),
+                DemoAccounts.TECHNICIAN)).andExpect(status().isForbidden());
+
+        // Holding a scheduled job takes it off its technician's route.
+        Map held = Http.json(mvc, People.asDispatcher(Http.body(post(path),
+                "{\"status\":\"AWAITING_PARTS\"}"), DemoAccounts.DISPATCHER));
+        assertEquals("AWAITING_PARTS", held.get("status"));
+        assertEquals("", held.get("techId"));
+
+        // Intake never schedules, and a scheduled job is not released here.
+        mvc.perform(People.asDispatcher(Http.body(post(path), "{\"status\":\"SCHEDULED\"}"),
+                DemoAccounts.DISPATCHER)).andExpect(status().isConflict());
+
+        // The planner leaves it alone and the board refuses to place it.
+        Http.json(mvc, People.asDispatcher(post("/api/dispatch/optimize"), DemoAccounts.DISPATCHER));
+        Map after = find(id);
+        assertEquals("AWAITING_PARTS", after.get("status"));
+        assertEquals("", after.get("techId"));
+        Map answer = Http.json(mvc, People.asDispatcher(Http.body(post("/api/dispatch/move"),
+                "{\"jobId\":\"" + id + "\",\"techId\":\"t106\",\"start\":"
+                        + job.get("plannedStart") + ",\"apply\":true}"), DemoAccounts.DISPATCHER));
+        assertEquals(Boolean.FALSE, answer.get("ok"));
+
+        // Released, it waits unassigned for the board.
+        Map released = Http.json(mvc, People.asDispatcher(Http.body(post(path),
+                "{\"status\":\"UNASSIGNED\"}"), DemoAccounts.DISPATCHER));
+        assertEquals("UNASSIGNED", released.get("status"));
+        assertEquals("", released.get("techId"));
+    }
+
+    private Map find(String id) throws Exception {
+        for (Object o : (List) board().get("jobs")) {
+            if (id.equals(((Map) o).get("id"))) {
+                return (Map) o;
+            }
+        }
+        throw new AssertionError("no job " + id);
+    }
+
+    @Test
     void anAbsenceIsCoveredByTheRestOfTheCrew() throws Exception {
         Map board = board();
         long from = ((Number) board.get("dayStart")).longValue();

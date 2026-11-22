@@ -25,7 +25,7 @@ package com.codename1.backend;
 import java.io.IOException;
 import java.util.LinkedHashMap;
 import java.util.List;
-import com.codename1.backend.sql.QueryRows;
+import com.codename1.db.sql.QueryRows;
 import java.util.Map;
 
 /// SQLite persistence for server-side binaries, on the engine the translator

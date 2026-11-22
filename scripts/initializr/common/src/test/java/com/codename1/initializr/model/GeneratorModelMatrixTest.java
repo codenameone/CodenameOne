@@ -240,6 +240,10 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         // Gradle builds -- from the IDE or ./gradlew -- report through the plugin's
         // settings half; a backend-only project has no client build to report.
         String gradleProperties = getText(entries, "gradle.properties");
+        // No build property names a database engine: the build reads the URLs.
+        assertFalse(gradleProperties.indexOf("cn1.backend.database") >= 0,
+                label + "no database engine property");
+        assertNull(entries.get("backend/gradle.properties"), label + "a backend needs no gradle.properties");
         if (type.hasNoClient()) {
             assertFalse(gradleProperties.indexOf("cn1.telemetry.") >= 0,
                     label + "a backend-only project does not report builds");
@@ -448,20 +452,16 @@ public class GeneratorModelMatrixTest extends AbstractTest {
                     label + "README carries no other template's accounts");
             assertFalse(chat && readme.indexOf("rider@") >= 0, label + "README carries no ride-hailing accounts");
         }
-        if (template.hasRules()) {
-            assertContains(rootPom, "<module>rules</module><module>shared</module>",
-                    label + "the rules module is built ahead of the contract");
-            assertContains(getText(entries, "common/pom.xml"), "<artifactId>" + artifact + "-rules</artifactId>",
-                    label + "the app depends on the rules");
-            assertContains(getText(entries, "backend/pom.xml"), "<artifactId>" + artifact + "-rules</artifactId>",
-                    label + "the server depends on the rules");
-        }
+        assertFalse(rootPom.indexOf("<module>rules</module>") >= 0,
+                label + "code both halves run is in shared, not a module of its own");
         String sharedPom = getText(entries, "shared/pom.xml");
         assertContains(sharedPom, "<artifactId>" + artifact + "-shared</artifactId>", label + "shared module id");
         assertContains(getText(entries, "common/pom.xml"), "<artifactId>" + artifact + "-shared</artifactId>",
                 label + "the app depends on the contract");
         assertContains(getText(entries, "backend/pom.xml"), "<artifactId>" + artifact + "-shared</artifactId>",
                 label + "the server depends on the contract");
+        assertFalse(getText(entries, "backend/pom.xml").indexOf("cn1.backend.database") >= 0,
+                label + "the template's server declares no engine property");
         assertContains(getText(entries, "backend/pom.xml"), "<goal>generate-annotation-stubs</goal>",
                 label + "the server generates its half of the contract");
 
@@ -781,6 +781,8 @@ public class GeneratorModelMatrixTest extends AbstractTest {
                 "com.acme.same", mavenOptions(ProjectOptions.ProjectType.APP_WITH_BACKEND, false));
         assertEqual(app.keySet(), withBackend.keySet(), "Maven App and App + backend should be the same download");
         assertNotNull(app.get("backend/pom.xml"), "Maven projects keep the backend module");
+        assertFalse(getText(app, "backend/pom.xml").indexOf("cn1.backend.database") >= 0,
+                "The generic backend module declares no engine property");
 
         Map<String, byte[]> minimal = mavenEntries(LAYOUTS_VERSION, Template.BAREBONES, IDE.INTELLIJ, "SameApp",
                 "com.acme.same", ProjectOptions.defaults());
@@ -879,6 +881,8 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         }
         if (type == ProjectOptions.ProjectType.APP_WITH_BACKEND) {
             assertNotNull(entries.get("backend/pom.xml"), label + "App + backend has the backend module");
+            assertFalse(getText(entries, "backend/pom.xml").indexOf("cn1.backend.database") >= 0,
+                    label + "the backend module declares no engine property");
             assertContains(getText(entries, "README.md"), "## Backend", label + "README should explain the backend");
         }
         if (template.isFullStack()) {
@@ -904,6 +908,8 @@ public class GeneratorModelMatrixTest extends AbstractTest {
     }
 
     private void validateMavenBackendOnly(Map<String, byte[]> entries, ProjectOptions.ProjectType type, IDE ide, String packageName, String label) {
+        assertFalse(getText(entries, "pom.xml").indexOf("cn1.backend.database") >= 0,
+                label + "a backend-only pom declares no engine property");
         String packagePath = packageName.replace('.', '/');
         for (String path : entries.keySet()) {
             assertFalse(path.startsWith("common/") || path.startsWith("backend/"),

@@ -40,7 +40,7 @@
     equality would violate that contract; redundant overrides also trigger PMD.
     -->
     <Match>
-        <Class name="com.codename1.backend.sql.QueryRows" />
+        <Class name="com.codename1.db.sql.QueryRows" />
         <Bug pattern="EQ_DOESNT_OVERRIDE_EQUALS" />
     </Match>
 

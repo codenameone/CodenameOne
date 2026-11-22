@@ -214,6 +214,10 @@ image::img/bastion-console-approve.png["The decision dialog: the request, a reas
 
 image::img/bastion-console-audit-chain.png["The audit chain: an Intact badge, the number of links checked, the head hash and the latest events with their previous and own hashes",scaledwidth=95%]
 
+The audit chain's events are in a data grid, because a chain runs to thousands of rows. Tap a column header to sort by it, and type in the field above the grid to filter by actor, action, or subject. The sequence column stays in place while the other columns scroll sideways, the link that broke the chain is highlighted, the grid mirrors right to left in Arabic and Hebrew, and a screen reader reads it as a table. The ledger's statements and reports stay on the plain table, which prints and puts a component in each cell, and that suits their short lists.
+
+image::img/bastion-audit-grid.png["The audit chain's events in a data grid with a filter field above it and the sequence column at the left",scaledwidth=95%]
+
 *Evidence* exports the journal, the trial balance or the audit chain as CSV or JSON for an external auditor. The file is saved, a browser downloads it, and the screen shows who made it, when, and its SHA-256 digest so the copy can be checked later.
 
 image::img/bastion-console-evidence.png["The evidence section after a CSV export: the file name, who made it and when, its SHA-256 digest and the first lines",scaledwidth=95%]

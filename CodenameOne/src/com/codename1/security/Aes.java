@@ -95,11 +95,35 @@ public final class Aes {
         return fast != null && fast.length == data.length ? fast : new Aes(key).decryptCbc(iv, data);
     }
 
+    /// Encrypts `data`, a whole number of blocks, with `key` chained from an
+    /// all-zero IV, for protocols that fix the IV themselves (Oracle's O5LOGON
+    /// sign-in). Never use it for data of your own: a fixed IV makes equal
+    /// plaintexts encrypt alike. Runs in portable Java on every platform.
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: for a key or data of the wrong length
+    public static byte[] cbcEncryptZeroIv(byte[] key, byte[] data) {
+        check(key, null, data);
+        return new Aes(key).encryptCbc(null, data);
+    }
+
+    /// Decrypts `data`, a whole number of blocks, with `key` chained from an
+    /// all-zero IV; the inverse of [#cbcEncryptZeroIv(byte[], byte[])].
+    ///
+    /// #### Throws
+    ///
+    /// - `IllegalArgumentException`: for a key or data of the wrong length
+    public static byte[] cbcDecryptZeroIv(byte[] key, byte[] data) {
+        check(key, null, data);
+        return new Aes(key).decryptCbc(null, data);
+    }
+
     private static void check(byte[] key, byte[] iv, byte[] data) {
         if (key.length != 16 && key.length != 24 && key.length != 32) {
             throw new IllegalArgumentException("AES key of " + key.length + " bytes");
         }
-        if (iv.length != 16 || data.length % 16 != 0) {
+        if ((iv != null && iv.length != 16) || data.length % 16 != 0) {
             throw new IllegalArgumentException("AES-CBC needs a 16 byte IV and whole blocks");
         }
     }
@@ -233,7 +257,9 @@ public final class Aes {
         int blocks = data.length / 16;
         byte[] out = new byte[blocks * 16];
         byte[] prev = new byte[16];
-        System.arraycopy(iv, 0, prev, 0, 16);
+        if (iv != null) {
+            System.arraycopy(iv, 0, prev, 0, 16);
+        }
         for (int b = 0; b < blocks; b++) {
             decryptBlock(data, off + b * 16, out, b * 16);
             for (int i = 0; i < 16; i++) {
@@ -247,7 +273,9 @@ public final class Aes {
     private byte[] encryptCbc(byte[] iv, byte[] data) {
         byte[] out = new byte[data.length / 16 * 16];
         byte[] prev = new byte[16];
-        System.arraycopy(iv, 0, prev, 0, 16);
+        if (iv != null) {
+            System.arraycopy(iv, 0, prev, 0, 16);
+        }
         byte[] block = new byte[16];
         for (int b = 0; b < out.length; b += 16) {
             for (int i = 0; i < 16; i++) {

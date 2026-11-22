@@ -1,14 +1,14 @@
 name: Skirmish (game sample)
 
 # scripts/skirmish is one Maven project holding a game and its server: a
-# `rules` module (the pure, deterministic simulation both sides run), a `shared`
-# module of transfer objects and @RestClient contracts, the Codename One client
+# `shared` module (the deterministic simulation both sides run, plus the
+# transfer objects and @RestClient contracts), the Codename One client
 # (`common`), a Codename One Backend that implements the contracts, and an `ios`
 # module for the device build. It is modelled on savor.yml.
 #
 # Five things are checked here, because each fails without the others noticing:
 #
-#   rules       the simulation's own tests, on the JVM, with no server
+#   rules       the simulation's own tests (in `shared`), on the JVM, with no server
 #   backend     the server's own tests, on the JVM and compiled by ParparVM,
 #               then the same tests on PostgreSQL and MySQL
 #   client-e2e  the application in the simulator, driven through its real
@@ -115,9 +115,9 @@ jobs:
           JAVA_HOME: ${{ env.JDK_8_HOME }}
           RETRY_ONLY_MATCHING: transient
 
-      - name: Run the rules tests
+      - name: Run the simulation tests
         working-directory: scripts/skirmish
-        run: mvn -B -pl rules test -Dmaven.repo.local="$GITHUB_WORKSPACE/.m2-repo"
+        run: mvn -B -pl shared test -Dmaven.repo.local="$GITHUB_WORKSPACE/.m2-repo"
         env:
           JAVA_HOME: ${{ env.JDK_17_HOME }}
           JDK_8_HOME: ${{ env.JDK_8_HOME }}
@@ -126,8 +126,8 @@ jobs:
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v7
         with:
-          name: skirmish-rules-tests
-          path: scripts/skirmish/rules/target/surefire-reports/**
+          name: skirmish-simulation-tests
+          path: scripts/skirmish/shared/target/surefire-reports/**
           if-no-files-found: warn
           retention-days: 14
 
@@ -188,7 +188,7 @@ jobs:
       - name: Run the server tests on the JVM and compiled
         working-directory: scripts/skirmish
         run: |
-          mvn -B -Dcodename1.platform=backend -pl rules,shared,backend test \
+          mvn -B -Dcodename1.platform=backend -pl shared,backend test \
             -Dcn1.backend.compiledTests=true \
             -Dmaven.repo.local="$GITHUB_WORKSPACE/.m2-repo"
         env:

@@ -22,6 +22,7 @@
  */
 package com.codename1.security;
 
+import java.util.Arrays;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
@@ -58,6 +59,20 @@ class AesTest {
         } finally {
             CryptoEngine.install(was);
         }
+    }
+
+    @Test
+    void zeroIvChainsFromZeros() {
+        // FIPS 197 with an all-zero key: one block of zeros, so CBC from a zero
+        // IV is the bare block cipher; the second block checks the chaining.
+        byte[] key = new byte[16];
+        byte[] plain = new byte[32];
+        byte[] sealed = Aes.cbcEncryptZeroIv(key, plain);
+        assertArrayEquals(Hash.fromHex("66e94bd4ef8a2c3b884cfa59ca342b2e"), Arrays.copyOf(sealed, 16));
+        assertArrayEquals(Aes.cbcEncrypt(key, Arrays.copyOf(sealed, 16), new byte[16]),
+                Arrays.copyOfRange(sealed, 16, 32));
+        assertArrayEquals(plain, Aes.cbcDecryptZeroIv(key, sealed));
+        assertThrows(IllegalArgumentException.class, () -> Aes.cbcEncryptZeroIv(key, new byte[15]));
     }
 
     @Test

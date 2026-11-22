@@ -40,8 +40,13 @@ class ManagedSessionTest {
     }
     /// Issue 6310: the JPQL functions and parameter null tests BuildCloud's
     /// repositories use, the reporter's three queries verbatim among them.
+    /// Set while the test runs on Oracle, which stores and answers '' as NULL:
+    /// a text expression whose result is empty is NULL there, and the ORM
+    /// cannot tell that from a NULL operand's NULL.
+    static boolean emptyTextIsNull;
     static void assertIssue6310Jpql(Session s,Record one,Record two,Record three) {
         String R=Record.class.getName();
+        String empty=emptyTextIsNull?null:"";
         assertEquals(2,s.createQuery("select r from "+R+" r where r.name like concat(:prefix, '%')").setParameter("prefix","case-").list().size());
         assertEquals("case-first!",s.createQuery("select concat(r.name,'!') from "+R+" r where r.id=:id",String.class).setParameter("id",one.id).first());
         assertNull(s.createQuery("select concat(r.name,'!') from "+R+" r where r.id=:id",String.class).setParameter("id",three.id).first());
@@ -49,9 +54,9 @@ class ManagedSessionTest {
         assertEquals("fir",s.createQuery("select substring(r.name,6,3) from "+R+" r where r.id=:id",String.class).setParameter("id",one.id).first());
         assertEquals(Long.valueOf(6),s.createQuery("select locate('first',r.name) from "+R+" r where r.id=:id",Long.class).setParameter("id",one.id).first());
         // Outside JPQL's range the dialects disagree; one answer is pinned.
-        assertEquals("",s.createQuery("select substring(r.name,:start,2) from "+R+" r where r.id=:id",String.class).setParameter("start",-2L).setParameter("id",one.id).first());
-        assertEquals("",s.createQuery("select substring(r.name,0) from "+R+" r where r.id=:id",String.class).setParameter("id",one.id).first());
-        assertEquals("",s.createQuery("select substring(r.name,2,:len) from "+R+" r where r.id=:id",String.class).setParameter("len",-1L).setParameter("id",one.id).first());
+        assertEquals(empty,s.createQuery("select substring(r.name,:start,2) from "+R+" r where r.id=:id",String.class).setParameter("start",-2L).setParameter("id",one.id).first());
+        assertEquals(empty,s.createQuery("select substring(r.name,0) from "+R+" r where r.id=:id",String.class).setParameter("id",one.id).first());
+        assertEquals(empty,s.createQuery("select substring(r.name,2,:len) from "+R+" r where r.id=:id",String.class).setParameter("len",-1L).setParameter("id",one.id).first());
         assertEquals(Long.valueOf(0),s.createQuery("select locate('c',r.name,0) from "+R+" r where r.id=:id",Long.class).setParameter("id",one.id).first());
         assertEquals(Long.valueOf(0),s.createQuery("select locate('t',r.name,:start) from "+R+" r where r.id=:id",Long.class).setParameter("start",-1L).setParameter("id",one.id).first());
         // Past 2^52 every double is integral; the integer and DECIMAL paths would clamp it.
@@ -442,7 +447,11 @@ class ManagedSessionTest {
                 public String table() { return explicit?"bulk_text_explicit":"bulk_text_default"; }
                 public Attribute[] attributes() {
                     Attribute[] attrs=super.attributes().clone();
-                    attrs[3]=new Attribute("name","name",Attribute.TEXT,false,false,true,false,explicit?"VARCHAR(512)":null);
+                    // VARCHAR is not Unicode on SQL Server; NVARCHAR is. Oracle's
+                    // VARCHAR counts bytes unless told CHAR.
+                    String declared="sqlserver".equals(db.dialect().getName())?"NVARCHAR(512)"
+                            :"oracle".equals(db.dialect().getName())?"VARCHAR2(512 CHAR)":"VARCHAR(512)";
+                    attrs[3]=new Attribute("name","name",Attribute.TEXT,false,false,true,false,explicit?declared:null);
                     return attrs;
                 }
                 public com.codename1.impl.orm.Index[] indexes() { return new com.codename1.impl.orm.Index[]{new com.codename1.impl.orm.Index("",true,new String[]{"name"})}; }
@@ -459,7 +468,10 @@ class ManagedSessionTest {
                     if(explicit) { assertEquals(1,query.executeUpdate());session.commitTransaction();session.clear(); }
                     else { assertThrows(PersistenceException.class,query::executeUpdate);session.rollbackTransaction();assertEquals("original",session.find(Record.class,row.id).name); }
                 }
-                String unicode=new String(new char[255]).replace("\0","\ud83d\ude00");
+                // SQL Server bounds NVARCHAR(n) in UTF-16 units, so a character
+                // outside the BMP takes two of the 255.
+                boolean utf16Bound="sqlserver".equals(db.dialect().getName());
+                String unicode=new String(new char[utf16Bound?127:255]).replace("\0","\ud83d\ude00");
                 session.beginTransaction();session.find(Record.class,row.id).name=unicode;session.commitTransaction();session.clear();assertEquals(unicode,session.find(Record.class,row.id).name);
                 for(String value:new String[]{boundary,unicode,null}) {
                     session.beginTransaction();assertEquals(1,session.createQuery("update ManagedSessionTest$Record r set r.name=:value").setParameter("value",value).executeUpdate());session.commitTransaction();session.clear();assertEquals(value,session.find(Record.class,row.id).name);
@@ -469,7 +481,7 @@ class ManagedSessionTest {
     }
 
     @Test void bulkDeleteUsesPortableAliasSyntaxForEachDialect() throws Exception {
-        for(com.codename1.backend.sql.Dialect dialect:new com.codename1.backend.sql.Dialect[]{com.codename1.backend.sql.Dialect.SQLITE,com.codename1.backend.sql.Dialect.POSTGRES,com.codename1.backend.sql.Dialect.MYSQL,com.codename1.backend.sql.Dialect.MARIADB}) {
+        for(com.codename1.db.sql.Dialect dialect:new com.codename1.db.sql.Dialect[]{com.codename1.db.sql.Dialect.SQLITE,com.codename1.db.sql.Dialect.POSTGRES,com.codename1.db.sql.Dialect.MYSQL,com.codename1.db.sql.Dialect.MARIADB}) {
             java.util.List<String> statements=new java.util.ArrayList<String>();
             com.codename1.impl.orm.SqlAccess access=(com.codename1.impl.orm.SqlAccess)java.lang.reflect.Proxy.newProxyInstance(getClass().getClassLoader(),new Class[]{com.codename1.impl.orm.SqlAccess.class},(proxy,method,args)-> {
                 if(method.getName().equals("dialect")) return dialect.getName();
@@ -493,7 +505,7 @@ class ManagedSessionTest {
     }
 
     @Test void mysqlRejectsDefaultBinaryIdentitySchemaBeforeSql() throws Exception {
-        for(com.codename1.backend.sql.Dialect dialect:new com.codename1.backend.sql.Dialect[]{com.codename1.backend.sql.Dialect.MYSQL,com.codename1.backend.sql.Dialect.MARIADB,com.codename1.backend.sql.Dialect.SQLITE,com.codename1.backend.sql.Dialect.POSTGRES}) for(boolean explicit:new boolean[]{false,true}) for(int shape:new int[]{0,1,2}) {
+        for(com.codename1.db.sql.Dialect dialect:new com.codename1.db.sql.Dialect[]{com.codename1.db.sql.Dialect.MYSQL,com.codename1.db.sql.Dialect.MARIADB,com.codename1.db.sql.Dialect.SQLITE,com.codename1.db.sql.Dialect.POSTGRES}) for(boolean explicit:new boolean[]{false,true}) for(int shape:new int[]{0,1,2}) {
             java.util.List<String> statements=new java.util.ArrayList<String>();com.codename1.impl.orm.BackendSqlAccess adapter=new com.codename1.impl.orm.BackendSqlAccess(null,null,dialect);
             com.codename1.impl.orm.SqlAccess access=(com.codename1.impl.orm.SqlAccess)java.lang.reflect.Proxy.newProxyInstance(getClass().getClassLoader(),new Class[]{com.codename1.impl.orm.SqlAccess.class},(proxy,method,args)-> {
                 if(method.getName().equals("describe")) { statements.add("describe");return java.util.Collections.emptyList(); }if(method.getName().equals("execute")) { statements.add((String)args[0]);return 0; }return method.invoke(adapter,args);
@@ -504,7 +516,7 @@ class ManagedSessionTest {
     }
 
     @Test void averagesRenderFloatingResultsForEveryDialect() throws Exception {
-        for(com.codename1.backend.sql.Dialect dialect:new com.codename1.backend.sql.Dialect[]{com.codename1.backend.sql.Dialect.SQLITE,com.codename1.backend.sql.Dialect.POSTGRES,com.codename1.backend.sql.Dialect.MYSQL,com.codename1.backend.sql.Dialect.MARIADB}) {
+        for(com.codename1.db.sql.Dialect dialect:new com.codename1.db.sql.Dialect[]{com.codename1.db.sql.Dialect.SQLITE,com.codename1.db.sql.Dialect.POSTGRES,com.codename1.db.sql.Dialect.MYSQL,com.codename1.db.sql.Dialect.MARIADB}) {
             com.codename1.impl.orm.BackendSqlAccess adapter=new com.codename1.impl.orm.BackendSqlAccess(null,null,dialect);
             com.codename1.impl.orm.SqlAccess access=(com.codename1.impl.orm.SqlAccess)java.lang.reflect.Proxy.newProxyInstance(getClass().getClassLoader(),new Class[]{com.codename1.impl.orm.SqlAccess.class},(proxy,method,args)-> {
                 if(method.getName().equals("query")) {
@@ -521,7 +533,7 @@ class ManagedSessionTest {
 
     static class Other extends Record { }
     @Test void mysqlBulkSubqueriesCannotReadTheirMutationTarget() throws Exception {
-        for(com.codename1.backend.sql.Dialect dialect:new com.codename1.backend.sql.Dialect[]{com.codename1.backend.sql.Dialect.SQLITE,com.codename1.backend.sql.Dialect.POSTGRES,com.codename1.backend.sql.Dialect.MYSQL,com.codename1.backend.sql.Dialect.MARIADB}) {
+        for(com.codename1.db.sql.Dialect dialect:new com.codename1.db.sql.Dialect[]{com.codename1.db.sql.Dialect.SQLITE,com.codename1.db.sql.Dialect.POSTGRES,com.codename1.db.sql.Dialect.MYSQL,com.codename1.db.sql.Dialect.MARIADB}) {
             java.util.Map<String,EntityModel<?>> models=new java.util.LinkedHashMap<String,EntityModel<?>>();models.put(Record.class.getName(),new Model());models.put(Other.class.getName(),new Model() { public Class<Record> type() { return (Class)Other.class; } public String table() { return "other_record"; } });
             Session session=new com.codename1.impl.orm.SessionImpl(new com.codename1.impl.orm.BackendSqlAccess(null,null,dialect),models);
             try {
@@ -536,7 +548,7 @@ class ManagedSessionTest {
     }
 
     @Test void integerAssignmentsRenderCheckedRangesForEveryDialect() throws Exception {
-        for(com.codename1.backend.sql.Dialect dialect:new com.codename1.backend.sql.Dialect[]{com.codename1.backend.sql.Dialect.SQLITE,com.codename1.backend.sql.Dialect.POSTGRES,com.codename1.backend.sql.Dialect.MYSQL,com.codename1.backend.sql.Dialect.MARIADB}) {
+        for(com.codename1.db.sql.Dialect dialect:new com.codename1.db.sql.Dialect[]{com.codename1.db.sql.Dialect.SQLITE,com.codename1.db.sql.Dialect.POSTGRES,com.codename1.db.sql.Dialect.MYSQL,com.codename1.db.sql.Dialect.MARIADB}) {
             com.codename1.impl.orm.BackendSqlAccess adapter=new com.codename1.impl.orm.BackendSqlAccess(null,null,dialect);
             com.codename1.impl.orm.SqlAccess access=(com.codename1.impl.orm.SqlAccess)java.lang.reflect.Proxy.newProxyInstance(getClass().getClassLoader(),new Class[]{com.codename1.impl.orm.SqlAccess.class},(proxy,method,args)-> {
                 if(method.getName().equals("execute")) {
@@ -554,7 +566,7 @@ class ManagedSessionTest {
     }
 
     @Test void lengthUsesCharacterSemanticsForEachDialect() throws Exception {
-        for(com.codename1.backend.sql.Dialect dialect:new com.codename1.backend.sql.Dialect[]{com.codename1.backend.sql.Dialect.SQLITE,com.codename1.backend.sql.Dialect.POSTGRES,com.codename1.backend.sql.Dialect.MYSQL,com.codename1.backend.sql.Dialect.MARIADB}) {
+        for(com.codename1.db.sql.Dialect dialect:new com.codename1.db.sql.Dialect[]{com.codename1.db.sql.Dialect.SQLITE,com.codename1.db.sql.Dialect.POSTGRES,com.codename1.db.sql.Dialect.MYSQL,com.codename1.db.sql.Dialect.MARIADB}) {
             com.codename1.impl.orm.BackendSqlAccess adapter=new com.codename1.impl.orm.BackendSqlAccess(null,null,dialect);
             com.codename1.impl.orm.SqlAccess access=(com.codename1.impl.orm.SqlAccess)java.lang.reflect.Proxy.newProxyInstance(getClass().getClassLoader(),new Class[]{com.codename1.impl.orm.SqlAccess.class},(proxy,method,args)-> {
                 if(method.getName().equals("query")) {
@@ -569,7 +581,7 @@ class ManagedSessionTest {
     }
 
     @Test void managedOrderingUsesDialectForTextNumericAndExpressionTerms() throws Exception {
-        for(com.codename1.backend.sql.Dialect dialect:new com.codename1.backend.sql.Dialect[]{com.codename1.backend.sql.Dialect.SQLITE,com.codename1.backend.sql.Dialect.POSTGRES,com.codename1.backend.sql.Dialect.MYSQL,com.codename1.backend.sql.Dialect.MARIADB}) {
+        for(com.codename1.db.sql.Dialect dialect:new com.codename1.db.sql.Dialect[]{com.codename1.db.sql.Dialect.SQLITE,com.codename1.db.sql.Dialect.POSTGRES,com.codename1.db.sql.Dialect.MYSQL,com.codename1.db.sql.Dialect.MARIADB}) {
             java.util.List<String> statements=new java.util.ArrayList<String>();
             com.codename1.impl.orm.BackendSqlAccess adapter=new com.codename1.impl.orm.BackendSqlAccess(null,null,dialect);
             com.codename1.impl.orm.SqlAccess access=(com.codename1.impl.orm.SqlAccess)java.lang.reflect.Proxy.newProxyInstance(getClass().getClassLoader(),new Class[]{com.codename1.impl.orm.SqlAccess.class},(proxy,method,args)-> {
@@ -630,7 +642,7 @@ class ManagedSessionTest {
     }
 
     @Test void schemaColumnNamesFollowDialectCaseRules() throws Exception {
-        for(com.codename1.backend.sql.Dialect dialect:new com.codename1.backend.sql.Dialect[]{com.codename1.backend.sql.Dialect.SQLITE,com.codename1.backend.sql.Dialect.POSTGRES,com.codename1.backend.sql.Dialect.MYSQL}) {
+        for(com.codename1.db.sql.Dialect dialect:new com.codename1.db.sql.Dialect[]{com.codename1.db.sql.Dialect.SQLITE,com.codename1.db.sql.Dialect.POSTGRES,com.codename1.db.sql.Dialect.MYSQL}) {
             for(boolean collection:new boolean[]{false,true}) {
                 Model model=new Model() {
                     public com.codename1.impl.orm.Relationship[] relationships() { return new com.codename1.impl.orm.Relationship[]{new com.codename1.impl.orm.Relationship("tags",String.class,true,true,-1,"","record_tags","owner_id","value",0,false,false,"","position","",true)}; }
@@ -639,7 +651,7 @@ class ManagedSessionTest {
                 com.codename1.impl.orm.SqlAccess access=(com.codename1.impl.orm.SqlAccess)java.lang.reflect.Proxy.newProxyInstance(getClass().getClassLoader(),new Class[]{com.codename1.impl.orm.SqlAccess.class},(proxy,method,args)-> {
                     if(method.getName().equals("describe")) {
                         java.util.List<Object[]> rows=new java.util.ArrayList<Object[]>();
-                        if(args[0].equals("record_tags")) { for(String column:new String[]{collection?"Owner_id":"owner_id","value","position"}) rows.add(new Object[]{column,column.equals("value")?(dialect==com.codename1.backend.sql.Dialect.MYSQL?"LONGTEXT":"TEXT"):column.equals("position")?dialect.columnType(Attribute.INTEGER):"BIGINT",column.equals("value")?0:1,column.equals("value")?0:1}); }
+                        if(args[0].equals("record_tags")) { for(String column:new String[]{collection?"Owner_id":"owner_id","value","position"}) rows.add(new Object[]{column,column.equals("value")?(dialect==com.codename1.db.sql.Dialect.MYSQL?"LONGTEXT":"TEXT"):column.equals("position")?dialect.columnType(Attribute.INTEGER):"BIGINT",column.equals("value")?0:1,column.equals("value")?0:1}); }
                         else { for(Attribute a:model.attributes()) rows.add(new Object[]{!collection && a.id ? "ID" : a.column,dialect.columnType(a.kind),a.nullable?0:1,a.id?1:0}); }
                         return rows;
                     }
@@ -649,7 +661,7 @@ class ManagedSessionTest {
                 java.util.Map<String,EntityModel<?>> models=new java.util.LinkedHashMap<String,EntityModel<?>>();models.put(Record.class.getName(),model);
                 Session session=new com.codename1.impl.orm.SessionImpl(access,models);
                 try {
-                    if(dialect==com.codename1.backend.sql.Dialect.POSTGRES) {
+                    if(dialect==com.codename1.db.sql.Dialect.POSTGRES) {
                         PersistenceException error=assertThrows(PersistenceException.class,session::validateSchema);
                         assertTrue(error.getMessage().contains(collection?"Missing collection column record_tags.owner_id":"Missing column managed_record.id"));
                     } else session.validateSchema();

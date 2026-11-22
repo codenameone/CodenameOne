@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
-# Runs a full-stack sample's server tests against a real PostgreSQL or MySQL
-# database.
+# Runs a full-stack sample's server tests against a real PostgreSQL, MySQL,
+# SQL Server or Oracle database.
 #
 #   scripts/ci/sample-server-tests-on-database.sh <sample-dir> [mvn args...]
 #
@@ -9,11 +9,14 @@
 #
 #   postgres://user:password@host:port/db?sslmode=disable
 #   mysql://user:password@host:port/db?sslmode=disable
+#   sqlserver://user:password@host:port/db?sslmode=disable
+#   oracle://user:password@host:port/service?sslmode=disable
 #
 # The schema is emptied with psql or mysql, whichever the URL needs, so that
 # client has to be installed. CN1_TEST_DATABASE_RESET replaces that with a
 # command of your own -- a `podman exec` into the database container, say, on
-# a machine without the client.
+# a machine without the client. SQL Server and Oracle have no client this
+# script drives, so for them CN1_TEST_DATABASE_RESET is required.
 #
 # The samples' own test runs use an in-memory SQLite database, and SQLite takes
 # any declared column type for any value. A mapping that disagrees with its
@@ -34,8 +37,26 @@ set -euo pipefail
 
 SAMPLE="${1:?usage: $0 <sample-dir> [mvn args...]}"
 shift
-URL="${CN1_TEST_DATABASE_URL:?set CN1_TEST_DATABASE_URL to a postgres:// or mysql:// URL}"
+URL="${CN1_TEST_DATABASE_URL:?set CN1_TEST_DATABASE_URL to a postgres://, mysql://, sqlserver:// or oracle:// URL}"
 MVN="${MVN:-mvn}"
+
+# The engine this URL names, for resetting its schema. The build is given the
+# URL too (cn1.datasource.url), so the generated wiring registers its engine.
+case "$URL" in
+  postgres://*|postgresql://*) ENGINE=postgres ;;
+  mysql://*|mariadb://*) ENGINE=mysql ;;
+  sqlserver://*|mssql://*) ENGINE=sqlserver ;;
+  oracle://*) ENGINE=oracle ;;
+  *) echo "CN1_TEST_DATABASE_URL names no server engine: it is a postgres://, mysql://, sqlserver:// or oracle:// URL" >&2; exit 2 ;;
+esac
+case "$ENGINE" in
+  sqlserver|oracle)
+    if [ -z "${CN1_TEST_DATABASE_RESET:-}" ]; then
+      echo "CN1_TEST_DATABASE_RESET is required for $ENGINE: a command that empties the schema" >&2
+      exit 2
+    fi
+    ;;
+esac
 
 log() { echo "[database-tests] $*" >&2; }
 
@@ -49,7 +70,7 @@ reset_schema() {
       psql "$URL" -q -v ON_ERROR_STOP=1 \
           -c "DROP SCHEMA IF EXISTS public CASCADE" -c "CREATE SCHEMA public" >/dev/null
       ;;
-    mysql://*)
+    mysql://*|mariadb://*)
       # mysql takes no URL: mysql://user:password@host:port/db?options. Parsed
       # as the backend's Database.Url does -- bracketed IPv6 hosts, percent
       # escapes decoded, 3306 when the port is absent -- so the reset empties
@@ -93,14 +114,9 @@ print("\n".join([user, password, p.hostname or "localhost", str(p.port or 3306),
 
 cd "$SAMPLE"
 reset_schema
-# A sample whose server depends on another reactor module (Skirmish and Dash rules)
-# builds it in the same run; -pl alone would resolve it from the repository.
 MODULES=shared,backend
-if [ -f rules/pom.xml ]; then
-  MODULES=rules,$MODULES
-fi
 log "compiling the server and its tests"
-"$MVN" -B -q -Dcodename1.platform=backend -pl "$MODULES" test-compile "$@"
+"$MVN" -B -q -Dcodename1.platform=backend -Dcn1.datasource.url="$URL" -pl "$MODULES" test-compile "$@"
 
 classes=()
 while IFS= read -r file; do
@@ -122,7 +138,7 @@ failed=()
 for class in "${classes[@]}"; do
   reset_schema
   log "$class"
-  if ! CN1_DATASOURCE_URL="$URL" "$MVN" -B -q -Dcodename1.platform=backend -pl "$MODULES" \
+  if ! CN1_DATASOURCE_URL="$URL" "$MVN" -B -q -Dcodename1.platform=backend -Dcn1.datasource.url="$URL" -pl "$MODULES" \
       test -Dtest="$class" -Dsurefire.failIfNoSpecifiedTests=false "$@"; then
     failed+=("$class")
   fi
