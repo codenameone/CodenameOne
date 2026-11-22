@@ -66,18 +66,24 @@ public class RiveGpuScreenshotTest extends BaseTest {
         // the surface is placed after the first paint and compiles its
         // programs on its first frame, which can take seconds on a slow
         // emulator: poll until it has rendered a frame, then give it one more
-        // tick to reach the screen; a generous cap keeps a dead surface from
-        // hanging
+        // tick to reach the screen. The cap stays well inside the suite's own
+        // 30 second limit for a test, so a dead surface fails the comparison
+        // with a capture instead of timing the whole test out.
         final Form form = parent;
         final Runnable ready = run;
-        final long deadline = System.currentTimeMillis() + 30000L;
+        final long deadline = System.currentTimeMillis() + 20000L;
         UITimer.timer(100, false, form, new Runnable() {
             @Override
             public void run() {
                 boolean drawn = image instanceof GpuImage
                         && ((GpuImage) image).getFramesRendered() > 0;
-                if (drawn || !(image instanceof GpuImage)
-                        || System.currentTimeMillis() > deadline) {
+                boolean late = System.currentTimeMillis() > deadline;
+                if (late && image instanceof GpuImage) {
+                    GpuImage gi = (GpuImage) image;
+                    System.out.println("CN1SS:WARN:RiveGpu no GPU frame: onSurface="
+                            + gi.isOnGpuSurface() + " frames=" + gi.getFramesRendered());
+                }
+                if (drawn || !(image instanceof GpuImage) || late) {
                     UITimer.timer(200, false, form, ready);
                 } else {
                     UITimer.timer(100, false, form, this);
