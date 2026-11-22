@@ -30,6 +30,8 @@ import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.layouts.GridLayout;
 import com.codenameone.examples.bazaar.api.OrderDto;
+import com.codenameone.examples.bazaar.api.PayLinkDto;
+import com.codenameone.examples.bazaar.api.PayLinkRequestDto;
 import com.codenameone.examples.bazaar.api.OrderEventDto;
 import com.codenameone.examples.bazaar.api.OrderLineDto;
 import com.codenameone.examples.bazaar.api.OrderNoteDto;
@@ -199,6 +201,12 @@ final class OrderDetail extends Container {
                     Api.orders().convertDraft(MerchantState.storeId(), o.id(), Net.to(this::updated,
                             Ui::fail))));
         }
+        if (!cancelled && "DRAFT".equals(o.channel())
+                && ("OPEN".equals(o.status()) || "PENDING".equals(o.financial()))) {
+            row.add(Ui.secondary(Lang.tr("Send pay link"), "draft-pay-link", e ->
+                    Api.orderTools().payLink(MerchantState.storeId(), o.id(),
+                            new PayLinkRequestDto(0), Net.to(OrderDetail::payLinkSent, Ui::fail))));
+        }
         if (!cancelled && ("PENDING".equals(o.financial()) || "AUTHORIZED".equals(o.financial()))) {
             row.add(Ui.secondary(Lang.tr("Mark as paid"), "order-paid", e ->
                     Api.orders().markPaid(MerchantState.storeId(), o.id(), Net.to(this::updated,
@@ -212,6 +220,22 @@ final class OrderDetail extends Container {
             row.add(Ui.danger(Lang.tr("Cancel order"), "order-cancel", e -> cancel(o, () -> reload())));
         }
         return row;
+    }
+
+    /// Shows a pay link the server made: the address, when it expires and
+    /// whether the customer was emailed; the address can be copied.
+    private static void payLinkSent(final PayLinkDto link) {
+        Container body = new Container(com.codename1.ui.layouts.BoxLayout.y());
+        body.add(Ui.text(link.url(), "SvText"));
+        body.add(Ui.plain(Lang.tr("Expires {0}", MUi.when(link.expiresAt())), "SvRowDetail"));
+        body.add(Ui.plain(Lang.tr(link.emailed() ? "Emailed to the customer"
+                : "Not emailed; share the link yourself"), "SvRowDetail"));
+        Command copy = Command.create(Lang.tr("Copy link"), null, null);
+        Command close = Command.create(Lang.tr("OK"), null, null);
+        if (Dialog.show(Lang.tr("Pay link"), body, close, copy) == copy) {
+            com.codename1.ui.Display.getInstance().copyToClipboard(link.url());
+            Ui.say("Link copied");
+        }
     }
 
     /// The order's documents, rendered by the server and previewed here.

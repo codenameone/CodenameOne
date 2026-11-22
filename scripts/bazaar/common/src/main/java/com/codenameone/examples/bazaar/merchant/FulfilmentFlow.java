@@ -41,6 +41,7 @@ import com.codenameone.examples.bazaar.api.OpenLineDto;
 import com.codenameone.examples.bazaar.api.OrderCardDto;
 import com.codenameone.examples.bazaar.api.PackDto;
 import com.codenameone.examples.bazaar.api.RateQuoteDto;
+import com.codenameone.examples.bazaar.api.SerialAssignDto;
 import com.codenameone.examples.bazaar.api.TrackingEventDto;
 import com.codenameone.examples.bazaar.api.UnfulfilledDto;
 import com.codenameone.examples.bazaar.docs.Pdfs;
@@ -135,6 +136,46 @@ final class FulfilmentFlow extends Container {
         Ui.relayout(this);
     }
 
+    /// Records the serial numbers shipped for `line`: scanned one at a time
+    /// (camera or keyboard-wedge scanner) or typed, one per line.
+    private void serials(final OpenLineDto line) {
+        Container body = new Container(BoxLayout.y());
+        body.add(Ui.plain(line.title(), "SvRowTitle"));
+        final TextArea all = new TextArea("", 4, 20);
+        all.setUIID("SvField");
+        all.setName("fu-serials-list");
+        final TextField scan = Scan.field("fu-serial-scan", null);
+        final Runnable add = () -> {
+            String code = scan.getText().trim();
+            if (code.length() > 0) {
+                String now = all.getText();
+                all.setText(now.length() == 0 ? code : now + "\n" + code);
+                scan.setText("");
+            }
+        };
+        scan.setDoneListener(e -> add.run());
+        Container scanRow = new Container(new BorderLayout());
+        scanRow.add(BorderLayout.CENTER, scan);
+        scanRow.add(BorderLayout.EAST, Scan.button("fu-serial-camera", scan, add));
+        body.add(scanRow);
+        body.add(all);
+        com.codename1.ui.Command ok = com.codename1.ui.Command.create(Lang.tr("Save"), null, null);
+        com.codename1.ui.Command cancel = com.codename1.ui.Command.create(Lang.tr("Cancel"),
+                null, null);
+        if (com.codename1.ui.Dialog.show(Lang.tr("Serial numbers"), body, cancel, ok) != ok) {
+            return;
+        }
+        add.run();
+        List<String> list = OrderBulk.serials(all.getText());
+        if (list.isEmpty()) {
+            Ui.say("Scan at least one serial number");
+            return;
+        }
+        Api.stockStates().assignSerials(store(), card.orderId(),
+                new SerialAssignDto(line.orderLineId(), list), Net.to(saved -> Ui.say(
+                Lang.tr("{0} serial numbers recorded", String.valueOf(saved.size()))), Ui::fail));
+    }
+
     private static Button doc(String text, String name, Runnable run) {
         Button b = Ui.secondary(Lang.tr(text), name, e -> run.run());
         FontImage.setMaterialIcon(b, FontImage.MATERIAL_PICTURE_AS_PDF, 3.2f);
@@ -177,7 +218,13 @@ final class FulfilmentFlow extends Container {
             TextField qty = new TextField(String.valueOf(l.open()), "0", 3, TextArea.NUMERIC);
             qty.setUIID("SvField");
             qty.setName("fu-qty-" + iter);
-            row.add(BorderLayout.EAST, qty);
+            final OpenLineDto line = l;
+            Button serials = Ui.secondary(Lang.tr("Serials"), "fu-serials-" + iter,
+                    e -> serials(line));
+            Container end = new Container(new FlowLayout());
+            end.add(qty);
+            end.add(serials);
+            row.add(BorderLayout.EAST, end);
             box.add(row);
             lines.add(l);
             quantities.add(qty);

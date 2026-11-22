@@ -19,9 +19,11 @@
 package com.codenameone.examples.bazaar.merchant;
 
 import com.codename1.appkit.Net;
+import com.codename1.ui.CheckBox;
 import com.codename1.ui.Command;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
+import com.codename1.ui.Dialog;
 import com.codename1.ui.Display;
 import com.codename1.ui.FontImage;
 import com.codename1.ui.TextField;
@@ -31,6 +33,8 @@ import com.codename1.ui.layouts.FlowLayout;
 import com.codename1.ui.spinner.Picker;
 import com.codename1.ui.table.DataGrid;
 import com.codename1.ui.table.GridColumn;
+import com.codenameone.examples.bazaar.api.BulkActionDto;
+import com.codenameone.examples.bazaar.api.BulkActionResultDto;
 import com.codenameone.examples.bazaar.api.OrderDto;
 import com.codenameone.examples.bazaar.net.Api;
 import com.codenameone.examples.bazaar.ui.DesktopActions;
@@ -44,7 +48,9 @@ import java.util.List;
 /// Orders: filtered by status, payment, fulfilment and channel, searched by
 /// number or customer. A sortable grid on wide screens, a list on phones; a
 /// right click (or long press) on an order opens it in a window of its own,
-/// copies its number, refunds or cancels it. New orders arrive live.
+/// copies its number, refunds, cancels or archives it. An archived view
+/// lists the orders put away, and bulk actions run on several at once.
+/// New orders arrive live.
 final class OrdersPane extends MerchantPane {
     /// An order to open once the list is in, set by the dashboard.
     static String open;
@@ -58,6 +64,8 @@ final class OrdersPane extends MerchantPane {
     private Picker channel;
     private DataGrid grid;
     private Container list;
+    /// Whether the archived orders are listed instead of the live ones.
+    private boolean archived;
 
     OrdersPane() {
         super("Orders", "merchant-orders");
@@ -90,6 +98,12 @@ final class OrdersPane extends MerchantPane {
         clearTools();
         tool(FontImage.MATERIAL_ADD, "Draft order", "order-draft", this::newDraft);
         tool(FontImage.MATERIAL_REFRESH, "Refresh", "orders-refresh", this::reload);
+        tool(FontImage.MATERIAL_ARCHIVE, archived ? "Active orders" : "Archived",
+                "orders-archived", () -> {
+                    archived = !archived;
+                    load();
+                });
+        tool(FontImage.MATERIAL_CHECKLIST, "Bulk actions", "orders-bulk", this::bulk);
         if (search == null) {
             build();
         }
@@ -165,6 +179,14 @@ final class OrdersPane extends MerchantPane {
         }
         String q = search.getText().trim();
         final String store = MerchantState.storeId();
+        if (archived) {
+            Api.orderTools().archived(store, Net.to(found -> {
+                if (store.equals(MerchantState.storeId())) {
+                    fill(found);
+                }
+            }, Ui::fail));
+            return;
+        }
         Api.orders().list(store, chosen(status), chosen(financial), chosen(fulfilment),
                 chosen(channel), null, null, q.length() == 0 ? null : q, Net.to(found -> {
                     if (store.equals(MerchantState.storeId())) {
@@ -218,6 +240,13 @@ final class OrdersPane extends MerchantPane {
             out.add(Command.create(Lang.tr("Refund..."), null, e -> detailThen(o.id(), true)));
             out.add(Command.create(Lang.tr("Cancel order"), null, e -> OrderDetail.cancel(o, this::reload)));
         }
+        if (archived) {
+            out.add(Command.create(Lang.tr("Unarchive"), null, e -> Api.orderTools().unarchive(
+                    MerchantState.storeId(), o.id(), Net.to(done -> reload(), Ui::fail))));
+        } else {
+            out.add(Command.create(Lang.tr("Archive"), null, e -> Api.orderTools().archive(
+                    MerchantState.storeId(), o.id(), Net.to(done -> reload(), Ui::fail))));
+        }
         return out.toArray(new Command[out.size()]);
     }
 
@@ -240,6 +269,69 @@ final class OrdersPane extends MerchantPane {
             Component c = new OrderDetail(order, this::reload);
             Windows.open(Lang.tr("Order #{0}", String.valueOf(order.number())), c, 140, 160);
         }, Ui::fail));
+    }
+
+    /// Picks orders from the list, an action and (for a tag) the tag, sends
+    /// them as one request and shows how each order fared.
+    private void bulk() {
+        if (rows.getRowCount() == 0) {
+            Ui.say("No orders");
+            return;
+        }
+        Container body = new Container(BoxLayout.y());
+        body.setScrollableY(true);
+        final List<CheckBox> boxes = new ArrayList<CheckBox>();
+        for (int iter = 0; iter < rows.getRowCount(); iter++) {
+            OrderDto o = rows.at(iter);
+            CheckBox c = new CheckBox(Lang.tr("Order #{0}", String.valueOf(o.number()))
+                    + Ui.DOT + customer(o));
+            c.setName("orders-bulk-" + o.number());
+            c.putClientProperty("id", o.id());
+            body.add(c);
+            boxes.add(c);
+        }
+        String[] titles = new String[OrderBulk.TITLES.length];
+        for (int iter = 0; iter < titles.length; iter++) {
+            titles[iter] = Lang.tr(OrderBulk.TITLES[iter]);
+        }
+        Picker action = MUi.picker(body, "Action", "orders-bulk-action", OrderBulk.ACTIONS,
+                OrderBulk.FULFIL);
+        action.setStrings(titles);
+        action.setSelectedStringIndex(0);
+        TextField tag = Ui.field(body, Lang.tr("Tag"), "orders-bulk-tag", "");
+        Command ok = Command.create(Lang.tr("Apply"), null, null);
+        Command cancel = Command.create(Lang.tr("Cancel"), null, null);
+        if (Dialog.show(Lang.tr("Bulk actions"), body, cancel, ok) != ok) {
+            return;
+        }
+        List<String> ids = new ArrayList<String>();
+        for (CheckBox c : boxes) {
+            if (c.isSelected()) {
+                ids.add((String) c.getClientProperty("id"));
+            }
+        }
+        String code = MUi.code(action, OrderBulk.ACTIONS);
+        BulkActionDto request = OrderBulk.request(ids, code, tag.getText());
+        if (request == null) {
+            Ui.say(ids.isEmpty() ? "Choose at least one order" : "Enter a tag");
+            return;
+        }
+        Api.orderTools().bulk(MerchantState.storeId(), request, Net.to(results -> {
+            results(code, results);
+            reload();
+        }, Ui::fail));
+    }
+
+    private static void results(String action, List<BulkActionResultDto> results) {
+        Container body = new Container(BoxLayout.y());
+        body.setScrollableY(true);
+        for (BulkActionResultDto r : results) {
+            body.add(Ui.plain((r.ok() ? Lang.tr("Done") : Lang.tr("Failed")) + Ui.DOT
+                    + OrderBulk.line(r), r.ok() ? "SvRowDetail" : "SvRowTitle"));
+        }
+        Dialog.show(Lang.tr(OrderBulk.title(action)) + Ui.DOT + Lang.tr("{0} of {1} done",
+                String.valueOf(OrderBulk.succeeded(results)), String.valueOf(results.size())),
+                body, Command.create(Lang.tr("OK"), null, null));
     }
 
     private void newDraft() {

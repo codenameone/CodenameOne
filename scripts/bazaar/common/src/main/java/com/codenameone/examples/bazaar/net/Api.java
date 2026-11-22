@@ -34,6 +34,8 @@ import com.codenameone.examples.bazaar.api.ReturnApi;
 import com.codenameone.examples.bazaar.api.GiftCardApi;
 import com.codenameone.examples.bazaar.api.InventoryApi;
 import com.codenameone.examples.bazaar.api.ShippingApi;
+import com.codenameone.examples.bazaar.api.OrderToolsApi;
+import com.codenameone.examples.bazaar.api.StockStatesApi;
 import com.codenameone.examples.bazaar.api.TaxApi;
 import com.codenameone.examples.bazaar.api.OrderApi;
 import com.codenameone.examples.bazaar.api.PaymentApi;
@@ -78,6 +80,8 @@ public final class Api {
     private static InventoryApi inventory;
     private static DiscountApi discounts;
     private static TaxApi taxes;
+    private static OrderToolsApi orderTools;
+    private static StockStatesApi stockStates;
     private static ShippingApi shipping;
     private static FulfillmentApi fulfilment;
     private static ReturnApi returns;
@@ -122,6 +126,8 @@ public final class Api {
         inventory = RestClients.create(InventoryApi.class, baseUrl);
         discounts = RestClients.create(DiscountApi.class, baseUrl);
         taxes = RestClients.create(TaxApi.class, baseUrl);
+        orderTools = RestClients.create(OrderToolsApi.class, baseUrl);
+        stockStates = RestClients.create(StockStatesApi.class, baseUrl);
         shipping = RestClients.create(ShippingApi.class, baseUrl);
         fulfilment = RestClients.create(FulfillmentApi.class, baseUrl);
         returns = RestClients.create(ReturnApi.class, baseUrl);
@@ -193,6 +199,14 @@ public final class Api {
 
     public static DiscountApi discounts() {
         return discounts;
+    }
+
+    public static OrderToolsApi orderTools() {
+        return orderTools;
+    }
+
+    public static StockStatesApi stockStates() {
+        return stockStates;
     }
 
     public static TaxApi taxes() {
