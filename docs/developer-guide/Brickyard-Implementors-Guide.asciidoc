@@ -158,8 +158,8 @@ live in the explorer.
 The studio has an experimental Logic tab beside the Luau editor, a second tab in the
 bottom dock on a tablet or desktop and a fifth tab on a phone. With a part selected it
 shows a `NodeGraph` (`com.codename1.ui.graph`) of one behavior: a `Touched` trigger
-followed by a chain of steps picked from a fixed palette, "Is a player?", "Add to
-leaderstat", "Flash part" and "Destroy part". A new tab starts from a collectible: a
+followed by a chain of steps picked from a fixed palette: `Is a player?`, `Add to
+leaderstat`, `Flash part` and `Destroy part`. A new tab starts from a collectible: a
 player's touch adds one to the `Coins` leaderstat, flashes the part and removes it.
 
 image::img/brickyard-logic-graph.png["The Logic tab on a phone: the trigger and an Add 1 Coins step, the palette and Apply to Spinner",scaledwidth=30%]
@@ -172,7 +172,7 @@ ordinary Luau and writes it as a `Script` named `Logic` inside the part, through
 same `write_script` tool and undo history as the Script tab. The script runs in the
 same sandboxed interpreter, under the same instruction budget, as any hand-written
 one. The graph itself is stored in the script's first line, a Luau comment such as
-`--[[brickyard-logic v1 touched|player|stat:Coins:1|flash|destroy]]`, so it is saved
+`--[[brickyard-logic v1 touched|player|stat:Coins:1|flash|destroy]]`, so it's saved
 with the place and a player that knows nothing about graphs still runs the script.
 
 The tab reads a graph back only when the script's text is exactly what that graph
@@ -181,7 +181,7 @@ in the Script tab, or a header that doesn't parse, leaves the graph detached: th
 says so and offers the Script tab, and it replaces the text only when the creator asks
 for a new graph. The canvas refuses renames, deletions and new wires, so what it shows
 is always what Apply compiles; nodes can still be moved and zoomed. Leaderstat names
-are limited to letters, digits and spaces, because they are written into Luau string
+are limited to letters, digits and spaces, because they're written into Luau string
 literals.
 
 `LogicGraphTest` covers the generated Luau, the text round trip, a place saved and

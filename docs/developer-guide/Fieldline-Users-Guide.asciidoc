@@ -217,7 +217,7 @@ moved.
 
 ==== Intake
 
-*Intake* in the menu shows the jobs by why they are not on a route yet:
+*Intake* in the menu shows the jobs by why they aren't on a route yet:
 ready to schedule, awaiting parts or blocked, with the scheduled jobs in a
 last column. Dragging a card to another column holds or releases the job. The
 server checks every move, and a move it refuses, or one made without a

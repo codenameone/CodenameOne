@@ -220,7 +220,7 @@ moves a job between the three, as `Jobs.intake`, under `Planner.publish` like
 any other change to the plan. It never schedules: asking it for any other
 state is refused, as are a job that has started or is closed and releasing a
 scheduled job, which is the board's to unassign. Holding a scheduled job takes
-it off its technician's route. Like the rest of `/api/dispatch`, it is for
+it off its technician's route. Like the rest of `/api/dispatch`, it's for
 dispatchers only.
 
 The app's intake board, `IntakeBoard` in `dispatch`, is a `KanbanBoard` over

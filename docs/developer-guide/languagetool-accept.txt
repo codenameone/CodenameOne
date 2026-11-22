@@ -925,3 +925,4 @@ worklet
 # PDF standard font names.
 Zapf
 Fieldline
+leaderstat
