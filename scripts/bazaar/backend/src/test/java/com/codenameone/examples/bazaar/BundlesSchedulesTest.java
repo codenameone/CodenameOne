@@ -23,6 +23,7 @@ import com.codename1.backend.ResponseStatusException;
 import com.codename1.backend.annotations.Autowired;
 import com.codename1.backend.test.BackendTest;
 import com.codename1.backend.test.MockMvc;
+import com.codename1.backend.test.MockResponse;
 import com.codenameone.examples.bazaar.account.Accounts;
 import com.codenameone.examples.bazaar.api.BundleDto;
 import com.codenameone.examples.bazaar.api.BundlePartDto;
@@ -235,6 +236,37 @@ class BundlesSchedulesTest {
         assertEquals(8, inventory.available(s.variantId, s.locationId));
     }
 
+    @Test
+    void theBackOfficeSavesABundleAndAWindow() throws Exception {
+        Shop s = shop("bdl-web", 6);
+        String set = giftSet(s);
+        String setProduct = productOf(set);
+        Browser b = new Browser(mvc);
+        b.signIn(s.owner, People.PASSWORD);
+        String page = "/admin/" + s.storeId + "/products/" + setProduct;
+        MockResponse r = b.get(page);
+        b.assertPage(r, "Save bundle");
+        b.assertPage(r, "Publishing schedule");
+        MockResponse saved = b.post(page + "/bundle", "bundle", "1", "c0_variant", s.variantId,
+                "c0_qty", "3");
+        assertTrue(saved.getStatus() == 302 || saved.getStatus() == 303,
+                saved.getStatus() + " " + saved.getContentAsString());
+        BundleDto now = catalog.bundle(s.owner, s.storeId, setProduct);
+        assertTrue(now.bundle());
+        assertEquals(3, now.parts().get(0).quantity());
+        assertEquals(2, now.available());
+        // The first channel is the online store.
+        saved = b.post(page + "/schedule", "ch0", Schedules.ONLINE, "pub0", "2099-01-01T09:30",
+                "unpub0", "");
+        assertTrue(saved.getStatus() == 302 || saved.getStatus() == 303,
+                saved.getStatus() + " " + saved.getContentAsString());
+        ChannelScheduleDto online = catalog.schedule(s.owner, s.storeId, setProduct).get(0);
+        assertEquals(Schedules.ONLINE, online.channel());
+        assertEquals(4070943000000L, online.publishAt());
+        assertFalse(online.visible());
+        b.assertPage(b.get(page), "2099-01-01T09:30");
+    }
+
     // ============================================================== schedules
 
     @Test
@@ -243,6 +275,10 @@ class BundlesSchedulesTest {
         long now = System.currentTimeMillis();
         String mugPage = "/s/sch-web/products/sch-web-mug";
         assertEquals(200, status(mugPage));
+        assertTrue(page("/s/sch-web").contains("sch-web-mug"));
+        assertTrue(page("/s/sch-web/search?q=mug").contains("sch-web-mug"));
+        assertTrue(page("/sitemap.xml").contains("sch-web-mug"));
+        assertTrue(page("/s/sch-web/feeds/default/products.xml").contains("sch-web-mug"));
         schedules.set(s.storeId, s.productId, Schedules.ONLINE, now + HOUR, 0, now);
         assertEquals(404, status(mugPage));
         assertFalse(page("/s/sch-web").contains("sch-web-mug"));
@@ -252,8 +288,11 @@ class BundlesSchedulesTest {
         String user = People.customer(accounts, "sch-web-buyer");
         assertEquals(404, assertThrows(ResponseStatusException.class, () -> carts.add(s.storeId,
                 user, null, new CartLineChangeDto(s.variantId, 1))).getStatus());
-        // The job opens the window when its time comes.
-        assertTrue(schedules.tick(now + 2 * HOUR) >= 1);
+        // The job opens the window when its time comes: the same window, as
+        // set an hour and a half ago, is opened by the clock reaching it.
+        schedules.set(s.storeId, s.productId, Schedules.ONLINE, now - HOUR, 0, now - 2 * HOUR);
+        assertEquals(404, status(mugPage));
+        assertTrue(schedules.tick(now) >= 1);
         assertEquals(200, status(mugPage));
         assertTrue(page("/sitemap.xml").contains("sch-web-mug"));
         assertTrue(page("/s/sch-web/feeds/default/products.xml").contains("sch-web-mug"));
@@ -264,10 +303,22 @@ class BundlesSchedulesTest {
         Shop s = shop("sch-cart", 5);
         String user = People.customer(accounts, "sch-cart-buyer");
         carts.add(s.storeId, user, null, new CartLineChangeDto(s.variantId, 1));
+        CartDto c = carts.estimate(s.storeId, user, null, new EstimateDto(Shop.NY, null));
+        String rate = c.shippingOptions().get(0).rateId();
+        Map card = Rest.addCard(mvc, user, Rest.VISA);
+        // A window that closed an hour ago, set before it did.
         long now = System.currentTimeMillis();
-        schedules.set(s.storeId, s.productId, Schedules.ONLINE, now - 2 * HOUR, now + HOUR, now);
-        assertTrue(schedules.tick(now + 2 * HOUR) >= 1);
-        assertThrows(ResponseStatusException.class, () -> place(s, user));
+        schedules.set(s.storeId, s.productId, Schedules.ONLINE, now - 2 * HOUR, now - HOUR,
+                now - 90 * 60000L);
+        schedules.tick(now);
+        ResponseStatusException refused = assertThrows(ResponseStatusException.class,
+                () -> checkouts.place(user, s.storeId, Ids.next(), new PlaceOrderDto(Shop.NY, rate,
+                    (String) card.get("id"), user + "@example.com", "", null)));
+        // The cart drops a line no longer sold, or the quote refuses it.
+        String why = String.valueOf(refused.getMessage());
+        assertTrue(why.contains("no longer sold") || why.contains("cart is empty"), why);
+        assertTrue(carts.estimate(s.storeId, user, null, new EstimateDto(Shop.NY, null)).lines()
+                .isEmpty(), "the cart lets go of a line no longer sold");
         assertEquals(5, inventory.available(s.variantId, s.locationId));
     }
 
@@ -298,9 +349,9 @@ class BundlesSchedulesTest {
         long now = System.currentTimeMillis();
         sync.tick(now);
         assertEquals(30, connectors.simulated().listing(ch, s.sku)[0]);
-        schedules.set(s.storeId, s.productId, ch, now - HOUR, now + HOUR, now);
-        assertTrue(schedules.tick(now + 2 * HOUR) >= 1);
-        sync.run(ch, now + 2 * HOUR, true);
+        schedules.set(s.storeId, s.productId, ch, now - 2 * HOUR, now - HOUR, now - 90 * 60000L);
+        schedules.tick(now);
+        sync.run(ch, now + 1000, true);
         assertEquals(0, connectors.simulated().listing(ch, s.sku)[0]);
         boolean found = false;
         for (ChannelScheduleDto w : catalog.schedule(s.owner, s.storeId, s.productId)) {

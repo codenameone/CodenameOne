@@ -39,6 +39,7 @@ import java.util.List;
 final class ProductChannels {
     /// Component rows offered beyond those the bundle has.
     private static final int SPARE = 3;
+    /// As many components as the server takes (`Bundles.MAX_PARTS`).
     private static final int MAX_PARTS = 20;
 
     private final String productId;
@@ -82,6 +83,7 @@ final class ProductChannels {
         }
         int rows = Math.min(MAX_PARTS, b.parts().size() + SPARE);
         final List<TextField[]> fields = new ArrayList<TextField[]>();
+        final List<BundlePartDto> loaded = b.parts();
         for (int iter = 0; iter < rows; iter++) {
             BundlePartDto part = iter < b.parts().size() ? b.parts().get(iter) : null;
             Container row = new Container(new GridLayout(1, 2));
@@ -104,11 +106,18 @@ final class ProductChannels {
             List<BundlePartDto> parts = new ArrayList<BundlePartDto>();
             for (int iter = 0; iter < fields.size(); iter++) {
                 String sku = fields.get(iter)[0].getText().trim();
-                if (sku.length() == 0) {
+                int n = MUi.integer(fields.get(iter)[1]);
+                // A loaded row whose SKU was left as it was keeps its variant,
+                // which matters for a component that has no SKU at all.
+                BundlePartDto was = iter < loaded.size() ? loaded.get(iter) : null;
+                String wasSku = was == null || was.sku() == null ? "" : was.sku();
+                String variantId = was != null && sku.equals(wasSku) ? was.variantId() : null;
+                // A quantity of 0 takes a loaded component out.
+                if (sku.length() == 0 && variantId == null || was != null && n <= 0) {
                     continue;
                 }
-                int n = MUi.integer(fields.get(iter)[1]);
-                parts.add(new BundlePartDto(null, sku, n <= 0 ? 1 : n, "", 0));
+                parts.add(new BundlePartDto(variantId, variantId == null ? sku : "",
+                        n <= 0 ? 1 : n, "", 0));
             }
             Api.catalog().setBundle(MerchantState.storeId(), productId, new BundleDto(productId,
                     on.isSelected(), parts, 0), Net.to(saved -> {
