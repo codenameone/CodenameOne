@@ -228,6 +228,10 @@ public class CheckoutPages {
                     }
                 } else if ("remove-gift".equals(f.codeAction)) {
                     carts.removeGiftCard(store.getId(), null, token);
+                } else if (("use-credit".equals(f.codeAction) || "stop-credit".equals(f.codeAction))
+                        && signedIn() != null) {
+                    carts.useStoreCredit(store.getId(), null, token,
+                            "use-credit".equals(f.codeAction));
                 }
             } catch (ResponseStatusException refused) {
                 if (refused.getStatus() == 429) {
@@ -519,12 +523,12 @@ public class CheckoutPages {
         CartDto dto = null;
         if (token != null) {
             AddressDto address = country(f.country) == null ? null : address(f);
-            dto = carts.estimate(store.getId(), null, token,
-                    new EstimateDto(address, f.rateId.length() == 0 ? null : f.rateId));
+            dto = carts.estimateFor(store.getId(), token,
+                    new EstimateDto(address, f.rateId.length() == 0 ? null : f.rateId), me);
             if (f.rateId.length() > 0 && !offered(dto, f.rateId)) {
                 // Another country offers other rates: take the cheapest
                 // rather than complain about a choice the page no longer shows.
-                dto = carts.estimate(store.getId(), null, token, new EstimateDto(address, null));
+                dto = carts.estimateFor(store.getId(), token, new EstimateDto(address, null), me);
             }
             String delivery = f.rateId.length() == 0 ? cheapestDelivery(dto) : null;
             if (delivery != null && !delivery.equals(dto.shippingRateId())) {
@@ -532,7 +536,8 @@ public class CheckoutPages {
                 // pickup where the store has one. A shopper who typed an
                 // address means it to be delivered: start from the cheapest
                 // delivery, and let them choose the pickup.
-                dto = carts.estimate(store.getId(), null, token, new EstimateDto(address, delivery));
+                dto = carts.estimateFor(store.getId(), token, new EstimateDto(address, delivery),
+                        me);
             }
         }
         String currency = store.getCurrency();
@@ -578,6 +583,11 @@ public class CheckoutPages {
             view.giftCard = dto.giftCardCents() > 0 ? "-" + Money.format(dto.giftCardCents(),
                     currency) : "";
             view.due = Money.format(dto.dueCents(), currency);
+            view.storeCredit = dto.storeCreditCents() > 0 ? "-" + Money.format(
+                    dto.storeCreditCents(), currency) : "";
+            view.creditAvailable = dto.creditAvailableCents() > 0
+                    ? Money.format(dto.creditAvailableCents(), currency) : "";
+            view.usingCredit = dto.useStoreCredit() && dto.storeCreditCents() > 0;
             if (f.country.length() == 2) {
                 List<String[]> dutiable = new java.util.ArrayList<String[]>();
                 for (int iter = 0; iter < dto.lines().size(); iter++) {

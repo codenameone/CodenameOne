@@ -115,12 +115,36 @@ public class GiftCards {
         card.setExpiresAt(wanted.expiresAt() > 0 ? Instant.ofEpochMilli(wanted.expiresAt())
                 : Instant.EPOCH);
         card.setActive(true);
-        card.setCreatedAt(Instant.now());
+        Instant now = Instant.now();
+        card.setCreatedAt(now);
+        String to = Codes.cut(wanted.recipientEmail() == null ? "" : wanted.recipientEmail().trim(),
+                190);
+        if (to.length() > 0 && !com.codename1.backend.mail.Mail.isAddress(to)) {
+            throw new ResponseStatusException(400, "The recipient's e-mail address is not valid");
+        }
+        card.setRecipientEmail(to);
+        card.setRecipientName(Codes.cut(wanted.recipientName() == null ? ""
+                : wanted.recipientName().trim(), 80));
+        card.setMessage(Codes.cut(wanted.message() == null ? "" : wanted.message().trim(), 500));
+        long deliverAt = to.length() == 0 ? 0 : wanted.deliverAt();
+        if (deliverAt > now.toEpochMilli() + MAX_DELIVERY_DELAY) {
+            throw new ResponseStatusException(400, "A gift card is delivered within a year");
+        }
+        card.setDeliverAt(deliverAt > now.toEpochMilli() ? Instant.ofEpochMilli(deliverAt)
+                : Instant.EPOCH);
         cards.insert(card);
         record(card.getId(), "", wanted.initialCents(), "Issued by " + username);
-        Store owner = stores.findById(storeId);
-        emails.giftCard(storeId, card.getCustomerId(), code, wanted.initialCents(),
-                owner == null ? "" : owner.getCurrency());
+        if (to.length() > 0) {
+            // A gift for someone else: mailed to them, now or on the chosen
+            // day, by the delivery sweep.
+            if (card.getDeliverAt().toEpochMilli() == 0) {
+                deliverOne(card, now);
+            }
+        } else {
+            Store owner = stores.findById(storeId);
+            emails.giftCard(storeId, card.getCustomerId(), code, wanted.initialCents(),
+                    owner == null ? "" : owner.getCurrency());
+        }
         return dto(card, true);
     }
 
@@ -208,11 +232,47 @@ public class GiftCards {
         txs.insert(tx);
     }
 
+    /// How far ahead a gift card's delivery may be scheduled: a year.
+    static final long MAX_DELIVERY_DELAY = 366L * 86400000L;
+
+    @com.codename1.backend.annotations.Scheduled(fixedDelay = 300000, initialDelay = 60000,
+            lock = "bazaar-gift-delivery")
+    public void deliveryJob() throws IOException {
+        deliverDue(System.currentTimeMillis());
+    }
+
+    /// Mails every scheduled gift card whose day has come; answers how many
+    /// went. Public so that tests can run the clock forward.
+    public int deliverDue(long now) throws IOException {
+        List<GiftCard> due = cards.findByDeliveredAtAndDeliverAtLessThan(Instant.EPOCH,
+                Instant.ofEpochMilli(now + 1));
+        int sent = 0;
+        for (int iter = 0; iter < due.size(); iter++) {
+            GiftCard c = due.get(iter);
+            if (c.getRecipientEmail().length() > 0 && c.getDeliverAt().toEpochMilli() > 0
+                    && deliverOne(c, Instant.ofEpochMilli(now))) {
+                sent++;
+            }
+        }
+        return sent;
+    }
+
+    /// Claims the card's delivery (so two nodes never both mail it) and mails it.
+    private boolean deliverOne(GiftCard c, Instant now) {
+        if (cards.claimDelivery(c.getId(), Instant.EPOCH, now) != 1) {
+            return false;
+        }
+        c.setDeliveredAt(now);
+        return emails.giftCardTo(c);
+    }
+
     static GiftCardDto dto(GiftCard card, boolean withCode) {
         return new GiftCardDto(card.getId(), withCode ? card.getCode() : null, card.getLastFour(),
                 card.getInitialCents(), card.getBalanceCents(), card.isActive(), card.getNote(),
                 card.getExpiresAt() == null ? 0 : card.getExpiresAt().toEpochMilli(),
                 card.getCustomerId(), card.getCreatedAt() == null ? 0
-                        : card.getCreatedAt().toEpochMilli());
+                        : card.getCreatedAt().toEpochMilli(), card.getRecipientEmail(),
+                card.getRecipientName(), card.getMessage(), card.getDeliverAt().toEpochMilli(),
+                card.getDeliveredAt().toEpochMilli());
     }
 }

@@ -30,8 +30,24 @@ import java.util.List;
 public class DiscountEndpoint implements DiscountApiServer {
     private final RateSettings settings;
 
-    public DiscountEndpoint(RateSettings settings) {
+    private final DiscountCodes codes;
+
+    public DiscountEndpoint(RateSettings settings, DiscountCodes codes) {
         this.settings = settings;
+        this.codes = codes;
+    }
+
+    @Override
+    public com.codenameone.examples.bazaar.api.ExportDto generateCodes(String storeId,
+            String discountId, com.codenameone.examples.bazaar.api.DiscountCodesDto body)
+            throws Exception {
+        return codes.generate(Caller.name(), storeId, discountId, body);
+    }
+
+    @Override
+    public com.codenameone.examples.bazaar.api.ExportDto codes(String storeId, String discountId)
+            throws Exception {
+        return codes.codes(Caller.name(), storeId, discountId);
     }
 
     @Override

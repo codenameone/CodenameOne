@@ -20,7 +20,9 @@ package com.codenameone.examples.bazaar.merchant;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import com.codenameone.examples.bazaar.api.CustomerDto;
 import java.util.Arrays;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 
 /// The customer screen's tag handling, without a display.
@@ -40,5 +42,35 @@ class CustomerLogicTest {
         assertEquals("SvBadgeGood", Words.badge("PUBLISHED"));
         assertEquals("SvBadgeBad", Words.badge("REJECTED"));
         assertEquals("SvBadgeWarn", Words.badge("PENDING"));
+    }
+
+    private static CustomerDto person(String id, String email, String phone, String first,
+            String last) {
+        return new CustomerDto(id, "", email, phone, first, last, null, false, "", 0, 0, 0, 0,
+                0);
+    }
+
+    @Test
+    void duplicatesMatchOnEmailPhoneOrName() {
+        CustomerDto me = person("a", "Ada@Example.com", "", "Ada", "Lovelace");
+        List<CustomerDto> all = Arrays.asList(me, person("b", "ada@example.com", "", "", ""),
+                person("c", "x@example.com", "", "ada", "lovelace"),
+                person("d", "y@example.com", "555", "Grace", "Hopper"));
+        List<CustomerDto> dups = CustomerMatches.duplicates(all, me);
+        assertEquals(2, dups.size());
+        assertEquals("b", dups.get(0).id());
+        assertEquals("c", dups.get(1).id());
+        assertEquals(0, CustomerMatches.duplicates(null, me).size());
+    }
+
+    @Test
+    void daysAndCountsParseStrictly() {
+        assertEquals(0, CustomerMatches.daysFrom("", 1000));
+        assertEquals(0, CustomerMatches.daysFrom("abc", 1000));
+        assertEquals(0, CustomerMatches.daysFrom("0", 1000));
+        assertEquals(1000 + 3 * CustomerMatches.DAY, CustomerMatches.daysFrom(" 3 ", 1000));
+        assertEquals(250, CustomerMatches.count("250"));
+        assertEquals(0, CustomerMatches.count("-5"));
+        assertEquals(0, CustomerMatches.count("123456"));
     }
 }

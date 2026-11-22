@@ -41,6 +41,10 @@ final class GlobalSeed {
         db.execute("INSERT INTO checkout_field (id, store_id, sort_order, label, kind, choices, "
                 + "required, created_at) VALUES (?, ?, 0, 'IDOR field', 'text', '', 0, 0)",
                 new Object[] {Ids.next(), s.storeId});
+        // A data request, for the data request routes.
+        db.execute("INSERT INTO data_request (id, store_id, customer_id, username, kind, status, "
+                + "created_at, done_at, done_by) VALUES (?, ?, ?, 'idor@example.com', 'EXPORT', "
+                + "'OPEN', 0, 0, '')", new Object[] {Ids.next(), s.storeId, Ids.next()});
         // A card reader and a card payment it took, for the card reader routes.
         String reader = Ids.next();
         db.execute("INSERT INTO card_reader (id, store_id, register_id, provider, provider_ref, "

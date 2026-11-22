@@ -122,7 +122,40 @@ final class AccountPane extends ShopPane {
                 "account-settings", e -> SettingsForm.show(CN.getCurrentForm())));
         side.add(Ui.tap(Ui.row(FontImage.MATERIAL_LOGOUT, "Sign out", null, null),
                 "account-signout", e -> Nav.signOut()));
+
+        Ui.section(side, "Your data");
+        side.add(Ui.tap(Ui.row(FontImage.MATERIAL_DOWNLOAD, "Download my data", null, null),
+                "account-data-export", e -> downloadData()));
+        if (ShopState.store() != null) {
+            side.add(Ui.tap(Ui.row(FontImage.MATERIAL_DELETE_FOREVER,
+                    "Ask this store to erase my data", null, null), "account-data-erase",
+                    e -> askErase()));
+        }
         Ui.relayout(page);
+    }
+
+    private void downloadData() {
+        Api.shopperData().export(Net.to(x -> {
+            try {
+                com.codenameone.examples.bazaar.merchant.Files.saveBytes(x.fileName(),
+                        com.codename1.util.Base64.decode(x.zipBase64().getBytes("UTF-8")),
+                        "application/zip");
+            } catch (java.io.IOException failed) {
+                com.codename1.io.Log.e(failed);
+            }
+        }, Ui::fail));
+    }
+
+    private void askErase() {
+        final String storeId = ShopState.store().id();
+        if (!com.codename1.ui.Dialog.show(Lang.tr("Erase my data"),
+                Lang.tr("Ask {0} to erase your personal data? Orders keep their amounts.",
+                        ShopState.store().name()), Lang.tr("Ask"), Lang.tr("Cancel"))) {
+            return;
+        }
+        Api.shopperData().request(storeId,
+                new com.codenameone.examples.bazaar.api.DataRequestKindDto("ERASURE"),
+                Net.to(r -> Ui.say("Request sent to the store"), Ui::fail));
     }
 
     private void addresses(Container into) {

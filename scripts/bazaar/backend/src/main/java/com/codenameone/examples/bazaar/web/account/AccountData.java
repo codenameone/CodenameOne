@@ -770,6 +770,36 @@ public class AccountData {
         }
     }
 
+    /// One item per store the shopper is a customer of, with what they asked
+    /// it for and whether that is still open.
+    public void dataPage(String user, AccountView v,
+            List<com.codenameone.examples.bazaar.api.DataRequestDto> asked) {
+        List<Customer> mine = customers.findByUsername(user);
+        for (int iter = 0; iter < mine.size(); iter++) {
+            Store s = storeRows.findById(mine.get(iter).getStoreId());
+            if (s == null) {
+                continue;
+            }
+            AccountItem i = new AccountItem();
+            i.id = s.getId();
+            i.title = s.getName();
+            i.action = "/account/data/" + s.getId();
+            StringBuilder said = new StringBuilder();
+            for (int k = 0; k < asked.size(); k++) {
+                com.codenameone.examples.bazaar.api.DataRequestDto d = asked.get(k);
+                if (d.storeId().equals(s.getId())) {
+                    if (said.length() > 0) {
+                        said.append("; ");
+                    }
+                    said.append("EXPORT".equals(d.kind()) ? "Export" : "Erasure").append(' ')
+                            .append("OPEN".equals(d.status()) ? "requested" : "done");
+                }
+            }
+            i.detail = said.toString();
+            v.items.add(i);
+        }
+    }
+
     public void saveMarketing(String user, String storeId, boolean email, boolean sms)
             throws IOException {
         Customer c = storeId == null ? null : customers.findByStoreIdAndUsername(storeId, user);

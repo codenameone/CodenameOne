@@ -71,6 +71,15 @@ public interface CartApi {
     void applyGiftCard(@Path("storeId") String storeId, @Header("X-Cart-Token") String token,
             @Body CodeDto code, OnComplete<Response<CartDto>> callback);
 
+    /// Pays with the signed-in shopper's store credit at this store, as far as it goes.
+    @POST("/api/shop/cart/{storeId}/store-credit")
+    void useStoreCredit(@Path("storeId") String storeId, @Header("X-Cart-Token") String token,
+            OnComplete<Response<CartDto>> callback);
+
+    @DELETE("/api/shop/cart/{storeId}/store-credit")
+    void stopStoreCredit(@Path("storeId") String storeId, @Header("X-Cart-Token") String token,
+            OnComplete<Response<CartDto>> callback);
+
     @DELETE("/api/shop/cart/{storeId}/gift-card")
     void removeGiftCard(@Path("storeId") String storeId, @Header("X-Cart-Token") String token,
             OnComplete<Response<CartDto>> callback);

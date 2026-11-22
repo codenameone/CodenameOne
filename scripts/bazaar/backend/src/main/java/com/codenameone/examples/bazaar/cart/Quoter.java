@@ -74,6 +74,12 @@ import java.util.Set;
 /// subtotal after them.
 @Component
 public class Quoter {
+    /// Field-injected, so the constructor stays as it was.
+    @com.codename1.backend.annotations.Autowired
+    private com.codenameone.examples.bazaar.customer.StoreCredit storeCredit;
+    @com.codename1.backend.annotations.Autowired
+    private com.codenameone.examples.bazaar.repository.CustomerRepository customerRows;
+
     public static final String ACTIVE = "ACTIVE";
 
     private final StoreRepository stores;
@@ -390,6 +396,18 @@ public class Quoter {
                 quote.giftCardCents = Math.min(card.getBalanceCents(), quote.totalCents);
             } else {
                 quote.problems.add("That gift card cannot be used");
+            }
+        }
+        // A signed-in shopper's store credit, when they chose to use it; a
+        // staff draft (not online) never spends it.
+        if (online && username != null && username.length() > 0) {
+            com.codenameone.examples.bazaar.domain.Customer c =
+                    customerRows.findByStoreIdAndUsername(cart.getStoreId(), username);
+            quote.creditAvailableCents = storeCredit.available(c);
+            if (cart.isUseStoreCredit() && quote.creditAvailableCents > 0) {
+                quote.creditCustomer = c;
+                quote.storeCreditCents = Math.min(quote.creditAvailableCents,
+                        Math.max(0, quote.totalCents - quote.giftCardCents));
             }
         }
         return quote;

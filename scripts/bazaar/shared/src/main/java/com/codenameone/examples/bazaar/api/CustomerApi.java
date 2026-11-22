@@ -65,4 +65,33 @@ public interface CustomerApi {
     @GET("/api/merchant/stores/{storeId}/customer-export")
     void export(@Path("storeId") String storeId, @Query("segment") String segment,
             OnComplete<Response<ExportDto>> callback);
+
+    /// Merges another customer of the store into this one (see [CustomerMergeDto]); answers
+    /// the customer as it now is. OWNER and MANAGER.
+    @POST("/api/merchant/stores/{storeId}/customers/{customerId}/merge")
+    void merge(@Path("storeId") String storeId, @Path("customerId") String customerId,
+            @Body CustomerMergeDto merge, OnComplete<Response<CustomerDto>> callback);
+
+    /// Everything the store holds about a customer, as a zip of JSON files: what a shopper's
+    /// data request is answered with. OWNER and MANAGER.
+    @GET("/api/merchant/stores/{storeId}/customers/{customerId}/data-export")
+    void dataExport(@Path("storeId") String storeId, @Path("customerId") String customerId,
+            OnComplete<Response<DataExportDto>> callback);
+
+    /// Erases a customer's personal data: the record is anonymised, addresses, reviews and
+    /// wishlist are deleted, and orders keep their amounts under no name. Completes an open
+    /// erasure request. OWNER only; it cannot be undone.
+    @POST("/api/merchant/stores/{storeId}/customers/{customerId}/erase")
+    void erase(@Path("storeId") String storeId, @Path("customerId") String customerId,
+            OnComplete<Response<CustomerDto>> callback);
+
+    /// The shoppers' data requests to the store, open ones first.
+    @GET("/api/merchant/stores/{storeId}/data-requests")
+    void dataRequests(@Path("storeId") String storeId,
+            OnComplete<Response<List<DataRequestDto>>> callback);
+
+    /// Marks an export request answered (the export was sent to the shopper).
+    @POST("/api/merchant/stores/{storeId}/data-requests/{requestId}/done")
+    void completeRequest(@Path("storeId") String storeId, @Path("requestId") String requestId,
+            OnComplete<Response<DataRequestDto>> callback);
 }

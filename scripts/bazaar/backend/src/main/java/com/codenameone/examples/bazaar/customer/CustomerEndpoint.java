@@ -35,6 +35,8 @@ import java.util.List;
 @Component
 public class CustomerEndpoint implements CustomerApiServer {
     private final Customers customers;
+    @com.codename1.backend.annotations.Autowired
+    private CustomerData data;
 
     public CustomerEndpoint(Customers customers) {
         this.customers = customers;
@@ -90,5 +92,35 @@ public class CustomerEndpoint implements CustomerApiServer {
     @Override
     public ExportDto export(String storeId, String segment) throws Exception {
         return customers.export(Caller.name(), storeId, segment);
+    }
+
+    @Override
+    public CustomerDto merge(String storeId, String customerId,
+            com.codenameone.examples.bazaar.api.CustomerMergeDto body) throws Exception {
+        return data.merge(Caller.name(), storeId, customerId, body == null ? null
+                : body.duplicateId());
+    }
+
+    @Override
+    public com.codenameone.examples.bazaar.api.DataExportDto dataExport(String storeId,
+            String customerId) throws Exception {
+        return data.exportFor(Caller.name(), storeId, customerId);
+    }
+
+    @Override
+    public CustomerDto erase(String storeId, String customerId) throws Exception {
+        return data.erase(Caller.name(), storeId, customerId);
+    }
+
+    @Override
+    public List<com.codenameone.examples.bazaar.api.DataRequestDto> dataRequests(String storeId)
+            throws Exception {
+        return data.forStore(Caller.name(), storeId);
+    }
+
+    @Override
+    public com.codenameone.examples.bazaar.api.DataRequestDto completeRequest(String storeId,
+            String requestId) throws Exception {
+        return data.complete(Caller.name(), storeId, requestId);
     }
 }

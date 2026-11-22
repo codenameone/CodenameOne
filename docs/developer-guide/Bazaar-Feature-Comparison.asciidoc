@@ -218,20 +218,20 @@ on a row.
 | Segment query editor | &#9681; | core | no | no | no | A rule-tree editor rather than a query language.
 | Customer import/export CSV | &#10003; | core | core | core | core | 
 | Customer accounts self-service (orders, addresses) | &#10003; | core | core | core | core | 
-| Account deletion / GDPR data requests | &#10003; | core | core | core | core | 
+| Account deletion / GDPR data requests | &#10003; | core | core | core | core | Shoppers ask a store for an export or an erasure from their account; the store's data requests page tracks them, and erasing the customer anonymises the record and keeps the order amounts.
 | Customer lifetime value / order count | &#10003; | core | core | core | core | 
-| Customer merge | &#8211; | core | app/plugin | no | core | 
+| Customer merge | &#10003; | core | app/plugin | no | core | Orders, addresses, store credit, gift cards, loyalty points, reviews and wishlist move to the kept record, and the merge is audited.
 | Tax exemptions per customer | &#10003; | core | app/plugin | core | no | Exempt customers pay no tax; in tax-inclusive stores the included tax comes off. 
 | Store credit | &#10003; | core | app/plugin | core | no | 
 | Live chat widget | &#10003; | core | app/plugin | app/plugin | no | A floating chat on every store page: live over a WebSocket, with presence, typing, read receipts and voice or video calls over WebRTC, answered from the merchant inbox. 
 | Unified inbox (email/social messages) | &#9681; | core | app/plugin | app/plugin | core | One live inbox for storefront chat and calls, with assignment and canned replies; no e-mail or social channels. 
 | AI assistant | &#8211; | core | app/plugin | app/plugin | core | 
 | Issue/adjust store credit | &#10003; | core | app/plugin | core | no | 
-| Redeem at checkout | &#9681; | core | app/plugin | core | no | Store credit pays at the register.
-| Expiring credit | &#8211; | core | app/plugin | no | no | 
+| Redeem at checkout | &#10003; | core | app/plugin | core | no | Signed-in shoppers choose to spend their credit at web and app checkout; it also pays at the register.
+| Expiring credit | &#10003; | core | app/plugin | no | no | Each grant can carry an expiry date; credit is spent soonest-to-lapse first and a daily job expires the rest, audited.
 | Privacy / terms / refund policies | &#10003; | core | core | core | core | 
 | Cookie consent banner / privacy API | &#10003; | core | app/plugin | core | core | A consent banner by category gates the scripts in app slots.
-| Customer data export (GDPR) | &#9681; | core | core | core | core | Account closure removes personal data; there is no export download.
+| Customer data export (GDPR) | &#10003; | core | core | core | core | A zip of JSON files: shoppers download theirs from the account page, and the store downloads a customer's from the customer page.
 | Accessibility (storefront) | &#9681; | core | core | core | core | Semantic HTML pages.
 |===
 
@@ -246,7 +246,7 @@ on a row.
 | Buy X get Y | &#10003; | core | core | core | core | 
 | Free shipping discount | &#10003; | core | core | core | core | 
 | Tiered / volume discounts | &#10003; | app/plugin | app/plugin | app/plugin | no | TIERED and VOLUME discount kinds with quantity or spend breaks.
-| Bulk-generated unique codes | &#9681; | core | app/plugin | core | no | Single-use codes are issued per reward and per signup; there is no bulk generator.
+| Bulk-generated unique codes | &#10003; | core | app/plugin | core | no | Up to 1,000 single-use codes with a prefix, copied from a discount and exported as CSV.
 | Min requirements / usage limits / once per customer | &#10003; | core | core | core | core | 
 | Discount combinations rules | &#10003; | core | core | core | no | 
 | Scheduled discounts (start/end) | &#10003; | core | core | core | core | 
@@ -257,19 +257,19 @@ on a row.
 | Push notifications to shoppers | &#10003; | app/plugin | app/plugin | app/plugin | no | 
 | Marketing automations (graph-based) | &#10003; | core | app/plugin | app/plugin | core | 
 | Welcome / win-back / post-purchase flows | &#10003; | core | app/plugin | app/plugin | core | Journeys enter on a trigger or a segment, wait, branch and send e-mail, text or push.
-| Browse abandonment | &#8211; | app/plugin | app/plugin | app/plugin | no | 
+| Browse abandonment | &#10003; | app/plugin | app/plugin | app/plugin | no | A shopper who viewed a product and left with an empty cart and no order is mailed once, if they consented, at most once a week, with a signed unsubscribe link.
 | Signup forms / popups | &#10003; | core | app/plugin | app/plugin | core | Newsletter forms with double opt-in, a honeypot, rate limits and an optional welcome code.
 | Campaign attribution / UTM reports | &#10003; | core | app/plugin | core | no | UTM and referrer captured on the storefront and stamped on orders, with an attribution report. 
 | Ads integrations (Google/Meta) | &#8211; | core | app/plugin | core | app/plugin | 
-| Customer reviews requests | &#9681; | app/plugin | app/plugin | app/plugin | no | Reviews are collected; no automatic request message.
+| Customer reviews requests | &#10003; | app/plugin | app/plugin | app/plugin | no | A request goes a set number of days after delivery, with a signed one-click link that writes a verified review for moderation.
 | Points programs | &#10003; | app/plugin | app/plugin | app/plugin | core | Points earned on paid orders, reversed on refunds, with expiry.
 | VIP tiers / membership clubs | &#10003; | app/plugin | app/plugin | app/plugin | core | Loyalty tiers with member prices and free shipping; clubs with member-only products and early access.
 | Referral programs | &#10003; | app/plugin | app/plugin | app/plugin | no | 
-| Rewards redemption at POS | &#9681; | app/plugin | app/plugin | app/plugin | core | A register scans the member card and earns points; rewards redeem as single-use codes.
+| Rewards redemption at POS | &#10003; | app/plugin | app/plugin | app/plugin | core | A register scans the member card and earns points; rewards redeem as single-use codes or as store credit.
 | Paid membership | &#10003; | app/plugin | app/plugin | app/plugin | no | Clubs can charge for membership.
 | Issue / sell gift cards | &#10003; | core | app/plugin | core | core | 
 | Balance check & transactions | &#10003; | core | app/plugin | core | core | 
-| Digital gift card delivery to recipient with message/scheduled date | &#9681; | core | app/plugin | core | core | Cards are issued and e-mailed; no scheduled send.
+| Digital gift card delivery to recipient with message/scheduled date | &#10003; | core | app/plugin | core | core | A card is mailed to a recipient's address with a message, now or on a chosen date.
 | Gift card at POS | &#10003; | core | app/plugin | core | core | 
 |===
 

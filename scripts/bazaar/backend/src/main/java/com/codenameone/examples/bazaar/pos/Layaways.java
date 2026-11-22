@@ -83,6 +83,10 @@ public class Layaways {
     private final Inventory inventory;
     private final Payments payments;
 
+    /// Field-injected, so the constructor stays as it was.
+    @com.codename1.backend.annotations.Autowired
+    private com.codenameone.examples.bazaar.customer.StoreCredit storeCredit;
+
     public Layaways(Pos pos, PosSales sales, PosTools tools, StoreAccess access,
             CustomerRepository customers, LayawayRepository layaways,
             LayawayPaymentRepository layawayPayments, StoreOrderRepository orderRows,
@@ -358,7 +362,8 @@ public class Layaways {
         long refund = paid - fee;
         if (refund > 0) {
             if ("STORE_CREDIT".equals(to)) {
-                customers.addCredit(l.getCustomerId(), refund);
+                storeCredit.grant(storeId, l.getCustomerId(), refund, null,
+                        "Layaway " + l.getId() + " cancelled");
             } else if (shift != null) {
                 shifts.addTotals(shift.getId(), -refund, 0, 0, 0, -refund, 0);
             }

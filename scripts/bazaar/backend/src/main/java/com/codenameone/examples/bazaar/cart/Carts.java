@@ -175,6 +175,23 @@ public class Carts {
         return quoter.price(cart, null, null, username).toDto();
     }
 
+    /// Turns paying with store credit on or off. Only a signed-in shopper's
+    /// quote spends it ([Quoter]); the caller checks there is one.
+    public CartDto useStoreCredit(String storeId, String username, String token, boolean use)
+            throws IOException {
+        Cart cart = setCredit(storeId, username, token, use);
+        return quoter.price(cart, null, null, username).toDto();
+    }
+
+    @Transactional(rollbackFor = IOException.class)
+    private Cart setCredit(String storeId, String username, String token, boolean use)
+            throws IOException {
+        Cart cart = cart(storeId, username, token);
+        cart.setUseStoreCredit(use);
+        touch(cart);
+        return cart;
+    }
+
     public CartDto removeGiftCard(String storeId, String username, String token)
             throws IOException {
         Cart cart = setCodes(storeId, username, token, null, "");
@@ -200,6 +217,16 @@ public class Carts {
         Cart cart = cart(storeId, username, token);
         return quoter.price(cart, estimate == null ? null : estimate.address(),
                 estimate == null ? null : estimate.shippingRateId(), username).toDto();
+    }
+
+    /// [#estimate] of the session cart `token`, priced for `shopper` (the
+    /// signed-in name, or null): the web checkout, whose cart is the visitor's
+    /// whether signed in or not, but whose store credit is the account's.
+    public CartDto estimateFor(String storeId, String token, EstimateDto estimate, String shopper)
+            throws IOException {
+        Cart cart = cart(storeId, null, token);
+        return quoter.price(cart, estimate == null ? null : estimate.address(),
+                estimate == null ? null : estimate.shippingRateId(), shopper).toDto();
     }
 
     /// Moves the guest cart `token` into `username`'s cart at the store:
@@ -265,6 +292,7 @@ public class Carts {
         if (cart != null) {
             cart.setDiscountCode("");
             cart.setGiftCardCode("");
+            cart.setUseStoreCredit(false);
             touch(cart);
         }
     }

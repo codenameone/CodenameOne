@@ -24,7 +24,7 @@
 <th:block th:if="${view.page == 'orders'}"><h1>Orders</h1><section th:replace="~{table :: grid}"></section></th:block>
 <th:block th:if="${view.page == 'products'}"><h1>Products</h1><section th:replace="~{table :: grid}"></section></th:block>
 <th:block th:if="${view.page == 'inventory'}"><h1>Inventory</h1><section th:replace="~{table :: grid}"></section></th:block>
-<th:block th:if="${view.page == 'customers'}"><h1>Customers</h1><section th:replace="~{table :: grid}"></section></th:block>
+<th:block th:if="${view.page == 'customers'}"><h1>Customers</h1><p><a th:href="${view.base + '/data-requests'}">Data requests</a></p><section th:replace="~{table :: grid}"></section></th:block>
 <th:block th:if="${view.page == 'apps'}"><h1>Apps</h1><p class="muted">Third-party scripts and widgets on your storefront. A script loads only from the hosts you allow here; a widget runs in a sandboxed frame; analytics and marketing apps wait for the visitor's consent and never load at checkout.</p><p><a class="button" th:href="${view.base + '/new-app'}">Add an app</a></p><section th:replace="~{table :: grid}"></section></th:block>
 <th:block th:if="${view.page == 'app'}"><p><a th:href="${view.base + '/apps'}">Apps</a></p><h1 th:text="${shell.heading}">App</h1>
 <form method="post" class="card" th:action="${view.appAction}"><div class="stack"><label for="a-name">Name</label><input id="a-name" name="name" required maxlength="100" th:value="${view.app.name}">
@@ -110,6 +110,17 @@
 <section class="card"><h2>Orders</h2><p th:if="${view.orders.empty}" class="muted">No orders at this store.</p>
 <div class="table-wrap" th:unless="${view.orders.empty}"><table class="data"><caption class="sr">Orders</caption><thead><tr><th scope="col">Order</th><th scope="col">Placed</th><th scope="col">Status</th><th scope="col" class="num">Total</th></tr></thead><tbody>
 <tr th:each="o : ${view.orders}"><td><a th:href="${o.url}" th:text="${o.title}">#1</a></td><td th:text="${o.meta}">2026-01-01</td><td><span class="pill" th:text="${o.status}">Open</span> <small class="muted" th:text="${o.detail}">Paid</small></td><td class="num" th:text="${o.amount}">$1</td></tr></tbody></table></div></section></div>
+<div class="grid2"><section class="card"><h2>Store credit</h2><p th:if="${view.credits.empty}" class="muted">No credit.</p><ul th:unless="${view.credits.empty}"><li th:each="g : ${view.credits}"><span th:text="${g.amount}">$5</span> <span th:text="${g.title}">Return</span> <small class="muted" th:text="${g.meta}">Expires</small></li></ul></section>
+<section class="card"><h2>Merge a duplicate</h2><p class="muted">The other record's orders, addresses, credit, gift cards, loyalty points, reviews and wishlist move here, and it is deleted.</p>
+<form method="post" th:action="${view.mergeAction}" class="stack" hx-confirm="Merge the other record into this customer? This cannot be undone."><label for="dup">Duplicate</label><select id="dup" name="duplicateId" th:if="${!view.duplicates.empty}"><option th:each="d : ${view.duplicates}" th:value="${d.id}" th:text="${d.title}">Ada</option></select><input id="dup" name="duplicateId" th:if="${view.duplicates.empty}" placeholder="Customer id" required maxlength="32"><button type="submit">Merge</button></form></section></div>
+<section class="card"><h2>Personal data</h2><p><a th:href="${view.exportUrl}">Download the data export (zip)</a></p>
+<form method="post" th:action="${view.eraseAction}" hx-confirm="Erase this customer's personal data? Orders keep their amounts. This cannot be undone."><button type="submit" class="danger">Erase personal data</button></form></section>
+</th:block>
+
+<th:block th:if="${view.page == 'data-requests'}"><p><a th:href="${view.base + '/customers'}">Customers</a></p><h1>Data requests</h1><p class="muted">Shoppers ask for their data or its erasure from their account. Answer an export by sending the customer's download; an erasure is done by erasing the customer.</p>
+<p th:if="${view.requests.empty}" class="muted">No requests.</p>
+<div class="table-wrap" th:unless="${view.requests.empty}"><table class="data"><caption class="sr">Data requests</caption><thead><tr><th scope="col">Customer</th><th scope="col">Request</th><th scope="col">Asked</th><th scope="col">Status</th><th scope="col"></th></tr></thead><tbody>
+<tr th:each="r : ${view.requests}"><td><a th:href="${r.url}" th:text="${r.title}">Ada</a></td><td th:text="${r.detail}">Export</td><td th:text="${r.meta}">2026-01-01</td><td><span class="pill" th:text="${r.status}">Open</span></td><td><form th:if="${r.flag}" method="post" th:action="${r.action}"><button type="submit" class="quiet">Mark done</button></form></td></tr></tbody></table></div>
 </th:block>
 
 </main></div>

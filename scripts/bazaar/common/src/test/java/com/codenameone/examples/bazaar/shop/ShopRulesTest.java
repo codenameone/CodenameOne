@@ -67,7 +67,7 @@ class ShopRulesTest {
     private static CartDto cart(String rate, long shipping, boolean inclusive, long gift) {
         return new CartDto("c", "s", null, "USD", Collections.emptyList(), "SAVE", "GC", 5000, 500,
                 shipping, 400, inclusive, 4900 + shipping, gift, 4900 + shipping - gift, false,
-                null, null, rate, null, true);
+                null, null, rate, null, true, false, 0, 0);
     }
 
     private static String captions(CartDto cart) {
@@ -84,6 +84,15 @@ class ShopRulesTest {
                 captions(cart(null, 0, false, 0)));
         assertEquals("Subtotal;Discount;Shipping(Free);Tax included;Total;Gift card;Due now;",
                 captions(cart("r1", 0, true, 1000)));
+        CartDto c = cart("r1", 0, true, 0);
+        CartDto credited = new CartDto(c.id(), c.storeId(), c.token(), c.currency(), c.lines(),
+                c.discountCode(), c.giftCardCode(), c.subtotalCents(), c.discountCents(),
+                c.shippingCents(), c.taxCents(), c.taxInclusive(), c.totalCents(), 0,
+                c.totalCents() - 300, c.freeShipping(), c.discounts(),
+                c.shippingOptions(), c.shippingRateId(), c.problems(), c.shippingRequired(), true, 300,
+                900);
+        assertEquals("Subtotal;Discount;Shipping(Free);Tax included;Total;Store credit;Due now;",
+                captions(credited));
         List<Estimate.Row> rows = Estimate.rows(cart("r1", 700, false, 0));
         assertEquals(-500, rows.get(1).cents);
         assertEquals(Estimate.SAVING, rows.get(1).kind);

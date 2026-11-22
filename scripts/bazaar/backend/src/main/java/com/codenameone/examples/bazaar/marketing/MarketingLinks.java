@@ -84,6 +84,18 @@ public class MarketingLinks {
                 : "That unsubscribe link is not valid.");
     }
 
+    @com.codename1.backend.annotations.Autowired
+    private MarketingMails automations;
+
+    /// The browse abandonment mail's unsubscribe link ([MarketingMails]).
+    @GetMapping("/api/shop/m/b/{viewId}")
+    public HttpServer.Response unsubscribeBrowse(@PathVariable("viewId") String viewId,
+            @RequestParam(value = "s", required = false) String signature) throws Exception {
+        boolean done = automations.unsubscribeBrowse(viewId, signature);
+        return page(done ? 200 : 400, done ? "You are unsubscribed. You will not hear from us again."
+                : "That unsubscribe link is not valid.");
+    }
+
     @GetMapping("/api/shop/m/confirm/{token}")
     public HttpServer.Response confirm(@PathVariable("token") String token) throws Exception {
         String code = forms.confirm(token, Instant.now());

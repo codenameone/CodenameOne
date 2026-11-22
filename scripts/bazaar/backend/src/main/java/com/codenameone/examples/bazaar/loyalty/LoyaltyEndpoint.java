@@ -80,7 +80,8 @@ public class LoyaltyEndpoint implements LoyaltyApiServer {
     @Override
     public LoyaltyRewardDto redeemFor(String storeId, String memberId, RedeemDto body)
             throws Exception {
-        return loyalty.redeemFor(Caller.name(), storeId, memberId, body == null ? 0 : body.points());
+        return loyalty.redeemFor(Caller.name(), storeId, memberId, body == null ? 0 : body.points(),
+                body != null && body.toCredit());
     }
 
     @Override

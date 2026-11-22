@@ -74,6 +74,10 @@ import java.util.List;
 /// [DiscountEngine] like any other, and [Memberships] says who qualifies.
 @Component
 public class Loyalty {
+    /// Field-injected, so the constructor stays as it was.
+    @com.codename1.backend.annotations.Autowired
+    private com.codenameone.examples.bazaar.customer.StoreCredit storeCredit;
+
     public static final String EARN = "EARN";
     public static final String REVERSE = "REVERSE";
     public static final String REDEEM = "REDEEM";
@@ -460,8 +464,43 @@ public class Loyalty {
 
     public LoyaltyRewardDto redeemFor(String username, String storeId, String memberId, long points)
             throws IOException {
+        return redeemFor(username, storeId, memberId, points, false);
+    }
+
+    /// [#redeemFor] at the register; with `toCredit` the points become store
+    /// credit on the member's customer, which lapses with the reward window,
+    /// instead of a code.
+    public LoyaltyRewardDto redeemFor(String username, String storeId, String memberId, long points,
+            boolean toCredit) throws IOException {
         access.requireStaff(username, storeId, StoreAccess.ANYONE);
-        return issue(storeId, member(storeId, memberId).getId(), points);
+        String id = member(storeId, memberId).getId();
+        return toCredit ? issueCredit(storeId, id, points) : issue(storeId, id, points);
+    }
+
+    /// Takes `points` off the balance and puts their value on the member's
+    /// customer as store credit lapsing in [#REWARD_DAYS]. Answers a reward
+    /// with no code, already used.
+    @Transactional(rollbackFor = IOException.class)
+    LoyaltyRewardDto issueCredit(String storeId, String memberId, long points) throws IOException {
+        LoyaltyProgram p = programs.findByStoreId(storeId);
+        LoyaltyMember m = members.findById(memberId);
+        String why = LoyaltyMath.redeemProblem(points, m.getBalance(), p);
+        if (why != null) {
+            throw new ResponseStatusException(why.startsWith("Not enough") ? 409 : 400, why);
+        }
+        if (m.getCustomerId().length() == 0) {
+            throw new ResponseStatusException(409, "The member has no customer record to credit");
+        }
+        if (members.addIf(memberId, -points) != 1) {
+            throw new ResponseStatusException(409, "Not enough points");
+        }
+        long cents = LoyaltyMath.value(points, p);
+        Instant now = Instant.now();
+        Instant until = now.plusMillis(REWARD_DAYS * DAY);
+        storeCredit.grant(storeId, m.getCustomerId(), cents, until, points + " points redeemed");
+        String ref = Ids.next();
+        record(storeId, memberId, REDEEM, -points, "", "CREDIT:" + ref, "Store credit " + cents);
+        return new LoyaltyRewardDto(ref, points, cents, "", USED, until.toEpochMilli());
     }
 
     /// Takes `points` off the balance and issues a single-use code worth

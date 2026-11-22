@@ -23,8 +23,10 @@ import com.codename1.annotations.Mapped;
 /// Adds store credit to a customer (or takes it, when negative).
 ///
 /// @param amountCents Positive to add, negative to take; never takes more than there is.
+/// @param expiresAt When added credit lapses, epoch milliseconds; 0 for never. Ignored when taking.
 @Mapped
 public record CreditAdjustDto(
         long amountCents,
-        String reason) {
+        String reason,
+        long expiresAt) {
 }

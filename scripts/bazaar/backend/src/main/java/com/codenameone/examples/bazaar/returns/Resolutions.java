@@ -89,7 +89,7 @@ public class Resolutions {
             StoreOrder o = orderRows.findById(r.getOrderId());
             if (parts[0] > 0 && o.getCustomerId().length() > 0) {
                 customers.adjustCredit(username, storeId, o.getCustomerId(),
-                        new CreditAdjustDto(parts[0], "Return " + r.getId()));
+                        new CreditAdjustDto(parts[0], "Return " + r.getId(), 0));
             }
             return;
         }

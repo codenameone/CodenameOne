@@ -70,6 +70,12 @@ public final class Quote {
     public long shippingCents;
     public long totalCents;
     public long giftCardCents;
+    /// What the shopper's store credit pays, after the gift card.
+    public long storeCreditCents;
+    /// What store credit the shopper could spend here; 0 for a guest.
+    public long creditAvailableCents;
+    /// The customer whose credit pays, or null.
+    public com.codenameone.examples.bazaar.domain.Customer creditCustomer;
     /// The tax exemption certificate that took the tax off, or null.
     public String exemptCertificate;
     /// In a tax-inclusive store, the tax inside the prices that an exemption
@@ -108,7 +114,7 @@ public final class Quote {
     }
 
     public long dueCents() {
-        return totalCents - giftCardCents;
+        return totalCents - giftCardCents - storeCreditCents;
     }
 
     /// The code of the first discount applied that has one, or empty.
@@ -152,7 +158,8 @@ public final class Quote {
                 cart.getDiscountCode(), cart.getGiftCardCode(), subtotalCents, discountCents(),
                 shippingCents, taxCents(), store.isTaxInclusive(), totalCents, giftCardCents,
                 dueCents(), discounts != null && discounts.freeShipping, applied, opts,
-                shipping == null ? null : shipping.id, problems, shippingRequired());
+                shipping == null ? null : shipping.id, problems, shippingRequired(),
+                cart.isUseStoreCredit(), storeCreditCents, creditAvailableCents);
     }
 
     static ShippingOptionDto option(ShippingCalculator.Option option) {

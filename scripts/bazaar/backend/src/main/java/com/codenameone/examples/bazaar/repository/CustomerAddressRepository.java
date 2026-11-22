@@ -30,4 +30,10 @@ public interface CustomerAddressRepository extends CrudRepository<CustomerAddres
     List<CustomerAddress> findByUsername(String username);
 
     List<CustomerAddress> findByCustomerId(String customerId);
+
+    /// Moves every row of one customer to another (a merge).
+    @com.codename1.orm.repository.Modifying(clearAutomatically = true)
+    @com.codename1.orm.repository.Query("update CustomerAddress x set x.customerId = :to where x.customerId = :from")
+    int moveCustomer(@com.codename1.orm.repository.Param("from") String from,
+            @com.codename1.orm.repository.Param("to") String to);
 }

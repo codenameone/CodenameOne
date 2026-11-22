@@ -70,6 +70,8 @@ import static org.junit.jupiter.api.Assertions.fail;
 @BackendTest
 class EmailsTest {
     @Autowired
+    private com.codenameone.examples.bazaar.marketing.MarketingMails automations;
+    @Autowired
     private Accounts accounts;
     @Autowired
     private Stores stores;
@@ -181,8 +183,16 @@ class EmailsTest {
         fulfillments.ship(s.owner, s.storeId, f.id());
         fulfillments.delivered(s.owner, s.storeId, f.id());
         find(to, "Order #" + o.number() + " was delivered");
+        // The review request waits a week after delivery, then goes once.
+        for (Mail m : mail.sent()) {
+            assertFalse(m.getSubject().startsWith("Tell us about order #" + o.number()),
+                    "no review request on the day of delivery");
+        }
+        long week = System.currentTimeMillis() + 8L * 86400000L;
+        assertTrue(automations.sweepReviews(week) >= 1);
         Mail review = find(to, "Tell us about order #" + o.number());
-        assertTrue(review.getHtml().contains("#reviews"), "links to the product's reviews");
+        assertTrue(review.getText().contains("/review/"), "a signed one-click link");
+        assertEquals(0, automations.sweepReviews(week), "sent once");
 
         List<FulfilLineDto> one = new ArrayList<FulfilLineDto>();
         one.add(new FulfilLineDto(lines.findByOrderId(o.id()).get(0).getId(), null, null, 1));
@@ -210,7 +220,7 @@ class EmailsTest {
         Customer c = customers.findByStoreIdAndEmail(s.storeId, to);
         assertNotNull(c, "the buyer is a customer of the store");
         GiftCardDto card = giftCards.issue(s.owner, s.storeId,
-                new GiftCardDto(null, null, null, 2500, 0, true, "", 0, c.getId(), 0));
+                new GiftCardDto(null, null, null, 2500, 0, true, "", 0, c.getId(), 0, "", "", "", 0, 0));
         Mail gift = find(to, "Your mail-pos gift card");
         assertTrue(gift.getText().contains(card.lastFour()), gift.getText());
         assertTrue(gift.getHtml().contains("cid:giftcard-qr"), "shows the QR code");

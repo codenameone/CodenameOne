@@ -417,6 +417,51 @@ public class AdminPages {
         return render(model, request, storeId, "Customers", view("customers"), t);
     }
 
+    @PostMapping("/admin/{storeId}/customers/{customerId}/merge")
+    public String merge(@PathVariable("storeId") String storeId,
+            @PathVariable("customerId") String customerId, HttpServer.Request request)
+            throws Exception {
+        member(request, storeId);
+        final String other = request.param("duplicateId");
+        return change(request, "/admin/" + storeId + "/customers/" + customerId,
+                "Customers merged", () -> data.mergeCustomer(storeId, customerId, other));
+    }
+
+    @PostMapping("/admin/{storeId}/customers/{customerId}/erase")
+    public String erase(@PathVariable("storeId") String storeId,
+            @PathVariable("customerId") String customerId, HttpServer.Request request)
+            throws Exception {
+        member(request, storeId);
+        return change(request, "/admin/" + storeId + "/customers/" + customerId,
+                "Personal data erased", () -> data.eraseCustomer(storeId, customerId));
+    }
+
+    @GetMapping("/admin/{storeId}/customers/{customerId}/export")
+    public HttpServer.Response exportCustomer(@PathVariable("storeId") String storeId,
+            @PathVariable("customerId") String customerId, HttpServer.Request request)
+            throws Exception {
+        member(request, storeId);
+        return data.export(storeId, customerId);
+    }
+
+    @GetMapping("/admin/{storeId}/data-requests")
+    public String dataRequests(@PathVariable("storeId") String storeId, Model model,
+            HttpServer.Request request) throws Exception {
+        member(request, storeId);
+        AdminView v = view("data-requests");
+        data.dataRequests(storeId, v);
+        return render(model, request, storeId, "Data requests", v, null);
+    }
+
+    @PostMapping("/admin/{storeId}/data-requests/{requestId}/done")
+    public String requestDone(@PathVariable("storeId") String storeId,
+            @PathVariable("requestId") String requestId, HttpServer.Request request)
+            throws Exception {
+        member(request, storeId);
+        return change(request, "/admin/" + storeId + "/data-requests", "Request marked done",
+                () -> data.completeRequest(storeId, requestId));
+    }
+
     @GetMapping("/admin/{storeId}/customers/{customerId}")
     public String customer(@PathVariable("storeId") String storeId,
             @PathVariable("customerId") String customerId, Model model,

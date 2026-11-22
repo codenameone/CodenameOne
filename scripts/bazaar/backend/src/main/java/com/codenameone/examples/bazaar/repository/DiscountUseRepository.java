@@ -32,4 +32,10 @@ public interface DiscountUseRepository extends CrudRepository<DiscountUse, Strin
     List<DiscountUse> findByOrderId(String orderId);
 
     void deleteByOrderId(String orderId);
+
+    /// Moves every row of one customer to another (a merge).
+    @com.codename1.orm.repository.Modifying(clearAutomatically = true)
+    @com.codename1.orm.repository.Query("update DiscountUse x set x.customerId = :to where x.customerId = :from")
+    int moveCustomer(@com.codename1.orm.repository.Param("from") String from,
+            @com.codename1.orm.repository.Param("to") String to);
 }

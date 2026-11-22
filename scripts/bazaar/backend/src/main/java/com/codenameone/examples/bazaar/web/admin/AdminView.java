@@ -29,6 +29,15 @@ public class AdminView {
     /// "customers" or "customer".
     public String page = "dashboard";
     public String base = "";
+    /// The customer page's merge, erase and export targets.
+    public String mergeAction = "";
+    public String eraseAction = "";
+    public String exportUrl = "";
+    /// Customers of the store that look like the same person.
+    public List<AdminRow> duplicates = new ArrayList<AdminRow>();
+    /// A customer's store credit grants, or the store's data requests.
+    public List<AdminRow> credits = new ArrayList<AdminRow>();
+    public List<AdminRow> requests = new ArrayList<AdminRow>();
     /// The product's translation sheet, from its page.
     public String translationsUrl = "";
 

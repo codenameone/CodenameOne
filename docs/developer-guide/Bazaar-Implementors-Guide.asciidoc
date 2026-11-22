@@ -587,6 +587,33 @@ allows pre-orders is sold ahead of stock and reserves nothing, counted against
 the variant's pre-order allowance.
 
 [[bazaar-ops]]
+=== Customer data, credit and automatic mail
+
+* *Merge and erasure* live in `customer/CustomerData`. A merge moves every row
+  keyed by the duplicate's id through each repository's `moveCustomer` query, and
+  the account rows (reviews, wishlist, product views) by username, then deletes
+  the duplicate and writes a `CUSTOMER_MERGED` audit event. Erasure blanks
+  personal fields on the customer and its orders but never an amount, so the
+  books still add up.
+* *Exports* are a zip of JSON files built in memory: `customers.json` (the store's
+  records) and `account.json` (the account's own rows).
+* *Store credit* is a ledger of grants (`store_credit_grant`) and uses
+  (`store_credit_use`). The customer's `storeCreditCents` is a cached sum. The
+  pure arithmetic is in `customer/CreditMath`: grants are spent in order of
+  expiry, never-expiring ones last. A refund puts credit back on the grants it
+  came from.
+* *Bulk codes* (`rates/DiscountCodes`) are copies of a discount with a usage
+  limit of one and `batchId` set, hidden from the discount list and deleted with
+  it.
+* *Automatic mail* is in `marketing/MarketingMails`, on scheduled jobs. Browse
+  mail is decided by `shouldMail` (an hour of quiet, a day at most, a week
+  between mails). Review requests are rows written at delivery and sent when
+  due, with `bazaar.reviews.requestDays` as the delay. Gift cards with a future
+  `deliverAt` go out from `GiftCards.deliveryJob`. Each send claims its row
+  with a conditional update first, so two instances never mail twice. The
+  review link and the browse unsubscribe link are HMAC-signed with the store's
+  campaign secret. The review page only displays on GET; the POST writes.
+
 === Operations and the register's tools
 
 The `ops` package holds the warehouse board (`Warehouse`, stage moves checked by

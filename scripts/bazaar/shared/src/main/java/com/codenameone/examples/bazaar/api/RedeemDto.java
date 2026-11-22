@@ -21,8 +21,10 @@ package com.codenameone.examples.bazaar.api;
 
 import com.codename1.annotations.Mapped;
 
-/// Points to turn into a reward.
+/// Points to turn into a reward: a single-use code, or with `toCredit` store credit that
+/// pays at the register and at checkout.
 @Mapped
 public record RedeemDto(
-        long points) {
+        long points,
+        boolean toCredit) {
 }

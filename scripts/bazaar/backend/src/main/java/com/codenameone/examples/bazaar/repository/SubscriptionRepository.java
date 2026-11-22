@@ -46,4 +46,10 @@ public interface SubscriptionRepository extends CrudRepository<Subscription, Str
     @Query("update Subscription s set s.nextAttemptAt = :lease where s.id = :id and s.nextAttemptAt = :at and s.status = :status")
     int claim(@Param("id") String id, @Param("at") Instant at, @Param("lease") Instant lease,
             @Param("status") String status);
+
+    /// Moves every row of one customer to another (a merge).
+    @com.codename1.orm.repository.Modifying(clearAutomatically = true)
+    @com.codename1.orm.repository.Query("update Subscription x set x.customerId = :to where x.customerId = :from")
+    int moveCustomer(@com.codename1.orm.repository.Param("from") String from,
+            @com.codename1.orm.repository.Param("to") String to);
 }

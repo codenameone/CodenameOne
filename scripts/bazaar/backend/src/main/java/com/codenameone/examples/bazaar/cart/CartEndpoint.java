@@ -76,6 +76,26 @@ public class CartEndpoint implements CartApiServer {
     }
 
     @Override
+    public CartDto useStoreCredit(String storeId, String token) throws Exception {
+        return carts.useStoreCredit(storeId, signedIn(), token, true);
+    }
+
+    @Override
+    public CartDto stopStoreCredit(String storeId, String token) throws Exception {
+        return carts.useStoreCredit(storeId, signedIn(), token, false);
+    }
+
+    /// Store credit belongs to an account: a guest has none to use.
+    private static String signedIn() {
+        String me = Codes.callerOrNull();
+        if (me == null) {
+            throw new com.codename1.backend.ResponseStatusException(401,
+                    "Sign in to use your store credit");
+        }
+        return me;
+    }
+
+    @Override
     public CartDto removeGiftCard(String storeId, String token) throws Exception {
         return carts.removeGiftCard(storeId, Codes.callerOrNull(), token);
     }

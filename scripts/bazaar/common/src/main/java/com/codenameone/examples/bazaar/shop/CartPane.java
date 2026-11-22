@@ -222,6 +222,7 @@ final class CartPane extends ShopPane {
         box.setUIID("ShopSummary");
         box.setName("cart-summary");
         codes(box, cart);
+        credit(box, cart);
         Ui.section(box, "Summary");
         rows(box, cart);
         box.add(Ui.primary("Checkout", "checkout", e -> checkout()));
@@ -286,6 +287,29 @@ final class CartPane extends ShopPane {
                                 Ui.fail(status, message);
                             }))));
         }
+    }
+
+    /// The store credit switch, shown when the signed-in shopper holds credit
+    /// at this store.
+    private void credit(Container box, final CartDto cart) {
+        if (cart.creditAvailableCents() <= 0) {
+            return;
+        }
+        final String storeId = cart.storeId();
+        final boolean on = cart.useStoreCredit();
+        String text = Lang.tr("Store credit available: {0}",
+                ShopState.money(cart.creditAvailableCents()));
+        box.add(Ui.text(text, "SvMuted"));
+        box.add(Ui.secondary(on ? "Don't use store credit" : "Use store credit",
+                "store-credit", e -> {
+                    if (on) {
+                        Api.cart().stopStoreCredit(storeId, ShopState.token(),
+                                Net.to(ShopState::setCart, Ui::fail));
+                    } else {
+                        Api.cart().useStoreCredit(storeId, ShopState.token(),
+                                Net.to(ShopState::setCart, Ui::fail));
+                    }
+                }));
     }
 
     private interface Apply {

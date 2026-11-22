@@ -10,7 +10,7 @@
 <p th:if="${view.items.empty}" class="muted"><span th:text="${shell.t['a.noOrdersYet']}">No orders yet.</span> <a href="/" th:text="${shell.t['a.browse']}">Browse the shops</a>.</p>
 <ul th:unless="${view.items.empty}"><li th:each="o : ${view.items}"><a th:href="${o.url}" th:text="${o.title}">Order #1</a> <span class="muted" th:text="${o.detail + ' - ' + o.meta}">Store</span> <span class="pill" th:text="${o.status}">Processing</span> <span th:text="${o.amount}">$1</span></li></ul>
 <p><a href="/account/orders" th:text="${shell.t['a.allOrders']}">All orders</a></p></section>
-<div class="grid2"><section class="card"><h2 th:text="${shell.t['a.details']}">Your details</h2><ul><li><a href="/account/addresses" th:text="${shell.t['a.addresses']}">Addresses</a></li><li><a href="/account/wishlist" th:text="${shell.t['a.wishlist']}">Wishlist</a></li><li><a href="/account/reviews" th:text="${shell.t['reviews.title']}">Reviews</a></li></ul></section>
+<div class="grid2"><section class="card"><h2 th:text="${shell.t['a.details']}">Your details</h2><ul><li><a href="/account/addresses" th:text="${shell.t['a.addresses']}">Addresses</a></li><li><a href="/account/wishlist" th:text="${shell.t['a.wishlist']}">Wishlist</a></li><li><a href="/account/reviews" th:text="${shell.t['reviews.title']}">Reviews</a></li><li><a href="/account/data" th:text="${shell.t['a.data']}">Your data</a></li></ul></section>
 <section class="card"><h2 th:text="${shell.t['a.rewards']}">Rewards and settings</h2><ul><li><a href="/account/loyalty" th:text="${shell.t['a.loyaltyRef']}">Loyalty and referrals</a></li><li><a href="/account/clubs" th:text="${shell.t['a.clubs']}">Clubs</a></li><li><a href="/account/alerts" th:text="${shell.t['a.alerts']}">Stock alerts</a></li><li><a href="/account/marketing" th:text="${shell.t['a.marketingPrefs']}">Marketing preferences</a></li><li><a href="/account/security" th:text="${shell.t['a.security']}">Security</a></li></ul></section></div>
 </th:block>
 
@@ -123,6 +123,15 @@
 <p th:if="${view.items.empty}" class="muted" th:text="${shell.t['a.noAlerts']}">You are not waiting for anything to come back in stock.</p>
 <div class="table-wrap" th:unless="${view.items.empty}"><table class="data"><thead><tr><th th:text="${shell.t['a.product']}">Product</th><th th:text="${shell.t['store.links']}">Store</th><th th:text="${shell.t['a.status']}">Status</th><th th:text="${shell.t['a.since']}">Since</th><th></th></tr></thead><tbody>
 <tr th:each="a : ${view.items}"><td><span th:text="${a.title}">Product</span> <span class="muted" th:text="${a.detail}">Variant</span></td><td th:text="${a.extra}">Store</td><td><span class="pill" th:text="${a.status}">PENDING</span></td><td th:text="${a.meta}">2026-01-01</td><td><form method="post" th:action="${a.action}" th:if="${a.flag}"><button class="quiet" type="submit" th:text="${shell.t['a.stopWaiting']}">Stop waiting</button></form></td></tr></tbody></table></div>
+</th:block>
+
+<th:block th:if="${view.page == 'data'}"><h1 th:text="${shell.t['a.data']}">Your data</h1>
+<p class="muted" th:text="${shell.t['a.dataIntro']}">Download everything the stores you shop at hold about you, or ask a store to erase it. Orders keep their amounts for the store's accounts.</p>
+<p><a class="button" href="/account/data/export" th:text="${shell.t['a.dataDownload']}">Download my data</a></p>
+<p th:if="${view.items.empty}" class="muted" th:text="${shell.t['a.notCustomer']}">You are not a customer of any store yet.</p>
+<section class="card" th:each="m : ${view.items}"><h2 th:text="${m.title}">Store</h2><p class="muted" th:unless="${m.detail.empty}" th:text="${m.detail}">Export requested</p>
+<form method="post" th:action="${m.action}" class="stack"><input type="hidden" name="kind" value="export"><button type="submit" class="quiet" th:text="${shell.t['a.dataAskExport']}">Ask the store for my data</button></form>
+<form method="post" th:action="${m.action}" class="stack" th:attr="hx-confirm=${shell.t['a.dataEraseConfirm']}"><input type="hidden" name="kind" value="erase"><button type="submit" class="quiet" th:text="${shell.t['a.dataAskErase']}">Ask the store to erase my data</button></form></section>
 </th:block>
 
 <th:block th:if="${view.page == 'marketing'}"><h1 th:text="${shell.t['a.marketingPrefs']}">Marketing preferences</h1>

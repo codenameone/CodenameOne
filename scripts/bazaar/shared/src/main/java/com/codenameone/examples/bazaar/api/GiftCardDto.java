@@ -20,7 +20,7 @@ package com.codenameone.examples.bazaar.api;
 
 import com.codename1.annotations.Mapped;
 
-/// A gift card. `code` is shown in full only when it is issued; afterwards only `lastFour`.
+/// A gift card. `code` is shown in full only when it is issued; afterwards only `lastFour`. With a `recipientEmail` the card is mailed there, with `message`, on `deliverAt` (epoch milliseconds; 0 sends it at once); `deliveredAt` is when it went, 0 while it waits.
 @Mapped
 public record GiftCardDto(
         String id,
@@ -32,5 +32,10 @@ public record GiftCardDto(
         String note,
         long expiresAt,
         String customerId,
-        long createdAt) {
+        long createdAt,
+        String recipientEmail,
+        String recipientName,
+        String message,
+        long deliverAt,
+        long deliveredAt) {
 }

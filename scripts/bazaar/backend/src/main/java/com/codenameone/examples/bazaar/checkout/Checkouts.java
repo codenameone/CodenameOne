@@ -77,6 +77,10 @@ import java.util.List;
 ///    customer record (orders and spend), the cart emptied.
 @Component
 public class Checkouts {
+    /// Field-injected, so the constructor stays as it was.
+    @com.codename1.backend.annotations.Autowired
+    private com.codenameone.examples.bazaar.customer.StoreCredit storeCredit;
+
     private final Carts carts;
     private final Quoter quoter;
     private final Inventory inventory;
@@ -341,6 +345,14 @@ public class Checkouts {
                         orders.tender(o.getId(), "GIFT_CARD", q.giftCardCents,
                                 q.giftCard.getLastFour());
                     }
+                    if (q.creditCustomer != null && q.storeCreditCents > 0) {
+                        if (!storeCredit.take(q.creditCustomer.getId(), q.storeCreditCents,
+                                o.getId())) {
+                            throw new ResponseStatusException(409,
+                                    "Your store credit changed; look at the cart again");
+                        }
+                        orders.tender(o.getId(), "STORE_CREDIT", q.storeCreditCents, "");
+                    }
                     orders.insertLines(o, q, at, back);
                     settings.keep(o.getId(), o.getStoreId(), answers);
                     orders.event(o.getId(), "PLACED", "Order placed", who);
@@ -482,6 +494,9 @@ public class Checkouts {
         if (quote.giftCard != null && quote.giftCardCents > 0) {
             giftCards.credit(quote.giftCard.getId(), orderId, quote.giftCardCents,
                     "Payment declined");
+        }
+        if (quote.storeCreditCents > 0) {
+            storeCredit.restore(orderId, quote.storeCreditCents);
         }
         undoDiscounts(orderId);
         orders.erase(orderId);

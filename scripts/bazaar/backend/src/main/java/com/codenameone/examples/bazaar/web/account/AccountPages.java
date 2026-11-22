@@ -340,6 +340,40 @@ public class AccountPages {
         return change(request, "/account/alerts", "Alert removed", () -> data.deleteAlert(me, id));
     }
 
+    // ----------------------------------------------------------------- data
+
+    @com.codename1.backend.annotations.Autowired
+    private com.codenameone.examples.bazaar.customer.CustomerData customerData;
+
+    /// The shopper's data: a download of everything, and a request to a
+    /// store to send it or erase it.
+    @GetMapping("/account/data")
+    public String myData(Model model, HttpServer.Request request) throws Exception {
+        AccountView v = view("data");
+        data.dataPage(Caller.name(), v, customerData.mine(Caller.name()));
+        return render(pages, model, request, "Your data", v);
+    }
+
+    @GetMapping("/account/data/export")
+    public HttpServer.Response downloadData(HttpServer.Request request) throws Exception {
+        com.codenameone.examples.bazaar.api.DataExportDto x = customerData.exportMine(me(request));
+        return new HttpServer.Response(200, "application/zip",
+                com.codename1.backend.Base64.decode(x.zipBase64()))
+                .header("Content-Disposition", "attachment; filename=\"" + x.fileName() + "\"")
+                .header("Cache-Control", "no-store");
+    }
+
+    @PostMapping("/account/data/{store}")
+    public String requestData(@PathVariable("store") String store, HttpServer.Request request)
+            throws Exception {
+        final String me = me(request);
+        final String kind = "erase".equals(request.param("kind"))
+                ? com.codenameone.examples.bazaar.customer.CustomerData.ERASURE
+                : com.codenameone.examples.bazaar.customer.CustomerData.EXPORT;
+        return change(request, "/account/data", "Request sent to the store",
+                () -> customerData.request(me, store, kind));
+    }
+
     // ------------------------------------------------------------ marketing
 
     @GetMapping("/account/marketing")

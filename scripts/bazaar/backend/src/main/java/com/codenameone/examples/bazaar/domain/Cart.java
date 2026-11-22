@@ -58,6 +58,10 @@ public class Cart {
     @Column(nullable = false)
     private Instant updatedAt = Instant.EPOCH;
 
+    /// The shopper pays with their store credit, as far as it goes.
+    @Column(nullable = false)
+    private boolean useStoreCredit;
+
     public Cart() {
     }
 
@@ -151,5 +155,13 @@ public class Cart {
 
     public void setLanguage(String language) {
         this.language = language == null ? "" : language;
+    }
+
+    public boolean isUseStoreCredit() {
+        return useStoreCredit;
+    }
+
+    public void setUseStoreCredit(boolean useStoreCredit) {
+        this.useStoreCredit = useStoreCredit;
     }
 }

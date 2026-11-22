@@ -63,4 +63,10 @@ public interface StoreOrderRepository extends CrudRepository<StoreOrder, String>
     List<StoreOrder> findByCreatedAtGreaterThanEqual(Instant since);
     /// A page of a shopper's orders, newest first (index `store_order_username_created_at`).
     List<StoreOrder> findByUsernameOrderByCreatedAtDesc(String username, PageRequest page);
+
+    /// Moves every row of one customer to another (a merge).
+    @com.codename1.orm.repository.Modifying(clearAutomatically = true)
+    @com.codename1.orm.repository.Query("update StoreOrder x set x.customerId = :to where x.customerId = :from")
+    int moveCustomer(@com.codename1.orm.repository.Param("from") String from,
+            @com.codename1.orm.repository.Param("to") String to);
 }

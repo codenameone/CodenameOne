@@ -44,7 +44,7 @@ import java.io.OutputStream;
 /// takes the text pasted into a box, or -- where the platform has native drag
 /// and drop -- a `.csv` file dropped onto that box. Codename One has no file
 /// open dialog of its own, which is why import is paste or drop.
-final class Files {
+public final class Files {
     interface Read {
         void read(String text);
     }
@@ -59,12 +59,21 @@ final class Files {
     }
 
     static void save(String name, String text, String mime) {
+        try {
+            saveBytes(name, text.getBytes("UTF-8"), mime);
+        } catch (IOException failed) {
+            Log.e(failed);
+        }
+    }
+
+    /// Writes `bytes` to the app's folder and offers them to share.
+    public static void saveBytes(String name, byte[] bytes, String mime) {
         FileSystemStorage fs = FileSystemStorage.getInstance();
         String path = fs.getAppHomePath() + name;
         OutputStream out = null;
         try {
             out = fs.openOutputStream(path);
-            out.write(text.getBytes("UTF-8"));
+            out.write(bytes);
         } catch (IOException failed) {
             Log.e(failed);
             Ui.say("The file could not be written");

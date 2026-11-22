@@ -101,7 +101,10 @@ public class RateSettings {
         List<Discount> rows = discounts.findByStoreIdOrderByCreatedAtDesc(storeId);
         List<DiscountDto> out = new ArrayList<DiscountDto>();
         for (int iter = 0; iter < rows.size(); iter++) {
-            out.add(dto(rows.get(iter)));
+            // Bulk-generated codes are listed by DiscountCodes, not here.
+            if (rows.get(iter).getBatchId().length() == 0) {
+                out.add(dto(rows.get(iter)));
+            }
         }
         return out;
     }
@@ -183,6 +186,11 @@ public class RateSettings {
         Discount d = id == null ? null : discounts.findById(id);
         if (d == null || !storeId.equals(d.getStoreId())) {
             throw new ResponseStatusException(404, "No such discount");
+        }
+        // The codes generated from it go with it.
+        List<Discount> codes = discounts.findByBatchIdOrderByCreatedAtAsc(d.getId());
+        for (int iter = 0; iter < codes.size(); iter++) {
+            discounts.delete(codes.get(iter));
         }
         discounts.delete(d);
         return dto(d);

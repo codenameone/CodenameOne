@@ -36,6 +36,9 @@ public interface DiscountRepository extends CrudRepository<Discount, String> {
 
     List<Discount> findByStoreIdAndAutomatic(String storeId, boolean automatic);
 
+    /// The single-use codes generated from discount `batchId`.
+    List<Discount> findByBatchIdOrderByCreatedAtAsc(String batchId);
+
     /// Counts one use of a discount if it has uses left (a `usageLimit` of 0
     /// is no limit). The conditional update is what keeps two checkouts from
     /// both taking the last use.

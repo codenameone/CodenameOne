@@ -31,5 +31,6 @@ public record CustomerDetailDto(
         List<SavedAddressDto> addresses,
         long lifetimeValueCents,
         long averageOrderCents,
-        String currency) {
+        String currency,
+        List<CreditGrantDto> credits) {
 }

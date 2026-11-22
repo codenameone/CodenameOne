@@ -54,6 +54,8 @@ final class LoyaltyPane extends MerchantPane {
     void load() {
         clearTools();
         tool(FontImage.MATERIAL_ADD, "Add tier", "loyalty-add-tier", this::addTier);
+        tool(FontImage.MATERIAL_REDEEM, "Redeem as store credit", "loyalty-redeem-credit",
+                this::redeemToCredit);
         Api.loyalty().program(MerchantState.storeId(), Net.to(p -> {
             program = p;
             tiers.clear();
@@ -61,6 +63,39 @@ final class LoyaltyPane extends MerchantPane {
                 tiers.addAll(p.tiers());
             }
             paint();
+        }, Ui::fail));
+    }
+
+    /// Turns a member's points into store credit at the counter: the credit
+    /// is spendable online and at the register, and expires with the store's
+    /// reward expiry.
+    private void redeemToCredit() {
+        Container body = new Container(BoxLayout.y());
+        com.codename1.ui.TextField who = MUi.text(body, "Member e-mail or name",
+                "loyalty-redeem-who", "");
+        com.codename1.ui.TextField points = Ui.field(body, "Points", "loyalty-redeem-points",
+                "", com.codename1.ui.TextArea.NUMERIC);
+        com.codename1.ui.Command ok = com.codename1.ui.Command.create(Lang.tr("Redeem"), null,
+                null);
+        com.codename1.ui.Command cancel = com.codename1.ui.Command.create(Lang.tr("Cancel"),
+                null, null);
+        if (com.codename1.ui.Dialog.show(Lang.tr("Redeem as store credit"), body, cancel, ok)
+                != ok) {
+            return;
+        }
+        final long n = CustomerMatches.count(points.getText());
+        if (n <= 0) {
+            return;
+        }
+        final String storeId = MerchantState.storeId();
+        Api.loyalty().members(storeId, who.getText().trim(), Net.to(found -> {
+            if (found == null || found.isEmpty()) {
+                Ui.say("No member matches");
+                return;
+            }
+            Api.loyalty().redeemFor(storeId, found.get(0).id(),
+                    new com.codenameone.examples.bazaar.api.RedeemDto(n, true),
+                    Net.to(r -> Ui.say("Points redeemed as store credit"), Ui::fail));
         }, Ui::fail));
     }
 

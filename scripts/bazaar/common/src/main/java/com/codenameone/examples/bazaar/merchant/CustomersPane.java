@@ -328,7 +328,10 @@ final class CustomersPane extends MerchantPane {
                 null, "customer-credit"));
         page.add(tiles);
         page.add(MUi.buttons(Ui.secondary(Lang.tr("Adjust store credit"), "customer-adjust",
-                e -> credit(c, () -> open(c)))));
+                e -> credit(c, () -> open(c))),
+                Ui.secondary(Lang.tr("Merge a duplicate"), "customer-merge", e -> merge(c)),
+                Ui.secondary(Lang.tr("Export data"), "customer-data-export", e -> exportData(c)),
+                Ui.secondary(Lang.tr("Erase personal data"), "customer-erase", e -> erase(c))));
 
         Ui.section(page, "Notes and tags");
         Container card = new Container(BoxLayout.y());
@@ -399,6 +402,8 @@ final class CustomersPane extends MerchantPane {
                 MerchantState.money(c.storeCreditCents())), "SvMuted"));
         TextField amount = Ui.field(body, "Amount", "credit-amount", "0.00", TextArea.ANY);
         TextField reason = MUi.text(body, "Reason", "credit-reason", "");
+        TextField days = Ui.field(body, "Expires in days (blank: never)", "credit-expiry", "",
+                TextArea.NUMERIC);
         Command ok = Command.create(Lang.tr("Adjust"), null, null);
         Command cancel = Command.create(Lang.tr("Cancel"), null, null);
         if (Dialog.show(Lang.tr("Adjust store credit"), body, cancel, ok) != ok) {
@@ -411,13 +416,77 @@ final class CustomersPane extends MerchantPane {
             return;
         }
         Api.customers().adjustCredit(MerchantState.storeId(), c.id(), new CreditAdjustDto(
-                negative ? -cents : cents, reason.getText().trim()), Net.to(saved -> {
+                negative ? -cents : cents, reason.getText().trim(),
+                negative ? 0 : CustomerMatches.daysFrom(days.getText(), System.currentTimeMillis())),
+                Net.to(saved -> {
                     Ui.say("Store credit adjusted");
                     fetch();
                     if (after != null) {
                         after.run();
                     }
                 }, Ui::fail));
+    }
+
+    // ---------------------------------------------------------- personal data
+
+    private void merge(final CustomerDto c) {
+        List<CustomerDto> dups = CustomerMatches.duplicates(customers, c);
+        if (dups.isEmpty()) {
+            Ui.say("No other customer has this e-mail, phone or name");
+            return;
+        }
+        String[] labels = new String[dups.size()];
+        for (int iter = 0; iter < labels.length; iter++) {
+            CustomerDto d = dups.get(iter);
+            labels[iter] = CustomerMatches.name(d) + " (" + d.email() + ")";
+        }
+        Container body = new Container(BoxLayout.y());
+        body.add(Ui.text(Lang.tr("The other record's orders, addresses, credit, gift cards, "
+                + "points, reviews and wishlist move here, and it is deleted."), "SvMuted"));
+        com.codename1.ui.spinner.Picker p = new com.codename1.ui.spinner.Picker();
+        p.setType(com.codename1.ui.Display.PICKER_TYPE_STRINGS);
+        p.setUIID("SvField");
+        p.setName("customer-merge-pick");
+        p.setStrings(labels);
+        p.setSelectedStringIndex(0);
+        body.add(p);
+        Command ok = Command.create(Lang.tr("Merge"), null, null);
+        Command cancel = Command.create(Lang.tr("Cancel"), null, null);
+        if (Dialog.show(Lang.tr("Merge a duplicate"), body, cancel, ok) != ok) {
+            return;
+        }
+        CustomerDto other = dups.get(Math.max(0, p.getSelectedStringIndex()));
+        Api.customers().merge(MerchantState.storeId(), c.id(),
+                new com.codenameone.examples.bazaar.api.CustomerMergeDto(other.id()),
+                Net.to(merged -> {
+                    Ui.say("Customers merged");
+                    fetch();
+                    open(merged);
+                }, Ui::fail));
+    }
+
+    private void exportData(CustomerDto c) {
+        Api.customers().dataExport(MerchantState.storeId(), c.id(), Net.to(x -> {
+            try {
+                Files.saveBytes(x.fileName(), com.codename1.util.Base64.decode(
+                        x.zipBase64().getBytes("UTF-8")), "application/zip");
+            } catch (java.io.IOException failed) {
+                com.codename1.io.Log.e(failed);
+            }
+        }, Ui::fail));
+    }
+
+    private void erase(final CustomerDto c) {
+        if (!MUi.confirm("Erase personal data", "The customer's name, contact details, "
+                + "addresses, reviews and wishlist are erased. Orders keep their amounts. "
+                + "This cannot be undone.", "Erase")) {
+            return;
+        }
+        Api.customers().erase(MerchantState.storeId(), c.id(), Net.to(done -> {
+            Ui.say("Personal data erased");
+            fetch();
+            open(done);
+        }, Ui::fail));
     }
 
     // -------------------------------------------------------------- export

@@ -95,6 +95,10 @@ import java.util.Map;
 /// The processor is never called with a transaction open, as in [Payments].
 @Component
 public class Orders {
+    /// Field-injected, so the constructor stays as it was.
+    @com.codename1.backend.annotations.Autowired
+    private com.codenameone.examples.bazaar.customer.StoreCredit storeCredit;
+
     public static final String ONLINE = "ONLINE";
     public static final String POS = "POS";
     public static final String DRAFT = "DRAFT";
@@ -466,6 +470,8 @@ public class Orders {
         if (card != null && onCard > 0) {
             giftCards.credit(card, order.getId(), onCard, "Order cancelled");
         }
+        // Store credit goes back on the grants it came from.
+        storeCredit.restore(order.getId(), Long.MAX_VALUE);
         StoreOrder done = finishCancel(order.getId(), refunded, actor);
         publish(done);
         storeEvents.orderCancelled(order.getId());
@@ -693,11 +699,15 @@ public class Orders {
         if (giftPart > 0) {
             giftCards.credit(card, orderId, giftPart, "Refund");
         }
+        // What neither the card nor a gift card took goes back to the store
+        // credit the order spent, before anything is left to pay by hand.
+        long creditPart = byHand ? 0 : storeCredit.restore(orderId,
+                Math.max(0, amount - cardPart - giftPart));
         StoreOrder done = recordRefund(orderId, req, amount, username,
                 foreign ? presentmentPart : 0);
         publish(done);
         storeEvents.refunded(orderId, amount);
-        return new long[] {amount, cardPart, giftPart, amount - cardPart - giftPart};
+        return new long[] {amount, cardPart, giftPart, amount - cardPart - giftPart - creditPart};
     }
 
     /// Whether the order was charged in a currency other than the store's.

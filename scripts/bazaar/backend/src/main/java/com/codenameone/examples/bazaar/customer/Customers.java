@@ -81,10 +81,12 @@ public class Customers {
     private final StoreRepository stores;
     private final AuditEventRepository audits;
     private final StoreAccess access;
+    private final StoreCredit credit;
 
     public Customers(CustomerRepository customers, CustomerAddressRepository addresses,
             StoreOrderRepository orders, StoreRepository stores, AuditEventRepository audits,
-            StoreAccess access) {
+            StoreAccess access, StoreCredit credit) {
+        this.credit = credit;
         this.customers = customers;
         this.addresses = addresses;
         this.orders = orders;
@@ -276,7 +278,8 @@ public class Customers {
         }
         Store store = stores.findById(storeId);
         return new CustomerDetailDto(dto(c, lastAt), rows, saved, lifetime,
-                counted == 0 ? 0 : lifetime / counted, store == null ? "" : store.getCurrency());
+                counted == 0 ? 0 : lifetime / counted, store == null ? "" : store.getCurrency(),
+                credit.grantsOf(c.getId()));
     }
 
     @Transactional(rollbackFor = IOException.class)
@@ -324,7 +327,8 @@ public class Customers {
     }
 
     /// Adds to (or, negative, takes from) a customer's store credit; it never
-    /// goes below zero.
+    /// goes below zero. Added credit lapses at `adjust.expiresAt()` (0 for
+    /// never); taken credit comes off the grants that lapse first.
     @Transactional(rollbackFor = IOException.class)
     public CustomerDto adjustCredit(String username, String storeId, String customerId,
             CreditAdjustDto adjust) throws IOException {
@@ -338,17 +342,19 @@ public class Customers {
             throw new ResponseStatusException(400, "Say why the credit changes");
         }
         Customer c = mine(storeId, customerId);
-        long next = c.getStoreCreditCents() + adjust.amountCents();
-        if (next < 0) {
+        if (adjust.amountCents() > 0) {
+            credit.grant(storeId, customerId, adjust.amountCents(),
+                    adjust.expiresAt() <= 0 ? Instant.EPOCH : Instant.ofEpochMilli(adjust.expiresAt()),
+                    reason);
+        } else if (!credit.take(customerId, -adjust.amountCents(), "")) {
             throw new ResponseStatusException(409, "The customer has only "
-                    + c.getStoreCreditCents() + " cents of credit");
+                    + credit.available(c) + " cents of credit");
         }
-        c.setStoreCreditCents(next);
-        c.setUpdatedAt(Instant.now());
-        customers.save(c);
         audit(storeId, username, "STORE_CREDIT", customerId, Codes.cut(adjust.amountCents()
-                + " cents: " + reason, 500));
-        return dto(c, 0);
+                + " cents" + (adjust.amountCents() > 0 && adjust.expiresAt() > 0
+                    ? " until " + Instant.ofEpochMilli(adjust.expiresAt()) : "")
+                + ": " + reason, 500));
+        return dto(customers.findById(customerId), 0);
     }
 
     @Transactional(readOnly = true)

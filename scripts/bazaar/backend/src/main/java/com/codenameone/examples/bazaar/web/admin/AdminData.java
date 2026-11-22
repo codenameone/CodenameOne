@@ -1076,6 +1076,24 @@ public class AdminData {
         fact(v, "Marketing", c.acceptsMarketing() ? "Subscribed" : "Not subscribed");
         fact(v, "Customer since", date(c.createdAt()));
         fact(v, "Note", c.note());
+        String base = "/admin/" + storeId + "/customers/" + customerId;
+        v.mergeAction = base + "/merge";
+        v.eraseAction = base + "/erase";
+        v.exportUrl = base + "/export";
+        List<com.codenameone.examples.bazaar.api.CreditGrantDto> grants = d.credits() == null
+                ? new ArrayList<com.codenameone.examples.bazaar.api.CreditGrantDto>() : d.credits();
+        for (int iter = 0; iter < grants.size(); iter++) {
+            com.codenameone.examples.bazaar.api.CreditGrantDto g = grants.get(iter);
+            if (g.remainingCents() <= 0) {
+                continue;
+            }
+            AdminRow r = new AdminRow();
+            r.title = g.reason();
+            r.amount = Money.format(g.remainingCents(), cur);
+            r.meta = g.expiresAt() <= 0 ? "Never expires" : "Expires " + date(g.expiresAt());
+            v.credits.add(r);
+        }
+        duplicates(storeId, c, v);
         String root = "/admin/" + storeId + "/orders/";
         List<CustomerOrderDto> os = d.orders() == null ? new ArrayList<CustomerOrderDto>()
                 : d.orders();
@@ -1099,6 +1117,78 @@ public class AdminData {
             v.addresses.add(r);
         }
         return name(c);
+    }
+
+    @com.codename1.backend.annotations.Autowired
+    private com.codenameone.examples.bazaar.repository.CustomerRepository customerRows;
+    @com.codename1.backend.annotations.Autowired
+    private com.codenameone.examples.bazaar.customer.CustomerData customerData;
+
+    /// Up to twenty other customers of the store with the same e-mail, phone
+    /// or full name: the likely duplicates offered for a merge.
+    private void duplicates(String storeId, CustomerDto c, AdminView v) {
+        List<com.codenameone.examples.bazaar.domain.Customer> all =
+                customerRows.findByStoreIdOrderByLastNameAsc(storeId);
+        String name = (c.firstName() + " " + c.lastName()).trim();
+        for (int iter = 0; iter < all.size() && v.duplicates.size() < 20; iter++) {
+            com.codenameone.examples.bazaar.domain.Customer o = all.get(iter);
+            if (o.getId().equals(c.id())) {
+                continue;
+            }
+            String other = (o.getFirstName() + " " + o.getLastName()).trim();
+            boolean same = c.email().length() > 0 && c.email().equalsIgnoreCase(o.getEmail())
+                    || c.phone().length() > 0 && c.phone().equals(o.getPhone())
+                    || name.length() > 0 && name.equalsIgnoreCase(other);
+            if (same) {
+                AdminRow r = new AdminRow();
+                r.id = o.getId();
+                r.title = (other.length() > 0 ? other : o.getEmail()) + " (" + o.getEmail() + ", "
+                        + o.getOrdersCount() + " orders)";
+                v.duplicates.add(r);
+            }
+        }
+    }
+
+    void mergeCustomer(String storeId, String customerId, String duplicateId) throws Exception {
+        customers.merge(storeId, customerId,
+                new com.codenameone.examples.bazaar.api.CustomerMergeDto(duplicateId));
+    }
+
+    void eraseCustomer(String storeId, String customerId) throws Exception {
+        customers.erase(storeId, customerId);
+    }
+
+    void completeRequest(String storeId, String requestId) throws Exception {
+        customers.completeRequest(storeId, requestId);
+    }
+
+    /// The store's data requests, for the data requests page.
+    void dataRequests(String storeId, AdminView v) throws Exception {
+        List<com.codenameone.examples.bazaar.api.DataRequestDto> rs =
+                customers.dataRequests(storeId);
+        for (int iter = 0; iter < rs.size(); iter++) {
+            com.codenameone.examples.bazaar.api.DataRequestDto d = rs.get(iter);
+            AdminRow r = new AdminRow();
+            r.id = d.id();
+            r.title = d.customerName();
+            r.url = "/admin/" + storeId + "/customers/" + d.customerId();
+            r.detail = "EXPORT".equals(d.kind()) ? "Data export" : "Erasure";
+            r.status = words(d.status());
+            r.meta = date(d.createdAt());
+            r.flag = "OPEN".equals(d.status()) && "EXPORT".equals(d.kind());
+            r.action = "/admin/" + storeId + "/data-requests/" + d.id() + "/done";
+            v.requests.add(r);
+        }
+    }
+
+    /// The zip of a customer's data, as a download.
+    HttpServer.Response export(String storeId, String customerId) throws Exception {
+        com.codenameone.examples.bazaar.api.DataExportDto x = customers.dataExport(storeId,
+                customerId);
+        return new HttpServer.Response(200, "application/zip",
+                com.codename1.backend.Base64.decode(x.zipBase64()))
+                .header("Content-Disposition", "attachment; filename=\"" + x.fileName() + "\"")
+                .header("Cache-Control", "no-store");
     }
 
     private static void fact(AdminView v, String label, String value) {

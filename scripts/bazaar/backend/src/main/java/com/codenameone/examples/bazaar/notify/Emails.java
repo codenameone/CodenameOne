@@ -293,47 +293,168 @@ public class Emails {
                 .build();
     }
 
-    /// A parcel arrived: the delivery notice and, beside it, a request to
-    /// review what came.
+    /// A parcel arrived: the delivery notice, and a review request scheduled
+    /// for some days later ([com.codenameone.examples.bazaar.domain.ReviewRequest]),
+    /// when the shopper has had time to use what came. The request is mailed
+    /// by [com.codenameone.examples.bazaar.marketing.MarketingMails].
     public void delivered(String fulfillmentId) {
         try {
-            Mail[] both = deliveredMails(fulfillmentId);
-            if (both != null) {
-                send(both[0]);
-                send(both[1]);
-            }
+            send(deliveredMail(fulfillmentId));
         } catch (IOException | RuntimeException failed) {
             log("delivery notice", fulfillmentId, failed);
+        }
+        try {
+            scheduleReview(fulfillmentId, System.currentTimeMillis());
+        } catch (IOException | RuntimeException failed) {
+            log("review request", fulfillmentId, failed);
         }
     }
 
     @Transactional(readOnly = true)
-    private Mail[] deliveredMails(String fulfillmentId) throws IOException {
+    private Mail deliveredMail(String fulfillmentId) throws IOException {
         Fulfillment f = fulfillments.findById(fulfillmentId);
         StoreOrder o = f == null ? null : orders.findById(f.getOrderId());
         if (o == null || !Mail.isAddress(o.getEmail())) {
             return null;
         }
         Store s = stores.findById(o.getStoreId());
-        String lang = language.of(o);
-        Body d = new Body(s, lang, "mail.delivered.title");
+        Body d = new Body(s, language.of(o), "mail.delivered.title");
         d.para(d.f("mail.delivered.body", o.getNumber()));
         d.button(d.f("mail.seeOrder"), track(o));
-        Mail delivered = builder(s, o.getEmail(), d.f("mail.delivered.subject", o.getNumber()), d)
-                .build();
-        Body r = new Body(s, lang, "mail.review.title");
-        r.para(r.f("mail.review.body"));
+        return builder(s, o.getEmail(), d.f("mail.delivered.subject", o.getNumber()), d).build();
+    }
+
+    /// Days after delivery the review request goes out.
+    @Value("${bazaar.reviews.requestDays:7}")
+    private int reviewDelayDays = 7;
+    @Autowired
+    private com.codenameone.examples.bazaar.repository.ReviewRequestRepository reviewRequests;
+
+    /// Schedules the review request for the order whose fulfilment
+    /// `fulfillmentId` was delivered at `now`: one per order, however many
+    /// parcels it came in. Public so that tests can choose the time.
+    @Transactional(rollbackFor = IOException.class)
+    public void scheduleReview(String fulfillmentId, long now) throws IOException {
+        Fulfillment f = fulfillments.findById(fulfillmentId);
+        StoreOrder o = f == null ? null : orders.findById(f.getOrderId());
+        if (o == null || !Mail.isAddress(o.getEmail())
+                || reviewRequests.findByOrderId(o.getId()) != null) {
+            return;
+        }
+        com.codenameone.examples.bazaar.domain.ReviewRequest r =
+                new com.codenameone.examples.bazaar.domain.ReviewRequest();
+        r.setId(com.codenameone.examples.bazaar.Ids.next());
+        r.setStoreId(o.getStoreId());
+        r.setOrderId(o.getId());
+        r.setUsername(o.getUsername() == null ? "" : o.getUsername());
+        r.setEmail(o.getEmail());
+        r.setDueAt(java.time.Instant.ofEpochMilli(now + reviewDelayDays * 86400000L));
+        r.setCreatedAt(java.time.Instant.ofEpochMilli(now));
+        reviewRequests.insert(r);
+    }
+
+    /// The review request: one signed link that opens a page to rate every
+    /// product of the order without signing in. Answers whether it went.
+    public boolean reviewRequest(com.codenameone.examples.bazaar.domain.ReviewRequest r,
+            String link) {
+        try {
+            Mail m = reviewMail(r, link);
+            send(m);
+            return m != null;
+        } catch (IOException | RuntimeException failed) {
+            log("review request", r.getId(), failed);
+            return false;
+        }
+    }
+
+    @Transactional(readOnly = true)
+    private Mail reviewMail(com.codenameone.examples.bazaar.domain.ReviewRequest r, String link)
+            throws IOException {
+        StoreOrder o = orders.findById(r.getOrderId());
+        if (o == null || !Mail.isAddress(r.getEmail())) {
+            return null;
+        }
+        Store s = stores.findById(r.getStoreId());
+        Body b = new Body(s, language.of(o), "mail.review.title");
+        b.para(b.f("mail.review.body"));
         List<OrderLine> ls = lines.findByOrderId(o.getId());
         for (int iter = 0; iter < ls.size(); iter++) {
             Product p = products.findById(ls.get(iter).getProductId());
             if (p != null) {
-                r.link(r.f("mail.review.link", p.getTitle()), urls.absolute(null, "/s/"
-                        + enc(s.getHandle()) + "/products/" + enc(p.getHandle()) + "#reviews"));
+                b.para(p.getTitle());
             }
         }
-        Mail review = builder(s, o.getEmail(), r.f("mail.review.subject", o.getNumber()), r)
+        b.button(b.f("mail.review.button"), link);
+        return builder(s, r.getEmail(), b.f("mail.review.subject", o.getNumber()), b).build();
+    }
+
+    /// The browse abandonment mail: the product the shopper looked at, a link
+    /// back to it, and an unsubscribe link (also the `List-Unsubscribe`
+    /// header). Answers whether it went.
+    public boolean browsed(String storeId, String to, String lang, Product p,
+            String unsubscribeUrl) {
+        try {
+            Mail m = browseMail(storeId, to, lang, p, unsubscribeUrl);
+            send(m);
+            return m != null;
+        } catch (IOException | RuntimeException failed) {
+            log("browse reminder", p.getId(), failed);
+            return false;
+        }
+    }
+
+    @Transactional(readOnly = true)
+    private Mail browseMail(String storeId, String to, String lang, Product p,
+            String unsubscribeUrl) throws IOException {
+        if (!Mail.isAddress(to)) {
+            return null;
+        }
+        Store s = stores.findById(storeId);
+        Body b = new Body(s, lang, "mail.browse.title");
+        b.para(b.f("mail.browse.body", p.getTitle(), s.getName()));
+        b.button(b.f("mail.browse.button"), urls.absolute(null, "/s/" + enc(s.getHandle())
+                + "/products/" + enc(p.getHandle())));
+        b.link(b.f("mail.browse.unsubscribe"), unsubscribeUrl);
+        return builder(s, to, b.f("mail.browse.subject", p.getTitle()), b)
+                .header("List-Unsubscribe", "<" + unsubscribeUrl + ">").build();
+    }
+
+    /// A gift card for someone else, mailed to them on its delivery date with
+    /// the sender's message. Answers whether it went.
+    public boolean giftCardTo(com.codenameone.examples.bazaar.domain.GiftCard card) {
+        try {
+            Mail m = giftRecipientMail(card);
+            send(m);
+            return m != null;
+        } catch (IOException | RuntimeException failed) {
+            log("gift card delivery", card.getId(), failed);
+            return false;
+        }
+    }
+
+    @Transactional(readOnly = true)
+    private Mail giftRecipientMail(com.codenameone.examples.bazaar.domain.GiftCard card)
+            throws IOException {
+        if (!Mail.isAddress(card.getRecipientEmail())) {
+            return null;
+        }
+        Store s = stores.findById(card.getStoreId());
+        Body b = new Body(s, language.shopper(card.getStoreId(), null, card.getRecipientEmail()),
+                "mail.gift.title");
+        if (card.getRecipientName().length() > 0) {
+            b.para(b.f("mail.gift.hello", card.getRecipientName()));
+        }
+        if (card.getMessage().length() > 0) {
+            b.para(card.getMessage());
+        }
+        b.total(b.f("mail.gift.worth"), card.getBalanceCents(), s.getCurrency());
+        b.para(b.f("mail.gift.body"));
+        b.code(group(card.getCode()));
+        b.html.append("<p style=\"text-align:center\"><img src=\"cid:giftcard-qr\" width=\"180\" "
+                + "height=\"180\" alt=\"QR code\"></p>");
+        return builder(s, card.getRecipientEmail(), b.f("mail.gift.subject", s.getName()), b)
+                .inline("giftcard-qr", "image/png", qrPng(card.getCode()))
                 .build();
-        return new Mail[] {delivered, review};
     }
 
     /// Money went back: the amount, with the credit note attached.

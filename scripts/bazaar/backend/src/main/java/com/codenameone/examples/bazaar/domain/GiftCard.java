@@ -61,6 +61,24 @@ public class GiftCard {
     @Column(nullable = false)
     private Instant createdAt = Instant.EPOCH;
 
+    /// Where the card is mailed, with the message, on [#getDeliverAt]; empty for none.
+    @Column(nullable = false, type = "VARCHAR(190)")
+    private String recipientEmail = "";
+
+    @Column(nullable = false, type = "VARCHAR(80)")
+    private String recipientName = "";
+
+    @Column(nullable = false, type = "VARCHAR(500)")
+    private String message = "";
+
+    /// When the card is mailed to the recipient; `Instant.EPOCH` for at once.
+    @Column(nullable = false)
+    private Instant deliverAt = Instant.EPOCH;
+
+    /// When it was mailed; `Instant.EPOCH` while it waits.
+    @Column(nullable = false)
+    private Instant deliveredAt = Instant.EPOCH;
+
     public GiftCard() {
     }
 
@@ -150,5 +168,45 @@ public class GiftCard {
 
     public void setCreatedAt(Instant createdAt) {
         this.createdAt = createdAt;
+    }
+
+    public String getRecipientEmail() {
+        return recipientEmail;
+    }
+
+    public void setRecipientEmail(String recipientEmail) {
+        this.recipientEmail = recipientEmail;
+    }
+
+    public String getRecipientName() {
+        return recipientName;
+    }
+
+    public void setRecipientName(String recipientName) {
+        this.recipientName = recipientName;
+    }
+
+    public String getMessage() {
+        return message;
+    }
+
+    public void setMessage(String message) {
+        this.message = message;
+    }
+
+    public Instant getDeliverAt() {
+        return deliverAt;
+    }
+
+    public void setDeliverAt(Instant deliverAt) {
+        this.deliverAt = deliverAt;
+    }
+
+    public Instant getDeliveredAt() {
+        return deliveredAt;
+    }
+
+    public void setDeliveredAt(Instant deliveredAt) {
+        this.deliveredAt = deliveredAt;
     }
 }

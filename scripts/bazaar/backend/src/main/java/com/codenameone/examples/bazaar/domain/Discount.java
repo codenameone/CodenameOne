@@ -110,6 +110,10 @@ public class Discount {
     @Column(nullable = false, type = "VARCHAR(2000)")
     private String rules = "";
 
+    /// The discount a bulk-generated single-use code was made from; empty for others.
+    @Column(nullable = false, type = "VARCHAR(32)")
+    private String batchId = "";
+
     public Discount() {
     }
 
@@ -319,5 +323,13 @@ public class Discount {
 
     public void setRules(String rules) {
         this.rules = rules;
+    }
+
+    public String getBatchId() {
+        return batchId;
+    }
+
+    public void setBatchId(String batchId) {
+        this.batchId = batchId;
     }
 }

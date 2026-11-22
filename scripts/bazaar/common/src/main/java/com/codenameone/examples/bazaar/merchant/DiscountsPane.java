@@ -74,7 +74,8 @@ final class DiscountsPane extends MerchantPane {
                     describe(d) + Ui.DOT + uses, MUi.badge(d.active() ? "ACTIVE" : "DISABLED")),
                     "discount-" + d.id(), e -> edit(d));
             RowMenus.attach(tap, Command.create(Lang.tr("Delete"), null, e -> Api.discounts()
-                    .delete(MerchantState.storeId(), d.id(), Net.to(x -> load(), Ui::fail))));
+                    .delete(MerchantState.storeId(), d.id(), Net.to(x -> load(), Ui::fail))),
+                    Command.create(Lang.tr("Generate unique codes"), null, e -> codes(d)));
             card.add(tap);
         }
         if (list.isEmpty()) {
@@ -83,6 +84,41 @@ final class DiscountsPane extends MerchantPane {
         }
         page.add(card);
         root(page);
+    }
+
+    /// Makes single-use copies of `d` with codes of their own, and saves them
+    /// as a CSV to hand out.
+    private void codes(final DiscountDto d) {
+        if (d.automatic()) {
+            Ui.say("Automatic discounts have no codes");
+            return;
+        }
+        Container body = new Container(BoxLayout.y());
+        com.codename1.ui.TextField count = Ui.field(body, "How many", "codes-count", "100",
+                com.codename1.ui.TextArea.NUMERIC);
+        com.codename1.ui.TextField prefix = MUi.text(body, "Prefix", "codes-prefix", "");
+        Command ok = Command.create(Lang.tr("Generate"), null, null);
+        Command cancel = Command.create(Lang.tr("Cancel"), null, null);
+        if (com.codename1.ui.Dialog.show(Lang.tr("Generate unique codes"), body, cancel, ok)
+                != ok) {
+            return;
+        }
+        int n = CustomerMatches.count(count.getText());
+        if (n <= 0) {
+            return;
+        }
+        Api.discounts().generateCodes(MerchantState.storeId(), d.id(),
+                new com.codenameone.examples.bazaar.api.DiscountCodesDto(n,
+                        prefix.getText().trim()), Net.to(x -> {
+                    int rows = x.rows() == null ? 0 : x.rows().size();
+                    String[][] out = new String[rows + 1][];
+                    out[0] = x.columns().toArray(new String[x.columns().size()]);
+                    for (int iter = 0; iter < rows; iter++) {
+                        java.util.List<String> cells = x.rows().get(iter).cells();
+                        out[iter + 1] = cells.toArray(new String[cells.size()]);
+                    }
+                    Files.saveCsv("codes-" + d.code() + ".csv", out);
+                }, Ui::fail));
     }
 
     private void edit(DiscountDto d) {

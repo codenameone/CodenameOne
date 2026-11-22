@@ -82,6 +82,12 @@ final class GiftCardsPane extends MerchantPane {
         Container body = new Container(BoxLayout.y());
         TextField amount = MUi.money(body, "Value", "giftcard-value", 5000);
         TextField note = MUi.text(body, "Note", "giftcard-note", "");
+        TextField to = Ui.field(body, "Send to (e-mail, optional)", "giftcard-to", "",
+                com.codename1.ui.TextArea.EMAILADDR);
+        TextField name = MUi.text(body, "Recipient name", "giftcard-to-name", "");
+        TextField message = MUi.text(body, "Message", "giftcard-message", "");
+        TextField days = Ui.field(body, "Send in days (blank: now)", "giftcard-days", "",
+                com.codename1.ui.TextArea.NUMERIC);
         Command ok = Command.create(Lang.tr("Issue"), null, null);
         Command cancel = Command.create(Lang.tr("Cancel"), null, null);
         if (Dialog.show(Lang.tr("Issue gift card"), body, cancel, ok) != ok) {
@@ -92,7 +98,10 @@ final class GiftCardsPane extends MerchantPane {
             return;
         }
         Api.giftCards().issue(MerchantState.storeId(), new GiftCardDto(null, null, null, cents, cents,
-                true, note.getText(), 0, null, 0), Net.to(made -> {
+                true, note.getText(), 0, null, 0, to.getText().trim(), name.getText().trim(),
+                message.getText().trim(),
+                CustomerMatches.daysFrom(days.getText(), System.currentTimeMillis()), 0),
+                Net.to(made -> {
                     Dialog.show(Lang.tr("Gift card issued"), Lang.tr("Code: {0}", made.code()),
                             Lang.tr("OK"), null);
                     load();

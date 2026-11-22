@@ -49,6 +49,8 @@ import java.io.IOException;
 @Controller
 public class Storefront {
     private final StorefrontPages pages;
+    @com.codename1.backend.annotations.Autowired
+    private com.codenameone.examples.bazaar.marketing.MarketingMails automations;
     private final com.codenameone.examples.bazaar.ops.Attribution attribution;
 
     public Storefront(StorefrontPages pages,
@@ -100,6 +102,7 @@ public class Storefront {
             Model model, HttpServer.Request request) throws IOException {
         attribution.capture(request, handle);
         pages.product(handle, product, variant, model, request);
+        automations.viewedByHandle(handle, product, CheckoutPages.signedIn());
         return "product";
     }
 

@@ -72,15 +72,22 @@ public class CatalogEndpoint implements CatalogApiServer {
         return catalog.publicCollections(handle);
     }
 
+    @com.codename1.backend.annotations.Autowired
+    private com.codenameone.examples.bazaar.marketing.MarketingMails automations;
+
     @Override
     public ProductDto product(String id) throws Exception {
         ProductDto p = catalog.publicProduct(id);
+        automations.viewed(p.storeId(), com.codenameone.examples.bazaar.cart.Codes.callerOrNull(),
+                p.id());
         return productText.localize(p, productText.shopperLocale(p.storeId()));
     }
 
     @Override
     public ProductDto productByHandle(String handle, String productHandle) throws Exception {
         ProductDto p = catalog.publicProductByHandle(handle, productHandle);
+        automations.viewed(p.storeId(), com.codenameone.examples.bazaar.cart.Codes.callerOrNull(),
+                p.id());
         return productText.localize(p, productText.shopperLocale(p.storeId()));
 
     }

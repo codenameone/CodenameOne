@@ -30,4 +30,10 @@ public interface LayawayRepository extends CrudRepository<Layaway, String> {
     Layaway findByOrderId(String orderId);
 
     List<Layaway> findByStoreIdOrderByCreatedAtDesc(String storeId);
+
+    /// Moves every row of one customer to another (a merge).
+    @com.codename1.orm.repository.Modifying(clearAutomatically = true)
+    @com.codename1.orm.repository.Query("update Layaway x set x.customerId = :to where x.customerId = :from")
+    int moveCustomer(@com.codename1.orm.repository.Param("from") String from,
+            @com.codename1.orm.repository.Param("to") String to);
 }

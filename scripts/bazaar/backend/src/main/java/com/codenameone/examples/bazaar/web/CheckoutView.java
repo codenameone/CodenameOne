@@ -76,6 +76,11 @@ public final class CheckoutView {
     public boolean nothingDue;
     public String discountCode = "";
     public String giftCardCode = "";
+    /// What store credit pays ("-$5.00"), or empty.
+    public String storeCredit = "";
+    /// The signed-in shopper's credit at the store, or empty for none.
+    public String creditAvailable = "";
+    public boolean usingCredit;
 
     /// Problems with the order as a whole, shown first, in an alert.
     public List<String> problems = new ArrayList<String>();

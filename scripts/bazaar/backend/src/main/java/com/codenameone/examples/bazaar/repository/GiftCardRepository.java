@@ -46,4 +46,24 @@ public interface GiftCardRepository extends CrudRepository<GiftCard, String> {
     @Modifying
     @Query("update GiftCard g set g.balanceCents = g.balanceCents + :amount where g.id = :id")
     int credit(@Param("id") String id, @Param("amount") long amount);
+
+    /// Gift cards waiting to be mailed whose delivery time is before `before`.
+    List<GiftCard> findByDeliveredAtAndDeliverAtLessThan(java.time.Instant never,
+            java.time.Instant before);
+
+    /// Marks a scheduled card delivered, once.
+    @com.codename1.orm.repository.Modifying
+    @com.codename1.orm.repository.Query("update GiftCard g set g.deliveredAt = :at "
+            + "where g.id = :id and g.deliveredAt = :never")
+    int claimDelivery(@com.codename1.orm.repository.Param("id") String id,
+            @com.codename1.orm.repository.Param("never") java.time.Instant never,
+            @com.codename1.orm.repository.Param("at") java.time.Instant at);
+
+    /// Moves every row of one customer to another (a merge).
+    @com.codename1.orm.repository.Modifying(clearAutomatically = true)
+    @com.codename1.orm.repository.Query("update GiftCard x set x.customerId = :to where x.customerId = :from")
+    int moveCustomer(@com.codename1.orm.repository.Param("from") String from,
+            @com.codename1.orm.repository.Param("to") String to);
+
+    List<GiftCard> findByCustomerId(String customerId);
 }

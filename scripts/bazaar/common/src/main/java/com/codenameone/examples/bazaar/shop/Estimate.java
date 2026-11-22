@@ -92,6 +92,11 @@ public final class Estimate {
         if (cart.giftCardCents() > 0) {
             rows.add(new Row("Gift card", cart.giftCardCode(), -cart.giftCardCents(), SAVING,
                     null));
+        }
+        if (cart.storeCreditCents() > 0) {
+            rows.add(new Row("Store credit", null, -cart.storeCreditCents(), SAVING, null));
+        }
+        if (cart.giftCardCents() > 0 || cart.storeCreditCents() > 0) {
             rows.add(new Row("Due now", null, cart.dueCents(), TOTAL, null));
         }
         return rows;

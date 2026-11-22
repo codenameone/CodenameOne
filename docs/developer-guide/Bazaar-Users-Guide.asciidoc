@@ -204,6 +204,20 @@ tags and store credit. Discounts are codes for a percentage or an amount off,
 free shipping, or buy some and get some free, with limits on use and dates. Gift
 cards are issued with a code and a QR code, and their balance can be checked.
 
+A customer's page can merge a duplicate record into it, download everything the
+store holds about the customer as a zip, or erase their personal data while the
+orders keep their amounts. Shoppers ask for an export or an erasure from their
+account, and the requests wait on the data requests page. Store credit can be
+given with an expiry date; the credit that lapses first is spent first, and
+signed-in shoppers choose to spend it at checkout. A discount can be copied into
+a batch of single-use codes with a prefix, saved as a CSV. A gift card can go
+straight to a recipient's address with a message, now or on a chosen day.
+
+The store mails some messages by itself: a shopper who looked at a product and
+left without buying hears about it once (only with marketing consent, and at
+most once a week), and a review request with a one-click link goes a week after
+an order is delivered.
+
 ==== Shipping, taxes and settings
 
 Shipping zones group countries, each with rates: flat, by weight, by price, free

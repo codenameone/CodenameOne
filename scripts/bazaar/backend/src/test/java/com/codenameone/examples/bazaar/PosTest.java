@@ -199,7 +199,7 @@ class PosTest {
     void aGiftCardPaysPartOfASale() throws Exception {
         Till t = new Till("pos-gift", 10);
         GiftCardDto card = giftCards.issue(t.shop.owner, t.shop.storeId,
-                new GiftCardDto(null, null, null, 2000, 0, true, "", 0, "", 0));
+                new GiftCardDto(null, null, null, 2000, 0, true, "", 0, "", 0, "", "", "", 0, 0));
         Map r = (Map) t.sync(t.sale("gift", 1, "{\"kind\":\"GIFT_CARD\",\"amountCents\":600,"
                 + "\"reference\":\"" + card.code() + "\"}," + cash(500))).get(0);
         assertEquals("OK", r.get("status"), String.valueOf(r.get("message")));

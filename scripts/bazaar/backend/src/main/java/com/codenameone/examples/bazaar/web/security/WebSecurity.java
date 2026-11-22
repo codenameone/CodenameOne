@@ -56,7 +56,7 @@ import java.io.IOException;
 ///   request, the session id replaced at sign-in, sign-out by POST only, and the
 ///   password guarded twice -- per address by rate ([Throttle] `signin`) and per
 ///   account by failures ([Throttle] `signin-failures`, a lockout).
-/// - **Storefront** (`/`, `/s/**`, `/track/**`, `/consent/**`): public, no
+/// - **Storefront** (`/`, `/s/**`, `/track/**`, `/review/**`, `/consent/**`): public, no
 ///   session needed to read; the cart forms keep their same-site check.
 ///
 /// Every page of the last two gets [WebHeaders] -- a nonce CSP, HSTS,
@@ -173,7 +173,8 @@ public class WebSecurity {
     public SecurityFilterChain shopChain(HttpSecurity http,
             @Value("${bazaar.web.hsts:true}") boolean hsts,
             com.codenameone.examples.bazaar.web.StorefrontRedirects redirects) throws IOException {
-        http.securityMatcher("/", "/s/**", "/track/**", "/consent", "/consent/**", "/lang")
+        http.securityMatcher("/", "/s/**", "/track/**", "/review/**", "/consent", "/consent/**",
+                "/lang")
             .csrf(c -> c.disable())
             .addFilterBefore(ErrorPages.filter(), RateLimitFilter.class)
             .addFilterBefore(redirects.filter(), RateLimitFilter.class)

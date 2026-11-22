@@ -45,4 +45,10 @@ public interface ClubMemberRepository extends CrudRepository<ClubMember, String>
     @Modifying
     @Query("update ClubMember m set m.lastChargeId = :charge where m.id = :id and m.renewsAt = :due")
     int claimRenewal(@Param("id") String id, @Param("due") Instant due, @Param("charge") String charge);
+
+    /// Moves every row of one customer to another (a merge).
+    @com.codename1.orm.repository.Modifying(clearAutomatically = true)
+    @com.codename1.orm.repository.Query("update ClubMember x set x.customerId = :to where x.customerId = :from")
+    int moveCustomer(@com.codename1.orm.repository.Param("from") String from,
+            @com.codename1.orm.repository.Param("to") String to);
 }

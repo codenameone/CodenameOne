@@ -39,4 +39,10 @@ public interface ParkedCartRepository extends CrudRepository<ParkedCart, String>
     @Query("update ParkedCart p set p.status = :to, p.resumedAt = :at where p.id = :id and p.status = :from")
     int move(@Param("id") String id, @Param("from") String from, @Param("to") String to,
             @Param("at") java.time.Instant at);
+
+    /// Moves every row of one customer to another (a merge).
+    @com.codename1.orm.repository.Modifying(clearAutomatically = true)
+    @com.codename1.orm.repository.Query("update ParkedCart x set x.customerId = :to where x.customerId = :from")
+    int moveCustomer(@com.codename1.orm.repository.Param("from") String from,
+            @com.codename1.orm.repository.Param("to") String to);
 }

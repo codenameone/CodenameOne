@@ -106,6 +106,10 @@ import java.util.Map;
 /// totals -- is one transaction: a sale is written whole or not at all.
 @Component
 public class PosSales {
+    /// Field-injected, so the constructor stays as it was.
+    @com.codename1.backend.annotations.Autowired
+    private com.codenameone.examples.bazaar.customer.StoreCredit storeCredit;
+
     public static final String OK = "OK";
     public static final String DUPLICATE = "DUPLICATE";
     public static final String ERROR = "ERROR";
@@ -645,7 +649,7 @@ public class PosSales {
                     throw new ResponseStatusException(400, "Store credit needs the customer");
                 }
                 plan.creditCents += t.amountCents();
-                if (plan.creditCents > plan.customer.getStoreCreditCents()) {
+                if (plan.creditCents > storeCredit.available(plan.customer)) {
                     throw new ResponseStatusException(409, "The customer has less store credit");
                 }
             } else {
@@ -816,7 +820,7 @@ public class PosSales {
             tender(o.getId(), "GIFT_CARD", plan.giftCents, 0, plan.giftCard.getLastFour());
         }
         if (plan.creditCents > 0) {
-            if (customers.debitCreditIf(plan.customer.getId(), plan.creditCents) != 1) {
+            if (!storeCredit.take(plan.customer.getId(), plan.creditCents, o.getId())) {
                 throw new ResponseStatusException(409, "The customer's store credit changed");
             }
             tender(o.getId(), "STORE_CREDIT", plan.creditCents, 0, "");

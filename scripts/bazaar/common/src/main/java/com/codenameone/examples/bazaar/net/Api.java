@@ -59,6 +59,7 @@ import com.codenameone.examples.bazaar.api.MarketApi;
 import com.codenameone.examples.bazaar.api.MarketingApi;
 import com.codenameone.examples.bazaar.api.SaleApi;
 import com.codenameone.examples.bazaar.api.ClubApi;
+import com.codenameone.examples.bazaar.api.ShopperDataApi;
 import com.codenameone.examples.bazaar.api.LoyaltyApi;
 import com.codenameone.examples.bazaar.api.OpsApi;
 import com.codenameone.examples.bazaar.api.ChannelsApi;
@@ -111,6 +112,7 @@ public final class Api {
     private static MarketApi markets;
     private static SaleApi sales;
     private static ClubApi clubs;
+    private static ShopperDataApi shopperData;
     private static LoyaltyApi loyalty;
     private static OpsApi ops;
     private static ChannelsApi channels;
@@ -160,6 +162,7 @@ public final class Api {
         markets = RestClients.create(MarketApi.class, baseUrl);
         sales = RestClients.create(SaleApi.class, baseUrl);
         clubs = RestClients.create(ClubApi.class, baseUrl);
+        shopperData = RestClients.create(ShopperDataApi.class, baseUrl);
         loyalty = RestClients.create(LoyaltyApi.class, baseUrl);
         ops = RestClients.create(OpsApi.class, baseUrl);
         channels = RestClients.create(ChannelsApi.class, baseUrl);
@@ -327,6 +330,11 @@ public final class Api {
 
     public static SaleApi sales() {
         return sales;
+    }
+
+    /// The signed-in shopper's own data: the export and the requests to stores.
+    public static ShopperDataApi shopperData() {
+        return shopperData;
     }
 
     public static ClubApi clubs() {

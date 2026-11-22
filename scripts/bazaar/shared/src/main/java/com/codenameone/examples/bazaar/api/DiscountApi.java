@@ -43,4 +43,14 @@ public interface DiscountApi {
     @DELETE("/api/merchant/stores/{storeId}/discounts/{discountId}")
     void delete(@Path("storeId") String storeId, @Path("discountId") String discountId,
             OnComplete<Response<DiscountDto>> callback);
+
+    /// Makes `count` unique single-use codes from a discount; answers them as CSV rows.
+    @POST("/api/merchant/stores/{storeId}/discounts/{discountId}/codes")
+    void generateCodes(@Path("storeId") String storeId, @Path("discountId") String discountId,
+            @Body DiscountCodesDto codes, OnComplete<Response<ExportDto>> callback);
+
+    /// Every code generated from a discount, with whether it was used, as CSV rows.
+    @GET("/api/merchant/stores/{storeId}/discounts/{discountId}/codes")
+    void codes(@Path("storeId") String storeId, @Path("discountId") String discountId,
+            OnComplete<Response<ExportDto>> callback);
 }
