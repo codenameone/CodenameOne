@@ -518,7 +518,9 @@ rule is enforced once.
 fingerprinted assets under `/static/**` cached as immutable; signed-in pages with
 a session cookie, CSRF tokens, session id rotation at sign-in, an optional TOTP
 second step, sign-out by POST only, and rate limits per address plus a lockout per
-account and address, with a looser one per address across accounts (`Throttle`); and the public storefront. Signed-in pages carry a
+account and address, with looser ones per address across accounts and per
+account from every address (`Throttle`); and the public storefront. Signed-in
+pages carry a
 per-request CSP nonce. Public pages carry none, so they can be cached: their one
 inline style is allowed by its hash, which the build writes into `InlineHashes`.
 `ErrorPages` answers every failure, including a CSRF refusal or a rate limit, with

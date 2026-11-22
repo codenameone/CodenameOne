@@ -256,6 +256,11 @@ final class TenderSheet {
                 new com.codenameone.examples.bazaar.api.CardPaymentDto(null, null, null, clientId,
                     amount, PosState.currency(), null, null, null), Net.to(p -> {
                         if (over[0]) {
+                            // Cancelled before the reader answered: the
+                            // cashier's Cancel had no id to cancel, so the
+                            // payment it started is cancelled now.
+                            Api.posCounter().cancelCardPayment(PosState.storeId(), p.id(),
+                                    Net.to(q -> { }, (st, m) -> { }));
                             return;
                         }
                         paymentId[0] = p.id();

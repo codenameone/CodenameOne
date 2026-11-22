@@ -345,9 +345,31 @@ public final class Grid<T> {
                 .header("Cache-Control", "private, no-store");
     }
 
+    /// Whether a cell is a plain number -- an optional leading `-`, digits and
+    /// at most one `.` followed by digits. A spreadsheet reads it as the number
+    /// it is, so the formula guard leaves it alone: `-12.50` must not export as
+    /// the text `'-12.50`. Every CSV writer and the importer that undoes the
+    /// guard ask this, so a round trip stays symmetric.
+    public static boolean plainNumber(String c) {
+        int at = c.startsWith("-") ? 1 : 0;
+        int digits = 0;
+        int dot = -1;
+        for (int iter = at; iter < c.length(); iter++) {
+            char ch = c.charAt(iter);
+            if (ch >= '0' && ch <= '9') {
+                digits++;
+            } else if (ch == '.' && dot < 0 && digits > 0) {
+                dot = iter;
+            } else {
+                return false;
+            }
+        }
+        return digits > 0 && dot != c.length() - 1;
+    }
+
     public static String csvCell(String value) {
         String v = value == null ? "" : value;
-        if (v.length() > 0) {
+        if (v.length() > 0 && !plainNumber(v)) {
             char first = v.charAt(0);
             if (first == '=' || first == '+' || first == '-' || first == '@' || first == '\t'
                     || first == '\r') {

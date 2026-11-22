@@ -197,6 +197,9 @@ class MerchantLogicTest {
         assertEquals(0, ProductCsv.typedInteger("99999999999"));
         assertEquals(Integer.MAX_VALUE, ProductCsv.typedInteger(String.valueOf(Integer.MAX_VALUE)));
         assertEquals(0, ProductCsv.typedInteger(null));
+        assertEquals(0, ProductCsv.typedInteger("1.5"));
+        assertEquals(0, ProductCsv.typedInteger("12a"));
+        assertEquals(1299, ProductCsv.typedInteger("1,299"));
     }
 
     @Test

@@ -39,8 +39,11 @@ import java.util.Map;
 /// [#lockout] is the other shape: failures are counted rather than attempts,
 /// and once a key has too many the key is refused outright until the window
 /// has run, whatever the next attempt holds. Signing in with a password uses
-/// it per account, so guessing one user's password from many addresses is
-/// held to five a quarter hour in total.
+/// it three ways: per account and address (`signin-failures`, five a quarter
+/// hour), per address across accounts (`signin-failures-ip`), and per account
+/// from every address (`signin-failures-account`), looser so a stranger
+/// cannot cheaply lock an owner out, yet still bounding guessing one user's
+/// password from many addresses.
 ///
 /// Counts live in this process. A deployment of several instances multiplies
 /// each allowance by the instance count -- still a bound, just a looser one.
@@ -52,6 +55,9 @@ public class Throttle {
         {"signin-failures", "5/900"},
         // Wrong passwords from one address across every account: a spray.
         {"signin-failures-ip", "30/900"},
+        // Wrong passwords for one account from every address: distributed
+        // guessing.
+        {"signin-failures-account", "50/900"},
         {"sms", "5/600"},
         {"checkout", "10/60"},
         {"pin", "10/300"},

@@ -50,6 +50,7 @@ import com.codenameone.examples.bazaar.store.StoreAccess;
 import com.codenameone.examples.bazaar.store.Stores;
 import org.junit.jupiter.api.Test;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -58,6 +59,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 /// A received return settled end to end by each resolution the shopper can
 /// choose ([Resolutions]): store credit lands on the customer and nothing
@@ -298,6 +300,41 @@ class ReturnResolutionsTest {
                 new Object[] {o.id()});
         db.execute("UPDATE store_order SET financial = ? WHERE id = ?",
                 new Object[] {Orders.PAID, o.id()});
+        long[] parts = orders.refundParts(s.owner, s.storeId, o.id(), mugs(o, 1), false,
+                StoreAccess.MANAGERS);
+        assertEquals(500, parts[2]);
+        assertEquals(2500, count("SELECT balance_cents AS n FROM gift_card WHERE id = ?",
+                card.id()));
+    }
+
+    @Test
+    void aGiftCardOnlyRefundWhoseCreditFailsGivesItsClaimsBack() throws Exception {
+        Shop s = shop("rr-giftfail");
+        OrderDto o = s.buy(People.customer(accounts, "rr-giftfail-buyer"), 2);
+        GiftCardDto card = giftCards.issue(s.owner, s.storeId, new GiftCardDto(null, null, null,
+                2500, 0, true, "", 0, "", 0, "", "", "", 0, 0));
+        assertTrue(giftCards.redeem(card.id(), o.id(), 500));
+        db.execute("UPDATE payment SET refunded_cents = amount_cents WHERE order_id = ?",
+                new Object[] {o.id()});
+        db.execute("UPDATE store_order SET financial = ? WHERE id = ?",
+                new Object[] {Orders.PAID, o.id()});
+        // No card leg runs, so a failed gift card credit has moved nothing:
+        // the cents and the units must be free for the retry. It used to
+        // count as "moved" and strand both.
+        db.execute("CREATE TRIGGER rr_gift_down BEFORE UPDATE ON gift_card "
+                + "BEGIN SELECT RAISE(ABORT, 'gift card store down'); END", new Object[0]);
+        try {
+            orders.refundParts(s.owner, s.storeId, o.id(), mugs(o, 1), false,
+                    StoreAccess.MANAGERS);
+            fail("The gift card credit should have failed");
+        } catch (IOException | RuntimeException expected) {
+            // the credit leg failed
+        } finally {
+            db.execute("DROP TRIGGER rr_gift_down", new Object[0]);
+        }
+        assertEquals(0, count("SELECT refunded_cents AS n FROM store_order WHERE id = ?", o.id()));
+        assertEquals(0, count("SELECT COALESCE(SUM(refunded_qty), 0) AS n FROM order_line "
+                + "WHERE order_id = ?", o.id()));
         long[] parts = orders.refundParts(s.owner, s.storeId, o.id(), mugs(o, 1), false,
                 StoreAccess.MANAGERS);
         assertEquals(500, parts[2]);

@@ -212,13 +212,11 @@ public final class ProductCsv {
         return (cents < 0 ? "-" : "") + (a / 100) + "." + (frac < 10 ? "0" : "") + frac;
     }
 
-    /// "12.5", "12,50", "$12" or "1,299.00" as cents; 0 for anything that is
-    /// not a price, including a minus sign anywhere but first ("12-5") and a
-    /// value too large to hold. A comma followed by exactly one or two digits at the end
-    /// is a decimal comma; any other comma groups thousands.
     /// A whole number typed by hand; 0 for anything that is not one, so
     /// "12-5" is not -125 and a number past `int` is not a wrapped value. A
-    /// minus sign counts only first; other characters are ignored.
+    /// minus sign counts only first, spaces and thousands commas are skipped,
+    /// and any other character ("1.5", "12a") makes it not a number, so it is
+    /// never read as the digits around it.
     public static int typedInteger(String text) {
         if (text == null) {
             return 0;
@@ -238,11 +236,17 @@ public final class ProductCsv {
                 if (out > Integer.MAX_VALUE) {
                     return 0;
                 }
+            } else if (c != ' ' && c != ',') {
+                return 0;
             }
         }
         return (int) (negative ? -out : out);
     }
 
+    /// "12.5", "12,50", "$12" or "1,299.00" as cents; 0 for anything that is
+    /// not a price, including a minus sign anywhere but first ("12-5") and a
+    /// value too large to hold. A comma followed by exactly one or two digits at the end
+    /// is a decimal comma; any other comma groups thousands.
     public static long cents(String text) {
         if (text == null) {
             return 0;

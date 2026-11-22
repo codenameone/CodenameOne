@@ -63,6 +63,9 @@ class ShopLogicTest {
         assertEquals("12", Money.typed(1200));
         assertEquals("12.50", Money.typed(1250));
         assertEquals("0.05", Money.typed(5));
+        assertEquals("-12.50", Money.typed(-1250));
+        assertEquals("-0.05", Money.typed(-5));
+        assertEquals("-12", Money.typed(-1200));
         assertEquals(1250, Money.parse(Money.typed(1250)));
         assertEquals(1205, Money.parse(Money.typed(1205)));
     }

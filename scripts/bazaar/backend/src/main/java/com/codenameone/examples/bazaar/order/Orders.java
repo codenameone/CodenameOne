@@ -743,25 +743,29 @@ public class Orders {
                         "Another refund of this order got there first");
             }
         }
-        boolean moved = false;
+        // Each irreversible leg is tracked by itself: a refund with no card
+        // part whose gift card credit fails has moved nothing, and must give
+        // its claims back exactly as a refused card refund does.
+        boolean cardMoved = false;
+        boolean giftMoved = false;
         long creditPart;
         try {
             if (cardPart > 0 && presentmentPart > 0) {
                 payments.refund(orderId, presentmentPart, Codes.cut(req.reason(), 200));
+                cardMoved = true;
             }
-            moved = true;
             if (giftPart > 0) {
                 giftCards.credit(card, orderId, giftPart, "Refund");
+                giftMoved = true;
             }
             // What neither the card nor a gift card took goes back to the store
             // credit the order spent, before anything is left to pay by hand.
             creditPart = byHand ? 0 : storeCredit.restore(orderId,
                     Math.max(0, amount - cardPart - giftPart));
         } catch (IOException | RuntimeException failed) {
-            if (!moved) {
-                // The processor refused before anything went back: release
-                // the claim so the refund can be tried again. Once the card
-                // has been refunded the claim stays, since that money is gone.
+            if (!cardMoved && !giftMoved) {
+                // Nothing went back: release the claims so the refund can be
+                // tried again.
                 db.execute("UPDATE store_order SET refunded_cents = refunded_cents - ? "
                         + "WHERE id = ?", new Object[] {Long.valueOf(amount), orderId});
                 for (int back = 0; back < claimLines.size(); back++) {
@@ -773,12 +777,16 @@ public class Orders {
                     }
                 }
             } else {
-                // The card was refunded but a later leg (gift card, store credit)
-                // failed: the claims stay, since that money is gone, and the
-                // order's timeline says so for staff to settle the rest by hand.
-                event(orderId, "REFUND_INCOMPLETE", "Card refunded; the rest of " + amount
-                        + " cents failed: " + Codes.cut(String.valueOf(failed.getMessage()), 200),
-                        username);
+                // A leg moved money and a later one failed: the claims stay,
+                // since that money is gone, and the timeline says exactly what
+                // went back, what is still owed and that the claimed units'
+                // stock was neither released nor restocked.
+                long paid = (cardMoved ? cardPart : 0) + (giftMoved ? giftPart : 0);
+                event(orderId, "REFUND_INCOMPLETE", (cardMoved ? "Card refunded " + cardPart
+                        + " cents. " : "") + (giftMoved ? "Gift card credited " + giftPart
+                        + " cents. " : "") + "Still owed " + (amount - paid)
+                        + " cents; stock for the claimed units must be settled by hand. Failure: "
+                        + Codes.cut(String.valueOf(failed.getMessage()), 200), username);
             }
             throw failed;
         }

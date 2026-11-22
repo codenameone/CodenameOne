@@ -66,12 +66,15 @@ public final class Money {
     /// `cents` as a price filter shows it back for editing: `12`, or `12.50`
     /// when there are cents, so what `parse` reads is what was typed.
     public static String typed(long cents) {
-        long whole = cents / 100;
-        long part = cents % 100;
+        // Sign first, then the magnitude: -1250 is "-12.50", never "-12.-50".
+        String sign = cents < 0 ? "-" : "";
+        long a = Math.abs(cents);
+        long whole = a / 100;
+        long part = a % 100;
         if (part == 0) {
-            return String.valueOf(whole);
+            return sign + whole;
         }
-        return whole + "." + (part < 10 ? "0" : "") + part;
+        return sign + whole + "." + (part < 10 ? "0" : "") + part;
     }
 
     /// Dollars as typed into a price filter (`12`, `12.5`, `12.50`) to cents;

@@ -54,8 +54,10 @@ import java.io.IOException;
 ///   `/platform/**`, checkout and order pages): a session cookie from a password form (and an
 ///   authenticator code once enrolled), CSRF tokens on every state-changing
 ///   request, the session id replaced at sign-in, sign-out by POST only, and the
-///   password guarded twice -- per address by rate ([Throttle] `signin`) and per
-///   account by failures ([Throttle] `signin-failures`, a lockout).
+///   password guarded per address by rate ([Throttle] `signin`) and by failure
+///   lockouts ([Throttle]): `signin-failures` per account and address,
+///   `signin-failures-ip` per address across accounts, and the looser
+///   `signin-failures-account` per account from every address.
 /// - **Storefront** (`/`, `/s/**`, `/track/**`, `/review/**`, `/consent/**`): public, no
 ///   session needed to read; the cart forms keep their same-site check.
 ///
@@ -151,11 +153,13 @@ public class WebSecurity {
                     .loginProcessingUrl(SIGN_IN)
                     .successHandler((request, who) -> {
                         throttle.succeed("signin-failures", key(request));
+                        throttle.succeed("signin-failures-account", account(request));
                         return saved.onAuthenticationSuccess(request, who);
                     })
                     .failureHandler((request, refused) -> {
                         throttle.fail("signin-failures", key(request));
                         throttle.fail("signin-failures-ip", Throttle.client(request));
+                        throttle.fail("signin-failures-account", account(request));
                         return HttpServer.Response.text(303, "")
                                 .header("Location", SIGN_IN + "?error=1")
                                 .header("Cache-Control", "no-store");
@@ -221,6 +225,14 @@ public class WebSecurity {
     /// The account a sign-in attempt names, folded, with the client address, as
     /// the lockout's key.
     static String key(HttpServer.Request request) {
+        return account(request) + "|" + Throttle.client(request);
+    }
+
+    /// The account a sign-in attempt names, folded. The key of the loose
+    /// `signin-failures-account` lockout, which bounds guessing one account
+    /// from many addresses; it is set high enough that failing on purpose to
+    /// lock its owner out takes far more than five tries.
+    static String account(HttpServer.Request request) {
         String u;
         try {
             u = request.param("username");
@@ -230,8 +242,9 @@ public class WebSecurity {
         // Keyed on the account AND the address it is tried from: an account
         // alone would let anyone who knows a username keep its owner locked
         // out by failing five times every quarter hour. Guessing across many
-        // accounts from one address is held by "signin-failures-ip" instead.
-        return (u == null ? "" : Ascii.lower(u.trim())) + "|" + Throttle.client(request);
+        // accounts from one address is held by "signin-failures-ip", and one
+        // account from many addresses by "signin-failures-account".
+        return u == null ? "" : Ascii.lower(u.trim());
     }
 
     /// Refuses a password for an account with too many wrong ones lately --
@@ -241,7 +254,8 @@ public class WebSecurity {
         return (request, chain) -> {
             if ("POST".equals(request.getMethod()) && SIGN_IN.equals(request.pathFrom(0))
                     && (throttle.lockout("signin-failures", key(request))
-                    || throttle.lockout("signin-failures-ip", Throttle.client(request)))) {
+                    || throttle.lockout("signin-failures-ip", Throttle.client(request))
+                    || throttle.lockout("signin-failures-account", account(request)))) {
                 SecurityExchange.current().setResponseHeader("Cache-Control", "no-store");
                 return HttpServer.Response.text(303, "").header("Location", SIGN_IN + "?locked=1");
             }

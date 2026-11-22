@@ -405,7 +405,8 @@ public class Reports {
         for (int iter = 0; iter < cells.size(); iter++) {
             String c = cells.get(iter) == null ? "" : cells.get(iter);
             // A leading = + - @, tab or CR would be read as a formula by a spreadsheet.
-            if (c.length() > 0 && "=+-@\t\r".indexOf(c.charAt(0)) >= 0) {
+            if (c.length() > 0 && "=+-@\t\r".indexOf(c.charAt(0)) >= 0
+                    && !com.codenameone.examples.bazaar.web.table.Grid.plainNumber(c)) {
                 c = "'" + c;
             }
             sb.append(iter == 0 ? "" : ",").append('"');
