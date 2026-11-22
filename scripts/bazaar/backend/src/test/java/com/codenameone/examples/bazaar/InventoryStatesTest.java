@@ -24,6 +24,8 @@ import com.codename1.backend.annotations.Autowired;
 import com.codename1.backend.test.BackendTest;
 import com.codename1.backend.test.MockMvc;
 import com.codenameone.examples.bazaar.account.Accounts;
+import com.codenameone.examples.bazaar.api.CartDto;
+import com.codenameone.examples.bazaar.api.CartLineChangeDto;
 import com.codenameone.examples.bazaar.api.InventoryStateDto;
 import com.codenameone.examples.bazaar.api.LotDto;
 import com.codenameone.examples.bazaar.api.OrderDto;
@@ -48,6 +50,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -96,6 +99,26 @@ class InventoryStatesTest {
         InventoryStateDto st = states.state(s.storeId, s.variantId, s.locationId);
         assertEquals(-2, st.available());
         assertTrue(st.continueSelling());
+    }
+
+    @Test
+    void aCartLinePastTheShelfOfAVariantThatKeepsSellingIsBackordered() throws Exception {
+        Shop s = shop("backorder-cart-shop", 1);
+        db.execute("UPDATE variant SET allow_backorder = 1 WHERE id = ?",
+                new Object[] {s.variantId});
+        String user = People.customer(accounts, "backorder-cart-buyer");
+        CartDto one = carts.add(s.storeId, user, null, new CartLineChangeDto(s.variantId, 1));
+        assertTrue(one.lines().get(0).available());
+        assertFalse(one.lines().get(0).backordered(), "one is on the shelf");
+        CartDto three = carts.add(s.storeId, user, null, new CartLineChangeDto(s.variantId, 2));
+        assertTrue(three.lines().get(0).available(), "it keeps selling");
+        assertTrue(three.lines().get(0).backordered(), "two of the three are not on the shelf");
+        Shop plain = shop("untracked-cart-shop", 0);
+        db.execute("UPDATE variant SET track_inventory = 0 WHERE id = ?",
+                new Object[] {plain.variantId});
+        CartDto untracked = carts.add(plain.storeId, user, null,
+                new CartLineChangeDto(plain.variantId, 4));
+        assertFalse(untracked.lines().get(0).backordered(), "nothing is counted, nothing waits");
     }
 
     @Test

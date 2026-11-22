@@ -189,7 +189,7 @@ final class SearchPane extends ShopPane {
         add(BorderLayout.NORTH, north);
 
         panel = new FilterPanel(query, this::changed);
-        int side = wide && scoped ? CN.convertToPixels(56) + CN.convertToPixels(FILTERS_MM) : 0;
+        int side = wide && scoped ? CN.convertToPixels(FILTERS_MM) : 0;
         grid = new ProductGrid(null, query, side);
         if (wide && scoped) {
             Container left = new Container(new BorderLayout()) {

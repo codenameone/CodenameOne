@@ -43,7 +43,9 @@ import com.codenameone.examples.bazaar.ui.Ui;
 /// asked -- the words changed while it was on its way -- is dropped.
 final class ProductGrid {
     private static final int PAGE = 24;
-    private static final float CARD_MM = 46f;
+    private static final float CARD_MM = 40f;
+    /// The navigation beside a section on a wide screen (`Shell`).
+    private static final float NAV_MM = 56f;
 
     private final Container scroller = new Container(BoxLayout.y());
     private final Container grid;
@@ -58,10 +60,11 @@ final class ProductGrid {
     private int count;
 
     /// @param query what to show; read afresh on every [#reload]
+    /// @param sideWidth what sits beside the grid inside its section, in pixels
     ProductGrid(Component header, SearchQuery query, int sideWidth) {
         this.query = query;
-        int width = Math.max(1, CN.getDisplayWidth() - sideWidth);
-        columns = Math.max(2, Layouts.columns(width, CARD_MM, 6));
+        int width = Math.max(1, room() - sideWidth);
+        columns = columns(width);
         cardWidth = width / columns - CN.convertToPixels(3);
         grid = new Container(new GridLayout(1, columns));
         grid.setUIID("ShopGrid");
@@ -81,6 +84,21 @@ final class ProductGrid {
             }
         });
         Ui.pull(scroller, this::reload);
+    }
+
+    /// The width a shopper's section has for its content: the screen, less
+    /// the navigation and no wider than [Layouts#wideColumn()] on a wide one
+    /// (`ShopPane` stops there).
+    static int room() {
+        if (!Layouts.wide()) {
+            return CN.getDisplayWidth();
+        }
+        return Math.min(CN.getDisplayWidth() - CN.convertToPixels(NAV_MM), Layouts.wideColumn());
+    }
+
+    /// How many cards a grid `width` pixels wide shows across: two on a phone.
+    static int columns(int width) {
+        return Math.max(2, Layouts.columns(width, CARD_MM, 6));
     }
 
     Container component() {

@@ -34,6 +34,8 @@ public interface ReturnRequestRepository extends CrudRepository<ReturnRequest, S
 
     List<ReturnRequest> findByStoreIdOrderByCreatedAtDesc(String storeId);
 
+    List<ReturnRequest> findByUsernameOrderByCreatedAtDesc(String username);
+
     /// Moves a return on only if nobody moved it first; answers the rows changed.
     @Modifying
     @Query("update ReturnRequest r set r.status = :to where r.id = :id and r.status = :from")

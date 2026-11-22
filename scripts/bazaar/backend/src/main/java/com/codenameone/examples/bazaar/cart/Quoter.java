@@ -246,6 +246,11 @@ public class Quoter {
             } else if (variant.isDigital() || !variant.isTrackInventory()
                     || variant.isAllowBackorder()) {
                 line.availableQty = Integer.MAX_VALUE;
+                if (variant.isTrackInventory()) {
+                    // Sold past the shelf: say so, though nothing stops it.
+                    Integer a = availability.get(variant.getId());
+                    line.backordered = (a == null ? 0 : a.intValue()) < want.quantity;
+                }
             } else {
                 Integer a = availability.get(variant.getId());
                 line.availableQty = a == null ? 0 : a.intValue();

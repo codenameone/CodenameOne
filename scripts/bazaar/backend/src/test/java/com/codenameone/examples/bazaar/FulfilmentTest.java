@@ -382,7 +382,17 @@ class FulfilmentTest {
         // The other unit can still come back; the refunded one cannot again.
         expect(409, () -> returns.request(user, o.id(), new ReturnRequestDto("", "",
                 twoOf(line))));
-        assertNotNull(returns.request(user, o.id(), new ReturnRequestDto("", "", one)));
+        ReturnDto second = returns.request(user, o.id(), new ReturnRequestDto("", "", one));
+        assertNotNull(second);
+        // The account's list: the shopper's own, newest first, and nobody else's.
+        List<ReturnDto> asked = returns.requested(user);
+        assertEquals(2, asked.size());
+        // Both may share a millisecond, so newest-first is checked on the times.
+        assertTrue(asked.get(0).createdAt() >= asked.get(1).createdAt());
+        assertTrue(second.id().equals(asked.get(0).id()) || second.id().equals(asked.get(1).id()));
+        assertTrue(r.id().equals(asked.get(0).id()) || r.id().equals(asked.get(1).id()));
+        assertEquals(0, returns.requested(other).size());
+        assertEquals(0, returns.requested(s.owner).size());
     }
 
     private static List<FulfilLineDto> twoOf(String line) {

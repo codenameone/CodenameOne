@@ -89,6 +89,22 @@ public final class Layouts {
         return CN.convertToPixels(COLUMN_MM);
     }
 
+    /// The widest a shopper's section is drawn on a wide screen, in pixels: a
+    /// grid of products or a list beside its detail, which is wider than
+    /// [#column()] and still stops short of a desktop monitor's edges.
+    public static int wideColumn() {
+        return CN.convertToPixels(WIDE_COLUMN_MM);
+    }
+
+    private static final float WIDE_COLUMN_MM = 176f;
+
+    /// Keeps the content of `holder` no wider than `most` pixels, in the
+    /// middle of however much room there is, with its side padding. Called
+    /// by the holder as it is laid out.
+    public static void cap(Container holder, int most) {
+        centre(holder, 0, most);
+    }
+
     /// How many columns of `millimetres` each fit in `width` pixels: at least
     /// one, and no more than `most`.
     public static int columns(int width, float millimetres, int most) {
@@ -172,7 +188,11 @@ public final class Layouts {
     ///
     /// @param margin the side padding of the page's own style, in pixels
     static void centre(Container page, int margin) {
-        int side = Math.max(margin, (page.getWidth() - column()) / 2);
+        centre(page, margin, column());
+    }
+
+    private static void centre(Container page, int margin, int most) {
+        int side = Math.max(margin, (page.getWidth() - most) / 2);
         Style style = page.getAllStyles();
         Style now = page.getUnselectedStyle();
         if (now.getPaddingLeftNoRTL() != side || now.getPaddingRightNoRTL() != side) {

@@ -276,8 +276,7 @@ final class CheckoutForm {
                     : ShopState.money(o.priceCents()), "SvRowValue");
             char icon = "PICKUP".equals(o.kind()) ? FontImage.MATERIAL_STOREFRONT
                     : FontImage.MATERIAL_LOCAL_SHIPPING;
-            Container row = option(icon, o.name(), eta, o.rateId().equals(rateId));
-            row.add(BorderLayout.EAST, price);
+            Container row = option(icon, o.name(), eta, o.rateId().equals(rateId), price);
             shippingBox.add(Ui.tap(row, "rate-" + o.rateId(), e -> {
                 rateId = o.rateId();
                 ShopUi.tap();
@@ -386,20 +385,24 @@ final class CheckoutForm {
     // ---------------------------------------------------------------- pieces
 
     private static Container option(char icon, String title, String detail, boolean picked) {
-        Container row = Ui.row(icon, title, detail, null);
-        row.setUIID(picked ? "SvOptionPicked" : "SvOption");
-        if (picked) {
-            Label check = new Label("", "ShopCheck");
-            FontImage.setMaterialIcon(check, FontImage.MATERIAL_CHECK_CIRCLE, 3.4f);
-            Component center = ((BorderLayout) row.getLayout()).getCenter();
-            if (center != null) {
-                row.removeComponent(center);
-                Container c = new Container(new BorderLayout());
-                c.add(BorderLayout.CENTER, center);
-                c.add(BorderLayout.EAST, check);
-                row.add(BorderLayout.CENTER, c);
-            }
+        return option(icon, title, detail, picked, null);
+    }
+
+    /// A choice: `value` (a price) and the check of the picked one share the
+    /// right-hand column, and every row keeps the check's room, so prices
+    /// stay lined up whichever row is picked.
+    private static Container option(char icon, String title, String detail, boolean picked,
+            Component value) {
+        Label check = new Label("", "ShopCheck");
+        FontImage.setMaterialIcon(check, FontImage.MATERIAL_CHECK_CIRCLE, 3.4f);
+        check.setVisible(picked);
+        Container east = new Container(BoxLayout.x());
+        if (value != null) {
+            east.add(value);
         }
+        east.add(check);
+        Container row = Ui.row(icon, title, detail, east);
+        row.setUIID(picked ? "SvOptionPicked" : "SvOption");
         return row;
     }
 }

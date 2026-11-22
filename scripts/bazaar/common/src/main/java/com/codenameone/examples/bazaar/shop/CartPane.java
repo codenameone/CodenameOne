@@ -20,6 +20,7 @@ package com.codenameone.examples.bazaar.shop;
 
 import com.codename1.appkit.Net;
 import com.codename1.appkit.Skeleton;
+import com.codename1.components.SpanLabel;
 import com.codename1.ui.Button;
 import com.codename1.ui.CN;
 import com.codename1.ui.Command;
@@ -142,6 +143,13 @@ final class CartPane extends ShopPane {
             words.add(Ui.plain(line.availableQty() > 0
                     ? Lang.tr("Only {0} left", String.valueOf(line.availableQty()))
                     : Lang.tr("Sold out"), "ShopStockOut"));
+        } else if (line.backordered()) {
+            // More than the shelf holds, of a variant that keeps selling.
+            // Wraps rather than cut short: the line's words share the row
+            // with the price.
+            SpanLabel waits = Ui.text(Lang.tr("Ships when back in stock"), "ShopStockLow");
+            waits.setName("line-backordered-" + line.id());
+            words.add(waits);
         }
         Container stepper = new Container(BoxLayout.x());
         stepper.setUIID("ShopStepper");

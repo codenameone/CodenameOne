@@ -720,7 +720,35 @@ try {
   //    the same entry, but its popup is not in the accessibility tree the
   //    test reads, so it cannot be found by its words.)
   await settled();
+  // Follow a store from the front page's store cards, then find it on the
+  // Account tab, under "Stores you follow", and unfollow it there.
+  await click(await waitFor('the Home tab', stepSeconds, button('Home')));
+  await settled();
+  let follow = null;
+  for (let i = 0; i < 12 && !(follow = await button('Follow')()); i++) {
+    await page.mouse.move(210, 400);
+    await page.mouse.wheel(0, 400);
+    await page.waitForTimeout(500);
+  }
+  if (!follow) {
+    throw new Error('no Follow button on a store card');
+  }
+  await click(follow);
+  await waitFor('the follow to be saved', stepSeconds, async () =>
+      requests.some(r => /^20\d PUT \/api\/follows\//.test(r)));
   await click(await waitFor('the Account tab', stepSeconds, button('Account')));
+  await settled();
+  const heading = words => async () => (await components()).find(c => c.label === words || c.text === words);
+  await waitFor('Stores you follow on the Account tab', stepSeconds, heading('Stores you follow'));
+  await waitFor('the returns request', stepSeconds, async () => requests.includes('200 GET /api/returns'));
+  await waitFor('Returns on the Account tab', stepSeconds, heading('Returns'));
+  await click(await waitFor('Unfollow beside the store followed', stepSeconds, button('Unfollow')));
+  await waitFor('the unfollow to be saved', stepSeconds, async () =>
+      requests.some(r => /^20\d DELETE \/api\/follows\//.test(r)));
+  await waitFor('the store to leave the list', stepSeconds, async () => !(await button('Unfollow')()));
+  say('followed a store, found it on the account, and unfollowed it there');
+  await page.mouse.move(210, 400);
+  await page.mouse.wheel(0, -3000);
   await settled();
   // Sign out is the last row, and on a phone it can sit under the tab bar:
   // a click at its place would land on a tab. Scroll until it is clear.

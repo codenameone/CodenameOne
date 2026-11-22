@@ -26,9 +26,11 @@ import com.codenameone.examples.bazaar.account.Accounts;
 import com.codenameone.examples.bazaar.cart.Carts;
 import com.codenameone.examples.bazaar.checkout.Checkouts;
 import com.codenameone.examples.bazaar.domain.Product;
+import com.codenameone.examples.bazaar.domain.Review;
 import com.codenameone.examples.bazaar.inventory.Inventory;
 import com.codenameone.examples.bazaar.pricing.DemoPricing;
 import com.codenameone.examples.bazaar.repository.ProductRepository;
+import com.codenameone.examples.bazaar.repository.ReviewRepository;
 import com.codenameone.examples.bazaar.store.Stores;
 import org.junit.jupiter.api.Test;
 
@@ -65,6 +67,8 @@ class ShopperGapsTest {
     private Checkouts checkouts;
     @Autowired
     private ProductRepository products;
+    @Autowired
+    private ReviewRepository reviewRows;
 
     private Shop shop(String name) throws Exception {
         return new Shop(name, 10, accounts, stores, pricing, db, inventory, carts, checkouts, mvc);
@@ -83,6 +87,33 @@ class ShopperGapsTest {
         assertTrue(Rest.list(mvc, People.asCustomer(delete("/api/wishlist/" + s.productId),
                 user)).isEmpty());
         assertEquals(401, Rest.statusOf(mvc, get("/api/wishlist")));
+    }
+
+    @Test
+    void aProductsRatingIsTheAverageOfItsReviewsRoundedAsTheyAre() throws Exception {
+        Shop s = shop("rating-shop");
+        int[] stars = {4, 4, 3};
+        for (int iter = 0; iter < stars.length; iter++) {
+            Review r = new Review();
+            r.setId(Ids.next());
+            r.setStoreId(s.storeId);
+            r.setProductId(s.productId);
+            r.setUsername("rater-" + iter + "@bazaar.example");
+            r.setAuthorName("Rater");
+            r.setRating(stars[iter]);
+            r.setTitle("");
+            r.setBody("");
+            r.setStatus("PUBLISHED");
+            r.setCreatedAt(java.time.Instant.ofEpochMilli(1000L + iter));
+            reviewRows.insert(r);
+        }
+        products.addRating(s.productId, 11, 3);
+        // 11 / 3 is 3.67: both say 3.7, where truncating made the card say 3.6.
+        Map product = Rest.json(mvc, get("/api/shop/products/" + s.productId));
+        Map page = Rest.json(mvc, get("/api/shop/products/" + s.productId
+                + "/reviews?page=0&size=10"));
+        assertEquals(37, Rest.number(product, "rating"));
+        assertEquals(37, Rest.number(page, "averageTenths"));
     }
 
     @Test

@@ -122,7 +122,8 @@ final class HomePane extends ShopPane {
         Ui.pull(page, this::discover);
 
         Container head = new Container(BoxLayout.y());
-        head.setUIID("ShopDiscoverHead");
+        // Wide, it is a panel of the capped column rather than a band.
+        head.setUIID(Layouts.wide() ? "ShopDiscoverHeadWide" : "ShopDiscoverHead");
         head.add(Ui.label("Discover", "ShopDiscoverTitle"));
         head.add(Ui.text("Independent stores, one cart each. Browse freely; sign in only "
                 + "when you check out.", "ShopDiscoverText"));
@@ -152,9 +153,8 @@ final class HomePane extends ShopPane {
         page.add(popular);
 
         page.add(title("New across Bazaar", null));
-        final int width = Math.max(1, CN.getDisplayWidth()
-                - (Layouts.wide() ? CN.convertToPixels(56) : 0));
-        final int columns = Math.max(2, Layouts.columns(width, 46f, 6));
+        final int width = Math.max(1, ProductGrid.room());
+        final int columns = ProductGrid.columns(width);
         final int cardWidth = width / columns - CN.convertToPixels(3);
         final Container fresh = new Container(new com.codename1.ui.layouts.GridLayout(2, columns));
         fresh.setUIID("ShopGrid");
@@ -276,9 +276,17 @@ final class HomePane extends ShopPane {
             words.add(tag);
         }
         card.add(BorderLayout.CENTER, words);
-        card.add(BorderLayout.SOUTH, followButton(s, false));
-        card.setPreferredW(w);
-        return Ui.tap(card, "store-" + s.handle(), e -> open(s));
+        // The picture and the words open the store; Follow sits under them,
+        // outside that tap -- a lead component takes every press in its
+        // container, and puts its own button in the south of a border.
+        Container tappable = Ui.tap(card, "store-" + s.handle(), e -> open(s));
+        Container whole = new Container(new BorderLayout());
+        whole.setUIID("ShopStoreCard");
+        card.setUIID("Container");
+        whole.add(BorderLayout.CENTER, tappable);
+        whole.add(BorderLayout.SOUTH, FlowLayout.encloseIn(followButton(s, false)));
+        whole.setPreferredW(w);
+        return whole;
     }
 
     /// Follow / Following for `s`. A guest is asked to sign in first.
@@ -374,7 +382,7 @@ final class HomePane extends ShopPane {
         final Container collections = row("collections");
         top.add(collections);
         top.add(Ui.label("New arrivals", "ShopSectionTitle"));
-        grid = new ProductGrid(top, featured, Layouts.wide() ? CN.convertToPixels(56) : 0);
+        grid = new ProductGrid(top, featured, 0);
         add(BorderLayout.CENTER, grid.component());
         grid.reload();
         Api.catalog().collections(store.handle(), Net.to(list -> fill(collections, list),

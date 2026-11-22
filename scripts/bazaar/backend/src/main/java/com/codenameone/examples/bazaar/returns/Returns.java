@@ -252,6 +252,21 @@ public class Returns {
         return out;
     }
 
+    /// The most of their returns a shopper's account lists.
+    static final int MAX_REQUESTED = 100;
+
+    /// Every return `username` asked for, newest first: only their own,
+    /// whatever store it went to.
+    @Transactional(readOnly = true)
+    public List<ReturnDto> requested(String username) throws IOException {
+        List<ReturnDto> out = new ArrayList<ReturnDto>();
+        List<ReturnRequest> rs = returns.findByUsernameOrderByCreatedAtDesc(username);
+        for (int iter = 0; iter < rs.size() && iter < MAX_REQUESTED; iter++) {
+            out.add(dto(rs.get(iter)));
+        }
+        return out;
+    }
+
     // ------------------------------------------------------------- merchant
 
     @Transactional(readOnly = true)

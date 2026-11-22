@@ -71,6 +71,17 @@ class AccessTest {
     }
 
     @Test
+    void theReturnsAShopperAskedForAreTheirsAlone() throws Exception {
+        mvc.perform(get("/api/returns").header("Host", SignIn.HOST))
+                .andExpect(status().isUnauthorized());
+        // A shopper with no orders has asked for nothing -- the demo
+        // customer's returns are not theirs to see.
+        String fresh = SignIn.token(mvc, People.customer(accounts, "noreturns"), People.PASSWORD);
+        mvc.perform(as(get("/api/returns"), fresh)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
+    }
+
+    @Test
     void aRoleGrantedOrAnAccountSuspendedTakesEffectOnTheTokenInHand() throws Exception {
         String username = People.customer(accounts, "promoted");
         String token = SignIn.token(mvc, username, People.PASSWORD);

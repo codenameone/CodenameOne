@@ -699,7 +699,10 @@ public class DemoStores {
                     v.setPosition(position++);
                     variantRows.add(v);
                     for (int p = 0; p < places.size(); p++) {
-                        int onHand = v.isTrackInventory() ? stock(serial, p, iter) : 0;
+                        // The tent keeps selling with nothing on the shelf, so the
+                        // shop shows a backorder.
+                        int onHand = v.isTrackInventory() && !v.isAllowBackorder()
+                                ? stock(serial, p, iter) : 0;
                         InventoryLevel level = Inventory.newLevel(store.getId(), v.getId(),
                                 places.get(p).getId(), onHand);
                         level.setReorderPoint(p == 2 ? 0 : 4);

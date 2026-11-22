@@ -48,6 +48,11 @@ public class ReturnEndpoint implements ReturnApiServer {
     }
 
     @Override
+    public List<ReturnDto> requested() throws Exception {
+        return returns.requested(Caller.name());
+    }
+
+    @Override
     public List<ReturnDto> list(String storeId) throws Exception {
         return returns.list(Caller.name(), storeId);
     }

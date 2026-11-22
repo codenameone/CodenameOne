@@ -49,6 +49,9 @@ public final class Quote {
         public int availableQty;
         /// Sold ahead of stock: nothing is reserved for it at checkout.
         public boolean preorder;
+        /// More than is on hand, of a variant that keeps selling when out of
+        /// stock: it ships when the shelf is filled again.
+        public boolean backordered;
 
         public boolean available() {
             return availableQty >= price.quantity;
@@ -130,7 +133,8 @@ public final class Quote {
                     line.product.getPhotoId(), line.price.quantity, line.price.unitCents,
                     line.price.discountCents, line.price.taxCents, line.available(),
                     line.availableQty == Integer.MAX_VALUE ? line.price.quantity + 999
-                            : Math.max(0, line.availableQty), line.preorder));
+                            : Math.max(0, line.availableQty), line.preorder,
+                    line.backordered));
         }
         List<AppliedDiscountDto> applied = new ArrayList<AppliedDiscountDto>();
         if (discounts != null) {

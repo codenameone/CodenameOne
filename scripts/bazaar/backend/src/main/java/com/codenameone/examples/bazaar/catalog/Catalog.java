@@ -1608,10 +1608,11 @@ public class Catalog {
         return out.length() == 0 ? "item" : out.toString();
     }
 
-    /// Stars times ten, 0 without reviews.
+    /// Stars times ten, rounded to the nearest tenth as the reviews' own
+    /// average is (`ReviewEndpoint`), 0 without reviews.
     static int rating(Product product) {
         long count = product.getRatingCount();
-        return count <= 0 ? 0 : (int) (product.getRatingTotal() * 10 / count);
+        return count <= 0 ? 0 : (int) ((product.getRatingTotal() * 10 + count / 2) / count);
     }
 
     /// A comma-separated list, trimmed, without empty entries.

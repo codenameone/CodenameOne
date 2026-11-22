@@ -22,6 +22,7 @@ import com.codename1.ui.Container;
 import com.codename1.ui.layouts.Layout;
 import com.codenameone.examples.bazaar.live.LiveChannel;
 import com.codenameone.examples.bazaar.ui.DesktopActions;
+import com.codenameone.examples.bazaar.ui.Layouts;
 import java.util.Map;
 
 /// The root of a shopper's section. It claims the desktop menu's Find and
@@ -35,6 +36,17 @@ abstract class ShopPane extends Container {
 
     ShopPane(Layout layout) {
         super(layout);
+    }
+
+    /// On a wide screen every section stops at [Layouts#wideColumn()], in the
+    /// middle of the room beside the navigation: a grid or a list does not
+    /// run to the edges of a desktop monitor.
+    @Override
+    public void layoutContainer() {
+        if (Layouts.wide()) {
+            Layouts.cap(this, Layouts.wideColumn());
+        }
+        super.layoutContainer();
     }
 
     @Override

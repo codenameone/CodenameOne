@@ -40,6 +40,10 @@ public interface ReturnApi {
     @GET("/api/orders/{orderId}/returns")
     void mine(@Path("orderId") String orderId, OnComplete<Response<List<ReturnDto>>> callback);
 
+    /// Every return the caller asked for, across their orders, newest first.
+    @GET("/api/returns")
+    void requested(OnComplete<Response<List<ReturnDto>>> callback);
+
     @GET("/api/merchant/stores/{storeId}/returns")
     void list(@Path("storeId") String storeId, OnComplete<Response<List<ReturnDto>>> callback);
 

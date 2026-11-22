@@ -1398,11 +1398,14 @@ ShopGalleryArrow, ShopGalleryArrow.selected { color: var(--text); background: cn
 ShopGalleryArrow.pressed { color: var(--brand); background: cn1-pill-border; background-color: var(--surface-press); padding: 1.4mm; margin: 0 2mm 0 2mm; }
 /* Discover, the follow button, the sign-in prompt and the parcel timeline. */
 ShopDiscoverHead { background-color: var(--brand-tint); padding: 4mm 3.6mm 3.6mm 3.6mm; margin: 0 0 1mm 0; }
+ShopDiscoverHeadWide { background-color: var(--brand-tint); border-radius: var(--radius); padding: 4mm 3.6mm 3.6mm 3.6mm; margin: 2.4mm 1.6mm 1mm 1.6mm; }
 ShopDiscoverTitle { color: var(--text); font-family: "native:MainBold"; font-size: 7mm; padding: 0; margin: 0; background-color: transparent; }
 ShopDiscoverText { color: var(--text-muted); font-family: "native:MainRegular"; font-size: 2.75mm; padding: 1mm 0 2.4mm 0; margin: 0; background-color: transparent; }
 ShopSearchPill { color: var(--text-muted); background: cn1-pill-border; background-color: var(--surface); border: 1px solid var(--line-strong); font-family: "native:MainRegular"; font-size: 2.9mm; text-align: left; padding: 2.4mm 3.6mm 2.4mm 3.6mm; margin: 0; }
 ShopSearchPill.pressed { background-color: var(--surface-press); }
 ShopSectionHead { background-color: transparent; padding: 0; margin: 0; }
+ShopColumnStart { background-color: transparent; padding: 0 3mm 0 0; margin: 0; }
+ShopColumnEnd { background-color: transparent; padding: 0 0 0 3mm; margin: 0; }
 ShopStoreCard { background-color: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 0 0 2mm 0; margin: 0 1.2mm 0 1.2mm; }
 ShopStoreCard.pressed { background-color: var(--surface-alt); }
 ShopStoreCardArt { background-color: transparent; border-radius: var(--radius); padding: 0; margin: 0; }
@@ -1439,7 +1442,7 @@ ShopProductInfoSide { background-color: transparent; padding: 0 0 0 4mm; margin:
 ShopThumb { background-color: transparent; border-radius: var(--radius-small); padding: 0 2.4mm 0 0; margin: 0; }
 ShopSummary { background-color: var(--surface-alt); border-radius: var(--radius); padding: 3mm; margin: 2mm 0 2mm 0; }
 ShopCodeRow { background-color: transparent; padding: 0.8mm 0 0.8mm 0; margin: 0; }
-ShopCheck { color: var(--brand); background-color: transparent; padding: 0; margin: 0; }
+ShopCheck { color: var(--brand); background-color: transparent; padding: 0; margin: 0 0 0 2mm; }
 ShopPlacedIcon { color: var(--success); background-color: transparent; padding: 6mm 0 2mm 0; margin: 0; }
 ShopOrderNumber { color: var(--text-muted); font-family: "native:MainBold"; font-size: 3.5mm; padding: 0 0 2mm 0; margin: 0; background-color: transparent; }
 ShopCentered { color: var(--text); font-family: "native:MainRegular"; font-size: 2.75mm; text-align: center; padding: 0 0 3mm 0; margin: 0; background-color: transparent; }
@@ -2686,6 +2689,7 @@ ShopRatingMore { color: var(--brand); font-family: "native:MainBold"; font-size:
     ShopRatingRow.pressed { background-color: var(--surface-press-dark); border-radius: var(--radius-small); padding: 0.6mm 0 0.6mm 0; margin: 0; }
     ShopRatingMore { color: var(--brand-dark); }
     ShopDiscoverHead { background-color: var(--brand-tint-dark); }
+    ShopDiscoverHeadWide { background-color: var(--brand-tint-dark); border-radius: var(--radius); }
     ShopDiscoverTitle { color: var(--text-dark); }
     ShopDiscoverText { color: var(--text-muted-dark); }
     ShopSearchPill { background: cn1-pill-border; color: var(--text-muted-dark); background-color: var(--surface-dark); border: 1px solid var(--line-strong-dark); }
