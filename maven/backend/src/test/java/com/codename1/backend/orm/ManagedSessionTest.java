@@ -60,6 +60,9 @@ class ManagedSessionTest {
         assertEquals(Double.valueOf(3),s.createQuery("select round(2.5) from "+R+" r where r.id=:id",Double.class).setParameter("id",one.id).first());
         assertEquals(Double.valueOf(1.24),s.createQuery("select round(1.235,2) from "+R+" r where r.id=:id",Double.class).setParameter("id",one.id).first());
         assertEquals(Double.valueOf(3.5),s.createQuery("select floor(r.counter * 1.0 / 2) + 0.5 from "+R+" r where r.id=:id",Double.class).setParameter("id",two.id).first());
+        assertEquals(Double.valueOf(1.5),s.createQuery("select sqrt(2.25) from "+R+" r where r.id=:id",Double.class).setParameter("id",one.id).first());
+        assertNull(s.createQuery("select sqrt(-1) from "+R+" r where r.id=:id",Double.class).setParameter("id",one.id).first());
+        assertEquals(Long.valueOf(3),s.createQuery("select count(r) from "+R+" r where r.id < current_timestamp",Long.class).first());
         // Bucketed grouping, as the reporter's daily histogram does it.
         java.util.List rows=s.createQuery("select floor(r.counter / 3), count(r.id) from "+R+" r group by floor(r.counter / 3) order by floor(r.counter / 3)").list();
         assertEquals(3,rows.size());
@@ -1084,6 +1087,40 @@ class ManagedSessionTest {
                 assertThrows(PersistenceException.class,session::validateSchema,definition);session.close();
             } finally { em.close(); }
         }
+    }
+
+    /// Issue 6310: SIZE over a join-table collection and an element
+    /// collection, CURRENT_* bound in each field's storage, and SQRT.
+    @Test void sizeCurrentAndSqrt() throws Exception {
+        EntityManager em=manager();
+        try {
+            Models.register(new Model() { public com.codename1.impl.orm.Relationship[] relationships() { return new com.codename1.impl.orm.Relationship[]{
+                new com.codename1.impl.orm.Relationship("peers",Record.class,true,true,-1,"","record_peers","owner_id","target_id",0,false),
+                new com.codename1.impl.orm.Relationship("tags",String.class,true,true,-1,"","record_tags","owner_id","value",0,false,false,"","position","",true)}; } });
+            // Rows written directly: persisting needs an enhanced entity, and
+            // only the SQL SIZE renders is under test.
+            Session s=em.openSession();s.createTables();
+            long now=System.currentTimeMillis();
+            em.database().execute("INSERT INTO managed_record (id,version,counter,name) VALUES (1,0,?,'first'),(2,0,?,'second')",new Object[]{now-60000,now+3600000});
+            em.database().execute("INSERT INTO record_peers (owner_id,target_id) VALUES (1,2),(1,1)",new Object[0]);
+            em.database().execute("INSERT INTO record_tags (owner_id,position,value) VALUES (2,0,'a')",new Object[0]);
+            Record first=new Record();first.id=1;
+            String R="ManagedSessionTest$Record";
+            java.util.List rows=s.createQuery("select r.name, size(r.peers), size(r.tags) from "+R+" r order by r.name").list();
+            assertEquals(java.util.Arrays.asList("first",2L,0L),java.util.Arrays.asList((Object[])rows.get(0)));
+            assertEquals(java.util.Arrays.asList("second",0L,1L),java.util.Arrays.asList((Object[])rows.get(1)));
+            assertEquals(Long.valueOf(1),s.createQuery("select count(r) from "+R+" r where size(r.peers) > 1",Long.class).first());
+            for(String bad:new String[]{"size(r.name)","size(r)","size(nope.peers)","sqrt(r.name)","sqrt(1,2)"}) {
+                assertThrows(IllegalArgumentException.class,()->s.createQuery("select "+bad+" from "+R+" r"),bad);
+            }
+            assertEquals(Double.valueOf(3),s.createQuery("select sqrt(9) from "+R+" r where r.id=:id",Double.class).setParameter("id",first.id).first());
+            assertNull(s.createQuery("select sqrt(-4.0) from "+R+" r where r.id=:id",Double.class).setParameter("id",first.id).first());
+            // A long of epoch milliseconds compared with the clock.
+            assertEquals(Long.valueOf(1),s.createQuery("select count(r) from "+R+" r where r.counter < current_timestamp",Long.class).first());
+            assertEquals(Long.valueOf(2),s.createQuery("select count(r) from "+R+" r where r.counter >= current_date",Long.class).first()
+                    -(System.currentTimeMillis()%86400000L<60000?1:0));
+            s.close();
+        } finally { em.close(); }
     }
 
     @Test void orderedJoinAndMapSchemasValidateTheirDistinctKeyRoles() throws Exception {

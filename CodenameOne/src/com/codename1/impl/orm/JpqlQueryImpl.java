@@ -204,6 +204,7 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
             throw new IllegalStateException("Query has no SQL plan");
         }
         List<Object> values = new ArrayList<Object>();
+        clockMillis = System.currentTimeMillis();
         // Render each occurrence separately: dialect ordering and checked
         // arithmetic can repeat expressions containing the same bound value.
         StringBuilder statement = new StringBuilder();
@@ -217,7 +218,7 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
             position = end + 3;
             statement.append("?");
             if (binding instanceof LiteralBinding && ((LiteralBinding) binding).value == null
-                    && ((LiteralBinding) binding).query == null) {
+                    && ((LiteralBinding) binding).clock == 0 && ((LiteralBinding) binding).query == null) {
                 // Keep untyped, unmapped NULL valid in COUNT(NULL) and similar SQL.
                 statement.setLength(statement.length() - 1);
                 statement.append("NULL");
@@ -275,9 +276,11 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
         statement.append(template.substring(position));
         return new Bound(statement.toString(), values.toArray());
     }
+    /// The clock CURRENT_* reads, taken once per rendering of the statement.
+    private long clockMillis;
     private Object boundValue(Object binding) {
         if (binding instanceof LiteralBinding) {
-            return ((LiteralBinding) binding).convert();
+            return ((LiteralBinding) binding).convert(clockMillis);
         }
         if (!(binding instanceof Parameter)) {
             return binding;
@@ -289,14 +292,45 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
         return parameter.convert(parameters.get(parameter.name));
     }
     private static final class LiteralBinding {
+        static final int DATE = 1;
+        static final int TIMESTAMP = 3;
         final Object value;
         QueryImpl query;
         String field;
+        /// Nonzero for CURRENT_DATE/TIME/TIMESTAMP, read at each execution.
+        int clock;
         LiteralBinding(Object value) {
             this.value = value;
         }
-        Object convert() {
-            return query == null ? Values.storage(value) : query.parameter(field, value);
+        Object convert(long clockMillis) {
+            Object bound = clock == 0 ? value : now(clockMillis);
+            return query == null ? Values.storage(bound) : query.parameter(field, bound);
+        }
+        /// The clock in the Java type of the field it is compared with, which
+        /// is what that field's converter accepts: a java.time type by its
+        /// mapping, otherwise a Date (a `@Temporal` field, or a long of epoch
+        /// milliseconds once Values.storage has unwrapped it). Every form is
+        /// derived from ONE reading per execution, so two occurrences in a
+        /// statement never see different instants, and in UTC, the zone every
+        /// temporal converter here stores in.
+        private Object now(long millis) {
+            String mapping = query == null ? "" : query.mapping(field);
+            String type = mapping.substring(mapping.lastIndexOf(':') + 1);
+            long day = 86400000L;
+            long days = millis >= 0 ? millis / day : (millis - day + 1) / day;
+            long ofDay = millis - days * day;
+            if ("java.time.LocalDate".equals(type)) {
+                return java.time.LocalDate.ofEpochDay(days);
+            }
+            if ("java.time.LocalDateTime".equals(type)) {
+                return java.time.LocalDateTime.of(java.time.LocalDate.ofEpochDay(days),
+                        java.time.LocalTime.ofNanoOfDay(clock == DATE ? 0 : ofDay * 1000000L));
+            }
+            long at = clock == DATE ? days * day : millis;
+            if ("java.time.Instant".equals(type)) {
+                return java.time.Instant.ofEpochMilli(at);
+            }
+            return new java.util.Date(at);
         }
     }
     /// `:name IS [NOT] NULL`, answered from the bound value; see compare().
@@ -1200,6 +1234,18 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
             if ("NULL".equalsIgnoreCase(token)) {
                 return literal(-1, null);
             }
+            if ("CURRENT_DATE".equalsIgnoreCase(token)) {
+                return clock(LiteralBinding.DATE);
+            }
+            if ("CURRENT_TIME".equalsIgnoreCase(token)) {
+                // No mapped type stores a bare time of day (no LocalTime
+                // converter, and a Date is an instant), so nothing could compare
+                // with it meaningfully: refused rather than read as a timestamp.
+                throw error("CURRENT_TIME is not supported: no entity field type holds a time of day");
+            }
+            if ("CURRENT_TIMESTAMP".equalsIgnoreCase(token)) {
+                return clock(LiteralBinding.TIMESTAMP);
+            }
             if ("TRUE".equalsIgnoreCase(token) || "FALSE".equalsIgnoreCase(token)) {
                 return literal(Attribute.BOOLEAN, Boolean.valueOf("TRUE".equalsIgnoreCase(token)));
             }
@@ -1233,7 +1279,10 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                 } else if ("SUBSTR".equals(function)) {
                     function = "SUBSTRING";
                 }
-                if (" CONCAT SUBSTRING LOCATE MOD FLOOR CEILING ROUND ".contains(" " + function + " ")) {
+                if ("SIZE".equals(function)) {
+                    return size();
+                }
+                if (" CONCAT SUBSTRING LOCATE MOD FLOOR CEILING ROUND SQRT ".contains(" " + function + " ")) {
                     List<Expr> args = new ArrayList<Expr>();
                     do {
                         args.add(expression());
@@ -1432,6 +1481,18 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                 // The remainder operator under its JPQL name: integral operands,
                 // and a zero divisor answers NULL on every dialect.
                 return arithmetic(args.get(0), "%", args.get(1));
+            } else if ("SQRT".equals(function)) {
+                if (size != 1) {
+                    throw error("Invalid argument count for SQRT");
+                }
+                Expr value = args.get(0);
+                requireNumeric(value, false);
+                if (value.kind < 0) {
+                    requireKind(value, Attribute.REAL);
+                }
+                result = new Expr(session.squareRoot(session.numericOperand(value.sql, Attribute.REAL)),
+                        Attribute.REAL);
+                result.numericOperands = true;
             } else {
                 boolean round = "ROUND".equals(function);
                 if (round ? size != 1 && size != 2 : size != 1) {
@@ -1535,6 +1596,45 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                 }
             }
         }
+        /// `SIZE(alias.path)`, the opening parenthesis already taken.
+        private Expr size() {
+            StringBuilder path = new StringBuilder(word());
+            while (take(".")) {
+                path.append('.').append(word());
+            }
+            expect(")");
+            String full = path.toString();
+            int dot = full.indexOf('.');
+            Alias alias = dot < 0 ? null : aliases.get(full.substring(0, dot));
+            if (alias == null) {
+                throw error("SIZE requires a collection path: " + full);
+            }
+            String sql;
+            try {
+                sql = alias.query.size(alias.field(full.substring(dot + 1)));
+            } catch (IllegalArgumentException invalid) {
+                IllegalArgumentException located = error(invalid.getMessage());
+                located.initCause(invalid);
+                throw located;
+            }
+            Expr result = new Expr(sql, Attribute.BIGINT);
+            result.nonNull = true;
+            return result;
+        }
+        /// CURRENT_DATE, CURRENT_TIME or CURRENT_TIMESTAMP: the clock read when
+        /// the query runs, bound in the storage of whatever it is compared with
+        /// (issue 6310). Bound rather than rendered as the database's own
+        /// function because the three databases store a temporal field in
+        /// three different forms here -- ISO text, epoch milliseconds, epoch
+        /// days -- and only the field's converter knows which.
+        private Expr clock(int which) {
+            LiteralBinding binding = new LiteralBinding(null);
+            binding.clock = which;
+            Expr result = new Expr(bind(binding), -1);
+            result.literalBinding = binding;
+            result.nonNull = true;
+            return result;
+        }
         private Expr literal(int kind, Object value) {
             LiteralBinding binding = new LiteralBinding(value);
             String sql = bind(binding);
@@ -1596,7 +1696,7 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                 return allowParameters || value.parameter.nonNull;
             }
             if (value.literal) {
-                return value.literalBinding.convert() != null;
+                return value.literalBinding.convert(0L) != null;
             }
             if (value.nonNull) {
                 return true;
@@ -1635,7 +1735,10 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
         private void requireNonNull(Expr value) {
             if (value.parameter != null) {
                 value.parameter.nonNull = true;
-            } else if (!value.literal || value.literalBinding.convert() == null) {
+            } else if (value.literalBinding != null && value.literalBinding.clock != 0) {
+                // CURRENT_DATE / CURRENT_TIMESTAMP: never null.
+                return;
+            } else if (!value.literal || value.literalBinding.convert(0L) == null) {
                 throw error("Bulk assignment to a required subtype attribute needs a non-null literal or parameter");
             }
         }
@@ -1662,7 +1765,7 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
             Expr selected = null;
             String mapping = null;
             for (Expr arg : args) {
-                if (arg.literal || arg.parameter != null) {
+                if (arg.literal || arg.parameter != null || arg.literalBinding != null) {
                     continue;
                 }
                 String current = arg.projectionQuery == null ? ""
@@ -1826,7 +1929,9 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
             return value;
         }
         private boolean flexibleMapping(Expr value) {
-            if (value.literal || value.parameter != null) {
+            // A clock binding (CURRENT_*) is bound in the mapping of what it
+            // meets, as a literal or parameter is.
+            if (value.literal || value.parameter != null || value.literalBinding != null) {
                 return true;
             }
             if (value.projectionQuery != null || value.query != null || !value.numericOperands

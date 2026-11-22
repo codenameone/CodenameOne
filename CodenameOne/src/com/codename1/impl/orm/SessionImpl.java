@@ -191,6 +191,13 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         String rounded = function + "(" + value + ")";
         return "mysql".equals(dialect) ? "(1e0 * " + rounded + ")" : rounded;
     }
+    /// JPQL SQRT; NULL for a negative argument on every dialect, where
+    /// PostgreSQL would otherwise fail the statement and the others answer
+    /// NULL. SQLite's sqrt() needs its math functions, which the backend's
+    /// SQLite has and a device's system SQLite may not.
+    String squareRoot(String value) {
+        return "(CASE WHEN " + value + " < 0 THEN NULL ELSE SQRT(" + value + ") END)";
+    }
     String numericOperand(String value, int kind) {
         if ("postgresql".equals(sql.dialect())) {
             return "CAST(" + value + " AS " + (kind == Attribute.REAL ? "DOUBLE PRECISION" : "BIGINT") + ")";
