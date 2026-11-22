@@ -382,8 +382,12 @@ async function storefrontExtras() {
       // A header menu opened while the chat is open draws above the chat.
       // On a phone the two overlap; the topmost element at the centre of each
       // menu entry is the entry itself, never the chat panel.
+      // On a phone the open chat covers the header's own buttons, so the
+      // menu is opened the way its summary would open it.
       await v.setViewportSize({ width: 390, height: 700 });
-      await v.locator('details[data-pick]:has(form[action="/lang"]) > summary').click();
+      await v.evaluate(() => {
+        document.querySelector('details[data-pick]:has(form[action="/lang"])').open = true;
+      });
       const covered = await v.evaluate(() => {
         const menu = document.querySelector('details[data-pick][open] .pick-menu');
         const panel = document.querySelector('#chat .chat-panel');

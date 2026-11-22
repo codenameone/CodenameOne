@@ -381,12 +381,15 @@ final class HomePane extends ShopPane {
         top.add(hero(store, back));
         final Container collections = row("collections");
         top.add(collections);
-        top.add(Ui.label("New arrivals", "ShopSectionTitle"));
-        final Container categories = new Container(new com.codename1.ui.layouts.FlowLayout());
+        // One row of category chips that scrolls sideways, above the grid's
+        // heading so the products still start right under it.
+        final Container categories = new Container(BoxLayout.x());
         categories.setUIID("ShopChips");
         categories.setName("categories");
+        categories.setScrollableX(true);
         categories.setHidden(true);
         top.add(categories);
+        top.add(Ui.label("New arrivals", "ShopSectionTitle"));
         featured.type = null;
         grid = new ProductGrid(top, featured, 0);
         add(BorderLayout.CENTER, grid.component());

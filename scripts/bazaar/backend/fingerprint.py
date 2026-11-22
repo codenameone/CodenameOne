@@ -80,7 +80,10 @@ def main():
 
 # Templates whose pages are public (one copy for every visitor, cached by shared
 # caches): their inline <style> elements are allowed by hash instead of nonce.
-PUBLIC_TEMPLATES = ["layout.html"]
+# shell.html is not public, but a boosted navigation parses the next page and
+# brings in its <style>, which carries the nonce of ANOTHER response; its fixed
+# text is allowed by hash for the same reason as the public stylesheet.
+PUBLIC_TEMPLATES = ["layout.html", "shell.html"]
 HASHES_NAME = "InlineHashes.java"
 
 
