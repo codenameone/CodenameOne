@@ -473,7 +473,11 @@ campaign or site the customer came from. Permission sets give a staff member
 access to only some areas, at one location or all of them. The inbox answers
 chat messages live, with assignment and saved replies: a conversation page shows
 the shopper typing and reading, and a call from the storefront rings anywhere in
-the inbox and is answered on its conversation. The listings page imports a marketplace CSV
+the inbox and is answered on its conversation. The app's Inbox section works
+the same conversations: it shows unread counts and new messages as they arrive,
+replies from the conversation page, and rings with Accept and Decline when a
+shopper calls, answering voice and video calls on the phone or tablet. A call
+that one member of staff answers stops ringing for everyone else. The listings page imports a marketplace CSV
 as draft products, combining the colors of one item into a single listing.
 
 ==== The register's extras

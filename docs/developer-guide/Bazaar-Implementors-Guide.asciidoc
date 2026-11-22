@@ -659,6 +659,29 @@ credentials minted per connection from `bazaar.ice.turn`, `bazaar.ice.secret` an
 marketplace import (`Listings`, which validates every row before making any
 product).
 
+The merchant app's inbox (`merchant.InboxPane`) joins the same socket as one
+more member of staff: `ChatChannel` asks for a `LiveTickets` ticket over the
+authenticated API and connects with `?staff=<ticket>&store=<id>`, so the app
+and the web inbox share conversations, presence and calls. The REST list gives
+each conversation an `unread` count (shopper lines newer than the staff read
+mark), and the open thread sends `seen` with the newest message's server time.
+An incoming call is answered with Codename One's WebRTC package
+(`com.codename1.webrtc`): `ShopperCall` holds the signalling (it keeps the
+offer and the shopper's early candidates, and sends its own candidates only
+after the ANSWER that claims the call, since the server drops them before),
+and `RtcMedia` builds the peer connection from the ICE servers in the socket's
+`hello` frame. Candidates travel as `{candidate, sdpMid, sdpMLineIndex}`
+objects, the shape a browser's `toJSON()` makes.
+
+STUN alone connects most calls; behind symmetric NAT or a strict firewall a
+call needs a TURN relay. Run one with a shared secret (coturn's
+`use-auth-secret` and `static-auth-secret`) and set `bazaar.ice.turn` to its
+URLs (comma separated, for example `turn:turn.example.com:3478?transport=udp`
+and a `turns:` URL on 443), `bazaar.ice.secret` to the same secret, and
+optionally `bazaar.ice.ttl` to the credential lifetime in seconds. Browsers
+and the app then receive time-limited TURN credentials per connection; the
+secret never leaves the server.
+
 On the register side, `pos.PosTools` holds the store's register policy (tip
 presets, approval thresholds), commissions, manager approvals, parked carts and
 the product grid. An approval is a manager's PIN, checked with the sign-in

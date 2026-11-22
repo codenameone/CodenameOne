@@ -269,6 +269,7 @@ class OpsTest {
         }
         Map chat = (Map) list(s.owner, get(api(s, "/chats")), null).get(0);
         assertEquals(id, chat.get("id"));
+        assertEquals(1, ((Number) chat.get("unread")).intValue(), "the shopper's message is unread");
         int before = MailSender.current().sent().size();
         List messages = list(s.owner, post(api(s, "/chats/" + id + "/reply")),
                 "{\"body\":\"It ships today\"}");
@@ -279,6 +280,15 @@ class OpsTest {
             mailed |= mails.get(iter).getTo().contains("ada-chat@example.com");
         }
         assertTrue(mailed, "a shopper with the chat closed is mailed the reply");
+        Map answered = (Map) list(s.owner, get(api(s, "/chats")), null).get(0);
+        assertEquals(0, ((Number) answered.get("unread")).intValue(), "a reply reads the thread");
+        Thread.sleep(5); // the read mark is the reply's millisecond
+        chatInbox.say(s.storeId, id, "Thanks!");
+        Map more = (Map) list(s.owner, get(api(s, "/chats")), null).get(0);
+        assertEquals(1, ((Number) more.get("unread")).intValue(), "a new shopper line is unread again");
+        chatInbox.seen(id, true, System.currentTimeMillis() + 1);
+        Map seen = (Map) list(s.owner, get(api(s, "/chats")), null).get(0);
+        assertEquals(0, ((Number) seen.get("unread")).intValue(), "seen clears it");
         assertEquals("CLOSED", json(s.owner, post(api(s, "/chats/" + id + "/close")), "{}").get("status"));
         Shop other = shop("ops-chat-o");
         assertEquals(404, status(other.owner, get(api(other, "/chats/" + id)), null));

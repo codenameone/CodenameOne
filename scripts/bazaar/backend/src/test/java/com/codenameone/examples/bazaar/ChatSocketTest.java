@@ -128,6 +128,58 @@ class ChatSocketTest {
         }
     }
 
+    /// The call path the merchant app answers on: a handshake with no
+    /// `Origin` (a native client), the ring and the offer fanned out to every
+    /// staff connection, the first ANSWER winning, and the candidate travelling
+    /// as the object WebRTC produces.
+    @Test
+    void theAppAnswersAShoppersCall() throws Exception {
+        Shop s = shop("chat-call");
+        Tcp app = open("/ws/chat?staff=" + tickets.issue(s.owner).ticket() + "&store=" + s.storeId,
+                null);
+        Tcp web = open("/ws/chat?staff=" + tickets.issue(s.owner).ticket() + "&store=" + s.storeId,
+                null);
+        Tcp visitor = null;
+        try {
+            assertTrue(until(app, "hello").contains("\"ice\":["), text());
+            until(web, "hello");
+            visitor = open("/ws/chat?ticket=" + live.issue(s.storeId, "Chat Call", "", null,
+                    "call-client"), null);
+            until(visitor, "hello");
+            writeText(visitor, "{\"op\":\"send\",\"body\":\"Can I call?\",\"ref\":\"r1\"}");
+            String chat = field(until(app, "message"), "chat");
+            until(web, "message");
+
+            writeText(visitor, "{\"op\":\"call\",\"kind\":\"RING\",\"video\":true}");
+            String ring = until(app, "call");
+            assertTrue(ring.contains("\"RING\"") && ring.contains("\"video\":true")
+                    && ring.contains(chat), ring);
+            until(web, "call");
+            writeText(visitor, "{\"op\":\"call\",\"kind\":\"OFFER\",\"sdp\":\"v=0\\r\\n\",\"video\":true}");
+            assertTrue(until(app, "call").contains("\"OFFER\""), text());
+            until(web, "call");
+
+            writeText(app, "{\"op\":\"call\",\"chat\":\"" + chat
+                    + "\",\"kind\":\"ANSWER\",\"sdp\":\"v=0\\r\\n\"}");
+            assertTrue(until(visitor, "call").contains("\"ANSWER\""), text());
+            assertTrue(until(web, "call").contains("\"TAKEN\""), "the other staff hear it was taken");
+            writeText(app, "{\"op\":\"call\",\"chat\":\"" + chat + "\",\"kind\":\"ICE\","
+                    + "\"candidate\":{\"candidate\":\"candidate:1 1 udp 1 10.0.0.1 9 typ host\","
+                    + "\"sdpMid\":\"0\",\"sdpMLineIndex\":0}}");
+            String ice = until(visitor, "call");
+            assertTrue(ice.contains("\"ICE\"") && ice.contains("\"sdpMid\":\"0\""), ice);
+
+            writeText(app, "{\"op\":\"call\",\"chat\":\"" + chat + "\",\"kind\":\"END\"}");
+            assertTrue(until(visitor, "call").contains("\"END\""), text());
+        } finally {
+            app.close();
+            web.close();
+            if (visitor != null) {
+                visitor.close();
+            }
+        }
+    }
+
     @Test
     void aPageFromAnotherSiteIsRefused() throws Exception {
         Shop s = shop("chat-origin");
@@ -213,12 +265,20 @@ class ChatSocketTest {
     private static void writeText(Tcp connection, String text) throws IOException {
         byte[] body = ascii(text);
         byte[] mask = Crypto.randomBytes(4);
-        byte[] frame = new byte[6 + body.length];
+        // A call signal passes 125 bytes, so the 16-bit length form is needed.
+        int head = body.length < 126 ? 2 : 4;
+        byte[] frame = new byte[head + 4 + body.length];
         frame[0] = (byte) (0x80 | TEXT);
-        frame[1] = (byte) (0x80 | body.length);
-        System.arraycopy(mask, 0, frame, 2, 4);
+        if (head == 2) {
+            frame[1] = (byte) (0x80 | body.length);
+        } else {
+            frame[1] = (byte) (0x80 | 126);
+            frame[2] = (byte) (body.length >> 8);
+            frame[3] = (byte) body.length;
+        }
+        System.arraycopy(mask, 0, frame, head, 4);
         for (int iter = 0; iter < body.length; iter++) {
-            frame[6 + iter] = (byte) (body[iter] ^ mask[iter & 3]);
+            frame[head + 4 + iter] = (byte) (body[iter] ^ mask[iter & 3]);
         }
         connection.write(frame, 0, frame.length);
     }

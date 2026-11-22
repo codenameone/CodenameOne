@@ -20,7 +20,8 @@ package com.codenameone.examples.bazaar.api;
 
 import com.codename1.annotations.Mapped;
 
-/// A conversation with a shopper in the store's inbox.
+/// A conversation with a shopper in the store's inbox. `unread` counts the
+/// shopper's messages written after the staff last read the thread.
 @Mapped
 public record ChatConversationDto(
         String id,
@@ -30,5 +31,6 @@ public record ChatConversationDto(
         String status,
         String assignee,
         int messages,
-        long lastAt) {
+        long lastAt,
+        int unread) {
 }

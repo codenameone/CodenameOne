@@ -223,8 +223,9 @@ on a row.
 | Customer merge | &#10003; | core | app/plugin | no | core | Orders, addresses, store credit, gift cards, loyalty points, reviews and wishlist move to the kept record, and the merge is audited.
 | Tax exemptions per customer | &#10003; | core | app/plugin | core | no | Exempt customers pay no tax; in tax-inclusive stores the included tax comes off. 
 | Store credit | &#10003; | core | app/plugin | core | no | 
-| Live chat widget | &#10003; | core | app/plugin | app/plugin | no | A floating chat on every store page: live over a WebSocket, with presence, typing, read receipts and voice or video calls over WebRTC, answered from the merchant inbox. 
+| Live chat widget | &#10003; | core | app/plugin | app/plugin | no | A floating chat on every store page: live over a WebSocket, with presence, typing, read receipts and voice or video calls over WebRTC, answered from the web inbox or the merchant app. 
 | Unified inbox (email/social messages) | &#9681; | core | app/plugin | app/plugin | core | One live inbox for storefront chat and calls, with assignment and canned replies; no e-mail or social channels. 
+| Answer chat and calls from the merchant mobile app | &#10003; | core | app/plugin | app/plugin | no | The app's inbox lists conversations with unread counts, updates live and replies; shopper voice and video calls ring in the app and are answered with WebRTC. Shopify Inbox answers chat in its own mobile app but has no voice or video calling. 
 | AI assistant | &#8211; | core | app/plugin | app/plugin | core | 
 | Issue/adjust store credit | &#10003; | core | app/plugin | core | no | 
 | Redeem at checkout | &#10003; | core | app/plugin | core | no | Signed-in shoppers choose to spend their credit at web and app checkout; it also pays at the register.

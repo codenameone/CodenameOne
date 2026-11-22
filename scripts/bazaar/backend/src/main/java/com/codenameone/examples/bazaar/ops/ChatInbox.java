@@ -270,11 +270,16 @@ public class ChatInbox {
         return out;
     }
 
+    /// The select-list column counting a conversation's unread shopper
+    /// messages: those written after the staff's read mark.
+    private static final String UNREAD = "(SELECT COUNT(*) FROM chat_message m WHERE "
+            + "m.conversation_id = c.id AND m.staff = 0 AND m.created_at > c.staff_read) AS u";
+
     @Transactional(readOnly = true)
     public List<ChatConversationDto> list(String username, String storeId) throws IOException {
         access.requireArea(username, storeId, Perms.CUSTOMERS, false, StoreAccess.ANYONE);
         List rows = db.query("SELECT c.id, c.email, c.name, c.subject, c.status, c.assignee, c.updated_at, "
-                + "(SELECT COUNT(*) FROM chat_message m WHERE m.conversation_id = c.id) AS n FROM "
+                + "(SELECT COUNT(*) FROM chat_message m WHERE m.conversation_id = c.id) AS n, " + UNREAD + " FROM "
                 + "chat_conversation c WHERE c.store_id = ? ORDER BY c.updated_at DESC", new Object[] {storeId});
         List<ChatConversationDto> out = new ArrayList<ChatConversationDto>();
         for (int iter = 0; iter < rows.size() && iter < 500; iter++) {
@@ -287,7 +292,7 @@ public class ChatInbox {
         return new ChatConversationDto(Rows.text(r.get("id")), Rows.text(r.get("email")),
                 Rows.text(r.get("name")), Rows.text(r.get("subject")), Rows.text(r.get("status")),
                 Rows.text(r.get("assignee")), (int) Rows.number(r.get("n")),
-                Rows.number(r.get("updated_at")));
+                Rows.number(r.get("updated_at")), (int) Rows.number(r.get("u")));
     }
 
     private Map conversation(String username, String storeId, String chatId, boolean write)
@@ -295,7 +300,7 @@ public class ChatInbox {
         access.requireStaff(username, storeId, StoreAccess.ANYONE);
         Map c = chatId == null || chatId.length() > 32 ? null : db.queryOne(
                 "SELECT c.id, c.store_id, c.email, c.name, c.subject, c.status, c.assignee, c.updated_at, "
-                + "(SELECT COUNT(*) FROM chat_message m WHERE m.conversation_id = c.id) AS n "
+                + "(SELECT COUNT(*) FROM chat_message m WHERE m.conversation_id = c.id) AS n, " + UNREAD + " "
                 + "FROM chat_conversation c WHERE c.id = ?", new Object[] {chatId});
         StoreAccess.requireIn(c == null ? null : Rows.text(c.get("store_id")), storeId, "conversation");
         access.requireArea(username, storeId, Perms.CUSTOMERS, write, StoreAccess.ANYONE);
