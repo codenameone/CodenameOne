@@ -33,7 +33,6 @@ import com.codenameone.examples.bazaar.api.OrderDto;
 import com.codenameone.examples.bazaar.api.OrderEventDto;
 import com.codenameone.examples.bazaar.api.OrderLineDto;
 import com.codenameone.examples.bazaar.api.ReturnDto;
-import com.codenameone.examples.bazaar.api.ReturnRequestDto;
 import com.codenameone.examples.bazaar.api.SavedAddressDto;
 import com.codenameone.examples.bazaar.api.WishlistItemDto;
 import com.codenameone.examples.bazaar.club.Clubs;
@@ -64,6 +63,13 @@ import com.codenameone.examples.bazaar.repository.StoreRepository;
 import com.codenameone.examples.bazaar.repository.TrackingEventRepository;
 import com.codenameone.examples.bazaar.repository.VariantRepository;
 import com.codenameone.examples.bazaar.returns.Returns;
+import com.codenameone.examples.bazaar.returns.SelfReturns;
+import com.codenameone.examples.bazaar.api.ExchangeChoiceDto;
+import com.codenameone.examples.bazaar.api.ReturnOptionsDto;
+import com.codenameone.examples.bazaar.api.ReturnQuoteDto;
+import com.codenameone.examples.bazaar.api.ReturnableLineDto;
+import com.codenameone.examples.bazaar.api.SelfReturnDto;
+import com.codenameone.examples.bazaar.web.Backorders;
 import com.codenameone.examples.bazaar.shopper.AddressEndpoint;
 import com.codenameone.examples.bazaar.shopper.ReviewEndpoint;
 import com.codenameone.examples.bazaar.shopper.WishlistEndpoint;
@@ -89,6 +95,10 @@ public class AccountData {
     /// Orders on one page of the list.
     public static final int PAGE = 20;
 
+    @com.codename1.backend.annotations.Autowired
+    private SelfReturns selfReturns;
+    @com.codename1.backend.annotations.Autowired
+    private Backorders backorders;
     private final Orders orders;
     private final Returns returns;
     private final StoreOrderRepository orderRows;
@@ -224,6 +234,30 @@ public class AccountData {
         }
         boolean shipped = false;
         Map<String, Integer> canSendBack = returns.returnable(o.id());
+        Map<String, Integer> late = backorders.ofOrder(o.id());
+        ReturnOptionsDto rules = selfReturns.options(user, o.id());
+        Map<String, Boolean> finalSale = new HashMap<String, Boolean>();
+        for (int iter = 0; iter < rules.lines().size(); iter++) {
+            ReturnableLineDto r = rules.lines().get(iter);
+            if (r.finalSale()) {
+                finalSale.put(r.orderLineId(), Boolean.TRUE);
+            }
+            for (int e = 0; e < r.exchangeFor().size(); e++) {
+                ExchangeChoiceDto x = r.exchangeFor().get(e);
+                if (!listed(v.exchanges, x.variantId())) {
+                    AccountItem i = new AccountItem();
+                    i.id = x.variantId();
+                    i.title = x.title();
+                    i.amount = Money.format(x.priceCents(), c);
+                    v.exchanges.add(i);
+                }
+            }
+        }
+        v.returnWindow = Integer.toString(rules.windowDays());
+        v.restockingFee = rules.restockingFeeBp() <= 0 ? "" : percent(rules.restockingFeeBp());
+        v.returnShipping = rules.returnShippingCents() <= 0 ? ""
+                : Money.format(rules.returnShippingCents(), c);
+        v.returnsClosed = rules.reason() == null ? "" : rules.reason();
         for (int iter = 0; iter < o.lines().size(); iter++) {
             OrderLineDto l = o.lines().get(iter);
             AccountItem i = new AccountItem();
@@ -237,7 +271,9 @@ public class AccountData {
             Integer left = canSendBack.get(l.id());
             int returnable = left == null ? 0 : left.intValue();
             i.max = Integer.toString(returnable);
-            i.flag = returnable > 0;
+            i.flag = returnable > 0 && !finalSale.containsKey(l.id());
+            i.finalSale = finalSale.containsKey(l.id());
+            i.backordered = late.containsKey(l.id());
             shipped |= returnable > 0;
             i.amount = Money.format(l.priceCents() * l.quantity(), c);
             v.lines.add(i);
@@ -298,6 +334,7 @@ public class AccountData {
         v.invoiceUrl = base + "/invoice.pdf";
         v.cancelAction = base + "/cancel";
         v.returnAction = base + "/return";
+        v.quoteAction = base + "/return/quote";
         v.canCancel = Orders.OPEN.equals(o.status()) && Orders.UNFULFILLED.equals(o.fulfilment());
         v.canReturn = shipped && !Orders.CANCELLED.equals(o.status());
     }
@@ -314,8 +351,43 @@ public class AccountData {
         orders.cancelMine(user, orderId);
     }
 
-    /// Asks for a return of the quantities posted as `qty-<line id>`.
+    /// Asks for a return of the quantities posted as `qty-<line id>`, with
+    /// the resolution chosen (a refund, store credit or an exchange), under
+    /// the store's return rules ([SelfReturns]).
     public void requestReturn(String user, String orderId, HttpServer.Request request)
+            throws IOException {
+        selfReturns.request(user, orderId, selfReturn(user, orderId, request));
+    }
+
+    /// What the posted return would come to, written onto `v` with the form
+    /// as it was posted; a refusal the shopper can act on is `quoteError`.
+    public void quoteReturn(String user, String orderId, HttpServer.Request request,
+            AccountView v) throws IOException {
+        v.chosenReason = text(request.param("reason"));
+        v.chosenNote = text(request.param("note"));
+        v.chosenResolution = text(request.param("resolution"));
+        v.chosenExchange = text(request.param("exchange"));
+        String c = orders.mineDetail(user, orderId).currency();
+        try {
+            ReturnQuoteDto q = selfReturns.quote(user, orderId, selfReturn(user, orderId, request));
+            v.quoted = true;
+            v.quoteValue = Money.format(q.valueCents(), c);
+            v.quoteFee = q.feeCents() > 0 ? "-" + Money.format(q.feeCents(), c) : "";
+            v.quoteExchange = q.exchangeCents() > 0 ? Money.format(q.exchangeCents(), c) : "";
+            long d = q.differenceCents();
+            // Above zero the shopper owes it (an exchange costing more); below
+            // zero it goes back to them, as money or as credit.
+            v.quoteDirection = d > 0 ? "owed" : d < 0 ? "back" : "even";
+            v.quoteDifference = Money.format(d < 0 ? -d : d, c);
+        } catch (com.codename1.backend.ResponseStatusException refused) {
+            if (refused.getStatus() == 404) {
+                throw refused;
+            }
+            v.quoteError = refused.getReason() == null ? "" : refused.getReason();
+        }
+    }
+
+    private SelfReturnDto selfReturn(String user, String orderId, HttpServer.Request request)
             throws IOException {
         OrderDto o = orders.mineDetail(user, orderId);
         List<FulfilLineDto> wanted = new ArrayList<FulfilLineDto>();
@@ -331,9 +403,32 @@ public class AccountData {
             throw new ResponseStatusException(400, "Choose at least one item to return");
         }
         String reason = request.param("reason");
-        returns.request(user, orderId, new ReturnRequestDto(
+        String resolution = text(request.param("resolution")).trim();
+        return new SelfReturnDto(
                 reason == null || reason.trim().length() == 0 ? "OTHER" : reason.trim(),
-                request.param("note") == null ? "" : request.param("note"), wanted));
+                request.param("note") == null ? "" : request.param("note"),
+                resolution.length() == 0 ? "REFUND" : resolution,
+                text(request.param("exchange")).trim(), wanted);
+    }
+
+    private static boolean listed(List<AccountItem> items, String id) {
+        for (int iter = 0; iter < items.size(); iter++) {
+            if (items.get(iter).id.equals(id)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// Basis points as a percentage: 1500 is "15%", 1250 is "12.5%".
+    static String percent(int bp) {
+        int whole = bp / 100;
+        int rest = bp % 100;
+        if (rest == 0) {
+            return whole + "%";
+        }
+        return whole + "." + (rest % 10 == 0 ? Integer.toString(rest / 10)
+                : (rest < 10 ? "0" : "") + rest) + "%";
     }
 
     static int number(String s) {

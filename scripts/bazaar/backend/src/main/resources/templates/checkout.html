@@ -48,7 +48,7 @@
 </div>
 
 <aside id="summary" class="summary" aria-live="polite"><h2 th:text="${page.t['summary']}">Order summary</h2>
-<ul><li th:each="l : ${checkout.lines}"><span><span th:text="${l.title}">Item</span> <span class="variant" th:unless="${l.variant.empty}" th:text="${l.variant}">Variant</span> x <span th:text="${l.quantity}">1</span></span><span th:text="${l.total}">$1</span></li></ul>
+<ul><li th:each="l : ${checkout.lines}"><span><span th:text="${l.title}">Item</span> <span class="variant" th:unless="${l.variant.empty}" th:text="${l.variant}">Variant</span> <span class="badge" th:if="${l.backordered}" th:text="${page.t['backordered']}">Ships when back in stock</span> x <span th:text="${l.quantity}">1</span></span><span th:text="${l.total}">$1</span></li></ul>
 <fieldset><legend th:text="${page.t['delivery']}">Delivery</legend>
 <p th:if="${checkout.rates.empty}" th:text="${page.t['enterAddress']}">Enter an address to see delivery options.</p>
 <div class="choice" th:each="r : ${checkout.rates}"><input type="radio" name="rateId" th:value="${r.value}" th:checked="${r.chosen}" th:attr="id=${'rate-' + r.value},hx-post=${checkout.action}" hx-trigger="change" hx-target="#summary" hx-select="#summary" hx-swap="outerHTML"><label th:attr="for=${'rate-' + r.value}"><span th:text="${r.label}">Standard</span> <span class="meta" th:text="${r.detail}">3-5 days</span></label></div>

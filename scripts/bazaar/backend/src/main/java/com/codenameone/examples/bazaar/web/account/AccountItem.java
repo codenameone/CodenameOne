@@ -41,4 +41,10 @@ public class AccountItem {
     public boolean flag;
     public boolean flag2;
     public boolean disabled;
+    /// An order line sold past zero: it ships when back in stock.
+    public boolean backordered;
+    /// An order line the store's rules make final sale: it cannot come back.
+    public boolean finalSale;
+    /// The quantity a return form posted for this line, kept on a quote.
+    public String chosen = "0";
 }

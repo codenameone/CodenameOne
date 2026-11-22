@@ -199,6 +199,23 @@ public class AccountPages {
                 () -> data.requestReturn(me, id, request));
     }
 
+    /// What the return posted would come to -- the goods' value, the fees the
+    /// store's rules take, an exchange's price and the difference -- shown on
+    /// the order page with the form as posted, before anything is asked for.
+    @PostMapping("/account/orders/{id}/return/quote")
+    public String quoteReturn(@PathVariable("id") String id, Model model,
+            HttpServer.Request request) throws Exception {
+        String me = me(request);
+        AccountView v = view("order");
+        data.order(me, id, v);
+        data.quoteReturn(me, id, request, v);
+        for (int iter = 0; iter < v.lines.size(); iter++) {
+            AccountItem l = v.lines.get(iter);
+            l.chosen = Integer.toString(AccountData.number(request.param("qty-" + l.id)));
+        }
+        return render(pages, model, request, v.order.title, v);
+    }
+
     // ------------------------------------------------------------ addresses
 
     @GetMapping("/account/addresses")

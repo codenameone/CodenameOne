@@ -20,6 +20,7 @@ package com.codenameone.examples.bazaar.pay;
 
 import com.codename1.backend.HttpServer;
 import com.codename1.backend.annotations.GetMapping;
+import com.codename1.backend.annotations.PathVariable;
 import com.codename1.backend.annotations.RequestParam;
 import com.codename1.backend.annotations.RestController;
 
@@ -31,8 +32,30 @@ import com.codename1.backend.annotations.RestController;
 /// returns to it. That is also why the page needs no sign-in and takes nothing
 /// from its address but which of two sentences to show -- being sent here
 /// proves nothing and changes nothing.
+///
+/// It also answers the rest of `/pay/`: a merchant's checkout link
+/// ([com.codenameone.examples.bazaar.order.PayLinks]) is `/pay/{token}`, sent
+/// on to its store's checkout page. Both live in one controller so the
+/// literal `/pay/return` is matched before the token pattern.
 @RestController
 public class PayReturnPage {
+    private final com.codenameone.examples.bazaar.web.PayPages links;
+
+    public PayReturnPage(com.codenameone.examples.bazaar.web.PayPages links) {
+        this.links = links;
+    }
+
+    /// A checkout link: 303 to the order's store, or the 404 page.
+    @GetMapping("/pay/{token}")
+    public HttpServer.Response link(@PathVariable("token") String token) throws Exception {
+        String to = links.address(token);
+        if (to == null) {
+            return com.codenameone.examples.bazaar.web.NotFoundPage.response();
+        }
+        return HttpServer.Response.text(303, "").header("Location", to)
+                .header("Cache-Control", "no-store");
+    }
+
     @GetMapping("/pay/return")
     public HttpServer.Response page(
             @RequestParam(value = "result", required = false) String result) throws Exception {

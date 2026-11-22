@@ -94,6 +94,8 @@ public class CheckoutPages {
         {"IT", "Italy"}, {"IE", "Ireland"}, {"AU", "Australia"}, {"IL", "Israel"},
     };
 
+    @com.codename1.backend.annotations.Autowired
+    private Backorders backorders;
     private final Stores stores;
     private final Carts carts;
     private final Checkouts checkouts;
@@ -394,7 +396,7 @@ public class CheckoutPages {
     }
 
     /// The typed card, or null with the reason set on the view.
-    private static CardDto typedCard(CheckoutForm f, CheckoutView view) {
+    static CardDto typedCard(CheckoutForm f, CheckoutView view) {
         String exp = f.cardExpiry.replace(" ", "");
         int slash = exp.indexOf('/');
         int month = slash < 0 ? -1 : digits(exp.substring(0, slash));
@@ -529,6 +531,8 @@ public class CheckoutPages {
                 lv.unit = Money.format(l.priceCents(), currency);
                 lv.total = Money.format(l.priceCents() * l.quantity(), currency);
                 lv.available = l.available();
+                lv.backordered = !l.preorder() && backorders.wouldBackorder(l.variantId(),
+                        l.quantity());
                 view.lines.add(lv);
             }
             List<ShippingOptionDto> options = dto.shippingOptions();
@@ -777,6 +781,7 @@ public class CheckoutPages {
             view.shipTo = to.toString();
         }
         view.shippingTitle = o.shippingTitle() == null ? "" : o.shippingTitle();
+        Map<String, Integer> late = backorders.ofOrder(row.getId());
         for (int iter = 0; iter < o.lines().size(); iter++) {
             OrderLineDto l = o.lines().get(iter);
             CartLineView lv = new CartLineView();
@@ -786,6 +791,7 @@ public class CheckoutPages {
             lv.quantity = l.quantity();
             lv.unit = Money.format(l.priceCents(), currency);
             lv.total = Money.format(l.priceCents() * l.quantity(), currency);
+            lv.backordered = late.containsKey(l.id());
             view.lines.add(lv);
         }
         view.subtotal = Money.format(o.subtotalCents(), currency);

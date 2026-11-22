@@ -29,5 +29,7 @@ public final class CartLineView {
     public String total = "";
     public boolean available = true;
     public boolean preorder;
+    /// Sold past zero: the line ships when the variant is back in stock.
+    public boolean backordered;
     public Art art;
 }

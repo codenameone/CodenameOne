@@ -47,6 +47,32 @@ public class AccountView {
     public String returnAction = "";
     public boolean canCancel;
     public boolean canReturn;
+    // ---------------------------------------------------- self-serve returns
+    /// The store's return rules as shown: the window, the restocking fee and
+    /// the return shipping fee ("" when the store charges none).
+    public String returnWindow = "";
+    public String restockingFee = "";
+    public String returnShipping = "";
+    /// Why nothing can be sent back now, "" when returns are open.
+    public String returnsClosed = "";
+    /// The variants an exchange may swap to: id, title and price.
+    public List<AccountItem> exchanges = new ArrayList<AccountItem>();
+    public String quoteAction = "";
+    /// The form as posted, kept when the page shows a quote.
+    public String chosenReason = "";
+    public String chosenNote = "";
+    public String chosenResolution = "REFUND";
+    public String chosenExchange = "";
+    /// What the return would come to, once previewed.
+    public boolean quoted;
+    public String quoteValue = "";
+    public String quoteFee = "";
+    public String quoteExchange = "";
+    public String quoteDifference = "";
+    /// "back" (paid back or credited), "owed" (the shopper pays the
+    /// difference) or "even".
+    public String quoteDirection = "";
+    public String quoteError = "";
 
     // ------------------------------------------------------------ addresses
     public List<AddressRow> addresses = new ArrayList<AddressRow>();

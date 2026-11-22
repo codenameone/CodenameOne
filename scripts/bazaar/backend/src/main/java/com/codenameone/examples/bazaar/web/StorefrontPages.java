@@ -75,6 +75,8 @@ public class StorefrontPages {
     /// The session attribute a store's cart token is kept under, plus its id.
     static final String CART_KEY = "storefront.cart.";
 
+    @com.codename1.backend.annotations.Autowired
+    private Backorders backorders;
     private final Stores stores;
     private final Catalog catalog;
     private final Carts carts;
@@ -556,6 +558,8 @@ public class StorefrontPages {
                 lv.total = Money.format(l.priceCents() * l.quantity(), store.getCurrency());
                 lv.available = l.available();
                 lv.preorder = l.preorder();
+                lv.backordered = !l.preorder() && backorders.wouldBackorder(l.variantId(),
+                        l.quantity());
                 lv.art = new Art(l.productId(), l.photoId(), l.title());
                 view.lines.add(lv);
                 view.count += l.quantity();
