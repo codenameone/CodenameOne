@@ -129,6 +129,10 @@ public final class HttpServer {
         private boolean canonicalChecked;
         /// The sessions of the server serving this request; set by Backend.
         Sessions sessions;
+        /// What a handler or the server attached to this request; see
+        /// [#getAttribute]. Null until the first set, so a request that never
+        /// carries one allocates nothing.
+        private Map attributes;
         /// See [#endedSessions].
         private List endedSessions;
         /// The sessions this request counts as using; see Sessions.enter.
@@ -632,6 +636,7 @@ public final class HttpServer {
             this.endedSessions = null;
             this.sessionsInUse = null;
             this.sessionIdsFound = null;
+            this.attributes = null;
         }
 
         private byte[] peer() {
@@ -865,6 +870,7 @@ public final class HttpServer {
             this.endedSessions = null;
             this.sessionsInUse = null;
             this.sessionIdsFound = null;
+            this.attributes = null;
         }
 
         /// For HTTP/2, whose headers arrive already decoded from the HPACK state --
@@ -925,6 +931,61 @@ public final class HttpServer {
         /// Path plus query string, exactly as it arrived.
         public String getTarget() {
             return target;
+        }
+
+        /// A value attached to this request by name, or null: what the server
+        /// records for an error dispatch (the
+        /// [com.codename1.backend.web.RequestDispatcher] names), or what one
+        /// filter or interceptor leaves for the handler, as a servlet request
+        /// attribute does. Lives only as long as the request.
+        public Object getAttribute(String name) {
+            return attributes == null ? null : attributes.get(name);
+        }
+
+        /// Attaches `value` under `name`; null removes it.
+        public void setAttribute(String name, Object value) {
+            if (value == null) {
+                if (attributes != null) {
+                    attributes.remove(name);
+                }
+                return;
+            }
+            if (attributes == null) {
+                attributes = new LinkedHashMap();
+            }
+            attributes.put(name, value);
+        }
+
+        /// Points this request at `newTarget` for an internal dispatch -- the
+        /// error page a path nothing served is forwarded to -- and returns what
+        /// [#restoreTarget] needs to put it back. The same object rather than a
+        /// copy, so the dispatch keeps the request's session, connection and
+        /// scoped beans, as a servlet forward does.
+        Object[] retarget(String newTarget) {
+            Object[] saved = new Object[] {target,
+                    new int[] {targetStart, targetLength, pathLength, canonicalLength,
+                            canonicalChecked ? 1 : 0}, canonicalTarget};
+            this.target = newTarget;
+            // Zero length makes every byte read come from the String target.
+            this.targetStart = 0;
+            this.targetLength = 0;
+            this.pathLength = -1;
+            this.canonicalTarget = null;
+            this.canonicalLength = 0;
+            this.canonicalChecked = false;
+            return saved;
+        }
+
+        /// Undoes [#retarget].
+        void restoreTarget(Object[] saved) {
+            this.target = (String) saved[0];
+            int[] ints = (int[]) saved[1];
+            this.targetStart = ints[0];
+            this.targetLength = ints[1];
+            this.pathLength = ints[2];
+            this.canonicalLength = ints[3];
+            this.canonicalChecked = ints[4] != 0;
+            this.canonicalTarget = (byte[]) saved[2];
         }
 
         /// The headers as a Map, lower-cased names to values.

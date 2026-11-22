@@ -2460,10 +2460,13 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         for (int i = 0; i < route.params.size(); i++) {
             Param p = route.params.get(i);
             if ("BODY".equals(p.kind)) {
-                // Every body binding reads it as text, and a binary-typed body is
-                // not checked for UTF-8 on arrival, so getBody() throws for one that
-                // is not: refused as the client's error before anything reads it.
-                if (!bodyChecked) {
+                // Every body binding but byte[] reads it as text, and a binary-typed
+                // body is not checked for UTF-8 on arrival, so getBody() throws for
+                // one that is not: refused as the client's error before anything
+                // reads it. A byte[] binding is the raw octets and must reach the
+                // handler whatever they are -- an image, a signed binary webhook --
+                // as Spring binds them (issue 6310: this guard answered 400 first).
+                if (!bodyChecked && !"byte[]".equals(p.javaType)) {
                     bodyChecked = true;
                     sb.append(pad).append("if (!bodyIsText(request)) {\n");
                     sb.append(pad).append("    return request.respond(400, \"text/plain; charset=utf-8\",\n");
@@ -2526,6 +2529,12 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
             } else if ("PART".equals(p.kind)) {
                 test = "request.getPart(" + quote(p.name) + ") == null";
                 what = "part " + p.name;
+            } else if ("BODY".equals(p.kind) && "byte[]".equals(p.javaType)) {
+                // The octets, never getBody(): that decodes them as UTF-8 and
+                // throws on an image or a binary webhook, so a required raw body
+                // answered 500 before the handler ran (issue 6310).
+                test = "request.getBodyBytes() == null || request.getBodyBytes().length == 0";
+                what = "request body";
             } else if ("BODY".equals(p.kind)) {
                 test = "request.getBody() == null || request.getBody().length() == 0";
                 what = "request body";

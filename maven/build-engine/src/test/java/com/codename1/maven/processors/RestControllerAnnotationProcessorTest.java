@@ -943,6 +943,66 @@ public class RestControllerAnnotationProcessorTest {
     }
 
     @Test
+    public void aRetargetedRequestReachesTheGeneratedErrorRoute() throws Exception {
+        // Issue 6310: the server dispatches a path nothing served to the error
+        // route by pointing the same request at it. The generated router matches
+        // on the request's bytes, so it has to see the new target, not the one
+        // the request arrived with.
+        Router router = generate(
+                "package com.example;\n"
+                + "import com.codename1.backend.annotations.*;\n"
+                + "import com.codename1.backend.HttpServer;\n"
+                + "@RestController\n"
+                + "public class Notes {\n"
+                + "    @RequestMapping(\"/error\")\n"
+                + "    public String error(HttpServer.Request request) {\n"
+                + "        return String.valueOf(request.getAttribute(\"p\"));\n"
+                + "    }\n"
+                + "}\n");
+        HttpServer.Request request = Router.request("GET", "/no-such-page?q=1", null);
+        assertNull(router.handle.invoke(router.instance, request));
+        request.setAttribute("p", "/no-such-page");
+        Method retarget = HttpServer.Request.class.getDeclaredMethod("retarget", String.class);
+        retarget.setAccessible(true);
+        Object saved = retarget.invoke(request, "/error");
+        Object result = router.handle.invoke(router.instance, request);
+        assertNotNull("the retargeted request matched no route", result);
+        assertEquals("/no-such-page", Router.bodyOf(result));
+        Method restore = HttpServer.Request.class.getDeclaredMethod("restoreTarget", Object[].class);
+        restore.setAccessible(true);
+        restore.invoke(request, saved);
+        assertEquals("/no-such-page?q=1", request.getTarget());
+        assertNull(router.handle.invoke(router.instance, request));
+    }
+
+    @Test
+    public void aRequiredByteArrayBodyAcceptsBinaryOctets() throws Exception {
+        // Issue 6310: the required-body guard read getBody(), which decodes the
+        // octets as UTF-8 and throws on anything else -- so a JPEG upload or a
+        // binary webhook bound to a required byte[] answered 500.
+        Router router = generate(
+                "package com.example;\n"
+                + "import com.codename1.backend.annotations.*;\n"
+                + "@RestController\n"
+                + "public class Notes {\n"
+                + "    @PostMapping(\"/image\")\n"
+                + "    public String image(@RequestBody byte[] body) {\n"
+                + "        return body.length + \":\" + (body[0] & 0xff);\n"
+                + "    }\n"
+                + "}\n");
+        HttpServer.Request binary = Router.request("POST", "/image", null);
+        Field bytes = HttpServer.Request.class.getDeclaredField("bodyBytes");
+        bytes.setAccessible(true);
+        bytes.set(binary, new byte[] {(byte) 0xff, (byte) 0xd8, (byte) 0xff, (byte) 0xe0});
+        Object result = router.handle.invoke(router.instance, binary);
+        assertNotNull("POST /image matched no route", result);
+        assertEquals(Router.bodyOf(result), 200, Router.statusOf(result));
+        assertEquals("4:255", Router.bodyOf(result));
+        Object empty = router.call("POST", "/image", null);
+        assertEquals(400, Router.statusOf(empty));
+    }
+
+    @Test
     public void aNestedBodyElementOfTheWrongTypeIsAlso400() throws Exception {
         // The one-level check stopped at the outer list, because a nested
         // container is not one of the scalar types it looked for. "[[1]]" then

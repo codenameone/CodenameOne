@@ -985,26 +985,92 @@ public final class Backend {
             return cors;
         }
 
+        /// `cn1.server.error.path`: where a request nothing served is dispatched,
+        /// or null when that is off. Set once, before the server starts.
+        String errorPath;
+
         @Override
         public HttpServer.Response route(HttpServer.Request request) throws Exception {
             HttpServer.Response response = null;
+            // Whether what the chain produced is only "nothing here": no answer,
+            // or a static directory's 404 for a file that is not there.
+            boolean unserved = false;
             for (int i = 0 ; response == null && i < chain.length ; i++) {
                 response = chain[i].handle(request);
-                if (response != null && notFound != null && response.getStatus() == 404
+                if (response != null && response.getStatus() == 404
                         && chain[i] instanceof StaticFiles) {
-                    // A file that is not there is a path nothing serves, and the
-                    // application's NoHandlerFoundException handler answers it --
-                    // not the directory's plain-text 404 (issue 6240).
-                    HttpServer.Response own = notFound.notFound(request);
-                    if (own != null) {
-                        response = own;
+                    unserved = true;
+                    if (notFound != null) {
+                        // A file that is not there is a path nothing serves, and the
+                        // application's NoHandlerFoundException handler answers it --
+                        // not the directory's plain-text 404 (issue 6240).
+                        HttpServer.Response own = notFound.notFound(request);
+                        if (own != null) {
+                            response = own;
+                            unserved = false;
+                        }
                     }
                 }
             }
-            if (response == null && notFound != null) {
-                response = notFound.notFound(request);
+            if (response == null) {
+                unserved = true;
+                if (notFound != null) {
+                    response = notFound.notFound(request);
+                    unserved = response == null;
+                }
+            }
+            if (unserved && errorPath != null) {
+                HttpServer.Response page = errorPage(request, 404, "Not Found");
+                if (page != null) {
+                    response = page;
+                }
             }
             return response;
+        }
+
+        /// The application's error route's answer for `request`, which would
+        /// otherwise be answered `status`; null when no route serves the error
+        /// path. The request itself is pointed at that path for the dispatch --
+        /// not a copy, so the page sees the request's session and scoped beans --
+        /// and carries the [com.codename1.backend.web.RequestDispatcher]
+        /// attributes, as Spring Boot forwards to its error controller (issue
+        /// 6310). Only the routers are asked: a static file named like the
+        /// error path is not an error page.
+        private HttpServer.Response errorPage(HttpServer.Request request, int status,
+                                              String message) throws Exception {
+            String target = request.getTarget();
+            int query = target == null ? -1 : target.indexOf('?');
+            String path = query < 0 ? target : target.substring(0, query);
+            if (errorPath.equals(path)) {
+                // The error route itself is missing a method or failed to match:
+                // dispatching again would loop.
+                return null;
+            }
+            request.setAttribute(com.codename1.backend.web.RequestDispatcher.ERROR_STATUS_CODE,
+                    Integer.valueOf(status));
+            request.setAttribute(com.codename1.backend.web.RequestDispatcher.ERROR_REQUEST_URI, path);
+            request.setAttribute(com.codename1.backend.web.RequestDispatcher.ERROR_MESSAGE, message);
+            request.setAttribute(com.codename1.backend.web.RequestDispatcher.ERROR_METHOD,
+                    request.getMethod());
+            Object[] saved = request.retarget(errorPath);
+            HttpServer.Response page = null;
+            try {
+                for (int i = 0 ; page == null && i < chain.length ; i++) {
+                    if (!(chain[i] instanceof StaticFiles)) {
+                        page = chain[i].handle(request);
+                    }
+                }
+            } finally {
+                request.restoreTarget(saved);
+            }
+            if (page != null && page.getStatus() == 200) {
+                // A page that set no status of its own keeps the one the request
+                // earned, as a servlet error dispatch keeps the sendError status.
+                // A copy: a handler may answer every request with one object.
+                page = page.withHeaders(page.extraHeaders);
+                page.status = status;
+            }
+            return page;
         }
 
         /// A WebSocket handshake, put to the chain that guards its path. It
@@ -2367,6 +2433,8 @@ public final class Backend {
                         cors, Compression.fromConfig(config));
                 serving.forwarded = ForwardedHeaders.fromConfig(config);
                 serving.notFound = notFoundHooks;
+                String errorPath = config.get(Config.ERROR_PATH, "/error");
+                serving.errorPath = errorPath == null || errorPath.length() == 0 ? null : errorPath;
                 server = HttpServer.start(bindHost, listenPort, listenBacklog, workerCount,
                         serving, context, routes, active != null ? active : Tracing.NONE);
                 bound = true;
