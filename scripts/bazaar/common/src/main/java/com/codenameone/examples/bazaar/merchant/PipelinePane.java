@@ -164,7 +164,9 @@ final class PipelinePane extends MerchantPane {
             if (tabs != null && at >= 0 && tabs.getSelectedIndex() != at) {
                 tabs.setSelectedIndex(at, true);
             }
-        }, 4);
+            // Two to a row: eight titles with their counts do not fit four
+            // to a row on a phone.
+        }, 2);
         root.add(BorderLayout.NORTH, switcher);
         tabs = new Tabs();
         tabs.setName("pipeline-tabs");

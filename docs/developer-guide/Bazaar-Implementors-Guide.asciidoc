@@ -346,10 +346,13 @@ configured provider:
 
 [source,properties]
 ----
-bazaar.ai.provider=openai      # openai, anthropic, gemini, or url
+# openai, anthropic, gemini, or url
+bazaar.ai.provider=openai
 bazaar.ai.key=...
-bazaar.ai.model=gpt-4o-mini    # optional; each provider has a default
-bazaar.ai.url=                 # for "url": any OpenAI-compatible server
+# optional; each provider has a default
+bazaar.ai.model=gpt-4o-mini
+# for "url": any OpenAI-compatible server
+bazaar.ai.url=
 ----
 
 The assistant's tools (`AssistantTools`) run in the app over the dashboard,

@@ -106,8 +106,9 @@ public final class AiFallback {
         if (vendor.length() > 0) {
             out.append(" from ").append(vendor);
         }
-        out.append(type.length() > 0 ? " is a " + type + " made to be used every day."
-                : " is made to be used every day.");
+        // The type is a catalog heading ("Gear"), so it reads as one.
+        out.append(type.length() > 0 ? " is made to be used every day, from our " + type
+                + " range." : " is made to be used every day.");
         if (options.length() > 0) {
             out.append(" Choose from ").append(options).append('.');
         }

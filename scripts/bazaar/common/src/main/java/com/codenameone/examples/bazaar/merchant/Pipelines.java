@@ -103,7 +103,10 @@ final class Pipelines {
         List<PipelineColumnDto> ordered = ordered(columns);
         for (int iter = 0; iter < ordered.size(); iter++) {
             PipelineColumnDto c = ordered.get(iter);
-            model.addColumn(new KanbanColumn(c.id(), columnTitle(c, w)));
+            // The board counts the cards it holds itself; the total is worth
+            // saying only when more pages wait on the server.
+            model.addColumn(new KanbanColumn(c.id(), c.more() ? columnTitle(c, w)
+                    : w.tr(c.title() == null ? SalesPipeline.title(c.id()) : c.title())));
             for (int at = 0; c.cards() != null && at < c.cards().size(); at++) {
                 model.addCard(c.id(), card(c.cards().get(at), now, w));
             }

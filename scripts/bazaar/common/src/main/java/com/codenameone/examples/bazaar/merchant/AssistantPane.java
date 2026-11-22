@@ -22,6 +22,7 @@ package com.codenameone.examples.bazaar.merchant;
 import com.codename1.ai.ChatMessage;
 import com.codename1.ai.LlmClient;
 import com.codename1.components.ChatView;
+import com.codename1.ui.Form;
 import com.codename1.ui.Container;
 import com.codename1.ui.FontImage;
 import com.codename1.ui.layouts.BorderLayout;
@@ -132,6 +133,7 @@ final class AssistantPane extends MerchantPane {
                 history.add(ChatMessage.user(question));
                 history.add(ChatMessage.assistant(shown));
                 chat.addMessage(ChatMessage.assistant(shown));
+                relayout();
             }
 
             @Override
@@ -140,7 +142,19 @@ final class AssistantPane extends MerchantPane {
                 chat.setTypingIndicatorVisible(false);
                 chat.addMessage(ChatMessage.assistant(Lang.tr(
                         "The assistant is not available right now.")));
+                relayout();
             }
         });
+    }
+
+    /// Lays the whole screen out again once an answer is in: the bubble is
+    /// added while the typing indicator goes away, and a pass of the list
+    /// alone measured it one line tall with the rest of the answer scrolled
+    /// out of sight.
+    private void relayout() {
+        Form f = getComponentForm();
+        if (f != null) {
+            f.revalidate();
+        }
     }
 }

@@ -378,7 +378,7 @@ on a row.
 
 | Dashboard KPIs | &#10003; | core | core | core | core | 
 | Sales over time / breakdowns | &#10003; | core | core | core | core | 
-| Sales by channel (web, app, POS, marketplaces) | &#10003; | core | core | core | core | Counted by the database; orders placed in the app and on the website are told apart, which a web-first platform does not do for its own app.
+| Sales by channel (web, app, POS, marketplaces) | &#10003; | core | core | core | core | Counted by the database; orders placed in the app and on the website are told apart.
 | Conversion funnel | &#10003; | core | core | core | core | Product views, carts, checkouts and orders, counted by the database. Shopify's funnel starts from sessions.
 | Sales pipeline board (carts to returns) | &#10003; | no | | | | Browsing and checkout carts, reminded carts, paid, fulfilling, shipped, delivered and return requested on one Kanban board in the app. Dragging a card does the real thing -- the recovery mail, packing, shipping, delivery -- and the server refuses any other move. Shopify lists abandoned checkouts and orders on separate pages. The back office shows the same board read only.
 | Purchase-intent score per cart | &#10003; | no | | | | From product views, return visits, time on product pages, cart value and past orders, with the reasons in words on the card. Rules, not a trained model.

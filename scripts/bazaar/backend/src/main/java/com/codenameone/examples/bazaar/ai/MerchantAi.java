@@ -47,10 +47,14 @@ import java.util.Map;
 /// The provider is configured like the SMS one:
 ///
 /// ```properties
-/// bazaar.ai.provider=openai      # openai, anthropic, gemini, or url
-/// bazaar.ai.key=...              # never in the app
-/// bazaar.ai.model=gpt-4o-mini    # each provider has a default
-/// bazaar.ai.url=http://localhost:11434/v1   # for "url": any compatible server
+/// # openai, anthropic, gemini, or url
+/// bazaar.ai.provider=openai
+/// # never in the app
+/// bazaar.ai.key=...
+/// # each provider has a default
+/// bazaar.ai.model=gpt-4o-mini
+/// # for "url": any compatible server
+/// bazaar.ai.url=http://localhost:11434/v1
 /// ```
 ///
 /// With no provider the answers come from [AiFallback], rules with the same

@@ -184,6 +184,11 @@ abstract class MerchantPane extends Container {
         }
         bar.add(BorderLayout.WEST, start);
         Container end = new Container(BoxLayout.x());
+        // The tools outlive the bar: they are still inside the previous
+        // repaint's container, which removeAll only took off the bar, and
+        // adding them again while they have a parent throws. A store change
+        // repaints the bar of a pane that is already showing.
+        tools.remove();
         if (stack.isEmpty()) {
             end.add(tools);
         }
