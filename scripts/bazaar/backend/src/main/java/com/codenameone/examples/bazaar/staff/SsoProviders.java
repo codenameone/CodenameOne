@@ -434,7 +434,15 @@ public class SsoProviders implements ClientRegistrationRepository,
         if (unsafe != null) {
             throw new IOException(unsafe);
         }
-        Web.Result answer = Web.get(url);
+        // A caller header turns redirects off on both runtimes (Web follows them
+        // only for a bare request), so a 3xx cannot carry this fetch past the
+        // guard to an internal host; a discovery document is never a redirect.
+        // The guard resolves the name once and the fetch again, so a rebinding
+        // DNS answer is not covered: a production deployment fetches through
+        // an egress proxy that refuses private ranges.
+        List<String> accept = new ArrayList<String>();
+        accept.add("Accept: application/json");
+        Web.Result answer = Web.request("GET", url, accept, null);
         if (answer.getStatus() != 200) {
             throw new IOException("The provider answered " + answer.getStatus());
         }

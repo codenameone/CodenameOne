@@ -772,6 +772,13 @@ public class Orders {
                                 undo.orderLineId()});
                     }
                 }
+            } else {
+                // The card was refunded but a later leg (gift card, store credit)
+                // failed: the claims stay, since that money is gone, and the
+                // order's timeline says so for staff to settle the rest by hand.
+                event(orderId, "REFUND_INCOMPLETE", "Card refunded; the rest of " + amount
+                        + " cents failed: " + Codes.cut(String.valueOf(failed.getMessage()), 200),
+                        username);
             }
             throw failed;
         }
