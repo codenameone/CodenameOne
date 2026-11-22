@@ -308,6 +308,7 @@ public class StorefrontPages {
         ProductDto p = catalog.publicProductByHandle(store.getHandle(), productHandle);
         String path = productUrl(store.getHandle(), p.handle());
         PageMeta meta = meta(store, request, path);
+        meta.appUrl = meta.appUrl + "&product=" + SiteUrls.encode(p.handle());
         meta.type = "product";
         meta.title = (p.seoTitle() != null && p.seoTitle().length() > 0 ? p.seoTitle()
                 : p.title()) + " - " + store.getName();
@@ -723,6 +724,9 @@ public class StorefrontPages {
         page.cartUrl = "/s/" + store.getHandle() + "/cart";
         page.searchUrl = "/s/" + store.getHandle() + "/search";
         page.chatStore = store.getHandle();
+        // "Open the app" from a store's page opens that store in the app
+        // (DeepLink in the app reads it); a product page adds the product.
+        page.appUrl = "/app/?store=" + SiteUrls.encode(store.getHandle());
         page.description = describe(store.getTagline());
         try {
             // The interface language; choose() records the Vary (or the

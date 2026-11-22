@@ -407,6 +407,47 @@ async function htmlCheckout() {
   }
 }
 
+/// "Open the app" on a storefront page opens that page in the app: the store
+/// page's link names the store, a product page's the product as well, and the
+/// app follows it to the product.
+async function appDeepLink() {
+  const context = await browser.newContext({ viewport: { width: 1100, height: 900 } });
+  try {
+    const shop = await context.newPage();
+    await shop.goto(origin + '/s/littleclay', { waitUntil: 'load' });
+    await shop.screenshot({ path: path.join(out, '13-storefront-home.png') });
+    const storeLink = await shop.getAttribute('a.app-link', 'href');
+    if (storeLink !== '/app/?store=littleclay') {
+      throw new Error('the store page opens the app at ' + storeLink);
+    }
+    await shop.goto(origin + '/s/littleclay/products/speckled-morning-mug', { waitUntil: 'load' });
+    await shop.screenshot({ path: path.join(out, '14-storefront-product.png') });
+    const productLink = await shop.getAttribute('a.app-link', 'href');
+    if (productLink !== '/app/?store=littleclay&product=speckled-morning-mug') {
+      throw new Error('the product page opens the app at ' + productLink);
+    }
+    await shop.click('a.app-link');
+    const end = Date.now() + startSeconds * 1000;
+    for (;;) {
+      const found = await shop.evaluate(() => Array.from(document.querySelectorAll(
+          '#cn1-accessibility-tree [data-cn1-accessibility-id]')).some(el =>
+          el.getAttribute('role') === 'button' && el.getAttribute('aria-label') === 'Add to cart')
+          && document.body.innerText.includes('Speckled Morning Mug'));
+      if (found) {
+        break;
+      }
+      if (Date.now() > end) {
+        throw new Error('the app did not open the product the storefront linked to');
+      }
+      await shop.waitForTimeout(500);
+    }
+    await shop.screenshot({ path: path.join(out, '15-app-deep-link.png') });
+    say('"Open the app" on a product page opened that product in the app');
+  } finally {
+    await context.close();
+  }
+}
+
 let failed = null;
 try {
   say('opening ' + url);
@@ -470,8 +511,15 @@ try {
   say('a guest put a product in the cart');
   await page.waitForTimeout(800);
   await page.keyboard.press('Escape');
-  await page.goBack().catch(() => {});
   await settled();
+  // Back in history only while the product page is still up. Escape may
+  // already have closed it (it does on a taller, denser screen), and then
+  // the browser's Back leaves the app for the page before it: a blank tab
+  // with no Cart tab to find.
+  if (!(await button('Cart')())) {
+    await page.goBack().catch(() => {});
+    await settled();
+  }
   await click(await waitFor('the Cart tab', stepSeconds, button('Cart')));
   const checkout = await waitFor('the cart', stepSeconds, button('Checkout'));
   await settled();
@@ -610,6 +658,9 @@ try {
 
   // 9. The storefront's sign-up, language picker and markets.
   await storefrontExtras();
+
+  // 10. The storefront's "Open the app" link, into the app on that product.
+  await appDeepLink();
 } catch (err) {
   failed = err;
   try {

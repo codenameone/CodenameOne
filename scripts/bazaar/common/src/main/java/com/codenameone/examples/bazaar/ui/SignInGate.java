@@ -24,6 +24,7 @@ import com.codename1.ui.Form;
 import com.codename1.ui.Label;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
+import com.codename1.ui.layouts.FlowLayout;
 import com.codenameone.examples.bazaar.AppConfig;
 
 /// Where a guest is asked to sign in: only on the way to something that is
@@ -66,7 +67,9 @@ public final class SignInGate {
         box.setUIID("ShopGate");
         Label icon = new Label("", "ShopGateIcon");
         Ui.icon(icon, FontImage.MATERIAL_LOCK_OPEN, 7f);
-        box.add(icon);
+        // Centred at its own size: stretched across the column, the round
+        // badge became a wide pill.
+        box.add(FlowLayout.encloseCenter(icon));
         box.add(Ui.label(title, "ShopGateTitle"));
         box.add(Ui.text(why, "ShopGateText"));
         box.add(Ui.primary("Sign in", "signIn", e -> SignInForm.show(form)));

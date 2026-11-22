@@ -131,6 +131,10 @@ public final class Nav {
         Form home = build();
         if (home != null) {
             home.show();
+            if (SHOP.equals(homeMode)) {
+                // Opened from a store or product page of the web storefront.
+                com.codenameone.examples.bazaar.shop.DeepLink.apply();
+            }
         }
         Runnable then = pending;
         pending = null;

@@ -1358,6 +1358,11 @@ ShopFollow { color: var(--brand-contrast); background: cn1-pill-border; backgrou
 ShopFollow.pressed { background-color: var(--brand-pressed); }
 ShopFollowing { color: var(--brand); background: cn1-pill-border; background-color: var(--brand-tint); font-family: "native:MainBold"; font-size: 2.5mm; padding: 1.2mm 3mm 1.2mm 3mm; margin: 0 2.4mm 0 2.4mm; }
 ShopFollowing.pressed { background-color: var(--surface-press); }
+/* Beside the hero's "Shop all" (SvPrimary): its font, padding and margin, so both are one height. */
+ShopHeroFollow { color: var(--brand); background-color: var(--surface); border-radius: var(--radius); font-family: "native:MainBold"; font-size: 2.9mm; text-align: center; padding: 2.75mm 4mm 2.75mm 4mm; margin: 1.6mm 0 0.8mm 2mm; }
+ShopHeroFollow.pressed { background-color: var(--surface-press); }
+ShopHeroFollowing { color: var(--brand-contrast); background-color: var(--brand); border-radius: var(--radius); font-family: "native:MainBold"; font-size: 2.9mm; text-align: center; padding: 2.75mm 4mm 2.75mm 4mm; margin: 1.6mm 0 0.8mm 2mm; }
+ShopHeroFollowing.pressed { background-color: var(--brand-pressed); }
 ShopGate { background-color: transparent; text-align: center; padding: 8mm 2mm 4mm 2mm; margin: 0; }
 ShopGateIcon { color: var(--brand); background: cn1-pill-border; background-color: var(--brand-tint); text-align: center; padding: 3mm; margin: 0 0 3mm 0; }
 ShopGateTitle { color: var(--text); font-family: "native:MainBold"; font-size: 4.4mm; text-align: center; padding: 0; margin: 0; background-color: transparent; }
@@ -2610,6 +2615,10 @@ ShopReview { border-top: 1px solid var(--line); padding: 2mm 0 2mm 0; margin: 0;
     ShopFollow.pressed { background-color: var(--brand-pressed-dark); }
     ShopFollowing { color: var(--brand-dark); background-color: var(--brand-tint-dark); }
     ShopFollowing.pressed { background-color: var(--surface-press-dark); }
+    ShopHeroFollow { color: var(--brand-dark); background-color: var(--surface-dark); }
+    ShopHeroFollow.pressed { background-color: var(--surface-press-dark); }
+    ShopHeroFollowing { color: var(--brand-contrast-dark); background-color: var(--brand-dark); }
+    ShopHeroFollowing.pressed { background-color: var(--brand-pressed-dark); }
     ShopGateIcon { color: var(--brand-dark); background-color: var(--brand-tint-dark); }
     ShopGateTitle { color: var(--text-dark); }
     ShopGateText { color: var(--text-muted-dark); }

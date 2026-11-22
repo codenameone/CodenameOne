@@ -29,8 +29,10 @@ import com.codenameone.examples.bazaar.domain.CollectionProduct;
 import com.codenameone.examples.bazaar.domain.InventoryLevel;
 import com.codenameone.examples.bazaar.domain.InventoryMove;
 import com.codenameone.examples.bazaar.domain.Location;
+import com.codenameone.examples.bazaar.domain.Photo;
 import com.codenameone.examples.bazaar.domain.Product;
 import com.codenameone.examples.bazaar.domain.ProductOption;
+import com.codenameone.examples.bazaar.domain.ProductPhoto;
 import com.codenameone.examples.bazaar.domain.PurchaseLine;
 import com.codenameone.examples.bazaar.domain.PurchaseOrder;
 import com.codenameone.examples.bazaar.domain.Store;
@@ -58,9 +60,13 @@ import com.codenameone.examples.bazaar.repository.PurchaseOrderRepository;
 import com.codenameone.examples.bazaar.repository.StoreRepository;
 import com.codenameone.examples.bazaar.repository.StoreStaffRepository;
 import com.codenameone.examples.bazaar.repository.SupplierRepository;
+import com.codenameone.examples.bazaar.repository.PhotoRepository;
+import com.codenameone.examples.bazaar.repository.ProductPhotoRepository;
 import com.codenameone.examples.bazaar.repository.VariantRepository;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -71,7 +77,10 @@ import java.util.List;
 /// plentiful, low and gone, collections of both kinds, a supplier and an open
 /// purchase order.
 ///
-/// Products have no photos; the app draws a placeholder from the title.
+/// Every product has a photo, and some have two: JPEGs under
+/// `src/main/resources/seed-media`, named by the product's handle (`-2` for
+/// the second), with their provenance in `IMAGE-CREDITS.txt` beside them.
+/// Each store's hero is one of its product photos.
 /// Every opening stock level is written with a RESTOCK move beside it, so the
 /// ledger adds up from the first request. A store whose handle exists is left
 /// alone, so starting the server again adds nothing.
@@ -237,6 +246,8 @@ public class DemoStores {
     private final com.codenameone.examples.bazaar.pricing.DemoPricing pricing;
     private final com.codenameone.examples.bazaar.automation.Automations automations;
     private final com.codenameone.examples.bazaar.marketing.DemoMarketing marketing;
+    private final PhotoRepository photos;
+    private final ProductPhotoRepository gallery;
 
     public DemoStores(StoreRepository stores, StoreStaffRepository staff,
             LocationRepository locations, ProductRepository products,
@@ -249,7 +260,10 @@ public class DemoStores {
             com.codenameone.examples.bazaar.automation.Automations automations,
             RegisterRepository registers, StoreOrderRepository sales,
             OrderLineRepository saleLines,
-            com.codenameone.examples.bazaar.marketing.DemoMarketing marketing) {
+            com.codenameone.examples.bazaar.marketing.DemoMarketing marketing,
+            PhotoRepository photos, ProductPhotoRepository gallery) {
+        this.photos = photos;
+        this.gallery = gallery;
         this.marketing = marketing;
         this.registers = registers;
         this.sales = sales;
@@ -433,6 +447,7 @@ public class DemoStores {
         staff.insert(member(store, cashier, StoreAccess.CASHIER, pinHash, places.get(1).getId(),
                 "Casey Cashier"));
         List<Product> made = catalog(store, places, NORTHWIND_PRODUCTS, "NW", true);
+        hero(store, "ultralight-tent-2p-2.jpg");
         collection(store, "Staff picks", "staff-picks",
                 "What we reach for before a weekend in the hills.", "", 0,
                 pick(made, new int[] {0, 5, 10, 14, 21, 26}));
@@ -512,6 +527,7 @@ public class DemoStores {
         locations.saveAll(places);
         staff.insert(member(store, owner, StoreAccess.OWNER, "", "", "Morgan Owner"));
         List<Product> made = catalog(store, places, LITTLE_CLAY_PRODUCTS, "LC", false);
+        hero(store, "beginner-wheel-class.jpg");
         collection(store, "New arrivals", "new-arrivals", "Fresh out of the kiln this month.",
                 "", 0, pick(made, new int[] {2, 8, 17, 20, 25}));
         collection(store, "Mugs & cups", "mugs", "Something to hold your coffee or tea.",
@@ -683,12 +699,75 @@ public class DemoStores {
                 }
             }
         }
+        pictures(store, made);
         products.saveAll(made);
         options.saveAll(optionRows);
         variants.saveAll(variantRows);
         levels.saveAll(levelRows);
         moves.saveAll(moveRows);
         return made;
+    }
+
+    /// Stores each product's seed photos and makes the first its main one.
+    /// A product with no file keeps the drawn placeholder.
+    private void pictures(Store store, List<Product> made) throws IOException {
+        for (int iter = 0; iter < made.size(); iter++) {
+            Product product = made.get(iter);
+            for (int n = 1; n <= 3; n++) {
+                String id = seedPhoto(store,
+                        product.getHandle() + (n == 1 ? "" : "-" + n) + ".jpg");
+                if (id == null) {
+                    break;
+                }
+                ProductPhoto row = new ProductPhoto();
+                row.setId(Ids.next());
+                row.setProductId(product.getId());
+                row.setPhotoId(id);
+                row.setAlt(product.getTitle());
+                row.setPosition(n - 1);
+                gallery.insert(row);
+                if (n == 1) {
+                    product.setPhotoId(id);
+                }
+            }
+        }
+    }
+
+    /// The store's hero picture, from a seed file.
+    private void hero(Store store, String file) throws IOException {
+        String id = seedPhoto(store, file);
+        if (id != null) {
+            store.setHeroPhotoId(id);
+            stores.save(store);
+        }
+    }
+
+    /// Stores seed file `name` as a photo of `store` and answers its id, or
+    /// null when there is no such file.
+    private String seedPhoto(Store store, String name) throws IOException {
+        InputStream in = DemoStores.class.getResourceAsStream("/seed-media/" + name);
+        if (in == null) {
+            return null;
+        }
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        try {
+            byte[] chunk = new byte[16384];
+            int read = in.read(chunk);
+            while (read >= 0) {
+                out.write(chunk, 0, read);
+                read = in.read(chunk);
+            }
+        } finally {
+            in.close();
+        }
+        Photo row = new Photo();
+        row.setId(Ids.next());
+        row.setOwnerId(store.getId());
+        row.setContentType("image/jpeg");
+        row.setData(out.toByteArray());
+        row.setCreatedAt(Instant.now());
+        photos.insert(row);
+        return row.getId();
     }
 
     /// Opening stock: plenty at most places, a few low, a few gone.

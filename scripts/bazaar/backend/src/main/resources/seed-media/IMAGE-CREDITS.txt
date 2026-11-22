@@ -1,0 +1,432 @@
+Seed product photos for the Bazaar demo stores.
+
+Photographs: public-domain (PDM) or CC0 images found through the Openverse
+catalogue, cropped square and re-encoded. Illustrations: drawn for this sample
+with Python/PIL and released with it. No brand marks or recognizable people.
+
+alpine-softshell.jpg
+  original illustration drawn for this sample (Python/PIL)
+
+basecamp-flannel-shirt.jpg
+  original illustration drawn for this sample (Python/PIL)
+
+beginner-wheel-class-2.jpg
+  photo: Free person making pottery image
+  author: unknown
+  license: CC0 1.0
+  source: https://www.rawpixel.com/image/5907112/photo-image-light-public-domain-hands
+  file: https://images.rawpixel.com/editor_1024/cHJpdmF0ZS9zdGF0aWMvaW1hZ2Uvd2Vic2l0ZS8yMDIyLTA0L2xyL3B4NjQxNDU3LWltYWdlLWt3dnY5aXk1LmpwZw.jpg
+
+beginner-wheel-class.jpg
+  photo: person's hands crafting pottery spinning
+  author: unknown
+  license: CC0 1.0
+  source: https://www.rawpixel.com/image/3305530/free-photo-image-pottery-public-domain-cc0
+  file: https://images.rawpixel.com/editor_1024/czNmcy1wcml2YXRlL3Jhd3BpeGVsX2ltYWdlcy93ZWJzaXRlX2NvbnRlbnQvbHIvdXB3azYyMjE0MTk5LXdpa2ltZWRpYS1pbWFnZS1rb3dyeXNmZi1remVscGY0NS5qcGc.jpg
+
+berry-colander-2.jpg
+  photo: Free strawberries image
+  author: unknown
+  license: CC0 1.0
+  source: https://www.rawpixel.com/image/5919926/photo-image-public-domain-fruit-red
+  file: https://images.rawpixel.com/editor_1024/cHJpdmF0ZS9zdGF0aWMvaW1hZ2Uvd2Vic2l0ZS8yMDIyLTA0L2xyL3NrNjY1NS1pbWFnZS1rd3Z4OHE1dy5qcGc.jpg
+
+berry-colander.jpg
+  photo: Closeup mix berries bowl
+  author: unknown
+  license: CC0 1.0
+  source: https://www.rawpixel.com/image/6041032/photo-image-public-domain-blue-fruit
+  file: https://images.rawpixel.com/editor_1024/cHJpdmF0ZS9zdGF0aWMvaW1hZ2Uvd2Vic2l0ZS8yMDIyLTA0L2xyL2ZyYmVycmllc19mcnVpdHNfZnJ1aXRfMTU4NDIzNC1pbWFnZS1reWJlODYzeC5qcGc.jpg
+
+bud-vase.jpg
+  photo: A close-up, still-life photograph of a delicate bunch of off-white dried baby?s breath flowers arranged in a minimalist ceramic vase. The cream-colored vase features a single terracotta brown stripe and stands against a deep matte green wall.
+  author: Tilak Bahadur Karki
+  license: CC0 1.0
+  source: https://wordpress.org/photos/photo/4016a0c06d/
+  file: https://pd.w.org/2026/05/4016a0c06d0363686.50882683-1536x2048.jpeg
+
+butter-dish.jpg
+  original illustration drawn for this sample (Python/PIL)
+
+camp-mug.jpg
+  photo: Free mugs hanging hooks
+  author: unknown
+  license: CC0 1.0
+  source: https://www.rawpixel.com/image/5903158/photo-image-public-domain-kitchen-free
+  file: https://images.rawpixel.com/editor_1024/cHJpdmF0ZS9zdGF0aWMvaW1hZ2Uvd2Vic2l0ZS8yMDIyLTA0L2xyL3NrMTg0LWltYWdlLWt3dnVuem5oLmpwZw.jpg
+
+camp-slip-ons.jpg
+  original illustration drawn for this sample (Python/PIL)
+
+camp-style-enamel-mug.jpg
+  photo: A red enamel kettle with a lid and spout, accompanied by two matching red enamel mugs with white interiors, placed on a wooden shelf.
+  author: Nilo Velez
+  license: CC0 1.0
+  source: https://wordpress.org/photos/photo/631678ba29/
+  file: https://pd.w.org/2025/01/631678ba291de3915.98117673-2048x1366.jpg
+
+candle-in-ceramic-cup.jpg
+  original illustration drawn for this sample (Python/PIL)
+
+canyon-shorts.jpg
+  original illustration drawn for this sample (Python/PIL)
+
+cereal-bowl-2.jpg
+  photo: Elegant handcrafted ceramic bowl design
+  author: artinstitutechicago
+  license: CC0 1.0
+  source: https://www.rawpixel.com/image/8947083/bowl
+  file: https://images.rawpixel.com/editor_1024/cHJpdmF0ZS9sci9pbWFnZXMvd2Vic2l0ZS8yMDIyLTEyL2FpYzIxNDY3LWltYWdlLmpwZw.jpg
+
+cereal-bowl.jpg
+  photo: Minimalist white ceramic bowl
+  author: lacma
+  license: CC0 1.0
+  source: https://www.rawpixel.com/image/11800347/bowl
+  file: https://images.rawpixel.com/editor_1024/cHJpdmF0ZS9sci9pbWFnZXMvd2Vic2l0ZS8yMDIzLTAyL2xhY21hMjQ5MjY3LWltYWdlLmpwZw.jpg
+
+coastal-windbreaker.jpg
+  original illustration drawn for this sample (Python/PIL)
+
+convertible-trek-pants.jpg
+  original illustration drawn for this sample (Python/PIL)
+
+daypack-22l.jpg
+  photo: Backpack
+  author: unknown
+  license: CC0 1.0
+  source: https://www.rawpixel.com/image/5939166/backpack
+  file: https://images.rawpixel.com/editor_1024/czNmcy1wcml2YXRlL3Jhd3BpeGVsX2ltYWdlcy93ZWJzaXRlX2NvbnRlbnQvbHIvc2szOTk0LWltYWdlLWt3eW5vMjhmLmpwZw.jpg
+
+dinner-plate-2.jpg
+  photo: Dish (c. 1000 - c
+  author: rijksmuseum
+  license: CC0 1.0
+  source: https://www.rawpixel.com/image/13735181/dish-c-1000-1099-anonymous
+  file: https://images.rawpixel.com/editor_1024/cHJpdmF0ZS9sci9pbWFnZXMvd2Vic2l0ZS8yMDI0LTAxL2xyL3JpamtzYWstbWFrLTE3NDMtaW1hZ2UuanBn.jpg
+
+dinner-plate.jpg
+  photo: Saucer translucents rice-grain roundels (c
+  author: rijksmuseum
+  license: CC0 1.0
+  source: https://www.rawpixel.com/image/13749585/saucer-with-translucents-rice-grain-roundels-c-1700-1724-anonymous
+  file: https://images.rawpixel.com/editor_1024/cHJpdmF0ZS9sci9pbWFnZXMvd2Vic2l0ZS8yMDI0LTAxL2xyL3JpamtzYWstcmJrLTE0Nzg2LWItMS1pbWFnZS5qcGc.jpg
+
+down-sleeping-bag.jpg
+  photo: Sleeping setup in front of the sunset before a river on a bike tour.
+  author: Frank Bueltge
+  license: CC0 1.0
+  source: https://wordpress.org/photos/photo/96263d8ba7/
+  file: https://pd.w.org/2023/01/96263d8ba7bf30321.63479809-2048x1536.jpg
+
+espresso-cup-pair-2.jpg
+  photo: Coffee Australia
+  author: unknown
+  license: CC0 1.0
+  source: https://www.rawpixel.com/image/3283609/free-photo-image-espresso-coffee-beverage
+  file: https://images.rawpixel.com/editor_1024/czNmcy1wcml2YXRlL3Jhd3BpeGVsX2ltYWdlcy93ZWJzaXRlX2NvbnRlbnQvbHIvdXB3azYxNzEzNDk3LXdpa2ltZWRpYS1pbWFnZS1rb3diaTR5Zi5qcGc.jpg
+
+espresso-cup-pair.jpg
+  photo: A small white ceramic espresso cup filled with coffee sits on a matching saucer, placed on a wooden table. The photo is taken from above at a slight angle, showing the coffee?s light crema. The background is softly blurred, emphasizing the cup and saucer.
+  author: Ludwig You
+  license: CC0 1.0
+  source: https://wordpress.org/photos/photo/279694bfaa/
+  file: https://pd.w.org/2025/12/279694bfaaf03d699.11123593-2048x1536.jpeg
+
+everyday-organic-tee.jpg
+  original illustration drawn for this sample (Python/PIL)
+
+expedition-pack-60l.jpg
+  original illustration drawn for this sample (Python/PIL)
+
+gift-card-envelope.jpg
+  original illustration drawn for this sample (Python/PIL)
+
+glaze-sampler-workshop.jpg
+  photo: Clay pottery process image
+  author: unknown
+  license: CC0 1.0
+  source: https://www.rawpixel.com/image/5911709/image-public-domain-plant-art
+  file: https://images.rawpixel.com/editor_1024/czNmcy1wcml2YXRlL3Jhd3BpeGVsX2ltYWdlcy93ZWJzaXRlX2NvbnRlbnQvbHIvcHgxMjkyNTkyLWltYWdlLWt3dnZ6eWRmLmpwZw.jpg
+
+handleless-tea-cup.jpg
+  photo: Two cups tea
+  author: unknown
+  license: CC0 1.0
+  source: https://www.rawpixel.com/image/6031507/two-cups-tea-free-public-domain-cc0-photo
+  file: https://images.rawpixel.com/editor_1024/czNmcy1wcml2YXRlL3Jhd3BpeGVsX2ltYWdlcy93ZWJzaXRlX2NvbnRlbnQvbHIvZnJ0ZWFfemVuX3RlYV9jdXAtaW1hZ2Uta3liY21ra2UuanBn.jpg
+
+hanging-planter-2.jpg
+  photo: A hanging terracotta pot filled with lush, green succulent plants
+  author: shirishpoudel07
+  license: CC0 1.0
+  source: https://wordpress.org/photos/photo/47969949dc/
+  file: https://pd.w.org/2026/02/47969949dcb983674.47701364-1365x2048.jpg
+
+hanging-planter.jpg
+  photo: Hanging plant
+  author: unknown
+  license: CC0 1.0
+  source: https://www.rawpixel.com/image/3301565/free-photo-image-vine-potted-plant-hanging-plants
+  file: https://images.rawpixel.com/editor_1024/cHJpdmF0ZS9sci9pbWFnZXMvd2Vic2l0ZS8yMDIyLTA0L3Vwd2s2MTgyMDE2Ni13aWtpbWVkaWEtaW1hZ2Uta293cHU1NmMuanBn.jpg
+
+headlamp-400.jpg
+  original illustration drawn for this sample (Python/PIL)
+
+incense-holder.jpg
+  original illustration drawn for this sample (Python/PIL)
+
+insulated-water-bottle.jpg
+  photo: Metal Water Bottles
+  author: Amraepowell
+  license: CC0 1.0
+  source: https://commons.wikimedia.org/w/index.php?curid=19133709
+  file: https://upload.wikimedia.org/wikipedia/commons/4/45/Metal_Water_Bottles.jpeg
+
+merino-base-layer-crew.jpg
+  original illustration drawn for this sample (Python/PIL)
+
+merino-hiking-socks.jpg
+  photo: Free knitted socks image
+  author: unknown
+  license: CC0 1.0
+  source: https://www.rawpixel.com/image/5914326/photo-image-public-domain-pattern-free
+  file: https://images.rawpixel.com/editor_1024/czNmcy1wcml2YXRlL3Jhd3BpeGVsX2ltYWdlcy93ZWJzaXRlX2NvbnRlbnQvbHIvcHgxMDYzMzM0LWltYWdlLWt3dndlNDRoLmpwZw.jpg
+
+olive-oil-cruet-2.jpg
+  photo: Free olive oil bottle garlic
+  author: unknown
+  license: CC0 1.0
+  source: https://www.rawpixel.com/image/5927777/photo-image-background-public-domain-black
+  file: https://images.rawpixel.com/editor_1024/czNmcy1wcml2YXRlL3Jhd3BpeGVsX2ltYWdlcy93ZWJzaXRlX2NvbnRlbnQvbHIvZmY1ODkwLWltYWdlLWt3dnlpdXMyLmpwZw.jpg
+
+olive-oil-cruet.jpg
+  photo: Olive oil
+  author: unknown
+  license: CC0 1.0
+  source: https://www.rawpixel.com/image/6034466/olive-oil-free-public-domain-cc0-image
+  file: https://images.rawpixel.com/editor_1024/czNmcy1wcml2YXRlL3Jhd3BpeGVsX2ltYWdlcy93ZWJzaXRlX2NvbnRlbnQvbHIvZnJvbGl2ZV9vaWxfY2FyYWZlX3NwaWNlXzAtaW1hZ2Uta3liZDRja3QuanBn.jpg
+
+packable-rain-poncho.jpg
+  original illustration drawn for this sample (Python/PIL)
+
+pasta-bowl.jpg
+  photo: Free spaghetti image
+  author: unknown
+  license: CC0 1.0
+  source: https://www.rawpixel.com/image/5927071/photo-image-public-domain-food-white
+  file: https://images.rawpixel.com/editor_1024/czNmcy1wcml2YXRlL3Jhd3BpeGVsX2ltYWdlcy93ZWJzaXRlX2NvbnRlbnQvbHIvaXMxNTQ3MC1pbWFnZS1rd3Z5Z2o2NS5qcGc.jpg
+
+pour-over-coffee-dripper.jpg
+  photo: Drip coffee
+  author: unknown
+  license: CC0 1.0
+  source: https://www.rawpixel.com/image/3283278/free-photo-image-coffee-dessert-table
+  file: https://images.rawpixel.com/editor_1024/czNmcy1wcml2YXRlL3Jhd3BpeGVsX2ltYWdlcy93ZWJzaXRlX2NvbnRlbnQvbHIvdXB3azYxNzEzNDQwLXdpa2ltZWRpYS1pbWFnZS1rb3diYjZrby5qcGc.jpg
+
+quarter-zip-pullover.jpg
+  original illustration drawn for this sample (Python/PIL)
+
+ridge-runner-trail-shoes.jpg
+  original illustration drawn for this sample (Python/PIL)
+
+ridgeline-rain-shell.jpg
+  original illustration drawn for this sample (Python/PIL)
+
+ring-dish.jpg
+  photo: Deep Dish Design Seven Regal
+  author: unknown
+  license: CC0 1.0
+  source: https://www.rawpixel.com/image/8549986/photo-image-art-design-public-domain
+  file: https://images.rawpixel.com/editor_1024/cHJpdmF0ZS9sci9pbWFnZXMvd2Vic2l0ZS8yMDIyLTEwL3NsYW01NDk3NS1pbWFnZS5qcGc.jpg
+
+salad-bowl-large-2.jpg
+  photo: Free green salad bowl top
+  author: unknown
+  license: CC0 1.0
+  source: https://www.rawpixel.com/image/5918718/photo-image-white-background-public-domain-plant
+  file: https://images.rawpixel.com/editor_1024/czNmcy1wcml2YXRlL3Jhd3BpeGVsX2ltYWdlcy93ZWJzaXRlX2NvbnRlbnQvbHIvZmY2Njg0LWltYWdlLWt3dngweWE1LmpwZw.jpg
+
+salad-bowl-large.jpg
+  photo: Free salmon salad bowl, white
+  author: unknown
+  license: CC0 1.0
+  source: https://www.rawpixel.com/image/5919760/photo-image-background-public-domain-table
+  file: https://images.rawpixel.com/editor_1024/czNmcy1wcml2YXRlL3Jhd3BpeGVsX2ltYWdlcy93ZWJzaXRlX2NvbnRlbnQvbHIvc2s4NTUtaW1hZ2Uta3d2eDdkcnAuanBn.jpg
+
+salt-cellar.jpg
+  original illustration drawn for this sample (Python/PIL)
+
+seconds-mystery-box.jpg
+  original illustration drawn for this sample (Python/PIL)
+
+serving-platter.jpg
+  photo: 
+  author: unknown
+  license: CC0 1.0
+  source: https://www.rawpixel.com/image/5944446/free-public-domain-cc0-photo
+  file: https://images.rawpixel.com/editor_1024/czNmcy1wcml2YXRlL3Jhd3BpeGVsX2ltYWdlcy93ZWJzaXRlX2NvbnRlbnQvbHIvcHg4MjYyNzQtaW1hZ2Uta3d5b2dlc2suanBn.jpg
+
+side-plate.jpg
+  photo: Schotel van een soepkop, van
+  author: rijksmuseum
+  license: CC0 1.0
+  source: https://www.rawpixel.com/image/13748744/image-art-black-background-circle
+  file: https://images.rawpixel.com/editor_1024/cHJpdmF0ZS9sci9pbWFnZXMvd2Vic2l0ZS8yMDI0LTAxL2xyL3JpamtzYmstMTk3NS0xMTgtYi1pbWFnZS5qcGc.jpg
+
+speckled-morning-mug-2.jpg
+  photo: White ceramic mug plate table
+  author: unknown
+  license: CC0 1.0
+  source: https://www.rawpixel.com/image/3283201/free-photo-image-cafe-table-beverage
+  file: https://images.rawpixel.com/editor_1024/czNmcy1wcml2YXRlL3Jhd3BpeGVsX2ltYWdlcy93ZWJzaXRlX2NvbnRlbnQvbHIvdXB3azYxNzE2MjQ3LXdpa2ltZWRpYS1pbWFnZS1rb3diYTlqMy5qcGc.jpg
+
+speckled-morning-mug.jpg
+  photo: Ceramic mug wooden table
+  author: unknown
+  license: CC0 1.0
+  source: https://www.rawpixel.com/image/3283727/free-photo-image-coffee-table-wooden
+  file: https://images.rawpixel.com/editor_1024/cHJpdmF0ZS9sci9pbWFnZXMvd2Vic2l0ZS8yMDIyLTA1L3Vwd2s2MTc4Mjk3NS13aWtpbWVkaWEtaW1hZ2Uta293Ym40cnUuanBn.jpg
+
+succulent-pot-trio-2.jpg
+  photo: Close small cactus
+  author: Scott Webb
+  license: CC0 1.0
+  source: https://www.rawpixel.com/image/430344/free-photo-image-succulent-cactus-plant-pot
+  file: https://images.rawpixel.com/editor_1024/czNmcy1wcml2YXRlL3Jhd3BpeGVsX2ltYWdlcy93ZWJzaXRlX2NvbnRlbnQvbHIvYTAwNS1zY290dHctNTI1LmpwZw.jpg
+
+succulent-pot-trio.jpg
+  photo: Succulents pots
+  author: unknown
+  license: CC0 1.0
+  source: https://www.rawpixel.com/image/3301782/free-photo-image-house-plant-decoration-concrete-vase-cactus
+  file: https://images.rawpixel.com/editor_1024/czNmcy1wcml2YXRlL3Jhd3BpeGVsX2ltYWdlcy93ZWJzaXRlX2NvbnRlbnQvbHIvdXB3azYxODA1NjcxLXdpa2ltZWRpYS1pbWFnZS1rb3dweWpsOS5qcGc.jpg
+
+summit-down-parka.jpg
+  original illustration drawn for this sample (Python/PIL)
+
+sun-hoodie.jpg
+  original illustration drawn for this sample (Python/PIL)
+
+switchback-hiking-pants.jpg
+  original illustration drawn for this sample (Python/PIL)
+
+table-vase-2.jpg
+  photo: Elegant blue ceramic vase
+  author: unknown
+  license: CC0 1.0
+  source: https://www.rawpixel.com/image/9064149/vase
+  file: https://images.rawpixel.com/editor_1024/cHJpdmF0ZS9sci9pbWFnZXMvd2Vic2l0ZS8yMDIyLTA5L3NtaXRoc25jaHNkbTE4MTY2MzAxMDAwMDAxLWltYWdlLmpwZw.jpg
+
+table-vase.jpg
+  photo: Elegant minimalist white ceramic vase
+  author: lacma
+  license: CC0 1.0
+  source: https://www.rawpixel.com/image/11800244/jarlet
+  file: https://images.rawpixel.com/editor_1024/cHJpdmF0ZS9sci9pbWFnZXMvd2Vic2l0ZS8yMDIzLTAyL2xhY21hMjQ5MjI4LWltYWdlLmpwZw.jpg
+
+tall-latte-mug-2.jpg
+  photo: Hot coffee latte art
+  author: unknown
+  license: CC0 1.0
+  source: https://www.rawpixel.com/image/6026364/photo-image-public-domain-coffee-free
+  file: https://images.rawpixel.com/editor_1024/cHJpdmF0ZS9zdGF0aWMvaW1hZ2Uvd2Vic2l0ZS8yMDIyLTA0L2xyL2ZyY29mZmVlX211Z19tb3JuaW5nX2N1cC1pbWFnZS1reWJic3dqdS5qcGc.jpg
+
+tall-latte-mug.jpg
+  photo: Aesthetic latte art background
+  author: unknown
+  license: CC0 1.0
+  source: https://www.rawpixel.com/image/3303533/free-photo-image-coffee-beverage-brown-background
+  file: https://images.rawpixel.com/editor_1024/czNmcy1wcml2YXRlL3Jhd3BpeGVsX2ltYWdlcy93ZWJzaXRlX2NvbnRlbnQvbHIvdXB3azYxNzEzMjI5LXdpa2ltZWRpYS1pbWFnZS1rb3dxengxcC5qcGc.jpg
+
+teapot-2.jpg
+  photo: Free green ceramic teapot set
+  author: unknown
+  license: CC0 1.0
+  source: https://www.rawpixel.com/image/5915006/photo-image-public-domain-leaf-green
+  file: https://images.rawpixel.com/editor_1024/czNmcy1wcml2YXRlL3Jhd3BpeGVsX2ltYWdlcy93ZWJzaXRlX2NvbnRlbnQvbHIvcHUyMzM0MzQwLWltYWdlLWt3dndob3R5LmpwZw.jpg
+
+teapot.jpg
+  photo: 
+  author: unknown
+  license: CC0 1.0
+  source: https://www.rawpixel.com/image/5959186/free-public-domain-cc0-photo
+  file: https://images.rawpixel.com/editor_1024/czNmcy1wcml2YXRlL3Jhd3BpeGVsX2ltYWdlcy93ZWJzaXRlX2NvbnRlbnQvbHIvcHgxMjkyNjYwLWltYWdlLWt3eXFybTJ5LmpwZw.jpg
+
+thermal-leggings.jpg
+  original illustration drawn for this sample (Python/PIL)
+
+timberline-hiking-boots-2.jpg
+  photo: Hiking boots grass
+  author: unknown
+  license: CC0 1.0
+  source: https://www.rawpixel.com/image/6023116/photo-image-public-domain-nature-fashion
+  file: https://images.rawpixel.com/editor_1024/cHJpdmF0ZS9zdGF0aWMvaW1hZ2Uvd2Vic2l0ZS8yMDIyLTA0L2xyL2ZyaGlraW5nX25hdHVyZV9oaWtlX3Nob2VzLWltYWdlLWt5YmJjMGk2LmpwZw.jpg
+
+timberline-hiking-boots.jpg
+  photo: Hiking boots grass
+  author: unknown
+  license: CC0 1.0
+  source: https://www.rawpixel.com/image/6023074/photo-image-public-domain-nature-fashion
+  file: https://images.rawpixel.com/editor_1024/cHJpdmF0ZS9zdGF0aWMvaW1hZ2Uvd2Vic2l0ZS8yMDIyLTA0L2xyL2ZyaGlraW5nX3Nob2VzX25hdHVyZV9oaWtpbmctaW1hZ2Uta3liYmJxbDguanBn.jpg
+
+trailhead-fleece-jacket.jpg
+  original illustration drawn for this sample (Python/PIL)
+
+travel-tumbler.jpg
+  original illustration drawn for this sample (Python/PIL)
+
+trekking-poles-2.jpg
+  photo: Green adjustable trekking pole leaning against a slate brick wall
+  author: appealdahal
+  license: CC0 1.0
+  source: https://wordpress.org/photos/photo/7646a239c7/
+  file: https://pd.w.org/2026/06/7646a239c769fe059.85101792-1536x2048.jpg
+
+trekking-poles.jpg
+  photo: Trekking pole close photo
+  author: unknown
+  license: CC0 1.0
+  source: https://www.rawpixel.com/image/5909798/image-cloud-public-domain-blue
+  file: https://images.rawpixel.com/editor_1024/cHJpdmF0ZS9zdGF0aWMvaW1hZ2Uvd2Vic2l0ZS8yMDIyLTA0L2xyL3B4MTYwMzgwNC1pbWFnZS1rd3Z2cDJkNC5qcGc.jpg
+
+trucker-cap.jpg
+  original illustration drawn for this sample (Python/PIL)
+
+ultralight-tent-2p-2.jpg
+  photo: Blue tent camping grounds
+  author: unknown
+  license: CC0 1.0
+  source: https://www.rawpixel.com/image/5904403/photo-image-public-domain-trees-nature
+  file: https://images.rawpixel.com/editor_1024/cHJpdmF0ZS9zdGF0aWMvaW1hZ2Uvd2Vic2l0ZS8yMDIyLTA0L2xyL3B4OTM2OTU0LWltYWdlLWt3dnV1N3V5LmpwZw.jpg
+
+ultralight-tent-2p.jpg
+  photo: green orange tent camping snow
+  author: unknown
+  license: CC0 1.0
+  source: https://www.rawpixel.com/image/3295647/free-photo-image-snow-tents-advenaline-adventure
+  file: https://images.rawpixel.com/editor_1024/cHJpdmF0ZS9sci9pbWFnZXMvd2Vic2l0ZS8yMDIyLTA2L3Vwd2s2MjI3MTY0OC13aWtpbWVkaWEtaW1hZ2Uta293bW5uMm8uanBn.jpg
+
+utensil-crock.jpg
+  original illustration drawn for this sample (Python/PIL)
+
+wall-tile-set-2.jpg
+  photo: Floral ceramic tile. Original Minneapolis
+  author: unknown
+  license: CC0 1.0
+  source: https://www.rawpixel.com/image/8627108/photo-image-flower-art-vintage
+  file: https://images.rawpixel.com/editor_1024/cHJpdmF0ZS9sci9pbWFnZXMvd2Vic2l0ZS8yMDIyLTExL3BkbWlzYzctbWlhNjUzODAtaW1hZ2VfNC5qcGc.jpg
+
+wall-tile-set.jpg
+  photo: Intricate blue ceramic tile design
+  author: lacma
+  license: CC0 1.0
+  source: https://www.rawpixel.com/image/11800019/tile
+  file: https://images.rawpixel.com/editor_1024/cHJpdmF0ZS9sci9pbWFnZXMvd2Vic2l0ZS8yMDIzLTAyL2xhY21hMjA0NjIzLWltYWdlLmpwZw.jpg
+
+wool-beanie.jpg
+  photo: Cream knit hat pom pom
+  author: unknown
+  license: CC0 1.0
+  source: https://www.rawpixel.com/image/6042659/photo-image-public-domain-free
+  file: https://images.rawpixel.com/editor_1024/czNmcy1wcml2YXRlL3Jhd3BpeGVsX2ltYWdlcy93ZWJzaXRlX2NvbnRlbnQvbHIvZmw4NDg5NDkwNTAzLWltYWdlLWt5YmVoc3VhLmpwZw.jpg

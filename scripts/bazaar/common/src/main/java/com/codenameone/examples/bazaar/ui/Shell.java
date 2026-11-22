@@ -151,7 +151,10 @@ public final class Shell implements Nav.Home {
         if (wide && !DesktopMenus.nativeBar(form)) {
             form.setTitle(Lang.tr(title(mode)));
         } else {
-            form.setTitle(Lang.tr(sections.size() == 1 ? title(mode) : section.title()));
+            // The shopper's first tab is the marketplace's front page, so it
+            // carries the brand rather than the tab's own word ("Home").
+            boolean front = Nav.SHOP.equals(mode) && Sections.HOME.equals(id);
+            form.setTitle(Lang.tr(sections.size() == 1 || front ? title(mode) : section.title()));
         }
         mark();
         Ui.viewed(mode + "-" + id);

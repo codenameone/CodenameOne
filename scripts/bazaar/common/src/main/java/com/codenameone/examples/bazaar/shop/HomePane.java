@@ -58,6 +58,10 @@ final class HomePane extends ShopPane {
     private static final int FEED = 24;
     private static final int ROW = 10;
     private static final float ROW_CARD_MM = 38f;
+    /// A store card's width: narrow enough that a phone shows one and most
+    /// of the next, so the row reads as something to swipe.
+    private static final float STORE_CARD_W_MM = 40f;
+    private static final float STORE_CARD_H_MM = 20f;
 
     private ProductGrid grid;
     private final SearchQuery featured = new SearchQuery();
@@ -224,8 +228,8 @@ final class HomePane extends ShopPane {
         Container card = new Container(BoxLayout.y());
         card.setUIID("ShopStoreCard");
         Label art = new Label("", "ShopPlaceholderArt");
-        art.setPreferredH(CN.convertToPixels(24));
-        art.setPreferredW(CN.convertToPixels(56));
+        art.setPreferredH(CN.convertToPixels(STORE_CARD_H_MM));
+        art.setPreferredW(CN.convertToPixels(STORE_CARD_W_MM));
         card.add(art).add(new Label(" ", "ShopPlaceholderLine"))
                 .add(new Label(" ", "ShopPlaceholderLineShort"));
         return card;
@@ -246,8 +250,8 @@ final class HomePane extends ShopPane {
     }
 
     private Component storeCard(final StoreDto s) {
-        int w = CN.convertToPixels(56);
-        int h = CN.convertToPixels(24);
+        int w = CN.convertToPixels(STORE_CARD_W_MM);
+        int h = CN.convertToPixels(STORE_CARD_H_MM);
         Container card = new Container(new BorderLayout());
         card.setUIID("ShopStoreCard");
         Container top = new Container(new LayeredLayout());
@@ -272,14 +276,18 @@ final class HomePane extends ShopPane {
             words.add(tag);
         }
         card.add(BorderLayout.CENTER, words);
-        card.add(BorderLayout.SOUTH, followButton(s));
+        card.add(BorderLayout.SOUTH, followButton(s, false));
         card.setPreferredW(w);
         return Ui.tap(card, "store-" + s.handle(), e -> open(s));
     }
 
     /// Follow / Following for `s`. A guest is asked to sign in first.
-    private Button followButton(final StoreDto s) {
+    /// In the hero (`hero`) it sits beside "Shop all" and is sized like it.
+    private Button followButton(final StoreDto s, boolean hero) {
         final Button b = new Button("", "ShopFollow");
+        if (hero) {
+            b.putClientProperty("heroFollow", Boolean.TRUE);
+        }
         b.setName("follow-" + s.handle());
         paintFollow(b, ShopState.follows(s.id()));
         b.addActionListener(e -> SignInGate.require(b.getComponentForm(), "Follow your favourites",
@@ -297,7 +305,8 @@ final class HomePane extends ShopPane {
 
     private static void paintFollow(Button b, boolean on) {
         b.setText(Lang.tr(on ? "Following" : "Follow"));
-        b.setUIID(on ? "ShopFollowing" : "ShopFollow");
+        String prefix = b.getClientProperty("heroFollow") != null ? "ShopHero" : "Shop";
+        b.setUIID(prefix + (on ? "Following" : "Follow"));
         Ui.icon(b, on ? FontImage.MATERIAL_CHECK : FontImage.MATERIAL_ADD, 2.8f);
         if (b.getParent() != null) {
             Ui.relayout(b.getParent());
@@ -404,7 +413,7 @@ final class HomePane extends ShopPane {
         }
         Container actions = new Container(BoxLayout.x());
         actions.add(Ui.primary("Shop all", "shop-all", e -> ShopSections.search(null)));
-        actions.add(followButton(store));
+        actions.add(followButton(store, true));
         words.add(actions);
         hero.add(BorderLayout.south(words));
         hero.add(FlowLayout.encloseIn(back));
