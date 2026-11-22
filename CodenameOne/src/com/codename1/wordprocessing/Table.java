@@ -185,7 +185,8 @@ public final class Table implements Block {
         List<Float> w = new ArrayList<Float>();
         if (widths != null && widths.size() == columnCount) {
             for (Float f : widths) {
-                if (f == null || !(f.floatValue() > 0) || Float.isInfinite(f.floatValue())) {
+                float v = f == null ? 0 : f.floatValue();
+                if (v <= 0 || Float.isNaN(v) || Float.isInfinite(v)) {
                     throw new IllegalArgumentException("Column widths must be positive");
                 }
                 w.add(f);

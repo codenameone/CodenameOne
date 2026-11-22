@@ -251,4 +251,22 @@ class PageFormatsTest {
                 2, 100);
         assertEquals(50f, equal[1], 0.01f);
     }
+
+    @Test
+    void formatsWithoutPagesKeepTheText() throws IOException {
+        // HTML, Markdown, RTF and plain text have no pages to hold sections, headers or
+        // floats: the text and the pictures stay, the page features are dropped
+        Document d = sample();
+        Document.Format[] formats = {Document.Format.HTML, Document.Format.MARKDOWN,
+            Document.Format.RTF, Document.Format.TEXT};
+        for (Document.Format f : formats) {
+            String plain = roundTrip(d, f).plainText();
+            assertTrue(plain.contains("Intro text"), f + ": " + plain);
+            assertTrue(plain.contains("Two column text"), f + ": " + plain);
+            assertTrue(plain.contains("Landscape"), f + ": " + plain);
+        }
+        ByteArrayOutputStream pdf = new ByteArrayOutputStream();
+        d.write(pdf, Document.Format.PDF);
+        assertTrue(pdf.size() > 0);
+    }
 }

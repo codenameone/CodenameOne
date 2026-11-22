@@ -119,9 +119,10 @@ public class DocumentReviewScreenshotTest extends DualAppearanceBaseTest {
             total.add(b);
         }
         rows.add(total);
-        Table table = new Table("t1", rows, new ArrayList<Table.Merge>(), 1).withColumnWidths(200, 90, 90);
+        Table table = new Table("t1", rows, new ArrayList<Table.Merge>(), 1)
+                .withColumnWidths(200, 90, 90);
         RichText live = new RichText.Builder().append("Confidence: ", plain)
-                .append(new EmbeddedComponent("cn1ss-slider", "70", 140, 22, null), plain).build();
+                .append(new EmbeddedComponent("cn1ss-slider", "70", 160, 34, null), plain).build();
         List<Block> blocks = new ArrayList<Block>();
         blocks.add(para("title", "Heading1", Paragraph.NO_LIST, RichText.of("Quarterly Review",
                 plain.withBold(true).withSize(22))));

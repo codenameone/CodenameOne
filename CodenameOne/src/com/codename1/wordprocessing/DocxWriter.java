@@ -855,7 +855,8 @@ final class DocxWriter {
         int[] width = new int[columns];
         List<Float> widths = t.columnWidths();
         for (int c = 0; c < columns; c++) {
-            width[c] = widths.size() == columns ? Math.max(1, Math.round(widths.get(c).floatValue() * 20))
+            width[c] = widths.size() == columns
+                    ? Math.max(1, Math.round(widths.get(c).floatValue() * 20))
                     : 9000 / Math.max(1, columns);
         }
         b.append("<w:tbl><w:tblPr><w:tblW w:w=\"0\" w:type=\"auto\"/><w:tblBorders>");

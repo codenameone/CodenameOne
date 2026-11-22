@@ -1806,7 +1806,7 @@ final class DocxReader {
         float[] w = new float[grid.size()];
         for (int i = 0; i < w.length; i++) {
             float f = grid.get(i).floatValue();
-            if (!(f > 0) || Float.isInfinite(f)) {
+            if (f <= 0 || Float.isNaN(f) || Float.isInfinite(f)) {
                 return t;
             }
             w[i] = f;

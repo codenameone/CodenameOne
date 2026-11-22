@@ -60,6 +60,9 @@ import java.util.Map;
 /// zooms; by default a page is fitted to the view's width when it would not fit.
 public class DocumentView extends ScrollSurface implements TextInputClient {
     private static final int DESK = 0xe3e6ea;
+    /// The desk in dark mode. The pages stay white, as a word processor keeps them, so the
+    /// document looks the same printed as on screen.
+    private static final int DESK_DARK = 0x2b2e33;
     private static final int PAGE_EDGE = 0xc5cad1;
     private static final int SELECTION = 0x3d8bfd;
     private static final int CARET = 0x1f2933;
@@ -568,8 +571,12 @@ public class DocumentView extends ScrollSurface implements TextInputClient {
             paintOrder = new java.util.ArrayList<String>();
             DocumentModel.collectIds(model.getDocument().blocks, paintOrder);
         }
-        g.setColor(DESK);
-        g.fillRect(x, y, getContentWidth(), getContentHeight());
+        // null when the platform cannot tell
+        g.setColor(Boolean.TRUE.equals(Display.getInstance().isDarkMode()) ? DESK_DARK : DESK);
+        // the whole viewport, not just the pages' extent: a short document leaves the rest of
+        // it otherwise showing whatever is behind the view
+        g.fillRect(x, y, Math.max(getContentWidth(), getOffsetX() + getWidth()),
+                Math.max(getContentHeight(), getOffsetY() + getHeight()));
         DocumentLayout l = getLayout();
         float scale = getScale();
         int clipY = g.getClipY();
@@ -707,14 +714,16 @@ public class DocumentView extends ScrollSurface implements TextInputClient {
         // word; only the line's last item stops at its last glyph
         int textW = offset(it, paintLastOnLine ? rtrim(s).length() : s.length(), scale);
         int thick = Math.max(1, px / 14);
-        // a revision mark stays off the spaces at its ends: struck through, the space before a
-        // deleted word reads as no space at all ("Westrecovered")
+        // a revision mark starts after the spaces that open its run: struck through, the
+        // space before a deleted word reads as no space at all ("Westrecovered"). Words carry
+        // their own trailing spaces, so only a run's start has leading ones, and the mark
+        // stays unbroken between the words of a run
         int lead = 0;
         while (lead < s.length() && s.charAt(lead) == ' ') {
             lead++;
         }
         int markX = x + offset(it, lead, scale);
-        int markW = offset(it, rtrim(s).length(), scale) - (markX - x);
+        int markW = textW - (markX - x);
         if (st.underline || st.link != null && st.link.length() > 0) {
             g.fillRect(x, baseline + Math.max(1, px / 8), textW, thick);
         } else if (r != null && !r.isDeletion() && markW > 0) {

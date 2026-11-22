@@ -48,32 +48,43 @@ public final class Document {
     /// The file formats `read` and `write` understand.
     public enum Format {
         /// Codename One's own `.cn1doc`: a ZIP holding `document.xml`. Keeps everything the
-        /// model holds. Files written by the Codename One word processor open too; whatever
-        /// they hold beyond this model (comments, sections, revisions) is skipped.
+        /// model holds, page features included: sections, columns, headers and footers,
+        /// floating pictures, tab stops, indents and table column widths. Files written by the
+        /// Codename One word processor open too; whatever they hold beyond this model is
+        /// skipped.
         NATIVE("cn1doc"),
 
-        /// Plain UTF-8 text. Formatting is lost; tables become tab separated lines.
+        /// Plain UTF-8 text. Formatting and every page feature are lost; tables become tab
+        /// separated lines.
         TEXT("txt"),
 
         /// HTML. Reading accepts common markup, tables (with `colspan`/`rowspan`) and
-        /// `data:` URI images; writing produces a complete page.
+        /// `data:` URI images; writing produces a complete page. A web page has no pages:
+        /// sections, columns, headers and footers are dropped and a floating picture is
+        /// written in the flow of the text.
         HTML("html"),
 
-        /// Markdown with GitHub tables.
+        /// Markdown with GitHub tables. Like HTML it keeps no page features: sections,
+        /// columns, headers, footers, text wrap, tab stops and column widths are dropped.
         MARKDOWN("md"),
 
-        /// Office Open XML, the format of Word 2007 and later. Reads styles, lists, tables
-        /// with merged cells, pictures, fields, notes, comments and tracked changes; headers,
-        /// footers, text boxes and charts are skipped.
+        /// Office Open XML, the format of Word 2007 and later. Reads and writes styles,
+        /// lists, tables with merged cells and column widths, pictures inline and floating
+        /// with text wrap, fields, notes, comments, tracked changes, sections with columns,
+        /// headers and footers, tab stops and indents; text boxes and charts are skipped.
         DOCX("docx"),
 
         /// OpenDocument text, the format of LibreOffice Writer. Reads and writes styles,
-        /// lists, tables with spans, pictures, notes, annotations and tracked changes.
+        /// lists, tables with spans and column widths, pictures inline and floating with text
+        /// wrap, notes, annotations, tracked changes, sections with columns (as master pages
+        /// and text sections), headers and footers, tab stops and indents.
         ODT("odt"),
 
         /// Rich Text Format. Reads and writes character formatting, styles, lists, tables
         /// with merged cells, links, fields, notes, PNG and JPEG pictures, annotations and
-        /// tracked changes; nested tables are written as tab separated lines.
+        /// tracked changes; nested tables are written as tab separated lines. Page features
+        /// are not written: sections, columns, headers and footers are dropped and floating
+        /// pictures are written inline.
         RTF("rtf"),
 
         /// The binary format of Word 97 to 2003. Read only: styles, lists, tables with merged
