@@ -113,7 +113,9 @@ final class OrdersPane extends ShopPane {
             for (int iter = 0; o.lines() != null && iter < o.lines().size(); iter++) {
                 items += o.lines().get(iter).quantity();
             }
-            words.add(Ui.plain(Ui.day(o.createdAt()) + Ui.DOT
+            // The list comes without its lines (the detail has them): a count of
+            // nothing read "0 items" on every order.
+            words.add(Ui.plain(items == 0 ? Ui.day(o.createdAt()) : Ui.day(o.createdAt()) + Ui.DOT
                     + Lang.tr("{0} items", String.valueOf(items)), "SvRowDetail"));
             row.add(BorderLayout.CENTER, words);
             Container end = new Container(BoxLayout.y());

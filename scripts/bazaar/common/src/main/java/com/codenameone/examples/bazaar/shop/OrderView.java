@@ -21,6 +21,7 @@ package com.codenameone.examples.bazaar.shop;
 import com.codename1.appkit.Net;
 import com.codename1.ui.Button;
 import com.codename1.ui.CN;
+import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Dialog;
 import com.codename1.ui.FontImage;
@@ -117,16 +118,19 @@ final class OrderView {
             }
         }
 
-        Container actions = new Container(new GridLayout(1, 2));
+        // Side by side only where both fit: on a phone "Download invoice" and
+        // "Cancel order" were clipped to a few letters each.
+        final boolean sideBySide = com.codenameone.examples.bazaar.ui.Layouts.wide();
+        Container actions = new Container(sideBySide ? new GridLayout(1, 2) : BoxLayout.y());
         // The server renders the invoice; the app previews it, with Print,
         // Share and Save under it.
         Button invoice = Ui.secondary("Download invoice", "invoice", e ->
                 com.codenameone.examples.bazaar.docs.Pdfs.open("Invoice", "invoice-"
                         + order.number() + ".pdf", "/api/orders/" + order.id() + "/invoice.pdf"));
         FontImage.setMaterialIcon(invoice, FontImage.MATERIAL_PICTURE_AS_PDF, 3.2f);
-        actions.add(invoice);
+        actions.add(sideBySide ? cell(invoice, "SvPairLeft") : invoice);
         if (OrderSteps.cancellable(order)) {
-            actions.add(Ui.danger("Cancel order", "cancel-order", e -> {
+            Button cancel = Ui.danger("Cancel order", "cancel-order", e -> {
                 if (Dialog.show(Lang.tr("Cancel order"),
                         Lang.tr("Cancel order #{0}? Your card is not charged.",
                                 String.valueOf(order.number())),
@@ -136,7 +140,8 @@ final class OrderView {
                         changed.changed(o);
                     }, Ui::fail));
                 }
-            }));
+            });
+            actions.add(sideBySide ? cell(cancel, "SvPairRight") : cancel);
         }
         page.add(actions);
         return page;
@@ -199,7 +204,7 @@ final class OrderView {
             boolean done = iter < reached;
             Container s = new Container(BoxLayout.y());
             s.setUIID(done ? "SvStepDone" : "SvStep");
-            s.add(new Label("", done ? "SvStepBarDone" : "SvStepBar"));
+            s.add(ShopUi.stepBar(done));
             s.add(Ui.label(OrderSteps.STEPS[iter], done ? "SvStepText" : "SvStepTextTodo"));
             row.add(s);
         }
@@ -255,5 +260,13 @@ final class OrderView {
             default:
                 return s;
         }
+    }
+
+    /// One of two buttons side by side, holding its half of the gap between them.
+    private static Container cell(Component c, String uiid) {
+        Container box = new Container(new BorderLayout());
+        box.setUIID(uiid);
+        box.add(BorderLayout.CENTER, c);
+        return box;
     }
 }

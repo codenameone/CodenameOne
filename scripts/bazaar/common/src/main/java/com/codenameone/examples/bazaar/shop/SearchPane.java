@@ -22,6 +22,7 @@ import com.codename1.ui.Button;
 import com.codename1.ui.CN;
 import com.codename1.ui.Container;
 import com.codename1.ui.FontImage;
+import com.codename1.ui.Label;
 import com.codename1.ui.Form;
 import com.codename1.ui.Sheet;
 import com.codename1.ui.TextField;
@@ -115,14 +116,16 @@ final class SearchPane extends ShopPane {
     private void build() {
         removeAll();
         scoped = ShopState.inStore();
-        words.setUIID("SvSearchField");
+        // The pill is a box around the field and its magnifier, not the field
+        // itself: a hint icon sat under the caret, which drew through it.
+        words.setUIID("SvSearchInput");
+        words.getHintLabel().setUIID("SvSearchHint");
         words.setName("search");
         // Inside a store the search is that store's, with its filters; from
         // Discover it runs over every store.
         words.setHint(scoped ? Lang.tr("Search {0}", ShopState.store().name())
                 : Lang.tr("Search every store"));
         words.setText(query.q == null ? "" : query.q);
-        FontImage.setMaterialIcon(words.getHintLabel(), FontImage.MATERIAL_SEARCH);
         words.addDataChangedListener((type, index) -> {
             if (typing != null) {
                 typing.cancel();
@@ -155,7 +158,13 @@ final class SearchPane extends ShopPane {
 
         Container bar = new Container(new BorderLayout());
         bar.setUIID("ShopSearchBar");
-        bar.add(BorderLayout.CENTER, words);
+        Container box = new Container(new BorderLayout());
+        box.setUIID("SvSearchField");
+        Label glass = new Label("", "SvSearchIcon");
+        FontImage.setMaterialIcon(glass, FontImage.MATERIAL_SEARCH, 3.2f);
+        box.add(BorderLayout.WEST, glass);
+        box.add(BorderLayout.CENTER, words);
+        bar.add(BorderLayout.CENTER, box);
         Container tools = new Container(BoxLayout.x());
         if (!wide && scoped) {
             tools.add(filters);

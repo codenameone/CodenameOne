@@ -30,6 +30,7 @@ import com.codename1.ui.Label;
 import com.codename1.ui.Painter;
 import com.codename1.ui.animations.Animation;
 import com.codename1.ui.animations.Motion;
+import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.layouts.FlowLayout;
 import com.codenameone.examples.bazaar.ui.Lang;
@@ -196,5 +197,19 @@ final class ShopUi {
     /// "{0} left at {1}".
     static String left(int count, String where) {
         return Lang.tr("{0} left at {1}", String.valueOf(count), where);
+    }
+
+    /// The coloured segment over a step of a timeline. An empty label measures
+    /// nothing, so the bar the steps were drawn with never showed: this one
+    /// asks for its height.
+    static Component stepBar(boolean done) {
+        Container bar = new Container() {
+            @Override
+            protected Dimension calcPreferredSize() {
+                return new Dimension(CN.convertToPixels(4), CN.convertToPixels(1));
+            }
+        };
+        bar.setUIID(done ? "SvStepBarDone" : "SvStepBar");
+        return bar;
     }
 }

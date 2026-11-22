@@ -70,9 +70,12 @@ final class AccountPane extends ShopPane {
             page.add(Ui.person(user.displayName(), user.username(), null));
         }
         Container buttons = new Container(new GridLayout(1, 2));
-        buttons.add(Ui.secondary("Edit profile", "profile",
-                e -> ProfileForm.show(CN.getCurrentForm(), this::reload)));
-        buttons.add(Ui.secondary("Wallet", "wallet", e -> WalletForm.show(CN.getCurrentForm())));
+        Button edit = Ui.secondary("Edit profile", "profile",
+                e -> ProfileForm.show(CN.getCurrentForm(), this::reload));
+        edit.setUIID("SvPairStart");
+        Button wallet = Ui.secondary("Wallet", "wallet", e -> WalletForm.show(CN.getCurrentForm()));
+        wallet.setUIID("SvPairEnd");
+        buttons.add(edit).add(wallet);
         page.add(buttons);
 
         addresses();
@@ -165,6 +168,7 @@ final class AccountPane extends ShopPane {
         row.setUIID("ShopCodeRow");
         final TextField code = new TextField("", Lang.tr("Gift card code"), 16, TextField.ANY);
         code.setUIID("SvField");
+        code.getHintLabel().setUIID("SvFieldHint");
         code.setName("giftcard-check-code");
         final Label answer = new Label("", "SvMuted");
         answer.setName("giftcard-balance");
@@ -184,7 +188,9 @@ final class AccountPane extends ShopPane {
         };
         code.setDoneListener(e -> check.run());
         row.add(BorderLayout.CENTER, code);
-        row.add(BorderLayout.EAST, Ui.secondary("Check", "giftcard-check", e -> check.run()));
+        Button go = Ui.secondary("Check", "giftcard-check", e -> check.run());
+        go.setUIID("SvFieldButton");
+        row.add(BorderLayout.EAST, go);
         page.add(row);
         page.add(answer);
     }

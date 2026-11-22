@@ -289,8 +289,10 @@ final class CartPane extends ShopPane {
         row.setUIID("ShopCodeRow");
         final TextField field = new TextField("", Lang.tr(caption), 16, TextField.ANY);
         field.setUIID("SvField");
+        field.getHintLabel().setUIID("SvFieldHint");
         field.setName(name + "-code");
         final Button go = Ui.secondary("Apply", name + "-apply", null);
+        go.setUIID("SvFieldButton");
         Runnable submit = () -> {
             String code = field.getText().trim();
             if (code.length() == 0) {

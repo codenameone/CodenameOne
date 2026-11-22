@@ -24,6 +24,7 @@ import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.FontImage;
 import com.codename1.ui.TextField;
+import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.layouts.FlowLayout;
 import com.codenameone.examples.bazaar.api.FacetsDto;
@@ -140,9 +141,17 @@ final class FilterPanel {
                 ShopState.money(facets.maxPriceCents()), 8, TextField.DECIMAL);
         min.setUIID("SvField");
         max.setUIID("SvField");
+        min.getHintLabel().setUIID("SvFieldHint");
+        max.getHintLabel().setUIID("SvFieldHint");
         min.setName("price-min");
         max.setName("price-max");
-        row.add(min).add(max);
+        Container minBox = new Container(new BorderLayout());
+        minBox.setUIID("SvPairLeft");
+        minBox.add(BorderLayout.CENTER, min);
+        Container maxBox = new Container(new BorderLayout());
+        maxBox.setUIID("SvPairRight");
+        maxBox.add(BorderLayout.CENTER, max);
+        row.add(minBox).add(maxBox);
         panel.add(row);
         Runnable apply = () -> {
             long lo = Money.parse(min.getText());

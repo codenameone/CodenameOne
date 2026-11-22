@@ -33,7 +33,7 @@ public final class Stars {
     /// `rating` of five as stars, half stars from tenths.
     public static Container show(int ratingTenths, float size) {
         Container row = new Container(BoxLayout.x());
-        row.setUIID("ShopStars");
+        row.setUIID("ShopStarsFlush");
         for (int iter = 0; iter < 5; iter++) {
             int left = ratingTenths - iter * 10;
             char icon = left >= 8 ? FontImage.MATERIAL_STAR
@@ -53,7 +53,7 @@ public final class Stars {
     /// Five buttons; tapping the third picks three.
     public static Container pick(final int[] value, final Picked picked) {
         final Container row = new Container(BoxLayout.x());
-        row.setUIID("ShopStars");
+        row.setUIID("ShopStarsFlush");
         for (int iter = 0; iter < 5; iter++) {
             final int stars = iter + 1;
             Button b = new Button("", "ShopStarPick");

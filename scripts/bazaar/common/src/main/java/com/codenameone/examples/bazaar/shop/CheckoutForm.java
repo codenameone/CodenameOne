@@ -70,6 +70,7 @@ final class CheckoutForm {
     private AddressDto address;
     private String rateId;
     private String methodId;
+    private boolean cashPicked;
     private CartDto quoted;
     private int step;
     private boolean placing;
@@ -123,7 +124,7 @@ final class CheckoutForm {
             boolean done = iter <= step;
             Container s = new Container(BoxLayout.y());
             s.setUIID(done ? "SvStepDone" : "SvStep");
-            s.add(new Label("", done ? "SvStepBarDone" : "SvStepBar"));
+            s.add(ShopUi.stepBar(done));
             s.add(Ui.label(names[iter], done ? "SvStepText" : "SvStepTextTodo"));
             steps.add(s);
         }
@@ -169,6 +170,8 @@ final class CheckoutForm {
         Container pair = new Container(new GridLayout(1, 2));
         Container left = new Container(BoxLayout.y());
         Container right = new Container(BoxLayout.y());
+        left.setUIID("SvPairLeft");
+        right.setUIID("SvPairRight");
         region = Ui.field(left, "Region", "ship-region", "");
         postal = Ui.field(right, "Postal code", "ship-postal", "");
         region.setText(a == null ? "" : a.region());
@@ -310,11 +313,16 @@ final class CheckoutForm {
             }
         }
         for (final PaymentMethodDto m : methods) {
-            String label = m.label() != null ? m.label() : m.brand();
+            boolean cash = "cash".equals(m.kind());
+            String label = cash ? Lang.tr("Cash") : m.label() != null ? m.label() : m.brand();
             String expiry = m.expMonth() > 0 ? Lang.tr("Expires {0}/{1}",
                     String.valueOf(m.expMonth()), String.valueOf(m.expYear() % 100)) : null;
-            Container row = option(FontImage.MATERIAL_CREDIT_CARD, label, expiry,
+            Container row = option(cash ? FontImage.MATERIAL_PAYMENTS : FontImage.MATERIAL_CREDIT_CARD,
+                    label, expiry,
                     m.id().equals(methodId));
+            if (m.id().equals(methodId)) {
+                cashPicked = cash;
+            }
             paymentBox.add(Ui.tap(row, "method-" + m.id(), e -> {
                 methodId = m.id();
                 ShopUi.tap();
@@ -344,7 +352,10 @@ final class CheckoutForm {
         place.setEnabled(methodId != null && rateId != null && address != null);
         place.addActionListener(e -> place(place));
         reviewBox.add(place);
-        reviewBox.add(Ui.text("Your card is authorized now and charged when the order ships.",
+        // Cash is not authorized anywhere: say what happens to it instead.
+        reviewBox.add(Ui.text(cashPicked
+                ? "You pay in cash when the order is handed over."
+                : "Your card is authorized now and charged when the order ships.",
                 "SvMutedSmall"));
         go(Math.max(step, methodId != null ? 3 : 2));
     }

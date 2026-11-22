@@ -68,7 +68,10 @@ final class ProductForm {
     private String[] chosen = new String[3];
     private int quantity = 1;
     private final Container options = new Container(BoxLayout.y());
-    private final Container priceRow = new Container(new FlowLayout());
+    // Middle by row: the struck-out price and the badge sit on the big price's
+    // centre line, not at its top.
+    private final Container priceRow = new Container(
+            new FlowLayout(Component.LEFT, Component.CENTER, true));
     private final Label stock = new Label("", "ShopStock");
     private final Label count = new Label("1", "ShopStepValue");
     private Button add;
@@ -177,6 +180,9 @@ final class ProductForm {
         if (wide) {
             Container split = new Container(new GridLayout(1, 2));
             split.setUIID("ShopProductSplit");
+            // Beside the gallery the details keep a gap from it; stacked, they
+            // share its left edge.
+            info.setUIID("ShopProductInfoSide");
             split.add(gallery).add(info);
             page.add(split);
         } else {
@@ -300,7 +306,7 @@ final class ProductForm {
         Container head = new Container(new BorderLayout());
         Container words = new Container(BoxLayout.y());
         if (product.vendor() != null && product.vendor().length() > 0) {
-            words.add(Ui.plain(product.vendor(), "ShopVendor"));
+            words.add(Ui.plain(product.vendor(), "ShopProductVendor"));
         }
         words.add(Ui.text(product.title(), "SvTitle"));
         head.add(BorderLayout.CENTER, words);
@@ -341,6 +347,7 @@ final class ProductForm {
             rating.setName("rating");
             rating.setAccessibilityText(Lang.tr("{0} reviews", String.valueOf(product.ratingCount())));
             Container row = ShopUi.stars(product.rating(), product.ratingCount());
+            row.setUIID("ShopStarsFlush");
             Container tap = new Container(new BorderLayout());
             tap.setUIID("ShopRatingRow");
             tap.add(BorderLayout.CENTER, row);

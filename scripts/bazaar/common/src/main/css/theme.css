@@ -294,6 +294,26 @@ SvSecondary.pressed {
     background-color: var(--surface-press);
 }
 
+/* Two secondary buttons side by side keep a gap between them; a button beside a
+   field takes the field's height and stands clear of it. */
+SvPairStart, SvPairEnd, SvFieldButton {
+    color: var(--text);
+    background-color: var(--surface-alt);
+    border-radius: var(--radius);
+    font-family: "native:MainBold";
+    font-size: 2.9mm;
+    text-align: center;
+    padding: 2.75mm 4mm 2.75mm 4mm;
+}
+SvPairStart { margin: 1.6mm 1mm 0.8mm 0; }
+SvPairEnd { margin: 1.6mm 0 0.8mm 1mm; }
+/* Beside a field it is outlined like the field: the cart puts both on a recessed
+   panel, where a filled secondary button is the panel's own colour. */
+SvFieldButton { color: var(--brand); background-color: var(--surface); border: 1px solid var(--line-strong); border-radius: var(--radius); margin: 0 0 0 2mm; padding: 2.7mm 4mm 2.7mm 4mm; }
+SvPairStart.pressed, SvPairEnd.pressed { background-color: var(--surface-press); }
+SvFieldButton.pressed { background-color: var(--surface-press); border: 1px solid var(--line-strong); border-radius: var(--radius); }
+SvFieldButton.disabled { color: var(--line-strong); }
+
 SvDanger {
     color: var(--danger);
     background-color: var(--danger-tint);
@@ -364,9 +384,12 @@ SvBarButton.pressed {
 
 /* ------------------------------------------------------------------ fields */
 
+/* A field is a box with an outline, so it reads as a field on any ground --
+   the cart's code fields sit on a recessed panel the old fill vanished into. */
 SvField {
     color: var(--text);
-    background-color: var(--surface-alt);
+    background-color: var(--surface);
+    border: 1px solid var(--line-strong);
     border-radius: var(--radius);
     font-family: "native:MainRegular";
     font-size: 2.9mm;
@@ -376,11 +399,16 @@ SvField {
 
 /* The field being typed in says so. */
 SvField.selected {
-    background-color: var(--brand-tint);
+    background-color: var(--surface);
+    border: 1px solid var(--brand);
+    border-radius: var(--radius);
 }
 
 SvField.disabled {
     color: var(--text-muted);
+    background-color: var(--surface-alt);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
 }
 
 SvFieldHint {
@@ -853,6 +881,7 @@ SvOptionPicked {
     cn1-derive: SvOption;
     background-color: var(--brand-tint);
     border: 2px solid var(--brand);
+    border-radius: var(--radius);
 }
 SvOptionIcon {
     color: var(--text);
@@ -1263,7 +1292,10 @@ SvOrderRow.pressed { background-color: var(--surface-alt); }
 SvCartLine { background-color: var(--surface); border-bottom: 1px solid var(--line); padding: 2mm 0 2mm 0; margin: 0; }
 SvStepper { background: cn1-pill-border; background-color: var(--surface-alt); padding: 0 1mm 0 1mm; margin: 1.6mm 2mm 0.8mm 0; }
 SvQuantity { color: var(--text); font-family: "native:MainBold"; font-size: 2.9mm; text-align: center; padding: 2mm 1.6mm 2mm 1.6mm; margin: 0; background-color: transparent; }
-SvSearchField { color: var(--text); background: cn1-pill-border; background-color: var(--surface-alt); font-family: "native:MainRegular"; font-size: 2.9mm; padding: 2mm 3mm 2mm 3mm; margin: 0; }
+SvSearchField { color: var(--text); background: cn1-pill-border; background-color: var(--surface-alt); font-family: "native:MainRegular"; font-size: 2.9mm; padding: 0.4mm 3mm 0.4mm 2.6mm; margin: 0; }
+SvSearchIcon { color: var(--text-muted); background-color: transparent; padding: 0 1.4mm 0 0; margin: 0; }
+SvSearchInput { color: var(--text); background-color: transparent; border: none; font-family: "native:MainRegular"; font-size: 2.9mm; padding: 1.6mm 0 1.6mm 0; margin: 0; }
+SvSearchHint { color: var(--text-muted); background-color: transparent; font-family: "native:MainRegular"; font-size: 2.9mm; padding: 1.6mm 0 1.6mm 0; margin: 0; }
 SvTabBar { background-color: var(--surface); border-top: 1px solid var(--line); padding: 0.6mm 0 0.6mm 0; margin: 0; }
 SvTab { color: var(--text-muted); background-color: transparent; font-family: "native:MainRegular"; font-size: 2.05mm; text-align: center; padding: 1mm 0 1mm 0; margin: 0; }
 SvTab.pressed { color: var(--text); }
@@ -1272,8 +1304,8 @@ SvSheetTitle { color: var(--text); font-family: "native:MainBold"; font-size: 3.
 SvSteps { padding: 2mm 0 1mm 0; margin: 0; background-color: transparent; }
 SvStep { padding: 0 0.8mm 0 0.8mm; margin: 0; background-color: transparent; }
 SvStepDone { padding: 0 0.8mm 0 0.8mm; margin: 0; background-color: transparent; }
-SvStepBar { background-color: var(--line); border-radius: 0.5mm; padding: 0.5mm; margin: 0 0 1.2mm 0; }
-SvStepBarDone { background-color: var(--brand); border-radius: 0.5mm; padding: 0.5mm; margin: 0 0 1.2mm 0; }
+SvStepBar { background-color: var(--line); border-radius: 0.5mm; padding: 0; margin: 0 0 1.2mm 0; }
+SvStepBarDone { background-color: var(--brand); border-radius: 0.5mm; padding: 0; margin: 0 0 1.2mm 0; }
 SvStepText { color: var(--text); font-family: "native:MainBold"; font-size: 2.1mm; text-align: center; padding: 0; margin: 0; background-color: transparent; }
 SvStepTextTodo { color: var(--text-muted); font-family: "native:MainRegular"; font-size: 2.1mm; text-align: center; padding: 0; margin: 0; background-color: transparent; }
 SvDiscount { color: var(--success); font-family: "native:MainRegular"; font-size: 2.75mm; padding: 0; margin: 0; background-color: transparent; }
@@ -1302,12 +1334,15 @@ ShopGrid { background-color: transparent; padding: 0 1.6mm 2mm 1.6mm; margin: 0;
 SvProductCard.selected { border: 1px solid var(--brand); }
 ShopVendor { color: var(--text-muted); font-family: "native:MainRegular"; font-size: 2.1mm; padding: 0.2mm 2mm 0 2mm; margin: 0; background-color: transparent; }
 ShopPriceRow { background-color: transparent; padding: 0; margin: 0; }
-ShopCompareAt { color: var(--text-muted); font-family: "native:MainRegular"; font-size: 2.3mm; text-decoration: line-through; padding: 0.9mm 1mm 0 1mm; margin: 0; background-color: transparent; }
+ShopCompareAt { color: var(--text-muted); font-family: "native:MainRegular"; font-size: 2.3mm; text-decoration: line-through; padding: 0 1mm 0 1.4mm; margin: 0; background-color: transparent; }
 ShopPriceBig { color: var(--text); font-family: "native:MainBold"; font-size: 5mm; padding: 1mm 0 1mm 0; margin: 0; background-color: transparent; }
 ShopRibbon { color: var(--brand-contrast); background: cn1-pill-border; background-color: var(--text-muted); font-family: "native:MainBold"; font-size: 2.05mm; padding: 0.6mm 2mm 0.6mm 2mm; margin: 1.4mm; }
 ShopSale { color: var(--brand-contrast); background: cn1-pill-border; background-color: var(--danger); font-family: "native:MainBold"; font-size: 2.05mm; padding: 0.6mm 2mm 0.6mm 2mm; margin: 1.4mm; }
 ShopBadge { color: var(--brand-contrast); background: cn1-pill-border; background-color: var(--danger); font-family: "native:MainBold"; font-size: 1.8mm; padding: 0.3mm 1mm 0.3mm 1mm; margin: 0; }
 ShopStars { background-color: transparent; padding: 0.4mm 2mm 0 2mm; margin: 0; }
+/* Stars on a page share its text edge; only a card insets them. */
+ShopStarsFlush { background-color: transparent; padding: 0.4mm 0 0 0; margin: 0; }
+ShopProductVendor { color: var(--text-muted); font-family: "native:MainRegular"; font-size: 2.3mm; padding: 0.2mm 0 0 0; margin: 0; background-color: transparent; }
 ShopStar { color: var(--warning); background-color: transparent; padding: 0; margin: 0; }
 ShopPlaceholderArt { background-color: var(--surface-alt); border-radius: var(--radius-small); padding: 0; margin: 0 0 1.6mm 0; }
 ShopPlaceholderLine { background-color: var(--surface-alt); border-radius: 0.6mm; font-size: 2mm; padding: 0; margin: 0.6mm 2mm 0.6mm 2mm; }
@@ -1399,7 +1434,8 @@ ShopScanTitle { color: var(--text); font-family: "native:MainRegular"; font-size
 ShopScanTitleNow { color: var(--text); font-family: "native:MainBold"; font-size: 2.75mm; padding: 0; margin: 0; background-color: transparent; }
 ShopScanDetail { color: var(--text-muted); font-family: "native:MainRegular"; font-size: 2.1mm; padding: 0.3mm 0 2mm 0; margin: 0; background-color: transparent; }
 ShopProductSplit { background-color: transparent; padding: 0; margin: 0; }
-ShopProductInfo { background-color: transparent; padding: 2mm 0 0 3mm; margin: 0; }
+ShopProductInfo { background-color: transparent; padding: 2mm 0 0 0; margin: 0; }
+ShopProductInfoSide { background-color: transparent; padding: 0 0 0 4mm; margin: 0; }
 ShopThumb { background-color: transparent; border-radius: var(--radius-small); padding: 0 2.4mm 0 0; margin: 0; }
 ShopSummary { background-color: var(--surface-alt); border-radius: var(--radius); padding: 3mm; margin: 2mm 0 2mm 0; }
 ShopCodeRow { background-color: transparent; padding: 0.8mm 0 0.8mm 0; margin: 0; }
@@ -1450,7 +1486,7 @@ MeAccentTagline { color: var(--brand-contrast); background-color: transparent; f
 
 
 @media (prefers-color-scheme: dark) {
-    SvProductCard { background-color: var(--surface-dark); border: 1px solid var(--line-dark); }
+    SvProductCard { background-color: var(--surface-dark); border: 1px solid var(--line-dark); border-radius: var(--radius); }
     SvProductCard.pressed { background-color: var(--surface-alt-dark); }
     SvProductPhoto { background-color: var(--surface-alt-dark); }
     SvProductName { color: var(--text-dark); }
@@ -1478,6 +1514,11 @@ MeAccentTagline { color: var(--brand-contrast); background-color: transparent; f
     SvPrimary.disabled { color: var(--text-muted-dark); background-color: var(--surface-press-dark); }
     SvSecondary { color: var(--text-dark); background-color: var(--surface-alt-dark); }
     SvSecondary.pressed { background-color: var(--surface-press-dark); }
+    SvPairStart, SvPairEnd { color: var(--text-dark); background-color: var(--surface-alt-dark); }
+    SvPairStart.pressed, SvPairEnd.pressed { background-color: var(--surface-press-dark); }
+    SvFieldButton { color: var(--brand-dark); background-color: var(--surface-alt-dark); border: 1px solid var(--line-strong-dark); border-radius: var(--radius); }
+    SvFieldButton.pressed { background-color: var(--surface-press-dark); border: 1px solid var(--line-strong-dark); border-radius: var(--radius); }
+    SvFieldButton.disabled { color: var(--line-strong-dark); }
     SvDanger { color: var(--danger-dark); background-color: var(--danger-tint-dark); }
     SvDanger.pressed { background-color: var(--surface-press-dark); }
     SvLink { color: var(--brand-dark); }
@@ -1486,7 +1527,7 @@ MeAccentTagline { color: var(--brand-contrast); background-color: transparent; f
     SvMapButton.pressed { background: cn1-round-border; background-color: var(--surface-alt-dark); }
     SvBarButton { background: cn1-round-border; color: var(--text-dark); background-color: var(--surface-dark); }
     SvBarButton.pressed { background: cn1-round-border; background-color: var(--surface-alt-dark); }
-    SvField { color: var(--text-dark); background-color: var(--surface-alt-dark); }
+    SvField { color: var(--text-dark); background-color: var(--surface-alt-dark); border: 1px solid var(--line-strong-dark); border-radius: var(--radius); }
     SvFieldHint { color: var(--text-muted-dark); }
     SvRow { background-color: var(--surface-dark); border-bottom: 1px solid var(--line-dark); }
     SvRow.pressed { background-color: var(--surface-alt-dark); }
@@ -1539,7 +1580,7 @@ MeAccentTagline { color: var(--brand-contrast); background-color: transparent; f
     SvBannerTitle { color: var(--text-dark); }
     SvBannerText { color: var(--text-muted-dark); }
     SvAmount { color: var(--text-dark); }
-    SvTile { background-color: var(--surface-dark); border: 1px solid var(--line-dark); }
+    SvTile { background-color: var(--surface-dark); border: 1px solid var(--line-dark); border-radius: var(--radius); }
     SvChart { color: var(--brand-dark); }
     SvChartPeak { color: var(--brand-pressed-dark); }
     SvChartGrid { color: var(--line-dark); }
@@ -1548,9 +1589,9 @@ MeAccentTagline { color: var(--brand-contrast); background-color: transparent; f
     SvMeter { color: var(--brand-dark); }
     SvAlert { color: var(--warning-dark); background-color: var(--warning-tint-dark); }
     SvAlert.pressed { background-color: var(--surface-press-dark); }
-    SvOption { background-color: var(--surface-dark); border: 1px solid var(--line-dark); }
+    SvOption { background-color: var(--surface-dark); border: 1px solid var(--line-dark); border-radius: var(--radius); }
     SvOption.pressed { background-color: var(--surface-alt-dark); }
-    SvOptionPicked { background-color: var(--brand-tint-dark); border: 2px solid var(--brand-dark); }
+    SvOptionPicked { background-color: var(--brand-tint-dark); border: 2px solid var(--brand-dark); border-radius: var(--radius); }
     SvOptionIcon { color: var(--text-dark); }
     SvCardFace { background-color: var(--brand-dark); }
     SvCardBrand { color: var(--brand-contrast-dark); }
@@ -1571,8 +1612,8 @@ MeAccentTagline { color: var(--brand-contrast); background-color: transparent; f
     SvPaneTitle { color: var(--text-dark); }
     SvRowPicked { background-color: var(--surface-alt-dark); }
     SvSecondary.disabled, SvDanger.disabled, SvLink.disabled { color: var(--line-strong-dark); }
-    SvField.selected { background-color: var(--brand-tint-dark); }
-    SvField.disabled { color: var(--text-muted-dark); }
+    SvField.selected { background-color: var(--surface-alt-dark); border: 1px solid var(--brand-dark); border-radius: var(--radius); }
+    SvField.disabled { color: var(--text-muted-dark); background-color: var(--surface-dark); border: 1px solid var(--line-dark); border-radius: var(--radius); }
     Switch { color: #ffffff; background-color: var(--line-strong-dark); }
     Switch.selected { color: #ffffff; background-color: var(--brand-dark); }
     Switch.disabled { color: var(--text-muted-dark); background-color: var(--line-dark); }
@@ -1629,9 +1670,12 @@ MeAccentTagline { color: var(--brand-contrast); background-color: transparent; f
     SvOrderRow { background-color: var(--surface-dark); border-bottom: 1px solid var(--line-dark); }
     SvOrderRow.pressed { background-color: var(--surface-alt-dark); }
     SvCartLine { background-color: var(--surface-dark); border-bottom: 1px solid var(--line-dark); }
-    SvStepper { background-color: var(--surface-alt-dark); }
+    SvStepper { background: cn1-pill-border; background-color: var(--surface-alt-dark); }
     SvQuantity { color: var(--text-dark); }
-    SvSearchField { color: var(--text-dark); background-color: var(--surface-alt-dark); }
+    SvSearchField { background: cn1-pill-border; color: var(--text-dark); background-color: var(--surface-alt-dark); }
+    SvSearchIcon { color: var(--text-muted-dark); }
+    SvSearchInput { color: var(--text-dark); }
+    SvSearchHint { color: var(--text-muted-dark); }
     SvTabBar { background-color: var(--surface-dark); border-top: 1px solid var(--line-dark); }
     SvTab { color: var(--text-muted-dark); }
     SvTab.pressed { color: var(--text-dark); }
@@ -1643,19 +1687,20 @@ MeAccentTagline { color: var(--brand-contrast); background-color: transparent; f
     SvDiscount { color: var(--success-dark); }
     SvTotal { color: var(--text-dark); }
 
-    ShopHeaderButton.pressed { background-color: var(--brand-pressed-dark); }
+    ShopHeaderButton.pressed { background: cn1-pill-border; background-color: var(--brand-pressed-dark); }
     ShopHero { background-color: var(--surface-alt-dark); }
     ShopSectionTitle { color: var(--text-dark); }
     ShopCollection { background-color: var(--surface-alt-dark); }
     ShopCollection.pressed { background-color: var(--surface-press-dark); }
     ShopScroller { background-color: var(--surface-dark); }
-    SvProductCard.selected { border: 1px solid var(--brand-dark); }
+    SvProductCard.selected { border: 1px solid var(--brand-dark); border-radius: var(--radius); }
     ShopVendor { color: var(--text-muted-dark); }
+    ShopProductVendor { color: var(--text-muted-dark); }
     ShopCompareAt { color: var(--text-muted-dark); }
     ShopPriceBig { color: var(--text-dark); }
-    ShopRibbon { color: var(--brand-contrast-dark); background-color: var(--text-muted-dark); }
-    ShopSale { color: var(--brand-contrast-dark); background-color: var(--danger-dark); }
-    ShopBadge { color: var(--brand-contrast-dark); background-color: var(--danger-dark); }
+    ShopRibbon { background: cn1-pill-border; color: var(--brand-contrast-dark); background-color: var(--text-muted-dark); }
+    ShopSale { background: cn1-pill-border; color: var(--brand-contrast-dark); background-color: var(--danger-dark); }
+    ShopBadge { background: cn1-pill-border; color: var(--brand-contrast-dark); background-color: var(--danger-dark); }
     ShopStar { color: var(--warning-dark); }
     ShopPlaceholderArt { background-color: var(--surface-alt-dark); }
     ShopPlaceholderLine { background-color: var(--surface-alt-dark); }
@@ -1664,7 +1709,7 @@ MeAccentTagline { color: var(--brand-contrast); background-color: transparent; f
     ShopStoreRow.pressed { background-color: var(--surface-alt-dark); }
     ShopSearchBar { background-color: var(--surface-dark); border-bottom: 1px solid var(--line-dark); }
     ShopToolButton { color: var(--text-dark); }
-    ShopToolButton.pressed { background-color: var(--surface-press-dark); }
+    ShopToolButton.pressed { background: cn1-pill-border; background-color: var(--surface-press-dark); }
     ShopFilterOn { background-color: var(--brand-tint-dark); }
     ShopFilterSide { background-color: var(--surface-alt-dark); border-right: 1px solid var(--line-dark); }
     ShopFilterTitle { color: var(--text-muted-dark); }
@@ -1679,7 +1724,7 @@ MeAccentTagline { color: var(--brand-contrast); background-color: transparent; f
     ShopStockLow { color: var(--warning-dark); }
     ShopStockOut { color: var(--danger-dark); }
     ShopIconButton { color: var(--text-dark); }
-    ShopIconButton.pressed { background-color: var(--surface-press-dark); }
+    ShopIconButton.pressed { background: cn1-pill-border; background-color: var(--surface-press-dark); }
     ShopQtyLabel { color: var(--text-dark); }
     ShopStepper { background-color: var(--surface-dark); border: 1px solid var(--line-strong-dark); border-radius: var(--radius); padding: 0; margin: 0; }
     ShopStepButton, ShopStepButton.selected { color: var(--text-dark); background-color: transparent; text-align: center; padding: 1.8mm 2.4mm 1.8mm 2.4mm; margin: 0; }
@@ -1705,23 +1750,23 @@ MeAccentTagline { color: var(--brand-contrast); background-color: transparent; f
     MeStore { color: var(--brand-dark); background-color: var(--brand-tint-dark); }
     MeStore.pressed { background-color: var(--surface-press-dark); }
     MePage { background-color: var(--surface-alt-dark); }
-    MeCard { background-color: var(--surface-dark); border: 1px solid var(--line-dark); }
+    MeCard { background-color: var(--surface-dark); border: 1px solid var(--line-dark); border-radius: var(--radius); }
     MeListRow { background-color: var(--surface-dark); border-bottom: 1px solid var(--line-dark); }
     MeListRow.pressed { background-color: var(--surface-press-dark); }
-    MeTile { background-color: var(--surface-dark); border: 1px solid var(--line-dark); }
+    MeTile { background-color: var(--surface-dark); border: 1px solid var(--line-dark); border-radius: var(--radius); }
     MeTileCaption { color: var(--text-muted-dark); }
     MeTileValue { color: var(--text-dark); }
     MeSpark { color: var(--brand-dark); }
     MeFilters { background-color: var(--surface-dark); border-bottom: 1px solid var(--line-dark); }
-    MeFilter { color: var(--text-dark); background-color: var(--surface-alt-dark); border: 1px solid var(--line-dark); }
-    MeSearch { color: var(--text-dark); background-color: var(--surface-alt-dark); border: 1px solid var(--line-dark); }
+    MeFilter { color: var(--text-dark); background-color: var(--surface-alt-dark); border: 1px solid var(--line-dark); border-radius: var(--radius-small); }
+    MeSearch { color: var(--text-dark); background-color: var(--surface-alt-dark); border: 1px solid var(--line-dark); border-radius: var(--radius-small); }
     MeBulk { background-color: var(--brand-tint-dark); }
     MeBulkText { color: var(--brand-dark); }
     MeTimelineDot { color: var(--brand-dark); }
     MeThumb { background-color: var(--surface-alt-dark); }
-    MeDrop { color: var(--text-muted-dark); background-color: var(--surface-alt-dark); border: 1px solid var(--line-strong-dark); }
+    MeDrop { color: var(--text-muted-dark); background-color: var(--surface-alt-dark); border: 1px solid var(--line-strong-dark); border-radius: var(--radius); }
     MeLowStock { color: var(--danger-dark); }
-    MeSwatch { border: 1px solid var(--line-strong-dark); }
+    MeSwatch { border: 1px solid var(--line-strong-dark); border-radius: var(--radius-small); }
 }
 
 /* Fulfilment board (phone column lists), carrier quotes and document previews. */
@@ -1733,12 +1778,12 @@ DocActions { background-color: var(--surface); border-top: 1px solid var(--line)
 DocDrag { color: var(--text-muted); background-color: var(--surface-alt); border: 1px solid var(--line); border-radius: var(--radius); padding: 1.6mm 2.4mm 1.6mm 2.4mm; margin: 0 0 0 1.6mm; font-size: 2.6mm; }
 
 @media (prefers-color-scheme: dark) {
-    FuCard { background-color: var(--surface-dark); border: 1px solid var(--line-dark); }
+    FuCard { background-color: var(--surface-dark); border: 1px solid var(--line-dark); border-radius: var(--radius); }
     FuCard.pressed { background-color: var(--surface-press-dark); }
     FuChip { color: var(--brand-dark); background-color: var(--brand-tint-dark); }
     FuRate { background-color: var(--surface-dark); border-bottom: 1px solid var(--line-dark); }
     DocActions { background-color: var(--surface-dark); border-top: 1px solid var(--line-dark); }
-    DocDrag { color: var(--text-muted-dark); background-color: var(--surface-alt-dark); border: 1px solid var(--line-dark); }
+    DocDrag { color: var(--text-muted-dark); background-color: var(--surface-alt-dark); border: 1px solid var(--line-dark); border-radius: var(--radius); }
 }
 
 /* Point of sale */
@@ -2583,8 +2628,8 @@ MeCode { color: var(--text); background-color: var(--surface-alt); font-family: 
 MeMediaRow { padding: 1.2mm 0 1.2mm 0; margin: 0; border-bottom: 1px solid var(--line); }
 MeMediaThumb { color: var(--text-muted); background-color: var(--surface-alt); border-radius: var(--radius); padding: 1mm; margin: 0 2mm 0 0; }
 ShopStarPick { color: #f59e0b; background-color: transparent; padding: 0.6mm; margin: 0; }
-ShopReviewSummary { padding: 1.6mm 0 2mm 0; margin: 0; }
-ShopReviewAverage { color: var(--text); font-family: "native:MainBold"; font-size: 6mm; padding: 0; margin: 0 3mm 0 0; }
+ShopReviewSummary { background-color: transparent; padding: 1.6mm 0 2mm 0; margin: 0; }
+ShopReviewAverage { background-color: transparent; color: var(--text); font-family: "native:MainBold"; font-size: 6mm; padding: 0; margin: 0 3mm 0 0; }
 ShopReviewTrack { background-color: var(--surface-alt); border-radius: 0.6mm; padding: 0; margin: 0.8mm 1.4mm 0.8mm 1.4mm; }
 ShopReviewFill { background-color: #f59e0b; border-radius: 0.6mm; padding: 0.6mm 0 0.6mm 0; margin: 0; }
 ShopReview { background-color: transparent; border-top: 1px solid var(--line); padding: 2mm 0 2mm 0; margin: 0; }
@@ -2627,8 +2672,8 @@ ShopRatingMore { color: var(--brand); font-family: "native:MainBold"; font-size:
     MeFunnelBox { background-color: var(--brand-tint-dark); color: var(--brand-dark); }
     MeMeter { color: var(--brand-dark); background-color: var(--surface-alt-dark); }
     MeBreakRow { border-bottom: 1px solid var(--line-dark); }
-    MeChip { color: var(--text-dark); background-color: var(--surface-dark); border: 1px solid var(--line-strong-dark); }
-    MeChipOn { color: var(--brand-contrast-dark); background-color: var(--brand-dark); border: 1px solid var(--brand-dark); }
+    MeChip { color: var(--text-dark); background-color: var(--surface-dark); border: 1px solid var(--line-strong-dark); border-radius: 3mm; }
+    MeChipOn { color: var(--brand-contrast-dark); background-color: var(--brand-dark); border: 1px solid var(--brand-dark); border-radius: 3mm; }
     MeCode { color: var(--text-dark); background-color: var(--surface-alt-dark); }
     MeMediaRow { border-bottom: 1px solid var(--line-dark); }
     MeMediaThumb { color: var(--text-muted-dark); background-color: var(--surface-alt-dark); }
@@ -2643,16 +2688,16 @@ ShopRatingMore { color: var(--brand); font-family: "native:MainBold"; font-size:
     ShopDiscoverHead { background-color: var(--brand-tint-dark); }
     ShopDiscoverTitle { color: var(--text-dark); }
     ShopDiscoverText { color: var(--text-muted-dark); }
-    ShopSearchPill { color: var(--text-muted-dark); background-color: var(--surface-dark); border: 1px solid var(--line-strong-dark); }
+    ShopSearchPill { background: cn1-pill-border; color: var(--text-muted-dark); background-color: var(--surface-dark); border: 1px solid var(--line-strong-dark); }
     ShopSearchPill.pressed { background-color: var(--surface-press-dark); }
-    ShopStoreCard { background-color: var(--surface-dark); border: 1px solid var(--line-dark); }
+    ShopStoreCard { background-color: var(--surface-dark); border: 1px solid var(--line-dark); border-radius: var(--radius); }
     ShopStoreCard.pressed { background-color: var(--surface-alt-dark); }
     ShopStoreCardLogo { background-color: var(--surface-dark); }
     ShopStoreCardName { color: var(--text-dark); }
     ShopStoreCardTag { color: var(--text-muted-dark); }
-    ShopFollow { color: var(--brand-contrast-dark); background-color: var(--brand-dark); }
+    ShopFollow { background: cn1-pill-border; color: var(--brand-contrast-dark); background-color: var(--brand-dark); }
     ShopFollow.pressed { background-color: var(--brand-pressed-dark); }
-    ShopFollowing { color: var(--brand-dark); background-color: var(--brand-tint-dark); }
+    ShopFollowing { background: cn1-pill-border; color: var(--brand-dark); background-color: var(--brand-tint-dark); }
     ShopFollowing.pressed { background-color: var(--surface-press-dark); }
     ShopHeroFollow { color: var(--brand-dark); background-color: var(--surface-dark); }
     ShopHeroFollow.pressed { background-color: var(--surface-press-dark); }
@@ -2662,8 +2707,8 @@ ShopRatingMore { color: var(--brand); font-family: "native:MainBold"; font-size:
     ShopGateTitle { color: var(--text-dark); }
     ShopGateText { color: var(--text-muted-dark); }
     ShopParcel { background-color: var(--surface-alt-dark); }
-    ShopScanDot { background-color: var(--line-strong-dark); }
-    ShopScanDotNow { background-color: var(--brand-dark); }
+    ShopScanDot { background: cn1-pill-border; background-color: var(--line-strong-dark); }
+    ShopScanDotNow { background: cn1-pill-border; background-color: var(--brand-dark); }
     ShopScanLine { background-color: var(--line-strong-dark); }
     ShopScanTitle { color: var(--text-dark); }
     ShopScanTitleNow { color: var(--text-dark); }
