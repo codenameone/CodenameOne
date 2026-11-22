@@ -110,6 +110,79 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
     String functionName(String function) {
         return "LENGTH".equals(function) && "mysql".equals(sql.dialect()) ? "CHAR_LENGTH" : function;
     }
+    /// JPQL CONCAT. `||` where it is concatenation; MySQL parses `||` as OR,
+    /// so it gets CONCAT(), which answers NULL for a NULL operand exactly as
+    /// `||` does. (PostgreSQL's own concat() skips NULLs, so it is not used.)
+    String concat(String[] values) {
+        boolean mysql = "mysql".equals(sql.dialect());
+        StringBuilder out = new StringBuilder(mysql ? "CONCAT(" : "(");
+        for (int i = 0; i < values.length; i++) {
+            if (i > 0) {
+                out.append(mysql ? ", " : " || ");
+            }
+            out.append(values[i]);
+        }
+        return out.append(')').toString();
+    }
+    /// JPQL SUBSTRING(value, start[, length]), 1-based. PostgreSQL's substr
+    /// takes INTEGER positions, and a bound number is typed BIGINT.
+    String substring(String value, String start, String length) {
+        boolean postgres = "postgresql".equals(sql.dialect());
+        StringBuilder out = new StringBuilder("SUBSTR(").append(value).append(", ")
+                .append(position(start, postgres));
+        if (length != null) {
+            out.append(", ").append(position(length, postgres));
+        }
+        return out.append(')').toString();
+    }
+    /// JPQL LOCATE(search, value[, start]): the 1-based position of `search`
+    /// in `value` at or after `start`, 0 when it is not there. MySQL has it;
+    /// SQLite and PostgreSQL search with instr/strpos, which take no start.
+    String locate(String search, String value, String start) {
+        String dialect = sql.dialect();
+        if ("mysql".equals(dialect)) {
+            return "LOCATE(" + search + ", " + value + (start == null ? "" : ", " + start) + ")";
+        }
+        boolean postgres = "postgresql".equals(dialect);
+        if (start == null) {
+            return postgres ? "CAST(STRPOS(" + value + ", " + search + ") AS BIGINT)"
+                    : "instr(" + value + ", " + search + ")";
+        }
+        String from = position(start, postgres);
+        String tail = "SUBSTR(" + value + ", " + from + ")";
+        String found = postgres ? "STRPOS(" + tail + ", " + search + ")" : "instr(" + tail + ", " + search + ")";
+        String located = "(CASE WHEN " + found + " = 0 THEN 0 ELSE " + found + " + " + from + " - 1 END)";
+        return postgres ? "CAST(" + located + " AS BIGINT)" : located;
+    }
+    private static String position(String value, boolean postgres) {
+        return postgres ? "CAST(" + value + " AS INTEGER)" : value;
+    }
+    /// FLOOR, CEILING and ROUND of a REAL operand, as a REAL. ROUND rounds half
+    /// away from zero on every dialect -- SQLite's round() does, and PostgreSQL
+    /// and MySQL do it for exact numerics, so the double goes through NUMERIC /
+    /// DECIMAL there rather than their round-half-even double paths. SQLite's
+    /// platform builds have no FLOOR or CEILING, so both are spelled with a
+    /// truncating cast.
+    String roundingFunction(String function, String value, int digits) {
+        String dialect = sql.dialect();
+        if ("sqlite".equals(dialect)) {
+            if ("ROUND".equals(function)) {
+                return "round(" + value + ", " + digits + ")";
+            }
+            String truncated = "CAST(" + value + " AS INTEGER)";
+            boolean floor = "FLOOR".equals(function);
+            return "CAST((CASE WHEN " + value + (floor ? " < " : " > ") + truncated + " THEN " + truncated
+                    + (floor ? " - 1" : " + 1") + " ELSE " + truncated + " END) AS REAL)";
+        }
+        if ("ROUND".equals(function)) {
+            if ("mysql".equals(dialect)) {
+                return "(1e0 * ROUND(CAST(" + value + " AS DECIMAL(65,15)), " + digits + "))";
+            }
+            return "CAST(ROUND(CAST(" + value + " AS NUMERIC), " + digits + ") AS DOUBLE PRECISION)";
+        }
+        String rounded = function + "(" + value + ")";
+        return "mysql".equals(dialect) ? "(1e0 * " + rounded + ")" : rounded;
+    }
     String numericOperand(String value, int kind) {
         if ("postgresql".equals(sql.dialect())) {
             return "CAST(" + value + " AS " + (kind == Attribute.REAL ? "DOUBLE PRECISION" : "BIGINT") + ")";

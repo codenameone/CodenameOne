@@ -61,6 +61,7 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
         boolean found = false;
         for (Object binding : plan.bindings) {
             if (binding instanceof Parameter && ((Parameter) binding).name.equals(name)
+                    || binding instanceof NullTest && ((NullTest) binding).name.equals(name)
                     || binding instanceof LikeBinding && ((LikeBinding) binding).uses(name)) {
                 found = true;
             }
@@ -220,6 +221,13 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                 // Keep untyped, unmapped NULL valid in COUNT(NULL) and similar SQL.
                 statement.setLength(statement.length() - 1);
                 statement.append("NULL");
+            } else if (binding instanceof NullTest) {
+                NullTest test = (NullTest) binding;
+                if (!parameters.containsKey(test.name)) {
+                    throw new IllegalArgumentException("Unbound named parameter: " + test.name);
+                }
+                boolean isNull = parameters.get(test.name) == null;
+                values.add(Long.valueOf(isNull != test.not ? 1 : 0));
             } else if (binding instanceof LikeBinding) {
                 LikeBinding like = (LikeBinding) binding;
                 Object pattern = boundValue(like.pattern);
@@ -289,6 +297,15 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
         }
         Object convert() {
             return query == null ? Values.storage(value) : query.parameter(field, value);
+        }
+    }
+    /// `:name IS [NOT] NULL`, answered from the bound value; see compare().
+    private static final class NullTest {
+        final String name;
+        final boolean not;
+        NullTest(String name, boolean not) {
+            this.name = name;
+            this.not = not;
         }
     }
     private static final class LikeBinding {
@@ -851,6 +868,18 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
             }
             Expr left = add();
             if (take("IS")) {
+                if (left.kind < 0 && left.parameter != null && left.parameter.marker == null) {
+                    // A bare parameter has no storage kind to type "? IS NULL"
+                    // with -- PostgreSQL refuses an untyped parameter there -- but
+                    // its value is known before the statement runs. So the test is
+                    // answered then and bound as a 1 or a 0: the optional filter
+                    // and null-safe compare-and-set idiom (issue 6310).
+                    boolean not = take("NOT");
+                    expect("NULL");
+                    Expr flag = new Expr(session.numericOperand(bind(new NullTest(left.parameter.name, not)),
+                            Attribute.BIGINT), Attribute.BIGINT);
+                    return node("(" + flag.sql + " = 1)", Attribute.BOOLEAN, flag);
+                }
                 if (left.kind < 0) {
                     throw error("IS NULL requires a known operand storage kind");
                 }
@@ -1185,6 +1214,19 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
             }
             if (take("(")) {
                 String function = upper(token);
+                if ("CEIL".equals(function)) {
+                    function = "CEILING";
+                } else if ("SUBSTR".equals(function)) {
+                    function = "SUBSTRING";
+                }
+                if (" CONCAT SUBSTRING LOCATE MOD FLOOR CEILING ROUND ".contains(" " + function + " ")) {
+                    List<Expr> args = new ArrayList<Expr>();
+                    do {
+                        args.add(expression());
+                    } while (take(","));
+                    expect(")");
+                    return scalarFunction(function, args);
+                }
                 if (!(" COUNT SUM AVG MIN MAX LOWER UPPER LENGTH ABS COALESCE NULLIF TRIM ".contains(
                             " " + function + " "))) {
                     throw error("Unsupported function: " + token);
@@ -1322,6 +1364,109 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
             }
             if (value.association) {
                 throw error("Association-valued scalar projections are not supported; select an explicit target field");
+            }
+        }
+        /// CONCAT, SUBSTRING, LOCATE, MOD, FLOOR, CEILING and ROUND (issue 6310):
+        /// the JPQL string and numeric functions beyond the original set, plus
+        /// the Hibernate FLOOR/CEILING/ROUND. Each is rendered per dialect by the
+        /// session, because the three databases spell several of them
+        /// differently -- MySQL's `||` is OR, SQLite has no LOCATE and, on the
+        /// platform builds, no FLOOR or CEILING -- and must answer the same.
+        private Expr scalarFunction(String function, List<Expr> args) {
+            int size = args.size();
+            for (Expr arg : args) {
+                if (arg.entity != null) {
+                    throw error("Entity argument requires COUNT");
+                }
+            }
+            String[] sql = new String[size];
+            for (int i = 0; i < size; i++) {
+                sql[i] = args.get(i).sql;
+            }
+            Expr result;
+            if ("CONCAT".equals(function)) {
+                if (size < 2) {
+                    throw error("Invalid argument count for CONCAT");
+                }
+                for (Expr arg : args) {
+                    requireText(arg, function);
+                }
+                result = new Expr(session.concat(sql), Attribute.TEXT);
+            } else if ("SUBSTRING".equals(function)) {
+                if (size != 2 && size != 3) {
+                    throw error("Invalid argument count for SUBSTRING");
+                }
+                requireText(args.get(0), function);
+                for (int i = 1; i < size; i++) {
+                    requireIntegral(args.get(i), function);
+                }
+                result = new Expr(session.substring(sql[0], sql[1], size == 3 ? sql[2] : null), Attribute.TEXT);
+            } else if ("LOCATE".equals(function)) {
+                if (size != 2 && size != 3) {
+                    throw error("Invalid argument count for LOCATE");
+                }
+                requireText(args.get(0), function);
+                requireText(args.get(1), function);
+                if (size == 3) {
+                    requireIntegral(args.get(2), function);
+                }
+                result = new Expr(session.locate(sql[0], sql[1], size == 3 ? sql[2] : null), Attribute.BIGINT);
+            } else if ("MOD".equals(function)) {
+                if (size != 2) {
+                    throw error("Invalid argument count for MOD");
+                }
+                // The remainder operator under its JPQL name: integral operands,
+                // and a zero divisor answers NULL on every dialect.
+                return arithmetic(args.get(0), "%", args.get(1));
+            } else {
+                boolean round = "ROUND".equals(function);
+                if (round ? size != 1 && size != 2 : size != 1) {
+                    throw error("Invalid argument count for " + function);
+                }
+                Expr value = args.get(0);
+                requireNumeric(value, false);
+                int digits = 0;
+                if (size == 2) {
+                    Expr places = args.get(1);
+                    if (!places.literal || !(places.literalValue instanceof Long)) {
+                        throw error("ROUND takes an integer literal number of decimal places");
+                    }
+                    long requested = ((Long) places.literalValue).longValue();
+                    if (requested < 0 || requested > 15) {
+                        throw error("ROUND takes between 0 and 15 decimal places");
+                    }
+                    digits = (int) requested;
+                }
+                if (value.kind == Attribute.INTEGER || value.kind == Attribute.BIGINT) {
+                    // Already integral: integer division in JPQL truncates, so
+                    // FLOOR(a / b) over integers is the quotient on every dialect,
+                    // and MySQL's DIV keeps it integral rather than DECIMAL.
+                    result = new Expr(value.sql, Attribute.BIGINT);
+                } else {
+                    // A parameter without a declared kind binds as a double here.
+                    requireKind(value, Attribute.REAL);
+                    result = new Expr(session.roundingFunction(function, session.numericOperand(value.sql,
+                            Attribute.REAL), digits), Attribute.REAL);
+                }
+                result.numericOperands = true;
+            }
+            result.nullPreserving = true;
+            result.children.addAll(args);
+            return result;
+        }
+        private void requireText(Expr arg, String function) {
+            requireKind(arg, Attribute.TEXT);
+            if (arg.kind >= 0 && arg.temporal) {
+                throw error("Invalid operand type for " + function);
+            }
+        }
+        private void requireIntegral(Expr arg, String function) {
+            if (arg.kind == Attribute.REAL) {
+                throw error(function + " requires integral positions");
+            }
+            requireNumeric(arg, true);
+            if (arg.kind < 0) {
+                requireKind(arg, Attribute.BIGINT);
             }
         }
         private void validateFunction(String function, List<Expr> args, boolean distinct) {

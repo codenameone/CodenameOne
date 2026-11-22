@@ -38,6 +38,44 @@ class ManagedSessionTest {
         try { session.createTables(); assertCaseAndNativeQueries(session); }
         finally { session.close(); em.close(); }
     }
+    /// Issue 6310: the JPQL functions and parameter null tests BuildCloud's
+    /// repositories use, the reporter's three queries verbatim among them.
+    static void assertIssue6310Jpql(Session s,Record one,Record two,Record three) {
+        String R=Record.class.getName();
+        assertEquals(2,s.createQuery("select r from "+R+" r where r.name like concat(:prefix, '%')").setParameter("prefix","case-").list().size());
+        assertEquals("case-first!",s.createQuery("select concat(r.name,'!') from "+R+" r where r.id=:id",String.class).setParameter("id",one.id).first());
+        assertNull(s.createQuery("select concat(r.name,'!') from "+R+" r where r.id=:id",String.class).setParameter("id",three.id).first());
+        assertEquals("first",s.createQuery("select substring(r.name,6) from "+R+" r where r.id=:id",String.class).setParameter("id",one.id).first());
+        assertEquals("fir",s.createQuery("select substring(r.name,6,3) from "+R+" r where r.id=:id",String.class).setParameter("id",one.id).first());
+        assertEquals(Long.valueOf(6),s.createQuery("select locate('first',r.name) from "+R+" r where r.id=:id",Long.class).setParameter("id",one.id).first());
+        assertEquals(Long.valueOf(0),s.createQuery("select locate('zzz',r.name) from "+R+" r where r.id=:id",Long.class).setParameter("id",one.id).first());
+        assertEquals(Long.valueOf(4),s.createQuery("select locate('e',r.name,3) from "+R+" r where r.id=:id",Long.class).setParameter("id",two.id).first());
+        assertEquals(Long.valueOf(8),s.createQuery("select locate('c',r.name,2) from "+R+" r where r.id=:id",Long.class).setParameter("id",two.id).first());
+        assertEquals(Long.valueOf(1),s.createQuery("select mod(r.counter,3) from "+R+" r where r.id=:id",Long.class).setParameter("id",two.id).first());
+        assertNull(s.createQuery("select mod(r.counter,0) from "+R+" r where r.id=:id",Long.class).setParameter("id",two.id).first());
+        assertEquals(Long.valueOf(3),s.createQuery("select floor(r.counter / 2) from "+R+" r where r.id=:id",Long.class).setParameter("id",two.id).first());
+        assertEquals(Double.valueOf(-2),s.createQuery("select floor(-1.5) from "+R+" r where r.id=:id",Double.class).setParameter("id",one.id).first());
+        assertEquals(Double.valueOf(2),s.createQuery("select ceiling(1.25) from "+R+" r where r.id=:id",Double.class).setParameter("id",one.id).first());
+        assertEquals(Double.valueOf(-1),s.createQuery("select ceiling(-1.5) from "+R+" r where r.id=:id",Double.class).setParameter("id",one.id).first());
+        assertEquals(Double.valueOf(3),s.createQuery("select round(2.5) from "+R+" r where r.id=:id",Double.class).setParameter("id",one.id).first());
+        assertEquals(Double.valueOf(1.24),s.createQuery("select round(1.235,2) from "+R+" r where r.id=:id",Double.class).setParameter("id",one.id).first());
+        assertEquals(Double.valueOf(3.5),s.createQuery("select floor(r.counter * 1.0 / 2) + 0.5 from "+R+" r where r.id=:id",Double.class).setParameter("id",two.id).first());
+        // Bucketed grouping, as the reporter's daily histogram does it.
+        java.util.List rows=s.createQuery("select floor(r.counter / 3), count(r.id) from "+R+" r group by floor(r.counter / 3) order by floor(r.counter / 3)").list();
+        assertEquals(3,rows.size());
+        assertEquals(Long.valueOf(0),((Object[])rows.get(0))[0]);
+        // :param IS [NOT] NULL, the null-safe compare-and-set idiom.
+        String nullSafe="select count(r) from "+R+" r where (:previous is null and r.name is null) or r.name = :previous";
+        assertEquals(Long.valueOf(1),s.createQuery(nullSafe,Long.class).setParameter("previous",null).first());
+        assertEquals(Long.valueOf(1),s.createQuery(nullSafe,Long.class).setParameter("previous","case-first").first());
+        assertEquals(Long.valueOf(3),s.createQuery("select count(r) from "+R+" r where :name is null or r.name = :name",Long.class).setParameter("name",null).first());
+        assertEquals(Long.valueOf(1),s.createQuery("select count(r) from "+R+" r where :name is null or r.name = :name",Long.class).setParameter("name","case-second").first());
+        assertEquals(Long.valueOf(0),s.createQuery("select count(r) from "+R+" r where :name is not null",Long.class).setParameter("name",null).first());
+        assertThrows(IllegalArgumentException.class,()->s.createQuery("select count(r) from "+R+" r where :name is null").list());
+        for(String bad:new String[]{"concat(r.name)","concat(r.counter,'x')","substring(r.name,1.5)","locate(r.counter,r.name)","mod(1.5,2)","floor(r.name)","round(1.5,:n)","round(1.5,99)","nosuch(r.name)"}) {
+            assertThrows(IllegalArgumentException.class,()->s.createQuery("select "+bad+" from "+R+" r"),bad);
+        }
+    }
     static void assertCaseAndNativeQueries(Session s) {
         s.beginTransaction();
         Record one=new Record();one.name="case-first";one.counter=4;s.persist(one);
@@ -52,6 +90,7 @@ class ManagedSessionTest {
         assertEquals(Double.valueOf(1.5),s.createQuery("select case when r.counter=4 then 1.5 else 0 end from "+Record.class.getName()+" r where r.id=:id",Double.class).setParameter("id",one.id).first());
         assertEquals("yes",s.createQuery("select case when r.counter=4 then case when r.name=:name then 'yes' else 'no' end else 'other' end from "+Record.class.getName()+" r where r.id=:id",String.class).setParameter("name","case-first").setParameter("id",one.id).first());
         assertEquals(Long.valueOf(1),s.createQuery("select count(r) from "+Record.class.getName()+" r where r.name=case when true then :name else 'none' end",Long.class).setParameter("name","case-first").first());
+        assertIssue6310Jpql(s,one,two,three);
         s.beginTransaction();
         assertEquals(3,s.createQuery("update "+Record.class.getName()+" r set r.name=case when true then :name else r.name end").setParameter("name","renamed").executeUpdate());
         s.rollbackTransaction();one=s.find(Record.class,one.id);
@@ -818,7 +857,7 @@ class ManagedSessionTest {
         EntityManager em=manager();
         try {
             Session session=em.openSession();seed(session);
-            for(String predicate:new String[]{":left=:right","(:left)<>:right",":left>:right",":left in (:right)",":left between :low and :high","coalesce(:a,:b)=nullif(:c,:d)",":value is null",":value is not null","(:value) is null","coalesce(:a,:b) is null"}) {
+            for(String predicate:new String[]{":left=:right","(:left)<>:right",":left>:right",":left in (:right)",":left between :low and :high","coalesce(:a,:b)=nullif(:c,:d)","coalesce(:a,:b) is null"}) {
                 assertThrows(IllegalArgumentException.class,()->session.createQuery("select r from ManagedSessionTest$Record r where "+predicate),predicate);
             }
             assertEquals(1,session.createQuery("select r from ManagedSessionTest$Record r where :value=1").setParameter("value",1L).list().size());
