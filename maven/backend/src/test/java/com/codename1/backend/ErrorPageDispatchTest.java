@@ -54,6 +54,27 @@ class ErrorPageDispatchTest {
             if ("/api/ok".equals(path)) {
                 return new HttpServer.Response(200, "text/plain", bytes("fine"));
             }
+            // What the generated router answers itself, and what a handler does.
+            if ("/api/decode".equals(path)) {
+                return request.frameworkError(400, "malformed body");
+            }
+            if ("/api/type".equals(path)) {
+                return request.frameworkError(415, "Unsupported Media Type");
+            }
+            if ("/api/own".equals(path)) {
+                return request.respond(400, "text/plain", bytes("mine"));
+            }
+            if ("/api/boom".equals(path)) {
+                throw new IllegalStateException("boom");
+            }
+            if ("/api/teapot".equals(path)) {
+                throw new ResponseStatusException(418, "short and stout");
+            }
+            if ("/api/get-only".equals(path)) {
+                // A route for GET alone, as a generated router declines others.
+                return "GET".equals(request.getMethod())
+                        ? new HttpServer.Response(200, "text/plain", bytes("got")) : null;
+            }
             if (!"/error".equals(path)) {
                 return null;
             }
@@ -64,10 +85,26 @@ class ErrorPageDispatchTest {
                 return new HttpServer.Response(200, "text/html",
                         bytes("<html><h2>Page not found</h2>" + uri + "</html>"));
             }
+            Object thrown = request.getAttribute(RequestDispatcher.ERROR_EXCEPTION);
             return new HttpServer.Response(((Integer) status).intValue(), "application/json",
-                    bytes("{\"status\":" + status + ",\"path\":\"" + uri + "\"}"));
+                    bytes("{\"status\":" + status + ",\"path\":\"" + uri + "\",\"message\":\""
+                            + request.getAttribute(RequestDispatcher.ERROR_MESSAGE) + "\""
+                            + (thrown == null ? "" : ",\"exception\":\"" + thrown.getClass().getSimpleName() + "\"")
+                            + "}"));
         }
     };
+
+    /// The same application as a generated router presents itself: a
+    /// controller's declared error route is the one errors are handed to.
+    private static final class Controller implements HttpServer.Handler,
+            com.codename1.backend.web.ControllerHooks.Invocation {
+        public HttpServer.Response handle(HttpServer.Request request) throws Exception {
+            return APP.handle(request);
+        }
+        public HttpServer.Response proceed(int route, HttpServer.Request request, String[] bound) {
+            throw new UnsupportedOperationException();
+        }
+    }
 
     @Test
     @DisplayName("an unmatched path reaches the error route as JSON or as a page")
@@ -94,6 +131,79 @@ class ErrorPageDispatchTest {
 
             // A served route is untouched, and so is the error route asked directly.
             assertEquals("fine", get("/api/ok", null).body);
+        } finally {
+            backend.stop();
+        }
+    }
+
+    @Test
+    @DisplayName("the router's own errors and escaping exceptions reach the error route")
+    void frameworkErrorsAndExceptionsReachTheErrorRoute(@TempDir File dir) throws Exception {
+        Backend backend = Backend.builder(Config.of(settings(dir), "test")).quiet().handler(new Controller()).start();
+        try {
+            Reply decode = send("POST", "/api/decode", "application/json");
+            assertEquals(400, decode.status);
+            assertTrue(decode.body.contains("\"path\":\"/api/decode\""), decode.body);
+            assertTrue(decode.body.contains("\"message\":\"malformed body\""), decode.body);
+            assertFalse(decode.body.contains("exception"), decode.body);
+
+            Reply type = send("POST", "/api/type", "application/json");
+            assertEquals(415, type.status);
+            assertTrue(type.body.contains("\"status\":415"), type.body);
+
+            // A handler's own error is its answer, not the error page's.
+            Reply own = send("POST", "/api/own", "application/json");
+            assertEquals(400, own.status);
+            assertEquals("mine", own.body);
+
+            Reply boom = send("GET", "/api/boom", "application/json");
+            assertEquals(500, boom.status);
+            assertTrue(boom.body.contains("\"exception\":\"IllegalStateException\""), boom.body);
+
+            Reply teapot = send("GET", "/api/teapot", "application/json");
+            assertEquals(418, teapot.status);
+            assertTrue(teapot.body.contains("\"message\":\"short and stout\""), teapot.body);
+
+            // A method the route does not take is a path nothing serves: a 404.
+            Reply method = send("DELETE", "/api/get-only", "application/json");
+            assertEquals(404, method.status);
+            assertTrue(method.body.contains("\"path\":\"/api/get-only\""), method.body);
+
+            // On one kept-alive connection, a router error then a handler's own
+            // 400: the reused Response must not carry the mark into the second.
+            String[] both = twoOnOneConnection("/api/decode", "/api/own");
+            assertTrue(both[0].startsWith("HTTP/1.1 400") && both[0].contains("\"path\":\"/api/decode\""), both[0]);
+            assertTrue(both[1].startsWith("HTTP/1.1 400") && both[1].endsWith("mine"), both[1]);
+        } finally {
+            backend.stop();
+        }
+    }
+
+    @Test
+    @DisplayName("without an error route the router's answer and the plain 500 stand")
+    void withoutAnErrorRouteTheOwnAnswersStand(@TempDir File dir) throws Exception {
+        Properties settings = settings(dir);
+        settings.setProperty(Config.ERROR_PATH, "");
+        Backend backend = Backend.builder(Config.of(settings, "test")).quiet().handler(new Controller()).start();
+        try {
+            Reply decode = send("POST", "/api/decode", "application/json");
+            assertEquals(400, decode.status);
+            assertEquals("malformed body", decode.body);
+            assertEquals(500, send("GET", "/api/boom", null).status);
+        } finally {
+            backend.stop();
+        }
+    }
+
+    @Test
+    @DisplayName("a hand-written handler at the error path does not take over errors")
+    void aCatchAllHandlerIsNotAnErrorRoute(@TempDir File dir) throws Exception {
+        Backend backend = Backend.builder(Config.of(settings(dir), "test")).quiet().handler(APP).start();
+        try {
+            Reply decode = send("POST", "/api/decode", "application/json");
+            assertEquals(400, decode.status);
+            assertEquals("malformed body", decode.body);
+            assertEquals(500, send("GET", "/api/boom", null).status);
         } finally {
             backend.stop();
         }
@@ -144,8 +254,45 @@ class ErrorPageDispatchTest {
     }
 
     private Reply get(String path, String accept) throws Exception {
+        return send("GET", path, accept);
+    }
+
+    /// Two GETs written on one socket, each answer read by its Content-Length.
+    private String[] twoOnOneConnection(String first, String second) throws Exception {
+        java.net.Socket socket = new java.net.Socket("127.0.0.1", port);
+        try {
+            socket.setSoTimeout(5000);
+            java.io.OutputStream out = socket.getOutputStream();
+            java.io.DataInputStream in = new java.io.DataInputStream(socket.getInputStream());
+            String[] answers = new String[2];
+            String[] paths = {first, second};
+            for (int i = 0; i < 2; i++) {
+                out.write(bytes("POST " + paths[i] + " HTTP/1.1\r\nHost: x\r\nAccept: application/json\r\nContent-Length: 0\r\n\r\n"));
+                out.flush();
+                StringBuilder head = new StringBuilder();
+                while (!head.toString().endsWith("\r\n\r\n")) {
+                    head.append((char) in.readUnsignedByte());
+                }
+                int length = 0;
+                for (String line : head.toString().split("\r\n")) {
+                    if (line.toLowerCase(java.util.Locale.ROOT).startsWith("content-length:")) {
+                        length = Integer.parseInt(line.substring(15).trim());
+                    }
+                }
+                byte[] body = new byte[length];
+                in.readFully(body);
+                answers[i] = head.toString().trim() + "\n" + new String(body, "UTF-8");
+            }
+            return answers;
+        } finally {
+            socket.close();
+        }
+    }
+
+    private Reply send(String method, String path, String accept) throws Exception {
         HttpURLConnection connection = (HttpURLConnection)
                 new URL("http://127.0.0.1:" + port + path).openConnection();
+        connection.setRequestMethod(method);
         connection.setConnectTimeout(5000);
         connection.setReadTimeout(5000);
         if (accept != null) {

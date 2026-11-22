@@ -530,6 +530,33 @@ public final class HttpServer {
         ///
         /// `new Response(...)` still works and still allocates; a handler that
         /// needs its Response to outlive the call must use it.
+        /// An error the generated router answers on its own -- a malformed
+        /// request target, a body or parameter it cannot bind, an unsupported
+        /// content type -- rather than the application's handler. The
+        /// application's error route (`cn1.server.error.path`) is given the
+        /// request in its place, as Spring Boot forwards these to its error
+        /// controller; with no such route this answer is sent (issue 6310).
+        /// Generated code calls it; a handler answering an error of its own uses
+        /// [#respond], which is sent as it is.
+        public Response frameworkError(int status, String message) {
+            return frameworkError(status, "text/plain; charset=utf-8", utf8Bytes(message));
+        }
+
+        /// [#frameworkError(int, String)] with the body already encoded.
+        public Response frameworkError(int status, String contentType, byte[] body) {
+            Response response = respond(status, contentType, body);
+            response.frameworkError = true;
+            return response;
+        }
+
+        private static byte[] utf8Bytes(String text) {
+            try {
+                return text.getBytes("UTF-8");
+            } catch (java.io.UnsupportedEncodingException err) {
+                throw new IllegalStateException(err.toString(), err);
+            }
+        }
+
         public Response respond(int status, String contentType, byte[] body) {
             if (conn == null) {
                 return new Response(status, contentType, body);   // HTTP/2 path
@@ -1541,6 +1568,11 @@ public final class HttpServer {
         long fileOffset;
         long fileLength;
         Map extraHeaders;
+        /// Set by [Request#frameworkError]: an answer the generated router made
+        /// itself (a body it could not decode, a content type the route does not
+        /// consume), which the application's error route may replace. Cleared on
+        /// reuse, so a handler's own 400 on the same connection stands.
+        boolean frameworkError;
         /// Serialised into the connection buffer at write time; see jsonValue.
         Object deferredJson;
         boolean hasDeferredJson;
@@ -1640,6 +1672,7 @@ public final class HttpServer {
             this.fileOffset = fileOffset;
             this.fileLength = fileLength;
             this.extraHeaders = extraHeaders;
+            this.frameworkError = false;
             this.deferredJson = null;
             this.hasDeferredJson = false;
             this.deferredEncoder = null;

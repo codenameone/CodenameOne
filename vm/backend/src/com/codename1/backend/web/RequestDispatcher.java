@@ -35,6 +35,11 @@ package com.codename1.backend.web;
 /// }
 /// ```
 ///
+/// So are the errors the generated router answers itself -- a malformed
+/// target, a body or parameter it cannot bind (400), a content type the route
+/// does not consume (415) -- and an exception escaping a handler (500, or the
+/// status of a `ResponseStatusException`), each with its own status.
+///
 /// A request no route, file or `NoHandlerFoundException` handler answers is
 /// dispatched to the application's route for the error path -- `/error`, or
 /// `cn1.server.error.path`, empty to turn the dispatch off -- with
@@ -52,6 +57,10 @@ public final class RequestDispatcher {
     /// a forward keeps the method, and an error page that answers differently
     /// for a HEAD can read it here.
     public static final String ERROR_METHOD = "cn1.error.method";
+    /// The exception that escaped the handler, a `Throwable`; absent when the
+    /// error is not an exception (a path nothing serves, a body the router
+    /// could not decode).
+    public static final String ERROR_EXCEPTION = "jakarta.servlet.error.exception";
 
     private RequestDispatcher() {
     }

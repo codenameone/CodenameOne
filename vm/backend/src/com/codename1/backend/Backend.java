@@ -1038,6 +1038,66 @@ public final class Backend {
 
         @Override
         public HttpServer.Response route(HttpServer.Request request) throws Exception {
+            if (errorPath == null) {
+                return routeChain(request);
+            }
+            HttpServer.Response response;
+            try {
+                response = routeChain(request);
+            } catch (Exception err) {
+                if (securityFailure(err)) {
+                    // The security layer answers these (401, 403, the login
+                    // page), as Spring Security's ExceptionTranslationFilter does
+                    // before any error dispatch.
+                    throw err;
+                }
+                // An exception escaping a handler goes to the error route with
+                // its status, as Spring Boot forwards it to its error controller
+                // (issue 6310). Here rather than in the listener, so the page
+                // runs inside the security chain, the request scope and the
+                // session bracket, and reaches dispatch() callers too.
+                int status = 500;
+                String message = "Internal Server Error";
+                if (err instanceof ResponseStatusException) { // NOPMD AvoidInstanceofChecksInCatchClause - one catch must take every exception to the error route; the status comes from this one kind
+                    status = ((ResponseStatusException) err).getStatus();
+                    String reason = ((ResponseStatusException) err).getReason();
+                    message = reason == null ? message : reason;
+                }
+                request.setAttribute(com.codename1.backend.web.RequestDispatcher.ERROR_EXCEPTION, err);
+                HttpServer.Response page;
+                try {
+                    page = errorPage(request, status, message, true);
+                } catch (Exception pageErr) {
+                    // A failing error page never hides the original failure.
+                    throw err;
+                }
+                if (page == null) {
+                    throw err;
+                }
+                if (status >= 500) {
+                    // What the listener would have logged had it seen the throw;
+                    // handle() records it in the request log from the attribute.
+                    HttpServer.handlerFailed(err);
+                }
+                return page;
+            }
+            if (response != null && response.frameworkError) {
+                // Read before the dispatch: the answer is the connection's pooled
+                // Response, which the error route's own respond() re-points.
+                int status = response.getStatus();
+                String message = new String(response.body, "UTF-8");
+                HttpServer.Response page = errorPage(request, status, message, true);
+                if (page != null) {
+                    return page;
+                }
+                // No error route took it: the router's own answer, rebuilt in
+                // case a route that declined still re-pointed the pooled one.
+                return request.frameworkError(status, message);
+            }
+            return response;
+        }
+
+        private HttpServer.Response routeChain(HttpServer.Request request) throws Exception {
             HttpServer.Response response = null;
             // Whether what the chain produced is only "nothing here": no answer,
             // or a static directory's 404 for a file that is not there.
@@ -1067,7 +1127,7 @@ public final class Backend {
                 }
             }
             if (unserved && errorPath != null) {
-                HttpServer.Response page = errorPage(request, 404, "Not Found");
+                HttpServer.Response page = errorPage(request, 404, "Not Found", false);
                 if (page != null) {
                     response = page;
                 }
@@ -1083,8 +1143,25 @@ public final class Backend {
         /// attributes, as Spring Boot forwards to its error controller (issue
         /// 6310). Only the routers are asked: a static file named like the
         /// error path is not an error page.
+        /// Whether `err`, or anything it wraps, is the security layer's to answer.
+        private static boolean securityFailure(Throwable err) {
+            for (int depth = 0 ; err != null && depth < 16 ; depth++) {
+                if (err instanceof com.codename1.backend.security.AccessDeniedException
+                        || err instanceof com.codename1.backend.security.AuthenticationException) {
+                    return true;
+                }
+                err = err.getCause();
+            }
+            return false;
+        }
+
+        /// @param controllersOnly ask only the generated routers -- an error
+        ///     route a controller declares -- never a hand-written handler. A
+        ///     router's own refusal or a thrown exception is an answer the
+        ///     application already had; only a declared error route takes it
+        ///     over, never a catch-all handler that happens to match the path.
         private HttpServer.Response errorPage(HttpServer.Request request, int status,
-                                              String message) throws Exception {
+                                              String message, boolean controllersOnly) throws Exception {
             String target = request.getTarget();
             int query = target == null ? -1 : target.indexOf('?');
             String path = query < 0 ? target : target.substring(0, query);
@@ -1106,7 +1183,8 @@ public final class Backend {
             HttpServer.Response page = null;
             try {
                 for (int i = 0 ; page == null && i < chain.length ; i++) {
-                    if (!(chain[i] instanceof StaticFiles)) {
+                    if (!(chain[i] instanceof StaticFiles) && (!controllersOnly
+                            || chain[i] instanceof com.codename1.backend.web.ControllerHooks.Invocation)) {
                         page = chain[i].handle(request);
                     }
                 }
@@ -1500,8 +1578,13 @@ public final class Backend {
                 }
                 // Null is a 404 from here, which is what a
                 // router answers for a path it does not route.
+                // An exception the error route answered is still the
+                // handler's failure, and the log says so.
+                Object handled = request.getAttribute(
+                        com.codename1.backend.web.RequestDispatcher.ERROR_EXCEPTION);
                 requestLog.record(request, response == null ? 404
-                        : response.getStatus(), startedMillis, null);
+                        : response.getStatus(), startedMillis,
+                        handled instanceof Throwable ? (Throwable) handled : null);
                 status = response == null ? 404 : response.getStatus();
                 return response;
             } finally {

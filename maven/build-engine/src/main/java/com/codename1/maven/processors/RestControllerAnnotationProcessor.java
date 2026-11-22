@@ -2131,7 +2131,7 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
         // into "no route" -- a 404 for what is a syntax error the client can fix.
         sb.append("        if (!wellFormedEscapes(request.getTarget())\n");
         sb.append("                || !targetIsUtf8(request.getTarget())) {\n");
-        sb.append("            return request.respond(400, \"text/plain; charset=utf-8\",\n");
+        sb.append("            return request.frameworkError(400, \"text/plain; charset=utf-8\",\n");
         sb.append("                    utf8(\"malformed percent-escape in the request target\"));\n");
         sb.append("        }\n");
 
@@ -2252,11 +2252,11 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
 
         if (route.consumes != null) {
             sb.append(pad).append("if (!com.codename1.backend.web.MediaTypes.consumable(request.getHeader(\"Content-Type\"), ")
-              .append(quote(route.consumes)).append(")) return com.codename1.backend.HttpServer.Response.text(415, \"Unsupported Media Type\");\n");
+              .append(quote(route.consumes)).append(")) return request.frameworkError(415, \"Unsupported Media Type\");\n");
         }
         if (route.produces != null) {
             sb.append(pad).append("if (!com.codename1.backend.web.MediaTypes.acceptable(request.getHeader(\"Accept\"), ")
-              .append(quote(route.produces)).append(")) return com.codename1.backend.HttpServer.Response.text(406, \"Not Acceptable\");\n");
+              .append(quote(route.produces)).append(")) return request.frameworkError(406, \"Not Acceptable\");\n");
         }
         emitPartGuards(sb, route, pad);
         emitRequiredGuards(sb, route, pad);
@@ -2271,7 +2271,7 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
             if ("FORM".equals(p.kind)) {
                 appendIndented(sb, p.formBinding, pad);
                 if (i + 1 >= route.params.size() || !"ERRORS".equals(route.params.get(i + 1).kind))
-                    sb.append(pad).append("if (").append(p.local).append("Errors.hasErrors()) return com.codename1.backend.HttpServer.Response.text(400, \"Invalid form\");\n");
+                    sb.append(pad).append("if (").append(p.local).append("Errors.hasErrors()) return request.frameworkError(400, \"Invalid form\");\n");
             }
         }
         StringBuilder args = new StringBuilder();
@@ -2469,7 +2469,7 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
                 if (!bodyChecked && !"byte[]".equals(p.javaType)) {
                     bodyChecked = true;
                     sb.append(pad).append("if (!bodyIsText(request)) {\n");
-                    sb.append(pad).append("    return request.respond(400, \"text/plain; charset=utf-8\",\n");
+                    sb.append(pad).append("    return request.frameworkError(400, \"text/plain; charset=utf-8\",\n");
                     sb.append(pad).append("            utf8(\"The request body is not UTF-8 text\"));\n");
                     sb.append(pad).append("}\n");
                 }
@@ -2483,7 +2483,7 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
                 sb.append(pad).append("String unreadable").append(i).append(" = paramProblem(request, ")
                   .append(quote(p.name)).append(");\n");
                 sb.append(pad).append("if (unreadable").append(i).append(" != null) {\n");
-                sb.append(pad).append("    return request.respond(400, \"text/plain; charset=utf-8\",\n");
+                sb.append(pad).append("    return request.frameworkError(400, \"text/plain; charset=utf-8\",\n");
                 sb.append(pad).append("            utf8(unreadable").append(i).append("));\n");
                 sb.append(pad).append("}\n");
                 continue;
@@ -2494,14 +2494,14 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
             if (!any) {
                 any = true;
                 sb.append(pad).append("if (!partsWellFormed(request)) {\n");
-                sb.append(pad).append("    return request.respond(400, \"text/plain; charset=utf-8\",\n");
+                sb.append(pad).append("    return request.frameworkError(400, \"text/plain; charset=utf-8\",\n");
                 sb.append(pad).append("            utf8(\"The multipart body is malformed\"));\n");
                 sb.append(pad).append("}\n");
             }
             if ("java.lang.String".equals(p.javaType)) {
                 sb.append(pad).append("if (!partIsText(request.getPart(").append(quote(p.name))
                   .append("))) {\n");
-                sb.append(pad).append("    return request.respond(400, \"text/plain; charset=utf-8\",\n");
+                sb.append(pad).append("    return request.frameworkError(400, \"text/plain; charset=utf-8\",\n");
                 sb.append(pad).append("            utf8(").append(quote("The part " + p.name
                         + " is not UTF-8 text")).append("));\n");
                 sb.append(pad).append("}\n");
@@ -2544,7 +2544,7 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
                 continue;
             }
             sb.append(pad).append("if (").append(test).append(") {\n");
-            sb.append(pad).append("    return request.respond(400, \"text/plain; charset=utf-8\",\n");
+            sb.append(pad).append("    return request.frameworkError(400, \"text/plain; charset=utf-8\",\n");
             sb.append(pad).append("            utf8(").append(quote("Missing required " + what))
               .append("));\n");
             sb.append(pad).append("}\n");
@@ -2597,7 +2597,7 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
             }
             sb.append(pad).append("if (!").append(checker).append('(').append(raw)
               .append(")) {\n");
-            sb.append(pad).append("    return request.respond(400, \"text/plain; charset=utf-8\",\n");
+            sb.append(pad).append("    return request.frameworkError(400, \"text/plain; charset=utf-8\",\n");
             sb.append(pad).append("            utf8(").append(quote("The " + what + " is not a valid "
                     + p.javaType)).append("));\n");
             sb.append(pad).append("}\n");
@@ -2921,7 +2921,7 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
                 sb.append(pad).append("if (request.getBody() != null && request.getBody().length() > 0) {\n");
                 sb.append(pad).append("    Object parsed = bodyAsValue(request.getBody());\n");
                 sb.append(pad).append("    if (parsed == MALFORMED) {\n");
-                sb.append(pad).append("        return request.respond(400, \"text/plain; charset=utf-8\",\n");
+                sb.append(pad).append("        return request.frameworkError(400, \"text/plain; charset=utf-8\",\n");
                 sb.append(pad).append("                utf8(\"The request body is not valid JSON\"));\n");
                 sb.append(pad).append("    }\n");
                 sb.append(pad).append("    ").append(type).append(" target = null;\n");
@@ -2931,7 +2931,7 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
                 sb.append(pad).append("    try {\n");
                 appendIndented(sb, p.codecRead, pad + "        ");
                 sb.append(pad).append("    } catch (IllegalArgumentException err) {\n");
-                sb.append(pad).append("        return request.respond(400, \"text/plain; charset=utf-8\",\n");
+                sb.append(pad).append("        return request.frameworkError(400, \"text/plain; charset=utf-8\",\n");
                 sb.append(pad).append("                utf8(String.valueOf(err.getMessage())));\n");
                 sb.append(pad).append("    }\n");
                 sb.append(pad).append("    ").append(p.local).append(" = target;\n");
@@ -2947,7 +2947,7 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
             sb.append(pad).append("    ").append(p.local).append(" = ").append(decoder)
               .append("(request.getBody());\n");
             sb.append(pad).append("    if (").append(p.local).append(" == null) {\n");
-            sb.append(pad).append("        return request.respond(400, \"text/plain; charset=utf-8\",\n");
+            sb.append(pad).append("        return request.frameworkError(400, \"text/plain; charset=utf-8\",\n");
             sb.append(pad).append("                utf8(\"The request body is not valid JSON\"));\n");
             sb.append(pad).append("    }\n");
             // Declaring List<String> does not make the ELEMENTS strings. The
@@ -2995,7 +2995,7 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
                   .append(depth).append("$.next();\n");
                 sb.append(pad).append("    if (").append(var).append(" != null && !(")
                   .append(var).append(" instanceof ").append(raw).append(")) {\n");
-                sb.append(pad).append("        return request.respond(400, "
+                sb.append(pad).append("        return request.frameworkError(400, "
                         + "\"text/plain; charset=utf-8\",\n");
                 sb.append(pad).append("                utf8(")
                   .append(quote("A value of the request body is not a " + raw))
@@ -3047,7 +3047,7 @@ public final class RestControllerAnnotationProcessor extends AbstractAnnotationP
                 : element.substring(0, element.indexOf('<'));
         sb.append(pad).append("    if (").append(var).append(" != null && !(").append(var)
           .append(" instanceof ").append(raw).append(")) {\n");
-        sb.append(pad).append("        return request.respond(400, "
+        sb.append(pad).append("        return request.frameworkError(400, "
                 + "\"text/plain; charset=utf-8\",\n");
         sb.append(pad).append("                utf8(")
           .append(quote("An element of the request body is not a " + raw)).append("));\n");

@@ -199,6 +199,17 @@ public class RestControllerAnnotationProcessorTest {
         assertEquals(406, Router.statusOf(router.callWith("GET", "/m/out", null, "Accept: application/json;q=0, text/html")));
         assertEquals(200, Router.statusOf(router.callWith("GET", "/m/out", null, "Accept: text/html, */*;q=0.1")));
         assertEquals(200, Router.statusOf(router.callWith("GET", "/m/out", null)));
+        // The router's own refusals are marked, so the server hands them to the
+        // application's error route; a handler's answer is not (issue 6310).
+        assertTrue(frameworkError(router.callWith("POST", "/m/in", "x", "Content-Type: application/xml")));
+        assertTrue(frameworkError(router.callWith("GET", "/m/out", null, "Accept: text/html")));
+        assertFalse(frameworkError(router.callWith("GET", "/m/out", null)));
+    }
+
+    private static boolean frameworkError(Object response) throws Exception {
+        java.lang.reflect.Field mark = com.codename1.backend.HttpServer.Response.class.getDeclaredField("frameworkError");
+        mark.setAccessible(true);
+        return mark.getBoolean(response);
     }
 
     /// A `@CrossOrigin` route reports its own policy, the preflight included, and
