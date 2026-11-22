@@ -279,6 +279,10 @@ class ReturnResolutionsTest {
         assertTrue(orders.detailOf(o.id()).refundedCents() <= total);
         assertTrue(count("SELECT COALESCE(SUM(refunded_cents), 0) AS n FROM payment "
                 + "WHERE order_id = ?", o.id()) <= total);
+        // Each unit is refunded once at most, and released or restocked once.
+        assertEquals(1, ok[0], "the order's two units went to exactly one refund");
+        assertTrue(count("SELECT COALESCE(SUM(refunded_qty - quantity), 0) AS n FROM order_line "
+                + "WHERE order_id = ? AND refunded_qty > quantity", o.id()) == 0);
     }
 
     @Test

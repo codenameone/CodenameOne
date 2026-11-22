@@ -715,6 +715,34 @@ public class Orders {
                 orderId, Long.valueOf(amount)}) != 1) {
             throw new ResponseStatusException(409, "Another refund of this order got there first");
         }
+        // The units too: each line's refunded_qty is claimed the same way, so
+        // two refunds racing for one unit cannot both restock or release it.
+        // A line that lost the race gives back everything claimed so far.
+        List<RefundLineDto> claimLines = req.lines() == null ? new ArrayList<RefundLineDto>()
+                : req.lines();
+        for (int iter = 0; iter < claimLines.size(); iter++) {
+            RefundLineDto w = claimLines.get(iter);
+            if (w == null || w.quantity() <= 0) {
+                continue;
+            }
+            if (db.execute("UPDATE order_line SET refunded_qty = refunded_qty + ? WHERE id = ? "
+                    + "AND order_id = ? AND refunded_qty + ? <= quantity", new Object[] {
+                    Integer.valueOf(w.quantity()), w.orderLineId(), orderId,
+                    Integer.valueOf(w.quantity())}) != 1) {
+                for (int back = 0; back < iter; back++) {
+                    RefundLineDto undo = claimLines.get(back);
+                    if (undo != null && undo.quantity() > 0) {
+                        db.execute("UPDATE order_line SET refunded_qty = refunded_qty - ? "
+                                + "WHERE id = ?", new Object[] {Integer.valueOf(undo.quantity()),
+                                undo.orderLineId()});
+                    }
+                }
+                db.execute("UPDATE store_order SET refunded_cents = refunded_cents - ? "
+                        + "WHERE id = ?", new Object[] {Long.valueOf(amount), orderId});
+                throw new ResponseStatusException(409,
+                        "Another refund of this order got there first");
+            }
+        }
         boolean moved = false;
         long creditPart;
         try {
@@ -736,6 +764,14 @@ public class Orders {
                 // has been refunded the claim stays, since that money is gone.
                 db.execute("UPDATE store_order SET refunded_cents = refunded_cents - ? "
                         + "WHERE id = ?", new Object[] {Long.valueOf(amount), orderId});
+                for (int back = 0; back < claimLines.size(); back++) {
+                    RefundLineDto undo = claimLines.get(back);
+                    if (undo != null && undo.quantity() > 0) {
+                        db.execute("UPDATE order_line SET refunded_qty = refunded_qty - ? "
+                                + "WHERE id = ?", new Object[] {Integer.valueOf(undo.quantity()),
+                                undo.orderLineId()});
+                    }
+                }
             }
             throw failed;
         }
@@ -883,8 +919,9 @@ public class Orders {
             row.setOrderLineId(line.getId());
             row.setQuantity(w.quantity());
             refundLines.insert(row);
+            // refunded_qty already includes this refund's claim (refundParts).
             int unshipped = Math.max(0, line.getQuantity() - line.getFulfilledQty()
-                    - line.getRefundedQty());
+                    - (line.getRefundedQty() - w.quantity()));
             int release = Math.min(unshipped, w.quantity());
             int back = w.quantity() - release;
             if (release > 0 && line.getLocationId().length() > 0) {
@@ -895,8 +932,6 @@ public class Orders {
                 inventory.restock(order.getStoreId(), line.getVariantId(), line.getLocationId(),
                         back, refund.getId(), username, Inventory.RESTOCK);
             }
-            line.setRefundedQty(line.getRefundedQty() + w.quantity());
-            lines.save(line);
         }
         // refunded_cents already holds this refund (refundParts claimed it).
         // Saving the whole row would write back a stale total over a claim
