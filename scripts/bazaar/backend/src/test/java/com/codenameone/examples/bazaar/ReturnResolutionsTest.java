@@ -321,6 +321,12 @@ class ReturnResolutionsTest {
         // No card leg runs, so a failed gift card credit has moved nothing:
         // the cents and the units must be free for the retry. It used to
         // count as "moved" and strand both.
+        // A trigger is the one portable-enough way to make the credit leg
+        // fail mid-refund, and its syntax is SQLite's: the database matrix
+        // (CN1_DATASOURCE_URL set to PostgreSQL/MySQL) skips this check.
+        String url = System.getenv("CN1_DATASOURCE_URL");
+        org.junit.jupiter.api.Assumptions.assumeTrue(url == null || url.isEmpty()
+                || url.startsWith("jdbc:sqlite"), "SQLite-only failure injection");
         db.execute("CREATE TRIGGER rr_gift_down BEFORE UPDATE ON gift_card "
                 + "BEGIN SELECT RAISE(ABORT, 'gift card store down'); END", new Object[0]);
         try {
