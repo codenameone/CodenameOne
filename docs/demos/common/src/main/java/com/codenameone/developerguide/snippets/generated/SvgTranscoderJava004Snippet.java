@@ -80,8 +80,10 @@ class SvgTranscoderJava004Snippet {
     Resources theme;
     void snippet() throws Exception {
         // tag::svg-transcoder-java-004[]
+        Form form = new Form("Rive", new BorderLayout());
         Image juice = Resources.getGlobalResources().getImage("juice.riv");
         form.add(BorderLayout.CENTER, new ScaleImageLabel(juice));
+        form.show();
         // end::svg-transcoder-java-004[]
     }
 
@@ -95,8 +97,8 @@ class SvgTranscoderJava004Snippet {
     }
 
     void properties() throws Exception {
-        Image img = myImage;
         // tag::svg-transcoder-java-006[]
+        Image img = Resources.getGlobalResources().getImage("juice.riv");
         img.setAnimationProperty("profile/name", "Ada");
         img.setAnimationProperty("score", Float.valueOf(42));
         img.setAnimationProperty("theme/accent", Integer.valueOf(0xff3366cc));
@@ -105,8 +107,8 @@ class SvgTranscoderJava004Snippet {
     }
 
     void events() throws Exception {
-        Image img = myImage;
         // tag::svg-transcoder-java-007[]
+        Image img = Resources.getGlobalResources().getImage("juice.riv");
         img.addAnimationListener(e -> {
             AnimationEvent ev = (AnimationEvent) e;
             if (ev.getType() == AnimationEvent.TYPE_OPEN_URL) {
@@ -119,8 +121,8 @@ class SvgTranscoderJava004Snippet {
     }
 
     void clock() throws Exception {
-        Image img = myImage;
         // tag::svg-transcoder-java-008[]
+        Image img = Resources.getGlobalResources().getImage("juice.riv");
         img.setAnimationPlaying(false);
         img.advanceAnimation(0.5f);
         // end::svg-transcoder-java-008[]
