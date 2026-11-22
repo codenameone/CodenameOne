@@ -172,7 +172,7 @@ public class BulkOrders {
 
     /// Whether the comma separated `tags` already holds `tag`, ignoring ASCII
     /// case.
-    static boolean hasTag(String tags, String tag) {
+    public static boolean hasTag(String tags, String tag) {
         int start = 0;
         for (int iter = 0; iter <= tags.length(); iter++) {
             if (iter == tags.length() || tags.charAt(iter) == ',') {
