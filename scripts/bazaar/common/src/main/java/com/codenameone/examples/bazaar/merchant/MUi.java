@@ -181,10 +181,10 @@ final class MUi {
         renderer.setShowGrid(false);
         renderer.setPanEnabled(false, false);
         renderer.setZoomEnabled(false, false);
-        renderer.setApplyBackgroundColor(true);
-        renderer.setBackgroundColor(0);
-        renderer.setMarginsColor(0);
-        renderer.setMargins(new int[] {2, 0, 2, 0});
+        // No background and no margins: the chart paints colours without their alpha,
+        // so a "transparent" 0 background or margin came out as a solid black block.
+        renderer.setApplyBackgroundColor(false);
+        renderer.setMargins(new int[] {0, 0, 0, 0});
         renderer.setYAxisMin(0);
         renderer.setYAxisMax(max * 1.1);
         renderer.setXAxisMin(0);
