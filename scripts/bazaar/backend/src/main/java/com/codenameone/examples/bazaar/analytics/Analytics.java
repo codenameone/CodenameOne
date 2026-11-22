@@ -45,7 +45,6 @@ import com.codenameone.examples.bazaar.repository.CustomerRepository;
 import com.codenameone.examples.bazaar.repository.InventoryLevelRepository;
 import com.codenameone.examples.bazaar.repository.LocationRepository;
 import com.codenameone.examples.bazaar.repository.OrderLineRepository;
-import com.codenameone.examples.bazaar.repository.RefundRepository;
 import com.codenameone.examples.bazaar.repository.StoreOrderRepository;
 import com.codenameone.examples.bazaar.repository.VariantRepository;
 import com.codenameone.examples.bazaar.ops.Perms;
@@ -89,7 +88,6 @@ public class Analytics {
 
     private final StoreOrderRepository orders;
     private final OrderLineRepository lines;
-    private final RefundRepository refunds;
     private final CartRepository carts;
     private final CustomerRepository customers;
     private final InventoryLevelRepository levels;
@@ -98,12 +96,11 @@ public class Analytics {
     private final StoreAccess access;
 
     public Analytics(StoreOrderRepository orders, OrderLineRepository lines,
-            RefundRepository refunds, CartRepository carts, CustomerRepository customers,
+            CartRepository carts, CustomerRepository customers,
             InventoryLevelRepository levels, VariantRepository variants,
             LocationRepository locations, StoreAccess access) {
         this.orders = orders;
         this.lines = lines;
-        this.refunds = refunds;
         this.carts = carts;
         this.customers = customers;
         this.levels = levels;
