@@ -204,6 +204,7 @@ public class Checkouts {
 
         // Reserve, all or nothing.
         final String[] at = new String[quote.lines.size()];
+        final int[] back = new int[quote.lines.size()];
         List<String[]> held = new ArrayList<String[]>();
         for (int iter = 0; iter < quote.lines.size(); iter++) {
             Quote.Line line = quote.lines.get(iter);
@@ -215,14 +216,16 @@ public class Checkouts {
             }
             String location = pickup ? quote.shipping.rate.getLocationId()
                     : inventory.pickLocation(storeId, line.variant.getId(), line.price.quantity);
-            if (location == null || !inventory.reserve(storeId, line.variant.getId(), location,
-                    line.price.quantity, orderId, username)) {
+            int over = location == null ? -1 : inventory.reserveCounted(storeId,
+                    line.variant.getId(), location, line.price.quantity, orderId, username);
+            if (over < 0) {
                 orders.releaseAll(storeId, held, orderId, username);
                 throw new ResponseStatusException(409, "Not enough " + line.product.getTitle()
                         + (line.variant.getTitle() == null || line.variant.getTitle().length() == 0
                             ? "" : " (" + line.variant.getTitle() + ")") + " in stock");
             }
             at[iter] = location;
+            back[iter] = over;
             held.add(new String[] {line.cartLineId, line.variant.getId(), location,
                 Integer.toString(line.price.quantity)});
         }
@@ -243,7 +246,7 @@ public class Checkouts {
                         orders.tender(o.getId(), "GIFT_CARD", q.giftCardCents,
                                 q.giftCard.getLastFour());
                     }
-                    orders.insertLines(o, q, at);
+                    orders.insertLines(o, q, at, back);
                     orders.event(o.getId(), "PLACED", "Order placed", who);
                 }
             });

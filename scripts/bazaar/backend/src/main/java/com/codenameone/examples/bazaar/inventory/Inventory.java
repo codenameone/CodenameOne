@@ -83,11 +83,13 @@ public class Inventory {
     private final VariantRepository variants;
     private final LocationRepository locations;
     private final Bundles bundles;
+    private final Tracking tracking;
 
     public Inventory(InventoryLevelRepository levels, InventoryMoveRepository moves,
             VariantRepository variants, LocationRepository locations,
-            Bundles bundles) {
+            Bundles bundles, Tracking tracking) {
         this.bundles = bundles;
+        this.tracking = tracking;
         this.levels = levels;
         this.moves = moves;
         this.variants = variants;
@@ -102,39 +104,57 @@ public class Inventory {
     @Transactional(rollbackFor = IOException.class)
     public boolean reserve(String storeId, String variantId, String locationId, int qty,
             String reference, String username) throws IOException {
+        return reserveCounted(storeId, variantId, locationId, qty, reference, username) >= 0;
+    }
+
+    /// [#reserve], answering -1 when refused, otherwise how many of the
+    /// `qty` units were promised past zero: 0 unless the variant continues
+    /// selling when out of stock and fewer than `qty` were available. The
+    /// order line keeps that figure as its backordered units.
+    @Transactional(rollbackFor = IOException.class)
+    public int reserveCounted(String storeId, String variantId, String locationId, int qty,
+            String reference, String username) throws IOException {
         Variant variant = variant(storeId, variantId);
         location(storeId, locationId);
         positive(qty);
         List<Bundles.Part> parts = bundles.partsOfVariant(variantId);
         if (!parts.isEmpty()) {
+            int backordered = 0;
             // A bundle holds no stock: its components are promised, all or
             // none -- a later component that is short gives the earlier back.
             for (int iter = 0; iter < parts.size(); iter++) {
                 Bundles.Part part = parts.get(iter);
-                if (!reserve(storeId, part.variantId, locationId, qty * part.quantity, reference,
-                        username)) {
+                int part0 = reserveCounted(storeId, part.variantId, locationId,
+                        qty * part.quantity, reference, username);
+                if (part0 > backordered) {
+                    backordered = part0;
+                }
+                if (part0 < 0) {
                     for (int back = 0; back < iter; back++) {
                         release(storeId, parts.get(back).variantId, locationId,
                                 qty * parts.get(back).quantity, reference, username);
                     }
-                    return false;
+                    return -1;
                 }
             }
-            return true;
+            return backordered;
         }
         if (!variant.isTrackInventory()) {
-            return true;
+            return 0;
         }
         if (variant.isAllowBackorder()) {
             change(storeId, variantId, locationId, 0, qty, 0, RESERVE, reference, username);
-            return true;
+            // Read after the relative update: what this order took beyond
+            // what was there, never more than it asked for.
+            int after = available(variantId, locationId);
+            return after >= 0 ? 0 : Math.min(qty, -after);
         }
         InventoryLevel level = level(storeId, variantId, locationId);
         if (levels.reserveIf(level.getId(), qty, Instant.now()) != 1) {
-            return false;
+            return -1;
         }
         record(storeId, variantId, locationId, 0, qty, RESERVE, reference, username);
-        return true;
+        return 0;
     }
     // end::bazaar-reserve[]
 
@@ -287,6 +307,11 @@ public class Inventory {
         levels.apply(level.getId(), onHand, committed, incoming, Instant.now());
         if (onHand != 0 || committed != 0) {
             record(storeId, variantId, locationId, onHand, committed, reason, reference, username);
+        }
+        if (onHand < 0 && (SALE.equals(reason) || POS_SYNC.equals(reason))) {
+            // Units leaving for a buyer: a lot-tracked variant draws them
+            // from its lots, the soonest to expire first.
+            tracking.pickLots(storeId, variantId, locationId, -onHand, reference);
         }
     }
 

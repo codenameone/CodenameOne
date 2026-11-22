@@ -78,7 +78,20 @@ public class OrderLine {
     @Column(nullable = false)
     private boolean preorder;
 
+    /// Units of `quantity` sold past zero: the variant sells when out of
+    /// stock and these were not on hand when the order was placed.
+    @Column(nullable = false)
+    private int backorderedQty;
+
     public OrderLine() {
+    }
+
+    public int getBackorderedQty() {
+        return backorderedQty;
+    }
+
+    public void setBackorderedQty(int backorderedQty) {
+        this.backorderedQty = backorderedQty;
     }
 
     public boolean isPreorder() {

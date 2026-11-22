@@ -200,6 +200,10 @@ class MerchantIdorTest {
         "GET /channels", "POST /channels", "POST /channels/{channelId}/remove",
         "POST /channels/{channelId}/sync", "GET /channels/{channelId}/listings",
         "POST /channels/{channelId}/listings", "GET /channels/{channelId}/log",
+        // Inventory states, serials and lots.
+        "GET /inventory/states", "POST /inventory/unavailable", "GET /tracking",
+        "POST /tracking", "POST /tracking/receive", "GET /serials", "GET /lots",
+        "POST /orders/{orderId}/serials",
     };
 
     /// Routes of [#ROUTES] served as documents by `DocumentPages` rather than

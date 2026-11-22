@@ -172,6 +172,11 @@ public class StoreOrder {
     @Column(nullable = false, type = "VARCHAR(16)")
     private String fxSource = "";
 
+    /// Out of the working order list, whatever its status: archived by hand,
+    /// in bulk, or when it closed and the store archives closed orders.
+    @Column(nullable = false)
+    private boolean archived;
+
     public StoreOrder() {
     }
 
@@ -477,6 +482,14 @@ public class StoreOrder {
 
     public void setNote(String note) {
         this.note = note;
+    }
+
+    public boolean isArchived() {
+        return archived;
+    }
+
+    public void setArchived(boolean archived) {
+        this.archived = archived;
     }
 
     public String getTags() {

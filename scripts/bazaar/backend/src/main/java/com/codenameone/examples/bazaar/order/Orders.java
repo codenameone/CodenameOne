@@ -800,14 +800,15 @@ public class Orders {
         for (int iter = 0; iter < rows.size(); iter++) {
             OrderLine line = rows.get(iter);
             String at = inventory.pickLocation(storeId, line.getVariantId(), line.getQuantity());
-            if (at == null || !inventory.reserve(storeId, line.getVariantId(), at,
-                    line.getQuantity(), orderId, username)) {
+            int over = at == null ? -1 : inventory.reserveCounted(storeId, line.getVariantId(),
+                    at, line.getQuantity(), orderId, username);
+            if (over < 0) {
                 releaseAll(storeId, held, orderId, username);
                 throw new ResponseStatusException(409, "Not enough " + line.getTitle()
                         + " in stock");
             }
             held.add(new String[] {line.getId(), line.getVariantId(), at,
-                Integer.toString(line.getQuantity())});
+                Integer.toString(line.getQuantity()), Integer.toString(over)});
         }
         StoreOrder done = convertedTx(orderId, held, username);
         publish(done);
@@ -822,6 +823,9 @@ public class Orders {
         for (int iter = 0; iter < held.size(); iter++) {
             OrderLine line = lines.findById(held.get(iter)[0]);
             line.setLocationId(held.get(iter)[2]);
+            if (held.get(iter).length > 4) {
+                line.setBackorderedQty(Integer.parseInt(held.get(iter)[4]));
+            }
             lines.save(line);
         }
         order.setLocationId(held.isEmpty() ? "-" : held.get(0)[2]);
@@ -938,6 +942,13 @@ public class Orders {
     /// @param locations where each quote line's stock is held, by index, or
     ///     null when nothing is reserved yet
     public void insertLines(StoreOrder order, Quote quote, String[] locations) throws IOException {
+        insertLines(order, quote, locations, null);
+    }
+
+    /// [#insertLines] with each line's backordered units
+    /// ([Inventory#reserveCounted]), or null for none.
+    public void insertLines(StoreOrder order, Quote quote, String[] locations, int[] backordered)
+            throws IOException {
         // A capped flash sale counts these units now, in the order's own
         // transaction, so the cap cannot be passed by two orders at once.
         saleEvents.claim(order, quote);
@@ -958,6 +969,7 @@ public class Orders {
             line.setTaxCents(q.price.taxCents);
             line.setWeightGrams(q.variant.getWeightGrams());
             line.setPreorder(q.preorder);
+            line.setBackorderedQty(backordered == null ? 0 : Math.max(0, backordered[iter]));
             // A custom sale item (no variant) is held nowhere: nothing to
             // release, ship or restock for it later.
             line.setLocationId(locations == null || locations[iter] == null
