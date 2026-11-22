@@ -47,6 +47,7 @@ final class HtmlFormat {
     private static final class Reader {
         final Ids ids = new Ids();
         final List<Block> out;
+        int depth;
         RichText.Builder text = new RichText.Builder();
         String style = "Normal";
         String align = Paragraph.LEFT;
@@ -128,9 +129,21 @@ final class HtmlFormat {
         return Ids.asciiLower(e.getTagName());
     }
 
+    /// Deeper than this, markup is dropped: no real page nests that far, and each level is
+    /// a frame on a device thread's small stack.
+    private static final int MAX_DEPTH = 100;
+
     private static void walkChildren(Element e, Reader r, TextStyle style) {
-        for (int i = 0; i < e.getNumChildren(); i++) {
-            walk(e.getChildAt(i), r, style);
+        if (r.depth >= MAX_DEPTH) {
+            return;
+        }
+        r.depth++;
+        try {
+            for (int i = 0; i < e.getNumChildren(); i++) {
+                walk(e.getChildAt(i), r, style);
+            }
+        } finally {
+            r.depth--;
         }
     }
 

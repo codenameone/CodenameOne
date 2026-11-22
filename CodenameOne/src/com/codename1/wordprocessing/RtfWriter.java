@@ -202,6 +202,30 @@ final class RtfWriter {
         if (p.indent > 0) {
             b.append("\\li").append(tw(p.indent));
         }
+        if (p.firstLine != 0) {
+            // negative is a hanging indent
+            b.append("\\fi").append(tw(p.firstLine));
+        }
+        if (p.rightIndent > 0) {
+            b.append("\\ri").append(tw(p.rightIndent));
+        }
+        for (TabStop t : p.tabs) {
+            if (TabStop.CENTER.equals(t.alignment)) {
+                b.append("\\tqc");
+            } else if (TabStop.RIGHT.equals(t.alignment)) {
+                b.append("\\tqr");
+            } else if (TabStop.DECIMAL.equals(t.alignment)) {
+                b.append("\\tqdec");
+            }
+            if (t.leader == '.') {
+                b.append("\\tldot");
+            } else if (t.leader == '-') {
+                b.append("\\tlhyph");
+            } else if (t.leader == '_') {
+                b.append("\\tlul");
+            }
+            b.append("\\tx").append(tw(t.position));
+        }
         if (p.lineSpacing != 1 && p.lineSpacing > 0) {
             b.append("\\sl").append(Math.round(p.lineSpacing * 240)).append("\\slmult1");
         }
@@ -223,7 +247,11 @@ final class RtfWriter {
                 b.append("{\\pntxta .}}");
             }
         }
-        b.append(' ');
+        // a space after a closing brace is text, not a delimiter: each round trip would add
+        // one to the start of the item
+        if (b.charAt(b.length() - 1) != '}') {
+            b.append(' ');
+        }
         rich(b, p.text, p.id);
     }
 

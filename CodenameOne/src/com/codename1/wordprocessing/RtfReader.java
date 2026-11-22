@@ -152,6 +152,13 @@ final class RtfReader {
         float before;
         float after;
         float indent;
+        float firstLine;
+        float rightIndent;
+        // tab stops of the paragraph; the alignment and leader words come before the \tx
+        // they qualify
+        final List<TabStop> tabs = new ArrayList<TabStop>();
+        String tabAlign = TabStop.LEFT;
+        char tabLeader = ' ';
         float spacing = 1;
         boolean pageBreak;
         boolean keepNext;
@@ -167,6 +174,11 @@ final class RtfReader {
             before = 0;
             after = 0;
             indent = 0;
+            firstLine = 0;
+            rightIndent = 0;
+            tabs.clear();
+            tabAlign = TabStop.LEFT;
+            tabLeader = ' ';
             spacing = 1;
             pageBreak = false;
             keepNext = false;
@@ -227,6 +239,13 @@ final class RtfReader {
                 b = new Paragraph(paraId, styleName(style), p.align, kind, p.level, start,
                         p.before, p.after, Math.max(0, p.indent), p.spacing,
                         p.pageBreak || pendingBreak, p.keepNext, t);
+                if (p.firstLine != 0 || p.rightIndent != 0) {
+                    b = ((Paragraph) b).withIndents(Math.max(0, p.indent), p.firstLine,
+                            Math.max(0, p.rightIndent));
+                }
+                if (!p.tabs.isEmpty()) {
+                    b = ((Paragraph) b).withTabs(new ArrayList<TabStop>(p.tabs));
+                }
             }
             pendingBreak = false;
             if (p.inTable || cellEnd) {
@@ -743,6 +762,28 @@ final class RtfReader {
             p.after = Math.max(0, v / 20f);
         } else if ("li".equals(w)) {
             p.indent = v / 20f;
+        } else if ("fi".equals(w)) {
+            p.firstLine = v / 20f;
+        } else if ("ri".equals(w)) {
+            p.rightIndent = v / 20f;
+        } else if ("tqc".equals(w)) {
+            p.tabAlign = TabStop.CENTER;
+        } else if ("tqr".equals(w)) {
+            p.tabAlign = TabStop.RIGHT;
+        } else if ("tqdec".equals(w)) {
+            p.tabAlign = TabStop.DECIMAL;
+        } else if ("tldot".equals(w)) {
+            p.tabLeader = '.';
+        } else if ("tlhyph".equals(w)) {
+            p.tabLeader = '-';
+        } else if ("tlul".equals(w) || "tlth".equals(w)) {
+            p.tabLeader = '_';
+        } else if ("tx".equals(w)) {
+            if (p.tabs.size() < 64) {
+                p.tabs.add(new TabStop(v / 20f, p.tabAlign, p.tabLeader));
+            }
+            p.tabAlign = TabStop.LEFT;
+            p.tabLeader = ' ';
         } else if ("sl".equals(w)) {
             if (v > 0) {
                 p.spacing = Math.round(v * 100f / 240) / 100f;

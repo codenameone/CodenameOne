@@ -1611,7 +1611,24 @@ final class DocxReader {
 
     // ------------------------------------------------------------------ tables
 
+    /// Tables nested deeper than this are refused: Word stops well short of it, and each
+    /// level costs stack frames a hostile file could otherwise exhaust.
+    private static final int MAX_TABLE_DEPTH = 16;
+    private int tableDepth;
+
     private Table table(XmlScanner x) throws IOException {
+        if (tableDepth >= MAX_TABLE_DEPTH) {
+            throw new IOException("Tables are nested too deeply");
+        }
+        tableDepth++;
+        try {
+            return readTable(x);
+        } finally {
+            tableDepth--;
+        }
+    }
+
+    private Table readTable(XmlScanner x) throws IOException {
         String id = ids.next('t');
         List<List<List<Block>>> rows = new ArrayList<List<List<Block>>>();
         // per row, per grid column: 0 = own cell, 1 = covered horizontally, 2 = vMerge continue

@@ -500,7 +500,9 @@ final class OdtWriter {
         String name = null;
         for (Map.Entry<String, String> e : paraStyles.entrySet()) {
             if (e.getKey().equals(k)) {
-                name = e.getValue().substring(18, e.getValue().indexOf('"', 18));
+                // the value opens with <style:style style:name=" -- 25 characters
+                int from = "<style:style style:name=\"".length();
+                name = e.getValue().substring(from, e.getValue().indexOf('"', from));
                 break;
             }
         }

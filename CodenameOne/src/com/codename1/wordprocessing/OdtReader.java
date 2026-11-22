@@ -45,6 +45,10 @@ final class OdtReader {
     private final Map<String, byte[]> parts;
     private final long[] budget = {XmlScanner.MAX_DOCUMENT};
     private final Ids ids = new Ids();
+    /// Cells in all tables of the file together, repeats expanded. A repeat count turns a few
+    /// bytes into a row or column of copies, so the totals are what bound memory.
+    private static final int MAX_CELLS = 200000;
+    private int cells;
     private final Map<String, Style> styles = new HashMap<String, Style>();
     private final Map<String, String[]> listStyles = new HashMap<String, String[]>();
     private final Map<String, Revision> changes = new HashMap<String, Revision>();
@@ -1165,7 +1169,24 @@ final class OdtReader {
 
     // ------------------------------------------------------------------ tables
 
+    /// Tables nested deeper than this are refused: Word stops well short of it, and each
+    /// level costs stack frames a hostile file could otherwise exhaust.
+    private static final int MAX_TABLE_DEPTH = 16;
+    private int tableDepth;
+
     private Table table(XmlScanner x) throws IOException {
+        if (tableDepth >= MAX_TABLE_DEPTH) {
+            throw new IOException("Tables are nested too deeply");
+        }
+        tableDepth++;
+        try {
+            return readTable(x);
+        } finally {
+            tableDepth--;
+        }
+    }
+
+    private Table readTable(XmlScanner x) throws IOException {
         String id = ids.next('t');
         List<List<List<Block>>> rows = new ArrayList<List<List<Block>>>();
         List<int[]> anchors = new ArrayList<int[]>();
@@ -1211,6 +1232,10 @@ final class OdtReader {
             }
         }
         List<Table.Merge> merges = new ArrayList<Table.Merge>();
+        if ((long) rows.size() * columns > MAX_CELLS) {
+            // ragged rows: one wide row over many narrow ones still makes a full grid here
+            throw new IOException("The table is too large");
+        }
         boolean[][] used = new boolean[rows.size()][columns];
         for (int[] a : anchors) {
             int r = a[0];
@@ -1289,6 +1314,10 @@ final class OdtReader {
             return;
         }
         for (int i = 0; i < repeat && rows.size() < MAX_ROWS; i++) {
+            cells += row.size();
+            if (cells > MAX_CELLS) {
+                throw new IOException("The tables have too many cells");
+            }
             List<List<Block>> copy = i == 0 ? row : new ArrayList<List<Block>>(row);
             rows.add(copy);
         }

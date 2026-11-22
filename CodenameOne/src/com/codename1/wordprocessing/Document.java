@@ -80,7 +80,8 @@ public final class Document {
         /// and text sections), headers and footers, tab stops and indents.
         ODT("odt"),
 
-        /// Rich Text Format. Reads and writes character formatting, styles, lists, tables
+        /// Rich Text Format. Reads and writes character formatting, styles, lists, indents,
+        /// tab stops, tables
         /// with merged cells, links, fields, notes, PNG and JPEG pictures, annotations and
         /// tracked changes; nested tables are written as tab separated lines. Page features
         /// are not written: sections, columns, headers and footers are dropped and floating
@@ -581,6 +582,18 @@ public final class Document {
     ///
     /// - `IOException`: when the stream fails or does not hold a document of that format
     public static Document read(InputStream in, Format format) throws IOException {
+        try {
+            return readFormat(in, format);
+        } catch (StackOverflowError ex) {
+            // the readers bound their nesting; this is the backstop for a thread whose stack
+            // is smaller than those bounds assume
+            IOException e = new IOException("The document is nested too deeply: " + ex);
+            e.initCause(ex);
+            throw e;
+        }
+    }
+
+    private static Document readFormat(InputStream in, Format format) throws IOException {
         if (format == Format.NATIVE) {
             return NativeFormat.read(in);
         }
