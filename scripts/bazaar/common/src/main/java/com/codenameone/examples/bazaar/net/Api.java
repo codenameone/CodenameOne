@@ -34,6 +34,7 @@ import com.codenameone.examples.bazaar.api.OrderEditApi;
 import com.codenameone.examples.bazaar.api.ReturnApi;
 import com.codenameone.examples.bazaar.api.GiftCardApi;
 import com.codenameone.examples.bazaar.api.InventoryApi;
+import com.codenameone.examples.bazaar.api.RoutingApi;
 import com.codenameone.examples.bazaar.api.ShippingApi;
 import com.codenameone.examples.bazaar.api.OrderToolsApi;
 import com.codenameone.examples.bazaar.api.StockStatesApi;
@@ -85,6 +86,7 @@ public final class Api {
     private static OrderToolsApi orderTools;
     private static StockStatesApi stockStates;
     private static ShippingApi shipping;
+    private static RoutingApi routing;
     private static FulfillmentApi fulfilment;
     private static ReturnApi returns;
     private static PosApi pos;
@@ -133,6 +135,7 @@ public final class Api {
         orderTools = RestClients.create(OrderToolsApi.class, baseUrl);
         stockStates = RestClients.create(StockStatesApi.class, baseUrl);
         shipping = RestClients.create(ShippingApi.class, baseUrl);
+        routing = RestClients.create(RoutingApi.class, baseUrl);
         fulfilment = RestClients.create(FulfillmentApi.class, baseUrl);
         returns = RestClients.create(ReturnApi.class, baseUrl);
         pos = RestClients.create(PosApi.class, baseUrl);
@@ -221,6 +224,10 @@ public final class Api {
 
     public static ShippingApi shipping() {
         return shipping;
+    }
+
+    public static RoutingApi routing() {
+        return routing;
     }
 
     public static FulfillmentApi fulfilment() {

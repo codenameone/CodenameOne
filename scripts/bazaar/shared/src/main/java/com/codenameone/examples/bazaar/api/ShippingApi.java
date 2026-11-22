@@ -53,4 +53,21 @@ public interface ShippingApi {
     @DELETE("/api/merchant/stores/{storeId}/shipping/rates/{rateId}")
     void deleteRate(@Path("storeId") String storeId, @Path("rateId") String rateId,
             OnComplete<Response<ShippingRateDto>> callback);
+
+    /// The shipping profiles by position, each with its products.
+    @GET("/api/merchant/stores/{storeId}/shipping/profiles")
+    void profiles(@Path("storeId") String storeId,
+            OnComplete<Response<List<ShippingProfileDto>>> callback);
+
+    /// Saves a profile; its `productIds` become exactly the products in it,
+    /// taken out of any other profile.
+    @POST("/api/merchant/stores/{storeId}/shipping/profiles")
+    void saveProfile(@Path("storeId") String storeId, @Body ShippingProfileDto profile,
+            OnComplete<Response<ShippingProfileDto>> callback);
+
+    /// Deletes a profile with its zones and rates; its products go back to the
+    /// general profile.
+    @DELETE("/api/merchant/stores/{storeId}/shipping/profiles/{profileId}")
+    void deleteProfile(@Path("storeId") String storeId, @Path("profileId") String profileId,
+            OnComplete<Response<ShippingProfileDto>> callback);
 }

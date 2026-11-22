@@ -284,11 +284,14 @@ public class Quoter {
         long cheapest = 0;
         ShippingCalculator.CarrierQuotes live = hasAddress
                 ? carrierQuotes(cart, all, address) : null;
+        Map<String, String> profileOf = hasAddress && ships ? profiles(cart.getStoreId())
+                : new HashMap<String, String>();
         if (hasAddress && ships) {
-            List<ShippingCalculator.Option> before = ShippingCalculator.options(
+            List<ShippingCalculator.Option> before = ShippingCalculator.combined(
                     zones.findByStoreIdOrderByPositionAsc(cart.getStoreId()), storeRates,
                     locationById, country, hasPoint, hasPoint ? address.lat() : 0,
-                    hasPoint ? address.lng() : 0, quote.subtotalCents, weight, false, live);
+                    hasPoint ? address.lng() : 0,
+                    groups(quote, profileOf, quote.subtotalCents, weight), false, live);
             cheapest = cheapestDelivery(before);
         }
         // Discounts.
@@ -329,10 +332,10 @@ public class Quoter {
         }
         long afterDiscounts = quote.subtotalCents - quote.discountCents();
         if (hasAddress && ships) {
-            quote.options = ShippingCalculator.options(
+            quote.options = ShippingCalculator.combined(
                     zones.findByStoreIdOrderByPositionAsc(cart.getStoreId()), storeRates,
                     locationById, country, hasPoint, hasPoint ? address.lat() : 0,
-                    hasPoint ? address.lng() : 0, afterDiscounts, weight,
+                    hasPoint ? address.lng() : 0, groups(quote, profileOf, afterDiscounts, weight),
                     quote.discounts.freeShipping, live);
             quote.options = pickupsInStock(quote, quote.options, locationById,
                     bundleParts.keySet());
@@ -414,6 +417,62 @@ public class Quoter {
             }
         }
         return null;
+    }
+
+    /// The store's products that are in a shipping profile, each with its
+    /// profile, in the profiles' order. Empty when the store has none.
+    private Map<String, String> profiles(String storeId) throws IOException {
+        Map<String, String> out = new java.util.LinkedHashMap<String, String>();
+        List rows = db.query("SELECT p.product_id, p.profile_id FROM shipping_profile_product p "
+                + "JOIN shipping_profile s ON s.id = p.profile_id WHERE p.store_id = ? "
+                + "ORDER BY s.position, s.id", new Object[] {storeId});
+        for (int iter = 0; iter < rows.size(); iter++) {
+            Map r = (Map) rows.get(iter);
+            out.put(String.valueOf(r.get("product_id")), String.valueOf(r.get("profile_id")));
+        }
+        return out;
+    }
+
+    /// The cart's physical lines grouped by shipping profile
+    /// ([ShippingCalculator#combined]): the general profile first, then the
+    /// others in their order. A cart all in one profile is one group over the
+    /// whole `subtotalCents` and `weightGrams`, exactly as before profiles.
+    static List<ShippingCalculator.Group> groups(Quote quote, Map<String, String> profileOf,
+            long subtotalCents, int weightGrams) {
+        Map<String, long[]> by = new java.util.LinkedHashMap<String, long[]>();
+        by.put("", new long[2]);
+        java.util.Set<String> order = new java.util.LinkedHashSet<String>(profileOf.values());
+        for (String p : order) {
+            by.put(p, new long[2]);
+        }
+        for (int iter = 0; iter < quote.lines.size(); iter++) {
+            Quote.Line line = quote.lines.get(iter);
+            if (line.variant.isDigital()) {
+                continue;
+            }
+            String p = profileOf.get(line.product.getId());
+            long[] sum = by.get(p == null ? "" : p);
+            sum[0] += line.price.netCents();
+            sum[1] += (long) line.price.weightGrams * line.price.quantity;
+        }
+        List<ShippingCalculator.Group> out = new ArrayList<ShippingCalculator.Group>();
+        List<String> used = new ArrayList<String>();
+        for (Map.Entry<String, long[]> e : by.entrySet()) {
+            if (e.getValue()[1] > 0 || e.getValue()[0] > 0) {
+                used.add(e.getKey());
+            }
+        }
+        if (used.size() <= 1) {
+            out.add(new ShippingCalculator.Group(used.isEmpty() ? "" : used.get(0), subtotalCents,
+                    weightGrams));
+            return out;
+        }
+        for (int iter = 0; iter < used.size(); iter++) {
+            long[] sum = by.get(used.get(iter));
+            out.add(new ShippingCalculator.Group(used.get(iter), sum[0],
+                    (int) Math.min(Integer.MAX_VALUE, sum[1])));
+        }
+        return out;
     }
 
     /// Prices CARRIER rates through [CarrierRates]: from the store's first

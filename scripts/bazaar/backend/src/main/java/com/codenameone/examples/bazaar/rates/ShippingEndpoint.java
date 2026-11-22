@@ -21,6 +21,7 @@ package com.codenameone.examples.bazaar.rates;
 import com.codename1.appkit.server.Caller;
 import com.codename1.backend.annotations.Component;
 import com.codenameone.examples.bazaar.api.ShippingApiServer;
+import com.codenameone.examples.bazaar.api.ShippingProfileDto;
 import com.codenameone.examples.bazaar.api.ShippingRateDto;
 import com.codenameone.examples.bazaar.api.ShippingZoneDto;
 
@@ -58,5 +59,21 @@ public class ShippingEndpoint implements ShippingApiServer {
     @Override
     public ShippingRateDto deleteRate(String storeId, String rateId) throws Exception {
         return settings.deleteRate(Caller.name(), storeId, rateId);
+    }
+
+    @Override
+    public List<ShippingProfileDto> profiles(String storeId) throws Exception {
+        return settings.profiles(Caller.name(), storeId);
+    }
+
+    @Override
+    public ShippingProfileDto saveProfile(String storeId, ShippingProfileDto body)
+            throws Exception {
+        return settings.saveProfile(Caller.name(), storeId, body);
+    }
+
+    @Override
+    public ShippingProfileDto deleteProfile(String storeId, String profileId) throws Exception {
+        return settings.deleteProfile(Caller.name(), storeId, profileId);
     }
 }

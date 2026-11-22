@@ -62,9 +62,12 @@ public class LineOrders {
     private final Inventory inventory;
     private final StoreEvents storeEvents;
 
+    private final com.codenameone.examples.bazaar.routing.OrderRouting routing;
+
     public LineOrders(Orders orders, StoreOrderRepository orderRows, OrderLineRepository lines,
             VariantRepository variants, ProductRepository products, StoreRepository stores,
-            Inventory inventory, StoreEvents storeEvents) {
+            Inventory inventory, StoreEvents storeEvents, com.codenameone.examples.bazaar.routing.OrderRouting routing) {
+        this.routing = routing;
         this.orders = orders;
         this.orderRows = orderRows;
         this.lines = lines;
@@ -136,7 +139,8 @@ public class LineOrders {
                 orders.releaseAll(storeId, held, orderId, actor);
                 throw new ResponseStatusException(404, "No such item");
             }
-            String at = inventory.pickLocation(storeId, v.getId(), it.quantity);
+            String at = routing.plan(storeId, new String[] {v.getId()},
+                    new int[] {it.quantity}, false, 0, 0).locations[0];
             if (at == null || !inventory.reserve(storeId, v.getId(), at, it.quantity, orderId,
                     actor)) {
                 orders.releaseAll(storeId, held, orderId, actor);

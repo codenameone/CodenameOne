@@ -165,12 +165,12 @@ on a row.
 | Packing slips / pick lists | &#10003; | core | core | core | core | 
 | Tracking numbers & tracking events | &#10003; | core | core | core | core | 
 | Delivery date estimates | &#10003; | core | core | core | core | 
-| Shipping profiles (per-product rates) | &#8211; | core | core | core | no | 
-| Fulfillment network / 3PL integration | &#8211; | app/plugin | app/plugin | app/plugin | no | 
-| Fulfillment orders / routing rules across locations | &#9681; | core | app/plugin | app/plugin | no | Multiple locations; no automatic routing.
+| Shipping profiles (per-product rates) | &#10003; | core | core | core | no | Named profiles (such as Oversized or Fragile) group products, each with its own zones and rates; a mixed cart is quoted per profile and the prices added up, the delivery estimate following the slowest. Assigned in the back office and the app.
+| Fulfillment network / 3PL integration | &#10003; | app/plugin | app/plugin | app/plugin | no | A `FulfilmentService` interface hands paid orders for the location it runs to a third-party warehouse; the bundled simulated service accepts them and reports shipment with tracking, which creates the fulfilment, mails the shopper and fires the `orders/fulfilled` webhook.
+| Fulfillment orders / routing rules across locations | &#10003; | core | app/plugin | app/plugin | no | Ordered rules (closest location, a location priority list, most stock) pick the location of each line among those holding the units, and a setting decides whether one order may ship from several locations. Applies to checkout, the admin's orders and channel orders.
 | Ship from store / BOPIS from POS | &#10003; | core | app/plugin | app/plugin | core | Checkout offers "Pick up at <location>" only where that location has every line in stock; the register's pickup queue makes orders ready (the shopper is mailed) and hands them over.
-| Customs forms / international docs | &#8211; | core | app/plugin | app/plugin | no | 
-| Returns label generation | &#8211; | core | app/plugin | app/plugin | no | 
+| Customs forms / international docs | &#10003; | core | app/plugin | app/plugin | no | A CN 22 or CN 23 PDF for an international fulfilment, chosen by value and weight, with each line's HS code and country of origin.
+| Returns label generation | &#10003; | core | app/plugin | app/plugin | no | Approving a return buys a prepaid return label through the store's carrier (an EasyPost return shipment, or the simulated carrier) and mails it to the shopper as a PDF; customs items are added for an international return.
 |===
 
 === Point of sale

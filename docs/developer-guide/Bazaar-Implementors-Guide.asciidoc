@@ -315,6 +315,29 @@ list for the cards in the first column is made on the device, with the same
 include::../../scripts/bazaar/common/src/main/java/com/codenameone/examples/bazaar/merchant/PickListPdf.java[tag=bazaar-picklist-pdf,indent=0]
 ----
 
+=== Profiles, routing and fulfilment services
+
+A shipping zone may belong to a shipping profile; `ShippingCalculator` prices
+each profile's lines against that profile's zones and adds the matching
+options up, so a mixed cart pays the sum. Line locations come from
+`routing.OrderRouting`, which feeds the store's rules to the pure
+`routing.Router`: locations that hold a line's units always come first, and
+each rule only breaks the ties the earlier ones left. Without rules, the first
+location in the store's order that holds a line's units ships it.
+
+A third-party warehouse is a `routing.FulfilmentService`: `submit` hands it an
+order's lines at the location it runs, and `status` reports what it has done.
+`ThirdPartyFulfilment` polls on a schedule under a cluster lock, records every
+hand-over once in `fulfilment_service_order`, and turns a shipment into an
+ordinary fulfilment, so the shopper's mail and the `orders/fulfilled` webhook
+come from the usual path. A real integration replaces
+`SimulatedFulfilmentService` with calls to the warehouse's API.
+
+`CarrierProvider.buyReturnLabel` buys a return label; EasyPost marks the
+shipment `is_return`. `ReturnLabels` calls it when a return is approved and
+never fails the approval: without a label the shopper is told to send the
+parcel back themselves.
+
 === Documents on the server and on the device
 
 The PDF package is shared with the backend, so the server renders invoices,

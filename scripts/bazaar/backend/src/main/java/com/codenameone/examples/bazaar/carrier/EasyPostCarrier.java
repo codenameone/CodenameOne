@@ -154,6 +154,48 @@ public class EasyPostCarrier implements CarrierProvider {
         return new Label(tracking, service, Math.max(0, c), url);
     }
 
+    /// A return shipment (`is_return`), bought at its cheapest rate.
+    @Override
+    public Label buyReturnLabel(Parcel parcel, Place store, Place customer, String reference)
+            throws IOException {
+        Map shipment = shipment(parcel, store, customer, true);
+        String id = text(shipment, "id");
+        String rateId = null;
+        String service = "";
+        long best = Long.MAX_VALUE;
+        Object rates = shipment.get("rates");
+        if (rates instanceof List) {
+            List list = (List) rates;
+            for (int iter = 0; iter < list.size(); iter++) {
+                Object o = list.get(iter);
+                if (!(o instanceof Map)) {
+                    continue;
+                }
+                long c = cents(text((Map) o, "rate"));
+                if (c >= 0 && c < best) {
+                    best = c;
+                    rateId = text((Map) o, "id");
+                    service = text((Map) o, "carrier") + " " + text((Map) o, "service");
+                }
+            }
+        }
+        if (id.length() == 0 || rateId == null) {
+            throw new IOException("EasyPost offers no return rate for this parcel");
+        }
+        Map rate = new LinkedHashMap();
+        rate.put("id", rateId);
+        Map body = new LinkedHashMap();
+        body.put("rate", rate);
+        Map bought = call("POST", "/shipments/" + id + "/buy", Json.write(body));
+        String tracking = text(bought, "tracking_code");
+        Object label = bought.get("postage_label");
+        String url = label instanceof Map ? text((Map) label, "label_url") : "";
+        if (tracking.length() == 0) {
+            throw new IOException("EasyPost bought no return label");
+        }
+        return new Label(tracking, service, best, url);
+    }
+
     @Override
     public List<Scan> track(String trackingNumber, long shippedAt, long now, Place from,
             Place to) throws IOException {
@@ -284,6 +326,14 @@ public class EasyPostCarrier implements CarrierProvider {
     }
 
     private Map shipment(Parcel parcel, Place from, Place to) throws IOException {
+        return shipment(parcel, from, to, false);
+    }
+
+    /// `is_return` makes EasyPost swap the two addresses itself, so a return
+    /// is described the way the parcel first went: from the store to the
+    /// customer.
+    private Map shipment(Parcel parcel, Place from, Place to, boolean isReturn)
+            throws IOException {
         Map p = new LinkedHashMap();
         // EasyPost weighs in ounces; round up so a label is never underpaid.
         p.put("weight", Long.valueOf((Math.max(1, parcel.weightGrams) * 1000L + 28349) / 28350));
@@ -292,6 +342,9 @@ public class EasyPostCarrier implements CarrierProvider {
         s.put("from_address", address(sender));
         s.put("to_address", address(to));
         s.put("parcel", p);
+        if (isReturn) {
+            s.put("is_return", Boolean.TRUE);
+        }
         // Decided on the address actually sent: a location's Place carries no
         // country of its own and takes the configured origin's.
         if (!parcel.items.isEmpty() && CarrierProvider.crossesBorder(sender.country, to.country)) {

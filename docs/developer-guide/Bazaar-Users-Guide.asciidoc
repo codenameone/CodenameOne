@@ -211,6 +211,25 @@ over an amount, pickup or local delivery. Tax rates are set per country and
 region. The settings hold the store's name, description, logo and banner,
 locations, staff and their roles, and the registers.
 
+*Shipping profiles* give some products zones and rates of their own: an
+Oversized profile can charge freight while everything else ships at the usual
+rates. Edit a profile and tick its products. A cart holding products from
+several profiles is quoted per profile and the prices are added up, and the
+delivery estimate is the slowest of them.
+
+*Order routing* decides which location ships each line. Without rules, the
+first location holding the stock does. Rules, applied in order, prefer the
+location closest to the shopper, a priority list of locations, or the one with
+the most stock. Turn off splitting to ship a whole order from one location
+whenever one can fill it. A location run by a fulfilment service (a 3PL) has
+its paid orders handed over automatically; when the service ships, the order
+is fulfilled with its tracking number and the shopper is told. The same page,
+*Shipping* in the back office, lists what was handed over.
+
+Approving a return buys a prepaid return label and mails it to the shopper.
+An international fulfilment has a customs form (CN 22 or CN 23) beside its
+label, filled from each variant's HS code and country of origin.
+
 *Checkout settings*, in the back office on the web, choose the payment methods
 the store takes beside cards (Klarna, Afterpay/Clearpay, iDEAL, Bancontact,
 SEPA debit and more). Checkout offers each one only where the order's currency

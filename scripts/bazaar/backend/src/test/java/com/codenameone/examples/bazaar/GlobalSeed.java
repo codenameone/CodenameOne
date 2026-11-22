@@ -28,6 +28,12 @@ final class GlobalSeed {
     }
 
     static void seed(Shop s, String orderId, DataSource db) throws Exception {
+        // A shipping profile and a routing rule, for the profile and routing
+        // routes.
+        db.execute("INSERT INTO shipping_profile (id, store_id, name, position) VALUES "
+                + "(?, ?, 'IDOR profile', 0)", new Object[] {Ids.next(), s.storeId});
+        db.execute("INSERT INTO routing_rule (id, store_id, kind, location_ids, position) "
+                + "VALUES (?, ?, 'CLOSEST', '', 0)", new Object[] {Ids.next(), s.storeId});
         // Checkout settings and a checkout field, for the checkout settings
         // routes.
         db.execute("INSERT INTO checkout_settings (store_id, methods, tips_enabled, tip_presets, "

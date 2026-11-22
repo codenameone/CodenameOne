@@ -94,6 +94,7 @@ public class Checkouts {
 
     private final com.codenameone.examples.bazaar.ops.Attribution attribution;
     private final CheckoutSettings settings;
+    private final com.codenameone.examples.bazaar.routing.OrderRouting routing;
 
     public Checkouts(Carts carts, Quoter quoter, Inventory inventory, Orders orders,
             Payments payments, GiftCards giftCards, DiscountRepository discounts,
@@ -103,7 +104,9 @@ public class Checkouts {
             com.codenameone.examples.bazaar.risk.Fraud fraud,
             com.codenameone.examples.bazaar.taxes.TaxExemptions exemptions,
             com.codenameone.examples.bazaar.ops.Attribution attribution,
-            CheckoutSettings settings) {
+            CheckoutSettings settings,
+            com.codenameone.examples.bazaar.routing.OrderRouting routing) {
+        this.routing = routing;
         this.attribution = attribution;
         this.settings = settings;
         this.carts = carts;
@@ -280,6 +283,24 @@ public class Checkouts {
         final String[] at = new String[quote.lines.size()];
         final int[] back = new int[quote.lines.size()];
         List<String[]> held = new ArrayList<String[]>();
+        // Where each shipped line leaves from: the store's routing rules.
+        String[] routed = new String[quote.lines.size()];
+        if (!pickup) {
+            String[] vs = new String[quote.lines.size()];
+            int[] qs = new int[quote.lines.size()];
+            for (int iter = 0; iter < vs.length; iter++) {
+                Quote.Line line = quote.lines.get(iter);
+                vs[iter] = line.preorder || line.variant.isDigital() ? null
+                        : line.variant.getId();
+                qs[iter] = line.price.quantity;
+            }
+            boolean point = address != null
+                    && com.codenameone.examples.bazaar.geo.Geo.isPoint(address.lat(),
+                            address.lng());
+            com.codenameone.examples.bazaar.routing.Router.Plan plan = routing.plan(storeId, vs,
+                    qs, point, point ? address.lat() : 0, point ? address.lng() : 0);
+            routed = plan.locations;
+        }
         for (int iter = 0; iter < quote.lines.size(); iter++) {
             Quote.Line line = quote.lines.get(iter);
             if (line.preorder || line.variant.isDigital()) {
@@ -289,7 +310,7 @@ public class Checkouts {
                 continue;
             }
             String location = pickup ? quote.shipping.rate.getLocationId()
-                    : inventory.pickLocation(storeId, line.variant.getId(), line.price.quantity);
+                    : routed[iter];
             int over = location == null ? -1 : inventory.reserveCounted(storeId,
                     line.variant.getId(), location, line.price.quantity, orderId, username);
             if (over < 0) {

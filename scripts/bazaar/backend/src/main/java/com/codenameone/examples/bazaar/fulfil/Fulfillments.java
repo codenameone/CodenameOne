@@ -1013,6 +1013,70 @@ public class Fulfillments {
         return true;
     }
 
+    /// A fulfilment service (3PL) shipped what it was handed of an order at
+    /// `locationId`: every line still open there goes into one fulfilment
+    /// carrying the service's carrier and tracking number, which leaves at
+    /// once -- stock moves, the order records it (firing `orders/fulfilled`
+    /// once the order is complete) and the shopper hears as for any parcel.
+    /// No staff check: the service is the store's own contractor, reached
+    /// only through [com.codenameone.examples.bazaar.routing.ThirdPartyFulfilment].
+    /// Answers the fulfilment's id, or null when nothing was left to send.
+    public String shippedByService(String storeId, String orderId, String locationId,
+            String carrierName, String trackingNumber, String actor) throws IOException {
+        StoreOrder order = orderIn(storeId, orderId);
+        if (!awaitsShipping(order)) {
+            return null;
+        }
+        Map<String, Integer> waiting = waiting(orderId);
+        List<OrderLine> ls = lines.findByOrderId(orderId);
+        List<FulfilLineDto> open = new ArrayList<FulfilLineDto>();
+        for (int iter = 0; iter < ls.size(); iter++) {
+            OrderLine line = ls.get(iter);
+            int left = openQty(line, waiting);
+            String at = line.getLocationId().length() > 0 ? line.getLocationId()
+                    : order.getLocationId();
+            if (left > 0 && locationId.equals(at)) {
+                open.add(new FulfilLineDto(line.getId(), line.getTitle(), line.getSku(), left));
+            }
+        }
+        if (open.isEmpty()) {
+            return null;
+        }
+        Fulfillment f = createTx(storeId, orderId, new NewFulfillmentDto(locationId, null, open),
+                actor);
+        serviceLabelTx(f.getId(), carrierName, trackingNumber);
+        f = fulfillments.findById(f.getId());
+        dispatch(f, SHIPPED, "Shipped by the fulfilment service with " + carrierName, actor);
+        notifyShopper(orderId, "push.shipped.title", "push.shipped.tracking", trackingNumber);
+        emails.shipped(f.getId());
+        orderService.publish(orderRead(storeId, orderId));
+        return f.getId();
+    }
+
+    @Transactional(rollbackFor = IOException.class)
+    private void serviceLabelTx(String id, String carrierName, String trackingNumber)
+            throws IOException {
+        Fulfillment f = fulfillments.findById(id);
+        f.setCarrier(carrierName);
+        f.setService("3PL");
+        f.setTrackingNumber(trackingNumber);
+        f.setUpdatedAt(Instant.now());
+        fulfillments.save(f);
+    }
+
+    /// Scans a fulfilment service reported for a parcel it shipped.
+    public void serviceScans(String fulfillmentId, List<CarrierProvider.Scan> scans)
+            throws IOException {
+        Fulfillment f = fulfillments.findById(fulfillmentId);
+        if (f == null) {
+            return;
+        }
+        String to = recordScans(f.getId(), scans);
+        if (to != null) {
+            announce(f, to);
+        }
+    }
+
     @Transactional(readOnly = true)
     private Fulfillment byTracking(String trackingNumber) throws IOException {
         return trackingNumber == null || trackingNumber.length() == 0 ? null
@@ -1344,6 +1408,20 @@ public class Fulfillments {
                 f.getTrackingNumber(), anonymous ? 0 : f.getLabelCents(), f.getWeightGrams(),
                 millis(f.getCreatedAt()), millis(f.getUpdatedAt()),
                 anonymous ? null : linesOf(f), evs, anonymous ? "" : f.getLabelUrl());
+    }
+
+    /// Buys the prepaid label for a parcel coming back from the order's
+    /// address to `locationId`, from the store's carrier. `reference` is the
+    /// return's id.
+    public CarrierProvider.Label returnLabel(StoreOrder o, String locationId, int grams,
+            List<CarrierProvider.CustomsItem> items, String reference) throws IOException {
+        return carrier.buyReturnLabel(new CarrierProvider.Parcel(Math.max(1, grams), items),
+                from(locationId), to(o), reference);
+    }
+
+    /// The carrier labels are bought from.
+    public String carrierName() {
+        return carrier.name();
     }
 
     private CarrierProvider.Place from(String locationId) {

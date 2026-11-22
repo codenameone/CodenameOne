@@ -55,6 +55,19 @@ public class ReturnRequest {
     @Column(nullable = false)
     private Instant updatedAt = Instant.EPOCH;
 
+    @Column(nullable = false, type = "VARCHAR(32)")
+    private String returnCarrier = "";
+
+    @Column(nullable = false, type = "VARCHAR(64)")
+    private String returnTracking = "";
+
+    @Column(nullable = false, type = "VARCHAR(500)")
+    private String returnLabelUrl = "";
+
+    /// What the prepaid return label cost the store.
+    @Column(nullable = false)
+    private long returnLabelCents;
+
     public ReturnRequest() {
     }
 
@@ -128,5 +141,37 @@ public class ReturnRequest {
 
     public void setUpdatedAt(Instant updatedAt) {
         this.updatedAt = updatedAt;
+    }
+
+    public String getReturnCarrier() {
+        return returnCarrier;
+    }
+
+    public void setReturnCarrier(String returnCarrier) {
+        this.returnCarrier = returnCarrier == null ? "" : returnCarrier;
+    }
+
+    public String getReturnTracking() {
+        return returnTracking;
+    }
+
+    public void setReturnTracking(String returnTracking) {
+        this.returnTracking = returnTracking == null ? "" : returnTracking;
+    }
+
+    public String getReturnLabelUrl() {
+        return returnLabelUrl;
+    }
+
+    public void setReturnLabelUrl(String returnLabelUrl) {
+        this.returnLabelUrl = returnLabelUrl == null ? "" : returnLabelUrl;
+    }
+
+    public long getReturnLabelCents() {
+        return returnLabelCents;
+    }
+
+    public void setReturnLabelCents(long returnLabelCents) {
+        this.returnLabelCents = returnLabelCents;
     }
 }

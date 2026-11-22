@@ -256,6 +256,98 @@ public final class ShippingCalculator {
         }
     }
 
+    /// The physical lines of a cart that share a shipping profile: their
+    /// subtotal after discounts and their weight. The empty profile is the
+    /// store's general one, which every product is in until it is assigned.
+    public static final class Group {
+        public final String profileId;
+        public final long subtotalCents;
+        public final int weightGrams;
+
+        public Group(String profileId, long subtotalCents, int weightGrams) {
+            this.profileId = profileId == null ? "" : profileId;
+            this.subtotalCents = subtotalCents;
+            this.weightGrams = weightGrams;
+        }
+    }
+
+    /// The zones of one shipping profile; the empty id is the general profile.
+    public static List<ShippingZone> zonesOf(List<ShippingZone> zones, String profileId) {
+        String want = profileId == null ? "" : profileId;
+        List<ShippingZone> out = new ArrayList<ShippingZone>();
+        for (int iter = 0; zones != null && iter < zones.size(); iter++) {
+            String has = zones.get(iter).getProfileId();
+            if (want.equals(has == null ? "" : has)) {
+                out.add(zones.get(iter));
+            }
+        }
+        return out;
+    }
+
+    /// The options for a cart whose lines fall into shipping profiles
+    /// (`groups`, the general profile first when the cart has any of it).
+    ///
+    /// The first group is priced as [#options] prices a whole cart, over the
+    /// zones of its own profile, and the shopper chooses among its options.
+    /// Every other group is priced the same way over its profile's zones and
+    /// adds its cheapest delivery option to each of those choices, so a cart
+    /// of a sofa and a lamp pays the oversized rate plus the general rate it
+    /// picked. A group whose profile has no rate for the address makes every
+    /// delivery option go away -- the cart cannot be sent there -- but pickup
+    /// stays: the shopper collects the whole order, for the pickup price
+    /// alone. A free-shipping discount makes every group cost nothing.
+    public static List<Option> combined(List<ShippingZone> zones, List<ShippingRate> rates,
+            Map<String, Location> locations, String country, boolean hasPoint, double lat,
+            double lng, List<Group> groups, boolean freeShipping, CarrierQuotes carrier) {
+        if (groups == null || groups.isEmpty()) {
+            return new ArrayList<Option>();
+        }
+        Group first = groups.get(0);
+        List<Option> primary = options(zonesOf(zones, first.profileId), rates, locations, country,
+                hasPoint, lat, lng, first.subtotalCents, first.weightGrams, freeShipping, carrier);
+        if (groups.size() == 1) {
+            return primary;
+        }
+        long extra = 0;
+        int slowest = 0;
+        boolean blocked = false;
+        for (int iter = 1; iter < groups.size() && !blocked; iter++) {
+            Group g = groups.get(iter);
+            List<Option> own = options(zonesOf(zones, g.profileId), rates, locations, country,
+                    hasPoint, lat, lng, g.subtotalCents, g.weightGrams, freeShipping, carrier);
+            Option best = null;
+            for (int k = 0; k < own.size(); k++) {
+                Option o = own.get(k);
+                if (!PICKUP.equals(o.rate.getKind())
+                        && (best == null || o.priceCents < best.priceCents)) {
+                    best = o;
+                }
+            }
+            if (best == null) {
+                blocked = true;
+            } else {
+                extra = saturatingAdd(extra, best.priceCents);
+                slowest = Math.max(slowest, best.etaDaysMax);
+            }
+        }
+        List<Option> out = new ArrayList<Option>();
+        for (int iter = 0; iter < primary.size(); iter++) {
+            Option o = primary.get(iter);
+            if (PICKUP.equals(o.rate.getKind())) {
+                out.add(o);
+            } else if (!blocked) {
+                out.add(new Option(o.rate, saturatingAdd(o.priceCents, extra), o.id, o.name,
+                        o.service, o.etaDaysMin, Math.max(o.etaDaysMax, slowest)));
+            }
+        }
+        return out;
+    }
+
+    private static long saturatingAdd(long a, long b) {
+        long sum = a + b;
+        return sum < a ? Long.MAX_VALUE : sum;
+    }
+
     /// The option for `rateId` (an [Option#id]), or null when the address
     /// does not get it.
     /// `o` named `name`, for a pickup the checkout titles by its location.

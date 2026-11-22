@@ -27,5 +27,7 @@ public record ShippingZoneDto(
         String name,
         String countries,
         int position,
-        java.util.List<ShippingRateDto> rates) {
+        java.util.List<ShippingRateDto> rates,
+        /// The shipping profile the zone prices; empty for the general profile.
+        String profileId) {
 }

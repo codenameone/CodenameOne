@@ -141,6 +141,8 @@ public class Orders {
 
     private final com.codenameone.examples.bazaar.checkout.CheckoutSettings checkoutSettings;
 
+    private final com.codenameone.examples.bazaar.routing.OrderRouting routing;
+
     public Orders(StoreOrderRepository orders, OrderLineRepository lines,
             OrderEventRepository events, TenderRepository tenders,
             FulfillmentRepository fulfillments, RefundRepository refunds,
@@ -148,7 +150,9 @@ public class Orders {
             StoreRepository stores, StoreStaffRepository staff, Payments payments,
             Inventory inventory, GiftCards giftCards, StoreAccess access, LiveHub live,
             Quoter quoter, StoreEvents storeEvents, CustomerRepository customers, SaleEvents saleEvents,
-            com.codenameone.examples.bazaar.checkout.CheckoutSettings checkoutSettings) {
+            com.codenameone.examples.bazaar.checkout.CheckoutSettings checkoutSettings,
+            com.codenameone.examples.bazaar.routing.OrderRouting routing) {
+        this.routing = routing;
         this.saleEvents = saleEvents;
         this.checkoutSettings = checkoutSettings;
         this.orders = orders;
@@ -937,9 +941,16 @@ public class Orders {
         }
         List<OrderLine> rows = lines.findByOrderId(orderId);
         List<String[]> held = new ArrayList<String[]>();
+        String[] vs = new String[rows.size()];
+        int[] qs = new int[rows.size()];
+        for (int iter = 0; iter < rows.size(); iter++) {
+            vs[iter] = rows.get(iter).getVariantId();
+            qs[iter] = rows.get(iter).getQuantity();
+        }
+        String[] routed = routing.plan(storeId, vs, qs, false, 0, 0).locations;
         for (int iter = 0; iter < rows.size(); iter++) {
             OrderLine line = rows.get(iter);
-            String at = inventory.pickLocation(storeId, line.getVariantId(), line.getQuantity());
+            String at = routed[iter];
             int over = at == null ? -1 : inventory.reserveCounted(storeId, line.getVariantId(),
                     at, line.getQuantity(), orderId, username);
             if (over < 0) {

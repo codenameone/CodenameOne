@@ -72,6 +72,11 @@ class MerchantIdorTest {
         "DELETE /discounts/{discountId}", "DELETE /hero", "DELETE /locations/{locationId}",
         "DELETE /logo", "DELETE /products/{productId}/photos/{photoId}",
         "DELETE /shipping/rates/{rateId}", "DELETE /shipping/zones/{zoneId}",
+        "DELETE /shipping/profiles/{profileId}", "GET /shipping/profiles",
+        "POST /shipping/profiles", "GET /routing", "POST /routing", "POST /routing/rules",
+        "DELETE /routing/rules/{ruleId}", "GET /fulfilment-services/orders",
+        "GET /fulfillments/{fulfillmentId}/customs.pdf",
+        "GET /returns/{returnId}/return-label.pdf",
         "DELETE /staff/{staffId}", "DELETE /suppliers/{supplierId}", "DELETE /tax-rates/{rateId}",
         "DELETE /webhooks/{webhookId}", "GET ", "GET /analytics", "GET /analytics/funnel",
         "GET /automation-catalog", "GET /automations", "GET /automations/{automationId}",
@@ -232,7 +237,8 @@ class MerchantIdorTest {
     /// declared by a shared API interface.
     static final String[] DOCUMENT_ROUTES = {"GET /pos/labels.pdf",
         "GET /label-sheets.pdf", "GET /purchase-orders/{purchaseOrderId}/labels.pdf",
-        "GET /bulk-orders/packing-slips.pdf"};
+        "GET /bulk-orders/packing-slips.pdf", "GET /fulfillments/{fulfillmentId}/customs.pdf",
+        "GET /returns/{returnId}/return-label.pdf"};
 
     /// The table an id placeholder names, by the path segment before it.
     private static final String[][] TABLES = {
@@ -243,6 +249,7 @@ class MerchantIdorTest {
         {"readers", "card_reader"}, {"card-payments", "card_payment"},
         {"pickups", "store_order"},
         {"products", "product"}, {"rates", "shipping_rate"}, {"zones", "shipping_zone"},
+        {"profiles", "shipping_profile"}, {"rules", "routing_rule"},
         {"staff", "store_staff"}, {"suppliers", "supplier"}, {"tax-rates", "tax_rate"},
         {"webhooks", "webhook"}, {"customers", "customer"}, {"fulfillments", "fulfillment"},
         {"orders", "store_order"}, {"drafts", "store_order"}, {"registers", "register"},

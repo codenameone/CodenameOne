@@ -98,10 +98,14 @@ public class ChannelSync {
     private final com.codenameone.examples.bazaar.catalog.Bundles bundles;
     private final com.codenameone.examples.bazaar.catalog.Schedules schedules;
 
+    private final com.codenameone.examples.bazaar.routing.OrderRouting routing;
+
     public ChannelSync(DataSource db, Connectors connectors, Orders orders,
             OrderLineRepository lines, Inventory inventory, Markets markets,
             com.codenameone.examples.bazaar.catalog.Bundles bundles,
-            com.codenameone.examples.bazaar.catalog.Schedules schedules) {
+            com.codenameone.examples.bazaar.catalog.Schedules schedules,
+            com.codenameone.examples.bazaar.routing.OrderRouting routing) {
+        this.routing = routing;
         this.bundles = bundles;
         this.schedules = schedules;
         this.markets = markets;
@@ -353,7 +357,8 @@ public class ChannelSync {
                 Map v = resolved.get(iter);
                 String variantId = Rows.text(v.get("id"));
                 variants.add(variantId);
-                String loc = inventory.pickLocation(storeId, variantId, l.quantity);
+                String loc = routing.plan(storeId, new String[] {variantId},
+                        new int[] {l.quantity}, false, 0, 0).locations[0];
                 if (loc == null) {
                     throw new ResponseStatusException(409, "The store has no location that "
                             + "fulfils online orders");

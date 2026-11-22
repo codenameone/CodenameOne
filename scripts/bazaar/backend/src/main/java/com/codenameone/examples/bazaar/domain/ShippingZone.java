@@ -42,7 +42,20 @@ public class ShippingZone {
     @Column(nullable = false)
     private int position;
 
+    /// The shipping profile whose products these rates carry; empty for the
+    /// store's general profile.
+    @Column(nullable = false, type = "VARCHAR(32)")
+    private String profileId = "";
+
     public ShippingZone() {
+    }
+
+    public String getProfileId() {
+        return profileId;
+    }
+
+    public void setProfileId(String profileId) {
+        this.profileId = profileId == null ? "" : profileId;
     }
 
     public String getId() {

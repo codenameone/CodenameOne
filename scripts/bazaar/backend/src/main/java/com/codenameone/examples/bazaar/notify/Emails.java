@@ -392,8 +392,17 @@ public class Emails {
         Body b = new Body(s, language.of(o), "mail.return.title");
         b.para(b.f("mail.return.body", o.getNumber(),
                 s.getAddress().length() > 0 ? s.getAddress() : s.getName()));
+        boolean label = r.getReturnTracking().length() > 0;
+        if (label) {
+            b.para(b.f("mail.returnLabel.body", r.getReturnCarrier(), r.getReturnTracking()));
+        }
         b.button(b.f("mail.seeOrder"), track(o));
-        return builder(s, o.getEmail(), b.f("mail.return.subject", o.getNumber()), b).build();
+        Mail.Builder m = builder(s, o.getEmail(), b.f("mail.return.subject", o.getNumber()), b);
+        if (label) {
+            m.attach("return-label-" + o.getNumber() + ".pdf", "application/pdf",
+                    documents.returnLabel(o.getStoreId(), returnId));
+        }
+        return m.build();
     }
 
     /// A receipt from the register, with the receipt PDF.

@@ -73,6 +73,20 @@ public class DocumentPages {
         return pdf(documents.label(storeId, id), "label-" + id);
     }
 
+    @GetMapping("/api/merchant/stores/{storeId}/fulfillments/{id}/customs.pdf")
+    public HttpServer.Response customs(@PathVariable("storeId") String storeId,
+            @PathVariable("id") String id) throws Exception {
+        access.requireStaff(Caller.name(), storeId, StoreAccess.STOCK);
+        return pdf(documents.customsForm(storeId, id), "customs-" + id);
+    }
+
+    @GetMapping("/api/merchant/stores/{storeId}/returns/{id}/return-label.pdf")
+    public HttpServer.Response returnLabel(@PathVariable("storeId") String storeId,
+            @PathVariable("id") String id) throws Exception {
+        access.requireStaff(Caller.name(), storeId, StoreAccess.STOCK);
+        return pdf(documents.returnLabel(storeId, id), "return-label-" + id);
+    }
+
     @GetMapping("/api/merchant/stores/{storeId}/purchase-orders/{id}/po.pdf")
     public HttpServer.Response purchaseOrder(@PathVariable("storeId") String storeId,
             @PathVariable("id") String id) throws Exception {

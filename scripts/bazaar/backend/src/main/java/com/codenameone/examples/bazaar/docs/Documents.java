@@ -97,6 +97,8 @@ public class Documents {
     private final CashMoveRepository cashMoves;
     private final Fulfillments fulfillments;
     private final TenderRepository tenders;
+    private final com.codenameone.examples.bazaar.repository.ReturnRequestRepository returns;
+    private final com.codenameone.examples.bazaar.repository.ReturnLineRepository returnLines;
 
     public Documents(StoreRepository stores, StoreOrderRepository orders,
             OrderLineRepository lines, LocationRepository locations, VariantRepository variants,
@@ -104,7 +106,11 @@ public class Documents {
             PurchaseLineRepository purchaseLines, SupplierRepository suppliers,
             RefundRepository refunds, RefundLineRepository refundLines, ShiftRepository shifts,
             RegisterRepository registers, CashMoveRepository cashMoves,
-            Fulfillments fulfillments, TenderRepository tenders) {
+            Fulfillments fulfillments, TenderRepository tenders,
+            com.codenameone.examples.bazaar.repository.ReturnRequestRepository returns,
+            com.codenameone.examples.bazaar.repository.ReturnLineRepository returnLines) {
+        this.returns = returns;
+        this.returnLines = returnLines;
         this.tenders = tenders;
         this.stores = stores;
         this.orders = orders;
@@ -310,6 +316,193 @@ public class Documents {
         t.end();
         sheet.text("Declared value " + Sheet.money(total, o.getCurrency()) + ", shipped to "
                 + o.getShipCountry() + ".");
+    }
+
+    // --------------------------------------------------------- return label
+
+    /// The prepaid return label of an approved return, 4x6 inches: from the
+    /// shopper, to the store's location, the carrier's tracking number as a
+    /// Code 128 barcode.
+    @Transactional(readOnly = true)
+    public byte[] returnLabel(String storeId, String returnId) throws IOException {
+        com.codenameone.examples.bazaar.domain.ReturnRequest r = returnId == null ? null
+                : returns.findById(returnId);
+        if (r == null || !storeId.equals(r.getStoreId())) {
+            throw new ResponseStatusException(404, "No such return");
+        }
+        if (r.getReturnTracking().length() == 0) {
+            throw new ResponseStatusException(409, "The return has no label");
+        }
+        StoreOrder o = orders.findById(r.getOrderId());
+        Store s = stores.findById(storeId);
+        List<OrderLine> ls = lines.findByOrderId(o.getId());
+        List<com.codenameone.examples.bazaar.domain.ReturnLine> back =
+                returnLines.findByReturnId(returnId);
+        int grams = 0;
+        Location to = null;
+        for (int iter = 0; iter < back.size(); iter++) {
+            OrderLine l = find(ls, back.get(iter).getOrderLineId());
+            if (l != null) {
+                grams += l.getWeightGrams() * back.get(iter).getQuantity();
+                if (to == null && l.getLocationId().length() > 0) {
+                    Location at = locations.findById(l.getLocationId());
+                    to = at != null && storeId.equals(at.getStoreId()) ? at : null;
+                }
+            }
+        }
+        PdfDocument doc = new PdfDocument();
+        doc.setTitle("Return label " + r.getReturnTracking()).setAuthor(s.getName())
+                .setCreator("Bazaar");
+        PdfPage page = doc.addPage(LABEL_W, LABEL_H);
+        PdfCanvas c = page.getCanvas();
+        float m = 12;
+        float w = LABEL_W - 2 * m;
+        c.setStrokeColor(0x000000).setLineWidth(1.5f).strokeRect(m / 2, m / 2, LABEL_W - m,
+                LABEL_H - m);
+        c.setFillColor(0x000000).setFont(PdfFont.HELVETICA_BOLD, 7).drawText("FROM", m, m + 12);
+        String[] sender = shipTo(o);
+        float y = m + 23;
+        for (int iter = 0; iter < sender.length - 1; iter++) {
+            if (sender[iter] != null && sender[iter].length() > 0) {
+                c.setFont(iter == 0 ? PdfFont.HELVETICA_BOLD : PdfFont.HELVETICA, 8)
+                        .drawText(Sheet.fit(sender[iter], PdfFont.HELVETICA, 8, w), m, y);
+                y += 10;
+            }
+        }
+        y = 86;
+        c.fillRect(m / 2, y, LABEL_W - m, 34);
+        c.setFillColor(0xffffff).setFont(PdfFont.HELVETICA_BOLD, 20).drawText("RETURN", m,
+                y + 24);
+        String weight = grams(grams);
+        c.setFont(PdfFont.HELVETICA_BOLD, 10).drawText(weight, LABEL_W - m
+                - PdfFont.HELVETICA_BOLD.getStringWidth(weight, 10), y + 21);
+        c.setFillColor(0x000000).setFont(PdfFont.HELVETICA_BOLD, 8).drawText("RETURN TO", m,
+                y + 52);
+        String[] dest = {s.getName(), to == null ? "" : to.getName(),
+            to == null || to.getAddress().length() == 0 ? s.getAddress() : to.getAddress()};
+        y += 70;
+        for (int iter = 0; iter < dest.length; iter++) {
+            if (dest[iter] == null || dest[iter].length() == 0) {
+                continue;
+            }
+            PdfFont font = iter == 0 ? PdfFont.HELVETICA_BOLD : PdfFont.HELVETICA;
+            float size = iter == 0 ? 15 : 13;
+            c.setFont(font, size).drawText(Sheet.fit(dest[iter], font, size, w), m + 8, y);
+            y += size + 4;
+        }
+        float barTop = 286;
+        c.setLineWidth(1).drawLine(m / 2, barTop - 14, LABEL_W - m / 2, barTop - 14);
+        c.setFont(PdfFont.HELVETICA_BOLD, 8).drawText("TRACKING #  " + r.getReturnCarrier()
+                + "   POSTAGE PAID", m, barTop - 2);
+        Code128.draw(c, r.getReturnTracking(), m, barTop + 4, w, 74);
+        String number = r.getReturnTracking();
+        c.setFont(PdfFont.COURIER_BOLD, 16);
+        float nw = PdfFont.COURIER_BOLD.getStringWidth(number, 16);
+        c.drawText(number, (LABEL_W - nw) / 2, barTop + 100);
+        c.setFont(PdfFont.HELVETICA, 7).drawText("Return for order #" + o.getNumber() + "   "
+                + Sheet.date(millis(r.getUpdatedAt())), m, LABEL_H - m - 4);
+        return doc.toByteArray();
+    }
+
+    // --------------------------------------------------------- customs form
+
+    /// Declared value (in minor units) above which a parcel needs a CN 23
+    /// rather than a CN 22: the UPU sets the line at 300 SDR, given here per
+    /// currency, rounded down, so a parcel near the line gets the fuller form.
+    private static final String[][] CN22_LIMITS = {
+        {"USD", "40000"}, {"EUR", "36000"}, {"GBP", "31000"}, {"CAD", "54000"},
+        {"AUD", "60000"}, {"ILS", "145000"}, {"JPY", "6000000"},
+    };
+    /// A CN 22 goes on a parcel of at most 2 kg.
+    static final int CN22_MAX_GRAMS = 2000;
+
+    /// Whether a parcel of `valueCents` in `currency` weighing `grams` is
+    /// declared on a CN 22 (else a CN 23). A currency missing from the table
+    /// takes the lowest limit.
+    public static boolean cn22(long valueCents, String currency, int grams) {
+        long limit = 31000;
+        for (int iter = 0; iter < CN22_LIMITS.length; iter++) {
+            if (CN22_LIMITS[iter][0].equalsIgnoreCase(currency)) {
+                limit = Long.parseLong(CN22_LIMITS[iter][1]);
+            }
+        }
+        return valueCents <= limit && grams <= CN22_MAX_GRAMS;
+    }
+
+    /// The customs declaration of an international shipment: CN 22 for a
+    /// small, low value parcel, CN 23 otherwise. Each item with its HS code
+    /// (from the variant, else the product), country of origin, net weight
+    /// and value, the parcel's totals, the category (sale of goods) and the
+    /// sender's certification.
+    @Transactional(readOnly = true)
+    public byte[] customsForm(String storeId, String fulfillmentId) throws IOException {
+        Fulfillment f = fulfillments.require(storeId, fulfillmentId);
+        StoreOrder o = orders.findById(f.getOrderId());
+        if (!fulfillments.international(o)) {
+            throw new ResponseStatusException(409, "The parcel does not cross a border");
+        }
+        Store s = stores.findById(storeId);
+        List<OrderLine> ls = lines.findByOrderId(o.getId());
+        List<FulfilLineDto> fl = fulfillments.linesOf(f);
+        List<OrderLine> picked = new java.util.ArrayList<OrderLine>();
+        List<Integer> quantities = new java.util.ArrayList<Integer>();
+        for (int iter = 0; iter < fl.size(); iter++) {
+            OrderLine l = find(ls, fl.get(iter).orderLineId());
+            if (l != null) {
+                picked.add(l);
+                quantities.add(Integer.valueOf(fl.get(iter).quantity()));
+            }
+        }
+        List<com.codenameone.examples.bazaar.carrier.CarrierProvider.CustomsItem> items =
+                fulfillments.customsItems(o, picked, quantities);
+        long value = 0;
+        int grams = 0;
+        for (int iter = 0; iter < items.size(); iter++) {
+            value += items.get(iter).valueCents;
+            grams += items.get(iter).weightGrams;
+        }
+        boolean small = cn22(value, o.getCurrency(), Math.max(grams, f.getWeightGrams()));
+        Location from = locations.findById(f.getLocationId());
+        Sheet sheet = new Sheet(s.getName(), small ? "CN 22" : "CN 23",
+                "CUSTOMS DECLARATION  -  Order #" + o.getNumber(), s.getAccentColor(), footer(s));
+        sheet.text("May be opened officially.");
+        sheet.blocks("SENDER", new String[] {s.getName(),
+            from == null || from.getAddress().length() == 0 ? s.getAddress() : from.getAddress()},
+            "ADDRESSEE", shipTo(o));
+        sheet.text("Category of item: [X] Sale of goods   [ ] Gift   [ ] Documents   "
+                + "[ ] Commercial sample   [ ] Returned goods   [ ] Other");
+        Sheet.Table t = sheet.table(new float[] {3.2f, 0.6f, 1.1f, 1.6f, 1.5f, 0.9f},
+                new String[] {"Detailed description of contents", "Qty", "Net weight",
+                    "Value", "HS tariff number", "Origin"},
+                new boolean[] {false, true, true, true, false, false});
+        for (int iter = 0; iter < items.size(); iter++) {
+            com.codenameone.examples.bazaar.carrier.CarrierProvider.CustomsItem it =
+                    items.get(iter);
+            t.row(it.description.length() > 0 ? it.description : "Merchandise",
+                    Integer.toString(it.quantity), grams(it.weightGrams),
+                    Sheet.money(it.valueCents, o.getCurrency()),
+                    it.hsCode.length() > 0 ? it.hsCode : "-",
+                    it.originCountry.length() > 0 ? it.originCountry : "-");
+        }
+        t.end();
+        sheet.totals(new String[][] {
+            {"Total gross weight", grams(Math.max(grams, f.getWeightGrams()))},
+            {"Total value", Sheet.money(value, o.getCurrency())},
+        }, true);
+        if (!small) {
+            sheet.space(6).text("Invoice: order #" + o.getNumber() + ", "
+                    + Sheet.date(millis(o.getCreatedAt())) + ".   Postage: "
+                    + Sheet.money(o.getShippingCents(), o.getCurrency())
+                    + (f.getTrackingNumber().length() > 0 ? ".   Tracking: "
+                        + f.getTrackingNumber() : "."));
+            sheet.text("In case of non-delivery: [X] Return to sender   [ ] Treat as abandoned");
+        }
+        sheet.space(10).muted("I certify that the particulars given in this customs "
+                + "declaration are correct and that this item does not contain any dangerous "
+                + "article prohibited by legislation or by postal or customs regulations.");
+        sheet.space(6).muted("Date and sender's signature: " + Sheet.date(System.currentTimeMillis())
+                + "   ____________________");
+        return sheet.finish();
     }
 
     // ---------------------------------------------------------------- label

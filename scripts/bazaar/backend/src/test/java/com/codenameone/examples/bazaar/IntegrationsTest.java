@@ -270,6 +270,38 @@ class IntegrationsTest {
     // ============================================================= Carrier
 
     @Test
+    void easyPostBuysAReturnLabelAtTheCheapestRate() throws Exception {
+        final List<String> sent = new java.util.ArrayList<String>();
+        EasyPostCarrier.Transport fake = (method, path, json) -> {
+            sent.add(path + " " + json);
+            if (path.equals("/shipments")) {
+                return new EasyPostCarrier.Reply(201, "{\"id\":\"shp_r\",\"rates\":["
+                        + "{\"id\":\"rate_x\",\"carrier\":\"UPS\",\"service\":\"Ground\","
+                        + "\"rate\":\"9.10\"},{\"id\":\"rate_y\",\"carrier\":\"USPS\","
+                        + "\"service\":\"Ground Advantage\",\"rate\":\"6.25\"}]}");
+            }
+            if (path.equals("/shipments/shp_r/buy")) {
+                return new EasyPostCarrier.Reply(200, "{\"tracking_code\":\"EZRET1\","
+                        + "\"postage_label\":{\"label_url\":\"https://labels.example/r.png\"},"
+                        + "\"selected_rate\":{\"rate\":\"6.25\"}}");
+            }
+            return new EasyPostCarrier.Reply(500, "");
+        };
+        CarrierProvider.Place store = new CarrierProvider.Place("Shop", "9 Dock Rd", "New York",
+                0, 0, "10001", "NY", "US");
+        EasyPostCarrier ep = new EasyPostCarrier(fake, "whsec", store, 60000L);
+        CarrierProvider.Place customer = new CarrierProvider.Place("Ann", "1 Main St", "Austin",
+                0, 0, "73301", "TX", "US");
+        CarrierProvider.Label label = ep.buyReturnLabel(new CarrierProvider.Parcel(500), store,
+                customer, "r1");
+        assertEquals("EZRET1", label.trackingNumber);
+        assertEquals(625L, label.costCents);
+        assertEquals(2, sent.size());
+        assertTrue(sent.get(0).contains("\"is_return\":true"), sent.get(0));
+        assertTrue(sent.get(1).contains("rate_y"), "the cheapest rate: " + sent.get(1));
+    }
+
+    @Test
     @SuppressWarnings("unchecked")
     void easyPostRatesLabelsSignaturesAndTrackingAgainstCannedAnswers() throws Exception {
         final List<String> calls = new java.util.ArrayList<String>();

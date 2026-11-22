@@ -42,6 +42,15 @@ public interface CarrierProvider {
     Label buyLabel(Parcel parcel, Place from, Place to, String service, String reference)
             throws IOException;
 
+    /// Buys a prepaid return label for a parcel coming back from `customer`
+    /// to `store`, at the carrier's cheapest service. `reference` (the return
+    /// id) makes a retry answer the same label. A carrier that sells no
+    /// return labels refuses with an [IOException].
+    default Label buyReturnLabel(Parcel parcel, Place store, Place customer, String reference)
+            throws IOException {
+        throw new IOException(name() + " sells no return labels");
+    }
+
     /// The scans of a shipment up to `now`. A real carrier knows its own
     /// parcels and needs only the number; the simulated one keeps nothing, so
     /// it is also told when the parcel was handed over and between where.

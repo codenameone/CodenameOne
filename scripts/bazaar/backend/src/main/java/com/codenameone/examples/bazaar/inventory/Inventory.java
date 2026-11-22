@@ -251,6 +251,17 @@ public class Inventory {
         return fallback;
     }
 
+    /// Units of a variant a location could send, as [#pickLocation] counts
+    /// them: [Integer#MAX_VALUE] for a variant whose stock is not tracked
+    /// (and is not a bundle), else what is available there.
+    @Transactional(readOnly = true)
+    public int routable(String storeId, String variantId, String locationId) throws IOException {
+        Variant variant = variant(storeId, variantId);
+        boolean bundle = !bundles.partsOfVariant(variantId).isEmpty();
+        return !bundle && !variant.isTrackInventory() ? Integer.MAX_VALUE
+                : available(variantId, locationId);
+    }
+
     /// Commits `qty` units whether or not they are there, for a sale made
     /// somewhere that could not ask first (a marketplace order): a bundle
     /// commits its components. Available may go below zero.

@@ -92,10 +92,13 @@ public class Returns {
     private final StoreAccess access;
     private final Emails emails;
 
+    private final ReturnLabels returnLabels;
+
     public Returns(ReturnRequestRepository returns, ReturnLineRepository returnLines,
             StoreOrderRepository orders, OrderLineRepository lines, StoreRepository stores,
             Orders orderService, Fulfillments fulfillments, Inventory inventory,
-            StoreAccess access, Emails emails) {
+            StoreAccess access, Emails emails, ReturnLabels returnLabels) {
+        this.returnLabels = returnLabels;
         this.emails = emails;
         this.returns = returns;
         this.returnLines = returnLines;
@@ -283,6 +286,10 @@ public class Returns {
     public ReturnDto approve(String username, String storeId, String id) throws IOException {
         access.requireStaff(username, storeId, StoreAccess.MANAGERS);
         ReturnDto approved = step(storeId, id, REQUESTED, APPROVED, "Return approved", username);
+        // The prepaid label is bought once the approval is recorded, outside
+        // its transaction: a carrier that fails never undoes the approval,
+        // and the mail below goes out with the label or without it.
+        returnLabels.buy(id);
         emails.returnApproved(id);
         return approved;
     }

@@ -18,11 +18,14 @@
  */
 package com.codenameone.examples.bazaar.rates;
 
+import com.codename1.backend.DataSource;
 import com.codename1.backend.ResponseStatusException;
 import com.codename1.backend.annotations.Component;
 import com.codename1.backend.annotations.Transactional;
 import com.codenameone.examples.bazaar.Ids;
 import com.codenameone.examples.bazaar.api.DiscountDto;
+import com.codenameone.examples.bazaar.Rows;
+import com.codenameone.examples.bazaar.api.ShippingProfileDto;
 import com.codenameone.examples.bazaar.api.ShippingRateDto;
 import com.codenameone.examples.bazaar.api.ShippingZoneDto;
 import com.codenameone.examples.bazaar.api.TaxRateDto;
@@ -45,6 +48,7 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 /// A store's discounts, tax rates and shipping zones and rates, written by
 /// its OWNER and MANAGERs. The arithmetic that uses them is in `pricing`.
@@ -66,10 +70,12 @@ public class RateSettings {
     private final ShippingRateRepository rates;
     private final LocationRepository locations;
     private final StoreAccess access;
+    private final DataSource db;
 
     public RateSettings(DiscountRepository discounts, TaxRateRepository taxes,
             ShippingZoneRepository zones, ShippingRateRepository rates,
-            LocationRepository locations, StoreAccess access) {
+            LocationRepository locations, StoreAccess access, DataSource db) {
+        this.db = db;
         this.discounts = discounts;
         this.taxes = taxes;
         this.zones = zones;
@@ -271,7 +277,7 @@ public class RateSettings {
                 }
             }
             out.add(new ShippingZoneDto(z.getId(), z.getName(), z.getCountries(), z.getPosition(),
-                    mine));
+                    mine, z.getProfileId()));
         }
         return out;
     }
@@ -298,13 +304,14 @@ public class RateSettings {
         z.setName(Codes.cut(w.name(), 120));
         z.setCountries(Codes.cut(w.countries().replace(" ", ""), 2000));
         z.setPosition(w.position());
+        z.setProfileId(profileIn(storeId, w.profileId()));
         if (fresh) {
             zones.insert(z);
         } else {
             zones.save(z);
         }
         return new ShippingZoneDto(z.getId(), z.getName(), z.getCountries(), z.getPosition(),
-                new ArrayList<ShippingRateDto>());
+                new ArrayList<ShippingRateDto>(), z.getProfileId());
     }
 
     @Transactional(rollbackFor = IOException.class)
@@ -318,7 +325,133 @@ public class RateSettings {
         rates.deleteByZoneId(z.getId());
         zones.delete(z);
         return new ShippingZoneDto(z.getId(), z.getName(), z.getCountries(), z.getPosition(),
-                new ArrayList<ShippingRateDto>());
+                new ArrayList<ShippingRateDto>(), z.getProfileId());
+    }
+
+    // ---------------------------------------------------- shipping profiles
+
+    /// `profileId` when it is a profile of the store, empty for the general
+    /// profile; 404 for anything else.
+    private String profileIn(String storeId, String profileId) throws IOException {
+        if (profileId == null || profileId.length() == 0) {
+            return "";
+        }
+        Map row = db.queryOne("SELECT id FROM shipping_profile WHERE id = ? AND store_id = ?",
+                new Object[] {profileId, storeId});
+        if (row == null) {
+            throw new ResponseStatusException(404, "No such shipping profile");
+        }
+        return profileId;
+    }
+
+    @Transactional(readOnly = true)
+    public List<ShippingProfileDto> profiles(String username, String storeId) throws IOException {
+        access.requireStaff(username, storeId, StoreAccess.MANAGERS);
+        List rows = db.query("SELECT id, name, position FROM shipping_profile WHERE store_id = ? "
+                + "ORDER BY position, id", new Object[] {storeId});
+        List<ShippingProfileDto> out = new ArrayList<ShippingProfileDto>();
+        for (int iter = 0; iter < rows.size(); iter++) {
+            Map r = (Map) rows.get(iter);
+            String id = Rows.text(r.get("id"));
+            out.add(new ShippingProfileDto(id, Rows.text(r.get("name")),
+                    (int) Rows.number(r.get("position")), productsOf(storeId, id)));
+        }
+        return out;
+    }
+
+    /// The store's products as `{id, title}`, by title, at most 500: what
+    /// the back office offers to put in a profile.
+    @Transactional(readOnly = true)
+    public List<String[]> productChoices(String username, String storeId) throws IOException {
+        access.requireStaff(username, storeId, StoreAccess.MANAGERS);
+        List rows = db.query("SELECT id, title FROM product WHERE store_id = ? ORDER BY title, id",
+                new Object[] {storeId});
+        List<String[]> out = new ArrayList<String[]>();
+        for (int iter = 0; iter < rows.size() && iter < 500; iter++) {
+            Map r = (Map) rows.get(iter);
+            out.add(new String[] {Rows.text(r.get("id")), Rows.text(r.get("title"))});
+        }
+        return out;
+    }
+
+    private List<String> productsOf(String storeId, String profileId) throws IOException {
+        List rows = db.query("SELECT product_id FROM shipping_profile_product WHERE store_id = ? "
+                + "AND profile_id = ? ORDER BY product_id", new Object[] {storeId, profileId});
+        List<String> out = new ArrayList<String>();
+        for (int iter = 0; iter < rows.size(); iter++) {
+            out.add(Rows.text(((Map) rows.get(iter)).get("product_id")));
+        }
+        return out;
+    }
+
+    /// Saves a profile; its `productIds` become exactly its products, each
+    /// taken out of whatever profile it was in.
+    @Transactional(rollbackFor = IOException.class)
+    public ShippingProfileDto saveProfile(String username, String storeId, ShippingProfileDto w)
+            throws IOException {
+        access.requireStaff(username, storeId, StoreAccess.MANAGERS);
+        String name = w == null ? "" : Codes.cut(w.name(), 120).trim();
+        if (name.length() == 0) {
+            throw new ResponseStatusException(400, "A shipping profile needs a name");
+        }
+        List<String> wanted = new ArrayList<String>();
+        for (int iter = 0; w.productIds() != null && iter < w.productIds().size(); iter++) {
+            String p = w.productIds().get(iter);
+            if (p == null || wanted.contains(p)) {
+                continue;
+            }
+            if (db.queryOne("SELECT id FROM product WHERE id = ? AND store_id = ?",
+                    new Object[] {p, storeId}) == null) {
+                throw new ResponseStatusException(404, "No such product");
+            }
+            wanted.add(p);
+        }
+        String id = w.id() == null ? "" : w.id();
+        if (id.length() == 0) {
+            id = Ids.next();
+            db.execute("INSERT INTO shipping_profile (id, store_id, name, position) VALUES "
+                    + "(?, ?, ?, ?)", new Object[] {id, storeId, name,
+                        Integer.valueOf(Math.max(0, w.position()))});
+        } else {
+            profileIn(storeId, id);
+            db.execute("UPDATE shipping_profile SET name = ?, position = ? WHERE id = ?",
+                    new Object[] {name, Integer.valueOf(Math.max(0, w.position())), id});
+        }
+        db.execute("DELETE FROM shipping_profile_product WHERE store_id = ? AND profile_id = ?",
+                new Object[] {storeId, id});
+        for (int iter = 0; iter < wanted.size(); iter++) {
+            db.execute("DELETE FROM shipping_profile_product WHERE product_id = ?",
+                    new Object[] {wanted.get(iter)});
+            db.execute("INSERT INTO shipping_profile_product (product_id, store_id, profile_id) "
+                    + "VALUES (?, ?, ?)", new Object[] {wanted.get(iter), storeId, id});
+        }
+        return new ShippingProfileDto(id, name, Math.max(0, w.position()), wanted);
+    }
+
+    /// Deletes a profile with its zones and their rates; its products ship
+    /// under the general profile again.
+    @Transactional(rollbackFor = IOException.class)
+    public ShippingProfileDto deleteProfile(String username, String storeId, String id)
+            throws IOException {
+        access.requireStaff(username, storeId, StoreAccess.MANAGERS);
+        Map row = id == null ? null : db.queryOne("SELECT id, name, position FROM shipping_profile "
+                + "WHERE id = ? AND store_id = ?", new Object[] {id, storeId});
+        if (row == null) {
+            throw new ResponseStatusException(404, "No such shipping profile");
+        }
+        List<String> had = productsOf(storeId, id);
+        List<ShippingZone> all = zones.findByStoreIdOrderByPositionAsc(storeId);
+        for (int iter = 0; iter < all.size(); iter++) {
+            if (id.equals(all.get(iter).getProfileId())) {
+                rates.deleteByZoneId(all.get(iter).getId());
+                zones.delete(all.get(iter));
+            }
+        }
+        db.execute("DELETE FROM shipping_profile_product WHERE store_id = ? AND profile_id = ?",
+                new Object[] {storeId, id});
+        db.execute("DELETE FROM shipping_profile WHERE id = ?", new Object[] {id});
+        return new ShippingProfileDto(id, Rows.text(row.get("name")),
+                (int) Rows.number(row.get("position")), had);
     }
 
     @Transactional(rollbackFor = IOException.class)

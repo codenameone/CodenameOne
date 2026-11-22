@@ -75,6 +75,7 @@ public class WebPages {
         {"Label sheets", "/labels", ""},
         {"Order settings", "/order-settings", ""},
         {"Checkout settings", "/checkout-settings", ""},
+        {"Shipping", "/shipping", ""},
         {"Notifications", "/notifications", ""},
         {"Forecast", "/forecast", "1"},
         {"Reports", "/reports", "2"},

@@ -100,6 +100,23 @@ public class SimulatedCarrier implements CarrierProvider {
                 quote(row, parcel, from, to).cents());
     }
 
+    /// A return label at the cheapest service, its number derived from the
+    /// return's id as an outbound label's is from the fulfilment's.
+    @Override
+    public Label buyReturnLabel(Parcel parcel, Place store, Place customer, String reference)
+            throws IOException {
+        Object[] cheapest = null;
+        long cents = Long.MAX_VALUE;
+        for (int iter = 0; iter < SERVICES.length; iter++) {
+            long c = quote(SERVICES[iter], parcel, customer, store).cents();
+            if (c < cents) {
+                cents = c;
+                cheapest = SERVICES[iter];
+            }
+        }
+        return new Label(trackingNumber("return:" + reference), (String) cheapest[0], cents);
+    }
+
     /// `SIM` and twelve digits, the same for the same reference.
     public static String trackingNumber(String reference) throws IOException {
         String hash = Ids.sha256("label:" + reference);
