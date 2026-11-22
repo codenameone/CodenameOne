@@ -244,6 +244,43 @@ class DocxFormatTest extends UITestBase {
         assertTrue(plain.contains("wide"), plain);
     }
 
+    @Test
+    void readsAFilePagesWrote() throws IOException {
+        // exported by Apple Pages: lists through list styles (numStyleLink), a fixed-width table
+        Document d = Document.read(DocxFormatTest.class.getResourceAsStream(
+                "/wordprocessing/pages.docx"), Document.Format.DOCX);
+        int bullets = 0;
+        int numbered = 0;
+        Table table = null;
+        for (Block b : d.blocks) {
+            if (b instanceof Paragraph) {
+                Paragraph p = (Paragraph) b;
+                bullets += Paragraph.BULLET.equals(p.list) ? 1 : 0;
+                numbered += Paragraph.NUMBERED.equals(p.list) ? 1 : 0;
+            } else if (b instanceof Table) {
+                table = (Table) b;
+            }
+        }
+        assertEquals(2, bullets);
+        assertEquals(2, numbered);
+        assertNotNull(table);
+        assertEquals(3, table.rows());
+        assertEquals("Region", table.cellText(0, 0));
+        assertEquals("98", table.cellText(2, 1));
+        assertEquals(Arrays.asList(40f, 22f), table.columnWidths());
+        RichText body = ((Paragraph) d.get(1)).text;
+        assertTrue(body.styleAt(body.plainText().indexOf("another")).bold);
+        assertTrue(body.styleAt(body.plainText().indexOf("italic")).italic);
+        // the list paragraphs of textutil's file hang their marker, written as first-line
+        Document t = Document.read(DocxFormatTest.class.getResourceAsStream(
+                "/wordprocessing/textutil.docx"), Document.Format.DOCX);
+        boolean hanging = false;
+        for (Block b : t.blocks) {
+            hanging |= b instanceof Paragraph && ((Paragraph) b).firstLine < 0;
+        }
+        assertTrue(hanging);
+    }
+
     static byte[] zip(String[] names, String[] contents) throws IOException {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         ZipArchiveOutputStream zip = new ZipArchiveOutputStream(out);

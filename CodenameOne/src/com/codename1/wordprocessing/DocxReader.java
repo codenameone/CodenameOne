@@ -501,6 +501,11 @@ final class DocxReader {
         if (x == null) {
             return;
         }
+        // a list style's definition is linked by name: Word and Pages write the numbering a
+        // paragraph names as an empty definition with a numStyleLink, and the levels under
+        // the definition carrying the same name as its styleLink
+        Map<String, String> linksTo = new HashMap<String, String>();
+        Map<String, String> linkedBy = new HashMap<String, String>();
         for (int e = x.next(); e != XmlScanner.EOF; e = x.next()) {
             if (e != XmlScanner.START) {
                 continue;
@@ -530,6 +535,10 @@ final class DocxReader {
                         formats[level] = x.attr("val");
                     } else if (level >= 0 && level < 9 && "start".equals(x.name)) {
                         starts[level] = x.intAttr("val", 1);
+                    } else if (id != null && "numStyleLink".equals(x.name) && x.attr("val") != null) {
+                        linksTo.put(id, x.attr("val"));
+                    } else if (id != null && "styleLink".equals(x.name) && x.attr("val") != null) {
+                        linkedBy.put(x.attr("val"), id);
                     }
                 }
                 if (id != null) {
@@ -565,6 +574,13 @@ final class DocxReader {
                 if (id != null) {
                     numOverrides.put(id, overrides);
                 }
+            }
+        }
+        for (Map.Entry<String, String> link : linksTo.entrySet()) {
+            String target = linkedBy.get(link.getValue());
+            if (target != null && abstractFormats.containsKey(target)) {
+                abstractFormats.put(link.getKey(), abstractFormats.get(target));
+                abstractStarts.put(link.getKey(), abstractStarts.get(target));
             }
         }
     }
@@ -926,6 +942,10 @@ final class DocxReader {
                     p.firstLine = Float.valueOf(-twips(x.attr("hanging"), 0));
                 } else if (x.attr("firstLine") != null) {
                     p.firstLine = Float.valueOf(twips(x.attr("firstLine"), 0));
+                } else if (x.attr("first-line") != null) {
+                    // Apple's writer (TextEdit, textutil) spells it this way, negative for a
+                    // hanging indent
+                    p.firstLine = Float.valueOf(twips(x.attr("first-line"), 0));
                 }
             } else if ("pageBreakBefore".equals(n)) {
                 p.pageBreak = Boolean.valueOf(onOff(x));
