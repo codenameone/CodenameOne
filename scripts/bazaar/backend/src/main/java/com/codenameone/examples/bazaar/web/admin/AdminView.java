@@ -80,6 +80,20 @@ public class AdminView {
     public List<AdminRow> levels = new ArrayList<AdminRow>();
     public List<AdminRow> reasons = new ArrayList<AdminRow>();
     public String adjustAction = "";
+    /// The product's bundle form: whether it is one, its component rows
+    /// (`field` the variant select's name, `field2` the quantity's, `id` the
+    /// variant chosen, `quantity` how many), the variants it may pick from
+    /// and how many bundles the components make.
+    public String bundleAction = "";
+    public boolean isBundle;
+    public String bundleAvailable = "";
+    public List<AdminRow> bundleRows = new ArrayList<AdminRow>();
+    public List<AdminRow> bundleChoices = new ArrayList<AdminRow>();
+    /// The product's publishing window per channel: `id` the channel, `title`
+    /// its name, `field`/`field2` the inputs' names, `price`/`cost` their
+    /// values (UTC) and `status` whether it shows there now.
+    public String scheduleAction = "";
+    public List<AdminRow> windows = new ArrayList<AdminRow>();
 
     // ------------------------------------------------------------- customer
     public List<AdminRow> facts = new ArrayList<AdminRow>();

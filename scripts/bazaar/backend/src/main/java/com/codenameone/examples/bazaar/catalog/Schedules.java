@@ -66,7 +66,7 @@ public class Schedules {
                 + "WHERE product_id = ? ORDER BY channel", new Object[] {productId});
         for (int iter = 0; iter < rs.size(); iter++) {
             Map r = (Map) rs.get(iter);
-            out.add(new ChannelScheduleDto(Rows.text(r.get("channel")),
+            out.add(new ChannelScheduleDto(Rows.text(r.get("channel")), "",
                     Rows.number(r.get("publish_at")), Rows.number(r.get("unpublish_at")),
                     Rows.number(r.get("visible")) == 1));
         }
@@ -85,6 +85,29 @@ public class Schedules {
         for (int iter = 0; iter < rs.size(); iter++) {
             Map r = (Map) rs.get(iter);
             out.add(new String[] {Rows.text(r.get("id")), Rows.text(r.get("name"))});
+        }
+        return out;
+    }
+
+    /// A product's window on every channel of its store, in [#channels]
+    /// order, named; a channel with no window answers 0 for both bounds and
+    /// visible.
+    @Transactional(readOnly = true)
+    public List<ChannelScheduleDto> windows(String storeId, String productId) throws IOException {
+        List<ChannelScheduleDto> had = of(productId);
+        List<String[]> all = channels(storeId);
+        List<ChannelScheduleDto> out = new ArrayList<ChannelScheduleDto>();
+        for (int iter = 0; iter < all.size(); iter++) {
+            String[] ch = all.get(iter);
+            ChannelScheduleDto found = null;
+            for (int h = 0; h < had.size(); h++) {
+                if (had.get(h).channel().equals(ch[0])) {
+                    found = had.get(h);
+                }
+            }
+            out.add(found == null ? new ChannelScheduleDto(ch[0], ch[1], 0, 0, true)
+                    : new ChannelScheduleDto(ch[0], ch[1], found.publishAt(), found.unpublishAt(),
+                        found.visible()));
         }
         return out;
     }
@@ -143,6 +166,34 @@ public class Schedules {
             out.add(Rows.text(((Map) rs.get(iter)).get("product_id")));
         }
         return out;
+    }
+
+    /// `products` less those hidden on `channel` right now, in order.
+    @Transactional(readOnly = true)
+    public List<com.codenameone.examples.bazaar.domain.Product> visible(String storeId,
+            String channel, List<com.codenameone.examples.bazaar.domain.Product> products)
+            throws IOException {
+        Set<String> hide = hidden(storeId, channel);
+        if (hide.isEmpty()) {
+            return products;
+        }
+        List<com.codenameone.examples.bazaar.domain.Product> out =
+                new ArrayList<com.codenameone.examples.bazaar.domain.Product>();
+        for (int iter = 0; iter < products.size(); iter++) {
+            if (!hide.contains(products.get(iter).getId())) {
+                out.add(products.get(iter));
+            }
+        }
+        return out;
+    }
+
+    /// When a window of the store last changed or flipped, 0 for never: a
+    /// list built from the products' own times must move with it too.
+    @Transactional(readOnly = true)
+    public long lastChange(String storeId) throws IOException {
+        Map r = db.queryOne("SELECT MAX(updated_at) AS t FROM channel_schedule WHERE store_id = ?",
+                new Object[] {storeId});
+        return r == null ? 0 : Rows.number(r.get("t"));
     }
 
     /// Whether a product is hidden on `channel` right now.

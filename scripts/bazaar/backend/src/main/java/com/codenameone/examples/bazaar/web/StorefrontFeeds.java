@@ -74,9 +74,15 @@ public class StorefrontFeeds {
     private final Markets markets;
     private final Pages pages;
     private final SiteUrls urls;
+    private final com.codenameone.examples.bazaar.catalog.Schedules schedules;
+    private final com.codenameone.examples.bazaar.catalog.Bundles bundles;
 
     public StorefrontFeeds(Stores stores, ProductRepository products, VariantRepository variants,
-            InventoryLevelRepository levels, Markets markets, Pages pages, SiteUrls urls) {
+            InventoryLevelRepository levels, Markets markets, Pages pages, SiteUrls urls,
+            com.codenameone.examples.bazaar.catalog.Schedules schedules,
+            com.codenameone.examples.bazaar.catalog.Bundles bundles) {
+        this.schedules = schedules;
+        this.bundles = bundles;
         this.stores = stores;
         this.products = products;
         this.variants = variants;
@@ -186,8 +192,9 @@ public class StorefrontFeeds {
             }
         }
         String currency = pricer == null ? store.getCurrency() : pricer.currency();
-        List<Product> ps = products.findByStoreIdAndStatusOrderByTitleAsc(store.getId(),
-                Catalog.ACTIVE);
+        List<Product> ps = schedules.visible(store.getId(),
+                com.codenameone.examples.bazaar.catalog.Schedules.ONLINE,
+                products.findByStoreIdAndStatusOrderByTitleAsc(store.getId(), Catalog.ACTIVE));
         List<String> ids = new ArrayList<String>();
         Map<String, Product> byId = new HashMap<String, Product>();
         for (int iter = 0; iter < ps.size(); iter++) {
@@ -208,6 +215,14 @@ public class StorefrontFeeds {
             Integer was = available.get(l.getVariantId());
             int n = (was == null ? 0 : was.intValue()) + Math.max(0, l.getOnHand() - l.getCommitted());
             available.put(l.getVariantId(), Integer.valueOf(n));
+        }
+        // A bundle has no stock of its own: it is in stock while its
+        // components make one.
+        Map<String, List<com.codenameone.examples.bazaar.catalog.Bundles.Part>> bundleParts =
+                bundles.byVariant(store.getId());
+        for (Map.Entry<String, List<com.codenameone.examples.bazaar.catalog.Bundles.Part>> e
+                : bundleParts.entrySet()) {
+            available.put(e.getKey(), Integer.valueOf(bundles.available(e.getValue(), null)));
         }
         List<Row> out = new ArrayList<Row>();
         // Products in title order, each product's variants in their own order.
@@ -231,7 +246,8 @@ public class StorefrontFeeds {
                 r.image = product.getPhotoId().length() > 0
                         ? urls.absolute(request, "/media/" + product.getPhotoId()) : "";
                 Integer n = available.get(v.getId());
-                boolean inStock = !v.isTrackInventory() || v.isAllowBackorder()
+                boolean inStock = bundleParts.containsKey(v.getId()) ? n != null && n.intValue() > 0
+                        : !v.isTrackInventory() || v.isAllowBackorder()
                         || n != null && n.intValue() > 0;
                 r.availability = inStock ? "in_stock" : "out_of_stock";
                 r.priceCents = pricer == null ? v.getPriceCents()

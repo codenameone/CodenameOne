@@ -24,6 +24,7 @@ LANGS = ["en", "es", "fr", "de", "he"]
 T = [
 # key, en, es, fr, de, he
 ("search", "Search", "Buscar", "Rechercher", "Suchen", "חיפוש"),
+("includes", "Includes", "Incluye", "Comprend", "Enthält", "כולל"),
 ("cart", "Cart", "Carrito", "Panier", "Warenkorb", "עגלה"),
 ("menu", "Main menu", "Menú principal", "Menu principal", "Hauptmenü", "תפריט ראשי"),
 ("preview", "Theme preview: this draft is not live yet.", "Vista previa del tema: este borrador aún no está publicado.", "Aperçu du thème : ce brouillon n'est pas encore en ligne.", "Theme-Vorschau: Dieser Entwurf ist noch nicht live.", "תצוגה מקדימה של ערכת העיצוב: הטיוטה עדיין לא פורסמה."),

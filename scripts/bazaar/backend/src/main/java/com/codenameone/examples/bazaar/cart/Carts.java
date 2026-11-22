@@ -62,9 +62,12 @@ public class Carts {
     private final StoreRepository stores;
     private final GiftCardRepository giftCards;
     private final Quoter quoter;
+    private final com.codenameone.examples.bazaar.catalog.Schedules schedules;
 
     public Carts(CartRepository carts, CartLineRepository lines, VariantRepository variants,
-            StoreRepository stores, GiftCardRepository giftCards, Quoter quoter) {
+            StoreRepository stores, GiftCardRepository giftCards, Quoter quoter,
+            com.codenameone.examples.bazaar.catalog.Schedules schedules) {
+        this.schedules = schedules;
         this.carts = carts;
         this.lines = lines;
         this.variants = variants;
@@ -91,7 +94,11 @@ public class Carts {
         }
         Cart cart = cart(storeId, username, token);
         Variant variant = variants.findById(change.variantId());
-        if (variant == null || !storeId.equals(variant.getStoreId())) {
+        if (variant == null || !storeId.equals(variant.getStoreId())
+                || schedules.isVariantHidden(variant.getId(),
+                    com.codenameone.examples.bazaar.catalog.Schedules.ONLINE)) {
+            // Outside its online store window a product cannot be found, so
+            // it cannot be added either.
             throw new ResponseStatusException(404, "No such item");
         }
         List<CartLine> have = lines.findByCartId(cart.getId());

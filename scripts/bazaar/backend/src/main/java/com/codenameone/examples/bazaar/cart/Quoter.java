@@ -95,6 +95,8 @@ public class Quoter {
     private final com.codenameone.examples.bazaar.taxes.TaxExemptions exemptions;
     private final com.codenameone.examples.bazaar.market.Markets markets;
     private final com.codenameone.examples.bazaar.carrier.CarrierRates carrierRates;
+    private final com.codenameone.examples.bazaar.catalog.Bundles bundles;
+    private final com.codenameone.examples.bazaar.catalog.Schedules schedules;
 
     public Quoter(StoreRepository stores, CartLineRepository cartLines, VariantRepository variants,
             ProductRepository products, CollectionProductRepository collections,
@@ -105,7 +107,11 @@ public class Quoter {
             com.codenameone.examples.bazaar.taxes.TaxExemptions exemptions,
             com.codenameone.examples.bazaar.market.Markets markets,
             PreorderRepository preorders, DataSource db,
-            com.codenameone.examples.bazaar.carrier.CarrierRates carrierRates) {
+            com.codenameone.examples.bazaar.carrier.CarrierRates carrierRates,
+            com.codenameone.examples.bazaar.catalog.Bundles bundles,
+            com.codenameone.examples.bazaar.catalog.Schedules schedules) {
+        this.bundles = bundles;
+        this.schedules = schedules;
         this.carrierRates = carrierRates;
         this.preorders = preorders;
         this.db = db;
@@ -154,13 +160,23 @@ public class Quoter {
             wants.add(new Want(row.getId(), row.getVariantId(), row.getQuantity()));
         }
         return price(cart, wants, cart.getDiscountCode(), cart.getGiftCardCode(), address, rateId,
-                username);
+                username, true);
     }
 
-    /// Prices `wants` at the cart's store.
+    /// Prices `wants` at the cart's store for staff (a draft order): a
+    /// product outside its online store window is still sold.
     @Transactional(readOnly = true)
     public Quote price(Cart cart, List<Want> wants, String code, String giftCode,
             AddressDto address, String rateId, String username) throws IOException {
+        return price(cart, wants, code, giftCode, address, rateId, username, false);
+    }
+
+    /// Prices `wants` at the cart's store. `online` is a shopper's cart,
+    /// which refuses a product whose online store window is closed.
+    @Transactional(readOnly = true)
+    public Quote price(Cart cart, List<Want> wants, String code, String giftCode,
+            AddressDto address, String rateId, String username, boolean online)
+            throws IOException {
         Quote quote = new Quote();
         quote.cart = cart;
         Store store = stores.findById(cart.getStoreId());
@@ -189,12 +205,22 @@ public class Quoter {
             locationById.put(all.get(iter).getId(), all.get(iter));
         }
         Map<String, Integer> availability = availability(ids, locationById);
+        Set<String> hidden = online ? schedules.hidden(cart.getStoreId(),
+                com.codenameone.examples.bazaar.catalog.Schedules.ONLINE) : new HashSet<String>();
+        Map<String, List<com.codenameone.examples.bazaar.catalog.Bundles.Part>> bundleParts =
+                bundles.byVariant(cart.getStoreId());
+        Set<String> online0 = new HashSet<String>();
+        for (Location at : locationById.values()) {
+            if (at.isActive() && at.isFulfilsOnline()) {
+                online0.add(at.getId());
+            }
+        }
         for (int iter = 0; iter < wants.size(); iter++) {
             Want want = wants.get(iter);
             Variant variant = byId.get(want.variantId);
             Product product = variant == null ? null : productById.get(variant.getProductId());
             if (variant == null || product == null || !cart.getStoreId().equals(variant.getStoreId())
-                    || !ACTIVE.equals(product.getStatus())) {
+                    || !ACTIVE.equals(product.getStatus()) || hidden.contains(product.getId())) {
                 quote.problems.add("An item in the cart is no longer sold");
                 continue;
             }
@@ -209,7 +235,13 @@ public class Quoter {
             for (int c = 0; c < in.size(); c++) {
                 line.price.collectionIds.add(in.get(c).getCollectionId());
             }
-            if (!variant.isTrackInventory() || variant.isAllowBackorder()) {
+            List<com.codenameone.examples.bazaar.catalog.Bundles.Part> parts =
+                    bundleParts.get(variant.getId());
+            if (parts != null) {
+                // A bundle is as available as its components make it,
+                // whatever its own variant's flags say.
+                line.availableQty = bundles.available(parts, online0);
+            } else if (!variant.isTrackInventory() || variant.isAllowBackorder()) {
                 line.availableQty = Integer.MAX_VALUE;
             } else {
                 Integer a = availability.get(variant.getId());

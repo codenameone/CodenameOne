@@ -95,9 +95,15 @@ public class ChannelSync {
     private final OrderLineRepository lines;
     private final Inventory inventory;
     private final Markets markets;
+    private final com.codenameone.examples.bazaar.catalog.Bundles bundles;
+    private final com.codenameone.examples.bazaar.catalog.Schedules schedules;
 
     public ChannelSync(DataSource db, Connectors connectors, Orders orders,
-            OrderLineRepository lines, Inventory inventory, Markets markets) {
+            OrderLineRepository lines, Inventory inventory, Markets markets,
+            com.codenameone.examples.bazaar.catalog.Bundles bundles,
+            com.codenameone.examples.bazaar.catalog.Schedules schedules) {
+        this.bundles = bundles;
+        this.schedules = schedules;
         this.markets = markets;
         this.db = db;
         this.connectors = connectors;
@@ -371,8 +377,7 @@ public class ChannelSync {
                 if (!inventory.reserve(storeId, variantId, loc, l.quantity, ref, SYNC_USER)) {
                     // Sold on the marketplace already: commit it anyway and
                     // say so, as an offline register sale does.
-                    inventory.change(storeId, variantId, loc, 0, l.quantity, 0, Inventory.RESERVE,
-                            ref, SYNC_USER);
+                    inventory.forceCommit(storeId, variantId, loc, l.quantity, ref, SYNC_USER);
                     oversold.add(line.getSku().length() > 0 ? line.getSku() : variantId);
                 }
                 Map r = new HashMap();
@@ -503,9 +508,23 @@ public class ChannelSync {
         }
         Map store = db.queryOne("SELECT currency FROM store WHERE id = ?", new Object[] {storeId});
         String currency = store == null ? "" : Rows.text(store.get("currency"));
-        List ls = db.query("SELECT l.*, v.price_cents AS vprice, v.track_inventory AS tracked FROM "
-                + "channel_listing l JOIN variant v ON v.id = l.variant_id WHERE l.channel_id = ?",
-                new Object[] {channelId});
+        List ls = db.query("SELECT l.*, v.price_cents AS vprice, v.track_inventory AS tracked, "
+                + "v.product_id AS vproduct FROM channel_listing l JOIN variant v ON v.id = "
+                + "l.variant_id WHERE l.channel_id = ?", new Object[] {channelId});
+        // A product outside its window on this channel is pushed as none
+        // available, which takes it off the marketplace; a bundle is what its
+        // components make, and moves when any of them does.
+        Set<String> hidden = schedules.hidden(storeId, channelId);
+        Map<String, List<com.codenameone.examples.bazaar.catalog.Bundles.Part>> bundleParts =
+                bundles.byVariant(storeId);
+        for (Map.Entry<String, List<com.codenameone.examples.bazaar.catalog.Bundles.Part>> e
+                : bundleParts.entrySet()) {
+            for (int p = 0; p < e.getValue().size(); p++) {
+                if (moved.contains(e.getValue().get(p).variantId)) {
+                    moved.add(e.getKey());
+                }
+            }
+        }
         final MarketplaceConnector c = connector(ch);
         MarketplaceConnector.Session[] s = {session};
         for (int iter = 0; iter < ls.size(); iter++) {
@@ -521,7 +540,12 @@ public class ChannelSync {
             if (!look || !force && Rows.number(l.get("next_attempt_at")) > now) {
                 continue;
             }
-            int qty = Rows.number(l.get("tracked")) == 1 ? available(variantId) : UNTRACKED_QTY;
+            List<com.codenameone.examples.bazaar.catalog.Bundles.Part> parts =
+                    bundleParts.get(variantId);
+            int qty = hidden.contains(Rows.text(l.get("vproduct"))) ? 0
+                    : parts != null ? Math.min(UNTRACKED_QTY, bundles.available(parts,
+                        onlineLocations(storeId)))
+                    : Rows.number(l.get("tracked")) == 1 ? available(variantId) : UNTRACKED_QTY;
             String state = qty + "@" + price;
             String id = Rows.text(l.get("id"));
             if (state.equals(pushed)) {
@@ -574,6 +598,17 @@ public class ChannelSync {
             db.execute("UPDATE sales_channel SET ledger_cursor = ? WHERE id = ?",
                     new Object[] {Long.valueOf(newest), channelId});
         }
+    }
+
+    /// The active locations of a store that fulfil online orders.
+    private Set<String> onlineLocations(String storeId) throws IOException {
+        Set<String> out = new HashSet<String>();
+        List rs = db.query("SELECT id FROM location WHERE store_id = ? AND active = 1 AND "
+                + "fulfils_online = 1", new Object[] {storeId});
+        for (int iter = 0; iter < rs.size(); iter++) {
+            out.add(Rows.text(((Map) rs.get(iter)).get("id")));
+        }
+        return out;
     }
 
     /// Units of a variant free to sell online: on hand less committed, summed

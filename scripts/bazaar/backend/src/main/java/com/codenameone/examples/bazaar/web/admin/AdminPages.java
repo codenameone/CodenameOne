@@ -302,6 +302,24 @@ public class AdminPages {
                 () -> data.adjust(storeId, productId, request));
     }
 
+    @PostMapping("/admin/{storeId}/products/{productId}/bundle")
+    public String saveBundle(@PathVariable("storeId") String storeId,
+            @PathVariable("productId") String productId, HttpServer.Request request)
+            throws Exception {
+        member(request, storeId);
+        return change(request, "/admin/" + storeId + "/products/" + productId, "Bundle saved",
+                () -> data.saveBundle(storeId, productId, request));
+    }
+
+    @PostMapping("/admin/{storeId}/products/{productId}/schedule")
+    public String saveSchedule(@PathVariable("storeId") String storeId,
+            @PathVariable("productId") String productId, HttpServer.Request request)
+            throws Exception {
+        member(request, storeId);
+        return change(request, "/admin/" + storeId + "/products/" + productId,
+                "Publishing schedule saved", () -> data.saveSchedule(storeId, productId, request));
+    }
+
     // ------------------------------------------------------------ inventory
 
     @GetMapping("/admin/{storeId}/inventory")

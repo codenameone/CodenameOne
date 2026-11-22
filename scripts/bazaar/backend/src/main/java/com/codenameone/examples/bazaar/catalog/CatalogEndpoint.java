@@ -21,6 +21,8 @@ package com.codenameone.examples.bazaar.catalog;
 import com.codename1.appkit.server.Caller;
 import com.codename1.backend.annotations.Component;
 import com.codenameone.examples.bazaar.api.BulkEditDto;
+import com.codenameone.examples.bazaar.api.BundleDto;
+import com.codenameone.examples.bazaar.api.ChannelScheduleDto;
 import com.codenameone.examples.bazaar.api.CatalogApiServer;
 import com.codenameone.examples.bazaar.api.CollectionDto;
 import com.codenameone.examples.bazaar.api.CountDto;
@@ -91,6 +93,34 @@ public class CatalogEndpoint implements CatalogApiServer {
     /// part of the shared API, which answers costs only inside a product.
     public java.util.Map<String, Integer> margins(String storeId) throws Exception {
         return catalog.margins(Caller.name(), storeId);
+    }
+
+    /// The variants a bundle of the store may be made of, id and name, for
+    /// the back office's picker; not part of the shared API.
+    public List<String[]> bundleChoices(String storeId) throws Exception {
+        return catalog.bundleChoices(Caller.name(), storeId);
+    }
+
+    @Override
+    public BundleDto bundle(String storeId, String productId) throws Exception {
+        return catalog.bundle(Caller.name(), storeId, productId);
+    }
+
+    @Override
+    public BundleDto setBundle(String storeId, String productId, BundleDto bundle)
+            throws Exception {
+        return catalog.setBundle(Caller.name(), storeId, productId, bundle);
+    }
+
+    @Override
+    public List<ChannelScheduleDto> schedule(String storeId, String productId) throws Exception {
+        return catalog.schedule(Caller.name(), storeId, productId);
+    }
+
+    @Override
+    public List<ChannelScheduleDto> setSchedule(String storeId, String productId,
+            ChannelScheduleDto window) throws Exception {
+        return catalog.setSchedule(Caller.name(), storeId, productId, window);
     }
 
     @Override

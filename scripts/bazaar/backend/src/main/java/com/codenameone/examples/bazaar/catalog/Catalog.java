@@ -25,6 +25,9 @@ import com.codename1.backend.annotations.Component;
 import com.codename1.backend.annotations.Transactional;
 import com.codenameone.examples.bazaar.Ids;
 import com.codenameone.examples.bazaar.api.BulkEditDto;
+import com.codenameone.examples.bazaar.api.BundleDto;
+import com.codenameone.examples.bazaar.api.BundlePartDto;
+import com.codenameone.examples.bazaar.api.ChannelScheduleDto;
 import com.codenameone.examples.bazaar.api.CollectionDto;
 import com.codenameone.examples.bazaar.api.CountDto;
 import com.codenameone.examples.bazaar.api.FacetsDto;
@@ -66,6 +69,7 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -102,14 +106,21 @@ public class Catalog {
     private final StoreAccess access;
     private final Stores storeService;
     private final Memberships memberships;
+    private final Bundles bundles;
+    private final Schedules schedules;
+    private final com.codename1.backend.DataSource db;
 
     public Catalog(StoreRepository stores, ProductRepository products, VariantRepository variants,
             ProductOptionRepository options, ProductPhotoRepository gallery,
             CollectionRepository collections, CollectionProductRepository members,
             InventoryLevelRepository levels, LocationRepository locations,
             PhotoRepository photos, StoreAccess access, Stores storeService,
-            Memberships memberships) {
+            Memberships memberships, Bundles bundles, Schedules schedules,
+            com.codename1.backend.DataSource db) {
         this.memberships = memberships;
+        this.bundles = bundles;
+        this.schedules = schedules;
+        this.db = db;
         this.stores = stores;
         this.products = products;
         this.variants = variants;
@@ -133,8 +144,11 @@ public class Catalog {
         final Map<String, Integer> available = new HashMap<String, Integer>();
         final Map<String, List<String>> membership = new HashMap<String, List<String>>();
         final List<Collection> allCollections;
+        /// Bundle variants to their components; a bundle's availability is
+        /// what its components make ([Bundles#available]).
+        final Map<String, List<Bundles.Part>> bundleParts;
 
-        Snapshot(String storeId, String status, boolean publicView) {
+        Snapshot(String storeId, String status, boolean publicView) throws IOException {
             list = status == null ? products.findByStoreIdOrderByTitleAsc(storeId)
                     : products.findByStoreIdAndStatusOrderByTitleAsc(storeId, status);
             byProduct = Search.byProduct(variants.findByStoreId(storeId));
@@ -154,6 +168,12 @@ public class Catalog {
                             : had.intValue()) + level.getOnHand() - level.getCommitted()));
                 }
             }
+            bundleParts = bundles.byVariant(storeId);
+            Set<String> countedSet = new HashSet<String>(counted);
+            for (Map.Entry<String, List<Bundles.Part>> e : bundleParts.entrySet()) {
+                available.put(e.getKey(), Integer.valueOf(bundles.available(e.getValue(),
+                        countedSet)));
+            }
             allCollections = collections.findByStoreIdOrderByPositionAsc(storeId);
             List<Product> everything = status == null ? list
                     : products.findByStoreIdOrderByTitleAsc(storeId);
@@ -172,14 +192,16 @@ public class Catalog {
         }
 
         /// Drops what the signed-in shopper (a guest when there is none)
-        /// may not see: members-only products of clubs they are not in.
-        Snapshot forViewer(String storeId) {
+        /// may not see: members-only products of clubs they are not in, and
+        /// products whose online store window is closed ([Schedules]).
+        Snapshot forViewer(String storeId) throws IOException {
             List<String> ids = new ArrayList<String>();
             for (int iter = 0; iter < list.size(); iter++) {
                 ids.add(list.get(iter).getId());
             }
-            Set<String> hide = memberships.hidden(storeId, ids, membership,
-                    memberships.of(storeId, Codes.callerOrNull(), Instant.now()));
+            Set<String> hide = new HashSet<String>(memberships.hidden(storeId, ids, membership,
+                    memberships.of(storeId, Codes.callerOrNull(), Instant.now())));
+            hide.addAll(schedules.hidden(storeId, Schedules.ONLINE));
             if (!hide.isEmpty()) {
                 List<Product> kept = new ArrayList<Product>();
                 for (int iter = 0; iter < list.size(); iter++) {
@@ -216,7 +238,7 @@ public class Catalog {
             for (int iter = 0; iter < mine.size(); iter++) {
                 Variant variant = mine.get(iter);
                 compare = Math.max(compare, variant.getCompareAtCents());
-                if (variant.isTrackInventory()) {
+                if (variant.isTrackInventory() || bundleParts.containsKey(variant.getId())) {
                     tracked = true;
                     Integer n = available.get(variant.getId());
                     stock += n == null ? 0 : Math.max(0, n.intValue());
@@ -400,7 +422,12 @@ public class Catalog {
 
     /// 404 for a members-only product the caller's clubs do not open: to
     /// anyone else it does not exist, as in the lists.
-    private void requireVisible(Product product) {
+    private void requireVisible(Product product) throws IOException {
+        if (schedules.isHidden(product.getId(), Schedules.ONLINE)) {
+            // Before its online store window opens, or after it closes, a
+            // product is not there at all.
+            throw new ResponseStatusException(404, "No such product");
+        }
         if (!memberships.anyRules(product.getStoreId())) {
             return;
         }
@@ -477,6 +504,129 @@ public class Catalog {
                     .marginBps(e.getValue()[0], e.getValue()[1])));
         }
         return out;
+    }
+
+    /// Whether a product is a bundle, and its components with what each has
+    /// available and how many bundles they make.
+    @Transactional(readOnly = true)
+    public BundleDto bundle(String username, String storeId, String productId)
+            throws IOException {
+        access.requireStaff(username, storeId, StoreAccess.ANYONE);
+        Product product = product(storeId, productId);
+        return bundleOf(product);
+    }
+
+    private BundleDto bundleOf(Product product) throws IOException {
+        List<Bundles.Part> parts = bundles.parts(product.getId());
+        List<BundlePartDto> out = new ArrayList<BundlePartDto>();
+        for (int iter = 0; iter < parts.size(); iter++) {
+            Bundles.Part part = parts.get(iter);
+            Variant v = variants.findById(part.variantId);
+            Product owner = v == null ? null : products.findById(v.getProductId());
+            List<Bundles.Part> single = new ArrayList<Bundles.Part>();
+            single.add(new Bundles.Part(part.variantId, 1));
+            out.add(new BundlePartDto(part.variantId, v == null ? "" : v.getSku(), part.quantity,
+                    owner == null ? "" : Bundles.title(owner.getTitle(), v.getTitle()),
+                    v == null ? 0 : bundles.available(single, null)));
+        }
+        return new BundleDto(product.getId(), Bundles.BUNDLE.equals(product.getKind()), out,
+                parts.isEmpty() ? 0 : bundles.available(parts, null));
+    }
+
+    /// The variants of the store a bundle may contain -- those of products
+    /// that are not bundles themselves -- as id and name, by name.
+    @Transactional(readOnly = true)
+    public List<String[]> bundleChoices(String username, String storeId) throws IOException {
+        access.requireStaff(username, storeId, StoreAccess.ANYONE);
+        List rs = db.query("SELECT v.id, v.title AS vtitle, v.sku, p.title AS ptitle FROM variant v "
+                + "JOIN product p ON p.id = v.product_id WHERE v.store_id = ? AND p.kind <> ? AND "
+                + "p.status <> 'ARCHIVED' ORDER BY p.title, v.position", new Object[] {storeId,
+                    Bundles.BUNDLE});
+        List<String[]> out = new ArrayList<String[]>();
+        for (int iter = 0; iter < rs.size(); iter++) {
+            Map r = (Map) rs.get(iter);
+            String sku = String.valueOf(r.get("sku") == null ? "" : r.get("sku"));
+            out.add(new String[] {String.valueOf(r.get("id")), Bundles.title(
+                    String.valueOf(r.get("ptitle")), String.valueOf(r.get("vtitle") == null ? ""
+                        : r.get("vtitle"))) + (sku.length() > 0 ? " (" + sku + ")" : "")});
+        }
+        return out;
+    }
+
+    /// Makes a product a bundle of the components sent, or a standard product
+    /// again. A product is a bundle exactly when it has components: the kind
+    /// and the rows change together, here only. Refused while an open order
+    /// holds the bundle unshipped, since shipping and releasing it move the
+    /// components it has when they happen.
+    @Transactional(rollbackFor = IOException.class)
+    public BundleDto setBundle(String username, String storeId, String productId,
+            BundleDto wanted) throws IOException {
+        access.requireStaff(username, storeId, StoreAccess.MANAGERS);
+        Product product = product(storeId, productId);
+        if (wanted == null) {
+            throw new ResponseStatusException(400, "Nothing to save");
+        }
+        if (db.queryOne("SELECT l.id FROM order_line l JOIN store_order o ON o.id = l.order_id "
+                + "JOIN variant v ON v.id = l.variant_id WHERE v.product_id = ? AND o.status = 'OPEN' "
+                + "AND l.quantity > l.fulfilled_qty LIMIT 1", new Object[] {productId}) != null) {
+            throw new ResponseStatusException(409, "An open order holds this product unshipped; "
+                    + "change its components once it has shipped or been cancelled");
+        }
+        List<Bundles.Part> parts = new ArrayList<Bundles.Part>();
+        if (wanted.bundle()) {
+            List<BundlePartDto> sent = wanted.parts() == null ? new ArrayList<BundlePartDto>()
+                    : wanted.parts();
+            for (int iter = 0; iter < sent.size(); iter++) {
+                BundlePartDto p = sent.get(iter);
+                String id = p.variantId();
+                if ((id == null || id.length() == 0) && p.sku() != null
+                        && p.sku().trim().length() > 0) {
+                    Map found = db.queryOne("SELECT id FROM variant WHERE store_id = ? AND sku = ?",
+                            new Object[] {storeId, p.sku().trim()});
+                    if (found == null) {
+                        throw new ResponseStatusException(404, "No variant has the SKU "
+                                + p.sku().trim());
+                    }
+                    id = String.valueOf(found.get("id"));
+                }
+                parts.add(new Bundles.Part(id, p.quantity()));
+            }
+            if (parts.isEmpty()) {
+                throw new ResponseStatusException(400, "A bundle needs at least one component");
+            }
+            if (bundles.isComponent(productId)) {
+                throw new ResponseStatusException(400, "This product is part of a bundle, so it "
+                        + "cannot be a bundle itself");
+            }
+        }
+        bundles.set(storeId, productId, parts);
+        product.setKind(parts.isEmpty() ? Bundles.STANDARD : Bundles.BUNDLE);
+        product.setUpdatedAt(Instant.now());
+        products.save(product);
+        return bundleOf(product);
+    }
+
+    /// A product's publishing window on each channel of its store.
+    @Transactional(readOnly = true)
+    public List<ChannelScheduleDto> schedule(String username, String storeId, String productId)
+            throws IOException {
+        access.requireStaff(username, storeId, StoreAccess.ANYONE);
+        product(storeId, productId);
+        return schedules.windows(storeId, productId);
+    }
+
+    /// Sets a product's window on one channel; both bounds 0 removes it.
+    @Transactional(rollbackFor = IOException.class)
+    public List<ChannelScheduleDto> setSchedule(String username, String storeId, String productId,
+            ChannelScheduleDto wanted) throws IOException {
+        access.requireStaff(username, storeId, StoreAccess.MANAGERS);
+        product(storeId, productId);
+        if (wanted == null || wanted.channel() == null) {
+            throw new ResponseStatusException(400, "Say which channel");
+        }
+        schedules.set(storeId, productId, wanted.channel(), wanted.publishAt(),
+                wanted.unpublishAt(), System.currentTimeMillis());
+        return schedules.windows(storeId, productId);
     }
 
     @Transactional(readOnly = true)
@@ -830,7 +980,7 @@ public class Catalog {
 
     // --------------------------------------------------------------- helpers
 
-    private CollectionDto collection(String storeId, String collectionId) {
+    private CollectionDto collection(String storeId, String collectionId) throws IOException {
         Snapshot snapshot = new Snapshot(storeId, null, false);
         return toDto(collections.findById(collectionId),
                 visibleIds(snapshot, collections.findById(collectionId)));
@@ -949,7 +1099,7 @@ public class Catalog {
 
     /// A product in full; costs only for staff, and stock of inactive
     /// locations only for staff.
-    private ProductDto detail(Product product, boolean staff) {
+    private ProductDto detail(Product product, boolean staff) throws IOException {
         List<Location> places = locations.findByStoreIdOrderByPositionAsc(product.getStoreId());
         Map<String, String> names = new HashMap<String, String>();
         for (int iter = 0; iter < places.size(); iter++) {
@@ -965,8 +1115,13 @@ public class Catalog {
         List<InventoryLevel> stock = ids.isEmpty() ? new ArrayList<InventoryLevel>()
                 : levels.findByVariantIdIn(ids);
         List<VariantDto> variantDtos = new ArrayList<VariantDto>();
+        List<Bundles.Part> parts = bundles.parts(product.getId());
         for (int iter = 0; iter < mine.size(); iter++) {
-            variantDtos.add(toDto(mine.get(iter), stock, places, names, staff));
+            VariantDto d = toDto(mine.get(iter), stock, places, names, staff);
+            if (!parts.isEmpty()) {
+                d = bundleStock(d, parts, places, names);
+            }
+            variantDtos.add(d);
         }
         List<OptionDto> optionDtos = new ArrayList<OptionDto>();
         List<ProductOption> rows = options.findByProductIdOrderByPositionAsc(product.getId());
@@ -1001,6 +1156,29 @@ public class Catalog {
                 product.getSeoTitle(), product.getSeoDescription(), product.getPhotoId(),
                 rating(product), (int) product.getRatingCount(), optionDtos, variantDtos,
                 photoDtos, collectionIds);
+    }
+
+    /// A bundle variant as its components make it: tracked, with the
+    /// bundles each listed location can make.
+    private VariantDto bundleStock(VariantDto d, List<Bundles.Part> parts, List<Location> places,
+            Map<String, String> names) throws IOException {
+        List<StockDto> per = new ArrayList<StockDto>();
+        int total = 0;
+        for (int p = 0; p < places.size(); p++) {
+            String locationId = places.get(p).getId();
+            if (!names.containsKey(locationId)) {
+                continue;
+            }
+            Set<String> one = new HashSet<String>();
+            one.add(locationId);
+            int n = bundles.available(parts, one);
+            total += n;
+            per.add(new StockDto(locationId, names.get(locationId), n));
+        }
+        return new VariantDto(d.id(), d.productId(), d.title(), d.option1(), d.option2(),
+                d.option3(), d.sku(), d.barcode(), d.priceCents(), d.compareAtCents(),
+                d.costCents(), d.weightGrams(), d.taxable(), true, false, d.position(),
+                Math.min(total, Bundles.UNLIMITED), per);
     }
 
     private static VariantDto toDto(Variant v, List<InventoryLevel> stock, List<Location> places,
@@ -1159,6 +1337,10 @@ public class Catalog {
         for (int iter = 0; iter < old.size(); iter++) {
             Variant v = old.get(iter);
             if (!kept.contains(v.getId())) {
+                if (bundles.isVariantComponent(v.getId())) {
+                    throw new ResponseStatusException(409, "A variant that is part of a bundle "
+                            + "cannot be deleted; take it out of the bundle first");
+                }
                 List<InventoryLevel> held = levels.findByVariantId(v.getId());
                 for (int l = 0; l < held.size(); l++) {
                     levels.delete(held.get(l));

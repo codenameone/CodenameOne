@@ -519,6 +519,8 @@ public class AdminData {
         String base = "/admin/" + storeId + "/products/" + p.id();
         v.saveAction = base;
         v.adjustAction = base + "/adjust";
+        bundleForm(storeId, p.id(), base, v);
+        scheduleForm(storeId, p.id(), base, v);
         v.title = p.title() == null ? "" : p.title();
         v.description = p.description() == null ? "" : p.description();
         v.status = p.status();
@@ -618,6 +620,132 @@ public class AdminData {
                 title, description, p.vendor(), p.productType(), p.tags(), status, p.seoTitle(),
                 p.seoDescription(), p.photoId(), p.rating(), p.ratingCount(), null, vs, null,
                 null));
+    }
+
+    /// The rows the bundle form offers beyond the components it has.
+    private static final int SPARE_PARTS = 3;
+
+    private void bundleForm(String storeId, String productId, String base, AdminView v)
+            throws Exception {
+        com.codenameone.examples.bazaar.api.BundleDto b = catalog.bundle(storeId, productId);
+        v.bundleAction = base + "/bundle";
+        v.isBundle = b.bundle();
+        v.bundleAvailable = Integer.toString(b.available());
+        List<String[]> choices = catalog.bundleChoices(storeId);
+        for (int iter = 0; iter < choices.size(); iter++) {
+            if (choices.get(iter)[0].length() == 0) {
+                continue;
+            }
+            AdminRow r = new AdminRow();
+            r.id = choices.get(iter)[0];
+            r.title = choices.get(iter)[1];
+            v.bundleChoices.add(r);
+        }
+        int rows = Math.min(com.codenameone.examples.bazaar.catalog.Bundles.MAX_PARTS,
+                b.parts().size() + SPARE_PARTS);
+        for (int iter = 0; iter < rows; iter++) {
+            AdminRow r = new AdminRow();
+            r.field = "c" + iter + "_variant";
+            r.field2 = "c" + iter + "_qty";
+            if (iter < b.parts().size()) {
+                r.id = b.parts().get(iter).variantId();
+                r.quantity = Integer.toString(b.parts().get(iter).quantity());
+                r.title = b.parts().get(iter).title();
+            }
+            v.bundleRows.add(r);
+        }
+    }
+
+    /// Saves the bundle form: the checkbox, and each row with a variant
+    /// chosen and a quantity above zero.
+    void saveBundle(String storeId, String productId, HttpServer.Request request)
+            throws Exception {
+        boolean on = AdminForms.field(request, "bundle").length() > 0;
+        List<com.codenameone.examples.bazaar.api.BundlePartDto> parts =
+                new ArrayList<com.codenameone.examples.bazaar.api.BundlePartDto>();
+        for (int iter = 0; iter < com.codenameone.examples.bazaar.catalog.Bundles.MAX_PARTS;
+                iter++) {
+            String variant = AdminForms.field(request, "c" + iter + "_variant");
+            String qty = AdminForms.field(request, "c" + iter + "_qty");
+            if (variant.length() == 0) {
+                continue;
+            }
+            int n = AdminForms.number(qty.length() == 0 ? "1" : qty, 1, "the quantity");
+            if (n > 0) {
+                parts.add(new com.codenameone.examples.bazaar.api.BundlePartDto(variant, "", n, "",
+                        0));
+            }
+        }
+        catalog.setBundle(storeId, productId, new com.codenameone.examples.bazaar.api.BundleDto(
+                productId, on, parts, 0));
+    }
+
+    private void scheduleForm(String storeId, String productId, String base, AdminView v)
+            throws Exception {
+        v.scheduleAction = base + "/schedule";
+        List<com.codenameone.examples.bazaar.api.ChannelScheduleDto> ws =
+                catalog.schedule(storeId, productId);
+        for (int iter = 0; iter < ws.size(); iter++) {
+            com.codenameone.examples.bazaar.api.ChannelScheduleDto w = ws.get(iter);
+            AdminRow r = new AdminRow();
+            r.id = w.channel();
+            r.title = w.name();
+            r.field = "pub" + iter;
+            r.field2 = "unpub" + iter;
+            r.meta = "ch" + iter;
+            r.price = localTime(w.publishAt());
+            r.cost = localTime(w.unpublishAt());
+            r.status = w.publishAt() == 0 && w.unpublishAt() == 0 ? "Always"
+                    : w.visible() ? "Showing now" : "Hidden now";
+            v.windows.add(r);
+        }
+    }
+
+    /// Saves the schedule form: each channel whose times changed.
+    void saveSchedule(String storeId, String productId, HttpServer.Request request)
+            throws Exception {
+        List<com.codenameone.examples.bazaar.api.ChannelScheduleDto> ws =
+                catalog.schedule(storeId, productId);
+        for (int iter = 0; iter < ws.size(); iter++) {
+            com.codenameone.examples.bazaar.api.ChannelScheduleDto w = ws.get(iter);
+            String channel = AdminForms.field(request, "ch" + iter);
+            if (channel.length() > 0 && !channel.equals(w.channel())) {
+                throw new ResponseStatusException(409, "The channels changed since the page "
+                        + "was opened; reload it and try again");
+            }
+            long pub = parseLocalTime(AdminForms.field(request, "pub" + iter), "the publish time");
+            long unpub = parseLocalTime(AdminForms.field(request, "unpub" + iter),
+                    "the unpublish time");
+            if (pub != w.publishAt() || unpub != w.unpublishAt()) {
+                catalog.setSchedule(storeId, productId,
+                        new com.codenameone.examples.bazaar.api.ChannelScheduleDto(w.channel(), "",
+                            pub, unpub, true));
+            }
+        }
+    }
+
+    /// Milliseconds as a `datetime-local` value in UTC, empty for 0.
+    static String localTime(long millis) {
+        if (millis <= 0) {
+            return "";
+        }
+        java.time.LocalDateTime t = java.time.LocalDateTime.ofEpochSecond(millis / 1000, 0,
+                java.time.ZoneOffset.UTC);
+        String s = t.toString();
+        return s.length() > 16 ? s.substring(0, 16) : s;
+    }
+
+    /// A `datetime-local` value (UTC) as milliseconds, 0 for empty.
+    static long parseLocalTime(String text, String what) {
+        if (text == null || text.length() == 0) {
+            return 0;
+        }
+        try {
+            return java.time.LocalDateTime.parse(text).toInstant(java.time.ZoneOffset.UTC)
+                    .toEpochMilli();
+        } catch (java.time.format.DateTimeParseException bad) {
+            throw new ResponseStatusException(400, "Enter " + what + " as a date and time");
+        }
     }
 
     /// Adds or takes away units of one variant at one location.

@@ -124,6 +124,9 @@ public class Pos {
     private final Emails emails;
     private final com.codenameone.examples.bazaar.notify.ShopperLanguage language;
 
+    private final com.codenameone.examples.bazaar.catalog.Bundles bundles;
+    private final com.codenameone.examples.bazaar.catalog.Schedules schedules;
+
     public Pos(StoreAccess access, StoreRepository stores, RegisterRepository registers,
             ShiftRepository shifts, CashMoveRepository cashMoves, StoreStaffRepository staff,
             LocationRepository locations, ProductRepository products, VariantRepository variants,
@@ -131,7 +134,11 @@ public class Pos {
             DiscountRepository discounts, CustomerRepository customers,
             StoreOrderRepository orderRows, Orders orders, Documents documents,
             PasswordEncoder encoder, SmsSender sms, Emails emails,
-            com.codenameone.examples.bazaar.notify.ShopperLanguage language) {
+            com.codenameone.examples.bazaar.notify.ShopperLanguage language,
+            com.codenameone.examples.bazaar.catalog.Bundles bundles,
+            com.codenameone.examples.bazaar.catalog.Schedules schedules) {
+        this.bundles = bundles;
+        this.schedules = schedules;
         this.language = language;
         this.emails = emails;
         this.access = access;
@@ -496,6 +503,18 @@ public class Pos {
             InventoryLevel l = ls.get(iter);
             here.put(l.getVariantId(), Integer.valueOf(l.getOnHand() - l.getCommitted()));
         }
+        // A bundle sells what its components make here; a product outside
+        // its point of sale window is not on the register at all.
+        Map<String, List<com.codenameone.examples.bazaar.catalog.Bundles.Part>> bundleParts =
+                bundles.byVariant(storeId);
+        java.util.Set<String> at = new java.util.HashSet<String>();
+        at.add(r.getLocationId());
+        for (Map.Entry<String, List<com.codenameone.examples.bazaar.catalog.Bundles.Part>> e
+                : bundleParts.entrySet()) {
+            here.put(e.getKey(), Integer.valueOf(bundles.available(e.getValue(), at)));
+        }
+        java.util.Set<String> hidden = schedules.hidden(storeId,
+                com.codenameone.examples.bazaar.catalog.Schedules.POS);
         StringBuilder digest = new StringBuilder();
         digest.append(store.getCurrency()).append('|').append(store.isTaxInclusive()).append('|')
                 .append(r.getLocationId()).append('|').append(r.getTaxCountry()).append('|')
@@ -503,20 +522,24 @@ public class Pos {
         List<PosItemDto> items = new ArrayList<PosItemDto>();
         for (int iter = 0; iter < ps.size(); iter++) {
             Product p = ps.get(iter);
+            if (hidden.contains(p.getId())) {
+                continue;
+            }
             List<Variant> list = byProduct.get(p.getId());
             for (int v = 0; list != null && v < list.size(); v++) {
                 Variant x = list.get(v);
                 Integer a = here.get(x.getId());
                 int available = a == null ? 0 : a.intValue();
+                boolean tracked = x.isTrackInventory() || bundleParts.containsKey(x.getId());
                 PosItemDto item = new PosItemDto(x.getId(), p.getId(), p.getTitle(), x.getTitle(),
                         x.getSku(), x.getBarcode(), x.getPriceCents(), x.getCompareAtCents(),
-                        x.isTaxable(), x.isTrackInventory(), available, p.getPhotoId());
+                        x.isTaxable(), tracked, available, p.getPhotoId());
                 items.add(item);
                 digest.append(x.getId()).append('|').append(p.getTitle()).append('|')
                         .append(x.getTitle()).append('|').append(x.getSku()).append('|')
                         .append(x.getBarcode()).append('|').append(x.getPriceCents()).append('|')
                         .append(x.getCompareAtCents()).append('|').append(x.isTaxable())
-                        .append('|').append(x.isTrackInventory()).append('|').append(available)
+                        .append('|').append(tracked).append('|').append(available)
                         .append('|').append(p.getPhotoId()).append('\n');
             }
         }

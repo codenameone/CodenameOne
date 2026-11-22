@@ -50,11 +50,14 @@ public class StorefrontFiles {
     private final SiteUrls urls;
     private final com.codenameone.examples.bazaar.content.Pages pages;
     private final com.codenameone.examples.bazaar.market.Markets markets;
+    private final com.codenameone.examples.bazaar.catalog.Schedules schedules;
 
     public StorefrontFiles(StoreRepository stores, ProductRepository products,
             CollectionRepository collections, Catalog catalog, SiteUrls urls,
             com.codenameone.examples.bazaar.content.Pages pages,
-            com.codenameone.examples.bazaar.market.Markets markets) {
+            com.codenameone.examples.bazaar.market.Markets markets,
+            com.codenameone.examples.bazaar.catalog.Schedules schedules) {
+        this.schedules = schedules;
         this.pages = pages;
         this.markets = markets;
         this.stores = stores;
@@ -97,9 +100,16 @@ public class StorefrontFiles {
         List<Store> active = stores.findByStatusOrderByNameAsc(Stores.ACTIVE);
         for (int s = 0; s < active.size(); s++) {
             Store store = active.get(s);
-            List<Product> ps = products.findByStoreIdAndStatusOrderByTitleAsc(store.getId(),
-                    Catalog.ACTIVE);
+            // Only what the online store shows now: a product outside its
+            // window is left out, and a flip counts as a change.
+            List<Product> ps = schedules.visible(store.getId(),
+                    com.codenameone.examples.bazaar.catalog.Schedules.ONLINE,
+                    products.findByStoreIdAndStatusOrderByTitleAsc(store.getId(), Catalog.ACTIVE));
             Instant storeChanged = store.getUpdatedAt();
+            long flipped = schedules.lastChange(store.getId());
+            if (flipped > 0) {
+                storeChanged = later(storeChanged, Instant.ofEpochMilli(flipped));
+            }
             for (int p = 0; p < ps.size(); p++) {
                 storeChanged = later(storeChanged, ps.get(p).getUpdatedAt());
             }

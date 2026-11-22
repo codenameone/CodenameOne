@@ -41,6 +41,8 @@ public final class ProductView {
     public String marketNote = "";
     /// The product's storefront metafields, as `{name, value}` pairs.
     public java.util.List<String[]> specs = new java.util.ArrayList<String[]>();
+    /// A bundle's components, "2 x Mug - Blue"; empty for any other product.
+    public java.util.List<String> includes = new java.util.ArrayList<String>();
     public boolean available;
     /// The chosen variant sells ahead of stock.
     public boolean preorder;

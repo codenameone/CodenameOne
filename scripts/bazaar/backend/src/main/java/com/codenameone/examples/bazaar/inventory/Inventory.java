@@ -251,6 +251,23 @@ public class Inventory {
         return fallback;
     }
 
+    /// Commits `qty` units whether or not they are there, for a sale made
+    /// somewhere that could not ask first (a marketplace order): a bundle
+    /// commits its components. Available may go below zero.
+    @Transactional(rollbackFor = IOException.class)
+    public void forceCommit(String storeId, String variantId, String locationId, int qty,
+            String reference, String username) throws IOException {
+        List<Bundles.Part> parts = parts(storeId, variantId, locationId, qty);
+        for (int iter = 0; iter < parts.size(); iter++) {
+            Bundles.Part part = parts.get(iter);
+            forceCommit(storeId, part.variantId, locationId, qty * part.quantity, reference,
+                    username);
+        }
+        if (parts.isEmpty()) {
+            change(storeId, variantId, locationId, 0, qty, 0, RESERVE, reference, username);
+        }
+    }
+
     /// Units of a variant available at a location; 0 where it has no level.
     @Transactional(readOnly = true)
     public int available(String variantId, String locationId) throws IOException {

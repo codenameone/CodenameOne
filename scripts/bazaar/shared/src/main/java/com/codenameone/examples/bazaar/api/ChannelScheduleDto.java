@@ -21,11 +21,13 @@ package com.codenameone.examples.bazaar.api;
 import com.codename1.annotations.Mapped;
 
 /// A product's publishing window on one sales channel: `ONLINE`, `POS` or a
-/// marketplace's id. A bound of 0 is open; `visible` is what the scheduler
-/// last set.
+/// marketplace's id, with the channel's `name` (only answered). Bounds are
+/// milliseconds since the epoch, 0 for none; both 0 removes the window.
+/// `visible` is what the scheduler last set.
 @Mapped
 public record ChannelScheduleDto(
         String channel,
+        String name,
         long publishAt,
         long unpublishAt,
         boolean visible) {

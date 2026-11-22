@@ -103,6 +103,8 @@ public class StorefrontPages {
 
     private final com.codenameone.examples.bazaar.ops.Attribution attribution;
 
+    private final com.codenameone.examples.bazaar.catalog.Bundles bundles;
+
     public StorefrontPages(Stores stores, Catalog catalog, Carts carts, StoreRepository storeRows,
             ProductRepository products, CollectionRepository collections,
             ReviewRepository reviews, FulfillmentRepository fulfillments,
@@ -115,7 +117,8 @@ public class StorefrontPages {
             com.codenameone.examples.bazaar.content.Navigation navigation,
             com.codenameone.examples.bazaar.content.Pages content,
             com.codenameone.examples.bazaar.content.Metafields metafields,
-            GeoCountry geo) {
+            GeoCountry geo, com.codenameone.examples.bazaar.catalog.Bundles bundles) {
+        this.bundles = bundles;
         this.geo = geo;
         this.themes = themes;
         this.navigation = navigation;
@@ -323,6 +326,7 @@ public class StorefrontPages {
         view.title = p.title();
         view.vendor = p.vendor();
         view.description = p.description();
+        view.includes = bundles.describe(p.id());
         view.currency = store.getCurrency();
         StorefrontMarkets.Choice market = StorefrontMarkets.choose(store, path, request, markets,
                 translations, urls, geo);

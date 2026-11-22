@@ -141,4 +141,27 @@ public interface CatalogApi {
     void deleteCollection(@Path("storeId") String storeId,
             @Path("collectionId") String collectionId,
             OnComplete<Response<CollectionDto>> callback);
+
+    /// Whether a product is a bundle, and its components.
+    @GET("/api/merchant/stores/{storeId}/products/{productId}/bundle")
+    void bundle(@Path("storeId") String storeId, @Path("productId") String productId,
+            OnComplete<Response<BundleDto>> callback);
+
+    /// Makes a product a bundle of the components sent, or a standard product
+    /// again. Refused while an open order holds a bundle not yet shipped.
+    @PUT("/api/merchant/stores/{storeId}/products/{productId}/bundle")
+    void setBundle(@Path("storeId") String storeId, @Path("productId") String productId,
+            @Body BundleDto bundle, OnComplete<Response<BundleDto>> callback);
+
+    /// A product's publishing window on every channel the store sells on; a
+    /// channel with no window answers 0 for both bounds.
+    @GET("/api/merchant/stores/{storeId}/products/{productId}/schedule")
+    void schedule(@Path("storeId") String storeId, @Path("productId") String productId,
+            OnComplete<Response<List<ChannelScheduleDto>>> callback);
+
+    /// Sets (or, with both bounds 0, removes) the window on one channel.
+    @PUT("/api/merchant/stores/{storeId}/products/{productId}/schedule")
+    void setSchedule(@Path("storeId") String storeId, @Path("productId") String productId,
+            @Body ChannelScheduleDto window,
+            OnComplete<Response<List<ChannelScheduleDto>>> callback);
 }
