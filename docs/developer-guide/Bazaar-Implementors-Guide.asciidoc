@@ -353,13 +353,7 @@ configured provider:
 
 [source,properties]
 ----
-# openai, anthropic, gemini, or url
-bazaar.ai.provider=openai
-bazaar.ai.key=...
-# optional; each provider has a default
-bazaar.ai.model=gpt-4o-mini
-# for "url": any OpenAI-compatible server
-bazaar.ai.url=
+include::../demos/common/src/main/snippets/developer-guide/bazaar.properties[tag=bazaar-properties-001,indent=0]
 ----
 
 The assistant's tools (`AssistantTools`) run in the app over the dashboard,
@@ -826,12 +820,7 @@ The eBay-style connector is enabled by the application's credentials:
 
 [source,properties]
 ----
-bazaar.channels.ebay.client-id=...
-bazaar.channels.ebay.client-secret=...
-# optional
-bazaar.channels.ebay.api-base=https://api.ebay.com
-bazaar.channels.ebay.identity-base=https://api.ebay.com
-bazaar.channels.ebay.marketplace-id=EBAY_US
+include::../demos/common/src/main/snippets/developer-guide/bazaar.properties[tag=bazaar-properties-002,indent=0]
 ----
 
 The seller's refresh token, from the marketplace's consent flow, is entered per

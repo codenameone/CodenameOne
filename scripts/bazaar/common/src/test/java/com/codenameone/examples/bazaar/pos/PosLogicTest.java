@@ -221,6 +221,36 @@ class PosLogicTest {
     }
 
     @Test
+    void aLateAnswerToAnAbandonedRequestNeverReopensASettledSale() {
+        final Map<String, String> disk = new HashMap<String, String>();
+        Outbox.Persist persist = new Outbox.Persist() {
+            @Override
+            public String read(String key) {
+                return disk.get(key);
+            }
+
+            @Override
+            public void write(String key, String value) {
+                disk.put(key, value);
+            }
+        };
+        Outbox box = new Outbox(persist, codec());
+        box.add(sale("s", "v1", 1));
+        List<Outbox.Entry> first = box.due(0);
+        box.sending(first);
+        // The first request timed out and the sale went again, and that one landed.
+        box.unanswered(first, 10);
+        List<Outbox.Entry> second = box.due(1000000);
+        box.sending(second);
+        box.answered(second, Arrays.asList(result("s", "OK")), 20);
+        assertEquals(Outbox.SYNCED, box.find("s").state);
+        // Then the first request's answer arrives, without a word about the sale.
+        box.answered(first, Arrays.<PosSaleResultDto>asList(), 30);
+        box.unanswered(first, 40);
+        assertEquals(Outbox.SYNCED, box.find("s").state, "a settled sale is never sent again");
+    }
+
+    @Test
     void aSaleRefusedForAnApprovalWaitsAndGoesAgainUnderItsOwnId() {
         final Map<String, String> disk = new HashMap<String, String>();
         Outbox.Persist persist = new Outbox.Persist() {

@@ -102,6 +102,7 @@ public final class PosSync {
             // callback was dropped): its sales wait and go again.
             PosState.outbox().unanswered(inFlight, System.currentTimeMillis());
             busy = false;
+            inFlight = null;
         }
         if (busy || !PosState.hasRegister() || Api.pos() == null) {
             return;
@@ -123,7 +124,13 @@ public final class PosSync {
         PosState.fireStatus();
         Api.pos().sync(PosState.storeId(), PosState.registerId(), new PosSyncDto(sales),
                 Net.to(result -> {
-                    busy = false;
+                    // A late answer to a batch the timeout already gave up on still
+                    // records what the server accepted, but must not end the request
+                    // that replaced it.
+                    if (inFlight == batch) {
+                        busy = false;
+                        inFlight = null;
+                    }
                     online = true;
                     box.answered(batch, result == null ? null : result.results(),
                             System.currentTimeMillis());
@@ -132,7 +139,12 @@ public final class PosSync {
                         kick();
                     }
                 }, (status, message) -> {
+                    if (inFlight != batch) {
+                        // The timeout already sent these sales back to wait.
+                        return;
+                    }
                     busy = false;
+                    inFlight = null;
                     // No answer, or one for the whole request (signed out,
                     // a server error): every sale waits and goes again.
                     if (status <= 0 || status >= 500) {

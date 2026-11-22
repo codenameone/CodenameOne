@@ -307,6 +307,10 @@ public final class Outbox {
     }
 
     private void backoff(Entry e, long now) {
+        if (SYNCED.equals(e.state) || DUPLICATE.equals(e.state)) {
+            // A late answer to an older request: a newer one already settled it.
+            return;
+        }
         e.state = PENDING;
         e.attempts++;
         e.nextAt = now + delay(e.attempts);
