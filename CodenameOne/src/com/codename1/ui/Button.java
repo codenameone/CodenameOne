@@ -848,6 +848,7 @@ public class Button extends Label implements ReleasableComponent, ActionSource<A
     /// {@inheritDoc}
     @Override
     public void pointerPressed(int x, int y) {
+        forwardPointerToIcon(ICON_PRESS, x, y);
         Component leadParent = LeadUtil.leadParentImpl(this);
         leadParent.clearDrag();
         leadParent.setDragActivated(false);
@@ -869,6 +870,7 @@ public class Button extends Label implements ReleasableComponent, ActionSource<A
     /// {@inheritDoc}
     @Override
     public void pointerReleased(int x, int y) {
+        forwardPointerToIcon(ICON_RELEASE, x, y);
         if (pointerReleasedListeners != null && pointerReleasedListeners.hasListeners()) {
             ActionEvent ev = new ActionEvent(this, ActionEvent.Type.PointerReleased, x, y);
             pointerReleasedListeners.fireActionEvent(ev);

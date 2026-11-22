@@ -20,15 +20,8 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codename1.rive;
+package com.codename1.impl.rive;
 
-import com.codename1.impl.rive.Artboard;
-import com.codename1.impl.rive.DataConverterOperation;
-import com.codename1.impl.rive.LinearAnimation;
-import com.codename1.impl.rive.LinearAnimationInstance;
-import com.codename1.impl.rive.RiveFileContext;
-import com.codename1.impl.rive.RiveFont;
-import com.codename1.impl.rive.RivePath;
 import java.io.File;
 import java.nio.file.Files;
 import java.util.Arrays;

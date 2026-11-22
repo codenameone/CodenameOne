@@ -50,7 +50,7 @@ public class RiveTranscoderTest {
     public void generatesARiveFileSubclassNamingOnlyTheClassesTheFileUses() throws Exception {
         String src = RiveTranscoder.transcode(fixture("juice.riv"), "app.gen", "JuiceRive");
         assertTrue(src.contains("package app.gen;"));
-        assertTrue(src.contains("public final class JuiceRive extends com.codename1.rive.RiveFile"));
+        assertTrue(src.contains("public final class JuiceRive extends com.codename1.impl.rive.RiveFile"));
         assertTrue(src.contains("import com.codename1.impl.rive.Shape;"));
         assertTrue(src.contains("b.begin(new Artboard());"));
         // juice has no bones: the class must not name them, or the stripper keeps them

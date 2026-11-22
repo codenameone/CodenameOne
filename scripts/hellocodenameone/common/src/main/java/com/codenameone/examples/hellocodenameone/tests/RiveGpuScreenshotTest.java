@@ -22,19 +22,13 @@
  */
 package com.codenameone.examples.hellocodenameone.tests;
 
-import com.codename1.generated.rive.JellyfishTestRive;
-import com.codename1.impl.rive.GpuRiveRenderer;
-import com.codename1.rive.RiveView;
 import com.codename1.ui.CN;
 import com.codename1.ui.Form;
+import com.codename1.ui.Image;
 import com.codename1.ui.layouts.BorderLayout;
-import com.codename1.ui.util.UITimer;
 
 /// A Rive file with an image mesh skinned to bones (`jellyfish_test`), shown
-/// on a form. Where the port has a GPU backend `RiveView` draws it into a
-/// `RenderView` through `GpuRiveRenderer`, which is the path this captures;
-/// `RiveAnimatedScreenshotTest` paints the same file into an image, through
-/// `Graphics`. The view is paused (views play by default) and advanced to a
+/// on a form as an image in a label. The image is paused and advanced to a
 /// fixed point, so the capture does not depend on the animation clock.
 public class RiveGpuScreenshotTest extends BaseTest {
     // cn1ss-skip: macos, watchos -- captures nothing on these ports (the guard below);
@@ -47,56 +41,15 @@ public class RiveGpuScreenshotTest extends BaseTest {
             done();
             return true;
         }
-        framesBefore = GpuRiveRenderer.getTotalFramesDrawn();
-        RiveView view = new RiveView(new JellyfishTestRive());
-        view.pause();
-        step(view, 0.5f);
-        form.add(BorderLayout.CENTER, view);
+        Image img = RiveFeaturesScreenshotTest.fresh("jellyfish_test.riv");
+        RiveAnimatedScreenshotTest.step(img, 0.5f);
+        form.add(BorderLayout.CENTER, RiveFeaturesScreenshotTest.holder(img));
         form.show();
         return true;
     }
 
-    private int framesBefore;
-
     @Override
     public boolean shouldTakeScreenshot() {
         return CN.isGpuSupported();
-    }
-
-    @Override
-    protected void registerReadyCallback(Form parent, Runnable run) {
-        // the surface compiles its programs on the first frame, which can
-        // take seconds on a slow emulator: poll until the GPU renderer has
-        // drawn a frame (an impl counter, not public API), then give it one more tick to
-        // reach the screen; a generous cap keeps a dead surface from hanging
-        final Form form = parent;
-        final Runnable ready = run;
-        final long deadline = System.currentTimeMillis() + 30000L;
-        UITimer.timer(100, false, form, new Runnable() {
-            @Override
-            public void run() {
-                if (GpuRiveRenderer.getTotalFramesDrawn() > framesBefore
-                        || System.currentTimeMillis() > deadline) {
-                    UITimer.timer(200, false, form, ready);
-                } else {
-                    UITimer.timer(100, false, form, this);
-                }
-            }
-        });
-    }
-
-    /// Steps a fresh view to `seconds` the way playback does, a frame at a
-    /// time. A state machine starts in Entry: its first advance only enters
-    /// the first state, at that animation's time 0, so one call of `seconds`
-    /// would show the first frame however large `seconds` is (rive-runtime
-    /// behaves the same; a player starts with small steps).
-    private static void step(RiveView view, float seconds) {
-        view.advance(0f);
-        float left = seconds;
-        while (left > 0f) {
-            float dt = Math.min(left, 1f / 60f);
-            view.advance(dt);
-            left -= dt;
-        }
     }
 }

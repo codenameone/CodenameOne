@@ -126,8 +126,10 @@ final class AppSupport {
                 com.codename1.maven.KmpProjectImporter.kmpDir(layout.projectDir()))) {
             addFramework(project, "implementation", version, com.codename1.maven.KmpProjectImporter.COMPOSE_ARTIFACT);
         }
-        // Rive files (src/main/rive) become RiveFile subclasses: the runtime is
-        // not part of the core and ships in the application like any library.
+        // Rive files (*.riv next to the theme CSS, like SVGs) become RiveFile
+        // subclasses. The runtime is not part of the core; the plugin adds it
+        // here, at its own version, so a project never declares it -- the
+        // Gradle counterpart of the Maven goal copying it into target/classes.
         if (com.codename1.maven.SvgTranscodeRunner.hasRiveSources(layout.projectDir())) {
             addFramework(project, "implementation", version,
                     com.codename1.maven.SvgTranscodeRunner.RIVE_RUNTIME_ARTIFACT);
@@ -200,7 +202,7 @@ final class AppSupport {
             // Every directory the transcoder reads, or adding an asset to one of
             // them leaves the task up to date and its generated classes stale.
             t.getSources().from(layout.cssDir(), new File(layout.projectDir(), "src/main/svg"),
-                    new File(layout.projectDir(), "src/main/lottie"), new File(layout.projectDir(), "src/main/rive"));
+                    new File(layout.projectDir(), "src/main/lottie"));
             t.getOutputDirectory().set(new File(layout.buildDir(), "generated/sources/cn1-svg"));
             t.getPlaceholderDirectory().set(new File(layout.buildDir(), "css-resources"));
         });

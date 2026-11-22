@@ -3,7 +3,8 @@
 Unmodified copies of rive-runtime test files
 (https://github.com/rive-app/rive-runtime, `tests/unit_tests/assets`), MIT
 licensed, Copyright (c) 2020 Rive; the licence is in `LICENSE-rive-runtime.txt`.
-The build translates each into a class in `com.codename1.generated.rive`.
+The build turns each into an image, read with
+`Resources.getGlobalResources().getImage("juice.riv")`.
 
 The files, and the test that draws each:
 

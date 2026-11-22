@@ -22,25 +22,20 @@
  */
 package com.codenameone.examples.hellocodenameone.tests;
 
-import com.codename1.generated.rive.ComplexIkDependencyRive;
-import com.codename1.generated.rive.DataBindingTest2Rive;
-import com.codename1.generated.rive.HelloWorldRive;
-import com.codename1.generated.rive.LayoutComplex1Rive;
-import com.codename1.generated.rive.LightSwitchRive;
-import com.codename1.generated.rive.StackedPathEffectsRive;
-import com.codename1.generated.rive.StateMachineTriggersRive;
-import com.codename1.generated.rive.TrimRive;
-import com.codename1.rive.RiveFile;
-import com.codename1.rive.RiveView;
+import com.codename1.components.ScaleImageLabel;
 import com.codename1.ui.Container;
 import com.codename1.ui.Form;
+import com.codename1.ui.Image;
 import com.codename1.ui.Label;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.GridLayout;
+import com.codename1.ui.plaf.Border;
+import com.codename1.ui.plaf.Style;
+import com.codename1.ui.util.Resources;
 
-/// One still frame per Rive feature family, each driven to a fixed point
-/// through the public `RiveView` API and paused (views play by default), so the capture does
-/// not depend on the clock:
+/// One still frame per Rive feature family, each a `.riv` image driven to a
+/// fixed point through the interactive-animation API of `Image` and paused
+/// (animations play by default), so the capture does not depend on the clock:
 ///
 /// - `light_switch`: a state machine boolean input set, then advanced;
 /// - `state_machine_triggers`: a trigger fired, then advanced;
@@ -49,75 +44,73 @@ import com.codename1.ui.layouts.GridLayout;
 /// - `data_binding_test_2`: a view-model number bound into the artboard;
 /// - `stacked_path_effects` and `trim`: trim and dash path effects;
 /// - `complex_ik_dependency`: bones under an IK constraint.
-///
-/// None of the files has a mesh, so every view draws through `Graphics`;
-/// `RiveGpuScreenshotTest` covers the GPU path.
 public class RiveFeaturesScreenshotTest extends BaseTest {
     @Override
     public boolean runTest() {
         Form form = createForm("Rive features", new GridLayout(4, 2), "RiveFeatures");
         // Not scrollable: the grid then divides the screen into eight cells.
-        // Scrolling, each row took a view's preferred (artboard) height and
-        // only the first row was on screen.
         form.setScrollable(false);
 
-        RiveView light = new RiveView(new LightSwitchRive());
-
-        light.pause();
-        light.setBoolean("On", true);
-        step(light, 1f);
+        Image light = fresh("light_switch.riv");
+        light.setAnimationInput("On", true);
+        RiveAnimatedScreenshotTest.step(light, 1f);
         form.add(cell("state machine bool", light));
 
-        RiveView trigger = new RiveView(new StateMachineTriggersRive());
-
-        trigger.pause();
-        trigger.fireTrigger("Trigger 1");
-        step(trigger, 0.5f);
+        Image trigger = fresh("state_machine_triggers.riv");
+        trigger.fireAnimationTrigger("Trigger 1");
+        RiveAnimatedScreenshotTest.step(trigger, 0.5f);
         form.add(cell("trigger", trigger));
 
-        form.add(cell("text", still(new HelloWorldRive(), 0f)));
-        form.add(cell("layout", still(new LayoutComplex1Rive(), 0f)));
+        form.add(cell("text", still("hello_world.riv", 0f)));
+        form.add(cell("layout", still("layout_complex1.riv", 0f)));
 
-        RiveView bound = new RiveView(new DataBindingTest2Rive());
-
-        bound.pause();
-        bound.setViewModelNumber("num", 50f);
-        step(bound, 0.5f);
+        Image bound = fresh("data_binding_test_2.riv");
+        bound.setAnimationProperty("num", Float.valueOf(50f));
+        RiveAnimatedScreenshotTest.step(bound, 0.5f);
         form.add(cell("data binding", bound));
 
-        form.add(cell("path effects", still(new StackedPathEffectsRive(), 0.5f)));
-        form.add(cell("trim", still(new TrimRive(), 0.5f)));
-        form.add(cell("bones + IK", still(new ComplexIkDependencyRive(), 0.5f)));
+        form.add(cell("path effects", still("stacked_path_effects.riv", 0.5f)));
+        form.add(cell("trim", still("trim.riv", 0.5f)));
+        form.add(cell("bones + IK", still("complex_ik_dependency.riv", 0.5f)));
         form.show();
         return true;
     }
 
-    private static RiveView still(RiveFile file, float seconds) {
-        RiveView v = new RiveView(file);
-        v.pause();
-        step(v, seconds);
-        return v;
+    /// A paused image of `name` in its initial state, independent of the
+    /// shared one the resources hold.
+    static Image fresh(String name) {
+        Image shared = Resources.getGlobalResources().getImage(name);
+        Image img = shared.scaled(shared.getWidth(), shared.getHeight());
+        img.setAnimationPlaying(false);
+        return img;
     }
 
-    private static Container cell(String name, RiveView view) {
+    private static Image still(String name, float seconds) {
+        Image img = fresh(name);
+        RiveAnimatedScreenshotTest.step(img, seconds);
+        return img;
+    }
+
+    private static Container cell(String name, Image img) {
         Container c = new Container(new BorderLayout());
-        c.add(BorderLayout.CENTER, view);
+        c.add(BorderLayout.CENTER, holder(img));
         c.add(BorderLayout.SOUTH, new Label(name));
         return c;
     }
 
-    /// Steps a fresh view to `seconds` the way playback does, a frame at a
-    /// time. A state machine starts in Entry: its first advance only enters
-    /// the first state, at that animation's time 0, so one call of `seconds`
-    /// would show the first frame however large `seconds` is (rive-runtime
-    /// behaves the same; a player starts with small steps).
-    private static void step(RiveView view, float seconds) {
-        view.advance(0f);
-        float left = seconds;
-        while (left > 0f) {
-            float dt = Math.min(left, 1f / 60f);
-            view.advance(dt);
-            left -= dt;
-        }
+    /// The image stretched over a label that fills the inner area of a
+    /// `RiveView`-styled container; the image fits itself into that area,
+    /// keeping its aspect ratio.
+    static Container holder(Image img) {
+        Container holder = new Container(new BorderLayout(), "RiveView");
+        ScaleImageLabel label = new ScaleImageLabel(img);
+        Style s = label.getAllStyles();
+        s.setPadding(0, 0, 0, 0);
+        s.setMargin(0, 0, 0, 0);
+        s.setBorder(Border.createEmpty());
+        s.setBgTransparency(0);
+        label.setBackgroundType(Style.BACKGROUND_IMAGE_SCALED);
+        holder.add(BorderLayout.CENTER, label);
+        return holder;
     }
 }

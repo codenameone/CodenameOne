@@ -50,6 +50,17 @@ public final class SVGTranscoder {
         public final float widthMm;
         /** Explicit height from CSS (`cn1-svg-height`), in millimeters; {@code 0} if not specified. */
         public final float heightMm;
+        /** Fully qualified image class the registry constructs around an
+         *  instance of this class ({@code new Wrapper(new Cls())}), or null when
+         *  the generated class is itself the image. A Rive file transcodes to a
+         *  {@code RiveFile}, which {@code RiveImage} presents as an image. */
+        public final String wrapperClass;
+
+        /** An entry whose generated class is wrapped by {@code wrapperClass}. */
+        public static GeneratedClass wrapped(String packageName, String className, String resourceName,
+                                             String wrapperClass) {
+            return new GeneratedClass(packageName, className, resourceName, 0, 0f, 0f, wrapperClass);
+        }
 
         public GeneratedClass(String packageName, String className, String resourceName) {
             this(packageName, className, resourceName, 0, 0f, 0f);
@@ -61,6 +72,12 @@ public final class SVGTranscoder {
 
         public GeneratedClass(String packageName, String className, String resourceName,
                               int sourceDensity, float widthMm, float heightMm) {
+            this(packageName, className, resourceName, sourceDensity, widthMm, heightMm, null);
+        }
+
+        private GeneratedClass(String packageName, String className, String resourceName,
+                               int sourceDensity, float widthMm, float heightMm, String wrapperClass) {
+            this.wrapperClass = wrapperClass;
             this.packageName = packageName;
             this.className = className;
             this.resourceName = resourceName;
@@ -145,6 +162,9 @@ public final class SVGTranscoder {
     }
 
     private static String newInstance(GeneratedClass c) {
+        if (c.wrapperClass != null) {
+            return "new " + c.wrapperClass + "(new " + c.fullyQualified() + "())";
+        }
         // Explicit millimeter dimensions win over density-based scaling --
         // they yield a deterministic physical size regardless of how the
         // SVG itself declares width/height.

@@ -20,7 +20,8 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-/// The Rive runtime behind [com.codename1.rive.RiveView]: the `.riv` reader,
+/// The Rive runtime behind [RiveImage], the `com.codename1.ui.Image` a `.riv`
+/// file becomes: the `.riv` reader,
 /// the object model, the artboard update loop and the renderers. A Java
 /// rewrite of rive-runtime (MIT).
 package com.codename1.impl.rive;

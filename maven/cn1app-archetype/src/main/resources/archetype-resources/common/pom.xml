@@ -161,23 +161,6 @@
                 </dependency>
             </dependencies>
         </profile>
-        <!-- Rive: each .riv in src/main/rive is translated at build time into a
-             com.codename1.rive.RiveFile subclass. The runtime is not part of
-             the core; it ships in the app like any library. -->
-        <profile>
-            <id>rive</id>
-            <activation>
-                <file>
-                    <exists>${basedir}/src/main/rive</exists>
-                </file>
-            </activation>
-            <dependencies>
-                <dependency>
-                    <groupId>com.codenameone</groupId>
-                    <artifactId>codenameone-rive-runtime</artifactId>
-                </dependency>
-            </dependencies>
-        </profile>
         <!-- Kotlin Multiplatform and Compose: the common and JVM sources of a
              KMP module in src/main/kmp build for every Codename One target.
              Compose's runtime and kotlinx.coroutines are translated as they

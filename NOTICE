@@ -392,7 +392,7 @@ their object model at build time from rive-runtime's generated headers, a
 pinned unmodified copy of which is in
 maven/rive-schema-gen/src/main/schema/rive-runtime-generated.zip with
 rive-runtime's LICENSE and the upstream commit (UPSTREAM.txt). maven/rive-transcoder/src/test/resources/rive and
-scripts/hellocodenameone/common/src/main/rive hold test files from
+scripts/hellocodenameone/common/src/main/css (the .riv files) hold test files from
 rive-runtime's tests/unit_tests/assets, unmodified. Some of them embed fonts
 under the SIL Open Font License 1.1 (Abel Regular, Copyright (c) 2011 Matthew
 Desmond; Inter Regular, Copyright The Inter Project Authors); the READMEs in

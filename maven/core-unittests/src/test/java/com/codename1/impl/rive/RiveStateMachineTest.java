@@ -20,14 +20,8 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codename1.rive;
+package com.codename1.impl.rive;
 
-import com.codename1.impl.rive.AnimationState;
-import com.codename1.impl.rive.Artboard;
-import com.codename1.impl.rive.LayerState;
-import com.codename1.impl.rive.LinearAnimation;
-import com.codename1.impl.rive.StateMachine;
-import com.codename1.impl.rive.StateMachineInstance;
 import com.codename1.rive.transcoder.RiveTranscoder;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;

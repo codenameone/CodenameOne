@@ -87,35 +87,93 @@ public class SvgTranscodeRunner {
     /** Package the classes translated from {@code .riv} files are emitted into. */
     public static final String RIVE_PACKAGE = "com.codename1.generated.rive";
 
-    /** Where {@code .riv} files live, relative to the module root. */
-    static final String RIVE_DIR = "src/main/rive";
-
-    /** The artifact that holds the Rive runtime ({@code com.codename1.rive}).
-     *  It is not part of the core: an application with {@code .riv} files
-     *  depends on it, and the generated classes extend its {@code RiveFile}. */
+    /** The artifact that holds the Rive runtime ({@code com.codename1.impl.rive}).
+     *  It is not part of the core, and an application never declares it: when
+     *  a module has {@code .riv} files the build tool resolves it at its own
+     *  version and puts its classes into the module's output directory (see
+     *  {@link #installRuntime}), so they compile with the generated classes and
+     *  ship in every target like the application's own classes. */
     public static final String RIVE_RUNTIME_ARTIFACT = "codenameone-rive-runtime";
 
-    /** The class every generated Rive class extends, as a class file path. */
-    public static final String RIVE_FILE_CLASS = "com/codename1/rive/RiveFile.class";
+    /** The image class the registry wraps each generated {@code RiveFile} in. */
+    public static final String RIVE_IMAGE_CLASS = "com.codename1.impl.rive.RiveImage";
 
-    /** True when {@code moduleDir} has at least one {@code .riv} file to translate. */
+    /** True when {@code moduleDir} has at least one {@code .riv} file in the
+     *  default vector source directories ({@code src/main/css} and friends). */
     public static boolean hasRiveSources(File moduleDir) {
-        List<File> out = new ArrayList<File>();
-        collectRive(new File(moduleDir, RIVE_DIR), out);
-        return !out.isEmpty();
+        return new SvgTranscodeRunner(moduleDir, null, null, null, null, null).hasRiveSources();
     }
 
-    /** The build failure for a module with {@code .riv} files and no Rive
-     *  runtime on its class path: names the dependency to add. */
-    public static String missingRiveRuntimeMessage(File moduleDir) {
-        return new File(moduleDir, RIVE_DIR) + " holds Rive files, which compile against the Rive runtime, "
-                + "and com.codename1.rive.RiveFile is not on this module's class path. Add this dependency "
-                + "to its pom.xml:\n\n"
-                + "    <dependency>\n"
-                + "        <groupId>com.codenameone</groupId>\n"
-                + "        <artifactId>" + RIVE_RUNTIME_ARTIFACT + "</artifactId>\n"
-                + "        <version>${cn1.version}</version>\n"
-                + "    </dependency>\n";
+    /** True when this module has at least one {@code .riv} file to translate. */
+    public boolean hasRiveSources() {
+        for (File f : locateSvgs()) {
+            if (VectorFormat.fromFilename(f.getName()) == VectorFormat.RIVE) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** Marker written into the output directory once a runtime jar is unpacked
+     *  there: the jar's size and time on the first line, so a changed jar is
+     *  unpacked again, then every file it wrote, so they can be removed first. */
+    static final String RUNTIME_MARKER = "META-INF/cn1-rive-runtime.stamp";
+
+    /**
+     * Copies the classes of the Rive runtime jar into {@code classesDir}, the
+     * module's compiler output directory. That directory is on javac's class
+     * path, so the generated classes compile against the runtime, and every
+     * target packages and translates what is in it, so the runtime ships the
+     * way the compatibility runtimes copied in by {@code remap-compat} do --
+     * without a dependency in the project. {@code META-INF} is not copied.
+     * Answers the number of files written; 0 when the stamp says the same jar
+     * was already unpacked.
+     */
+    public static int installRuntime(File runtimeJar, File classesDir) throws IOException {
+        String stamp = runtimeJar.length() + ":" + runtimeJar.lastModified();
+        File marker = new File(classesDir, RUNTIME_MARKER);
+        java.nio.file.Path root = classesDir.getCanonicalFile().toPath();
+        if (marker.isFile()) {
+            List<String> previous = Files.readAllLines(marker.toPath(), StandardCharsets.US_ASCII);
+            if (!previous.isEmpty() && stamp.equals(previous.get(0))
+                    && new File(classesDir, RIVE_IMAGE_CLASS.replace('.', '/') + ".class").isFile()) {
+                return 0;
+            }
+            // A different runtime: remove what the previous one wrote, so a
+            // class it had and this one dropped does not linger in the output
+            // and ship with the application until the next clean.
+            for (int i = 1; i < previous.size(); i++) {
+                java.nio.file.Path old = root.resolve(previous.get(i)).normalize();
+                if (old.startsWith(root)) {
+                    Files.deleteIfExists(old);
+                }
+            }
+        }
+        int written = 0;
+        StringBuilder record = new StringBuilder(stamp);
+        try (java.util.zip.ZipFile zip = new java.util.zip.ZipFile(runtimeJar)) {
+            java.util.Enumeration<? extends java.util.zip.ZipEntry> entries = zip.entries();
+            while (entries.hasMoreElements()) {
+                java.util.zip.ZipEntry e = entries.nextElement();
+                String name = e.getName();
+                if (e.isDirectory() || name.startsWith("META-INF/")) {
+                    continue;
+                }
+                java.nio.file.Path target = root.resolve(name).normalize();
+                if (!target.startsWith(root)) {
+                    throw new IOException(runtimeJar + " holds an entry outside its root: " + name);
+                }
+                Files.createDirectories(target.getParent());
+                try (InputStream in = zip.getInputStream(e)) {
+                    Files.copy(in, target, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                }
+                record.append('\n').append(name);
+                written++;
+            }
+        }
+        Files.createDirectories(marker.getParentFile().toPath());
+        Files.write(marker.toPath(), record.toString().getBytes(StandardCharsets.US_ASCII));
+        return written;
     }
 
     static final String[] DEFAULT_SVG_DIRS = {
@@ -130,7 +188,9 @@ public class SvgTranscodeRunner {
     enum VectorFormat {
         SVG(".svg"),
         LOTTIE_JSON(".json"),
-        LOTTIE_PACK(".lottie");
+        LOTTIE_PACK(".lottie"),
+        /** Rive; translated to a {@code RiveFile} subclass in {@link #RIVE_PACKAGE}. */
+        RIVE(".riv");
 
         final String ext;
         VectorFormat(String ext) { this.ext = ext; }
@@ -224,7 +284,7 @@ public class SvgTranscodeRunner {
 
     /** True when this module has at least one vector source to transcode. */
     public boolean hasVectorSources() {
-        return !locateSvgs().isEmpty() || !locateRive().isEmpty();
+        return !locateSvgs().isEmpty();
     }
 
     /** Filenames the theme CSS references through {@code url(...)}, whether or
@@ -244,22 +304,26 @@ public class SvgTranscodeRunner {
     /** Transcode every vector source, emit the registry and the CSS placeholders. */
     public void run() throws BuildException {
         transcodedCount = 0;
-        transcodeRive();
-        List<File> svgs = locateSvgs();
+        List<File> svgs = new ArrayList<File>();
+        List<File> rivs = new ArrayList<File>();
+        for (File f : locateSvgs()) {
+            (VectorFormat.fromFilename(f.getName()) == VectorFormat.RIVE ? rivs : svgs).add(f);
+        }
+        List<GeneratedClass> riveClasses = transcodeRive(rivs);
         Map<String, CssHint> cssHints = scanCssHints();
 
-        if (svgs.isEmpty() && !cssHints.isEmpty()) {
+        if (svgs.isEmpty() && rivs.isEmpty() && !cssHints.isEmpty()) {
             log.warn("CSS references " + cssHints.size()
                     + " SVG(s) but no .svg files were found under "
                     + String.join(", ", effectiveSourceDirs()));
         }
 
         File packageDir = new File(outputDir, svgPackage.replace('.', '/'));
-        long registrySrcMtime = lastModified(svgs);
-        List<GeneratedClass> generated = new ArrayList<GeneratedClass>();
+        long registrySrcMtime = Math.max(lastModified(svgs), lastModified(rivs));
+        List<GeneratedClass> generated = new ArrayList<GeneratedClass>(riveClasses);
         Set<String> usedClassNames = new HashSet<String>();
 
-        if (svgs.isEmpty()) {
+        if (svgs.isEmpty() && rivs.isEmpty()) {
             // No SVGs in this project -- skip the registry entirely so the
             // per-platform Stub injection (IPhoneBuilder / AndroidGradleBuilder
             // checking for SVGRegistry.class) stays a no-op. JavaSE Executor's
@@ -322,25 +386,6 @@ public class SvgTranscodeRunner {
         emitPlaceholders(cssHints.keySet());
     }
 
-    /**
-     * Every {@code .riv} under {@link #RIVE_DIR}, sorted by path relative to
-     * it. Two files of one name in different folders then get their class
-     * names ({@code CoinRive}, {@code CoinRive2}) in the same order on every
-     * machine, whatever order the file system lists them in.
-     */
-    private List<File> locateRive() {
-        List<File> out = new ArrayList<File>();
-        final File root = new File(basedir, RIVE_DIR);
-        collectRive(root, out);
-        final String rootPath = root.getAbsolutePath();
-        out.sort(new Comparator<File>() {
-            @Override public int compare(File a, File b) {
-                return relative(rootPath, a).compareTo(relative(rootPath, b));
-            }
-        });
-        return out;
-    }
-
     private static String relative(String rootPath, File f) {
         String p = f.getAbsolutePath();
         if (p.startsWith(rootPath)) {
@@ -354,7 +399,7 @@ public class SvgTranscodeRunner {
 
     /**
      * The source line written into a generated Rive class: the {@code .riv}
-     * file's path relative to the rive directory and a CRC32 of its bytes.
+     * file's path relative to the module and a CRC32 of its bytes.
      * Comparing it, and not only modification times, regenerates a class when
      * the files shift between class names (a rename, a new file sorting
      * first) or when a source is replaced by one with an older timestamp.
@@ -408,20 +453,6 @@ public class SvgTranscodeRunner {
         return src.substring(0, eol + 1) + sourceLine + "\n" + src.substring(eol + 1);
     }
 
-    private static void collectRive(File dir, List<File> out) {
-        File[] entries = dir.listFiles();
-        if (entries == null) {
-            return;
-        }
-        for (File f : entries) {
-            if (f.isDirectory()) {
-                collectRive(f, out);
-            } else if (asciiLower(f.getName()).endsWith(".riv")) {
-                out.add(f);
-            }
-        }
-    }
-
     /** The class a {@code .riv} file becomes: {@code coin.riv} is {@code CoinRive}. */
     static String riveClassNameFor(String fileName) {
         String base = SVGTranscoder.classNameFor(fileName);
@@ -432,18 +463,23 @@ public class SvgTranscodeRunner {
      * Translates every {@code .riv} file into a {@code RiveFile} subclass in
      * {@link #RIVE_PACKAGE}. The device never parses a Rive file: the class
      * builds the file's objects directly, and names only the runtime classes
-     * that file uses. Classes whose source is gone are removed.
+     * that file uses. Classes whose source is gone are removed. Answers the
+     * registry entries: each file is registered under its file name
+     * ({@code juice.riv}), wrapped in a {@code RiveImage}, exactly as an SVG is.
+     * {@code rivs} comes from {@link #locateSvgs}, sorted by file name with
+     * names unique, so class names are the same on every machine.
      */
-    private void transcodeRive() throws BuildException {
-        List<File> rivs = locateRive();
+    private List<GeneratedClass> transcodeRive(List<File> rivs) throws BuildException {
+        List<GeneratedClass> entries = new ArrayList<GeneratedClass>();
         File packageDir = new File(outputDir, RIVE_PACKAGE.replace('.', '/'));
         Set<String> used = new HashSet<String>();
-        String riveRoot = new File(basedir, RIVE_DIR).getAbsolutePath();
+        String riveRoot = basedir.getAbsolutePath();
         for (File riv : rivs) {
             String className = uniqueClassName(riveClassNameFor(riv.getName()), used);
             used.add(className);
             File outFile = new File(packageDir, className + ".java");
             transcodedCount++;
+            entries.add(GeneratedClass.wrapped(RIVE_PACKAGE, className, riv.getName(), RIVE_IMAGE_CLASS));
             byte[] bytes;
             try {
                 bytes = Files.readAllBytes(riv.toPath());
@@ -479,6 +515,7 @@ public class SvgTranscodeRunner {
                 }
             }
         }
+        return entries;
     }
 
     private static long lastModified(List<File> files) {
@@ -545,7 +582,7 @@ public class SvgTranscodeRunner {
         collectCss(cssDir, cssFiles);
         Pattern blockPattern = Pattern.compile("\\{([^}]*)\\}", Pattern.DOTALL);
         Pattern svgUrlPattern = Pattern.compile(
-                "url\\(\\s*['\"]?\\s*([^'\")\\s]+?\\.(?:svg|json|lottie))\\s*['\"]?\\s*\\)",
+                "url\\(\\s*['\"]?\\s*([^'\")\\s]+?\\.(?:svg|json|lottie|riv))\\s*['\"]?\\s*\\)",
                 Pattern.CASE_INSENSITIVE);
         Pattern dpiPattern = Pattern.compile(
                 "cn1-source-dpi\\s*:\\s*([\\w-]+)\\s*;?",
@@ -750,6 +787,9 @@ public class SvgTranscodeRunner {
             case LOTTIE_JSON:
                 LottieTranscoder.transcode(src, pkg, className, outFile);
                 break;
+            case RIVE:
+                // run() hands Rive files to transcodeRive, never here.
+                throw new IOException(src + " is a Rive file, which transcodeRive translates");
             case LOTTIE_PACK: {
                 // A dotLottie file is an archive around the same JSON.
                 String json = dotLottieAnimation(src);

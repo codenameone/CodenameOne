@@ -33,7 +33,7 @@ import java.util.List;
 import java.util.TreeSet;
 
 /// Translates a `.riv` file into Java source: a subclass of
-/// `com.codename1.rive.RiveFile` that replays the file's object stream
+/// `com.codename1.impl.rive.RiveFile` that replays the file's object stream
 /// through `com.codename1.impl.rive.RiveBuilder`. The device never parses the
 /// file, and the generated code names only the runtime classes the file uses,
 /// so the rest of the runtime is stripped from the application.
@@ -388,7 +388,7 @@ public final class RiveTranscoder {
         for (String c : used) {
             out.append("import com.codename1.impl.rive.").append(c).append(";\n");
         }
-        out.append("\npublic final class ").append(className).append(" extends com.codename1.rive.RiveFile {\n");
+        out.append("\npublic final class ").append(className).append(" extends com.codename1.impl.rive.RiveFile {\n");
         out.append("    public ").append(className).append("() {\n        super(new String[]{");
         for (int i = 0; i < artboards.size(); i++) {
             out.append(i == 0 ? "" : ", ").append(literal(artboards.get(i).get(0).string(COMPONENT_NAME_KEY)));

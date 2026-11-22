@@ -539,10 +539,10 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             // Build-time Lottie transcoder -- same pipeline as SVG, lowers
             // the Bodymovin JSON into the SVG model and reuses SVGRegistry.
             new LottieAnimatedScreenshotTest(),
-            // Build-time Rive translation: each .riv in src/main/rive becomes a
-            // RiveFile class; paths, gradients, strokes and clipping on one strip.
+            // Rive files as images: each .riv next to theme.css is read with
+            // Resources.getImage; paths, gradients, strokes and clipping on one strip.
             new RiveAnimatedScreenshotTest(),
-            // one still per Rive feature family, and the GPU (RenderView) path
+            // one still per Rive feature family, and a mesh shown in a label
             new RiveFeaturesScreenshotTest(),
             new RiveGpuScreenshotTest(),
             new AudioMixerApiTest(),

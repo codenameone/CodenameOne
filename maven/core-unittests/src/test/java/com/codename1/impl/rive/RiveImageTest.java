@@ -20,17 +20,18 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codename1.rive;
+package com.codename1.impl.rive;
 
-import com.codename1.impl.rive.Artboard;
-import com.codename1.impl.rive.LayerState;
-import com.codename1.impl.rive.StateMachineInstance;
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
 import com.codename1.rive.transcoder.RiveTranscoder;
 import com.codename1.ui.Container;
 import com.codename1.ui.Display;
 import com.codename1.ui.Form;
+import com.codename1.ui.Image;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.events.AnimationEvent;
 import com.codename1.ui.Label;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
@@ -40,7 +41,6 @@ import org.junit.jupiter.api.io.TempDir;
 
 import javax.tools.ToolProvider;
 import java.io.File;
-import java.lang.reflect.Field;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.nio.charset.StandardCharsets;
@@ -52,13 +52,13 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/// `RiveView` behaviour on a form: playing by default, pausing, inputs while
-/// paused, pointer mapping through padding and letterboxing, drags and
-/// hover, and events reported by the entry state.
-class RiveViewTest extends UITestBase {
+/// `RiveImage` behaviour through the core `Image` API: playing by default,
+/// pausing, inputs while paused, pointer mapping through a `Label` icon, drags
+/// that do not scroll the parent, and events reported by the entry state.
+class RiveImageTest extends UITestBase {
     private static final String FIXTURES = "../rive-transcoder/src/test/resources/rive/";
     private static final String[] FILES = {"light_switch.riv", "state_machine_triggers.riv", "events_on_states.riv", "hit_test_solos.riv",
         "component_list_row_click.riv"};
@@ -83,7 +83,7 @@ class RiveViewTest extends UITestBase {
             args.add(src.getPath());
         }
         assertEquals(0, ToolProvider.getSystemJavaCompiler().run(null, null, null, args.toArray(new String[0])));
-        loader = new URLClassLoader(new URL[]{temporary.toUri().toURL()}, RiveViewTest.class.getClassLoader());
+        loader = new URLClassLoader(new URL[]{temporary.toUri().toURL()}, RiveImageTest.class.getClassLoader());
     }
 
     @AfterAll
@@ -103,103 +103,79 @@ class RiveViewTest extends UITestBase {
         return f;
     }
 
-    @SuppressWarnings("unchecked")
-    private static boolean registered(Form f, Object c) throws Exception {
-        Field fl = Form.class.getDeclaredField("animatableComponents");
-        fl.setAccessible(true);
-        List<Object> l = (List<Object>) fl.get(f);
-        return l != null && l.contains(c);
+    /// Only core API: what an application holds is an Image.
+    private static Image image(int i) throws Exception {
+        return new RiveImage(file(i));
     }
 
     @FormTest
-    void playsByDefaultPausesAndStopsWhenRemoved() throws Exception {
-        Form f = form();
-        f.setLayout(new BorderLayout());
-        RiveView v = new RiveView(file(0));
-        assertTrue(v.isPlaying());
-        f.add(BorderLayout.CENTER, v);
-        f.revalidate();
-        assertTrue(registered(f, v), "a shown view runs on the form's clock");
-        v.pause();
-        assertFalse(v.isPlaying());
-        assertFalse(registered(f, v));
-        v.play();
-        assertTrue(registered(f, v));
-        f.removeComponent(v);
-        assertFalse(registered(f, v), "a removed view stops animating");
+    void playsByDefaultAndPauses() throws Exception {
+        Image v = image(0);
+        assertTrue(v.isAnimation());
+        assertTrue(v.isAnimationPlaying());
+        v.setAnimationPlaying(false);
+        assertFalse(v.isAnimationPlaying());
+        v.setAnimationPlaying(true);
+        assertTrue(v.isAnimationPlaying());
+    }
+
+    @FormTest
+    void scaledIsIndependentAndSized() throws Exception {
+        Image v = image(0);
+        Image s = v.scaled(123, 45);
+        assertEquals(123, s.getWidth());
+        assertEquals(45, s.getHeight());
+        assertNotSame(((RiveImage) v).machineInstance(), ((RiveImage) s).machineInstance());
     }
 
     @FormTest
     void playRewindsAFinishedOneShot() throws Exception {
-        RiveView v = new RiveView(file(1));
-        v.setAnimation(file(1).instance(null).getAnimations().get(0).getName());
-        v.pause();
-        v.advance(1000f);
-        v.play();
-        assertTrue(v.isPlaying());
+        // state_machine_triggers has no machine on some artboards; any file
+        // with only an animation plays it once and stops
+        Image v = image(1);
+        v.setAnimationPlaying(false);
+        v.advanceAnimation(1000f);
+        v.setAnimationPlaying(true);
+        assertTrue(v.isAnimationPlaying());
     }
 
     @FormTest
     void inputsTakeEffectWhilePaused() throws Exception {
-        RiveView v = new RiveView(file(0));
-        v.pause();
+        RiveImage v = new RiveImage(file(0));
+        v.setAnimationPlaying(false);
         StateMachineInstance m = v.machineInstance();
         LayerState before = m.getLayerState(0);
-        v.setBoolean("On", !m.getBoolean("On"));
+        v.setAnimationInput("On", !m.getBoolean("On"));
         assertFalse(m.needsAdvance(), "the change was settled at once");
         assertNotSame(before, m.getLayerState(0), "the state machine moved to the other state");
     }
 
     @FormTest
-    void tapMapsThroughPaddingAndLetterboxing() throws Exception {
+    void tapOnALabelIconMapsThroughPaddingAndLetterboxing() throws Exception {
         Form f = form();
         f.setLayout(new BorderLayout());
-        RiveView v = new RiveView(file(0));
-        v.pause();
-        v.getAllStyles().setPadding(10, 20, 30, 40);
-        v.getAllStyles().setPaddingUnit(com.codename1.ui.plaf.Style.UNIT_TYPE_PIXELS);
-        f.add(BorderLayout.CENTER, v);
+        RiveImage img = (RiveImage) new RiveImage(file(0)).scaled(300, 200);
+        img.setAnimationPlaying(false);
+        assertTrue(img.isInteractive());
+        Label l = new Label(img);
+        l.getAllStyles().setPadding(10, 20, 30, 40);
+        l.getAllStyles().setPaddingUnit(com.codename1.ui.plaf.Style.UNIT_TYPE_PIXELS);
+        l.getAllStyles().setAlignment(com.codename1.ui.Component.CENTER);
+        l.setGap(0);
+        f.add(BorderLayout.CENTER, l);
         f.revalidate();
         Artboard a = file(0).instance(null);
-        int iw = v.getInnerWidth();
-        int ih = v.getInnerHeight();
-        float scale = Math.min(iw / a.getWidth(), ih / a.getHeight());
-        int sx = Math.round(v.getAbsoluteX() + v.getStyle().getPaddingLeft(false)
-                + (iw - a.getWidth() * scale) / 2f + 150 * scale);
-        int sy = Math.round(v.getAbsoluteY() + v.getStyle().getPaddingTop()
-                + (ih - a.getHeight() * scale) / 2f + 258 * scale);
-        StateMachineInstance m = v.machineInstance();
+        float scale = Math.min(300 / a.getWidth(), 200 / a.getHeight());
+        // the icon is centered in the label's inner area
+        int iconX = 40 + (l.getWidth() - 40 - 20 - 300) / 2;
+        int iconY = 10 + (l.getHeight() - 10 - 30 - 200) / 2;
+        int sx = Math.round(l.getAbsoluteX() + iconX + (300 - a.getWidth() * scale) / 2f + 150 * scale);
+        int sy = Math.round(l.getAbsoluteY() + iconY + (200 - a.getHeight() * scale) / 2f + 258 * scale);
+        StateMachineInstance m = img.machineInstance();
         boolean on = m.getBoolean("On");
-        v.pointerPressed(sx, sy);
-        v.pointerReleased(sx, sy);
+        l.pointerPressed(sx, sy);
+        l.pointerReleased(sx, sy);
         assertEquals(!on, m.getBoolean("On"), "the tap reached the listener");
-    }
-
-    // the hover half of upstream's "hit test on solos": hovering the shape at
-    // (200, 100) sets "hovered" through an enter listener, leaving clears it
-    @FormTest
-    void hoverFiresEnterAndLeavingFiresExit() throws Exception {
-        Form f = form();
-        f.setLayout(new BorderLayout());
-        RiveView v = new RiveView(file(3));
-        v.pause();
-        f.add(BorderLayout.CENTER, v);
-        f.revalidate();
-        Artboard a = file(3).instance(null);
-        int iw = v.getInnerWidth();
-        int ih = v.getInnerHeight();
-        float scale = Math.min(iw / a.getWidth(), ih / a.getHeight());
-        int sx = Math.round(v.getAbsoluteX() + v.getStyle().getPaddingLeft(false)
-                + (iw - a.getWidth() * scale) / 2f + 200 * scale);
-        int sy = Math.round(v.getAbsoluteY() + v.getStyle().getPaddingTop()
-                + (ih - a.getHeight() * scale) / 2f + 100 * scale);
-        StateMachineInstance m = v.machineInstance();
-        assertFalse(m.getBoolean("hovered"));
-        v.pointerHover(new int[]{sx}, new int[]{sy});
-        assertTrue(m.getBoolean("hovered"), "hover fired the enter listener");
-        int out = v.getAbsoluteX() + v.getWidth() + 50;
-        v.pointerHover(new int[]{out}, new int[]{sy});
-        assertFalse(m.getBoolean("hovered"), "leaving the view fired the exit listener");
     }
 
     @FormTest
@@ -209,8 +185,7 @@ class RiveViewTest extends UITestBase {
         drag(plain, plain.getAbsoluteY() + plain.getHeight() * 3 / 4);
         assertTrue(plain.getScrollY() > 0, "a drag over a plain row scrolls");
 
-        RiveView v = new RiveView(file(0));
-        v.pause();
+        Label v = new com.codename1.components.ScaleImageLabel(image(0));
         Container content = scrollingForm(v);
         drag(content, v.getAbsoluteY() + v.getHeight() * 3 / 4);
         assertEquals(0, content.getScrollY(), "the state machine owns the drag");
@@ -219,20 +194,18 @@ class RiveViewTest extends UITestBase {
     @FormTest
     void dragOverARowListenerDoesNotScrollTheParent() throws Exception {
         // the fixture's own machine has no listener; only its list rows do
-        com.codename1.impl.rive.Artboard ab = file(4).instance((String) null);
-        com.codename1.impl.rive.StateMachineInstance top = new com.codename1.impl.rive.StateMachineInstance(
-                ab.getStateMachines().get(0), ab);
+        Artboard ab = file(4).instance((String) null);
+        StateMachineInstance top = new StateMachineInstance(ab.getStateMachines().get(0), ab);
         top.advance(0);
         assertTrue(top.getStateMachine().getListenerDefs().isEmpty(), "top-level machine has no listeners");
         assertTrue(top.hasPointerListeners(), "a row machine's listener counts");
-        RiveView v = new RiveView(file(4));
-        v.pause();
+        Label v = new com.codename1.components.ScaleImageLabel(image(4));
         Container content = scrollingForm(v);
         drag(content, v.getAbsoluteY() + v.getHeight() * 3 / 4);
         assertEquals(0, content.getScrollY(), "a row machine's listener owns the drag");
     }
 
-    private Container scrollingForm(RiveView v) {
+    private Container scrollingForm(Label v) {
         Form f = new Form("drag", BoxLayout.y());
         Container content = f.getContentPane();
         content.setScrollableY(true);
@@ -269,44 +242,19 @@ class RiveViewTest extends UITestBase {
     @FormTest
     void entryEventIsDelivered() throws Exception {
         // events_on_states reports "First" from its entry state
-        RiveView v = new RiveView(file(2));
-        v.pause();
+        Image v = image(2);
+        v.setAnimationPlaying(false);
         final List<String> names = new ArrayList<String>();
-        v.addEventListener(new RiveEventListener() {
+        v.addAnimationListener(new ActionListener() {
             @Override
-            public void onRiveEvent(RiveEvent e) {
-                names.add(e.getName());
+            public void actionPerformed(ActionEvent e) {
+                names.add(((AnimationEvent) e).getName());
+                assertNotNull(((AnimationEvent) e).getProperties());
             }
         });
-        v.advance(0);
+        v.advanceAnimation(0);
+        flushSerialCalls();
         assertTrue(names.size() >= 1, "entry event lost");
-        assertEquals("First", names.get(0));
-    }
-
-    @FormTest
-    void entryEventIsHeldAfterSetStateMachine() throws Exception {
-        // events_on_states reports "First" from its entry state; choosing the
-        // machine again with nobody listening must hold it for the first listener
-        RiveView v = new RiveView(file(2));
-        v.pause();
-        RiveEventListener drain = new RiveEventListener() {
-            @Override
-            public void onRiveEvent(RiveEvent e) {
-            }
-        };
-        v.addEventListener(drain);
-        v.advance(0);
-        v.removeEventListener(drain);
-        v.setStateMachine("State Machine 1");
-        final List<String> names = new ArrayList<String>();
-        v.addEventListener(new RiveEventListener() {
-            @Override
-            public void onRiveEvent(RiveEvent e) {
-                names.add(e.getName());
-            }
-        });
-        v.advance(0);
-        assertTrue(names.size() >= 1, "entry event lost after setStateMachine");
         assertEquals("First", names.get(0));
     }
 
@@ -320,24 +268,27 @@ class RiveViewTest extends UITestBase {
                 raw.advance(0);
                 expected = raw.getReportedEvents().size();
             }
-            RiveView v = new RiveView(file(i));
-            v.pause();
+            Image v = image(i);
+            v.setAnimationPlaying(false);
             final int[] got = new int[1];
-            v.addEventListener(new RiveEventListener() {
+            v.addAnimationListener(new ActionListener() {
                 @Override
-                public void onRiveEvent(RiveEvent e) {
+                public void actionPerformed(ActionEvent e) {
                     got[0]++;
                 }
             });
-            v.advance(0);
+            v.advanceAnimation(0);
+            flushSerialCalls();
             assertTrue(got[0] >= expected, FILES[i] + ": entry events lost");
         }
     }
 
     @FormTest
-    void nullNamesThrow() throws Exception {
-        final RiveView v = new RiveView(file(0));
-        assertThrows(IllegalArgumentException.class, () -> v.setAnimation(null));
-        assertThrows(IllegalArgumentException.class, () -> v.setStateMachine(null));
+    void plainImagesAreNotInteractive() {
+        Image plain = Image.createImage(4, 4);
+        assertFalse(plain.isInteractive());
+        assertFalse(plain.isAnimationPlaying());
+        plain.setAnimationProperty("x", Float.valueOf(1));
+        assertEquals(null, plain.getAnimationProperty("x"));
     }
 }

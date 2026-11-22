@@ -20,28 +20,21 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codename1.rive;
+package com.codename1.impl.rive;
 
-import com.codename1.impl.rive.Artboard;
-import com.codename1.impl.rive.RiveBuilder;
-import com.codename1.impl.rive.RiveFileContext;
 
 import java.util.ArrayList;
 
 /// A Rive (`.riv`) file, translated to Java by the build.
 ///
-/// Put the file under `src/main/rive` and the build generates a subclass of
-/// this class for it, named after the file: `coin.riv` becomes `CoinRive`.
+/// The build generates a subclass of this class for each `.riv` file of an
+/// application, and the generated image registry wraps it in a [RiveImage],
+/// which is what the application sees: an ordinary `com.codename1.ui.Image`.
 /// The generated class creates the file's objects directly, so nothing is
 /// parsed on the device, and an application ships only the parts of the
 /// runtime its files use.
 ///
-/// ```java
-/// RiveView view = new RiveView(new CoinRive());
-/// view.play();
-/// ```
-///
-/// Every view gets an artboard of its own, so one file can play in several
+/// Every image gets an artboard of its own, so one file can play in several
 /// places at once without the copies affecting each other.
 public abstract class RiveFile {
     private final String[] artboardNames;

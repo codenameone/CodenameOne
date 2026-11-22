@@ -22,33 +22,35 @@
  */
 package com.codenameone.examples.hellocodenameone.tests;
 
-import com.codename1.generated.rive.CircleClipsRive;
-import com.codename1.generated.rive.JellyfishTestRive;
-import com.codename1.generated.rive.JuiceRive;
-import com.codename1.generated.rive.OffRoadCarRive;
-import com.codename1.rive.RiveFile;
-import com.codename1.rive.RiveView;
 import com.codename1.ui.Graphics;
+import com.codename1.ui.Image;
+import com.codename1.ui.plaf.Style;
+import com.codename1.ui.plaf.UIManager;
+import com.codename1.ui.util.Resources;
 
-/// End-to-end test for the build-time Rive translation. The `.riv` files in
-/// `src/main/rive` are rive-runtime test assets, each translated into a class
-/// by the build; every frame of the strip draws the four side by side at the
-/// same point of their first animation:
+/// End-to-end test for Rive files as images. The `.riv` files next to
+/// `theme.css` are rive-runtime test assets; the build turns each into an
+/// image, read like any other with `Resources.getImage`. Every frame of the
+/// strip draws the four side by side at the same point of their first
+/// animation:
 ///
 /// - `juice`: paths, solid fills and a timeline of transforms;
 /// - `off_road_car`: a vehicle of many grouped shapes with gradients and strokes;
 /// - `circle_clips`: clipping shapes and strokes;
-/// - `jellyfish_test`: an image mesh skinned to bones. Painted into an image,
-///   the view draws it through `Graphics`; on screen with a GPU backend it
-///   draws through `com.codename1.gpu`.
+/// - `jellyfish_test`: an image mesh skinned to bones.
 ///
-/// Each frame builds fresh views and advances them from zero, so the capture
-/// does not depend on what was drawn before it.
+/// Each frame takes fresh images (`scaled` returns an independent image in
+/// its initial state) and advances them from zero, so the capture does not
+/// depend on what was drawn before it. Each cell is inset by the padding of
+/// the `RiveView` UIID, which is where the strip drew before, so the goldens
+/// still hold.
 public class RiveAnimatedScreenshotTest extends AbstractAnimationScreenshotTest {
     /// Seconds of animation the strip spans, start to end.
     private static final float SPAN_SECONDS = 2f;
 
-    private RiveFile[] files;
+    private static final String[] FILES = {"juice.riv", "off_road_car.riv", "circle_clips.riv", "jellyfish_test.riv"};
+
+    private Image[] images;
 
     @Override
     protected int getAnimationDurationMillis() {
@@ -58,42 +60,47 @@ public class RiveAnimatedScreenshotTest extends AbstractAnimationScreenshotTest 
     @Override
     protected void prepareCapture(int frameWidth, int frameHeight) {
         super.prepareCapture(frameWidth, frameHeight);
-        files = new RiveFile[]{new JuiceRive(), new OffRoadCarRive(), new CircleClipsRive(), new JellyfishTestRive()};
+        Resources res = Resources.getGlobalResources();
+        images = new Image[FILES.length];
+        for (int i = 0; i < FILES.length; i++) {
+            images[i] = res.getImage(FILES[i]);
+        }
     }
 
     @Override
     protected void renderFrame(Graphics g, int width, int height, double progress, int frameIndex) {
         g.setColor(0xFFFFFF);
         g.fillRect(0, 0, width, height);
-        int cell = width / files.length;
+        int cell = width / images.length;
+        Style s = UIManager.getInstance().getComponentStyle("RiveView");
+        int padLeft = s.getPaddingLeft(false);
+        int padTop = s.getPaddingTop();
+        int innerW = Math.max(1, cell - s.getHorizontalPadding());
+        int innerH = Math.max(1, height - s.getVerticalPadding());
         int[] clip = g.getClip();
-        for (int i = 0; i < files.length; i++) {
-            // A form gives each component its own clip; here the four share
-            // one Graphics, and off_road_car's road reaches past its artboard
+        for (int i = 0; i < images.length; i++) {
+            // the four share one Graphics, and off_road_car's road reaches
+            // past its artboard
             g.setClip(i * cell, 0, cell, height);
-            RiveView view = new RiveView(files[i]);
-            view.pause();
-            step(view, (float) progress * SPAN_SECONDS);
-            view.setX(i * cell);
-            view.setY(0);
-            view.setWidth(cell);
-            view.setHeight(height);
-            view.paint(g);
+            Image frame = images[i].scaled(innerW, innerH);
+            frame.setAnimationPlaying(false);
+            step(frame, (float) progress * SPAN_SECONDS);
+            g.drawImage(frame, i * cell + padLeft, padTop);
         }
         g.setClip(clip);
     }
 
-    /// Steps a fresh view to `seconds` the way playback does, a frame at a
+    /// Steps a fresh image to `seconds` the way playback does, a frame at a
     /// time. A state machine starts in Entry: its first advance only enters
     /// the first state, at that animation's time 0, so one call of `seconds`
     /// would show the first frame however large `seconds` is (rive-runtime
     /// behaves the same; a player starts with small steps).
-    private static void step(RiveView view, float seconds) {
-        view.advance(0f);
+    static void step(Image img, float seconds) {
+        img.advanceAnimation(0f);
         float left = seconds;
         while (left > 0f) {
             float dt = Math.min(left, 1f / 60f);
-            view.advance(dt);
+            img.advanceAnimation(dt);
             left -= dt;
         }
     }

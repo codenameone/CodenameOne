@@ -20,15 +20,9 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codename1.rive;
+package com.codename1.impl.rive;
 
-import com.codename1.impl.rive.Artboard;
-import com.codename1.impl.rive.LinearAnimation;
-import com.codename1.impl.rive.LinearAnimationInstance;
 import com.codename1.impl.rive.Mat2D;
-import com.codename1.impl.rive.RivePaint;
-import com.codename1.impl.rive.RivePath;
-import com.codename1.impl.rive.RiveRenderer;
 import com.codename1.rive.transcoder.RiveTranscoder;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -51,7 +45,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /// Translates rive-runtime test files with the build-time transcoder, compiles
 /// the generated classes with javac and runs them against the runtime: the
-/// whole path a `.riv` under `src/main/rive` takes, minus the build plugin.
+/// whole path a `.riv` next to the theme takes, minus the build plugin.
 class RiveGeneratedClassTest {
     private static final String FIXTURES = "../rive-transcoder/src/test/resources/rive/";
     private static final String[] FILES = {"juice.riv", "off_road_car.riv"};

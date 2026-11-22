@@ -96,11 +96,6 @@
                 <artifactId>codenameone-compose-compat</artifactId>
                 <version>${cn1.version}</version>
             </dependency>
-            <dependency>
-                <groupId>com.codenameone</groupId>
-                <artifactId>codenameone-rive-runtime</artifactId>
-                <version>${cn1.version}</version>
-            </dependency>
             <!--
               Optional desktop media binaries. BrowserComponent receives JCEF
               Maven transitively from codenameone-javase and downloads the native

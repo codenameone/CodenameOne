@@ -2416,49 +2416,32 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
 
     /** A transcoder configured exactly as the bound goal would be. */
     /**
-     * Names the dependency to add when this module has {@code .riv} files and
-     * no Rive runtime. Fails the build when the running goal resolved its
-     * class path and {@code com.codename1.rive.RiveFile} is on none of it;
-     * with nothing resolved it can see only declared dependencies, so a miss
-     * there is a warning.
+     * Supplies the Rive runtime to a module with {@code .riv} files. The
+     * project declares nothing: the runtime is resolved at this plugin's own
+     * version, like a port (see {@link #resolvePortJar}), and its classes are
+     * copied into the compiler output directory, which is on javac's class
+     * path and is what every target packages and translates. Never a plugin
+     * dependency: then every project, Rive or not, would download it.
+     *
+     * @return false when the runtime could not be resolved (logged)
      */
-    protected void requireRiveRuntime() throws MojoExecutionException {
-        if (!SvgTranscodeRunner.hasRiveSources(project.getBasedir())) {
-            return;
+    protected boolean installRiveRuntime(SvgTranscodeRunner runner) throws java.io.IOException {
+        if (!runner.hasRiveSources()) {
+            return true;
         }
-        java.util.Set<Artifact> artifacts = project.getArtifacts();
-        if (artifacts != null && !artifacts.isEmpty()) {
-            for (Artifact a : artifacts) {
-                if (!"test".equals(a.getScope()) && a.getFile() != null && hasRiveFileClass(a.getFile())) {
-                    return;
-                }
-            }
-        } else {
-            // Nothing resolved (transcode-svg resolves nothing, so the SVG
-            // build stays as cheap and offline-safe as it was): only the
-            // declared dependencies are visible, and the runtime may still
-            // arrive transitively, through a cn1lib or a shared parent. So a
-            // miss here only warns; javac reports a real absence.
-            for (org.apache.maven.model.Dependency d : project.getDependencies()) {
-                if (SvgTranscodeRunner.RIVE_RUNTIME_ARTIFACT.equals(d.getArtifactId()) && !"test".equals(d.getScope())) {
-                    return;
-                }
-            }
-            getLog().warn(SvgTranscodeRunner.missingRiveRuntimeMessage(project.getBasedir()));
-            return;
-        }
-        throw new MojoExecutionException(SvgTranscodeRunner.missingRiveRuntimeMessage(project.getBasedir()));
-    }
-
-    private static boolean hasRiveFileClass(File entry) {
-        if (entry.isDirectory()) {
-            return new File(entry, SvgTranscodeRunner.RIVE_FILE_CLASS).isFile();
-        }
-        try (java.util.zip.ZipFile zip = new java.util.zip.ZipFile(entry)) {
-            return zip.getEntry(SvgTranscodeRunner.RIVE_FILE_CLASS) != null;
-        } catch (java.io.IOException ex) {
+        File jar = resolvePortJar(SvgTranscodeRunner.RIVE_RUNTIME_ARTIFACT, null);
+        if (jar == null) {
+            getLog().error("This module has Rive (.riv) files, and the Rive runtime "
+                    + GROUP_ID + ":" + SvgTranscodeRunner.RIVE_RUNTIME_ARTIFACT + ":" + ownVersion()
+                    + " that this plugin supplies for them could not be resolved.");
             return false;
         }
+        File classes = new File(project.getBuild().getOutputDirectory());
+        int n = SvgTranscodeRunner.installRuntime(jar, classes);
+        if (n > 0) {
+            getLog().info("Copied the Rive runtime (" + n + " files) into " + classes);
+        }
+        return true;
     }
 
     protected SvgTranscodeRunner newSvgTranscodeRunner() {
@@ -2586,7 +2569,10 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
                 + "build-time vector transcoder. Transcoding them now.");
         try {
             // inside the try: a repair nobody asked for never aborts a build
-            requireRiveRuntime();
+            if (!installRiveRuntime(runner)) {
+                getLog().warn("The project has been left exactly as it was.");
+                return;
+            }
             runner.run();
             registerSourceRoot(svgOutputDir());
         } catch (Exception ex) {

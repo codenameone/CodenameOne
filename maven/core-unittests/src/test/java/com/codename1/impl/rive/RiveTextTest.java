@@ -20,16 +20,9 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codename1.rive;
+package com.codename1.impl.rive;
 
-import com.codename1.impl.rive.Artboard;
-import com.codename1.impl.rive.Core;
 import com.codename1.impl.rive.Mat2D;
-import com.codename1.impl.rive.RivePaint;
-import com.codename1.impl.rive.RivePath;
-import com.codename1.impl.rive.RiveRenderer;
-import com.codename1.impl.rive.Text;
-import com.codename1.impl.rive.TextValueRun;
 import com.codename1.rive.transcoder.RiveTranscoder;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;

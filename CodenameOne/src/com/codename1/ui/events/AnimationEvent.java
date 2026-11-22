@@ -20,36 +20,55 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codename1.rive;
+package com.codename1.ui.events;
 
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
 
-/// An event a Rive state machine reported: a general event, or a request to
-/// open a URL. Events are fired from timeline keyframes, state and transition
-/// actions and listeners, and carry the custom properties set on them in the
-/// Rive editor.
-public final class RiveEvent {
+/// An event reported by an interactive animated image, such as a Rive
+/// animation, delivered to the listeners added with
+/// `Image.addAnimationListener(ActionListener)`.
+///
+/// The animation designer names each event and may attach custom properties
+/// to it. An event of type [#TYPE_OPEN_URL] asks the application to open
+/// [#getUrl()]; nothing is opened on its behalf.
+public class AnimationEvent extends ActionEvent {
     /// A general event.
     public static final int TYPE_GENERAL = 0;
-    /// An event asking the host to open a URL, see [#getUrl()].
+
+    /// An event asking the application to open a URL, see [#getUrl()].
     public static final int TYPE_OPEN_URL = 1;
 
     private final String name;
-    private final int type;
+    private final int animationEventType;
     private final String url;
     private final String target;
     private final Map<String, Object> properties;
 
-    RiveEvent(String name, int type, String url, String target, Map<String, Object> properties) {
-        this.name = name;
-        this.type = type;
+    /// Creates an event.
+    ///
+    /// #### Parameters
+    ///
+    /// - `source`: the image that reported the event
+    /// - `name`: the name the designer gave the event
+    /// - `type`: [#TYPE_GENERAL] or [#TYPE_OPEN_URL]
+    /// - `url`: the URL of an open-URL event, or null
+    /// - `target`: the browser target of an open-URL event, or null
+    /// - `properties`: the custom properties of the event, or null for none
+    public AnimationEvent(Object source, String name, int type, String url, String target,
+                          Map<String, Object> properties) {
+        super(source, ActionEvent.Type.Other);
+        this.name = name == null ? "" : name;
+        this.animationEventType = type;
         this.url = url;
         this.target = target;
-        this.properties = Collections.unmodifiableMap(properties);
+        this.properties = properties == null
+                ? Collections.unmodifiableMap(new HashMap<String, Object>())
+                : Collections.unmodifiableMap(new HashMap<String, Object>(properties));
     }
 
-    /// The name given to the event in the Rive editor.
+    /// The name the designer gave the event.
     ///
     /// #### Returns
     ///
@@ -64,7 +83,7 @@ public final class RiveEvent {
     ///
     /// the type
     public int getType() {
-        return type;
+        return animationEventType;
     }
 
     /// The URL of an open-URL event.
@@ -76,8 +95,8 @@ public final class RiveEvent {
         return url;
     }
 
-    /// The browser target of an open-URL event: `_blank`, `_parent`,
-    /// `_self` or `_top`.
+    /// The browser target of an open-URL event: `_blank`, `_parent`, `_self`
+    /// or `_top`.
     ///
     /// #### Returns
     ///
@@ -86,8 +105,8 @@ public final class RiveEvent {
         return target;
     }
 
-    /// The custom properties of the event, by name: a `Float` for a number,
-    /// a `Boolean` or a `String`.
+    /// The custom properties of the event by name: a `Float` for a number, a
+    /// `Boolean` or a `String`.
     ///
     /// #### Returns
     ///
@@ -98,6 +117,6 @@ public final class RiveEvent {
 
     @Override
     public String toString() {
-        return "RiveEvent[" + name + "]";
+        return "AnimationEvent[" + name + "]";
     }
 }

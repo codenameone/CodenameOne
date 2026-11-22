@@ -20,7 +20,7 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codename1.rive;
+package com.codename1.impl.rive;
 
 import com.codename1.gpu.Camera;
 import com.codename1.gpu.GpuCapabilities;
@@ -31,10 +31,7 @@ import com.codename1.gpu.Mesh;
 import com.codename1.gpu.RenderState;
 import com.codename1.gpu.Texture;
 import com.codename1.gpu.VertexBuffer;
-import com.codename1.impl.rive.GpuRiveRenderer;
 import com.codename1.impl.rive.Mat2D;
-import com.codename1.impl.rive.RivePaint;
-import com.codename1.impl.rive.RivePath;
 import com.codename1.junit.UITestBase;
 import com.codename1.ui.Image;
 import java.util.ArrayList;

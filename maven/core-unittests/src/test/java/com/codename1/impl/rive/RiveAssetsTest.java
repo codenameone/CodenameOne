@@ -20,19 +20,9 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codename1.rive;
+package com.codename1.impl.rive;
 
-import com.codename1.impl.rive.Artboard;
-import com.codename1.impl.rive.Core;
-import com.codename1.impl.rive.GpuRiveRenderer;
-import com.codename1.impl.rive.Image;
 import com.codename1.impl.rive.Mat2D;
-import com.codename1.impl.rive.Mesh;
-import com.codename1.impl.rive.NestedArtboard;
-import com.codename1.impl.rive.RivePaint;
-import com.codename1.impl.rive.RivePath;
-import com.codename1.impl.rive.RiveRenderer;
-import com.codename1.impl.rive.TrimPath;
 import com.codename1.rive.transcoder.RiveTranscoder;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -131,16 +121,6 @@ class RiveAssetsTest {
         assertEquals(24, mesh.getVertices().size());
         assertEquals(31 * 3, mesh.getIndexCount());
         assertTrue(mesh.hasTriangles());
-    }
-
-    /// RiveView takes the GPU path only for an artboard with a mesh, nested
-    /// ones included.
-    @Test
-    void meshArtboardsAreFoundForTheGpuPath() throws Exception {
-        assertTrue(RiveView.containsMesh(artboard("jellyfish_test.riv"), 0));
-        assertTrue(RiveView.containsMesh(artboard("tape.riv"), 0));
-        assertTrue(RiveView.containsMesh(artboard("nested_mesh_pointers.riv"), 0));
-        assertFalse(RiveView.containsMesh(artboard("trim.riv"), 0));
     }
 
     /// The skinned jellyfish records frame after frame for the GPU and sends

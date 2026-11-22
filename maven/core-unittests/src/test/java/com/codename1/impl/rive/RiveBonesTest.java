@@ -20,22 +20,9 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codename1.rive;
+package com.codename1.impl.rive;
 
-import com.codename1.impl.rive.Artboard;
-import com.codename1.impl.rive.Bone;
-import com.codename1.impl.rive.Component;
-import com.codename1.impl.rive.Core;
-import com.codename1.impl.rive.DistanceConstraint;
-import com.codename1.impl.rive.IKConstraint;
 import com.codename1.impl.rive.Mat2D;
-import com.codename1.impl.rive.Node;
-import com.codename1.impl.rive.Path;
-import com.codename1.impl.rive.PathVertex;
-import com.codename1.impl.rive.PointsPath;
-import com.codename1.impl.rive.Shape;
-import com.codename1.impl.rive.Skin;
-import com.codename1.impl.rive.TransformComponent;
 import com.codename1.rive.transcoder.RiveTranscoder;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;

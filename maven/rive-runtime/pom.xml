@@ -15,11 +15,11 @@
     <packaging>jar</packaging>
     <name>codenameone-rive-runtime</name>
     <description>
-        The Codename One Rive runtime: com.codename1.rive (RiveFile, RiveView)
-        and the object model in com.codename1.impl.rive, a Java rewrite of
-        rive-runtime (MIT). An application with .riv files under src/main/rive
-        depends on it; the build translates each file into a RiveFile subclass
-        with codenameone-rive-transcoder, so nothing is parsed on the device.
+        The Codename One Rive runtime (com.codename1.impl.rive), a Java rewrite
+        of rive-runtime (MIT). Applications never depend on it: when a module
+        has .riv files beside its CSS, the build copies these classes into the
+        module's classes and translates each file into a RiveFile subclass
+        with codenameone-rive-transcoder, shown to the application as an Image.
         The object model's Base classes and the classes with no hand-written
         behaviour are generated at build time by codenameone-rive-schema-gen.
     </description>

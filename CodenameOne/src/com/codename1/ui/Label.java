@@ -1641,4 +1641,181 @@ public class Label extends Component implements IconHolder, TextHolder {
         }
     }
 
+
+    // ------------------------------------------------ interactive icon
+
+    static final int ICON_PRESS = 0;
+    static final int ICON_DRAG = 1;
+    static final int ICON_RELEASE = 2;
+
+    /// The icon, if it reacts to the pointer (`Image.isInteractive()`), else
+    /// null. A `ScaleImageLabel` keeps its image as the background image,
+    /// which counts as the icon here.
+    private Image interactiveIcon() {
+        Image i = getIcon();
+        if (i == null || !i.isInteractive()) {
+            return null;
+        }
+        return i;
+    }
+
+    /// Hands a pointer event to an interactive icon, in the icon's own pixel
+    /// coordinates. Returns true if it went to the icon.
+    boolean forwardPointerToIcon(int kind, int x, int y) {
+        Image icon = interactiveIcon();
+        if (icon == null) {
+            return false;
+        }
+        int[] r = iconBounds(icon);
+        if (r[2] <= 0 || r[3] <= 0) {
+            return false;
+        }
+        int lx = x - getAbsoluteX() - r[0];
+        int ly = y - getAbsoluteY() - r[1];
+        int iw = icon.getWidth();
+        int ih = icon.getHeight();
+        if (r[2] != iw || r[3] != ih) {
+            // drawn scaled: back to the image's own pixels
+            lx = (int) (lx * (float) iw / r[2]);
+            ly = (int) (ly * (float) ih / r[3]);
+        }
+        switch (kind) {
+            case ICON_PRESS:
+                icon.pointerPressed(lx, ly);
+                break;
+            case ICON_DRAG:
+                icon.pointerDragged(lx, ly);
+                break;
+            default:
+                icon.pointerReleased(lx, ly);
+                break;
+        }
+        repaint();
+        return true;
+    }
+
+    /// Where the icon is drawn, relative to this label: x, y, width, height.
+    /// Mirrors the icon placement of `DefaultLookAndFeel` (and the scaled
+    /// background modes of `Component` for an icon kept as the background
+    /// image), without the state icon of a check box or radio button.
+    private int[] iconBounds(Image icon) {
+        Style style = getStyle();
+        int cmpWidth = getWidth();
+        int cmpHeight = getHeight();
+        int iw = icon.getWidth();
+        int ih = icon.getHeight();
+        if (style.getBgImage() == icon) { //NOPMD CompareObjectsWithEquals - the same instance, not an equal image
+            float r;
+            int bw;
+            int bh;
+            switch (style.getBackgroundType()) {
+                case Style.BACKGROUND_IMAGE_SCALED:
+                    return new int[]{0, 0, cmpWidth, cmpHeight};
+                case Style.BACKGROUND_IMAGE_SCALED_FILL:
+                    r = Math.max(((float) cmpWidth) / ((float) iw), ((float) cmpHeight) / ((float) ih));
+                    break;
+                case Style.BACKGROUND_IMAGE_SCALED_FIT:
+                    r = Math.min(((float) cmpWidth) / ((float) iw), ((float) cmpHeight) / ((float) ih));
+                    break;
+                default:
+                    return new int[]{0, 0, iw, ih};
+            }
+            bw = (int) (((float) iw) * r);
+            bh = (int) (((float) ih) * r);
+            return new int[]{(cmpWidth - bw) / 2, (cmpHeight - bh) / 2, bw, bh};
+        }
+        boolean rtl = isRTL();
+        int leftPadding = style.getPaddingLeft(rtl);
+        int rightPadding = style.getPaddingRight(rtl);
+        int topPadding = style.getPaddingTop();
+        int bottomPadding = style.getPaddingBottom();
+        Font font = style.getFont();
+        String t = getText();
+        int fontHeight = t != null && t.length() > 0 ? font.getHeight() : 0;
+        int strWidth = getStringWidth(font);
+        int g = getGap();
+        int align = DefaultLookAndFeel.reverseAlignForBidi(this, style.getAlignment());
+        int textPos = DefaultLookAndFeel.reverseAlignForBidi(this, getTextPosition());
+        boolean sideways = textPos == LEFT || textPos == RIGHT;
+        int x = leftPadding;
+        int y = topPadding;
+        if (sideways) {
+            y += (cmpHeight - (topPadding + bottomPadding + Math.max(ih, fontHeight))) / 2;
+        } else {
+            y += (cmpHeight - (topPadding + bottomPadding + ih + g + fontHeight)) / 2;
+        }
+        if (align == CENTER) {
+            if (sideways) {
+                x += (cmpWidth - (leftPadding + rightPadding + iw + g + strWidth)) / 2;
+            } else {
+                x = Math.max(x + (cmpWidth - (leftPadding + rightPadding + Math.max(iw + g, strWidth))) / 2,
+                        leftPadding);
+            }
+        } else if (align == RIGHT) {
+            if (sideways) {
+                x = cmpWidth - rightPadding - (iw + g + strWidth);
+            } else {
+                x = Math.max(cmpWidth - rightPadding - Math.max(iw, strWidth), leftPadding);
+            }
+        }
+        int textSpaceW = cmpWidth - rightPadding - leftPadding - (sideways ? iw : 0);
+        int ix = x;
+        int iy = y;
+        switch (textPos) {
+            case LEFT:
+                ix = x + Math.min(strWidth, Math.max(0, textSpaceW)) + g;
+                if (ih <= fontHeight) {
+                    iy = y + (fontHeight - ih) / 2;
+                }
+                break;
+            case RIGHT:
+                if (ih <= fontHeight) {
+                    iy = y + (fontHeight - ih) / 2;
+                }
+                break;
+            case TOP:
+                iy = y + fontHeight + g;
+                if (iw <= strWidth) {
+                    ix = x + (Math.min(strWidth, textSpaceW) - iw) / 2;
+                }
+                break;
+            default:
+                if (iw <= strWidth) {
+                    ix = x + (Math.min(strWidth, textSpaceW) - iw) / 2;
+                }
+                break;
+        }
+        return new int[]{ix, iy, iw, ih};
+    }
+
+    /// {@inheritDoc}
+    ///
+    /// A press on an interactive icon (`Image.isInteractive()`) also reaches
+    /// the icon, in its own pixel coordinates.
+    @Override
+    public void pointerPressed(int x, int y) {
+        forwardPointerToIcon(ICON_PRESS, x, y);
+        super.pointerPressed(x, y);
+    }
+
+    /// {@inheritDoc}
+    ///
+    /// A drag over an interactive icon goes to the icon and does not scroll
+    /// the parent.
+    @Override
+    public void pointerDragged(int x, int y) {
+        if (!forwardPointerToIcon(ICON_DRAG, x, y)) {
+            super.pointerDragged(x, y);
+        }
+    }
+
+    /// {@inheritDoc}
+    ///
+    /// A release also reaches an interactive icon, in its own pixel
+    /// coordinates.
+    @Override
+    public void pointerReleased(int x, int y) {
+        forwardPointerToIcon(ICON_RELEASE, x, y);
+        super.pointerReleased(x, y);
+    }
 }

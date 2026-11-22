@@ -20,39 +20,8 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
-package com.codename1.rive;
+package com.codename1.impl.rive;
 
-import com.codename1.impl.rive.Artboard;
-import com.codename1.impl.rive.ArtboardComponentList;
-import com.codename1.impl.rive.ViewModelInstanceSymbolListIndex;
-import com.codename1.impl.rive.InterpolatingKeyFrame;
-import com.codename1.impl.rive.KeyedProperty;
-import com.codename1.impl.rive.ScriptedInterpolator;
-import com.codename1.impl.rive.ViewModelInstanceList;
-import com.codename1.impl.rive.Component;
-import com.codename1.impl.rive.Core;
-import com.codename1.impl.rive.CustomPropertyBoolean;
-import com.codename1.impl.rive.CustomPropertyNumber;
-import com.codename1.impl.rive.CustomPropertyString;
-import com.codename1.impl.rive.DataBind;
-import com.codename1.impl.rive.DataConverter;
-import com.codename1.impl.rive.DataConverterInterpolator;
-import com.codename1.impl.rive.DataContext;
-import com.codename1.impl.rive.DataConverterRangeMapper;
-import com.codename1.impl.rive.DataValue;
-import com.codename1.impl.rive.LinearAnimation;
-import com.codename1.impl.rive.LinearAnimationInstance;
-import com.codename1.impl.rive.NestedArtboard;
-import com.codename1.impl.rive.Shape;
-import com.codename1.impl.rive.StringTemplateFormat;
-import com.codename1.impl.rive.DataConverterStringTemplate;
-import com.codename1.impl.rive.StateMachineInstance;
-import com.codename1.impl.rive.ViewModelInstance;
-import com.codename1.impl.rive.ViewModelInstanceBoolean;
-import com.codename1.impl.rive.ViewModelInstanceNumber;
-import com.codename1.impl.rive.ViewModelInstanceTrigger;
-import com.codename1.impl.rive.ViewModelInstanceValue;
-import com.codename1.impl.rive.ViewModelInstanceViewModel;
 import com.codename1.rive.transcoder.RiveTranscoder;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
