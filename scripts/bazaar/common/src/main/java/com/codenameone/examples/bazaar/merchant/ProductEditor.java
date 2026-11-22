@@ -48,6 +48,7 @@ import com.codenameone.examples.bazaar.api.ProductDto;
 import com.codenameone.examples.bazaar.api.ProductPhotoDto;
 import com.codenameone.examples.bazaar.api.VariantDto;
 import com.codenameone.examples.bazaar.net.Api;
+import com.codenameone.examples.bazaar.ops.Margins;
 import com.codenameone.examples.bazaar.ui.Lang;
 import com.codenameone.examples.bazaar.ui.Layouts;
 import com.codenameone.examples.bazaar.ui.Photos;
@@ -101,6 +102,8 @@ final class ProductEditor extends Container {
                 .col(Lang.tr("Compare at"), v -> Long.valueOf(v.compareAtCents()),
                         (v, x) -> change(v, "compare", x))
                 .col(Lang.tr("Cost"), v -> Long.valueOf(v.costCents()), (v, x) -> change(v, "cost", x))
+                .col(Lang.tr("Margin"), v -> Margins.percent(Margins.marginBps(v.priceCents(),
+                        v.costCents())))
                 .col(Lang.tr("Weight (g)"), v -> Integer.valueOf(v.weightGrams()),
                         (v, x) -> change(v, "weight", x))
                 .col(Lang.tr("Stock"), v -> Integer.valueOf(v.available()));
@@ -321,6 +324,17 @@ final class ProductEditor extends Container {
         TextField price = MUi.money(body, "Price", "variant-price", v.priceCents());
         TextField compare = MUi.money(body, "Compare at price", "variant-compare", v.compareAtCents());
         TextField cost = MUi.money(body, "Cost per item", "variant-cost", v.costCents());
+        final Label margin = Ui.label(marginText(v.priceCents(), v.costCents()), "SvLabel");
+        margin.setName("variant-margin");
+        body.add(margin);
+        final TextField priceField = price;
+        final TextField costField = cost;
+        com.codename1.ui.events.DataChangedListener recalc = (type, index) -> {
+            margin.setText(marginText(MUi.cents(priceField), MUi.cents(costField)));
+            margin.getParent().revalidate();
+        };
+        price.addDataChangedListener(recalc);
+        cost.addDataChangedListener(recalc);
         TextField weight = MUi.number(body, "Weight in grams", "variant-weight", v.weightGrams());
         CheckBox track = new CheckBox(Lang.tr("Track inventory"));
         track.setSelected(v.trackInventory());
@@ -337,6 +351,16 @@ final class ProductEditor extends Container {
                 MUi.cents(compare), MUi.cents(cost), MUi.integer(weight), v.taxable(),
                 track.isSelected(), backorder.isSelected(), v.position(), v.available(), v.stock()));
         paintVariants();
+    }
+
+    /// "Margin 40.0% - markup 66.7%", or a hint when no cost is entered.
+    static String marginText(long priceCents, long costCents) {
+        int m = Margins.marginBps(priceCents, costCents);
+        if (m == Margins.UNKNOWN) {
+            return Lang.tr("Enter a cost to see the margin");
+        }
+        return Lang.tr("Margin") + " " + Margins.percent(m) + " - " + Lang.tr("markup") + " "
+                + Margins.percent(Margins.markupBps(priceCents, costCents));
     }
 
     /// An edit made in a grid cell.

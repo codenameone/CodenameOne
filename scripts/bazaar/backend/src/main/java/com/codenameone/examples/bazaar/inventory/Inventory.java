@@ -22,6 +22,7 @@ import com.codename1.backend.ResponseStatusException;
 import com.codename1.backend.annotations.Component;
 import com.codename1.backend.annotations.Transactional;
 import com.codenameone.examples.bazaar.Ids;
+import com.codenameone.examples.bazaar.catalog.Bundles;
 import com.codenameone.examples.bazaar.domain.InventoryLevel;
 import com.codenameone.examples.bazaar.domain.InventoryMove;
 import com.codenameone.examples.bazaar.domain.Location;
@@ -33,7 +34,9 @@ import com.codenameone.examples.bazaar.repository.VariantRepository;
 
 import java.io.IOException;
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /// The stock ledger: the one place a stock level changes.
 ///
@@ -79,9 +82,12 @@ public class Inventory {
     private final InventoryMoveRepository moves;
     private final VariantRepository variants;
     private final LocationRepository locations;
+    private final Bundles bundles;
 
     public Inventory(InventoryLevelRepository levels, InventoryMoveRepository moves,
-            VariantRepository variants, LocationRepository locations) {
+            VariantRepository variants, LocationRepository locations,
+            Bundles bundles) {
+        this.bundles = bundles;
         this.levels = levels;
         this.moves = moves;
         this.variants = variants;
@@ -99,6 +105,23 @@ public class Inventory {
         Variant variant = variant(storeId, variantId);
         location(storeId, locationId);
         positive(qty);
+        List<Bundles.Part> parts = bundles.partsOfVariant(variantId);
+        if (!parts.isEmpty()) {
+            // A bundle holds no stock: its components are promised, all or
+            // none -- a later component that is short gives the earlier back.
+            for (int iter = 0; iter < parts.size(); iter++) {
+                Bundles.Part part = parts.get(iter);
+                if (!reserve(storeId, part.variantId, locationId, qty * part.quantity, reference,
+                        username)) {
+                    for (int back = 0; back < iter; back++) {
+                        release(storeId, parts.get(back).variantId, locationId,
+                                qty * parts.get(back).quantity, reference, username);
+                    }
+                    return false;
+                }
+            }
+            return true;
+        }
         if (!variant.isTrackInventory()) {
             return true;
         }
@@ -119,7 +142,12 @@ public class Inventory {
     @Transactional(rollbackFor = IOException.class)
     public void release(String storeId, String variantId, String locationId, int qty,
             String reference, String username) throws IOException {
-        if (tracked(storeId, variantId, locationId, qty)) {
+        List<Bundles.Part> parts = parts(storeId, variantId, locationId, qty);
+        for (int iter = 0; iter < parts.size(); iter++) {
+            Bundles.Part part = parts.get(iter);
+            release(storeId, part.variantId, locationId, qty * part.quantity, reference, username);
+        }
+        if (parts.isEmpty() && tracked(storeId, variantId, locationId, qty)) {
             change(storeId, variantId, locationId, 0, -qty, 0, RELEASE, reference, username);
         }
     }
@@ -129,7 +157,12 @@ public class Inventory {
     @Transactional(rollbackFor = IOException.class)
     public void ship(String storeId, String variantId, String locationId, int qty,
             String reference, String username) throws IOException {
-        if (tracked(storeId, variantId, locationId, qty)) {
+        List<Bundles.Part> parts = parts(storeId, variantId, locationId, qty);
+        for (int iter = 0; iter < parts.size(); iter++) {
+            Bundles.Part part = parts.get(iter);
+            ship(storeId, part.variantId, locationId, qty * part.quantity, reference, username);
+        }
+        if (parts.isEmpty() && tracked(storeId, variantId, locationId, qty)) {
             change(storeId, variantId, locationId, -qty, -qty, 0, SALE, reference, username);
         }
     }
@@ -144,7 +177,13 @@ public class Inventory {
         if (!RETURN.equals(reason) && !RESTOCK.equals(reason)) {
             throw new ResponseStatusException(400, "A restock is a RETURN or a RESTOCK");
         }
-        if (tracked(storeId, variantId, locationId, qty)) {
+        List<Bundles.Part> parts = parts(storeId, variantId, locationId, qty);
+        for (int iter = 0; iter < parts.size(); iter++) {
+            Bundles.Part part = parts.get(iter);
+            restock(storeId, part.variantId, locationId, qty * part.quantity, reference, username,
+                    reason);
+        }
+        if (parts.isEmpty() && tracked(storeId, variantId, locationId, qty)) {
             change(storeId, variantId, locationId, qty, 0, 0, reason, reference, username);
         }
     }
@@ -155,7 +194,13 @@ public class Inventory {
     @Transactional(rollbackFor = IOException.class)
     public void recordPosSale(String storeId, String variantId, String locationId, int qty,
             String reference, String username) throws IOException {
-        if (tracked(storeId, variantId, locationId, qty)) {
+        List<Bundles.Part> parts = parts(storeId, variantId, locationId, qty);
+        for (int iter = 0; iter < parts.size(); iter++) {
+            Bundles.Part part = parts.get(iter);
+            recordPosSale(storeId, part.variantId, locationId, qty * part.quantity, reference,
+                    username);
+        }
+        if (parts.isEmpty() && tracked(storeId, variantId, locationId, qty)) {
             change(storeId, variantId, locationId, -qty, 0, 0, POS_SYNC, reference, username);
         }
     }
@@ -167,6 +212,7 @@ public class Inventory {
     @Transactional(readOnly = true)
     public String pickLocation(String storeId, String variantId, int qty) throws IOException {
         Variant variant = variant(storeId, variantId);
+        boolean bundle = !bundles.partsOfVariant(variantId).isEmpty();
         String fallback = null;
         List<Location> all = locations.findByStoreIdOrderByPositionAsc(storeId);
         for (int iter = 0; iter < all.size(); iter++) {
@@ -177,7 +223,8 @@ public class Inventory {
             if (fallback == null) {
                 fallback = location.getId();
             }
-            if (!variant.isTrackInventory() || available(variantId, location.getId()) >= qty) {
+            if (!bundle && !variant.isTrackInventory()
+                    || available(variantId, location.getId()) >= qty) {
                 return location.getId();
             }
         }
@@ -187,6 +234,19 @@ public class Inventory {
     /// Units of a variant available at a location; 0 where it has no level.
     @Transactional(readOnly = true)
     public int available(String variantId, String locationId) throws IOException {
+        List<Bundles.Part> parts = bundles.partsOfVariant(variantId);
+        if (!parts.isEmpty()) {
+            // As many bundles as the scarcest component makes; a component
+            // whose stock is not tracked never limits it.
+            Map<String, Integer> have = new HashMap<String, Integer>();
+            for (int iter = 0; iter < parts.size(); iter++) {
+                String id = parts.get(iter).variantId;
+                Variant v = variants.findById(id);
+                have.put(id, Integer.valueOf(v == null || v.isTrackInventory()
+                        ? available(id, locationId) : Integer.MAX_VALUE));
+            }
+            return Bundles.make(parts, have);
+        }
         InventoryLevel level = levels.findByVariantIdAndLocationId(variantId, locationId);
         return level == null ? 0 : level.getOnHand() - level.getCommitted();
     }
@@ -279,6 +339,16 @@ public class Inventory {
             int committed, String reason, String reference, String username) throws IOException {
         moves.insert(newMove(storeId, variantId, locationId, onHand, committed, reason,
                 reference, username));
+    }
+
+    /// A bundle variant's components after checking the call as [#tracked]
+    /// does; empty for any other variant.
+    private List<Bundles.Part> parts(String storeId, String variantId, String locationId, int qty)
+            throws IOException {
+        variant(storeId, variantId);
+        location(storeId, locationId);
+        positive(qty);
+        return bundles.partsOfVariant(variantId);
     }
 
     private boolean tracked(String storeId, String variantId, String locationId, int qty)

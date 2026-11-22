@@ -87,6 +87,12 @@ public class CatalogEndpoint implements CatalogApiServer {
         return catalog.merchantProduct(Caller.name(), storeId, productId);
     }
 
+    /// Each product's margin in basis points, for the back office's list; not
+    /// part of the shared API, which answers costs only inside a product.
+    public java.util.Map<String, Integer> margins(String storeId) throws Exception {
+        return catalog.margins(Caller.name(), storeId);
+    }
+
     @Override
     public ProductDto createProduct(String storeId, ProductDto product) throws Exception {
         return catalog.create(Caller.name(), storeId, product);

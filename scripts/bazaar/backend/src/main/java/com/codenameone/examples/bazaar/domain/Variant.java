@@ -78,6 +78,34 @@ public class Variant {
     @Column(nullable = false)
     private int position;
 
+    /// Delivered as a download: needs no shipping.
+    @Column(nullable = false)
+    private boolean digital;
+
+    /// Harmonized System code for customs; empty to use the product's.
+    @Column(nullable = false, type = "VARCHAR(16)")
+    private String hsCode = "";
+
+    /// Two letter country of origin for customs.
+    @Column(nullable = false, type = "VARCHAR(2)")
+    private String originCountry = "";
+
+    /// The measure sold, in thousandths of [#unitName]: 750000 for 750 ml.
+    @Column(nullable = false)
+    private long unitQuantity;
+
+    /// The measure's unit, such as `ml`, `g` or `m`.
+    @Column(nullable = false, type = "VARCHAR(8)")
+    private String unitName = "";
+
+    /// The quantity a unit price is shown per, such as 1 for "per 1 l".
+    @Column(nullable = false)
+    private int unitReference;
+
+    /// The unit the unit price is shown per.
+    @Column(nullable = false, type = "VARCHAR(8)")
+    private String unitReferenceName = "";
+
     public Variant() {
     }
 
@@ -215,5 +243,60 @@ public class Variant {
 
     public void setPosition(int position) {
         this.position = position;
+    }
+    public boolean isDigital() {
+        return digital;
+    }
+
+    public void setDigital(boolean digital) {
+        this.digital = digital;
+    }
+
+    public String getHsCode() {
+        return hsCode;
+    }
+
+    public void setHsCode(String hsCode) {
+        this.hsCode = hsCode;
+    }
+
+    public String getOriginCountry() {
+        return originCountry;
+    }
+
+    public void setOriginCountry(String originCountry) {
+        this.originCountry = originCountry;
+    }
+
+    public long getUnitQuantity() {
+        return unitQuantity;
+    }
+
+    public void setUnitQuantity(long unitQuantity) {
+        this.unitQuantity = unitQuantity;
+    }
+
+    public String getUnitName() {
+        return unitName;
+    }
+
+    public void setUnitName(String unitName) {
+        this.unitName = unitName;
+    }
+
+    public int getUnitReference() {
+        return unitReference;
+    }
+
+    public void setUnitReference(int unitReference) {
+        this.unitReference = unitReference;
+    }
+
+    public String getUnitReferenceName() {
+        return unitReferenceName;
+    }
+
+    public void setUnitReferenceName(String unitReferenceName) {
+        this.unitReferenceName = unitReferenceName;
     }
 }

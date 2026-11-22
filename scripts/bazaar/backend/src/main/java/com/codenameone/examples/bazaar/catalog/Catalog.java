@@ -450,6 +450,35 @@ public class Catalog {
         return page(snapshot, search);
     }
 
+    /// The margin of each product of the store with a cost recorded, in basis
+    /// points: what its variants' prices leave over their costs, over the
+    /// variants that have a cost. A product with none is left out.
+    @Transactional(readOnly = true)
+    public Map<String, Integer> margins(String username, String storeId) throws IOException {
+        access.requireStaff(username, storeId, StoreAccess.ANYONE);
+        Map<String, long[]> sums = new HashMap<String, long[]>();
+        List<Variant> all = variants.findByStoreId(storeId);
+        for (int iter = 0; iter < all.size(); iter++) {
+            Variant v = all.get(iter);
+            if (v.getCostCents() <= 0 || v.getPriceCents() <= 0) {
+                continue;
+            }
+            long[] s = sums.get(v.getProductId());
+            if (s == null) {
+                s = new long[2];
+                sums.put(v.getProductId(), s);
+            }
+            s[0] += v.getPriceCents();
+            s[1] += v.getCostCents();
+        }
+        Map<String, Integer> out = new HashMap<String, Integer>();
+        for (Map.Entry<String, long[]> e : sums.entrySet()) {
+            out.put(e.getKey(), Integer.valueOf(com.codenameone.examples.bazaar.ops.Margins
+                    .marginBps(e.getValue()[0], e.getValue()[1])));
+        }
+        return out;
+    }
+
     @Transactional(readOnly = true)
     public ProductDto merchantProduct(String username, String storeId, String productId)
             throws IOException {
@@ -526,6 +555,9 @@ public class Catalog {
         copy.setSeoTitle(source.getSeoTitle());
         copy.setSeoDescription(source.getSeoDescription());
         copy.setPhotoId(source.getPhotoId());
+        // A copied bundle is a bundle of nothing until its components are
+        // set; the category goes across.
+        copy.setCategoryId(source.getCategoryId());
         copy.setCreatedAt(Instant.now());
         copy.setUpdatedAt(Instant.now());
         products.insert(copy);
@@ -562,6 +594,13 @@ public class Catalog {
             n.setTrackInventory(v.isTrackInventory());
             n.setAllowBackorder(v.isAllowBackorder());
             n.setPosition(v.getPosition());
+            n.setDigital(v.isDigital());
+            n.setHsCode(v.getHsCode());
+            n.setOriginCountry(v.getOriginCountry());
+            n.setUnitQuantity(v.getUnitQuantity());
+            n.setUnitName(v.getUnitName());
+            n.setUnitReference(v.getUnitReference());
+            n.setUnitReferenceName(v.getUnitReferenceName());
             variants.insert(n);
             for (int p = 0; p < places.size(); p++) {
                 made.add(Inventory.newLevel(storeId, n.getId(), places.get(p).getId(), 0));
@@ -577,6 +616,8 @@ public class Catalog {
             n.setPhotoId(p.getPhotoId());
             n.setAlt(p.getAlt());
             n.setPosition(p.getPosition());
+            n.setKind(p.getKind());
+            n.setUrl(p.getUrl());
             gallery.insert(n);
         }
         List<CollectionProduct> placed = members.findByProductId(productId);

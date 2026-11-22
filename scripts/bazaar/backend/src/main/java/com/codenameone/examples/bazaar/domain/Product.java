@@ -64,6 +64,14 @@ public class Product {
     @Column(nullable = false, type = "VARCHAR(32)")
     private String photoId = "";
 
+    /// STANDARD, or BUNDLE for a product made of other variants.
+    @Column(nullable = false, type = "VARCHAR(16)")
+    private String kind = "STANDARD";
+
+    /// Its Google product taxonomy category, or 0.
+    @Column(nullable = false)
+    private int categoryId;
+
     @Column(nullable = false)
     private long ratingTotal;
 
@@ -205,5 +213,20 @@ public class Product {
 
     public void setUpdatedAt(Instant updatedAt) {
         this.updatedAt = updatedAt;
+    }
+    public String getKind() {
+        return kind;
+    }
+
+    public void setKind(String kind) {
+        this.kind = kind;
+    }
+
+    public int getCategoryId() {
+        return categoryId;
+    }
+
+    public void setCategoryId(int categoryId) {
+        this.categoryId = categoryId;
     }
 }

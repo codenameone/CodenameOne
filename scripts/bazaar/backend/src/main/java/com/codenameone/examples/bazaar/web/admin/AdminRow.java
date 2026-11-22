@@ -40,5 +40,9 @@ public class AdminRow {
     public String field = "";
     public String field2 = "";
     public String field3 = "";
+    public String field4 = "";
+    /// A variant's cost per item as typed, and its margin and markup in words.
+    public String cost = "";
+    public String margin = "";
     public boolean flag;
 }

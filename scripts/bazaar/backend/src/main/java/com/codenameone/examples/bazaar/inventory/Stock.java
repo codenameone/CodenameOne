@@ -636,6 +636,13 @@ public class Stock {
                 PurchaseLine fresh = orderLines.findById(line.getId());
                 fresh.setReceived(fresh.getReceived() + got);
                 orderLines.save(fresh);
+                // A variant with no cost per item yet takes what this
+                // purchase paid for it, so margins have something to read.
+                Variant v = variants.findById(line.getVariantId());
+                if (v != null && v.getCostCents() <= 0 && line.getCostCents() > 0) {
+                    v.setCostCents(line.getCostCents());
+                    variants.save(v);
+                }
             }
         }
         return orderStatus(orderId, done ? RECEIVED : PARTIAL, storeId, username);

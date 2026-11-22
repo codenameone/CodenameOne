@@ -42,6 +42,14 @@ public class ProductPhoto {
     @Column(nullable = false)
     private int position;
 
+    /// IMAGE, VIDEO or MODEL.
+    @Column(nullable = false, type = "VARCHAR(8)")
+    private String kind = "IMAGE";
+
+    /// An https address of a linked video; empty for a stored file.
+    @Column(nullable = false, type = "VARCHAR(500)")
+    private String url = "";
+
     public ProductPhoto() {
     }
 
@@ -83,5 +91,20 @@ public class ProductPhoto {
 
     public void setPosition(int position) {
         this.position = position;
+    }
+    public String getKind() {
+        return kind;
+    }
+
+    public void setKind(String kind) {
+        this.kind = kind;
+    }
+
+    public String getUrl() {
+        return url;
+    }
+
+    public void setUrl(String url) {
+        this.url = url;
     }
 }

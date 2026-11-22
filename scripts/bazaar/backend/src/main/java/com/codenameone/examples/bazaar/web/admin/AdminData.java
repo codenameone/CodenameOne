@@ -61,6 +61,7 @@ import com.codenameone.examples.bazaar.web.table.Grid;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 /// What the back-office pages show and do, through the same endpoint beans
 /// the app's API answers with. Every call passes the signed-in name and the
@@ -447,6 +448,7 @@ public class AdminData {
             status = "";
         }
         final String root = "/admin/" + storeId + "/products/";
+        final Map<String, Integer> margins = catalog.margins(storeId);
         Grid<ProductCardDto> g = new Grid<ProductCardDto>("products")
                 .col("title", "Product", p -> p.title()).sortBy(p -> p.title())
                     .link(p -> root + p.id())
@@ -460,6 +462,9 @@ public class AdminData {
                         : Money.format(p.minPriceCents(), cur) + " - "
                             + Money.format(p.maxPriceCents(), cur)).num()
                     .sortBy(p -> Long.valueOf(p.minPriceCents()))
+                .col("margin", "Margin", p -> com.codenameone.examples.bazaar.ops.Margins.percent(
+                        margin(margins, p.id()))).num()
+                    .sortBy(p -> Integer.valueOf(margin(margins, p.id())))
                 .rows(p -> p.id(), p -> root + p.id())
                 .defaultSort("title", false);
         Tabled out = done(g, allProducts(storeId, status), request, base, storeId, "products",
@@ -473,6 +478,11 @@ public class AdminData {
         t.filters.add(filter("status", "Status", status, new String[][] {
             {"", "Any status"}, {"ACTIVE", "Active"}, {"DRAFT", "Draft"}, {"ARCHIVED", "Archived"}}));
         return out;
+    }
+
+    private static int margin(Map<String, Integer> margins, String productId) {
+        Integer m = margins.get(productId);
+        return m == null ? com.codenameone.examples.bazaar.ops.Margins.UNKNOWN : m.intValue();
     }
 
     void product(String storeId, String productId, AdminView v) throws Exception {
@@ -504,6 +514,15 @@ public class AdminData {
             r.field = "v" + iter + "_title";
             r.field2 = "v" + iter + "_sku";
             r.field3 = "v" + iter + "_price";
+            r.field4 = "v" + iter + "_cost";
+            r.cost = x.costCents() > 0 ? Money.plain(x.costCents()) : "";
+            int margin = com.codenameone.examples.bazaar.ops.Margins.marginBps(x.priceCents(),
+                    x.costCents());
+            r.margin = margin == com.codenameone.examples.bazaar.ops.Margins.UNKNOWN ? "-"
+                    : com.codenameone.examples.bazaar.ops.Margins.percent(margin) + " margin, "
+                        + com.codenameone.examples.bazaar.ops.Margins.percent(
+                            com.codenameone.examples.bazaar.ops.Margins.markupBps(
+                                x.priceCents(), x.costCents())) + " markup";
             v.variants.add(r);
         }
         List<LevelDto> levels = inventory.levels(storeId, null, p.id(), null);
@@ -551,6 +570,7 @@ public class AdminData {
         for (int iter = 0; iter < was.size(); iter++) {
             VariantDto x = was.get(iter);
             String price = AdminForms.field(request, "v" + iter + "_price");
+            String cost = AdminForms.field(request, "v" + iter + "_cost");
             String sku = AdminForms.field(request, "v" + iter + "_sku");
             String vt = AdminForms.field(request, "v" + iter + "_title");
             String id = AdminForms.field(request, "v" + iter + "_id");
@@ -562,7 +582,8 @@ public class AdminData {
             vs.add(new VariantDto(x.id(), x.productId(), vt.length() == 0 ? x.title() : vt,
                     x.option1(), x.option2(), x.option3(), sku, x.barcode(),
                     price.length() == 0 ? x.priceCents() : AdminForms.cents(price, "the price"),
-                    x.compareAtCents(), x.costCents(), x.weightGrams(), x.taxable(),
+                    x.compareAtCents(), cost.length() == 0 ? x.costCents()
+                        : AdminForms.cents(cost, "the cost"), x.weightGrams(), x.taxable(),
                     x.trackInventory(), x.allowBackorder(), x.position(), x.available(), null));
         }
         catalog.updateProduct(storeId, productId, new ProductDto(p.id(), p.storeId(), p.handle(),
