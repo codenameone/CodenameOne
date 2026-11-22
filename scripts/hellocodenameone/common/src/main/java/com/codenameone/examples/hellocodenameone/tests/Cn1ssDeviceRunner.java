@@ -172,7 +172,10 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
                 || testClass instanceof GpuRenderTargetScreenshotTest
                 || testClass instanceof GpuShaderGalleryScreenshotTest
                 || testClass instanceof GpuShaderHarbourScreenshotTest
-                || testClass instanceof GpuSkinningScreenshotTest) {
+                || testClass instanceof GpuSkinningScreenshotTest
+                // RiveGpu waits for its image's first GPU frame, capped at
+                // 20s inside RiveGpuScreenshotTest
+                || testClass instanceof RiveGpuScreenshotTest) {
             return TEST_TIMEOUT_MS_NATIVE;
         }
         if (testClass instanceof BackendClientTest) {
