@@ -94,6 +94,10 @@ public class Quoter {
     private final DiscountRepository discounts;
     private final DiscountUseRepository uses;
     private final TaxRateRepository taxes;
+    /// The per-line tax rules; field-injected, as it was added after the
+    /// constructor's callers.
+    @com.codename1.backend.annotations.Autowired
+    private com.codenameone.examples.bazaar.taxes.TaxRules taxRules;
     private final ShippingZoneRepository zones;
     private final ShippingRateRepository rates;
     private final GiftCardRepository giftCards;
@@ -357,7 +361,7 @@ public class Quoter {
             }
         }
         quote.shippingCents = quote.shipping == null ? 0 : quote.shipping.priceCents;
-        quote.tax = TaxCalculator.apply(priceLines, quote.shippingCents,
+        quote.tax = taxRules.apply(cart.getStoreId(), priceLines, quote.shippingCents,
                 hasAddress ? taxes.findByStoreId(cart.getStoreId()) : null, country,
                 hasAddress ? address.region() : null, store.isTaxInclusive());
         // A signed-in shopper's tax exemption covering the address takes the

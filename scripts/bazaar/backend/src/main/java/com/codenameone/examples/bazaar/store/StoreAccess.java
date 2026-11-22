@@ -29,6 +29,7 @@ import com.codenameone.examples.bazaar.repository.StoreStaffRepository;
 
 import com.codenameone.examples.bazaar.Rows;
 import com.codenameone.examples.bazaar.ops.Perms;
+import com.codename1.backend.security.mfa.TotpService;
 import java.io.IOException;
 import java.util.Map;
 
@@ -60,11 +61,33 @@ public class StoreAccess {
     private final StoreRepository stores;
     private final StoreStaffRepository staff;
     private final DataSource db;
+    private final TotpService totp;
 
-    public StoreAccess(StoreRepository stores, StoreStaffRepository staff, DataSource db) {
+    public StoreAccess(StoreRepository stores, StoreStaffRepository staff, DataSource db,
+            TotpService totp) {
         this.stores = stores;
         this.staff = staff;
         this.db = db;
+        this.totp = totp;
+    }
+
+    /// The reason a member of a store that requires an authenticator app is
+    /// refused until they enrol one; the app and the web pages look for it to
+    /// offer enrolment.
+    public static final String TWO_FACTOR_REQUIRED = "This store requires two-step sign-in. "
+            + "Turn on an authenticator app in your account's security settings.";
+
+    /// Whether the store requires every member of its staff to have an
+    /// authenticator app.
+    public boolean requiresTwoFactor(String storeId) throws IOException {
+        Map row = db.queryOne("SELECT require_two_factor AS r FROM staff_security "
+                + "WHERE store_id = ?", new Object[] {storeId});
+        return row != null && Rows.number(row.get("r")) != 0;
+    }
+
+    /// Whether `username` has a confirmed authenticator app.
+    public boolean hasTwoFactor(String username) {
+        return totp.isEnabled(username);
     }
 
     /// The caller's place on the staff, judged by permission area: 404 as
@@ -128,6 +151,13 @@ public class StoreAccess {
         StoreStaff member = staff.findByStoreIdAndUsername(storeId, username);
         if (member == null || stores.findById(storeId) == null) {
             throw new ResponseStatusException(404, "No such store");
+        }
+        // Membership first, so a stranger still learns nothing but 404; then
+        // the store's sign-in rule, for every route and every role, the
+        // owner's included. Enrolling is under /api/account, which names no
+        // store, so a refused member can still put it right.
+        if (requiresTwoFactor(storeId) && !totp.isEnabled(username)) {
+            throw new ResponseStatusException(403, TWO_FACTOR_REQUIRED);
         }
         if (!isRole(member.getRole(), roles)) {
             throw new ResponseStatusException(403, "Your role at this store cannot do that");

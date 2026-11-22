@@ -236,14 +236,24 @@ class MerchantIdorTest {
         "POST /pos/card-payments/{paymentId}/cancel", "GET /pos/registers/{registerId}/pickups",
         "POST /pos/pickups/{orderId}/ready", "POST /pos/pickups/{orderId}/picked-up",
         "POST /pos/registers/{registerId}/ship-quote",
-        "POST /pos/registers/{registerId}/ship-sales"};
+        "POST /pos/registers/{registerId}/ship-sales",
+        // Staff security, the developer platform and tax rules.
+        "GET /staff-security", "POST /staff-security", "GET /sso-providers",
+        "POST /sso-providers", "DELETE /sso-providers/{providerId}",
+        "GET /api-keys", "POST /api-keys", "DELETE /api-keys/{keyId}",
+        "GET /bulk-jobs", "POST /bulk-jobs", "GET /bulk-jobs/{jobId}",
+        "GET /bulk-jobs/{jobId}/result.jsonl",
+        "GET /tax-settings", "POST /tax-settings", "GET /tax-overrides", "POST /tax-overrides",
+        "DELETE /tax-overrides/{overrideId}", "POST /products/{productId}/tax-category",
+        "GET /vat-rates", "GET /oss-report", "GET /oss-report.csv"};
 
     /// Routes of [#ROUTES] served as documents by `DocumentPages` rather than
     /// declared by a shared API interface.
     static final String[] DOCUMENT_ROUTES = {"GET /pos/labels.pdf",
         "GET /label-sheets.pdf", "GET /purchase-orders/{purchaseOrderId}/labels.pdf",
         "GET /bulk-orders/packing-slips.pdf", "GET /fulfillments/{fulfillmentId}/customs.pdf",
-        "GET /returns/{returnId}/return-label.pdf"};
+        "GET /returns/{returnId}/return-label.pdf", "GET /bulk-jobs/{jobId}/result.jsonl",
+        "GET /oss-report.csv"};
 
     /// The table an id placeholder names, by the path segment before it.
     private static final String[][] TABLES = {
@@ -275,6 +285,8 @@ class MerchantIdorTest {
         {"menu-links", "menu_link"}, {"redirects", "url_redirect"},
         {"metafields", "metafield_def"}, {"metaobject-types", "metaobject_type"},
         {"metaobjects", "metaobject_entry"}, {"channels", "sales_channel"},
+        {"sso-providers", "sso_provider"}, {"api-keys", "store_api_key"},
+        {"bulk-jobs", "bulk_job"}, {"tax-overrides", "tax_override"},
     };
 
     private static final String NO_SUCH = "no-such-id";

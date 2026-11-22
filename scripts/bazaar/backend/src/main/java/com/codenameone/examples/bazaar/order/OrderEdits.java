@@ -94,6 +94,10 @@ public class OrderEdits {
     private final OrderEditRepository edits;
     private final RegisterRepository registers;
     private final TaxRateRepository taxes;
+    /// The per-line tax rules; field-injected, as it was added after the
+    /// constructor's callers.
+    @com.codename1.backend.annotations.Autowired
+    private com.codenameone.examples.bazaar.taxes.TaxRules taxRules;
     private final StoreRepository stores;
     private final PaymentRepository paymentRows;
     private final LayawayRepository layaways;
@@ -408,7 +412,7 @@ public class OrderEdits {
             country = o.getShipCountry();
             region = o.getShipRegion();
         }
-        TaxCalculator.Result tax = TaxCalculator.apply(priced, o.getShippingCents(),
+        TaxCalculator.Result tax = taxRules.apply(o.getStoreId(), priced, o.getShippingCents(),
                 country.length() == 0 ? null : taxes.findByStoreId(o.getStoreId()),
                 country.length() == 0 ? null : country, region, plan.store.isTaxInclusive());
         plan.subtotal = subtotal;
@@ -533,6 +537,7 @@ public class OrderEdits {
         line.setPriceCents(n.price.unitCents);
         line.setDiscountCents(n.price.discountCents);
         line.setTaxCents(n.price.taxCents);
+        line.setTaxBp(n.price.taxBasisPoints);
         line.setWeightGrams(q.variant.getWeightGrams());
         line.setLocationId(variantId.length() == 0 ? "" : n.locationId);
         lines.insert(line);
@@ -580,6 +585,7 @@ public class OrderEdits {
         line.setQuantity(n.quantity);
         line.setDiscountCents(n.price.discountCents);
         line.setTaxCents(n.price.taxCents);
+        line.setTaxBp(n.price.taxBasisPoints);
         lines.save(line);
     }
 }

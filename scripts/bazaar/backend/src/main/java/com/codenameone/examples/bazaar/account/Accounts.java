@@ -179,6 +179,17 @@ public class Accounts {
         profiles.insert(profile);
     }
 
+    /// Opens the account a store's single sign-on provider vouched for: a
+    /// staff account whose password nobody knows, since it signs in through
+    /// the provider. The caller has checked the name is free.
+    @Transactional(rollbackFor = IOException.class)
+    public void openForSingleSignOn(String username, String displayName) throws IOException {
+        String name = displayName == null || displayName.trim().length() == 0 ? username
+                : displayName.trim();
+        create(username, Ids.hex(com.codename1.backend.Crypto.randomBytes(32)),
+                name.length() > 120 ? name.substring(0, 120) : name, "", false, true, false);
+    }
+
     public boolean exists(String username) {
         return users.userExists(username);
     }

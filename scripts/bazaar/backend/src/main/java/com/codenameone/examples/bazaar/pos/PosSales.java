@@ -126,6 +126,10 @@ public class PosSales {
     private final VariantRepository variants;
     private final ProductRepository products;
     private final TaxRateRepository taxes;
+    /// The per-line tax rules; field-injected, as it was added after the
+    /// constructor's callers.
+    @com.codename1.backend.annotations.Autowired
+    private com.codenameone.examples.bazaar.taxes.TaxRules taxRules;
     private final DiscountRepository discounts;
     private final DiscountUseRepository uses;
     private final CustomerRepository customers;
@@ -461,7 +465,7 @@ public class PosSales {
         quote.shipping = shipping;
         quote.shippingCents = shipping == null ? 0 : shipping.priceCents;
         String country = taxCountry == null ? "" : taxCountry;
-        quote.tax = TaxCalculator.apply(priceLines, quote.shippingCents,
+        quote.tax = taxRules.apply(storeId, priceLines, quote.shippingCents,
                 country.length() == 0 ? null : taxes.findByStoreId(storeId),
                 country.length() == 0 ? null : country, taxRegion,
                 store.isTaxInclusive());

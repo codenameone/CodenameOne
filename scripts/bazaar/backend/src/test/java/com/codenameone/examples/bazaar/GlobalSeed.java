@@ -129,5 +129,22 @@ final class GlobalSeed {
         db.execute("INSERT INTO chat_conversation (id, store_id, token, email, name, subject, status, "
                 + "assignee, created_at, updated_at) VALUES (?, ?, ?, 'x@example.com', 'X', 'Hi', "
                 + "'OPEN', '', 0, 0)", new Object[] {Ids.next(), s.storeId, "idor" + Ids.next()});
+        // A sign-on provider, an API key, a bulk job and a tax override.
+        db.execute("INSERT INTO sso_provider (id, store_id, name, issuer, client_id, client_secret, "
+                + "authorization_uri, token_uri, jwks_uri, domain_roles, enabled, created_at) VALUES "
+                + "(?, ?, 'Idor', 'https://id.example.com', 'c', 's', 'https://id.example.com/a', "
+                + "'https://id.example.com/t', 'https://id.example.com/k', '', 1, 0)",
+                new Object[] {Ids.next(), s.storeId});
+        db.execute("INSERT INTO store_api_key (id, store_id, name, scopes, key_hash, prefix, "
+                + "last_four, created_by, created_at, last_used_at, revoked_at) VALUES "
+                + "(?, ?, 'Idor', 'read_products', ?, 'bzk_', 'abcd', 'x', 0, 0, 0)",
+                new Object[] {Ids.next(), s.storeId, Ids.next()});
+        db.execute("INSERT INTO bulk_job (id, store_id, kind, status, requested_by, input, output, "
+                + "errors, line_count, error_count, created_at, finished_at) VALUES "
+                + "(?, ?, 'EXPORT_PRODUCTS', 'DONE', 'x', '', '', '', 0, 0, 0, 0)",
+                new Object[] {Ids.next(), s.storeId});
+        db.execute("INSERT INTO tax_override (id, store_id, target_kind, target_id, country, "
+                + "region, basis_points, created_at) VALUES (?, ?, 'product', ?, 'US', '', 0, 0)",
+                new Object[] {Ids.next(), s.storeId, s.productId});
     }
 }

@@ -65,9 +65,12 @@ public class AccountSecurityPages {
     private final RecoveryCodeRepository recoveryRows;
     private final Accounts accounts;
     private final WebSessions sessions;
+    private final com.codenameone.examples.bazaar.staff.StaffSecurity staffSecurity;
 
     public AccountSecurityPages(WebPages pages, TotpService totp, RecoveryCodeService recovery,
-            DataSource db, Accounts accounts, WebSessions sessions) {
+            DataSource db, Accounts accounts, WebSessions sessions,
+            com.codenameone.examples.bazaar.staff.StaffSecurity staffSecurity) {
+        this.staffSecurity = staffSecurity;
         this.pages = pages;
         this.totp = totp;
         this.recovery = recovery;
@@ -174,6 +177,9 @@ public class AccountSecurityPages {
         String me = me(request);
         if (!accounts.checkPassword(me, request.param("password"))) {
             return back(request, "That is not your password");
+        }
+        if (!staffSecurity.requiredBy(me).isEmpty()) {
+            return back(request, "A store you work at requires two-step sign-in");
         }
         totp.disable(me);
         recoveryRows.replace(me, new ArrayList<String>());

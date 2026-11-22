@@ -225,6 +225,10 @@ over an amount, pickup or local delivery. Tax rates are set per country and
 region. The settings hold the store's name, description, logo and banner,
 locations, staff and their roles, and the registers.
 
+Settings > Two-factor sign-in in the app turns on authenticator codes for the
+account: scan the QR code, enter a code, and keep the recovery codes it shows
+once. When an account has it, signing in asks for the code on its own screen.
+
 *Shipping profiles* give some products zones and rates of their own: an
 Oversized profile can charge freight while everything else ships at the usual
 rates. Edit a profile and tick its products. A cart holding products from
@@ -432,7 +436,16 @@ language they chose, else their market's, else their browser's, on every page,
 in the cart and checkout, and in order mail. Products can carry customs codes, and duty rates per
 destination give the shopper an estimate of import duties at checkout. The tax
 page reports tax collected by region for a period, as a CSV for filing, and
-records customers' tax exemption certificates.
+records customers' tax exemption certificates. Tax rules turns on EU VAT from
+the rate table, which charges each product by its tax category (standard,
+reduced, super-reduced or exempt), picks the US sales-tax provider, adds rate
+overrides for a product or a collection in a country or region, and downloads
+the OSS VAT report as CSV.
+
+*Security and API.* The owner can require two-factor sign-in of every staff
+member, add an OpenID Connect provider for single sign-on (staff at a mapped
+email domain join with its role), create API keys with scopes for other systems
+(a key is shown once), and start bulk exports of products or orders as JSONL.
 
 *Risk.* Each online order is scored for fraud. A high score holds the order:
 it can't be fulfilled until a manager approves or cancels it from the risk page.

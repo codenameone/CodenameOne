@@ -53,6 +53,7 @@ public final class SignInForm {
             }
             signIn.setEnabled(false);
             error.setText("");
+            TwoFactorForm.askCodesOver(form);
             Session.signIn(email.getText().trim(), password.getText(), () -> {
                 Telemetry.signedIn();
                 Nav.enter();

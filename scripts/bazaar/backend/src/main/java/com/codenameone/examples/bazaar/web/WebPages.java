@@ -67,6 +67,8 @@ public class WebPages {
         {"Markets", "/markets", "m"},
         {"Translations", "/translations", "x"},
         {"Tax", "/tax", "z"},
+        {"Tax rules", "/tax-rules", ""},
+        {"Security and API", "/security", ""},
         {"Fraud review", "/risk", "h"},
         {"Disputes", "/disputes", "w"},
         {"Warehouse", "/warehouse", "g"},

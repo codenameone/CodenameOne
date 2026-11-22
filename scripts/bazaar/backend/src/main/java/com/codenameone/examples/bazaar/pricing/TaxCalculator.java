@@ -98,9 +98,25 @@ public final class TaxCalculator {
         return Money.basisPoints(amount, basisPoints);
     }
 
+    /// The rate of one line where it is not the cart's: a product's own
+    /// override, its EU VAT category, a US provider's rate.
+    public interface LineRates {
+        /// The basis points `line` is taxed at; `cartRate` is what the
+        /// matching rates add up to, the answer when nothing else applies.
+        long basisPoints(PriceLine line, long cartRate);
+    }
+
     /// Taxes the lines (writing [PriceLine#taxCents]) and the shipping.
     public static Result apply(List<PriceLine> lines, long shippingCents, List<TaxRate> rates,
             String country, String region, boolean inclusive) {
+        return apply(lines, shippingCents, rates, country, region, inclusive, null);
+    }
+
+    /// As above, with each line's rate asked of `perLine` (none: the cart's).
+    /// [Result#basisPoints] is then the highest rate a line was taxed at.
+    /// Shipping keeps the matching rates' shipping rate.
+    public static Result apply(List<PriceLine> lines, long shippingCents, List<TaxRate> rates,
+            String country, String region, boolean inclusive, LineRates perLine) {
         Result result = new Result();
         result.inclusive = inclusive;
         List<TaxRate> apply = matching(rates, country, region);
@@ -114,11 +130,16 @@ public final class TaxCalculator {
             }
             result.names.add(rate.getName());
         }
-        result.basisPoints = bp;
+        result.basisPoints = perLine == null ? bp : 0;
         for (int iter = 0; iter < lines.size(); iter++) {
             PriceLine line = lines.get(iter);
-            line.taxCents = line.taxable ? tax(line.netCents(), bp, inclusive) : 0;
+            long lineBp = perLine == null ? bp : Math.max(0, perLine.basisPoints(line, bp));
+            line.taxBasisPoints = line.taxable ? lineBp : 0;
+            line.taxCents = line.taxable ? tax(line.netCents(), lineBp, inclusive) : 0;
             result.linesTaxCents += line.taxCents;
+            if (perLine != null && line.taxable && lineBp > result.basisPoints) {
+                result.basisPoints = lineBp;
+            }
         }
         result.shippingTaxCents = tax(shippingCents, shippingBp, inclusive);
         return result;

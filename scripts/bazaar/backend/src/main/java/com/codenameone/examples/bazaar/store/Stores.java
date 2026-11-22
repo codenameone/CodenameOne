@@ -51,6 +51,10 @@ import java.util.List;
 /// configure -- settings, locations and who works there.
 @Component
 public class Stores {
+    /// Who single sign-on opened; field-injected, as it was added after
+    /// the constructor's callers.
+    @com.codename1.backend.annotations.Autowired
+    private com.codenameone.examples.bazaar.staff.SsoProviders sso;
     public static final String ACTIVE = "ACTIVE";
     public static final String PENDING = "PENDING";
     public static final String SUSPENDED = "SUSPENDED";
@@ -313,6 +317,12 @@ public class Stores {
         String who = Accounts.email(wanted.username());
         if (!accounts.exists(who)) {
             throw new ResponseStatusException(404, "No such account");
+        }
+        // An account a store's own sign-on provider opened is that store's:
+        // the provider vouched for the address, nobody else did.
+        if (sso.ownedElsewhere(who, storeId)) {
+            throw new ResponseStatusException(409, "That account signs in through another "
+                    + "store's single sign-on");
         }
         String role = Text.oneOf(wanted.role(), new String[] {StoreAccess.MANAGER,
             StoreAccess.CASHIER, StoreAccess.FULFILMENT}, "", "the role");

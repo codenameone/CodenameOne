@@ -1201,6 +1201,7 @@ public class Orders {
             line.setPriceCents(q.price.unitCents);
             line.setDiscountCents(q.price.discountCents);
             line.setTaxCents(q.price.taxCents);
+            line.setTaxBp(q.price.taxBasisPoints);
             line.setWeightGrams(q.variant.getWeightGrams());
             line.setPreorder(q.preorder);
             line.setBackorderedQty(backordered == null ? 0 : Math.max(0, backordered[iter]));

@@ -547,6 +547,29 @@ certificate covers, and records the certificate on the order for the tax report.
 A store whose prices include tax refunds the tax portion instead, so lines and
 totals still agree.
 
+`taxes.TaxRules` applies, in order, a product's override, its collection's, the
+EU VAT table for the product's tax category when the store has EU VAT on, and
+the US provider for a US address. The VAT table (`vat_rate`, seeded by
+migration) is data, not code: rates change, and keeping them current is the
+operator's job. The OSS report sums goods lines by country and rate from the
+rate each line was charged; shipping keeps the cart's own rates and is not in
+it. US sales tax goes through `taxes.SalesTaxProvider`; the sample ships
+`SimulatedSalesTaxProvider` with a few state rates. A production store
+implements the interface over a real service such as Avalara, TaxJar or Stripe
+Tax, adds it to the providers listed in the `TaxRules` constructor, and picks
+its name in the store's tax settings. A provider that cannot answer returns -1, and the store's
+own rates apply.
+
+`staff.StaffSecurity`, `staff.SsoProviders` and `platform.StoreApiKeys` cover
+staff sign-in and machine access. Two-factor codes are TOTP with recovery codes,
+and a store that requires them refuses staff who have not enrolled. Single
+sign-on is OpenID Connect with PKCE; the ID token is checked against the
+provider's JWKS, the email must be verified, and its domain picks the role. An
+account owned by one store's provider cannot be added to another store. API
+keys are 256 random bits, stored only as SHA-256 hashes and found by that hash;
+only their prefix is shown again. `platform.BulkJobs` runs export and import jobs
+in the background and requeues a job left running by a stopped server.
+
 `risk.Fraud` scores each online order once its payment is held: order value,
 velocity, recent refused payments, an unusual delivery country, and a mismatch
 between delivery country and the client's country, read from a header a trusted

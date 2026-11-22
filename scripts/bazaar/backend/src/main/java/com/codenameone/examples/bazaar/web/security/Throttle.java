@@ -59,6 +59,8 @@ public class Throttle {
         {"chat-live", "30/60"}, {"chat-signal", "600/60"},
         {"upload", "30/600"},
         {"totp-enrol", "10/600"},
+        // A store API key on the key API.
+        {"keyapi", "240/60"},
     };
 
     private final Map<String, int[]> rules = new HashMap<String, int[]>();

@@ -36,6 +36,9 @@ public final class PriceLine {
     public final List<String> collectionIds = new ArrayList<String>();
     public long discountCents;
     public long taxCents;
+    /// The rate the line was taxed at, in basis points; written with
+    /// [#taxCents].
+    public long taxBasisPoints;
 
     public PriceLine(String key, String productId, String variantId, long unitCents,
             int quantity, int weightGrams, boolean taxable) {

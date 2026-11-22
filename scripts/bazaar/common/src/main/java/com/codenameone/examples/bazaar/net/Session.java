@@ -290,6 +290,21 @@ public final class Session {
         return new String(chars);
     }
 
+    /// Asks the person signing in for the code their authenticator app shows
+    /// (or a recovery code): `code` with what they typed, `cancelled` when
+    /// they gave up.
+    public interface CodePrompt {
+        void ask(Net.Ok<String> code, Runnable cancelled);
+    }
+
+    private static CodePrompt codePrompt;
+
+    /// Who asks for a second factor; with none, an account that has one
+    /// cannot sign in here.
+    public static void setCodePrompt(CodePrompt prompt) {
+        codePrompt = prompt;
+    }
+
     public static void signIn(String email, String password, final Runnable done,
             final Net.Failed failed) {
         // The server can be changed while the sign-in is under way, and
@@ -332,30 +347,16 @@ public final class Session {
         final Step login = new Step("POST", server + "/login");
         login.addArgument("username", accountName(email));
         login.addArgument("password", password);
-        login.send(() -> {
-            if (!server.equals(base)) {
-                failed.failed(0, "The server changed. Sign in again.");
-                return;
-            }
-            if (login.status == 0) {
-                failed.failed(0, "Could not reach the server. Check your connection.");
-                return;
-            }
-            if (login.status == 429) {
-                failed.failed(429, "Too many attempts. Wait a minute and try again.");
-                return;
-            }
-            if (web ? login.status != 200 : login.session == null) {
-                failed.failed(401, "That e-mail and password do not match an account.");
-                return;
-            }
+        // The session cookie, which the second factor's step replaces.
+        final String[] cookie = new String[1];
+        final Runnable afterPassword = () -> {
             // 2. The session, for an authorization code.
             final Step authorize = new Step("GET", server + "/oauth2/authorize");
             if (web) {
                 // Or a session that did not take is answered with a page.
                 authorize.addRequestHeader("Accept", "application/json");
             } else {
-                authorize.addRequestHeader("Cookie", login.session);
+                authorize.addRequestHeader("Cookie", cookie[0]);
             }
             authorize.addArgument("response_type", "code");
             authorize.addArgument("client_id", AppConfig.CLIENT_ID);
@@ -403,13 +404,73 @@ public final class Session {
                     // without it.
                     Step end = new Step("POST", server + "/logout");
                     if (!web) {
-                        end.addRequestHeader("Cookie", login.session);
+                        end.addRequestHeader("Cookie", cookie[0]);
                     }
                     end.send(() -> { });
                     got.got(tokens);
                 });
             });
+        };
+        login.send(() -> {
+            if (!server.equals(base)) {
+                failed.failed(0, "The server changed. Sign in again.");
+                return;
+            }
+            if (login.status == 0) {
+                failed.failed(0, "Could not reach the server. Check your connection.");
+                return;
+            }
+            if (login.status == 429) {
+                failed.failed(429, "Too many attempts. Wait a minute and try again.");
+                return;
+            }
+            cookie[0] = login.session;
+            if (SecondFactor.wanted(web, login.status, login.location, login.text("secondFactor"))) {
+                secondFactor(server, web, cookie, afterPassword, failed);
+                return;
+            }
+            if (web ? login.status != 200 : login.session == null) {
+                failed.failed(401, "That e-mail and password do not match an account.");
+                return;
+            }
+            afterPassword.run();
         });
+    }
+
+    /// 1b. The code from the authenticator app, for the session the password
+    /// started; then `next`.
+    private static void secondFactor(final String server, final boolean web,
+            final String[] cookie, final Runnable next, final Net.Failed failed) {
+        CodePrompt prompt = codePrompt;
+        if (prompt == null) {
+            failed.failed(401, "This account needs its authenticator code to sign in.");
+            return;
+        }
+        prompt.ask(code -> {
+            if (!server.equals(base)) {
+                failed.failed(0, "The server changed. Sign in again.");
+                return;
+            }
+            final Step mfa = new Step("POST", server + "/login/second-factor");
+            mfa.addArgument("code", SecondFactor.clean(code));
+            if (!web) {
+                mfa.addRequestHeader("Cookie", cookie[0]);
+            }
+            mfa.send(() -> {
+                if (mfa.status == 429) {
+                    failed.failed(429, "Too many attempts. Wait a minute and try again.");
+                    return;
+                }
+                if (SecondFactor.refused(mfa.status, mfa.location)) {
+                    failed.failed(401, "That code is not right. Try again.");
+                    return;
+                }
+                if (mfa.session != null) {
+                    cookie[0] = mfa.session;
+                }
+                next.run();
+            });
+        }, () -> failed.failed(401, "Signing in was cancelled."));
     }
 
     /// Signs out: the refresh token is revoked at the server, so the session
@@ -491,7 +552,12 @@ public final class Session {
 
         /// A text member of the JSON this request was answered with, or null.
         String answer(String name) {
-            if (status != 200 || body == null) {
+            return status == 200 ? text(name) : null;
+        }
+
+        /// A text member of the JSON answer whatever its status, or null.
+        String text(String name) {
+            if (body == null) {
                 return null;
             }
             try {

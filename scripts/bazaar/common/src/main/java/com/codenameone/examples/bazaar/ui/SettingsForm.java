@@ -147,6 +147,9 @@ public final class SettingsForm {
                 "Share which screens and features are used. Never your name, places or "
                 + "payment details.",
                 Ui.toggle("usageStatistics", Telemetry.allowed(), Telemetry::allow)));
+        safe.add(Ui.tap(Ui.row(FontImage.MATERIAL_VERIFIED_USER, "Two-factor sign-in",
+                "A code from an authenticator app as well as the password", chevron()),
+                "twoFactor", e -> TwoFactorForm.show(form)));
         page.add(safe);
 
         Ui.section(page, "About");

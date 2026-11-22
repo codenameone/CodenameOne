@@ -65,6 +65,8 @@ public class SecurityConfig {
     static final String SIGNUP_SUBMIT = "/api/shop/stores/*/signup-forms/*/submit";
     /// A back-in-stock alert; open to guests, who give an e-mail address.
     static final String STOCK_ALERT = "/api/shop/stores/*/stock-alerts";
+    /// Where the app's sign-in is sent when the account has a second factor.
+    public static final String SECOND_FACTOR = "/login/second-factor";
 
     @Bean
     public PasswordEncoder passwordEncoder() {
@@ -102,11 +104,27 @@ public class SecurityConfig {
     /// Signing in. Ten tries a minute from one address, unless
     /// `bazaar.signin.per-minute` says otherwise: the end-to-end tests are many
     /// people signing in from one address, and their profile raises it.
+    ///
+    /// An account with an authenticator app is not signed in by its password
+    /// alone, here any more than on the web: the password is held back and
+    /// answered with a redirect to [#SECOND_FACTOR], which answers
+    /// `{"signedIn":false,"secondFactor":"required"}`, and the app then posts
+    /// the code (or a recovery code) to the same path as `code`, which answers
+    /// `{"signedIn":true}`. The same TOTP and recovery code services as the
+    /// web chain, so a factor is one factor wherever it was set up.
     @Bean
     @Order(1)
     public SecurityFilterChain signIn(HttpSecurity http,
             @Value("${" + AccountSecurity.ISSUER_KEY + ":}") String issuer,
-            @Value("${bazaar.signin.per-minute:10}") int signInsPerMinute) throws IOException {
+            @Value("${bazaar.signin.per-minute:10}") int signInsPerMinute,
+            com.codename1.backend.security.mfa.TotpService totp,
+            com.codename1.backend.security.mfa.RecoveryCodeService recoveryCodes)
+            throws IOException {
+        http.mfa(mfa -> mfa.totpService(totp).recoveryCodeService(recoveryCodes)
+                .secondFactorPage(SECOND_FACTOR)
+                .successHandler((request, who) -> new com.codename1.backend.HttpServer.Response(
+                        200, "application/json", "{\"signedIn\":true}".getBytes("UTF-8"))
+                        .header("Cache-Control", "no-store")));
         return AccountSecurity.signIn(http, issuer, signInsPerMinute, AUDIENCE);
     }
 
@@ -114,8 +132,23 @@ public class SecurityConfig {
     @Order(2)
     public SecurityFilterChain api(HttpSecurity http, JwkSource signingKeys,
             @Value("${" + AccountSecurity.ISSUER_KEY + ":}") String issuer,
-            JdbcUserDetailsManager users, Throttle throttle) throws IOException {
+            JdbcUserDetailsManager users, Throttle throttle,
+            com.codenameone.examples.bazaar.platform.StoreApiKeys storeKeys) throws IOException {
         http.securityMatcher("/api/**")
+            // A store's API key: `Authorization: Bearer bzk_...` or
+            // `X-API-Key`. It carries scopes and no role, and KeyApiOnly keeps
+            // it to /api/v1, the key API, where each route checks the scope.
+            .apiKey(k -> k.repository(storeKeys)
+                    .prefix(com.codenameone.examples.bazaar.platform.StoreApiKeys.PREFIX))
+            .addFilterAfter(new com.codenameone.examples.bazaar.platform.KeyApiOnly(),
+                    com.codename1.backend.security.ApiKeyAuthenticationFilter.class)
+            .rateLimit("/api/v1/**", RateLimitKeys.firstOf(RateLimitKeys.apiKeyId(),
+                    RateLimitKeys.clientAddress()), throttle.limiter("keyapi"))
+            // Codes and passwords checked by the account's two-factor routes:
+            // the web enrolment's allowance, per account.
+            .rateLimit(AntPathRequestMatcher.antMatcher("POST", "/api/account/two-factor/**"),
+                    RateLimitKeys.firstOf(RateLimitKeys.principal(), RateLimitKeys.clientAddress()),
+                    throttle.limiter("totp-enrol"))
             .sessionManagement(session ->
                     session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             // Opening accounts and sending text messages are the two things
@@ -193,6 +226,7 @@ public class SecurityConfig {
                             com.codenameone.examples.bazaar.channel.ChannelWebhook.PATH)).permitAll()
                     .requestMatchers(AntPathRequestMatcher.antMatcher("POST",
                             com.codenameone.examples.bazaar.carrier.CarrierWebhook.PATH)).permitAll()
+                    .requestMatchers("/api/v1/**").authenticated()
                     .requestMatchers("/api/admin/**").hasRole(Roles.ADMIN)
                     .requestMatchers("/api/merchant/**").hasRole(Roles.MERCHANT)
                     .anyRequest().authenticated())

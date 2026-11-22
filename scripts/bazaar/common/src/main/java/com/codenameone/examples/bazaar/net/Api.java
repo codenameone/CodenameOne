@@ -64,6 +64,7 @@ import com.codenameone.examples.bazaar.api.LoyaltyApi;
 import com.codenameone.examples.bazaar.api.OpsApi;
 import com.codenameone.examples.bazaar.api.ChannelsApi;
 import com.codenameone.examples.bazaar.api.DigitalApi;
+import com.codenameone.examples.bazaar.api.TwoFactorApi;
 
 /// The server, as the app calls it.
 ///
@@ -117,6 +118,7 @@ public final class Api {
     private static OpsApi ops;
     private static ChannelsApi channels;
     private static DigitalApi digital;
+    private static TwoFactorApi twoFactor;
 
     private Api() {
     }
@@ -167,6 +169,7 @@ public final class Api {
         ops = RestClients.create(OpsApi.class, baseUrl);
         channels = RestClients.create(ChannelsApi.class, baseUrl);
         digital = RestClients.create(DigitalApi.class, baseUrl);
+        twoFactor = RestClients.create(TwoFactorApi.class, baseUrl);
     }
 
     public static AccountApi account() {
@@ -354,6 +357,10 @@ public final class Api {
     /// Digital downloads, licence keys and product video and models.
     public static DigitalApi digital() {
         return digital;
+    }
+
+    public static TwoFactorApi twoFactor() {
+        return twoFactor;
     }
 
     public static LoyaltyApi loyalty() {

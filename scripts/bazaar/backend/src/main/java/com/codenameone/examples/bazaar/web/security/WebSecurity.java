@@ -114,7 +114,8 @@ public class WebSecurity {
     @Order(3)
     public SecurityFilterChain webAppChain(HttpSecurity http, TotpService totp,
             RecoveryCodeService recoveryCodes, final Throttle throttle, BotGuard bots,
-            @Value("${bazaar.web.hsts:true}") boolean hsts) throws IOException {
+            @Value("${bazaar.web.hsts:true}") boolean hsts,
+            com.codenameone.examples.bazaar.staff.SsoProviders sso) throws IOException {
         final SavedRequestAwareAuthenticationSuccessHandler saved =
                 new SavedRequestAwareAuthenticationSuccessHandler();
         saved.setDefaultTargetUrl("/account");
@@ -158,6 +159,20 @@ public class WebSecurity {
                                 .header("Location", SIGN_IN + "?error=1")
                                 .header("Cache-Control", "no-store");
                     }))
+            // Staff single sign-on through a store's OpenID Connect provider:
+            // PKCE, state, nonce and the ID token's signature are the
+            // framework's; who the user is, is SsoProviders'. Under /auth, so
+            // the authorization server's /oauth2 paths stay its own. mfa()
+            // below holds these sign-ins back for a code as it does passwords.
+            .oauth2Login(o -> o.clientRegistrationRepository(sso)
+                    .oidcUserService(sso)
+                    .loginPage(SIGN_IN)
+                    .authorizationEndpointBaseUri(
+                            com.codenameone.examples.bazaar.staff.SsoProviders.START)
+                    .redirectionEndpointBaseUri(
+                            com.codenameone.examples.bazaar.staff.SsoProviders.CALLBACK)
+                    .defaultSuccessUrl("/admin")
+                    .failureUrl(SIGN_IN + "?error=sso"))
             .mfa(mfa -> mfa.totpService(totp).recoveryCodeService(recoveryCodes)
                     .secondFactorPage(SECOND_FACTOR)
                     .processingUrl(SECOND_FACTOR)

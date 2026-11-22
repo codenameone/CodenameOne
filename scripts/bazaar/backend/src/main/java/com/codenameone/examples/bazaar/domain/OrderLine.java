@@ -69,6 +69,11 @@ public class OrderLine {
     @Column(nullable = false)
     private long taxCents;
 
+    /// The rate the line was taxed at in basis points; -1 for a line sold
+    /// before rates were kept per line.
+    @Column(nullable = false)
+    private long taxBp = -1;
+
     @Column(nullable = false)
     private int weightGrams;
 
@@ -212,6 +217,14 @@ public class OrderLine {
 
     public void setTaxCents(long taxCents) {
         this.taxCents = taxCents;
+    }
+
+    public long getTaxBp() {
+        return taxBp;
+    }
+
+    public void setTaxBp(long taxBp) {
+        this.taxBp = taxBp;
     }
 
     public int getWeightGrams() {

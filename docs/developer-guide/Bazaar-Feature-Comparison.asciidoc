@@ -314,10 +314,10 @@ on a row.
 | Geolocation redirects / country selector | &#10003; | core | app/plugin | app/plugin | no | A market selector with a cookie, and a banner suggesting the market of the visitor's country from trusted CDN headers or an IP range table. It never redirects, so crawlers and canonical URLs are unaffected. 
 | Tax rates by region | &#10003; | core | core | core | core | 
 | Tax-inclusive pricing | &#10003; | core | core | core | core | 
-| Automatic tax calculation (United States and European Union) | &#8211; | core | app/plugin | core | core | 
-| Tax overrides per product/collection | &#8211; | core | core | core | core | 
+| Automatic tax calculation (United States and European Union) | &#10003; | core | app/plugin | core | core | An editable EU VAT table (standard, reduced, super-reduced and zero rates per country) chosen by each product's tax category; US sales tax goes through a provider interface, with a simulated provider in the sample.
+| Tax overrides per product/collection | &#10003; | core | core | core | core | A rate for a product or a collection in a country or one of its regions; a product's override wins over its collection's.
 | Tax exemptions | &#10003; | core | core | core | core | Per customer, with certificate details. 
-| VAT/GST registration & reports | &#8211; | core | app/plugin | app/plugin | no | VAT numbers of business customers are verified with VIES; registration and filing reports are not covered.
+| VAT/GST registration & reports | &#10003; | core | app/plugin | app/plugin | no | VAT numbers of business customers are verified with VIES. An OSS VAT report by country and rate for a period, as a table or CSV; it covers goods lines, not shipping. Registration itself is the merchant's.
 |===
 
 === Storefront, web and SEO
@@ -361,11 +361,11 @@ on a row.
 | Feature | Bazaar | Shopify | WooCommerce | BigCommerce | Square | Notes
 
 | REST/HTTP API | &#10003; | core | core | core | core | 
-| GraphQL API | &#8211; | core | app/plugin | core | no | 
+| GraphQL API | &#10003; | core | app/plugin | core | no | A small read-only endpoint for products and orders with field selection, aliases and paging, authorised by an API key's scopes; no mutations or subscriptions.
 | Webhooks with delivery log & retries | &#10003; | core | core | core | core | 
 | App store / third-party app installs | &#9681; | core | core | core | core | App slots place owner-approved snippets and sandboxed widgets; there is no app marketplace.
-| API access tokens / custom apps | &#9681; | core | core | core | core | Session and OAuth 2 tokens; no per-app scoped keys.
-| Bulk operations API | &#8211; | core | no | no | no | 
+| API access tokens / custom apps | &#10003; | core | core | core | core | Per-store API keys with scopes (read or write products, read orders), stored hashed, shown once, with the last time each was used, and revocable; accepted by the REST API as bearer tokens.
+| Bulk operations API | &#10003; | core | no | no | no | Asynchronous jobs: JSONL export of products or orders and JSONL product import with an error per line, with job status and a download.
 | Functions / checkout scripts | &#8211; | core | core | app/plugin | no | 
 |===
 
@@ -383,7 +383,7 @@ on a row.
 | Custom reports / report builder | &#10003; | core | app/plugin | core | core | Pick measures, dimensions and filters; save reports. 
 | Cohort / retention analysis | &#10003; | core | app/plugin | no | no | 
 | Inventory / sell-through reports | &#9681; | core | core | core | core | Inventory value only.
-| Finance / tax / payout reports | &#9681; | core | core | core | core | Payout list; no tax liability report.
+| Finance / tax / payout reports | &#9681; | core | core | core | core | Payout list, tax collected by region and the OSS VAT report as CSV; no profit and loss statement.
 | Session / traffic source analytics | &#10003; | core | core | core | core | Traffic sources from UTM tags and referrers. 
 | Benchmarks vs peers | &#8211; | core | no | no | no | 
 |===
@@ -397,8 +397,8 @@ on a row.
 | Staff accounts & invites | &#10003; | core | core | core | core | 
 | Roles & permissions | &#10003; | core | core | core | core | Granular permission sets per staff member on top of the four roles. 
 | Audit log / activity | &#10003; | core | app/plugin | core | core | 
-| Two-factor authentication | &#8211; | core | app/plugin | core | core | 
-| SSO / SAML | &#8211; | core | app/plugin | core | no | 
+| Two-factor authentication | &#10003; | core | app/plugin | core | core | Authenticator-app codes (TOTP) with a QR code on the web and in the app, single-use recovery codes, and a store setting that requires them of every staff member.
+| SSO / SAML | &#10003; | core | app/plugin | core | no | OpenID Connect from any provider: authorization code with PKCE, the ID token checked against the provider's keys, and a verified email's domain mapped to a staff role. SAML is not supported.
 | Organization admin across stores | &#9681; | core | app/plugin | core | core | A platform administrator manages all stores.
 |===
 
