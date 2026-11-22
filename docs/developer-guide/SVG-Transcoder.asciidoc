@@ -282,10 +282,7 @@ src/main/css/
 
 [source,css]
 ----
-JuiceStyle {
-    background: url(juice.riv);
-    cn1-background-type: cn1-image-scaled-fit;
-}
+include::../demos/common/src/main/css/guide-snippets-theme.css[tag=svg-transcoder-css-004,indent=0]
 ----
 
 [source,java]
