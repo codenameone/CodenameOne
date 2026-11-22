@@ -228,7 +228,7 @@ those states. A drop calls that endpoint, and the card goes back to where the
 server says the job is when it refuses or can't be reached. Undo, adding,
 renaming and reordering columns are turned off, so the board can only make
 the transitions the server allows. `FieldTest` covers the role, an illegal
-transition and a held job surviving an optimize.
+transition and a held job surviving an optimizer run.
 
 image::img/fieldline-intake-board.png["The intake board on a phone",scaledwidth=40%]
 

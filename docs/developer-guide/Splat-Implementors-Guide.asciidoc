@@ -122,7 +122,7 @@ image::img/splat-desktop-shop.png["The store on a desktop, with its title bar an
 
 * `shared` holds the game, in the `rules` package: a deterministic simulation in
   fixed-point integers. The app predicts with it, the server runs it as the authority
-  and the replay viewer re-runs it. Beside it are the REST interfaces and the objects
+  and the replay viewer re-runs it. Next to it are the REST interfaces and the objects
   they carry.
 * `backend` is the server: accounts, matchmaking, the match rooms, results, the shop,
   social features and the admin API.

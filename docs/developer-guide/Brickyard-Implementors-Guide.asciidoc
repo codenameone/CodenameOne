@@ -180,7 +180,7 @@ compiles to, apart from line endings and trailing blank space. A script edited b
 in the Script tab, or a header that doesn't parse, leaves the graph detached: the tab
 says so and offers the Script tab, and it replaces the text only when the creator asks
 for a new graph. The canvas refuses renames, deletions and new wires, so what it shows
-is always what Apply compiles; nodes can still be moved and zoomed. Leaderstat names
+is always what Apply compiles; nodes can still be moved and zoomed. The names of leaderstats
 are limited to letters, digits and spaces, because they're written into Luau string
 literals.
 
