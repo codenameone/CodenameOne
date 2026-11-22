@@ -7,15 +7,16 @@
             <format>jar</format>
         </formats>
         <includeBaseDirectory>false</includeBaseDirectory>
+  <!-- The cn1-binaries jars, unzipped by the unpack-cn1-binaries execution in the pom.
+       Not a dependencySet: that makes the plugin look up a POM for each jar remotely,
+       and they have none. Listed before the port's own classes, as they always were. -->
+  <fileSets>
+    <fileSet>
+      <directory>${project.build.directory}/cn1-binaries-unpacked</directory>
+      <outputDirectory>/</outputDirectory>
+    </fileSet>
+  </fileSets>
   <dependencySets>
-    <dependencySet>
-        <scope>system</scope>
-        <unpack>true</unpack>
-        <useTransitiveDependencies>false</useTransitiveDependencies>
-      <includes>
-        <include>com.codenameone.cn1binaries:*:jar</include>
-      </includes>
-  </dependencySet>
   <dependencySet>
       <unpack>true</unpack>
       <includes>

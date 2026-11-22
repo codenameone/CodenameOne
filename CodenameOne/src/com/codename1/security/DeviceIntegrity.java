@@ -243,6 +243,107 @@ public final class DeviceIntegrity {
         return false;
     }
 
+    /// The keyboard (input method) the user has selected, as `package/.Service`. Android only;
+    /// null on iOS and other ports, where an app cannot see it.
+    ///
+    /// #### Returns
+    ///
+    /// the selected keyboard's id, or null when it cannot be determined
+    public static String getActiveKeyboard() {
+        return Display.getInstance().getActiveInputMethod();
+    }
+
+    /// Returns true when the selected keyboard was installed by the user rather than shipped with the
+    /// device, and its package is not in `allowedPackages`.
+    ///
+    /// On Android every keystroke typed into any app goes to the selected keyboard, so a malicious
+    /// one is a keylogger the app cannot switch off: password and [com.codename1.ui.TextArea#SENSITIVE]
+    /// fields already ask the keyboard not to learn what is typed, but only a well-behaved keyboard
+    /// honours that. Check this before a credential screen and warn the user, or switch to
+    /// [SecureKeyboard], which never goes through the system keyboard:
+    ///
+    /// ```java
+    /// TextField password = new TextField("", "Password", 20, TextArea.PASSWORD);
+    /// if (DeviceIntegrity.isThirdPartyKeyboardActive("com.touchtype.swiftkey")) {
+    ///     SecureKeyboard.install(password);
+    /// }
+    /// ```
+    ///
+    /// To accept the mainstream keyboards users commonly install, pass [#wellKnownKeyboards()]:
+    ///
+    /// ```java
+    /// boolean risky = DeviceIntegrity.isThirdPartyKeyboardActive(DeviceIntegrity.wellKnownKeyboards());
+    /// ```
+    ///
+    /// Always false on iOS, where an app cannot see which keyboard is selected; refuse third-party
+    /// keyboards there with [#setThirdPartyKeyboardsAllowed(boolean)] instead. Always false on the
+    /// other ports.
+    ///
+    /// #### Parameters
+    ///
+    /// - `allowedPackages`: user-installed keyboard packages your app trusts
+    ///
+    /// #### Returns
+    ///
+    /// true if the selected keyboard is neither preinstalled nor allowed
+    public static boolean isThirdPartyKeyboardActive(String... allowedPackages) {
+        Display d = Display.getInstance();
+        return isUntrustedKeyboard(d.getActiveInputMethod(), d.isActiveInputMethodPreinstalled(), allowedPackages);
+    }
+
+    /// Packages of widely used keyboards from large, accountable vendors, for the allow-list of
+    /// [#isThirdPartyKeyboardActive(String...)]: Gboard, Microsoft SwiftKey and Samsung Keyboard.
+    /// Most devices ship one of these preinstalled anyway; this list accepts them where the user
+    /// installed one from a store instead. It is a judgement about the vendor, not an audit of the
+    /// keyboard, so an app with stricter needs should pass its own list or none at all.
+    ///
+    /// #### Returns
+    ///
+    /// a new array each call, safe to modify or extend
+    public static String[] wellKnownKeyboards() {
+        return new String[] {
+            "com.google.android.inputmethod.latin",
+            "com.touchtype.swiftkey",
+            "com.samsung.android.honeyboard",
+            "com.sec.android.inputmethod"
+        };
+    }
+
+    /// Allows or refuses user-installed keyboards inside this app.
+    ///
+    /// On iOS, refusing makes the app use only Apple's keyboards: a third-party keyboard sees
+    /// everything typed outside a password field (including [com.codename1.ui.TextArea#SENSITIVE]
+    /// fields such as card numbers and one-time codes), and with "Allow Full Access" it can send that
+    /// anywhere. Call it from `init()`, before any field is edited: iOS may remember its answer
+    /// for the rest of the launch, so switching it for one screen is not dependable.
+    ///
+    /// Android cannot refuse the user's keyboard; there, use [#isThirdPartyKeyboardActive(String...)]
+    /// and [SecureKeyboard].
+    ///
+    /// ```java
+    /// // Refuse third-party keyboards for the whole app, typically from init()
+    /// DeviceIntegrity.setThirdPartyKeyboardsAllowed(false);
+    /// ```
+    ///
+    /// #### Parameters
+    ///
+    /// - `allowed`: false to refuse user-installed keyboards
+    ///
+    /// #### Returns
+    ///
+    /// true when this platform enforces the choice (iOS), false where it cannot
+    public static boolean setThirdPartyKeyboardsAllowed(boolean allowed) {
+        return Display.getInstance().setThirdPartyKeyboardsAllowed(allowed);
+    }
+
+    /// Pure decision behind [#isThirdPartyKeyboardActive(String...)], separated for unit tests.
+    static boolean isUntrustedKeyboard(String keyboardId, boolean preinstalled, String[] allowedPackages) {
+        if (keyboardId == null || keyboardId.length() == 0 || preinstalled) {
+            return false;
+        }
+        return containsUntrustedService(new String[] {keyboardId}, allowedPackages);
+    }
+
     /// Marks the currently displayed screen as secure, blocking OS screenshots, screen recording and
     /// accessibility screen scraping while it is showing (Android `FLAG_SECURE`). Call with `true`
     /// when entering a sensitive screen (PIN entry, transfer confirmation) and `false` when leaving it.

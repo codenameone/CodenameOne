@@ -147,7 +147,24 @@ static void installSignalHandlers() {
 }
 
 
+// Set by IOSNative.setThirdPartyKeyboardsAllowed (DeviceIntegrity.setThirdPartyKeyboardsAllowed).
+extern BOOL cn1_allowThirdPartyKeyboards;
+
 @implementation CodenameOne_GLAppDelegate
+
+#if !TARGET_OS_TV && !TARGET_OS_MACCATALYST
+// A third-party keyboard sees everything typed outside a secure (password) field, and with
+// "Allow Full Access" can send it anywhere. Answering NO for the keyboard extension point makes
+// iOS use only its own keyboards in this app. iOS may cache the answer for the launch, so the
+// Java side documents calling it from init(), before any field is edited.
+- (BOOL)application:(UIApplication *)application shouldAllowExtensionPointIdentifier:(UIApplicationExtensionPointIdentifier)extensionPointIdentifier
+{
+    if ([extensionPointIdentifier isEqualToString:UIApplicationKeyboardExtensionPointIdentifier]) {
+        return cn1_allowThirdPartyKeyboards;
+    }
+    return YES;
+}
+#endif
 
 
 @synthesize window=_window;

@@ -180,6 +180,8 @@ include::Dash-Implementors-Guide.asciidoc[]
 
 include::Splat-Implementors-Guide.asciidoc[]
 
+include::Papercut-Implementors-Guide.asciidoc[]
+
 include::Brickyard-Implementors-Guide.asciidoc[]
 
 include::Parley-Users-Guide.asciidoc[]
