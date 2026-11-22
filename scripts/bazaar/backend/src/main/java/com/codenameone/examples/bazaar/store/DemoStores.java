@@ -251,6 +251,7 @@ public class DemoStores {
     private final PhotoRepository photos;
     private final ProductPhotoRepository gallery;
     private final ReviewRepository reviews;
+    private final DemoFunnel funnel;
 
     private static final String[] REVIEWERS = {"Maya", "Daniel", "Priya", "Tom", "Lena",
         "Omar", "Grace", "Kenji", "Sofia", "Ben", "Aisha", "Lucas"};
@@ -274,7 +275,9 @@ public class DemoStores {
             RegisterRepository registers, StoreOrderRepository sales,
             OrderLineRepository saleLines,
             com.codenameone.examples.bazaar.marketing.DemoMarketing marketing,
-            PhotoRepository photos, ProductPhotoRepository gallery, ReviewRepository reviews) {
+            PhotoRepository photos, ProductPhotoRepository gallery, ReviewRepository reviews,
+            DemoFunnel funnel) {
+        this.funnel = funnel;
         this.reviews = reviews;
         this.photos = photos;
         this.gallery = gallery;
@@ -379,8 +382,12 @@ public class DemoStores {
             return;
         }
         java.util.Map<String, String> titles = new java.util.HashMap<String, String>();
+        List<String> browse = new ArrayList<String>();
         for (Product p : products.findByStoreIdOrderByTitleAsc(store.getId())) {
             titles.put(p.getId(), p.getTitle());
+            if (Catalog.ACTIVE.equals(p.getStatus())) {
+                browse.add(p.getId());
+            }
         }
         long day = 24L * 60 * 60 * 1000;
         int number = 1001;
@@ -435,6 +442,10 @@ public class DemoStores {
             o.setClosedAt(at);
             sales.insert(o);
             saleLines.saveAll(lines);
+            if (!pos) {
+                // The views and carts the order came from (DemoFunnel).
+                funnel.behind(o, lines, browse, iter);
+            }
         }
     }
 

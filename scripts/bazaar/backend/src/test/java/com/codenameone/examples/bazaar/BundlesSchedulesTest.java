@@ -34,8 +34,12 @@ import com.codenameone.examples.bazaar.api.ChannelListingDto;
 import com.codenameone.examples.bazaar.api.ChannelScheduleDto;
 import com.codenameone.examples.bazaar.api.ChannelSetupDto;
 import com.codenameone.examples.bazaar.api.EstimateDto;
+import com.codenameone.examples.bazaar.api.FulfilLineDto;
+import com.codenameone.examples.bazaar.api.NewFulfillmentDto;
 import com.codenameone.examples.bazaar.api.OrderDto;
 import com.codenameone.examples.bazaar.api.PlaceOrderDto;
+import com.codenameone.examples.bazaar.api.RefundLineDto;
+import com.codenameone.examples.bazaar.api.RefundRequestDto;
 import com.codenameone.examples.bazaar.api.ShippingOptionDto;
 import com.codenameone.examples.bazaar.cart.Carts;
 import com.codenameone.examples.bazaar.catalog.Catalog;
@@ -45,6 +49,7 @@ import com.codenameone.examples.bazaar.channel.Channels;
 import com.codenameone.examples.bazaar.channel.Connectors;
 import com.codenameone.examples.bazaar.channel.SimulatedConnector;
 import com.codenameone.examples.bazaar.checkout.Checkouts;
+import com.codenameone.examples.bazaar.fulfil.Fulfillments;
 import com.codenameone.examples.bazaar.inventory.Inventory;
 import com.codenameone.examples.bazaar.order.Orders;
 import com.codenameone.examples.bazaar.pricing.DemoPricing;
@@ -89,6 +94,8 @@ class BundlesSchedulesTest {
     private Schedules schedules;
     @Autowired
     private Orders orders;
+    @Autowired
+    private Fulfillments fulfillments;
     @Autowired
     private Channels channels;
     @Autowired
@@ -172,6 +179,43 @@ class BundlesSchedulesTest {
         assertEquals(3, catalog.bundle(s.owner, s.storeId, productOf(set)).available());
         orders.cancelMine(user, o.id());
         assertEquals(10, inventory.available(s.variantId, s.locationId));
+    }
+
+    /// On hand of the shop's mug where it is stocked.
+    private long onHand(Shop s) throws Exception {
+        return Rows.number(db.queryOne("SELECT on_hand FROM inventory_level WHERE variant_id = ? "
+                + "AND location_id = ?", new Object[] {s.variantId, s.locationId}).get("on_hand"));
+    }
+
+    @Test
+    void aRefundedBundleRestocksItsComponents() throws Exception {
+        Shop s = shop("bdl-refund", 10);
+        String set = giftSet(s);
+        String user = People.customer(accounts, "bdl-refund-buyer");
+        OrderDto o = buy(s, user, set, 3);
+        String line = o.lines().get(0).id();
+        assertEquals(10 - 6, inventory.available(s.variantId, s.locationId));
+        // Two sets ship: four mugs leave the building.
+        String fid = fulfillments.create(s.owner, s.storeId, o.id(), new NewFulfillmentDto(
+                s.locationId, "LOCAL", Arrays.asList(new FulfilLineDto(line, null, null, 2))))
+                .id();
+        fulfillments.ship(s.owner, s.storeId, fid);
+        assertEquals(10 - 4, onHand(s));
+        // Refunding one set without restocking releases the unshipped set
+        // first: its two mugs were only promised, and the shelf is unchanged.
+        orders.refund(s.owner, s.storeId, o.id(), new RefundRequestDto(Arrays.asList(
+                new RefundLineDto(line, 1)), 0, false, "damaged"));
+        assertEquals(10 - 4, onHand(s));
+        assertEquals(10 - 4, inventory.available(s.variantId, s.locationId));
+        // Refunding the two shipped sets with restock puts their four mugs
+        // back on hand, as moves of the component.
+        orders.refund(s.owner, s.storeId, o.id(), new RefundRequestDto(Arrays.asList(
+                new RefundLineDto(line, 2)), 0, true, "returned"));
+        assertEquals(10, onHand(s));
+        assertEquals(10, inventory.available(s.variantId, s.locationId));
+        // The bundle itself never holds stock.
+        assertEquals(0, Rows.number(db.queryOne("SELECT COUNT(*) AS n FROM inventory_level "
+                + "WHERE variant_id = ? AND on_hand <> 0", new Object[] {set}).get("n")));
     }
 
     @Test

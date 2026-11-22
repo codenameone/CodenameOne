@@ -24,6 +24,7 @@ import com.codename1.backend.test.BackendTest;
 import com.codename1.backend.test.MockMvc;
 import com.codenameone.examples.bazaar.account.Accounts;
 import com.codenameone.examples.bazaar.cart.Carts;
+import com.codenameone.examples.bazaar.catalog.Schedules;
 import com.codenameone.examples.bazaar.checkout.Checkouts;
 import com.codenameone.examples.bazaar.domain.Product;
 import com.codenameone.examples.bazaar.domain.Review;
@@ -69,6 +70,8 @@ class ShopperGapsTest {
     private ProductRepository products;
     @Autowired
     private ReviewRepository reviewRows;
+    @Autowired
+    private Schedules schedules;
 
     private Shop shop(String name) throws Exception {
         return new Shop(name, 10, accounts, stores, pricing, db, inventory, carts, checkouts, mvc);
@@ -87,6 +90,31 @@ class ShopperGapsTest {
         assertTrue(Rest.list(mvc, People.asCustomer(delete("/api/wishlist/" + s.productId),
                 user)).isEmpty());
         assertEquals(401, Rest.statusOf(mvc, get("/api/wishlist")));
+    }
+
+    @Test
+    void aScheduledProductIsNotWishedNorReviewedBeforeItsWindow() throws Exception {
+        Shop s = shop("wish-sched");
+        String user = People.customer(accounts, "wish-sched-buyer");
+        Rest.json(mvc, People.asCustomer(put("/api/wishlist/" + s.productId), user));
+        assertEquals(1, Rest.list(mvc, People.asCustomer(get("/api/wishlist"), user)).size());
+        String reviews = "/api/shop/products/" + s.productId + "/reviews?page=0&size=10";
+        assertEquals(200, Rest.statusOf(mvc, get(reviews)));
+        long now = System.currentTimeMillis();
+        schedules.set(s.storeId, s.productId, Schedules.ONLINE, now + 3600000L, 0, now);
+        // Before its launch the product shows nowhere: not in a wishlist that
+        // saved it, not as a new wish, not through its reviews.
+        assertTrue(Rest.list(mvc, People.asCustomer(get("/api/wishlist"), user)).isEmpty());
+        assertEquals(404, Rest.statusOf(mvc, People.asCustomer(put("/api/wishlist/"
+                + s.productId), user)));
+        assertEquals(404, Rest.statusOf(mvc, get(reviews)));
+        assertEquals(404, Rest.statusOf(mvc, People.asCustomer(Rest.body(post(
+                "/api/products/" + s.productId + "/reviews"),
+                "{\"rating\":5,\"title\":\"Early\",\"body\":\"\"}"), user)));
+        // Once the window opens the saved wish is back.
+        schedules.set(s.storeId, s.productId, Schedules.ONLINE, now - 3600000L, 0, now);
+        assertEquals(1, Rest.list(mvc, People.asCustomer(get("/api/wishlist"), user)).size());
+        assertEquals(200, Rest.statusOf(mvc, get(reviews)));
     }
 
     @Test

@@ -658,6 +658,12 @@ public class CheckoutPages {
         view.rateError = StoreText.translate(meta.t, view.rateError);
         view.cardError = StoreText.translate(meta.t, view.cardError);
         view.codeError = StoreText.translate(meta.t, view.codeError);
+        // Payment types: "Card" and the generic ones translate; brand names
+        // (Klarna, iDEAL) have no row and stay as they are.
+        for (int iter = 0; iter < view.payTypes.size(); iter++) {
+            CheckoutView.Option o = view.payTypes.get(iter);
+            o.label = StoreText.translate(meta.t, o.label);
+        }
         model.addAttribute("page", meta).addAttribute("checkout", view);
         return dto;
     }

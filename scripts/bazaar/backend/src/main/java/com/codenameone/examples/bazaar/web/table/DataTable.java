@@ -60,6 +60,14 @@ public class DataTable {
     public boolean bulkTag;
     public List<NavItem> actions = new ArrayList<NavItem>();
     public String empty = "Nothing here yet.";
+    /// The frame's own words, in the reader's language
+    /// ([com.codenameone.examples.bazaar.web.admin.AdminText]).
+    public String applyLabel = "Apply";
+    public String columnsLabel = "Columns";
+    public String saveLabel = "Save";
+    public String ofLabel = "of";
+    public String prevLabel = "Previous";
+    public String nextLabel = "Next";
 
     public static class Column {
         public String key = "";

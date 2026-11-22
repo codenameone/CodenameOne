@@ -43,6 +43,7 @@ import org.junit.jupiter.api.Test;
 
 import static com.codename1.backend.test.MockMvcRequestBuilders.get;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -228,6 +229,24 @@ class StoreTextTest {
             }
         }
         assertEquals(StoreText.table("en"), StoreText.table("xx"), "unknown is English");
+    }
+
+    /// The payment types a shopper picks from read in their language; a
+    /// brand name has no row and passes through as it is.
+    @Test
+    void paymentTypeLabelsAreTranslated() {
+        for (String lang : StoreText.LANGUAGES) {
+            Map<String, String> t = StoreText.table(lang);
+            for (com.codenameone.examples.bazaar.api.PaymentTypeDto p
+                    : com.codenameone.examples.bazaar.pay.PaymentTypes.all()) {
+                assertNotNull(StoreText.translate(t, p.label()), p.type());
+            }
+        }
+        assertEquals("Tarjeta", StoreText.translate(StoreText.table("es"),
+                com.codenameone.examples.bazaar.pay.PaymentTypes.label("card")));
+        assertEquals("SEPA-Lastschrift", StoreText.translate(StoreText.table("de"),
+                com.codenameone.examples.bazaar.pay.PaymentTypes.label("sepa_debit")));
+        assertEquals("Klarna", StoreText.translate(StoreText.table("fr"), "Klarna"));
     }
 
     @Test

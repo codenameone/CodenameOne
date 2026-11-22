@@ -40,6 +40,7 @@ import com.codenameone.examples.bazaar.api.SubscribeDto;
 import com.codenameone.examples.bazaar.api.SubscriptionDto;
 import com.codenameone.examples.bazaar.api.TradeQuoteDto;
 import com.codenameone.examples.bazaar.cart.Carts;
+import com.codenameone.examples.bazaar.catalog.Schedules;
 import com.codenameone.examples.bazaar.checkout.Checkouts;
 import com.codenameone.examples.bazaar.inventory.Inventory;
 import com.codenameone.examples.bazaar.order.Orders;
@@ -92,6 +93,8 @@ class CommerceDepthTest {
     private Subscriptions subscriptions;
     @Autowired
     private Trade trade;
+    @Autowired
+    private Schedules schedules;
 
     private Shop shop(String name, int stock) throws Exception {
         return new Shop(name, stock, accounts, stores, pricing, db, inventory, carts, checkouts, mvc);
@@ -252,6 +255,29 @@ class CommerceDepthTest {
                 3));
         assertEquals(850, q2.lines().get(0).unitCents());
         assertEquals(2550, q2.totalCents());
+    }
+
+    @Test
+    void aProductOutsideItsWindowIsNotOnTheTradeSheetNorQuoted() throws Exception {
+        Shop s = shop("cd-sched", 50);
+        PriceListDto list = trade.writePriceList(s.storeId, null, new PriceListDto(null, "Gold",
+                1000));
+        trade.writeEntry(s.storeId, list.id(), new PriceListEntryDto(null, s.variantId, 700, 0, 0,
+                0));
+        CompanyDto c = trade.writeCompany(s.storeId, null, new CompanyDto(null, "Acme", "", 0,
+                list.id()));
+        String buyer = People.customer(accounts, "cd-sched-buyer");
+        trade.addBuyer(s.owner, s.storeId, c.id(), new CompanyBuyerDto(null, buyer, ""));
+        assertEquals(1, trade.myTerms(buyer, s.storeId).prices.size());
+        long now = System.currentTimeMillis();
+        schedules.set(s.storeId, s.productId, Schedules.ONLINE, now + 3600000L, 0, now);
+        assertTrue(trade.myTerms(buyer, s.storeId).prices.isEmpty());
+        try {
+            trade.requestQuote(buyer, s.storeId, CommerceSeed.request(s.variantId, 2));
+            fail("a product before its launch was quoted");
+        } catch (ResponseStatusException e) {
+            assertTrue(e.getMessage().contains("not sold"), e.getMessage());
+        }
     }
 
     @Test

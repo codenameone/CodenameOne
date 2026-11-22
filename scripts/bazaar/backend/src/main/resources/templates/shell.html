@@ -10,14 +10,14 @@
 <a class="brand" th:href="${shell.home}" th:text="${shell.brand}">Bazaar</a>
 <details class="switch" th:unless="${shell.stores.empty}"><summary th:text="${shell.storeName}">Store</summary><ul><li th:each="s : ${shell.stores}"><a th:href="${s.url}" th:text="${s.label}" th:attr="aria-current=${s.current}">Store</a></li></ul></details>
 <span class="grow"></span>
-<button class="icon" type="button" data-shortcuts title="Keyboard shortcuts (?)"><span class="sr">Keyboard shortcuts</span>?</button>
-<a th:if="${shell.merchant and shell.area != 'admin'}" href="/admin">Back office</a>
-<a th:if="${shell.admin and shell.area != 'platform'}" href="/platform">Platform</a>
+<button class="icon" type="button" data-shortcuts title="Keyboard shortcuts (?)"><span class="sr" th:text="${shell.t['bo.shortcuts']}">Keyboard shortcuts</span>?</button>
+<a th:if="${shell.merchant and shell.area != 'admin'}" href="/admin" th:text="${shell.t['bo.backOffice']}">Back office</a>
+<a th:if="${shell.admin and shell.area != 'platform'}" href="/platform" th:text="${shell.t['bo.platform']}">Platform</a>
 <form method="post" action="/lang" class="inline langs" hx-boost="false" th:unless="${shell.langs.empty}"><input type="hidden" name="back" th:value="${shell.langBack}"><span class="sr" th:text="${shell.t['lang.pick']}">Language</span><button th:each="l : ${shell.langs}" class="quiet" type="submit" name="lang" th:value="${l.url}" th:text="${l.label}" th:attr="lang=${l.url},aria-pressed=${l.current}">English</button></form>
 <a th:unless="${shell.area == 'account'}" href="/account" th:text="${shell.t['account']}">Account</a>
 <form method="post" action="/auth/signout" class="inline"><button class="quiet" type="submit" th:text="${shell.t['signOut'] + ' ' + shell.user}">Sign out</button></form></header>
 <nav th:fragment="sidebar" class="side" id="side" aria-label="Sections"><ul class="nav"><li th:each="n : ${shell.nav}"><a th:href="${n.url}" th:classappend="${n.active ? 'on' : ''}" th:attr="aria-current=${n.current}, data-key=${n.key}"><span th:text="${n.label}">Section</span><kbd th:unless="${n.key.empty}" th:text="${'g ' + n.key}">g o</kbd></a></li></ul></nav>
 <div th:fragment="toasts" class="toasts" id="toasts" role="status" aria-live="polite"><p class="toast" th:unless="${shell.toast.empty}" th:text="${shell.toast}">Saved</p><p class="toast bad" role="alert" th:unless="${shell.error.empty}" th:text="${shell.error}">Error</p></div>
 <div th:fragment="slots" class="slots" hidden><th:block th:each="s : ${shell.slots}"><span th:if="${s.script}" class="slot-script" th:attr="data-src=${s.src}"></span></th:block></div>
-<dialog th:fragment="help" id="help" aria-labelledby="help-t"><h2 id="help-t">Keyboard shortcuts</h2><dl class="keys"><dt><kbd>/</kbd></dt><dd>Search or filter</dd><dt><kbd>g</kbd> then a letter</dt><dd>Go to the section marked with it</dd><dt><kbd>j</kbd> <kbd>k</kbd></dt><dd>Next and previous row</dd><dt><kbd>Enter</kbd></dt><dd>Open the row</dd><dt><kbd>?</kbd></dt><dd>This list</dd><dt><kbd>Esc</kbd></dt><dd>Close</dd></dl><form method="dialog"><button type="submit">Close</button></form></dialog>
+<dialog th:fragment="help" id="help" aria-labelledby="help-t"><h2 id="help-t" th:text="${shell.t['bo.shortcuts']}">Keyboard shortcuts</h2><dl class="keys"><dt><kbd>/</kbd></dt><dd>Search or filter</dd><dt><kbd>g</kbd> then a letter</dt><dd>Go to the section marked with it</dd><dt><kbd>j</kbd> <kbd>k</kbd></dt><dd>Next and previous row</dd><dt><kbd>Enter</kbd></dt><dd>Open the row</dd><dt><kbd>?</kbd></dt><dd>This list</dd><dt><kbd>Esc</kbd></dt><dd>Close</dd></dl><form method="dialog"><button type="submit" th:text="${shell.t['bo.close']}">Close</button></form></dialog>
 </body></html>

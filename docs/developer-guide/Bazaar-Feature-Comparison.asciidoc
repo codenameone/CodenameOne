@@ -34,7 +34,7 @@ on a row.
 | Product media (multiple photos) | &#10003; | core | core | core | core | 
 | Product video / 3D models | &#10003; | core | app/plugin | core | no | Uploaded MP4 or WebM video and `.glb` models in the product gallery, reordered with the pictures; the storefront plays video in a `<video>` element served in byte ranges, and shows a model in Google's `<model-viewer>`, served from the store's own site and loaded only on a page with a model (a compressed model shows its poster). The app links the model file.
 | Compare-at price | &#10003; | core | core | core | core | 
-| Cost per item / margin | &#9681; | core | core | core | core | Cost is kept on purchase lines; margin isn't shown per variant.
+| Cost per item / margin | &#10003; | core | core | core | core | Cost per variant; the back office's product list shows each product's margin.
 | SKU / barcode | &#10003; | core | core | core | core | 
 | Weight / dimensions | &#10003; | core | core | core | core | 
 | Vendor / product type / tags | &#10003; | core | core | core | core | 
@@ -226,7 +226,7 @@ on a row.
 | Live chat widget | &#10003; | core | app/plugin | app/plugin | no | A floating chat on every store page: live over a WebSocket, with presence, typing, read receipts and voice or video calls over WebRTC, answered from the web inbox or the merchant app. 
 | Unified inbox (email/social messages) | &#9681; | core | app/plugin | app/plugin | core | One live inbox for storefront chat and calls, with assignment and canned replies; no e-mail or social channels. 
 | Answer chat and calls from the merchant mobile app | &#10003; | core | app/plugin | app/plugin | no | The app's inbox lists conversations with unread counts, updates live and replies; shopper voice and video calls ring in the app and are answered with WebRTC. Shopify Inbox answers chat in its own mobile app but has no voice or video calling. 
-| AI assistant | &#8211; | core | app/plugin | app/plugin | core | 
+| AI assistant | &#10003; | core | app/plugin | app/plugin | core | An assistant in the merchant app that answers from the store's analytics and drafts product descriptions; the provider key stays on the server, and requests are rate limited.
 | Issue/adjust store credit | &#10003; | core | app/plugin | core | no | 
 | Redeem at checkout | &#10003; | core | app/plugin | core | no | Signed-in shoppers choose to spend their credit at web and app checkout; it also pays at the register.
 | Expiring credit | &#10003; | core | app/plugin | no | no | Each grant can carry an expiry date; credit is spent soonest-to-lapse first and a daily job expires the rest, audited.
@@ -310,7 +310,7 @@ on a row.
 | Multi-currency storefront | &#10003; | core | app/plugin | core | no | Market prices in the local currency; checkout and refunds are charged in that currency. Rates are the merchant's own or the European Central Bank's daily feed, per market, and each order keeps the rate it used. 
 | Multi-language storefront content | &#10003; | core | app/plugin | core | no | Pages, policies and posts translate per market, with hreflang alternates in the sitemap. 
 | Per-market pricing / price adjustments | &#10003; | core | app/plugin | core | no | Per-market price lists and adjustments. 
-| Duties & import taxes at checkout | &#8211; | core | app/plugin | app/plugin | no | 
+| Duties & import taxes at checkout | &#9681; | core | app/plugin | app/plugin | no | Checkout estimates duties from HS codes and per-country rates; the carrier collects them on delivery, so they are not charged at checkout.
 | Domains / subfolders per market | &#8211; | core | app/plugin | core | no | 
 | Geolocation redirects / country selector | &#10003; | core | app/plugin | app/plugin | no | A market selector with a cookie, and a banner suggesting the market of the visitor's country from trusted CDN headers or an IP range table. It never redirects, so crawlers and canonical URLs are unaffected. 
 | Tax rates by region | &#10003; | core | core | core | core | 
@@ -388,7 +388,7 @@ on a row.
 | Live view (real-time) | &#9681; | core | app/plugin | no | core | A live channel streams sales to the dashboard.
 | Custom reports / report builder | &#10003; | core | app/plugin | core | core | Pick measures, dimensions and filters; save reports. 
 | Cohort / retention analysis | &#10003; | core | app/plugin | no | no | 
-| Inventory / sell-through reports | &#9681; | core | core | core | core | Inventory value only.
+| Inventory / sell-through reports | &#10003; | core | core | core | core | Stock on hand at cost and at price, low-stock count and sell-through for the period.
 | Finance / tax / payout reports | &#9681; | core | core | core | core | Payout list, tax collected by region and the OSS VAT report as CSV; no profit and loss statement.
 | Session / traffic source analytics | &#10003; | core | core | core | core | Traffic sources from UTM tags and referrers. 
 | Benchmarks vs peers | &#8211; | core | no | no | no | 

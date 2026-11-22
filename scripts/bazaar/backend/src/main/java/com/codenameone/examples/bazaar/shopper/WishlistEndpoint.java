@@ -37,16 +37,21 @@ import java.util.ArrayList;
 import java.util.List;
 
 /// A shopper's wishlist: products saved for later, across stores. A product
-/// archived since it was saved stays listed, marked unavailable.
+/// archived since it was saved stays listed, marked unavailable; one whose
+/// storefront window is closed ([Schedules]) is left out until it opens,
+/// so a scheduled launch is not shown early through a wishlist.
 @Component
 public class WishlistEndpoint implements WishlistApiServer {
     static final int MAX_ITEMS = 500;
     private final WishlistRepository rows;
     private final ProductRepository products;
     private final VariantRepository variants;
+    private final com.codenameone.examples.bazaar.catalog.Schedules schedules;
 
     public WishlistEndpoint(WishlistRepository rows, ProductRepository products,
-            VariantRepository variants) {
+            VariantRepository variants,
+            com.codenameone.examples.bazaar.catalog.Schedules schedules) {
+        this.schedules = schedules;
         this.rows = rows;
         this.products = products;
         this.variants = variants;
@@ -63,7 +68,7 @@ public class WishlistEndpoint implements WishlistApiServer {
     public WishlistItemDto add(String productId) throws Exception {
         String user = Caller.name();
         Product p = productId == null ? null : products.findById(productId);
-        if (p == null || !"ACTIVE".equals(p.getStatus())) {
+        if (!schedules.onlineNow(p)) {
             throw new ResponseStatusException(404, "No such product");
         }
         Wishlist w = rows.findByUsernameAndProductId(user, productId);
@@ -93,12 +98,18 @@ public class WishlistEndpoint implements WishlistApiServer {
         return listOf(user);
     }
 
-    private List<WishlistItemDto> listOf(String user) {
+    private List<WishlistItemDto> listOf(String user) throws java.io.IOException {
         List<Wishlist> saved = rows.findByUsernameOrderByCreatedAtDesc(user);
         List<WishlistItemDto> out = new ArrayList<WishlistItemDto>();
         for (int iter = 0; iter < saved.size(); iter++) {
             Wishlist w = saved.get(iter);
-            out.add(dto(w, products.findById(w.getProductId())));
+            Product p = products.findById(w.getProductId());
+            if (p != null && "ACTIVE".equals(p.getStatus())
+                    && schedules.hiddenNow(p.getId(),
+                        com.codenameone.examples.bazaar.catalog.Schedules.ONLINE)) {
+                continue;
+            }
+            out.add(dto(w, p));
         }
         return out;
     }

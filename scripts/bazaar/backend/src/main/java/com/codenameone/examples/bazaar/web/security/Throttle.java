@@ -61,6 +61,12 @@ public class Throttle {
         {"totp-enrol", "10/600"},
         // A store API key on the key API.
         {"keyapi", "240/60"},
+        // The merchant assistant: each request is a model call, the most
+        // expensive thing a signed-in merchant can ask for.
+        {"ai", "20/60"},
+        // A review left through an e-mailed review link: a stranger with a
+        // link, so held to what a person writes.
+        {"review", "10/600"},
     };
 
     private final Map<String, int[]> rules = new HashMap<String, int[]>();

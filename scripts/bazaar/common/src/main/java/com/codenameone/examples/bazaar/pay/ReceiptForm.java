@@ -18,6 +18,7 @@
  */
 package com.codenameone.examples.bazaar.pay;
 
+import com.codenameone.examples.bazaar.shop.PayLabels;
 import com.codename1.ui.Container;
 import com.codename1.ui.FontImage;
 import com.codename1.ui.Form;
@@ -86,6 +87,7 @@ public final class ReceiptForm {
             paid.add(Ui.fact("Refunded", "-" + Ui.money(receipt.refunded(), currency)));
         }
         paid.add(Ui.fact("Paid with", "cash".equals(receipt.status()) ? Lang.tr("Cash")
+                : PayLabels.translatable(receipt.methodLabel()) ? Lang.tr(receipt.methodLabel())
                 : receipt.methodLabel()));
         page.add(paid);
         return page;

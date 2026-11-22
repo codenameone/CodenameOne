@@ -216,9 +216,28 @@ async function noErrorDialog() {
 // signs up on the web (the bot guard refuses a form sent in under its minimum
 // fill time, so the test waits it out like a person would), picks Spanish in
 // the footer, and buys in a market's currency.
+// Every Content Security Policy refusal in a context: the browser reports
+// each as a securitypolicyviolation event, which the init script prints as a
+// console error the listener collects. Read with cspProblems().
+const csp = [];
+async function watchCsp(context) {
+  await context.addInitScript(() => {
+    document.addEventListener('securitypolicyviolation', e => {
+      console.error('[csp] ' + e.violatedDirective + ' ' + (e.blockedURI || 'inline')
+          + ' ' + (e.sourceFile || '') + ':' + (e.lineNumber || 0));
+    });
+  });
+  context.on('page', p => p.on('console', m => {
+    if (m.type() === 'error' && /^\[csp\]|Content Security Policy/.test(m.text())) {
+      csp.push(p.url() + ' ' + m.text().split('\n')[0]);
+    }
+  }));
+}
+
 async function storefrontExtras() {
   const store = process.env.BAZAAR_WEB_STORE || 'northwind';
   const context = await browser.newContext({ viewport: { width: 1100, height: 900 } });
+  await watchCsp(context);
   const shop = await context.newPage();
   try {
     // Sign up.
@@ -286,6 +305,23 @@ async function storefrontExtras() {
     }
     await shop.emulateMedia({ colorScheme: 'light' });
     say('the back office shows the sales pipeline, read only, in light and dark');
+    // Boosted navigation through the back office: htmx swaps each page in,
+    // and nothing it does may be refused by the strict policy.
+    await shop.goto(origin + '/admin/' + storeId, { waitUntil: 'load' });
+    const sections = (await shop.locator('nav a[href^="/admin/' + storeId + '/"]')
+        .evaluateAll(as => as.map(a => a.getAttribute('href')))).slice(0, 12);
+    if (sections.length === 0) {
+      throw new Error('the back office sidebar has no sections to walk');
+    }
+    for (const href of sections) {
+      await shop.locator('nav a[href="' + href + '"]').first().click();
+      await shop.waitForURL(u => u.pathname === href, { timeout: stepSeconds * 1000 });
+      await shop.waitForLoadState('networkidle');
+    }
+    if (csp.length > 0) {
+      throw new Error('the strict policy refused something: ' + csp.slice(0, 3).join(' | '));
+    }
+    say('boosted back-office navigation through ' + sections.length + ' sections ran with no policy refusal');
     await shop.goto(origin + '/admin/' + storeId + '/markets', { waitUntil: 'load' });
     const csrf = await shop.locator('input[name=_csrf]').first().getAttribute('value');
     const post = async (where, form) => {
@@ -338,10 +374,44 @@ async function storefrontExtras() {
     // signed in on `shop` -- answers from the web inbox, and the reply
     // arrives in the widget over the socket, with no reload.
     const visitor = await browser.newContext({ viewport: { width: 1100, height: 900 } });
+    await watchCsp(visitor);
     try {
       const v = await visitor.newPage();
       await v.goto(origin + '/s/' + store, { waitUntil: 'load' });
       await v.locator('#chat .chat-bubble').click();
+      // A header menu opened while the chat is open draws above the chat.
+      // On a phone the two overlap; the topmost element at the centre of each
+      // menu entry is the entry itself, never the chat panel.
+      await v.setViewportSize({ width: 390, height: 700 });
+      await v.locator('details[data-pick]:has(form[action="/lang"]) > summary').click();
+      const covered = await v.evaluate(() => {
+        const menu = document.querySelector('details[data-pick][open] .pick-menu');
+        const panel = document.querySelector('#chat .chat-panel');
+        if (!menu || !panel) {
+          return 'no open menu or chat panel';
+        }
+        const a = menu.getBoundingClientRect();
+        const c = panel.getBoundingClientRect();
+        if (a.right <= c.left || c.right <= a.left || a.bottom <= c.top || c.bottom <= a.top) {
+          return 'the menu and the chat do not overlap, so this proves nothing';
+        }
+        for (const b of menu.querySelectorAll('button')) {
+          const r = b.getBoundingClientRect();
+          const top = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+          if (top && !menu.contains(top)) {
+            return (top.closest('#chat') ? 'the chat' : top.tagName) + ' covers ' + b.textContent;
+          }
+        }
+        return '';
+      });
+      if (covered) {
+        throw new Error('the header menu is under something: ' + covered);
+      }
+      await v.screenshot({ path: path.join(out, '12-menu-over-chat.png') });
+      await v.evaluate(() => document.querySelectorAll('details[data-pick][open]')
+          .forEach(d => d.removeAttribute('open')));
+      await v.setViewportSize({ width: 1100, height: 900 });
+      say('a header menu opens above the support chat');
       const question = 'Does this come gift wrapped? ' + Date.now();
       await v.fill('#chat .chat-form textarea', question);
       await v.locator('#chat .chat-send').click();
@@ -358,6 +428,9 @@ async function storefrontExtras() {
       await visitor.close();
     }
     say('a shopper chatted from the widget and the owner\'s reply arrived live');
+    if (csp.length > 0) {
+      throw new Error('the strict policy refused something: ' + csp.slice(0, 3).join(' | '));
+    }
   } finally {
     await context.close();
   }

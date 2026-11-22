@@ -382,12 +382,47 @@ final class HomePane extends ShopPane {
         final Container collections = row("collections");
         top.add(collections);
         top.add(Ui.label("New arrivals", "ShopSectionTitle"));
+        final Container categories = new Container(new com.codename1.ui.layouts.FlowLayout());
+        categories.setUIID("ShopChips");
+        categories.setName("categories");
+        categories.setHidden(true);
+        top.add(categories);
+        featured.type = null;
         grid = new ProductGrid(top, featured, 0);
         add(BorderLayout.CENTER, grid.component());
         grid.reload();
         Api.catalog().collections(store.handle(), Net.to(list -> fill(collections, list),
                 (status, message) -> collections.setHidden(true)));
+        final int ticket = built;
+        Api.catalog().facets(store.handle(), null, null, null, null, null, null, null,
+                Net.to(facets -> {
+                    if (ticket == built) {
+                        categories(categories, Categories.choices(facets.types(),
+                                Categories.MAX));
+                    }
+                }, (status, message) -> { }));
         Ui.relayout(this);
+    }
+
+    /// The category row: "All" and each category; a tap narrows the grid
+    /// to it ([Categories] decides what a tap means).
+    private void categories(Container row, List<String> names) {
+        row.removeAll();
+        row.setHidden(names.isEmpty());
+        for (int iter = -1; iter < names.size(); iter++) {
+            final String name = iter < 0 ? null : names.get(iter);
+            Button chip = new Button(name == null ? Lang.tr("All") : name,
+                    Categories.chosen(featured.type, name) ? "ShopChipOn" : "ShopChip");
+            chip.setName("category-" + (name == null ? "all" : name));
+            chip.addActionListener(e -> {
+                ShopUi.tap();
+                featured.type = Categories.tap(featured.type, name);
+                categories(row, names);
+                grid.reload();
+            });
+            row.add(chip);
+        }
+        Ui.relayout(row);
     }
 
     private Container hero(final StoreDto store, Button back) {

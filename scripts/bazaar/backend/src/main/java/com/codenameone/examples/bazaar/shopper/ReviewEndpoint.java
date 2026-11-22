@@ -59,9 +59,12 @@ public class ReviewEndpoint implements ReviewApiServer {
     private final StoreOrderRepository orders;
     private final OrderLineRepository lines;
     private final StoreAccess access;
+    private final com.codenameone.examples.bazaar.catalog.Schedules schedules;
 
     public ReviewEndpoint(ReviewRepository rows, ProductRepository products,
-            StoreOrderRepository orders, OrderLineRepository lines, StoreAccess access) {
+            StoreOrderRepository orders, OrderLineRepository lines, StoreAccess access,
+            com.codenameone.examples.bazaar.catalog.Schedules schedules) {
+        this.schedules = schedules;
         this.rows = rows;
         this.products = products;
         this.orders = orders;
@@ -75,7 +78,9 @@ public class ReviewEndpoint implements ReviewApiServer {
     @Transactional(readOnly = true)
     public ReviewPageDto reviews(String productId, int page, int size) throws Exception {
         Product p = productId == null ? null : products.findById(productId);
-        if (p == null || !"ACTIVE".equals(p.getStatus())) {
+        // Outside its storefront window a product has no public reviews and
+        // takes none, exactly as a draft ([Schedules#onlineNow]).
+        if (!schedules.onlineNow(p)) {
             throw new ResponseStatusException(404, "No such product");
         }
         int pageSize = size <= 0 ? 10 : Math.min(size, MAX_PAGE);
@@ -110,7 +115,9 @@ public class ReviewEndpoint implements ReviewApiServer {
     public ReviewDto submit(String productId, ReviewDto review) throws Exception {
         String user = Caller.name();
         Product p = productId == null ? null : products.findById(productId);
-        if (p == null || !"ACTIVE".equals(p.getStatus())) {
+        // Outside its storefront window a product has no public reviews and
+        // takes none, exactly as a draft ([Schedules#onlineNow]).
+        if (!schedules.onlineNow(p)) {
             throw new ResponseStatusException(404, "No such product");
         }
         if (review == null || review.rating() < 1 || review.rating() > 5) {

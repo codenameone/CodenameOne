@@ -118,6 +118,7 @@ public class Trade {
     private final Orders orders;
     private final LineOrders lineOrders;
     private final VatVerification vat;
+    private final com.codenameone.examples.bazaar.catalog.Schedules schedules;
 
     public Trade(CompanyRepository companies, CompanySiteRepository sites,
             CompanyBuyerRepository buyers, PriceListRepository priceLists,
@@ -125,7 +126,9 @@ public class Trade {
             TradeQuoteLineRepository quoteLines, NetTermRepository netTerms,
             VariantRepository variants, ProductRepository products,
             StoreOrderRepository orderRows, StoreAccess access, Shoppers shoppers, Orders orders,
-            LineOrders lineOrders, VatVerification vat) {
+            LineOrders lineOrders, VatVerification vat,
+            com.codenameone.examples.bazaar.catalog.Schedules schedules) {
+        this.schedules = schedules;
         this.companies = companies;
         this.sites = sites;
         this.buyers = buyers;
@@ -539,7 +542,9 @@ public class Trade {
             return out;
         }
         Product p = products.findById(v.getProductId());
-        if (p == null || !"ACTIVE".equals(p.getStatus())) {
+        // A trade buyer orders from the online catalog: a product outside its
+        // storefront window is not sold to them either.
+        if (!schedules.onlineNow(p)) {
             out.problem = "That item is not sold";
             return out;
         }
@@ -1100,7 +1105,7 @@ public class Trade {
     /// price list has an entry for; everything else sells at
     /// [BuyerTerms#percentOffBps] off.
     @Transactional(readOnly = true)
-    public BuyerTerms myTerms(String username, String storeId) {
+    public BuyerTerms myTerms(String username, String storeId) throws IOException {
         CompanyBuyer b = buyer(username, storeId);
         Company c = companies.findById(b.getCompanyId());
         BuyerTerms out = new BuyerTerms();
@@ -1122,6 +1127,11 @@ public class Trade {
                 continue;
             }
             Product p = products.findById(v.getProductId());
+            // The sheet lists what the buyer can order now: not a draft, an
+            // archived product or one outside its storefront window.
+            if (!schedules.onlineNow(p)) {
+                continue;
+            }
             BuyerPrice bp = new BuyerPrice();
             bp.variantId = v.getId();
             bp.sku = v.getSku();

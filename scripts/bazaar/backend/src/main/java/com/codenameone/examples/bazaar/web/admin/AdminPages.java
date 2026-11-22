@@ -171,7 +171,11 @@ public class AdminPages {
             HttpServer.Request request) throws Exception {
         if ("ARCHIVED".equals(AdminForms.field(request, "status"))) {
             pages.admin(request, storeId, "");
-            return "redirect:/admin/" + storeId + "/archived-orders";
+            // The search and the date filter go along: the archived list
+            // answers both, so choosing "Archived" keeps what was typed.
+            return "redirect:/admin/" + storeId + "/archived-orders"
+                    + OrderOpsPages.archivedQuery(AdminForms.field(request, "q"),
+                        AdminForms.field(request, "since"));
         }
         DataTable t = data.orders(storeId, request, "/admin/" + storeId + "/orders", false).table;
         return render(model, request, storeId, "Orders", view("orders"), t);

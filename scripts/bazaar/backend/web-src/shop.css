@@ -7,7 +7,12 @@ body{margin:0;font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif
 a{color:inherit}
 img,svg{display:block;width:100%;height:auto}
 .wrap{max-width:1120px;margin:0 auto;padding:0 16px}
+/* The header is a stacking context, so its menus rise no higher than it does.
+   While one is open (hover, focus, an open picker) it sits above the support
+   chat (z-index 40); otherwise the chat, which reaches the top of a phone,
+   stays above the header. */
 .bar{border-bottom:1px solid var(--line);background:var(--bg);position:sticky;top:0;z-index:2}
+.bar:hover,.bar:focus-within,.bar:has([open]){z-index:45}
 .bar-in{max-width:1120px;margin:0 auto;padding:10px 16px;display:flex;gap:12px;align-items:center}
 .brand{font-weight:700;font-size:1.15rem;text-decoration:none;color:var(--accent)}
 .search{flex:1}

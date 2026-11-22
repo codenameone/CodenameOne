@@ -187,16 +187,34 @@ public class WebSecurity {
     @Order(4)
     public SecurityFilterChain shopChain(HttpSecurity http,
             @Value("${bazaar.web.hsts:true}") boolean hsts,
-            com.codenameone.examples.bazaar.web.StorefrontRedirects redirects) throws IOException {
+            com.codenameone.examples.bazaar.web.StorefrontRedirects redirects, Throttle throttle)
+            throws IOException {
         http.securityMatcher("/", "/s/**", "/track/**", "/review/**", "/consent", "/consent/**",
                 "/lang")
             .csrf(c -> c.disable())
+            // A review posted through an e-mailed link ([ReviewLinks]): the
+            // link is the only credential, so it is held per address and per
+            // link: the second also bounds one link posted from many places
+            // (and is the one a request without an address still meets).
+            .rateLimit(AntPathRequestMatcher.antMatcher("POST", "/review/*"),
+                    RateLimitKeys.clientAddress(), throttle.limiter("review"))
+            .rateLimit(AntPathRequestMatcher.antMatcher("POST", "/review/*"),
+                    request -> "link:" + linkOf(request.getTarget()), throttle.limiter("review"))
             .addFilterBefore(ErrorPages.filter(), RateLimitFilter.class)
             .addFilterBefore(redirects.filter(), RateLimitFilter.class)
             .addFilterBefore(new WebHeaders(hsts, true), CsrfFilter.class)
             .addFilterBefore(new PageEtags(), CsrfFilter.class)
             .authorizeHttpRequests(auth -> auth.anyRequest().permitAll());
         return http.build();
+    }
+
+    /// The path of a review link, without its query, as a rate-limit key.
+    static String linkOf(String target) {
+        if (target == null) {
+            return "";
+        }
+        int q = target.indexOf('?');
+        return q < 0 ? target : target.substring(0, q);
     }
 
     /// The account a sign-in attempt names, folded, as the lockout's key.

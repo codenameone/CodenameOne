@@ -144,6 +144,10 @@ public class SecurityConfig {
                     com.codename1.backend.security.ApiKeyAuthenticationFilter.class)
             .rateLimit("/api/v1/**", RateLimitKeys.firstOf(RateLimitKeys.apiKeyId(),
                     RateLimitKeys.clientAddress()), throttle.limiter("keyapi"))
+            // The merchant assistant: every request is a model call.
+            .rateLimit(AntPathRequestMatcher.antMatcher("POST", "/api/merchant/stores/*/ai/**"),
+                    RateLimitKeys.firstOf(RateLimitKeys.principal(), RateLimitKeys.clientAddress()),
+                    throttle.limiter("ai"))
             // Codes and passwords checked by the account's two-factor routes:
             // the web enrolment's allowance, per account.
             .rateLimit(AntPathRequestMatcher.antMatcher("POST", "/api/account/two-factor/**"),

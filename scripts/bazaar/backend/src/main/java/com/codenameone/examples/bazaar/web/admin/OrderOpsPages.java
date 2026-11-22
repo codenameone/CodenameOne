@@ -640,7 +640,13 @@ public class OrderOpsPages {
 
     // ---------------------------------------------------------------- orders
 
+    /// The "placed within" choices of the archived list, in days, as the
+    /// orders table offers them.
+    static final String[] SINCE_DAYS = {"7", "30", "90", "365"};
+
     /// Archived orders, newest first, each with a button to bring it back.
+    /// `q` keeps those whose number or e-mail contains it (ignoring case) and
+    /// `since` those placed within that many days, as on the orders table.
     @GetMapping("/admin/{storeId}/archived-orders")
     public String archived(@PathVariable("storeId") String storeId, Model model,
             HttpServer.Request request) throws Exception {
@@ -651,9 +657,32 @@ public class OrderOpsPages {
         back.url = "/admin/" + storeId + "/orders";
         v.links.add(back);
         v.cardsTitle = "Archived orders";
+        String q = f(request, "q").trim();
+        String since = knownSince(f(request, "since"));
+        v.searchAction = "/admin/" + storeId + "/archived-orders";
+        v.q = q;
+        AdminRow any = new AdminRow();
+        any.id = "";
+        any.title = "Any time";
+        any.flag = since.length() == 0;
+        v.sinceOptions.add(any);
+        for (int iter = 0; iter < SINCE_DAYS.length; iter++) {
+            AdminRow o = new AdminRow();
+            o.id = SINCE_DAYS[iter];
+            o.title = "Last " + SINCE_DAYS[iter] + " days";
+            o.flag = SINCE_DAYS[iter].equals(since);
+            v.sinceOptions.add(o);
+        }
+        long from = since.length() == 0 ? Long.MIN_VALUE
+                : System.currentTimeMillis() - Long.parseLong(since) * Days.MILLIS;
         List<OrderDto> list = orders.archived(Caller.name(), storeId);
+        int shown = 0;
         for (int iter = 0; iter < list.size(); iter++) {
             OrderDto o = list.get(iter);
+            if (o.createdAt() < from || !matches(o, q)) {
+                continue;
+            }
+            shown++;
             ActionCard k = new ActionCard();
             k.title = "#" + o.number();
             k.url = "/admin/" + storeId + "/orders/" + o.id();
@@ -665,8 +694,57 @@ public class OrderOpsPages {
         }
         if (list.isEmpty()) {
             v.intro = "No archived orders.";
+        } else if (shown == 0) {
+            v.intro = "No archived orders match.";
         }
         return render(model, request, storeId, "Archived orders", v);
+    }
+
+    /// `since` when it is one of [#SINCE_DAYS], else empty.
+    static String knownSince(String since) {
+        for (int iter = 0; iter < SINCE_DAYS.length; iter++) {
+            if (SINCE_DAYS[iter].equals(since)) {
+                return since;
+            }
+        }
+        return "";
+    }
+
+    /// The query string that carries a search and a date filter to the
+    /// archived list; empty when there is neither.
+    static String archivedQuery(String q, String since) {
+        StringBuilder b = new StringBuilder();
+        String words = q == null ? "" : q.trim();
+        if (words.length() > 0) {
+            b.append("?q=").append(java.net.URLEncoder.encode(words,
+                    java.nio.charset.StandardCharsets.UTF_8));
+        }
+        String days = knownSince(since);
+        if (days.length() > 0) {
+            b.append(b.length() == 0 ? '?' : '&').append("since=").append(days);
+        }
+        return b.toString();
+    }
+
+    /// Whether the order's number, with or without its `#`, or its e-mail
+    /// contains `q`, ignoring case (character by character, so the device
+    /// locale cannot fold it).
+    static boolean matches(OrderDto o, String q) {
+        if (q.length() == 0) {
+            return true;
+        }
+        String words = q.charAt(0) == '#' ? q.substring(1) : q;
+        return contains(Long.toString(o.number()), words)
+                || o.email() != null && contains(o.email(), words);
+    }
+
+    private static boolean contains(String text, String part) {
+        for (int at = 0; at + part.length() <= text.length(); at++) {
+            if (text.regionMatches(true, at, part, 0, part.length())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @PostMapping("/admin/{storeId}/orders/{orderId}/archive")

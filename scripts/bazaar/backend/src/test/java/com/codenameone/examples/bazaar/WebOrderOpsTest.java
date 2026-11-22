@@ -168,6 +168,28 @@ class WebOrderOpsTest {
         assertFalse(templates.overrides(s.storeId, "en").containsKey("mail.paylink.title"));
     }
 
+    /// The back office reads in the language the storefront picks: the
+    /// `lang` cookie (else `Accept-Language`) sets the page's language and
+    /// direction, its sections and its tables' frame.
+    @Test
+    void theBackOfficeSpeaksTheReadersLanguage() throws Exception {
+        Shop s = shop("wo-lang");
+        Browser b = signedIn(s.owner);
+        String a = "/admin/" + s.storeId;
+        b.lang = "de";
+        String de = b.get(a + "/archived-orders?since=30").getContentAsString();
+        assertTrue(de.contains("lang=\"de\""), "German page");
+        assertTrue(de.contains("Bestellungen") && de.contains("Produkte"), "German sections");
+        assertTrue(de.contains("Letzte 30 Tage"), "German filter");
+        b.lang = "he";
+        String he = b.get(a + "/orders").getContentAsString();
+        assertTrue(he.contains("dir=\"rtl\""), "Hebrew reads right to left");
+        assertTrue(he.contains("\u05de\u05d5\u05e6\u05e8\u05d9\u05dd"), "Hebrew sections");
+        b.lang = null;
+        String en = b.get(a + "/orders").getContentAsString();
+        assertTrue(en.contains(">Products<"), "English without a choice");
+    }
+
     @Test
     void bulkActionsReportEachOrderAndArchivedOrdersComeBack() throws Exception {
         Shop s = shop("woo-bulk");
@@ -188,6 +210,18 @@ class WebOrderOpsTest {
                 .getStatus());
         b.assertPage(b.get(a + "/archived-orders"), "#" + one.number());
         redirected(b.get(a + "/orders?status=ARCHIVED"));
+        // The archived list answers the orders table's search and date
+        // filter, and choosing "Archived" there carries both along.
+        MockResponse moved = b.get(a + "/orders?status=ARCHIVED&q=%23" + one.number()
+                + "&since=30");
+        assertEquals(303, moved.getStatus());
+        assertTrue(moved.getHeader("Location").endsWith("/archived-orders?q=%23"
+                + one.number() + "&since=30"), moved.getHeader("Location"));
+        b.assertPage(b.get(a + "/archived-orders?q=%23" + one.number() + "&since=7"),
+                "#" + one.number());
+        String none = b.get(a + "/archived-orders?q=no-such-order-xyz").getContentAsString();
+        assertTrue(none.contains("No archived orders match."), none);
+        assertFalse(none.contains(">#" + one.number() + "<"), none);
         redirected(b.post(a + "/orders/" + one.id() + "/unarchive"));
         assertTrue(orders.archived(s.owner, s.storeId).isEmpty());
         redirected(b.post(a + "/orders/bulk", "action", "PACKING_SLIPS", "ids", one.id()));

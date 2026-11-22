@@ -179,10 +179,11 @@ public class WebPages {
             s.home = table[0][1];
         }
         s.toast = takeToast(request);
-        if ("account".equals(area)) {
-            // The shopper's language (StoreText#forRequest); every account
-            // page is no-store, so nothing about caching depends on it. The
-            // back office and the platform admin stay English.
+        if ("account".equals(area) || "admin".equals(area)) {
+            // The reader's language, picked as the storefront picks it
+            // (StoreText#forRequest); account and back-office pages are
+            // no-store, so nothing about caching depends on it. The platform
+            // admin, run by the operator, stays English.
             language(s, request);
             s.title = StoreText.translate(s.t, title) + " - Bazaar";
             s.heading = StoreText.translate(s.t, title);
@@ -228,7 +229,8 @@ public class WebPages {
         }
         String base = "/admin/" + storeId;
         for (int iter = 0; iter < ADMIN.length; iter++) {
-            NavItem n = new NavItem(ADMIN[iter][0], base + ADMIN[iter][1], ADMIN[iter][2]);
+            NavItem n = new NavItem(StoreText.translate(s.t, ADMIN[iter][0]),
+                    base + ADMIN[iter][1], ADMIN[iter][2]);
             if (iter == 0) {
                 n.active = path.equals(base);
                 n.current = n.active ? "page" : "false";
@@ -271,6 +273,9 @@ public class WebPages {
     /// its `main` fragment for an htmx request that targets it.
     public static String view(Model model, Shell shell, String template) {
         model.addAttribute("shell", shell);
+        if ("admin".equals(shell.area)) {
+            com.codenameone.examples.bazaar.web.admin.AdminText.localize(model, shell.t);
+        }
         return template;
     }
 }

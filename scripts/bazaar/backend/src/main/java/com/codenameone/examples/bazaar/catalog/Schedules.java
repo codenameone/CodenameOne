@@ -156,6 +156,26 @@ public class Schedules {
         touchListings(productId, channel);
     }
 
+    /// Whether one product is hidden on `channel` right now: its window there
+    /// has not opened or has closed. A product with no window follows its
+    /// status alone, as everywhere else.
+    @Transactional(readOnly = true)
+    public boolean hiddenNow(String productId, String channel) throws IOException {
+        Map row = db.queryOne("SELECT visible FROM channel_schedule WHERE product_id = ? AND "
+                + "channel = ?", new Object[] {productId, channel});
+        return row != null && Rows.number(row.get("visible")) == 0;
+    }
+
+    /// Whether shoppers may see `p` online: ACTIVE and inside any storefront
+    /// window. Reads that name a product by id -- wishlists, reviews, the
+    /// trade price sheet -- answer through this, so a product before its
+    /// launch or after its window shows nowhere a listing would not.
+    @Transactional(readOnly = true)
+    public boolean onlineNow(com.codenameone.examples.bazaar.domain.Product p)
+            throws IOException {
+        return p != null && "ACTIVE".equals(p.getStatus()) && !hiddenNow(p.getId(), ONLINE);
+    }
+
     /// The products of a store hidden on `channel` right now.
     @Transactional(readOnly = true)
     public Set<String> hidden(String storeId, String channel) throws IOException {

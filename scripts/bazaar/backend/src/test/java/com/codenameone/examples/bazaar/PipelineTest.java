@@ -43,11 +43,13 @@ import com.codenameone.examples.bazaar.ops.SalesPipeline;
 import com.codenameone.examples.bazaar.pipeline.Pipeline;
 import com.codenameone.examples.bazaar.pricing.DemoPricing;
 import com.codenameone.examples.bazaar.repository.CartRepository;
+import com.codenameone.examples.bazaar.store.DemoStores;
 import com.codenameone.examples.bazaar.store.Stores;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 
 import static com.codename1.backend.test.MockMvcRequestBuilders.get;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -127,6 +129,45 @@ class PipelineTest {
             pipeline.move(s.owner, s.storeId, new PipelineMoveDto(id, to));
         } catch (java.io.IOException e) {
             throw new IllegalStateException(e);
+        }
+    }
+
+    /// The demo stores' seeded online orders come with the browsing behind
+    /// them, so their funnel narrows step by step: every step at most the
+    /// one before, and views well above orders. Every seeded cart is empty,
+    /// so none reaches the pipeline board or the abandoned-cart mail (both
+    /// read only carts with lines).
+    @Test
+    void theDemoStoresFunnelNarrowsAtEveryStep() throws Exception {
+        String[] handles = {DemoStores.NORTHWIND, DemoStores.LITTLE_CLAY};
+        // Carts seeded with the demo are older than this; a cart another test
+        // made today may hold lines.
+        long seeded = System.currentTimeMillis() - 10 * 60000L;
+        for (int h = 0; h < handles.length; h++) {
+            String storeId = (String) Rest.json(mvc, get("/api/shop/stores/" + handles[h]))
+                    .get("id");
+            Map carts = db.queryOne("SELECT COUNT(*) AS n FROM cart WHERE store_id = ? AND "
+                    + "created_at < ?", new Object[] {storeId, Long.valueOf(seeded)});
+            assertTrue(com.codenameone.examples.bazaar.Rows.number(carts.get("n")) > 0,
+                    handles[h] + " has seeded carts");
+            Map lined = db.queryOne("SELECT COUNT(*) AS n FROM cart c, cart_line l WHERE "
+                    + "l.cart_id = c.id AND c.store_id = ? AND c.created_at < ?",
+                    new Object[] {storeId, Long.valueOf(seeded)});
+            assertEquals(0, com.codenameone.examples.bazaar.Rows.number(lined.get("n")),
+                    handles[h] + ": a seeded cart holds lines");
+            List<FunnelStepDto> f = analytics.insights(
+                    com.codenameone.examples.bazaar.account.DemoAccounts.MERCHANT, storeId, 0, 0)
+                    .funnel();
+            assertEquals("views", f.get(0).step());
+            assertEquals("orders", f.get(f.size() - 1).step());
+            assertTrue(f.get(f.size() - 1).count() > 0, handles[h] + " has online orders");
+            for (int iter = 1; iter < f.size(); iter++) {
+                assertTrue(f.get(iter).count() <= f.get(iter - 1).count(), handles[h] + ": "
+                        + f.get(iter).step() + " " + f.get(iter).count() + " after "
+                        + f.get(iter - 1).step() + " " + f.get(iter - 1).count());
+            }
+            assertTrue(f.get(0).count() >= 5 * f.get(f.size() - 1).count(), handles[h]
+                    + " views " + f.get(0).count());
         }
     }
 

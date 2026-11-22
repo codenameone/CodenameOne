@@ -2,7 +2,7 @@
 <!-- cn1:model view com.codenameone.examples.bazaar.web.admin.AdminView -->
 <!-- cn1:model table com.codenameone.examples.bazaar.web.table.DataTable -->
 <!doctype html>
-<html lang="en" xmlns:th="http://www.thymeleaf.org"><head th:replace="~{shell :: head}"></head>
+<html th:attr="lang=${shell.lang},dir=${shell.dir}" xmlns:th="http://www.thymeleaf.org"><head th:replace="~{shell :: head}"></head>
 <body hx-boost="true"><header th:replace="~{shell :: topbar}"></header><div class="frame"><nav th:replace="~{shell :: sidebar}"></nav>
 <main id="main" tabindex="-1">
 

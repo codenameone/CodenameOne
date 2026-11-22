@@ -38,6 +38,11 @@ public class MarketingView {
     /// The list page this one belongs to.
     public String back = "";
     public String backLabel = "";
+    /// A search form above the cards (`archived`): where it submits, the
+    /// words searched and the "placed within" choices, `flag` on the chosen.
+    public String searchAction = "";
+    public String q = "";
+    public List<AdminRow> sinceOptions = new ArrayList<AdminRow>();
     /// The live inbox (`app.js` with `inbox-live`): the store whose chat
     /// socket the page joins, the conversation it shows (empty on the
     /// list), the address of its socket ticket, and the thread itself.
