@@ -448,14 +448,8 @@ public class GeneratorModelMatrixTest extends AbstractTest {
                     label + "README carries no other template's accounts");
             assertFalse(chat && readme.indexOf("rider@") >= 0, label + "README carries no ride-hailing accounts");
         }
-        if (template.hasRules()) {
-            assertContains(rootPom, "<module>rules</module><module>shared</module>",
-                    label + "the rules module is built ahead of the contract");
-            assertContains(getText(entries, "common/pom.xml"), "<artifactId>" + artifact + "-rules</artifactId>",
-                    label + "the app depends on the rules");
-            assertContains(getText(entries, "backend/pom.xml"), "<artifactId>" + artifact + "-rules</artifactId>",
-                    label + "the server depends on the rules");
-        }
+        assertFalse(rootPom.indexOf("<module>rules</module>") >= 0,
+                label + "code both halves run is in shared, not a module of its own");
         String sharedPom = getText(entries, "shared/pom.xml");
         assertContains(sharedPom, "<artifactId>" + artifact + "-shared</artifactId>", label + "shared module id");
         assertContains(getText(entries, "common/pom.xml"), "<artifactId>" + artifact + "-shared</artifactId>",

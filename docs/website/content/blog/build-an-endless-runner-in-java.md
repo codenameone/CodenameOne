@@ -49,13 +49,13 @@ LevelDef level = route.level();
 
 ## Leaderboards you can trust
 
-A run is never reported as a number. The app sends the seed and the input log, a few hundred bytes, and the server plays it through the same Java rules module the app runs. A typed-in score, or a log edited to dodge an obstacle the player hit, does not reproduce. The rules use no floating point and no clock, so the phone, the server and the replay viewer agree to the bit.
+A run is never reported as a number. The app sends the seed and the input log, a few hundred bytes, and the server plays it through the same Java simulation code the app runs. A typed-in score, or a log edited to dodge an obstacle the player hit, does not reproduce. The rules use no floating point and no clock, so the phone, the server and the replay viewer agree to the bit.
 
 {{< mermaid >}}
 sequenceDiagram
     participant P as Phone
     participant S as Server
-    P->>P: Run on seed + rules module
+    P->>P: Run on seed + shared rules
     P->>S: Seed + input log (a few hundred bytes)
     S->>S: Replay the log on the same rules
     alt Replay matches

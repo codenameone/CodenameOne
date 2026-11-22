@@ -27,6 +27,7 @@ import com.codenameone.examples.fieldline.api.DecisionDto;
 import com.codenameone.examples.fieldline.api.DispatchApiServer;
 import com.codenameone.examples.fieldline.api.JobDto;
 import com.codenameone.examples.fieldline.api.MoveDto;
+import com.codenameone.examples.fieldline.api.IntakeDto;
 import com.codenameone.examples.fieldline.api.NewJobDto;
 import com.codenameone.examples.fieldline.api.ScheduleRunDto;
 import com.codenameone.examples.fieldline.api.SiteDto;
@@ -72,6 +73,14 @@ public class DispatchEndpoint implements DispatchApiServer {
         JobDto made = jobs.create(job);
         planner.repair(Planner.NEW_JOB, "New job: " + made.title(), Caller.name());
         return jobs.job(Jobs.DISPATCHER, made.id());
+    }
+
+    @Override
+    public JobDto intake(String id, IntakeDto intake) throws Exception {
+        if (intake == null || intake.status() == null) {
+            throw new ResponseStatusException(400, "Which state?");
+        }
+        return jobs.intake(id, intake.status());
     }
 
     @Override

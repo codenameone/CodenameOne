@@ -33,6 +33,13 @@ import com.codename1.ui.Form;
 import com.codename1.ui.Label;
 import com.codename1.ui.TextArea;
 import com.codename1.ui.TextField;
+import com.codename1.ui.table.GridColumn;
+import com.codename1.ui.table.GridCell;
+import com.codename1.ui.table.DefaultTableModel;
+import com.codename1.ui.table.DefaultGridCellRenderer;
+import com.codename1.ui.table.DataGrid;
+import com.codename1.ui.plaf.UIManager;
+import com.codename1.ui.Graphics;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.layouts.FlowLayout;
@@ -1029,20 +1036,82 @@ public final class ConsoleForm {
                 }, failed(body, () -> chain(body)))), failed(body, () -> chain(body))));
     }
 
-    private Printout.Section events(Container body, List<AuditEventDto> events, long broken) {
-        Table table = new Table(new String[] {"#", "Time", "Actor", "Action", "Subject",
-            "Previous hash", "Hash"}, new int[] {1, 3, 4, 4, 4, 3, 3},
+    /// The audit events, in a `DataGrid`: a chain runs to thousands of rows,
+    /// which the grid paints a screen at a time where `Table` would build a
+    /// component per cell. A tap on a header sorts, the field above filters
+    /// by actor, action or subject, the sequence column stays put while the
+    /// hashes scroll, and the link that broke the chain is painted in the
+    /// bad-row colour. Right to left the grid mirrors, and it describes its
+    /// rows to a screen reader. The printout keeps every row, as before.
+    private Printout.Section events(Container body, List<AuditEventDto> events, final long broken) {
+        final String[] headers = {"#", "Time", "Actor", "Action", "Subject", "Previous hash", "Hash"};
+        String[] translated = new String[headers.length];
+        for (int iter = 0; iter < headers.length; iter++) {
+            translated[iter] = Lang.tr(headers[iter]);
+        }
+        Printout.Section printable = new Printout.Section(null, translated,
+                new int[] {1, 3, 4, 4, 4, 3, 3},
                 new boolean[] {true, false, false, false, false, false, false});
-        for (AuditEventDto e : events) {
-            table.add(new String[] {String.valueOf(e.seq()), when(e.at()), e.actor(), e.action(),
-                e.subject(), shortHash(e.prevHash()), shortHash(e.hash())},
-                    e.seq() == broken ? "BnTableRowBad" : "BnTableRow", null, null);
+        Object[][] data = new Object[events.size()][];
+        for (int iter = 0; iter < data.length; iter++) {
+            AuditEventDto e = events.get(iter);
+            data[iter] = new Object[] {Long.valueOf(e.seq()), when(e.at()), e.actor(), e.action(),
+                e.subject(), shortHash(e.prevHash()), shortHash(e.hash())};
+            printable.row(String.valueOf(e.seq()), when(e.at()), e.actor(), e.action(), e.subject(),
+                    shortHash(e.prevHash()), shortHash(e.hash()));
         }
         if (events.isEmpty()) {
-            table.note(Lang.tr("No events."));
+            printable.note(Lang.tr("No events."));
         }
-        body.add(table.component());
-        return table.printable();
+        final DataGrid grid = new DataGrid(new DefaultTableModel(translated, data, false));
+        grid.getColumn(0).setKind(GridColumn.Kind.NUMBER).setWidthMM(12);
+        grid.getColumn(1).setWidthMM(30);
+        for (int iter = 2; iter < 5; iter++) {
+            grid.getColumn(iter).setFlex(1).setMinWidthMM(26);
+        }
+        grid.getColumn(5).setWidthMM(24);
+        grid.getColumn(6).setWidthMM(24);
+        grid.setFrozenColumns(1);
+        grid.setEmptyText(Lang.tr("No events."));
+        final int bad = UIManager.getInstance().getComponentStyle("BnTableRowBad").getBgColor();
+        grid.setDefaultRenderer(new DefaultGridCellRenderer() {
+            @Override
+            public void paint(Graphics g, GridCell cell, int x, int y, int width, int height) {
+                Object seq = cell.getGrid().getValueAt(cell.getRow(), cell.getGrid().getColumn(0));
+                if (broken >= 0 && seq instanceof Long && ((Long) seq).longValue() == broken) {
+                    g.setColor(bad);
+                    g.fillRect(x, y, width, height);
+                }
+                super.paint(g, cell, x, y, width, height);
+            }
+        });
+        // Tall enough for a screen of rows; the grid scrolls the rest itself.
+        grid.setPreferredH(CN.convertToPixels(wide ? 110f : 90f));
+        final TextField filter = Ui.field("Filter by actor, action or subject", TextField.ANY);
+        filter.addDataChangedListener((type, index) -> {
+            final String needle = filter.getText().trim().toLowerCase();
+            grid.setFilter(needle.length() == 0 ? null : row -> {
+                for (int col = 2; col < 5; col++) {
+                    Object v = row.getValue(col);
+                    if (v != null && v.toString().toLowerCase().indexOf(needle) >= 0) {
+                        return true;
+                    }
+                }
+                return false;
+            });
+        });
+        body.add(filter);
+        body.add(grid);
+        if (broken >= 0) {
+            for (int row = 0; row < grid.getRowCount(); row++) {
+                Object seq = grid.getValueAt(row, grid.getColumn(0));
+                if (seq instanceof Long && ((Long) seq).longValue() == broken) {
+                    grid.scrollToCell(row, 0);
+                    break;
+                }
+            }
+        }
+        return printable;
     }
 
     private void trail(final Container body, final String subject) {

@@ -33,6 +33,13 @@
     transfer objects are records: both the app's generated mappers and the
     server's JSON codec build a record through its canonical constructor and
     read it through its accessors.
+
+    The game itself lives here too, in com.codenameone.examples.splat.rules: one deterministic
+    simulation that the app runs, the server re-runs as the authority and the
+    replay viewer plays back. It must give the same answer to the bit on every
+    runtime, so it uses no float or double, no clock, no java.util.Random and no
+    String.split, and nothing of the core but plain Java. Its tests are ordinary
+    JUnit 5 and run with `mvn -pl shared test`, with no server.
   -->
   <properties>
     <maven.compiler.source>17</maven.compiler.source>
@@ -45,5 +52,21 @@
       <artifactId>codenameone-core</artifactId>
       <scope>provided</scope>
     </dependency>
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <version>5.9.3</version>
+      <scope>test</scope>
+    </dependency>
   </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <version>3.0.0-M5</version>
+      </plugin>
+    </plugins>
+  </build>
 </project>

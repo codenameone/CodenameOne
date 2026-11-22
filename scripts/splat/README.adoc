@@ -9,8 +9,7 @@ accounts, quick matches with bots filling the empty slots, parties with voice ch
 replays, crews, a shop with in-app purchases and rewarded ads, push notifications,
 and a console for running the game.
 
-The rules are one module, `rules`, that the app, the server and the tests all
-compile. It uses no floating point and no clock, so a match plays out identically
+The rules live in the `shared` module, which the app, the server and the tests all compile. It uses no floating point and no clock, so a match plays out identically
 on a phone, on the server and in a replay. The server runs every online match as
 the authority and sends snapshots; the app predicts its own player with the same
 rules and reconciles when a snapshot arrives, so the marker fires with no wait.
@@ -34,9 +33,9 @@ One chapter of the developer guide covers this project:
 |===
 | Module | What it holds
 
-| `rules` | The deterministic simulation: fields, markers, paintballs, the three
-  modes, lag compensation, the bots and replays.
-| `shared` | The data transfer objects and `@RestClient` interfaces.
+| `shared` | The deterministic simulation (package `rules`): fields, markers, paintballs, the three
+  modes, lag compensation, the bots and replays; and
+  the data transfer objects and `@RestClient` interfaces.
 | `common` | The app: the 3D field and HUD, prediction, the menus, the party lobby
   and voice, the replay viewer, the store, the admin console.
 | `backend` | The server: accounts, matchmaking, the authoritative match rooms,
@@ -78,8 +77,8 @@ mvn package -DskipTests -Dcodename1.platform=ios -Dcodename1.buildTarget=ios-sou
 
 [source,bash]
 ----
-mvn -pl rules test   # <1>
-mvn -pl rules,shared,backend -Dcodename1.platform=backend test   # <2>
+mvn -pl shared test   # <1>
+mvn -pl shared,backend -Dcodename1.platform=backend test   # <2>
 ./run-e2e.sh   # <3>
 ./check-template.sh   # <4>
 ----

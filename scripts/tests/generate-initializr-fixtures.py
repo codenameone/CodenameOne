@@ -150,18 +150,15 @@ def check_full_stack_fixture(archive, z, template):
     full = archive.name.split('-')[1] == 'FULL'
     root_pom = ''.join(z.read('pom.xml').decode().split())
     assert '<module>shared</module><module>common</module>' in root_pom, archive.name
-    # SKIRMISH, DASH and SPLAT also have the game's rules as a module of its own, ahead of the contract;
-    # PAPERCUT is a game without one: its arena runs in the app, and the server bounds scores.
-    # FIELDLINE keeps its scheduling engine in shared.
+    # The games keep their rules in shared, beside the contract, as FIELDLINE keeps its engine;
+    # PAPERCUT has none: its arena runs in the app, and the server bounds scores.
     game = template in ('SKIRMISH', 'DASH', 'SPLAT', 'PAPERCUT')
-    rules = template in ('SKIRMISH', 'DASH', 'SPLAT')
-    assert (not rules) or '<module>rules</module><module>shared</module>' in root_pom, archive.name
-    for module in ('shared', 'common', 'backend') + (('rules',) if rules else ()):
+    assert '<module>rules</module>' not in root_pom, archive.name
+    for module in ('shared', 'common', 'backend'):
         assert module + '/pom.xml' in names, (archive.name, module)
     for module in ('common', 'backend'):
-        for dependency in ('shared',) + (('rules',) if rules else ()):
-            assert '<artifactId>launcherprobe-' + dependency + '</artifactId>' in z.read(module + '/pom.xml').decode(), \
-                (archive.name, module, dependency)
+        assert '<artifactId>launcherprobe-shared</artifactId>' in z.read(module + '/pom.xml').decode(), \
+            (archive.name, module)
     assert ('javase/pom.xml' in names) == full, archive.name
     for name in ['shared/src/main/java/com/example/probe/' + contract,
                  'backend/src/main/java/com/example/probe/SecurityConfig.java',

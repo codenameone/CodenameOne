@@ -371,6 +371,31 @@ public final class SecureKeyboard extends Component {
         return true;
     }
 
+    /// Retries a show that came before layout. One retry was not enough: when the form's layout
+    /// lands a serial call later than the show (a transition, a slower host), the single retry
+    /// still saw a height of zero and the show was lost for good. It keeps trying while the field
+    /// is still on that form, and gives up after a bounded number of serial calls so a form that
+    /// is never laid out does not spin the EDT.
+    private void deferShow(final Form f, final int attempt) {
+        CN.callSerially(new Runnable() {
+            @Override
+            public void run() {
+                if (field.getComponentForm() != f) {
+                    showDeferred = false;
+                    return;
+                }
+                if (f.getContentPane().getHeight() > 0) {
+                    showDeferred = false;
+                    show();
+                } else if (attempt < 50) {
+                    deferShow(f, attempt + 1);
+                } else {
+                    showDeferred = false;
+                }
+            }
+        });
+    }
+
     /// Shows the keyboard at the bottom of the field's form. Called by a tap on the field; call it
     /// yourself to open the keyboard when a screen appears.
     public void show() {
@@ -386,15 +411,7 @@ public final class SecureKeyboard extends Component {
             // the keyboard would dock at the top. Try again once the form has a size.
             if (!showDeferred) {
                 showDeferred = true;
-                CN.callSerially(new Runnable() {
-                    @Override
-                    public void run() {
-                        showDeferred = false;
-                        if (f.getContentPane().getHeight() > 0) {
-                            show();
-                        }
-                    }
-                });
+                deferShow(f, 0);
             }
             return;
         }
