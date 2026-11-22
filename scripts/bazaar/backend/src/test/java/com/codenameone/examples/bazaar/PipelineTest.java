@@ -177,6 +177,13 @@ class PipelineTest {
         refused(409, () -> move(s, o.id(), SalesPipeline.SHIPPED));
         refused(409, () -> move(s, o.id(), SalesPipeline.CHECKOUT));
         refused(404, () -> move(s, "no-such-card", SalesPipeline.REMINDED));
+        // Another store's cart, named in the body of this store's move: the
+        // route is this store's, so the card is not found.
+        Shop other = shop("pipe-other");
+        String otherToken = carts.add(other.storeId, null, null,
+                new CartLineChangeDto(other.variantId, 1)).token();
+        String otherCart = carts.cart(other.storeId, null, otherToken).getId();
+        refused(404, () -> move(s, otherCart, SalesPipeline.REMINDED));
 
         // The recovery mail goes once; the card is then in Reminded and stays.
         move(s, signedIn.getId(), SalesPipeline.REMINDED);
