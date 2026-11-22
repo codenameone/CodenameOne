@@ -567,7 +567,9 @@ public class GlobalData {
         StringBuilder out = new StringBuilder("country,region,orders,exempt_orders,sales,tax\r\n");
         for (int iter = 0; iter < rows.size(); iter++) {
             TaxReportRowDto r = rows.get(iter);
-            out.append(r.country()).append(',').append(r.region()).append(',')
+            // Region is what the shopper typed: quoted and formula-guarded.
+            out.append(com.codenameone.examples.bazaar.web.table.Grid.csvCell(r.country())).append(',')
+                    .append(com.codenameone.examples.bazaar.web.table.Grid.csvCell(r.region())).append(',')
                     .append(r.orders()).append(',').append(r.exemptOrders()).append(',')
                     .append(Money.plain(r.salesCents())).append(',')
                     .append(Money.plain(r.taxCents())).append("\r\n");

@@ -404,8 +404,8 @@ public class Reports {
     private static void line(StringBuilder sb, List<String> cells) {
         for (int iter = 0; iter < cells.size(); iter++) {
             String c = cells.get(iter) == null ? "" : cells.get(iter);
-            // A leading = + - @ would be read as a formula by a spreadsheet.
-            if (c.length() > 0 && "=+-@".indexOf(c.charAt(0)) >= 0) {
+            // A leading = + - @, tab or CR would be read as a formula by a spreadsheet.
+            if (c.length() > 0 && "=+-@\t\r".indexOf(c.charAt(0)) >= 0) {
                 c = "'" + c;
             }
             sb.append(iter == 0 ? "" : ",").append('"');

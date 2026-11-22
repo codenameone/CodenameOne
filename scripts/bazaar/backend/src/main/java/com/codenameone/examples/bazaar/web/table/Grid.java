@@ -345,7 +345,7 @@ public final class Grid<T> {
                 .header("Cache-Control", "private, no-store");
     }
 
-    static String csvCell(String value) {
+    public static String csvCell(String value) {
         String v = value == null ? "" : value;
         if (v.length() > 0) {
             char first = v.charAt(0);

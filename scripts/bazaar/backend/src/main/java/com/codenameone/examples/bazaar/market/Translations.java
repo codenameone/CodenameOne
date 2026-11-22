@@ -637,7 +637,7 @@ public class Translations {
     private static String cell(List<String> row, int at) {
         String c = at < row.size() && row.get(at) != null ? row.get(at) : "";
         // Undo the export's guard against a spreadsheet reading a formula.
-        if (c.length() > 1 && c.charAt(0) == '\'' && "=+-@".indexOf(c.charAt(1)) >= 0) {
+        if (c.length() > 1 && c.charAt(0) == '\'' && "=+-@\t\r".indexOf(c.charAt(1)) >= 0) {
             c = c.substring(1);
         }
         return c;
@@ -646,8 +646,8 @@ public class Translations {
     static void csvLine(StringBuilder sb, String[] cells) {
         for (int iter = 0; iter < cells.length; iter++) {
             String c = cells[iter] == null ? "" : cells[iter];
-            // A leading = + - @ would be read as a formula by a spreadsheet.
-            if (c.length() > 0 && "=+-@".indexOf(c.charAt(0)) >= 0) {
+            // A leading = + - @, tab or CR would be read as a formula by a spreadsheet.
+            if (c.length() > 0 && "=+-@\t\r".indexOf(c.charAt(0)) >= 0) {
                 c = "'" + c;
             }
             sb.append(iter == 0 ? "" : ",").append('"');
