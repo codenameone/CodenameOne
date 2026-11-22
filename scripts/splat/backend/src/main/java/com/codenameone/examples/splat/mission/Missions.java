@@ -41,7 +41,7 @@ import java.util.List;
 import java.util.Set;
 
 /// Player-built missions: storing them, listing them, and making one
-/// playable online. The rules module resolves an arena id through
+/// playable online. The shared simulation code resolves an arena id through
 /// `Catalog.arena`, which knows a mission only once it has been
 /// `register()`ed, so anything that takes a level from a player calls
 /// [#resolve] before `Arenas.normalize` -- `Arenas` itself stays free of the

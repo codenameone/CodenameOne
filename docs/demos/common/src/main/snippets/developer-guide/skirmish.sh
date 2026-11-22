@@ -13,8 +13,8 @@ mvn package -DskipTests -Dcodename1.platform=ios -Dcodename1.buildTarget=ios-sou
 // end::skirmish-sh-ios[]
 
 // tag::skirmish-sh-tests[]
-mvn -pl rules test
-mvn -pl rules,shared,backend -Dcodename1.platform=backend test
+mvn -pl shared test
+mvn -pl shared,backend -Dcodename1.platform=backend test
 ./run-e2e.sh
 // end::skirmish-sh-tests[]
 

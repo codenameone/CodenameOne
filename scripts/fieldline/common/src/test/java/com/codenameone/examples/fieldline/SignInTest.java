@@ -70,6 +70,19 @@ public class SignInTest extends E2e {
         // A dispatcher lands on the board.
         signIn(DISPATCH, "Board");
         shot("board");
+
+        // The intake board: a status view beside the plan, on the phone.
+        click("menu-open");
+        click("menu-intake");
+        waitForForm("Intake");
+        until(() -> findByName("intakeBoard") != null, 20000, "the intake board");
+        shot("intake-board");
+        click("scheduleOnBoard");
+        waitForForm("Board");
+        // Intake never schedules: the server refuses, whatever the client.
+        Actor dispatcher = Actor.signIn(DISPATCH);
+        dispatcher.post("/api/dispatch/jobs/no-such-job/intake", "{\"status\":\"SCHEDULED\"}");
+        assertEqual(409, dispatcher.status, "asking intake to schedule a job");
         signOut();
         return true;
     }

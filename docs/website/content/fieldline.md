@@ -40,7 +40,7 @@ In the Initializr, choose the **Fieldline** field service template, set your app
 | Part | Included workflows |
 | --- | --- |
 | Technician | The day as a numbered route on a map with travel time between stops, start driving, check in on site, a checklist that saves as you go, photos with AI diagnosis cards, notes, a drafted report, a customer signature sealed with a hash, working hours and limits, time-off requests, and jobs added to the phone's calendar |
-| Dispatcher | A crew timeline, a Gantt chart against the last plan and a map of the crew, drag to reassign with every constraint checked before it is applied, new jobs placed automatically, an absence covered in one tap, the time-off queue, and every optimizer run with what it changed and why |
+| Dispatcher | A crew timeline, a Gantt chart against the last plan and a map of the crew, drag to reassign with every constraint checked before it is applied, new jobs placed automatically, an absence covered in one tap, an intake board for jobs awaiting parts or blocked that never schedules by drag, the time-off queue, and every optimizer run with what it changed and why |
 | Assistant | Diagnosis of a photo against the equipment and the checklist, answers about the job in hand, a drafted inspection report, and a dispatcher's assistant that re-plans when asked in plain words |
 | Scheduling engine | Regret insertion, then adaptive large neighbourhood search over skills, working hours, time windows, time off, maximum drive and weekly hours, travel time and overtime, with a seeded search that gives one plan for one seed, and a repair that keeps work in place when the day changes |
 | Java backend | Accounts and roles, technicians and availability, sites and jobs, checklists, photos and signatures, the optimizer runs, the assistant behind the server's own key, push notifications and the live channel |
@@ -54,6 +54,7 @@ The account's roles decide which screens a person sees. The same client project 
 ![Fieldline field assistant answering from a manual](/developer-guide/img/fieldline-assistant.png)
 ![Fieldline customer signature sealed with a hash](/developer-guide/img/fieldline-sealed.png)
 ![Fieldline dispatch board](/developer-guide/img/fieldline-board.png)
+![Fieldline intake board with jobs awaiting parts or blocked](/developer-guide/img/fieldline-intake-board.png)
 ![Fieldline optimizer run with what it moved](/developer-guide/img/fieldline-optimize.png)
 ![Fieldline dispatcher's assistant covering an absence](/developer-guide/img/fieldline-dispatch-assistant.png)
 ![Fieldline staffing against booked work](/developer-guide/img/fieldline-staffing.png)

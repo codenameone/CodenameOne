@@ -411,7 +411,9 @@ public class Planner {
 
         List<Plan.Visit> visits = new ArrayList<Plan.Visit>();
         for (Job job : jobs.inSpan(h.origin(), h.end())) {
-            if (!Catalog.isOpen(job.getStatus())) {
+            // A held job stays out of the model: placed, it would be given a
+            // route, and left unplaced it would be reset to UNASSIGNED.
+            if (!Catalog.isPlannable(job.getStatus())) {
                 continue;
             }
             Site site = m.sites.get(job.getSiteId());
@@ -1131,6 +1133,9 @@ public class Planner {
     String hardRule(Job job, Technician tech, long start, Horizon h) {
         if (!Catalog.isOpen(job.getStatus())) {
             return "That job is closed";
+        }
+        if (Catalog.isHeld(job.getStatus())) {
+            return "That job is on hold; release it on the intake board first";
         }
         if (Catalog.isUnderWay(job.getStatus())) {
             return "That job has started; it stays with " + job.getTechId();

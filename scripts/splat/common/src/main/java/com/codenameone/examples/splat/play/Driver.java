@@ -33,7 +33,7 @@ import java.util.List;
 /// - [ReplayDriver]: a recorded match, at any speed.
 ///
 /// All three step the same [Match] the server runs, which is why a rule
-/// changed in the rules module is changed in every one of them.
+/// changed in the shared simulation code is changed in every one of them.
 // tag::splat-driver[]
 public abstract class Driver {
     protected Match match;

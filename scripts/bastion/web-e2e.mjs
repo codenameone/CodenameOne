@@ -547,9 +547,48 @@ async function guideTour() {
   await shot('bastion-transaction');
   await back();
   await waitFor('the account', stepSeconds, textOnScreen(/Order a card/));
+
+  // Everything from the card on is signed by a registered device, and the
+  // server lets an account register one only after a sign-in with a second
+  // factor (DeviceSetup.register, Devices on the server). The demo customer
+  // signed in with a password alone, so the tour does what a customer is
+  // told to: turn an authenticator app on, sign in again with its code, and
+  // register this browser when the card asks for a signature.
+  await back();
+  await waitFor('the dashboard', stepSeconds, textOnScreen(/Total balance/));
+  await menu('Settings');
+  await click(await waitFor('the authenticator app row', stepSeconds, visible(/^Authenticator app$/)));
+  await waitFor('the password prompt', stepSeconds, textOnScreen(/Confirm it is you/));
+  await typeInto(0, 'bastion-demo-password', 'password');
+  await press('Continue');
+  const customerSecret = await scrapeSecret();
+  const enrolledAt = step();
+  await typeInto(0, totp(customerSecret, enrolledAt), 'any');
+  await press('Turn on');
+  await press('I have saved them');
+  await menu('Sign out');
+  await waitFor('the sign-in form', stepSeconds, button('Sign in'));
+  await typeInto(0, 'customer@bastion.example', 'email');
+  await typeInto(1, 'bastion-demo-password', 'password');
+  await press('Sign in');
+  await waitFor('the code screen', stepSeconds, button('Continue'));
+  // A code is good once: the sign-in takes the next step's.
+  await waitFor('a new code', 35, async () => step() + 1 > enrolledAt + 1);
+  await typeInto(0, totp(customerSecret, enrolledAt + 1), 'any');
+  await page.mouse.click(210, 8);
+  await settled();
+  await press('Continue');
+  await waitFor('the dashboard', stepSeconds, textOnScreen(/Total balance/));
+  await click(await waitFor('the checking account', stepSeconds, async () =>
+      (await components()).find(c => /Checking/.test(c.label || c.text || '') && c.height < 200)));
+  await waitFor('the account', stepSeconds, textOnScreen(/Order a card/));
+
   await scroll(-6000);
   await press('Order a card');
-  await waitFor('the card', stepSeconds, async () => requests.some(r => /POST \/api\/accounts\/.*\/card/.test(r)));
+  // The first card asks for this device: registered, the order is sent again.
+  await waitFor('the device prompt', stepSeconds, textOnScreen(/Sign with this device/));
+  await press('Register');
+  await waitFor('the card', stepSeconds, async () => requests.some(r => /200 POST \/api\/accounts\/.*\/card/.test(r)));
   await waitFor('the cards screen', stepSeconds, textOnScreen(/Daily limit/));
   await waitFor('the card payments', stepSeconds, textOnScreen(/Recent card payments/));
   await page.waitForTimeout(1000);
@@ -666,6 +705,10 @@ async function guideTour() {
     await waitFor(section, stepSeconds, textOnScreen(pattern));
     await page.waitForTimeout(500);
     await shot(name);
+    // The audit events are a DataGrid; the guide shows it by its own name.
+    if (name === 'bastion-console-audit-chain') {
+      await shot('bastion-audit-grid');
+    }
   }
   await press('General ledger');
   // Maker: an adjustment over the four-eyes threshold waits for a second
@@ -716,9 +759,28 @@ async function guideTour() {
   await shot('bastion-console-phone');
 }
 
+/// BASTION_WEB_AUDIT_ONLY=1 (with BASTION_WEB_TOUR) retakes the audit grid's
+/// picture alone: an administrator opens the audit chain page. It needs no
+/// customer onboarding, so it does not depend on the rest of the run.
+async function auditGridOnly() {
+  fs.mkdirSync(tour, { recursive: true });
+  await signInStaff('admin@bastion.example', { width: 1440, height: 900 });
+  await waitFor('the console', stepSeconds, textOnScreen(/Awaiting approval/));
+  await press('Audit chain');
+  await waitFor('the audit chain', stepSeconds, textOnScreen(/Links checked/));
+  await page.waitForTimeout(1000);
+  await shot('bastion-audit-grid');
+}
+
 let failed = null;
 try {
   say('opening ' + url);
+  if (process.env.BASTION_WEB_AUDIT_ONLY) {
+    await auditGridOnly();
+    await browser.close();
+    say('passed');
+    process.exit(0);
+  }
   await newPage();
   const first = await page.goto(url, { waitUntil: 'load' });
   if (!first || first.status() !== 200) {

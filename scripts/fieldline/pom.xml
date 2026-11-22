@@ -167,8 +167,8 @@
           <name>codename1.platform</name>
           <value>!backend</value>
         </property>
-        <!-- Only in a Codename One client module. The rules module's tests are
-             plain JUnit 5 too, and this provider would swallow them as well. -->
+        <!-- Only in a Codename One client module. The simulation tests in
+             shared are plain JUnit 5, and this provider would swallow them. -->
         <file>
           <exists>${basedir}/codenameone_settings.properties</exists>
         </file>

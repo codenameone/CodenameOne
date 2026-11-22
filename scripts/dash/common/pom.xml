@@ -31,11 +31,6 @@
             <version>${cn1.version}</version>
             <type>pom</type>
         </dependency>
-        <dependency>
-            <groupId>com.codenameone.examples.dash</groupId>
-            <artifactId>dash-rules</artifactId>
-            <version>${project.version}</version>
-        </dependency>
 
         <!--
           Test-scope deps needed if you add JUnit 5 tests under
