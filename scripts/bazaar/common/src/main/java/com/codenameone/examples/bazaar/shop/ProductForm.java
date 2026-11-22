@@ -492,6 +492,16 @@ final class ProductForm {
             priceRow.add(Ui.plain(ShopState.money(v.compareAtCents()), "ShopCompareAt"));
             priceRow.add(Ui.badge(Lang.tr("Save {0}%", String.valueOf(off)), "ShopSale"));
         }
+        long unit = com.codenameone.examples.bazaar.ops.UnitPricing.unitPriceCents(
+                v.priceCents(), v.unitQuantity(), v.unitName(), v.unitReference(),
+                v.unitReferenceName());
+        if (unit >= 0) {
+            Label unitPrice = Ui.plain(ShopState.money(unit) + " / "
+                    + com.codenameone.examples.bazaar.ops.UnitPricing.per(v.unitReference(),
+                        v.unitReferenceName()), "SvMuted");
+            unitPrice.setName("product-unit-price");
+            priceRow.add(unitPrice);
+        }
         boolean buyable = Variants.buyable(v);
         add.setEnabled(buyable);
         add.setText(Lang.tr(buyable ? "Add to cart" : "Sold out"));

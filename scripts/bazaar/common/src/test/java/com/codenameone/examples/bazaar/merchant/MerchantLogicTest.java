@@ -19,6 +19,7 @@
 package com.codenameone.examples.bazaar.merchant;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -46,7 +47,7 @@ class MerchantLogicTest {
 
     private static VariantDto variant(String id, String o1, String o2, String sku, long price) {
         return new VariantDto(id, "p", "", o1, o2, null, sku, "", price, 0, 0, 0, true, true,
-                false, 0, 0, new ArrayList<StockDto>(), false);
+                false, 0, 0, new ArrayList<StockDto>(), false, "", "", 0L, "", 0, "");
     }
 
     @Test
@@ -106,7 +107,21 @@ class MerchantLogicTest {
             List<VariantDto> variants) {
         return new ProductDto("id-" + handle, "s", handle, title, "Soft, warm \"tee\"", "Acme",
                 "Shirts", Arrays.asList("cotton", "sale"), "ACTIVE", "", "", null, 0, 0, options,
-                variants, new ArrayList<ProductPhotoDto>(), new ArrayList<String>());
+                variants, new ArrayList<ProductPhotoDto>(), new ArrayList<String>(), 0);
+    }
+
+    @Test
+    void variantCustomsAndUnitsAreCheckedBeforeSaving() {
+        assertNull(ProductEditor.unitProblem("691200", "PT", 0, "", 1, ""));
+        assertNull(ProductEditor.unitProblem("", "", 250000, "g", 100, "g"));
+        assertNull(ProductEditor.unitProblem("", "", 750000, "ml", 1, "l"));
+        assertNotNull(ProductEditor.unitProblem(null, "", 0, "", 1, ""));
+        assertNotNull(ProductEditor.unitProblem("", null, 0, "", 1, ""));
+        assertNotNull(ProductEditor.unitProblem("", "", -1, "g", 1, "g"));
+        assertNotNull(ProductEditor.unitProblem("", "", 250000, "g", 1, "ml"));
+        assertNotNull(ProductEditor.unitProblem("", "", 250000, "furlong", 1, "furlong"));
+        assertNotNull(ProductEditor.unitProblem("", "", 0, "g", 100, "g"));
+        assertNotNull(ProductEditor.unitProblem("", "", 250000, "g", 0, "g"));
     }
 
     @Test

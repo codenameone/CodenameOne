@@ -48,7 +48,9 @@ import com.codenameone.examples.bazaar.api.ProductDto;
 import com.codenameone.examples.bazaar.api.ProductPhotoDto;
 import com.codenameone.examples.bazaar.api.VariantDto;
 import com.codenameone.examples.bazaar.net.Api;
+import com.codenameone.examples.bazaar.ops.Customs;
 import com.codenameone.examples.bazaar.ops.Margins;
+import com.codenameone.examples.bazaar.ops.UnitPricing;
 import com.codenameone.examples.bazaar.ui.Lang;
 import com.codenameone.examples.bazaar.ui.Layouts;
 import com.codenameone.examples.bazaar.ui.Photos;
@@ -84,6 +86,9 @@ final class ProductEditor extends Container {
     private TextField vendor;
     private TextField tags;
     private TextField seoTitle;
+    /// The product's taxonomy category id, 0 for none.
+    private int categoryId;
+    private Button categoryButton;
     private TextArea seoDescription;
     private Picker status;
     private Container variantHost;
@@ -216,6 +221,23 @@ final class ProductEditor extends Container {
         type = MUi.text(org, "Type", "product-type", p == null ? "" : p.productType());
         vendor = MUi.text(org, "Vendor", "product-vendor", p == null ? "" : p.vendor());
         tags = MUi.text(org, "Tags", "product-tags", p == null ? "" : VariantMatrix.join(p.tags()));
+        org.add(Ui.label("Category", "SvLabel"));
+        categoryId = p == null ? 0 : Math.max(0, p.categoryId());
+        categoryButton = new Button(Lang.tr("None"));
+        categoryButton.setUIID("SvField");
+        categoryButton.setName("product-category");
+        categoryButton.addActionListener(e -> CategoryPicker.show(categoryId, (id, path) -> {
+            categoryId = id;
+            categoryButton.setText(id == 0 ? Lang.tr("None") : path);
+            categoryButton.getParent().revalidate();
+        }));
+        org.add(categoryButton);
+        if (categoryId > 0) {
+            CategoryPicker.label(categoryId, path -> {
+                categoryButton.setText(path);
+                categoryButton.getParent().revalidate();
+            });
+        }
         Container seo = card(side, "Search engine listing");
         seoTitle = MUi.text(seo, "Page title", "product-seo-title", p == null ? "" : p.seoTitle());
         seo.add(Ui.label("Meta description", "SvLabel"));
@@ -354,17 +376,69 @@ final class ProductEditor extends Container {
         if (v.id() != null && v.digital()) {
             body.add(DigitalFiles.button(v));
         }
+        body.add(Ui.plain(Lang.tr("Customs"), "SvHeading"));
+        TextField hs = MUi.text(body, "HS code", "variant-hs", v.hsCode());
+        TextField origin = MUi.text(body, "Country of origin", "variant-origin",
+                v.originCountry());
+        body.add(Ui.plain(Lang.tr("Unit price"), "SvHeading"));
+        TextField measure = MUi.text(body, "Measure", "variant-measure",
+                v.unitQuantity() > 0 ? UnitPricing.quantity(v.unitQuantity()) : "");
+        TextField unit = MUi.text(body, "Unit (g, kg, ml, l, m...)", "variant-unit",
+                v.unitName());
+        TextField per = MUi.number(body, "Price per", "variant-per",
+                v.unitReference() > 0 ? v.unitReference() : 1);
+        TextField perUnit = MUi.text(body, "Unit of that price", "variant-per-unit",
+                v.unitReferenceName());
         Command ok = Command.create(Lang.tr("Done"), null, null);
         Command cancel = Command.create(Lang.tr("Cancel"), null, null);
         if (Dialog.show(Lang.tr("Variant"), body, cancel, ok) != ok) {
             return;
         }
+        String hsCode = Customs.hsCode(hs.getText());
+        String country = Customs.country(origin.getText());
+        String unitName = unit.getText().trim();
+        long quantity = UnitPricing.parseQuantity(measure.getText());
+        String refName = perUnit.getText().trim().length() == 0 ? unitName
+                : perUnit.getText().trim();
+        int reference = MUi.integer(per);
+        String problem = unitProblem(hsCode, country, quantity, unitName, reference, refName);
+        if (problem != null) {
+            Ui.say(problem);
+            return;
+        }
+        boolean byMeasure = quantity > 0 && unitName.length() > 0;
         replace(v, new VariantDto(v.id(), v.productId(), v.title(), v.option1(), v.option2(),
                 v.option3(), sku.getText().trim(), barcode.getText().trim(), MUi.cents(price),
                 MUi.cents(compare), MUi.cents(cost), MUi.integer(weight), v.taxable(),
                 track.isSelected(), backorder.isSelected(), v.position(), v.available(), v.stock(),
-                digital.isSelected()));
+                digital.isSelected(), hsCode, country, byMeasure ? quantity : 0,
+                byMeasure ? unitName : "", byMeasure ? reference : 0,
+                byMeasure ? refName : ""));
         paintVariants();
+    }
+
+    /// Why a variant's customs and unit pricing cannot be saved, or null.
+    /// `hsCode` and `country` are what [Customs] made of the fields.
+    static String unitProblem(String hsCode, String country, long quantity, String unitName,
+            int reference, String referenceName) {
+        if (hsCode == null) {
+            return Lang.tr("An HS code has 6 to 10 digits");
+        }
+        if (country == null) {
+            return Lang.tr("Enter a two-letter country code, such as US or DE");
+        }
+        if (quantity < 0) {
+            return Lang.tr("Enter the measure as a number, such as 250 or 1.5");
+        }
+        if (quantity == 0 && unitName.length() == 0) {
+            return null;
+        }
+        if (quantity == 0 || !UnitPricing.isUnit(unitName) || !UnitPricing.isUnit(referenceName)
+                || !UnitPricing.compatible(unitName, referenceName)
+                || reference < 1 || reference > UnitPricing.MAX_REFERENCE) {
+            return Lang.tr("Enter a measure, a unit and a price-per unit of the same kind");
+        }
+        return null;
     }
 
     /// "Margin 40.0% - markup 66.7%", or a hint when no cost is entered.
@@ -393,7 +467,8 @@ final class ProductEditor extends Container {
                         value instanceof Number ? ((Number) value).longValue() : number / 100))
                         : v.weightGrams(),
                 v.taxable(), v.trackInventory(), v.allowBackorder(), v.position(), v.available(),
-                v.stock(), v.digital());
+                v.stock(), v.digital(), v.hsCode(), v.originCountry(), v.unitQuantity(),
+                v.unitName(), v.unitReference(), v.unitReferenceName());
         replace(v, out);
         variantRows.replace(variantRows.indexOf(v), out);
     }
@@ -502,7 +577,9 @@ final class ProductEditor extends Container {
             vs.add(new VariantDto(v.id(), v.productId(), v.title(), v.option1(), v.option2(),
                     v.option3(), v.sku(), v.barcode(), v.priceCents(), v.compareAtCents(),
                     v.costCents(), v.weightGrams(), v.taxable(), v.trackInventory(),
-                    v.allowBackorder(), iter, v.available(), v.stock(), v.digital()));
+                    v.allowBackorder(), iter, v.available(), v.stock(), v.digital(),
+                    v.hsCode(), v.originCountry(), v.unitQuantity(), v.unitName(),
+                    v.unitReference(), v.unitReferenceName()));
         }
         return new ProductDto(product == null ? null : product.id(), MerchantState.storeId(),
                 product == null || product.handle() == null ? Handles.of(t) : product.handle(), t,
@@ -511,7 +588,7 @@ final class ProductEditor extends Container {
                 seoTitle.getText().trim(), seoDescription.getText().trim(),
                 product == null ? null : product.photoId(), 0, 0, opts, vs,
                 product == null ? new ArrayList<ProductPhotoDto>() : product.photos(),
-                product == null ? new ArrayList<String>() : product.collectionIds());
+                product == null ? new ArrayList<String>() : product.collectionIds(), categoryId);
     }
 
     private void save() {

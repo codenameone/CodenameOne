@@ -32,7 +32,7 @@ on a row.
 | Products with title/description/price | &#10003; | core | core | core | core | 
 | Variants & options matrix | &#10003; | core | core | core | core | 
 | Product media (multiple photos) | &#10003; | core | core | core | core | 
-| Product video / 3D models | &#10003; | core | app/plugin | core | no | Uploaded MP4 or WebM video and `.glb` models in the product gallery, reordered with the pictures; the storefront plays video in a `<video>` element served in byte ranges, and links a model with no third-party viewer.
+| Product video / 3D models | &#10003; | core | app/plugin | core | no | Uploaded MP4 or WebM video and `.glb` models in the product gallery, reordered with the pictures; the storefront plays video in a `<video>` element served in byte ranges, and shows a model in Google's `<model-viewer>`, served from the store's own site and loaded only on a page with a model (a compressed model shows its poster). The app links the model file.
 | Compare-at price | &#10003; | core | core | core | core | 
 | Cost per item / margin | &#9681; | core | core | core | core | Cost is kept on purchase lines; margin isn't shown per variant.
 | SKU / barcode | &#10003; | core | core | core | core | 
@@ -50,9 +50,9 @@ on a row.
 | Combined listings (parent/child products) | &#10003; | core | core | no | no | Combined listings group separate products under one parent page. 
 | Metafields on products/variants | &#10003; | core | app/plugin | core | no | Typed metafield definitions; values show in a specs section on the product page. 
 | Metaobjects (custom content types) | &#10003; | core | app/plugin | no | no | Owner-defined types with entries. 
-| Product taxonomy / standardized categories | &#8211; | core | no | no | no | 
-| Customs info (HS code, country of origin) | &#8211; | core | app/plugin | core | no | 
-| Unit pricing (per kg/l) | &#8211; | core | app/plugin | app/plugin | no | 
+| Product taxonomy / standardized categories | &#10003; | core | no | no | no | The first two levels of Google's product taxonomy, picked with search in the back office and the app; sent as `google_product_category` in the shopping feed and as the structured-data category, and a category filter on collection pages.
+| Customs info (HS code, country of origin) | &#10003; | core | app/plugin | core | no | Per variant, validated (6 to 10 digit HS code, ISO country); sent to EasyPost as customs items for a shipment that crosses a border, and printed on an international order's packing slip.
+| Unit pricing (per kg/l) | &#10003; | core | app/plugin | app/plugin | no | A measure and a reference unit per variant; "$4.00 / 100 g" on the storefront product page and cards and in the app, in the shopping feed's unit pricing attributes and as a `UnitPriceSpecification` in structured data.
 | Product reviews | &#10003; | app/plugin | core | core | no | 
 | Wishlist | &#10003; | app/plugin | app/plugin | core | no | 
 | Product translations | &#9681; | core | app/plugin | core | no | Pages, policies and blog posts translate per market; product fields do not yet. 

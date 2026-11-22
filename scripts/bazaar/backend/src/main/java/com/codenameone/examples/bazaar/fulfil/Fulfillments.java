@@ -138,6 +138,10 @@ public class Fulfillments {
     @com.codename1.backend.annotations.Autowired
     private ShopperLanguage language;
 
+    /// Products' HS codes, the fallback of a variant without one.
+    @com.codename1.backend.annotations.Autowired
+    private com.codenameone.examples.bazaar.repository.CustomsCodeRepository customsCodes;
+
     /// Refuses to fulfil an order held for a fraud review.
     private final com.codenameone.examples.bazaar.risk.RiskHolds holds;
 
@@ -438,8 +442,8 @@ public class Fulfillments {
         if (!SHIP.equals(method(f)) || !isOpen(f.getStatus())) {
             throw new ResponseStatusException(409, "Only a parcel waiting to ship has rates");
         }
-        return carrier.rates(new CarrierProvider.Parcel(f.getWeightGrams()),
-                from(f.getLocationId()), to(orders.findById(f.getOrderId())));
+        return carrier.rates(parcel(f), from(f.getLocationId()),
+                to(orders.findById(f.getOrderId())));
     }
 
     public FulfillmentDto buyLabel(String username, String storeId, String id,
@@ -456,9 +460,8 @@ public class Fulfillments {
         if (service == null) {
             // No service named (labels bought in bulk): the cheapest one the
             // carrier quotes for this parcel.
-            List<RateQuoteDto> quoted = carrier.rates(new CarrierProvider.Parcel(
-                    f.getWeightGrams()), from(f.getLocationId()), to(orders.findById(
-                    f.getOrderId())));
+            List<RateQuoteDto> quoted = carrier.rates(parcel(f), from(f.getLocationId()),
+                    to(orders.findById(f.getOrderId())));
             for (int iter = 0; iter < quoted.size(); iter++) {
                 if (service == null || quoted.get(iter).cents() < cheapest(quoted, service)) {
                     service = quoted.get(iter).service();
@@ -468,8 +471,7 @@ public class Fulfillments {
                 throw new ResponseStatusException(400, "Choose a service");
             }
         }
-        CarrierProvider.Label label = carrier.buyLabel(
-                new CarrierProvider.Parcel(f.getWeightGrams()), from(f.getLocationId()),
+        CarrierProvider.Label label = carrier.buyLabel(parcel(f), from(f.getLocationId()),
                 to(orders.findById(f.getOrderId())), service, f.getId());
         labelTx(id, label, username);
         return published(id);
@@ -1199,6 +1201,85 @@ public class Fulfillments {
 
     /// Its lines with titles, for the documents.
     @Transactional(readOnly = true)
+    /// A fulfilment's parcel as the carrier is told about it: its weight and,
+    /// when it goes to another country, the customs line of each item.
+    private CarrierProvider.Parcel parcel(Fulfillment f) throws IOException {
+        StoreOrder o = orders.findById(f.getOrderId());
+        if (o == null || !international(o)) {
+            return new CarrierProvider.Parcel(f.getWeightGrams());
+        }
+        List<OrderLine> ls = lines.findByOrderId(f.getOrderId());
+        List<FulfillmentLine> fl = fulfillmentLines.findByFulfillmentId(f.getId());
+        List<OrderLine> picked = new ArrayList<OrderLine>();
+        List<Integer> quantities = new ArrayList<Integer>();
+        for (int iter = 0; iter < fl.size(); iter++) {
+            OrderLine line = find(ls, fl.get(iter).getOrderLineId());
+            if (line != null) {
+                picked.add(line);
+                quantities.add(Integer.valueOf(fl.get(iter).getQuantity()));
+            }
+        }
+        return new CarrierProvider.Parcel(f.getWeightGrams(), customsItems(o, picked,
+                quantities));
+    }
+
+    /// Whether an order ships to another country than the carrier's origin.
+    public boolean international(StoreOrder o) {
+        return CarrierProvider.crossesBorder(carrier.originCountry(), o.getShipCountry());
+    }
+
+    /// The customs lines of `quantities` of each of `picked`: the variant's
+    /// HS code, else the product's, and the variant's country of origin.
+    @Transactional(readOnly = true)
+    public List<CarrierProvider.CustomsItem> customsItems(StoreOrder o, List<OrderLine> picked,
+            List<Integer> quantities) throws IOException {
+        List<String> variantIds = new ArrayList<String>();
+        List<String> productIds = new ArrayList<String>();
+        for (int iter = 0; iter < picked.size(); iter++) {
+            variantIds.add(picked.get(iter).getVariantId());
+            productIds.add(picked.get(iter).getProductId());
+        }
+        Map<String, Variant> byId = new HashMap<String, Variant>();
+        List<Variant> found = variantIds.isEmpty() ? new ArrayList<Variant>()
+                : variants.findByIdIn(variantIds);
+        for (int iter = 0; iter < found.size(); iter++) {
+            byId.put(found.get(iter).getId(), found.get(iter));
+        }
+        Map<String, String> productHs = new HashMap<String, String>();
+        List<com.codenameone.examples.bazaar.domain.CustomsCode> codes = productIds.isEmpty()
+                || customsCodes == null
+                ? new ArrayList<com.codenameone.examples.bazaar.domain.CustomsCode>()
+                : customsCodes.findByProductIdIn(productIds);
+        for (int iter = 0; iter < codes.size(); iter++) {
+            productHs.put(codes.get(iter).getProductId(), codes.get(iter).getHsCode());
+        }
+        List<CarrierProvider.CustomsItem> out = new ArrayList<CarrierProvider.CustomsItem>();
+        for (int iter = 0; iter < picked.size(); iter++) {
+            OrderLine l = picked.get(iter);
+            int q = quantities.get(iter).intValue();
+            if (q <= 0) {
+                continue;
+            }
+            Variant v = byId.get(l.getVariantId());
+            if (v != null && v.isDigital()) {
+                continue;
+            }
+            String hs = v == null ? "" : v.getHsCode();
+            if (hs.length() == 0) {
+                String p = productHs.get(l.getProductId());
+                hs = p == null ? "" : p;
+            }
+            long discount = l.getQuantity() > 0 ? l.getDiscountCents() * q / l.getQuantity() : 0;
+            String title = l.getVariantTitle().length() > 0 ? l.getTitle() + " - "
+                    + l.getVariantTitle() : l.getTitle();
+            out.add(new CarrierProvider.CustomsItem(Codes.cut(title, 100), q,
+                    Math.max(0, l.getPriceCents() * q - discount), o.getCurrency(),
+                    l.getWeightGrams() * q, hs, v == null ? "" : v.getOriginCountry(),
+                    l.getSku()));
+        }
+        return out;
+    }
+
     public List<FulfilLineDto> linesOf(Fulfillment f) throws IOException {
         List<FulfilLineDto> out = new ArrayList<FulfilLineDto>();
         List<OrderLine> ls = lines.findByOrderId(f.getOrderId());

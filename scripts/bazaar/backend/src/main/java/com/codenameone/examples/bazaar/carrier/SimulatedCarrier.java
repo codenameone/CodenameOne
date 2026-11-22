@@ -53,10 +53,23 @@ public class SimulatedCarrier implements CarrierProvider {
     private static final double UNKNOWN_KM = 500;
 
     private final long stepMillis;
+    private final String originCountry;
 
     /// @param stepMillis the time between two scans
     public SimulatedCarrier(long stepMillis) {
+        this(stepMillis, "");
+    }
+
+    /// @param stepMillis the time between two scans
+    /// @param originCountry the country parcels leave from, or empty
+    public SimulatedCarrier(long stepMillis, String originCountry) {
         this.stepMillis = Math.max(1, stepMillis);
+        this.originCountry = originCountry == null ? "" : originCountry.trim();
+    }
+
+    @Override
+    public String originCountry() {
+        return originCountry;
     }
 
     @Override

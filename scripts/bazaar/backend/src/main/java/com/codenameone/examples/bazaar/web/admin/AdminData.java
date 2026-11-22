@@ -549,6 +549,16 @@ public class AdminData {
         v.title = p.title() == null ? "" : p.title();
         v.description = p.description() == null ? "" : p.description();
         v.status = p.status();
+        v.category = com.codenameone.examples.bazaar.catalog.Taxonomy.path(p.categoryId());
+        List<com.codenameone.examples.bazaar.api.NameCountDto> cats =
+                com.codenameone.examples.bazaar.catalog.Taxonomy.all();
+        for (int iter = 0; iter < cats.size(); iter++) {
+            v.taxonomy.add(cats.get(iter).name());
+        }
+        String[] units = com.codenameone.examples.bazaar.ops.UnitPricing.units();
+        for (int iter = 0; iter < units.length; iter++) {
+            v.units.add(units[iter]);
+        }
         for (int iter = 0; iter < PRODUCT_STATUSES.length; iter++) {
             AdminRow r = new AdminRow();
             r.id = PRODUCT_STATUSES[iter];
@@ -578,6 +588,21 @@ public class AdminData {
                         + com.codenameone.examples.bazaar.ops.Margins.percent(
                             com.codenameone.examples.bazaar.ops.Margins.markupBps(
                                 x.priceCents(), x.costCents())) + " markup";
+            r.hs = x.hsCode() == null ? "" : x.hsCode();
+            r.origin = x.originCountry() == null ? "" : x.originCountry();
+            boolean measured = x.unitQuantity() > 0 && x.unitName() != null
+                    && x.unitName().length() > 0;
+            r.measure = measured ? com.codenameone.examples.bazaar.ops.UnitPricing.quantity(
+                    x.unitQuantity()) : "";
+            r.unit = measured ? x.unitName() : "";
+            r.reference = measured ? Integer.toString(x.unitReference()) : "";
+            r.referenceUnit = measured ? x.unitReferenceName() : "";
+            long up = com.codenameone.examples.bazaar.ops.UnitPricing.unitPriceCents(
+                    x.priceCents(), x.unitQuantity(), x.unitName(), x.unitReference(),
+                    x.unitReferenceName());
+            r.unitPrice = up < 0 ? "-" : Money.format(up, cur) + " / "
+                    + com.codenameone.examples.bazaar.ops.UnitPricing.per(x.unitReference(),
+                        x.unitReferenceName());
             v.variants.add(r);
         }
         List<LevelDto> levels = inventory.levels(storeId, null, p.id(), null);
@@ -634,18 +659,60 @@ public class AdminData {
                 throw new ResponseStatusException(409, "The product changed since the page "
                         + "was opened; reload it and try again");
             }
+            // Customs and unit pricing: a form without the fields (an older
+            // page) keeps what the variant has.
+            String hs = optionalField(request, "v" + iter + "_hs", x.hsCode());
+            String origin = optionalField(request, "v" + iter + "_origin", x.originCountry());
+            String measure = optionalField(request, "v" + iter + "_measure",
+                    x.unitQuantity() > 0 ? com.codenameone.examples.bazaar.ops.UnitPricing
+                        .quantity(x.unitQuantity()) : "");
+            long quantity = com.codenameone.examples.bazaar.ops.UnitPricing.parseQuantity(measure);
+            if (quantity < 0) {
+                throw new ResponseStatusException(400, "The measure is a number such as 750 or 1.5");
+            }
+            String unit = optionalField(request, "v" + iter + "_unit", x.unitName());
+            String refUnit = optionalField(request, "v" + iter + "_refunit",
+                    x.unitReferenceName());
+            String ref = optionalField(request, "v" + iter + "_ref",
+                    x.unitReference() > 0 ? Integer.toString(x.unitReference()) : "");
+            int reference = Math.max(0, AdminForms.number(ref, 1, "the unit price reference"));
+            if (quantity == 0 || unit.length() == 0) {
+                quantity = 0;
+                unit = "";
+            }
             vs.add(new VariantDto(x.id(), x.productId(), vt.length() == 0 ? x.title() : vt,
                     x.option1(), x.option2(), x.option3(), sku, x.barcode(),
                     price.length() == 0 ? x.priceCents() : AdminForms.cents(price, "the price"),
                     x.compareAtCents(), cost.length() == 0 ? x.costCents()
                         : AdminForms.cents(cost, "the cost"), x.weightGrams(), x.taxable(),
                     x.trackInventory(), x.allowBackorder(), x.position(), x.available(), null,
-                    x.digital()));
+                    x.digital(), hs, origin, quantity, unit, reference, refUnit));
+        }
+        int category = p.categoryId();
+        if (sent(request, "category")) {
+            category = com.codenameone.examples.bazaar.catalog.Taxonomy.parse(
+                    AdminForms.field(request, "category"));
+            if (category < 0) {
+                throw new ResponseStatusException(400, "Choose a category from the list");
+            }
         }
         catalog.updateProduct(storeId, productId, new ProductDto(p.id(), p.storeId(), p.handle(),
                 title, description, p.vendor(), p.productType(), p.tags(), status, p.seoTitle(),
                 p.seoDescription(), p.photoId(), p.rating(), p.ratingCount(), null, vs, null,
-                null));
+                null, category));
+    }
+
+    /// A form field, or `kept` when the form did not send it at all.
+    private static String optionalField(HttpServer.Request request, String name, String kept) {
+        return sent(request, name) ? AdminForms.field(request, name) : kept == null ? "" : kept;
+    }
+
+    private static boolean sent(HttpServer.Request request, String name) {
+        try {
+            return request.param(name) != null;
+        } catch (RuntimeException malformed) {
+            return false;
+        }
     }
 
     /// The gallery with its move buttons, and a download form per digital

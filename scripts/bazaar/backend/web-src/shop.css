@@ -159,3 +159,8 @@ body.radius-round{--radius:22px}
 .app-card .d2,.app-card .d3,.app-card .d4{fill:#ffffff40;stroke:none}
 .app-card .d5{fill:#fff;stroke:none}
 @media (max-width:620px){.app-card{grid-template-columns:1fr;padding:22px}.app-card svg{display:none}}
+
+/* Unit pricing beside a price, and the 3D model viewer in the gallery. */
+.unit-price{display:inline-block;font-size:.8em;font-weight:400;color:var(--muted,#666)}
+.gallery model-viewer.model{display:block;width:100%;aspect-ratio:1/1;height:auto;background:var(--soft,#f4f4f4);border-radius:inherit}
+.gallery figure figcaption{font-size:.85em;margin-top:.4em}

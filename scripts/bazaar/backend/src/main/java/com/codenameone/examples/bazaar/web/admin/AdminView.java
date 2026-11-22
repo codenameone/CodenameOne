@@ -75,6 +75,12 @@ public class AdminView {
     public String description = "";
     public String status = "";
     public List<AdminRow> statuses = new ArrayList<AdminRow>();
+    /// The product's taxonomy category as its path, or empty.
+    public String category = "";
+    /// Every taxonomy category's path, for the picker's suggestions.
+    public List<String> taxonomy = new ArrayList<String>();
+    /// The units a variant's measure may be in.
+    public List<String> units = new ArrayList<String>();
     public List<AdminRow> variants = new ArrayList<AdminRow>();
     /// Stock per variant and location, each with its adjust form.
     public List<AdminRow> levels = new ArrayList<AdminRow>();

@@ -41,7 +41,7 @@ class ShopRulesTest {
         return new VariantDto(id, "p", o1 + " / " + o2, o1, o2, null, null, null, 1000, 0, 0, 0,
                 true, true, false, 0, available,
                 Arrays.asList(new StockDto("l1", "Downtown", available), new StockDto("l2", "Mall", 1)),
-                false);
+                false, "", "", 0L, "", 0, "");
     }
 
     private static final List<OptionDto> OPTIONS = Arrays.asList(

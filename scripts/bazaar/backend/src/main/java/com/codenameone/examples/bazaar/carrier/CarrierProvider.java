@@ -48,13 +48,65 @@ public interface CarrierProvider {
     List<Scan> track(String trackingNumber, long shippedAt, long now, Place from, Place to)
             throws IOException;
 
+    /// The country parcels leave from when a shipment names none, or empty
+    /// when it is not known. A parcel to another country is international:
+    /// it carries a customs declaration and its packing slip lists the
+    /// customs data.
+    default String originCountry() {
+        return "";
+    }
+
     /// A parcel as a carrier prices it.
     final class Parcel {
         public final int weightGrams;
+        /// What is in it, for the customs declaration of a parcel that
+        /// crosses a border; empty when that is not known.
+        public final List<CustomsItem> items;
 
         public Parcel(int weightGrams) {
-            this.weightGrams = weightGrams;
+            this(weightGrams, new java.util.ArrayList<CustomsItem>());
         }
+
+        public Parcel(int weightGrams, List<CustomsItem> items) {
+            this.weightGrams = weightGrams;
+            this.items = items == null ? new java.util.ArrayList<CustomsItem>() : items;
+        }
+    }
+
+    /// One line of a customs declaration: what it is, how many, what they are
+    /// worth and weigh together, its HS code and where it was made.
+    final class CustomsItem {
+        public final String description;
+        public final int quantity;
+        /// The value of the whole line, in cents of `currency`.
+        public final long valueCents;
+        public final String currency;
+        /// The weight of the whole line.
+        public final int weightGrams;
+        /// Digits only, or empty when the variant and product have none.
+        public final String hsCode;
+        /// ISO 3166 alpha-2, or empty.
+        public final String originCountry;
+        public final String sku;
+
+        public CustomsItem(String description, int quantity, long valueCents, String currency,
+                int weightGrams, String hsCode, String originCountry, String sku) {
+            this.description = description == null ? "" : description;
+            this.quantity = quantity;
+            this.valueCents = valueCents;
+            this.currency = currency == null ? "" : currency;
+            this.weightGrams = weightGrams;
+            this.hsCode = hsCode == null ? "" : hsCode;
+            this.originCountry = originCountry == null ? "" : originCountry;
+            this.sku = sku == null ? "" : sku;
+        }
+    }
+
+    /// Whether a parcel from `from` to `to` (ISO countries, either may be
+    /// empty when not known) crosses a border.
+    static boolean crossesBorder(String from, String to) {
+        return from != null && to != null && from.trim().length() == 2
+                && to.trim().length() == 2 && !from.trim().equalsIgnoreCase(to.trim());
     }
 
     /// One end of a shipment.

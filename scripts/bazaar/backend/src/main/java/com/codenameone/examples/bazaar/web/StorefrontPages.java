@@ -239,13 +239,49 @@ public class StorefrontPages {
         }
         String path = collectionUrl(store.getHandle(), c.getHandle());
         String order = sort(sort);
+        int category = category(param(request, "category"));
         ProductPageDto found = catalog.browse(store.getHandle(), c.getHandle(), null, order,
-                Math.max(0, page), PAGE_SIZE);
+                Math.max(0, page), PAGE_SIZE, category);
         PageMeta meta = meta(store, request, path + (page > 0 ? "?page=" + page : ""));
         meta.title = c.getTitle() + " - " + store.getName();
         meta.description = describe(c.getDescription().length() > 0 ? c.getDescription()
                 : c.getTitle() + " from " + store.getName());
-        list(model, store, meta, found, path, order, "", c.getTitle(), c.getDescription());
+        if (category > 0) {
+            // A filtered page is a permutation of the collection, not a page
+            // of its own for an index.
+            meta.noindex = true;
+        }
+        list(model, store, meta, found, path, order, "", c.getTitle(), c.getDescription(),
+                category);
+        model.addAttribute("categories", categoryChips(store, c.getHandle(), path, order,
+                category, meta));
+    }
+
+    /// The `category` query parameter as a taxonomy id, 0 for none or junk.
+    static int category(String text) {
+        int id = com.codenameone.examples.bazaar.catalog.Taxonomy.parse(text);
+        return id > 0 ? id : 0;
+    }
+
+    /// The category filter of a collection: "All" and each top-level
+    /// category its products are in, with how many. Empty when the products
+    /// fall under fewer than two, where a filter would choose nothing.
+    private List<LinkView> categoryChips(Store store, String collection, String path,
+            String order, int current, PageMeta meta) throws IOException {
+        List<int[]> counts = catalog.categoryCounts(store.getHandle(), collection, null);
+        List<LinkView> out = new ArrayList<LinkView>();
+        if (counts.size() < 2 && current == 0) {
+            return out;
+        }
+        String sorted = "sort=" + SiteUrls.encode(order);
+        out.add(new LinkView(meta.t.get("allCategories"), path + "?" + sorted, current == 0));
+        for (int iter = 0; iter < counts.size(); iter++) {
+            int id = counts.get(iter)[0];
+            out.add(new LinkView(com.codenameone.examples.bazaar.catalog.Taxonomy.name(id)
+                    + " (" + counts.get(iter)[1] + ")", path + "?category=" + id + "&" + sorted,
+                    id == com.codenameone.examples.bazaar.catalog.Taxonomy.top(current)));
+        }
+        return out;
     }
 
     /// Search results.
@@ -268,12 +304,14 @@ public class StorefrontPages {
         // and collections are what belongs in an index.
         meta.noindex = true;
         list(model, store, meta, found, path, order, words,
-                words.length() > 0 ? "Results for \"" + words + "\"" : "All products", "");
+                words.length() > 0 ? "Results for \"" + words + "\"" : "All products", "", 0);
+        model.addAttribute("categories", new ArrayList<LinkView>());
     }
 
     private void list(Model model, Store store, PageMeta meta, ProductPageDto found, String path,
-            String order, String q, String heading, String intro) {
-        String query = q.length() > 0 ? "q=" + SiteUrls.encode(q) + "&" : "";
+            String order, String q, String heading, String intro, int category) {
+        String query = (q.length() > 0 ? "q=" + SiteUrls.encode(q) + "&" : "")
+                + (category > 0 ? "category=" + category + "&" : "");
         List<LinkView> sorts = new ArrayList<LinkView>();
         String[][] choices = {{"relevance", "Featured"}, {"newest", "Newest"},
             {"price", "Price, low to high"}, {"-price", "Price, high to low"},
@@ -364,6 +402,8 @@ public class StorefrontPages {
             if ("VIDEO".equals(ph.kind()) || "MODEL".equals(ph.kind())) {
                 view.gallery.add(new Art(ph.id(), ph.photoId(), p.title(), ph.kind(), ph.url(),
                         poster));
+                view.hasModel |= "MODEL".equals(ph.kind()) && ph.url() != null
+                        && ph.url().startsWith("/");
                 continue;
             }
             view.gallery.add(new Art(ph.id(), ph.photoId(), p.title()));
@@ -409,6 +449,18 @@ public class StorefrontPages {
                     : pricer.price(chosen.id(), chosen.priceCents());
             view.price = Money.format(cents, shown);
             view.amount = Money.plain(cents);
+            // Per the price actually shown, so a market's price has its own.
+            long unit = com.codenameone.examples.bazaar.ops.UnitPricing.unitPriceCents(cents,
+                    chosen.unitQuantity(), chosen.unitName(), chosen.unitReference(),
+                    chosen.unitReferenceName());
+            if (unit >= 0) {
+                view.unitPrice = Money.format(unit, shown) + " / "
+                        + com.codenameone.examples.bazaar.ops.UnitPricing.per(
+                            chosen.unitReference(), chosen.unitReferenceName());
+                view.unitAmount = Money.plain(unit);
+                view.unitReference = chosen.unitReference();
+                view.unitReferenceName = chosen.unitReferenceName();
+            }
             view.compareAt = chosen.compareAtCents() > chosen.priceCents()
                     ? Money.format(pricer == null ? chosen.compareAtCents()
                         : pricer.price("", chosen.compareAtCents()), shown) : "";
@@ -468,8 +520,25 @@ public class StorefrontPages {
         while (view.related.size() > 4) {
             view.related.remove(view.related.size() - 1);
         }
+        view.category = com.codenameone.examples.bazaar.catalog.Taxonomy.path(p.categoryId());
+        if (view.hasModel) {
+            com.codenameone.examples.bazaar.web.security.WebHeaders.allowModelViewer();
+        }
         meta.jsonLd = productLd(p, view, meta, images, rs);
         model.addAttribute("page", meta).addAttribute("product", view);
+    }
+
+    /// The UN/CEFACT common code of a unit, as schema.org's `unitCode` takes it.
+    static String unitCode(String unit) {
+        String[][] codes = {{"mg", "MGM"}, {"g", "GRM"}, {"kg", "KGM"}, {"ml", "MLT"},
+            {"cl", "CLT"}, {"l", "LTR"}, {"mm", "MMT"}, {"cm", "CMT"}, {"m", "MTR"},
+            {"m2", "MTK"}, {"oz", "ONZ"}, {"lb", "LBR"}, {"ct", "C62"}};
+        for (int iter = 0; iter < codes.length; iter++) {
+            if (codes[iter][0].equals(unit)) {
+                return codes[iter][1];
+            }
+        }
+        return "C62";
     }
 
     /// "every month", "every 2 weeks".
@@ -489,6 +558,9 @@ public class StorefrontPages {
         if (!images.isEmpty()) {
             ld.put("image", images);
         }
+        if (view.category.length() > 0) {
+            ld.put("category", view.category);
+        }
         if (p.vendor().length() > 0) {
             Map<String, Object> brand = new LinkedHashMap<String, Object>();
             brand.put("@type", "Brand");
@@ -504,6 +576,19 @@ public class StorefrontPages {
             offer.put("price", view.amount);
             offer.put("availability", view.availability);
             offer.put("itemCondition", "https://schema.org/NewCondition");
+            if (view.unitAmount.length() > 0) {
+                Map<String, Object> spec = new LinkedHashMap<String, Object>();
+                spec.put("@type", "UnitPriceSpecification");
+                spec.put("price", view.unitAmount);
+                spec.put("priceCurrency", view.currency);
+                Map<String, Object> ref = new LinkedHashMap<String, Object>();
+                ref.put("@type", "QuantitativeValue");
+                ref.put("value", Integer.valueOf(view.unitReference));
+                ref.put("unitCode", unitCode(view.unitReferenceName));
+                ref.put("unitText", view.unitReferenceName);
+                spec.put("referenceQuantity", ref);
+                offer.put("priceSpecification", spec);
+            }
             ld.put("offers", offer);
         }
         if (p.ratingCount() > 0) {
@@ -887,6 +972,8 @@ public class StorefrontPages {
                     + Money.format(c.minPriceCents(), store.getCurrency());
             v.compareAt = c.compareAtCents() > c.minPriceCents()
                     ? Money.format(c.compareAtCents(), store.getCurrency()) : "";
+            v.unitPrice = c.unitPriceCents() < 0 || c.unitPer() == null ? ""
+                    : Money.format(c.unitPriceCents(), store.getCurrency()) + " / " + c.unitPer();
             v.soldOut = c.available() == 0;
             v.rating = c.ratingCount() > 0 ? stars10(c.rating()) : "";
             v.ratingCount = c.ratingCount();

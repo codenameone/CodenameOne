@@ -21,7 +21,10 @@ TEMPLATES = os.path.join(HERE, "src", "main", "resources", "templates")
 # Source file -> published stem and extension.
 ASSETS = [("app.css", "app", "css"), ("app.js", "app", "js"),
           ("htmx.js", "htmx", "js"), ("shop.css", "shop", "css"), ("shop.js", "shop", "js"),
-          ("chat.css", "chat", "css"), ("chat.js", "chat", "js"), ("rtc.js", "rtc", "js")]
+          ("chat.css", "chat", "css"), ("chat.js", "chat", "js"), ("rtc.js", "rtc", "js"),
+          # The vendored 3D model viewer (MODEL-VIEWER-NOTICE.txt), loaded only by
+          # a product page with a model.
+          ("model-viewer.js", "model-viewer", "js")]
 
 # Java sources that name an asset (pages answered without a view). Found by file
 # name, not by path: a project generated from this sample has its own package.

@@ -44,5 +44,15 @@ public class AdminRow {
     /// A variant's cost per item as typed, and its margin and markup in words.
     public String cost = "";
     public String margin = "";
+    /// A variant's customs fields: HS code and country of origin.
+    public String hs = "";
+    public String origin = "";
+    /// A variant's unit pricing: the measure sold ("750"), its unit, the
+    /// reference quantity and unit, and the unit price it comes to.
+    public String measure = "";
+    public String unit = "";
+    public String reference = "";
+    public String referenceUnit = "";
+    public String unitPrice = "";
     public boolean flag;
 }

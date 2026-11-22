@@ -197,7 +197,7 @@ public final class ProductCsv {
                     cents(cell(row, at[PRICE])), cents(cell(row, at[COMPARE])),
                     cents(cell(row, at[COST])), integer(cell(row, at[WEIGHT])),
                     true, true, false, current.variants.size(), 0, new ArrayList<StockDto>(),
-                    false));
+                    false, null, null, 0L, null, 0, null));
         }
         if (current != null) {
             out.add(current.build());
@@ -371,7 +371,7 @@ public final class ProductCsv {
             }
             return new ProductDto(null, null, handle, title, description, vendor, type, tags,
                     status, "", "", null, 0, 0, options, variants,
-                    new ArrayList<ProductPhotoDto>(), new ArrayList<String>());
+                    new ArrayList<ProductPhotoDto>(), new ArrayList<String>(), -1);
         }
     }
 }

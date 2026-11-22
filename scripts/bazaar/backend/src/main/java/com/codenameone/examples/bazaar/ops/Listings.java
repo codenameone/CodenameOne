@@ -232,7 +232,7 @@ public class Listings {
             }
             variants.add(new VariantDto(null, null, size == null ? "Default" : size, size, null, null,
                     it.sku, null, it.priceCents, 0, 0, 0, true, true, false, iter, it.quantity, null,
-                    false));
+                    false, null, null, 0, null, 0, null));
         }
         if (sized) {
             options.add(new OptionDto(null, "Size", sizes, 0));
@@ -242,6 +242,6 @@ public class Listings {
             tags.add(Codes.cut(l.category, 60));
         }
         return new ProductDto(null, null, null, Codes.cut(title, 200), l.description, l.brand,
-                l.category, tags, null, null, null, null, 0, 0, options, variants, null, null);
+                l.category, tags, null, null, null, null, 0, 0, options, variants, null, null, -1);
     }
 }

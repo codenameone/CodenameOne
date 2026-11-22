@@ -185,6 +185,21 @@ Gallery rows in `product_photo` have a `kind`: `IMAGE`, `VIDEO` or `MODEL`. An
 uploaded video or model is served at `/media/file/{id}` with single byte ranges
 and a year of caching; a linked video is a link out, since the page policy only
 allows `media-src 'self'`. The product's main photo is always its first picture.
+A product page with a model loads Google's `<model-viewer>` from
+`web-src/model-viewer.js` (licenses in `web-src/MODEL-VIEWER-NOTICE.txt`) as a
+module script from `/static`; no other page loads it. Its policy adds `blob:` to
+`img-src` and `connect-src` (`WebHeaders.allowModelViewer`), since the viewer
+decodes a model's textures from URLs it makes itself, and nothing else. The
+viewer fetches Draco and KTX2 decoders from Google's servers, which the policy
+refuses, so a model compressed that way shows its poster.
+
+`product.category_id` is an id from the first two levels of Google's product
+taxonomy, read from `taxonomy/google-product-taxonomy.txt` by `Taxonomy`; the
+app searches it through `GET /api/shop/taxonomy`. Variants carry `hs_code`,
+`origin_country` and unit pricing: `unit_quantity` in thousandths of
+`unit_name`, priced per `unit_reference` of `unit_reference_name`.
+`UnitPricing` in `shared` computes the unit price in cents, half up, and answers
+-1 for no measure, two kinds of unit or a result too large to compute.
 
 [[bazaar-payments]]
 === Authorize at checkout, capture at shipping
@@ -628,6 +643,10 @@ header against the secret and records the scans the way polling does. Polling
 stays on as a backstop, once per parcel every
 `bazaar.carrier.easypost.poll.minutes` (30 by default). A bought label keeps its
 printable URL on the shipment. Development profiles keep the simulated carrier.
+A parcel whose destination country differs from the origin's goes with
+`customs_info`: one item per line with its HS code (the variant's, else the
+product's), country of origin, quantity, value and weight, certified by the
+origin's name.
 
 The same carrier prices checkout. A shipping rate of type `CARRIER` in a zone
 asks the carrier, for the cart's weight from the store's first active location

@@ -27,6 +27,8 @@ import java.util.List;
 /// @param minPriceCents The cheapest variant.
 /// @param available Units available across every location, or -1 when the product tracks no stock.
 /// @param rating Average stars times ten (45 = 4.5), 0 without reviews.
+/// @param unitPriceCents The cheapest variant's unit price, or -1 when it is not sold by measure.
+/// @param unitPer What `unitPriceCents` is per, such as "100 g".
 @Mapped
 public record ProductCardDto(
         String id,
@@ -44,5 +46,7 @@ public record ProductCardDto(
         int available,
         int rating,
         int ratingCount,
-        int variantCount) {
+        int variantCount,
+        long unitPriceCents,
+        String unitPer) {
 }

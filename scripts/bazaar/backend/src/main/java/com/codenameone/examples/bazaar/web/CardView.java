@@ -26,6 +26,8 @@ public final class CardView {
     public String price = "";
     /// The struck-through former price, or empty.
     public String compareAt = "";
+    /// "$4.00 / 100 g" for a product sold by measure, else empty.
+    public String unitPrice = "";
     public boolean soldOut;
     /// Stars out of five, rounded, as text (`4.5`), or empty when unrated.
     public String rating = "";

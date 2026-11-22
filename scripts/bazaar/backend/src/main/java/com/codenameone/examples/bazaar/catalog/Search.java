@@ -35,12 +35,15 @@ final class Search {
     static final String TYPE = "type";
     static final String VENDOR = "vendor";
     static final String PRICE = "price";
+    static final String CATEGORY = "category";
 
     String[] words = new String[0];
     String collectionId = "";
     String tag = "";
     String type = "";
     String vendor = "";
+    /// A taxonomy category, 0 for any; a top-level one takes those under it.
+    int category;
     long min = -1;
     long max = -1;
     String sort = "relevance";
@@ -100,6 +103,10 @@ final class Search {
         }
         if (!VENDOR.equals(skip) && vendor.length() > 0
                 && !vendor.equalsIgnoreCase(product.getVendor())) {
+            return false;
+        }
+        if (!CATEGORY.equals(skip) && category > 0
+                && !Taxonomy.within(product.getCategoryId(), category)) {
             return false;
         }
         if (!PRICE.equals(skip)) {

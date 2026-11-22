@@ -26,6 +26,7 @@ import java.util.List;
 /// left out are deleted; options likewise. `costCents` is only answered to staff.
 ///
 /// @param rating Average stars times ten.
+/// @param categoryId Its Google product taxonomy category, or 0.
 @Mapped
 public record ProductDto(
         String id,
@@ -45,5 +46,6 @@ public record ProductDto(
         List<OptionDto> options,
         List<VariantDto> variants,
         List<ProductPhotoDto> photos,
-        List<String> collectionIds) {
+        List<String> collectionIds,
+        int categoryId) {
 }

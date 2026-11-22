@@ -38,7 +38,8 @@ public final class Art {
     public final boolean video;
     /// A video linked on another site: a link out, never embedded.
     public final boolean videoLink;
-    /// A 3D model (`.glb`): a link to the file.
+    /// A 3D model (`.glb`): shown in the vendored model viewer, with a link
+    /// to the file under it.
     public final boolean model;
     /// The poster frame of a video: the product's first picture, or empty.
     public final String poster;

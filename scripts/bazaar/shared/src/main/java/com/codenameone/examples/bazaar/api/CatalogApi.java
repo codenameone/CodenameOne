@@ -153,6 +153,12 @@ public interface CatalogApi {
     void setBundle(@Path("storeId") String storeId, @Path("productId") String productId,
             @Body BundleDto bundle, OnComplete<Response<BundleDto>> callback);
 
+    /// Categories of the product taxonomy whose path has every word of `q`
+    /// (or the one category whose id `q` is), each as its path and id
+    /// ([NameCountDto] `name` and `count`); at most 40.
+    @GET("/api/shop/taxonomy")
+    void taxonomy(@Query("q") String q, OnComplete<Response<List<NameCountDto>>> callback);
+
     /// A product's publishing window on every channel the store sells on; a
     /// channel with no window answers 0 for both bounds.
     @GET("/api/merchant/stores/{storeId}/products/{productId}/schedule")

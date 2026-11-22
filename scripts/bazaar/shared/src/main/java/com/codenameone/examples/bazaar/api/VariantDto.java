@@ -26,6 +26,10 @@ import java.util.List;
 ///
 /// @param available Across every location; `stock` per location.
 /// @param digital Delivered as a download: needs no shipping.
+/// @param hsCode Harmonized System code for customs, 6 to 10 digits; empty to use the product's.
+/// @param originCountry ISO 3166 country of origin for customs, or empty.
+/// @param unitQuantity The measure sold for unit pricing, in thousandths of `unitName`; 0 for none.
+/// @param unitReference The quantity of `unitReferenceName` a unit price is shown per.
 @Mapped
 public record VariantDto(
         String id,
@@ -46,5 +50,11 @@ public record VariantDto(
         int position,
         int available,
         List<StockDto> stock,
-        boolean digital) {
+        boolean digital,
+        String hsCode,
+        String originCountry,
+        long unitQuantity,
+        String unitName,
+        int unitReference,
+        String unitReferenceName) {
 }

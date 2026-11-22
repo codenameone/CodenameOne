@@ -262,7 +262,8 @@ public class Services {
         String kind = chosen.trim().length() > 0 ? chosen.trim()
                 : config.isDevelopmentProfile() ? SimulatedCarrier.NAME : "";
         if (SimulatedCarrier.NAME.equalsIgnoreCase(kind)) {
-            return new SimulatedCarrier(Math.max(1, stepSeconds) * 1000L);
+            return new SimulatedCarrier(Math.max(1, stepSeconds) * 1000L,
+                    config.get("bazaar.carrier.origin.country", "US"));
         }
         if (EasyPostCarrier.NAME.equalsIgnoreCase(kind)) {
             String key = config.get("bazaar.carrier.easypost.key", "").trim();

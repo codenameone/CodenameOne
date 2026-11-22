@@ -41,6 +41,8 @@ import com.codenameone.examples.bazaar.api.ProductPageDto;
 import com.codenameone.examples.bazaar.api.ProductPhotoDto;
 import com.codenameone.examples.bazaar.api.StockDto;
 import com.codenameone.examples.bazaar.api.VariantDto;
+import com.codenameone.examples.bazaar.ops.Customs;
+import com.codenameone.examples.bazaar.ops.UnitPricing;
 import com.codenameone.examples.bazaar.cart.Codes;
 import com.codenameone.examples.bazaar.domain.Collection;
 import com.codenameone.examples.bazaar.domain.CollectionProduct;
@@ -241,6 +243,21 @@ public class Catalog {
             long compare = 0;
             boolean tracked = false;
             int stock = 0;
+            // The unit price of the cheapest variant sold by measure.
+            long[] unit = {-1, Long.MAX_VALUE};
+            String unitPer = "";
+            for (int iter = 0; iter < mine.size(); iter++) {
+                Variant variant = mine.get(iter);
+                long u = UnitPricing.unitPriceCents(variant.getPriceCents(),
+                        variant.getUnitQuantity(), variant.getUnitName(),
+                        variant.getUnitReference(), variant.getUnitReferenceName());
+                if (u >= 0 && variant.getPriceCents() < unit[1]) {
+                    unit[0] = u;
+                    unit[1] = variant.getPriceCents();
+                    unitPer = UnitPricing.per(variant.getUnitReference(),
+                            variant.getUnitReferenceName());
+                }
+            }
             for (int iter = 0; iter < mine.size(); iter++) {
                 Variant variant = mine.get(iter);
                 compare = Math.max(compare, variant.getCompareAtCents());
@@ -254,7 +271,8 @@ public class Catalog {
                     product.getTitle(), product.getVendor(), product.getProductType(),
                     tags(product.getTags()), product.getStatus(), product.getPhotoId(), range[0],
                     range[1], compare, tracked ? stock : -1, rating(product),
-                    (int) product.getRatingCount(), mine.size());
+                    (int) product.getRatingCount(), mine.size(), unit[0] < 0 ? -1 : unit[0],
+                    unit[0] < 0 ? "" : unitPer);
         }
     }
 
@@ -311,8 +329,62 @@ public class Catalog {
     @Transactional(readOnly = true)
     public ProductPageDto browse(String handle, String collection, String q, String sort,
             int page, int size) throws IOException {
-        return products(handle, collection, Search.of(q, null, null, null, null, null, sort,
-                Integer.toString(page), Integer.toString(size)));
+        return browse(handle, collection, q, sort, page, size, 0);
+    }
+
+    /// [#browse(String, String, String, String, int, int)] narrowed to a
+    /// taxonomy category (0 for any); a top-level category takes the ones
+    /// under it.
+    @Transactional(readOnly = true)
+    public ProductPageDto browse(String handle, String collection, String q, String sort,
+            int page, int size, int category) throws IOException {
+        Search search = Search.of(q, null, null, null, null, null, sort,
+                Integer.toString(page), Integer.toString(size));
+        search.category = Math.max(0, category);
+        return products(handle, collection, search);
+    }
+
+    /// The top-level taxonomy categories of an active store's products (in a
+    /// published collection, or all for null) that match `q`, each as
+    /// `{id, count}`, most products first: the storefront's category filter.
+    @Transactional(readOnly = true)
+    public List<int[]> categoryCounts(String handle, String collection, String q)
+            throws IOException {
+        Store store = storeService.activeStore(handle);
+        Snapshot snapshot = new Snapshot(store.getId(), ACTIVE, true).forViewer(store.getId());
+        Search search = Search.of(q, null, null, null, null, null, null, null, null);
+        search.collectionId = collectionId(snapshot, collection, true);
+        List<int[]> out = new ArrayList<int[]>();
+        for (int iter = 0; iter < snapshot.list.size(); iter++) {
+            Product product = snapshot.list.get(iter);
+            int top = Taxonomy.top(product.getCategoryId());
+            if (top <= 0 || !snapshot.matches(search, product, Search.CATEGORY)) {
+                continue;
+            }
+            int[] seen = null;
+            for (int c = 0; c < out.size() && seen == null; c++) {
+                if (out.get(c)[0] == top) {
+                    seen = out.get(c);
+                }
+            }
+            if (seen == null) {
+                out.add(new int[] {top, 1});
+            } else {
+                seen[1]++;
+            }
+        }
+        // An insertion sort, most products first then taxonomy name.
+        for (int i = 1; i < out.size(); i++) {
+            int[] item = out.get(i);
+            int j = i - 1;
+            while (j >= 0 && (out.get(j)[1] < item[1] || out.get(j)[1] == item[1]
+                    && Taxonomy.path(out.get(j)[0]).compareTo(Taxonomy.path(item[0])) > 0)) {
+                out.set(j + 1, out.get(j));
+                j--;
+            }
+            out.set(j + 1, item);
+        }
+        return out;
     }
 
     @Transactional(readOnly = true)
@@ -1262,7 +1334,7 @@ public class Catalog {
                 product.getProductType(), tags(product.getTags()), product.getStatus(),
                 product.getSeoTitle(), product.getSeoDescription(), product.getPhotoId(),
                 rating(product), (int) product.getRatingCount(), optionDtos, variantDtos,
-                photoDtos, collectionIds);
+                photoDtos, collectionIds, product.getCategoryId());
     }
 
     /// A bundle variant as its components make it: tracked, with the
@@ -1285,7 +1357,9 @@ public class Catalog {
         return new VariantDto(d.id(), d.productId(), d.title(), d.option1(), d.option2(),
                 d.option3(), d.sku(), d.barcode(), d.priceCents(), d.compareAtCents(),
                 d.costCents(), d.weightGrams(), d.taxable(), true, false, d.position(),
-                Math.min(total, Bundles.UNLIMITED), per, d.digital());
+                Math.min(total, Bundles.UNLIMITED), per, d.digital(), d.hsCode(),
+                d.originCountry(), d.unitQuantity(), d.unitName(), d.unitReference(),
+                d.unitReferenceName());
     }
 
     private static VariantDto toDto(Variant v, List<InventoryLevel> stock, List<Location> places,
@@ -1313,7 +1387,9 @@ public class Catalog {
                 v.getOption2(), v.getOption3(), v.getSku(), v.getBarcode(), v.getPriceCents(),
                 v.getCompareAtCents(), staff ? v.getCostCents() : 0, v.getWeightGrams(),
                 v.isTaxable(), v.isTrackInventory(), v.isAllowBackorder(), v.getPosition(),
-                v.isTrackInventory() ? total : -1, per, v.isDigital());
+                v.isTrackInventory() ? total : -1, per, v.isDigital(), v.getHsCode(),
+                v.getOriginCountry(), v.getUnitQuantity(), v.getUnitName(),
+                v.getUnitReference(), v.getUnitReferenceName());
     }
 
     public static CollectionDto toDto(Collection c, List<String> productIds) {
@@ -1334,6 +1410,14 @@ public class Catalog {
         product.setSeoTitle(Text.optional(wanted.seoTitle(), 200, "the search title"));
         product.setSeoDescription(Text.optional(wanted.seoDescription(), 320,
                 "the search description"));
+        // Negative leaves the category as it is (an import that does not
+        // know it); 0 clears it.
+        if (wanted.categoryId() > 0 && !Taxonomy.known(wanted.categoryId())) {
+            throw new ResponseStatusException(400, "Choose a category from the list");
+        }
+        if (wanted.categoryId() >= 0) {
+            product.setCategoryId(wanted.categoryId());
+        }
         product.setUpdatedAt(Instant.now());
     }
 
@@ -1375,7 +1459,7 @@ public class Catalog {
         } else if (variants.findByProductIdOrderByPositionAsc(product.getId()).isEmpty()) {
             List<VariantDto> one = new ArrayList<VariantDto>();
             one.add(new VariantDto(null, null, "", "", "", "", "", "", 0, 0, 0, 0, true, true,
-                    false, 0, 0, null, false));
+                    false, 0, 0, null, false, null, null, 0, null, 0, null));
             saveVariants(product, one);
         }
         if (wanted.photos() != null) {
@@ -1502,6 +1586,7 @@ public class Catalog {
             v.setTrackInventory(w.trackInventory());
             v.setAllowBackorder(w.allowBackorder());
             v.setDigital(w.digital());
+            customsAndUnits(v, w);
             v.setPosition(iter);
             if (fresh) {
                 variants.insert(v);
@@ -1514,6 +1599,52 @@ public class Catalog {
                 variants.save(v);
             }
         }
+    }
+
+    /// The customs and unit pricing fields of `w` into `v`, checked. A field
+    /// sent as null is left as it is, so a client that does not know them
+    /// (an import, an older app) never clears them.
+    static void customsAndUnits(Variant v, VariantDto w) {
+        if (w.hsCode() != null) {
+            String hs = Customs.hsCode(w.hsCode());
+            if (hs == null) {
+                throw new ResponseStatusException(400, "An HS code is 6 to 10 digits");
+            }
+            v.setHsCode(hs);
+        }
+        if (w.originCountry() != null) {
+            String c = Customs.country(w.originCountry());
+            if (c == null) {
+                throw new ResponseStatusException(400,
+                        "The country of origin is a two-letter ISO code");
+            }
+            v.setOriginCountry(c);
+        }
+        if (w.unitName() == null) {
+            return;
+        }
+        if (w.unitName().length() == 0 || w.unitQuantity() == 0) {
+            v.setUnitQuantity(0);
+            v.setUnitName("");
+            v.setUnitReference(0);
+            v.setUnitReferenceName("");
+            return;
+        }
+        // No reference unit: the price is shown per the measure's own unit.
+        String ref = w.unitReferenceName() == null || w.unitReferenceName().length() == 0
+                ? w.unitName() : w.unitReferenceName();
+        if (!UnitPricing.compatible(w.unitName(), ref)) {
+            throw new ResponseStatusException(400,
+                    "The measure and the unit price must use units of the same kind");
+        }
+        if (w.unitQuantity() < 0 || w.unitQuantity() > UnitPricing.MAX_QUANTITY
+                || w.unitReference() <= 0 || w.unitReference() > UnitPricing.MAX_REFERENCE) {
+            throw new ResponseStatusException(400, "The measure is out of range");
+        }
+        v.setUnitQuantity(w.unitQuantity());
+        v.setUnitName(w.unitName());
+        v.setUnitReference(w.unitReference());
+        v.setUnitReferenceName(ref);
     }
 
     private static String variantTitle(Variant v) {

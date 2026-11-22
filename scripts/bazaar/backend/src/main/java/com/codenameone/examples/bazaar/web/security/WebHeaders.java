@@ -44,6 +44,8 @@ public final class WebHeaders implements SecurityFilter {
     public static final String NONCE = "bazaar.cspNonce";
     /// The exchange attribute a page's extra sources are kept under.
     public static final String SOURCES = "bazaar.cspSources";
+    /// Set on the exchange of a page that shows a 3D model ([#allowModelViewer()]).
+    public static final String MODELS = "bazaar.cspModels";
     /// Set by a response that wrote its own policy (the widget sandbox).
     public static final String OWN_POLICY = "X-Bazaar-Own-Policy";
 
@@ -98,6 +100,20 @@ public final class WebHeaders implements SecurityFilter {
         had.addAll(sources);
     }
 
+    /// Widens the policy of the request being served for the vendored 3D
+    /// model viewer (`/static/model-viewer.*.js`, loaded only by a page with a
+    /// model): it decodes the textures inside a `.glb` from `blob:` URLs it
+    /// makes itself, as images or by fetching them. Nothing else changes --
+    /// no other origin, no inline script or style, no workers; a compressed
+    /// model, whose decoders the viewer would fetch from another site, shows
+    /// its poster instead.
+    public static void allowModelViewer() {
+        SecurityExchange exchange = SecurityExchange.current();
+        if (exchange != null) {
+            exchange.setAttribute(MODELS, "1");
+        }
+    }
+
     @Override
     public HttpServer.Response doFilter(HttpServer.Request request, FilterChain chain)
             throws Exception {
@@ -124,7 +140,8 @@ public final class WebHeaders implements SecurityFilter {
         exchange.setResponseHeader("X-Frame-Options", "DENY");
         exchange.setResponseHeader("Cross-Origin-Opener-Policy", "same-origin");
         exchange.setResponseHeader("Content-Security-Policy",
-                policy(nonce, (CspSources) exchange.getAttribute(SOURCES)));
+                policy(nonce, (CspSources) exchange.getAttribute(SOURCES),
+                        exchange.getAttribute(MODELS) != null));
         return response;
     }
 
@@ -133,6 +150,12 @@ public final class WebHeaders implements SecurityFilter {
     /// all, and inline style only as the public templates have it
     /// ([InlineHashes]).
     public static String policy(String nonce, CspSources extra) {
+        return policy(nonce, extra, false);
+    }
+
+    /// [#policy(String, CspSources)], with `blob:` images and fetches for the
+    /// 3D model viewer when `models` ([#allowModelViewer()]).
+    public static String policy(String nonce, CspSources extra, boolean models) {
         StringBuilder b = new StringBuilder();
         b.append("default-src 'self'; script-src 'self'");
         if (nonce != null) {
@@ -152,11 +175,17 @@ public final class WebHeaders implements SecurityFilter {
             b.append(" 'nonce-").append(nonce).append('\'');
         }
         b.append("; img-src 'self' data:");
+        if (models) {
+            b.append(" blob:");
+        }
         CspSources.append(extra, b, CspSources.IMG);
         // A product's uploaded video plays from this origin only; a video
         // the merchant links elsewhere is a link out, never embedded.
         b.append("; media-src 'self'");
         b.append("; connect-src 'self'");
+        if (models) {
+            b.append(" blob:");
+        }
         CspSources.append(extra, b, CspSources.CONNECT);
         b.append("; frame-src 'self'");
         CspSources.append(extra, b, CspSources.FRAME);

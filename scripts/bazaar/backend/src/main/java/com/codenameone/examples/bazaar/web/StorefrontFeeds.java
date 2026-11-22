@@ -106,6 +106,16 @@ public class StorefrontFeeds {
         String brand;
         String gtin;
         String sku;
+        /// The Google product taxonomy id, 0 for none.
+        int category;
+        /// `750ml` and `1l`, or empty when the variant is not sold by measure.
+        String unitMeasure = "";
+        String unitBase = "";
+    }
+
+    /// A unit as Google's unit pricing attributes spell it.
+    static String feedUnit(String unit) {
+        return "m2".equals(unit) ? "sqm" : unit;
     }
 
     @GetMapping("/s/{handle}/feeds/{market}/products.xml")
@@ -144,6 +154,13 @@ public class StorefrontFeeds {
             if (r.sku.length() > 0) {
                 tag(x, "g:mpn", r.sku);
             }
+            if (r.category > 0) {
+                tag(x, "g:google_product_category", Integer.toString(r.category));
+            }
+            if (r.unitMeasure.length() > 0) {
+                tag(x, "g:unit_pricing_measure", r.unitMeasure);
+                tag(x, "g:unit_pricing_base_measure", r.unitBase);
+            }
             x.append("</item>\n");
         }
         x.append("</channel>\n</rss>\n");
@@ -160,7 +177,8 @@ public class StorefrontFeeds {
         List<Row> rows = rows(store, market, request);
         StringBuilder c = new StringBuilder(4096);
         c.append("id,item_group_id,title,description,link,image_link,availability,price,"
-                + "condition,brand,gtin,mpn\r\n");
+                + "condition,brand,gtin,mpn,google_product_category,unit_pricing_measure,"
+                + "unit_pricing_base_measure\r\n");
         for (int iter = 0; iter < rows.size(); iter++) {
             Row r = rows.get(iter);
             cell(c, r.id, false);
@@ -174,7 +192,10 @@ public class StorefrontFeeds {
             cell(c, "new", false);
             cell(c, r.brand, false);
             cell(c, r.gtin, false);
-            cell(c, r.sku, true);
+            cell(c, r.sku, false);
+            cell(c, r.category > 0 ? Integer.toString(r.category) : "", false);
+            cell(c, r.unitMeasure, false);
+            cell(c, r.unitBase, true);
             c.append("\r\n");
         }
         return Conditional.answer(request, "text/csv; charset=utf-8",
@@ -256,6 +277,14 @@ public class StorefrontFeeds {
                 r.brand = product.getVendor().length() > 0 ? product.getVendor() : store.getName();
                 r.gtin = v.getBarcode();
                 r.sku = v.getSku();
+                r.category = product.getCategoryId();
+                if (com.codenameone.examples.bazaar.ops.UnitPricing.unitPriceCents(r.priceCents,
+                        v.getUnitQuantity(), v.getUnitName(), v.getUnitReference(),
+                        v.getUnitReferenceName()) >= 0) {
+                    r.unitMeasure = com.codenameone.examples.bazaar.ops.UnitPricing.quantity(
+                            v.getUnitQuantity()) + feedUnit(v.getUnitName());
+                    r.unitBase = v.getUnitReference() + feedUnit(v.getUnitReferenceName());
+                }
                 out.add(r);
             }
         }

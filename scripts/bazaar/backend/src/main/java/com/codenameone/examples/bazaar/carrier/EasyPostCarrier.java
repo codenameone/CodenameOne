@@ -86,6 +86,11 @@ public class EasyPostCarrier implements CarrierProvider {
     }
 
     @Override
+    public String originCountry() {
+        return origin == null ? "" : origin.country;
+    }
+
+    @Override
     public List<RateQuoteDto> rates(Parcel parcel, Place from, Place to) throws IOException {
         Map shipment = shipment(parcel, from, to);
         List<RateQuoteDto> out = new ArrayList<RateQuoteDto>();
@@ -283,12 +288,61 @@ public class EasyPostCarrier implements CarrierProvider {
         // EasyPost weighs in ounces; round up so a label is never underpaid.
         p.put("weight", Long.valueOf((Math.max(1, parcel.weightGrams) * 1000L + 28349) / 28350));
         Map s = new LinkedHashMap();
-        s.put("from_address", address(from.postal.length() > 0 ? from : merge(from, origin)));
+        Place sender = from.postal.length() > 0 ? from : merge(from, origin);
+        s.put("from_address", address(sender));
         s.put("to_address", address(to));
         s.put("parcel", p);
+        // Decided on the address actually sent: a location's Place carries no
+        // country of its own and takes the configured origin's.
+        if (!parcel.items.isEmpty() && CarrierProvider.crossesBorder(sender.country, to.country)) {
+            s.put("customs_info", customs(parcel.items, sender.name));
+        }
         Map body = new LinkedHashMap();
         body.put("shipment", s);
         return call("POST", "/shipments", Json.write(body));
+    }
+
+    /// EasyPost's customs_info: one customs_item per line, each with its total
+    /// value in the currency's major unit and total weight in ounces.
+    static Map customs(List<CustomsItem> items, String signer) {
+        List<Object> list = new ArrayList<Object>();
+        for (int iter = 0; iter < items.size(); iter++) {
+            CustomsItem it = items.get(iter);
+            Map m = new LinkedHashMap();
+            m.put("description", it.description.length() > 0 ? it.description : "Merchandise");
+            m.put("quantity", Integer.valueOf(Math.max(1, it.quantity)));
+            m.put("value", decimal(it.valueCents));
+            m.put("weight", Long.valueOf((Math.max(1, it.weightGrams) * 1000L + 28349) / 28350));
+            if (it.hsCode.length() > 0) {
+                m.put("hs_tariff_number", it.hsCode);
+            }
+            if (it.originCountry.length() > 0) {
+                m.put("origin_country", it.originCountry);
+            }
+            if (it.currency.length() > 0) {
+                m.put("currency", it.currency);
+            }
+            if (it.sku.length() > 0) {
+                m.put("code", it.sku);
+            }
+            list.add(m);
+        }
+        Map c = new LinkedHashMap();
+        c.put("contents_type", "merchandise");
+        c.put("customs_certify", Boolean.TRUE);
+        c.put("customs_signer", signer == null || signer.length() == 0 ? "Shipping" : signer);
+        c.put("non_delivery_option", "return");
+        c.put("restriction_type", "none");
+        c.put("eel_pfc", "NOEEI 30.37(a)");
+        c.put("customs_items", list);
+        return c;
+    }
+
+    /// Cents as a plain decimal: 1250 is "12.50".
+    public static String decimal(long cents) {
+        long c = Math.max(0, cents);
+        long frac = c % 100;
+        return (c / 100) + "." + (frac < 10 ? "0" : "") + frac;
     }
 
     private static Place merge(Place p, Place fallback) {

@@ -30,6 +30,17 @@ public final class ProductView {
     public String compareAt = "";
     /// The price as a plain decimal (`12.50`), for structured data.
     public String amount = "";
+    /// "$4.00 / 100 g" for the chosen variant sold by measure, else empty.
+    public String unitPrice = "";
+    /// The unit price for structured data: the amount, the reference
+    /// quantity and its unit; empty when there is none.
+    public String unitAmount = "";
+    public int unitReference;
+    public String unitReferenceName = "";
+    /// The product's taxonomy category path, or empty.
+    public String category = "";
+    /// Whether the gallery has a 3D model, so the page loads the viewer.
+    public boolean hasModel;
     public String currency = "";
     /// A banner suggesting the market of the visitor's country, or empty.
     public String geoNote = "";

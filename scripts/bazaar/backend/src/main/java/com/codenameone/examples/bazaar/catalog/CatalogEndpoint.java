@@ -27,6 +27,7 @@ import com.codenameone.examples.bazaar.api.CatalogApiServer;
 import com.codenameone.examples.bazaar.api.CollectionDto;
 import com.codenameone.examples.bazaar.api.CountDto;
 import com.codenameone.examples.bazaar.api.FacetsDto;
+import com.codenameone.examples.bazaar.api.NameCountDto;
 import com.codenameone.examples.bazaar.api.PhotoDto;
 import com.codenameone.examples.bazaar.api.ProductDto;
 import com.codenameone.examples.bazaar.api.ProductPageDto;
@@ -183,6 +184,21 @@ public class CatalogEndpoint implements CatalogApiServer {
     public CollectionDto updateCollection(String storeId, String collectionId,
             CollectionDto collection) throws Exception {
         return catalog.updateCollection(Caller.name(), storeId, collectionId, collection);
+    }
+
+    @Override
+    public List<NameCountDto> taxonomy(String q) throws Exception {
+        String text = q == null ? "" : q.trim();
+        if (text.length() > 120) {
+            return new java.util.ArrayList<NameCountDto>();
+        }
+        int id = Taxonomy.parse(text);
+        if (id > 0) {
+            List<NameCountDto> one = new java.util.ArrayList<NameCountDto>();
+            one.add(new NameCountDto(Taxonomy.path(id), id));
+            return one;
+        }
+        return Taxonomy.search(text, 40);
     }
 
     @Override

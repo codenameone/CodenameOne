@@ -144,7 +144,16 @@ in the order mail, on the confirmation page and on the buyer's order page; a
 register sale emails them. A full refund stops a line's link, and the order page
 in the back office can revoke one by hand. The gallery also takes videos (an
 MP4 or WebM file, or an `https` link) and 3D models (`.glb` files), in any order
-with the pictures; the storefront plays the video and links the model.
+with the pictures; the storefront plays the video and shows the model in a
+viewer you can turn and zoom, and the app links the model file.
+
+A product can have a category from Google's product taxonomy, found by typing a
+word of it ("tea", "shoes") in the product editor. Shopping feeds send it, and a
+collection page in the browser offers its products' categories as a filter.
+Each variant can also carry customs details, an HS code and a country of origin,
+which go to the carrier for a parcel that leaves the country and onto the
+packing slip of such an order; and a measure with the unit to price it by (250
+g, priced per 100 g), so shoppers see "$4.00 / 100 g" beside the price.
 Collections are either chosen by hand or smart, defined by rules such as a tag or
 a price range.
 

@@ -244,6 +244,8 @@ public class Documents {
                 new String[] {"", "Item", "SKU", "Barcode", "Qty"},
                 new boolean[] {false, false, false, false, true});
         List<OrderLine> ls = lines.findByOrderId(orderId);
+        List<OrderLine> picked = new java.util.ArrayList<OrderLine>();
+        List<Integer> quantities = new java.util.ArrayList<Integer>();
         int units = 0;
         if (fulfillmentId != null && fulfillmentId.length() > 0) {
             Fulfillment f = fulfillments.require(storeId, fulfillmentId);
@@ -256,6 +258,10 @@ public class Documents {
                 t.checkRow(fl.get(iter).title(), fl.get(iter).sku(), barcode(l),
                         Integer.toString(fl.get(iter).quantity()));
                 units += fl.get(iter).quantity();
+                if (l != null) {
+                    picked.add(l);
+                    quantities.add(Integer.valueOf(fl.get(iter).quantity()));
+                }
             }
         } else {
             for (int iter = 0; iter < ls.size(); iter++) {
@@ -264,15 +270,46 @@ public class Documents {
                 if (q > 0) {
                     t.checkRow(title(l), l.getSku(), barcode(l), Integer.toString(q));
                     units += q;
+                    picked.add(l);
+                    quantities.add(Integer.valueOf(q));
                 }
             }
         }
         t.end();
         sheet.text(units + (units == 1 ? " item" : " items") + " in this parcel.");
+        if (fulfillments.international(o)) {
+            customs(sheet, o, fulfillments.customsItems(o, picked, quantities));
+        }
         if (o.getNote().length() > 0) {
             sheet.space(6).heading("Note").text(o.getNote());
         }
         sheet.space(10).muted("Packed by ____________________    Checked by ____________________");
+    }
+
+    /// The customs data of an international parcel: each item's HS code,
+    /// country of origin and declared value, so the slip agrees with the
+    /// declaration the label was bought with.
+    private static void customs(Sheet sheet, StoreOrder o,
+            List<com.codenameone.examples.bazaar.carrier.CarrierProvider.CustomsItem> items) {
+        if (items.isEmpty()) {
+            return;
+        }
+        sheet.space(6).heading("Customs");
+        Sheet.Table t = sheet.table(new float[] {3.8f, 1.6f, 0.9f, 0.7f, 1.9f},
+                new String[] {"Item", "HS code", "Origin", "Qty", "Value"},
+                new boolean[] {false, false, false, true, true});
+        long total = 0;
+        for (int iter = 0; iter < items.size(); iter++) {
+            com.codenameone.examples.bazaar.carrier.CarrierProvider.CustomsItem it =
+                    items.get(iter);
+            t.row(it.description, it.hsCode.length() > 0 ? it.hsCode : "-",
+                    it.originCountry.length() > 0 ? it.originCountry : "-",
+                    Integer.toString(it.quantity), Sheet.money(it.valueCents, o.getCurrency()));
+            total += it.valueCents;
+        }
+        t.end();
+        sheet.text("Declared value " + Sheet.money(total, o.getCurrency()) + ", shipped to "
+                + o.getShipCountry() + ".");
     }
 
     // ---------------------------------------------------------------- label
