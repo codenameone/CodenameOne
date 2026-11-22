@@ -100,7 +100,6 @@ public class StorefrontPages {
     public static final String PREVIEW = "bazaar.themePreview";
 
     private final com.codenameone.examples.bazaar.ops.Attribution attribution;
-    private final com.codenameone.examples.bazaar.ops.ChatInbox chatInbox;
 
     public StorefrontPages(Stores stores, Catalog catalog, Carts carts, StoreRepository storeRows,
             ProductRepository products, CollectionRepository collections,
@@ -110,7 +109,6 @@ public class StorefrontPages {
             com.codenameone.examples.bazaar.market.Markets markets,
             com.codenameone.examples.bazaar.market.Translations translations,
             com.codenameone.examples.bazaar.ops.Attribution attribution,
-            com.codenameone.examples.bazaar.ops.ChatInbox chatInbox,
             com.codenameone.examples.bazaar.content.Themes themes,
             com.codenameone.examples.bazaar.content.Navigation navigation,
             com.codenameone.examples.bazaar.content.Pages content,
@@ -122,7 +120,6 @@ public class StorefrontPages {
         this.content = content;
         this.metafields = metafields;
         this.attribution = attribution;
-        this.chatInbox = chatInbox;
         this.subscriptions = subscriptions;
         this.markets = markets;
         this.translations = translations;
@@ -330,7 +327,6 @@ public class StorefrontPages {
             view.geoNote = market.suggested.label;
             view.geoUrl = market.suggested.url;
         }
-        view.markets = market.picker.size() > 1 ? market.picker : new ArrayList<LinkView>();
         if (market.locale != null) {
             Map<String, String> tr = translations.fields(store.getId(),
                     com.codenameone.examples.bazaar.market.Translations.PRODUCT, p.id(),
@@ -716,43 +712,6 @@ public class StorefrontPages {
         model.addAttribute("page", meta).addAttribute("privacy", slots.privacy(store, request));
     }
 
-    /// The chat page: the thread `token` opens (none yet when empty).
-    public void chat(String handle, String token, String error, Model model,
-            HttpServer.Request request) throws IOException {
-        Store store = stores.activeStore(handle);
-        String path = "/s/" + store.getHandle() + "/chat";
-        PageMeta meta = meta(store, request, path);
-        meta.title = meta.t.get("chat.link") + " - " + store.getName();
-        meta.noindex = true;
-        ChatView view = new ChatView();
-        view.action = path;
-        view.error = error == null ? "" : error;
-        if (token != null && token.length() > 0) {
-            List<com.codenameone.examples.bazaar.api.ChatMessageDto> m =
-                    chatInbox.thread(store.getId(), token);
-            view.token = token;
-            view.started = true;
-            for (int iter = 0; iter < m.size(); iter++) {
-                ChatView.Line l = new ChatView.Line();
-                l.author = m.get(iter).staff() ? store.getName() : m.get(iter).author();
-                l.body = m.get(iter).body();
-                l.staff = m.get(iter).staff();
-                l.when = com.codenameone.examples.bazaar.Days.iso(m.get(iter).at());
-                view.lines.add(l);
-            }
-        }
-        model.addAttribute("page", meta).addAttribute("chat", view);
-    }
-
-    /// A shopper's chat message; answers the conversation's token.
-    public String ask(String handle, String token, String name, String email, String message,
-            HttpServer.Request request) throws IOException {
-        Store store = stores.activeStore(handle);
-        return chatInbox.ask(store.getId(),
-                com.codenameone.examples.bazaar.web.security.Throttle.client(request), token, name,
-                email, message);
-    }
-
     // -------------------------------------------------------------- helpers
 
     PageMeta meta(Store store, HttpServer.Request request, String path) {
@@ -763,16 +722,28 @@ public class StorefrontPages {
         page.home = storeUrl(store.getHandle());
         page.cartUrl = "/s/" + store.getHandle() + "/cart";
         page.searchUrl = "/s/" + store.getHandle() + "/search";
-        page.chatUrl = "/s/" + store.getHandle() + "/chat";
+        page.chatStore = store.getHandle();
         page.description = describe(store.getTagline());
         try {
             // The interface language; choose() records the Vary (or the
             // private copy) the choice needs, once per request.
             int query = path.indexOf('?');
-            StoreText.apply(page, StorefrontMarkets.choose(store,
+            StorefrontMarkets.Choice choice = StorefrontMarkets.choose(store,
                     query < 0 ? path : path.substring(0, query), request, markets,
-                    translations, urls).ui);
+                    translations, urls);
+            StoreText.apply(page, choice.ui);
             StoreText.offer(page, request);
+            page.marketName = store.getCurrency();
+            if (choice.picker.size() > 1) {
+                page.markets = choice.picker;
+                for (int iter = 1; iter < choice.picker.size(); iter++) {
+                    LinkView m = choice.picker.get(iter);
+                    int open = m.label.lastIndexOf('(');
+                    if (m.current && open >= 0 && m.label.endsWith(")")) {
+                        page.marketName = m.label.substring(open + 1, m.label.length() - 1);
+                    }
+                }
+            }
             decorate(page, store, request, path);
             slots.decorate(page, store, request);
         } catch (IOException e) {

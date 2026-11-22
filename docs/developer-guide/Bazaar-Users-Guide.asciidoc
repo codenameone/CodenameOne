@@ -225,9 +225,14 @@ those pages; most of what they do is also on the app's screens.
 ==== Shopping on the web
 
 Each store lives at `/s/<handle>`: home, collections, search, product pages, the
-store's own pages and blog, and a cart. A shopper who picks a country from the
-market selector sees prices in that market's currency and, when the store has
-translated them, product names and descriptions in its language.
+store's own pages and blog, and a cart. The header has a globe menu for the
+language (English, Spanish, French, German and Hebrew, each named in its own
+language) and, when the store sells in more than one market, a market menu
+beside it. A shopper who picks a market sees prices in that market's currency
+and, when the store has translated them, product names and descriptions in its
+language. Both menus work from the keyboard, and without JavaScript they are
+plain forms. The header's *Open the app* link goes to the Bazaar app at `/app/`,
+and the platform's home page carries a card for it.
 
 Checkout happens on the page. A guest gives an email address and a delivery
 address; a signed-in shopper picks one of the saved addresses. Delivery options
@@ -242,8 +247,13 @@ and the confirmation say the item ships when stock arrives. An item that isn't
 on pre-order offers a form to be emailed when it's back. A shopper who left a
 cart gets a reminder whose link restores that cart on any device.
 
-The chat button opens a conversation with the store; replies arrive by email
-and on the same page. The cookie banner asks once which optional cookies the
+The chat bubble in the corner of every store page opens a conversation with
+the store. It shows whether anyone on the staff is online, when they're typing,
+and a tick for each message once it is delivered and another once it is read.
+The conversation follows the shopper from page to page and, once they sign in,
+to their account on another device. A shopper who leaves an email address gets
+replies there when the chat is closed. While someone on the staff is online the
+shopper can also place a voice or video call from the chat. The cookie banner asks once which optional cookies the
 shopper accepts, and the privacy page changes the answer later.
 
 A visitor can create an account at `/signup` and sign in with a password. Once
@@ -337,7 +347,9 @@ product, channel, source) and saves the result. The cohort grid shows how many
 customers of each month came back, and the attribution page shows sales by the
 campaign or site the customer came from. Permission sets give a staff member
 access to only some areas, at one location or all of them. The inbox answers
-chat messages, with saved replies. The listings page imports a marketplace CSV
+chat messages live, with assignment and saved replies: a conversation page shows
+the shopper typing and reading, and a call from the storefront rings anywhere in
+the inbox and is answered on its conversation. The listings page imports a marketplace CSV
 as draft products, combining the colors of one item into a single listing.
 
 ==== The register's extras

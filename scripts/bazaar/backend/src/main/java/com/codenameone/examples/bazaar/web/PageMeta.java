@@ -33,6 +33,16 @@ public final class PageMeta {
     public java.util.List<LinkView> langs = new java.util.ArrayList<LinkView>();
     /// Where the picker returns to (this page's address).
     public String langBack = "/";
+    /// The shown language's own name, on the header's language button.
+    public String langName = "English";
+    /// The market picker ([StorefrontMarkets.Choice#picker]): `url` is the
+    /// market code, empty for the store's own prices. Empty when the store
+    /// sells in one currency only.
+    public java.util.List<LinkView> markets = new java.util.ArrayList<LinkView>();
+    /// The currency the page is priced in, on the header's market button.
+    public String marketName = "";
+    /// Where the hosted Codename One app is served.
+    public String appUrl = "/app/";
     /// The interface text in [#lang], by key: `${page.t['cart.title']}`.
     public java.util.Map<String, String> t = StoreText.table("en");
     public String description = "";
@@ -78,8 +88,11 @@ public final class PageMeta {
     public String consentBack = "/";
     /// The store's privacy and cookie policy page, or empty.
     public String privacyUrl = "";
-    /// The store's chat page, or empty off a store.
-    public String chatUrl = "";
+    /// The store's handle when the floating chat is offered (every storefront
+    /// page), or empty off a store. The page carries no per-visitor chat
+    /// state: storefront pages are cached and shared, so the widget reads the
+    /// visitor's conversation over its own no-store calls (`chat.js`).
+    public String chatStore = "";
     /// The theme classes on the page's body (palette, font, corner style), or empty.
     public String themeClass = "";
     /// The store logo's address, or empty.

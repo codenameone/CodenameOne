@@ -464,7 +464,14 @@ referral attribution (`Attribution`, first and last touch carried from the landi
 page through the cart to the order, held in the session only when there is a
 touch so plain visits stay cacheable), permission sets (`Permissions`, per area
 and per location; the owner is never restricted), the chat inbox (`ChatInbox`,
-rate limited before anything is stored or mailed) and combined listings with
+rate limited before anything is stored or mailed; the floating storefront chat
+reaches it over `/ws/chat`, where `ChatSocket` takes a single-use visitor
+ticket from `POST /s/<handle>/chat/session` or a staff `LiveTickets` ticket,
+re-checks the inbox rights on every frame that names a conversation and refuses
+handshakes from other origins; `ChatLive` keeps the connections, presence and
+WebRTC call signalling in memory, with STUN from `bazaar.ice.stun` and TURN
+credentials minted per connection from `bazaar.ice.turn`, `bazaar.ice.secret` and
+`bazaar.ice.ttl`) and combined listings with
 marketplace import (`Listings`, which validates every row before making any
 product).
 

@@ -53,3 +53,71 @@
     });
   }
 })();
+// The header's language and market menus. Each is a <details> holding a
+// form, so with scripts off it opens on click and its buttons post. Here it
+// becomes a menu button: aria-expanded on the toggle, menuitemradio items,
+// arrow keys and Home/End between them, Escape and an outside click close it
+// and give focus back to the toggle.
+(function () {
+  var picks = document.querySelectorAll('details[data-pick]');
+  function items(d) { return d.querySelectorAll('.pick-item'); }
+  function close(d, focus) {
+    if (!d.open) { return; }
+    d.open = false;
+    d.querySelector('summary').setAttribute('aria-expanded', 'false');
+    if (focus) { d.querySelector('summary').focus(); }
+  }
+  for (var i = 0; i < picks.length; i++) {
+    (function (d) {
+      var summary = d.querySelector('summary');
+      var menu = d.querySelector('.pick-menu');
+      var id = 'pick-' + i;
+      menu.id = id;
+      menu.setAttribute('role', 'menu');
+      summary.setAttribute('role', 'button');
+      summary.setAttribute('aria-haspopup', 'menu');
+      summary.setAttribute('aria-controls', id);
+      summary.setAttribute('aria-expanded', 'false');
+      var list = items(d);
+      for (var j = 0; j < list.length; j++) {
+        list[j].setAttribute('role', 'menuitemradio');
+        list[j].tabIndex = -1;
+      }
+      d.addEventListener('toggle', function () {
+        summary.setAttribute('aria-expanded', d.open ? 'true' : 'false');
+        if (!d.open) { return; }
+        for (var k = 0; k < picks.length; k++) {
+          if (picks[k] !== d) { close(picks[k], false); }
+        }
+        var all = items(d);
+        var current = d.querySelector('.pick-item[aria-checked=true]') || all[0];
+        if (current) { current.focus(); }
+      });
+      d.addEventListener('keydown', function (e) {
+        var all = Array.prototype.slice.call(items(d));
+        var at = all.indexOf(document.activeElement);
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          close(d, true);
+        } else if (d.open && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
+          e.preventDefault();
+          var step = e.key === 'ArrowDown' ? 1 : -1;
+          all[(at + step + all.length) % all.length].focus();
+        } else if (d.open && (e.key === 'Home' || e.key === 'End')) {
+          e.preventDefault();
+          all[e.key === 'Home' ? 0 : all.length - 1].focus();
+        } else if (!d.open && document.activeElement === summary && e.key === 'ArrowDown') {
+          e.preventDefault();
+          d.open = true;
+        } else if (e.key === 'Tab' && d.open) {
+          close(d, false);
+        }
+      });
+    })(picks[i]);
+  }
+  document.addEventListener('click', function (e) {
+    for (var k = 0; k < picks.length; k++) {
+      if (!picks[k].contains(e.target)) { close(picks[k], false); }
+    }
+  });
+})();

@@ -36,9 +36,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-/// Customer chat: a shopper writes from the storefront widget, the store
-/// answers from its inbox, and the shopper reads the thread by its token
-/// (and gets an email for each reply).
+/// Customer chat: a shopper writes from the floating storefront chat, the
+/// store answers from its inbox, and the shopper reads the thread live
+/// ([ChatLive], [ChatSocket]) and, when the chat is closed and an address was
+/// left, by email.
 ///
 /// A shopper's message is rate limited per client and per address under
 /// the `chat` rule before anything is stored or sent, so the widget cannot
@@ -53,12 +54,39 @@ public class ChatInbox {
     private final StoreAccess access;
     private final Emails emails;
     private final Throttle throttle;
+    private final ChatLive live;
 
-    public ChatInbox(DataSource db, StoreAccess access, Emails emails, Throttle throttle) {
+    public ChatInbox(DataSource db, StoreAccess access, Emails emails, Throttle throttle,
+            ChatLive live) {
         this.db = db;
         this.access = access;
         this.emails = emails;
         this.throttle = throttle;
+        this.live = live;
+    }
+
+    /// Tells both sides of a conversation, live, about a message just written:
+    /// the visitor sees a staff message under the store's name (never the
+    /// staff member's account), the staff see who wrote and the conversation.
+    private void push(String storeId, String conversationId, String name, ChatMessageDto m)
+            throws IOException {
+        java.util.Map<String, Object> f = ChatLive.frame("message");
+        f.put("chat", conversationId);
+        f.put("id", m.id());
+        f.put("staff", Boolean.valueOf(m.staff()));
+        f.put("body", m.body());
+        f.put("at", Long.valueOf(m.at()));
+        java.util.Map<String, Object> toStaff = new java.util.LinkedHashMap<String, Object>(f);
+        toStaff.put("author", m.author());
+        toStaff.put("name", name);
+        live.toStaff(storeId, toStaff, null);
+        // The visitor's own message is acknowledged on the socket it came
+        // from (ChatSocket); echoing it here would show it twice.
+        if (m.staff()) {
+            Map store = db.queryOne("SELECT name FROM store WHERE id = ?", new Object[] {storeId});
+            f.put("author", store == null ? "" : Rows.text(store.get("name")));
+            live.toVisitor(conversationId, f, null);
+        }
     }
 
     static String body(String text) {
@@ -75,59 +103,158 @@ public class ChatInbox {
                 && !e.endsWith(".");
     }
 
-    /// A shopper's message: a new conversation, or another message on the
-    /// conversation `token` names. Answers the conversation's token.
+    /// A shopper's first message from the floating chat: a new conversation,
+    /// answered with its id. The address is optional -- a shopper can chat
+    /// without giving one -- but one that is given must look like one, and a
+    /// signed-in `customer` is linked and lends the account's address.
+    /// Starting conversations is held to the `chat` rule per client, since
+    /// each can end in mail to the shop's staff.
     @Transactional(rollbackFor = IOException.class)
-    public String ask(String storeId, String client, String token, String name, String emailAddress,
-            String text) throws IOException {
+    public String start(String storeId, String client, String customer, String emailAddress,
+            String name, String text) throws IOException {
         String b = body(text);
         throttle.check("chat", "c:" + client);
-        long now = System.currentTimeMillis();
-        if (token != null && token.length() > 0) {
-            Map c = token.length() > 64 ? null : db.queryOne(
-                    "SELECT id, store_id FROM chat_conversation WHERE token = ?", new Object[] {token});
-            if (c == null || !storeId.equals(Rows.text(c.get("store_id")))) {
-                throw new ResponseStatusException(404, "No such conversation");
-            }
-            message(storeId, Rows.text(c.get("id")), "customer", false, b, now);
-            db.execute("UPDATE chat_conversation SET status = ?, updated_at = ? WHERE id = ?",
-                    new Object[] {OPEN, Long.valueOf(now), Rows.text(c.get("id"))});
-            return token;
-        }
         String e = emailAddress == null ? "" : emailAddress.trim();
-        if (!email(e)) {
-            throw new ResponseStatusException(400, "Give an email address so the shop can answer");
+        if (e.length() > 0 && !email(e)) {
+            throw new ResponseStatusException(400, "That email address does not look right");
         }
-        throttle.check("chat", "e:" + e);
-        String n = name == null || name.trim().length() == 0 ? e.substring(0, e.indexOf('@'))
-                : Codes.cut(name.trim(), 100);
+        String c = customer == null ? "" : customer;
+        if (e.length() == 0 && c.length() > 0 && email(c)) {
+            e = c;
+        }
+        String n = name != null && name.trim().length() > 0 ? Codes.cut(name.trim(), 100)
+                : e.length() > 0 ? Codes.cut(e.substring(0, e.indexOf('@')), 100) : "Visitor";
+        long now = System.currentTimeMillis();
         String id = Ids.next();
         String t = Ids.next() + Ids.next();
         db.execute("INSERT INTO chat_conversation (id, store_id, token, email, name, subject, status, "
-                + "assignee, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", new Object[] {
+                + "assignee, created_at, updated_at, customer, visitor_read, staff_read) VALUES "
+                + "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", new Object[] {
                     id, storeId, t, e, n, Codes.cut(b, 80), OPEN, "", Long.valueOf(now),
-                    Long.valueOf(now)});
-        message(storeId, id, n, false, b, now);
-        return t;
+                    Long.valueOf(now), Codes.cut(c, 200), Long.valueOf(now), Long.valueOf(0)});
+        String mid = message(storeId, id, n, false, b, now);
+        push(storeId, id, n, new ChatMessageDto(mid, n, false, b, now));
+        return id;
     }
 
-    private void message(String storeId, String conversationId, String author, boolean staff,
-            String body, long now) throws IOException {
-        db.execute("INSERT INTO chat_message (id, store_id, conversation_id, author, staff, body, "
-                + "created_at) VALUES (?, ?, ?, ?, ?, ?, ?)", new Object[] {Ids.next(), storeId,
-                    conversationId, Codes.cut(author, 200), Integer.valueOf(staff ? 1 : 0), body,
-                    Long.valueOf(now)});
-    }
-
-    /// The thread a shopper's token opens, oldest first; 404 for any other store.
-    @Transactional(readOnly = true)
-    public List<ChatMessageDto> thread(String storeId, String token) throws IOException {
-        Map c = token == null || token.length() > 64 ? null : db.queryOne(
-                "SELECT id, store_id FROM chat_conversation WHERE token = ?", new Object[] {token});
+    /// Another shopper message on a conversation that exists; reopens it.
+    /// Held to the `chat-live` rule per conversation.
+    @Transactional(rollbackFor = IOException.class)
+    public ChatMessageDto say(String storeId, String conversationId, String text)
+            throws IOException {
+        String b = body(text);
+        throttle.check("chat-live", "v:" + conversationId);
+        Map c = row(conversationId);
         if (c == null || !storeId.equals(Rows.text(c.get("store_id")))) {
             throw new ResponseStatusException(404, "No such conversation");
         }
-        return messages(Rows.text(c.get("id")));
+        long now = System.currentTimeMillis();
+        String id = message(storeId, conversationId, Rows.text(c.get("name")), false, b, now);
+        db.execute("UPDATE chat_conversation SET status = ?, updated_at = ?, visitor_read = ? "
+                + "WHERE id = ?", new Object[] {OPEN, Long.valueOf(now), Long.valueOf(now),
+                    conversationId});
+        ChatMessageDto m = new ChatMessageDto(id, Rows.text(c.get("name")), false, b, now);
+        push(storeId, conversationId, Rows.text(c.get("name")), m);
+        return m;
+    }
+
+    /// A conversation's row by its id (store, token, names, read marks), or null.
+    @Transactional(readOnly = true)
+    public Map row(String conversationId) throws IOException {
+        return conversationId == null || conversationId.length() == 0
+                || conversationId.length() > 32 ? null : db.queryOne(
+                "SELECT id, store_id, token, email, name, status, customer, visitor_read, "
+                + "staff_read FROM chat_conversation WHERE id = ?", new Object[] {conversationId});
+    }
+
+    /// The conversation a visitor's lasting token opens at `storeId`, or null.
+    @Transactional(readOnly = true)
+    public Map byToken(String storeId, String token) throws IOException {
+        Map c = token == null || token.length() == 0 || token.length() > 64 ? null
+                : db.queryOne("SELECT id, store_id FROM chat_conversation WHERE token = ?",
+                        new Object[] {token});
+        return c == null || !storeId.equals(Rows.text(c.get("store_id"))) ? null
+                : row(Rows.text(c.get("id")));
+    }
+
+    /// The newest conversation a signed-in customer has at `storeId`, or
+    /// null: how a conversation follows its customer to another device.
+    @Transactional(readOnly = true)
+    public Map latestOf(String storeId, String customer) throws IOException {
+        if (customer == null || customer.length() == 0) {
+            return null;
+        }
+        List rows = db.query("SELECT id FROM chat_conversation WHERE store_id = ? AND customer = ? "
+                + "ORDER BY updated_at DESC", new Object[] {storeId, customer});
+        return rows.isEmpty() ? null : row(Rows.text(((Map) rows.get(0)).get("id")));
+    }
+
+    /// Links a guest's conversation to the customer who signed in, and takes
+    /// the account's address when the conversation had none.
+    @Transactional(rollbackFor = IOException.class)
+    public void link(String conversationId, String customer) throws IOException {
+        if (customer == null || customer.length() == 0) {
+            return;
+        }
+        db.execute("UPDATE chat_conversation SET customer = ? WHERE id = ? AND customer = ''",
+                new Object[] {Codes.cut(customer, 200), conversationId});
+        if (email(customer)) {
+            db.execute("UPDATE chat_conversation SET email = ? WHERE id = ? AND email = ''",
+                    new Object[] {customer, conversationId});
+        }
+    }
+
+    /// The address a shopper left from the widget, for replies by mail.
+    @Transactional(rollbackFor = IOException.class)
+    public void leaveEmail(String conversationId, String emailAddress) throws IOException {
+        String e = emailAddress == null ? "" : emailAddress.trim();
+        if (!email(e)) {
+            throw new ResponseStatusException(400, "That email address does not look right");
+        }
+        throttle.check("chat-live", "v:" + conversationId);
+        db.execute("UPDATE chat_conversation SET email = ? WHERE id = ?",
+                new Object[] {e, conversationId});
+    }
+
+    /// Records that one side has read the conversation up to `at`.
+    @Transactional(rollbackFor = IOException.class)
+    public void seen(String conversationId, boolean staff, long at) throws IOException {
+        String column = staff ? "staff_read" : "visitor_read";
+        db.execute("UPDATE chat_conversation SET " + column + " = ? WHERE id = ? AND " + column
+                + " < ?", new Object[] {Long.valueOf(at), conversationId, Long.valueOf(at)});
+    }
+
+    /// The thread of a conversation the caller already holds, oldest first.
+    @Transactional(readOnly = true)
+    public List<ChatMessageDto> threadOf(String conversationId) throws IOException {
+        return messages(conversationId);
+    }
+
+    /// Checks that `username` may work the store's inbox (staff, with the
+    /// customers area), as every live staff frame must: the socket has no
+    /// filter chain in front of it.
+    @Transactional(readOnly = true)
+    public void requireInbox(String username, String storeId) throws IOException {
+        access.requireStaff(username, storeId, StoreAccess.ANYONE);
+        access.requireArea(username, storeId, Perms.CUSTOMERS, true, StoreAccess.ANYONE);
+    }
+
+    /// The conversation `chatId` for a member of staff: refused (404) unless it
+    /// is the store's and the caller may work its inbox.
+    @Transactional(readOnly = true)
+    public Map staffConversation(String username, String storeId, String chatId)
+            throws IOException {
+        return conversation(username, storeId, chatId, true);
+    }
+
+    private String message(String storeId, String conversationId, String author, boolean staff,
+            String body, long now) throws IOException {
+        String id = Ids.next();
+        db.execute("INSERT INTO chat_message (id, store_id, conversation_id, author, staff, body, "
+                + "created_at) VALUES (?, ?, ?, ?, ?, ?, ?)", new Object[] {id, storeId,
+                    conversationId, Codes.cut(author, 200), Integer.valueOf(staff ? 1 : 0), body,
+                    Long.valueOf(now)});
+        return id;
     }
 
     private List<ChatMessageDto> messages(String conversationId) throws IOException {
@@ -181,19 +308,35 @@ public class ChatInbox {
         return messages(Rows.text(conversation(username, storeId, chatId, false).get("id")));
     }
 
-    /// A staff reply, emailed to the shopper.
+    /// A staff reply from the inbox page or the API ([#answer]).
     @Transactional(rollbackFor = IOException.class)
     public List<ChatMessageDto> reply(String username, String storeId, String chatId, String text)
+            throws IOException {
+        answer(username, storeId, chatId, text);
+        return messages(chatId);
+    }
+
+    /// [#reply], answering the one message written. The shopper sees it live
+    /// when the chat is open somewhere; otherwise it is mailed, when the
+    /// conversation has an address.
+    @Transactional(rollbackFor = IOException.class)
+    public ChatMessageDto answer(String username, String storeId, String chatId, String text)
             throws IOException {
         Map c = conversation(username, storeId, chatId, true);
         String b = body(text);
         long now = System.currentTimeMillis();
-        message(storeId, chatId, username, true, b, now);
-        db.execute("UPDATE chat_conversation SET status = ?, updated_at = ?, assignee = CASE WHEN "
-                + "assignee = '' THEN ? ELSE assignee END WHERE id = ?", new Object[] {OPEN,
-                    Long.valueOf(now), Codes.cut(username, 200), chatId});
-        emails.custom(storeId, Rows.text(c.get("email")), "Re: " + Rows.text(c.get("subject")), b);
-        return messages(chatId);
+        String id = message(storeId, chatId, username, true, b, now);
+        db.execute("UPDATE chat_conversation SET status = ?, updated_at = ?, staff_read = ?, "
+                + "assignee = CASE WHEN assignee = '' THEN ? ELSE assignee END WHERE id = ?",
+                new Object[] {OPEN, Long.valueOf(now), Long.valueOf(now), Codes.cut(username, 200),
+                    chatId});
+        String to = Rows.text(c.get("email"));
+        if (to.length() > 0 && !live.visitorOnline(chatId)) {
+            emails.custom(storeId, to, "Re: " + Rows.text(c.get("subject")), b);
+        }
+        ChatMessageDto m = new ChatMessageDto(id, username, true, b, now);
+        push(storeId, chatId, Rows.text(c.get("name")), m);
+        return m;
     }
 
     @Transactional(rollbackFor = IOException.class)

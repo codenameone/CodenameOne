@@ -152,32 +152,12 @@ public class Storefront {
     }
 
     /// The store's privacy and cookie policy, with the consent choice.
-    /// The chat page; `?t=` reopens a conversation by its token.
+    /// The old chat page's address, kept for links already out there: the
+    /// store's front page with the floating chat opened (`#chat`, which
+    /// `chat.js` reads). The conversation itself lives in the widget.
     @GetMapping("/s/{handle}/chat")
-    public String chat(@PathVariable("handle") String handle, Model model,
-            HttpServer.Request request) throws IOException {
-        pages.chat(handle, param(request, "t"), null, model, request);
-        return "chat";
-    }
-
-    /// A shopper's message: post/redirect/get back to the thread. A refused
-    /// message (empty, no address, too many) shows the page again with why.
-    @PostMapping("/s/{handle}/chat")
-    public String ask(@PathVariable("handle") String handle, Model model,
-            HttpServer.Request request) throws IOException {
-        sameSite(request);
-        String token = param(request, "token");
-        try {
-            token = pages.ask(handle, token, param(request, "name"), param(request, "email"),
-                    param(request, "message"), request);
-        } catch (ResponseStatusException refused) {
-            if (refused.getStatus() == 404) {
-                throw refused;
-            }
-            pages.chat(handle, token, refused.getReason(), model, request);
-            return "chat";
-        }
-        return "redirect:" + StorefrontPages.storeUrl(handle) + "/chat?t=" + SiteUrls.encode(token);
+    public String chat(@PathVariable("handle") String handle) {
+        return "redirect:" + StorefrontPages.storeUrl(handle) + "#chat";
     }
 
     private static String param(HttpServer.Request request, String name) {

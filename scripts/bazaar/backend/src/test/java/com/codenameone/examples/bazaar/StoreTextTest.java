@@ -187,7 +187,7 @@ class StoreTextTest {
         String deBody = body(de);
         assertTrue(deBody.contains("lang=\"de\"") && deBody.contains("In den Warenkorb"), "German");
         assertTrue(de.getHeader("Cache-Control").startsWith("private"), de.getHeader("Cache-Control"));
-        assertTrue(deBody.contains("aria-pressed=\"true\""), "the picker marks the choice");
+        assertTrue(deBody.contains("aria-checked=\"true\""), "the picker marks the choice");
 
         // Without the cookie: the market, then the header; a shared copy
         // that varies by the cookie and the header.

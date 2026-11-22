@@ -223,8 +223,8 @@ on a row.
 | Customer merge | &#8211; | core | app/plugin | no | core | 
 | Tax exemptions per customer | &#10003; | core | app/plugin | core | no | Exempt customers pay no tax; in tax-inclusive stores the included tax comes off. 
 | Store credit | &#10003; | core | app/plugin | core | no | 
-| Live chat widget | &#10003; | core | app/plugin | app/plugin | no | A storefront chat that works without JavaScript, answered from the merchant inbox. 
-| Unified inbox (email/social messages) | &#9681; | core | app/plugin | app/plugin | core | One inbox for storefront chat with assignment and canned replies; no e-mail or social channels. 
+| Live chat widget | &#10003; | core | app/plugin | app/plugin | no | A floating chat on every store page: live over a WebSocket, with presence, typing, read receipts and voice or video calls over WebRTC, answered from the merchant inbox. 
+| Unified inbox (email/social messages) | &#9681; | core | app/plugin | app/plugin | core | One live inbox for storefront chat and calls, with assignment and canned replies; no e-mail or social channels. 
 | AI assistant | &#8211; | core | app/plugin | app/plugin | core | 
 | Issue/adjust store credit | &#10003; | core | app/plugin | core | no | 
 | Redeem at checkout | &#9681; | core | app/plugin | core | no | Store credit pays at the register.

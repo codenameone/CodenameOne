@@ -238,17 +238,23 @@ async function storefrontExtras() {
     await shop.screenshot({ path: path.join(out, '9-signed-up.png') });
     say('signed up on the web as ' + email);
 
-    // The language picker: Spanish labels, and the page says so.
+    // The language picker, a menu in the header: Spanish labels, and the
+    // page says so.
     await shop.goto(origin + '/s/' + store, { waitUntil: 'load' });
+    await shop.locator('details[data-pick]:has(form[action="/lang"]) > summary').click();
+    if (await shop.locator('details[data-pick] > summary[aria-expanded=true]').count() !== 1) {
+      throw new Error('the language menu does not say it is open');
+    }
     await shop.locator('form[action="/lang"] button[value=es]').first().click();
     await shop.waitForLoadState('load');
     const lang = await shop.locator('html').getAttribute('lang');
     const dir = await shop.locator('html').getAttribute('dir');
     const words = await shop.locator('body').innerText();
-    if (lang !== 'es' || dir !== 'ltr' || !/Idioma/.test(words)) {
+    if (lang !== 'es' || dir !== 'ltr' || !/Español/.test(words)) {
       throw new Error('after picking Spanish the page has lang=' + lang + ' dir=' + dir);
     }
     await shop.screenshot({ path: path.join(out, '10-spanish.png') });
+    await shop.locator('details[data-pick]:has(form[action="/lang"]) > summary').click();
     await shop.locator('form[action="/lang"] button[value=en]').first().click();
     await shop.waitForLoadState('load');
     say('the language picker switched the storefront to Spanish (lang=es dir=ltr)');
@@ -282,20 +288,21 @@ async function storefrontExtras() {
         countries: 'DE, FR', locale: 'de', rounding: 'NONE', adjustBps: '0', active: 'true',
         fxSource: 'manual' });
     const buyer = await browser.newContext({ viewport: { width: 1100, height: 900 } });
-    // The shopper picks the market on a product page (a form post that sets
-    // the `market` cookie, MarketChoice); every later page and the checkout
-    // keep it with no query in the address.
+    // The shopper picks the market from the header's menu on a product page
+    // (a form post that sets the `market` cookie, MarketChoice); every later
+    // page and the checkout keep it with no query in the address.
     const b = await buyer.newPage();
     try {
       await b.goto(origin + '/s/' + store, { waitUntil: 'load' });
       await b.locator('a[href*="/products/"]').first().click();
       await b.waitForLoadState('load');
+      await b.locator('details[data-pick]:has(form[action="/market"]) > summary').click();
       await Promise.all([b.waitForNavigation({ waitUntil: 'load' }),
-          b.locator('form[action="/market"] button[value=e2e]').click()]);
+          b.locator('form.pick-menu[action="/market"] button[value=e2e]').click()]);
       if (/[?&]market=/.test(b.url())) {
         throw new Error('choosing a market left a query market: ' + b.url());
       }
-      const chosen = await b.locator('form[action="/market"] button[value=e2e]').getAttribute('aria-pressed');
+      const chosen = await b.locator('form.pick-menu[action="/market"] button[value=e2e]').getAttribute('aria-checked');
       if (chosen !== 'true') {
         throw new Error('the picker does not mark the chosen market');
       }
@@ -314,6 +321,31 @@ async function storefrontExtras() {
       await buyer.close();
     }
     say('a shopper in the euro market is charged in EUR at checkout');
+
+    // The floating chat: a shopper writes from the widget, the owner -- still
+    // signed in on `shop` -- answers from the web inbox, and the reply
+    // arrives in the widget over the socket, with no reload.
+    const visitor = await browser.newContext({ viewport: { width: 1100, height: 900 } });
+    try {
+      const v = await visitor.newPage();
+      await v.goto(origin + '/s/' + store, { waitUntil: 'load' });
+      await v.locator('#chat .chat-bubble').click();
+      const question = 'Does this come gift wrapped? ' + Date.now();
+      await v.fill('#chat .chat-form textarea', question);
+      await v.locator('#chat .chat-send').click();
+      await v.waitForSelector('#chat .chat-msg.me[data-id] .chat-tick', { timeout: stepSeconds * 1000 });
+      await shop.goto(origin + '/admin/' + storeId + '/inbox', { waitUntil: 'load' });
+      await shop.locator('li.item', { hasText: question.substring(0, 40) }).locator('a').first().click();
+      await shop.waitForSelector('#inbox-live .live-log li', { timeout: stepSeconds * 1000 });
+      const answer = 'Yes, every order ships wrapped. ' + Date.now();
+      await shop.fill('form[action$="/reply"] textarea[name=body]', answer);
+      await shop.locator('form[action$="/reply"] button[type=submit]').click();
+      await v.waitForSelector('#chat .chat-msg.them:has-text("' + answer + '")', { timeout: stepSeconds * 1000 });
+      await v.screenshot({ path: path.join(out, '12-chat-reply.png') });
+    } finally {
+      await visitor.close();
+    }
+    say('a shopper chatted from the widget and the owner\'s reply arrived live');
   } finally {
     await context.close();
   }

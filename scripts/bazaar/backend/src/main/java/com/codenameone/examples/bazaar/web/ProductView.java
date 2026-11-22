@@ -31,8 +31,6 @@ public final class ProductView {
     /// The price as a plain decimal (`12.50`), for structured data.
     public String amount = "";
     public String currency = "";
-    /// The market picker: each market's label and code ([MarketChoice]), or empty.
-    public java.util.List<LinkView> markets = new java.util.ArrayList<LinkView>();
     /// A banner suggesting the market of the visitor's country, or empty.
     public String geoNote = "";
     /// The market code that banner's button chooses ([MarketChoice]).

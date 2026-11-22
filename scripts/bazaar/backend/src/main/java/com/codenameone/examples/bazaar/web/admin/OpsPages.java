@@ -854,13 +854,15 @@ public class OpsPages {
             HttpServer.Request request) throws Exception {
         pages.admin(request, storeId, "Inbox");
         MarketingView v = view("inbox");
-        v.intro = "Messages from the storefront chat. A reply is emailed to the customer.";
+        v.intro = "Messages from the storefront chat. A shopper who has the chat open "
+                + "sees a reply at once; one who left it gets it by email, when they gave an address.";
+        live(v, storeId, "");
         List<ChatConversationDto> list = chat.list(Caller.name(), storeId);
         v.cardsTitle = "Conversations";
         for (int iter = 0; iter < list.size(); iter++) {
             ChatConversationDto c = list.get(iter);
             ActionCard a = new ActionCard();
-            a.title = c.name() + " <" + c.email() + ">";
+            a.title = c.email().length() == 0 ? c.name() : c.name() + " <" + c.email() + ">";
             a.url = base(storeId) + "/inbox/" + c.id();
             a.status = c.status();
             a.detail = c.subject();
@@ -890,14 +892,14 @@ public class OpsPages {
         MarketingView v = view("conversation");
         v.back = base(storeId) + "/inbox";
         v.backLabel = "Inbox";
-        v.rowsTitle = "Messages";
-        v.headA = "From";
-        v.headB = "Message";
-        v.headC = "";
-        v.headD = "When";
+        live(v, storeId, id);
         for (int iter = 0; iter < messages.size(); iter++) {
             ChatMessageDto m = messages.get(iter);
-            v.rows.add(row(m.author() + (m.staff() ? " (staff)" : ""), m.body(), "", Days.iso(m.at())));
+            AdminRow r = row(m.author() + (m.staff() ? " (staff)" : ""), m.body(), "",
+                    Days.iso(m.at()));
+            r.id = String.valueOf(m.at());
+            r.flag = m.staff();
+            v.thread.add(r);
         }
         String path = base(storeId) + "/inbox/" + id;
         FormView reply = new FormView("reply", "Reply", path + "/reply", "Send");
@@ -924,6 +926,13 @@ public class OpsPages {
         FormView close = new FormView("close", "Close", path + "/close", "Close conversation");
         v.forms.add(close);
         return render(model, request, storeId, "Conversation", v);
+    }
+
+    /// Joins the page to the store's chat socket ([InboxLive]).
+    private void live(MarketingView v, String storeId, String chatId) {
+        v.liveStore = storeId;
+        v.liveChat = chatId;
+        v.liveTicket = base(storeId) + "/chat-ticket";
     }
 
     @PostMapping("/admin/{storeId}/inbox/{id}/reply")

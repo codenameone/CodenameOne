@@ -19,6 +19,7 @@
 package com.codenameone.examples.bazaar;
 
 import com.codename1.backend.DataSource;
+import com.codename1.backend.ResponseStatusException;
 import com.codename1.backend.annotations.Autowired;
 import com.codename1.backend.mail.Mail;
 import com.codename1.backend.mail.MailSender;
@@ -42,6 +43,7 @@ import static com.codename1.backend.test.MockMvcRequestBuilders.post;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 /// The operations features end to end: the warehouse board, forecasts,
 /// the report builder, attribution, permission sets, the chat inbox and the
@@ -67,6 +69,8 @@ class OpsTest {
     private Checkouts checkouts;
     @Autowired
     private Attribution attribution;
+    @Autowired
+    private com.codenameone.examples.bazaar.ops.ChatInbox chatInbox;
 
     private Shop shop(String name) throws Exception {
         return new Shop(name, 300, accounts, stores, pricing, db, inventory, carts, checkouts, mvc);
@@ -240,18 +244,31 @@ class OpsTest {
     void aShopperChatsAndTheStoreReplies() throws Exception {
         Shop s = shop("ops-chat");
         String h = handle(s);
+        // The page offers the floating chat; what the visitor has is fetched.
         Browser shopper = new Browser(mvc);
-        MockResponse sent = shopper.send(Browser.form("/s/" + h + "/chat", "name", "Ada", "email",
-                "ada-chat@example.com", "message", "Where is my order?"));
-        assertTrue(sent.getStatus() == 302 || sent.getStatus() == 303, sent.getContentAsString());
-        String where = sent.getHeader("Location");
-        assertTrue(where.indexOf("/chat?t=") > 0, where);
-        assertTrue(shopper.get(where).getContentAsString().contains("Where is my order?"));
-        MockResponse refused = shopper.send(Browser.form("/s/" + h + "/chat", "message", "hi"));
-        assertEquals(200, refused.getStatus(), "refused in place, with why");
-        assertTrue(refused.getContentAsString().contains("email address"));
+        String page = shopper.get("/s/" + h).getContentAsString();
+        assertTrue(page.contains("id=\"chat\"") && page.contains("data-store=\"" + h + "\""), "widget");
+        MockResponse session = shopper.send(Browser.form("/s/" + h + "/chat/session", "token", ""));
+        assertEquals(200, session.getStatus(), session.getContentAsString());
+        assertTrue(session.getContentAsString().contains("\"ticket\":\""), session.getContentAsString());
+        assertEquals("no-store", session.getHeader("Cache-Control"));
+        // The old chat page now opens the widget.
+        MockResponse old = shopper.get("/s/" + h + "/chat");
+        assertTrue(old.getHeader("Location").endsWith("/s/" + h + "#chat"), old.getHeader("Location"));
+
+        String id = chatInbox.start(s.storeId, "ops-chat-client", null, "ada-chat@example.com",
+                "Ada", "Where is my order?");
+        String token = Rows.text(chatInbox.row(id).get("token"));
+        MockResponse again = shopper.send(Browser.form("/s/" + h + "/chat/session", "token", token));
+        assertTrue(again.getContentAsString().contains(token), "the token resumes the conversation");
+        try {
+            chatInbox.start(s.storeId, "ops-chat-client", null, "not-an-address", "Ada", "hi");
+            fail("a malformed address is refused");
+        } catch (ResponseStatusException refused) {
+            assertEquals(400, refused.getStatus());
+        }
         Map chat = (Map) list(s.owner, get(api(s, "/chats")), null).get(0);
-        String id = (String) chat.get("id");
+        assertEquals(id, chat.get("id"));
         int before = MailSender.current().sent().size();
         List messages = list(s.owner, post(api(s, "/chats/" + id + "/reply")),
                 "{\"body\":\"It ships today\"}");
@@ -261,14 +278,19 @@ class OpsTest {
         for (int iter = before; iter < mails.size(); iter++) {
             mailed |= mails.get(iter).getTo().contains("ada-chat@example.com");
         }
-        assertTrue(mailed);
+        assertTrue(mailed, "a shopper with the chat closed is mailed the reply");
         assertEquals("CLOSED", json(s.owner, post(api(s, "/chats/" + id + "/close")), "{}").get("status"));
         Shop other = shop("ops-chat-o");
         assertEquals(404, status(other.owner, get(api(other, "/chats/" + id)), null));
-        assertFalse(shopper.get("/s/" + handle(other) + "/chat?t=" + where.substring(
-                where.indexOf("t=") + 2)).getStatus() == 200, "another store's thread");
+        assertEquals(null, chatInbox.byToken(other.storeId, token), "another store's thread");
         Browser web = signedIn(s.owner);
-        web.assertPage(web.get("/admin/" + s.storeId + "/inbox/" + id), "It ships today");
+        String inbox = web.get("/admin/" + s.storeId + "/inbox/" + id).getContentAsString();
+        assertTrue(inbox.contains("It ships today") && inbox.contains("id=\"inbox-live\""), inbox);
+        MockResponse live = web.get("/admin/" + s.storeId + "/chat-ticket");
+        assertEquals(200, live.getStatus());
+        assertTrue(live.getContentAsString().contains("\"ticket\":\""));
+        assertFalse(web.get("/admin/" + other.storeId + "/chat-ticket").getStatus() == 200,
+                "no ticket for another store's inbox");
     }
 
     @Test

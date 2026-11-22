@@ -121,3 +121,37 @@ body.radius-round{--radius:22px}
 .specs dl{display:grid;grid-template-columns:max-content 1fr;gap:4px 16px}
 .specs dt{font-weight:600}
 .specs dd{margin:0}
+/* Header tools: the app link, the language and market menus, the cart. The
+   menus are <details> elements, so they open without script; shop.js adds
+   the menu roles, Escape, arrow keys and closing on an outside click. */
+.tools{display:flex;align-items:center;gap:4px;margin-inline-start:auto}
+.tools svg{width:18px;height:18px;flex:none;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.app-link,.cart-link,.pick-btn{display:inline-flex;align-items:center;gap:6px;padding:7px 10px;border-radius:999px;text-decoration:none;font-size:.92rem;font-weight:600;color:var(--ink);cursor:pointer;white-space:nowrap}
+.app-link:hover,.cart-link:hover,.pick-btn:hover,.pick[open]>.pick-btn{background:var(--soft)}
+.app-link{color:var(--accent)}
+.pick{position:relative}
+.pick-btn{list-style:none}
+.pick-btn::-webkit-details-marker{display:none}
+.pick-btn .caret{width:14px;height:14px;opacity:.6;transition:transform .15s}
+.pick[open]>.pick-btn .caret{transform:rotate(180deg)}
+.pick-menu{position:absolute;inset-inline-end:0;top:calc(100% + 6px);min-width:200px;max-height:70vh;overflow:auto;margin:0;padding:6px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:12px;box-shadow:0 12px 32px #0003;z-index:20}
+.pick-title{margin:4px 10px 6px;font-size:.75rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.pick-item{display:flex;width:100%;align-items:center;justify-content:space-between;gap:12px;padding:8px 10px;border:0;border-radius:8px;background:none;color:inherit;font:inherit;text-align:start;cursor:pointer}
+.pick-item:hover,.pick-item:focus-visible{background:var(--soft);outline:none}
+.pick-item .tick{width:16px;height:16px;stroke:var(--accent);stroke-width:2.4;visibility:hidden}
+.pick-item[aria-checked=true]{font-weight:700}
+.pick-item[aria-checked=true] .tick{visibility:visible}
+.app-link:focus-visible,.cart-link:focus-visible,.pick-btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+@media (max-width:720px){.bar-in{flex-wrap:wrap}.search{order:3;flex-basis:100%}.app-link span,.cart-link span,.pick-btn .pick-cur{display:none}.pick-btn .caret{display:none}}
+
+/* The platform home's app card. */
+.app-card{display:grid;grid-template-columns:minmax(0,1fr) 180px;gap:24px;align-items:center;margin:24px 0 32px;padding:28px;border-radius:calc(var(--radius) + 8px);background:var(--accent);background:linear-gradient(135deg,var(--accent),color-mix(in srgb,var(--accent) 55%,#000));color:#fff;overflow:hidden}
+.app-card .kicker{margin:0;font-size:.8rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;opacity:.85}
+.app-card h2{margin:6px 0 8px;font-size:clamp(1.4rem,3vw,2rem);line-height:1.15}
+.app-card p{margin:0 0 18px;max-width:34rem;opacity:.92}
+.app-card .button{background:#fff;color:var(--accent)}
+.app-card svg{width:100%;max-width:180px;justify-self:center;fill:none;stroke:#fff;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.app-card .d1{fill:#ffffff1f}
+.app-card .d2,.app-card .d3,.app-card .d4{fill:#ffffff40;stroke:none}
+.app-card .d5{fill:#fff;stroke:none}
+@media (max-width:620px){.app-card{grid-template-columns:1fr;padding:22px}.app-card svg{display:none}}

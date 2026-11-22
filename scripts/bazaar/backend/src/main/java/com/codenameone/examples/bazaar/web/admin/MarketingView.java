@@ -38,6 +38,13 @@ public class MarketingView {
     /// The list page this one belongs to.
     public String back = "";
     public String backLabel = "";
+    /// The live inbox (`app.js` with `inbox-live`): the store whose chat
+    /// socket the page joins, the conversation it shows (empty on the
+    /// list), the address of its socket ticket, and the thread itself.
+    public String liveStore = "";
+    public String liveChat = "";
+    public String liveTicket = "";
+    public List<AdminRow> thread = new ArrayList<AdminRow>();
     public boolean hasTable;
     /// Buttons at the top: `url` and `title`.
     public List<AdminRow> links = new ArrayList<AdminRow>();

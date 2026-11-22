@@ -54,6 +54,9 @@ public class Throttle {
         {"checkout", "10/60"},
         {"pin", "10/300"},
         {"form", "30/60"}, {"chat", "5/600"},
+        // The floating chat: messages on a conversation that exists, and the
+        // frames that are not messages (typing, read marks, call signalling).
+        {"chat-live", "30/60"}, {"chat-signal", "600/60"},
         {"upload", "30/600"},
         {"totp-enrol", "10/600"},
     };

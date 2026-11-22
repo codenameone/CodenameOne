@@ -113,7 +113,7 @@ public final class WebHeaders implements SecurityFilter {
         exchange.setResponseHeader("X-Content-Type-Options", "nosniff");
         exchange.setResponseHeader("Referrer-Policy", "strict-origin-when-cross-origin");
         exchange.setResponseHeader("Permissions-Policy",
-                "camera=(), microphone=(), geolocation=(), usb=(), payment=(self)");
+                "camera=(self), microphone=(self), geolocation=(), usb=(), payment=(self)");
         if (hsts) {
             exchange.setResponseHeader("Strict-Transport-Security",
                     "max-age=31536000; includeSubDomains");
