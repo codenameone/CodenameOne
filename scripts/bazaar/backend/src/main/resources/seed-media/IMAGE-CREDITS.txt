@@ -1,14 +1,14 @@
 Seed product photos for the Bazaar demo stores.
 
 Photographs: public-domain (PDM) or CC0 images found through the Openverse
-catalogue, cropped square and re-encoded. Illustrations: drawn for this sample
-with Python/PIL and released with it. No brand marks or recognizable people.
+catalogue, cropped square and re-encoded. Generated images: made for this sample
+and released with it. No brand marks or recognizable people.
 
 alpine-softshell.jpg
-  original illustration drawn for this sample (Python/PIL)
+  original AI-generated product image made for this sample, released with it
 
 basecamp-flannel-shirt.jpg
-  original illustration drawn for this sample (Python/PIL)
+  original AI-generated product image made for this sample, released with it
 
 beginner-wheel-class-2.jpg
   photo: Free person making pottery image
@@ -46,7 +46,7 @@ bud-vase.jpg
   file: https://pd.w.org/2026/05/4016a0c06d0363686.50882683-1536x2048.jpeg
 
 butter-dish.jpg
-  original illustration drawn for this sample (Python/PIL)
+  original AI-generated product image made for this sample, released with it
 
 camp-mug.jpg
   photo: Free mugs hanging hooks
@@ -56,7 +56,7 @@ camp-mug.jpg
   file: https://images.rawpixel.com/editor_1024/cHJpdmF0ZS9zdGF0aWMvaW1hZ2Uvd2Vic2l0ZS8yMDIyLTA0L2xyL3NrMTg0LWltYWdlLWt3dnVuem5oLmpwZw.jpg
 
 camp-slip-ons.jpg
-  original illustration drawn for this sample (Python/PIL)
+  original AI-generated product image made for this sample, released with it
 
 camp-style-enamel-mug.jpg
   photo: A red enamel kettle with a lid and spout, accompanied by two matching red enamel mugs with white interiors, placed on a wooden shelf.
@@ -66,10 +66,10 @@ camp-style-enamel-mug.jpg
   file: https://pd.w.org/2025/01/631678ba291de3915.98117673-2048x1366.jpg
 
 candle-in-ceramic-cup.jpg
-  original illustration drawn for this sample (Python/PIL)
+  original AI-generated product image made for this sample, released with it
 
 canyon-shorts.jpg
-  original illustration drawn for this sample (Python/PIL)
+  original AI-generated product image made for this sample, released with it
 
 cereal-bowl-2.jpg
   photo: Elegant handcrafted ceramic bowl design
@@ -86,10 +86,10 @@ cereal-bowl.jpg
   file: https://images.rawpixel.com/editor_1024/cHJpdmF0ZS9sci9pbWFnZXMvd2Vic2l0ZS8yMDIzLTAyL2xhY21hMjQ5MjY3LWltYWdlLmpwZw.jpg
 
 coastal-windbreaker.jpg
-  original illustration drawn for this sample (Python/PIL)
+  original AI-generated product image made for this sample, released with it
 
 convertible-trek-pants.jpg
-  original illustration drawn for this sample (Python/PIL)
+  original AI-generated product image made for this sample, released with it
 
 daypack-22l.jpg
   photo: Backpack
@@ -134,13 +134,13 @@ espresso-cup-pair.jpg
   file: https://pd.w.org/2025/12/279694bfaaf03d699.11123593-2048x1536.jpeg
 
 everyday-organic-tee.jpg
-  original illustration drawn for this sample (Python/PIL)
+  original AI-generated product image made for this sample, released with it
 
 expedition-pack-60l.jpg
-  original illustration drawn for this sample (Python/PIL)
+  original AI-generated product image made for this sample, released with it
 
 gift-card-envelope.jpg
-  original illustration drawn for this sample (Python/PIL)
+  original AI-generated product image made for this sample, released with it
 
 glaze-sampler-workshop.jpg
   photo: Clay pottery process image
@@ -171,10 +171,10 @@ hanging-planter.jpg
   file: https://images.rawpixel.com/editor_1024/cHJpdmF0ZS9sci9pbWFnZXMvd2Vic2l0ZS8yMDIyLTA0L3Vwd2s2MTgyMDE2Ni13aWtpbWVkaWEtaW1hZ2Uta293cHU1NmMuanBn.jpg
 
 headlamp-400.jpg
-  original illustration drawn for this sample (Python/PIL)
+  original AI-generated product image made for this sample, released with it
 
 incense-holder.jpg
-  original illustration drawn for this sample (Python/PIL)
+  original AI-generated product image made for this sample, released with it
 
 insulated-water-bottle.jpg
   photo: Metal Water Bottles
@@ -184,7 +184,7 @@ insulated-water-bottle.jpg
   file: https://upload.wikimedia.org/wikipedia/commons/4/45/Metal_Water_Bottles.jpeg
 
 merino-base-layer-crew.jpg
-  original illustration drawn for this sample (Python/PIL)
+  original AI-generated product image made for this sample, released with it
 
 merino-hiking-socks.jpg
   photo: Free knitted socks image
@@ -208,7 +208,7 @@ olive-oil-cruet.jpg
   file: https://images.rawpixel.com/editor_1024/czNmcy1wcml2YXRlL3Jhd3BpeGVsX2ltYWdlcy93ZWJzaXRlX2NvbnRlbnQvbHIvZnJvbGl2ZV9vaWxfY2FyYWZlX3NwaWNlXzAtaW1hZ2Uta3liZDRja3QuanBn.jpg
 
 packable-rain-poncho.jpg
-  original illustration drawn for this sample (Python/PIL)
+  original AI-generated product image made for this sample, released with it
 
 pasta-bowl.jpg
   photo: Free spaghetti image
@@ -225,13 +225,13 @@ pour-over-coffee-dripper.jpg
   file: https://images.rawpixel.com/editor_1024/czNmcy1wcml2YXRlL3Jhd3BpeGVsX2ltYWdlcy93ZWJzaXRlX2NvbnRlbnQvbHIvdXB3azYxNzEzNDQwLXdpa2ltZWRpYS1pbWFnZS1rb3diYjZrby5qcGc.jpg
 
 quarter-zip-pullover.jpg
-  original illustration drawn for this sample (Python/PIL)
+  original AI-generated product image made for this sample, released with it
 
 ridge-runner-trail-shoes.jpg
-  original illustration drawn for this sample (Python/PIL)
+  original AI-generated product image made for this sample, released with it
 
 ridgeline-rain-shell.jpg
-  original illustration drawn for this sample (Python/PIL)
+  original AI-generated product image made for this sample, released with it
 
 ring-dish.jpg
   photo: Deep Dish Design Seven Regal
@@ -255,10 +255,10 @@ salad-bowl-large.jpg
   file: https://images.rawpixel.com/editor_1024/czNmcy1wcml2YXRlL3Jhd3BpeGVsX2ltYWdlcy93ZWJzaXRlX2NvbnRlbnQvbHIvc2s4NTUtaW1hZ2Uta3d2eDdkcnAuanBn.jpg
 
 salt-cellar.jpg
-  original illustration drawn for this sample (Python/PIL)
+  original AI-generated product image made for this sample, released with it
 
 seconds-mystery-box.jpg
-  original illustration drawn for this sample (Python/PIL)
+  original AI-generated product image made for this sample, released with it
 
 serving-platter.jpg
   photo: 
@@ -303,13 +303,13 @@ succulent-pot-trio.jpg
   file: https://images.rawpixel.com/editor_1024/czNmcy1wcml2YXRlL3Jhd3BpeGVsX2ltYWdlcy93ZWJzaXRlX2NvbnRlbnQvbHIvdXB3azYxODA1NjcxLXdpa2ltZWRpYS1pbWFnZS1rb3dweWpsOS5qcGc.jpg
 
 summit-down-parka.jpg
-  original illustration drawn for this sample (Python/PIL)
+  original AI-generated product image made for this sample, released with it
 
 sun-hoodie.jpg
-  original illustration drawn for this sample (Python/PIL)
+  original AI-generated product image made for this sample, released with it
 
 switchback-hiking-pants.jpg
-  original illustration drawn for this sample (Python/PIL)
+  original AI-generated product image made for this sample, released with it
 
 table-vase-2.jpg
   photo: Elegant blue ceramic vase
@@ -354,7 +354,7 @@ teapot.jpg
   file: https://images.rawpixel.com/editor_1024/czNmcy1wcml2YXRlL3Jhd3BpeGVsX2ltYWdlcy93ZWJzaXRlX2NvbnRlbnQvbHIvcHgxMjkyNjYwLWltYWdlLWt3eXFybTJ5LmpwZw.jpg
 
 thermal-leggings.jpg
-  original illustration drawn for this sample (Python/PIL)
+  original AI-generated product image made for this sample, released with it
 
 timberline-hiking-boots-2.jpg
   photo: Hiking boots grass
@@ -371,10 +371,10 @@ timberline-hiking-boots.jpg
   file: https://images.rawpixel.com/editor_1024/cHJpdmF0ZS9zdGF0aWMvaW1hZ2Uvd2Vic2l0ZS8yMDIyLTA0L2xyL2ZyaGlraW5nX3Nob2VzX25hdHVyZV9oaWtpbmctaW1hZ2Uta3liYmJxbDguanBn.jpg
 
 trailhead-fleece-jacket.jpg
-  original illustration drawn for this sample (Python/PIL)
+  original AI-generated product image made for this sample, released with it
 
 travel-tumbler.jpg
-  original illustration drawn for this sample (Python/PIL)
+  original AI-generated product image made for this sample, released with it
 
 trekking-poles-2.jpg
   photo: Green adjustable trekking pole leaning against a slate brick wall
@@ -391,7 +391,7 @@ trekking-poles.jpg
   file: https://images.rawpixel.com/editor_1024/cHJpdmF0ZS9zdGF0aWMvaW1hZ2Uvd2Vic2l0ZS8yMDIyLTA0L2xyL3B4MTYwMzgwNC1pbWFnZS1rd3Z2cDJkNC5qcGc.jpg
 
 trucker-cap.jpg
-  original illustration drawn for this sample (Python/PIL)
+  original AI-generated product image made for this sample, released with it
 
 ultralight-tent-2p-2.jpg
   photo: Blue tent camping grounds
@@ -408,7 +408,7 @@ ultralight-tent-2p.jpg
   file: https://images.rawpixel.com/editor_1024/cHJpdmF0ZS9sci9pbWFnZXMvd2Vic2l0ZS8yMDIyLTA2L3Vwd2s2MjI3MTY0OC13aWtpbWVkaWEtaW1hZ2Uta293bW5uMm8uanBn.jpg
 
 utensil-crock.jpg
-  original illustration drawn for this sample (Python/PIL)
+  original AI-generated product image made for this sample, released with it
 
 wall-tile-set-2.jpg
   photo: Floral ceramic tile. Original Minneapolis
