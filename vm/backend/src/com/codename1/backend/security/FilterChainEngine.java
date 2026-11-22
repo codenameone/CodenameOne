@@ -127,7 +127,11 @@ final class FilterChainEngine implements RequestSecurity {
         for (int i = 0; i < all.size(); i++) {
             SecurityFilter filter = all.get(i);
             if ((declared == null || !declared.isApplicationFilter(filter))
-                    && filter.getClass().getName().endsWith("AuthenticationFilter")) {
+                    && filter.getClass().getName().endsWith("AuthenticationFilter")
+                    // Anonymous only fills a principal in when there is none, and
+                    // runs last: counting it would skip every filter added after
+                    // Basic or Bearer, where a tenant or audit filter sits.
+                    && !(filter instanceof AnonymousAuthenticationFilter)) {
                 lastSignIn = i;
             }
         }

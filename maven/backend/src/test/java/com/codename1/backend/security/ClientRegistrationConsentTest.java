@@ -321,6 +321,13 @@ class ClientRegistrationConsentTest {
         try (SecuredServer server = startRegistering()) {
             String client = registered(server);
             String verifier = OAuth2Parameters.random(32);
+            // Answered questions do not count toward the cap.
+            for (int i = 0; i < 8; i++) {
+                Reply page = signedIn(server, authorizeUrl(client, "read", verifier, "a" + i, null));
+                assertEquals(302, server.call("POST", action(page.body), form("_csrf",
+                        OAuth2Testing.field(page.body, "_csrf"), "ticket", OAuth2Testing.field(page.body,
+                        "ticket"), "decision", "approve", "scope", "read"), FORM).status);
+            }
             Reply[] pages = new Reply[9];
             for (int i = 0; i < pages.length; i++) {
                 pages[i] = signedIn(server, authorizeUrl(client, "read", verifier, "t" + i, null));

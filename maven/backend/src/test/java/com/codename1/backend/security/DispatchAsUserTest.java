@@ -109,6 +109,11 @@ class DispatchAsUserTest {
                                         && request.getHeader("Authorization") == null
                                         ? HttpServer.Response.text(401, "no token") : chain.doFilter(request),
                                 BasicAuthenticationFilter.class)
+                        // A filter after Basic, where a tenant or audit filter
+                        // reads the principal: it runs under dispatch too.
+                        .addFilterAfter((request, chain) -> "/api/audited".equals(request.pathFrom(0))
+                                        ? HttpServer.Response.text(200, "audited") : chain.doFilter(request),
+                                BasicAuthenticationFilter.class)
                         .build());
     }
 
@@ -156,6 +161,7 @@ class DispatchAsUserTest {
             Map<String, String> tenant = new HashMap<String, String>();
             tenant.put("X-Tenant", "acme");
             assertEquals(200, as("GET", "/api/tenant/1", user("ann", "ROLE_USER"), tenant).getStatus());
+            assertEquals("audited", text(as("GET", "/api/audited", user("ann", "ROLE_USER"), null)));
 
             // No route: a 404, no template.
             r = as("GET", "/nowhere", user("ann", "ROLE_USER"), null);

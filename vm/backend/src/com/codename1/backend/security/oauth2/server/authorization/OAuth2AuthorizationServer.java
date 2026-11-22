@@ -603,6 +603,13 @@ public final class OAuth2AuthorizationServer {
             if (question != null) {
                 // Once, right or wrong: a ticket cannot be tried twice.
                 held.removeAttribute(CONSENT_TICKET + "." + ticket);
+                // And out of the order, so an answered question stops counting
+                // toward the cap of waiting ones.
+                Object order = held.getAttribute(CONSENT_TICKET);
+                if (order instanceof String) {
+                    String rest = (" " + order + " ").replace(" " + ticket + " ", " ").trim();
+                    held.setAttribute(CONSENT_TICKET, rest);
+                }
             }
             // The ticket is 32 random bytes, single use and bound to this user
             // and this exact request: it is found by its own value, and what it
