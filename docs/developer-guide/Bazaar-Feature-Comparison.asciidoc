@@ -75,7 +75,7 @@ on a row.
 | Continue selling when out of stock (oversell) | &#10003; | core | core | core | no | Per variant: a variant set to continue selling takes orders past zero, and the shortfall shows as backordered on the order.
 | Committed / unavailable / incoming states | &#10003; | core | no | no | no | Committed (reserved by orders), unavailable with a reason (damaged, quality control, safety stock) and incoming from purchase orders.
 | Inventory value report | &#10003; | core | app/plugin | app/plugin | core | 
-| Barcode label printing | &#10003; | app/plugin | app/plugin | app/plugin | core | Code 128 label sheets as PDF: Avery 30-up letter sheets and 2x1 inch thermal labels, from the product list or a received purchase order.
+| Barcode label printing | &#10003; | app/plugin | app/plugin | app/plugin | core | Code 128 label sheets as PDF: Avery 30-up letter sheets and 2x1 inch thermal labels, for chosen variants or for everything a received purchase order brought in.
 | Serial / lot tracking | &#10003; | app/plugin | app/plugin | app/plugin | no | Serial numbers and lots with expiry dates; lots are picked first-expiring-first, and a serial can be looked up to its order.
 |===
 
