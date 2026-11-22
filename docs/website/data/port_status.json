@@ -1544,7 +1544,7 @@
       "test": "Chart2ZoomAnimationScreenshotTest"
     },
     {
-      "pattern": "Chart2BarStylesScreenshotTest",
+      "pattern": "chart2-bar-styles",
       "test": "Chart2BarStylesScreenshotTest"
     },
     {
@@ -1556,11 +1556,11 @@
       "test": "Chart2FinancialGrowInAnimationScreenshotTest"
     },
     {
-      "pattern": "Chart2FinancialStylesScreenshotTest",
+      "pattern": "chart2-financial-styles",
       "test": "Chart2FinancialStylesScreenshotTest"
     },
     {
-      "pattern": "Chart2FlameGraphScreenshotTest",
+      "pattern": "chart2-flame-graph",
       "test": "Chart2FlameGraphScreenshotTest"
     },
     {
@@ -1572,7 +1572,7 @@
       "test": "Chart2LegendToggleAnimationScreenshotTest"
     },
     {
-      "pattern": "Chart2LineStylesScreenshotTest",
+      "pattern": "chart2-line-styles",
       "test": "Chart2LineStylesScreenshotTest"
     },
     {
@@ -1588,7 +1588,7 @@
       "test": "Chart2PartsGrowInAnimationScreenshotTest"
     },
     {
-      "pattern": "Chart2PointStylesScreenshotTest",
+      "pattern": "chart2-point-styles",
       "test": "Chart2PointStylesScreenshotTest"
     },
     {
