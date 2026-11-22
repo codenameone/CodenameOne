@@ -34,6 +34,7 @@ import com.codenameone.examples.bazaar.api.OrderRiskDto;
 import com.codenameone.examples.bazaar.api.TaxExemptionDto;
 import com.codenameone.examples.bazaar.api.TaxReportRowDto;
 import com.codenameone.examples.bazaar.api.TranslationDto;
+import com.codenameone.examples.bazaar.api.TranslationFieldDto;
 import com.codenameone.examples.bazaar.dispute.Disputes;
 import com.codenameone.examples.bazaar.market.Markets;
 import com.codenameone.examples.bazaar.market.Translations;
@@ -74,6 +75,17 @@ public class GlobalData {
 
     private static String f(HttpServer.Request request, String name) {
         return AdminForms.field(request, name);
+    }
+
+    /// A form field as sent, trimmed, or null when the form did not send it.
+    private static String sent(HttpServer.Request request, String name) {
+        String v;
+        try {
+            v = request.param(name);
+        } catch (RuntimeException malformed) {
+            v = null;
+        }
+        return v == null ? null : v.trim();
     }
 
     private static AdminRow row(String a, String b, String c, String d) {
@@ -346,7 +358,23 @@ public class GlobalData {
                 .hint(locales.isEmpty() ? "e.g. de or fr-CA" : "In use: " + join(locales));
         CommerceData.selectChosen(pick);
         v.forms.add(pick);
+        // Bulk: one CSV per language, every product and collection, with
+        // the original and the status beside each translation.
+        for (int iter = 0; iter < locales.size(); iter++) {
+            v.links.add(link("Export CSV, " + locales.get(iter), base + "/export.csv?locale="
+                    + com.codenameone.examples.bazaar.web.SiteUrls.encode(locales.get(iter))));
+        }
+        FormView bulk = new FormView("import", "Import translations", base + "/import",
+                "Import");
+        bulk.text = "Paste a CSV exported here, with its translation column filled in. Only "
+                + "the rows whose translation changed are saved.";
+        bulk.add("csv", "CSV", "textarea", "");
+        v.forms.add(bulk);
         if (kind == null || refId == null || refId.length() == 0) {
+            return;
+        }
+        if (locale != null && locale.length() > 0) {
+            sheet(storeId, kind, refId, locale, v);
             return;
         }
         Map<String, String> originals = translations.originals(storeId, kind, refId, null);
@@ -367,27 +395,56 @@ public class GlobalData {
                 }
             }
         }
-        if (locale == null || locale.length() == 0) {
-            return;
+    }
+
+    /// One thing's sheet in one language: each field's original, its
+    /// translation and its status, side by side, and the form that edits
+    /// them. A product's sheet has its options, pictures and text
+    /// metafields too.
+    private void sheet(String storeId, String kind, String refId, String locale,
+            MarketingView v) throws IOException {
+        String base = "/admin/" + storeId + "/translations";
+        List<TranslationFieldDto> rows = translations.sheet(me(), storeId, kind, refId, locale);
+        v.rowsTitle = "Original and translation to " + locale;
+        v.rowsEmpty = "Nothing to translate.";
+        v.headA = "Field";
+        v.headB = "Original";
+        v.headC = "Translation";
+        v.headD = "Status";
+        int missing = 0;
+        int outdated = 0;
+        for (int iter = 0; iter < rows.size(); iter++) {
+            TranslationFieldDto f = rows.get(iter);
+            v.rows.add(row(f.label(), cut(f.original()), cut(f.value()), words(f.status())));
+            missing += Translations.MISSING.equals(f.status()) ? 1 : 0;
+            outdated += Translations.OUTDATED.equals(f.status()) ? 1 : 0;
         }
         FormView edit = new FormView("translation", "Translation to " + locale, base, "Save");
-        edit.text = "The original is beside each field. An empty field falls back to the "
-                + "original.";
+        edit.text = rows.size() + " fields, " + missing + " missing, " + outdated
+                + " outdated. The original is beside each field; an empty field shows the "
+                + "original. Option values are comma separated, in the original's order.";
         edit.add("kind", "", "hidden", kind);
         edit.add("refId", "", "hidden", refId);
         edit.add("locale", "", "hidden", locale);
-        for (int iter = 0; iter < fields.size(); iter++) {
-            String field = fields.get(iter);
-            String now = "";
-            for (int t = 0; t < done.size(); t++) {
-                if (done.get(t).field().equals(field) && done.get(t).locale().equals(locale)) {
-                    now = done.get(t).value();
-                }
-            }
-            String orig = originals.get(field);
-            edit.add(field, field, "textarea", now).hint("Original: " + cut(orig));
+        for (int iter = 0; iter < rows.size(); iter++) {
+            TranslationFieldDto f = rows.get(iter);
+            String label = f.label() + (Translations.DONE.equals(f.status()) ? ""
+                    : " (" + words(f.status()) + ")");
+            edit.add(sheetField(f), label, "textarea", f.value()).hint("Original: "
+                    + cut(f.original()));
         }
         v.forms.add(edit);
+    }
+
+    /// The form field of one sheet row.
+    private static String sheetField(TranslationFieldDto f) {
+        return "t." + f.kind() + "." + f.refId() + "." + f.field();
+    }
+
+    /// `MISSING` as `Missing`.
+    private static String words(String status) {
+        return status.length() == 0 ? status : status.charAt(0)
+                + status.substring(1).toLowerCase(java.util.Locale.ROOT);
     }
 
     private static String cut(String s) {
@@ -397,15 +454,49 @@ public class GlobalData {
         return s.length() > 160 ? s.substring(0, 157) + "..." : s;
     }
 
+    /// Saves the sheet's form: only the fields that changed, so a field left
+    /// as it was keeps its status -- an outdated translation is not marked
+    /// current by saving the page around it.
     void putTranslations(String storeId, HttpServer.Request request) throws IOException {
         String kind = f(request, "kind");
-        List<String> fields = Translations.fieldsOf(kind);
-        for (int iter = 0; iter < fields.size(); iter++) {
-            String field = fields.get(iter);
-            translations.put(me(), storeId, new TranslationDto(kind, f(request, "refId"),
-                    f(request, "locale"), field, f(request, field)));
+        String refId = f(request, "refId");
+        String locale = f(request, "locale");
+        List<TranslationFieldDto> rows = translations.sheet(me(), storeId, kind, refId, locale);
+        for (int iter = 0; iter < rows.size(); iter++) {
+            TranslationFieldDto row = rows.get(iter);
+            // A field the form did not send is left alone, never emptied.
+            String now = sent(request, sheetField(row));
+            if (now == null && row.kind().equals(kind) && row.refId().equals(refId)) {
+                // A form or script naming the thing's own fields plainly.
+                now = sent(request, row.field());
+            }
+            if (now == null || now.trim().equals(row.value())) {
+                continue;
+            }
+            translations.put(me(), storeId, new TranslationDto(row.kind(), row.refId(), locale,
+                    row.field(), now));
         }
     }
+
+    /// The store's catalog as a translation CSV.
+    String exportTranslations(String storeId, String locale) throws IOException {
+        return translations.exportCsv(me(), storeId, locale);
+    }
+
+    /// Reads a translation CSV back; answers what it did, for the flash.
+    String importTranslations(String storeId, HttpServer.Request request) throws IOException {
+        Translations.ImportResult r = translations.importCsv(me(), storeId, f(request, "csv"));
+        StringBuilder out = new StringBuilder();
+        out.append(r.saved).append(" saved, ").append(r.unchanged).append(" unchanged");
+        if (!r.errors.isEmpty()) {
+            out.append("; ").append(r.errors.size()).append(" refused: ");
+            for (int iter = 0; iter < r.errors.size() && iter < 5; iter++) {
+                out.append(iter > 0 ? "; " : "").append(r.errors.get(iter));
+            }
+        }
+        return out.toString();
+    }
+
 
     // ================================================================= taxes
 

@@ -43,6 +43,8 @@ public final class Art {
     public final boolean model;
     /// The poster frame of a video: the product's first picture, or empty.
     public final String poster;
+    /// The picture's alternative text, in the page's language.
+    public final String alt;
 
     Art(String key, String photoId, String title) {
         this(key, photoId, title, null, null, null);
@@ -69,6 +71,7 @@ public final class Art {
         this.from = "hsl(" + hue + ",70%,62%)";
         this.to = "hsl(" + ((hue + 40) % 360) + ",65%,42%)";
         this.initials = initials(title);
+        this.alt = title == null ? "" : title;
     }
 
     /// Up to two letters or digits: the first of the first two words.

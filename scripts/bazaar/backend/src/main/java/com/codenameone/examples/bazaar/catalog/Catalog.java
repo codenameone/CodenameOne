@@ -22,6 +22,7 @@ import com.codename1.appkit.server.Text;
 import com.codename1.backend.Base64;
 import com.codename1.backend.ResponseStatusException;
 import com.codename1.backend.annotations.Autowired;
+import com.codenameone.examples.bazaar.market.Translations;
 import com.codename1.backend.annotations.Component;
 import com.codename1.backend.annotations.Transactional;
 import com.codenameone.examples.bazaar.Ids;
@@ -143,11 +144,23 @@ public class Catalog {
     @Autowired
     private CatalogFiles catalogFiles;
 
+    /// Product and collection text in the shopper's language. Field-injected
+    /// like the files.
+    @Autowired
+    private com.codenameone.examples.bazaar.market.ProductText productText;
+    /// Forgets the translations of a picture or collection that is deleted.
+    @Autowired
+    private com.codenameone.examples.bazaar.market.Translations translations;
+
+
     // ------------------------------------------------------------ the snapshot
 
     /// One store's catalog, read once for a search.
     private final class Snapshot {
         List<Product> list;
+        /// Product id to its title in the shopper's language, for a public
+        /// page whose shopper reads one; null shows the originals.
+        Map<String, String> titles;
         final Map<String, List<Variant>> byProduct;
         final Map<String, Integer> available = new HashMap<String, Integer>();
         final Map<String, List<String>> membership = new HashMap<String, List<String>>();
@@ -267,8 +280,9 @@ public class Catalog {
                     stock += n == null ? 0 : Math.max(0, n.intValue());
                 }
             }
+            String title = titles == null ? null : titles.get(product.getId());
             return new ProductCardDto(product.getId(), product.getStoreId(), product.getHandle(),
-                    product.getTitle(), product.getVendor(), product.getProductType(),
+                    title == null ? product.getTitle() : title, product.getVendor(), product.getProductType(),
                     tags(product.getTags()), product.getStatus(), product.getPhotoId(), range[0],
                     range[1], compare, tracked ? stock : -1, rating(product),
                     (int) product.getRatingCount(), mine.size(), unit[0] < 0 ? -1 : unit[0],
@@ -313,6 +327,14 @@ public class Catalog {
         Store store = storeService.activeStore(handle);
         Snapshot snapshot = new Snapshot(store.getId(), ACTIVE, true).forViewer(store.getId());
         search.collectionId = collectionId(snapshot, collection, true);
+        String locale = search.locale == null ? productText.shopperLocale(store.getId())
+                : search.locale;
+        if (locale != null && locale.length() > 0) {
+            // Shown and matched in the shopper's language: a search for the
+            // German word finds the product a German shopper reads.
+            snapshot.titles = productText.titles(store.getId(), locale);
+            search.titles = snapshot.titles;
+        }
         return page(snapshot, search);
     }
 
@@ -338,10 +360,7 @@ public class Catalog {
     @Transactional(readOnly = true)
     public ProductPageDto browse(String handle, String collection, String q, String sort,
             int page, int size, int category) throws IOException {
-        Search search = Search.of(q, null, null, null, null, null, sort,
-                Integer.toString(page), Integer.toString(size));
-        search.category = Math.max(0, category);
-        return products(handle, collection, search);
+        return browse(handle, collection, q, sort, page, size, category, null);
     }
 
     /// The top-level taxonomy categories of an active store's products (in a
@@ -387,11 +406,37 @@ public class Catalog {
         return out;
     }
 
+    /// [#browse] for a shopper reading `locale` (null for the originals):
+    /// titles shown, and words matched, in that language too.
+    @Transactional(readOnly = true)
+    public ProductPageDto browse(String handle, String collection, String q, String sort,
+            int page, int size, String locale) throws IOException {
+        return browse(handle, collection, q, sort, page, size, 0, locale);
+    }
+
+    /// [#browse] narrowed to a taxonomy category (0 for any) and read in
+    /// `locale` (null for the originals).
+    @Transactional(readOnly = true)
+    public ProductPageDto browse(String handle, String collection, String q, String sort,
+            int page, int size, int category, String locale) throws IOException {
+        Search search = Search.of(q, null, null, null, null, null, sort,
+                Integer.toString(page), Integer.toString(size));
+        search.category = Math.max(0, category);
+        search.locale = locale == null ? "" : locale;
+        return products(handle, collection, search);
+    }
+
+
     @Transactional(readOnly = true)
     public FacetsDto facets(String handle, String collection, Search search) throws IOException {
         Store store = storeService.activeStore(handle);
         Snapshot snapshot = new Snapshot(store.getId(), ACTIVE, true).forViewer(store.getId());
         search.collectionId = collectionId(snapshot, collection, true);
+        String locale = search.locale == null ? productText.shopperLocale(store.getId())
+                : search.locale;
+        if (locale != null && locale.length() > 0) {
+            search.titles = productText.titles(store.getId(), locale);
+        }
         Map<String, Integer> typeCounts = new HashMap<String, Integer>();
         Map<String, Integer> vendorCounts = new HashMap<String, Integer>();
         Map<String, Integer> tagCounts = new HashMap<String, Integer>();
@@ -446,14 +491,29 @@ public class Catalog {
 
     @Transactional(readOnly = true)
     public List<CollectionDto> publicCollections(String handle) throws IOException {
+        return publicCollections(handle, null);
+    }
+
+    /// The published collections, titled in `locale`: null asks the request
+    /// (`ProductText#shopperLocale`), empty keeps the originals.
+    @Transactional(readOnly = true)
+    public List<CollectionDto> publicCollections(String handle, String locale)
+            throws IOException {
         Store store = storeService.activeStore(handle);
+        String shown = locale == null ? productText.shopperLocale(store.getId()) : locale;
+        Map<String, Map<String, String>> tr = shown == null || shown.length() == 0
+                ? new HashMap<String, Map<String, String>>()
+                : productText.collections(store.getId(), shown);
         Snapshot snapshot = new Snapshot(store.getId(), ACTIVE, true).forViewer(store.getId());
         List<CollectionDto> out = new ArrayList<CollectionDto>();
         for (int iter = 0; iter < snapshot.allCollections.size(); iter++) {
             Collection collection = snapshot.allCollections.get(iter);
             if (collection.isPublished()) {
-                out.add(toDto(collection, visibleIds(snapshot, collection)));
+                out.add(com.codenameone.examples.bazaar.market.ProductText.localize(
+                        toDto(collection, visibleIds(snapshot, collection)),
+                        tr.get(collection.getId())));
             }
+
         }
         return out;
     }
@@ -1025,6 +1085,7 @@ public class Catalog {
             if (p.getId().equals(photoId) || p.getPhotoId().equals(photoId)) {
                 removed = p.getPhotoId();
                 gallery.delete(p);
+                translations.forget(storeId, Translations.IMAGE, p.getId());
                 if (!Media.isImage(p) && p.getUrl().length() == 0 && p.getPhotoId().length() > 0
                         && gallery.findByPhotoId(p.getPhotoId()).isEmpty()) {
                     catalogFiles.remove(p.getPhotoId());
@@ -1154,6 +1215,7 @@ public class Catalog {
             members.delete(old.get(iter));
         }
         collections.delete(collection);
+        translations.forget(storeId, Translations.COLLECTION, collectionId);
         return answer;
     }
 
@@ -1474,6 +1536,7 @@ public class Catalog {
                 }
                 if (at < 0) {
                     gallery.delete(p);
+                    translations.forget(product.getStoreId(), Translations.IMAGE, p.getId());
                 } else {
                     p.setPosition(at);
                     p.setAlt(Text.optional(wanted.photos().get(at).alt(), 200, "the caption"));

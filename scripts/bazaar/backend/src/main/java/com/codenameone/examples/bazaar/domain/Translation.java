@@ -51,6 +51,11 @@ public class Translation {
     @Column(nullable = false)
     private Instant updatedAt = Instant.EPOCH;
 
+    /// A stamp of the original this was translated from
+    /// (`Translations#stamp`); empty when unknown, which counts as current.
+    @Column(nullable = false, type = "VARCHAR(16)")
+    private String sourceHash = "";
+
     public Translation() {
     }
 
@@ -116,5 +121,13 @@ public class Translation {
 
     public void setUpdatedAt(Instant updatedAt) {
         this.updatedAt = updatedAt;
+    }
+
+    public String getSourceHash() {
+        return sourceHash;
+    }
+
+    public void setSourceHash(String sourceHash) {
+        this.sourceHash = sourceHash;
     }
 }

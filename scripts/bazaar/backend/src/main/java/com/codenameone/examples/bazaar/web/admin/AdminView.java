@@ -29,6 +29,8 @@ public class AdminView {
     /// "customers" or "customer".
     public String page = "dashboard";
     public String base = "";
+    /// The product's translation sheet, from its page.
+    public String translationsUrl = "";
 
     // ------------------------------------------------------------ dashboard
     /// False for a role that may not read the store's figures (fulfilment,

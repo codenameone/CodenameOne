@@ -481,7 +481,15 @@ worked out in the store's currency and the amount due is converted at the rate
 the page showed, locked for the order. The order keeps both its totals in the
 store's currency and the presentment currency, total and rate, and refunds go
 back in what was charged. `market.Translations` answers each field from the exact
-locale, then its language, then the original. The storefront's interface text
+locale, then its language, then the original. Product text is translated where
+it is shown, by `market.ProductText`, never where it is stored: an order line
+and the merchant's editor keep the original, and cart, checkout, order pages and
+mail translate the line's name in the order's language. Option ids change on
+every product save, so `OPTION` translations are keyed by the product and the
+option's position (`name1`, `values1`), and a values translation applies only
+when it has as many values as the original. Each translation stores a hash of
+the original it was made from (`source_hash`); a different hash today is what
+the sheet calls outdated. The storefront's interface text
 (`web.StoreText`, read in templates as `${page.t['key']}`) follows the market's
 language when there is text for it, else the visitor's `Accept-Language`, and
 falls back to English key by key; a Hebrew page is drawn right to left. A page

@@ -189,10 +189,28 @@ public final class StorefrontMarkets {
         if (ex != null) {
             ex.setAttribute(LINKS, links.toString());
         }
-        if (c.pricer != null) {
-            c.locale = Locales.orNull(c.pricer.market().getLocale());
+        // The content language: the shopper's explicit choice (`?lang=`, an
+        // address of its own that the hreflang alternates name, else the
+        // `lang` cookie), then the market's, then the browser's -- each
+        // resolved to a locale the store translated into, so `de` finds
+        // `de-CH`. The interface language below follows the same choice.
+        String explicit = StoreText.chosen(request);
+        String marketLocale = c.pricer == null ? null
+                : Locales.orNull(c.pricer.market().getLocale());
+        if (explicit != null) {
+            if (marketLocale != null && Locales.language(marketLocale).equals(explicit)) {
+                c.locale = marketLocale;
+            } else {
+                List<String> one = new ArrayList<String>();
+                one.add(explicit);
+                c.locale = translations.pick(store.getId(), one);
+            }
+        } else {
+            c.locale = marketLocale;
         }
-        if (c.locale == null) {
+        // A language the shopper chose and the store never translated into
+        // shows the originals, not some third language.
+        if (c.locale == null && explicit == null) {
             List<String> wanted = Locales.accepted(request.getHeader("Accept-Language"));
             c.locale = wanted.isEmpty() ? null : translations.pick(store.getId(), wanted);
             StoreText.vary(ex, "Accept-Language");

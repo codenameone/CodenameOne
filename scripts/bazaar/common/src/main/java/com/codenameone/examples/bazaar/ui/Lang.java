@@ -77,6 +77,10 @@ public final class Lang {
             bundle.putAll(translated);
         }
         UIManager.getInstance().setBundle(bundle);
+        // The shop answers product text in this language too: titles,
+        // descriptions and options a store translated.
+        com.codename1.io.NetworkManager.getInstance().addDefaultHeader("Accept-Language",
+                current());
     }
 
     /// What `code`'s language calls itself.

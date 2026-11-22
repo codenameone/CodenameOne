@@ -543,6 +543,9 @@ public class AdminData {
         String base = "/admin/" + storeId + "/products/" + p.id();
         v.saveAction = base;
         v.adjustAction = base + "/adjust";
+        v.translationsUrl = "/admin/" + storeId + "/translations?kind="
+                + com.codenameone.examples.bazaar.market.Translations.PRODUCT + "&refId=" + p.id();
+
         bundleForm(storeId, p.id(), base, v);
         scheduleForm(storeId, p.id(), base, v);
         mediaForm(storeId, p, base, v);

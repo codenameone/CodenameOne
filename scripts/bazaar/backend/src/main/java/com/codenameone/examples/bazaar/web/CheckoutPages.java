@@ -522,12 +522,13 @@ public class CheckoutPages {
         if (dto != null && !dto.lines().isEmpty()) {
             view.empty = false;
             Map<String, String> handles = pages.handles(dto.lines());
+            String locale = pages.contentLocale(store, base, request);
             for (int iter = 0; iter < dto.lines().size(); iter++) {
                 CartLineDto l = dto.lines().get(iter);
                 CartLineView lv = new CartLineView();
                 lv.id = l.id();
-                lv.title = l.title();
-                lv.variant = l.variantTitle();
+                pages.lineNames(lv, store, l.productId(), l.title(), l.variantTitle(), locale);
+
                 String ph = handles.get(l.productId());
                 lv.url = ph == null ? "" : StorefrontPages.productUrl(store.getHandle(), ph);
                 lv.quantity = l.quantity();
@@ -785,12 +786,13 @@ public class CheckoutPages {
         }
         view.shippingTitle = o.shippingTitle() == null ? "" : o.shippingTitle();
         Map<String, Integer> late = backorders.ofOrder(row.getId());
+        // The lines in the language the order was placed in, as its mail.
+        String locale = pages.orderLocale(store, row.getLanguage());
         for (int iter = 0; iter < o.lines().size(); iter++) {
             OrderLineDto l = o.lines().get(iter);
             CartLineView lv = new CartLineView();
             lv.id = l.id();
-            lv.title = l.title();
-            lv.variant = l.variantTitle();
+            pages.lineNames(lv, store, l.productId(), l.title(), l.variantTitle(), locale);
             lv.quantity = l.quantity();
             lv.unit = Money.format(l.priceCents(), currency);
             lv.total = Money.format(l.priceCents() * l.quantity(), currency);

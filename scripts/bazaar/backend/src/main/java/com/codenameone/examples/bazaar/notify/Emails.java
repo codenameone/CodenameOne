@@ -98,6 +98,10 @@ public class Emails {
     private ShopperLanguage language;
     @Autowired
     private Templates templates;
+    /// Product names in the shopper's language, for the order lines.
+    @Autowired
+    private com.codenameone.examples.bazaar.market.ProductText productText;
+
 
     public Emails(MailSender mail, StoreRepository stores, StoreOrderRepository orders,
             OrderLineRepository lines, CustomerRepository customers, RefundRepository refunds,
@@ -843,10 +847,28 @@ public class Emails {
         void lines(List<OrderLine> ls, String currency) {
             html.append("<table width=\"100%\" cellpadding=\"6\" style=\"border-collapse:collapse;"
                     + "margin:0 0 8px\">");
+            // Product names in the mail's language where the store translated
+            // them; the line's recorded names otherwise.
+            String locale = null;
+            try {
+                locale = store == null || productText == null ? null
+                        : productText.locale(store.getId(), lang);
+            } catch (java.io.IOException unreadable) {
+                locale = null;
+            }
             for (int iter = 0; iter < ls.size(); iter++) {
                 OrderLine l = ls.get(iter);
-                String name = l.getTitle() + (l.getVariantTitle().length() > 0 ? " - "
-                        + l.getVariantTitle() : "");
+                String[] names = {l.getTitle(), l.getVariantTitle()};
+                if (locale != null) {
+                    try {
+                        names = productText.line(store.getId(), l.getProductId(), l.getTitle(),
+                                l.getVariantTitle(), locale);
+                    } catch (java.io.IOException unreadable) {
+                        names = new String[] {l.getTitle(), l.getVariantTitle()};
+                    }
+                }
+                String name = names[0] + (names[1] != null && names[1].length() > 0 ? " - "
+                        + names[1] : "");
                 String price = money(l.getPriceCents() * l.getQuantity(), currency);
                 html.append("<tr style=\"border-bottom:1px solid #e2e8f0\"><td>")
                         .append(l.getQuantity()).append(" x ").append(esc(name))

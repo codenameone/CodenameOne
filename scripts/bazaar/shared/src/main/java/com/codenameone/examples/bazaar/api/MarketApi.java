@@ -101,6 +101,16 @@ public interface MarketApi {
             @Query("refId") String refId,
             OnComplete<Response<List<TranslationDto>>> callback);
 
+    /// Every translatable field of one thing beside its translation into
+    /// `locale` and its status; for a product, its options, pictures and text
+    /// metafields too.
+    @GET("/api/merchant/stores/{storeId}/translations/sheet")
+    void translationSheet(@Path("storeId") String storeId,
+            @Query("kind") String kind,
+            @Query("refId") String refId,
+            @Query("locale") String locale,
+            OnComplete<Response<List<TranslationFieldDto>>> callback);
+
     @POST("/api/merchant/stores/{storeId}/translations")
     void putTranslation(@Path("storeId") String storeId,
             @Body TranslationDto body,

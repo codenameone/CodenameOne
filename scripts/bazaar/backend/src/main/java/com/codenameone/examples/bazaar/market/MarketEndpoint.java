@@ -112,6 +112,12 @@ public class MarketEndpoint implements MarketApiServer {
     }
 
     @Override
+    public List<com.codenameone.examples.bazaar.api.TranslationFieldDto> translationSheet(
+            String storeId, String kind, String refId, String locale) throws Exception {
+        return translations.sheet(Caller.name(), storeId, kind, refId, locale);
+    }
+
+    @Override
     public List<TranslationDto> putTranslation(String storeId, TranslationDto body) throws Exception {
         return translations.put(Caller.name(), storeId, body);
     }

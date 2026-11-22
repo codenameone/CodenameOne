@@ -42,6 +42,11 @@ public class CatalogEndpoint implements CatalogApiServer {
     private final Catalog catalog;
     private final StoreEvents storeEvents;
 
+    /// Shop products in the caller's language (the app sends
+    /// `Accept-Language`). Field-injected so the constructor stays as it was.
+    @com.codename1.backend.annotations.Autowired
+    private com.codenameone.examples.bazaar.market.ProductText productText;
+
     public CatalogEndpoint(Catalog catalog, StoreEvents storeEvents) {
         this.catalog = catalog;
         this.storeEvents = storeEvents;
@@ -69,12 +74,15 @@ public class CatalogEndpoint implements CatalogApiServer {
 
     @Override
     public ProductDto product(String id) throws Exception {
-        return catalog.publicProduct(id);
+        ProductDto p = catalog.publicProduct(id);
+        return productText.localize(p, productText.shopperLocale(p.storeId()));
     }
 
     @Override
     public ProductDto productByHandle(String handle, String productHandle) throws Exception {
-        return catalog.publicProductByHandle(handle, productHandle);
+        ProductDto p = catalog.publicProductByHandle(handle, productHandle);
+        return productText.localize(p, productText.shopperLocale(p.storeId()));
+
     }
 
     @Override

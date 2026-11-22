@@ -223,13 +223,22 @@ public class Metafields {
                 com.codenameone.examples.bazaar.market.Translations.METAFIELD, locale);
         java.util.Map<String, java.util.Map<String, String>> titles = translations.allOf(storeId,
                 com.codenameone.examples.bazaar.market.Translations.METAOBJECT_ENTRY, locale);
+        java.util.Map<String, java.util.Map<String, String>> texts = translations.allOf(storeId,
+                com.codenameone.examples.bazaar.market.Translations.METAFIELD_VALUE, locale);
         List<MetafieldValue> vs = values.findByStoreIdAndOwnerId(storeId, ownerId);
         List<MetafieldValueDto> out = new ArrayList<MetafieldValueDto>();
         for (int iter = 0; iter < plain.size(); iter++) {
             MetafieldValueDto f = plain.get(iter);
             String name = pickText(names.get(f.defId()), "name", f.name());
             String value = f.value();
-            if ("reference".equals(f.type())) {
+            if ("text".equals(f.type())) {
+                // The words of a text field translate as the field's own row.
+                for (int v = 0; v < vs.size(); v++) {
+                    if (vs.get(v).getDefId().equals(f.defId())) {
+                        value = pickText(texts.get(vs.get(v).getId()), "value", value);
+                    }
+                }
+            } else if ("reference".equals(f.type())) {
                 for (int v = 0; v < vs.size(); v++) {
                     if (vs.get(v).getDefId().equals(f.defId())) {
                         value = pickText(titles.get(vs.get(v).getTextValue()), "title", value);

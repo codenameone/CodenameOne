@@ -55,7 +55,7 @@ on a row.
 | Unit pricing (per kg/l) | &#10003; | core | app/plugin | app/plugin | no | A measure and a reference unit per variant; "$4.00 / 100 g" on the storefront product page and cards and in the app, in the shopping feed's unit pricing attributes and as a `UnitPriceSpecification` in structured data.
 | Product reviews | &#10003; | app/plugin | core | core | no | 
 | Wishlist | &#10003; | app/plugin | app/plugin | core | no | 
-| Product translations | &#9681; | core | app/plugin | core | no | Pages, policies and blog posts translate per market; product fields do not yet. 
+| Product translations | &#10003; | core | app/plugin | core | no | Titles, descriptions, SEO text, options, alt text, text metafields and collections, with original-beside-translation editing, missing/outdated status and CSV export and import. No machine translation. 
 |===
 
 === Inventory

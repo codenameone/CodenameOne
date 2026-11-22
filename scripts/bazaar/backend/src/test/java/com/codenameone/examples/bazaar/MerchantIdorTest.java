@@ -174,7 +174,7 @@ class MerchantIdorTest {
         "DELETE /markets/{marketId}", "GET /markets/{marketId}/prices",
         "POST /markets/{marketId}/prices", "GET /fx-rates", "POST /fx-rates", "GET /duty-rates",
         "POST /duty-rates", "DELETE /duty-rates/{dutyId}", "GET /customs-codes",
-        "POST /customs-codes", "GET /translations", "POST /translations",
+        "POST /customs-codes", "GET /translations", "POST /translations", "GET /translations/sheet",
         "GET /tax-exemptions", "POST /tax-exemptions", "DELETE /tax-exemptions/{exemptionId}",
         "GET /tax-report", "GET /order-risks", "GET /order-risks/{orderId}",
         "POST /order-risks/{orderId}/approve", "POST /order-risks/{orderId}/cancel",

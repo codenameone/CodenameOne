@@ -167,6 +167,7 @@ public class PayPages {
         view.storeUrl = StorefrontPages.storeUrl(store.getHandle());
         view.action = address(store, token);
         view.typedCards = payments.takesTypedCards();
+        String locale = pages.orderLocale(store, row.getLanguage());
         Map<String, Integer> late = backorders.ofOrder(row.getId());
         for (int iter = 0; iter < o.lines().size(); iter++) {
             OrderLineDto l = o.lines().get(iter);
@@ -174,6 +175,7 @@ public class PayPages {
             lv.id = l.id();
             lv.title = l.title();
             lv.variant = l.variantTitle() == null ? "" : l.variantTitle();
+            pages.lineNames(lv, store, l.productId(), l.title(), l.variantTitle(), locale);
             lv.quantity = l.quantity();
             lv.unit = Money.format(l.priceCents(), cur);
             lv.total = Money.format(l.priceCents() * l.quantity(), cur);

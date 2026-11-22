@@ -358,7 +358,14 @@ email addresses, and only people who agreed receive marketing.
 *Markets and tax.* A market groups countries under a currency and language, with
 an exchange rate the merchant enters, a price adjustment, rounding and, where
 wanted, fixed prices. The translations page edits product, collection and page
-text per language. Products can carry customs codes, and duty rates per
+text per language, each field beside its original and marked missing, outdated
+(the original changed since) or done. A product's sheet covers its title,
+description, SEO text, option names and values, pictures' alternative text and
+text metafields; a product's page links to it, and the app's product editor has
+a Translations card. A whole catalog goes out to a translator as one CSV per
+language and comes back the same way. Shoppers see the translation for the
+language they chose, else their market's, else their browser's, on every page,
+in the cart and checkout, and in order mail. Products can carry customs codes, and duty rates per
 destination give the shopper an estimate of import duties at checkout. The tax
 page reports tax collected by region for a period, as a CSV for filing, and
 records customers' tax exemption certificates.

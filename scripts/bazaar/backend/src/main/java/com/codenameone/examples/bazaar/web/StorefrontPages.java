@@ -104,6 +104,10 @@ public class StorefrontPages {
     private final com.codenameone.examples.bazaar.ops.Attribution attribution;
 
     private final com.codenameone.examples.bazaar.catalog.Bundles bundles;
+    /// Product and collection text in the shopper's language. Field-injected
+    /// so the constructor stays as it was.
+    @com.codename1.backend.annotations.Autowired
+    private com.codenameone.examples.bazaar.market.ProductText productText;
 
     public StorefrontPages(Stores stores, Catalog catalog, Carts carts, StoreRepository storeRows,
             ProductRepository products, CollectionRepository collections,
@@ -190,7 +194,8 @@ public class StorefrontPages {
             ld.put("image", page.image);
         }
         page.jsonLd = Json.write(ld);
-        List<CollectionDto> cs = catalog.publicCollections(store.getHandle());
+        String locale = contentLocale(store, page.canonical, request);
+        List<CollectionDto> cs = catalog.publicCollections(store.getHandle(), locale);
         List<LinkView> links = new ArrayList<LinkView>();
         for (int iter = 0; iter < cs.size(); iter++) {
             CollectionDto c = cs.get(iter);
@@ -199,7 +204,8 @@ public class StorefrontPages {
                         false));
             }
         }
-        ProductPageDto featured = catalog.browse(store.getHandle(), null, null, "rating", 0, 8);
+        ProductPageDto featured = catalog.browse(store.getHandle(), null, null, "rating", 0, 8,
+                locale);
         model.addAttribute("page", page)
                 .addAttribute("hero", new Art(store.getId(), store.getHeroPhotoId(),
                         store.getName()))
@@ -240,19 +246,25 @@ public class StorefrontPages {
         String path = collectionUrl(store.getHandle(), c.getHandle());
         String order = sort(sort);
         int category = category(param(request, "category"));
-        ProductPageDto found = catalog.browse(store.getHandle(), c.getHandle(), null, order,
-                Math.max(0, page), PAGE_SIZE, category);
         PageMeta meta = meta(store, request, path + (page > 0 ? "?page=" + page : ""));
-        meta.title = c.getTitle() + " - " + store.getName();
-        meta.description = describe(c.getDescription().length() > 0 ? c.getDescription()
-                : c.getTitle() + " from " + store.getName());
+        String locale = contentLocale(store, path, request);
+        ProductPageDto found = catalog.browse(store.getHandle(), c.getHandle(), null, order,
+                Math.max(0, page), PAGE_SIZE, category, locale);
+        Map<String, String> tr = locale.length() == 0 ? null
+                : translations.fields(store.getId(),
+                    com.codenameone.examples.bazaar.market.Translations.COLLECTION, c.getId(),
+                    locale);
+        String title = StorefrontMarkets.text(tr, "title", c.getTitle());
+        String about = StorefrontMarkets.text(tr, "description", c.getDescription());
+        meta.title = title + " - " + store.getName();
+        meta.description = describe(about.length() > 0 ? about
+                : title + " from " + store.getName());
         if (category > 0) {
             // A filtered page is a permutation of the collection, not a page
             // of its own for an index.
             meta.noindex = true;
         }
-        list(model, store, meta, found, path, order, "", c.getTitle(), c.getDescription(),
-                category);
+        list(model, store, meta, found, path, order, "", title, about, category);
         model.addAttribute("categories", categoryChips(store, c.getHandle(), path, order,
                 category, meta));
     }
@@ -293,10 +305,11 @@ public class StorefrontPages {
             words = words.substring(0, 100);
         }
         String order = sort(sort);
-        ProductPageDto found = catalog.browse(store.getHandle(), null, words, order,
-                Math.max(0, page), PAGE_SIZE);
         String path = "/s/" + store.getHandle() + "/search";
         PageMeta meta = meta(store, request, path);
+        // Matched against the titles the shopper reads, too.
+        ProductPageDto found = catalog.browse(store.getHandle(), null, words, order,
+                Math.max(0, page), PAGE_SIZE, contentLocale(store, path, request));
         meta.title = (words.length() > 0 ? "\"" + words + "\" - " : "Search - ") + store.getName();
         meta.description = "Search " + store.getName();
         meta.query = words;
@@ -373,15 +386,16 @@ public class StorefrontPages {
             view.geoUrl = market.suggested.url;
         }
         if (market.locale != null) {
-            Map<String, String> tr = translations.fields(store.getId(),
-                    com.codenameone.examples.bazaar.market.Translations.PRODUCT, p.id(),
-                    market.locale);
-            view.title = StorefrontMarkets.text(tr, "title", view.title);
-            view.description = StorefrontMarkets.text(tr, "description", view.description);
-            meta.title = StorefrontMarkets.text(tr, "seoTitle", view.title) + " - "
-                    + store.getName();
-            meta.description = describe(StorefrontMarkets.text(tr, "seoDescription",
-                    view.description));
+            // Everything below -- variants, pictures, structured data -- reads
+            // the product in the shopper's language from here on.
+            p = productText.localize(p, market.locale);
+            view.title = p.title();
+            view.description = p.description();
+            meta.title = (p.seoTitle() != null && p.seoTitle().length() > 0 ? p.seoTitle()
+                    : view.title) + " - " + store.getName();
+            meta.description = describe(p.seoDescription() != null
+                    && p.seoDescription().length() > 0 ? p.seoDescription()
+                    : view.description.length() > 0 ? view.description : view.title);
             view.lang = market.locale;
         }
         final com.codenameone.examples.bazaar.market.Markets.Pricer pricer = market.pricer;
@@ -400,13 +414,13 @@ public class StorefrontPages {
         for (int iter = 0; iter < photos.size(); iter++) {
             ProductPhotoDto ph = photos.get(iter);
             if ("VIDEO".equals(ph.kind()) || "MODEL".equals(ph.kind())) {
-                view.gallery.add(new Art(ph.id(), ph.photoId(), p.title(), ph.kind(), ph.url(),
+                view.gallery.add(new Art(ph.id(), ph.photoId(), alt(ph, p), ph.kind(), ph.url(),
                         poster));
                 view.hasModel |= "MODEL".equals(ph.kind()) && ph.url() != null
                         && ph.url().startsWith("/");
                 continue;
             }
-            view.gallery.add(new Art(ph.id(), ph.photoId(), p.title()));
+            view.gallery.add(new Art(ph.id(), ph.photoId(), alt(ph, p)));
             images.add(urls.absolute(request, "/media/" + ph.photoId()));
         }
         if (view.gallery.isEmpty()) {
@@ -515,7 +529,8 @@ public class StorefrontPages {
             rv.verified = r.isVerified();
             view.reviews.add(rv);
         }
-        ProductPageDto more = catalog.browse(store.getHandle(), null, null, "rating", 0, 5);
+        ProductPageDto more = catalog.browse(store.getHandle(), null, null, "rating", 0, 5,
+                market.locale == null ? "" : market.locale);
         view.related = cards(store, more.items(), p.id());
         while (view.related.size() > 4) {
             view.related.remove(view.related.size() - 1);
@@ -555,6 +570,9 @@ public class StorefrontPages {
         ld.put("name", p.title());
         ld.put("description", meta.description);
         ld.put("url", meta.canonical);
+        if (view.lang != null && view.lang.length() > 0) {
+            ld.put("inLanguage", view.lang);
+        }
         if (!images.isEmpty()) {
             ld.put("image", images);
         }
@@ -647,12 +665,13 @@ public class StorefrontPages {
         if (dto != null) {
             remember(request, store, dto.token());
             Map<String, String> handles = handles(dto.lines());
+            String locale = contentLocale(store, "/s/" + store.getHandle() + "/cart", request);
             for (int iter = 0; iter < dto.lines().size(); iter++) {
                 CartLineDto l = dto.lines().get(iter);
                 CartLineView lv = new CartLineView();
                 lv.id = l.id();
-                lv.title = l.title();
-                lv.variant = l.variantTitle();
+                lineNames(lv, store, l.productId(), l.title(), l.variantTitle(), locale);
+
                 String ph = handles.get(l.productId());
                 lv.url = ph == null ? "" : productUrl(store.getHandle(), ph);
                 lv.quantity = l.quantity();
@@ -957,7 +976,38 @@ public class StorefrontPages {
         }
     }
 
+    /// A picture's alternative text: its own (translated), else the title.
+    private static String alt(ProductPhotoDto ph, ProductDto p) {
+        return ph.alt() != null && ph.alt().length() > 0 ? ph.alt() : p.title();
+    }
+
+    /// The locale this page shows products in, or empty for the originals:
+    /// [StorefrontMarkets#choose]'s, which the page's frame already asked.
+    public String contentLocale(Store store, String path, HttpServer.Request request)
+            throws IOException {
+        StorefrontMarkets.Choice c = StorefrontMarkets.choose(store, path, request, markets,
+                translations, urls);
+        return c.locale == null ? "" : c.locale;
+    }
+
+    /// Fills a cart or order line's names in `locale` (empty keeps the names
+    /// the line recorded).
+    public void lineNames(CartLineView lv, Store store, String productId, String title,
+            String variant, String locale) throws IOException {
+        String[] n = productText.line(store.getId(), productId, title, variant, locale);
+        lv.title = n[0];
+        lv.variant = n[1] == null ? "" : n[1];
+    }
+
+    /// An order's language ([StoreOrder#getLanguage]) as a locale the store
+    /// translated into, or empty.
+    public String orderLocale(Store store, String language) throws IOException {
+        String l = productText.locale(store.getId(), language);
+        return l == null ? "" : l;
+    }
+
     private List<CardView> cards(Store store, List<ProductCardDto> items, String skip) {
+
         List<CardView> out = new ArrayList<CardView>();
         for (int iter = 0; iter < items.size(); iter++) {
             ProductCardDto c = items.get(iter);

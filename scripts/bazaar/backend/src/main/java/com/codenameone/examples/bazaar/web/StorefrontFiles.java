@@ -51,6 +51,10 @@ public class StorefrontFiles {
     private final com.codenameone.examples.bazaar.content.Pages pages;
     private final com.codenameone.examples.bazaar.market.Markets markets;
     private final com.codenameone.examples.bazaar.catalog.Schedules schedules;
+    /// The languages a store translated into, for the sitemap alternates.
+    /// Field-injected so the constructor stays as it was.
+    @com.codename1.backend.annotations.Autowired
+    private com.codenameone.examples.bazaar.market.Translations translations;
 
     public StorefrontFiles(StoreRepository stores, ProductRepository products,
             CollectionRepository collections, Catalog catalog, SiteUrls urls,
@@ -121,7 +125,23 @@ public class StorefrontFiles {
                 String lang = com.codenameone.examples.bazaar.market.Locales.orNull(
                         ms.get(m).locale());
                 if (lang != null) {
-                    alternates.add(new String[] {lang, ms.get(m).code()});
+                    alternates.add(new String[] {lang, "market="
+                        + SiteUrls.encode(ms.get(m).code())});
+                }
+            }
+            // Each language the store translated its catalog into is an
+            // address of its own too (`?lang=`, as the pages' Link headers
+            // say), unless a market already stands for it.
+            List<String> spoken = translations.languages(store.getId());
+            for (int l = 0; l < spoken.size(); l++) {
+                String lang = spoken.get(l);
+                boolean covered = !StoreText.supported(lang);
+                for (int a = 0; a < alternates.size() && !covered; a++) {
+                    covered = com.codenameone.examples.bazaar.market.Locales.language(
+                            alternates.get(a)[0]).equals(lang);
+                }
+                if (!covered) {
+                    alternates.add(new String[] {lang, "lang=" + lang});
                 }
             }
             List<com.codenameone.examples.bazaar.domain.ContentPage> content =
@@ -207,8 +227,8 @@ public class StorefrontFiles {
             xml.append("<xhtml:link rel=\"alternate\" hreflang=\"");
             escape(xml, alternates.get(iter)[0]);
             xml.append("\" href=\"");
-            escape(xml, urls.absolute(request, path + "?market="
-                    + SiteUrls.encode(alternates.get(iter)[1])));
+            escape(xml, urls.absolute(request, path + "?" + alternates.get(iter)[1]));
+
             xml.append("\"/>");
         }
         if (!alternates.isEmpty()) {

@@ -49,6 +49,12 @@ final class Search {
     String sort = "relevance";
     int page;
     int size = 24;
+    /// The shopper's content locale; null asks the request
+    /// (`ProductText#shopperLocale`), empty means the originals.
+    String locale;
+    /// Product id to its title in [#locale], for the products translated;
+    /// a word matches either title, and scores by the better one.
+    Map<String, String> titles;
 
     static Search of(String q, String tag, String type, String vendor, String min, String max,
             String sort, String page, String size) {
@@ -74,7 +80,8 @@ final class Search {
         for (int iter = 0; iter < words.length; iter++) {
             String word = words[iter];
             boolean hit = contains(product.getTitle(), word) || contains(product.getVendor(), word)
-                    || contains(product.getProductType(), word);
+                    || contains(product.getProductType(), word)
+                    || contains(translatedTitle(product), word);
             for (int t = 0; t < tags.size() && !hit; t++) {
                 hit = contains(tags.get(t), word);
             }
@@ -123,10 +130,11 @@ final class Search {
     /// How well a product matches the words: a word in the title counts most.
     int score(Product product) {
         int score = 0;
+        String shown = translatedTitle(product);
         for (int iter = 0; iter < words.length; iter++) {
-            if (startsWith(product.getTitle(), words[iter])) {
+            if (startsWith(product.getTitle(), words[iter]) || startsWith(shown, words[iter])) {
                 score += 3;
-            } else if (contains(product.getTitle(), words[iter])) {
+            } else if (contains(product.getTitle(), words[iter]) || contains(shown, words[iter])) {
                 score += 2;
             } else {
                 score++;
@@ -199,7 +207,13 @@ final class Search {
         return out;
     }
 
+    /// The product's title in the shopper's language, or null.
+    String translatedTitle(Product product) {
+        return titles == null ? null : titles.get(product.getId());
+    }
+
     static boolean contains(String hay, String needle) {
+
         if (hay == null) {
             return false;
         }

@@ -69,7 +69,8 @@
 <form method="post" th:action="${view.cancelAction}" hx-confirm="Cancel this order?"><button class="danger" type="submit">Cancel order</button></form></section>
 </th:block>
 
-<th:block th:if="${view.page == 'product'}"><p><a th:href="${view.base + '/products'}">Products</a></p><h1 th:text="${view.title}">Product</h1>
+<th:block th:if="${view.page == 'product'}"><p><a th:href="${view.base + '/products'}">Products</a> <a th:href="${view.translationsUrl}">Translations</a></p><h1 th:text="${view.title}">Product</h1>
+
 <form method="post" class="card" th:action="${view.saveAction}"><h2>Details</h2>
 <div class="stack"><label for="p-title">Title</label><input id="p-title" name="title" required maxlength="200" th:value="${view.title}">
 <label for="p-description">Description</label><textarea id="p-description" name="description" rows="6" maxlength="20000" th:text="${view.description}">Text</textarea>

@@ -228,6 +228,33 @@ public class GlobalPages {
                 () -> global.putTranslations(storeId, request));
     }
 
+    /// Every product's and collection's text with one language's
+    /// translation and status, for a translator's spreadsheet.
+    @GetMapping("/admin/{storeId}/translations/export.csv")
+    public HttpServer.Response exportTranslations(@PathVariable("storeId") String storeId,
+            @RequestParam(value = "locale", required = false) String locale,
+            HttpServer.Request request) throws Exception {
+        pages.admin(request, storeId, "Translations");
+        return new HttpServer.Response(200, "text/csv; charset=utf-8",
+                global.exportTranslations(storeId, locale).getBytes("UTF-8"))
+                .header("Content-Disposition", "attachment; filename=\"translations.csv\"");
+    }
+
+    /// The spreadsheet back: each row with a changed translation is saved,
+    /// and the toast counts what was saved and names refused rows.
+    @PostMapping("/admin/{storeId}/translations/import")
+    public String importTranslations(@PathVariable("storeId") String storeId,
+            HttpServer.Request request) throws Exception {
+        member(request, storeId);
+        String[] said = {null};
+        String done = change(request, base(storeId) + "/translations", "Imported",
+                () -> said[0] = global.importTranslations(storeId, request));
+        if (said[0] != null) {
+            WebPages.toast(request, said[0]);
+        }
+        return done;
+    }
+
     // ================================================================= taxes
 
     @GetMapping("/admin/{storeId}/tax")
