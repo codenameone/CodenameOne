@@ -416,9 +416,11 @@ public class GeneratorModelMatrixTest extends AbstractTest {
                                         String packageName, String mainClassName, String label) throws IOException {
         boolean rides = template == Template.WAYLINE;
         boolean bank = template == Template.BASTION;
-        boolean game = template == Template.SKIRMISH || template == Template.DASH || template == Template.SPLAT;
+        boolean game = template == Template.SKIRMISH || template == Template.DASH || template == Template.SPLAT
+                || template == Template.PAPERCUT;
         boolean runner = template == Template.DASH;
         boolean paintball = template == Template.SPLAT;
+        boolean arena = template == Template.PAPERCUT;
         boolean video = template == Template.REEL;
         boolean studio = template == Template.PULSE;
         boolean booking = template == Template.SLATE;
@@ -437,7 +439,7 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         // project once got the ride-hailing accounts and chapters.
         String readme = getText(entries, "README.md");
         boolean chat = template == Template.PARLEY;
-        assertContains(readme, game ? (runner ? "endless runner" : paintball ? "paintball shooter" : "card battler") : rides ? "ride-hailing app" : chat ? "messaging app" : bank ? "working bank" : studio ? "fitness studio app" : field ? "field service app" : booking ? "appointment booking app" : video ? "video streaming service" : "food-delivery app",
+        assertContains(readme, game ? (runner ? "endless runner" : paintball ? "paintball shooter" : arena ? "arena shooter" : "card battler") : rides ? "ride-hailing app" : chat ? "messaging app" : bank ? "working bank" : studio ? "fitness studio app" : field ? "field service app" : booking ? "appointment booking app" : video ? "video streaming service" : "food-delivery app",
                 label + "README names the app");
         if (!game) {
             assertContains(readme, (rides ? "`rider@" : chat ? "`alice@" : bank ? "`customer2@" : studio ? "`member@" : field ? "`tech@" : booking ? "`client@" : video ? "`viewer@" : "`customer@") + artifact + ".example`",
@@ -469,7 +471,7 @@ public class GeneratorModelMatrixTest extends AbstractTest {
                 "package " + packageName + ";", label + "the server moves to the project's package");
         assertNotNull(entries.get("backend/src/main/resources/db/migration/" + (game ? "V1__game.sql" : bank ? "V4__accounts.sql" : studio || booking ? "V2__accounts.sql" : "V1__accounts.sql")),
                 label + "the server keeps its migrations");
-        assertNotNull(entries.get("backend/src/test/java/" + packagePath + (game ? "/GameSocketTest.java" : rides ? "/RideFlowTest.java" : chat ? "/MessagingTest.java" : bank ? "/LedgerTest.java" : video ? "/PlaybackTest.java" : studio ? "/StudioTest.java" : field ? "/FieldTest.java" : booking ? "/booking/BookingFlowTest.java" : "/OrderFlowTest.java")),
+        assertNotNull(entries.get("backend/src/test/java/" + packagePath + (arena ? "/RunTest.java" : game ? "/GameSocketTest.java" : rides ? "/RideFlowTest.java" : chat ? "/MessagingTest.java" : bank ? "/LedgerTest.java" : video ? "/PlaybackTest.java" : studio ? "/StudioTest.java" : field ? "/FieldTest.java" : booking ? "/booking/BookingFlowTest.java" : "/OrderFlowTest.java")),
                 label + "the server keeps its tests");
         assertNotNull(entries.get("common/src/main/java/" + packagePath + (game ? "/ui/HomeForm.java" : rides ? "/rider/RiderForm.java" : chat ? "/ui/ChatForm.java" : bank ? "/ui/HomeForm.java" : video ? "/ui/WelcomeForm.java" : studio ? "/member/MemberForm.java" : field ? "/field/TodayForm.java" : booking ? "/client/ClientForm.java" : "/customer/CustomerForm.java")),
                 label + "the app's screens move to the project's package");
@@ -1701,9 +1703,9 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         String pom = getText(entries, "pom.xml");
         assertContains(pom, packageName, "Root pom should include package as groupId");
         assertContains(pom, GeneratorModel.toLowerCaseInvariant(mainClassName), "Root pom should include app artifact/name");
-        assertContains(pom, "<cn1.plugin.version>7.0.282</cn1.plugin.version>",
+        assertContains(pom, "<cn1.plugin.version>7.0.283</cn1.plugin.version>",
                 "Root pom should use current CN1 plugin version");
-        assertContains(pom, "<cn1.version>7.0.282</cn1.version>",
+        assertContains(pom, "<cn1.version>7.0.283</cn1.version>",
                 "Root pom should align CN1 runtime version with plugin version");
         assertFalse(pom.indexOf("com.example.myapp") >= 0, "Root pom still contains placeholder package");
         assertFalse(pom.indexOf("myappname") >= 0, "Root pom still contains placeholder app name");

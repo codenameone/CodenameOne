@@ -1125,6 +1125,11 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
             if((constraint & 0x80000) == 0x80000) {
                 utf.autocorrectionType = UITextAutocorrectionTypeNo;
             }
+            // SENSITIVE: no autocorrection or spell checking, so the keyboard learns nothing
+            if((constraint & 0x40000) == 0x40000) {
+                utf.autocorrectionType = UITextAutocorrectionTypeNo;
+                utf.spellCheckingType = UITextSpellCheckingTypeNo;
+            }
             
             // PASSWORD
             if((constraint & 0x10000) == 0x10000) {
@@ -1360,6 +1365,11 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
             // NON_PREDICTIVE
             if((constraint & 0x80000) == 0x80000) {
                 utv.autocorrectionType = UITextAutocorrectionTypeNo;
+            }
+            // SENSITIVE: no autocorrection or spell checking, so the keyboard learns nothing
+            if((constraint & 0x40000) == 0x40000) {
+                utv.autocorrectionType = UITextAutocorrectionTypeNo;
+                utv.spellCheckingType = UITextSpellCheckingTypeNo;
             }
             
             // PASSWORD (Note: multiline password fields are uncommon, but supported)

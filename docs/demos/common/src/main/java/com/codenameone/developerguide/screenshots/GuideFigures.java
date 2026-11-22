@@ -42,7 +42,8 @@ public final class GuideFigures {
         FigureVariant[] grid = DataGridFigures.variants();
         FigureVariant[] kanban = KanbanFigures.variants();
         FigureVariant[] charts = ChartFigures.variants();
-        FigureVariant[][] parts = {general, scheduling, graph, grid, kanban, charts};
+        FigureVariant[] secureKeyboard = SecureKeyboardFigures.variants();
+        FigureVariant[][] parts = {general, scheduling, graph, grid, kanban, charts, secureKeyboard};
         int count = 0;
         for (FigureVariant[] part : parts) {
             count += part.length;

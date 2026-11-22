@@ -273,6 +273,7 @@ public class IOSNative {
     native void lockScreen();
     native void unlockScreen();
     native void setDisableScreenshots(boolean disable);
+    native void setThirdPartyKeyboardsAllowed(boolean allowed);
 
     native void vibrate(int duration);
 

@@ -1,0 +1,114 @@
+/*
+ * Copyright (c) 2026, Codename One and/or its affiliates.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
+ */
+package com.codenameone.examples.papercut;
+
+import com.codename1.backend.Json;
+import com.codename1.backend.test.MockMvc;
+import com.codename1.backend.test.MockRequestBuilder;
+import com.codenameone.examples.papercut.account.Accounts;
+import com.codenameone.examples.papercut.api.RegisterDto;
+import java.util.List;
+import java.util.Map;
+
+import static com.codename1.backend.test.MockMvcResultMatchers.status;
+import static com.codename1.backend.test.SecurityMockMvcRequestPostProcessors.jwt;
+
+/// The steps most tests take: making a player, calling the API as them, and
+/// reading what came back.
+public final class Api {
+    public static final String PASSWORD = "a-long-password";
+
+    private Api() {
+    }
+
+    /// A fresh player of the test's own, so no test meets what another left.
+    public static String player(Accounts accounts, String name) throws Exception {
+        return accounts.register(new RegisterDto(name + "@test.example", PASSWORD, name)).username();
+    }
+
+    public static MockRequestBuilder as(MockRequestBuilder request, String username) {
+        return request.with(jwt().subject(username).authorities("ROLE_PLAYER"));
+    }
+
+    public static MockRequestBuilder asAdmin(MockRequestBuilder request, String username) {
+        return request.with(jwt().subject(username).authorities("ROLE_PLAYER", "ROLE_ADMIN"));
+    }
+
+    public static MockRequestBuilder body(MockRequestBuilder request, String json) {
+        return request.contentType("application/json").content(json);
+    }
+
+    public static Map json(MockMvc mvc, MockRequestBuilder request) throws Exception {
+        return Json.parseObject(mvc.perform(request).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString());
+    }
+
+    public static List list(MockMvc mvc, MockRequestBuilder request) throws Exception {
+        return (List) Json.parse(mvc.perform(request).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString());
+    }
+
+    public static int statusOf(MockMvc mvc, MockRequestBuilder request) throws Exception {
+        return mvc.perform(request).andReturn().getResponse().getStatus();
+    }
+
+    public static long number(Map object, String field) {
+        return ((Number) object.get(field)).longValue();
+    }
+
+    /// A ticket for `mode`, as the app asks before a run.
+    public static String ticket(MockMvc mvc, String who, String mode) throws Exception {
+        return (String) json(mvc, as(body(com.codename1.backend.test.MockMvcRequestBuilders.post("/api/runs/start"),
+                "{\"mode\":\"" + mode + "\"}"), who)).get("token");
+    }
+
+    /// Plays one plausible run of `mode` scoring `score` over `seconds`.
+    public static Map submit(MockMvc mvc, String who, String mode, long score, int seconds) throws Exception {
+        String token = ticket(mvc, who, mode);
+        // The run takes as long as it says: the server refuses a run longer
+        // than the time since its ticket was issued.
+        Clock.shiftForTests(seconds * 1000L);
+        try {
+            return json(mvc, as(body(com.codename1.backend.test.MockMvcRequestBuilders.post("/api/runs"),
+                    run(token, mode, score, (int) (score / 2000) + 10, 0, seconds, 5)), who));
+        } finally {
+            Clock.shiftForTests(0);
+        }
+    }
+
+    /// A run with every number given, played for as long as it claims.
+    public static Map played(MockMvc mvc, String who, String mode, long score, int kills, int gates,
+            int seconds, int multiplier) throws Exception {
+        String token = ticket(mvc, who, mode);
+        Clock.shiftForTests(seconds * 1000L);
+        try {
+            return json(mvc, as(body(com.codename1.backend.test.MockMvcRequestBuilders.post("/api/runs"),
+                    run(token, mode, score, kills, gates, seconds, multiplier)), who));
+        } finally {
+            Clock.shiftForTests(0);
+        }
+    }
+
+    public static String run(String token, String mode, long score, int kills, int gates, int seconds,
+            int multiplier) {
+        return "{\"token\":\"" + token + "\",\"mode\":\"" + mode + "\",\"score\":" + score
+                + ",\"kills\":" + kills + ",\"gates\":" + gates + ",\"seconds\":" + seconds
+                + ",\"peakMultiplier\":" + multiplier + "}";
+    }
+}

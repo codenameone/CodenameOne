@@ -201,7 +201,11 @@ class JavaSEJoglSurface extends JComponent implements JavaSEGpuSurface {
             if (timer == null) {
                 timer = new Timer(16, new ActionListener() {
                     public void actionPerformed(ActionEvent e) {
-                        view.repaint();
+                        if (JavaSEGLSurface.HIDDEN) {
+                            renderOffscreen();
+                        } else {
+                            view.repaint();
+                        }
                     }
                 });
             }
@@ -234,10 +238,45 @@ class JavaSEJoglSurface extends JComponent implements JavaSEGpuSurface {
     }
 
     public void requestRender() {
-        view.repaint();
+        if (JavaSEGLSurface.HIDDEN) {
+            renderOffscreen();
+        } else {
+            view.repaint();
+        }
+    }
+
+    // A hidden simulator never shows its window and Swing never paints it, so
+    // there the timer renders each frame itself and painting only draws the
+    // last one -- see JavaSEGLSurface, which does the same in software.
+    private Runnable afterOffscreenFrame;
+    private boolean disposed;
+
+    public void setAfterOffscreenFrame(Runnable afterFrame) {
+        afterOffscreenFrame = afterFrame;
+    }
+
+    private void renderOffscreen() {
+        if (disposed) {
+            return;
+        }
+        renderFrame(getWidth(), getHeight());
+        if (afterOffscreenFrame != null) {
+            afterOffscreenFrame.run();
+        }
     }
 
     public void disposeSurface() {
+        if (JavaSEGLSurface.HIDDEN && !java.awt.EventQueue.isDispatchThread()) {
+            // Hidden, frames render on the AWT thread; never destroy the
+            // drawable in the middle of one.
+            java.awt.EventQueue.invokeLater(new Runnable() {
+                public void run() {
+                    disposeSurface();
+                }
+            });
+            return;
+        }
+        disposed = true;
         if (timer != null) {
             timer.stop();
             timer = null;
@@ -251,8 +290,15 @@ class JavaSEJoglSurface extends JComponent implements JavaSEGpuSurface {
 
     @Override
     protected void paintComponent(Graphics g) {
-        int w = getWidth();
-        int h = getHeight();
+        if (!JavaSEGLSurface.HIDDEN || frame == null) {
+            renderFrame(getWidth(), getHeight());
+        }
+        if (frame != null) {
+            g.drawImage(frame, 0, 0, null);
+        }
+    }
+
+    private void renderFrame(int w, int h) {
         if (w <= 0 || h <= 0) {
             return;
         }
@@ -273,9 +319,6 @@ class JavaSEJoglSurface extends JComponent implements JavaSEGpuSurface {
             drawable.display();
         } catch (Throwable t) {
             t.printStackTrace();
-        }
-        if (frame != null) {
-            g.drawImage(frame, 0, 0, null);
         }
     }
 

@@ -300,6 +300,12 @@ public class IOSImplementation extends CodenameOneImplementation {
         nativeInstance.setDisableScreenshots(disable);
     }
 
+    @Override
+    public boolean setThirdPartyKeyboardsAllowed(boolean allowed) {
+        nativeInstance.setThirdPartyKeyboardsAllowed(allowed);
+        return true;
+    }
+
     public void setThreadPriority(Thread t, int p) {
     }
     
@@ -1893,7 +1899,9 @@ public class IOSImplementation extends CodenameOneImplementation {
         int captureId = queueTextInputCapture(st, client);
         tiNativeSeq = 0;
         int constraint = config != null ? config.getConstraint() : 0;
-        boolean autoCorrect = config == null || config.isAutoCorrect();
+        // SENSITIVE: keep it out of the keyboard's learned words, as Android's incognito flag does.
+        boolean autoCorrect = (config == null || config.isAutoCorrect())
+                && (constraint & com.codename1.ui.TextArea.SENSITIVE) == 0;
         boolean autoCap = config == null || config.isAutoCapitalize();
         boolean multiline = config == null || config.isMultiline();
         nativeInstance.startTextInput(constraint, autoCorrect, autoCap, multiline,
