@@ -306,7 +306,9 @@ public final class Backend {
     /// @param authentication who it is answered as
     /// @return the response; [HttpServer.Response#getMatchedRoute] names the
     ///         route template that answered, or is null when none matched
-    /// @throws Exception what a handler threw and nothing handled
+    /// @throws Exception what a handler threw and nothing handled -- with an
+    ///         error route declared, the application's error page answers
+    ///         such a failure instead, as it does over the wire
     public HttpServer.Response dispatch(HttpServer.Request request,
             com.codename1.backend.security.Authentication authentication) throws Exception {
         if (request == null || authentication == null) {
@@ -1051,6 +1053,11 @@ public final class Backend {
                     // before any error dispatch.
                     throw err;
                 }
+                if (request.getAttribute(com.codename1.backend.web.RequestDispatcher.ERROR_STATUS_CODE) != null) {
+                    // The error page itself failed (serving a 404): its failure
+                    // is not a second error to dispatch.
+                    throw err;
+                }
                 // An exception escaping a handler goes to the error route with
                 // its status, as Spring Boot forwards it to its error controller
                 // (issue 6310). Here rather than in the listener, so the page
@@ -1068,10 +1075,13 @@ public final class Backend {
                 try {
                     page = errorPage(request, status, message, true);
                 } catch (Exception pageErr) {
-                    // A failing error page never hides the original failure.
-                    throw err;
+                    page = null;
                 }
                 if (page == null) {
+                    // No page, or a failing one, never hides the original
+                    // failure; the listener logs and records it, so the
+                    // attribute must not make the request log record it too.
+                    request.setAttribute(com.codename1.backend.web.RequestDispatcher.ERROR_EXCEPTION, null);
                     throw err;
                 }
                 if (status >= 500) {
@@ -1127,7 +1137,14 @@ public final class Backend {
                 }
             }
             if (unserved && errorPath != null) {
-                HttpServer.Response page = errorPage(request, 404, "Not Found", false);
+                HttpServer.Response page = null;
+                try {
+                    page = errorPage(request, 404, "Not Found", false);
+                } catch (Exception pageErr) {
+                    // A broken error page is logged, and the path is still
+                    // answered as the 404 it is rather than as the page's 500.
+                    HttpServer.handlerFailed(pageErr);
+                }
                 if (page != null) {
                     response = page;
                 }
@@ -1181,14 +1198,20 @@ public final class Backend {
             // capture must report no match, not the error page's template.
             Object previousCapture = Tracing.beginRouteCapture(new String[1]);
             HttpServer.Response page = null;
+            String method = request.getMethod();
             try {
-                for (int i = 0 ; page == null && i < chain.length ; i++) {
-                    if (!(chain[i] instanceof StaticFiles) && (!controllersOnly
-                            || chain[i] instanceof com.codename1.backend.web.ControllerHooks.Invocation)) {
-                        page = chain[i].handle(request);
-                    }
+                page = errorRoute(request, controllersOnly);
+                if (page == null && !"GET".equals(method)) {
+                    // The error route keeps the failed request's method, as a
+                    // servlet forward does -- but the usual declaration is
+                    // @GetMapping("/error"), which a POST that failed would then
+                    // miss and leave the bare error standing. So it is asked
+                    // once more as a GET.
+                    request.remethod("GET");
+                    page = errorRoute(request, controllersOnly);
                 }
             } finally {
+                request.remethod(method);
                 Tracing.endRouteCapture(previousCapture);
                 request.restoreTarget(saved);
             }
@@ -1202,6 +1225,20 @@ public final class Backend {
             return page;
         }
 
+        private HttpServer.Response errorRoute(HttpServer.Request request, boolean controllersOnly)
+                throws Exception {
+            for (HttpServer.Handler handler : chain) {
+                if (!(handler instanceof StaticFiles) && (!controllersOnly
+                        || handler instanceof com.codename1.backend.web.ControllerHooks.Invocation)) {
+                    HttpServer.Response page = handler.handle(request);
+                    if (page != null) {
+                        return page;
+                    }
+                }
+            }
+            return null;
+        }
+
         /// See [Backend#dispatch(HttpServer.Request,
         /// com.codename1.backend.security.Authentication)]. Not [#handle]: that
         /// tries the server's own routes first and stores sessions afterwards.
@@ -1212,6 +1249,9 @@ public final class Backend {
                         + "there is no principal to dispatch as");
             }
             request.sessions = sessions;
+            // The headers may be a client's, Cookie included: nothing of a
+            // session it names is read or written here (see dispatch()).
+            request.ignoreSessionCookie();
             String[] route = new String[1];
             Object previousCapture = Tracing.beginRouteCapture(route);
             Object previousTasks = Tasks.enter(tasks);

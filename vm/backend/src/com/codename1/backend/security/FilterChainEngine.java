@@ -108,14 +108,17 @@ final class FilterChainEngine implements RequestSecurity {
             }
             return next.route(request);
         }
-        // Authorization and nothing else. A sign-in filter would authenticate
-        // the request from its own headers -- and so replace the principal the
-        // caller vouched for -- the context filter would load or save a
-        // session, and CSRF guards a browser form, which an in-process call
-        // is not.
+        // Of the framework's filters, authorization and nothing else. A sign-in
+        // filter would authenticate the request from its own headers -- and so
+        // replace the principal the caller vouched for -- the context filter
+        // would load or save a session, and CSRF guards a browser form, which
+        // an in-process call is not. The application's own filters all run:
+        // one added with addFilterBefore may be what enforces a tenant or a
+        // scope, and dropping it would serve what it exists to refuse.
         List<SecurityFilter> authorization = new ArrayList<SecurityFilter>();
         for (SecurityFilter filter : chain.getFilters()) {
-            if (filter instanceof AuthorizationFilter) {
+            if (filter instanceof AuthorizationFilter || (chain instanceof DefaultSecurityFilterChain
+                    && ((DefaultSecurityFilterChain) chain).isApplicationFilter(filter))) {
                 authorization.add(filter);
             }
         }

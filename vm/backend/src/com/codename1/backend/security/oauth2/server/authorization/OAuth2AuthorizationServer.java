@@ -206,10 +206,13 @@ public final class OAuth2AuthorizationServer {
     /// clients that require it
     /// @param page the consent page; null for the built-in one
     public void authorizationConsent(AuthorizationConsentPolicy policy, String page) {
-        if (page != null && (page.length() == 0 || page.indexOf('#') >= 0
-                || !(page.startsWith("/") || page.startsWith("https://")
-                || page.startsWith("http://")))) {
-            throw new IllegalArgumentException("The consent page must be a path or an http(s) "
+        // The ticket travels to the page in its query string, so the page is
+        // this server's own path or an https address: never plain http, where
+        // the ticket could be read on the way, and never a "//host" path,
+        // which a browser reads as another origin.
+        if (page != null && (page.length() == 0 || page.indexOf('#') >= 0 || page.startsWith("//")
+                || !(page.startsWith("/") || page.startsWith("https://")))) {
+            throw new IllegalArgumentException("The consent page must be a path or an https "
                     + "address without a fragment: " + page);
         }
         this.consent = policy;
@@ -567,23 +570,25 @@ public final class OAuth2AuthorizationServer {
                             "The user has to approve this client");
                 }
                 String ticket = OAuth2Parameters.random(32);
-                request.getSession(true).setAttribute(CONSENT_TICKET, ticket + "." + digest);
+                // One attribute per ticket: two authorizations pending in one
+                // session (two tabs, two clients) each keep their own question.
+                request.getSession(true).setAttribute(CONSENT_TICKET + "." + ticket, digest);
                 return askConsent(request, client, scopes, redirectUri, ticket, authentication,
                         csrfParameter, csrfToken);
             }
             String sent = form(request);
             String ticket = OAuth2Parameters.parse(sent).get("ticket");
             HttpSession held = request.getSession(false);
-            Object question = held == null ? null : held.getAttribute(CONSENT_TICKET);
-            if (held != null) {
+            Object question = held == null || ticket == null ? null
+                    : held.getAttribute(CONSENT_TICKET + "." + ticket);
+            if (question != null) {
                 // Once, right or wrong: a ticket cannot be tried twice.
-                held.removeAttribute(CONSENT_TICKET);
+                held.removeAttribute(CONSENT_TICKET + "." + ticket);
             }
             // The ticket is 32 random bytes, single use and bound to this user
-            // and this exact request, so a plain comparison leaks nothing
-            // worth timing.
-            if (ticket == null || !(question instanceof String)
-                    || !question.equals(ticket + "." + digest)) {
+            // and this exact request: it is found by its own value, and what it
+            // holds must be the digest of who is answering and which request.
+            if (!(question instanceof String) || !question.equals(digest)) {
                 throw new Refusal(400, OAuth2ErrorCodes.INVALID_REQUEST, "This is not an answer to "
                         + "a consent question this server asked; start the sign-in again");
             }
@@ -671,7 +676,7 @@ public final class OAuth2AuthorizationServer {
         String hidden = (csrfParameter == null || csrfToken == null ? ""
                 : "<input type=\"hidden\" name=\"" + escape(csrfParameter) + "\" value=\""
                         + escape(csrfToken) + "\">\n")
-                + "<input type=\"hidden\" name=\"ticket\" value=\"" + ticket + "\">\n";
+                + "<input type=\"hidden\" name=\"ticket\" value=\"" + escape(ticket) + "\">\n";
         String loopback = loopbackWithoutPort(redirectUri);
         String destination = loopback != null ? "an application on this computer"
                 : host(redirectUri);

@@ -48,6 +48,16 @@ class ManagedSessionTest {
         assertEquals("first",s.createQuery("select substring(r.name,6) from "+R+" r where r.id=:id",String.class).setParameter("id",one.id).first());
         assertEquals("fir",s.createQuery("select substring(r.name,6,3) from "+R+" r where r.id=:id",String.class).setParameter("id",one.id).first());
         assertEquals(Long.valueOf(6),s.createQuery("select locate('first',r.name) from "+R+" r where r.id=:id",Long.class).setParameter("id",one.id).first());
+        // Outside JPQL's range the dialects disagree; one answer is pinned.
+        assertEquals("",s.createQuery("select substring(r.name,:start,2) from "+R+" r where r.id=:id",String.class).setParameter("start",-2L).setParameter("id",one.id).first());
+        assertEquals("",s.createQuery("select substring(r.name,0) from "+R+" r where r.id=:id",String.class).setParameter("id",one.id).first());
+        assertEquals("",s.createQuery("select substring(r.name,2,:len) from "+R+" r where r.id=:id",String.class).setParameter("len",-1L).setParameter("id",one.id).first());
+        assertEquals(Long.valueOf(0),s.createQuery("select locate('c',r.name,0) from "+R+" r where r.id=:id",Long.class).setParameter("id",one.id).first());
+        assertEquals(Long.valueOf(0),s.createQuery("select locate('t',r.name,:start) from "+R+" r where r.id=:id",Long.class).setParameter("start",-1L).setParameter("id",one.id).first());
+        // Past 2^52 every double is integral; the integer and DECIMAL paths would clamp it.
+        assertEquals(Double.valueOf(1e20),s.createQuery("select floor(1e20) from "+R+" r where r.id=:id",Double.class).setParameter("id",one.id).first());
+        assertEquals(Double.valueOf(-1e19),s.createQuery("select ceiling(-1e19) from "+R+" r where r.id=:id",Double.class).setParameter("id",one.id).first());
+        assertEquals(Double.valueOf(1e60),s.createQuery("select round(1e60) from "+R+" r where r.id=:id",Double.class).setParameter("id",one.id).first());
         assertEquals(Long.valueOf(0),s.createQuery("select locate('zzz',r.name) from "+R+" r where r.id=:id",Long.class).setParameter("id",one.id).first());
         assertEquals(Long.valueOf(4),s.createQuery("select locate('e',r.name,3) from "+R+" r where r.id=:id",Long.class).setParameter("id",two.id).first());
         assertEquals(Long.valueOf(8),s.createQuery("select locate('c',r.name,2) from "+R+" r where r.id=:id",Long.class).setParameter("id",two.id).first());
@@ -1119,6 +1129,8 @@ class ManagedSessionTest {
             assertEquals(Long.valueOf(1),s.createQuery("select count(r) from "+R+" r where r.counter < current_timestamp",Long.class).first());
             assertEquals(Long.valueOf(2),s.createQuery("select count(r) from "+R+" r where r.counter >= current_date",Long.class).first()
                     -(System.currentTimeMillis()%86400000L<60000?1:0));
+            // Selected alone a clock has no field to take its type from.
+            assertThrows(IllegalArgumentException.class,()->s.createQuery("select current_date from "+R+" r").list());
             s.close();
         } finally { em.close(); }
     }

@@ -62,7 +62,10 @@ public interface ClientRegistrationPolicy {
     /// [ClientRegistrationException], or return the client to save -- the one
     /// given, or one built from it with less (fewer redirects, fewer scopes,
     /// shorter token lifetimes). It is also the place to count registrations
-    /// per address and refuse past a limit.
+    /// per address and refuse past a limit -- and the only such place: the
+    /// endpoint takes anonymous requests, and every registration it accepts
+    /// is a saved client, so a policy that accepts everything lets anyone
+    /// fill the client table.
     ///
     /// @param request the HTTP request
     /// @param metadata the client metadata the request sent, as parsed JSON

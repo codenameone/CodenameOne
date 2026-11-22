@@ -563,7 +563,10 @@ public final class QueryImpl<T> implements com.codename1.orm.session.Query<T> {
                     + session.joinEquality(session.foreignColumns(target, owning), alias, parentKey, parent.alias)
                     + ")";
         }
-        // A join table: its rows are the collection, one per element.
+        // A join table: its rows are the collection, one per element. The
+        // target table is not read: the schema gives each join row a foreign
+        // key to its element, so a row cannot outlive the entity it names.
+        // (tableSource above applies a subtype's discriminator.)
         String ownerColumn = inverse ? owning.inverseJoinColumn : owning.joinColumn;
         return "(SELECT COUNT(*) FROM " + session.q(owning.joinTable) + " " + alias + " WHERE "
                 + session.joinEquality(session.joinColumns(ownerColumn, parent.model), alias, parentKey,

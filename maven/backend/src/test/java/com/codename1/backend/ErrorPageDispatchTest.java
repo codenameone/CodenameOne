@@ -98,7 +98,24 @@ class ErrorPageDispatchTest {
     /// controller's declared error route is the one errors are handed to.
     private static final class Controller implements HttpServer.Handler,
             com.codename1.backend.web.ControllerHooks.Invocation {
+        /// 0: /error takes any method; 1: GET only, as @GetMapping("/error");
+        /// 2: the error page itself throws.
+        private final int errorRoute;
+        Controller() {
+            this(0);
+        }
+        Controller(int errorRoute) {
+            this.errorRoute = errorRoute;
+        }
         public HttpServer.Response handle(HttpServer.Request request) throws Exception {
+            if ("/error".equals(request.pathFrom(0))) {
+                if (errorRoute == 1 && !"GET".equals(request.getMethod())) {
+                    return null;
+                }
+                if (errorRoute == 2) {
+                    throw new IllegalStateException("the error page is broken");
+                }
+            }
             return APP.handle(request);
         }
         public HttpServer.Response proceed(int route, HttpServer.Request request, String[] bound) {
@@ -190,6 +207,35 @@ class ErrorPageDispatchTest {
             assertEquals(400, decode.status);
             assertEquals("malformed body", decode.body);
             assertEquals(500, send("GET", "/api/boom", null).status);
+        } finally {
+            backend.stop();
+        }
+    }
+
+    @Test
+    @DisplayName("a GET-only error route still answers a failed POST")
+    void aGetOnlyErrorRouteAnswersAFailedPost(@TempDir File dir) throws Exception {
+        Backend backend = Backend.builder(Config.of(settings(dir), "test")).quiet().handler(new Controller(1)).start();
+        try {
+            Reply boom = send("POST", "/api/boom", "application/json");
+            assertEquals(500, boom.status);
+            assertTrue(boom.body.contains("\"exception\":\"IllegalStateException\""), boom.body);
+            Reply decode = send("POST", "/api/decode", "application/json");
+            assertEquals(400, decode.status);
+            assertTrue(decode.body.contains("\"path\":\"/api/decode\""), decode.body);
+        } finally {
+            backend.stop();
+        }
+    }
+
+    @Test
+    @DisplayName("a failing error page leaves the original status standing")
+    void aFailingErrorPageLeavesTheOriginalStatus(@TempDir File dir) throws Exception {
+        Backend backend = Backend.builder(Config.of(settings(dir), "test")).quiet().handler(new Controller(2)).start();
+        try {
+            assertEquals(500, send("GET", "/api/boom", null).status);
+            // Serving a 404, the page's own failure leaves the 404.
+            assertEquals(404, send("GET", "/nowhere", null).status);
         } finally {
             backend.stop();
         }

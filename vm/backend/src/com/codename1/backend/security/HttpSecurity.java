@@ -130,6 +130,9 @@ public final class HttpSecurity {
     static final int ORDER_AUTHORIZATION_SERVER_USER = 2450;
     static final int ORDER_AUTHORIZATION = 2500;
     static final int ORDER_WEBAUTHN_REGISTRATION = 2600;
+    /// The filters added through the public addFilter methods, which the
+    /// framework's configurers never call.
+    private final List<SecurityFilter> applicationFilters = new ArrayList<SecurityFilter>();
     /// {Integer order, SecurityFilter}, in the order they were added.
     private final List<Object[]> filters = new ArrayList<Object[]>();
     private final List<RequestMatcher> permitted = new ArrayList<RequestMatcher>();
@@ -654,6 +657,7 @@ public final class HttpSecurity {
         }
         int order = position.intValue() + offset;
         filters.add(new Object[] {Integer.valueOf(order), filter});
+        applicationFilters.add(filter);
         // So that a later filter can be placed relative to this one.
         String name = filter.getClass().getName();
         if (!filterOrder.containsKey(name)) {
@@ -792,7 +796,9 @@ public final class HttpSecurity {
         for (Object[] entry : sorted) {
             chain.add((SecurityFilter) entry[1]);
         }
-        return new DefaultSecurityFilterChain(requestMatcher, chain);
+        DefaultSecurityFilterChain built = new DefaultSecurityFilterChain(requestMatcher, chain);
+        built.setApplicationFilters(applicationFilters);
+        return built;
     }
 
     // ------------------------------------------------- what the parts ask for

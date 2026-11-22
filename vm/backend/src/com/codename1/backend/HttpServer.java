@@ -723,6 +723,14 @@ public final class HttpServer {
                     && forwarded.secure(peer(), getHeader("X-Forwarded-Proto"));
         }
 
+        /// Answers this request as one that presented no session cookie: an
+        /// in-process dispatch runs as a principal it was handed, and must not
+        /// pick up the session a forwarded Cookie header names.
+        void ignoreSessionCookie() {
+            sessionResolved = true;
+            session = null;
+        }
+
         /// The session of this request, creating one if it has none.
         public HttpSession getSession() {
             return getSession(true);
@@ -1001,6 +1009,13 @@ public final class HttpServer {
             this.canonicalLength = 0;
             this.canonicalChecked = false;
             return saved;
+        }
+
+        /// Swaps the method for an error dispatch; returns the one it replaced.
+        String remethod(String newMethod) {
+            String was = method;
+            method = newMethod;
+            return was;
         }
 
         /// Undoes [#retarget].

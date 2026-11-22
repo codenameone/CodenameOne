@@ -796,6 +796,12 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                         kinds.add(Integer.valueOf(a.kind));
                     }
                 } else {
+                    if (expr.literalBinding != null && expr.literalBinding.clock != 0) {
+                        // A clock takes its Java type from the field it is
+                        // compared with; selected alone it has none, and would
+                        // come back as raw epoch milliseconds.
+                        throw error("CURRENT_DATE and CURRENT_TIMESTAMP cannot be selected; compare them with a field");
+                    }
                     projection.append(" AS cn1_scalar_").append(kinds.size());
                     validateProjection(expr);
                     kinds.add(Integer.valueOf(expr.kind));

@@ -134,14 +134,22 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
     }
     /// JPQL SUBSTRING(value, start[, length]), 1-based. PostgreSQL's substr
     /// takes INTEGER positions, and a bound number is typed BIGINT.
+    ///
+    /// The dialects disagree outside the range JPQL defines: below 1 SQLite and
+    /// MySQL count from the end while PostgreSQL counts from before the first
+    /// character, and a negative length is an error on PostgreSQL alone. Both
+    /// are pinned here so every dialect gives one answer: a start below 1 is
+    /// the empty string, a negative length is 0. NULL stays NULL.
     String substring(String value, String start, String length) {
         boolean postgres = "postgresql".equals(sql.dialect());
-        StringBuilder out = new StringBuilder("SUBSTR(").append(value).append(", ")
-                .append(position(start, postgres));
+        String from = position(start, postgres);
+        StringBuilder out = new StringBuilder("(CASE WHEN ").append(from).append(" < 1 THEN SUBSTR(")
+                .append(value).append(", 1, 0) ELSE SUBSTR(").append(value).append(", ").append(from);
         if (length != null) {
-            out.append(", ").append(position(length, postgres));
+            String count = position(length, postgres);
+            out.append(", (CASE WHEN ").append(count).append(" < 0 THEN 0 ELSE ").append(count).append(" END)");
         }
-        return out.append(')').toString();
+        return out.append(") END)").toString();
     }
     /// JPQL LOCATE(search, value[, start]): the 1-based position of `search`
     /// in `value` at or after `start`, 0 when it is not there. MySQL has it;
@@ -159,7 +167,11 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
         String from = position(start, postgres);
         String tail = "SUBSTR(" + value + ", " + from + ")";
         String found = postgres ? "STRPOS(" + tail + ", " + search + ")" : "instr(" + tail + ", " + search + ")";
-        String located = "(CASE WHEN " + found + " = 0 THEN 0 ELSE " + found + " + " + from + " - 1 END)";
+        // A start below 1 finds nothing, as MySQL's LOCATE answers; substr
+        // there would count from the end (SQLite) or from before the string
+        // (PostgreSQL) and report a position that is not one.
+        String located = "(CASE WHEN " + from + " < 1 THEN 0 WHEN " + found + " = 0 THEN 0 ELSE "
+                + found + " + " + from + " - 1 END)";
         return postgres ? "CAST(" + located + " AS BIGINT)" : located;
     }
     private static String position(String value, boolean postgres) {
@@ -171,7 +183,16 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
     /// DECIMAL there rather than their round-half-even double paths. SQLite's
     /// platform builds have no FLOOR or CEILING, so both are spelled with a
     /// truncating cast.
+    ///
+    /// A double of magnitude 2^52 or more is already integral, and the paths
+    /// above cannot take it: SQLite's integer cast saturates at 2^63, MySQL's
+    /// DECIMAL(65,15) holds 50 integer digits, and PostgreSQL before 14 cannot
+    /// cast an infinity to NUMERIC. Such a value is answered as it is.
     String roundingFunction(String function, String value, int digits) {
+        return "(CASE WHEN ABS(" + value + ") >= 4503599627370496.0 THEN " + value + " ELSE "
+                + rounding(function, value, digits) + " END)";
+    }
+    private String rounding(String function, String value, int digits) {
         String dialect = sql.dialect();
         if ("sqlite".equals(dialect)) {
             if ("ROUND".equals(function)) {

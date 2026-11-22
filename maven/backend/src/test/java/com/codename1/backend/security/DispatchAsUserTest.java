@@ -23,11 +23,13 @@
 package com.codename1.backend.security;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.codename1.backend.Backend;
 import com.codename1.backend.HttpServer;
+import com.codename1.backend.HttpSession;
 import com.codename1.backend.Tracing;
 import java.util.Collections;
 import java.util.HashMap;
@@ -52,6 +54,10 @@ class DispatchAsUserTest {
         }
         if ("/touch-session".equals(path)) {
             request.getSession(true).setAttribute("seen", "yes");
+        }
+        if ("/read-session".equals(path)) {
+            HttpSession session = request.getSession(false);
+            return HttpServer.Response.text(200, session == null ? "no session" : "session " + session.getAttribute("seen"));
         }
         if (path.startsWith("/api/")) {
             Tracing.route(path.startsWith("/api/admin/") ? "/api/admin/{x}" : "/api/apps/{id}");
@@ -90,6 +96,11 @@ class DispatchAsUserTest {
                                         .userdetails.User.withUsername("mallory")
                                         .password("{noop}secret").roles("ADMIN").build()))
                         .httpBasic(Customizer.withDefaults())
+                        // The application's own rule, as a tenant check would be.
+                        .addFilterBefore((request, chain) -> request.pathFrom(0).startsWith("/api/tenant/")
+                                        && !"acme".equals(request.getHeader("X-Tenant"))
+                                        ? HttpServer.Response.text(403, "wrong tenant") : chain.doFilter(request),
+                                AuthorizationFilter.class)
                         .build());
     }
 
@@ -130,6 +141,14 @@ class DispatchAsUserTest {
             assertEquals(200, r.getStatus(), text(r));
             assertEquals("POST /api/apps/7 as ann", text(r));
 
+            // The application's own filter still runs under dispatch.
+            r = as("GET", "/api/tenant/1", user("ann", "ROLE_USER"), null);
+            assertEquals(403, r.getStatus());
+            assertEquals("wrong tenant", text(r));
+            Map<String, String> tenant = new HashMap<String, String>();
+            tenant.put("X-Tenant", "acme");
+            assertEquals(200, as("GET", "/api/tenant/1", user("ann", "ROLE_USER"), tenant).getStatus());
+
             // No route: a 404, no template.
             r = as("GET", "/nowhere", user("ann", "ROLE_USER"), null);
             assertEquals("GET /nowhere as ann", text(r));
@@ -145,6 +164,17 @@ class DispatchAsUserTest {
             // A handler may touch a session; the bracket releases it.
             r = as("GET", "/touch-session", user("ann", "ROLE_USER"), null);
             assertEquals(200, r.getStatus());
+
+            // A forwarded Cookie header does not hand the dispatch the session
+            // it names, though the same cookie over the wire finds it.
+            SecuredServer.Reply touched = server.get("/touch-session");
+            String cookie = touched.header("Set-Cookie");
+            assertNotNull(cookie, touched.status + " " + touched.body);
+            cookie = cookie.substring(0, cookie.indexOf(';'));
+            assertEquals("session yes", server.get("/read-session", "Cookie", cookie).body);
+            Map<String, String> withCookie = new HashMap<String, String>();
+            withCookie.put("Cookie", cookie);
+            assertEquals("no session", text(as("GET", "/read-session", user("ann", "ROLE_USER"), withCookie)));
 
             // Over the wire nothing changed: the same path wants credentials.
             assertEquals(401, server.get("/api/apps/7").status);

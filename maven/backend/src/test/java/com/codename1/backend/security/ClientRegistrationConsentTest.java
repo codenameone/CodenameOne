@@ -299,6 +299,24 @@ class ClientRegistrationConsentTest {
     }
 
     @Test
+    void twoPendingQuestionsInOneSessionAreEachAnswerable() throws Exception {
+        try (SecuredServer server = startRegistering()) {
+            String client = registered(server);
+            String verifier = OAuth2Parameters.random(32);
+            // Two tabs: the second question must not overwrite the first.
+            Reply first = signedIn(server, authorizeUrl(client, "read", verifier, "tab-1", null));
+            Reply second = signedIn(server, authorizeUrl(client, "read", verifier, "tab-2", null));
+            for (Reply page : new Reply[] {first, second}) {
+                Reply back = server.call("POST", action(page.body), form("_csrf",
+                        OAuth2Testing.field(second.body, "_csrf"), "ticket",
+                        OAuth2Testing.field(page.body, "ticket"), "decision", "approve", "scope", "read"), FORM);
+                assertEquals(302, back.status, back.toString());
+                assertTrue(back.header("Location").contains("code="), back.header("Location"));
+            }
+        }
+    }
+
+    @Test
     void anAnswerCountsOnlyForTheRequestItWasAskedAbout() throws Exception {
         try (SecuredServer server = startRegistering()) {
             String client = registered(server);
