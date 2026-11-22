@@ -621,6 +621,11 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             editorInfo.imeOptions |= imeActionFor(cfg == null
                     ? com.codename1.ui.TextInputConfig.ACTION_DEFAULT : cfg.getActionType());
         }
+        if ((constraint & (com.codename1.ui.TextArea.PASSWORD | com.codename1.ui.TextArea.SENSITIVE)) != 0) {
+            // IME_FLAG_NO_PERSONALIZED_LEARNING (API 26, literal for the old android.jar): ask the
+            // keyboard not to learn or store what is typed, as InPlaceEditView does.
+            editorInfo.imeOptions |= 0x1000000;
+        }
         editorInfo.initialSelStart = activeInputState != null ? activeInputState.getSelectionStart() : 0;
         editorInfo.initialSelEnd = activeInputState != null ? activeInputState.getSelectionEnd() : 0;
     }
@@ -18919,6 +18924,52 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             // ignore
         }
         return false;
+    }
+
+    /// The Settings.Secure id (`package/.Service`) of the keyboard the user has selected.
+    @Override
+    public String getActiveInputMethod() {
+        Context context = getContext();
+        if (context == null) {
+            return null;
+        }
+        try {
+            return Settings.Secure.getString(context.getContentResolver(), Settings.Secure.DEFAULT_INPUT_METHOD);
+        } catch (Throwable t) {
+            com.codename1.io.Log.e(t);
+            return null;
+        }
+    }
+
+    /// True when the selected keyboard ships in the system image (or is an update of one). The
+    /// lookup goes through InputMethodManager rather than PackageManager: an input method is
+    /// always visible to apps, so this needs no `<queries>` entry on Android 11+.
+    @Override
+    public boolean isActiveInputMethodPreinstalled() {
+        String active = getActiveInputMethod();
+        Context context = getContext();
+        if (active == null || context == null) {
+            return true;
+        }
+        try {
+            android.view.inputmethod.InputMethodManager imm = (android.view.inputmethod.InputMethodManager)
+                    context.getSystemService(Context.INPUT_METHOD_SERVICE);
+            if (imm == null) {
+                return true;
+            }
+            for (android.view.inputmethod.InputMethodInfo info : imm.getInputMethodList()) {
+                if (active.equals(info.getId())) {
+                    android.content.pm.ApplicationInfo ai = info.getServiceInfo().applicationInfo;
+                    return (ai.flags & (android.content.pm.ApplicationInfo.FLAG_SYSTEM
+                            | android.content.pm.ApplicationInfo.FLAG_UPDATED_SYSTEM_APP)) != 0;
+                }
+            }
+            // Selected but not listed: we cannot vouch for it.
+            return false;
+        } catch (Throwable t) {
+            com.codename1.io.Log.e(t);
+            return true;
+        }
     }
 
     @Override

@@ -260,6 +260,23 @@ public class InPlaceEditView extends FrameLayout{
         }
         lastWasOneTimeCode = oneTimeCode;
     }
+    /// EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING (API 26). Spelled as a literal because the
+    /// port compiles against an android.jar older than the constant; the bit is ignored by
+    /// earlier platforms.
+    static final int IME_FLAG_NO_PERSONALIZED_LEARNING = 0x1000000;
+
+    /// Adds the "incognito" request to a password or SENSITIVE field's IME options, asking the
+    /// keyboard not to learn from, store or sync what is typed. A well-behaved keyboard (Gboard,
+    /// Samsung, SwiftKey) honours it; a keylogging keyboard ignores it, which is what
+    /// `DeviceIntegrity.isThirdPartyKeyboardActive` and `SecureKeyboard` are for.
+    private int withIncognito(int imeOptions, int codenameOneInputType) {
+        if (hasConstraint(codenameOneInputType, TextArea.PASSWORD)
+                || hasConstraint(codenameOneInputType, TextArea.SENSITIVE)) {
+            return imeOptions | IME_FLAG_NO_PERSONALIZED_LEARNING;
+        }
+        return imeOptions;
+    }
+
     private boolean isNonPredictive(int inputType) {
         return hasConstraint(inputType, TextArea.NON_PREDICTIVE) || hasConstraint(inputType, TextArea.SENSITIVE);
     }
@@ -1101,6 +1118,7 @@ public class InPlaceEditView extends FrameLayout{
         }
 
         updateOneTimeCodeHint(mEditText, codenameOneInputType);
+        mEditText.setImeOptions(withIncognito(mEditText.getImeOptions(), codenameOneInputType));
 
         int maxLength = textArea.maxSize;
         InputFilter[] FilterArray = new InputFilter[1];

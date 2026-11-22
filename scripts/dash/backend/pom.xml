@@ -65,15 +65,6 @@
             <version>${project.version}</version>
         </dependency>
         <!--
-             The rules of the game: the server runs the same simulation as the
-             app, and is the one whose result counts.
-        -->
-        <dependency>
-            <groupId>${project.groupId}</groupId>
-            <artifactId>dash-rules</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-        <!--
              The SQLite driver for `cn1:backend`, the local JVM run. It is optional in
              codenameone-backend, so Maven does not pass it down here, and without it
              Database.open(":memory:") fails with "No suitable driver" in the loop the

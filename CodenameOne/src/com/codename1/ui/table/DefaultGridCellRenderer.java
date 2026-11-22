@@ -42,7 +42,7 @@ public class DefaultGridCellRenderer implements GridCellRenderer {
         int padL = st.getPaddingLeftNoRTL();
         int padR = st.getPaddingRightNoRTL();
         GridColumn c = cell.getColumn();
-        int align = c.resolveAlignment(v);
+        int align = mirror(c.resolveAlignment(v), cell.getGrid() != null && cell.getGrid().isRTL());
         if (v instanceof Image) {
             Image img = (Image) v;
             int ih = Math.max(1, height - st.getPaddingTop() - st.getPaddingBottom());
@@ -123,6 +123,19 @@ public class DefaultGridCellRenderer implements GridCellRenderer {
             g.drawRoundRect(x, y, size - 1, size - 1, arc, arc);
         }
         g.setAlpha(a);
+    }
+
+    /// `align` as it reads in the grid's direction: right to left, LEFT is
+    /// the right edge and RIGHT the left one, so text starts and numbers end
+    /// where the language puts them.
+    protected static int mirror(int align, boolean rtl) {
+        if (!rtl) {
+            return align;
+        }
+        if (align == Component.LEFT) {
+            return Component.RIGHT;
+        }
+        return align == Component.RIGHT ? Component.LEFT : align;
     }
 
     /// Where something `w` wide starts in a span from `x`, `avail` wide.

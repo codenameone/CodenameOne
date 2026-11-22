@@ -13141,6 +13141,25 @@ public abstract class CodenameOneImplementation {
         return new String[0];
     }
 
+    /// The platform id of the keyboard (input method) the user has selected, `package/.Service` on
+    /// Android. Null where the app cannot know it (iOS and most other ports).
+    public String getActiveInputMethod() {
+        return null;
+    }
+
+    /// Whether the selected keyboard ships with the device. True where the question does not apply,
+    /// so a port without the concept never reports a third-party keyboard.
+    public boolean isActiveInputMethodPreinstalled() {
+        return true;
+    }
+
+    /// Allows or refuses user-installed keyboards in this app. Returns true when the platform
+    /// enforces the choice (iOS); false where it cannot (Android lets the user's keyboard type
+    /// into every app, and the other ports have no third-party keyboards).
+    public boolean setThirdPartyKeyboardsAllowed(boolean allowed) {
+        return false;
+    }
+
     /// Discards cached platform attestation state so the next [#requestIntegrityToken(String)] starts
     /// from a fresh hardware key.
     ///

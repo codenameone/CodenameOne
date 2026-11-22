@@ -37,7 +37,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /// Building a deck: tap a card to put it in or take it out. The card list,
-/// the costs and what makes a deck valid all come from the rules module,
+/// the costs and what makes a deck valid all come from the shared simulation code,
 /// which the server checks the saved deck against with the same code.
 // tag::skirmish-deck-form[]
 public final class DeckForm {

@@ -118,7 +118,7 @@ Transitions support `none`, `fade`, `slide-left`, `slide-right`, `slide-up`, `sl
 
 See [`examples/release-feature/video.json`](examples/release-feature/video.json) for all of these capabilities together, including slide transitions between explanatory material and a compiled live demo.
 
-Compiled live demos implement `DemoScene` in the `demos` module. The JSON references the fully qualified class name. Rebuild after changing demo source so the exact code shown in the video compiles and runs against the snapshot APIs. `examples/release-feature/ar-demo-smoke.json` is a low-resolution regression fixture for the compiled AR session. A `live-demo` production script must drive at least two distinct `demo.action` state changes; pointer motion or a pan over a frozen capture never counts as interaction.
+Compiled live demos implement `DemoScene` in the `common` module, beside the builder. The JSON references the fully qualified class name. Rebuild after changing demo source so the exact code shown in the video compiles and runs against the snapshot APIs. `examples/release-feature/ar-demo-smoke.json` is a low-resolution regression fixture for the compiled AR session. A `live-demo` production script must drive at least two distinct `demo.action` state changes; pointer motion or a pan over a frozen capture never counts as interaction.
 When a real demo genuinely uses a drag or swipe, `pointer.move` must include a `semanticIntent`
 and align with the `demo.action` it drives. Cursor choreography without a state change fails QA.
 Set `animated: false` on `demo.mount` when the component changes only at discrete `demo.action`

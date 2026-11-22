@@ -28,7 +28,7 @@ import com.codenameone.examples.dash.rules.Run;
 /// - [ReplayDriver]: a finished run's log, at any speed, seekable.
 ///
 /// All three step the same [Run] -- the class the server runs -- which is why
-/// a rule changed in the rules module is changed in every one of them.
+/// a rule changed in the shared simulation code is changed in every one of them.
 // tag::dash-driver[]
 public abstract class Driver {
     protected Run run;

@@ -420,9 +420,11 @@ public class GeneratorModelMatrixTest extends AbstractTest {
                                         String packageName, String mainClassName, String label) throws IOException {
         boolean rides = template == Template.WAYLINE;
         boolean bank = template == Template.BASTION;
-        boolean game = template == Template.SKIRMISH || template == Template.DASH || template == Template.SPLAT;
+        boolean game = template == Template.SKIRMISH || template == Template.DASH || template == Template.SPLAT
+                || template == Template.PAPERCUT;
         boolean runner = template == Template.DASH;
         boolean paintball = template == Template.SPLAT;
+        boolean arena = template == Template.PAPERCUT;
         boolean video = template == Template.REEL;
         boolean studio = template == Template.PULSE;
         boolean booking = template == Template.SLATE;
@@ -441,7 +443,7 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         // project once got the ride-hailing accounts and chapters.
         String readme = getText(entries, "README.md");
         boolean chat = template == Template.PARLEY;
-        assertContains(readme, game ? (runner ? "endless runner" : paintball ? "paintball shooter" : "card battler") : rides ? "ride-hailing app" : chat ? "messaging app" : bank ? "working bank" : studio ? "fitness studio app" : field ? "field service app" : booking ? "appointment booking app" : video ? "video streaming service" : "food-delivery app",
+        assertContains(readme, game ? (runner ? "endless runner" : paintball ? "paintball shooter" : arena ? "arena shooter" : "card battler") : rides ? "ride-hailing app" : chat ? "messaging app" : bank ? "working bank" : studio ? "fitness studio app" : field ? "field service app" : booking ? "appointment booking app" : video ? "video streaming service" : "food-delivery app",
                 label + "README names the app");
         if (!game) {
             assertContains(readme, (rides ? "`rider@" : chat ? "`alice@" : bank ? "`customer2@" : studio ? "`member@" : field ? "`tech@" : booking ? "`client@" : video ? "`viewer@" : "`customer@") + artifact + ".example`",
@@ -450,14 +452,8 @@ public class GeneratorModelMatrixTest extends AbstractTest {
                     label + "README carries no other template's accounts");
             assertFalse(chat && readme.indexOf("rider@") >= 0, label + "README carries no ride-hailing accounts");
         }
-        if (template.hasRules()) {
-            assertContains(rootPom, "<module>rules</module><module>shared</module>",
-                    label + "the rules module is built ahead of the contract");
-            assertContains(getText(entries, "common/pom.xml"), "<artifactId>" + artifact + "-rules</artifactId>",
-                    label + "the app depends on the rules");
-            assertContains(getText(entries, "backend/pom.xml"), "<artifactId>" + artifact + "-rules</artifactId>",
-                    label + "the server depends on the rules");
-        }
+        assertFalse(rootPom.indexOf("<module>rules</module>") >= 0,
+                label + "code both halves run is in shared, not a module of its own");
         String sharedPom = getText(entries, "shared/pom.xml");
         assertContains(sharedPom, "<artifactId>" + artifact + "-shared</artifactId>", label + "shared module id");
         assertContains(getText(entries, "common/pom.xml"), "<artifactId>" + artifact + "-shared</artifactId>",
@@ -475,7 +471,7 @@ public class GeneratorModelMatrixTest extends AbstractTest {
                 "package " + packageName + ";", label + "the server moves to the project's package");
         assertNotNull(entries.get("backend/src/main/resources/db/migration/" + (game ? "V1__game.sql" : bank ? "V4__accounts.sql" : studio || booking ? "V2__accounts.sql" : "V1__accounts.sql")),
                 label + "the server keeps its migrations");
-        assertNotNull(entries.get("backend/src/test/java/" + packagePath + (game ? "/GameSocketTest.java" : rides ? "/RideFlowTest.java" : chat ? "/MessagingTest.java" : bank ? "/LedgerTest.java" : video ? "/PlaybackTest.java" : studio ? "/StudioTest.java" : field ? "/FieldTest.java" : booking ? "/booking/BookingFlowTest.java" : "/OrderFlowTest.java")),
+        assertNotNull(entries.get("backend/src/test/java/" + packagePath + (arena ? "/RunTest.java" : game ? "/GameSocketTest.java" : rides ? "/RideFlowTest.java" : chat ? "/MessagingTest.java" : bank ? "/LedgerTest.java" : video ? "/PlaybackTest.java" : studio ? "/StudioTest.java" : field ? "/FieldTest.java" : booking ? "/booking/BookingFlowTest.java" : "/OrderFlowTest.java")),
                 label + "the server keeps its tests");
         assertNotNull(entries.get("common/src/main/java/" + packagePath + (game ? "/ui/HomeForm.java" : rides ? "/rider/RiderForm.java" : chat ? "/ui/ChatForm.java" : bank ? "/ui/HomeForm.java" : video ? "/ui/WelcomeForm.java" : studio ? "/member/MemberForm.java" : field ? "/field/TodayForm.java" : booking ? "/client/ClientForm.java" : "/customer/CustomerForm.java")),
                 label + "the app's screens move to the project's package");

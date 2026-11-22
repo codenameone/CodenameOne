@@ -142,8 +142,8 @@ public class Assistant {
         }
         out.add(tool("list_jobs", "Jobs on one day, optionally only one status. Returns id, "
                 + "title, technician, planned time, priority.", props("day_offset", integer(
-                "0 for today"), "status", str("Optional: UNASSIGNED, SCHEDULED, EN_ROUTE, ON_SITE, "
-                + "COMPLETED")), "day_offset"));
+                "0 for today"), "status", str("Optional: UNASSIGNED, AWAITING_PARTS, BLOCKED, "
+                + "SCHEDULED, EN_ROUTE, ON_SITE, COMPLETED")), "day_offset"));
         out.add(tool("technician_schedule", "One technician's route for a day, with drive times.",
                 props("technician", str("Name or id"), "day_offset", integer("0 for today")),
                 "technician", "day_offset"));

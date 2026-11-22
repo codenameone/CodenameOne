@@ -236,7 +236,7 @@ The game is only half of what ships. **The Forge** is a level editor inside the 
 </div>
 {{< /guide-block >}}
 
-Adding a unit to the game is one line in the shared rules module:
+Adding a unit to the game is one line in the shared simulation code:
 
 ```java {class="cn1-no-try"}
 add(new CardDef("squire", "Squire", CardDef.TROOP, 3)

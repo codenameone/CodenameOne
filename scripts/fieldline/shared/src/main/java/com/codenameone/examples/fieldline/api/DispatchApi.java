@@ -28,6 +28,11 @@ public interface DispatchApi {
     void createJob(@Body NewJobDto job, OnComplete<Response<JobDto>> callback);
 
     /// Re-plans the whole horizon, keeping work that has started.
+    /// Moves a job between the intake states (UNASSIGNED, AWAITING_PARTS,
+    /// BLOCKED). It never schedules; that is the board's.
+    @POST("/api/dispatch/jobs/{id}/intake")
+    void intake(@Path("id") String id, @Body IntakeDto intake, OnComplete<Response<JobDto>> callback);
+
     @POST("/api/dispatch/optimize")
     void optimize(OnComplete<Response<ScheduleRunDto>> callback);
 

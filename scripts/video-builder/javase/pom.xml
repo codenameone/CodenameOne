@@ -21,11 +21,6 @@
             <version>${project.version}</version>
         </dependency>
         <dependency>
-            <groupId>com.codenameone.videobuilder</groupId>
-            <artifactId>cn1-video-builder-demos</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-        <dependency>
             <groupId>com.codenameone</groupId>
             <artifactId>codenameone-core</artifactId>
         </dependency>

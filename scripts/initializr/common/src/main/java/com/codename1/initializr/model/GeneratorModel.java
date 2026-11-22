@@ -91,6 +91,11 @@ public class GeneratorModel {
     /// compile, so it is neither offered nor generated.
     static final String SPLAT_SINCE = "7.0.282";
 
+    /// The first release whose build plugin and core carry everything the arena
+    /// shooter template is built on. It is gated on the release that follows its
+    /// addition, so it is neither offered nor generated before then.
+    static final String PAPERCUT_SINCE = "7.0.284";
+
     /// The first release whose framework has what the banking template's app calls:
     /// timed clipboard clearing, the P-256 key and signature API it signs requests
     /// with, and the `BigDecimal` arithmetic its ledger rounds with. Against an
@@ -124,6 +129,7 @@ public class GeneratorModel {
         return template == Template.BASTION ? BASTION_SINCE
                 : template == Template.REEL ? REEL_SINCE
                 : template == Template.SPLAT ? SPLAT_SINCE
+                : template == Template.PAPERCUT ? PAPERCUT_SINCE
                 : template == Template.SLATE ? SLATE_SINCE
                 : template == Template.FIELDLINE ? FIELDLINE_SINCE : JAVA_TIME_ENTITIES_SINCE;
     }
@@ -147,6 +153,9 @@ public class GeneratorModel {
 
     /// The paintball template's accent, used for its icon: it has no `--brand`.
     public static final int SPLAT_BRAND = 0xff7a1f;
+
+    /// The arena shooter template's accent, used for its icon: it has no `--brand`.
+    public static final int PAPERCUT_BRAND = 0x2b3a67;
 
     /// The messaging template's `--brand`, held to its theme.css the same way.
     public static final int PARLEY_BRAND = 0x0a7d6b;
@@ -187,7 +196,8 @@ public class GeneratorModel {
         return template == Template.SAVOR ? SAVOR_BRAND
                 : template == Template.SKIRMISH ? SKIRMISH_BRAND
                 : template == Template.DASH ? DASH_BRAND
-                : template == Template.SPLAT ? SPLAT_BRAND : FULL_STACK_BRAND;
+                : template == Template.SPLAT ? SPLAT_BRAND
+                : template == Template.PAPERCUT ? PAPERCUT_BRAND : FULL_STACK_BRAND;
     }
 
     /// Whether `template` can be generated at [CN1_PLUGIN_VERSION]: the UI offers
@@ -1212,22 +1222,6 @@ public class GeneratorModel {
                 "dependency on the shared module");
         requirePomFragment("backend/pom.xml", normalizedPom(entries, "backend/pom.xml"), dependency,
                 "dependency on the shared module");
-        if (template.hasRules()) {
-            // The rules pom takes its group and version from the parent, so its
-            // coordinates are the parent's and its artifact id.
-            requirePomFragment("rules/pom.xml", normalizedPom(entries, "rules/pom.xml"),
-                    "</modelVersion><parent><groupId>" + packageName + "</groupId><artifactId>"
-                            + toLowerCaseInvariant(appName) + "</artifactId><version>" + version
-                            + "</version></parent><artifactId>" + rootArtifactId + "-rules</artifactId>",
-                    "rules module coordinates");
-            String rules = "<artifactId>" + rootArtifactId + "-rules</artifactId>";
-            requirePomFragment("pom.xml", rootPom, "<module>rules</module><module>shared</module>",
-                    "rules module ahead of shared");
-            requirePomFragment("common/pom.xml", normalizedPom(entries, "common/pom.xml"), rules,
-                    "dependency on the rules module");
-            requirePomFragment("backend/pom.xml", normalizedPom(entries, "backend/pom.xml"), rules,
-                    "dependency on the rules module");
-        }
         String packagePath = packageName.replace('.', '/');
         String sourcePath = template.SOURCE_PACKAGE.replace('.', '/');
         for (String path : entries.keySet()) {
@@ -1700,7 +1694,7 @@ public class GeneratorModel {
             content = replaceTagValue(content, "cn1.plugin.version", pluginVersion);
             content = replaceTagValue(content, "cn1.version", pluginVersion);
             if (template.isFullStack() && !options.isGradle() && !isMavenBackendOnly()) {
-                content = addSharedModule(content, template.hasRules());
+                content = addSharedModule(content);
             }
             if (mavenLayoutsEnabled() && !isMavenBackendOnly()) {
                 content = guardModuleProfiles(content, !includesPlatformModules());
@@ -1935,7 +1929,7 @@ public class GeneratorModel {
     /// The root pom with the `shared` module in it, ahead of `common`: Maven would
     /// order the two by their dependency anyway, and a reader should not have to
     /// know that to see which is built first.
-    private static String addSharedModule(String pom, boolean withRules) throws IOException {
+    private static String addSharedModule(String pom) throws IOException {
         String common = "<module>common</module>";
         int at = pom.indexOf(common);
         if (at < 0) {
@@ -1947,7 +1941,6 @@ public class GeneratorModel {
         return pom.substring(0, at)
                 + "<!-- What the app and its server have in common: the REST contract and the\n"
                 + indent + "     objects it transfers. Built first, because both depend on it. -->\n"
-                + (withRules ? indent + "<module>rules</module>\n" : "")
                 + indent + "<module>shared</module>\n" + indent
                 + pom.substring(at);
     }
@@ -2137,9 +2130,8 @@ public class GeneratorModel {
                     .append("This project is a working endless runner: a 2D-to-3D camera swing, a track editor, ")
                     .append("leaderboards the server re-simulates, live races with voice, crews and an admin console, ")
                     .append("and the server they talk to.\n\n")
-                    .append("- `rules/` is the game: a deterministic simulation with no dependencies, which the app ")
-                    .append("runs, the server re-simulates to verify scores and the replay viewer re-runs.\n")
-                    .append("- `shared/` is the contract: the REST interfaces and the objects they carry.\n")
+                    .append("- `shared/` is the game and the contract: a deterministic simulation, which the app ")
+                    .append("runs, the server re-simulates to verify scores and the replay viewer re-runs. Beside it, the REST interfaces and the objects they carry.\n")
                     .append("- `backend/` is the server.\n")
                     .append("- `common/` is the app.\n\n")
                     .append("Start the server, then, in a second terminal, the app:\n\n```\n")
@@ -2153,11 +2145,25 @@ public class GeneratorModel {
                     .append("This project is a working team paintball shooter: first-person 3D matches against bots ")
                     .append("or other players, a server that referees every match while the phone predicts, parties ")
                     .append("with voice, crews, replays and an admin console, and the server they talk to.\n\n")
-                    .append("- `rules/` is the game: a deterministic simulation with no dependencies, which the app ")
-                    .append("predicts with, the server runs as the authority and the replay viewer re-runs.\n")
-                    .append("- `shared/` is the contract: the REST interfaces and the objects they carry.\n")
+                    .append("- `shared/` is the game and the contract: a deterministic simulation, which the app ")
+                    .append("predicts with, the server runs as the authority and the replay viewer re-runs. Beside it, the REST interfaces and the objects they carry.\n")
                     .append("- `backend/` is the server.\n")
                     .append("- `common/` is the app.\n\n")
+                    .append("Start the server, then, in a second terminal, the app:\n\n```\n")
+                    .append("./run-server.sh\n")
+                    .append("./run.sh\n```\n\n")
+                    .append("On Windows: `run-server.bat`, then `run.bat`. Your IDE's run menu has both: ")
+                    .append("\"Run Server\" and the simulator.\n\n")
+                    .append("`./mvnw -pl backend -am -Dcodename1.platform=backend test` runs the server's tests.\n\n");
+        } else if (template == Template.PAPERCUT) {
+            out.append("## The game and its server\n\n")
+                    .append("This project is a working twin-stick arena shooter in cut paper and ink: three modes, ")
+                    .append("a daily seed, leaderboards, a shop, achievements and an admin console, and the server ")
+                    .append("they talk to.\n\n")
+                    .append("- `shared/` is the contract: the REST interfaces, the objects they carry and the ")
+                    .append("bounds the server holds a score to.\n")
+                    .append("- `backend/` is the server.\n")
+                    .append("- `common/` is the app, and the game: the arena runs there.\n\n")
                     .append("Start the server, then, in a second terminal, the app:\n\n```\n")
                     .append("./run-server.sh\n")
                     .append("./run.sh\n```\n\n")
@@ -2168,9 +2174,8 @@ public class GeneratorModel {
             out.append("## The game and its server\n\n")
                     .append("This project is a working real-time card battler: a 3D arena, matchmaking, replays, ")
                     .append("progression and an admin console, and the server they talk to.\n\n")
-                    .append("- `rules/` is the game: a deterministic simulation with no dependencies, which the app ")
-                    .append("renders, the server enforces and the replay viewer re-runs.\n")
-                    .append("- `shared/` is the contract: the REST interfaces and the objects they carry.\n")
+                    .append("- `shared/` is the game and the contract: a deterministic simulation, which the app ")
+                    .append("renders, the server enforces and the replay viewer re-runs. Beside it, the REST interfaces and the objects they carry.\n")
                     .append("- `backend/` is the server.\n")
                     .append("- `common/` is the app.\n\n")
                     .append("Start the server, then, in a second terminal, the app:\n\n```\n")
@@ -2350,10 +2355,9 @@ public class GeneratorModel {
         out.append("## The app and its server\n\n")
                 .append("This project is a working field service app: a technician and a dispatch mode in one ")
                 .append("app, chosen by the role of whoever signs in, and the server they talk to.\n\n")
-                .append("- `rules/` is the scheduling engine: regret insertion, then adaptive large ")
+                .append("- `shared/` holds the scheduling engine (`scheduler`): regret insertion, then adaptive large ")
                 .append("neighbourhood search, over technicians' skills, hours, time off and travel time. It ")
-                .append("depends on nothing, and is seeded, so one seed gives one plan.\n")
-                .append("- `shared/` is the contract: the REST interfaces and the objects they carry. The app's ")
+                .append("is seeded, so one seed gives one plan. Beside it is the contract: the REST interfaces and the objects they carry. The app's ")
                 .append("client and the server's dispatcher are both generated from it, so the two cannot drift.\n")
                 .append("- `backend/` is the server: accounts and roles, technicians and their availability, ")
                 .append("sites and jobs, checklists, photos and sealed signatures, the optimizer runs and ")
@@ -2372,7 +2376,7 @@ public class GeneratorModel {
                 .append(lower).append(".example`.\n\n")
                 .append("The assistant answers from a built-in demo source until the server is given a ")
                 .append("model to call; `backend/application.properties` says how.\n\n")
-                .append("`./mvnw -pl rules,shared,backend -am -Dcodename1.platform=backend test` runs the ")
+                .append("`./mvnw -pl shared,backend -am -Dcodename1.platform=backend test` runs the ")
                 .append("engine's and the server's tests.\n\n");
     }
 
