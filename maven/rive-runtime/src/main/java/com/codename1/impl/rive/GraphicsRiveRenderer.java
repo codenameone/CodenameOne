@@ -51,6 +51,7 @@ public final class GraphicsRiveRenderer implements RiveRenderer {
     private GeneralPath activeClip;
     private final GeneralPath path = new GeneralPath();
     private final float[] bounds = new float[4];
+    private final float[] clipBounds = new float[4];
     private int depth;
     private final com.codename1.ui.Stroke stroke = new com.codename1.ui.Stroke(1f, 0, 0, 4f);
     private final ArrayList<GeneralPath> clipPool = new ArrayList<GeneralPath>();
@@ -125,8 +126,7 @@ public final class GraphicsRiveRenderer implements RiveRenderer {
         GeneralPath prev = clipShapes.get(depth);
         if (prev != activeClip) { // NOPMD CompareObjectsWithEquals - identity is the intent
             if (prev != null) {
-                g.setClip(prev);
-                g.clipRect(c[0], c[1], c[2], c[3]);
+                shapeClip(prev, c[0], c[1], c[2], c[3]);
             } else {
                 g.setClip(c[0], c[1], c[2], c[3]);
             }
@@ -183,9 +183,39 @@ public final class GraphicsRiveRenderer implements RiveRenderer {
         int cy = g.getClipY();
         int cw = g.getClipWidth();
         int ch = g.getClipHeight();
-        g.setClip(clip);
-        g.clipRect(cx, cy, cw, ch);
+        shapeClip(clip, cx, cy, cw, ch);
         activeClip = clip;
+    }
+
+    /// Clips to `s` within the rectangle (x, y, w, h). A shape that lies inside
+    /// the rectangle needs no intersection at all, which is the common case.
+    /// Otherwise the port intersects the two, and the Android port's
+    /// `GeneralPath` intersection throws on some curves ("Unexpected shape
+    /// segmentation"): thrown inside a paint, that aborted every pass of the
+    /// form. The clip then falls back to the rectangle, and false tells the
+    /// caller the shape is not clipped.
+    private boolean shapeClip(GeneralPath s, int x, int y, int w, int h) {
+        s.getBounds2D(clipBounds);
+        g.setClip(s);
+        if (clipBounds[0] >= x && clipBounds[1] >= y
+                && clipBounds[0] + clipBounds[2] <= x + w && clipBounds[1] + clipBounds[3] <= y + h) {
+            return true;
+        }
+        try {
+            g.clipRect(x, y, w, h);
+            return true;
+        } catch (RuntimeException e) {
+            g.setClip(x, y, w, h);
+            return false;
+        }
+    }
+
+    private void restoreClip(int cx, int cy, int cw, int ch) {
+        if (activeClip != null) {
+            shapeClip(activeClip, cx, cy, cw, ch);
+        } else {
+            g.setClip(cx, cy, cw, ch);
+        }
     }
 
     private static int alpha(int argb) {
@@ -250,8 +280,20 @@ public final class GraphicsRiveRenderer implements RiveRenderer {
         int cy = g.getClipY();
         int cw = g.getClipWidth();
         int ch = g.getClipHeight();
-        g.setClip(path);
-        g.clipRect(cx, cy, cw, ch);
+        if (!shapeClip(path, cx, cy, cw, ch)) {
+            // no shape clip on this port for this path: a solid fill of the
+            // middle stop stays inside the shape, where the gradient would
+            // cover its whole bounding box
+            int mid = colors[n / 2];
+            if (alpha(mid) != 0) {
+                g.setColor(mid & 0xffffff);
+                g.setAlpha(alpha(mid));
+                g.fillShape(path);
+                g.setAlpha(255);
+            }
+            restoreClip(cx, cy, cw, ch);
+            return;
+        }
         int bx = (int) Math.floor(bounds[0]);
         int by = (int) Math.floor(bounds[1]);
         int bw = (int) Math.ceil(bounds[0] + bounds[2]) - bx;
@@ -271,12 +313,7 @@ public final class GraphicsRiveRenderer implements RiveRenderer {
             rg.setRelativeRadiusY(r / bh);
             g.fillGradient(rg, bx, by, bw, bh);
         }
-        if (activeClip != null) {
-            g.setClip(activeClip);
-            g.clipRect(cx, cy, cw, ch);
-        } else {
-            g.setClip(cx, cy, cw, ch);
-        }
+        restoreClip(cx, cy, cw, ch);
     }
 
     /// A Rive linear gradient runs from (sx, sy) to (ex, ey). The core's
@@ -485,19 +522,16 @@ public final class GraphicsRiveRenderer implements RiveRenderer {
             triangle.lineTo(x1, y1);
             triangle.lineTo(x2, y2);
             triangle.closePath();
-            g.setClip(triangle);
-            g.clipRect(cx, cy, cw, ch);
+            if (!shapeClip(triangle, cx, cy, cw, ch)) {
+                // unclipped, the whole image would cover the rectangle
+                continue;
+            }
             meshTransform.setAffine(a, b, c, d, e, f);
             g.setTransform(meshTransform);
             g.drawImage(img, 0, 0);
             g.setTransform(savedTransform);
         }
-        if (activeClip != null) {
-            g.setClip(activeClip);
-            g.clipRect(cx, cy, cw, ch);
-        } else {
-            g.setClip(cx, cy, cw, ch);
-        }
+        restoreClip(cx, cy, cw, ch);
     }
 
     private void drawMeshBounds(com.codename1.ui.Image img, float[] vertices, int vertexCount) {
