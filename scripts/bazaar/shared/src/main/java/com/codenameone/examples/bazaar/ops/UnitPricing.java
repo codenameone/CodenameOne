@@ -106,9 +106,10 @@ public final class UnitPricing {
         return (price * num + half) / den;
     }
 
-    /// "100 g" for a reference of 100 grams.
+    /// "100 g" for a reference of 100 grams; a reference of one is just the
+    /// unit, so a price reads "/ kg" rather than "/ 1 kg".
     public static String per(int reference, String referenceName) {
-        return reference + " " + referenceName;
+        return reference == 1 ? referenceName : reference + " " + referenceName;
     }
 
     /// A measure for people: "750 ml", "1.5 kg" (thousandths, trailing

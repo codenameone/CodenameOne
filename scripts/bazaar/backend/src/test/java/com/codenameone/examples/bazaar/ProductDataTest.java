@@ -259,12 +259,12 @@ class ProductDataTest {
                 .getResponse().getContentAsString();
         assertTrue(xml.contains("<g:google_product_category>413</g:google_product_category>"),
                 xml);
-        assertTrue(xml.contains("<g:unit_pricing_measure>250 g</g:unit_pricing_measure>"), xml);
-        assertTrue(xml.contains("<g:unit_pricing_base_measure>100 g"), xml);
+        assertTrue(xml.contains("<g:unit_pricing_measure>250g</g:unit_pricing_measure>"), xml);
+        assertTrue(xml.contains("<g:unit_pricing_base_measure>100g"), xml);
         String csv = mvc.perform(get("/s/pd-page/feeds/default/products.csv")).andReturn()
                 .getResponse().getContentAsString();
         assertTrue(csv.contains("google_product_category"), csv);
-        assertTrue(csv.contains("250 g"), csv);
+        assertTrue(csv.contains("250g"), csv);
     }
 
     @Test

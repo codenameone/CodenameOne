@@ -112,16 +112,16 @@ class MerchantLogicTest {
 
     @Test
     void variantCustomsAndUnitsAreCheckedBeforeSaving() {
-        assertNull(ProductEditor.unitProblem("691200", "PT", 0, "", 1, ""));
-        assertNull(ProductEditor.unitProblem("", "", 250000, "g", 100, "g"));
-        assertNull(ProductEditor.unitProblem("", "", 750000, "ml", 1, "l"));
-        assertNotNull(ProductEditor.unitProblem(null, "", 0, "", 1, ""));
-        assertNotNull(ProductEditor.unitProblem("", null, 0, "", 1, ""));
-        assertNotNull(ProductEditor.unitProblem("", "", -1, "g", 1, "g"));
-        assertNotNull(ProductEditor.unitProblem("", "", 250000, "g", 1, "ml"));
-        assertNotNull(ProductEditor.unitProblem("", "", 250000, "furlong", 1, "furlong"));
-        assertNotNull(ProductEditor.unitProblem("", "", 0, "g", 100, "g"));
-        assertNotNull(ProductEditor.unitProblem("", "", 250000, "g", 0, "g"));
+        assertNull(VariantChecks.unitProblem("691200", "PT", 0, "", 1, ""));
+        assertNull(VariantChecks.unitProblem("", "", 250000, "g", 100, "g"));
+        assertNull(VariantChecks.unitProblem("", "", 750000, "ml", 1, "l"));
+        assertNotNull(VariantChecks.unitProblem(null, "", 0, "", 1, ""));
+        assertNotNull(VariantChecks.unitProblem("", null, 0, "", 1, ""));
+        assertNotNull(VariantChecks.unitProblem("", "", -1, "g", 1, "g"));
+        assertNotNull(VariantChecks.unitProblem("", "", 250000, "g", 1, "ml"));
+        assertNotNull(VariantChecks.unitProblem("", "", 250000, "furlong", 1, "furlong"));
+        assertNotNull(VariantChecks.unitProblem("", "", 0, "g", 100, "g"));
+        assertNotNull(VariantChecks.unitProblem("", "", 250000, "g", 0, "g"));
     }
 
     @Test

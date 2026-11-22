@@ -401,9 +401,10 @@ final class ProductEditor extends Container {
         String refName = perUnit.getText().trim().length() == 0 ? unitName
                 : perUnit.getText().trim();
         int reference = MUi.integer(per);
-        String problem = unitProblem(hsCode, country, quantity, unitName, reference, refName);
+        String problem = VariantChecks.unitProblem(hsCode, country, quantity, unitName,
+                reference, refName);
         if (problem != null) {
-            Ui.say(problem);
+            Ui.say(Lang.tr(problem));
             return;
         }
         boolean byMeasure = quantity > 0 && unitName.length() > 0;
@@ -415,30 +416,6 @@ final class ProductEditor extends Container {
                 byMeasure ? unitName : "", byMeasure ? reference : 0,
                 byMeasure ? refName : ""));
         paintVariants();
-    }
-
-    /// Why a variant's customs and unit pricing cannot be saved, or null.
-    /// `hsCode` and `country` are what [Customs] made of the fields.
-    static String unitProblem(String hsCode, String country, long quantity, String unitName,
-            int reference, String referenceName) {
-        if (hsCode == null) {
-            return Lang.tr("An HS code has 6 to 10 digits");
-        }
-        if (country == null) {
-            return Lang.tr("Enter a two-letter country code, such as US or DE");
-        }
-        if (quantity < 0) {
-            return Lang.tr("Enter the measure as a number, such as 250 or 1.5");
-        }
-        if (quantity == 0 && unitName.length() == 0) {
-            return null;
-        }
-        if (quantity == 0 || !UnitPricing.isUnit(unitName) || !UnitPricing.isUnit(referenceName)
-                || !UnitPricing.compatible(unitName, referenceName)
-                || reference < 1 || reference > UnitPricing.MAX_REFERENCE) {
-            return Lang.tr("Enter a measure, a unit and a price-per unit of the same kind");
-        }
-        return null;
     }
 
     /// "Margin 40.0% - markup 66.7%", or a hint when no cost is entered.

@@ -183,7 +183,8 @@ final class AccountPane extends ShopPane {
                         new com.codenameone.examples.bazaar.api.ProductCardDto(p.id(), p.storeId(),
                                 p.handle(), p.title(), p.vendor(), p.productType(), p.tags(),
                                 p.status(), p.photoId(), low, high, compare, available, p.rating(),
-                                p.ratingCount(), p.variants() == null ? 0 : p.variants().size()),
+                                p.ratingCount(), p.variants() == null ? 0 : p.variants().size(),
+                                -1, null),
                         width));
                 Ui.relayout(slot);
             }, (status, message) -> {
