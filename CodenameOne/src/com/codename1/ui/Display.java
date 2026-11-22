@@ -259,6 +259,8 @@ public final class Display extends CN1Constants {
     /// is common in Android devices
     private boolean pureTouch;
     private Graphics codenameOneGraphics;
+    /// Counts the display's paint passes (`Graphics.getPaintPass()`).
+    int paintPass;
     /// Indicates whether this is a touch device
     private boolean touchScreen;
     private HashMap<String, String> localProperties;
@@ -2003,6 +2005,7 @@ public final class Display extends CN1Constants {
             // before the next paint cycle.
             current.flushRevalidateQueue();
         }
+        paintPass++;
         impl.paintDirty();
 
         // draw the animations

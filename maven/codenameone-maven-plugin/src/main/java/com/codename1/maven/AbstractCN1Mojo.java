@@ -2414,7 +2414,6 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
                 ? svgPackage : SvgTranscodeRunner.DEFAULT_PACKAGE;
     }
 
-    /** A transcoder configured exactly as the bound goal would be. */
     /**
      * Supplies the Rive runtime to a module with {@code .riv} files. The
      * project declares nothing: the runtime is resolved at this plugin's own
@@ -2426,7 +2425,40 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
      * @return false when the runtime could not be resolved (logged)
      */
     protected boolean installRiveRuntime(SvgTranscodeRunner runner) throws java.io.IOException {
+        File classes = new File(project.getBuild().getOutputDirectory());
         if (!runner.hasRiveSources()) {
+            // the last .riv is gone: take back a runtime an earlier build put
+            // there, or the module ships it until the next clean
+            int n = SvgTranscodeRunner.uninstallRuntime(classes);
+            if (n > 0) {
+                getLog().info("Removed the Rive runtime (" + n + " files) from " + classes
+                        + ": this module has no .riv files any more");
+            }
+            return true;
+        }
+        if (isCN1LibraryModule()) {
+            // A cn1lib must not carry the runtime in its jar: the application
+            // that uses it supplies the one matching its own plugin, and two
+            // copies on one class path means one silently wins. The library's
+            // generated classes compile against it as a provided dependency,
+            // which is on javac's class path and in neither the jar nor the
+            // library's pom.
+            SvgTranscodeRunner.uninstallRuntime(classes);
+            org.apache.maven.model.Dependency dep = new org.apache.maven.model.Dependency();
+            dep.setGroupId(GROUP_ID);
+            dep.setArtifactId(SvgTranscodeRunner.RIVE_RUNTIME_ARTIFACT);
+            dep.setVersion(ownVersion());
+            dep.setScope("provided");
+            boolean present = false;
+            for (org.apache.maven.model.Dependency d : project.getDependencies()) {
+                if (SvgTranscodeRunner.RIVE_RUNTIME_ARTIFACT.equals(d.getArtifactId())) {
+                    present = true;
+                    break;
+                }
+            }
+            if (!present) {
+                project.getDependencies().add(dep);
+            }
             return true;
         }
         File jar = resolvePortJar(SvgTranscodeRunner.RIVE_RUNTIME_ARTIFACT, null);
@@ -2436,7 +2468,6 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
                     + " that this plugin supplies for them could not be resolved.");
             return false;
         }
-        File classes = new File(project.getBuild().getOutputDirectory());
         int n = SvgTranscodeRunner.installRuntime(jar, classes);
         if (n > 0) {
             getLog().info("Copied the Rive runtime (" + n + " files) into " + classes);
@@ -2444,6 +2475,7 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
         return true;
     }
 
+    /** A transcoder configured exactly as the bound goal would be. */
     protected SvgTranscodeRunner newSvgTranscodeRunner() {
         File placeholders = svgPlaceholderDir != null ? svgPlaceholderDir
                 : new File(project.getBuild().getDirectory(), "css-resources");
@@ -2565,7 +2597,7 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
             return;
         }
 
-        getLog().info("This project has SVG/Lottie assets but its pom does not run the "
+        getLog().info("This project has SVG/Lottie/Rive assets but its pom does not run the "
                 + "build-time vector transcoder. Transcoding them now.");
         try {
             // inside the try: a repair nobody asked for never aborts a build
@@ -2591,6 +2623,12 @@ public abstract class AbstractCN1Mojo extends AbstractMojo {
      * holds: an app has {@code codenameone_settings.properties}, a library has
      * {@code codenameone_library_appended.properties} and no settings file.
      */
+    private boolean isCN1LibraryModule() {
+        File dir = project.getBasedir();
+        return dir != null && new File(dir, "codenameone_library_appended.properties").isFile()
+                && !new File(dir, "codenameone_settings.properties").isFile();
+    }
+
     private boolean isCN1ApplicationModule() {
         File dir = getCN1ProjectDir();
         return dir != null && new File(dir, "codenameone_settings.properties").isFile();

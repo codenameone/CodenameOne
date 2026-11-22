@@ -2147,6 +2147,12 @@ public class Image implements ActionSource {
     /// pointer events that land on it, and keeps drags on it from scrolling
     /// the parent. Images are not interactive by default.
     ///
+    /// An interactive image is one animation however many places show it:
+    /// one instance shown twice at once shares its state (inputs, pointer
+    /// presses, playback), and where it draws through a GPU surface
+    /// (`com.codename1.gpu.GpuImage`) only one placement per paint pass gets
+    /// the surface while the others draw through `Graphics`.
+    ///
     /// #### Returns
     ///
     /// true if the image wants pointer events

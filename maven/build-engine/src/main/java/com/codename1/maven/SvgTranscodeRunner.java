@@ -142,12 +142,7 @@ public class SvgTranscodeRunner {
             // A different runtime: remove what the previous one wrote, so a
             // class it had and this one dropped does not linger in the output
             // and ship with the application until the next clean.
-            for (int i = 1; i < previous.size(); i++) {
-                java.nio.file.Path old = root.resolve(previous.get(i)).normalize();
-                if (old.startsWith(root)) {
-                    Files.deleteIfExists(old);
-                }
-            }
+            deleteRecorded(root, previous);
         }
         int written = 0;
         StringBuilder record = new StringBuilder(stamp);
@@ -174,6 +169,36 @@ public class SvgTranscodeRunner {
         Files.createDirectories(marker.getParentFile().toPath());
         Files.write(marker.toPath(), record.toString().getBytes(StandardCharsets.US_ASCII));
         return written;
+    }
+
+    /**
+     * Removes a runtime {@link #installRuntime} put into {@code classesDir}:
+     * every file its stamp lists, then the stamp. A module whose last
+     * {@code .riv} file was deleted, or a library that must not ship the
+     * runtime, would otherwise keep shipping it until the next clean.
+     * Answers the number of files removed; 0 when there is no stamp.
+     */
+    public static int uninstallRuntime(File classesDir) throws IOException {
+        File marker = new File(classesDir, RUNTIME_MARKER);
+        if (!marker.isFile()) {
+            return 0;
+        }
+        List<String> previous = Files.readAllLines(marker.toPath(), StandardCharsets.US_ASCII);
+        int removed = deleteRecorded(classesDir.getCanonicalFile().toPath(), previous);
+        Files.deleteIfExists(marker.toPath());
+        return removed;
+    }
+
+    /** Deletes the files a stamp lists after its first line, inside {@code root} only. */
+    private static int deleteRecorded(java.nio.file.Path root, List<String> stamp) throws IOException {
+        int removed = 0;
+        for (int i = 1; i < stamp.size(); i++) {
+            java.nio.file.Path old = root.resolve(stamp.get(i)).normalize();
+            if (old.startsWith(root) && Files.deleteIfExists(old)) {
+                removed++;
+            }
+        }
+        return removed;
     }
 
     static final String[] DEFAULT_SVG_DIRS = {

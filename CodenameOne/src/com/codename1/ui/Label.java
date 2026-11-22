@@ -1648,36 +1648,71 @@ public class Label extends Component implements IconHolder, TextHolder {
     static final int ICON_DRAG = 1;
     static final int ICON_RELEASE = 2;
 
-    /// The icon, if it reacts to the pointer (`Image.isInteractive()`), else
-    /// null. A `ScaleImageLabel` keeps its image as the background image,
-    /// which counts as the icon here.
-    private Image interactiveIcon() {
-        Image i = getIcon();
-        if (i == null || !i.isInteractive()) {
-            return null;
-        }
-        return i;
+    /// The interactive image (`Image.isInteractive()`) this label last
+    /// painted, whichever renderer, state icon or background mode drew it,
+    /// and where: x, y, width, height relative to the label. Recorded by
+    /// `Graphics.drawImage` while this label paints, so the hit test is the
+    /// rectangle actually drawn rather than a second copy of the look and
+    /// feel's placement math.
+    private Image paintedIcon;
+    private final int[] paintedIconBounds = new int[4];
+    /// True from a press inside the painted icon until the release: only
+    /// then do drags and the release go to the icon.
+    private boolean iconPressActive;
+
+    /// Called by `Graphics.drawImage` for an interactive image drawn while
+    /// this label paints, in the graphics' coordinates (the label's parent's).
+    void iconPainted(Image img, int x, int y, int w, int h) {
+        paintedIcon = img;
+        paintedIconBounds[0] = x - getX();
+        paintedIconBounds[1] = y - getY();
+        paintedIconBounds[2] = w;
+        paintedIconBounds[3] = h;
     }
 
-    /// Hands a pointer event to an interactive icon, in the icon's own pixel
-    /// coordinates. Returns true if it went to the icon.
+    /// Covers the background (a `ScaleImageLabel` draws its icon as the
+    /// background image) and the paint of every subclass's look and feel.
+    @Override
+    void internalPaintImpl(Graphics g, boolean paintIntersects) {
+        Label previous = g.paintingLabel;
+        g.paintingLabel = this;
+        try {
+            super.internalPaintImpl(g, paintIntersects);
+        } finally {
+            g.paintingLabel = previous;
+        }
+    }
+
+    /// Hands a pointer event to the interactive icon, in the icon's own pixel
+    /// coordinates. A press goes to it only when it lands on the rectangle
+    /// the icon was painted into; drags and the release only while such a
+    /// press is active. Returns true if the event went to the icon.
     boolean forwardPointerToIcon(int kind, int x, int y) {
-        Image icon = interactiveIcon();
-        if (icon == null) {
+        Image icon = paintedIcon;
+        if (icon == null || !icon.isInteractive()) {
+            iconPressActive = false;
             return false;
         }
-        int[] r = iconBounds(icon);
-        if (r[2] <= 0 || r[3] <= 0) {
+        int rw = paintedIconBounds[2];
+        int rh = paintedIconBounds[3];
+        if (rw <= 0 || rh <= 0) {
+            iconPressActive = false;
             return false;
         }
-        int lx = x - getAbsoluteX() - r[0];
-        int ly = y - getAbsoluteY() - r[1];
+        int lx = x - getAbsoluteX() - paintedIconBounds[0];
+        int ly = y - getAbsoluteY() - paintedIconBounds[1];
+        if (kind == ICON_PRESS) {
+            iconPressActive = lx >= 0 && ly >= 0 && lx < rw && ly < rh;
+        }
+        if (!iconPressActive) {
+            return false;
+        }
         int iw = icon.getWidth();
         int ih = icon.getHeight();
-        if (r[2] != iw || r[3] != ih) {
+        if (rw != iw || rh != ih) {
             // drawn scaled: back to the image's own pixels
-            lx = (int) (lx * (float) iw / r[2]);
-            ly = (int) (ly * (float) ih / r[3]);
+            lx = (int) (lx * (float) iw / rw);
+            ly = (int) (ly * (float) ih / rh);
         }
         switch (kind) {
             case ICON_PRESS:
@@ -1687,105 +1722,12 @@ public class Label extends Component implements IconHolder, TextHolder {
                 icon.pointerDragged(lx, ly);
                 break;
             default:
+                iconPressActive = false;
                 icon.pointerReleased(lx, ly);
                 break;
         }
         repaint();
         return true;
-    }
-
-    /// Where the icon is drawn, relative to this label: x, y, width, height.
-    /// Mirrors the icon placement of `DefaultLookAndFeel` (and the scaled
-    /// background modes of `Component` for an icon kept as the background
-    /// image), without the state icon of a check box or radio button.
-    private int[] iconBounds(Image icon) {
-        Style style = getStyle();
-        int cmpWidth = getWidth();
-        int cmpHeight = getHeight();
-        int iw = icon.getWidth();
-        int ih = icon.getHeight();
-        if (style.getBgImage() == icon) { //NOPMD CompareObjectsWithEquals - the same instance, not an equal image
-            float r;
-            int bw;
-            int bh;
-            switch (style.getBackgroundType()) {
-                case Style.BACKGROUND_IMAGE_SCALED:
-                    return new int[]{0, 0, cmpWidth, cmpHeight};
-                case Style.BACKGROUND_IMAGE_SCALED_FILL:
-                    r = Math.max(((float) cmpWidth) / ((float) iw), ((float) cmpHeight) / ((float) ih));
-                    break;
-                case Style.BACKGROUND_IMAGE_SCALED_FIT:
-                    r = Math.min(((float) cmpWidth) / ((float) iw), ((float) cmpHeight) / ((float) ih));
-                    break;
-                default:
-                    return new int[]{0, 0, iw, ih};
-            }
-            bw = (int) (((float) iw) * r);
-            bh = (int) (((float) ih) * r);
-            return new int[]{(cmpWidth - bw) / 2, (cmpHeight - bh) / 2, bw, bh};
-        }
-        boolean rtl = isRTL();
-        int leftPadding = style.getPaddingLeft(rtl);
-        int rightPadding = style.getPaddingRight(rtl);
-        int topPadding = style.getPaddingTop();
-        int bottomPadding = style.getPaddingBottom();
-        Font font = style.getFont();
-        String t = getText();
-        int fontHeight = t != null && t.length() > 0 ? font.getHeight() : 0;
-        int strWidth = getStringWidth(font);
-        int g = getGap();
-        int align = DefaultLookAndFeel.reverseAlignForBidi(this, style.getAlignment());
-        int textPos = DefaultLookAndFeel.reverseAlignForBidi(this, getTextPosition());
-        boolean sideways = textPos == LEFT || textPos == RIGHT;
-        int x = leftPadding;
-        int y = topPadding;
-        if (sideways) {
-            y += (cmpHeight - (topPadding + bottomPadding + Math.max(ih, fontHeight))) / 2;
-        } else {
-            y += (cmpHeight - (topPadding + bottomPadding + ih + g + fontHeight)) / 2;
-        }
-        if (align == CENTER) {
-            if (sideways) {
-                x += (cmpWidth - (leftPadding + rightPadding + iw + g + strWidth)) / 2;
-            } else {
-                x = Math.max(x + (cmpWidth - (leftPadding + rightPadding + Math.max(iw + g, strWidth))) / 2,
-                        leftPadding);
-            }
-        } else if (align == RIGHT) {
-            if (sideways) {
-                x = cmpWidth - rightPadding - (iw + g + strWidth);
-            } else {
-                x = Math.max(cmpWidth - rightPadding - Math.max(iw, strWidth), leftPadding);
-            }
-        }
-        int textSpaceW = cmpWidth - rightPadding - leftPadding - (sideways ? iw : 0);
-        int ix = x;
-        int iy = y;
-        switch (textPos) {
-            case LEFT:
-                ix = x + Math.min(strWidth, Math.max(0, textSpaceW)) + g;
-                if (ih <= fontHeight) {
-                    iy = y + (fontHeight - ih) / 2;
-                }
-                break;
-            case RIGHT:
-                if (ih <= fontHeight) {
-                    iy = y + (fontHeight - ih) / 2;
-                }
-                break;
-            case TOP:
-                iy = y + fontHeight + g;
-                if (iw <= strWidth) {
-                    ix = x + (Math.min(strWidth, textSpaceW) - iw) / 2;
-                }
-                break;
-            default:
-                if (iw <= strWidth) {
-                    ix = x + (Math.min(strWidth, textSpaceW) - iw) / 2;
-                }
-                break;
-        }
-        return new int[]{ix, iy, iw, ih};
     }
 
     /// {@inheritDoc}
@@ -1800,8 +1742,8 @@ public class Label extends Component implements IconHolder, TextHolder {
 
     /// {@inheritDoc}
     ///
-    /// A drag over an interactive icon goes to the icon and does not scroll
-    /// the parent.
+    /// A drag that began with a press on an interactive icon goes to the icon
+    /// and does not scroll the parent; any other drag is handled as usual.
     @Override
     public void pointerDragged(int x, int y) {
         if (!forwardPointerToIcon(ICON_DRAG, x, y)) {
@@ -1811,8 +1753,8 @@ public class Label extends Component implements IconHolder, TextHolder {
 
     /// {@inheritDoc}
     ///
-    /// A release also reaches an interactive icon, in its own pixel
-    /// coordinates.
+    /// The release of a press that began on an interactive icon also reaches
+    /// the icon, in its own pixel coordinates.
     @Override
     public void pointerReleased(int x, int y) {
         forwardPointerToIcon(ICON_RELEASE, x, y);

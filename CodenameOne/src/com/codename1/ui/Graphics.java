@@ -53,6 +53,11 @@ public final class Graphics {
     /// call clearRect() for its bounds to "poke a hole" in the graphics context
     /// to see through to the native layer.
     boolean paintPeersBehind;
+    /// The form whose tree is being painted, set by `Component.paintComponent`.
+    Form paintingForm;
+    /// The label whose paint is under way, so an interactive icon it draws
+    /// records where it went (`Label.paintedIcon`).
+    Label paintingLabel;
     private int xTranslate;
     private int yTranslate;
     private Transform translation;
@@ -578,18 +583,26 @@ public final class Graphics {
     /// NOTE: In contrast to other drawing methods, coordinates input here
     /// are absolute and will not be adjusted by the xTranslate and yTranslate values
     ///
-    /// This method is designed to be used by `#drawPeerComponent(com.codename1.ui.PeerComponent)` only.
+    /// On a mutable image's graphics (`Image.getGraphics()`) the pixels
+    /// become fully transparent. On the display's graphics
+    /// ([#isScreenGraphics()]) there is nothing beneath the UI to show, so it
+    /// does nothing, on every port -- except on a port that paints native
+    /// peers behind the UI, where it uncovers them. Clearing the display
+    /// used to show black on some ports and nothing on others.
     ///
     /// #### Parameters
     ///
-    /// - `x`: The x-coordinate of the box to clear.  In screen coordinates.
+    /// - `x`: The x-coordinate of the box to clear.
     ///
-    /// - `y`: The y-coordinate of the box to clear.  In screen coordinates.
+    /// - `y`: The y-coordinate of the box to clear.
     ///
     /// - `width`: The width of the box to clear.
     ///
     /// - `height`: The height of the box to clear.
     public void clearRect(int x, int y, int width, int height) {
+        if (!paintPeersBehind && isScreenGraphics()) {
+            return;
+        }
         clearRectImpl(xTranslate + x, yTranslate + y, width, height);
     }
 
@@ -929,6 +942,27 @@ public final class Graphics {
         return Display.getInstance().isScreenGraphics(this);
     }
 
+    /// The form whose component tree this graphics is painting right now, or
+    /// null outside a component's paint. While a dialog is shown and paints
+    /// the form behind it, this is that form, not `Display.getCurrent()`.
+    ///
+    /// #### Returns
+    ///
+    /// the form being painted, or null
+    public Form getPaintingForm() {
+        return paintingForm;
+    }
+
+    /// A number that changes with every paint pass of the display, so code
+    /// that draws during a pass can tell one pass from the next.
+    ///
+    /// #### Returns
+    ///
+    /// the current paint pass of the display
+    public int getPaintPass() {
+        return Display.getInstance().paintPass;
+    }
+
     /// Draws the image so its top left coordinate corresponds to x/y
     ///
     /// #### Parameters
@@ -940,6 +974,9 @@ public final class Graphics {
     ///
     /// - `y`: the y coordinate.
     public void drawImage(Image img, int x, int y) {
+        if (paintingLabel != null && img.isInteractive()) {
+            paintingLabel.iconPainted(img, x, y, img.getWidth(), img.getHeight());
+        }
         img.drawImage(this, nativeGraphics, x, y);
     }
 
@@ -1103,6 +1140,9 @@ public final class Graphics {
     }
 
     public void drawImage(Image img, int x, int y, int w, int h) {
+        if (paintingLabel != null && img.isInteractive()) {
+            paintingLabel.iconPainted(img, x, y, w, h);
+        }
         if (impl.isScaledImageDrawingSupported()) {
             img.drawImage(this, nativeGraphics, x, y, w, h);
         } else {

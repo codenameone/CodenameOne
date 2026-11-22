@@ -53,6 +53,13 @@ import java.util.Map;
 /// `GpuImage`, it places a GPU surface over the rectangle it is drawn into
 /// and records each frame for `GpuRiveRenderer`. Everything else, and every
 /// platform without a GPU backend, draws through `Graphics`.
+///
+/// One instance is one animation. Shown in two places at once (two labels,
+/// or twice in one `paint`), both show the
+/// same state and react to the same inputs and pointer events, and only the
+/// first placement drawn in a pass gets the GPU surface; a second
+/// simultaneous placement draws through `Graphics`. Use
+/// [#scaled(int, int)] for an independent copy.
 public class RiveImage extends GpuImage {
     private final RiveFile file;
     private final Artboard artboard;

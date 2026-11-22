@@ -56,10 +56,17 @@ import java.util.concurrent.atomic.AtomicInteger;
 /// without drawing the image. It ignores pointer events, which go on to the
 /// component under it.
 ///
-/// One instance has one surface: drawing the same instance in two places in
-/// one paint pass is not supported. The first draw of a pass takes the
-/// surface and the others draw through `Graphics`; use `scaled` or a second
-/// instance for a second placement.
+/// One instance has one surface and one state: shown in two places at once
+/// (two labels, or twice in one `paint`), both show the same animation, and
+/// the first draw of a pass takes the surface while the others draw through
+/// `Graphics`. Use `scaled` or a second instance for an independent
+/// placement.
+///
+/// The surface is placed only while the image is painted as part of
+/// `Display.getCurrent()`'s own tree: a dialog painting the form behind it
+/// draws that form's images through `Graphics`. When the form is
+/// deinitialized (replaced, or covered by a dialog) the surface is removed
+/// and released, and placed again when the form paints the image next.
 ///
 /// The surface is a native peer, so lightweight components painted over the
 /// image (a dialog, a popup) appear under it, as they do under any peer.
@@ -68,9 +75,9 @@ public abstract class GpuImage extends Image {
     private final int[] visible = new int[4];
     private final int[] drawn = new int[4];
     private Placement placement;
-    private Form placementForm;
     private boolean attachQueued;
     private boolean takenThisPass;
+    private int lastPass;
 
     /// Creates the image. Its size is what `getWidth()` and `getHeight()`
     /// answer, which a subclass overrides.
@@ -178,7 +185,11 @@ public abstract class GpuImage extends Image {
         }
         Display d = Display.getInstance();
         Form form = d.getCurrent();
-        if (form == null || !usesGpu() || !d.isGpuSupported() || !g.isScreenGraphics()) {
+        if (form == null || !usesGpu() || !d.isGpuSupported() || !g.isScreenGraphics()
+                || g.getPaintingForm() != form) { //NOPMD CompareObjectsWithEquals - same form instance
+            // not part of the current form's own tree (a dialog painting the
+            // form behind it): attaching would put the surface over the dialog
+
             drawFallback(g, x, y, w, h);
             return;
         }
@@ -186,11 +197,21 @@ public abstract class GpuImage extends Image {
             drawFallback(g, x, y, w, h);
             return;
         }
+        int pass = g.getPaintPass();
+        if (pass != lastPass) {
+            // a new pass: whatever the last one took is free again, even when
+            // the layered pane (whose paint also resets these) was not painted
+            lastPass = pass;
+            takenThisPass = false;
+            if (placement != null) {
+                placement.drawnThisPass = false;
+            }
+        }
         int tx = g.getTranslateX();
         int ty = g.getTranslateY();
         int ax = tx + x;
         int ay = ty + y;
-        boolean same = placement != null && placementForm == form && placement.getParent() != null //NOPMD CompareObjectsWithEquals - same form instance
+        boolean same = placement != null && placement.getComponentForm() == form //NOPMD CompareObjectsWithEquals - same form instance
                 && drawn[0] == ax && drawn[1] == ay && drawn[2] == w && drawn[3] == h;
         if (!visibleRect(ax, ay, w, h, g.getClipX() + tx, g.getClipY() + ty,
                 g.getClipWidth(), g.getClipHeight(), same ? visible : null, visible)) {
@@ -206,7 +227,7 @@ public abstract class GpuImage extends Image {
         drawn[1] = ay;
         drawn[2] = w;
         drawn[3] = h;
-        if (placement == null || placementForm != form || placement.getParent() == null //NOPMD CompareObjectsWithEquals - same form instance
+        if (placement == null || placement.getComponentForm() != form //NOPMD CompareObjectsWithEquals - same form instance
                 || placement.view.getPeer() == null) {
             queueAttach(form);
             drawFallback(g, x, y, w, h);
@@ -312,7 +333,6 @@ public abstract class GpuImage extends Image {
             }
             pane.addComponent(p);
         }
-        placementForm = form;
         p.failed = p.view.peerFailed();
         passPointerEvents(p);
         // repaint so the Graphics frames drawn meanwhile give way to the surface
@@ -330,10 +350,25 @@ public abstract class GpuImage extends Image {
             public void run() {
                 p.relayoutQueued = false;
                 Form f = p.getComponentForm();
-                if (f != null) {
-                    f.revalidate();
-                    f.repaint();
+                if (f == null) {
+                    return;
                 }
+                // move only the surface: a revalidate and full repaint of the
+                // form on every frame a scrolled image moves is far too much
+                SurfaceView v = p.view;
+                int ox = v.getAbsoluteX();
+                int oy = v.getAbsoluteY();
+                int ow = v.getWidth();
+                int oh = v.getHeight();
+                p.layoutContainer();
+                v.layoutContainer();
+                int nx = v.getAbsoluteX();
+                int ny = v.getAbsoluteY();
+                int x1 = Math.min(ox, nx);
+                int y1 = Math.min(oy, ny);
+                int x2 = Math.max(ox + ow, nx + v.getWidth());
+                int y2 = Math.max(oy + oh, ny + v.getHeight());
+                f.repaint(x1, y1, x2 - x1, y2 - y1);
             }
         });
     }
@@ -463,6 +498,35 @@ public abstract class GpuImage extends Image {
         protected void initComponent() {
             super.initComponent();
             passPointerEvents(this);
+        }
+
+        /// The form went away (replaced, or covered by a dialog): leave its
+        /// layered pane and let the image drop this placement and its
+        /// surface, so neither keeps the old form alive. Deferred, because
+        /// the pane is walking its children while it deinitializes them.
+        @Override
+        protected void deinitialize() {
+            super.deinitialize();
+            final Placement p = this;
+            Display.getInstance().callSerially(new Runnable() {
+                @Override
+                public void run() {
+                    if (p.isInitialized()) {
+                        // shown again before this ran
+                        return;
+                    }
+                    Container parent = p.getParent();
+                    if (parent == null) {
+                        // taken away by detach(): no form holds it, keep it
+                        // for the next attach
+                        return;
+                    }
+                    parent.removeComponent(p);
+                    if (owner.placement == p) { //NOPMD CompareObjectsWithEquals
+                        owner.placement = null;
+                    }
+                }
+            });
         }
     }
 

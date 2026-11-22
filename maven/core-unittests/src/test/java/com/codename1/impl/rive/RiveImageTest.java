@@ -164,6 +164,8 @@ class RiveImageTest extends UITestBase {
         l.setGap(0);
         f.add(BorderLayout.CENTER, l);
         f.revalidate();
+        // the hit test is where the icon was painted
+        paintOnce(f);
         Artboard a = file(0).instance(null);
         float scale = Math.min(300 / a.getWidth(), 200 / a.getHeight());
         // the icon is centered in the label's inner area
@@ -173,9 +175,18 @@ class RiveImageTest extends UITestBase {
         int sy = Math.round(l.getAbsoluteY() + iconY + (200 - a.getHeight() * scale) / 2f + 258 * scale);
         StateMachineInstance m = img.machineInstance();
         boolean on = m.getBoolean("On");
+        // a tap on the padding, outside the icon, never reaches it
+        l.pointerPressed(l.getAbsoluteX() + 2, l.getAbsoluteY() + 2);
+        l.pointerReleased(sx, sy);
+        assertEquals(on, m.getBoolean("On"), "a press outside the icon is not the icon's");
         l.pointerPressed(sx, sy);
         l.pointerReleased(sx, sy);
         assertEquals(!on, m.getBoolean("On"), "the tap reached the listener");
+    }
+
+    private static void paintOnce(Form f) {
+        Image img = Image.createImage(Math.max(1, f.getWidth()), Math.max(1, f.getHeight()));
+        f.paintComponent(img.getGraphics(), true);
     }
 
     @FormTest
@@ -223,6 +234,7 @@ class RiveImageTest extends UITestBase {
             v.setPreferredH(content.getHeight() * 9 / 10);
             f.revalidate();
         }
+        paintOnce(f);
         return content;
     }
 

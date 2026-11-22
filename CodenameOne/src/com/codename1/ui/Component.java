@@ -3540,16 +3540,23 @@ public class Component implements Animation, StyleListener, Editable {
         }
 
         g.clipRect(translateX + getX(), translateY + getY(), getWidth(), getHeight());
-        if (background) {
-            paintBackgrounds(g);
+        // which form's tree is painting: a dialog paints the form behind it
+        // through here as well (Graphics.getPaintingForm())
+        Form previousPaintingForm = g.paintingForm;
+        g.paintingForm = getComponentForm();
+        try {
+            if (background) {
+                paintBackgrounds(g);
+            }
+
+            g.translate(translateX, translateY);
+            paintInternal(g);
+            g.translate(-translateX, -translateY);
+
+            paintGlassImpl(g);
+        } finally {
+            g.paintingForm = previousPaintingForm;
         }
-
-
-        g.translate(translateX, translateY);
-        paintInternal(g);
-        g.translate(-translateX, -translateY);
-
-        paintGlassImpl(g);
 
         g.setClip(clipX, clipY, clipW, clipH);
         //g.popClip();
