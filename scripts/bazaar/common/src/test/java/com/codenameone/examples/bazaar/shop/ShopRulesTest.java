@@ -40,7 +40,8 @@ class ShopRulesTest {
     private static VariantDto variant(String id, String o1, String o2, int available) {
         return new VariantDto(id, "p", o1 + " / " + o2, o1, o2, null, null, null, 1000, 0, 0, 0,
                 true, true, false, 0, available,
-                Arrays.asList(new StockDto("l1", "Downtown", available), new StockDto("l2", "Mall", 1)));
+                Arrays.asList(new StockDto("l1", "Downtown", available), new StockDto("l2", "Mall", 1)),
+                false);
     }
 
     private static final List<OptionDto> OPTIONS = Arrays.asList(
@@ -66,7 +67,7 @@ class ShopRulesTest {
     private static CartDto cart(String rate, long shipping, boolean inclusive, long gift) {
         return new CartDto("c", "s", null, "USD", Collections.emptyList(), "SAVE", "GC", 5000, 500,
                 shipping, 400, inclusive, 4900 + shipping, gift, 4900 + shipping - gift, false,
-                null, null, rate, null);
+                null, null, rate, null, true);
     }
 
     private static String captions(CartDto cart) {

@@ -34,10 +34,29 @@ public final class Art {
     public final String from;
     public final String to;
     public final String initials;
+    /// An uploaded video, played by a `<video>` element.
+    public final boolean video;
+    /// A video linked on another site: a link out, never embedded.
+    public final boolean videoLink;
+    /// A 3D model (`.glb`): a link to the file.
+    public final boolean model;
+    /// The poster frame of a video: the product's first picture, or empty.
+    public final String poster;
 
     Art(String key, String photoId, String title) {
-        this.photo = photoId != null && photoId.length() > 0;
-        this.url = photo ? "/media/" + photoId : "";
+        this(key, photoId, title, null, null, null);
+    }
+
+    /// A gallery entry of `kind` (`IMAGE`, `VIDEO`, `MODEL`); `url` is where a
+    /// video or model is fetched from and `poster` a picture for a video.
+    Art(String key, String photoId, String title, String kind, String url, String poster) {
+        boolean media = "VIDEO".equals(kind) || "MODEL".equals(kind);
+        this.photo = !media && photoId != null && photoId.length() > 0;
+        this.video = "VIDEO".equals(kind) && url != null && url.startsWith("/");
+        this.videoLink = "VIDEO".equals(kind) && !video;
+        this.model = "MODEL".equals(kind);
+        this.poster = poster == null ? "" : poster;
+        this.url = photo ? "/media/" + photoId : media && url != null ? url : "";
         int h = 0;
         String seed = key == null ? "" : key;
         for (int iter = 0; iter < seed.length(); iter++) {

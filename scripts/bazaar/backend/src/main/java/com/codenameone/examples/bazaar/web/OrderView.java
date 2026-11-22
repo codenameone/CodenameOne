@@ -40,4 +40,6 @@ public final class OrderView {
     public String invoiceUrl = "";
     public String storeUrl = "";
     public List<LinkView> tracking = new ArrayList<LinkView>();
+    /// The order's downloads, once it is paid.
+    public List<DownloadView> downloads = new ArrayList<DownloadView>();
 }

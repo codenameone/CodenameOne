@@ -26,5 +26,7 @@ public record ProductPhotoDto(
         String id,
         String photoId,
         String alt,
-        int position) {
+        int position,
+        String kind,
+        String url) {
 }

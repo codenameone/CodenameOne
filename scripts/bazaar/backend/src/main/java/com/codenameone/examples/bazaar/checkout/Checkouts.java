@@ -176,21 +176,33 @@ public class Checkouts {
         }
         Cart cart = given != null ? given : carts.cart(storeId, username, null);
         AddressDto address = req.address();
-        if (address == null || address.country() == null || address.country().trim().length() != 2) {
+        boolean hasCountry = address != null && address.country() != null
+                && address.country().trim().length() == 2;
+        Quote quote = quoter.price(cart, hasCountry ? address : null, req.shippingRateId(),
+                username);
+        // Digital goods only: nothing ships, so neither an address nor a
+        // delivery option is asked for. The country, when given, still
+        // decides the tax; without one the quote above already stands.
+        boolean ships = quote.shippingRequired();
+        if (!ships && !hasCountry) {
+            address = new AddressDto(address == null ? "" : address.name(), "", "", "", "", "",
+                    "", address == null ? "" : address.phone(), 0, 0);
+        }
+        if (ships && !hasCountry) {
             throw new ResponseStatusException(400, "The address needs a two letter country");
         }
-        Quote quote = quoter.price(cart, address, req.shippingRateId(), username);
         if (quote.lines.isEmpty()) {
             throw new ResponseStatusException(400, "The cart is empty");
         }
         if (!quote.problems.isEmpty()) {
             throw new ResponseStatusException(409, quote.problems.get(0));
         }
-        if (quote.shipping == null) {
+        if (ships && quote.shipping == null) {
             throw new ResponseStatusException(400, "Choose how the order is delivered");
         }
-        boolean pickup = ShippingCalculator.PICKUP.equals(quote.shipping.rate.getKind());
-        if (!pickup && (empty(address.name()) || empty(address.line1()) || empty(address.city()))) {
+        boolean pickup = ships && ShippingCalculator.PICKUP.equals(quote.shipping.rate.getKind());
+        if (ships && !pickup && (empty(address.name()) || empty(address.line1())
+                || empty(address.city()))) {
             throw new ResponseStatusException(400, "The address needs a name, a street and a city");
         }
         final StoreOrder order = orders.newOrder(quote, Orders.ONLINE, username,
@@ -208,8 +220,8 @@ public class Checkouts {
         List<String[]> held = new ArrayList<String[]>();
         for (int iter = 0; iter < quote.lines.size(); iter++) {
             Quote.Line line = quote.lines.get(iter);
-            if (line.preorder) {
-                // Sold ahead of stock: there is nothing on hand to hold, so
+            if (line.preorder || line.variant.isDigital()) {
+                // A download holds no stock. Sold ahead of stock: there is nothing on hand to hold, so
                 // the line is placed with no location and reserves nothing;
                 // Quoter#preorderAllowance counts it against the allowance.
                 continue;

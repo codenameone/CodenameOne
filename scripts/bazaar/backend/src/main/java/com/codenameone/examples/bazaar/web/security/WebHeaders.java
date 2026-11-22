@@ -153,6 +153,9 @@ public final class WebHeaders implements SecurityFilter {
         }
         b.append("; img-src 'self' data:");
         CspSources.append(extra, b, CspSources.IMG);
+        // A product's uploaded video plays from this origin only; a video
+        // the merchant links elsewhere is a link out, never embedded.
+        b.append("; media-src 'self'");
         b.append("; connect-src 'self'");
         CspSources.append(extra, b, CspSources.CONNECT);
         b.append("; frame-src 'self'");

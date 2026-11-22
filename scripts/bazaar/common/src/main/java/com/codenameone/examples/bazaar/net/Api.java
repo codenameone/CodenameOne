@@ -60,6 +60,7 @@ import com.codenameone.examples.bazaar.api.ClubApi;
 import com.codenameone.examples.bazaar.api.LoyaltyApi;
 import com.codenameone.examples.bazaar.api.OpsApi;
 import com.codenameone.examples.bazaar.api.ChannelsApi;
+import com.codenameone.examples.bazaar.api.DigitalApi;
 
 /// The server, as the app calls it.
 ///
@@ -109,6 +110,7 @@ public final class Api {
     private static LoyaltyApi loyalty;
     private static OpsApi ops;
     private static ChannelsApi channels;
+    private static DigitalApi digital;
 
     private Api() {
     }
@@ -155,6 +157,7 @@ public final class Api {
         loyalty = RestClients.create(LoyaltyApi.class, baseUrl);
         ops = RestClients.create(OpsApi.class, baseUrl);
         channels = RestClients.create(ChannelsApi.class, baseUrl);
+        digital = RestClients.create(DigitalApi.class, baseUrl);
     }
 
     public static AccountApi account() {
@@ -323,6 +326,11 @@ public final class Api {
     /// Marketplace channels and their sync.
     public static ChannelsApi channels() {
         return channels;
+    }
+
+    /// Digital downloads, licence keys and product video and models.
+    public static DigitalApi digital() {
+        return digital;
     }
 
     public static LoyaltyApi loyalty() {

@@ -136,6 +136,15 @@ each go into one, and give the bundle its own price. Selling a bundle takes its
 components out of stock, and the storefront lists what it includes. A product
 can also be scheduled per channel (the online store, the register and each
 marketplace), with times to publish and unpublish it, in UTC.
+A variant marked as a digital download ships nothing: upload its file, set how
+many times and for how many days a buyer's link works, and paste licence keys
+if it needs them. A cart of downloads only checks out without an address or a
+delivery option. Once the order is paid, the links (and a key per unit) appear
+in the order mail, on the confirmation page and on the buyer's order page; a
+register sale emails them. A full refund stops a line's link, and the order page
+in the back office can revoke one by hand. The gallery also takes videos (an
+MP4 or WebM file, or an `https` link) and 3D models (`.glb` files), in any order
+with the pictures; the storefront plays the video and links the model.
 Collections are either chosen by hand or smart, defined by rules such as a tag or
 a price range.
 

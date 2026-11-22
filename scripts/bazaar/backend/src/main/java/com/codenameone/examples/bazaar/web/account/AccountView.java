@@ -38,6 +38,9 @@ public class AccountView {
     // --------------------------------------------------------- order detail
     public AccountItem order = new AccountItem();
     public List<AccountItem> lines = new ArrayList<AccountItem>();
+    /// The order's downloads and licence keys.
+    public List<com.codenameone.examples.bazaar.web.DownloadView> downloads =
+            new ArrayList<com.codenameone.examples.bazaar.web.DownloadView>();
     public List<AccountItem> events = new ArrayList<AccountItem>();
     public List<AccountItem> tracking = new ArrayList<AccountItem>();
     public List<AccountItem> returns = new ArrayList<AccountItem>();

@@ -90,6 +90,13 @@ public class AdminData {
     private final StoreEndpoint storeApi;
     private final Stores stores;
 
+    @com.codename1.backend.annotations.Autowired
+    private com.codenameone.examples.bazaar.catalog.Catalog catalogService;
+    @com.codename1.backend.annotations.Autowired
+    private com.codenameone.examples.bazaar.catalog.CatalogFiles catalogFiles;
+    @com.codename1.backend.annotations.Autowired
+    private com.codenameone.examples.bazaar.catalog.Downloads downloadService;
+
     public AdminData(OrderEndpoint orders, FulfillmentEndpoint fulfillments,
             CatalogEndpoint catalog, InventoryEndpoint inventory, CustomerEndpoint customers,
             AnalyticsEndpoint analytics, StoreEndpoint storeApi, Stores stores) {
@@ -304,6 +311,23 @@ public class AdminData {
         OrderDto o = orders.detail(storeId, orderId);
         String cur = o.currency();
         String base = "/admin/" + storeId + "/orders/" + o.id();
+        List<com.codenameone.examples.bazaar.api.DownloadGrantDto> gs =
+                downloadService.ofOrder(Caller.name(), storeId, o.id());
+        for (int iter = 0; iter < gs.size(); iter++) {
+            com.codenameone.examples.bazaar.api.DownloadGrantDto g = gs.get(iter);
+            AdminRow r = new AdminRow();
+            r.id = g.id();
+            r.title = g.title();
+            r.detail = g.fileName();
+            r.quantity = g.downloads() + " / " + g.maxDownloads();
+            r.status = g.revoked() ? "Revoked" : g.expiresAt() < System.currentTimeMillis()
+                    ? "Expired" : "Active";
+            r.meta = String.join(", ", g.licenseKeys());
+            r.flag = !g.revoked();
+            r.action = "/admin/" + storeId + "/download-grants/" + g.id() + "/revoke?order="
+                    + o.id();
+            v.grantRows.add(r);
+        }
         v.order.id = o.id();
         v.order.title = "Order #" + o.number();
         v.order.status = words(o.status());
@@ -521,6 +545,7 @@ public class AdminData {
         v.adjustAction = base + "/adjust";
         bundleForm(storeId, p.id(), base, v);
         scheduleForm(storeId, p.id(), base, v);
+        mediaForm(storeId, p, base, v);
         v.title = p.title() == null ? "" : p.title();
         v.description = p.description() == null ? "" : p.description();
         v.status = p.status();
@@ -614,12 +639,115 @@ public class AdminData {
                     price.length() == 0 ? x.priceCents() : AdminForms.cents(price, "the price"),
                     x.compareAtCents(), cost.length() == 0 ? x.costCents()
                         : AdminForms.cents(cost, "the cost"), x.weightGrams(), x.taxable(),
-                    x.trackInventory(), x.allowBackorder(), x.position(), x.available(), null));
+                    x.trackInventory(), x.allowBackorder(), x.position(), x.available(), null,
+                    x.digital()));
         }
         catalog.updateProduct(storeId, productId, new ProductDto(p.id(), p.storeId(), p.handle(),
                 title, description, p.vendor(), p.productType(), p.tags(), status, p.seoTitle(),
                 p.seoDescription(), p.photoId(), p.rating(), p.ratingCount(), null, vs, null,
                 null));
+    }
+
+    /// The gallery with its move buttons, and a download form per digital
+    /// variant.
+    private void mediaForm(String storeId, ProductDto p, String base, AdminView v)
+            throws Exception {
+        v.mediaAction = base + "/media";
+        List<com.codenameone.examples.bazaar.api.ProductPhotoDto> ph = p.photos() == null
+                ? new ArrayList<com.codenameone.examples.bazaar.api.ProductPhotoDto>() : p.photos();
+        for (int iter = 0; iter < ph.size(); iter++) {
+            com.codenameone.examples.bazaar.api.ProductPhotoDto x = ph.get(iter);
+            AdminRow r = new AdminRow();
+            r.id = x.id();
+            r.title = x.kind() == null || "IMAGE".equals(x.kind()) ? "Picture"
+                    : "VIDEO".equals(x.kind()) ? "Video" : "3D model";
+            r.detail = x.url() == null ? "" : x.url();
+            r.action = base + "/media/" + x.id() + "/move?direction=up";
+            r.url = base + "/media/" + x.id() + "/move?direction=down";
+            v.mediaRows.add(r);
+        }
+        List<VariantDto> vs = p.variants() == null ? new ArrayList<VariantDto>() : p.variants();
+        for (int iter = 0; iter < vs.size(); iter++) {
+            VariantDto x = vs.get(iter);
+            if (!x.digital()) {
+                continue;
+            }
+            com.codenameone.examples.bazaar.api.DigitalAssetDto a =
+                    downloadService.asset(Caller.name(), storeId, x.id());
+            AdminRow r = new AdminRow();
+            r.id = x.id();
+            r.title = x.title() == null ? "" : x.title();
+            r.detail = a.name().length() == 0 ? "No file yet" : a.name() + " ("
+                    + (a.sizeBytes() / 1024) + " KB)";
+            r.quantity = Integer.toString(a.maxDownloads());
+            r.max = Integer.toString(a.expiryDays());
+            r.meta = a.keysFree() + " licence keys free, " + a.keysAssigned() + " assigned";
+            r.action = "/admin/" + storeId + "/variants/" + x.id() + "/download";
+            r.url = "/admin/" + storeId + "/variants/" + x.id() + "/license-keys";
+            v.downloadRows.add(r);
+        }
+    }
+
+    /// Adds an uploaded video or model, or a linked video, to the gallery.
+    void addMedia(String storeId, String productId, HttpServer.Request request)
+            throws Exception {
+        com.codenameone.examples.bazaar.domain.Product product =
+                catalogService.managedProduct(Caller.name(), storeId, productId);
+        String kind = AdminForms.field(request, "kind");
+        if (!"VIDEO".equals(kind) && !"MODEL".equals(kind)) {
+            throw new com.codename1.backend.ResponseStatusException(400,
+                    "Choose a video or a 3D model");
+        }
+        int position = catalog.merchantProduct(storeId, productId).photos().size();
+        if (position >= com.codenameone.examples.bazaar.catalog.Catalog.MAX_GALLERY) {
+            throw new com.codename1.backend.ResponseStatusException(409, "The gallery is full");
+        }
+        HttpServer.Part file = request.getPart("file");
+        if (file != null && file.getSize() > 0) {
+            String id = catalogFiles.store(storeId, kind, file.getFilename(),
+                    file.getContentType(), file.getBytes());
+            catalogService.addMediaRow(product, kind, id, "", position);
+            return;
+        }
+        String url = com.codenameone.examples.bazaar.catalog.Media.httpsUrl(
+                AdminForms.field(request, "url"));
+        if (!"VIDEO".equals(kind) || url == null) {
+            throw new com.codename1.backend.ResponseStatusException(400,
+                    "Choose a file, or give a video's https address");
+        }
+        catalogService.addMediaRow(product, kind, "", url, position);
+    }
+
+    void moveMedia(String storeId, String productId, String entryId, String direction)
+            throws Exception {
+        catalogService.moveMedia(Caller.name(), storeId, productId, entryId,
+                "up".equals(direction));
+    }
+
+    /// Stores a digital variant's file (when one is chosen) and its limits.
+    void saveDownload(String storeId, String variantId, HttpServer.Request request)
+            throws Exception {
+        downloadService.asset(Caller.name(), storeId, variantId);
+        String fileId = null;
+        HttpServer.Part file = request.getPart("file");
+        if (file != null && file.getSize() > 0) {
+            fileId = catalogFiles.store(storeId,
+                    com.codenameone.examples.bazaar.catalog.CatalogFiles.DOWNLOAD,
+                    file.getFilename(), file.getContentType(), file.getBytes());
+        }
+        downloadService.saveAsset(storeId, variantId, fileId,
+                AdminForms.number(AdminForms.field(request, "maxDownloads"), 0, "downloads"),
+                AdminForms.number(AdminForms.field(request, "expiryDays"), 0, "days"));
+    }
+
+    void addKeys(String storeId, String variantId, HttpServer.Request request) throws Exception {
+        downloadService.addKeys(Caller.name(), storeId, variantId,
+                new com.codenameone.examples.bazaar.api.LicenseKeysDto(
+                    AdminForms.field(request, "keys")));
+    }
+
+    void revokeGrant(String storeId, String grantId) throws Exception {
+        downloadService.revoke(Caller.name(), storeId, grantId);
     }
 
     /// The rows the bundle form offers beyond the components it has.

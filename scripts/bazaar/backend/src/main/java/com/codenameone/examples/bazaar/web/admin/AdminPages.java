@@ -320,6 +320,85 @@ public class AdminPages {
                 "Publishing schedule saved", () -> data.saveSchedule(storeId, productId, request));
     }
 
+    @PostMapping("/admin/{storeId}/products/{productId}/media")
+    public String addMedia(@PathVariable("storeId") String storeId,
+            @PathVariable("productId") String productId, HttpServer.Request request)
+            throws Exception {
+        member(request, storeId);
+        return change(request, "/admin/" + storeId + "/products/" + productId, "Media added",
+                () -> data.addMedia(storeId, productId, request));
+    }
+
+    @PostMapping("/admin/{storeId}/products/{productId}/media/{entryId}/move")
+    public String moveMedia(@PathVariable("storeId") String storeId,
+            @PathVariable("productId") String productId, @PathVariable("entryId") String entryId,
+            HttpServer.Request request) throws Exception {
+        member(request, storeId);
+        final String direction = request.param("direction");
+        return change(request, "/admin/" + storeId + "/products/" + productId, "Gallery reordered",
+                () -> data.moveMedia(storeId, productId, entryId, direction));
+    }
+
+    @PostMapping("/admin/{storeId}/variants/{variantId}/download")
+    public String saveDownload(@PathVariable("storeId") String storeId,
+            @PathVariable("variantId") String variantId, HttpServer.Request request)
+            throws Exception {
+        member(request, storeId);
+        return change(request, back(request, storeId), "Download saved",
+                () -> data.saveDownload(storeId, variantId, request));
+    }
+
+    @PostMapping("/admin/{storeId}/variants/{variantId}/license-keys")
+    public String addKeys(@PathVariable("storeId") String storeId,
+            @PathVariable("variantId") String variantId, HttpServer.Request request)
+            throws Exception {
+        member(request, storeId);
+        return change(request, back(request, storeId), "Licence keys added",
+                () -> data.addKeys(storeId, variantId, request));
+    }
+
+    @PostMapping("/admin/{storeId}/download-grants/{grantId}/revoke")
+    public String revokeGrant(@PathVariable("storeId") String storeId,
+            @PathVariable("grantId") String grantId, HttpServer.Request request)
+            throws Exception {
+        member(request, storeId);
+        String order = request.param("order");
+        String back = order != null && order.length() > 0 && order.length() <= 32
+                && plain(order) ? "/admin/" + storeId + "/orders/" + order
+                    : "/admin/" + storeId + "/orders";
+        return change(request, back, "Download revoked", () -> data.revokeGrant(storeId, grantId));
+    }
+
+    private static boolean plain(String id) {
+        for (int iter = 0; iter < id.length(); iter++) {
+            char c = id.charAt(iter);
+            if (!(c >= '0' && c <= '9' || c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z')) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /// The product page a variant form came from (its Referer path within the
+    /// store's back office), or the products list.
+    private static String back(HttpServer.Request request, String storeId) {
+        String ref = request.getHeader("Referer");
+        String prefix = "/admin/" + storeId + "/products/";
+        int at = ref == null ? -1 : ref.indexOf(prefix);
+        if (at >= 0) {
+            String rest = ref.substring(at + prefix.length());
+            int end = 0;
+            while (end < rest.length() && end < 32 && (Character.isLetterOrDigit(rest.charAt(end))
+                    || rest.charAt(end) == '-' || rest.charAt(end) == '_')) {
+                end++;
+            }
+            if (end > 0) {
+                return prefix + rest.substring(0, end);
+            }
+        }
+        return "/admin/" + storeId + "/products";
+    }
+
     // ------------------------------------------------------------ inventory
 
     @GetMapping("/admin/{storeId}/inventory")

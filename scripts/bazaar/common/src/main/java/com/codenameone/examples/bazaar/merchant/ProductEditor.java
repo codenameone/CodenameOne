@@ -195,6 +195,9 @@ final class ProductEditor extends Container {
         camera.setEnabled(com.codename1.capture.Capture.hasCamera());
         photoButtons.add(camera).add(pick);
         photos.add(photoButtons);
+        if (p != null && p.id() != null) {
+            photos.add(ProductMedia.buttons(p.id(), this::mediaChanged));
+        }
         if (NativeDragAndDrop.isSupported()) {
             photos.add(Ui.plain(Lang.tr("Or drag image files onto the photos"), "SvMuted"));
             gallery.setNativeDropTarget(true);
@@ -344,6 +347,13 @@ final class ProductEditor extends Container {
         CheckBox backorder = new CheckBox(Lang.tr("Sell when out of stock"));
         backorder.setSelected(v.allowBackorder());
         body.add(track).add(backorder);
+        CheckBox digital = new CheckBox(Lang.tr("Digital download, no shipping"));
+        digital.setName("variant-digital");
+        digital.setSelected(v.digital());
+        body.add(digital);
+        if (v.id() != null && v.digital()) {
+            body.add(DigitalFiles.button(v));
+        }
         Command ok = Command.create(Lang.tr("Done"), null, null);
         Command cancel = Command.create(Lang.tr("Cancel"), null, null);
         if (Dialog.show(Lang.tr("Variant"), body, cancel, ok) != ok) {
@@ -352,7 +362,8 @@ final class ProductEditor extends Container {
         replace(v, new VariantDto(v.id(), v.productId(), v.title(), v.option1(), v.option2(),
                 v.option3(), sku.getText().trim(), barcode.getText().trim(), MUi.cents(price),
                 MUi.cents(compare), MUi.cents(cost), MUi.integer(weight), v.taxable(),
-                track.isSelected(), backorder.isSelected(), v.position(), v.available(), v.stock()));
+                track.isSelected(), backorder.isSelected(), v.position(), v.available(), v.stock(),
+                digital.isSelected()));
         paintVariants();
     }
 
@@ -382,7 +393,7 @@ final class ProductEditor extends Container {
                         value instanceof Number ? ((Number) value).longValue() : number / 100))
                         : v.weightGrams(),
                 v.taxable(), v.trackInventory(), v.allowBackorder(), v.position(), v.available(),
-                v.stock());
+                v.stock(), v.digital());
         replace(v, out);
         variantRows.replace(variantRows.indexOf(v), out);
     }
@@ -400,8 +411,9 @@ final class ProductEditor extends Container {
                 ? new ArrayList<ProductPhotoDto>() : product.photos();
         int size = CN.convertToPixels(22f);
         for (final ProductPhotoDto photo : photos) {
-            Label l = ProductArt.label(product.id(), product.title(), product.productType(),
-                    photo.photoId(), size, size, "MeThumb");
+            Label l = ProductMedia.isMedia(photo) ? ProductMedia.tile(photo, size)
+                    : ProductArt.label(product.id(), product.title(), product.productType(),
+                        photo.photoId(), size, size, "MeThumb");
             l.setName("photo-" + photo.position());
             Container holder = new Container(new BorderLayout());
             holder.add(BorderLayout.CENTER, l);
@@ -409,7 +421,10 @@ final class ProductEditor extends Container {
                     e -> removePhoto(photo));
             holder.add(BorderLayout.SOUTH, remove);
             RowMenus.attach(holder, Command.create(Lang.tr("Remove photo"), null,
-                    e -> removePhoto(photo)));
+                    e -> removePhoto(photo)), Command.create(Lang.tr("Move earlier"), null,
+                    e -> ProductMedia.move(product.id(), photo, true, this::mediaChanged)),
+                    Command.create(Lang.tr("Move later"), null,
+                    e -> ProductMedia.move(product.id(), photo, false, this::mediaChanged)));
             gallery.add(holder);
         }
         if (photos.isEmpty()) {
@@ -419,9 +434,18 @@ final class ProductEditor extends Container {
         Ui.relayout(gallery);
     }
 
+    private void mediaChanged(ProductDto p) {
+        product = p;
+        paintGallery();
+    }
+
     private void dropped(String[] files) {
         for (int iter = 0; files != null && iter < files.length; iter++) {
             String f = files[iter];
+            if (product != null && product.id() != null && ProductMedia.kindOf(f) != null) {
+                ProductMedia.dropped(product.id(), f, this::mediaChanged);
+                continue;
+            }
             if (!(endsWith(f, ".jpg") || endsWith(f, ".jpeg") || endsWith(f, ".png"))) {
                 continue;
             }
@@ -478,7 +502,7 @@ final class ProductEditor extends Container {
             vs.add(new VariantDto(v.id(), v.productId(), v.title(), v.option1(), v.option2(),
                     v.option3(), v.sku(), v.barcode(), v.priceCents(), v.compareAtCents(),
                     v.costCents(), v.weightGrams(), v.taxable(), v.trackInventory(),
-                    v.allowBackorder(), iter, v.available(), v.stock()));
+                    v.allowBackorder(), iter, v.available(), v.stock(), v.digital()));
         }
         return new ProductDto(product == null ? null : product.id(), MerchantState.storeId(),
                 product == null || product.handle() == null ? Handles.of(t) : product.handle(), t,

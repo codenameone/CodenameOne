@@ -211,6 +211,10 @@ final class ProductForm {
         picture = null;
         if (photos != null && !photos.isEmpty()) {
             for (ProductPhotoDto photo : photos) {
+                if (GalleryMedia.isMedia(photo)) {
+                    tabs.addTab("", GalleryMedia.slide(photo, width, height));
+                    continue;
+                }
                 Label l = ProductArt.label(product.id(), product.title(), product.productType(),
                         photo.photoId(), width, height, "ShopGalleryImage");
                 if (picture == null) {

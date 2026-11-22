@@ -30,4 +30,6 @@ public interface ProductPhotoRepository extends CrudRepository<ProductPhoto, Str
     List<ProductPhoto> findByProductIdOrderByPositionAsc(String productId);
 
     int deleteByProductId(String productId);
+
+    List<ProductPhoto> findByPhotoId(String photoId);
 }

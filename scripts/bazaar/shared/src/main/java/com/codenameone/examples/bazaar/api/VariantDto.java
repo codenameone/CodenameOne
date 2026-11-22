@@ -25,6 +25,7 @@ import java.util.List;
 /// One buyable combination of a product's options.
 ///
 /// @param available Across every location; `stock` per location.
+/// @param digital Delivered as a download: needs no shipping.
 @Mapped
 public record VariantDto(
         String id,
@@ -44,5 +45,6 @@ public record VariantDto(
         boolean allowBackorder,
         int position,
         int available,
-        List<StockDto> stock) {
+        List<StockDto> stock,
+        boolean digital) {
 }

@@ -77,6 +77,17 @@ public final class Quote {
     public long dutyCents;
     public final List<String> problems = new ArrayList<String>();
 
+    /// False when every line is a digital variant: nothing to ship, so no
+    /// address, delivery option or shipping charge.
+    public boolean shippingRequired() {
+        for (int iter = 0; iter < lines.size(); iter++) {
+            if (!lines.get(iter).variant.isDigital()) {
+                return true;
+            }
+        }
+        return lines.isEmpty();
+    }
+
     public List<PriceLine> priceLines() {
         List<PriceLine> out = new ArrayList<PriceLine>();
         for (int iter = 0; iter < lines.size(); iter++) {
@@ -137,7 +148,7 @@ public final class Quote {
                 cart.getDiscountCode(), cart.getGiftCardCode(), subtotalCents, discountCents(),
                 shippingCents, taxCents(), store.isTaxInclusive(), totalCents, giftCardCents,
                 dueCents(), discounts != null && discounts.freeShipping, applied, opts,
-                shipping == null ? null : shipping.id, problems);
+                shipping == null ? null : shipping.id, problems, shippingRequired());
     }
 
     static ShippingOptionDto option(ShippingCalculator.Option option) {

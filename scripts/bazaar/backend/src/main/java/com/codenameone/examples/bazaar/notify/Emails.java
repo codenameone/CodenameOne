@@ -88,6 +88,8 @@ public class Emails {
     /// reaches the order service, which tells this class what happened, so a
     /// constructor dependency would be a cycle.
     @Autowired
+    private com.codenameone.examples.bazaar.catalog.Downloads downloads;
+    @Autowired
     private Documents documents;
 
     /// The language each mail is written in. Field-injected like the
@@ -139,12 +141,54 @@ public class Emails {
         b.para(b.f("mail.order.body", o.getNumber()));
         b.lines(ls, o.getCurrency());
         b.total(b.f("total"), o.getTotalCents(), o.getCurrency());
+        downloadsBlock(b, orderId);
         b.para(b.f("mail.invoice"));
         b.button(b.f("mail.track"), track(o));
         return builder(s, o.getEmail(), b.f("mail.order.subject", o.getNumber()), b)
                 .attach("invoice-" + o.getNumber() + ".pdf", "application/pdf",
                         documents.invoice(o.getStoreId(), orderId))
                 .build();
+    }
+
+    /// The order's download links and licence keys, when it has any.
+    private void downloadsBlock(Body b, String orderId) throws IOException {
+        List<com.codenameone.examples.bazaar.api.DownloadGrantDto> gs =
+                downloads.forOrder(orderId);
+        if (gs.isEmpty()) {
+            return;
+        }
+        b.heading(b.f("mail.downloads.heading"));
+        for (int iter = 0; iter < gs.size(); iter++) {
+            com.codenameone.examples.bazaar.api.DownloadGrantDto g = gs.get(iter);
+            if (g.url().length() > 0) {
+                b.link(g.title(), g.url());
+            }
+            for (int k = 0; k < g.licenseKeys().size(); k++) {
+                b.para(b.f("mail.downloads.key", g.licenseKeys().get(k)));
+            }
+        }
+        b.para(b.f("mail.downloads.limits", Integer.valueOf(gs.get(0).maxDownloads())));
+    }
+
+    /// The download links of an order whose payment came after its
+    /// confirmation, or of a register sale. True when a mail went out.
+    public boolean downloads(String orderId) {
+        try {
+            StoreOrder o = orders.findById(orderId);
+            if (o == null || !Mail.isAddress(o.getEmail())) {
+                return false;
+            }
+            Store s = stores.findById(o.getStoreId());
+            Body b = new Body(s, language.of(o), "mail.downloads.title");
+            b.para(b.f("mail.downloads.body", o.getNumber()));
+            downloadsBlock(b, orderId);
+            send(builder(s, o.getEmail(), b.f("mail.downloads.subject", o.getNumber()), b)
+                    .build());
+            return true;
+        } catch (IOException | RuntimeException failed) {
+            log("downloads", orderId, failed);
+            return false;
+        }
     }
 
     /// A checkout link for a draft or an unpaid order: the lines, the total

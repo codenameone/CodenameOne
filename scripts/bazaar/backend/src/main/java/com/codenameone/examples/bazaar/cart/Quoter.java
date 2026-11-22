@@ -228,8 +228,10 @@ public class Quoter {
             line.cartLineId = want.lineId;
             line.variant = variant;
             line.product = product;
+            // A download weighs nothing and ships nowhere.
             line.price = new PriceLine(want.lineId, product.getId(), variant.getId(),
-                    variant.getPriceCents(), want.quantity, variant.getWeightGrams(),
+                    variant.getPriceCents(), want.quantity,
+                    variant.isDigital() ? 0 : variant.getWeightGrams(),
                     variant.isTaxable());
             List<CollectionProduct> in = collections.findByProductId(product.getId());
             for (int c = 0; c < in.size(); c++) {
@@ -241,7 +243,8 @@ public class Quoter {
                 // A bundle is as available as its components make it,
                 // whatever its own variant's flags say.
                 line.availableQty = bundles.available(parts, online0);
-            } else if (!variant.isTrackInventory() || variant.isAllowBackorder()) {
+            } else if (variant.isDigital() || !variant.isTrackInventory()
+                    || variant.isAllowBackorder()) {
                 line.availableQty = Integer.MAX_VALUE;
             } else {
                 Integer a = availability.get(variant.getId());
@@ -267,6 +270,8 @@ public class Quoter {
         quote.subtotalCents = PriceLine.subtotal(priceLines);
         boolean hasAddress = address != null && address.country() != null
                 && address.country().trim().length() > 0;
+        // Digital goods only: no delivery options are offered or charged.
+        boolean ships = quote.shippingRequired();
         String country = hasAddress ? address.country().trim() : null;
         boolean hasPoint = hasAddress && Geo.isPoint(address.lat(), address.lng());
         List<ShippingRate> storeRates = rates.findByStoreIdOrderByPositionAsc(cart.getStoreId());
@@ -274,7 +279,7 @@ public class Quoter {
         long cheapest = 0;
         ShippingCalculator.CarrierQuotes live = hasAddress
                 ? carrierQuotes(cart, all, address) : null;
-        if (hasAddress) {
+        if (hasAddress && ships) {
             List<ShippingCalculator.Option> before = ShippingCalculator.options(
                     zones.findByStoreIdOrderByPositionAsc(cart.getStoreId()), storeRates,
                     locationById, country, hasPoint, hasPoint ? address.lat() : 0,
@@ -318,7 +323,7 @@ public class Quoter {
             quote.problems.add(quote.discounts.codeProblem);
         }
         long afterDiscounts = quote.subtotalCents - quote.discountCents();
-        if (hasAddress) {
+        if (hasAddress && ships) {
             quote.options = ShippingCalculator.options(
                     zones.findByStoreIdOrderByPositionAsc(cart.getStoreId()), storeRates,
                     locationById, country, hasPoint, hasPoint ? address.lat() : 0,

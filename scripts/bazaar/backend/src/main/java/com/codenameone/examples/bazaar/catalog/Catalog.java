@@ -21,6 +21,7 @@ package com.codenameone.examples.bazaar.catalog;
 import com.codename1.appkit.server.Text;
 import com.codename1.backend.Base64;
 import com.codename1.backend.ResponseStatusException;
+import com.codename1.backend.annotations.Autowired;
 import com.codename1.backend.annotations.Component;
 import com.codename1.backend.annotations.Transactional;
 import com.codenameone.examples.bazaar.Ids;
@@ -32,6 +33,7 @@ import com.codenameone.examples.bazaar.api.CollectionDto;
 import com.codenameone.examples.bazaar.api.CountDto;
 import com.codenameone.examples.bazaar.api.FacetsDto;
 import com.codenameone.examples.bazaar.api.OptionDto;
+import com.codenameone.examples.bazaar.api.MediaUploadDto;
 import com.codenameone.examples.bazaar.api.PhotoDto;
 import com.codenameone.examples.bazaar.api.ProductCardDto;
 import com.codenameone.examples.bazaar.api.ProductDto;
@@ -134,6 +136,10 @@ public class Catalog {
         this.access = access;
         this.storeService = storeService;
     }
+
+    /// Field-injected so the constructor stays as it was.
+    @Autowired
+    private CatalogFiles catalogFiles;
 
     // ------------------------------------------------------------ the snapshot
 
@@ -813,6 +819,103 @@ public class Catalog {
         return new CountDto(chosen.size());
     }
 
+    /// Most entries a gallery holds, pictures, videos and models together.
+    public static final int MAX_GALLERY = 30;
+
+    /// Adds a video (an uploaded MP4 or WebM, or an `https` link) or a 3D
+    /// model (an uploaded `.glb`) to the end of the product's gallery.
+    @Transactional(rollbackFor = IOException.class)
+    public ProductDto addMedia(String username, String storeId, String productId,
+            MediaUploadDto media) throws IOException {
+        access.requireStaff(username, storeId, StoreAccess.MANAGERS);
+        Product product = product(storeId, productId);
+        if (media == null || media.kind() == null) {
+            throw new ResponseStatusException(400, "Say what kind of media it is");
+        }
+        String kind = media.kind();
+        if (!Media.VIDEO.equals(kind) && !Media.MODEL.equals(kind)) {
+            throw new ResponseStatusException(400, "Media is a VIDEO or a MODEL");
+        }
+        List<ProductPhoto> pictures = gallery.findByProductIdOrderByPositionAsc(productId);
+        if (pictures.size() >= MAX_GALLERY) {
+            throw new ResponseStatusException(409, "A gallery holds at most " + MAX_GALLERY
+                    + " entries");
+        }
+        String fileId = "";
+        String url = "";
+        boolean hasData = media.data() != null && media.data().length() > 0;
+        if (hasData) {
+            fileId = catalogFiles.storeBase64(storeId, kind, media.name(), media.contentType(),
+                    media.data());
+        } else if (Media.VIDEO.equals(kind)) {
+            url = Media.httpsUrl(media.url());
+            if (url == null) {
+                throw new ResponseStatusException(400, "A video link is an https address");
+            }
+        } else {
+            throw new ResponseStatusException(400, "No file");
+        }
+        return addMediaRow(product, kind, fileId, url, pictures.size());
+    }
+
+    /// Adds an already stored catalog file (or a link) to the gallery.
+    @Transactional(rollbackFor = IOException.class)
+    public ProductDto addMediaRow(Product product, String kind, String fileId, String url,
+            int position) throws IOException {
+        ProductPhoto row = new ProductPhoto();
+        row.setId(Ids.next());
+        row.setProductId(product.getId());
+        row.setPhotoId(fileId);
+        row.setUrl(url);
+        row.setKind(kind);
+        row.setAlt(clip(product.getTitle(), 200));
+        row.setPosition(position);
+        gallery.insert(row);
+        return detail(products.findById(product.getId()), true);
+    }
+
+    /// The product a merchant may change, for the web back office's uploads.
+    @Transactional(readOnly = true)
+    public Product managedProduct(String username, String storeId, String productId)
+            throws IOException {
+        access.requireStaff(username, storeId, StoreAccess.MANAGERS);
+        return product(storeId, productId);
+    }
+
+    /// Moves a gallery entry one place towards the front (`up`) or the back.
+    /// The product's main photo follows the first picture.
+    @Transactional(rollbackFor = IOException.class)
+    public ProductDto moveMedia(String username, String storeId, String productId,
+            String entryId, boolean up) throws IOException {
+        access.requireStaff(username, storeId, StoreAccess.MANAGERS);
+        Product product = product(storeId, productId);
+        List<ProductPhoto> pictures = gallery.findByProductIdOrderByPositionAsc(productId);
+        int at = -1;
+        for (int iter = 0; iter < pictures.size(); iter++) {
+            if (pictures.get(iter).getId().equals(entryId)) {
+                at = iter;
+            }
+        }
+        if (at < 0) {
+            throw new ResponseStatusException(404, "No such photo");
+        }
+        int to = up ? at - 1 : at + 1;
+        if (to >= 0 && to < pictures.size()) {
+            ProductPhoto moved = pictures.remove(at);
+            pictures.add(to, moved);
+        }
+        for (int iter = 0; iter < pictures.size(); iter++) {
+            ProductPhoto p = pictures.get(iter);
+            if (p.getPosition() != iter) {
+                p.setPosition(iter);
+                gallery.save(p);
+            }
+        }
+        product.setPhotoId(Media.firstImage(pictures));
+        products.save(product);
+        return detail(products.findById(productId), true);
+    }
+
     /// Stores a JPEG or PNG for the store and adds it to the product's
     /// gallery; the first picture becomes the product's main photo.
     @Transactional(rollbackFor = IOException.class)
@@ -850,6 +953,10 @@ public class Catalog {
             if (p.getId().equals(photoId) || p.getPhotoId().equals(photoId)) {
                 removed = p.getPhotoId();
                 gallery.delete(p);
+                if (!Media.isImage(p) && p.getUrl().length() == 0 && p.getPhotoId().length() > 0
+                        && gallery.findByPhotoId(p.getPhotoId()).isEmpty()) {
+                    catalogFiles.remove(p.getPhotoId());
+                }
                 break;
             }
         }
@@ -858,7 +965,7 @@ public class Catalog {
         }
         if (removed.equals(product.getPhotoId())) {
             List<ProductPhoto> left = gallery.findByProductIdOrderByPositionAsc(productId);
-            product.setPhotoId(left.isEmpty() ? "" : left.get(0).getPhotoId());
+            product.setPhotoId(Media.firstImage(left));
             products.save(product);
         }
         return detail(products.findById(productId), true);
@@ -1135,7 +1242,7 @@ public class Catalog {
         for (int iter = 0; iter < pictures.size(); iter++) {
             ProductPhoto p = pictures.get(iter);
             photoDtos.add(new ProductPhotoDto(p.getId(), p.getPhotoId(), p.getAlt(),
-                    p.getPosition()));
+                    p.getPosition(), p.getKind(), Media.url(p)));
         }
         List<String> collectionIds = new ArrayList<String>();
         List<Collection> all = collections.findByStoreIdOrderByPositionAsc(product.getStoreId());
@@ -1178,7 +1285,7 @@ public class Catalog {
         return new VariantDto(d.id(), d.productId(), d.title(), d.option1(), d.option2(),
                 d.option3(), d.sku(), d.barcode(), d.priceCents(), d.compareAtCents(),
                 d.costCents(), d.weightGrams(), d.taxable(), true, false, d.position(),
-                Math.min(total, Bundles.UNLIMITED), per);
+                Math.min(total, Bundles.UNLIMITED), per, d.digital());
     }
 
     private static VariantDto toDto(Variant v, List<InventoryLevel> stock, List<Location> places,
@@ -1206,7 +1313,7 @@ public class Catalog {
                 v.getOption2(), v.getOption3(), v.getSku(), v.getBarcode(), v.getPriceCents(),
                 v.getCompareAtCents(), staff ? v.getCostCents() : 0, v.getWeightGrams(),
                 v.isTaxable(), v.isTrackInventory(), v.isAllowBackorder(), v.getPosition(),
-                v.isTrackInventory() ? total : -1, per);
+                v.isTrackInventory() ? total : -1, per, v.isDigital());
     }
 
     public static CollectionDto toDto(Collection c, List<String> productIds) {
@@ -1268,7 +1375,7 @@ public class Catalog {
         } else if (variants.findByProductIdOrderByPositionAsc(product.getId()).isEmpty()) {
             List<VariantDto> one = new ArrayList<VariantDto>();
             one.add(new VariantDto(null, null, "", "", "", "", "", "", 0, 0, 0, 0, true, true,
-                    false, 0, 0, null));
+                    false, 0, 0, null, false));
             saveVariants(product, one);
         }
         if (wanted.photos() != null) {
@@ -1291,7 +1398,7 @@ public class Catalog {
             }
             List<ProductPhoto> left = gallery.findByProductIdOrderByPositionAsc(product.getId());
             Product fresh = products.findById(product.getId());
-            fresh.setPhotoId(left.isEmpty() ? "" : left.get(0).getPhotoId());
+            fresh.setPhotoId(Media.firstImage(left));
             products.save(fresh);
         }
         if (wanted.collectionIds() != null) {
@@ -1394,6 +1501,7 @@ public class Catalog {
             v.setTaxable(w.taxable());
             v.setTrackInventory(w.trackInventory());
             v.setAllowBackorder(w.allowBackorder());
+            v.setDigital(w.digital());
             v.setPosition(iter);
             if (fresh) {
                 variants.insert(v);

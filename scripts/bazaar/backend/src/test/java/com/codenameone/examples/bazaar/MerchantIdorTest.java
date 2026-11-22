@@ -130,6 +130,11 @@ class MerchantIdorTest {
         // Bundles and per-channel publishing.
         "GET /products/{productId}/bundle", "PUT /products/{productId}/bundle",
         "GET /products/{productId}/schedule", "PUT /products/{productId}/schedule",
+        // Digital goods and product media.
+        "GET /variants/{variantId}/download", "POST /variants/{variantId}/download",
+        "POST /variants/{variantId}/license-keys", "GET /orders/{orderId}/downloads",
+        "POST /download-grants/{grantId}/revoke", "POST /products/{productId}/media",
+        "POST /products/{productId}/photos/{photoId}/move",
         // The growth features: loyalty, clubs, sales, alerts, marketing, journeys.
         "DELETE /clubs/{clubId}/items/{itemId}", "DELETE /segments/{segmentId}",
         "GET /campaigns", "GET /campaigns/{campaignId}/stats", "GET /clubs",
@@ -226,6 +231,7 @@ class MerchantIdorTest {
     /// The table an id placeholder names, by the path segment before it.
     private static final String[][] TABLES = {
         {"automations", "automation"}, {"collections", "collection"},
+        {"download-grants", "download_grant"},
         {"discounts", "discount"}, {"locations", "location"}, {"photos", "product_photo"},
         {"parked", "parked_cart"}, {"layaways", "layaway"},
         {"products", "product"}, {"rates", "shipping_rate"}, {"zones", "shipping_zone"},

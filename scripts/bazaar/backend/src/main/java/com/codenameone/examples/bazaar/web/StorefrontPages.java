@@ -352,8 +352,20 @@ public class StorefrontPages {
         List<String> images = new ArrayList<String>();
         List<ProductPhotoDto> photos = p.photos() == null ? new ArrayList<ProductPhotoDto>()
                 : p.photos();
+        String poster = "";
+        for (int iter = 0; iter < photos.size() && poster.length() == 0; iter++) {
+            if (!"VIDEO".equals(photos.get(iter).kind()) && !"MODEL".equals(photos.get(iter).kind())
+                    && photos.get(iter).photoId().length() > 0) {
+                poster = "/media/" + photos.get(iter).photoId();
+            }
+        }
         for (int iter = 0; iter < photos.size(); iter++) {
             ProductPhotoDto ph = photos.get(iter);
+            if ("VIDEO".equals(ph.kind()) || "MODEL".equals(ph.kind())) {
+                view.gallery.add(new Art(ph.id(), ph.photoId(), p.title(), ph.kind(), ph.url(),
+                        poster));
+                continue;
+            }
             view.gallery.add(new Art(ph.id(), ph.photoId(), p.title()));
             images.add(urls.absolute(request, "/media/" + ph.photoId()));
         }
@@ -406,6 +418,7 @@ public class StorefrontPages {
                 view.marketNote = "Shown in " + shown + "; checkout charges " + shown + ".";
             }
             view.available = sellable(chosen);
+            view.digital = chosen.digital();
             if (!view.available && carts.preorderAllowance(chosen.id()) > 0) {
                 view.available = true;
                 view.preorder = true;

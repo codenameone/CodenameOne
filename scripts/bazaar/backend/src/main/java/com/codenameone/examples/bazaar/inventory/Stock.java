@@ -266,7 +266,7 @@ public class Stock {
                 v.getOption2(), v.getOption3(), v.getSku(), v.getBarcode(), v.getPriceCents(),
                 v.getCompareAtCents(), v.getCostCents(), v.getWeightGrams(), v.isTaxable(),
                 v.isTrackInventory(), v.isAllowBackorder(), v.getPosition(),
-                v.isTrackInventory() ? total : -1, per);
+                v.isTrackInventory() ? total : -1, per, v.isDigital());
         return new VariantHitDto(v.getProductId(), product == null ? "" : product.getTitle(),
                 product == null ? "" : product.getStatus(),
                 product == null ? "" : product.getPhotoId(), dto);

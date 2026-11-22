@@ -196,7 +196,8 @@ public final class ProductCsv {
                     cell(row, at[SKU]), cell(row, at[BARCODE]),
                     cents(cell(row, at[PRICE])), cents(cell(row, at[COMPARE])),
                     cents(cell(row, at[COST])), integer(cell(row, at[WEIGHT])),
-                    true, true, false, current.variants.size(), 0, new ArrayList<StockDto>()));
+                    true, true, false, current.variants.size(), 0, new ArrayList<StockDto>(),
+                    false));
         }
         if (current != null) {
             out.add(current.build());

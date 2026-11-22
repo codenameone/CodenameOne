@@ -46,7 +46,7 @@ class MerchantLogicTest {
 
     private static VariantDto variant(String id, String o1, String o2, String sku, long price) {
         return new VariantDto(id, "p", "", o1, o2, null, sku, "", price, 0, 0, 0, true, true,
-                false, 0, 0, new ArrayList<StockDto>());
+                false, 0, 0, new ArrayList<StockDto>(), false);
     }
 
     @Test

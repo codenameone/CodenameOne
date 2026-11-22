@@ -32,7 +32,7 @@ on a row.
 | Products with title/description/price | &#10003; | core | core | core | core | 
 | Variants & options matrix | &#10003; | core | core | core | core | 
 | Product media (multiple photos) | &#10003; | core | core | core | core | 
-| Product video / 3D models | &#8211; | core | app/plugin | core | no | 
+| Product video / 3D models | &#10003; | core | app/plugin | core | no | Uploaded MP4 or WebM video and `.glb` models in the product gallery, reordered with the pictures; the storefront plays video in a `<video>` element served in byte ranges, and links a model with no third-party viewer.
 | Compare-at price | &#10003; | core | core | core | core | 
 | Cost per item / margin | &#9681; | core | core | core | core | Cost is kept on purchase lines; margin isn't shown per variant.
 | SKU / barcode | &#10003; | core | core | core | core | 
@@ -45,7 +45,7 @@ on a row.
 | Bulk editor | &#10003; | core | core | core | core | 
 | CSV import/export of products | &#10003; | core | core | core | core | 
 | Gift card products | &#10003; | core | core | core | core | 
-| Digital products / downloads | &#8211; | app/plugin | core | core | core | 
+| Digital products / downloads | &#10003; | app/plugin | core | core | core | A digital variant ships nothing and checks out without an address; payment issues signed, expiring links with a download limit, in the order mail and on the order pages. Refunds and the owner revoke them; optional licence-key pools hand out one key per unit.
 | Bundles (fixed bundles / mix-and-match) | &#10003; | app/plugin | app/plugin | app/plugin | no | A bundle product sells fixed quantities of component variants at its own price; availability and every stock movement go through the components. A BUNDLE discount prices mix-and-match sets.
 | Combined listings (parent/child products) | &#10003; | core | core | no | no | Combined listings group separate products under one parent page. 
 | Metafields on products/variants | &#10003; | core | app/plugin | core | no | Typed metafield definitions; values show in a specs section on the product page. 

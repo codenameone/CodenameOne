@@ -19,6 +19,7 @@
 package com.codenameone.examples.bazaar.events;
 
 import com.codename1.backend.Json;
+import com.codename1.backend.annotations.Autowired;
 import com.codename1.backend.annotations.Component;
 import com.codename1.backend.annotations.Transactional;
 import com.codenameone.examples.bazaar.notify.Emails;
@@ -62,6 +63,15 @@ public class StoreEvents {
     private final Emails emails;
     private final GrowthEvents growth;
 
+    /// Field-injected: downloads reach the order service, which tells these
+    /// events, so a constructor dependency would be a cycle.
+    @Autowired
+    private com.codenameone.examples.bazaar.catalog.Downloads downloads;
+
+    /// The order whose placing is under way on this thread, so the payment
+    /// its own digital delivery takes does not mail the links a second time.
+    private static final ThreadLocal<String> PLACING = new ThreadLocal<String>();
+
     public StoreEvents(Webhooks webhooks, Automations automations, StoreOrderRepository orders,
             OrderLineRepository lines, CustomerRepository customers,
             InventoryLevelRepository levels, ProductRepository products, Emails emails,
@@ -100,9 +110,13 @@ public class StoreEvents {
                         context(s));
             }
             lowStock(s);
+            deliverDigital(orderId);
             if (!"POS".equals(s.order.getChannel())) {
                 // A register sale gets its receipt when the shopper asks for one.
                 emails.orderConfirmation(orderId);
+            } else if (!downloads.forOrder(orderId).isEmpty()) {
+                // ...but its downloads go out at once.
+                emails.downloads(orderId);
             }
             growth.placed(orderId, "PAID".equals(s.order.getFinancial()));
         } catch (IOException | RuntimeException failed) {
@@ -113,7 +127,29 @@ public class StoreEvents {
     /// An order's payment was taken.
     public void orderPaid(String orderId) {
         orderEvent(orderId, Webhooks.ORDERS_PAID, NodeCatalog.ORDER_PAID);
+        if (!orderId.equals(PLACING.get())) {
+            try {
+                if (downloads.deliver(orderId) > 0) {
+                    emails.downloads(orderId);
+                }
+            } catch (IOException | RuntimeException failed) {
+                log("downloads", orderId, failed);
+            }
+        }
         growth.paid(orderId);
+    }
+
+    /// Delivers a new order's digital lines: takes a held payment for them
+    /// and issues their links, which the confirmation then carries.
+    private void deliverDigital(String orderId) {
+        PLACING.set(orderId);
+        try {
+            downloads.deliver(orderId);
+        } catch (IOException | RuntimeException failed) {
+            log("downloads", orderId, failed);
+        } finally {
+            PLACING.remove();
+        }
     }
 
     /// The last of an order shipped or was handed over.
@@ -124,6 +160,11 @@ public class StoreEvents {
     /// An order was cancelled. Webhooks only; no automation triggers on it.
     public void orderCancelled(String orderId) {
         orderEvent(orderId, Webhooks.ORDERS_CANCELLED, null);
+        try {
+            downloads.revokeAll(orderId);
+        } catch (IOException | RuntimeException failed) {
+            log("downloads", orderId, failed);
+        }
         growth.cancelled(orderId);
     }
 
@@ -137,6 +178,7 @@ public class StoreEvents {
                 webhooks.emit(s.order.getStoreId(), Webhooks.REFUNDS_CREATE, Json.write(payload));
                 emails.refundIssued(orderId);
             }
+            downloads.revokeRefunded(orderId);
             growth.refunded(orderId);
         } catch (IOException | RuntimeException failed) {
             log("refunds/create", orderId, failed);

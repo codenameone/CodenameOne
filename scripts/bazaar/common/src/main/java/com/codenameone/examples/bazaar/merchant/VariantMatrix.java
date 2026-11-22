@@ -92,7 +92,7 @@ public final class VariantMatrix {
                         match.sku(), match.barcode(), match.priceCents(), match.compareAtCents(),
                         match.costCents(), match.weightGrams(), match.taxable(),
                         match.trackInventory(), match.allowBackorder(), iter, match.available(),
-                        match.stock()));
+                        match.stock(), match.digital()));
             } else {
                 out.add(new VariantDto(null, productId, title(values), o1, o2, o3, "", "",
                         template == null ? 0 : template.priceCents(),
@@ -102,7 +102,7 @@ public final class VariantMatrix {
                         template == null || template.taxable(),
                         template == null || template.trackInventory(),
                         template != null && template.allowBackorder(), iter, 0,
-                        new ArrayList<StockDto>()));
+                        new ArrayList<StockDto>(), template != null && template.digital()));
             }
         }
         return out;

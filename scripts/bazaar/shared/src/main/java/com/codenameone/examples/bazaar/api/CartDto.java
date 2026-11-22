@@ -20,7 +20,7 @@ package com.codenameone.examples.bazaar.api;
 
 import com.codename1.annotations.Mapped;
 
-/// A cart with every amount worked out. `token` is what a guest sends back in the `X-Cart-Token` header. With tax inclusive, `taxCents` is already inside the prices and not added to `totalCents`. `giftCardCents` is what the gift card will pay; `dueCents` what is left for the card. `problems` lists why the cart cannot be checked out as it is.
+/// A cart with every amount worked out. `token` is what a guest sends back in the `X-Cart-Token` header. With tax inclusive, `taxCents` is already inside the prices and not added to `totalCents`. `giftCardCents` is what the gift card will pay; `dueCents` what is left for the card. `problems` lists why the cart cannot be checked out as it is. `shippingRequired` is false for a cart of digital goods only, which checks out without an address or a delivery option.
 @Mapped
 public record CartDto(
         String id,
@@ -42,5 +42,6 @@ public record CartDto(
         java.util.List<AppliedDiscountDto> discounts,
         java.util.List<ShippingOptionDto> shippingOptions,
         String shippingRateId,
-        java.util.List<String> problems) {
+        java.util.List<String> problems,
+        boolean shippingRequired) {
 }

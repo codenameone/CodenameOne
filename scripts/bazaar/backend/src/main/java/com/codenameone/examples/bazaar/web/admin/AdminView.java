@@ -85,6 +85,14 @@ public class AdminView {
     /// variant chosen, `quantity` how many), the variants it may pick from
     /// and how many bundles the components make.
     public String bundleAction = "";
+    /// The product's gallery entries (pictures, videos, models) in order;
+    /// `action` moves one up, `url` moves it down.
+    public List<AdminRow> mediaRows = new ArrayList<AdminRow>();
+    public String mediaAction = "";
+    /// One row per digital variant: its file, limits and licence keys.
+    public List<AdminRow> downloadRows = new ArrayList<AdminRow>();
+    /// An order's downloads; `action` revokes one.
+    public List<AdminRow> grantRows = new ArrayList<AdminRow>();
     public boolean isBundle;
     public String bundleAvailable = "";
     public List<AdminRow> bundleRows = new ArrayList<AdminRow>();

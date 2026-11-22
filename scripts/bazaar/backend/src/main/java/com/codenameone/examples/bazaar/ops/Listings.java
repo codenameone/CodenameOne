@@ -231,7 +231,8 @@ public class Listings {
                 sizes.add(size);
             }
             variants.add(new VariantDto(null, null, size == null ? "Default" : size, size, null, null,
-                    it.sku, null, it.priceCents, 0, 0, 0, true, true, false, iter, it.quantity, null));
+                    it.sku, null, it.priceCents, 0, 0, 0, true, true, false, iter, it.quantity, null,
+                    false));
         }
         if (sized) {
             options.add(new OptionDto(null, "Size", sizes, 0));

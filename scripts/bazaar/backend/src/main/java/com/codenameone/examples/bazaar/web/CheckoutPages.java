@@ -20,6 +20,7 @@ package com.codenameone.examples.bazaar.web;
 
 import com.codename1.backend.HttpServer;
 import com.codename1.backend.ResponseStatusException;
+import com.codename1.backend.annotations.Autowired;
 import com.codename1.backend.annotations.Component;
 import com.codename1.backend.mvc.Model;
 import com.codename1.backend.security.AnonymousAuthenticationToken;
@@ -86,6 +87,8 @@ import java.util.Map;
 /// needs neither a column nor a key of its own.
 @Component
 public class CheckoutPages {
+    @Autowired
+    private com.codenameone.examples.bazaar.catalog.Downloads downloads;
     static final String GUEST = "guest:";
     /// The countries the form offers: ISO code, name.
     static final String[][] COUNTRIES = {
@@ -804,6 +807,7 @@ public class CheckoutPages {
         view.invoiceUrl = "/s/" + SiteUrls.encode(store.getHandle()) + "/orders/" + o.number()
                 + "/invoice.pdf?t=" + t;
         view.storeUrl = StorefrontPages.storeUrl(store.getHandle());
+        view.downloads = DownloadView.of(downloads.forOrder(row.getId()));
         List<Fulfillment> shipped = fulfillments.findByOrderId(row.getId());
         for (int iter = 0; iter < shipped.size(); iter++) {
             Fulfillment f = shipped.get(iter);

@@ -46,6 +46,8 @@ public final class ProductView {
     public boolean available;
     /// The chosen variant sells ahead of stock.
     public boolean preorder;
+    /// The chosen variant is a download: nothing ships.
+    public boolean digital;
     public String availability = "";
     /// The chosen variant id, for the add-to-cart form.
     public String variantId = "";

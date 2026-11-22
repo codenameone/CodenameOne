@@ -21,6 +21,7 @@ package com.codenameone.examples.bazaar.web.account;
 import com.codename1.appkit.server.Text;
 import com.codename1.backend.HttpServer;
 import com.codename1.backend.ResponseStatusException;
+import com.codename1.backend.annotations.Autowired;
 import com.codename1.backend.annotations.Component;
 import com.codename1.orm.repository.PageRequest;
 import com.codenameone.examples.bazaar.Days;
@@ -92,6 +93,8 @@ import java.util.Map;
 /// loyalty page lists the programmes a shopper is in, and joining is a post.
 @Component
 public class AccountData {
+    @Autowired
+    private com.codenameone.examples.bazaar.catalog.Downloads downloads;
     /// Orders on one page of the list.
     public static final int PAGE = 20;
 
@@ -222,6 +225,7 @@ public class AccountData {
         v.order.meta = Days.iso(o.createdAt());
         v.order.status = status(o.status(), o.fulfilment());
         v.order.amount = Money.format(o.totalCents(), c);
+        v.downloads = com.codenameone.examples.bazaar.web.DownloadView.of(downloads.forOrder(o.id()));
         AddressDto a = o.address();
         if (a != null) {
             StringBuilder to = new StringBuilder();

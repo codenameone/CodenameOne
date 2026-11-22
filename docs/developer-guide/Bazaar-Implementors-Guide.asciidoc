@@ -164,6 +164,28 @@ the sitemap and the feeds), carts and checkout read `ONLINE`; the register's
 catalog reads `POS`; and marketplace sync pushes a hidden listing with no stock.
 A product with no window follows its status alone.
 
+A variant's `digital` flag means it ships nothing: it weighs nothing in a
+quote, holds no stock, and a cart of digital variants only needs no address or
+delivery option. Uploaded files (downloads, videos and models) live in
+`catalog_file`, capped by `bazaar.catalog.max-file-bytes`; a video or model is
+checked by its leading bytes, not its declared type. `Downloads` keeps each
+variant's `digital_asset` and, once an order is paid, one `download_grant` per
+digital line. When an order is placed, `StoreEvents` marks its digital lines
+fulfilled, which takes a held card payment the same way shipping does, so the
+confirmation mail already carries the links. A link is the grant id, its expiry
+and an HMAC of both under the grant's own random secret; a forged, foreign,
+expired, used-up or revoked link answers the same 404. Each fetch is counted by
+one conditional update, so the limit holds under concurrent requests, and a
+download is never served in byte ranges. Licence keys are claimed one by one
+with an update that only a free key passes, so two sales never share one; a pool
+with five or fewer keys left mails the store's low-stock alert. A line refunded
+in full, or a cancelled order, revokes its grants.
+
+Gallery rows in `product_photo` have a `kind`: `IMAGE`, `VIDEO` or `MODEL`. An
+uploaded video or model is served at `/media/file/{id}` with single byte ranges
+and a year of caching; a linked video is a link out, since the page policy only
+allows `media-src 'self'`. The product's main photo is always its first picture.
+
 [[bazaar-payments]]
 === Authorize at checkout, capture at shipping
 

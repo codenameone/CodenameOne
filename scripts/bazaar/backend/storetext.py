@@ -568,6 +568,20 @@ T = [
 ("a.quote.owed", "You pay the difference", "Pagas la diferencia", "Vous payez la différence", "Sie zahlen die Differenz", "תשלם את ההפרש"),
 ("a.quote.even", "Nothing to pay or refund", "Nada que pagar ni devolver", "Rien à payer ni à rembourser", "Nichts zu zahlen oder zu erstatten", "אין מה לשלם או להחזיר"),
 ("a.quoteBtn", "Show the amount", "Ver el importe", "Afficher le montant", "Betrag anzeigen", "הצגת הסכום"),
+("digital", "Digital download", "Descarga digital", "Téléchargement numérique", "Digitaler Download", "הורדה דיגיטלית"),
+("digital.note", "Delivered by email and on your order page as soon as it is paid. Nothing ships.", "Se entrega por correo y en la página del pedido en cuanto se paga. No hay envío.", "Livré par e-mail et sur la page de la commande dès le paiement. Rien n'est expédié.", "Nach der Zahlung per E-Mail und auf der Bestellseite geliefert. Kein Versand.", "נמסר בדוא\"ל ובדף ההזמנה מיד לאחר התשלום. ללא משלוח."),
+("downloads", "Downloads", "Descargas", "Téléchargements", "Downloads", "הורדות"),
+("download", "Download", "Descargar", "Télécharger", "Herunterladen", "הורדה"),
+("download.gone", "This link is no longer available", "Este enlace ya no está disponible", "Ce lien n'est plus disponible", "Dieser Link ist nicht mehr verfügbar", "הקישור כבר אינו זמין"),
+("licenceKey", "Licence key", "Clave de licencia", "Clé de licence", "Lizenzschlüssel", "מפתח רישיון"),
+("video", "Video", "Vídeo", "Vidéo", "Video", "סרטון"),
+("model3d", "View the 3D model", "Ver el modelo 3D", "Voir le modèle 3D", "3D-Modell ansehen", "צפייה במודל התלת-ממדי"),
+("mail.downloads.heading", "Your downloads", "Tus descargas", "Vos téléchargements", "Ihre Downloads", "ההורדות שלך"),
+("mail.downloads.key", "Licence key: {0}", "Clave de licencia: {0}", "Clé de licence : {0}", "Lizenzschlüssel: {0}", "מפתח רישיון: {0}"),
+("mail.downloads.limits", "Each link works up to {0} times and expires; your order page always has them.", "Cada enlace funciona hasta {0} veces y caduca; siempre están en la página del pedido.", "Chaque lien fonctionne jusqu'à {0} fois et expire ; ils restent sur la page de la commande.", "Jeder Link funktioniert bis zu {0} Mal und läuft ab; Ihre Bestellseite zeigt sie immer.", "כל קישור פועל עד {0} פעמים ופג תוקפו; הם תמיד זמינים בדף ההזמנה."),
+("mail.downloads.title", "Your downloads are ready", "Tus descargas están listas", "Vos téléchargements sont prêts", "Ihre Downloads sind bereit", "ההורדות שלך מוכנות"),
+("mail.downloads.body", "Order #{0} is paid. Here is what you bought.", "El pedido n.º {0} está pagado. Esto es lo que compraste.", "La commande n° {0} est payée. Voici vos achats.", "Bestellung Nr. {0} ist bezahlt. Hier ist Ihr Kauf.", "הזמנה מס' {0} שולמה. הנה מה שרכשת."),
+("mail.downloads.subject", "Downloads for order #{0}", "Descargas del pedido n.º {0}", "Téléchargements de la commande n° {0}", "Downloads zu Bestellung Nr. {0}", "הורדות להזמנה מס' {0}"),
 ]
 
 

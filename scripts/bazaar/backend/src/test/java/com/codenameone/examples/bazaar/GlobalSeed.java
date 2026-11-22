@@ -36,6 +36,19 @@ final class GlobalSeed {
         db.execute("INSERT INTO channel_schedule (id, store_id, product_id, channel, publish_at, "
                 + "unpublish_at, visible, updated_at) VALUES (?, ?, ?, 'POS', 1, 0, 1, 0)",
                 new Object[] {Ids.next(), s.storeId, s.productId});
+        // A digital asset, a licence key and a download grant, for the
+        // digital goods routes.
+        db.execute("INSERT INTO digital_asset (id, store_id, variant_id, file_id, max_downloads, "
+                + "expiry_days, created_at) VALUES (?, ?, ?, '', 5, 30, 0)",
+                new Object[] {Ids.next(), s.storeId, s.variantId});
+        db.execute("INSERT INTO license_key (id, store_id, variant_id, key_text, order_id, "
+                + "line_id, assigned_at, created_at) VALUES (?, ?, ?, 'IDOR-KEY', '', '', 0, 0)",
+                new Object[] {Ids.next(), s.storeId, s.variantId});
+        db.execute("INSERT INTO download_grant (id, store_id, order_id, line_id, variant_id, "
+                + "file_id, username, secret, expires_at, downloads, max_downloads, license_key, "
+                + "created_at, revoked_at) VALUES (?, ?, ?, ?, ?, '', '', ?, 0, 0, 5, '', 0, 0)",
+                new Object[] {Ids.next(), s.storeId, orderId, Ids.next(), s.variantId,
+                    Ids.next()});
         // The online store's rows: a page, a post, a menu link, a redirect, a
         // metafield and a metaobject type with one entry.
         db.execute("INSERT INTO content_page (id, store_id, kind, handle, title, body, published, "
