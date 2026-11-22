@@ -71,6 +71,13 @@ final class OdtWriter {
     private int frameCount;
     private int tableCount;
     private boolean lastSpace;
+    private final Map<String, String> graphicStyles = new LinkedHashMap<String, String>();
+    /// The page of every section that starts on a new page, by its master page's name.
+    private final Map<String, PageSpec> masters = new LinkedHashMap<String, PageSpec>();
+    private final List<String> sectionStyles = new ArrayList<String>();
+    /// The master page the next paragraph starts, or null.
+    private String pendingMaster;
+    private String headerXml = "";
 
     private OdtWriter(Document doc) {
         this.doc = doc;
@@ -81,8 +88,48 @@ final class OdtWriter {
     }
 
     private void write(OutputStream out) throws IOException {
+        headerXml = furniture();
+        masters.put("Standard", doc.page);
         StringBuilder body = new StringBuilder();
-        blocks(body, doc.blocks);
+        // a section on a new page is a master page its first paragraph names; one that
+        // continues on the page is a text:section with its own columns
+        List<Block> section = new ArrayList<Block>();
+        boolean inSection = false;
+        for (Block block : doc.blocks) {
+            if (!(block instanceof SectionBreak)) {
+                section.add(block);
+                continue;
+            }
+            blocks(body, section);
+            section.clear();
+            if (inSection) {
+                body.append("</text:section>");
+                inSection = false;
+            }
+            SectionBreak br = (SectionBreak) block;
+            if (br.newPage) {
+                String name = "M" + (masters.size() + 1);
+                masters.put(name, br.page);
+                pendingMaster = name;
+            } else {
+                String name = "Sect" + (sectionStyles.size() + 1);
+                sectionStyles.add("<style:style style:name=\"" + name + "\" style:family=\"section\">"
+                        + "<style:section-properties text:dont-balance-text-columns=\"false\">"
+                        + columns(br.page) + "</style:section-properties></style:style>");
+                body.append("<text:section text:style-name=\"").append(name)
+                        .append("\" text:name=\"").append(name).append("\">");
+                inSection = true;
+            }
+        }
+        blocks(body, section);
+        if (pendingMaster != null) {
+            // a break with nothing after it still starts its page
+            Paragraph empty = new Paragraph("odt-end", RichText.EMPTY);
+            paragraph(body, empty);
+        }
+        if (inSection) {
+            body.append("</text:section>");
+        }
         StringBuilder content = new StringBuilder(XML);
         content.append("<office:document-content").append(NS).append("><office:automatic-styles>");
         for (Map.Entry<String, String> e : paraStyles.entrySet()) {
@@ -93,6 +140,13 @@ final class OdtWriter {
         }
         listStyle(content, "L1", true);
         listStyle(content, "L2", false);
+        for (Map.Entry<String, String> g : graphicStyles.entrySet()) {
+            content.append("<style:style style:name=\"").append(g.getValue()).append('"')
+                    .append(g.getKey());
+        }
+        for (String g : sectionStyles) {
+            content.append(g);
+        }
         content.append("</office:automatic-styles><office:body><office:text>");
         if (changes.length() > 0) {
             content.append("<text:tracked-changes text:track-changes=\"")
@@ -176,6 +230,41 @@ final class OdtWriter {
         return b.append("</office:meta></office:document-meta>").toString();
     }
 
+    private static String columns(PageSpec p) {
+        if (p.columns < 2) {
+            return "";
+        }
+        return "<style:columns fo:column-count=\"" + p.columns + "\" fo:column-gap=\""
+                + pt(p.columnGap) + "\"/>";
+    }
+
+    /// The header and footer elements every master page carries. They are written first, so
+    /// the automatic styles they use are in the maps when styles.xml copies them.
+    private String furniture() {
+        StringBuilder b = new StringBuilder();
+        if (!doc.header.isEmpty()) {
+            b.append("<style:header>");
+            blocks(b, doc.header);
+            b.append("</style:header>");
+        }
+        if (doc.firstHeader != null) {
+            b.append("<style:header-first>");
+            blocks(b, doc.firstHeader);
+            b.append("</style:header-first>");
+        }
+        if (!doc.footer.isEmpty()) {
+            b.append("<style:footer>");
+            blocks(b, doc.footer);
+            b.append("</style:footer>");
+        }
+        if (doc.firstFooter != null) {
+            b.append("<style:footer-first>");
+            blocks(b, doc.firstFooter);
+            b.append("</style:footer-first>");
+        }
+        return b.toString();
+    }
+
     private String styles() {
         StringBuilder b = new StringBuilder(XML);
         b.append("<office:document-styles").append(NS).append("><office:styles>")
@@ -207,10 +296,23 @@ final class OdtWriter {
             DocxWriter.esc(b, e.getKey());
             b.append("\" style:family=\"paragraph\" style:parent-style-name=\"Standard\"/>");
         }
-        b.append("</office:styles>");
-        if (doc.page != null) {
-            PageSpec p = doc.page;
-            b.append("<office:automatic-styles><style:page-layout style:name=\"pm1\">")
+        b.append("</office:styles><office:automatic-styles>");
+        // the header's paragraphs name automatic styles, and styles.xml cannot see those of
+        // content.xml: the same definitions are written into both
+        for (Map.Entry<String, String> e : paraStyles.entrySet()) {
+            b.append(e.getValue());
+        }
+        for (Map.Entry<TextStyle, String> e : textStyles.entrySet()) {
+            textStyle(b, e.getValue(), e.getKey());
+        }
+        for (Map.Entry<String, String> g : graphicStyles.entrySet()) {
+            b.append("<style:style style:name=\"").append(g.getValue()).append('"')
+                    .append(g.getKey());
+        }
+        int n = 0;
+        for (PageSpec p : masters.values()) {
+            n++;
+            b.append("<style:page-layout style:name=\"pm").append(n).append("\">")
                     .append("<style:page-layout-properties fo:page-width=\"").append(pt(p.width))
                     .append("\" fo:page-height=\"").append(pt(p.height))
                     .append("\" style:print-orientation=\"")
@@ -218,11 +320,19 @@ final class OdtWriter {
                     .append("\" fo:margin-top=\"").append(pt(p.top))
                     .append("\" fo:margin-right=\"").append(pt(p.right))
                     .append("\" fo:margin-bottom=\"").append(pt(p.bottom))
-                    .append("\" fo:margin-left=\"").append(pt(p.left))
-                    .append("\"/></style:page-layout></office:automatic-styles>")
-                    .append("<office:master-styles><style:master-page style:name=\"Standard\" ")
-                    .append("style:page-layout-name=\"pm1\"/></office:master-styles>");
+                    .append("\" fo:margin-left=\"").append(pt(p.left)).append("\">")
+                    .append(columns(p)).append("</style:page-layout-properties>")
+                    .append("</style:page-layout>");
         }
+        b.append("</office:automatic-styles><office:master-styles>");
+        n = 0;
+        for (String name : masters.keySet()) {
+            n++;
+            b.append("<style:master-page style:name=\"").append(name)
+                    .append("\" style:page-layout-name=\"pm").append(n).append("\">")
+                    .append(headerXml).append("</style:master-page>");
+        }
+        b.append("</office:master-styles>");
         return b.append("</office:document-styles>").toString();
     }
 
@@ -338,13 +448,15 @@ final class OdtWriter {
         return name;
     }
 
-    private String paraStyleName(Paragraph p) {
+    private String paraStyleName(Paragraph p, String master) {
         StringBuilder key = new StringBuilder();
         key.append(" style:parent-style-name=\"");
         DocxWriter.esc(key, parentName(p.style));
         key.append("\"><style:paragraph-properties fo:margin-top=\"").append(pt(p.before))
                 .append("\" fo:margin-bottom=\"").append(pt(p.after))
                 .append("\" fo:margin-left=\"").append(pt(p.indent))
+                .append("\" fo:margin-right=\"").append(pt(p.rightIndent))
+                .append("\" fo:text-indent=\"").append(pt(p.firstLine))
                 .append("\" fo:line-height=\"").append(Math.round(p.lineSpacing * 100))
                 .append("%\" fo:text-align=\"")
                 .append(Paragraph.CENTER.equals(p.align) ? "center" : Paragraph.RIGHT.equals(p.align)
@@ -356,7 +468,29 @@ final class OdtWriter {
         if (p.keepNext) {
             key.append(" fo:keep-with-next=\"always\"");
         }
-        key.append("/></style:style>");
+        if (p.tabs.isEmpty()) {
+            key.append("/></style:style>");
+        } else {
+            key.append("><style:tab-stops>");
+            for (TabStop t : p.tabs) {
+                key.append("<style:tab-stop style:position=\"").append(pt(t.position))
+                        .append("\" style:type=\"").append(TabStop.DECIMAL.equals(t.alignment)
+                        ? "char" : t.alignment).append('"');
+                if (TabStop.DECIMAL.equals(t.alignment)) {
+                    key.append(" style:char=\".\"");
+                }
+                if (t.leader != 0) {
+                    key.append(" style:leader-style=\"").append(t.leader == '.' ? "dotted"
+                            : "solid").append("\" style:leader-text=\"").append(t.leader)
+                            .append('"');
+                }
+                key.append("/>");
+            }
+            key.append("</style:tab-stops></style:paragraph-properties></style:style>");
+        }
+        if (master != null) {
+            key.insert(0, " style:master-page-name=\"" + master + "\"");
+        }
         String k = key.toString();
         String name = null;
         for (Map.Entry<String, String> e : paraStyles.entrySet()) {
@@ -415,9 +549,8 @@ final class OdtWriter {
             } else if (block instanceof Table) {
                 table(b, (Table) block);
             } else if (block instanceof Picture) {
-                b.append("<text:p text:style-name=\"Standard\">");
-                frame(b, (Picture) block);
-                b.append("</text:p>");
+                paragraph(b, new Paragraph(block.id() + "-p", RichText.of((Picture) block,
+                        TextStyle.DEFAULT)));
             }
         }
         closeLists(b, open, 0);
@@ -434,8 +567,10 @@ final class OdtWriter {
         int heading = p.style.length() == 8 && p.style.startsWith("Heading")
                 ? p.headingLevel() : 0;
         String element = heading > 0 ? "text:h" : "text:p";
-        b.append('<').append(element).append(" text:style-name=\"").append(paraStyleName(p))
-                .append('"');
+        String master = pendingMaster;
+        pendingMaster = null;
+        b.append('<').append(element).append(" text:style-name=\"").append(paraStyleName(p,
+                master)).append('"');
         if (heading > 0) {
             b.append(" text:outline-level=\"").append(heading).append('"');
         }
@@ -692,6 +827,30 @@ final class OdtWriter {
         }
     }
 
+    private String graphicStyle(Picture p) {
+        StringBuilder k = new StringBuilder();
+        k.append(" style:family=\"graphic\"><style:graphic-properties style:wrap=\"")
+                .append(Picture.SQUARE.equals(p.wrap) ? "parallel" : Picture.TOP_BOTTOM
+                        .equals(p.wrap) ? "none" : "run-through").append('"');
+        if (Picture.BEHIND.equals(p.wrap) || Picture.IN_FRONT.equals(p.wrap)) {
+            k.append(" style:run-through=\"").append(Picture.BEHIND.equals(p.wrap)
+                    ? "background" : "foreground").append('"');
+        }
+        k.append(" style:horizontal-pos=\"").append(p.align)
+                .append("\" style:horizontal-rel=\"paragraph\" style:vertical-pos=\"from-top\"")
+                .append(" style:vertical-rel=\"paragraph\" fo:margin-left=\"").append(pt(p.distance))
+                .append("\" fo:margin-right=\"").append(pt(p.distance))
+                .append("\" fo:margin-bottom=\"").append(pt(p.distance))
+                .append("\"/></style:style>");
+        String key = k.toString();
+        String name = graphicStyles.get(key);
+        if (name == null) {
+            name = "fr" + (graphicStyles.size() + 1);
+            graphicStyles.put(key, name);
+        }
+        return name;
+    }
+
     private void frame(StringBuilder b, Picture p) {
         String ext = "image/png".equals(p.mimeType) ? "png" : "image/jpeg".equals(p.mimeType)
                 ? "jpg" : "image/gif".equals(p.mimeType) ? "gif" : "bin";
@@ -700,8 +859,14 @@ final class OdtWriter {
         pictureData.add(p.data());
         pictureTypes.add(p.mimeType);
         int n = ++frameCount;
-        b.append("<draw:frame draw:name=\"Image").append(n)
-                .append("\" text:anchor-type=\"as-char\" svg:width=\"").append(pt(p.width))
+        b.append("<draw:frame draw:name=\"Image").append(n);
+        if (p.isFloating()) {
+            b.append("\" draw:style-name=\"").append(graphicStyle(p))
+                    .append("\" text:anchor-type=\"paragraph\" svg:y=\"").append(pt(p.offsetY));
+        } else {
+            b.append("\" text:anchor-type=\"as-char");
+        }
+        b.append("\" svg:width=\"").append(pt(p.width))
                 .append("\" svg:height=\"").append(pt(p.height))
                 .append("\" draw:z-index=\"0\"><draw:image xlink:href=\"").append(name)
                 .append("\" xlink:type=\"simple\" xlink:show=\"embed\" xlink:actuate=\"onLoad\"/>");

@@ -54,17 +54,37 @@ final class NativeFormat {
         XmlOut x = new XmlOut(zip);
         x.raw("<?xml version=\"1.0\" encoding=\"UTF-8\"?><document version=\"1\"");
         x.attr("title", d.title).attr("next", String.valueOf(d.nextId));
-        x.raw(" trackChanges=\"").raw(String.valueOf(d.trackChanges)).raw("\"><page");
-        x.attr("width", Ids.fmt(d.page.width)).attr("height", Ids.fmt(d.page.height));
-        x.attr("top", Ids.fmt(d.page.top)).attr("right", Ids.fmt(d.page.right));
-        x.attr("bottom", Ids.fmt(d.page.bottom)).attr("left", Ids.fmt(d.page.left));
-        x.raw("/>");
+        x.raw(" trackChanges=\"").raw(String.valueOf(d.trackChanges)).raw("\">");
+        page(x, d.page);
+        furniture(x, "header", "default", d.header);
+        furniture(x, "header", "first", d.firstHeader);
+        furniture(x, "footer", "default", d.footer);
+        furniture(x, "footer", "first", d.firstFooter);
         blocks(x, d.blocks);
         comments(x, d.comments);
         x.raw("</document>");
         x.flush();
         zip.closeEntry();
         zip.finish();
+    }
+
+    private static void page(XmlOut x, PageSpec p) throws IOException {
+        x.raw("<page");
+        x.attr("width", Ids.fmt(p.width)).attr("height", Ids.fmt(p.height));
+        x.attr("top", Ids.fmt(p.top)).attr("right", Ids.fmt(p.right));
+        x.attr("bottom", Ids.fmt(p.bottom)).attr("left", Ids.fmt(p.left));
+        x.attr("columns", p.columns).attr("columnGap", Ids.fmt(p.columnGap));
+        x.raw("/>");
+    }
+
+    private static void furniture(XmlOut x, String element, String kind, List<Block> blocks)
+            throws IOException {
+        if (blocks == null || blocks.isEmpty() && "default".equals(kind)) {
+            return;
+        }
+        x.raw("<").raw(element).attr("kind", kind).raw(">");
+        blocks(x, blocks);
+        x.raw("</").raw(element).raw(">");
     }
 
     private static void blocks(XmlOut x, List<Block> blocks) throws IOException {
@@ -75,6 +95,12 @@ final class NativeFormat {
                 table(x, (Table) b);
             } else if (b instanceof Picture) {
                 picture(x, (Picture) b);
+            } else if (b instanceof SectionBreak) {
+                SectionBreak br = (SectionBreak) b;
+                x.raw("<section").attr("id", br.id)
+                        .attr("newPage", String.valueOf(br.newPage)).raw(">");
+                page(x, br.page);
+                x.raw("</section>");
             }
         }
     }
@@ -86,7 +112,13 @@ final class NativeFormat {
                 .attr("after", Ids.fmt(p.after)).attr("indent", Ids.fmt(p.indent))
                 .attr("spacing", Ids.fmt(p.lineSpacing))
                 .attr("pageBreak", String.valueOf(p.pageBreak))
-                .attr("keepNext", String.valueOf(p.keepNext)).raw(">");
+                .attr("keepNext", String.valueOf(p.keepNext))
+                .attr("firstLine", Ids.fmt(p.firstLine))
+                .attr("rightIndent", Ids.fmt(p.rightIndent)).raw(">");
+        for (TabStop tab : p.tabs) {
+            x.raw("<tab").attr("pos", Ids.fmt(tab.position)).attr("align", tab.alignment)
+                    .attr("leader", tab.leader == 0 ? "" : String.valueOf(tab.leader)).raw("/>");
+        }
         RichText t = p.text;
         for (int i = 0; i < t.runCount(); i++) {
             TextStyle s = t.runStyle(i);
@@ -185,7 +217,9 @@ final class NativeFormat {
 
     private static void picture(XmlOut x, Picture p) throws IOException {
         x.raw("<picture").attr("id", p.id).attr("width", Ids.fmt(p.width))
-                .attr("height", Ids.fmt(p.height)).attr("align", "left")
+                .attr("height", Ids.fmt(p.height)).attr("align", p.align)
+                .attr("wrap", p.wrap).attr("offsetY", Ids.fmt(p.offsetY))
+                .attr("distance", Ids.fmt(p.distance))
                 .attr("alt", p.description).attr("type", p.mimeType).raw(">");
         x.raw(Base64.encodeNoNewline(p.data()));
         x.raw("</picture>");
@@ -213,6 +247,8 @@ final class NativeFormat {
         List<Comment> comments = new ArrayList<Comment>();
         long next = (long) x.doubleAttr("next", 1);
         PageSpec page = null;
+        @SuppressWarnings("unchecked")
+        List<Block>[] furniture = new List[4];
         Set<String> ids = new HashSet<String>();
         List<Block> blocks = new ArrayList<Block>();
         for (int ev = x.next(); ev != XmlScanner.END; ev = x.next()) {
@@ -223,11 +259,20 @@ final class NativeFormat {
                 continue;
             }
             if ("page".equals(x.name)) {
-                page = new PageSpec((float) x.doubleAttr("width", 595.28),
-                        (float) x.doubleAttr("height", 841.89), (float) x.doubleAttr("top", 54),
-                        (float) x.doubleAttr("right", 54), (float) x.doubleAttr("bottom", 54),
-                        (float) x.doubleAttr("left", 54));
-                x.skipElement();
+                page = readPage(x);
+            } else if ("header".equals(x.name) || "footer".equals(x.name)) {
+                boolean head = "header".equals(x.name);
+                boolean first = "first".equals(x.attr("kind"));
+                List<Block> b = new ArrayList<Block>();
+                for (int e = x.next(); e != XmlScanner.END; e = x.next()) {
+                    if (e == XmlScanner.EOF) {
+                        throw new IOException("Truncated .cn1doc document");
+                    }
+                    if (e == XmlScanner.START && !block(x, b, ids)) {
+                        x.skipElement();
+                    }
+                }
+                furniture[(head ? 0 : 2) + (first ? 1 : 0)] = b;
             } else if ("comment".equals(x.name)) {
                 Comment c = readComment(x);
                 if (c != null) {
@@ -237,7 +282,27 @@ final class NativeFormat {
                 x.skipElement();
             }
         }
-        return new Document(blocks, page, title, next, comments, track);
+        Document d = new Document(blocks, page, title, next, comments, track);
+        if (furniture[0] != null || furniture[1] != null || furniture[2] != null
+                || furniture[3] != null) {
+            d = d.withHeaders(furniture[0], furniture[2], furniture[1], furniture[3]);
+        }
+        return d;
+    }
+
+    private static PageSpec readPage(XmlScanner x) throws IOException {
+        PageSpec page;
+        try {
+            page = new PageSpec((float) x.doubleAttr("width", 595.28),
+                    (float) x.doubleAttr("height", 841.89), (float) x.doubleAttr("top", 54),
+                    (float) x.doubleAttr("right", 54), (float) x.doubleAttr("bottom", 54),
+                    (float) x.doubleAttr("left", 54)).withColumns(x.intAttr("columns", 1),
+                    (float) x.doubleAttr("columnGap", 36));
+        } catch (IllegalArgumentException e) {
+            throw damaged("page", e);
+        }
+        x.skipElement();
+        return page;
     }
 
     /// Reads the block whose start tag the scanner is on into `out`, or answers false when the
@@ -257,6 +322,25 @@ final class NativeFormat {
             if (p != null) {
                 out.add(p);
             }
+            return true;
+        }
+        if ("section".equals(x.name)) {
+            String id = id(x, ids);
+            boolean newPage = !"false".equals(x.attr("newPage"));
+            PageSpec page = null;
+            for (int e = x.next(); e != XmlScanner.END; e = x.next()) {
+                if (e == XmlScanner.EOF) {
+                    throw new IOException("Truncated section " + id);
+                }
+                if (e == XmlScanner.START) {
+                    if ("page".equals(x.name)) {
+                        page = readPage(x);
+                    } else {
+                        x.skipElement();
+                    }
+                }
+            }
+            out.add(new SectionBreak(id, page, newPage));
             return true;
         }
         return false;
@@ -286,6 +370,9 @@ final class NativeFormat {
         float spacing = (float) x.doubleAttr("spacing", 1.15);
         boolean pageBreak = x.boolAttr("pageBreak");
         boolean keepNext = x.boolAttr("keepNext");
+        float firstLine = (float) x.doubleAttr("firstLine", 0);
+        float rightIndent = (float) x.doubleAttr("rightIndent", 0);
+        List<TabStop> tabs = new ArrayList<TabStop>();
         RichText.Builder text = new RichText.Builder();
         int depth = 0;
         TextStyle style0 = null;
@@ -295,6 +382,11 @@ final class NativeFormat {
             }
             if (ev == XmlScanner.START) {
                 if ("previousFormat".equals(x.name)) {
+                    x.skipElement();
+                } else if ("tab".equals(x.name)) {
+                    String l = x.attr("leader");
+                    tabs.add(new TabStop((float) x.doubleAttr("pos", 0), x.attr("align"),
+                            l == null || l.length() == 0 ? 0 : l.charAt(0)));
                     x.skipElement();
                 } else if ("r".equals(x.name)) {
                     style0 = readStyle(x);
@@ -332,7 +424,8 @@ final class NativeFormat {
             }
         }
         return new Paragraph(id, style, align, list, level, start, before, after, indent, spacing,
-                pageBreak, keepNext, text.build());
+                pageBreak, keepNext, text.build()).withIndents(indent, firstLine, rightIndent)
+                .withTabs(tabs);
     }
 
     /// Reads to the end of a field and answers the style of the run inside it.
@@ -541,6 +634,10 @@ final class NativeFormat {
         float h = (float) x.doubleAttr("height", 0);
         String alt = x.attr("alt");
         String type = x.attr("type");
+        String wrap = x.attr("wrap");
+        String align = x.attr("align");
+        float offsetY = (float) x.doubleAttr("offsetY", 0);
+        float distance = (float) x.doubleAttr("distance", 9);
         StringBuilder data = new StringBuilder();
         for (int ev = x.next(); ev != XmlScanner.END; ev = x.next()) {
             if (ev == XmlScanner.EOF) {
@@ -558,6 +655,6 @@ final class NativeFormat {
                 || h <= 0) {
             return null;
         }
-        return new Picture(id, bytes, type, w, h, alt);
+        return new Picture(id, bytes, type, w, h, alt).withWrap(wrap, align, offsetY, distance);
     }
 }

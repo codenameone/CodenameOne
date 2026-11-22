@@ -55,6 +55,13 @@ final class OdtReader {
     private final Map<String, String> masterPages = new HashMap<String, String>();
     private final Map<String, PageSpec> layouts = new HashMap<String, PageSpec>();
     private boolean trackChanges;
+    /// Header and footer blocks: default header, first header, default footer, first footer.
+    @SuppressWarnings("unchecked")
+    private final List<Block>[] furniture = new List[4];
+    private boolean inBody;
+    private boolean bodyStarted;
+    private PageSpec firstPage;
+    private PageSpec currentPage;
     private int noteCounter;
     private int commentCounter;
 
@@ -73,6 +80,12 @@ final class OdtReader {
         String parent;
         String listStyle;
         Integer outline;
+        String master;
+        String wrap;
+        String horizontal;
+        float distance = -1;
+        int columns;
+        float columnGap = 36;
         final DocxReader.Props run = new DocxReader.Props();
         final DocxReader.Para para = new DocxReader.Para();
     }
@@ -112,17 +125,37 @@ final class OdtReader {
                 trackChanges = !"false".equals(x.attr("track-changes"));
                 readChanges(x);
             } else if ("text".equals(n)) {
+                inBody = true;
                 content(x, blocks, null);
+                inBody = false;
             } else if ("font-face-decls".equals(n) || "scripts".equals(n)) {
                 x.skipElement();
             }
         }
-        PageSpec page = null;
+        PageSpec page = firstPage;
         String layout = masterLayout;
-        if (layout != null) {
+        if (page == null && layout != null) {
             page = layouts.get(layout);
         }
-        return new Document(blocks, page, title, ids.peek(), comments, trackChanges);
+        Document d = new Document(blocks, page, title, ids.peek(), comments, trackChanges);
+        if (furniture[0] != null || furniture[1] != null || furniture[2] != null
+                || furniture[3] != null) {
+            d = d.withHeaders(furniture[0], furniture[2], furniture[1], furniture[3]);
+        }
+        return d.withNextId(Math.max(d.nextId, ids.peek()));
+    }
+
+    private PageSpec masterPage(String master) {
+        String layout = master == null ? null : masterPages.get(master);
+        return layout == null ? null : layouts.get(layout);
+    }
+
+    private PageSpec pageNow() {
+        if (currentPage != null) {
+            return currentPage;
+        }
+        PageSpec p = masterLayout == null ? null : layouts.get(masterLayout);
+        return p == null ? PageSpec.A4 : p;
     }
 
     private String readTitle() throws IOException {
@@ -166,15 +199,41 @@ final class OdtReader {
                     if (f == XmlScanner.START) {
                         if ("master-page".equals(x.name)) {
                             String layout = x.attr("page-layout-name");
+                            boolean standard = masterLayout == null
+                                    || "Standard".equals(x.attr("name"));
                             masterPages.put(x.attr("name"), layout);
-                            if (masterLayout == null || "Standard".equals(x.attr("name"))) {
+                            if (standard) {
                                 masterLayout = layout;
                             }
+                            masterFurniture(x, standard);
+                        } else {
+                            x.skipElement();
                         }
-                        x.skipElement();
                     }
                 }
             }
+        }
+    }
+
+    /// Reads a master page's header and footer; the model keeps the standard page's.
+    private void masterFurniture(XmlScanner x, boolean keep) throws IOException {
+        for (int e = x.next(); e != XmlScanner.END; e = x.next()) {
+            if (e == XmlScanner.EOF) {
+                throw new IOException("The OpenDocument file is truncated");
+            }
+            if (e != XmlScanner.START) {
+                continue;
+            }
+            String n = x.name;
+            int slot = "header".equals(n) ? 0 : "header-first".equals(n) ? 1
+                    : "footer".equals(n) ? 2 : "footer-first".equals(n) ? 3 : -1;
+            if (slot < 0 || !keep || "false".equals(x.attr("display"))) {
+                x.skipElement();
+                continue;
+            }
+            List<Block> b = new ArrayList<Block>();
+            content(x, b, null);
+            furniture[slot] = b;
         }
     }
 
@@ -206,8 +265,8 @@ final class OdtReader {
                     }
                 }
                 String master = x.attr("master-page-name");
-                if (master != null && master.length() > 0 && masterPages.get(master) != null) {
-                    masterLayout = masterPages.get(master);
+                if (master != null && master.length() > 0) {
+                    s.master = master;
                 }
                 for (int f = x.next(); f != XmlScanner.END; f = x.next()) {
                     if (f == XmlScanner.EOF) {
@@ -216,10 +275,29 @@ final class OdtReader {
                     if (f != XmlScanner.START) {
                         continue;
                     }
-                    if ("text-properties".equals(x.name)) {
+                    String c = x.name;
+                    if ("text-properties".equals(c)) {
                         textProps(x, s.run);
-                    } else if ("paragraph-properties".equals(x.name)) {
+                    } else if ("paragraph-properties".equals(c)) {
                         paraProps(x, s.para);
+                        s.para.tabs = tabStops(x);
+                        continue;
+                    } else if ("graphic-properties".equals(c)) {
+                        String wrap = x.attr("wrap");
+                        String run = x.attr("run-through");
+                        s.wrap = "parallel".equals(wrap) || "dynamic".equals(wrap)
+                                || "left".equals(wrap) || "right".equals(wrap)
+                                || "biggest".equals(wrap) ? Picture.SQUARE
+                                : "none".equals(wrap) ? Picture.TOP_BOTTOM
+                                : "background".equals(run) ? Picture.BEHIND : Picture.IN_FRONT;
+                        String h = x.attr("horizontal-pos");
+                        s.horizontal = "right".equals(h) || "outside".equals(h) ? Picture.RIGHT
+                                : "center".equals(h) ? Picture.CENTER : Picture.LEFT;
+                        s.distance = Math.max(length(x.attr("margin-left"), 0),
+                                length(x.attr("margin-right"), 0));
+                    } else if ("section-properties".equals(c)) {
+                        s.columns = columnsOf(x, s);
+                        continue;
                     }
                     x.skipElement();
                 }
@@ -263,15 +341,22 @@ final class OdtReader {
                     if ("page-layout-properties".equals(x.name) && name != null) {
                         float w = length(x.attr("page-width"), 595.28f);
                         float h = length(x.attr("page-height"), 841.89f);
+                        PageSpec spec = null;
                         try {
-                            layouts.put(name, new PageSpec(w, h,
+                            spec = new PageSpec(w, h,
                                     length(x.attr("margin-top"), 72),
                                     length(x.attr("margin-right"), 72),
                                     length(x.attr("margin-bottom"), 72),
-                                    length(x.attr("margin-left"), 72)));
+                                    length(x.attr("margin-left"), 72));
                         } catch (IllegalArgumentException ignored) {
                             // a layout with no room: keep the default
                         }
+                        Style cols = new Style();
+                        int count = columnsOf(x, cols);
+                        if (spec != null) {
+                            layouts.put(name, spec.withColumns(count, cols.columnGap));
+                        }
+                        continue;
                     }
                     x.skipElement();
                 }
@@ -279,6 +364,66 @@ final class OdtReader {
                 x.skipElement();
             }
         }
+    }
+
+    /// The tab stops among a paragraph-properties element's children, read to its end.
+    private static List<TabStop> tabStops(XmlScanner x) throws IOException {
+        List<TabStop> out = null;
+        for (int e = x.next(); e != XmlScanner.END; e = x.next()) {
+            if (e == XmlScanner.EOF) {
+                throw new IOException("The OpenDocument file is truncated");
+            }
+            if (e != XmlScanner.START) {
+                continue;
+            }
+            if (!"tab-stops".equals(x.name)) {
+                x.skipElement();
+                continue;
+            }
+            out = new ArrayList<TabStop>();
+            for (int f = x.next(); f != XmlScanner.END; f = x.next()) {
+                if (f == XmlScanner.EOF) {
+                    throw new IOException("The OpenDocument file is truncated");
+                }
+                if (f == XmlScanner.START) {
+                    tabStop(x, out);
+                }
+            }
+        }
+        return out;
+    }
+
+    private static void tabStop(XmlScanner x, List<TabStop> out) throws IOException {
+        if ("tab-stop".equals(x.name) && out.size() < 64) {
+            String type = x.attr("type");
+            String a = "char".equals(type) ? TabStop.DECIMAL : "right".equals(type)
+                    ? TabStop.RIGHT : "center".equals(type) ? TabStop.CENTER : TabStop.LEFT;
+            String text = x.attr("leader-text");
+            String ls = x.attr("leader-style");
+            char leader = text != null && text.length() == 1 ? text.charAt(0)
+                    : "dotted".equals(ls) ? '.' : "solid".equals(ls) ? '_' : 0;
+            out.add(new TabStop(length(x.attr("position"), 0), a, leader));
+        }
+        x.skipElement();
+    }
+
+    /// The column count among an element's children, read to its end; the gap goes into
+    /// `into`.
+    private static int columnsOf(XmlScanner x, Style into) throws IOException {
+        int count = 1;
+        for (int e = x.next(); e != XmlScanner.END; e = x.next()) {
+            if (e == XmlScanner.EOF) {
+                throw new IOException("The OpenDocument file is truncated");
+            }
+            if (e == XmlScanner.START) {
+                if ("columns".equals(x.name)) {
+                    count = x.intAttr("column-count", 1);
+                    into.columnGap = length(x.attr("column-gap"), 36);
+                }
+                x.skipElement();
+            }
+        }
+        return count;
     }
 
     /// A length in points from an ODF measure such as `2cm`, `12pt` or `0.5in`.
@@ -386,6 +531,12 @@ final class OdtReader {
         }
         if (x.attr("fo:margin-left") != null) {
             p.indent = Float.valueOf(length(x.attr("fo:margin-left"), 0));
+        }
+        if (x.attr("fo:margin-right") != null) {
+            p.rightIndent = Float.valueOf(length(x.attr("fo:margin-right"), 0));
+        }
+        if (x.attr("fo:text-indent") != null) {
+            p.firstLine = Float.valueOf(length(x.attr("fo:text-indent"), 0));
         }
         String lh = x.attr("fo:line-height");
         if (lh != null && lh.endsWith("%")) {
@@ -602,6 +753,18 @@ final class OdtReader {
                 if (t != null) {
                     out.add(t);
                 }
+            } else if ("section".equals(n) && inBody && list == null) {
+                Style st = styles.get(x.attr("style-name"));
+                int cols = st == null ? 0 : st.columns;
+                if (cols > 1) {
+                    PageSpec around = pageNow();
+                    out.add(new SectionBreak(ids.next('p'), around.withColumns(cols,
+                            st.columnGap), false));
+                    content(x, out, list);
+                    out.add(new SectionBreak(ids.next('p'), around, false));
+                } else {
+                    content(x, out, list);
+                }
             } else if ("section".equals(n) || "index-body".equals(n) || "deletion".equals(n)
                     || "table-of-content".equals(n) || "alphabetical-index".equals(n)) {
                 if ("table-of-content".equals(n) || "alphabetical-index".equals(n)) {
@@ -658,6 +821,19 @@ final class OdtReader {
             throws IOException {
         String styleName = x.attr("style-name");
         int level = heading ? Math.max(1, x.intAttr("outline-level", 1)) : 0;
+        Style own = styleName == null ? null : styles.get(styleName);
+        if (inBody && own != null && own.master != null && masterPage(own.master) != null) {
+            PageSpec mp = masterPage(own.master);
+            if (!bodyStarted) {
+                firstPage = mp;
+            } else {
+                out.add(new SectionBreak(ids.next('p'), mp, true));
+            }
+            currentPage = mp;
+        }
+        if (inBody) {
+            bodyStarted = true;
+        }
         Para p = new Para(ids.next('p'));
         DocxReader.Props base = runOf(styleName);
         spans(x, p, base);
@@ -686,7 +862,12 @@ final class OdtReader {
                 props.indent == null ? 0 : Math.max(0, props.indent.floatValue()),
                 props.spacing == null ? 1 : props.spacing.floatValue(),
                 props.pageBreak != null && props.pageBreak.booleanValue(),
-                props.keepNext != null && props.keepNext.booleanValue(), text));
+                props.keepNext != null && props.keepNext.booleanValue(), text)
+                .withIndents(props.indent == null ? 0 : Math.max(0, props.indent.floatValue()),
+                        props.firstLine == null ? 0 : props.firstLine.floatValue(),
+                        props.rightIndent == null ? 0 : Math.max(0,
+                        props.rightIndent.floatValue()))
+                .withTabs(props.tabs));
     }
 
     private static RichText trimEnd(RichText t) {
@@ -928,6 +1109,9 @@ final class OdtReader {
         float w = length(x.attr("width"), 0);
         float h = length(x.attr("height"), 0);
         String alt = x.attr("name");
+        String anchor = x.attr("anchor-type");
+        Style gs = styles.get(x.attr("style-name"));
+        float y = length(x.attr("y"), 0);
         String href = null;
         String desc = null;
         int depth = 1;
@@ -966,7 +1150,14 @@ final class OdtReader {
             w = 100;
             h = 100;
         }
-        return new Picture(ids.next('i'), data, null, w, h, desc != null ? desc : alt);
+        Picture pic = new Picture(ids.next('i'), data, null, w, h, desc != null ? desc : alt);
+        boolean floats = "paragraph".equals(anchor) || "char".equals(anchor);
+        if (floats && gs != null && gs.wrap != null) {
+            pic = pic.withWrap(gs.wrap, gs.horizontal, y, gs.distance < 0 ? 9 : gs.distance);
+        } else if (floats) {
+            pic = pic.withWrap(Picture.SQUARE, Picture.LEFT, y, 9);
+        }
+        return pic;
     }
 
     // ------------------------------------------------------------------ tables

@@ -1379,17 +1379,19 @@ public final class DocumentLayout {
         }
         LayoutItem bestLine = null;
         float bestDy = Float.MAX_VALUE;
+        float bestLineDx = Float.MAX_VALUE;
         for (LayoutItem it : pages.get(page).getItems()) {
             if (it.paragraphId == null || it.kind == LayoutItem.FILL
                     || it.kind == LayoutItem.LINE) {
                 continue;
             }
             float dy = y < it.y ? it.y - y : y > it.y + it.height ? y - it.y - it.height : 0;
-            // with columns or text beside a float, several lines share a height: the nearest
-            // box wins, not the first line found at that height
-            dy += x < it.x ? it.x - x : x > it.x + it.width ? x - it.x - it.width : 0;
-            if (dy < bestDy) {
+            // the nearest line wins; with columns or text beside a float several lines share a
+            // height, and then the horizontally nearest of them
+            float dx = x < it.x ? it.x - x : x > it.x + it.width ? x - it.x - it.width : 0;
+            if (dy < bestDy - 0.01f || Math.abs(dy - bestDy) <= 0.01f && dx < bestLineDx) {
                 bestDy = dy;
+                bestLineDx = dx;
                 bestLine = it;
             }
         }

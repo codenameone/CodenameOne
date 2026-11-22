@@ -74,6 +74,13 @@ final class DocxReader {
     private String minorFont = "Calibri";
     private PageSpec page;
     private int noteCounter;
+    /// Every section's page and start, in order; the body's last one closes the list.
+    private final List<PageSpec> sectionPages = new ArrayList<PageSpec>();
+    private final List<Boolean> sectionNewPage = new ArrayList<Boolean>();
+    /// `{default header, first header, default footer, first footer}` part names.
+    private String[] furnitureParts;
+    private boolean titlePage;
+    private boolean sectionPending;
 
     private DocxReader(Map<String, byte[]> parts) {
         this.parts = parts;
@@ -140,6 +147,9 @@ final class DocxReader {
         String numId;
         Integer level;
         Integer outline;
+        Float firstLine;
+        Float rightIndent;
+        List<TabStop> tabs;
 
         void overlay(Para p) {
             if (p == null) {
@@ -155,6 +165,9 @@ final class DocxReader {
             numId = p.numId != null ? p.numId : numId;
             level = p.level != null ? p.level : level;
             outline = p.outline != null ? p.outline : outline;
+            firstLine = p.firstLine != null ? p.firstLine : firstLine;
+            rightIndent = p.rightIndent != null ? p.rightIndent : rightIndent;
+            tabs = p.tabs != null ? p.tabs : tabs;
         }
     }
 
@@ -211,7 +224,55 @@ final class DocxReader {
                 }
             }
         }
-        return new Document(blocks, page, title, ids.peek(), buildComments(), readTrackChanges());
+        List<Block> body = new ArrayList<Block>();
+        int k = 0;
+        for (Block b : blocks) {
+            if (b instanceof SectionBreak) {
+                // a break carries the page of the section after it, Word the one before
+                k++;
+                if (k < sectionPages.size()) {
+                    body.add(new SectionBreak(b.id(), sectionPages.get(k),
+                            sectionNewPage.get(k).booleanValue()));
+                }
+            } else {
+                body.add(b);
+            }
+        }
+        PageSpec first = sectionPages.isEmpty() ? page : sectionPages.get(0);
+        Document d = new Document(body, first, title, ids.peek(), buildComments(),
+                readTrackChanges());
+        if (furnitureParts != null) {
+            d = d.withHeaders(furniture(furnitureParts[0]), furniture(furnitureParts[2]),
+                    titlePage ? furnitureOrEmpty(furnitureParts[1]) : null,
+                    titlePage ? furnitureOrEmpty(furnitureParts[3]) : null);
+        }
+        return d.withNextId(Math.max(d.nextId, ids.peek()));
+    }
+
+    private List<Block> furnitureOrEmpty(String part) throws IOException {
+        List<Block> b = furniture(part);
+        return b == null ? new ArrayList<Block>() : b;
+    }
+
+    /// The blocks of a header or footer part, read against that part's own relationships.
+    private List<Block> furniture(String part) throws IOException {
+        if (part == null || !parts.containsKey(part)) {
+            return null;
+        }
+        Map<String, String[]> saved = new HashMap<String, String[]>(rels);
+        rels.clear();
+        readRels(part);
+        List<Block> out = new ArrayList<Block>();
+        try {
+            XmlScanner x = scanner(part);
+            if (root(x)) {
+                content(x, out, false);
+            }
+        } finally {
+            rels.clear();
+            rels.putAll(saved);
+        }
+        return out;
     }
 
     // ------------------------------------------------------------------ package plumbing
@@ -589,7 +650,17 @@ final class DocxReader {
             }
             String n = x.name;
             if ("p".equals(n)) {
+                sectionPending = false;
                 paragraph(x, out);
+                if (sectionPending && body) {
+                    sectionPending = false;
+                    Block last = out.isEmpty() ? null : out.get(out.size() - 1);
+                    if (last instanceof Paragraph && ((Paragraph) last).text.length() == 0) {
+                        // the empty paragraph that only carried the section's properties
+                        out.remove(out.size() - 1);
+                    }
+                    out.add(new SectionBreak(ids.next('p'), null, true));
+                }
             } else if ("tbl".equals(n)) {
                 Table t = table(x);
                 if (t != null) {
@@ -613,25 +684,55 @@ final class DocxReader {
         float right = 72;
         float bottom = 72;
         float left = 72;
+        int columns = 1;
+        float gap = 36;
+        boolean newPage = true;
+        String[] refs = new String[4];
+        boolean title = false;
         for (int e = x.next(); e != XmlScanner.END && e != XmlScanner.EOF; e = x.next()) {
             if (e != XmlScanner.START) {
                 continue;
             }
-            if ("pgSz".equals(x.name)) {
+            String n = x.name;
+            if ("pgSz".equals(n)) {
                 w = twips(x.attr("w"), w);
                 h = twips(x.attr("h"), h);
-            } else if ("pgMar".equals(x.name)) {
+            } else if ("pgMar".equals(n)) {
                 top = Math.abs(twips(x.attr("top"), top));
                 right = twips(x.attr("right"), right);
                 bottom = Math.abs(twips(x.attr("bottom"), bottom));
                 left = twips(x.attr("left"), left);
+            } else if ("cols".equals(n)) {
+                columns = x.intAttr("num", 1);
+                gap = twips(x.attr("space"), 36);
+            } else if ("type".equals(n)) {
+                newPage = !"continuous".equals(x.attr("val"));
+            } else if ("titlePg".equals(n)) {
+                title = onOff(x);
+            } else if ("headerReference".equals(n) || "footerReference".equals(n)) {
+                String[] rel = rels.get(x.attr("id"));
+                int slot = ("footerReference".equals(n) ? 2 : 0)
+                        + ("first".equals(x.attr("type")) ? 1 : 0);
+                if (rel != null && !"even".equals(x.attr("type"))) {
+                    refs[slot] = rel[1];
+                }
             }
             x.skipElement();
         }
+        PageSpec spec = page;
         try {
-            page = new PageSpec(w, h, top, right, bottom, left);
+            spec = new PageSpec(w, h, top, right, bottom, left).withColumns(columns, gap);
         } catch (IllegalArgumentException ignored) {
             // margins that leave no room: keep the previous geometry
+        }
+        page = spec;
+        sectionPages.add(spec == null ? PageSpec.A4 : spec);
+        sectionNewPage.add(Boolean.valueOf(newPage));
+        boolean any = refs[0] != null || refs[1] != null || refs[2] != null || refs[3] != null;
+        if (furnitureParts == null && any) {
+            // the model has one set of headers: the first section that names any gives it
+            furnitureParts = refs;
+            titlePage = title;
         }
     }
 
@@ -765,7 +866,11 @@ final class DocxReader {
                 p.indent == null ? 0 : Math.max(0, p.indent.floatValue()),
                 p.spacing == null ? 1 : p.spacing.floatValue(),
                 st.pageBreak || p.pageBreak != null && p.pageBreak.booleanValue(),
-                p.keepNext != null && p.keepNext.booleanValue(), built));
+                p.keepNext != null && p.keepNext.booleanValue(), built)
+                .withIndents(p.indent == null ? 0 : Math.max(0, p.indent.floatValue()),
+                        p.firstLine == null ? 0 : p.firstLine.floatValue(),
+                        p.rightIndent == null ? 0 : Math.max(0, p.rightIndent.floatValue()))
+                .withTabs(p.tabs));
     }
 
     /// A field still open when its paragraph ended; its result continues as ordinary text.
@@ -813,6 +918,15 @@ final class DocxReader {
                 if (left != null) {
                     p.indent = Float.valueOf(twips(left, 0));
                 }
+                String rightInd = x.attr("right") != null ? x.attr("right") : x.attr("end");
+                if (rightInd != null) {
+                    p.rightIndent = Float.valueOf(twips(rightInd, 0));
+                }
+                if (x.attr("hanging") != null) {
+                    p.firstLine = Float.valueOf(-twips(x.attr("hanging"), 0));
+                } else if (x.attr("firstLine") != null) {
+                    p.firstLine = Float.valueOf(twips(x.attr("firstLine"), 0));
+                }
             } else if ("pageBreakBefore".equals(n)) {
                 p.pageBreak = Boolean.valueOf(onOff(x));
             } else if ("keepNext".equals(n)) {
@@ -828,6 +942,10 @@ final class DocxReader {
                 p.numId = x.attr("val");
             } else if ("sectPr".equals(n)) {
                 section(x);
+                sectionPending = true;
+                continue;
+            } else if ("tabs".equals(n)) {
+                p.tabs = tabs(x);
                 continue;
             }
             x.skipElement();
@@ -1299,11 +1417,43 @@ final class DocxReader {
 
     // ------------------------------------------------------------------ pictures
 
+    private List<TabStop> tabs(XmlScanner x) throws IOException {
+        List<TabStop> out = new ArrayList<TabStop>();
+        for (int e = x.next(); e != XmlScanner.END; e = x.next()) {
+            if (e == XmlScanner.EOF) {
+                throw new IOException("The Word document is truncated");
+            }
+            if (e != XmlScanner.START) {
+                continue;
+            }
+            if ("tab".equals(x.name) && out.size() < 64) {
+                String v = x.attr("val");
+                String l = x.attr("leader");
+                char leader = "dot".equals(l) || "middleDot".equals(l) ? '.'
+                        : "hyphen".equals(l) ? '-' : "underscore".equals(l)
+                        || "heavy".equals(l) ? '_' : 0;
+                if (v != null && !"clear".equals(v) && !"bar".equals(v)) {
+                    String a = "end".equals(v) ? TabStop.RIGHT : "start".equals(v)
+                            ? TabStop.LEFT : v;
+                    out.add(new TabStop(twips(x.attr("pos"), 0), a, leader));
+                }
+            }
+            x.skipElement();
+        }
+        return out;
+    }
+
     private Picture drawing(XmlScanner x) throws IOException {
         float w = 0;
         float h = 0;
         String alt = null;
         String embed = null;
+        String wrap = null;
+        String align = Picture.LEFT;
+        float offsetY = 0;
+        float distance = 0;
+        boolean behind = false;
+        String positioning = null;
         int depth = 1;
         while (depth > 0) {
             int e = x.next();
@@ -1318,6 +1468,35 @@ final class DocxReader {
                 continue;
             }
             depth++;
+            String n = x.name;
+            if ("anchor".equals(n) && wrap == null) {
+                wrap = Picture.IN_FRONT;
+                behind = onOffAttr(x.attr("behindDoc"));
+                distance = (float) (Math.max(x.doubleAttr("distL", 0), x.doubleAttr("distR", 0))
+                        / 12700);
+            } else if ("wrapSquare".equals(n) || "wrapTight".equals(n)
+                    || "wrapThrough".equals(n)) {
+                wrap = Picture.SQUARE;
+            } else if ("wrapTopAndBottom".equals(n)) {
+                wrap = Picture.TOP_BOTTOM;
+            } else if ("wrapNone".equals(n)) {
+                wrap = behind ? Picture.BEHIND : Picture.IN_FRONT;
+            } else if ("positionH".equals(n) || "positionV".equals(n)) {
+                positioning = n;
+            } else if ("align".equals(n) && "positionH".equals(positioning)) {
+                String v = x.elementText();
+                depth--;
+                align = "right".equals(v) || "outside".equals(v) ? Picture.RIGHT
+                        : "center".equals(v) ? Picture.CENTER : Picture.LEFT;
+            } else if ("posOffset".equals(n) && "positionV".equals(positioning)) {
+                String v = x.elementText();
+                depth--;
+                try {
+                    offsetY = (float) (Double.parseDouble(v.trim()) / 12700);
+                } catch (NumberFormatException ignored) {
+                    offsetY = 0;
+                }
+            }
             if ("extent".equals(x.name) && w == 0) {
                 w = (float) (x.doubleAttr("cx", 0) / 12700);
                 h = (float) (x.doubleAttr("cy", 0) / 12700);
@@ -1330,7 +1509,14 @@ final class DocxReader {
                 embed = x.attr("embed");
             }
         }
-        return picture(embed, w, h, alt);
+        Picture pic = picture(embed, w, h, alt);
+        if (pic != null && wrap != null) {
+            if (Picture.IN_FRONT.equals(wrap) && behind) {
+                wrap = Picture.BEHIND;
+            }
+            pic = pic.withWrap(wrap, align, offsetY, distance);
+        }
+        return pic;
     }
 
     private Picture vml(XmlScanner x) throws IOException {

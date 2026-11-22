@@ -54,7 +54,11 @@ final class DocxWriter {
     private final Document doc;
     private final Map<String, String> media = new LinkedHashMap<String, String>();
     private final List<byte[]> mediaData = new ArrayList<byte[]>();
-    private final List<String[]> rels = new ArrayList<String[]>();
+    /// The relationships of the part being written; a header has its own.
+    private List<String[]> rels = new ArrayList<String[]>();
+    /// `{part name, root element, relationships}` of each header and footer written.
+    private final List<Object[]> furniture = new ArrayList<Object[]>();
+    private String headerRefs = "";
     private final StringBuilder footnotes = new StringBuilder(); //NOPMD AvoidStringBufferField - a single-use writer owns its output
     private final StringBuilder endnotes = new StringBuilder(); //NOPMD AvoidStringBufferField - a single-use writer owns its output
     private final Set<String> styleNames = new LinkedHashSet<String>();
@@ -85,21 +89,30 @@ final class DocxWriter {
                 commentIds.put(c.id, Integer.valueOf(n++));
             }
         }
+        headerRefs = headerParts();
         StringBuilder body = new StringBuilder();
         body.append(XML).append("<w:document").append(NS).append("><w:body>");
-        blocks(body, doc.blocks);
-        if (doc.page != null) {
-            PageSpec p = doc.page;
-            body.append("<w:sectPr><w:pgSz w:w=\"").append(tw(p.width)).append("\" w:h=\"")
-                    .append(tw(p.height)).append('"');
-            if (p.width > p.height) {
-                body.append(" w:orient=\"landscape\"");
+        // Word keeps a section's properties at its end: in the last paragraph of each section
+        // but the final one, whose properties close the body
+        PageSpec page = doc.page;
+        boolean continuous = false;
+        List<Block> section = new ArrayList<Block>();
+        for (Block block : doc.blocks) {
+            if (block instanceof SectionBreak) {
+                blocks(body, section);
+                section.clear();
+                body.append("<w:p><w:pPr>");
+                sectPr(body, page, continuous);
+                body.append("</w:pPr></w:p>");
+                SectionBreak br = (SectionBreak) block;
+                page = br.page;
+                continuous = !br.newPage;
+            } else {
+                section.add(block);
             }
-            body.append("/><w:pgMar w:top=\"").append(tw(p.top)).append("\" w:right=\"")
-                    .append(tw(p.right)).append("\" w:bottom=\"").append(tw(p.bottom))
-                    .append("\" w:left=\"").append(tw(p.left))
-                    .append("\" w:header=\"720\" w:footer=\"720\" w:gutter=\"0\"/></w:sectPr>");
         }
+        blocks(body, section);
+        sectPr(body, page, continuous);
         body.append("</w:body></w:document>");
 
         ZipArchiveOutputStream zip = new ZipArchiveOutputStream(out);
@@ -124,6 +137,18 @@ final class DocxWriter {
             entry(zip, "word/comments.xml", comments());
         }
         entry(zip, "word/_rels/document.xml.rels", documentRels());
+        for (Object[] f : furniture) {
+            entry(zip, "word/" + f[0], (String) f[1]);
+            @SuppressWarnings("unchecked")
+            List<String[]> own = (List<String[]>) f[2];
+            StringBuilder r = new StringBuilder(XML);
+            r.append("<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/")
+                    .append("relationships\">");
+            for (String[] x : own) {
+                rel(r, x[0], x[1], x[2], "1".equals(x[3]));
+            }
+            entry(zip, "word/_rels/" + f[0] + ".rels", r.append("</Relationships>").toString());
+        }
         int i = 0;
         for (String name : media.values()) {
             byte[] data = mediaData.get(i++);
@@ -140,6 +165,65 @@ final class DocxWriter {
         zip.putNextEntry(new ZipEntry(name));
         zip.write(b, 0, b.length);
         zip.closeEntry();
+    }
+
+    private void sectPr(StringBuilder b, PageSpec p, boolean continuous) {
+        b.append("<w:sectPr>").append(headerRefs);
+        if (continuous) {
+            b.append("<w:type w:val=\"continuous\"/>");
+        }
+        b.append("<w:pgSz w:w=\"").append(tw(p.width)).append("\" w:h=\"").append(tw(p.height))
+                .append('"');
+        if (p.width > p.height) {
+            b.append(" w:orient=\"landscape\"");
+        }
+        b.append("/><w:pgMar w:top=\"").append(tw(p.top)).append("\" w:right=\"")
+                .append(tw(p.right)).append("\" w:bottom=\"").append(tw(p.bottom))
+                .append("\" w:left=\"").append(tw(p.left)).append("\" w:header=\"")
+                .append(tw(Math.min(36, p.top * 0.5f))).append("\" w:footer=\"")
+                .append(tw(Math.min(36, p.bottom * 0.5f))).append("\" w:gutter=\"0\"/>");
+        if (p.columns > 1) {
+            b.append("<w:cols w:num=\"").append(p.columns).append("\" w:space=\"")
+                    .append(tw(p.columnGap)).append("\"/>");
+        }
+        if (doc.firstHeader != null || doc.firstFooter != null) {
+            b.append("<w:titlePg/>");
+        }
+        b.append("</w:sectPr>");
+    }
+
+    /// Writes the header and footer parts and answers the references every section carries.
+    private String headerParts() {
+        StringBuilder refs = new StringBuilder();
+        furniturePart(refs, "header", "hdr", "default", doc.header, !doc.header.isEmpty());
+        furniturePart(refs, "header", "hdr", "first", doc.firstHeader, doc.firstHeader != null);
+        furniturePart(refs, "footer", "ftr", "default", doc.footer, !doc.footer.isEmpty());
+        furniturePart(refs, "footer", "ftr", "first", doc.firstFooter, doc.firstFooter != null);
+        return refs.toString();
+    }
+
+    private void furniturePart(StringBuilder refs, String kind, String root, String type,
+            List<Block> blocks, boolean present) {
+        if (!present) {
+            return;
+        }
+        String name = kind + (furniture.size() + 1) + ".xml";
+        String id = "rIdH" + (furniture.size() + 1);
+        List<String[]> saved = rels;
+        rels = new ArrayList<String[]>();
+        StringBuilder b = new StringBuilder(XML);
+        b.append("<w:").append(root).append(NS).append('>');
+        blocks(b, blocks);
+        if (blocks.isEmpty()) {
+            // an empty first-page header still needs a paragraph
+            b.append("<w:p/>");
+        }
+        b.append("</w:").append(root).append('>');
+        furniture.add(new Object[] {name, b.toString(), rels});
+        rels = saved;
+        rels.add(new String[] {id, kind, name, ""});
+        refs.append("<w:").append(kind).append("Reference w:type=\"").append(type)
+                .append("\" r:id=\"").append(id).append("\"/>");
     }
 
     private static String tw(float pt) {
@@ -166,6 +250,11 @@ final class DocxWriter {
         override(b, "/word/endnotes.xml", wp + "endnotes+xml");
         if (!commentIds.isEmpty()) {
             override(b, "/word/comments.xml", wp + "comments+xml");
+        }
+        for (Object[] f : furniture) {
+            String name = (String) f[0];
+            override(b, "/word/" + name, wp + (name.startsWith("header") ? "header" : "footer")
+                    + "+xml");
         }
         override(b, "/docProps/core.xml", "application/vnd.openxmlformats-package.core-properties+xml");
         return b.append("</Types>").toString();
@@ -405,8 +494,29 @@ final class DocxWriter {
         b.append("<w:spacing w:before=\"").append(tw(p.before)).append("\" w:after=\"")
                 .append(tw(p.after)).append("\" w:line=\"").append(Math.round(p.lineSpacing * 240))
                 .append("\" w:lineRule=\"auto\"/>");
-        if (p.indent != 0) {
-            b.append("<w:ind w:left=\"").append(tw(p.indent)).append("\"/>");
+        if (!p.tabs.isEmpty()) {
+            b.append("<w:tabs>");
+            for (TabStop t : p.tabs) {
+                b.append("<w:tab w:val=\"").append(t.alignment).append('"');
+                if (t.leader != 0) {
+                    b.append(" w:leader=\"").append(t.leader == '.' ? "dot" : t.leader == '-'
+                            ? "hyphen" : "underscore").append('"');
+                }
+                b.append(" w:pos=\"").append(tw(t.position)).append("\"/>");
+            }
+            b.append("</w:tabs>");
+        }
+        if (p.indent != 0 || p.firstLine != 0 || p.rightIndent != 0) {
+            b.append("<w:ind w:left=\"").append(tw(p.indent)).append('"');
+            if (p.rightIndent != 0) {
+                b.append(" w:right=\"").append(tw(p.rightIndent)).append('"');
+            }
+            if (p.firstLine > 0) {
+                b.append(" w:firstLine=\"").append(tw(p.firstLine)).append('"');
+            } else if (p.firstLine < 0) {
+                b.append(" w:hanging=\"").append(tw(-p.firstLine)).append('"');
+            }
+            b.append("/>");
         }
         if (!Paragraph.LEFT.equals(p.align)) {
             b.append("<w:jc w:val=\"").append(Paragraph.JUSTIFY.equals(p.align) ? "both"
@@ -698,9 +808,32 @@ final class DocxWriter {
         long cx = Math.round(p.width * 12700.0);
         long cy = Math.round(p.height * 12700.0);
         int n = ++drawingCount;
-        b.append("<w:drawing><wp:inline distT=\"0\" distB=\"0\" distL=\"0\" distR=\"0\">")
-                .append("<wp:extent cx=\"").append(cx).append("\" cy=\"").append(cy)
-                .append("\"/><wp:docPr id=\"").append(n).append("\" name=\"Picture ").append(n)
+        if (p.isFloating()) {
+            long d = Math.round(p.distance * 12700.0);
+            b.append("<w:drawing><wp:anchor distT=\"0\" distB=\"").append(d).append("\" distL=\"")
+                    .append(d).append("\" distR=\"").append(d).append("\" simplePos=\"0\" ")
+                    .append("relativeHeight=\"").append(n).append("\" behindDoc=\"")
+                    .append(Picture.BEHIND.equals(p.wrap) ? 1 : 0).append("\" locked=\"0\" ")
+                    .append("layoutInCell=\"1\" allowOverlap=\"1\"><wp:simplePos x=\"0\" y=\"0\"/>")
+                    .append("<wp:positionH relativeFrom=\"column\"><wp:align>").append(p.align)
+                    .append("</wp:align></wp:positionH><wp:positionV relativeFrom=\"paragraph\">")
+                    .append("<wp:posOffset>").append(Math.round(p.offsetY * 12700.0))
+                    .append("</wp:posOffset></wp:positionV><wp:extent cx=\"").append(cx)
+                    .append("\" cy=\"").append(cy).append("\"/>");
+            if (Picture.SQUARE.equals(p.wrap)) {
+                b.append("<wp:wrapSquare wrapText=\"bothSides\"/>");
+            } else if (Picture.TOP_BOTTOM.equals(p.wrap)) {
+                b.append("<wp:wrapTopAndBottom/>");
+            } else {
+                b.append("<wp:wrapNone/>");
+            }
+            b.append("<wp:docPr id=\"");
+        } else {
+            b.append("<w:drawing><wp:inline distT=\"0\" distB=\"0\" distL=\"0\" distR=\"0\">")
+                    .append("<wp:extent cx=\"").append(cx).append("\" cy=\"").append(cy)
+                    .append("\"/><wp:docPr id=\"");
+        }
+        b.append(n).append("\" name=\"Picture ").append(n)
                 .append("\" descr=\"");
         esc(b, p.description);
         b.append("\"/><a:graphic><a:graphicData uri=\"http://schemas.openxmlformats.org/")
@@ -711,7 +844,7 @@ final class DocxWriter {
                 .append("<pic:spPr><a:xfrm><a:off x=\"0\" y=\"0\"/><a:ext cx=\"").append(cx)
                 .append("\" cy=\"").append(cy).append("\"/></a:xfrm><a:prstGeom prst=\"rect\">")
                 .append("<a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic>")
-                .append("</wp:inline></w:drawing>");
+                .append(p.isFloating() ? "</wp:anchor></w:drawing>" : "</wp:inline></w:drawing>");
     }
 
     // ------------------------------------------------------------------ tables
