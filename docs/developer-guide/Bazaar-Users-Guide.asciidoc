@@ -82,28 +82,38 @@ is declined. No money moves.
 
 === The shopper
 
-The home screen is the store's front page: its banner, its collections and new
-arrivals. The store button at the top switches to another store. Search finds
-products by name, tag or type, and the filter panel narrows the results by
-collection, price and availability and sorts them.
+The app opens straight into shopping. Nobody has to sign in to look around: the
+Discover tab shows every store on the platform, what's popular and the newest
+products across all of them, and Search runs across every store. Opening a store
+shows its own page: its banner, its collections and new arrivals, and a search
+that stays inside the store with filters for collection, price and availability.
+The arrow on the banner goes back to Discover.
 
 A product page shows its photos, its description and reviews, and lets the
 shopper choose a variant, such as a size and a color. A variant that's out of
-stock says so and can't be added. Products can be kept in the wishlist.
+stock says so and can't be added. Every store has a cart of its own, kept on
+the server for a guest too, and the Cart tab shows the one of the store the
+shopper is in, with a discount code field and an estimate of shipping and tax.
 
-The cart shows the lines, a discount code field and an estimate of shipping and
-tax. Checkout asks for the address, from the saved ones or a new one, the
-shipping method the store offers for it (including pickup or local delivery where
-the store has them), and the card. The card is held, not charged, until the
-order ships.
+The app asks for a sign-in only where an account is needed: at checkout, to
+follow a store, to save to the wishlist, and on the Orders and Account tabs. The
+guest's cart moves into the account, and the checkout carries on. Checkout asks
+for the address, from the saved ones or a new one, the shipping method the
+store offers for it (including pickup or local delivery where the store has
+them), and the card. A returning shopper finds their default address and card
+already chosen, so a repeat order is one tap on Place order. The card is held,
+not charged, until the order ships.
 
-The orders tab follows each order through its steps: placed, packed, shipped and
-delivered, with the carrier's tracking events. An order can be cancelled until
-it's packed. The shopper can download the invoice as a PDF, ask to return lines
-of a delivered order, and review the products they bought.
+Following a store puts its new products in a row of their own at the top of
+Discover. The orders tab follows each order through its steps: placed, packed,
+shipped and delivered, and shows each parcel's scans from the carrier, newest
+first. An order can be cancelled until it's packed. The shopper can download the
+invoice as a PDF, ask to return lines of a delivered order, and review the
+products they bought.
 
 The account tab holds the profile, saved addresses, the wallet of cards and the
-settings.
+settings. Store staff and administrators sign in from the account tab too; their
+role decides which home they land on.
 
 === The merchant
 

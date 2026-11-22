@@ -224,7 +224,7 @@ final class CartPane extends ShopPane {
         SignInGate.require(CN.getCurrentForm(), "Sign in to check out",
                 "Your cart comes with you. Next time your address and card are already "
                 + "filled in, so checking out takes a tap.",
-                () -> ShopState.loadCart(CheckoutForm::show));
+                () -> ShopState.loadCart(() -> ShopState.syncIfNeeded(CheckoutForm::show)));
     }
 
     /// The summary lines of `cart`, as [Estimate] decides them.

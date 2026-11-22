@@ -3,10 +3,12 @@
 //   URL=http://localhost:18081/ OUT=target/web-e2e node web-e2e.mjs
 //
 // It checks what a person opening the server's address gets: the app loads from
-// the server, reaches the welcome screen, signs in as the demo shopper, lands on
-// the home screen with its map, and has its live channel open. Then it signs
-// out, signs in as the demo admin and reaches the admin console. Last, a guest
-// buys on the website through the HTML checkout and opens the confirmation.
+// the server straight into shopping, as a guest -- Discover, a store, a
+// product, the cart -- and asks for a sign-in only at the checkout. The demo
+// shopper signs in there, the guest cart comes along, and the order is placed;
+// the live channel is open. Then it signs out (back to the guest shop), signs
+// in as the demo admin from the Account tab and reaches the admin console.
+// Last, a guest buys on the website through the HTML checkout.
 // run-web-e2e.sh builds everything, starts the server and runs this; see there.
 //
 // The app draws on a canvas, so there are no buttons in the page to ask a
@@ -184,12 +186,13 @@ async function typeInto(index, text, type) {
   await page.keyboard.type(text, { delay: 10 });
 }
 
-/// Fills in the sign-in form the welcome screen opens, and sends it.
+/// Fills in the sign-in form (the prompt's Sign in button opens it), and sends it.
 async function signInAs(who) {
-  await click(await waitFor('the welcome screen', startSeconds, button('Sign in')));
+  await settled();
+  await click(await waitFor('the sign-in prompt', startSeconds, button('Sign in')));
   await typeInto(0, who, 'email');
   await typeInto(1, password, 'password');
-  // The form's own button now: the welcome screen's is gone with its form.
+  // The form's own button now: the prompt's is gone with its form.
   await settled();
   await click(await waitFor('the form\'s Sign in button', stepSeconds, async () =>
       (await fields()).length >= 2 ? button('Sign in')() : null));
@@ -384,55 +387,76 @@ try {
     throw new Error('/ is served as ' + type + ', not as a page');
   }
 
-  // 1. The welcome screen: the app started, in the browser, from this server.
-  const signIn = await waitFor('the welcome screen', startSeconds, button('Sign in'));
-  await waitFor('the welcome screen to offer an account', stepSeconds, button('Create an account'));
-  await page.screenshot({ path: path.join(out, '1-welcome.png') });
-  say('the welcome screen is up');
+  const shot = name => page.screenshot({ path: path.join(out, name + '.png') });
+  const textOn = words => async () => (await screenText()).includes(words);
+  const named = words => async () =>
+      (await components()).find(c => c.text === words || c.label === words);
+
+  // 1. No sign-in wall: the app opens on Discover, as a guest, with the
+  //    platform's stores and the newest products across them.
+  await waitFor('Discover', startSeconds, textOn('New across Bazaar'));
+  await waitFor('a store on Discover', stepSeconds, named('Little Clay Studio'));
   for (const file of ['/app/translated_app.js', '/app/port.js', '/app/worker.js']) {
     if (!requests.includes('200 GET ' + file)) {
       throw new Error(file + ' was not served by this server: ' + requests.join(', '));
     }
   }
+  if (requests.some(r => r.includes('/api/me'))) {
+    throw new Error('a guest asked who it is: ' + requests.filter(r => r.includes('/api/me')));
+  }
+  await waitFor('the feed across stores', stepSeconds, async () =>
+      requests.some(r => r.startsWith('200 GET /api/shop/discover')));
+  await page.waitForTimeout(2000);
+  await settled();
+  await shot('1-home');
+  say('the app opened on Discover as a guest');
 
-  // 2. Signing in. The form is the app's own; the flow behind it is the
-  //    authorization-code flow against the server the page came from.
+  // 2. A store's page.
+  await click(await waitFor('Little Clay on Discover', stepSeconds, named('Little Clay Studio')));
+  await waitFor('the store page', stepSeconds, textOn('New arrivals'));
+  await page.waitForTimeout(1500);
+  await settled();
+  await shot('2-store');
+  say('opened the Little Clay Studio store page');
+
+  // 3. A product, into the cart, as a guest.
+  // A card's name: the first line of words under the "New arrivals" heading.
+  const productCard = async () => {
+    const all = await components();
+    const heading = all.filter(c => c.text === 'New arrivals').sort((a, b) => b.y - a.y)[0];
+    return heading && all.find(c => c.role !== 'button' && c.y > heading.y + 60
+        && c.y < 780 && c.height > 15 && c.text && !c.text.startsWith('$'));
+  };
+  await click(await waitFor('a product card', stepSeconds, productCard));
+  const add = await waitFor('the product page', stepSeconds, button('Add to cart'));
+  await page.waitForTimeout(1500);
+  await settled();
+  await shot('3-product');
+  await click(add);
+  await waitFor('the guest cart on the server', stepSeconds, async () =>
+      requests.some(r => /^200 POST \/api\/shop\/cart\/[^/]+\/lines/.test(r)));
+  say('a guest put a product in the cart');
+  await page.waitForTimeout(800);
+  await page.keyboard.press('Escape');
+  await page.goBack().catch(() => {});
+  await settled();
+  await click(await waitFor('the Cart tab', stepSeconds, button('Cart')));
+  const checkout = await waitFor('the cart', stepSeconds, button('Checkout'));
+  await settled();
+  await shot('4-cart');
+
+  // 4. The checkout is where a guest is first asked to sign in.
+  await click(checkout);
+  await waitFor('the sign-in prompt at checkout', stepSeconds, textOn('Sign in to check out'));
+  await settled();
+  await shot('5-sign-in-at-checkout');
+  say('the checkout asked the guest to sign in');
   await signInAs(email);
-
   // The first sign-in in a browser is asked whether usage statistics may be
   // shared. The answer is kept with the page's storage, so the admin's
   // sign-in further down is not asked again.
   await click(await waitFor('the usage statistics question', stepSeconds, button('Not now')));
   say('declined usage statistics');
-
-  // 3. The home screen. A shopper with more than one store to choose from is
-  //    first shown the directory; picking a store opens its home.
-  const landing = await waitFor('the home screen or the store directory', stepSeconds,
-      async () => {
-        const text = await screenText();
-        return text.includes('New arrivals') ? 'home'
-            : text.includes('Choose a store') ? 'directory' : null;
-      });
-  if (landing === 'directory') {
-    await settled();
-    await page.screenshot({ path: path.join(out, '2-stores.png') });
-    await click(await waitFor('a store in the directory', stepSeconds, async () =>
-        (await components()).find(c => c.text === 'Northwind Outfitters')));
-    say('chose Northwind Outfitters from the store directory');
-  }
-  await waitFor('the home screen', stepSeconds, async () =>
-      (await screenText()).includes('New arrivals'));
-  // The store's hero, read from the server: one of the seeded stores.
-  const seeded = ['Northwind', 'Little Clay'];
-  await waitFor('a seeded store on the home screen', stepSeconds, async () => {
-    const text = await screenText();
-    return seeded.some(name => text.includes(name));
-  });
-  // The cards are laid out on the next frame; let the photos and words land.
-  await page.waitForTimeout(1500);
-  await page.screenshot({ path: path.join(out, '3-home.png') });
-  say('signed in: the home screen is up');
-
   const expected = ['200 POST /login', '200 GET /signin/code', '200 POST /oauth2/token',
     '200 GET /api/me'];
   for (const line of expected) {
@@ -441,6 +465,52 @@ try {
           + requests.filter(r => !/\.(js|css|png|res|gif|json|ttf)$/.test(r)).join(', '));
     }
   }
+  await waitFor('the guest cart merged into the account', stepSeconds, async () =>
+      requests.some(r => /^200 POST \/api\/cart\/[^/]+\/merge/.test(r)));
+
+  // 5. The checkout carried on after the sign-in. A first order types the
+  //    address (Enter in the postal code continues); cash is the default.
+  await waitFor('the checkout', stepSeconds, textOn('Shipping address'));
+  await settled();
+  await shot('6-checkout');
+  if (!(await screenText()).includes('Or a new address')) {
+    await typeInto(1, '1 Market St', 'text');
+    await typeInto(3, 'San Francisco', 'text');
+    await typeInto(4, 'CA', 'text');
+    await typeInto(5, '94105', 'text');
+    await page.keyboard.press('Enter');
+  }
+  const place = await waitFor('Place order to be ready', stepSeconds * 2, async () => {
+    const b = await button('Place order')();
+    return b && requests.some(r => r.startsWith('200 POST /api/shop/cart/') && r.endsWith('/estimate'))
+        && requests.some(r => r === '200 GET /api/payments/methods') ? b : null;
+  });
+  await page.waitForTimeout(1500);
+  await settled();
+  // The button is at the foot of a long form: scroll it into view first.
+  let ready = (await button('Place order')()) || place;
+  for (let turn = 0; turn < 20 && ready.y + ready.height > 790; turn++) {
+    await page.mouse.move(210, 400);
+    await page.mouse.wheel(0, 400);
+    await page.waitForTimeout(400);
+    ready = (await button('Place order')()) || ready;
+  }
+  await settled();
+  ready = (await button('Place order')()) || ready;
+  await shot('7-review');
+  await click(ready);
+  await waitFor('the order to be placed', stepSeconds, async () =>
+      requests.some(r => /^200 POST \/api\/checkout\//.test(r)) ? named('View order')() : null);
+  await settled();
+  await shot('8-order-placed');
+  say('signed in at checkout and placed the order');
+  await click(await named('View order')());
+  await page.waitForTimeout(2000);
+  await settled();
+  await shot('9-order-tracking');
+  // Back to the tabs, by the order's own back arrow (top left).
+  await page.mouse.click(26, 22);
+  await waitFor('the tabs after the order', stepSeconds, button('Account'));
 
   // 4. The live channel, a WebSocket to the same origin.
   const live = await waitFor('the live channel', stepSeconds, async () =>
@@ -455,14 +525,7 @@ try {
   // the moment it needs to show itself.
   await page.waitForTimeout(3000);
   await noErrorDialog();
-  await page.screenshot({ path: path.join(out, '4-settled.png') });
-  // The title bar's overflow menu, for its picture only: its rows are not in
-  // the accessibility tree, so it is opened by position and closed by Escape.
-  await page.mouse.click(408, 21);
-  await page.waitForTimeout(1500);
-  await page.screenshot({ path: path.join(out, '4-menu.png') });
-  await page.keyboard.press('Escape');
-  await page.waitForTimeout(800);
+  await shot('10-settled');
 
   // 5. The session that carried the sign-in is over: the app ended it when it
   //    had its tokens, so the cookie the browser still holds is worth nothing.
@@ -486,13 +549,14 @@ try {
   await settled();
   await click(await waitFor('Sign out on the Account tab', stepSeconds, async () =>
       (await components()).find(c => c.label === 'Sign out' || c.text === 'Sign out')));
-  await waitFor('the welcome screen after signing out', stepSeconds, button('Create an account'));
+  // Back to the guest shop, whose Account tab offers a sign-in again.
+  await waitFor('the guest Account tab after signing out', stepSeconds, button('Create an account'));
   await settled();
   await noErrorDialog();
-  await page.screenshot({ path: path.join(out, '5-signed-out.png') });
-  say('signed out: the welcome screen is back');
+  await shot('11-signed-out');
+  say('signed out: back to shopping as a guest');
 
-  // 7. The admin, who lands in the console.
+  // 7. The admin, who signs in from Account and lands in the console.
   await signInAs(admin);
   await waitFor('the admin console', stepSeconds, async () => {
     // The console opens on its Overview tab, figures first.
@@ -505,7 +569,7 @@ try {
   await page.waitForTimeout(3000);
   await settled();
   await noErrorDialog();
-  await page.screenshot({ path: path.join(out, '6-admin.png') });
+  await shot('12-admin');
   say('signed in as ' + admin + ': the admin console is up');
 
   // 8. A guest buys on the website: the server-rendered storefront and its

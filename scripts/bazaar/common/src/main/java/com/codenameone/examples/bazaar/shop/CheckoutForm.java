@@ -73,6 +73,8 @@ final class CheckoutForm {
     private CartDto quoted;
     private int step;
     private boolean placing;
+    /// Whether the default saved address was taken without asking already.
+    private boolean picked;
     private TextField name;
     private TextField line1;
     private TextField line2;
@@ -139,6 +141,14 @@ final class CheckoutForm {
         addressBox.removeAll();
         Ui.section(addressBox, "Shipping address");
         List<AddressDto> saved = ShopState.addresses();
+        if (address == null && !picked && !saved.isEmpty()) {
+            // A repeat checkout: the default address (first) and the default
+            // payment method are taken as they are, so the order is one tap
+            // on Place order away. Either can still be changed.
+            picked = true;
+            address = saved.get(0);
+            quote();
+        }
         if (!saved.isEmpty()) {
             for (final AddressDto a : saved) {
                 Container row = option(FontImage.MATERIAL_LOCATION_ON, Addresses.summary(a), null,
