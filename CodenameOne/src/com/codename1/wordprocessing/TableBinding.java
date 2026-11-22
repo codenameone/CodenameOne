@@ -24,6 +24,7 @@ package com.codename1.wordprocessing;
 
 import com.codename1.spreadsheet.Sheet;
 import com.codename1.spreadsheet.Workbook;
+import com.codename1.ui.CN;
 import com.codename1.ui.events.DataChangedListener;
 import com.codename1.ui.table.DataGrid;
 
@@ -47,11 +48,24 @@ public final class TableBinding {
     private final String tableId;
     private final Sheet sheet;
     private boolean syncing;
-    private boolean disposed;
+    /// Volatile: a sheet changed off the EDT is followed on it, and must see a dispose made on
+    /// the thread that changed it.
+    private volatile boolean disposed; //NOPMD AvoidUsingVolatile - read on the EDT after a dispose on another thread
     private final DataChangedListener sheetListener = new DataChangedListener() {
         @Override
         public void dataChanged(int type, int index) {
-            sheetChanged();
+            if (CN.isEdt()) {
+                sheetChanged();
+            } else {
+                // the model is the EDT's; a sheet changed elsewhere is followed there, after
+                // anything that thread did next -- a dispose included
+                CN.callSerially(new Runnable() {
+                    @Override
+                    public void run() {
+                        sheetChanged();
+                    }
+                });
+            }
         }
     };
     private final DocumentListener modelListener = new DocumentListener() {

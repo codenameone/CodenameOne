@@ -765,9 +765,36 @@ public class DocumentView extends ScrollSurface implements TextInputClient {
             if (end < 0) {
                 end = n;
             }
-            g.drawString(s.substring(start, end), x + offset(it, start, scale), y);
+            int at = x + offset(it, start, scale);
+            int box = x + offset(it, end, scale) - at;
+            String word = s.substring(start, end);
+            if (repeated(word)) {
+                // a tab leader: every dot at its own measured place, so a run of them cannot
+                // drift into the text after the tab
+                for (int k = start; k < end; k++) {
+                    g.drawString(s.substring(k, k + 1), x + offset(it, k, scale), y);
+                }
+            } else {
+                // the font is drawn at a whole pixel size, so a word is a little wider or
+                // narrower than the box it was measured into: centring it splits the
+                // difference between the gaps on either side instead of piling it on one
+                g.drawString(word, at + (box - g.getFont().stringWidth(word)) / 2, y);
+            }
             start = end;
         }
+    }
+
+    private static boolean repeated(String word) {
+        if (word.length() < 3) {
+            return false;
+        }
+        char c = word.charAt(0);
+        for (int i = 1; i < word.length(); i++) {
+            if (word.charAt(i) != c) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private void paintComments(Graphics g, LayoutItem it, float scale, int x, int y, int h) {

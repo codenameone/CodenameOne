@@ -228,8 +228,7 @@ public final class DocumentLayout {
         float[] free(float top, float h, float lo, float hi) {
             float l = lo;
             float r = hi;
-            for (int i = 0; i < floats.size(); i++) {
-                float[] f = floats.get(i);
+            for (float[] f : floats) {
                 if (f[3] <= top + 0.01f || f[1] >= top + h - 0.01f || f[2] <= l || f[0] >= r) {
                     continue;
                 }
@@ -246,8 +245,7 @@ public final class DocumentLayout {
         /// `top` when none does.
         float nextClear(float top, float h) {
             float best = Float.MAX_VALUE;
-            for (int i = 0; i < floats.size(); i++) {
-                float[] f = floats.get(i);
+            for (float[] f : floats) {
                 if (f[3] > top + 0.01f && f[1] < top + h - 0.01f) {
                     best = Math.min(best, f[3]);
                 }
@@ -258,8 +256,8 @@ public final class DocumentLayout {
         /// The bottom of the lowest float, or `y` when that is higher.
         float clearAll() {
             float b = y;
-            for (int i = 0; i < floats.size(); i++) {
-                b = Math.max(b, floats.get(i)[3]);
+            for (float[] f : floats) {
+                b = Math.max(b, f[3]);
             }
             return b;
         }
@@ -638,7 +636,6 @@ public final class DocumentLayout {
                     // a word wider than the line: break it between letters
                     Piece head = splitWord(q, avail - x);
                     line.add(head);
-                    x += head.width;
                     break;
                 }
                 line.add(q);
@@ -1026,7 +1023,7 @@ public final class DocumentLayout {
 
     /// A page being filled: its frame (the body between header and footer), its columns and
     /// what each column holds so far.
-    private final class PageBuilder {
+    private static final class PageBuilder {
         final List<LayoutItem> items = new ArrayList<LayoutItem>();
         final List<LayoutItem> behind = new ArrayList<LayoutItem>();
         final PageSpec page;
@@ -1047,14 +1044,15 @@ public final class DocumentLayout {
         final List<Slice> sectionSlices = new ArrayList<Slice>();
         boolean sectionHasNotes;
 
-        PageBuilder(PageSpec page, int number) {
+        PageBuilder(DocumentLayout owner, PageSpec page, int number) {
             this.page = page;
             this.number = number;
             boolean first = number == 1;
-            head = furniture(first && doc.firstHeader != null ? doc.firstHeader : doc.header,
-                    page);
-            foot = furniture(first && doc.firstFooter != null ? doc.firstFooter : doc.footer,
-                    page);
+            Document doc = owner.doc;
+            head = owner.furniture(first && doc.firstHeader != null ? doc.firstHeader
+                    : doc.header, page);
+            foot = owner.furniture(first && doc.firstFooter != null ? doc.firstFooter
+                    : doc.footer, page);
             float edge = Math.min(36, page.top * 0.5f);
             float t = page.top;
             if (!head.isEmpty()) {
@@ -1105,8 +1103,8 @@ public final class DocumentLayout {
 
         float lowest() {
             float m = sectionTop;
-            for (int c = 0; c < y.length; c++) {
-                m = Math.max(m, y[c]);
+            for (float v : y) {
+                m = Math.max(m, v);
             }
             return m;
         }
@@ -1145,7 +1143,7 @@ public final class DocumentLayout {
     private void paginate(List<Slice> all) {
         List<Slice> slices = new ArrayList<Slice>(all);
         PageSpec sheet = spec;
-        PageBuilder page = new PageBuilder(sheet, 1);
+        PageBuilder page = new PageBuilder(this, sheet, 1);
         List<Slice> headers = new ArrayList<Slice>();
         Table headersOf = null;
         for (int i = 0; i < slices.size(); i++) {
@@ -1155,9 +1153,9 @@ public final class DocumentLayout {
                 PageSpec next = s.section;
                 if (!page.empty && (s.sectionNewPage || !sameSheet(next, page.page))) {
                     finish(page);
-                    page = new PageBuilder(next, pages.size() + 1);
+                    page = new PageBuilder(this, next, pages.size() + 1);
                 } else if (page.empty && !sameSheet(next, page.page)) {
-                    page = new PageBuilder(next, pages.size() + 1);
+                    page = new PageBuilder(this, next, pages.size() + 1);
                 } else {
                     page.startSection(next, page.lowest());
                 }
@@ -1197,13 +1195,13 @@ public final class DocumentLayout {
             float room = page.frame() - page.y[c] - page.notesHeight[c] - separator - noteH;
             if (s.breakBefore && !page.empty) {
                 finish(page);
-                page = new PageBuilder(page.section, pages.size() + 1);
+                page = new PageBuilder(this, page.section, pages.size() + 1);
             } else if (need > room + 0.01f && !page.columnEmpty[c]) {
                 if (c + 1 < page.section.columns) {
                     page.column = c + 1;
                 } else {
                     finish(page);
-                    page = new PageBuilder(page.section, pages.size() + 1);
+                    page = new PageBuilder(this, page.section, pages.size() + 1);
                 }
                 if (s.table != null && !s.header && !headers.isEmpty()) {
                     for (Slice h : headers) {
@@ -1302,7 +1300,8 @@ public final class DocumentLayout {
                 moved = moved.withText(number);
             }
             if (moved.picture != null && Picture.BEHIND.equals(moved.picture.wrap)
-                    && moved.kind == LayoutItem.PICTURE && into == page.items) {
+                    && moved.kind == LayoutItem.PICTURE
+                    && into == page.items) { //NOPMD CompareObjectsWithEquals - which list, not its contents
                 page.behind.add(moved);
             } else {
                 into.add(moved);

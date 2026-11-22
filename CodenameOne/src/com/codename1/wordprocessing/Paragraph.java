@@ -185,7 +185,7 @@ public final class Paragraph implements Block {
                 while (i < t.size() && t.get(i).position < s.position) {
                     i++;
                 }
-                if (i < t.size() && t.get(i).position == s.position) {
+                if (i < t.size() && Float.compare(t.get(i).position, s.position) == 0) {
                     t.set(i, s);
                 } else {
                     t.add(i, s);

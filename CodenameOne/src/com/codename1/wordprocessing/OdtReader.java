@@ -760,10 +760,10 @@ final class OdtReader {
                     PageSpec around = pageNow();
                     out.add(new SectionBreak(ids.next('p'), around.withColumns(cols,
                             st.columnGap), false));
-                    content(x, out, list);
+                    content(x, out, null);
                     out.add(new SectionBreak(ids.next('p'), around, false));
                 } else {
-                    content(x, out, list);
+                    content(x, out, null);
                 }
             } else if ("section".equals(n) || "index-body".equals(n) || "deletion".equals(n)
                     || "table-of-content".equals(n) || "alphabetical-index".equals(n)) {
