@@ -41,7 +41,8 @@ import java.util.List;
 /// Search parameters, all optional: `q` (words in the title, vendor, type or
 /// tags), `collection` (handle), `tag`, `type`, `vendor`, `min` and `max`
 /// (cents), `sort` (`relevance`, `newest`, `price`, `-price`, `title`,
-/// `rating`), `page` (from 0) and `size` (1 to 100, 24 when absent).
+/// `rating`), `page` (from 0), `size` (1 to 100, 24 when absent) and
+/// `category` (a taxonomy id; a top-level one takes those under it).
 @RestClient
 public interface CatalogApi {
     @GET("/api/shop/stores/{handle}/products")
@@ -50,6 +51,7 @@ public interface CatalogApi {
             @Query("type") String type, @Query("vendor") String vendor,
             @Query("min") String min, @Query("max") String max, @Query("sort") String sort,
             @Query("page") String page, @Query("size") String size,
+            @Query("category") String category,
             OnComplete<Response<ProductPageDto>> callback);
 
     /// The counts behind the filters, for the same search less its own facet.
@@ -58,6 +60,7 @@ public interface CatalogApi {
             @Query("collection") String collection, @Query("tag") String tag,
             @Query("type") String type, @Query("vendor") String vendor,
             @Query("min") String min, @Query("max") String max,
+            @Query("category") String category,
             OnComplete<Response<FacetsDto>> callback);
 
     /// Published collections, each with the number of active products in it.

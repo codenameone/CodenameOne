@@ -18,13 +18,13 @@
  */
 package com.codenameone.examples.bazaar.shop;
 
-import com.codenameone.examples.bazaar.api.NameCountDto;
+import com.codenameone.examples.bazaar.api.CategoryCountDto;
 import java.util.ArrayList;
 import java.util.List;
 
-/// The category row above a store's products: which categories (product
-/// types) it offers and what a tap on one does. Plain, so the rules are
-/// tested without the UI.
+/// The category row above a store's products: which top-level taxonomy
+/// categories it offers and what a tap on one does -- the same categories the
+/// web storefront filters by. Plain, so the rules are tested without the UI.
 public final class Categories {
     /// The most categories the row shows; the rest are a search away.
     public static final int MAX = 8;
@@ -32,15 +32,15 @@ public final class Categories {
     private Categories() {
     }
 
-    /// The categories to offer, from the store's type facet: the ones with
-    /// products, the biggest first (ties by name), at most `max`, and none
-    /// at all when there is only one -- a row with a single choice filters
-    /// nothing.
-    public static List<String> choices(List<NameCountDto> types, int max) {
-        List<NameCountDto> kept = new ArrayList<NameCountDto>();
-        for (int iter = 0; types != null && iter < types.size(); iter++) {
-            NameCountDto t = types.get(iter);
-            if (t != null && t.count() > 0 && t.name() != null && t.name().length() > 0) {
+    /// The categories to offer: the ones with products, the biggest first
+    /// (ties by name), at most `max`, and none at all when there is only one
+    /// -- a row with a single choice filters nothing.
+    public static List<CategoryCountDto> choices(List<CategoryCountDto> found, int max) {
+        List<CategoryCountDto> kept = new ArrayList<CategoryCountDto>();
+        for (int iter = 0; found != null && iter < found.size(); iter++) {
+            CategoryCountDto t = found.get(iter);
+            if (t != null && t.id() > 0 && t.count() > 0 && t.name() != null
+                    && t.name().length() > 0) {
                 int at = 0;
                 while (at < kept.size() && before(kept.get(at), t)) {
                     at++;
@@ -48,9 +48,9 @@ public final class Categories {
                 kept.add(at, t);
             }
         }
-        List<String> out = new ArrayList<String>();
+        List<CategoryCountDto> out = new ArrayList<CategoryCountDto>();
         for (int iter = 0; iter < kept.size() && iter < max; iter++) {
-            out.add(kept.get(iter).name());
+            out.add(kept.get(iter));
         }
         if (out.size() < 2) {
             out.clear();
@@ -58,21 +58,18 @@ public final class Categories {
         return out;
     }
 
-    /// The category after a tap on `tapped` (null for "All"): tapping the
+    /// The category after a tap on `tapped` (0 for "All"): tapping the
     /// chosen one again, or "All", clears the filter.
-    public static String tap(String current, String tapped) {
-        if (tapped == null || tapped.equals(current)) {
-            return null;
-        }
-        return tapped;
+    public static int tap(int current, int tapped) {
+        return tapped == current ? 0 : tapped;
     }
 
-    /// Whether the chip for `name` (null for "All") shows as chosen.
-    public static boolean chosen(String current, String name) {
-        return name == null ? current == null : name.equals(current);
+    /// Whether the chip for `id` (0 for "All") shows as chosen.
+    public static boolean chosen(int current, int id) {
+        return current == id;
     }
 
-    private static boolean before(NameCountDto a, NameCountDto b) {
+    private static boolean before(CategoryCountDto a, CategoryCountDto b) {
         if (a.count() != b.count()) {
             return a.count() > b.count();
         }

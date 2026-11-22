@@ -157,7 +157,7 @@ final class ProductGrid {
         }
         Api.catalog().products(store.handle(), query.words(), query.collection, query.tag,
                 query.type, query.vendor, query.minParam(), query.maxParam(), query.sortParam(),
-                String.valueOf(page), String.valueOf(PAGE), Net.to(answer -> {
+                String.valueOf(page), String.valueOf(PAGE), query.categoryParam(), Net.to(answer -> {
                     if (ticket != asked) {
                         return;
                     }

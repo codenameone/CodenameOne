@@ -26,6 +26,8 @@ public final class SearchQuery {
     public String q = "";
     public String collection;
     public String type;
+    /// A top-level taxonomy category id, 0 for any.
+    public int category;
     public String vendor;
     public String tag;
     /// Cents, or -1 for no bound.
@@ -89,5 +91,10 @@ public final class SearchQuery {
 
     private static boolean empty(String s) {
         return s == null || s.length() == 0;
+    }
+
+    /// The category as the `category` parameter, null for any.
+    public String categoryParam() {
+        return category > 0 ? String.valueOf(category) : null;
     }
 }

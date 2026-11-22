@@ -56,6 +56,12 @@ final class Search {
     /// a word matches either title, and scores by the better one.
     Map<String, String> titles;
 
+    /// A `category` parameter as a known taxonomy id, 0 (any) for anything else.
+    static int category(String param) {
+        long id = number(param, 0);
+        return id > 0 && id <= Integer.MAX_VALUE && Taxonomy.known((int) id) ? (int) id : 0;
+    }
+
     static Search of(String q, String tag, String type, String vendor, String min, String max,
             String sort, String page, String size) {
         Search search = new Search();

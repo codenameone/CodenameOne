@@ -32,6 +32,7 @@ import com.codenameone.examples.bazaar.api.BundlePartDto;
 import com.codenameone.examples.bazaar.api.ChannelScheduleDto;
 import com.codenameone.examples.bazaar.api.CollectionDto;
 import com.codenameone.examples.bazaar.api.CountDto;
+import com.codenameone.examples.bazaar.api.CategoryCountDto;
 import com.codenameone.examples.bazaar.api.FacetsDto;
 import com.codenameone.examples.bazaar.api.OptionDto;
 import com.codenameone.examples.bazaar.api.MediaUploadDto;
@@ -453,8 +454,23 @@ public class Catalog {
         long lo = Long.MAX_VALUE;
         long hi = 0;
         int total = 0;
+        List<int[]> categoryCounts = new ArrayList<int[]>();
         for (int iter = 0; iter < snapshot.list.size(); iter++) {
             Product product = snapshot.list.get(iter);
+            int top = Taxonomy.top(product.getCategoryId());
+            if (top > 0 && snapshot.matches(search, product, Search.CATEGORY)) {
+                int[] seen = null;
+                for (int c = 0; c < categoryCounts.size() && seen == null; c++) {
+                    if (categoryCounts.get(c)[0] == top) {
+                        seen = categoryCounts.get(c);
+                    }
+                }
+                if (seen == null) {
+                    categoryCounts.add(new int[] {top, 1});
+                } else {
+                    seen[1]++;
+                }
+            }
             if (snapshot.matches(search, product, Search.TYPE)) {
                 Search.count(typeCounts, typeOrder, product.getProductType());
             }
@@ -486,7 +502,24 @@ public class Catalog {
         return new FacetsDto(Search.list(typeCounts, typeOrder),
                 Search.list(vendorCounts, vendorOrder), Search.list(tagCounts, tagOrder),
                 Search.list(collectionCounts, collectionOrder), lo == Long.MAX_VALUE ? 0 : lo,
-                hi, total);
+                hi, total, categoryList(categoryCounts));
+    }
+
+    /// Top-level categories as the app's chips read them, most products first.
+    private static List<CategoryCountDto> categoryList(List<int[]> counts) {
+        List<CategoryCountDto> out = new ArrayList<CategoryCountDto>();
+        for (int iter = 0; iter < counts.size(); iter++) {
+            int[] c = counts.get(iter);
+            CategoryCountDto d = new CategoryCountDto(c[0], Taxonomy.name(c[0]), c[1]);
+            int at = 0;
+            while (at < out.size() && (out.get(at).count() > d.count()
+                    || out.get(at).count() == d.count()
+                    && out.get(at).name().compareTo(d.name()) <= 0)) {
+                at++;
+            }
+            out.add(at, d);
+        }
+        return out;
     }
 
     @Transactional(readOnly = true)

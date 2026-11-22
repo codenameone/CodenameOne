@@ -55,16 +55,18 @@ public class CatalogEndpoint implements CatalogApiServer {
     @Override
     public ProductPageDto products(String handle, String q, String collection, String tag,
             String type, String vendor, String min, String max, String sort, String page,
-            String size) throws Exception {
-        return catalog.products(handle, collection,
-                Search.of(q, tag, type, vendor, min, max, sort, page, size));
+            String size, String category) throws Exception {
+        Search search = Search.of(q, tag, type, vendor, min, max, sort, page, size);
+        search.category = Search.category(category);
+        return catalog.products(handle, collection, search);
     }
 
     @Override
     public FacetsDto facets(String handle, String q, String collection, String tag, String type,
-            String vendor, String min, String max) throws Exception {
-        return catalog.facets(handle, collection,
-                Search.of(q, tag, type, vendor, min, max, null, null, null));
+            String vendor, String min, String max, String category) throws Exception {
+        Search search = Search.of(q, tag, type, vendor, min, max, null, null, null);
+        search.category = Search.category(category);
+        return catalog.facets(handle, collection, search);
     }
 
     @Override

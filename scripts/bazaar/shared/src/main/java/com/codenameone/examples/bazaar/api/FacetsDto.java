@@ -31,5 +31,6 @@ public record FacetsDto(
         List<NameCountDto> collections,
         long minPriceCents,
         long maxPriceCents,
-        int total) {
+        int total,
+        List<CategoryCountDto> categories) {
 }

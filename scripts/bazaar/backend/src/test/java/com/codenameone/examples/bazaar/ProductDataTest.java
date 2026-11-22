@@ -297,6 +297,29 @@ class ProductDataTest {
     }
 
     @Test
+    void theAppApiFiltersAndCountsByTheSameCategories() throws Exception {
+        Shops shop = Shops.open(accounts, stores, "pd-appcat");
+        tea(shop, "Oolong tea");
+        String shirt = "{\"title\":\"Linen shirt\",\"status\":\"ACTIVE\",\"categoryId\":" + CLOTHING
+                + ",\"options\":[{\"name\":\"Size\",\"values\":[\"M\"]}],\"variants\":[{"
+                + "\"option1\":\"M\",\"sku\":\"ASHIRT-M\",\"barcode\":\"\",\"priceCents\":3000,"
+                + "\"taxable\":true,\"trackInventory\":false}]}";
+        Rest.json(mvc, People.asMerchant(Rest.body(post(shop.base() + "/products"), shirt),
+                shop.owner));
+        Map facets = Rest.json(mvc, get("/api/shop/stores/pd-appcat/facets"));
+        String cats = String.valueOf(facets.get("categories"));
+        assertTrue(cats.contains("412") && cats.contains("166"), cats);
+        String food = String.valueOf(Rest.json(mvc,
+                get("/api/shop/stores/pd-appcat/products?category=412")).get("items"));
+        assertTrue(food.contains("Oolong tea"), food);
+        assertFalse(food.contains("Linen shirt"), food);
+        // Junk is no filter, never an error.
+        String junk = String.valueOf(Rest.json(mvc,
+                get("/api/shop/stores/pd-appcat/products?category=x")).get("items"));
+        assertTrue(junk.contains("Linen shirt"), junk);
+    }
+
+    @Test
     void aModelLoadsTheLocalViewerAndWidensThePolicyForItsPageOnly() throws Exception {
         Shop s = new Shop("pd-model", 5, accounts, stores, pricing, db, inventory, carts,
                 checkouts, mvc);

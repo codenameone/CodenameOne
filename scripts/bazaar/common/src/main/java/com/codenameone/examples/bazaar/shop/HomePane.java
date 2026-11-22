@@ -30,6 +30,7 @@ import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.layouts.FlowLayout;
 import com.codename1.ui.layouts.LayeredLayout;
+import com.codenameone.examples.bazaar.api.CategoryCountDto;
 import com.codenameone.examples.bazaar.api.CollectionDto;
 import com.codenameone.examples.bazaar.api.ProductCardDto;
 import com.codenameone.examples.bazaar.api.ProductPageDto;
@@ -391,16 +392,17 @@ final class HomePane extends ShopPane {
         top.add(categories);
         top.add(Ui.label("New arrivals", "ShopSectionTitle"));
         featured.type = null;
+        featured.category = 0;
         grid = new ProductGrid(top, featured, 0);
         add(BorderLayout.CENTER, grid.component());
         grid.reload();
         Api.catalog().collections(store.handle(), Net.to(list -> fill(collections, list),
                 (status, message) -> collections.setHidden(true)));
         final int ticket = built;
-        Api.catalog().facets(store.handle(), null, null, null, null, null, null, null,
+        Api.catalog().facets(store.handle(), null, null, null, null, null, null, null, null,
                 Net.to(facets -> {
                     if (ticket == built) {
-                        categories(categories, Categories.choices(facets.types(),
+                        categories(categories, Categories.choices(facets.categories(),
                                 Categories.MAX));
                     }
                 }, (status, message) -> { }));
@@ -409,17 +411,18 @@ final class HomePane extends ShopPane {
 
     /// The category row: "All" and each category; a tap narrows the grid
     /// to it ([Categories] decides what a tap means).
-    private void categories(Container row, List<String> names) {
+    private void categories(Container row, List<CategoryCountDto> names) {
         row.removeAll();
         row.setHidden(names.isEmpty());
         for (int iter = -1; iter < names.size(); iter++) {
-            final String name = iter < 0 ? null : names.get(iter);
-            Button chip = new Button(name == null ? Lang.tr("All") : name,
-                    Categories.chosen(featured.type, name) ? "ShopChipOn" : "ShopChip");
-            chip.setName("category-" + (name == null ? "all" : name));
+            final CategoryCountDto c = iter < 0 ? null : names.get(iter);
+            final int id = c == null ? 0 : c.id();
+            Button chip = new Button(c == null ? Lang.tr("All") : c.name(),
+                    Categories.chosen(featured.category, id) ? "ShopChipOn" : "ShopChip");
+            chip.setName("category-" + (c == null ? "all" : c.name()));
             chip.addActionListener(e -> {
                 ShopUi.tap();
-                featured.type = Categories.tap(featured.type, name);
+                featured.category = Categories.tap(featured.category, id);
                 categories(row, names);
                 grid.reload();
             });

@@ -69,7 +69,7 @@ final class FilterPanel {
         final int ticket = ++asked;
         Api.catalog().facets(store.handle(), query.words(), query.collection, query.tag,
                 query.type, query.vendor, query.minParam(), query.maxParam(),
-                Net.to(facets -> {
+                query.categoryParam(), Net.to(facets -> {
                     if (ticket == asked) {
                         draw(facets);
                     }
