@@ -334,7 +334,10 @@ public class Analytics {
         int n = period.size();
         return new KpiDto(gross, disc, refunded, gross - disc - refunded, tax, ship, n,
                 n == 0 ? 0 : (gross - disc) / n, who.size(), bp(returning, who.size()), cartCount,
-                bp(online, cartCount));
+                // A shopper keeps one cart and checkout only empties it, so an
+                // order often comes from a cart opened before the period: at least
+                // every online order had a cart, which keeps this at or under 100%.
+                bp(online, Math.max(cartCount, online)));
     }
 
     /// `part / whole` in basis points, 0 for an empty whole.

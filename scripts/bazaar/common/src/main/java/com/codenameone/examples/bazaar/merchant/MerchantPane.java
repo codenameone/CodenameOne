@@ -206,7 +206,9 @@ abstract class MerchantPane extends Container {
         if (MerchantState.store() == null) {
             return null;
         }
-        Button b = new Button(MerchantState.store().name(), "MeStore");
+        // A phone has no room for the name beside the section title, so the
+        // switcher is the store icon there; its menu still names every store.
+        Button b = new Button(wide ? MerchantState.store().name() : "", "MeStore");
         b.setName("store-switcher");
         FontImage.setMaterialIcon(b, FontImage.MATERIAL_STORE, 3.2f);
         if (stores.size() < 2) {

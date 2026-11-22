@@ -108,6 +108,14 @@ class AnalyticsMathTest {
         assertEquals(0, empty.averageOrderCents());
         assertEquals(0, empty.conversionBp());
 
+        // Orders from carts opened before the period never read above 100%.
+        Analytics.Data reused = new Analytics.Data();
+        reused.counted.add(order("alice", T0 + DAY, 1000, 0, Orders.ONLINE));
+        reused.counted.add(order("bob", T0 + DAY, 1000, 0, Orders.ONLINE));
+        reused.carts.add(cart(T0 + DAY, ""));
+        assertEquals(10000, Analytics.kpis(reused, reused.between(p[0], p[1]), p[0], p[1])
+                .conversionBp());
+
         List<SeriesPointDto> days = Analytics.daily(now, p[0], p[1]);
         assertEquals(7, days.size());
         assertEquals(9000, days.get(1).salesCents());

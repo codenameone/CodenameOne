@@ -2597,15 +2597,15 @@ MeAutoRoot { background-color: var(--surface-alt); padding: 0; margin: 0; }
 MeAutoBar { background-color: var(--surface); border-bottom: 1px solid var(--line); padding: 1mm 2mm 1mm 2mm; margin: 0; }
 MeAutoSide { background-color: var(--surface); border-right: 1px solid var(--line); padding: 1.6mm; margin: 0; }
 MeAutoInspector { background-color: var(--surface); border-left: 1px solid var(--line); padding: 2.4mm; margin: 0; }
-MeAutoKind { color: var(--text-muted); font-family: "native:MainBold"; font-size: 2mm; padding: 1.6mm 0 0.6mm 0; margin: 0; }
+MeAutoKind { color: var(--text-muted); background-color: transparent; font-family: "native:MainBold"; font-size: 2mm; padding: 1.6mm 0 0.6mm 0; margin: 0; }
 MeAutoProblems { background-color: var(--danger-tint); padding: 1.2mm 2.4mm 1.2mm 2.4mm; margin: 0; }
-MeAutoProblem { color: var(--danger); font-size: 2.2mm; padding: 0.4mm 0 0.4mm 0; margin: 0; }
+MeAutoProblem { color: var(--danger); background-color: transparent; font-size: 2.2mm; padding: 0.4mm 0 0.4mm 0; margin: 0; }
 MeAnalyticsHead { padding: 0 0 1.6mm 0; margin: 0; }
-MeAnalyticsRange { color: var(--text); font-family: "native:MainBold"; font-size: 3.4mm; padding: 0; margin: 0; }
-MeCardTitle { color: var(--text); font-family: "native:MainBold"; font-size: 2.6mm; padding: 0 0 1.6mm 0; margin: 0; }
-MeDeltaUp { color: var(--success); font-family: "native:MainBold"; font-size: 2.1mm; padding: 0.6mm 0 0 0; margin: 0; }
-MeDeltaDown { color: var(--danger); font-family: "native:MainBold"; font-size: 2.1mm; padding: 0.6mm 0 0 0; margin: 0; }
-MeDeltaFlat { color: var(--text-muted); font-size: 2.1mm; padding: 0.6mm 0 0 0; margin: 0; }
+MeAnalyticsRange { color: var(--text); background-color: transparent; font-family: "native:MainBold"; font-size: 3.4mm; padding: 0; margin: 0; }
+MeCardTitle { color: var(--text); background-color: transparent; font-family: "native:MainBold"; font-size: 2.6mm; padding: 0 0 1.6mm 0; margin: 0; }
+MeDeltaUp { color: var(--success); background-color: transparent; font-family: "native:MainBold"; font-size: 2.1mm; padding: 0.6mm 0 0 0; margin: 0; }
+MeDeltaDown { color: var(--danger); background-color: transparent; font-family: "native:MainBold"; font-size: 2.1mm; padding: 0.6mm 0 0 0; margin: 0; }
+MeDeltaFlat { color: var(--text-muted); background-color: transparent; font-size: 2.1mm; padding: 0.6mm 0 0 0; margin: 0; }
 MeChartBox { background-color: var(--surface); padding: 0; margin: 0; }
 MeChart { color: var(--brand); background-color: var(--surface); padding: 0; margin: 0; }
 MeChartGrid { color: var(--line); }
@@ -2618,8 +2618,8 @@ MeChartSlice1 { color: var(--brand); }
 MeChartSlice2 { color: #0d9488; }
 MeChartSlice3 { color: #d97706; }
 MeChartSlice4 { color: #db2777; }
-MeLegend { color: var(--text); font-size: 2.1mm; padding: 0.4mm 1mm 0.4mm 0; margin: 0; }
-MeLegendValue { color: var(--text-muted); font-size: 2.1mm; padding: 0.4mm 0 0.4mm 1mm; margin: 0; }
+MeLegend { color: var(--text); background-color: transparent; font-size: 2.1mm; padding: 0.4mm 1mm 0.4mm 0; margin: 0; }
+MeLegendValue { color: var(--text-muted); background-color: transparent; font-size: 2.1mm; padding: 0.4mm 0 0.4mm 1mm; margin: 0; }
 MeSwatchDot { padding: 0; margin: 0 1mm 0 0; }
 MeFunnel { color: var(--brand); background-color: var(--surface); font-size: 2.1mm; padding: 0; margin: 0; }
 MeFunnelBox { background-color: var(--brand-tint); color: var(--brand); padding: 0; margin: 0; }
