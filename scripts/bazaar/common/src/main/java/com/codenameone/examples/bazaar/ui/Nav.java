@@ -70,6 +70,9 @@ public final class Nav {
     /// The home screen last built, and the mode it is the home of.
     private static Form homeForm;
     private static String homeMode = "";
+    /// Whether a session was entered, so that its loss is noticed once.
+    private static boolean signedIn;
+    private static Runnable pending;
 
     private Nav() {
     }
@@ -88,20 +91,26 @@ public final class Nav {
         com.codenameone.examples.bazaar.merchant.MerchantSections.install();
         com.codenameone.examples.bazaar.pos.PosSections.install();
         Session.onSignedOut(() -> {
+            if (!signedIn) {
+                // A guest has no session to lose; a stray 401 changes nothing.
+                return;
+            }
+            signedIn = false;
             LiveChannel.stop();
             Telemetry.signedOut("expired");
-            WelcomeForm.show();
+            home();
         });
         Form starting = Ui.form("", "Starting");
         starting.getToolbar().hideToolbar();
         starting.show();
-        Session.restore(Nav::enter, WelcomeForm::show, Nav::unreachable);
+        Session.restore(Nav::enter, Nav::home, Nav::unreachable);
     }
 
     /// Someone has just signed in, or been found still signed in: their
     /// account's settings are fetched, applied, and then their home is shown in
     /// the language and the colours they chose.
     public static void enter() {
+        signedIn = true;
         Notifications.signedIn();
         // Prices are shown in the server's currency, which only the payment
         // config says.
@@ -123,6 +132,26 @@ public final class Nav {
         if (home != null) {
             home.show();
         }
+        Runnable then = pending;
+        pending = null;
+        if (then != null && Session.user() != null && SHOP.equals(homeMode)) {
+            // Signed in on the way to something a guest may not do (the
+            // checkout, following a store): carried on with, in the shop.
+            // Staff land on their own home and the errand is dropped.
+            CN.callSerially(then);
+        }
+    }
+
+    /// What to do once the sign-in under way has finished, if it leaves the
+    /// user shopping; null for nothing. See [SignInGate].
+    public static void afterSignIn(Runnable then) {
+        pending = then;
+    }
+
+    /// Whether anyone is signed in. Shopping needs nobody; the checkout, the
+    /// orders, the account and following a store do.
+    public static boolean guest() {
+        return Session.user() == null;
     }
 
     /// The account was asked about again: back to the home screen only if
@@ -135,15 +164,15 @@ public final class Nav {
     }
 
     /// Builds the home screen of the mode the user is in, without showing it.
-    /// Null, and the welcome screen showing, when nobody is signed in.
+    /// With nobody signed in that is the shop, as a guest: browsing, search
+    /// and the cart need no account.
     public static Form build() {
         UserDto user = Session.user();
-        if (user == null) {
-            WelcomeForm.show();
-            return null;
+        String mode = SHOP;
+        if (user != null) {
+            LiveChannel.start();
+            mode = mode(user);
         }
-        LiveChannel.start();
-        String mode = mode(user);
         Telemetry.role(mode);
         Home home = new Shell(mode);
         home.start();
@@ -241,9 +270,10 @@ public final class Nav {
         LiveChannel.stop();
         homeForm = null;
         homeMode = "";
+        signedIn = false;
         Runnable out = () -> {
             Telemetry.signedOut(reason);
-            Session.signOut(WelcomeForm::show);
+            Session.signOut(Nav::home);
         };
         if (forgetDevice) {
             Notifications.signingOut(out);

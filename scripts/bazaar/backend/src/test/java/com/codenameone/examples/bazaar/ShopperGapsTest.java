@@ -85,6 +85,35 @@ class ShopperGapsTest {
         assertEquals(401, Rest.statusOf(mvc, get("/api/wishlist")));
     }
 
+    @Test
+    void aGuestBrowsesTheFeedAndAShopperFollowsStores() throws Exception {
+        Shop s = shop("follow-shop");
+        Map feed = Rest.json(mvc, get("/api/shop/discover?size=60"));
+        boolean found = false;
+        for (Object o : (List) feed.get("items")) {
+            found |= s.productId.equals(((Map) o).get("id"));
+        }
+        assertTrue(found, "the feed reads every active store, with no token");
+        assertEquals(200, Rest.statusOf(mvc, get("/api/shop/discover?q=mug&sort=popular")));
+        assertEquals(400, Rest.statusOf(mvc, get("/api/shop/discover?size=x")));
+        assertEquals(401, Rest.statusOf(mvc, get("/api/follows")));
+        assertEquals(401, Rest.statusOf(mvc, put("/api/follows/" + s.storeId)));
+        assertEquals(401, Rest.statusOf(mvc, get("/api/follows/feed")));
+
+        String user = People.customer(accounts, "follower");
+        String other = People.customer(accounts, "follower-other");
+        assertEquals(1, Rest.list(mvc, People.asCustomer(put("/api/follows/" + s.storeId), user))
+                .size());
+        assertEquals(1, Rest.list(mvc, People.asCustomer(put("/api/follows/" + s.storeId), user))
+                .size());
+        assertEquals(404, Rest.statusOf(mvc, People.asCustomer(put("/api/follows/nope"), user)));
+        assertTrue(Rest.list(mvc, People.asCustomer(get("/api/follows"), other)).isEmpty());
+        Map mine = Rest.json(mvc, People.asCustomer(get("/api/follows/feed"), user));
+        assertEquals(s.productId, ((Map) ((List) mine.get("items")).get(0)).get("id"));
+        assertTrue(Rest.list(mvc, People.asCustomer(delete("/api/follows/" + s.storeId), user))
+                .isEmpty());
+    }
+
     private static String address(String city, boolean isDefault) {
         return "{\"id\":null,\"address\":{\"name\":\"Ada\",\"line1\":\"1 Main St\",\"line2\":\"\","
                 + "\"city\":\"" + city + "\",\"region\":\"NY\",\"postal\":\"12207\","

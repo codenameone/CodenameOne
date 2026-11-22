@@ -19,11 +19,15 @@
 package com.codenameone.examples.bazaar.shop;
 
 import com.codename1.ui.CN;
+import com.codename1.ui.Component;
+import com.codename1.ui.Container;
 import com.codename1.ui.Form;
 import com.codenameone.examples.bazaar.net.Session;
 import com.codenameone.examples.bazaar.ui.Nav;
 import com.codenameone.examples.bazaar.ui.Sections;
 import com.codenameone.examples.bazaar.ui.Shell;
+import com.codenameone.examples.bazaar.ui.SignInGate;
+import com.codenameone.examples.bazaar.ui.Ui;
 
 /// Puts the shopper's screens in the place of the Shop mode's placeholders,
 /// and moves between them.
@@ -43,8 +47,18 @@ public final class ShopSections {
         Sections.content(Nav.SHOP, Sections.HOME, HomePane::new);
         Sections.content(Nav.SHOP, Sections.SEARCH, SearchPane::new);
         Sections.content(Nav.SHOP, Sections.CART, CartPane::new);
-        Sections.content(Nav.SHOP, Sections.ORDERS, OrdersPane::new);
-        Sections.content(Nav.SHOP, Sections.ACCOUNT, AccountPane::new);
+        // The orders and the account are an account's: a guest is asked to
+        // sign in there, and nowhere else until the checkout.
+        Sections.content(Nav.SHOP, Sections.ORDERS, () -> Nav.guest()
+                ? guest("shop-orders", "Track every order",
+                        "Sign in to see your orders from every store, and follow each "
+                        + "parcel from the warehouse to your door.")
+                : new OrdersPane());
+        Sections.content(Nav.SHOP, Sections.ACCOUNT, () -> Nav.guest()
+                ? guest("shop-account", "Your Bazaar account",
+                        "Browse and fill your cart as a guest. Sign in to check out faster, "
+                        + "follow stores and keep your addresses and wishlist.")
+                : new AccountPane());
         // The cart's badge follows the cart on whatever home screen is up.
         ShopState.onCart(() -> {
             Shell shell = Shell.current();
@@ -52,6 +66,13 @@ public final class ShopSections {
                 ShopUi.badge(shell.form());
             }
         });
+    }
+
+    private static Component guest(String name, String title, String why) {
+        Container page = Ui.page();
+        page.setName(name);
+        page.add(SignInGate.prompt(CN.getCurrentForm(), title, why));
+        return page;
     }
 
     /// Opens the search, with `collection` (a handle) as its only filter

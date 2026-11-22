@@ -43,6 +43,7 @@ import com.codenameone.examples.bazaar.ui.Layouts;
 import com.codenameone.examples.bazaar.ui.ProductArt;
 import com.codenameone.examples.bazaar.ui.RowMenus;
 import com.codenameone.examples.bazaar.ui.Sections;
+import com.codenameone.examples.bazaar.ui.SignInGate;
 import com.codenameone.examples.bazaar.ui.Ui;
 import java.util.List;
 
@@ -111,6 +112,11 @@ final class CartPane extends ShopPane {
             add(BorderLayout.CENTER, split);
         } else {
             Container page = Ui.page();
+            // Every store has a cart of its own: say whose this is.
+            page.add(Ui.label(Lang.tr("Cart ({0})", String.valueOf(ShopState.units())), "SvTitle"));
+            Label from = Ui.plain(Lang.tr("From {0}", ShopState.store().name()), "SvMuted");
+            from.setName("cart-store");
+            page.add(from);
             page.add(lines);
             page.add(summary);
             Ui.pull(page, this::reload);
@@ -208,8 +214,17 @@ final class CartPane extends ShopPane {
         codes(box, cart);
         Ui.section(box, "Summary");
         rows(box, cart);
-        box.add(Ui.primary("Checkout", "checkout", e -> CheckoutForm.show()));
+        box.add(Ui.primary("Checkout", "checkout", e -> checkout()));
         return box;
+    }
+
+    /// The checkout is the first place a guest is asked to sign in. The cart
+    /// they filled is merged into the account's, and the checkout opens on it.
+    static void checkout() {
+        SignInGate.require(CN.getCurrentForm(), "Sign in to check out",
+                "Your cart comes with you. Next time your address and card are already "
+                + "filled in, so checking out takes a tap.",
+                () -> ShopState.loadCart(CheckoutForm::show));
     }
 
     /// The summary lines of `cart`, as [Estimate] decides them.

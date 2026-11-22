@@ -275,6 +275,12 @@ public final class Shell implements Nav.Home {
                 go.putClientProperty("name", "switch-" + to);
             }
         }
+        if (user == null) {
+            // A guest: settings are the account's, and there is nobody to sign out.
+            form.getToolbar().addCommandToOverflowMenu(Lang.tr("Sign in"), null,
+                    e -> SignInGate.signIn(form)).putClientProperty("name", "menu-signIn");
+            return;
+        }
         form.getToolbar().addCommandToOverflowMenu(Lang.tr("Settings"), null,
                 e -> SettingsForm.show(form));
         form.getToolbar().addCommandToOverflowMenu(Lang.tr("Sign out"), null, e -> Nav.signOut());
@@ -295,8 +301,8 @@ public final class Shell implements Nav.Home {
         panel.setName("side");
         UserDto user = Session.user();
         Container who = new Container(BoxLayout.y());
-        who.add(Ui.plain(user == null ? "" : user.displayName(), "SvSideName"));
-        who.add(Ui.plain(user == null ? "" : user.username(), "SvSideDetail"));
+        who.add(Ui.plain(user == null ? "Welcome" : user.displayName(), "SvSideName"));
+        who.add(Ui.plain(user == null ? "Browsing as a guest" : user.username(), "SvSideDetail"));
 
         Container list = new Container(BoxLayout.y());
         list.setScrollableY(true);
@@ -326,6 +332,14 @@ public final class Shell implements Nav.Home {
         }
 
         Container bottom = new Container(BoxLayout.y());
+        if (user == null) {
+            bottom.add(entry(FontImage.MATERIAL_LOGIN, "Sign in", "menu-signIn",
+                    () -> SignInGate.signIn(form)));
+            panel.add(BorderLayout.NORTH, who);
+            panel.add(BorderLayout.CENTER, list);
+            panel.add(BorderLayout.SOUTH, bottom);
+            return panel;
+        }
         bottom.add(entry(FontImage.MATERIAL_SETTINGS, "Settings", "menu-settings",
                 () -> SettingsForm.show(form)));
         bottom.add(entry(FontImage.MATERIAL_LOGOUT, "Sign out", "menu-signOut", Nav::signOut));

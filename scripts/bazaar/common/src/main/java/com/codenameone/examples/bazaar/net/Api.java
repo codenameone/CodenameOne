@@ -46,6 +46,7 @@ import com.codenameone.examples.bazaar.api.StoreMediaApi;
 import com.codenameone.examples.bazaar.api.PlatformApi;
 import com.codenameone.examples.bazaar.api.ReviewApi;
 import com.codenameone.examples.bazaar.api.WishlistApi;
+import com.codenameone.examples.bazaar.api.DiscoverApi;
 import com.codenameone.examples.bazaar.api.AddressApi;
 import com.codenameone.examples.bazaar.api.TradeApi;
 import com.codenameone.examples.bazaar.api.SubscriptionApi;
@@ -92,6 +93,7 @@ public final class Api {
     private static PlatformApi platform;
     private static ReviewApi reviews;
     private static WishlistApi wishlist;
+    private static DiscoverApi discover;
     private static AddressApi addresses;
     private static TradeApi trade;
     private static SubscriptionApi subscriptions;
@@ -135,6 +137,7 @@ public final class Api {
         platform = RestClients.create(PlatformApi.class, baseUrl);
         reviews = RestClients.create(ReviewApi.class, baseUrl);
         wishlist = RestClients.create(WishlistApi.class, baseUrl);
+        discover = RestClients.create(DiscoverApi.class, baseUrl);
         addresses = RestClients.create(AddressApi.class, baseUrl);
         trade = RestClients.create(TradeApi.class, baseUrl);
         subscriptions = RestClients.create(SubscriptionApi.class, baseUrl);
@@ -253,6 +256,11 @@ public final class Api {
 
     public static ReviewApi reviews() {
         return reviews;
+    }
+
+    /// The feed across stores, and the stores the shopper follows.
+    public static DiscoverApi discover() {
+        return discover;
     }
 
     public static WishlistApi wishlist() {

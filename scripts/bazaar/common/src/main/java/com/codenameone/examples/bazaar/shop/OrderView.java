@@ -29,7 +29,9 @@ import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.layouts.GridLayout;
 import com.codenameone.examples.bazaar.api.AddressDto;
+import com.codenameone.examples.bazaar.api.FulfillmentDto;
 import com.codenameone.examples.bazaar.api.FulfillmentSummaryDto;
+import com.codenameone.examples.bazaar.api.TrackingEventDto;
 import com.codenameone.examples.bazaar.api.OrderDto;
 import com.codenameone.examples.bazaar.api.OrderEventDto;
 import com.codenameone.examples.bazaar.api.OrderLineDto;
@@ -37,6 +39,7 @@ import com.codenameone.examples.bazaar.net.Api;
 import com.codenameone.examples.bazaar.ui.Lang;
 import com.codenameone.examples.bazaar.ui.ProductArt;
 import com.codenameone.examples.bazaar.ui.Ui;
+import java.util.List;
 
 /// One of the shopper's orders: where it is (a timeline), what is in it,
 /// what it cost, where it goes and its parcels, and Cancel while nothing has
@@ -87,13 +90,25 @@ final class OrderView {
             page.add(Ui.text(Addresses.summary(a), "SvText"));
         }
         if (order.fulfillments() != null && !order.fulfillments().isEmpty()) {
-            Ui.section(page, "Parcels");
+            Ui.section(page, "Tracking");
+            final Container parcels = new Container(BoxLayout.y());
+            parcels.setName("tracking");
             for (FulfillmentSummaryDto f : order.fulfillments()) {
-                String detail = f.carrier() == null ? null
-                        : f.carrier() + (f.trackingNumber() == null ? "" : Ui.DOT + f.trackingNumber());
-                page.add(Ui.row(FontImage.MATERIAL_LOCAL_SHIPPING, Lang.tr(status(f.status())),
-                        detail, null));
+                parcels.add(parcelHead(f.status(), f.carrier(), f.trackingNumber()));
             }
+            page.add(parcels);
+            // The summaries are in the order; the scans of each parcel are
+            // fetched, and replace them when they come.
+            Api.fulfilment().tracking(order.id(), Net.to(list -> {
+                if (list == null || list.isEmpty()) {
+                    return;
+                }
+                parcels.removeAll();
+                for (FulfillmentDto f : list) {
+                    parcels.add(parcel(f));
+                }
+                Ui.relayout(parcels);
+            }, (status, message) -> { }));
         }
         if (order.events() != null && !order.events().isEmpty()) {
             Ui.section(page, "History");
@@ -125,6 +140,48 @@ final class OrderView {
         }
         page.add(actions);
         return page;
+    }
+
+    private static Container parcelHead(String state, String carrier, String number) {
+        String detail = carrier == null ? null
+                : carrier + (number == null ? "" : Ui.DOT + number);
+        return Ui.row(FontImage.MATERIAL_LOCAL_SHIPPING, Lang.tr(status(state)), detail, null);
+    }
+
+    /// One parcel: where it is, and every scan on the way, newest on top,
+    /// down a line that joins them.
+    private static Container parcel(FulfillmentDto f) {
+        Container box = new Container(BoxLayout.y());
+        box.setUIID("ShopParcel");
+        box.add(parcelHead(f.status(), f.carrier(), f.trackingNumber()));
+        List<TrackingEventDto> events = f.events();
+        if (events == null || events.isEmpty()) {
+            box.add(Ui.plain(Lang.tr("No scans yet. They show here as the carrier reports them."),
+                    "SvMutedSmall"));
+            return box;
+        }
+        for (int iter = events.size() - 1; iter >= 0; iter--) {
+            TrackingEventDto e = events.get(iter);
+            boolean latest = iter == events.size() - 1;
+            Container row = new Container(new BorderLayout());
+            row.setUIID("ShopScan");
+            Container rail = new Container(new BorderLayout());
+            rail.setUIID("ShopScanRail");
+            rail.add(BorderLayout.NORTH, new Label("", latest ? "ShopScanDotNow" : "ShopScanDot"));
+            Label line = new Label("", iter == 0 ? "ShopScanLineEnd" : "ShopScanLine");
+            rail.add(BorderLayout.CENTER, line);
+            row.add(BorderLayout.WEST, rail);
+            Container words = new Container(BoxLayout.y());
+            String text = e.message() != null && e.message().length() > 0 ? e.message()
+                    : Lang.tr(status(e.status()));
+            words.add(Ui.text(text, latest ? "ShopScanTitleNow" : "ShopScanTitle"));
+            String where = e.place() == null || e.place().length() == 0 ? Ui.when(e.at())
+                    : e.place() + Ui.DOT + Ui.when(e.at());
+            words.add(Ui.plain(where, "ShopScanDetail"));
+            row.add(BorderLayout.CENTER, words);
+            box.add(row);
+        }
+        return box;
     }
 
     private static Container timeline(OrderDto order) {

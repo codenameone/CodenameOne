@@ -270,6 +270,17 @@ final class ProductForm {
         heart.setName("wishlist");
         FontImage.setMaterialIcon(heart, ProductCard.wishIcon(ShopState.wished(product.id())), 3.8f);
         heart.addActionListener(e -> {
+            if (com.codenameone.examples.bazaar.ui.Nav.guest()) {
+                // The wishlist is an account's: saved once signed in.
+                com.codenameone.examples.bazaar.ui.SignInGate.require(heart.getComponentForm(),
+                        "Save it for later", "Sign in and your wishlist follows you to "
+                        + "every device.", () -> ShopState.syncAccount(() -> {
+                            if (!ShopState.wished(product.id())) {
+                                ShopState.toggleWish(product.id());
+                            }
+                        }));
+                return;
+            }
             boolean on = ShopState.toggleWish(product.id());
             ShopUi.tap();
             FontImage.setMaterialIcon(heart, ProductCard.wishIcon(on), 3.8f);

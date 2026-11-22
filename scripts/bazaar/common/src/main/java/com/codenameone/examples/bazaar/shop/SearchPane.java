@@ -98,30 +98,29 @@ final class SearchPane extends ShopPane {
 
     @Override
     void reload() {
-        if (ShopState.store() == null) {
-            removeAll();
-            add(BorderLayout.CENTER, Ui.empty(FontImage.MATERIAL_STOREFRONT, "Choose a store first",
-                    "Pick a store on the Home tab."));
-            return;
-        }
-        if (grid == null) {
+        if (grid == null || scoped != ShopState.inStore()) {
             build();
             return;
         }
         grid.reload();
-        panel.load();
+        if (scoped) {
+            panel.load();
+        }
         marks();
     }
 
+    /// Whether the screen was built for one store's search.
+    private boolean scoped;
+
     private void build() {
         removeAll();
-        if (ShopState.store() == null) {
-            reload();
-            return;
-        }
+        scoped = ShopState.inStore();
         words.setUIID("SvSearchField");
         words.setName("search");
-        words.setHint(Lang.tr("Search {0}", ShopState.store().name()));
+        // Inside a store the search is that store's, with its filters; from
+        // Discover it runs over every store.
+        words.setHint(scoped ? Lang.tr("Search {0}", ShopState.store().name())
+                : Lang.tr("Search every store"));
         words.setText(query.q == null ? "" : query.q);
         FontImage.setMaterialIcon(words.getHintLabel(), FontImage.MATERIAL_SEARCH);
         words.addDataChangedListener((type, index) -> {
@@ -158,7 +157,7 @@ final class SearchPane extends ShopPane {
         bar.setUIID("ShopSearchBar");
         bar.add(BorderLayout.CENTER, words);
         Container tools = new Container(BoxLayout.x());
-        if (!wide) {
+        if (!wide && scoped) {
             tools.add(filters);
         }
         tools.add(sort);
@@ -181,9 +180,9 @@ final class SearchPane extends ShopPane {
         add(BorderLayout.NORTH, north);
 
         panel = new FilterPanel(query, this::changed);
-        int side = wide ? CN.convertToPixels(56) + CN.convertToPixels(FILTERS_MM) : 0;
+        int side = wide && scoped ? CN.convertToPixels(56) + CN.convertToPixels(FILTERS_MM) : 0;
         grid = new ProductGrid(null, query, side);
-        if (wide) {
+        if (wide && scoped) {
             Container left = new Container(new BorderLayout()) {
                 @Override
                 protected Dimension calcPreferredSize() {
@@ -198,7 +197,9 @@ final class SearchPane extends ShopPane {
         }
         add(BorderLayout.CENTER, grid.component());
         grid.reload();
-        panel.load();
+        if (scoped) {
+            panel.load();
+        }
         marks();
     }
 

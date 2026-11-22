@@ -70,10 +70,10 @@ final class ProductCard {
         Container price = new Container(new com.codename1.ui.layouts.FlowLayout());
         price.setUIID("ShopPriceRow");
         price.add(Ui.plain(p.maxPriceCents() > p.minPriceCents()
-                ? Lang.tr("From {0}", ShopState.money(p.minPriceCents()))
-                : ShopState.money(p.minPriceCents()), "SvProductPrice"));
+                ? Lang.tr("From {0}", ShopState.money(p.storeId(), p.minPriceCents()))
+                : ShopState.money(p.storeId(), p.minPriceCents()), "SvProductPrice"));
         if (off > 0) {
-            price.add(Ui.plain(ShopState.money(p.compareAtCents()), "ShopCompareAt"));
+            price.add(Ui.plain(ShopState.money(p.storeId(), p.compareAtCents()), "ShopCompareAt"));
         }
         text.add(price);
         if (p.ratingCount() > 0) {
@@ -82,17 +82,27 @@ final class ProductCard {
         card.add(BorderLayout.NORTH, picture);
         card.add(BorderLayout.CENTER, text);
         Container tappable = Ui.tap(card, "product-" + p.handle(),
-                e -> ProductForm.show(p.id(), p.title()));
+                e -> open(p));
         RowMenus.attach(tappable, () -> new Command[] {
             Command.create(Lang.tr("Open in new window"), null,
                     e -> ProductForm.openInWindow(p.id(), p.title())),
-            Command.create(Lang.tr("Add to cart"), null, e -> ProductForm.quickAdd(p.id())),
+            Command.create(Lang.tr("Add to cart"), null, e -> {
+                ShopState.enter(p.storeId());
+                ProductForm.quickAdd(p.id());
+            }),
             Command.create(Lang.tr("Copy link"), null, e -> {
                 Display.getInstance().copyToClipboard(ShopSections.link(p.handle()));
                 Ui.say("Link copied");
             })
         });
         return tappable;
+    }
+
+    /// Opens `p`, in its own store: a card from the feed may be another
+    /// store's than the current one, and its cart is the one it goes into.
+    static void open(ProductCardDto p) {
+        ShopState.enter(p.storeId());
+        ProductForm.show(p.id(), p.title());
     }
 
     /// The outline of a card while the grid loads.

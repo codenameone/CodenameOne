@@ -28,6 +28,7 @@ public class RegisterTest extends E2e {
         // passes share it, and a timestamp in the address wrapped differently from
         // run to run in the screens that are compared.
         String email = "new." + (desktopRun() ? "desk" : "phone") + "@bazaar.example";
+        openAccountAsGuest();
         click("register");
         waitForForm("Register");
         type("name", "Nico Newcomer");

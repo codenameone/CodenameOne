@@ -1340,6 +1340,38 @@ ShopGalleryImage { background-color: transparent; padding: 0; margin: 0; }
 ShopDots { background-color: transparent; padding: 0 0 1.6mm 0; margin: 0; }
 ShopDot { background: cn1-pill-border; background-color: var(--line-strong); padding: 0.6mm; margin: 0 0.6mm 0 0.6mm; }
 ShopDotOn { background: cn1-pill-border; background-color: var(--brand); padding: 0.6mm 1.4mm 0.6mm 1.4mm; margin: 0 0.6mm 0 0.6mm; }
+/* Discover, the follow button, the sign-in prompt and the parcel timeline. */
+ShopDiscoverHead { background-color: var(--brand-tint); padding: 4mm 3.6mm 3.6mm 3.6mm; margin: 0 0 1mm 0; }
+ShopDiscoverTitle { color: var(--text); font-family: "native:MainBold"; font-size: 7mm; padding: 0; margin: 0; background-color: transparent; }
+ShopDiscoverText { color: var(--text-muted); font-family: "native:MainRegular"; font-size: 2.75mm; padding: 1mm 0 2.4mm 0; margin: 0; background-color: transparent; }
+ShopSearchPill { color: var(--text-muted); background: cn1-pill-border; background-color: var(--surface); border: 1px solid var(--line-strong); font-family: "native:MainRegular"; font-size: 2.9mm; text-align: left; padding: 2.4mm 3.6mm 2.4mm 3.6mm; margin: 0; }
+ShopSearchPill.pressed { background-color: var(--surface-press); }
+ShopSectionHead { background-color: transparent; padding: 0; margin: 0; }
+ShopStoreCard { background-color: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 0 0 2mm 0; margin: 0 1.2mm 0 1.2mm; }
+ShopStoreCard.pressed { background-color: var(--surface-alt); }
+ShopStoreCardArt { background-color: transparent; border-radius: var(--radius); padding: 0; margin: 0; }
+ShopStoreCardLogo { background-color: var(--surface); border-radius: var(--radius-small); padding: 0.4mm; margin: 0 0 1.6mm 2mm; }
+ShopStoreCardWords { background-color: transparent; padding: 1.6mm 2.4mm 1.2mm 2.4mm; margin: 0; }
+ShopStoreCardName { color: var(--text); font-family: "native:MainBold"; font-size: 3mm; padding: 0; margin: 0; background-color: transparent; }
+ShopStoreCardTag { color: var(--text-muted); font-family: "native:MainRegular"; font-size: 2.3mm; padding: 0.4mm 0 0 0; margin: 0; background-color: transparent; }
+ShopFollow { color: var(--brand-contrast); background: cn1-pill-border; background-color: var(--brand); font-family: "native:MainBold"; font-size: 2.5mm; padding: 1.2mm 3mm 1.2mm 3mm; margin: 0 2.4mm 0 2.4mm; }
+ShopFollow.pressed { background-color: var(--brand-pressed); }
+ShopFollowing { color: var(--brand); background: cn1-pill-border; background-color: var(--brand-tint); font-family: "native:MainBold"; font-size: 2.5mm; padding: 1.2mm 3mm 1.2mm 3mm; margin: 0 2.4mm 0 2.4mm; }
+ShopFollowing.pressed { background-color: var(--surface-press); }
+ShopGate { background-color: transparent; text-align: center; padding: 8mm 2mm 4mm 2mm; margin: 0; }
+ShopGateIcon { color: var(--brand); background: cn1-pill-border; background-color: var(--brand-tint); text-align: center; padding: 3mm; margin: 0 0 3mm 0; }
+ShopGateTitle { color: var(--text); font-family: "native:MainBold"; font-size: 4.4mm; text-align: center; padding: 0; margin: 0; background-color: transparent; }
+ShopGateText { color: var(--text-muted); font-family: "native:MainRegular"; font-size: 2.75mm; text-align: center; padding: 1.6mm 2mm 4mm 2mm; margin: 0; background-color: transparent; }
+ShopParcel { background-color: var(--surface-alt); border-radius: var(--radius); padding: 1.6mm 2.4mm 2mm 2.4mm; margin: 0 0 2mm 0; }
+ShopScan { background-color: transparent; padding: 0; margin: 0; }
+ShopScanRail { background-color: transparent; padding: 0 2.4mm 0 1.6mm; margin: 0; }
+ShopScanDot { background: cn1-pill-border; background-color: var(--line-strong); padding: 0.9mm; margin: 1mm 0 0 0; }
+ShopScanDotNow { background: cn1-pill-border; background-color: var(--brand); padding: 1.1mm; margin: 0.8mm 0 0 0; }
+ShopScanLine { background-color: var(--line-strong); padding: 0 0.15mm 0 0.15mm; margin: 0.4mm 0 0 0.75mm; }
+ShopScanLineEnd { background-color: transparent; padding: 0; margin: 0; }
+ShopScanTitle { color: var(--text); font-family: "native:MainRegular"; font-size: 2.75mm; padding: 0; margin: 0; background-color: transparent; }
+ShopScanTitleNow { color: var(--text); font-family: "native:MainBold"; font-size: 2.75mm; padding: 0; margin: 0; background-color: transparent; }
+ShopScanDetail { color: var(--text-muted); font-family: "native:MainRegular"; font-size: 2.1mm; padding: 0.3mm 0 2mm 0; margin: 0; background-color: transparent; }
 ShopProductSplit { background-color: transparent; padding: 0; margin: 0; }
 ShopProductInfo { background-color: transparent; padding: 2mm 0 0 3mm; margin: 0; }
 ShopThumb { background-color: transparent; border-radius: var(--radius-small); padding: 0 2.4mm 0 0; margin: 0; }
@@ -2564,4 +2596,28 @@ ShopReview { border-top: 1px solid var(--line); padding: 2mm 0 2mm 0; margin: 0;
     ShopReviewTrack { background-color: var(--surface-alt-dark); }
     ShopReviewFill { background-color: #fbbf24; }
     ShopReview { border-top: 1px solid var(--line-dark); }
+    ShopDiscoverHead { background-color: var(--brand-tint-dark); }
+    ShopDiscoverTitle { color: var(--text-dark); }
+    ShopDiscoverText { color: var(--text-muted-dark); }
+    ShopSearchPill { color: var(--text-muted-dark); background-color: var(--surface-dark); border: 1px solid var(--line-strong-dark); }
+    ShopSearchPill.pressed { background-color: var(--surface-press-dark); }
+    ShopStoreCard { background-color: var(--surface-dark); border: 1px solid var(--line-dark); }
+    ShopStoreCard.pressed { background-color: var(--surface-alt-dark); }
+    ShopStoreCardLogo { background-color: var(--surface-dark); }
+    ShopStoreCardName { color: var(--text-dark); }
+    ShopStoreCardTag { color: var(--text-muted-dark); }
+    ShopFollow { color: var(--brand-contrast-dark); background-color: var(--brand-dark); }
+    ShopFollow.pressed { background-color: var(--brand-pressed-dark); }
+    ShopFollowing { color: var(--brand-dark); background-color: var(--brand-tint-dark); }
+    ShopFollowing.pressed { background-color: var(--surface-press-dark); }
+    ShopGateIcon { color: var(--brand-dark); background-color: var(--brand-tint-dark); }
+    ShopGateTitle { color: var(--text-dark); }
+    ShopGateText { color: var(--text-muted-dark); }
+    ShopParcel { background-color: var(--surface-alt-dark); }
+    ShopScanDot { background-color: var(--line-strong-dark); }
+    ShopScanDotNow { background-color: var(--brand-dark); }
+    ShopScanLine { background-color: var(--line-strong-dark); }
+    ShopScanTitle { color: var(--text-dark); }
+    ShopScanTitleNow { color: var(--text-dark); }
+    ShopScanDetail { color: var(--text-muted-dark); }
 }

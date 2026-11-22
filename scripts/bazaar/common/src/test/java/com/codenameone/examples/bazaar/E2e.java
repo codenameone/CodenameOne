@@ -127,7 +127,9 @@ public abstract class E2e extends AbstractTest {
             AppConfig.setMode("");
             Nav.launch();
         });
-        waitForForm("Welcome");
+        // No sign-in wall: the app opens on the shop, as a guest.
+        waitForForm("home-shop");
+        until(() -> Session.user() == null, 20000, "the guest shop");
     }
 
     @Override
@@ -232,6 +234,8 @@ public abstract class E2e extends AbstractTest {
 
     /// Signs in through the app's own screens.
     protected void signIn(String email, String homeForm) {
+        // A guest signs in from the Account tab, where the prompt is.
+        openAccountAsGuest();
         click("signIn");
         waitForForm("SignIn");
         type("email", email);
@@ -276,7 +280,20 @@ public abstract class E2e extends AbstractTest {
         } else {
             onEdt(Nav::signOut);
         }
-        waitForForm("Welcome");
+        waitForForm("home-shop");
+        until(() -> Session.user() == null, 20000, "the guest shop after signing out");
+    }
+
+    /// Shows the guest's Account tab, which offers Sign in and Create an account.
+    protected void openAccountAsGuest() {
+        onEdt(() -> {
+            com.codenameone.examples.bazaar.ui.Shell shell =
+                    com.codenameone.examples.bazaar.ui.Shell.current();
+            if (shell != null) {
+                shell.show(com.codenameone.examples.bazaar.ui.Sections.ACCOUNT);
+            }
+        });
+        until(() -> findByName("signIn") instanceof Button, 20000, "the Account tab's Sign in");
     }
 
     /// Sets the date field called `name`. A test cannot turn the wheels of

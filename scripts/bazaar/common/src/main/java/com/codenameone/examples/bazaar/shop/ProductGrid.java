@@ -115,11 +115,28 @@ final class ProductGrid {
 
     private void fetch(final boolean first) {
         StoreDto store = ShopState.store();
-        if (store == null) {
-            return;
-        }
         loading = true;
         final int ticket = ++asked;
+        if (!ShopState.inStore() || store == null) {
+            // Not inside a store: the search runs over every store, one page.
+            String sort = query.sortParam();
+            Api.discover().feed(query.words(), "rating".equals(sort) ? "popular"
+                    : "newest".equals(sort) ? "newest" : null, String.valueOf(PAGE),
+                    Net.to(answer -> {
+                        if (ticket != asked) {
+                            return;
+                        }
+                        loading = false;
+                        show(new ProductPageDto(answer.items(), answer.items() == null ? 0
+                                : answer.items().size(), 0, PAGE), first);
+                    }, (status, message) -> {
+                        if (ticket == asked) {
+                            loading = false;
+                            failed(first, status, message);
+                        }
+                    }));
+            return;
+        }
         Api.catalog().products(store.handle(), query.words(), query.collection, query.tag,
                 query.type, query.vendor, query.minParam(), query.maxParam(), query.sortParam(),
                 String.valueOf(page), String.valueOf(PAGE), Net.to(answer -> {
@@ -133,15 +150,19 @@ final class ProductGrid {
                         return;
                     }
                     loading = false;
-                    if (first) {
-                        grid.removeAll();
-                        footer.removeAll();
-                        footer.add(Ui.empty(FontImage.MATERIAL_CLOUD_OFF, message, null));
-                        footer.add(Ui.link("Try again", "retry", e -> reload()));
-                        Ui.relayout(scroller);
-                    }
-                    Ui.fail(status, message);
+                    failed(first, status, message);
                 }));
+    }
+
+    private void failed(boolean first, int status, String message) {
+        if (first) {
+            grid.removeAll();
+            footer.removeAll();
+            footer.add(Ui.empty(FontImage.MATERIAL_CLOUD_OFF, message, null));
+            footer.add(Ui.link("Try again", "retry", e -> reload()));
+            Ui.relayout(scroller);
+        }
+        Ui.fail(status, message);
     }
 
     private void show(ProductPageDto answer, boolean first) {
