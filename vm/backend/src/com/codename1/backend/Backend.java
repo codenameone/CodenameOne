@@ -272,6 +272,53 @@ public final class Backend {
         return sessions;
     }
 
+    /// The backend this process is running, or null when none has started or
+    /// the last one stopped. One process runs one backend.
+    ///
+    /// @return the running backend, or null
+    public static synchronized Backend running() {
+        return processLive != null && !processLive.isStopped() ? processLive : null;
+    }
+
+    /// Answers `request` in process as `authentication`, a principal the caller
+    /// has already established -- an MCP tool running an API endpoint as the
+    /// MCP client's user, say (issue 6310).
+    ///
+    /// The security chain that claims the request runs its **authorization**
+    /// rules for that principal, and the routers answer it with that principal
+    /// in the [com.codename1.backend.security.SecurityContextHolder], so
+    /// method security sees it too. Nothing authenticates: the request's own
+    /// `Authorization` header and cookies are not read, no session is loaded,
+    /// created or saved, and CSRF is not checked. A refusal is a plain 401 (an
+    /// anonymous or unauthenticated principal) or 403, never a login redirect.
+    /// The server's own routes -- MCP, management -- are not reachable this way.
+    ///
+    /// It may be called from inside a request: the calling thread's security
+    /// context, current request and tracing are what they were afterwards.
+    ///
+    /// ```java
+    /// HttpServer.Response r = Backend.running().dispatch(
+    ///         HttpServer.Request.of("GET", "/api/v2/apps/7", headers, null), auth);
+    /// String route = r.getMatchedRoute(); // "/api/v2/apps/{id}"
+    /// ```
+    ///
+    /// @param request the request to answer
+    /// @param authentication who it is answered as
+    /// @return the response; [HttpServer.Response#getMatchedRoute] names the
+    ///         route template that answered, or is null when none matched
+    /// @throws Exception what a handler threw and nothing handled
+    public HttpServer.Response dispatch(HttpServer.Request request,
+            com.codename1.backend.security.Authentication authentication) throws Exception {
+        if (request == null || authentication == null) {
+            throw new IllegalArgumentException("request/authentication is null");
+        }
+        Serving chain = serving;
+        if (chain == null) {
+            throw new IllegalStateException("This server is not serving");
+        }
+        return chain.dispatchAs(request, authentication);
+    }
+
     /// Answers `request` as the listener would -- sessions, scoped beans, tracing
     /// and metrics included -- on the calling thread, without a socket. A request
     /// no handler answers is a 404, as on the wire.
@@ -1071,6 +1118,57 @@ public final class Backend {
                 page.status = status;
             }
             return page;
+        }
+
+        /// See [Backend#dispatch(HttpServer.Request,
+        /// com.codename1.backend.security.Authentication)]. Not [#handle]: that
+        /// tries the server's own routes first and stores sessions afterwards.
+        HttpServer.Response dispatchAs(HttpServer.Request request, Object authentication)
+                throws Exception {
+            if (security == null) {
+                throw new IllegalStateException("This server has no SecurityFilterChain, so "
+                        + "there is no principal to dispatch as");
+            }
+            request.sessions = sessions;
+            String[] route = new String[1];
+            Object previousCapture = Tracing.beginRouteCapture(route);
+            Object previousTasks = Tasks.enter(tasks);
+            Object previousSecurity = security.enter();
+            Object previous = null;
+            if (track) {
+                previous = CURRENT_REQUEST.get();
+                CURRENT_REQUEST.set(request);
+            }
+            HttpServer.Response response = null;
+            try {
+                try {
+                    response = security.serveAs(request, authentication, this);
+                } catch (ResponseStatusException chosen) {
+                    response = HttpServer.Response.text(chosen.getStatus(), chosen.getReason());
+                }
+                if (response == null) {
+                    response = HttpServer.Response.text(404, "Not Found");
+                }
+                // A copy: a handler may answer every request with one object, and
+                // the route is written into it.
+                response = response.withHeaders(response.extraHeaders);
+                response.matchedRoute = route[0];
+                return response;
+            } finally {
+                try {
+                    endRequestBeans(request, response);
+                } finally {
+                    // A session the handler touched is never stored: nothing was
+                    // signed in, and the caller's own request owns its session.
+                    request.forgetSession();
+                    if (track) {
+                        CURRENT_REQUEST.set(previous);
+                    }
+                    security.leave(previousSecurity);
+                    Tasks.leave(previousTasks);
+                    Tracing.endRouteCapture(previousCapture);
+                }
+            }
         }
 
         /// A WebSocket handshake, put to the chain that guards its path. It

@@ -1680,6 +1680,20 @@ public final class HttpServer {
         /// request, and writing into it would hand one client's cookie to the next.
         /// Only one of the two is ever sent, so a file descriptor it carries still
         /// has exactly one owner.
+        /// The route template that answered, such as `/api/v2/apps/{id}`, on a
+        /// response from [com.codename1.backend.Backend#dispatch(Request,
+        /// com.codename1.backend.security.Authentication)]; null for any other
+        /// response, and when no route matched.
+        String matchedRoute;
+
+        /// The template of the route that answered an in-process dispatch as a
+        /// user, or null; see the field.
+        ///
+        /// @return the route template, or null
+        public String getMatchedRoute() {
+            return matchedRoute;
+        }
+
         Response withHeaders(Map headers) {
             Response copy = new Response(status, contentType, body, fileFd, fileOffset,
                     fileLength, headers);
