@@ -50,6 +50,8 @@ public class Throttle {
     static final String[][] DEFAULTS = {
         {"signin", "20/60"},
         {"signin-failures", "5/900"},
+        // Wrong passwords from one address across every account: a spray.
+        {"signin-failures-ip", "30/900"},
         {"sms", "5/600"},
         {"checkout", "10/60"},
         {"pin", "10/300"},

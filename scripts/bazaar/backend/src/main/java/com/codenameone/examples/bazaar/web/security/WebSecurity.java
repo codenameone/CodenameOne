@@ -155,6 +155,7 @@ public class WebSecurity {
                     })
                     .failureHandler((request, refused) -> {
                         throttle.fail("signin-failures", key(request));
+                        throttle.fail("signin-failures-ip", Throttle.client(request));
                         return HttpServer.Response.text(303, "")
                                 .header("Location", SIGN_IN + "?error=1")
                                 .header("Cache-Control", "no-store");
@@ -217,7 +218,8 @@ public class WebSecurity {
         return q < 0 ? target : target.substring(0, q);
     }
 
-    /// The account a sign-in attempt names, folded, as the lockout's key.
+    /// The account a sign-in attempt names, folded, with the client address, as
+    /// the lockout's key.
     static String key(HttpServer.Request request) {
         String u;
         try {
@@ -225,7 +227,11 @@ public class WebSecurity {
         } catch (RuntimeException malformed) {
             u = null;
         }
-        return u == null ? "" : Ascii.lower(u.trim());
+        // Keyed on the account AND the address it is tried from: an account
+        // alone would let anyone who knows a username keep its owner locked
+        // out by failing five times every quarter hour. Guessing across many
+        // accounts from one address is held by "signin-failures-ip" instead.
+        return (u == null ? "" : Ascii.lower(u.trim())) + "|" + Throttle.client(request);
     }
 
     /// Refuses a password for an account with too many wrong ones lately --
@@ -234,7 +240,8 @@ public class WebSecurity {
     static SecurityFilter lockout(final Throttle throttle) {
         return (request, chain) -> {
             if ("POST".equals(request.getMethod()) && SIGN_IN.equals(request.pathFrom(0))
-                    && throttle.lockout("signin-failures", key(request))) {
+                    && (throttle.lockout("signin-failures", key(request))
+                    || throttle.lockout("signin-failures-ip", Throttle.client(request)))) {
                 SecurityExchange.current().setResponseHeader("Cache-Control", "no-store");
                 return HttpServer.Response.text(303, "").header("Location", SIGN_IN + "?locked=1");
             }
