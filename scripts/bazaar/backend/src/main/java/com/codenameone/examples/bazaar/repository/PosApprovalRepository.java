@@ -34,4 +34,10 @@ public interface PosApprovalRepository extends CrudRepository<PosApproval, Strin
     @Modifying
     @Query("update PosApproval a set a.usedBy = :subject where a.id = :id and a.usedBy = ''")
     int use(@Param("id") String id, @Param("subject") String subject);
+
+    /// Gives back an approval `subject` claimed, when what it was claimed
+    /// for failed before anything was paid out.
+    @Modifying
+    @Query("update PosApproval a set a.usedBy = '' where a.id = :id and a.usedBy = :subject")
+    int release(@Param("id") String id, @Param("subject") String subject);
 }

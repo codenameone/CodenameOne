@@ -664,6 +664,19 @@ public class Pos {
                 parts[2]);
     }
 
+    /// What the counter return `req` of `orderId` would refund, refunding
+    /// nothing: what a manager's approval is checked against.
+    @Transactional(readOnly = true)
+    public long quoteReturn(String storeId, String orderId, PosReturnDto req)
+            throws IOException {
+        StoreOrder order = orderId == null ? null : orderRows.findById(orderId);
+        if (order == null || !storeId.equals(order.getStoreId()) || req == null) {
+            throw new ResponseStatusException(404, "No such order");
+        }
+        return orders.quoteRefund(orderId, new RefundRequestDto(req.lines(), 0, req.restock(),
+                ""));
+    }
+
     @Transactional(readOnly = true)
     private Shift checkReturn(String username, String storeId, String registerId, String orderId,
             PosReturnDto req) throws IOException {

@@ -487,16 +487,47 @@ public class PosTools {
     }
 
     /// The approval a refund at the counter needs, or null: one is needed
-    /// when the store's policy asks for it and the caller is not an owner or
-    /// a manager.
+    /// when the caller is not an owner or a manager and either the store's
+    /// policy asks for it, or the money goes out by hand (cash, store credit)
+    /// on an order that was not a register sale. The policy alone used to
+    /// decide, so with it off any cashier could pay an online card order out
+    /// of the drawer.
     @Transactional(readOnly = true)
-    public PosApproval refundApproval(String username, String storeId, String approvalId)
-            throws IOException {
+    public PosApproval refundApproval(String username, String storeId, String approvalId,
+            String orderId, boolean byHand) throws IOException {
         StoreStaff me = access.requireStaff(username, storeId, StoreAccess.ANYONE);
-        if (approvesItself(me) || !policyOf(storeId).isApproveRefunds()) {
+        if (approvesItself(me)) {
+            return null;
+        }
+        StoreOrder order = orderId == null ? null : orders.findById(orderId);
+        if (order == null || !storeId.equals(order.getStoreId())) {
+            throw new ResponseStatusException(404, "No such order");
+        }
+        boolean counterSale = Orders.POS.equals(order.getChannel());
+        if (!policyOf(storeId).isApproveRefunds() && (!byHand || counterSale)) {
             return null;
         }
         return requireApproval(storeId, approvalId, REFUND);
+    }
+
+    /// Claims `a` for a refund of `orderId` worth `refundCents`, before any
+    /// money moves: reading the approval first and spending it after the
+    /// refund let one approval pay several refunds sent together. An
+    /// approval asked for an amount covers no more than that; one asked for
+    /// 0 covers the whole return the manager signed off at the till.
+    @Transactional(rollbackFor = IOException.class)
+    public void claimRefund(String storeId, PosApproval a, String orderId, long refundCents,
+            String actor) throws IOException {
+        if (a.getAmountCents() > 0 && refundCents > a.getAmountCents()) {
+            throw new ResponseStatusException(403, "That approval covers a smaller refund");
+        }
+        use(storeId, a.getId(), orderId, actor);
+    }
+
+    /// Gives `a` back after the refund it was claimed for failed.
+    @Transactional(rollbackFor = IOException.class)
+    public void releaseRefund(PosApproval a, String orderId) {
+        approvals.release(a.getId(), Codes.cut(orderId, 64));
     }
 
     /// [#use] in a transaction of its own.

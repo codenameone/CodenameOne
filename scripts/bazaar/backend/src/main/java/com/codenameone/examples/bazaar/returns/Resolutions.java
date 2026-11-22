@@ -83,11 +83,13 @@ public class Resolutions {
                 + "return_request WHERE id = ?", new Object[] {r.getId()});
         String resolution = row == null ? REFUND : Rows.text(row.get("resolution"));
         long fee = row == null ? 0 : Rows.number(row.get("fee_cents"));
-        if (STORE_CREDIT.equals(resolution)) {
+        StoreOrder buyer = orderRows.findById(r.getOrderId());
+        if (STORE_CREDIT.equals(resolution) && buyer != null
+                && buyer.getCustomerId().length() > 0) {
             long[] parts = orders.refundParts(username, storeId, r.getOrderId(), req, true, fee,
                     StoreAccess.MANAGERS);
             StoreOrder o = orderRows.findById(r.getOrderId());
-            if (parts[0] > 0 && o.getCustomerId().length() > 0) {
+            if (parts[0] > 0) {
                 customers.adjustCredit(username, storeId, o.getCustomerId(),
                         new CreditAdjustDto(parts[0], "Return " + r.getId(), 0));
             }
@@ -97,6 +99,9 @@ public class Resolutions {
             exchange(username, storeId, r, req, fee, Rows.text(row.get("exchange_variant_id")));
             return;
         }
+        // A plain refund, and also store credit on a guest order: with no
+        // customer there is no account to credit, and recording the refund
+        // by hand while granting nothing would keep the shopper's money.
         orders.refundParts(username, storeId, r.getOrderId(), req, false, fee,
                 StoreAccess.MANAGERS);
     }

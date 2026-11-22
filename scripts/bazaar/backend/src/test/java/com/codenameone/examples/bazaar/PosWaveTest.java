@@ -60,6 +60,8 @@ class PosWaveTest {
     @Autowired
     private DataSource db;
     @Autowired
+    private com.codenameone.examples.bazaar.order.Orders orders;
+    @Autowired
     private Inventory inventory;
     @Autowired
     private Carts carts;
@@ -430,5 +432,39 @@ class PosWaveTest {
         assertEquals(409, t.status(post(cancel), "{\"refundTo\":\"CASH\"}", t.shop.owner));
         assertEquals(409, t.status(post(t.store + "/layaways/" + l.get("id") + "/payments"),
                 tender("CASH", 100), t.shop.owner));
+    }
+
+    private String refundApproval(Till t, long cents) throws Exception {
+        return (String) Rest.json(mvc, t.as(post(t.reg() + "/approvals"), "{\"managerUsername\":\""
+                + t.manager + "\",\"pin\":\"4321\",\"kind\":\"REFUND\",\"amountCents\":"
+                + cents + ",\"reason\":\"\"}", t.cashier)).get("id");
+    }
+
+    @Test
+    void aCashierPaysAnOnlineOrderOutOfTheDrawerOnlyWithOneApprovalUsedOnce() throws Exception {
+        Till t = new Till("pw-ret-ok", 10);
+        t.owner(post(t.base + "/policy"), "{\"discountApprovalBp\":0,"
+                + "\"approvePriceOverrides\":false,\"approveRefunds\":false,"
+                + "\"approveOrderEdits\":false,\"tip1Bp\":0,\"tip2Bp\":0,\"tip3Bp\":0,"
+                + "\"layawayDepositBp\":2000,\"layawayCancelFeeBp\":0}");
+        OrderDto o = t.shop.buy(People.customer(accounts, "pw-ret-ok-buyer"), 2);
+        String url = t.reg() + "/orders/" + o.id() + "/return";
+        String body = "{\"shiftId\":\"" + t.shiftId + "\",\"lines\":[{\"orderLineId\":\""
+                + o.lines().get(0).id() + "\",\"quantity\":1}],\"refundTo\":\"CASH\","
+                + "\"reason\":\"\",\"restock\":false%s}";
+        // The policy is off, but the card order was not a register sale.
+        assertEquals(403, t.status(post(url), String.format(body, ""), t.cashier));
+        // An approval for less than the return is worth does not cover it,
+        // and is not spent by trying.
+        String small = refundApproval(t, 100);
+        assertEquals(403, t.status(post(url),
+                String.format(body, ",\"approvalId\":\"" + small + "\""), t.cashier));
+        String ok = refundApproval(t, 0);
+        assertEquals(200, t.status(post(url),
+                String.format(body, ",\"approvalId\":\"" + ok + "\""), t.cashier));
+        // Spent before the money moved: the second unit needs a new one.
+        assertEquals(409, t.status(post(url),
+                String.format(body, ",\"approvalId\":\"" + ok + "\""), t.cashier));
+        assertEquals(1, orders.detailOf(o.id()).lines().get(0).refundedQty());
     }
 }

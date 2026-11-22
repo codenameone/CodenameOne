@@ -127,12 +127,23 @@ public class PosEndpoint implements PosApiServer {
     @Override
     public PosReturnResultDto counterReturn(String storeId, String registerId, String orderId,
             PosReturnDto body) throws Exception {
+        boolean byHand = body == null || !"ORIGINAL".equalsIgnoreCase(body.refundTo());
         PosApproval approval = tools.refundApproval(Caller.name(), storeId,
-                body == null ? null : body.approvalId());
-        PosReturnResultDto out = pos.counterReturn(Caller.name(), storeId, registerId, orderId,
-                body);
+                body == null ? null : body.approvalId(), orderId, byHand);
         if (approval != null) {
-            tools.spend(storeId, approval.getId(), orderId, Caller.name());
+            // Spent on this order, against what the return is worth, before
+            // any money moves; given back only if the return then fails.
+            tools.claimRefund(storeId, approval, orderId,
+                    pos.quoteReturn(storeId, orderId, body), Caller.name());
+        }
+        PosReturnResultDto out;
+        try {
+            out = pos.counterReturn(Caller.name(), storeId, registerId, orderId, body);
+        } catch (Exception failed) {
+            if (approval != null) {
+                tools.releaseRefund(approval, orderId);
+            }
+            throw failed;
         }
         return out;
     }

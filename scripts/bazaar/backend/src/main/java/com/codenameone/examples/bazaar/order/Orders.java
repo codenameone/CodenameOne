@@ -693,20 +693,52 @@ public class Orders {
         }
         long giftPart = amount - cardPart;
         String card = giftCards.cardOf(orderId);
-        if (byHand || giftPart > 0 && (card == null || giftPart > giftCards.spentOn(orderId))) {
-            // Paid by hand (mark paid): the money goes back the same way.
+        if (byHand || card == null) {
+            // Paid by hand (mark paid), or no gift card: the money goes back
+            // the same way, never to a card.
             giftPart = 0;
+        } else if (giftPart > 0) {
+            // A gift card takes back at most what it paid; the rest falls
+            // through to store credit and the drawer below. Zeroing the whole
+            // part when it asked for more stranded what the card did pay.
+            giftPart = Math.min(giftPart, giftCards.spentOn(orderId));
         }
-        if (cardPart > 0 && presentmentPart > 0) {
-            payments.refund(orderId, presentmentPart, Codes.cut(req.reason(), 200));
+        // Claims the amount on the order before any money moves: one
+        // conditional UPDATE, so two refunds of one order racing each other
+        // cannot both pass the "is anything left" check above and together
+        // pay out more than the order took. Plain arithmetic in the WHERE
+        // clause runs the same on SQLite, PostgreSQL and MySQL, as the gift
+        // card debit and the inventory reserve do. recordRefund then counts
+        // the claim instead of adding the amount again.
+        if (db.execute("UPDATE store_order SET refunded_cents = refunded_cents + ? WHERE id = ? "
+                + "AND refunded_cents + ? <= total_cents", new Object[] {Long.valueOf(amount),
+                orderId, Long.valueOf(amount)}) != 1) {
+            throw new ResponseStatusException(409, "Another refund of this order got there first");
         }
-        if (giftPart > 0) {
-            giftCards.credit(card, orderId, giftPart, "Refund");
+        boolean moved = false;
+        long creditPart;
+        try {
+            if (cardPart > 0 && presentmentPart > 0) {
+                payments.refund(orderId, presentmentPart, Codes.cut(req.reason(), 200));
+            }
+            moved = true;
+            if (giftPart > 0) {
+                giftCards.credit(card, orderId, giftPart, "Refund");
+            }
+            // What neither the card nor a gift card took goes back to the store
+            // credit the order spent, before anything is left to pay by hand.
+            creditPart = byHand ? 0 : storeCredit.restore(orderId,
+                    Math.max(0, amount - cardPart - giftPart));
+        } catch (IOException | RuntimeException failed) {
+            if (!moved) {
+                // The processor refused before anything went back: release
+                // the claim so the refund can be tried again. Once the card
+                // has been refunded the claim stays, since that money is gone.
+                db.execute("UPDATE store_order SET refunded_cents = refunded_cents - ? "
+                        + "WHERE id = ?", new Object[] {Long.valueOf(amount), orderId});
+            }
+            throw failed;
         }
-        // What neither the card nor a gift card took goes back to the store
-        // credit the order spent, before anything is left to pay by hand.
-        long creditPart = byHand ? 0 : storeCredit.restore(orderId,
-                Math.max(0, amount - cardPart - giftPart));
         StoreOrder done = recordRefund(orderId, req, amount, username,
                 foreign ? presentmentPart : 0);
         publish(done);
@@ -762,6 +794,15 @@ public class Orders {
         List<RefundLineDto> wanted = req.lines() == null ? new ArrayList<RefundLineDto>() : req.lines();
         for (int iter = 0; iter < wanted.size(); iter++) {
             RefundLineDto w = wanted.get(iter);
+            // Each entry is checked against what is left of its line on its
+            // own, so one line named twice would pass twice and refund (and
+            // restock) more units than were sold.
+            for (int prior = 0; prior < iter; prior++) {
+                String id = wanted.get(prior).orderLineId();
+                if (id != null && id.equals(w.orderLineId())) {
+                    throw new ResponseStatusException(400, "Name each line once");
+                }
+            }
             OrderLine line = find(rows, w.orderLineId());
             if (line == null || w.quantity() < 0
                     || w.quantity() > line.getQuantity() - line.getRefundedQty()) {
@@ -857,12 +898,13 @@ public class Orders {
             line.setRefundedQty(line.getRefundedQty() + w.quantity());
             lines.save(line);
         }
+        // refunded_cents already holds this refund (refundParts claimed it).
+        // Saving the whole row would write back a stale total over a claim
+        // another refund made meanwhile, so only these columns are set.
+        db.execute("UPDATE store_order SET financial = CASE WHEN refunded_cents >= total_cents "
+                + "THEN ? ELSE ? END, updated_at = ? WHERE id = ?", new Object[] {REFUNDED,
+                PARTIALLY_REFUNDED, Long.valueOf(Instant.now().toEpochMilli()), orderId});
         order = orders.findById(orderId);
-        order.setRefundedCents(order.getRefundedCents() + amount);
-        order.setFinancial(order.getRefundedCents() >= order.getTotalCents() ? REFUNDED
-                : PARTIALLY_REFUNDED);
-        order.setUpdatedAt(Instant.now());
-        orders.save(order);
         event(orderId, "REFUNDED", "Refunded " + amount + " cents", username);
         return order;
     }

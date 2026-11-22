@@ -25,6 +25,9 @@ import com.codename1.backend.test.BackendTest;
 import com.codename1.backend.test.MockMvc;
 import com.codenameone.examples.bazaar.account.Accounts;
 import com.codenameone.examples.bazaar.api.FulfilLineDto;
+import com.codenameone.examples.bazaar.api.GiftCardDto;
+import com.codenameone.examples.bazaar.api.RefundLineDto;
+import com.codenameone.examples.bazaar.api.RefundRequestDto;
 import com.codenameone.examples.bazaar.api.NewFulfillmentDto;
 import com.codenameone.examples.bazaar.api.OrderDto;
 import com.codenameone.examples.bazaar.api.OrderSettingsDto;
@@ -35,6 +38,7 @@ import com.codenameone.examples.bazaar.api.SelfReturnDto;
 import com.codenameone.examples.bazaar.cart.Carts;
 import com.codenameone.examples.bazaar.checkout.Checkouts;
 import com.codenameone.examples.bazaar.fulfil.Fulfillments;
+import com.codenameone.examples.bazaar.giftcard.GiftCards;
 import com.codenameone.examples.bazaar.inventory.Inventory;
 import com.codenameone.examples.bazaar.order.OrderSettings;
 import com.codenameone.examples.bazaar.order.Orders;
@@ -42,6 +46,7 @@ import com.codenameone.examples.bazaar.pricing.DemoPricing;
 import com.codenameone.examples.bazaar.returns.Resolutions;
 import com.codenameone.examples.bazaar.returns.Returns;
 import com.codenameone.examples.bazaar.returns.SelfReturns;
+import com.codenameone.examples.bazaar.store.StoreAccess;
 import com.codenameone.examples.bazaar.store.Stores;
 import org.junit.jupiter.api.Test;
 
@@ -87,6 +92,8 @@ class ReturnResolutionsTest {
     private SelfReturns selfReturns;
     @Autowired
     private OrderSettings settings;
+    @Autowired
+    private GiftCards giftCards;
 
     private Shop shop(String name) throws Exception {
         return new Shop(name, 10, accounts, stores, pricing, db, inventory, carts, checkouts, mvc);
@@ -221,5 +228,87 @@ class ReturnResolutionsTest {
         assertEquals(owed - r.totalCents(), orders.detailOf(o.id()).refundedCents());
         assertEquals(0, count("SELECT COUNT(*) AS n FROM pay_link WHERE order_id = ?",
                 replacement));
+    }
+
+    private static RefundRequestDto mugs(OrderDto o, int... quantities) {
+        List<RefundLineDto> ls = new ArrayList<RefundLineDto>();
+        for (int q : quantities) {
+            ls.add(new RefundLineDto(o.lines().get(0).id(), q));
+        }
+        return new RefundRequestDto(ls, 0, true, "");
+    }
+
+    @Test
+    void aLineNamedTwiceInOneRefundIsRefused() throws Exception {
+        Shop s = shop("rr-dup");
+        OrderDto o = s.buy(People.customer(accounts, "rr-dup-buyer"), 2);
+        // Two mugs sold; 2 + 2 used to pass as two separate "2 of 2 left".
+        ResponseStatusException e = assertThrows(ResponseStatusException.class,
+                () -> orders.refund(s.owner, s.storeId, o.id(), mugs(o, 2, 2)));
+        assertEquals(400, e.getStatus());
+        assertEquals(0, orders.detailOf(o.id()).refundedCents());
+        assertEquals(0, orders.detailOf(o.id()).lines().get(0).refundedQty());
+    }
+
+    @Test
+    void refundsRacingForOneOrderNeverPayMoreThanItTook() throws Exception {
+        Shop s = shop("rr-race");
+        OrderDto o = s.buy(People.customer(accounts, "rr-race-buyer"), 2);
+        long total = orders.detailOf(o.id()).totalCents();
+        // Four refunds of the whole order at once: exactly one may pay.
+        Thread[] runs = new Thread[4];
+        final int[] ok = new int[1];
+        for (int iter = 0; iter < runs.length; iter++) {
+            runs[iter] = new Thread(() -> {
+                try {
+                    orders.refund(s.owner, s.storeId, o.id(), mugs(o, 2));
+                    synchronized (ok) {
+                        ok[0]++;
+                    }
+                } catch (Exception refused) {
+                    // 400 or 409: someone else got there first.
+                }
+            });
+            runs[iter].start();
+        }
+        for (Thread r : runs) {
+            r.join();
+        }
+        assertEquals(1, ok[0]);
+        assertTrue(orders.detailOf(o.id()).refundedCents() <= total);
+        assertTrue(count("SELECT COALESCE(SUM(refunded_cents), 0) AS n FROM payment "
+                + "WHERE order_id = ?", o.id()) <= total);
+    }
+
+    @Test
+    void aGiftCardGetsBackWhatItPaidWhenTheRefundIsLarger() throws Exception {
+        Shop s = shop("rr-gift");
+        OrderDto o = s.buy(People.customer(accounts, "rr-gift-buyer"), 2);
+        GiftCardDto card = giftCards.issue(s.owner, s.storeId, new GiftCardDto(null, null, null,
+                2500, 0, true, "", 0, "", 0, "", "", "", 0, 0));
+        assertTrue(giftCards.redeem(card.id(), o.id(), 500));
+        // No card charge to take the refund: all of it asks the gift card,
+        // which paid 500 of the order. It used to get nothing at all.
+        db.execute("DELETE FROM payment WHERE order_id = ?", new Object[] {o.id()});
+        long[] parts = orders.refundParts(s.owner, s.storeId, o.id(), mugs(o, 1), false,
+                StoreAccess.MANAGERS);
+        assertEquals(500, parts[2]);
+        assertEquals(2500, count("SELECT balance_cents AS n FROM gift_card WHERE id = ?",
+                card.id()));
+    }
+
+    @Test
+    void storeCreditOnAGuestOrderIsRefundedInstead() throws Exception {
+        Shop s = shop("rr-guest");
+        String user = People.customer(accounts, "rr-guest-buyer");
+        OrderDto o = delivered(s, user);
+        ReturnQuoteDto q = selfReturns.request(user, o.id(), new SelfReturnDto("CHANGED_MIND",
+                "", Resolutions.STORE_CREDIT, null, oneMug(o)));
+        db.execute("UPDATE store_order SET customer_id = '' WHERE id = ?", new Object[] {o.id()});
+        settle(s, q.returnId());
+        long owed = q.valueCents() - q.feeCents();
+        // Nobody to credit, so the money goes back to the card.
+        assertEquals(owed, count("SELECT COALESCE(SUM(refunded_cents), 0) AS n FROM payment "
+                + "WHERE order_id = ?", o.id()));
     }
 }

@@ -51,9 +51,10 @@ import java.util.List;
 /// not answered 2xx is tried again after [#backoffMillis] -- 1, 2, 4, 8 and
 /// 16 minutes -- and is FAILED after [#MAX_ATTEMPTS] tries.
 ///
-/// The URL is the merchant's to choose, so a real service would also refuse
-/// private and loopback addresses before calling it; the sample only insists
-/// on http or https.
+/// The URL is the merchant's to choose, so it must be http or https and
+/// [com.codenameone.examples.bazaar.web.security.UrlGuard#refuse] turns away
+/// private, loopback and link-local hosts
+/// before anything is called.
 @Component
 public class Webhooks {
     public static final String PENDING = "PENDING";
