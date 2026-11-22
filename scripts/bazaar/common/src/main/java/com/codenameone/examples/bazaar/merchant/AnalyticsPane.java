@@ -37,6 +37,7 @@ import com.codename1.ui.table.DataGrid;
 import com.codenameone.examples.bazaar.api.AnalyticsDto;
 import com.codenameone.examples.bazaar.api.BreakdownDto;
 import com.codenameone.examples.bazaar.api.FunnelStepDto;
+import com.codenameone.examples.bazaar.api.InsightsDto;
 import com.codenameone.examples.bazaar.api.KpiDto;
 import com.codenameone.examples.bazaar.api.SeriesPointDto;
 import com.codenameone.examples.bazaar.api.TopItemDto;
@@ -58,6 +59,8 @@ final class AnalyticsPane extends MerchantPane {
     private boolean compare = true;
     private AnalyticsDto data;
     private AnalyticsDto before;
+    /// Channel mix and the views-to-orders funnel, counted by the database.
+    private InsightsDto insights;
 
     AnalyticsPane() {
         super("Analytics", "merchant-analytics");
@@ -77,6 +80,13 @@ final class AnalyticsPane extends MerchantPane {
                 paint();
             }
         }, Ui::fail));
+        insights = null;
+        Api.analytics().insights(store, asked.fromParam(), asked.toParam(), Net.to(found -> {
+            if (store.equals(MerchantState.storeId()) && asked == period) {
+                insights = found;
+                paint();
+            }
+        }, (status, message) -> { }));
         before = null;
         if (compare) {
             final Period prev = asked.previous();
@@ -228,13 +238,15 @@ final class AnalyticsPane extends MerchantPane {
         page.add(charts);
 
         Container splits = new Container(wideNow ? new GridLayout(1, 2) : BoxLayout.y());
-        splits.add(card("Sales by channel", channels(data.byChannel())));
+        splits.add(card("Sales by channel", channels(insights == null ? data.byChannel()
+                : Insights.withSales(insights.channels()))));
         splits.add(card("Sales by location", locations(data.byLocation())));
         page.add(splits);
 
         Container lower = new Container(wideNow ? new GridLayout(1, 2) : BoxLayout.y());
         lower.add(card("Top products", topProducts(data.topProducts(), wideNow)));
-        lower.add(card("Checkout funnel", funnel(data.funnel())));
+        lower.add(card("Conversion funnel", funnel(insights == null ? data.funnel()
+                : insights.funnel())));
         page.add(lower);
 
         page.add(card("Inventory value", inventory()));

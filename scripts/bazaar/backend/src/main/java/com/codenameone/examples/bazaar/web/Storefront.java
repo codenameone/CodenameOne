@@ -95,6 +95,9 @@ public class Storefront {
         return "listing";
     }
 
+    @com.codename1.backend.annotations.Autowired
+    private com.codenameone.examples.bazaar.analytics.Views views;
+
     @GetMapping("/s/{handle}/products/{product}")
     public String product(@PathVariable("handle") String handle,
             @PathVariable("product") String product,
@@ -103,6 +106,7 @@ public class Storefront {
         attribution.capture(request, handle);
         pages.product(handle, product, variant, model, request);
         automations.viewedByHandle(handle, product, CheckoutPages.signedIn());
+        views.viewedByHandle(handle, product, request, CheckoutPages.signedIn());
         return "product";
     }
 

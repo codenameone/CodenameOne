@@ -79,6 +79,8 @@ class MerchantIdorTest {
         "GET /returns/{returnId}/return-label.pdf",
         "DELETE /staff/{staffId}", "DELETE /suppliers/{supplierId}", "DELETE /tax-rates/{rateId}",
         "DELETE /webhooks/{webhookId}", "GET ", "GET /analytics", "GET /analytics/funnel",
+        "GET /analytics/insights", "GET /pipeline", "POST /pipeline/move",
+        "POST /ai/v1/chat/completions",
         "GET /automation-catalog", "GET /automations", "GET /automations/{automationId}",
         "GET /automations/{automationId}/activity", "GET /collections", "GET /customer-export",
         "GET /customer-segments", "GET /customers", "GET /customers/{customerId}",
@@ -247,9 +249,11 @@ class MerchantIdorTest {
         "DELETE /tax-overrides/{overrideId}", "POST /products/{productId}/tax-category",
         "GET /vat-rates", "GET /oss-report", "GET /oss-report.csv"};
 
-    /// Routes of [#ROUTES] served as documents by `DocumentPages` rather than
-    /// declared by a shared API interface.
+    /// Routes of [#ROUTES] served by a controller rather than declared by a
+    /// shared API interface: documents (`DocumentPages`) and the merchant AI
+    /// (`MerchantAiController`).
     static final String[] DOCUMENT_ROUTES = {"GET /pos/labels.pdf",
+        "POST /ai/v1/chat/completions",
         "GET /label-sheets.pdf", "GET /purchase-orders/{purchaseOrderId}/labels.pdf",
         "GET /bulk-orders/packing-slips.pdf", "GET /fulfillments/{fulfillmentId}/customs.pdf",
         "GET /returns/{returnId}/return-label.pdf", "GET /bulk-jobs/{jobId}/result.jsonl",

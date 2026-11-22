@@ -275,6 +275,7 @@ public class Checkouts {
         }
         final StoreOrder order = orders.newOrder(quote, Orders.ONLINE, username,
                 empty(req.email()) ? username : req.email(), address, clientId);
+        order.setSource(given != null ? Orders.SOURCE_WEB : Orders.SOURCE_APP);
         order.setNote(Codes.cut(req.note(), 1000));
         order.setTipCents(tip);
         // The language its mail goes out in: the storefront's, or what the

@@ -41,4 +41,10 @@ public interface AnalyticsApi {
     @GET("/api/merchant/stores/{storeId}/analytics/funnel")
     void funnel(@Path("storeId") String storeId, @Query("from") String from,
             @Query("to") String to, OnComplete<Response<List<FunnelStepDto>>> callback);
+
+    /// Sales by channel (web, app, point of sale, marketplace, drafts) and the
+    /// funnel from product views to orders, both counted by the database.
+    @GET("/api/merchant/stores/{storeId}/analytics/insights")
+    void insights(@Path("storeId") String storeId, @Query("from") String from,
+            @Query("to") String to, OnComplete<Response<InsightsDto>> callback);
 }

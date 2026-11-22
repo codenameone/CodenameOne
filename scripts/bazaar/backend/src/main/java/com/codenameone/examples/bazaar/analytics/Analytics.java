@@ -27,6 +27,7 @@ import com.codenameone.examples.bazaar.api.BreakdownDto;
 import com.codenameone.examples.bazaar.api.FunnelStepDto;
 import com.codenameone.examples.bazaar.api.InventoryValueDto;
 import com.codenameone.examples.bazaar.api.KpiDto;
+import com.codenameone.examples.bazaar.api.InsightsDto;
 import com.codenameone.examples.bazaar.api.SeriesPointDto;
 import com.codenameone.examples.bazaar.api.TopItemDto;
 import com.codenameone.examples.bazaar.domain.Cart;
@@ -149,6 +150,94 @@ public class Analytics {
         long[] p = period(from, to, System.currentTimeMillis());
         Data d = load(storeId, p[0]);
         return funnel(d, d.between(p[0], p[1]), p[0], p[1]);
+    }
+
+    @com.codename1.backend.annotations.Autowired
+    private com.codenameone.examples.bazaar.repository.ProductViewEventRepository views;
+
+    /// Sales by channel and the views-to-orders funnel of a period, each
+    /// counted by the database rather than added up here:
+    ///
+    /// - channels: `web` (online orders placed on the storefront, and those
+    ///   from before the source was kept), `app` (the app and the API), `pos`,
+    ///   `marketplace`, and `draft` (draft orders turned into orders); orders
+    ///   and sales (subtotal less discounts) as the dashboard counts them.
+    /// - funnel: product pages viewed, carts created, carts that reached
+    ///   checkout (an email or an account, as [#funnel] counts them), and
+    ///   online orders.
+    @Transactional(readOnly = true)
+    public InsightsDto insights(String username, String storeId, long from, long to)
+            throws IOException {
+        access.requireArea(username, storeId, Perms.REPORTS, false, StoreAccess.MANAGERS);
+        Store store = access.requireStore(username, storeId);
+        long[] p = period(from, to, System.currentTimeMillis());
+        Instant start = Instant.ofEpochMilli(p[0]);
+        Instant end = Instant.ofEpochMilli(p[1]);
+        long[][] sums = new long[CHANNELS.length][2];
+        List<Object[]> mix = orders.channelMix(storeId, start, end, Orders.CANCELLED,
+                Orders.DRAFT);
+        for (int iter = 0; iter < mix.size(); iter++) {
+            Object[] row = mix.get(iter);
+            int at = channelIndex(text(row[0]), text(row[1]));
+            if (at >= 0) {
+                sums[at][0] += number(row[2]);
+                sums[at][1] += number(row[3]) - number(row[4]);
+            }
+        }
+        List<Object[]> drafts = orders.convertedDrafts(storeId, start, end, Orders.CANCELLED,
+                Orders.DRAFT, "");
+        if (!drafts.isEmpty()) {
+            Object[] row = drafts.get(0);
+            sums[4][0] += number(row[0]);
+            sums[4][1] += number(row[1]) - number(row[2]);
+        }
+        List<BreakdownDto> channels = new ArrayList<BreakdownDto>();
+        for (int iter = 0; iter < CHANNELS.length; iter++) {
+            channels.add(new BreakdownDto(CHANNELS[iter], CHANNEL_TITLES[iter],
+                    (int) sums[iter][0], sums[iter][1]));
+        }
+        long cartCount = number(carts.countCreated(storeId, start, end));
+        long anonymous = number(carts.countAnonymous(storeId, start, end, ""));
+        List<FunnelStepDto> funnel = new ArrayList<FunnelStepDto>();
+        funnel.add(new FunnelStepDto("views", "Product views",
+                (int) number(views.countViews(storeId, start, end))));
+        funnel.add(new FunnelStepDto("carts", "Carts", (int) cartCount));
+        funnel.add(new FunnelStepDto("checkouts", "Reached checkout",
+                (int) (cartCount - anonymous)));
+        funnel.add(new FunnelStepDto("orders", "Ordered", (int) number(orders.countOnline(storeId,
+                start, end, Orders.CANCELLED, Orders.ONLINE))));
+        return new InsightsDto(p[0], p[1], channels, funnel, store.getCurrency());
+    }
+
+    static final String[] CHANNELS = {"web", "app", "pos", "marketplace", "draft"};
+    static final String[] CHANNEL_TITLES = {"Online store", "App", "Point of sale",
+        "Marketplaces", "Draft orders"};
+
+    /// The [#CHANNELS] slot of an order's channel and source, or -1.
+    static int channelIndex(String channel, String source) {
+        if (Orders.ONLINE.equals(channel)) {
+            return Orders.SOURCE_APP.equals(source) ? 1 : 0;
+        }
+        if (Orders.POS.equals(channel)) {
+            return 2;
+        }
+        if ("MARKETPLACE".equals(channel)) {
+            return 3;
+        }
+        return -1;
+    }
+
+    private static String text(Object o) {
+        return o == null ? "" : o.toString();
+    }
+
+    /// A count or sum the database answered: a Long, an Integer or a decimal
+    /// depending on the engine, and null for a sum of no rows.
+    static long number(Object o) {
+        if (o instanceof Number) {
+            return ((Number) o).longValue();
+        }
+        return 0;
     }
 
     /// The rows a dashboard reads, from `since` on; every counted order of

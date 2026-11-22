@@ -157,6 +157,8 @@ final class ProductEditor extends Container {
         description.setUIID("SvField");
         description.setName("product-description");
         words.add(description);
+        words.add(Ui.link(Lang.tr("Draft description"), "product-draft-description",
+                e -> draftDescription()));
 
         Container opts = card(main, "Options");
         opts.add(Ui.text(Lang.tr("Up to three options, values separated by commas: "
@@ -608,5 +610,41 @@ final class ProductEditor extends Container {
             saved.run();
             pane.popAll();
         }, Ui::fail));
+    }
+
+    /// Asks the store's AI for a description from the title, vendor, type,
+    /// tags and options as they are in the form, and puts the draft in the
+    /// description field for the merchant to edit. Saving stays theirs.
+    private void draftDescription() {
+        StringBuilder options = new StringBuilder();
+        for (int iter = 0; iter < optionNames.length; iter++) {
+            String name = optionNames[iter].getText().trim();
+            String values = optionValues[iter].getText().trim();
+            if (name.length() > 0 && values.length() > 0) {
+                options.append(options.length() == 0 ? "" : "; ").append(name).append(": ")
+                        .append(values);
+            }
+        }
+        String fields = DescriptionDraft.fields(title.getText(), vendor == null ? ""
+                : vendor.getText(), type == null ? "" : type.getText(), tags == null ? ""
+                : tags.getText(), options.toString());
+        Ui.say("Drafting a description...");
+        DescriptionDraft.draft(com.codename1.ai.LlmClient.localOpenAiCompatible(
+                com.codenameone.examples.bazaar.net.Session.serverUrl() + "/api/merchant/stores/"
+                + MerchantState.storeId() + "/ai/v1", "", "bazaar"), fields,
+                new AssistantRun.Done() {
+                    @Override
+                    public void answered(String text) {
+                        if (text.length() > 0) {
+                            description.setText(text);
+                            description.getParent().revalidate();
+                        }
+                    }
+
+                    @Override
+                    public void failed(Throwable error) {
+                        Ui.say("The description could not be drafted");
+                    }
+                });
     }
 }

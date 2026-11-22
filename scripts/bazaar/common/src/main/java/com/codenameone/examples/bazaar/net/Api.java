@@ -44,6 +44,7 @@ import com.codenameone.examples.bazaar.api.PaymentApi;
 import com.codenameone.examples.bazaar.api.StoreApi;
 import com.codenameone.examples.bazaar.api.AutomationApi;
 import com.codenameone.examples.bazaar.api.AnalyticsApi;
+import com.codenameone.examples.bazaar.api.PipelineApi;
 import com.codenameone.examples.bazaar.api.CustomerApi;
 import com.codenameone.examples.bazaar.api.WebhookApi;
 import com.codenameone.examples.bazaar.api.StoreMediaApi;
@@ -98,6 +99,7 @@ public final class Api {
     private static OrderEditApi orderEdits;
     private static AutomationApi automations;
     private static AnalyticsApi analytics;
+    private static PipelineApi pipeline;
     private static CustomerApi customers;
     private static WebhookApi webhooks;
     private static StoreMediaApi storeMedia;
@@ -149,6 +151,7 @@ public final class Api {
         orderEdits = RestClients.create(OrderEditApi.class, baseUrl);
         automations = RestClients.create(AutomationApi.class, baseUrl);
         analytics = RestClients.create(AnalyticsApi.class, baseUrl);
+        pipeline = RestClients.create(PipelineApi.class, baseUrl);
         customers = RestClients.create(CustomerApi.class, baseUrl);
         webhooks = RestClients.create(WebhookApi.class, baseUrl);
         storeMedia = RestClients.create(StoreMediaApi.class, baseUrl);
@@ -274,6 +277,11 @@ public final class Api {
 
     public static AnalyticsApi analytics() {
         return analytics;
+    }
+
+    /// The sales pipeline board.
+    public static PipelineApi pipeline() {
+        return pipeline;
     }
 
     public static CustomerApi customers() {

@@ -28,6 +28,11 @@ final class GlobalSeed {
     }
 
     static void seed(Shop s, String orderId, DataSource db) throws Exception {
+        // A product view, for the pipeline's intent signals and the insights
+        // funnel.
+        db.execute("INSERT INTO product_view_event (id, store_id, product_id, visitor, "
+                + "viewed_at) VALUES (?, ?, ?, 'idor-visitor', ?)", new Object[] {Ids.next(),
+                    s.storeId, s.productId, Long.valueOf(System.currentTimeMillis())});
         // A shipping profile and a routing rule, for the profile and routing
         // routes.
         db.execute("INSERT INTO shipping_profile (id, store_id, name, position) VALUES "

@@ -51,6 +51,7 @@ public class WebPages {
         {"Inventory", "/inventory", "i"},
         {"Customers", "/customers", "c"},
         {"Fulfilment", "/fulfilment", "f"},
+        {"Sales pipeline", "/pipeline", ""},
         {"Sales", "/sales", "r"},
         {"Discounts", "/discounts", "t"},
         {"Calendar", "/calendar", "l"},

@@ -24,6 +24,7 @@ import com.codename1.backend.annotations.Component;
 import com.codenameone.examples.bazaar.api.AnalyticsApiServer;
 import com.codenameone.examples.bazaar.api.AnalyticsDto;
 import com.codenameone.examples.bazaar.api.FunnelStepDto;
+import com.codenameone.examples.bazaar.api.InsightsDto;
 
 import java.util.List;
 
@@ -44,6 +45,11 @@ public class AnalyticsEndpoint implements AnalyticsApiServer {
     @Override
     public List<FunnelStepDto> funnel(String storeId, String from, String to) throws Exception {
         return analytics.funnel(Caller.name(), storeId, millis(from), millis(to));
+    }
+
+    @Override
+    public InsightsDto insights(String storeId, String from, String to) throws Exception {
+        return analytics.insights(Caller.name(), storeId, millis(from), millis(to));
     }
 
     static long millis(String text) {

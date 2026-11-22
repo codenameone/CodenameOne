@@ -75,11 +75,15 @@ public class CatalogEndpoint implements CatalogApiServer {
     @com.codename1.backend.annotations.Autowired
     private com.codenameone.examples.bazaar.marketing.MarketingMails automations;
 
+    @com.codename1.backend.annotations.Autowired
+    private com.codenameone.examples.bazaar.analytics.Views views;
+
     @Override
     public ProductDto product(String id) throws Exception {
         ProductDto p = catalog.publicProduct(id);
         automations.viewed(p.storeId(), com.codenameone.examples.bazaar.cart.Codes.callerOrNull(),
                 p.id());
+        views.viewed(p.storeId(), p.id(), com.codenameone.examples.bazaar.cart.Codes.callerOrNull());
         return productText.localize(p, productText.shopperLocale(p.storeId()));
     }
 
@@ -88,6 +92,7 @@ public class CatalogEndpoint implements CatalogApiServer {
         ProductDto p = catalog.publicProductByHandle(handle, productHandle);
         automations.viewed(p.storeId(), com.codenameone.examples.bazaar.cart.Codes.callerOrNull(),
                 p.id());
+        views.viewed(p.storeId(), p.id(), com.codenameone.examples.bazaar.cart.Codes.callerOrNull());
         return productText.localize(p, productText.shopperLocale(p.storeId()));
 
     }

@@ -378,7 +378,12 @@ on a row.
 
 | Dashboard KPIs | &#10003; | core | core | core | core | 
 | Sales over time / breakdowns | &#10003; | core | core | core | core | 
-| Conversion funnel | &#10003; | core | core | core | core | 
+| Sales by channel (web, app, POS, marketplaces) | &#10003; | core | core | core | core | Counted by the database; orders placed in the app and on the website are told apart, which a web-first platform does not do for its own app.
+| Conversion funnel | &#10003; | core | core | core | core | Product views, carts, checkouts and orders, counted by the database. Shopify's funnel starts from sessions.
+| Sales pipeline board (carts to returns) | &#10003; | no | | | | Browsing and checkout carts, reminded carts, paid, fulfilling, shipped, delivered and return requested on one Kanban board in the app. Dragging a card does the real thing -- the recovery mail, packing, shipping, delivery -- and the server refuses any other move. Shopify lists abandoned checkouts and orders on separate pages. The back office shows the same board read only.
+| Purchase-intent score per cart | &#10003; | no | | | | From product views, return visits, time on product pages, cart value and past orders, with the reasons in words on the card. Rules, not a trained model.
+| AI assistant over store analytics | &#10003; | core | | | | Shopify's Sidekick is broader: it answers about the whole store and acts in the admin. Bazaar's assistant answers from a fixed set of the store's own queries that the model calls as tools, with the provider and key the owner picks (OpenAI, Anthropic, Gemini or any compatible server); without one it answers by rules.
+| AI product description drafts | &#10003; | core | app/plugin | core | core | Drafted from the product's own fields on the server, which holds the key; the merchant edits the draft before saving.
 | Top products / items | &#10003; | core | core | core | core | 
 | Live view (real-time) | &#9681; | core | app/plugin | no | core | A live channel streams sales to the dashboard.
 | Custom reports / report builder | &#10003; | core | app/plugin | core | core | Pick measures, dimensions and filters; save reports. 
@@ -438,6 +443,12 @@ about how the platform is built and run rather than what a store sells.
 * *Journeys drawn as flowcharts.* Automations and customer journeys are graphs
   of triggers, waits, splits and messages, edited on a canvas, with per-step
   counts of who passed through.
+* *Carts and orders on one board.* The sales pipeline puts every open cart
+  next to every open order, scores each cart's purchase intent with reasons a
+  merchant can read, and turns a drag into the action it stands for. The AI
+  behind the assistant and the description drafts is the owner's choice of
+  provider, its key never leaves the server, and the same screens work with no
+  provider at all.
 * *A Kanban board for fulfilment.* Orders move through columns from paid to
   delivered.
 * *Charts drawn by the server.* The back-office dashboard draws its charts on

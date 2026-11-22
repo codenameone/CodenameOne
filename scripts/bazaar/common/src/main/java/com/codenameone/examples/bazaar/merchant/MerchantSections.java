@@ -29,6 +29,10 @@ import com.codenameone.examples.bazaar.ui.Sections;
 public final class MerchantSections {
     /// The order fulfilment board.
     public static final String FULFILMENT = "fulfilment";
+    /// The sales pipeline board, carts to returns.
+    public static final String PIPELINE = "pipeline";
+    /// The assistant that answers questions over the store's numbers.
+    public static final String ASSISTANT = "assistant";
     public static final String COLLECTIONS = "collections";
     public static final String SHIPPING = "shipping";
     public static final String TAXES = "taxes";
@@ -68,6 +72,8 @@ public final class MerchantSections {
         String manage = "Manage";
         Sections.content(Nav.MERCHANT, Sections.DASHBOARD, DashboardPane::new);
         Sections.content(Nav.MERCHANT, Sections.ORDERS, OrdersPane::new);
+        Sections.register(Nav.MERCHANT, new Section(PIPELINE, "Sales pipeline", store,
+                FontImage.MATERIAL_VIEW_KANBAN, PipelinePane::new));
         Sections.register(Nav.MERCHANT, new Section(FULFILMENT, "Fulfilment", store,
                 FontImage.MATERIAL_LOCAL_SHIPPING,
                 FulfilmentPane::new));
@@ -108,6 +114,8 @@ public final class MerchantSections {
                 FontImage.MATERIAL_WAREHOUSE, WarehousePane::new));
         Sections.register(Nav.MERCHANT, new Section(FORECAST, "Forecast", manage,
                 FontImage.MATERIAL_TRENDING_UP, ForecastPane::new));
+        Sections.register(Nav.MERCHANT, new Section(ASSISTANT, "Assistant", manage,
+                FontImage.MATERIAL_AUTO_AWESOME, AssistantPane::new));
         Sections.register(Nav.MERCHANT, new Section(REPORTS, "Reports", manage,
                 FontImage.MATERIAL_INSIGHTS, ReportsPane::new));
         Sections.register(Nav.MERCHANT, new Section(COMMISSIONS, "Commissions", manage,

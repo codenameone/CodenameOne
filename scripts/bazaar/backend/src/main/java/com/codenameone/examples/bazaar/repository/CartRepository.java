@@ -46,4 +46,21 @@ public interface CartRepository extends CrudRepository<Cart, String> {
     @Modifying(clearAutomatically = true)
     @Query("update Cart c set c.reminderSentAt = :at where c.id = :id and c.reminderSentAt = :never")
     int claimReminder(@Param("id") String id, @Param("never") Instant never, @Param("at") Instant at);
+
+    /// Carts of a store created in `[from, to)`.
+    @Query("select count(c) from Cart c where c.storeId = :storeId and c.createdAt >= :from "
+            + "and c.createdAt < :to")
+    Long countCreated(@Param("storeId") String storeId, @Param("from") Instant from,
+            @Param("to") Instant to);
+
+    /// Carts of a store created in `[from, to)` with no email and no account:
+    /// the ones that never reached checkout.
+    @Query("select count(c) from Cart c where c.storeId = :storeId and c.createdAt >= :from "
+            + "and c.createdAt < :to and c.email = :blank and c.username = :blank")
+    Long countAnonymous(@Param("storeId") String storeId, @Param("from") Instant from,
+            @Param("to") Instant to, @Param("blank") String blank);
+
+    /// A store's carts updated since `since`, the newest first.
+    List<Cart> findByStoreIdAndUpdatedAtGreaterThanEqualOrderByUpdatedAtDesc(String storeId,
+            Instant since);
 }

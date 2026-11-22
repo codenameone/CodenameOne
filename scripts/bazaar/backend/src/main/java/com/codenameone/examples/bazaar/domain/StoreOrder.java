@@ -52,6 +52,10 @@ public class StoreOrder {
     @Column(nullable = false, type = "VARCHAR(16)")
     private String channel = "";
 
+    /// For an ONLINE order, WEB or APP (see `Orders.SOURCE_WEB`); blank otherwise.
+    @Column(nullable = false, type = "VARCHAR(16)")
+    private String source = "";
+
     @Column(nullable = false, type = "VARCHAR(16)")
     private String status = "";
 
@@ -248,6 +252,14 @@ public class StoreOrder {
 
     public void setChannel(String channel) {
         this.channel = channel;
+    }
+
+    public String getSource() {
+        return source;
+    }
+
+    public void setSource(String source) {
+        this.source = source;
     }
 
     public String getStatus() {

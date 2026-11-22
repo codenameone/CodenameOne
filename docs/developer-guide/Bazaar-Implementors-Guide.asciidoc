@@ -315,6 +315,51 @@ list for the cards in the first column is made on the device, with the same
 include::../../scripts/bazaar/common/src/main/java/com/codenameone/examples/bazaar/merchant/PickListPdf.java[tag=bazaar-picklist-pdf,indent=0]
 ----
 
+=== Sales pipeline, insights and the merchant AI
+
+The sales pipeline (`pipeline/Pipeline`, `PipelineApi`) is worked out, never
+stored. A cart with lines that was touched in the last 30 days is Browsing, or
+Checkout started once it has an email or an account to write to, and Reminded
+once its recovery mail went. Orders take their column from the fulfilment
+board, and an open return moves an order to Return requested. The legal moves
+live in the shared `ops/SalesPipeline`, which the app checks before a drop and
+the server checks again. Checkout to Reminded claims the cart's reminder the
+way the abandoned-cart sweep does, so the mail goes once whichever sends it;
+the order moves call `Fulfillments.moveCard`. Each column pages by 20 cards.
+
+Product views are recorded one row per view in `product_view_event`, keyed by
+the cart token or the account, from both the storefront and the app's catalog
+API. Those rows give the purchase-intent signals (views, visits split at a
+30-minute gap, minutes between views in a visit) that `SalesPipeline.score`
+turns into 0 to 100, and the views step of the insights funnel. An order's
+`source` column tells a website checkout from an app one, so
+`Analytics.insights` can split the channel mix with one grouped query.
+
+The merchant AI uses `com.codename1.ai` in the app and keeps the key on the
+server. The app makes an OpenAI-compatible client with
+`LlmClient.localOpenAiCompatible` pointed at
+`/api/merchant/stores/{storeId}/ai/v1`, with no key: the session's bearer token
+authorizes it. `MerchantAiController` accepts only a first system message of
+`bazaar:assistant` or `bazaar:description`, replaces it with the server's own
+instructions, fixes the model and the reply length, and forwards to the
+configured provider:
+
+[source,properties]
+----
+bazaar.ai.provider=openai      # openai, anthropic, gemini, or url
+bazaar.ai.key=...
+bazaar.ai.model=gpt-4o-mini    # optional; each provider has a default
+bazaar.ai.url=                 # for "url": any OpenAI-compatible server
+----
+
+The assistant's tools (`AssistantTools`) run in the app over the dashboard,
+insights and pipeline it already fetched; the model calls them and
+`AssistantRun` sends the results back until it answers in words. Every tool
+result carries a `summary` sentence. With no provider, `AiFallback` answers in
+the same response shape: it picks the tool a question's words point to, then
+answers with the tool's summary, and drafts descriptions from the product's
+fields. The tests run against that fallback.
+
 === Profiles, routing and fulfilment services
 
 A shipping zone may belong to a shipping profile; `ShippingCalculator` prices

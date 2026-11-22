@@ -120,9 +120,25 @@ role decides which home they land on.
 ==== Dashboard and analytics
 
 The dashboard shows today's sales, orders to fulfil, low stock and recent
-activity. Analytics charts sales over a chosen period, by channel (online or
-register), top products, the checkout funnel and customer segments, and exports
-what it shows as CSV.
+activity. Analytics charts sales over a chosen period, by channel (online
+store, app, register, marketplaces and draft orders), top products, the
+conversion funnel from product views to orders and customer segments, and
+exports what it shows as CSV.
+
+The sales pipeline shows every open cart and order on one board: shoppers
+browsing, checkouts started, carts already reminded, then paid, fulfilling,
+shipped, delivered and return requested. Each cart has a purchase-intent score
+from low to high and the reasons for it, such as "Came back: 3 visits". Drag a
+checkout to Reminded to send its recovery email, or an order one column on to
+pack, ship or deliver it; on a phone each card has a button for the same step.
+The back office shows the board under Sales pipeline, read only.
+
+The assistant answers questions about the store, such as "Which channel sells
+the most?" or "Which carts should I chase?", with the numbers of the last 30
+days. In the product editor, Draft description writes a first description from
+the title, vendor, type, tags and options for you to edit. Both use the AI
+provider the store's server is set up with, and give simpler answers without
+one.
 
 ==== Products and collections
 

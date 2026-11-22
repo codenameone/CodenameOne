@@ -101,6 +101,10 @@ public class Orders {
 
     public static final String ONLINE = "ONLINE";
     public static final String POS = "POS";
+    /// `StoreOrder.source` of an ONLINE order placed on the storefront.
+    public static final String SOURCE_WEB = "WEB";
+    /// `StoreOrder.source` of an ONLINE order placed in the app or the API.
+    public static final String SOURCE_APP = "APP";
     public static final String DRAFT = "DRAFT";
     public static final String OPEN = "OPEN";
     public static final String CLOSED = "CLOSED";

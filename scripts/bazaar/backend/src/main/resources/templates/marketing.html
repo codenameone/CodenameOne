@@ -56,6 +56,13 @@
 <form method="post" th:action="${view.base + '/quotes/move'}" hx-target="#board" hx-select="#board" hx-swap="outerHTML"><input type="hidden" name="quote" th:value="${o.id}"><select name="to" th:attr="aria-label=${'Move ' + o.title + ' to'}"><option th:each="t : ${view.columns}" th:value="${t.id}" th:selected="${t.id == c.next}" th:text="${t.title}">Sent</option></select><button type="submit">Move</button></form></li></ul></div>
 </section>
 
+<section th:if="${view.page == 'pipeline'}" id="board" class="board" aria-label="Sales pipeline">
+<div class="kanban" th:each="c : ${view.columns}"><h2><span th:text="${c.title}">Paid</span> <span class="pill" th:text="${c.count}">0</span></h2>
+<p th:if="${c.cards.empty}" class="muted">Nothing here.</p>
+<ul><li class="item" th:each="o : ${c.cards}"><a th:if="${!o.url.empty}" th:href="${o.url}" th:text="${o.title}">#1</a><b th:if="${o.url.empty}" th:text="${o.title}">Shopper</b> <small th:text="${o.amount}">$1</small> <small class="muted" th:text="${o.detail}">1h ago</small>
+<br th:unless="${o.status.empty}"><span th:unless="${o.status.empty}" class="pill" th:text="${o.status}">Intent 80</span> <small th:unless="${o.meta.empty}" class="muted" th:text="${o.meta}">viewed products 6 times</small></li></ul></div>
+</section>
+
 <section th:if="${view.page == 'warehouse'}" id="board" class="board" aria-label="Warehouse flow">
 <div class="kanban" th:each="c : ${view.columns}"><h2><span th:text="${c.title}">Pick</span> <span class="pill" th:text="${c.count}">0</span></h2>
 <p th:if="${c.cards.empty}" class="muted">Nothing here.</p>

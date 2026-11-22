@@ -69,4 +69,30 @@ public interface StoreOrderRepository extends CrudRepository<StoreOrder, String>
     @com.codename1.orm.repository.Query("update StoreOrder x set x.customerId = :to where x.customerId = :from")
     int moveCustomer(@com.codename1.orm.repository.Param("from") String from,
             @com.codename1.orm.repository.Param("to") String to);
+
+    /// Orders of `[from, to)` by channel and source, drafts and cancelled
+    /// orders aside: each row is channel, source, orders, subtotals, discounts.
+    @Query("select o.channel, o.source, count(o), sum(o.subtotalCents), sum(o.discountCents) "
+            + "from StoreOrder o where o.storeId = :storeId and o.createdAt >= :from "
+            + "and o.createdAt < :to and o.status <> :cancelled and o.channel <> :draft "
+            + "group by o.channel, o.source")
+    List<Object[]> channelMix(@Param("storeId") String storeId, @Param("from") Instant from,
+            @Param("to") Instant to, @Param("cancelled") String cancelled,
+            @Param("draft") String draft);
+
+    /// Draft orders of `[from, to)` that were turned into orders (they have a
+    /// location), not cancelled: one row of orders, subtotals, discounts.
+    @Query("select count(o), sum(o.subtotalCents), sum(o.discountCents) from StoreOrder o "
+            + "where o.storeId = :storeId and o.createdAt >= :from and o.createdAt < :to "
+            + "and o.status <> :cancelled and o.channel = :draft and o.locationId <> :blank")
+    List<Object[]> convertedDrafts(@Param("storeId") String storeId, @Param("from") Instant from,
+            @Param("to") Instant to, @Param("cancelled") String cancelled,
+            @Param("draft") String draft, @Param("blank") String blank);
+
+    /// Online orders of `[from, to)` that are not cancelled.
+    @Query("select count(o) from StoreOrder o where o.storeId = :storeId and o.createdAt >= :from "
+            + "and o.createdAt < :to and o.status <> :cancelled and o.channel = :online")
+    Long countOnline(@Param("storeId") String storeId, @Param("from") Instant from,
+            @Param("to") Instant to, @Param("cancelled") String cancelled,
+            @Param("online") String online);
 }

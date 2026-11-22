@@ -274,6 +274,18 @@ async function storefrontExtras() {
     if (!storeId) {
       throw new Error('the owner\'s admin lists no store: ' + links.slice(0, 5).join(', '));
     }
+    // The read-only sales pipeline, in both colour schemes: plain HTML under
+    // the strict policy, so a refused script or style would show in the log.
+    for (const scheme of ['light', 'dark']) {
+      await shop.emulateMedia({ colorScheme: scheme });
+      const board = await shop.goto(origin + '/admin/' + storeId + '/pipeline', { waitUntil: 'load' });
+      if (board.status() !== 200 || await shop.locator('#board .kanban').count() !== 8) {
+        throw new Error('the pipeline board answered ' + board.status() + ' without its 8 columns');
+      }
+      await shop.screenshot({ path: path.join(out, '14-pipeline-' + scheme + '.png'), fullPage: true });
+    }
+    await shop.emulateMedia({ colorScheme: 'light' });
+    say('the back office shows the sales pipeline, read only, in light and dark');
     await shop.goto(origin + '/admin/' + storeId + '/markets', { waitUntil: 'load' });
     const csrf = await shop.locator('input[name=_csrf]').first().getAttribute('value');
     const post = async (where, form) => {

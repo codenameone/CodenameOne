@@ -735,6 +735,15 @@ public class StorefrontPages {
         return token instanceof String ? (String) token : null;
     }
 
+    /// The cart token the visitor's session holds for store `storeId`, or
+    /// null; never makes a session.
+    public static String cartToken(HttpServer.Request request, String storeId) {
+        com.codename1.backend.HttpSession session = request == null ? null
+                : request.getSession(false);
+        Object token = session == null ? null : session.getAttribute(CART_KEY + storeId);
+        return token instanceof String ? (String) token : null;
+    }
+
     static void remember(HttpServer.Request request, Store store, String token) {
         com.codename1.backend.HttpSession session = request.getSession(true);
         if (session != null && token != null) {

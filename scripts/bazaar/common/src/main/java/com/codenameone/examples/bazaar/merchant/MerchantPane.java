@@ -266,6 +266,7 @@ abstract class MerchantPane extends Container {
 
             @Override
             public void changed(String type, Map<String, Object> frame) {
+                MerchantPane.this.liveChanged(type, frame);
             }
         });
     }
@@ -286,5 +287,9 @@ abstract class MerchantPane extends Container {
     }
 
     void stockChanged(String variantId, String locationId) {
+    }
+
+    /// Any other frame of the live channel (a cart reminded, for one).
+    void liveChanged(String type, Map<String, Object> frame) {
     }
 }
