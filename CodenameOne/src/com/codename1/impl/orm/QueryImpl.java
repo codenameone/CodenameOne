@@ -272,8 +272,8 @@ public final class QueryImpl<T> implements com.codename1.orm.session.Query<T> {
             String column = rootAlias + "." + session.q(attributes[i].column);
             selection.append(pluralJoin ? session.orderValue(column, attributes[i].sqlKind()) : column);
         }
-        String sql = selection + from() + where() + (order.length() == 0 ? "" : " ORDER BY " + order) +
-                     session.limit(max, offset);
+        String sql = selection + from() + where() + (order.length() == 0 ? "" : " ORDER BY " + order);
+        sql += session.limit(sql, max, offset);
         return session.hydrateAll(model, session.read(sql, params.toArray(), session.kinds(model)), fetches);
     }
     /// Counts matching roots, ignoring pagination and ordering.

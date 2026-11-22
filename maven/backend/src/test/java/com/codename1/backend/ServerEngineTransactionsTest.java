@@ -71,12 +71,15 @@ class ServerEngineTransactionsTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"POSTGRES", "MYSQL"})
+    @ValueSource(strings = {"POSTGRES", "MYSQL", "SQLSERVER"})
     void explicitIsolationDoesNotLeakIntoPooledConnections(String engine) throws Exception {
         DataSource pool = open(engine);
         Database db = pool.borrow();
         try {
             String query = "POSTGRES".equals(engine) ? "SHOW transaction_isolation"
+                    : "SQLSERVER".equals(engine)
+                    ? "SELECT transaction_isolation_level AS transaction_isolation FROM sys.dm_exec_sessions"
+                            + " WHERE session_id = @@SPID"
                     : "SELECT @@session.transaction_isolation AS transaction_isolation";
             Object baseline;
             try {
@@ -120,7 +123,7 @@ class ServerEngineTransactionsTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"POSTGRES", "MYSQL"})
+    @ValueSource(strings = {"POSTGRES", "MYSQL", "SQLSERVER"})
     void explicitRepeatableReadKeepsSnapshotAndReadCommittedSeesNewRows(String engine) throws Exception {
         DataSource pool = open(engine);
         Database observer = pool.borrow();
@@ -132,7 +135,10 @@ class ServerEngineTransactionsTest {
                 int before = ((Number) observer.queryOne("SELECT COUNT(*) AS n FROM cn1_tx_probe", null).get("n")).intValue();
                 insert(pool, "other-connection");
                 int after = ((Number) observer.queryOne("SELECT COUNT(*) AS n FROM cn1_tx_probe", null).get("n")).intValue();
-                assertEquals(before + (isolation == Isolation.READ_COMMITTED ? 1 : 0), after);
+                // SQL Server's REPEATABLE READ is the ANSI level: the rows read
+                // stay as they were, and a row inserted since is seen.
+                boolean phantoms = isolation == Isolation.READ_COMMITTED || "SQLSERVER".equals(engine);
+                assertEquals(before + (phantoms ? 1 : 0), after);
                 observer.commitTransaction();
             }
         } finally {
@@ -144,7 +150,7 @@ class ServerEngineTransactionsTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"POSTGRES", "MYSQL"})
+    @ValueSource(strings = {"POSTGRES", "MYSQL", "SQLSERVER"})
     void commitRollbackAndSavepoints(String engine) throws Exception {
         DataSource pool = open(engine);
         try {
@@ -182,8 +188,10 @@ class ServerEngineTransactionsTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"POSTGRES", "MYSQL"})
+    @ValueSource(strings = {"POSTGRES", "MYSQL", "SQLSERVER"})
     void aReadOnlyTransactionRefusesWrites(String engine) throws Exception {
+        Assumptions.assumeFalse("SQLSERVER".equals(engine),
+                "SQL Server has no read-only transaction; readOnly is a hint there");
         DataSource pool = open(engine);
         try {
             final DataSource p = pool;
@@ -199,7 +207,7 @@ class ServerEngineTransactionsTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"POSTGRES", "MYSQL"})
+    @ValueSource(strings = {"POSTGRES", "MYSQL", "SQLSERVER"})
     void theSessionStoreRoundTrips(String engine) throws Exception {
         DataSource pool = open(engine);
         try {
@@ -250,7 +258,7 @@ class ServerEngineTransactionsTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"POSTGRES", "MYSQL"})
+    @ValueSource(strings = {"POSTGRES", "MYSQL", "SQLSERVER"})
     void theSchedulerLockIsExclusive(String engine) throws Exception {
         DataSource pool = open(engine);
         try {

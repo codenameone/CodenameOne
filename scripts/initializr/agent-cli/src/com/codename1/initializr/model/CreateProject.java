@@ -71,6 +71,7 @@ public final class CreateProject {
             case SKIRMISH: return "Real-time card battle game (arena style) with matchmaking server.";
             case DASH: return "Endless runner game.";
             case SPLAT: return "3D first-person team paintball shooter with authoritative server, voice and replays.";
+            case PAPERCUT: return "Twin-stick arena shooter in cut paper and ink, with leaderboards, daily seed and shop.";
             case PARLEY: return "End-to-end encrypted messaging: chats, groups, WebRTC calls, Java backend.";
             case BASTION: return "Mobile banking: accounts, transfers, cards, biometric sign-in, security showcase, Java backend.";
             case REEL: return "Video streaming: catalogue, player, downloads, DRM, profiles, Java backend.";

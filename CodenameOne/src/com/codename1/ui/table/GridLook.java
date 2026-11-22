@@ -143,13 +143,23 @@ final class GridLook {
 
     /// A small triangle pointing down (`open`) or right, centred in a box.
     static void arrow(Graphics g, int x, int y, int size, boolean open) {
+        arrow(g, x, y, size, open, false);
+    }
+
+    // A closed arrow points toward the reading direction: right, or left
+    // when `rtl`.
+    static void arrow(Graphics g, int x, int y, int size, boolean open, boolean rtl) {
         int s = Math.max(4, size / 2);
         int cx = x + size / 2;
         int cy = y + size / 2;
         if (open) {
             g.fillTriangle(cx - s / 2, cy - s / 4, cx + s / 2, cy - s / 4, cx, cy + s / 3);
         } else {
-            g.fillTriangle(cx - s / 4, cy - s / 2, cx - s / 4, cy + s / 2, cx + s / 3, cy);
+            if (rtl) {
+                g.fillTriangle(cx + s / 4, cy - s / 2, cx + s / 4, cy + s / 2, cx - s / 3, cy);
+            } else {
+                g.fillTriangle(cx - s / 4, cy - s / 2, cx - s / 4, cy + s / 2, cx + s / 3, cy);
+            }
         }
     }
 }

@@ -211,6 +211,27 @@ the server machine's zone, which suits a demo on one machine; a deployment sets 
 to the crew's. `fieldline.scheduler.iterations` is the number of improvement steps
 a run takes: 2500, about a second for the demo crew.
 
+==== Holding a job at intake
+
+Two states sit beside `UNASSIGNED` before a job is planned: `AWAITING_PARTS`
+and `BLOCKED` (`Catalog.isHeld`). The planner leaves a held job out of every
+run, and a move on the board refuses it. `POST /api/dispatch/jobs/{id}/intake`
+moves a job between the three, as `Jobs.intake`, under `Planner.publish` like
+any other change to the plan. It never schedules: asking it for any other
+state is refused, as are a job that has started or is closed and releasing a
+scheduled job, which is the board's to unassign. Holding a scheduled job takes
+it off its technician's route. Like the rest of `/api/dispatch`, it's for
+dispatchers only.
+
+The app's intake board, `IntakeBoard` in `dispatch`, is a `KanbanBoard` over
+those states. A drop calls that endpoint, and the card goes back to where the
+server says the job is when it refuses or can't be reached. Undo, adding,
+renaming and reordering columns are turned off, so the board can only make
+the transitions the server allows. `FieldTest` covers the role, an illegal
+transition and a held job surviving an optimizer run.
+
+image::img/fieldline-intake-board.png["The intake board on a phone",scaledwidth=40%]
+
 === Time and pay
 
 `Timekeeping` holds the labor rates, the clock and the timesheets. A technician

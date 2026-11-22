@@ -117,7 +117,8 @@ public final class GradleProjectTemplate {
 
     /// Writes a backend skeleton into `backendDir`: its `application*.properties`
     /// and, when `packageName` is not null, an `Api` controller, the `Greeter`
-    /// service it is given and the tests of both, in that package.
+    /// service it is given and the tests of both, in that package. The engine
+    /// the server is built for is declared in its `gradle.properties`.
     ///
     /// @param taskPrefix how the backend's tasks are addressed from the root:
     ///        `:backend:` for a subproject, empty for a backend-only project

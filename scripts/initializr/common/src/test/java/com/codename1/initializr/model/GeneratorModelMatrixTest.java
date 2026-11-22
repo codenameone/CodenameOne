@@ -241,6 +241,10 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         // Gradle builds -- from the IDE or ./gradlew -- report through the plugin's
         // settings half; a backend-only project has no client build to report.
         String gradleProperties = getText(entries, "gradle.properties");
+        // No build property names a database engine: the build reads the URLs.
+        assertFalse(gradleProperties.indexOf("cn1.backend.database") >= 0,
+                label + "no database engine property");
+        assertNull(entries.get("backend/gradle.properties"), label + "a backend needs no gradle.properties");
         if (type.hasNoClient()) {
             assertFalse(gradleProperties.indexOf("cn1.telemetry.") >= 0,
                     label + "a backend-only project does not report builds");
@@ -417,9 +421,11 @@ public class GeneratorModelMatrixTest extends AbstractTest {
                                         String packageName, String mainClassName, String label) throws IOException {
         boolean rides = template == Template.WAYLINE;
         boolean bank = template == Template.BASTION;
-        boolean game = template == Template.SKIRMISH || template == Template.DASH || template == Template.SPLAT;
+        boolean game = template == Template.SKIRMISH || template == Template.DASH || template == Template.SPLAT
+                || template == Template.PAPERCUT;
         boolean runner = template == Template.DASH;
         boolean paintball = template == Template.SPLAT;
+        boolean arena = template == Template.PAPERCUT;
         boolean video = template == Template.REEL;
         boolean studio = template == Template.PULSE;
         boolean booking = template == Template.SLATE;
@@ -439,7 +445,7 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         // project once got the ride-hailing accounts and chapters.
         String readme = getText(entries, "README.md");
         boolean chat = template == Template.PARLEY;
-        assertContains(readme, game ? (runner ? "endless runner" : paintball ? "paintball shooter" : "card battler") : rides ? "ride-hailing app" : chat ? "messaging app" : bank ? "working bank" : studio ? "fitness studio app" : field ? "field service app" : shop ? "commerce platform" : booking ? "appointment booking app" : video ? "video streaming service" : "food-delivery app",
+        assertContains(readme, game ? (runner ? "endless runner" : paintball ? "paintball shooter" : arena ? "arena shooter" : "card battler") : rides ? "ride-hailing app" : chat ? "messaging app" : bank ? "working bank" : studio ? "fitness studio app" : field ? "field service app" : shop ? "commerce platform" : booking ? "appointment booking app" : video ? "video streaming service" : "food-delivery app",
                 label + "README names the app");
         if (!game) {
             assertContains(readme, (rides ? "`rider@" : chat ? "`alice@" : bank ? "`customer2@" : studio ? "`member@" : field ? "`tech@" : shop ? "`shopper@" : booking ? "`client@" : video ? "`viewer@" : "`customer@") + artifact + ".example`",
@@ -448,20 +454,16 @@ public class GeneratorModelMatrixTest extends AbstractTest {
                     label + "README carries no other template's accounts");
             assertFalse(chat && readme.indexOf("rider@") >= 0, label + "README carries no ride-hailing accounts");
         }
-        if (template.hasRules()) {
-            assertContains(rootPom, "<module>rules</module><module>shared</module>",
-                    label + "the rules module is built ahead of the contract");
-            assertContains(getText(entries, "common/pom.xml"), "<artifactId>" + artifact + "-rules</artifactId>",
-                    label + "the app depends on the rules");
-            assertContains(getText(entries, "backend/pom.xml"), "<artifactId>" + artifact + "-rules</artifactId>",
-                    label + "the server depends on the rules");
-        }
+        assertFalse(rootPom.indexOf("<module>rules</module>") >= 0,
+                label + "code both halves run is in shared, not a module of its own");
         String sharedPom = getText(entries, "shared/pom.xml");
         assertContains(sharedPom, "<artifactId>" + artifact + "-shared</artifactId>", label + "shared module id");
         assertContains(getText(entries, "common/pom.xml"), "<artifactId>" + artifact + "-shared</artifactId>",
                 label + "the app depends on the contract");
         assertContains(getText(entries, "backend/pom.xml"), "<artifactId>" + artifact + "-shared</artifactId>",
                 label + "the server depends on the contract");
+        assertFalse(getText(entries, "backend/pom.xml").indexOf("cn1.backend.database") >= 0,
+                label + "the template's server declares no engine property");
         assertContains(getText(entries, "backend/pom.xml"), "<goal>generate-annotation-stubs</goal>",
                 label + "the server generates its half of the contract");
 
@@ -471,7 +473,7 @@ public class GeneratorModelMatrixTest extends AbstractTest {
                 "package " + packageName + ";", label + "the server moves to the project's package");
         assertNotNull(entries.get("backend/src/main/resources/db/migration/" + (game ? "V1__game.sql" : bank ? "V4__accounts.sql" : studio || booking ? "V2__accounts.sql" : "V1__accounts.sql")),
                 label + "the server keeps its migrations");
-        assertNotNull(entries.get("backend/src/test/java/" + packagePath + (game ? "/GameSocketTest.java" : rides ? "/RideFlowTest.java" : chat ? "/MessagingTest.java" : bank ? "/LedgerTest.java" : video ? "/PlaybackTest.java" : studio ? "/StudioTest.java" : field ? "/FieldTest.java" : booking ? "/booking/BookingFlowTest.java" : "/OrderFlowTest.java")),
+        assertNotNull(entries.get("backend/src/test/java/" + packagePath + (arena ? "/RunTest.java" : game ? "/GameSocketTest.java" : rides ? "/RideFlowTest.java" : chat ? "/MessagingTest.java" : bank ? "/LedgerTest.java" : video ? "/PlaybackTest.java" : studio ? "/StudioTest.java" : field ? "/FieldTest.java" : booking ? "/booking/BookingFlowTest.java" : "/OrderFlowTest.java")),
                 label + "the server keeps its tests");
         assertNotNull(entries.get("common/src/main/java/" + packagePath + (game ? "/ui/HomeForm.java" : rides ? "/rider/RiderForm.java" : chat ? "/ui/ChatForm.java" : bank ? "/ui/HomeForm.java" : video ? "/ui/WelcomeForm.java" : studio ? "/member/MemberForm.java" : field ? "/field/TodayForm.java" : booking ? "/client/ClientForm.java" : "/customer/CustomerForm.java")),
                 label + "the app's screens move to the project's package");
@@ -794,6 +796,8 @@ public class GeneratorModelMatrixTest extends AbstractTest {
                 "com.acme.same", mavenOptions(ProjectOptions.ProjectType.APP_WITH_BACKEND, false));
         assertEqual(app.keySet(), withBackend.keySet(), "Maven App and App + backend should be the same download");
         assertNotNull(app.get("backend/pom.xml"), "Maven projects keep the backend module");
+        assertFalse(getText(app, "backend/pom.xml").indexOf("cn1.backend.database") >= 0,
+                "The generic backend module declares no engine property");
 
         Map<String, byte[]> minimal = mavenEntries(LAYOUTS_VERSION, Template.BAREBONES, IDE.INTELLIJ, "SameApp",
                 "com.acme.same", ProjectOptions.defaults());
@@ -892,6 +896,8 @@ public class GeneratorModelMatrixTest extends AbstractTest {
         }
         if (type == ProjectOptions.ProjectType.APP_WITH_BACKEND) {
             assertNotNull(entries.get("backend/pom.xml"), label + "App + backend has the backend module");
+            assertFalse(getText(entries, "backend/pom.xml").indexOf("cn1.backend.database") >= 0,
+                    label + "the backend module declares no engine property");
             assertContains(getText(entries, "README.md"), "## Backend", label + "README should explain the backend");
         }
         if (template.isFullStack()) {
@@ -917,6 +923,8 @@ public class GeneratorModelMatrixTest extends AbstractTest {
     }
 
     private void validateMavenBackendOnly(Map<String, byte[]> entries, ProjectOptions.ProjectType type, IDE ide, String packageName, String label) {
+        assertFalse(getText(entries, "pom.xml").indexOf("cn1.backend.database") >= 0,
+                label + "a backend-only pom declares no engine property");
         String packagePath = packageName.replace('.', '/');
         for (String path : entries.keySet()) {
             assertFalse(path.startsWith("common/") || path.startsWith("backend/"),

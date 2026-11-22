@@ -1,0 +1,1711 @@
+/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the "Classpath" exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.db.sql;
+
+import java.io.IOException;
+
+/// What the three engines spell differently, in one place.
+///
+/// A the backend `Database` already hides which engine answered a
+/// query: rows come back as the same Java types whichever one produced them. What
+/// it could not hide was the STATEMENT. PostgreSQL binds $1 where SQLite and MySQL
+/// bind ?, it has no last-insert-id to ask for, and the three name their column
+/// types and quote their identifiers differently -- so portable-looking code still
+/// carried an "am I on PostgreSQL" branch at every call site. This repository's own
+/// database check is the proof: it grew a placeholders(postgres, n) helper and a
+/// separate INSERT ... RETURNING arm, and any application would grow the same.
+///
+/// A Dialect is that branch, written once. Statements are written in ONE
+/// portable form -- ? for every parameter, plain unquoted names -- and the dialect
+/// renders them for whichever engine the connection turns out to be.
+///
+/// ```java
+/// ServerDatabase db = new PostgresDatabase("localhost", 5432, "app", "app", "secret");
+/// Dialect d = db.getDialect();
+/// db.execute("INSERT INTO notes (title) VALUES (?)", "A note");
+/// ```
+///
+/// The rewrite happens inside Database, so the example above needs no dialect at
+/// all; the type is public because schema generation -- the ORM's, or an
+/// application's own migration code -- has to ask what this engine calls a 64-bit
+/// integer.
+///
+/// Nothing here queries the server: a Dialect is chosen from the URL scheme
+/// before a connection exists, and it holds no state, so the three instances are
+/// shared constants.
+@com.codename1.impl.SharedWithBackend
+public abstract class Dialect {
+
+    /// The portable column kinds. These are the Java types an entity can hold,
+    /// not SQL types: what each engine calls them is the point of this class.
+    ///
+    /// BOOLEAN and TIMESTAMP are deliberately stored as integers on every
+    /// engine -- 0/1, and epoch milliseconds. A native BOOLEAN column reads back
+    /// as a Long from all three anyway (PostgreSQL decodes bool to 0/1, MySQL
+    /// sends TINYINT), but a native timestamp does NOT: it arrives as text whose
+    /// format follows the server's DateStyle and time zone, which is a second
+    /// portability problem underneath the first one. Milliseconds in a BIGINT are
+    /// the same number everywhere and need no parsing.
+    public static final int TEXT = 0;
+    /// A 32-bit integer.
+    public static final int INTEGER = 1;
+    /// A 64-bit integer.
+    public static final int BIGINT = 2;
+    /// A double-precision floating point number.
+    public static final int REAL = 3;
+    /// Arbitrary bytes.
+    public static final int BLOB = 4;
+    /// True or false, stored as 0 or 1.
+    public static final int BOOLEAN = 5;
+    /// A moment in time, stored as epoch milliseconds.
+    public static final int TIMESTAMP = 6;
+
+    public static final Dialect SQLITE = new SqliteDialect();
+    public static final Dialect POSTGRES = new PostgresDialect();
+    public static final Dialect MYSQL = new MySqlDialect();
+
+    /// MariaDB, which is the MySQL dialect with one difference: the collation it
+    /// can name for a text column.
+    ///
+    /// Both need a collation that is case sensitive AND NO PAD, so "A" and
+    /// "a" are two keys and "token " keeps its space. Neither server has the
+    /// other's. Measured, creating a key column under each name:
+    ///
+    /// ```text
+    ///                      mariadb 10.11   mariadb 11.8   mysql 8.0
+    /// utf8mb4_0900_bin     unknown         ok             ok
+    /// utf8mb4_nopad_bin    ok              ok             unknown
+    /// utf8mb4_bin          collides        collides       collides
+    /// ```
+    ///
+    /// So there is no single name, and utf8mb4_bin -- the one both have -- is
+    /// PAD SPACE on both. Which is chosen comes from the SERVER's handshake
+    /// banner rather than from the URL scheme, because a mysql:// URL points at
+    /// a MariaDB server perfectly often. [#getName] still answers "mysql":
+    /// this is the same wire protocol and the same SQL, and everything that
+    /// branches on the engine name means that family.
+    public static final Dialect MARIADB = new MariaDbDialect();
+    /// Microsoft SQL Server and Azure SQL.
+    public static final Dialect SQLSERVER = new SqlServerDialect();
+    /// Oracle Database.
+    public static final Dialect ORACLE = new OracleDialect();
+
+    Dialect() {
+    }
+
+    /// The dialect for an engine name, or null when the name is not one of the
+    /// three. Accepts the spellings that appear in a URL scheme, ignoring case --
+    /// "postgres" and "postgresql" are the same engine. "mysql" and "mariadb" are
+    /// the same PROTOCOL but not the same dialect: they have no case-sensitive
+    /// NO PAD collation in common, so each name answers its own. A connection
+    /// picks between them by the server's handshake banner instead, which is the
+    /// better answer when there is a server to ask; this is for callers that
+    /// have only a name.
+    public static Dialect forName(String engine) {
+        if (engine == null) {
+            return null;
+        }
+        if (equalsIgnoreCaseAscii(engine, "sqlite")) {
+            return SQLITE;
+        }
+        if (equalsIgnoreCaseAscii(engine, "postgres")
+                || equalsIgnoreCaseAscii(engine, "postgresql")) {
+            return POSTGRES;
+        }
+        if (equalsIgnoreCaseAscii(engine, "mariadb")) {
+            // The MariaDB name answers the MariaDB dialect. They differ only in
+            // the collation they can name, and MySQL's is unknown to MariaDB
+            // 10.11 -- so a schema generator that asked by name and got MYSQL
+            // emitted DDL that server refuses outright.
+            return MARIADB;
+        }
+        if (equalsIgnoreCaseAscii(engine, "mysql")) {
+            return MYSQL;
+        }
+        if (equalsIgnoreCaseAscii(engine, "sqlserver") || equalsIgnoreCaseAscii(engine, "mssql")) {
+            return SQLSERVER;
+        }
+        if (equalsIgnoreCaseAscii(engine, "oracle")) {
+            return ORACLE;
+        }
+        return null;
+    }
+
+    /// "sqlite", "postgresql", "mysql", "sqlserver" or "oracle".
+    public abstract String getName();
+
+    /// `identifier` quoted so that its case is preserved and a reserved word
+    /// is still usable as a name.
+    ///
+    /// Quoting is not decoration here, it is what keeps a schema portable:
+    /// PostgreSQL folds an UNQUOTED name to lower case while SQLite and MySQL
+    /// preserve it, so a column written createdAt is createdat on one engine and
+    /// createdAt on the other two, and code that reads rows by name stops finding
+    /// it on exactly one of the three.
+    ///
+    /// The quote character itself is doubled, which is the escape all three
+    /// accept (Oracle, which has none, refuses a name containing its quote). A name carrying a NUL is refused rather than escaped: no engine can
+    /// hold one, and SQLite reads statements as C strings, so passing it through
+    /// would truncate the statement instead of failing.
+    public abstract String quote(String identifier);
+
+    /// What this engine calls one of the portable kinds above.
+    public abstract String columnType(int kind);
+
+    /// The full declaration of a primary key column whose value the DATABASE
+    /// assigns -- everything after the column name.
+    ///
+    /// This is the least portable line in any schema: SQLite wants INTEGER
+    /// PRIMARY KEY AUTOINCREMENT and refuses the keyword on any other type,
+    /// MySQL wants AUTO_INCREMENT on the type it was given, and PostgreSQL has
+    /// neither and uses an identity column.
+    public String generatedKeyColumn(int kind, String quotedColumn) {
+        return generatedKeyColumn(kind);
+    }
+
+    public abstract String generatedKeyColumn(int kind);
+
+    /// The declaration of a primary key column whose value the APPLICATION
+    /// assigns -- a UUID, a key issued by another service.
+    ///
+    /// NOT NULL is not redundant, whatever the standard says. SQLite lets a
+    /// PRIMARY KEY column that is not INTEGER PRIMARY KEY hold null, and even
+    /// several nulls, where PostgreSQL and MySQL refuse: an insert that forgot
+    /// its key succeeded in development and failed in production, and the row it
+    /// wrote could not be found again by the generated id = ? predicate. The
+    /// other two already imply the constraint, so saying it costs nothing there.
+    public String assignedKeyColumn(int kind) {
+        return columnType(kind) + " NOT NULL PRIMARY KEY";
+    }
+
+    /// Whether a generated key comes back from the INSERT itself rather than from
+    /// a follow-up question.
+    ///
+    /// True for PostgreSQL alone, and it is not a preference: PostgreSQL has no
+    /// last-insert-id concept, so INSERT ... RETURNING is the only way to learn the
+    /// key at all. the backend `Database.insert` is what reads this;
+    /// it exists so callers do not have to.
+    public boolean generatedKeysThroughReturning() {
+        return false;
+    }
+
+    /// Whether an upsert can answer with the key of the row it touched, the
+    /// inserted one or the updated one. Wherever keys come back through
+    /// RETURNING, except Oracle: its upsert is MERGE, which takes no RETURNING.
+    public boolean upsertKeysThroughReturning() {
+        return generatedKeysThroughReturning();
+    }
+
+    /// The clause [#generatedKeysThroughReturning] appends to an INSERT to have
+    /// it answer with `quotedColumn`.
+    ///
+    /// PostgreSQL's RETURNING makes the INSERT return a row. Oracle's
+    /// `RETURNING ... INTO` writes the value into a bind variable instead, which
+    /// the Oracle client hands back as the one row of the result.
+    public String returningClause(String quotedColumn) {
+        return " RETURNING " + quotedColumn;
+    }
+
+    /// An INSERT that supplies NO columns, for the entity whose only persisted
+    /// field is a key the database generates.
+    ///
+    /// Another line the three spell differently, and the naive construction is
+    /// not merely ugly but invalid: "INSERT INTO t () VALUES ()" is what an empty
+    /// column list builds, and SQLite and PostgreSQL both refuse it. They want
+    /// DEFAULT VALUES; MySQL wants the empty lists and has no DEFAULT VALUES form
+    /// at all.
+    public String insertDefaults(String quotedTable) {
+        return "INSERT INTO " + quotedTable + " DEFAULT VALUES";
+    }
+
+    /// [#insertDefaults(String)] for a table whose generated key is
+    /// `quotedKeyColumn`. Oracle has no `DEFAULT VALUES` and names the column
+    /// it fills: `INSERT INTO t (id) VALUES (DEFAULT)`.
+    public String insertDefaults(String quotedTable, String quotedKeyColumn) {
+        return insertDefaults(quotedTable);
+    }
+
+    /// A text column of at most `length` characters, for a column that is
+    /// indexed or bounded: VARCHAR(n) on most engines, NVARCHAR(n) on SQL
+    /// Server, whose VARCHAR is not Unicode, and VARCHAR2(n CHAR) on Oracle.
+    public String varchar(int length) {
+        return "VARCHAR(" + length + ")";
+    }
+
+    /// `count` rows starting at `offset`, or an empty string when both
+    /// are unbounded. All three accept LIMIT n OFFSET m; MySQL needs a limit before
+    /// it will accept an offset at all, so an offset-only request is given the
+    /// largest limit its parser takes.
+    public String limit(int count, int offset) {
+        if (count < 0 && offset <= 0) {
+            return "";
+        }
+        StringBuilder out = new StringBuilder();
+        out.append(" LIMIT ").append(count < 0 ? unboundedLimit() : String.valueOf(count));
+        if (offset > 0) {
+            out.append(" OFFSET ").append(offset);
+        }
+        return out.toString();
+    }
+
+    /// As [#limit(int, int)], told whether the statement it is appended to
+    /// already has an ORDER BY.
+    ///
+    /// It matters on SQL Server alone, where the paging clause is PART of ORDER
+    /// BY and a statement without one cannot be paged at all; there an unordered
+    /// statement is given an ordering that sorts nothing.
+    public String limit(int count, int offset, boolean ordered) {
+        return limit(count, offset);
+    }
+
+    /// The standard paging clause, which SQL Server and Oracle take in place of
+    /// LIMIT. `fetchNeedsOffset` is SQL Server's rule that FETCH cannot stand
+    /// without an OFFSET before it.
+    static String offsetFetch(int count, int offset, boolean fetchNeedsOffset) {
+        if (count < 0 && offset <= 0) {
+            return "";
+        }
+        StringBuilder out = new StringBuilder();
+        if (offset > 0 || fetchNeedsOffset) {
+            out.append(" OFFSET ").append(offset > 0 ? offset : 0).append(" ROWS");
+        }
+        if (count >= 0) {
+            out.append(offset > 0 || fetchNeedsOffset ? " FETCH NEXT " : " FETCH FIRST ")
+                    .append(count).append(" ROWS ONLY");
+        }
+        return out.toString();
+    }
+
+    /// The limit that means "all of them", for the offset-without-limit case.
+    String unboundedLimit() {
+        return "-1";
+    }
+
+    /// `sql` written in the portable form, rendered for this engine.
+    ///
+    /// The portable form is the one SQLite and MySQL already use: ? for each
+    /// parameter, in order. PostgreSQL is the engine that differs, and this is
+    /// where that difference stops -- it becomes $1, $2 and so on here rather than
+    /// at every call site. A literal question mark that is NOT a parameter is
+    /// written ?? -- which matters only on PostgreSQL, whose jsonb operators are
+    /// spelled ?, ?| and ?& -- and collapses to a single ? on every engine, so
+    /// the escape means the same thing everywhere.
+    ///
+    /// A statement with no ? in it is passed through untouched and unchecked.
+    /// That is what keeps engine-native SQL working: code that already writes $1
+    /// for PostgreSQL, or that calls a function whose name contains no placeholder
+    /// at all, is not this method's business. Once a statement DOES carry a
+    /// placeholder it is in the portable form, and then the count has to match
+    /// `paramCount` -- a mismatch is refused here, naming both numbers,
+    /// rather than reaching an engine that answers for it in three different ways
+    /// (SQLite binds the missing ones to NULL and commits the row).
+    ///
+    /// Placeholders are recognised only where a parameter can appear. String
+    /// literals, quoted identifiers, dollar-quoted bodies and comments are scanned
+    /// through, so a ? inside any of them stays what it was.
+    public String bind(String sql, int paramCount) throws IOException {
+        if (sql == null) {
+            throw new IOException("No statement");
+        }
+        return Placeholders.render(conditionalDdl(sql), paramCount, parameterMarker(), nestedBlockComments(),
+                backslashEscapesInLiterals(), hashLineComments(), dollarQuotedStrings(),
+                dashCommentNeedsSpace(), bracketIdentifiers(),
+                executableComments());
+    }
+
+    /// countInsertRows: the row count depends on the server version.
+    public static final int VERSION_GATED = Placeholders.VERSION_GATED;
+
+    /// How many rows an INSERT's VALUES clause writes, or -1 when the shape does
+    /// not say -- an INSERT ... SELECT, or a statement with no VALUES at all.
+    ///
+    /// the backend `Database.insert` answers with one key, and
+    /// a multi-row insert has no single key that means the same thing on three
+    /// engines. Counting the tuples is what lets it refuse BEFORE the rows are
+    /// written rather than after.
+    ///
+    /// [#VERSION_GATED] is the third answer: a MySQL statement whose
+    /// tuples sit behind a version-gated executable comment inserts a number of
+    /// rows that depends on the server, and this has no connection to ask.
+    public int countInsertRows(String sql) throws IOException {
+        if (sql == null) {
+            throw new IOException("No statement");
+        }
+        return Placeholders.countInsertRows(sql, nestedBlockComments(),
+                backslashEscapesInLiterals(), hashLineComments(), dollarQuotedStrings(),
+                dashCommentNeedsSpace(), bracketIdentifiers(),
+                executableComments());
+    }
+
+    /// The operator a portable `like` renders to, and the pattern it binds.
+    ///
+    /// SQLite's LIKE folds ASCII case and PostgreSQL's does not, so the same
+    /// query answered different rows depending on the engine. The obvious fix --
+    /// PRAGMA case_sensitive_like -- is connection wide, and that reaches further
+    /// than the ORM: measured, a table declared CHECK(v LIKE 'A%') accepts 'abc'
+    /// under the default and REFUSES it once the pragma is on, so merely opening
+    /// an existing database would change what writes it accepts, and an
+    /// expression index built on LIKE would no longer agree with its own rows.
+    ///
+    /// So SQLite renders GLOB instead, which is case sensitive, always
+    /// present, and scoped to the one comparison being made. The pattern is
+    /// translated to match: see [#likePattern].
+    public String likeOperator() {
+        // ESCAPE '' DISABLES THE ESCAPE. PostgreSQL and MySQL give LIKE a
+        // default escape of backslash and SQLite gives it none, so
+        // like("name", "100\\%") looked for the literal "100%" on two engines
+        // and for a "100\\" prefix on the third. Measured, matching 1, 1 and 0
+        // rows. An empty ESCAPE makes both of them agree with SQLite, where a
+        // backslash is an ordinary character -- and with the GLOB rendering
+        // below, whose translation leaves a backslash alone for the same reason.
+        //
+        // SQLite cannot say ESCAPE '' at all ("ESCAPE expression must be a
+        // single character"), which is another reason the SQLite branch renders
+        // something else entirely rather than sharing this string.
+        //
+        // AND THE MySQL FAMILY CAN, which review has now asked about twice: the
+        // suggestion is that those engines require exactly one character here
+        // and reject the statement, so every like() would fail on them. They do
+        // not. MySQL's own manual says the escape expression "must evaluate to a
+        // string that is empty or one character long", and measured by running
+        // SELECT 1 WHERE 'abc' LIKE ? ESCAPE '' with 'a%' bound:
+        //
+        //   MySQL 8.0.46        accepted, 1 row
+        //   MariaDB 11.8.9      accepted, 1 row
+        //   MariaDB 10.11.19    accepted, 1 row
+        //   MariaDB 10.4.34     accepted, 1 row
+        //   PostgreSQL 16.15    accepted, 1 row
+        //
+        // OrmCheck holds this without needing a case of its own: its five like()
+        // checks are not gated by dialect, so they run on all four MySQL-family
+        // arms of the matrix, and a rejected ESCAPE clause would fail every one
+        // of them rather than go unnoticed.
+        return " LIKE ? ESCAPE ''";
+    }
+
+    /// `pattern` as [#likeOperator] expects it. Unchanged except on
+    /// SQLite, where GLOB spells its wildcards differently.
+    public String likePattern(String pattern) {
+        return pattern;
+    }
+
+    /// One ORDER BY term, with NULLs placed the same way on every engine.
+    ///
+    /// The engines disagree by default, measured over one null and two values:
+    ///
+    /// ```text
+    ///                 ASC       DESC
+    /// sqlite          null,a,b  b,a,null
+    /// postgresql      a,b,null  null,b,a
+    /// mysql           null,a,b  b,a,null
+    /// ```
+    ///
+    /// So `orderBy("name", true).first()` answered the null row on two
+    /// engines and a real one on the third. NULL sorts LOWEST here -- first
+    /// ascending, last descending -- which is what SQLite and MySQL already do,
+    /// and PostgreSQL is brought to match rather than the other way round
+    /// because two of three and the usual reading of NULL agree on it.
+    ///
+    /// MySQL cannot say NULLS FIRST at all: it answers a syntax error, so the
+    /// order is expressed there as a leading `(col IS NULL)` term, which is
+    /// the documented way to get the same effect.
+    public String orderBy(String quotedColumn, boolean ascending) {
+        return orderBy(quotedColumn, ascending, false);
+    }
+
+    /// [#orderBy(String, boolean)] for a column whose kind is known.
+    ///
+    /// A TEXT column needs its collation pinned as well as its nulls placed.
+    /// Measured over "Z" and "a": SQLite orders them Z then a, because its
+    /// default collation is byte order, while a PostgreSQL database initialised
+    /// with a locale-aware collation orders a then Z -- so
+    /// `orderBy("name", true).first()` answered a different entity
+    /// depending on the database. Byte order is the one all three can agree on:
+    /// SQLite is already there, MySQL's text columns carry a binary collation
+    /// for the case-sensitivity reason, and PostgreSQL says it as COLLATE "C".
+    ///
+    /// The kind has to be passed because COLLATE is only valid on text. An
+    /// integer column with one is a type error, not a no-op.
+    public String orderBy(String quotedColumn, boolean ascending, boolean text) {
+        return quotedColumn + (ascending ? " ASC NULLS FIRST" : " DESC NULLS LAST");
+    }
+
+    /// The left side of an ORDERING comparison -- >, >=, <, <= -- on a
+    /// column of this kind.
+    ///
+    /// The same reason [#orderBy(String, boolean, boolean)] exists, for
+    /// the same columns, and leaving the two inconsistent is worse than leaving
+    /// both alone: ordering was pinned to byte order while the comparisons that
+    /// decide which rows come back were not, so a query could exclude a row that
+    /// its own ORDER BY would have placed first.
+    ///
+    /// MEASURED on a database created the way the standard image creates one,
+    /// with lc_collate en_US.utf8, against rows holding 'Z' and 'a':
+    ///
+    /// ```text
+    /// WHERE v > 'Z'    SQLite: a    MySQL: a    PostgreSQL: (none)
+    /// ```
+    ///
+    /// SQLite compares BINARY and the generated MySQL column carries a binary
+    /// collation, so both answer in byte order; PostgreSQL follows the database's
+    /// locale, where 'a' sorts before 'Z'. One entity, one query, two answers.
+    ///
+    /// EQUALITY is deliberately NOT routed through here. PostgreSQL requires a
+    /// deterministic collation by default, and under one, equality is byte
+    /// equality whatever the sort order is -- so eq, ne and in already agree
+    /// across the three, and collating them would be noise in every statement
+    /// that uses them.
+    public String comparison(String quotedColumn, boolean text) {
+        return quotedColumn;
+    }
+
+    /// A SQL string literal holding `value`, in PostgreSQL's E'' form --
+    /// which means the same thing WHATEVER standard_conforming_strings is set to.
+    ///
+    /// It exists rather than each caller writing quotes around a name because
+    /// a table called owner's_items is a perfectly ordinary identifier, and
+    /// pasting it between apostrophes ends the literal early and leaves the rest
+    /// of the statement as syntax. Doubling the apostrophe answers that.
+    ///
+    /// Doubling the apostrophe is NOT the whole of the escape, which is the
+    /// part that took a second look. It is right only while
+    /// standard_conforming_strings is on. With it off --
+    /// and a session can turn it off -- a backslash in a plain literal starts an
+    /// escape, so an @Entity(table) or column name containing one, which a quoted
+    /// identifier creates perfectly happily, decodes to different text inside the
+    /// literal: a name holding the two characters backslash and n reaches
+    /// pg_get_serial_sequence as a newline, it looks for a relation nobody has,
+    /// and the resync fails on a table that exists.
+    ///
+    /// E'' always interprets escapes, so doubling the backslashes here is
+    /// correct under both settings rather than under one of them. Deliberately
+    /// NOT on the base class: E'' is a syntax error on MySQL, where the E would
+    /// be read as an identifier.
+    static String postgresLiteral(String value) {
+        StringBuilder out = new StringBuilder(value.length() + 3);
+        out.append("E'");
+        for (int iter = 0 ; iter < value.length() ; iter++) {
+            char c = value.charAt(iter);
+            if (c == '\'' || c == '\\') {
+                out.append(c);
+            }
+            out.append(c);
+        }
+        return out.append('\'').toString();
+    }
+
+    /// A statement that puts a generated key back in step with the rows that are
+    /// there, or null when the engine needs none.
+    ///
+    /// SUPPLYING YOUR OWN KEY IS A DOCUMENTED CAPABILITY -- it is why
+    /// PostgreSQL's column is GENERATED BY DEFAULT rather than ALWAYS, so a data
+    /// import or a test fixture can insert the value it already has. On SQLite and
+    /// MySQL doing that also moves the counter, so the next generated insert
+    /// carries on above it. On PostgreSQL it does NOT: the identity's sequence is
+    /// untouched by an explicit value, and the next generated insert reuses a key
+    /// that is already there.
+    ///
+    /// MEASURED on a fresh table, explicit id 1 then a generated insert:
+    ///
+    /// ```text
+    /// SQLite: 2   MySQL: 2   PostgreSQL: duplicate key value violates unique
+    ///                                    constraint "idsync_pkey"
+    /// ```
+    ///
+    /// So the capability is portable only if the caller can put the sequence
+    /// back, and this is what lets the ORM offer that in one call rather than
+    /// leaving every importer to write engine-specific SQL it has no reason to
+    /// know about.
+    public String resyncGeneratedKey(String table, String column) {
+        return null;
+    }
+
+    /// The statement that holds inserts off `table` while
+    /// [#resyncGeneratedKey] runs, or null where none is needed.
+    ///
+    /// Null here, and that is not an oversight for the two engines that answer
+    /// it. Neither SQLite nor MySQL needs a resync at all -- both advance their
+    /// counter past an explicitly assigned key on their own -- so
+    /// resyncGeneratedKey is null for them and this is never reached.
+    ///
+    /// Must run in the SAME TRANSACTION as the resync, which is the only thing
+    /// that makes it a lock rather than a gesture: a lock taken by a statement of
+    /// its own is released the moment that statement ends.
+    public String lockForResync(String table) {
+        return null;
+    }
+
+    /// Whether anything follows the first statement in `sql`.
+    ///
+    /// What the backend `Database` refuses before dispatching,
+    /// because SQLite would run the first statement and drop the rest in silence.
+    /// See [Placeholders#hasTrailingStatement].
+    public boolean hasTrailingStatement(String sql) throws IOException {
+        if (sql == null) {
+            throw new IOException("No statement");
+        }
+        return Placeholders.hasTrailingStatement(sql, nestedBlockComments(),
+                backslashEscapesInLiterals(), hashLineComments(), dollarQuotedStrings(),
+                dashCommentNeedsSpace(), bracketIdentifiers(),
+                executableComments());
+    }
+
+    /// Cuts a script into its statements, by this engine's lexical rules.
+    ///
+    /// For migration scripts: everything else hands
+    /// the backend `Database` one statement at a time. Semicolons
+    /// inside literals, comments, dollar-quoted bodies and trigger bodies do not
+    /// split, and a piece that holds only comments is dropped. MySQL's
+    /// `DELIMITER` is a directive of its command-line client, not SQL, and is
+    /// not understood here.
+    ///
+    /// @param script the script
+    /// @return the statements in order, without their terminators; empty for a
+    ///     script that holds none
+    /// @throws IOException if a literal or comment in the script is never closed
+    public String[] splitStatements(String script) throws IOException {
+        if (script == null) {
+            throw new IOException("No script");
+        }
+        return Placeholders.split(script, nestedBlockComments(),
+                backslashEscapesInLiterals(), hashLineComments(), dollarQuotedStrings(),
+                dashCommentNeedsSpace(), bracketIdentifiers(),
+                executableComments());
+    }
+
+    /// Whether `sql` updates an existing row when it conflicts.
+    ///
+    /// What the backend `Database.insert` needs before it
+    /// trusts a key that came from connection state. See
+    /// [Placeholders#updatesOnConflict].
+    public boolean updatesOnConflict(String sql) throws IOException {
+        if (sql == null) {
+            throw new IOException("No statement");
+        }
+        return Placeholders.updatesOnConflict(sql, nestedBlockComments(),
+                backslashEscapesInLiterals(), hashLineComments(), dollarQuotedStrings(),
+                dashCommentNeedsSpace(), bracketIdentifiers(),
+                executableComments());
+    }
+
+    /// Where `sql` stops being the statement and starts being its
+    /// terminator, its trailing comment or trailing space.
+    ///
+    /// What the backend `Database.insert` needs to put
+    /// RETURNING somewhere it will run. See [Placeholders#endOfStatement].
+    public int endOfStatement(String sql) throws IOException {
+        if (sql == null) {
+            throw new IOException("No statement");
+        }
+        return Placeholders.endOfStatement(sql, nestedBlockComments(),
+                backslashEscapesInLiterals(), hashLineComments(), dollarQuotedStrings(),
+                dashCommentNeedsSpace(), bracketIdentifiers(),
+                executableComments());
+    }
+
+    /// `sql` with a leading `CREATE TABLE IF NOT EXISTS`, `CREATE INDEX IF
+    /// NOT EXISTS`, `DROP TABLE IF EXISTS` or `DROP VIEW IF EXISTS` spelled
+    /// the way this engine spells it.
+    ///
+    /// The conditional forms are part of the portable form, like the ?
+    /// placeholder: SQLite, PostgreSQL and MySQL take them as written, and the
+    /// engines that have no such clause get the test their own way here, so the
+    /// runtime's own tables and an application's are created by one statement
+    /// wherever it runs.
+    String conditionalDdl(String sql) {
+        return sql;
+    }
+
+    /// The parts of a conditional DDL statement, or null when `sql` is not one:
+    /// the verb and kind ("CREATE TABLE", "CREATE INDEX", "CREATE UNIQUE INDEX",
+    /// "DROP TABLE", "DROP VIEW"), the object's name as written, and the rest of
+    /// the statement after the name.
+    static String[] conditionalParts(String sql) {
+        int at = blanks(sql, 0);
+        boolean create = sql.regionMatches(true, at, "CREATE", 0, 6);
+        if (!create && !sql.regionMatches(true, at, "DROP", 0, 4)) {
+            return null;
+        }
+        at = blanks(sql, at + (create ? 6 : 4));
+        String unique = "";
+        if (create && word(sql, at, "UNIQUE")) {
+            unique = "UNIQUE ";
+            at = blanks(sql, at + 6);
+        }
+        String kind;
+        if (word(sql, at, "TABLE") && unique.length() == 0) {
+            kind = "TABLE";
+        } else if (word(sql, at, "INDEX") && create) {
+            kind = "INDEX";
+        } else if (word(sql, at, "VIEW") && !create) {
+            kind = "VIEW";
+        } else {
+            return null;
+        }
+        at = blanks(sql, at + kind.length());
+        if (!word(sql, at, "IF")) {
+            return null;
+        }
+        at = blanks(sql, at + 2);
+        if (create) {
+            if (!word(sql, at, "NOT")) {
+                return null;
+            }
+            at = blanks(sql, at + 3);
+        }
+        if (!word(sql, at, "EXISTS")) {
+            return null;
+        }
+        at = blanks(sql, at + 6);
+        int end = nameEnd(sql, at);
+        if (end <= at) {
+            return null;
+        }
+        return new String[] {(create ? "CREATE " : "DROP ") + unique + kind,
+            sql.substring(at, end), sql.substring(end)};
+    }
+
+    /// "ALTER TABLE t ADD COLUMN c ..." without the COLUMN, which SQL Server
+    /// and Oracle do not accept; null for any other statement.
+    static String addColumn(String sql) {
+        int at = blanks(sql, 0);
+        if (!word(sql, at, "ALTER")) {
+            return null;
+        }
+        at = blanks(sql, at + 5);
+        if (!word(sql, at, "TABLE")) {
+            return null;
+        }
+        at = blanks(sql, nameEnd(sql, blanks(sql, at + 5)));
+        if (!word(sql, at, "ADD")) {
+            return null;
+        }
+        int column = blanks(sql, at + 3);
+        if (!word(sql, column, "COLUMN")) {
+            return null;
+        }
+        return sql.substring(0, at + 3) + sql.substring(column + 6);
+    }
+
+    static int blanks(String sql, int from) {
+        int at = from;
+        while (at < sql.length() && sql.charAt(at) <= ' ') {
+            at++;
+        }
+        return at;
+    }
+
+    static boolean word(String sql, int at, String word) {
+        int end = at + word.length();
+        return sql.regionMatches(true, at, word, 0, word.length())
+                && (end >= sql.length() || sql.charAt(end) <= ' ');
+    }
+
+    /// Where the possibly quoted, possibly dotted name starting at `from` ends.
+    static int nameEnd(String sql, int from) {
+        int at = from;
+        while (at < sql.length()) {
+            char c = sql.charAt(at);
+            if (c == '[' || c == '"' || c == '`') {
+                char close = c == '[' ? ']' : c;
+                at++;
+                while (at < sql.length()) {
+                    if (sql.charAt(at) == close) {
+                        if (at + 1 < sql.length() && sql.charAt(at + 1) == close) {
+                            at++;
+                        } else {
+                            break;
+                        }
+                    }
+                    at++;
+                }
+                at++;
+            } else if (c <= ' ' || c == '(' || c == ';') {
+                break;
+            } else {
+                at++;
+            }
+        }
+        return at > sql.length() ? sql.length() : at;
+    }
+
+    /// `text` as the body of a single-quoted SQL literal.
+    static String literalBody(String text) {
+        return text.indexOf('\'') < 0 ? text : text.replace("'", "''");
+    }
+
+    /// Whether this engine's parameters are written $1, $2 rather than ?.
+    boolean dollarPlaceholders() {
+        return false;
+    }
+
+    /// What a numbered parameter opens with, or null where parameters stay ?.
+    ///
+    /// Three engines number them and none agrees on the spelling: $1 on
+    /// PostgreSQL, @p1 on SQL Server, :1 on Oracle.
+    String parameterMarker() {
+        return dollarPlaceholders() ? "$" : null;
+    }
+
+    /// Whether a backslash escapes the next character inside an ordinary string
+    /// literal.
+    ///
+    /// True for MySQL, whose default SQL mode works that way. False for SQLite,
+    /// where a backslash is an ordinary character, and for PostgreSQL, where it is
+    /// one unless the literal carries an E prefix.
+    ///
+    /// A MySQL server started with NO_BACKSLASH_ESCAPES is the case this reads
+    /// the wrong way, and it is the right way round to be wrong: that mode is
+    /// off by default, and the statement it mis-scans has to end a literal with a
+    /// backslash.
+    boolean backslashEscapesInLiterals() {
+        return false;
+    }
+
+    /// Whether # begins a line comment. MySQL alone.
+    boolean hashLineComments() {
+        return false;
+    }
+
+    /// Whether $tag$...$tag$ is a string literal. PostgreSQL alone.
+    ///
+    /// Scanning for one everywhere refused valid MySQL: $ is legal inside an
+    /// unquoted identifier there, so a column pair like total$usd$ opened a
+    /// dollar-quoted body that never closed and the statement was rejected before
+    /// the server saw it.
+    boolean dollarQuotedStrings() {
+        return false;
+    }
+
+    /// Whether a double dash begins a comment only when whitespace follows it.
+    ///
+    /// MySQL alone. There, "5--1" is five minus minus-one and only "-- " opens
+    /// a comment; SQLite and PostgreSQL take the two dashes whatever follows. Read
+    /// MySQL the other way, "VALUES (5--1), (2)" looked like one row with a
+    /// comment after it instead of the two rows it is -- which is exactly what the
+    /// multi-row insert check was reading.
+    boolean dashCommentNeedsSpace() {
+        return false;
+    }
+
+    /// Whether \[brackets\] quote an identifier.
+    ///
+    /// SQLite alone, and deliberately not PostgreSQL: brackets are an ARRAY
+    /// SUBSCRIPT there, so treating a\[1\] as a quoted name would swallow the rest
+    /// of the statement.
+    boolean bracketIdentifiers() {
+        return false;
+    }
+
+    /// Whether a block comment opening "/*!" is SQL that RUNS rather than text
+    /// that is ignored.
+    ///
+    /// MySQL alone. Its version-gated executable comments are how a statement
+    /// says "run this on MySQL and nowhere else", so what is inside one has to be
+    /// scanned as the statement it is.
+    int executableComments() {
+        return Placeholders.NO_EXECUTABLE_COMMENTS;
+    }
+
+    /// Whether block comments nest. PostgreSQL's do -- it is the one engine where
+    /// a comment opened inside another comment has to be closed before the outer
+    /// one ends.
+    boolean nestedBlockComments() {
+        return false;
+    }
+
+    @Override
+    public String toString() {
+        return getName();
+    }
+
+    /// ASCII case-insensitive comparison. String.equalsIgnoreCase is already
+    /// locale independent, so this exists only for the length check that keeps
+    /// it from allocating on a mismatch.
+    private static boolean equalsIgnoreCaseAscii(String value, String constant) {
+        return value.length() == constant.length() && value.equalsIgnoreCase(constant);
+    }
+
+    /// The shared identifier quoting, parameterised on the quote character.
+    /// Microsoft SQL Server, 2017 and later, and Azure SQL.
+    private static final class SqlServerDialect extends Dialect {
+        /// The collation every text column is given.
+        ///
+        /// The server default is case and accent insensitive, so eq("name", "A")
+        /// would match a stored "a" here and nothing on the other engines; a
+        /// binary collation makes equality byte equality, as MySQL's columns are
+        /// given one for. BIN2 rather than a _UTF8 collation: those arrived in
+        /// SQL Server 2019 and the columns are NVARCHAR, which needs none.
+        ///
+        /// It does NOT make a trailing space significant. SQL Server pads the
+        /// shorter operand of = under every collation, so that difference is
+        /// answered where the comparison is written, not here.
+        private static final String TEXT_COLLATION = "Latin1_General_100_BIN2";
+
+        @Override
+        public String getName() {
+            return "sqlserver";
+        }
+
+        /// Brackets, with a closing bracket doubled. Double quotes would work
+        /// only while QUOTED_IDENTIFIER is on, which a session can turn off.
+        @Override
+        public String quote(String identifier) {
+            if (identifier == null || identifier.length() == 0) {
+                throw new IllegalArgumentException("An SQL identifier cannot be empty");
+            }
+            StringBuilder out = new StringBuilder(identifier.length() + 4);
+            out.append('[');
+            for (int iter = 0 ; iter < identifier.length() ; iter++) {
+                char c = identifier.charAt(iter);
+                if (c == 0) {
+                    throw new IllegalArgumentException("An SQL identifier cannot hold a NUL: '"
+                            + identifier + "'");
+                }
+                if (c == ']') {
+                    out.append(']');
+                }
+                out.append(c);
+            }
+            out.append(']');
+            return out.toString();
+        }
+
+        @Override
+        public String columnType(int kind) {
+            switch (kind) {
+                case INTEGER:
+                    return "INT";
+                case BIGINT:
+                case TIMESTAMP:
+                    return "BIGINT";
+                case BOOLEAN:
+                    // Not BIT, so that every engine stores 0/1 as a number and
+                    // every read decodes the same way.
+                    return "SMALLINT";
+                case REAL:
+                    return "FLOAT(53)";
+                case BLOB:
+                    return "VARBINARY(MAX)";
+                default:
+                    return "NVARCHAR(MAX) COLLATE " + TEXT_COLLATION;
+            }
+        }
+
+        @Override
+        public String varchar(int length) {
+            return "NVARCHAR(" + length + ") COLLATE " + TEXT_COLLATION;
+        }
+
+        @Override
+        public String generatedKeyColumn(int kind) {
+            return (kind == INTEGER ? "INT" : "BIGINT") + " IDENTITY(1,1) NOT NULL PRIMARY KEY";
+        }
+
+        /// A (MAX) column cannot be indexed, so a text key is bounded, at the
+        /// length MySQL's is.
+        @Override
+        public String assignedKeyColumn(int kind) {
+            if (kind == TEXT) {
+                return "NVARCHAR(255) COLLATE " + TEXT_COLLATION + " NOT NULL PRIMARY KEY";
+            }
+            return columnType(kind) + " NOT NULL PRIMARY KEY";
+        }
+
+        /// Appended to a statement the caller says nothing about, this takes it
+        /// to be ordered: an ORDER BY added to one that has its own is a syntax
+        /// error, which is the worse of the two mistakes.
+        @Override
+        public String limit(int count, int offset) {
+            return offsetFetch(count, offset, true);
+        }
+
+        @Override
+        public String limit(int count, int offset, boolean ordered) {
+            String paging = offsetFetch(count, offset, true);
+            if (ordered || paging.length() == 0) {
+                return paging;
+            }
+            return " ORDER BY (SELECT NULL)" + paging;
+        }
+
+        /// NULLS FIRST is a syntax error here and is not needed: SQL Server
+        /// already sorts a null below every value, so ascending puts the nulls
+        /// first and descending puts them last.
+        @Override
+        public String orderBy(String quotedColumn, boolean ascending, boolean text) {
+            return quotedColumn + (ascending ? " ASC" : " DESC");
+        }
+
+        @Override
+        String parameterMarker() {
+            return "@p";
+        }
+
+        /// MERGE is SQL Server's upsert, and like ON CONFLICT it may update a
+        /// row instead of inserting one, so no generated key is its answer.
+        @Override
+        public boolean updatesOnConflict(String sql) throws IOException {
+            if (super.updatesOnConflict(sql)) {
+                return true;
+            }
+            int at = blanks(sql, 0);
+            return word(sql, at, "MERGE");
+        }
+
+        /// SQL Server refuses an empty ESCAPE and has no default one, and it
+        /// reads `[` as the start of a character class. So the escape is `!`,
+        /// and [#likePattern] escapes `!` and `[` to keep both literal.
+        @Override
+        public String likeOperator() {
+            return " LIKE ? ESCAPE '!'";
+        }
+
+        @Override
+        public String likePattern(String pattern) {
+            if (pattern == null || pattern.indexOf('!') < 0 && pattern.indexOf('[') < 0) {
+                return pattern;
+            }
+            StringBuilder out = new StringBuilder(pattern.length() + 4);
+            for (int iter = 0 ; iter < pattern.length() ; iter++) {
+                char c = pattern.charAt(iter);
+                if (c == '!' || c == '[') {
+                    out.append('!');
+                }
+                out.append(c);
+            }
+            return out.toString();
+        }
+
+        /// SQL Server has DROP ... IF EXISTS and no CREATE ... IF NOT EXISTS, so
+        /// the two CREATE forms are guarded by a lookup of the object.
+        @Override
+        String conditionalDdl(String sql) {
+            String added = addColumn(sql);
+            if (added != null) {
+                return added;
+            }
+            String[] parts = conditionalParts(sql);
+            if (parts == null || !parts[0].startsWith("CREATE")) {
+                return sql;
+            }
+            if ("CREATE TABLE".equals(parts[0])) {
+                return "IF OBJECT_ID(N'" + literalBody(parts[1]) + "', N'U') IS NULL CREATE TABLE "
+                        + parts[1] + parts[2];
+            }
+            // CREATE [UNIQUE] INDEX name ON table (...): the index is looked up by
+            // name on its table, since two tables may each have one of that name.
+            String rest = parts[2];
+            int on = blanks(rest, 0);
+            if (!word(rest, on, "ON")) {
+                return sql;
+            }
+            int table = blanks(rest, on + 2);
+            int tableEnd = nameEnd(rest, table);
+            return "IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'"
+                    + literalBody(unquoted(parts[1])) + "' AND object_id = OBJECT_ID(N'"
+                    + literalBody(rest.substring(table, tableEnd)) + "')) " + parts[0] + " "
+                    + parts[1] + rest;
+        }
+
+        private static String unquoted(String name) {
+            if (name.length() >= 2 && name.charAt(0) == '[') {
+                return name.substring(1, name.length() - 1).replace("]]", "]");
+            }
+            if (name.length() >= 2 && name.charAt(0) == '"') {
+                return name.substring(1, name.length() - 1).replace("\"\"", "\"");
+            }
+            return name;
+        }
+
+        @Override
+        boolean bracketIdentifiers() {
+            return true;
+        }
+    }
+
+    /// Oracle Database, 19c and later.
+    private static final class OracleDialect extends Dialect {
+        @Override
+        public String getName() {
+            return "oracle";
+        }
+
+        @Override
+        public String varchar(int length) {
+            return "VARCHAR2(" + length + " CHAR)";
+        }
+
+        /// Oracle before 23ai has no IF [NOT] EXISTS, so the statement runs
+        /// without it in a block that ignores the one error the clause would
+        /// have avoided: ORA-00955 (or ORA-01408, an index on the same columns)
+        /// for a CREATE, ORA-00942 for a DROP.
+        @Override
+        String conditionalDdl(String sql) {
+            String added = addColumn(sql);
+            if (added != null) {
+                return added;
+            }
+            String[] parts = conditionalParts(sql);
+            if (parts == null) {
+                return sql;
+            }
+            boolean create = parts[0].startsWith("CREATE");
+            String plain = parts[0] + " " + parts[1] + parts[2];
+            if (!create && "DROP TABLE".equals(parts[0])) {
+                plain += " CASCADE CONSTRAINTS";
+            }
+            return "BEGIN EXECUTE IMMEDIATE '" + plain.replace("'", "''")
+                    + "'; EXCEPTION WHEN OTHERS THEN IF SQLCODE NOT IN ("
+                    + (create ? "-955, -1408" : "-942") + ") THEN RAISE; END IF; END;";
+        }
+
+        /// Upper case inside the quotes, because Oracle folds an UNQUOTED name to
+        /// upper case: `"USERS"` is the table a hand-written `SELECT * FROM users`
+        /// reads, where `"users"` would be a different table that only quoted
+        /// SQL could reach. The client folds an all-upper-case column label back
+        /// to lower case, so rows are keyed the way they are on PostgreSQL.
+        @Override
+        ///
+        /// Oracle has no escape for `"` inside a quoted name -- doubling it ends
+        /// the identifier and starts another token -- so such a name is refused.
+        public String quote(String identifier) {
+            if (identifier != null && identifier.indexOf('"') >= 0) {
+                throw new IllegalArgumentException("An Oracle identifier cannot contain '\"': "
+                        + identifier);
+            }
+            return quoteWith(asciiUpper(identifier), '"');
+        }
+
+        /// Oracle returns the key through `RETURNING ... INTO`; there is no
+        /// connection-wide last id to ask for afterwards.
+        @Override
+        public boolean generatedKeysThroughReturning() {
+            return true;
+        }
+
+        @Override
+        public String returningClause(String quotedColumn) {
+            return " RETURNING " + quotedColumn + " INTO :cn1_key";
+        }
+
+        @Override
+        public String insertDefaults(String quotedTable, String quotedKeyColumn) {
+            return "INSERT INTO " + quotedTable + " (" + quotedKeyColumn + ") VALUES (DEFAULT)";
+        }
+
+        @Override
+        public boolean upsertKeysThroughReturning() {
+            return false;
+        }
+
+        /// MERGE is Oracle's upsert.
+        @Override
+        public boolean updatesOnConflict(String sql) throws IOException {
+            if (super.updatesOnConflict(sql)) {
+                return true;
+            }
+            return word(sql, blanks(sql, 0), "MERGE");
+        }
+
+        /// Oracle refuses an empty ESCAPE, and LIKE without one has no escape
+        /// character at all, which is what the empty ESCAPE asks for elsewhere.
+        @Override
+        public String likeOperator() {
+            return " LIKE ?";
+        }
+
+        @Override
+        public String columnType(int kind) {
+            switch (kind) {
+                case INTEGER:
+                    return "NUMBER(10)";
+                case BIGINT:
+                case TIMESTAMP:
+                    return "NUMBER(19)";
+                case BOOLEAN:
+                    return "NUMBER(1)";
+                case REAL:
+                    return "BINARY_DOUBLE";
+                case BLOB:
+                    return "BLOB";
+                default:
+                    // VARCHAR2 and not CLOB: a CLOB cannot stand in a
+                    // comparison, an ORDER BY, a GROUP BY or a DISTINCT, so eq()
+                    // on a string column would be refused outright. The price
+                    // is the bound -- 4000 bytes unless the database was created
+                    // with MAX_STRING_SIZE=EXTENDED -- where the other engines'
+                    // string columns have none.
+                    return "VARCHAR2(4000 CHAR)";
+            }
+        }
+
+        /// BY DEFAULT, as on PostgreSQL, so a caller that supplies its own key
+        /// inserts a value the column accepts.
+        @Override
+        public String generatedKeyColumn(int kind) {
+            return (kind == INTEGER ? "NUMBER(10)" : "NUMBER(19)")
+                    + " GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY";
+        }
+
+        @Override
+        public String assignedKeyColumn(int kind) {
+            if (kind == TEXT) {
+                return "VARCHAR2(255 CHAR) NOT NULL PRIMARY KEY";
+            }
+            return columnType(kind) + " NOT NULL PRIMARY KEY";
+        }
+
+        @Override
+        public String limit(int count, int offset) {
+            return offsetFetch(count, offset, false);
+        }
+
+        @Override
+        String parameterMarker() {
+            return ":";
+        }
+    }
+
+    /// ASCII-only upper case: `toUpperCase()` follows the default locale, and
+    /// under Turkish an `i` becomes a dotted capital I that names another table.
+    static String asciiUpper(String text) {
+        if (text == null) {
+            return null;
+        }
+        StringBuilder out = new StringBuilder(text.length());
+        for (int iter = 0 ; iter < text.length() ; iter++) {
+            char c = text.charAt(iter);
+            out.append(c >= 'a' && c <= 'z' ? (char) (c - 32) : c);
+        }
+        return out.toString();
+    }
+
+    static String quoteWith(String identifier, char quote) {
+        if (identifier == null || identifier.length() == 0) {
+            throw new IllegalArgumentException("An SQL identifier cannot be empty");
+        }
+        StringBuilder out = new StringBuilder(identifier.length() + 4);
+        out.append(quote);
+        for (int iter = 0 ; iter < identifier.length() ; iter++) {
+            char c = identifier.charAt(iter);
+            if (c == 0) {
+                throw new IllegalArgumentException("An SQL identifier cannot hold a NUL: '"
+                        + identifier + "'");
+            }
+            if (c == quote) {
+                out.append(quote);
+            }
+            out.append(c);
+        }
+        out.append(quote);
+        return out.toString();
+    }
+
+    // ------------------------------------------------------------------
+    // The three engines
+    // ------------------------------------------------------------------
+
+    private static final class SqliteDialect extends Dialect {
+        @Override
+        public String likeOperator() {
+            return " GLOB ?";
+        }
+
+        /// A LIKE pattern as GLOB spells it; see [Dialect#likeOperator].
+        ///
+        /// GLOB's wildcards are * and ?, and a literal one of those -- or of
+        /// the \[ that opens its character classes -- is written by bracketing it.
+        /// LIKE has no escape character unless ESCAPE names one, which this
+        /// builder does not offer, so every other character is literal and
+        /// passes through.
+        @Override
+        public String likePattern(String pattern) {
+            if (pattern == null) {
+                return null;
+            }
+            StringBuilder out = new StringBuilder(pattern.length() + 8);
+            for (int iter = 0 ; iter < pattern.length() ; iter++) {
+                char c = pattern.charAt(iter);
+                if (c == '%') {
+                    out.append('*');
+                } else if (c == '_') {
+                    out.append('?');
+                } else if (c == '*' || c == '?' || c == '[') {
+                    out.append('[').append(c).append(']');
+                } else {
+                    out.append(c);
+                }
+            }
+            return out.toString();
+        }
+
+
+        @Override
+        public String getName() {
+            return "sqlite";
+        }
+
+        @Override
+        public String quote(String identifier) {
+            return quoteWith(identifier, '"');
+        }
+
+        @Override
+        public String columnType(int kind) {
+            switch (kind) {
+                case INTEGER:
+                case BIGINT:
+                case BOOLEAN:
+                case TIMESTAMP:
+                    return "INTEGER";
+                case REAL:
+                    return "REAL";
+                case BLOB:
+                    return "BLOB";
+                default:
+                    return "TEXT";
+            }
+        }
+
+        /// AUTOINCREMENT is legal after INTEGER PRIMARY KEY and nothing else, which
+        /// is why the kind is ignored rather than mapped: an int id and a long id
+        /// are the same column here, and a String one cannot be generated at all.
+        @Override
+        public String generatedKeyColumn(int kind) {
+            return generatedKeyColumn(kind, null);
+        }
+
+        /// A generated key declared as `int` is BOUNDED to the Java int range
+        /// here, which the other two get from their column type for nothing.
+        ///
+        /// PostgreSQL declares INTEGER and MySQL declares INT for that kind, so
+        /// both refuse a key past 2147483647 at the database. SQLite has one
+        /// generated-key form -- AUTOINCREMENT is legal only after the exact words
+        /// INTEGER PRIMARY KEY -- and that column is 64 bit whatever the entity
+        /// said. So SQLite alone would hand back a key that does not fit the field
+        /// it has to be written into: the row COMMITS, and then Values.asInt throws
+        /// while narrowing it. The caller sees a failed insert over a row that
+        /// exists and an entity with no usable id, and retrying duplicates it.
+        ///
+        /// A CHECK is the only way to say it here, since the type cannot change.
+        /// It costs nothing until the counter actually reaches the bound, and at
+        /// that point it turns a committed row with an unusable key into a refused
+        /// insert -- which is what the other two already do.
+        @Override
+        public String generatedKeyColumn(int kind, String quotedColumn) {
+            if (kind == INTEGER && quotedColumn != null) {
+                return "INTEGER PRIMARY KEY AUTOINCREMENT CHECK(" + quotedColumn
+                        + " BETWEEN -2147483648 AND 2147483647)";
+            }
+            return "INTEGER PRIMARY KEY AUTOINCREMENT";
+        }
+
+        @Override
+        boolean bracketIdentifiers() {
+            return true;
+        }
+    }
+
+    private static final class PostgresDialect extends Dialect {
+        @Override
+        public String comparison(String quotedColumn, boolean text) {
+            return text ? quotedColumn + " COLLATE \"C\"" : quotedColumn;
+        }
+
+        @Override
+        public String orderBy(String quotedColumn, boolean ascending, boolean text) {
+            // COLLATE "C" is byte order, which is what the other two already
+            // give. Without it a locale-aware database ordered "a" before "Z"
+            // and the other two ordered "Z" first.
+            return (text ? quotedColumn + " COLLATE \"C\"" : quotedColumn)
+                    + (ascending ? " ASC NULLS FIRST" : " DESC NULLS LAST");
+        }
+
+        @Override
+        public String getName() {
+            return "postgresql";
+        }
+
+        @Override
+        public String quote(String identifier) {
+            return quoteWith(identifier, '"');
+        }
+
+        @Override
+        public String columnType(int kind) {
+            switch (kind) {
+                case INTEGER:
+                    return "INTEGER";
+                case BIGINT:
+                case TIMESTAMP:
+                    return "BIGINT";
+                case BOOLEAN:
+                    // SMALLINT rather than BOOLEAN, so that every engine stores
+                    // 0/1 and every read decodes the same way. See the note on
+                    // the constants above.
+                    return "SMALLINT";
+                case REAL:
+                    return "DOUBLE PRECISION";
+                case BLOB:
+                    return "BYTEA";
+                default:
+                    return "TEXT";
+            }
+        }
+
+        /// An identity column, which is the standard spelling and has been
+        /// available since PostgreSQL 10. BY DEFAULT rather than ALWAYS: a caller
+        /// that supplies its own key -- a data import, a test fixture -- is then
+        /// inserting a value the column accepts rather than one it refuses.
+        @Override
+        public String generatedKeyColumn(int kind) {
+            return (kind == INTEGER ? "INTEGER" : "BIGINT")
+                    + " GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY";
+        }
+
+        /// pg_get_serial_sequence finds the identity's sequence from the table and
+        /// column rather than from a name this would otherwise have to guess --
+        /// the sequence is named after them, but the rule has exceptions and a
+        /// truncated name is one of them.
+        ///
+        /// The third argument of setval is false so the NEXT value is the one
+        /// given: coalesce(max, 0) + 1 on an empty table is 1, which is where a
+        /// fresh identity starts. Passing the max with the default true would skip
+        /// a key on an empty table, which is harmless but wrong.
+        @Override
+        public String resyncGeneratedKey(String table, String column) {
+            // RAW NAMES IN, and each one spelled for the position it lands in.
+            // This took the QUOTED forms and dropped them into a SQL string
+            // literal, which breaks on two ordinary names:
+            //
+            //   @Entity(table = "owner's_items") creates fine, because the
+            //   identifier is double quoted -- and then closed the literal here,
+            //   making the statement invalid;
+            //
+            //   a column with a double quote in it arrives already escaped as
+            //   "" inside the quoted form, and trimming the outer quotes left
+            //   the doubling behind, so pg_get_serial_sequence looked for a
+            //   column nobody has.
+            //
+            // pg_get_serial_sequence takes TEXT, and its first argument is parsed
+            // as an identifier -- so the table goes in as its quoted form, which
+            // preserves case, and the column goes in raw, because that argument
+            // is matched against the column name as given. Both are escaped as
+            // string literals by doubling the apostrophes, which is the only
+            // escape a PostgreSQL literal needs. The identifier positions below
+            // keep the quoted forms.
+            //
+            // CLAMPED TO 1, because an import can carry negative keys and
+            // PostgreSQL accepts them: max(id) + 1 is then zero or negative, and
+            // setval refuses that outright because the identity's sequence starts
+            // at 1. SQLite and MySQL are left ready to generate a positive key
+            // after such an import, so without the clamp the resync turns a
+            // portable capability into one that throws on one engine only -- the
+            // exact shape it was added to remove.
+            String quotedTable = quote(table);
+            String quotedColumn = quote(column);
+            // READ AND WRITE UNDER THE LOCK lockForResync takes, because the two
+            // halves are not atomic on their own: max() is a snapshot, and a
+            // concurrent insert can take the very value this then installs as the
+            // sequence's next one, so the following generated insert fails on a
+            // duplicate key. EXCLUSIVE mode is what excludes that insert.
+            return "SELECT setval(pg_get_serial_sequence(" + postgresLiteral(quotedTable)
+                    + ", " + postgresLiteral(column) + "), "
+                    + "greatest(coalesce((SELECT max(" + quotedColumn + ") FROM "
+                    + quotedTable + "), 0) + 1, 1), false)";
+        }
+
+        /// EXCLUSIVE, which is the weakest mode that excludes an insert: it
+        /// conflicts with ROW EXCLUSIVE, which every INSERT, UPDATE and DELETE
+        /// takes, and does not conflict with ACCESS SHARE, so ordinary reads of
+        /// the table continue while this runs.
+        ///
+        /// ACCESS EXCLUSIVE would also work and is worse -- it would stop
+        /// readers as well, for a maintenance statement that only needs writers
+        /// held still.
+        @Override
+        public String lockForResync(String table) {
+            return "LOCK TABLE " + quote(table) + " IN EXCLUSIVE MODE";
+        }
+
+        @Override
+        public boolean generatedKeysThroughReturning() {
+            return true;
+        }
+
+        @Override
+        boolean dollarPlaceholders() {
+            return true;
+        }
+
+        @Override
+        boolean nestedBlockComments() {
+            return true;
+        }
+
+        @Override
+        boolean dollarQuotedStrings() {
+            return true;
+        }
+
+        /// PostgreSQL spells an unbounded limit LIMIT ALL.
+        @Override
+        String unboundedLimit() {
+            return "ALL";
+        }
+    }
+
+    /// See [#MARIADB].
+    private static final class MariaDbDialect extends MySqlDialect {
+        @Override
+        String textCollation() {
+            return "utf8mb4_nopad_bin";
+        }
+
+        @Override
+        int executableComments() {
+            // "/*M! ... */" as well as "/*! ... */". Only MariaDB runs the
+            // former: measured, "VALUES (1) /*M! , (2) */" inserts one row on
+            // SQLite, PostgreSQL and MySQL and TWO here, so a scanner blind to
+            // it counted one tuple for a statement writing two. Reading it as
+            // executable on MySQL would be the mirror mistake.
+            return Placeholders.MARIADB_EXECUTABLE_COMMENTS;
+        }
+    }
+
+    private static class MySqlDialect extends Dialect {
+        /// The case-sensitive NO PAD collation THIS server has; see
+        /// [Dialect#MARIADB] for why the two differ.
+        String textCollation() {
+            return "utf8mb4_0900_bin";
+        }
+
+        @Override
+        public String getName() {
+            return "mysql";
+        }
+
+        @Override
+        public String quote(String identifier) {
+            return quoteWith(identifier, '`');
+        }
+
+        @Override
+        public String columnType(int kind) {
+            switch (kind) {
+                case INTEGER:
+                    return "INT";
+                case BIGINT:
+                case TIMESTAMP:
+                    return "BIGINT";
+                case BOOLEAN:
+                    return "TINYINT";
+                case REAL:
+                    return "DOUBLE";
+                case BLOB:
+                    return "LONGBLOB";
+                default:
+                    // LONGTEXT, for the reason the LONGBLOB above it already
+                    // takes: MySQL's TEXT holds 65,535 BYTES, while SQLite and
+                    // PostgreSQL leave a string column unbounded. A document
+                    // body past that limit stored fine on two engines and was
+                    // rejected by a strict MySQL or silently TRUNCATED by a
+                    // permissive one -- and nothing in a generated write could
+                    // have caught it, because the limit is the column's, not the
+                    // field's. The blob branch got this right and the string one
+                    // did not, in the same switch.
+                    //
+                    // A KEY is unaffected: assignedKeyColumn overrides this with
+                    // VARCHAR(255), because MySQL cannot index an unbounded
+                    // column at all. See Table.MAX_ASSIGNED_TEXT_KEY.
+                    //
+                    // The same BINARY COLLATION the key column pins, and for the
+                    // same reason: MySQL's default is case and accent
+                    // insensitive, so with the server's default collation
+                    // dao.query().eq("name", "A") matched a stored "a" here and
+                    // matched nothing on the other two. Measured -- eq returned
+                    // 2 rows on MySQL against 1 on SQLite and PostgreSQL. eq and
+                    // in() are the operations an application builds its
+                    // behaviour on, so they have to mean one thing.
+                    // The NO PAD collation here too, so a trailing space is
+                    // part of an ordinary value exactly as it is part of a key.
+                    return "LONGTEXT CHARACTER SET utf8mb4 COLLATE " + textCollation();
+            }
+        }
+
+        @Override
+        public String generatedKeyColumn(int kind) {
+            return (kind == INTEGER ? "INT" : "BIGINT") + " NOT NULL AUTO_INCREMENT PRIMARY KEY";
+        }
+
+        /// True, which is this server's default and NOT its only setting: a
+        /// session with NO_BACKSLASH_ESCAPES in its sql_mode treats a backslash
+        /// as an ordinary character, and the scanner then disagrees with the
+        /// server about where a literal ends.
+        ///
+        /// The session is deliberately NOT pinned, because the disagreement
+        /// FAILS CLOSED. A backslash immediately before a quote is the only way
+        /// the two readings diverge: this scanner swallows that quote, which
+        /// flips the quote parity for the whole rest of the statement, and every
+        /// further tuple contributes an even number of quotes -- so the parity
+        /// stays odd and the scan ends inside an unterminated literal, which
+        /// countInsertRows refuses outright. Measured against a MySQL session
+        /// holding sql_mode='NO_BACKSLASH_ESCAPES', six crafted statements
+        /// including VALUES ('x\'), ('y') and the three- and four-tuple
+        /// versions of it: all six refused, ROWS WRITTEN 0 in every case. The
+        /// one that did restore the parity was then refused by the server itself
+        /// with a 1064. Nothing was committed and no key was answered, so the
+        /// single-row contract of Database#insert holds in that mode too.
+        ///
+        /// The refusal of an unterminated literal is what does that work, and
+        /// it is load bearing rather than incidental: with that one throw removed
+        /// and nothing else changed, the same six statements go to 3 accepted and
+        /// 8 ROWS WRITTEN. So the protection is real and this is where it lives.
+        ///
+        /// What the mode does cost is a false REFUSAL -- an application that
+        /// has turned it on can write VALUES ('C:\') as one legal row and be
+        /// told the statement ends inside a literal. That is the residual, and
+        /// it is preferred to the two alternatives. Pinning sql_mode on connect
+        /// would silently reinterpret the application's OWN literals, which is a
+        /// data change rather than a refusal; and reading the active mode per
+        /// connection cannot reach this method, because the dialects are shared
+        /// singletons with no connection to ask. OrmCheck.aBackslashModeStillFailsClosed
+        /// is what holds the measured behaviour in place.
+        @Override
+        boolean backslashEscapesInLiterals() {
+            return true;
+        }
+
+        @Override
+        boolean hashLineComments() {
+            return true;
+        }
+
+        @Override
+        boolean dashCommentNeedsSpace() {
+            return true;
+        }
+
+        @Override
+        int executableComments() {
+            return Placeholders.MYSQL_EXECUTABLE_COMMENTS;
+        }
+
+        /// MySQL has no DEFAULT VALUES; the empty lists are its spelling.
+        @Override
+        public String insertDefaults(String quotedTable) {
+            return "INSERT INTO " + quotedTable + " () VALUES ()";
+        }
+
+        /// VARCHAR rather than the TEXT this engine uses for an ordinary string
+        /// column: MySQL indexes a TEXT column only by a prefix whose length it
+        /// has to be given, so TEXT PRIMARY KEY is refused outright.
+        ///
+        /// 255 is the conventional bound and it fits InnoDB's modern 3072-byte
+        /// index limit with utf8mb4 to spare (255 * 4 = 1020). An earlier version
+        /// of this comment justified it by the 767-byte limit of much older
+        /// servers, which is arithmetic that does not work -- utf8mb4 would allow
+        /// only 191 characters under that one. The number is right; the reason
+        /// given for it was not.
+        ///
+        /// The other two engines leave a string key unbounded, so 255 is also the
+        /// portable bound and Table refuses a longer one on every engine rather
+        /// than letting the same entity work on two and fail on the third. See
+        /// Table.MAX_ASSIGNED_TEXT_KEY.
+        @Override
+        public String orderBy(String quotedColumn, boolean ascending, boolean text) {
+            // NULLS FIRST is a syntax error here, so the same placement is spelled
+            // with the boolean term MySQL's own documentation gives for it:
+            // (col IS NULL) is 1 for a null and 0 otherwise, so ordering that
+            // DESC puts the nulls first and ASC puts them last.
+            //
+            // The THREE-argument form is the one to override. Overriding only
+            // the two-argument one left Query calling the base version, which
+            // emitted NULLS FIRST and was refused outright -- text needs no
+            // COLLATE here, because these columns already carry a binary one.
+            return "(" + quotedColumn + " IS NULL) " + (ascending ? "DESC" : "ASC")
+                    + ", " + quotedColumn + (ascending ? " ASC" : " DESC");
+        }
+
+        @Override
+        public String assignedKeyColumn(int kind) {
+            if (kind == TEXT) {
+                // BINARY COLLATION, because MySQL's default one is case AND
+                // accent insensitive: with it, "A" and "a" are the same primary
+                // key. Measured against a live server -- inserting both gives
+                // "Duplicate entry 'a' for key 'PRIMARY'" here, while SQLite and
+                // PostgreSQL store two rows. An application that issued keys as
+                // mixed-case tokens lost rows on one engine only, and the loss
+                // is a duplicate-key error at best and a silent overwrite of
+                // meaning at worst.
+                //
+                // The charset is pinned with it: COLLATE alone conflicts when
+                // the table or database charset is not utf8mb4, and the other
+                // two engines are UTF-8 throughout, so naming it is what makes
+                // the three agree rather than depending on server defaults.
+                // utf8mb4_0900_bin rather than utf8mb4_bin, because the older
+                // binary collation is still PAD SPACE: measured, "token" and
+                // "token " are the same primary key under utf8mb4_bin and the
+                // second insert answers "Duplicate entry 'token '", while
+                // SQLite and PostgreSQL keep them apart. The _0900_ collations
+                // are NO PAD and keep the trailing space, which is what the
+                // other two do.
+                //
+                // This is the one place the backend needs MySQL 8.0: the _0900_
+                // collations arrived with it. 5.7 has been out of support since
+                // October 2023, and the alternative -- VARBINARY -- would stop
+                // the column being text at all and change what every read of it
+                // returns.
+                return "VARCHAR(255) CHARACTER SET utf8mb4 COLLATE " + textCollation()
+                        + " NOT NULL PRIMARY KEY";
+            }
+            return columnType(kind) + " NOT NULL PRIMARY KEY";
+        }
+
+        /// MySQL's parser requires a limit before it accepts an offset, and this
+        /// is the value its own documentation gives for "all rows from here on".
+        @Override
+        String unboundedLimit() {
+            return "18446744073709551615";
+        }
+    }
+
+    /// The name, if it is a plain SQL identifier: an ASCII letter or underscore,
+    /// then letters, digits and underscores. For the few statements that cannot
+    /// take a parameter where a name goes -- a savepoint -- so a name reaching the
+    /// text of a statement can never carry anything else.
+    public static String checkIdentifier(String name) throws IOException {
+        if (name == null || name.length() == 0 || name.length() > 63) {
+            throw new IOException("Not an identifier: " + name);
+        }
+        for (int iter = 0 ; iter < name.length() ; iter++) {
+            char c = name.charAt(iter);
+            boolean letter = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_';
+            if (!letter && (iter == 0 || c < '0' || c > '9')) {
+                throw new IOException("Not an identifier: " + name);
+            }
+        }
+        return name;
+    }
+}

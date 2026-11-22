@@ -31,7 +31,7 @@ import java.util.List;
 /// The Forge: packs of levels, obstacles, pickups and characters that players
 /// build, share and play. A pack's content travels as the JSON
 /// `com.codenameone.examples.dash.rules.forge.PackCodec` writes, and the
-/// server validates it with the same rules module the app runs.
+/// server validates it with the same shared simulation code the app runs.
 @RestClient
 public interface ForgeApi {
     /// `scope` is official, popular, new or mine.

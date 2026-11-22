@@ -40,6 +40,12 @@ public final class SecuritySupport {
     /// profile: what lets a clear-text `{noop}` password verify. Kept here so
     /// that the layer can record it without naming a password encoder, which a
     /// server that checks no passwords does not carry.
+    /// A text column of a security store as text. Oracle stores an empty
+    /// string as NULL, so NULL reads back as the "" that was written.
+    public static String storedText(Object value) {
+        return value == null ? "" : String.valueOf(value);
+    }
+
     public static synchronized boolean isDevelopmentProfile() {
         return development;
     }

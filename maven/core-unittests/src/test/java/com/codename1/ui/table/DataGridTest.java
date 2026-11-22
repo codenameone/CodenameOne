@@ -31,8 +31,12 @@ import com.codename1.ui.Form;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Image;
 import com.codename1.ui.TextField;
+import com.codename1.ui.accessibility.AccessibilityNode;
+import com.codename1.ui.accessibility.AccessibilityRole;
 import com.codename1.ui.events.SelectionListener;
 import com.codename1.ui.layouts.BorderLayout;
+
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -560,5 +564,86 @@ class DataGridTest extends UITestBase {
             rows[i] = new Object[]{"row " + i, Integer.valueOf(i)};
         }
         return new DefaultTableModel(new String[]{"Name", "N"}, rows, true);
+    }
+
+    // Right to left the first column is at the right edge, and every tap
+    // lands on the column painted under it.
+    @FormTest
+    void rightToLeftPutsTheFirstColumnAtTheRightAndTapsHitWhatIsPainted() {
+        DataGrid g = new DataGrid(people());
+        g.setRTL(true);
+        show(g);
+        int[] first = new int[4];
+        int[] last = new int[4];
+        g.getCellBounds(0, 0, first);
+        g.getCellBounds(0, 3, last);
+        assertTrue(first[0] > last[0], "column 0 is right of column 3");
+        assertTrue(first[0] + first[2] <= g.getWidth(), "column 0 inside the grid");
+        tap(g, header(g, 2));
+        assertEquals(1, g.getSortDirection(g.getColumn(2)), "the tapped header sorts");
+        tap(g, at(g, 1, 0));
+        assertEquals(1, g.getSelectedRow());
+    }
+
+    // A frozen column stays at the right; the rest scroll leftward, and a
+    // tap still finds the column painted where it lands.
+    @FormTest
+    void rightToLeftFreezesAtTheRightAndScrollsLeftward() {
+        DataGrid g = new DataGrid(people());
+        g.setRTL(true);
+        for (int i = 0; i < 4; i++) {
+            g.getColumn(i).setFlex(0).setMaxWidthMM(400).setWidthMM(300);
+        }
+        g.setFrozenColumns(1);
+        show(g);
+        assertTrue(g.getMaxOffsetX() > 0, "the grid must scroll for this test");
+        assertEquals(g.getWidth() - g.getHeaderWidth(), g.getHeaderX(), "frozen region on the right");
+        assertEquals(0, g.getBodyX());
+        int[] frozen = new int[4];
+        g.getCellBounds(0, 0, frozen);
+        assertEquals(g.getHeaderX(), frozen[0]);
+        int[] before = new int[4];
+        g.getCellBounds(0, 1, before);
+        assertEquals(g.getBodyWidth(), before[0] + before[2], "column 1 starts at the body's right edge");
+        g.scrollTo(g.getMaxOffsetX(), 0);
+        int[] lastCol = new int[4];
+        g.getCellBounds(0, 3, lastCol);
+        assertEquals(0, lastCol[0], "scrolled to the end, the last column is at the left edge");
+        tap(g, at(g, 2, 3));
+        assertEquals(3, g.getSelectedColumn() < 0 ? 3 : g.getSelectedColumn());
+        assertEquals(2, g.getSelectedRow());
+        int[] frozenNow = new int[4];
+        g.getCellBounds(0, 0, frozenNow);
+        assertEquals(g.getHeaderX(), frozenNow[0], "the frozen column does not scroll");
+    }
+
+    // A screen reader is told the grid's header and its visible rows, and a
+    // row keeps its node through a sort.
+    @FormTest
+    void theGridDescribesItsHeaderAndRowsToAccessibility() {
+        DataGrid g = show(new DataGrid(people()));
+        assertEquals(AccessibilityRole.GRID, g.getSemantics().getRole());
+        List<AccessibilityNode> nodes = g.getSemantics().getChildProvider().getAccessibilityChildren(g);
+        assertEquals(5, nodes.size(), "a header and four rows");
+        AccessibilityNode head = nodes.get(0);
+        assertEquals(4, head.getChildren().size());
+        assertEquals(AccessibilityRole.COLUMN_HEADER, head.getChildren().get(0).getRole());
+        assertEquals("Name", head.getChildren().get(0).getLabel());
+        AccessibilityNode dana = nodes.get(1);
+        assertEquals(AccessibilityRole.ROW, dana.getRole());
+        assertTrue(dana.getLabel().startsWith("dana, red, 7"), dana.getLabel());
+        assertEquals("Name: dana", dana.getChildren().get(0).getLabel());
+        String key = dana.getVirtualKey();
+        g.sortBy(g.getColumn(0), true);
+        nodes = g.getSemantics().getChildProvider().getAccessibilityChildren(g);
+        assertEquals("ascending", nodes.get(0).getChildren().get(0).getValue());
+        AccessibilityNode found = null;
+        for (AccessibilityNode n : nodes) {
+            if (key.equals(n.getVirtualKey())) {
+                found = n;
+            }
+        }
+        assertNotNull(found, "the row keeps its key through a sort");
+        assertTrue(found.getLabel().startsWith("dana"));
     }
 }

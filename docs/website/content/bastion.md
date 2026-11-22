@@ -28,6 +28,7 @@ The same client project targets iOS, Android, desktop and the web, and the serve
 ![Bastion dashboard](/developer-guide/img/bastion-dashboard.png)
 ![Bastion order book](/developer-guide/img/bastion-order-book.png)
 ![Bastion Security Center](/developer-guide/img/bastion-security-center.png)
+![The audit chain in a data grid: sort by a header, filter by actor, action or subject, sequence column frozen](/developer-guide/img/bastion-audit-grid.png)
 ![Bastion back-office console](/developer-guide/img/bastion-console-overview.png)
 ![Bastion payment confirmation](/developer-guide/img/bastion-transfer-confirm.png)
 ![Bastion journal](/developer-guide/img/bastion-console-journal.png)

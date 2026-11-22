@@ -3478,6 +3478,40 @@
         "url": "https://dev.to/codenameone/shopify-was-wrong-and-right-to-dump-react-native-2c93",
         "syndicated_at": "2026-11-20T14:01:07+00:00"
       }
+    },
+    "scheduler-gantt-and-material-pickers": {
+      "hashnode": {
+        "url": "https://debugagent.com/calendars-gantt-charts-and-booking-apps-without-writing-a-calendar",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6b00ed1fe3469df7860959ff",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-11-21T01:01:10+00:00"
+      },
+      "devto": {
+        "id": 5088674,
+        "url": "https://dev.to/codenameone/calendars-gantt-charts-and-booking-apps-without-writing-a-calendar-42ng",
+        "syndicated_at": "2026-11-21T14:26:15+00:00"
+      }
+    },
+    "subscriptions-and-paywalls-without-a-revenue-cut": {
+      "hashnode": {
+        "url": "https://debugagent.com/subscriptions-paywalls-and-a-customer-center-and-we-don-t-take-a-cut",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6b023e9e8700707cc4e2dc25",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-11-22T01:01:10+00:00"
+      },
+      "devto": {
+        "id": 5094113,
+        "url": "https://dev.to/codenameone/subscriptions-paywalls-and-a-customer-center-and-we-dont-take-a-cut-199a",
+        "syndicated_at": "2026-11-22T14:05:08+00:00"
+      }
     }
   }
 }

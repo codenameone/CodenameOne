@@ -28,6 +28,7 @@ import java.util.List;
 
 import com.codename1.backend.Config;
 import com.codename1.backend.DataSource;
+import com.codename1.backend.Database;
 import com.codename1.backend.orm.Dao;
 import com.codename1.backend.orm.EntityManager;
 import com.codename1.backend.orm.Query;
@@ -51,6 +52,11 @@ public class OrmCheck {
     private static final List failures = new ArrayList();
 
     public static void main(String[] args) throws Exception {
+        // This harness opens whatever URL it is given, so it carries every engine.
+        com.codename1.backend.Database.useEngine(com.codename1.db.sql.Postgres.CONNECTOR);
+        com.codename1.backend.Database.useEngine(com.codename1.db.sql.MySql.CONNECTOR);
+        com.codename1.backend.Database.useEngine(com.codename1.db.sql.SqlServer.CONNECTOR);
+        com.codename1.backend.Database.useEngine(com.codename1.db.sql.Oracle.CONNECTOR);
         // What the generated entry point does at start-up, and the only thing
         // that keeps the generated daos in the binary: the translator drops a
         // class nothing references.
@@ -75,7 +81,11 @@ public class OrmCheck {
             try {
                 generatedRepositories(em, pool.dialect().getName());
                 nativeDatesRoundTripInUtc(em);
-                roundTripsEveryColumn(notes);
+                generatedKeys(em);
+                roundTripsEveryColumn(notes, pool.dialect().getName());
+                emptyStringInJpql(em, notes);
+                lockedPages(em, notes, pool.dialect().getName());
+                unorderedPagesAndBooleans(em, notes);
                 updatesAndDeletes(notes);
                 queriesByFieldName(notes, pool.dialect().getName());
                 anExplicitKeyLeavesTheNextGeneratedOneUsable(pool);
@@ -107,6 +117,38 @@ public class OrmCheck {
         System.out.println(failures.isEmpty() ? "ORMCHECK OK" : "ORMCHECK FAILED");
         if(!failures.isEmpty()) {
             System.exit(1);
+        }
+    }
+
+    /// SEQUENCE and TABLE keys: each engine supplies a sequence its own way (or
+    /// the key table stands in), and both must hand out distinct ascending keys.
+    private static void generatedKeys(EntityManager em) {
+        com.codename1.orm.session.Session s = em.openSession();
+        try {
+            s.createTables();
+            s.beginTransaction();
+            Serial a = new Serial();
+            a.label = "a";
+            Serial b = new Serial();
+            b.label = "b";
+            Counted c = new Counted();
+            c.label = "c";
+            Counted d = new Counted();
+            d.label = "d";
+            s.persist(a);
+            s.persist(b);
+            s.persist(c);
+            s.persist(d);
+            s.commitTransaction();
+            check("sequence keys ascend", "true", "" + (a.id > 0 && b.id > a.id));
+            check("table keys ascend", "true", "" + (c.id > 0 && d.id > c.id));
+            s.clear();
+            check("a sequence-keyed row reads back", "b", s.find(Serial.class, Long.valueOf(b.id)).label);
+            check("a table-keyed row reads back", "d", s.find(Counted.class, Long.valueOf(d.id)).label);
+        } catch (RuntimeException err) {
+            check("generated keys", "no exception", "" + err);
+        } finally {
+            s.close();
         }
     }
 
@@ -158,6 +200,8 @@ public class OrmCheck {
     private static void generatedRepositories(EntityManager em, String dialect) {
         com.codename1.orm.session.Session s=em.openSession();
         try {
+            // Native SQL is the caller's own: before 23ai Oracle needs a FROM on every SELECT.
+            String noTable="oracle".equals(dialect) ? " FROM DUAL" : "";
             s.createTables();
             Records records=com.codename1.orm.repository.Repositories.create(Records.class,s);
             s.beginTransaction();
@@ -175,19 +219,19 @@ public class OrmCheck {
                 check("native connection after rejection", "2", ""+records.nativeCount("repository"));
             }
             try {
-                s.createNativeQuery("SELECT 1.5",Long.class).first();
+                s.createNativeQuery("SELECT 1.5"+noTable,Long.class).first();
                 check("native fractional integer", "rejected", "accepted");
             } catch (com.codename1.orm.session.PersistenceException expected) {
                 check("native fractional integer", "rejected", "rejected");
             }
             try {
-                s.createNativeQuery("SELECT 1",String.class).first();
+                s.createNativeQuery("SELECT 1"+noTable,String.class).first();
                 check("native numeric text", "rejected", "accepted");
             } catch (com.codename1.orm.session.PersistenceException expected) {
                 check("native numeric text", "rejected", "rejected");
             }
-            check("native date parameter", "12345", ""+s.createNativeQuery("SELECT :value",Long.class).setParameter("value",new java.util.Date(12345)).first());
-            check("native character parameter", "65", ""+s.createNativeQuery("SELECT :value",Long.class).setParameter("value",Character.valueOf('A')).first());
+            check("native date parameter", "12345", ""+s.createNativeQuery("SELECT :value"+noTable,Long.class).setParameter("value",new java.util.Date(12345)).first());
+            check("native character parameter", "65", ""+s.createNativeQuery("SELECT :value"+noTable,Long.class).setParameter("value",Character.valueOf('A')).first());
             check("repository count", "2", ""+records.count());
             check("repository exists", "true", ""+records.existsByName("repository"));
             check("repository native binding", "2", ""+records.nativeCount("repository"));
@@ -222,7 +266,97 @@ public class OrmCheck {
      * BIGINT rather than a native timestamp whose text format follows the
      * server's time zone, and a blob is BYTEA, BLOB or LONGBLOB.
      */
-    private static void roundTripsEveryColumn(Dao<Note> notes) throws Exception {
+    /// Paging without an ORDER BY (SQL Server pages only an ordered select)
+    /// and a JPQL boolean compared with a literal and a parameter (neither
+    /// T-SQL nor Oracle before 23ai has a boolean a predicate can equal).
+    private static void unorderedPagesAndBooleans(EntityManager em, Dao<Note> notes) throws Exception {
+        Note a = new Note();
+        a.title = "page-a";
+        a.pinned = true;
+        notes.insert(a);
+        try {
+            Note found = notes.findOne("title = ?", new Object[] {"page-a"});
+            Note first = notes.query().eq("title", "page-a").first();
+            int limited = notes.query().like("title", "page-%").offset(0).limit(1).list().size();
+            com.codename1.orm.session.Session s = em.openSession();
+            try {
+                String jpql = "select n from com.demo.Note n where n.title = 'page-a' and n.pinned = ";
+                int literal = s.createQuery(jpql + "true", Note.class).list().size();
+                int bound = s.createQuery(jpql + ":flag", Note.class).setParameter("flag", Boolean.TRUE).list().size();
+                int none = s.createQuery(jpql + ":flag", Note.class).setParameter("flag", Boolean.FALSE).list().size();
+                check("unordered paging and boolean comparison", "page-a/page-a/1/1/1/0",
+                        found.title + "/" + first.title + "/" + limited + "/" + literal + "/" + bound + "/" + none);
+            } finally {
+                s.close();
+            }
+        } finally {
+            notes.delete(a);
+        }
+    }
+
+    /// A locked read with paging, in each engine's order: MySQL takes LIMIT
+    /// before FOR UPDATE, SQL Server a table hint, and Oracle, which refuses a
+    /// lock on a row-limited query (ORA-02014), locks the page's rows by key
+    /// after reading them. A read lock is FOR UPDATE on Oracle, which has no
+    /// shared row lock. SQLite has no row locks and refuses the mode.
+    private static void lockedPages(EntityManager em, Dao<Note> notes, String dialect) throws Exception {
+        if ("sqlite".equals(dialect)) {
+            return;
+        }
+        Note a = new Note();
+        a.title = "lock-a";
+        notes.insert(a);
+        Note b = new Note();
+        b.title = "lock-b";
+        notes.insert(b);
+        com.codename1.orm.session.Session s = em.openSession();
+        try {
+            s.beginTransaction();
+            String jpql = "select n from com.demo.Note n where n.title like 'lock-%' order by n.title";
+            int first = s.createQuery(jpql, Note.class)
+                    .lockMode(com.codename1.orm.session.LockMode.PESSIMISTIC_WRITE).limit(1).list().size();
+            String second = s.createQuery(jpql, Note.class)
+                    .lockMode(com.codename1.orm.session.LockMode.PESSIMISTIC_WRITE).offset(1).limit(1).list().get(0).title;
+            int shared = s.createQuery(jpql, Note.class)
+                    .lockMode(com.codename1.orm.session.LockMode.PESSIMISTIC_READ).list().size();
+            s.commitTransaction();
+            check("locked reads with paging, and a read lock", "1/lock-b/2", first + "/" + second + "/" + shared);
+        } finally {
+            s.close();
+            notes.delete(a);
+            notes.delete(b);
+        }
+    }
+
+    /// JPQL comparing with '' agrees with the stored empty string: on
+    /// Oracle, where '' is NULL, the comparison is rendered as IS [NOT] NULL.
+    private static void emptyStringInJpql(EntityManager em, Dao<Note> notes) throws Exception {
+        Note blank = new Note();
+        blank.title = "";
+        notes.insert(blank);
+        com.codename1.orm.session.Session s = em.openSession();
+        try {
+            int empty = s.createQuery("select n.id from com.demo.Note n where n.title = '' and n.id = "
+                    + blank.id).list().size();
+            int nonEmpty = s.createQuery("select n.id from com.demo.Note n where n.title <> '' and n.id = "
+                    + blank.id).list().size();
+            check("JPQL = '' finds the empty string, <> '' does not", "1/0", empty + "/" + nonEmpty);
+            int boundEmpty = s.createQuery("select n.id from com.demo.Note n where n.title = :t and n.id = "
+                    + blank.id).setParameter("t", "").list().size();
+            int boundOther = s.createQuery("select n.id from com.demo.Note n where n.title <> :t and n.id = "
+                    + blank.id).setParameter("t", "x").list().size();
+            int boundSame = s.createQuery("select n.id from com.demo.Note n where n.title <> :t and n.id = "
+                    + blank.id).setParameter("t", "").list().size();
+            check("a bound \"\" matches the empty string, = and <>", "1/1/0",
+                    boundEmpty + "/" + boundOther + "/" + boundSame);
+        } finally {
+            s.close();
+            notes.delete(blank);
+        }
+    }
+
+    private static void roundTripsEveryColumn(Dao<Note> notes, String engine) throws Exception {
+        boolean oracle = "oracle".equals(engine);
         Note note = new Note();
         note.title = "first";
         // A QUESTION MARK in a stored value. Every statement goes through the
@@ -263,6 +397,26 @@ public class OrmCheck {
         check("byte[] length", "5", String.valueOf(back.payload == null ? -1 : back.payload.length));
         // A NUL INSIDE the blob, which is where a length-unaware path truncates.
         check("byte[] content", "1,2,3,0,4", join(back.payload));
+
+        // An EMPTY required string. Oracle stores '' as NULL, so a NOT NULL
+        // column refuses it there; the mapping keeps such a column nullable
+        // on Oracle and reads the NULL back as "".
+        Note blank = new Note();
+        blank.title = "";
+        notes.insert(blank);
+        Note blankBack = notes.findById(Long.valueOf(blank.id));
+        check("an empty required string round-trips", "[]",
+                blankBack == null ? "missing" : "[" + blankBack.title + "]");
+        notes.delete(blank);
+        // And null is still refused for it, on every engine.
+        Note untitled = new Note();
+        String nullTitle = "accepted";
+        try {
+            notes.insert(untitled);
+        } catch(Exception expected) {
+            nullTitle = "refused";
+        }
+        check("a null required string is refused", "refused", nullTitle);
         check("a null boxed field stays null", "null", String.valueOf(back.revision));
         check("char", "x", String.valueOf(back.initial));
         // A nullable char has no default to fall back on, so it is read through
@@ -294,12 +448,26 @@ public class OrmCheck {
         Note large = new Note();
         large.title = "large";
         large.body = big.toString();
-        notes.insert(large);
-        Note largeBack = notes.findById(Long.valueOf(large.id));
-        check("a string past MySQL's TEXT limit round trips", "70000",
-                String.valueOf(largeBack == null || largeBack.body == null
-                        ? -1 : largeBack.body.length()));
-        notes.delete(large);
+        if(oracle) {
+            // Oracle's string column is VARCHAR2(4000 CHAR): a CLOB would hold
+            // this but could not be compared, ordered or grouped, so the bound
+            // is the documented difference. What must hold is that the row is
+            // REFUSED, never stored cut short.
+            String refused = "stored";
+            try {
+                notes.insert(large);
+            } catch(java.io.IOException expected) {
+                refused = "refused";
+            }
+            check("a string past VARCHAR2's bound is refused, not truncated", "refused", refused);
+        } else {
+            notes.insert(large);
+            Note largeBack = notes.findById(Long.valueOf(large.id));
+            check("a string past MySQL's TEXT limit round trips", "70000",
+                    String.valueOf(largeBack == null || largeBack.body == null
+                            ? -1 : largeBack.body.length()));
+            notes.delete(large);
+        }
 
         // A NUL INSIDE A STRING. SQLite and MySQL store it -- both keep text
         // with a length rather than a terminator -- while PostgreSQL refuses the
@@ -786,6 +954,10 @@ public class OrmCheck {
             // primary key there -- measured, "Duplicate entry 'token '" --
             // while SQLite and PostgreSQL kept them apart. The NO PAD
             // collation makes the three agree.
+            //
+            // SQL Server is the documented exception: it pads the shorter
+            // operand of every string comparison, under every collation,
+            // binary ones included, so there the second key is a duplicate.
             Coupon padded = new Coupon();
             padded.code = "PAD";
             padded.discount = 6;
@@ -793,13 +965,24 @@ public class OrmCheck {
             Coupon spaced = new Coupon();
             spaced.code = "PAD ";
             spaced.discount = 7;
-            coupons.insert(spaced);
-            check("a trailing space makes a different key", "6",
-                    String.valueOf(coupons.findById("PAD").discount));
-            check("and the padded one is its own row", "7",
-                    String.valueOf(coupons.findById("PAD ").discount));
-            coupons.delete(padded);
-            coupons.delete(spaced);
+            if("sqlserver".equals(em.dialect().getName())) {
+                String padRefused = "accepted";
+                try {
+                    coupons.insert(spaced);
+                } catch(Exception expected) {
+                    padRefused = "refused";
+                }
+                check("SQL Server: a trailing space is not part of the key", "refused", padRefused);
+                coupons.delete(padded);
+            } else {
+                coupons.insert(spaced);
+                check("a trailing space makes a different key", "6",
+                        String.valueOf(coupons.findById("PAD").discount));
+                check("and the padded one is its own row", "7",
+                        String.valueOf(coupons.findById("PAD ").discount));
+                coupons.delete(padded);
+                coupons.delete(spaced);
+            }
 
             check("delete by a string key reports the row", "true",
                     String.valueOf(coupons.delete(ten)));
@@ -858,11 +1041,11 @@ public class OrmCheck {
      */
     private static void anExplicitKeyLeavesTheNextGeneratedOneUsable(DataSource pool)
             throws Exception {
-        String table = "cn1_idsync";
+        final String table = "cn1_idsync";
         pool.execute("DROP TABLE IF EXISTS " + table, null);
         pool.execute("CREATE TABLE " + table + " (id "
-                + pool.dialect().generatedKeyColumn(com.codename1.backend.sql.Dialect.BIGINT)
-                + ", name " + pool.dialect().columnType(com.codename1.backend.sql.Dialect.TEXT)
+                + pool.dialect().generatedKeyColumn(com.codename1.db.sql.Dialect.BIGINT)
+                + ", name " + pool.dialect().columnType(com.codename1.db.sql.Dialect.TEXT)
                 + ")", null);
         try {
             // NEGATIVE, because an import can carry them and PostgreSQL accepts
@@ -870,8 +1053,23 @@ public class OrmCheck {
             // outright, since the identity's sequence starts at 1. The clamp is
             // what keeps the resync portable, and an explicit 1 would not have
             // exercised it.
-            pool.execute("INSERT INTO " + table + " (id, name) VALUES (?, ?)",
-                    new Object[] {Long.valueOf(-5L), "imported"});
+            // SQL Server refuses an explicit value for an IDENTITY column
+            // unless the session allows it, which is a setting of the
+            // connection, so the import runs on one.
+            final boolean sqlServer = "sqlserver".equals(pool.dialect().getName());
+            pool.withConnection(new DataSource.Work() {
+                public Object run(Database db) throws Exception {
+                    if(sqlServer) {
+                        db.execute("SET IDENTITY_INSERT " + table + " ON", null);
+                    }
+                    db.execute("INSERT INTO " + table + " (id, name) VALUES (?, ?)",
+                            new Object[] {Long.valueOf(-5L), "imported"});
+                    if(sqlServer) {
+                        db.execute("SET IDENTITY_INSERT " + table + " OFF", null);
+                    }
+                    return null;
+                }
+            });
             // RAW NAMES: the dialect spells each one for the position it lands
             // in. Passing the quoted forms double-quoted them and PostgreSQL
             // looked for a relation called "\"cn1_idsync\"".
@@ -896,8 +1094,8 @@ public class OrmCheck {
     private static void aTerminatedStatementStillAnswersItsKey(DataSource pool) throws Exception {
         pool.execute("DROP TABLE IF EXISTS cn1_terminated", null);
         pool.execute("CREATE TABLE cn1_terminated (id "
-                + pool.dialect().generatedKeyColumn(com.codename1.backend.sql.Dialect.BIGINT)
-                + ", name " + pool.dialect().columnType(com.codename1.backend.sql.Dialect.TEXT)
+                + pool.dialect().generatedKeyColumn(com.codename1.db.sql.Dialect.BIGINT)
+                + ", name " + pool.dialect().columnType(com.codename1.db.sql.Dialect.TEXT)
                 + ")", null);
         try {
             long key = pool.insert("INSERT INTO cn1_terminated (name) VALUES (?);",
@@ -939,11 +1137,16 @@ public class OrmCheck {
     private static void anIgnoredInsertAnswersNoKey(DataSource pool) throws Exception {
         String engine = pool.dialect().getName();
         boolean mysql = "mysql".equals(engine);
+        boolean sqlServer = "sqlserver".equals(engine);
+        boolean oracle = "oracle".equals(engine);
         pool.execute("DROP TABLE IF EXISTS cn1_ignored", null);
         pool.execute("CREATE TABLE cn1_ignored (id "
-                + pool.dialect().generatedKeyColumn(com.codename1.backend.sql.Dialect.BIGINT)
-                + ", name " + (mysql ? "VARCHAR(64)" : "TEXT")
-                + " NOT NULL UNIQUE)", null);
+                + pool.dialect().generatedKeyColumn(com.codename1.db.sql.Dialect.BIGINT)
+                // SQL Server's INSERT IGNORE is a property of the index:
+                // IGNORE_DUP_KEY drops a duplicate row with a warning.
+                + ", name " + (mysql || oracle ? pool.dialect().varchar(64) : sqlServer ? "NVARCHAR(64)" : "TEXT")
+                + (sqlServer ? " NOT NULL, CONSTRAINT cn1_ignored_name UNIQUE (name) WITH (IGNORE_DUP_KEY = ON))"
+                        : " NOT NULL UNIQUE)"), null);
         try {
             pool.insert("INSERT INTO cn1_ignored (name) VALUES (?)",
                     new Object[] {"a"}, "id");
@@ -951,7 +1154,13 @@ public class OrmCheck {
                     new Object[] {"b"}, "id");
             check("the second fixture row has a key", "true", String.valueOf(second > 0));
             String ignore;
-            if("postgresql".equals(engine)) {
+            Object[] ignoreArgs = new Object[] {"a"};
+            if(sqlServer) {
+                ignore = "INSERT INTO cn1_ignored (name) VALUES (?)";
+            } else if(oracle) {
+                // Oracle's INSERT IGNORE is a hint naming the unique index.
+                ignore = "INSERT /*+ IGNORE_ROW_ON_DUPKEY_INDEX(cn1_ignored(name)) */ INTO cn1_ignored (name) VALUES (?)";
+            } else if("postgresql".equals(engine)) {
                 ignore = "INSERT INTO cn1_ignored (name) VALUES (?) ON CONFLICT DO NOTHING";
             } else if(mysql) {
                 ignore = "INSERT IGNORE INTO cn1_ignored (name) VALUES (?)";
@@ -960,7 +1169,7 @@ public class OrmCheck {
             }
             // Zero, and specifically NOT the key of row b.
             check("an insert that conflicted answers no key", "0",
-                    String.valueOf(pool.insert(ignore, new Object[] {"a"}, "id")));
+                    String.valueOf(pool.insert(ignore, ignoreArgs, "id")));
             check("and it wrote nothing", "2",
                     String.valueOf(((java.util.Map)pool.query(
                             "SELECT COUNT(*) AS c FROM cn1_ignored", null).get(0))
@@ -973,10 +1182,12 @@ public class OrmCheck {
     private static void anUpsertThatUpdatesStillAnswers(DataSource pool) throws Exception {
         String engine = pool.dialect().getName();
         boolean mysql = "mysql".equals(engine);
+        boolean sqlServer = "sqlserver".equals(engine);
+        boolean oracle = "oracle".equals(engine);
         pool.execute("DROP TABLE IF EXISTS cn1_upsert", null);
         pool.execute("CREATE TABLE cn1_upsert (id "
-                + pool.dialect().generatedKeyColumn(com.codename1.backend.sql.Dialect.BIGINT)
-                + ", name " + (mysql ? "VARCHAR(64)" : "TEXT")
+                + pool.dialect().generatedKeyColumn(com.codename1.db.sql.Dialect.BIGINT)
+                + ", name " + (mysql || oracle ? pool.dialect().varchar(64) : sqlServer ? "NVARCHAR(64)" : "TEXT")
                 + " NOT NULL UNIQUE, hits INTEGER)", null);
         try {
             long first = pool.insert("INSERT INTO cn1_upsert (name, hits) VALUES (?, ?)",
@@ -989,7 +1200,18 @@ public class OrmCheck {
                     new Object[] {"b", Long.valueOf(1)}, "id");
             check("the second fixture row has its own key", "true",
                     String.valueOf(second > first));
-            String upsert = mysql
+            // SQL Server has neither form; MERGE is its upsert, HOLDLOCK keeps
+            // two of them from both taking the insert branch, and MERGE must end
+            // in a semicolon.
+            String upsert = oracle
+                    ? "MERGE INTO cn1_upsert t USING (SELECT ? AS name, ? AS hits FROM DUAL) s "
+                            + "ON (t.name = s.name) WHEN MATCHED THEN UPDATE SET hits = t.hits + 1 "
+                            + "WHEN NOT MATCHED THEN INSERT (name, hits) VALUES (s.name, s.hits)"
+                    : sqlServer
+                    ? "MERGE cn1_upsert WITH (HOLDLOCK) AS t USING (VALUES (?, ?)) AS s (name, hits) "
+                            + "ON t.name = s.name WHEN MATCHED THEN UPDATE SET hits = t.hits + 1 "
+                            + "WHEN NOT MATCHED THEN INSERT (name, hits) VALUES (s.name, s.hits);"
+                    : mysql
                     ? "INSERT INTO cn1_upsert (name, hits) VALUES (?, ?) "
                             + "ON DUPLICATE KEY UPDATE hits = hits + 1"
                     : "INSERT INTO cn1_upsert (name, hits) VALUES (?, ?) "
@@ -1007,7 +1229,7 @@ public class OrmCheck {
             } catch (Exception err) {
                 answered = "refused";
             }
-            boolean returning = pool.dialect().generatedKeysThroughReturning();
+            boolean returning = pool.dialect().upsertKeysThroughReturning();
             check("an upsert answers with the updated row's key, or not at all",
                     returning ? String.valueOf(first) : "refused", answered);
             if(!returning) {
@@ -1058,8 +1280,8 @@ public class OrmCheck {
         pool.execute("SET SESSION sql_mode='NO_BACKSLASH_ESCAPES'", null);
         pool.execute("DROP TABLE IF EXISTS cn1_bsmode", null);
         pool.execute("CREATE TABLE cn1_bsmode (id "
-                + pool.dialect().generatedKeyColumn(com.codename1.backend.sql.Dialect.BIGINT)
-                + ", name " + pool.dialect().columnType(com.codename1.backend.sql.Dialect.TEXT)
+                + pool.dialect().generatedKeyColumn(com.codename1.db.sql.Dialect.BIGINT)
+                + ", name " + pool.dialect().columnType(com.codename1.db.sql.Dialect.TEXT)
                 + ")", null);
         try {
             String[] variants = new String[] {
@@ -1116,7 +1338,7 @@ public class OrmCheck {
         try {
             pool.execute("DROP TABLE IF EXISTS " + quoted, null);
             pool.execute("CREATE TABLE " + quoted + " (id "
-                    + pool.dialect().generatedKeyColumn(com.codename1.backend.sql.Dialect.BIGINT)
+                    + pool.dialect().generatedKeyColumn(com.codename1.db.sql.Dialect.BIGINT)
                     + ", name TEXT)", null);
             try {
                 String outcome;
@@ -1139,8 +1361,8 @@ public class OrmCheck {
     private static void aMultiRowInsertIsRefused(DataSource pool) throws Exception {
         pool.execute("DROP TABLE IF EXISTS cn1_multi", null);
         pool.execute("CREATE TABLE cn1_multi (id "
-                + pool.dialect().generatedKeyColumn(com.codename1.backend.sql.Dialect.BIGINT)
-                + ", name " + pool.dialect().columnType(com.codename1.backend.sql.Dialect.TEXT)
+                + pool.dialect().generatedKeyColumn(com.codename1.db.sql.Dialect.BIGINT)
+                + ", name " + pool.dialect().columnType(com.codename1.db.sql.Dialect.TEXT)
                 + ")", null);
         try {
             String refused;
@@ -1214,7 +1436,7 @@ public class OrmCheck {
     private static void aNulIsRefusedOnTheRawPathToo(DataSource pool) throws Exception {
         pool.execute("DROP TABLE IF EXISTS cn1_rawnul", null);
         pool.execute("CREATE TABLE cn1_rawnul (v "
-                + pool.dialect().columnType(com.codename1.backend.sql.Dialect.TEXT) + ")", null);
+                + pool.dialect().columnType(com.codename1.db.sql.Dialect.TEXT) + ")", null);
         try {
             String refused;
             try {
@@ -1258,7 +1480,7 @@ public class OrmCheck {
             // the same claim on a portable answer as a dao.
             pool.execute("DROP TABLE IF EXISTS cn1_rawbool", null);
             pool.execute("CREATE TABLE cn1_rawbool (flag "
-                    + pool.dialect().columnType(com.codename1.backend.sql.Dialect.BOOLEAN)
+                    + pool.dialect().columnType(com.codename1.db.sql.Dialect.BOOLEAN)
                     + ")", null);
             pool.execute("INSERT INTO cn1_rawbool (flag) VALUES (?)",
                     new Object[] {Boolean.TRUE});
@@ -1313,7 +1535,7 @@ public class OrmCheck {
             // belongs on every engine.
             pool.execute("DROP TABLE IF EXISTS cn1_rawnul", null);
             pool.execute("CREATE TABLE cn1_rawnul (v "
-                    + pool.dialect().columnType(com.codename1.backend.sql.Dialect.BLOB)
+                    + pool.dialect().columnType(com.codename1.db.sql.Dialect.BLOB)
                     + ")", null);
             pool.execute("INSERT INTO cn1_rawnul (v) VALUES (?)",
                     new Object[] {new byte[] {97, 0, 98}});

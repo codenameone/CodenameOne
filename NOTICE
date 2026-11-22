@@ -150,6 +150,21 @@ Splat sample fonts (scripts/splat/common/src/main/css/fonts/Rajdhani-*.ttf)
   Rajdhani, Copyright (c) 2014, Indian Type Foundry, licensed under the SIL
   Open Font License 1.1; the licence text is in the same directory (OFL.txt).
 
+Papercut sample paper textures (scripts/papercut/common/src/main/resources/tex_*.jpg)
+  Paper 001, Paper 003 and Paper 006 by ambientCG (ambientcg.com), released
+  under CC0 1.0. Blended into the drawn cut-outs by
+  scripts/papercut/tools/make-art.py.
+
+Papercut sample sounds (scripts/papercut/common/src/main/resources/sfx_*.wav)
+  "100 CC0 SFX" by rubberduck and "10 Book Page Flips" by StarNinjas
+  (opengameart.org), released under CC0 1.0. Converted by
+  scripts/papercut/tools/make-art.py.
+
+Papercut sample fonts (GochiHand-Regular.ttf, PatrickHand-Regular.ttf)
+  Gochi Hand by Juan Pablo del Peral (Huerta Tipografica) and Patrick Hand
+  by Patrick Wagesreiter, licensed under the SIL Open Font License 1.1; the
+  licence text is in scripts/papercut/common/src/main/css/fonts/OFL.txt.
+
 ================================================================================
 .NET Standard reference assembly
 ================================================================================
@@ -380,3 +395,9 @@ is kept verbatim beside the models.
   the Knight, Barbarian, Mage and Rogue of the KayKit "Character Pack:
   Adventurers" by Kay Lousberg (www.kaylousberg.com), CC0 1.0, as repacked
   for scripts/skirmish by scripts/skirmish/tools/pack-models.py.
+
+CodenameOne/src/com/codename1/db/sql/Oracle.java is a Java rewrite of the
+thin-mode protocol layer of python-oracledb
+(https://github.com/oracle/python-oracledb), Copyright (c) 2020, 2024, Oracle
+and/or its affiliates, dual-licensed under the Universal Permissive License
+1.0 and the Apache License 2.0. The file keeps that notice verbatim.

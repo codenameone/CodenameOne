@@ -22,6 +22,8 @@
  */
 package com.codename1.backend.security.oauth2.client;
 
+import com.codename1.impl.backend.security.SecuritySupport;
+
 import com.codename1.backend.DataSource;
 import com.codename1.backend.security.Clock;
 import com.codename1.backend.security.SecuritySchema;
@@ -74,7 +76,7 @@ public final class JdbcFederatedIdentityRepository implements FederatedIdentityR
     private String read(String provider, String subject) throws IOException {
         Map row = dataSource.queryOne("SELECT username FROM " + SecuritySchema.table("cn1_federated_identity") + " WHERE "
                 + "provider = ? AND subject = ?", new Object[] {provider, subject});
-        return row == null ? null : String.valueOf(row.get("username"));
+        return row == null ? null : SecuritySupport.storedText(row.get("username"));
     }
 
     @Override
@@ -124,8 +126,8 @@ public final class JdbcFederatedIdentityRepository implements FederatedIdentityR
                     + SecuritySchema.table("cn1_federated_identity") + " WHERE username_key = ? ORDER BY created_at, "
                     + "provider, subject", new Object[] {SecuritySchema.usernameKey(username)})) {
                 Map r = (Map) row;
-                out.add(new String[] {String.valueOf(r.get("provider")),
-                        String.valueOf(r.get("subject"))});
+                out.add(new String[] {SecuritySupport.storedText(r.get("provider")),
+                        SecuritySupport.storedText(r.get("subject"))});
             }
         } catch (IOException err) {
             throw new IllegalStateException("The federated identities could not be read: "

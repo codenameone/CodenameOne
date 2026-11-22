@@ -70,8 +70,8 @@ public enum Template {
             "The commerce template is an app, a server and the contract module they share; "
                     + "an Initializr Gradle project is a single project.",
             new String[0], "/bazaar-modules.zip", "/bazaar-settings.properties"),
-    // A card battler: a real-time arena, rules shared by the app and the server, and
-    // a `rules` module of its own besides `shared`. It is the project in
+    // A card battler: a real-time arena, and the rules in
+    // `shared`, which the app and the server both run. It is the project in
     // scripts/skirmish; its resources come from
     // `scripts/sync-initializr-template.py skirmish`. Its look is painted art, so it
     // has no colour scheme to choose.
@@ -100,6 +100,17 @@ public enum Template {
             "The paintball template is an app, a server and the modules they share; "
                     + "an Initializr Gradle project is a single project.",
             new String[0], "/splat-modules.zip", "/splat-settings.properties"),
+    // A twin-stick arena shooter in cut paper and ink: no rules module (the server
+    // holds scores to plausibility bounds instead of re-simulating them), daily
+    // seeds, boards, a shop and achievements. It is the project in
+    // scripts/papercut; its resources come from
+    // `scripts/sync-initializr-template.py papercut`. Its look is drawn art, so it
+    // has no colour scheme to choose.
+    PAPERCUT(false, "/papercut-src.zip", "/papercut-css.zip", "/papercut-pom.xml",
+            "com.codenameone.examples.papercut", "Papercut", "/papercut-preview.jpg",
+            "The arena shooter template is an app, a server and the contract module they share; "
+                    + "an Initializr Gradle project is a single project.",
+            new String[0], "/papercut-modules.zip", "/papercut-settings.properties"),
     // The same kind of template as WAYLINE: an end-to-end encrypted messaging app
     // (chats, groups, media, calls) and its server. It is the project in
     // scripts/parley, and its resources come from
@@ -199,12 +210,6 @@ public enum Template {
         SETTINGS = settings;
     }
 
-    /// Whether the template carries a `rules` module: logic that depends on
-    /// nothing, built ahead of the contract, which the app and the server both
-    /// depend on -- a game's simulation.
-    public boolean hasRules() {
-        return this == SKIRMISH || this == DASH || this == SPLAT;
-    }
 
     /// Whether the template is an app together with its server: the project is
     /// then Maven, has the `backend` and `shared` modules, and targets Java 17.
@@ -215,7 +220,7 @@ public enum Template {
     /// Whether the developer can choose a colour scheme for the template: false for
     /// one whose look is art and not a palette its stylesheet declares.
     public boolean hasColorScheme() {
-        return this != SKIRMISH && this != DASH && this != SPLAT;
+        return this != SKIRMISH && this != DASH && this != SPLAT && this != PAPERCUT;
     }
 
     public boolean supportsGradle() {

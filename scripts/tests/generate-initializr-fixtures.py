@@ -99,6 +99,7 @@ FULL_STACK = {
     'SKIRMISH': ('api/AccountApi.java', 'ui/HomeForm.java'),
     'DASH': ('api/AccountApi.java', 'ui/HomeForm.java'),
     'SPLAT': ('api/AccountApi.java', 'ui/HomeForm.java'),
+    'PAPERCUT': ('api/RunApi.java', 'ui/HomeForm.java'),
     'PARLEY': ('api/ConversationApi.java', 'ui/CallScreen.java'),
     'REEL': ('api/CatalogApi.java', 'ui/WelcomeForm.java'),
     'BASTION': ('api/BankingApi.java', 'ui/HomeForm.java'),
@@ -116,6 +117,7 @@ TEMPLATE_HINT = {
     'SKIRMISH': None,
     'DASH': None,
     'SPLAT': None,
+    'PAPERCUT': None,
     'PARLEY': 'codename1.arg.ios.NSLocationWhenInUseUsageDescription=',
     'BASTION': 'codename1.arg.ios.detectJailbreak=true',
     'REEL': None,
@@ -150,17 +152,15 @@ def check_full_stack_fixture(archive, z, template):
     full = archive.name.split('-')[1] == 'FULL'
     root_pom = ''.join(z.read('pom.xml').decode().split())
     assert '<module>shared</module><module>common</module>' in root_pom, archive.name
-    # SKIRMISH, DASH and SPLAT also have the game's rules as a module of its own, ahead of the contract.
-    # FIELDLINE keeps its scheduling engine in shared.
-    game = template in ('SKIRMISH', 'DASH', 'SPLAT')
-    rules = game
-    assert (not rules) or '<module>rules</module><module>shared</module>' in root_pom, archive.name
-    for module in ('shared', 'common', 'backend') + (('rules',) if rules else ()):
+    # The games keep their rules in shared, beside the contract, as FIELDLINE keeps its engine;
+    # PAPERCUT has none: its arena runs in the app, and the server bounds scores.
+    game = template in ('SKIRMISH', 'DASH', 'SPLAT', 'PAPERCUT')
+    assert '<module>rules</module>' not in root_pom, archive.name
+    for module in ('shared', 'common', 'backend'):
         assert module + '/pom.xml' in names, (archive.name, module)
     for module in ('common', 'backend'):
-        for dependency in ('shared',) + (('rules',) if rules else ()):
-            assert '<artifactId>launcherprobe-' + dependency + '</artifactId>' in z.read(module + '/pom.xml').decode(), \
-                (archive.name, module, dependency)
+        assert '<artifactId>launcherprobe-shared</artifactId>' in z.read(module + '/pom.xml').decode(), \
+            (archive.name, module)
     assert ('javase/pom.xml' in names) == full, archive.name
     for name in ['shared/src/main/java/com/example/probe/' + contract,
                  'backend/src/main/java/com/example/probe/SecurityConfig.java',

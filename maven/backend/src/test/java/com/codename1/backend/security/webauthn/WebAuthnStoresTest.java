@@ -66,6 +66,7 @@ class WebAuthnStoresTest {
         "cn1_persistent_logins", "cn1_mfa_totp", "cn1_mfa_recovery_code", "cn1_rate_limit",
         "cn1_federated_identity", "cn1_oauth2_registered_client", "cn1_oauth2_authorization",
         "cn1_oauth2_token", "cn1_webauthn_user", "cn1_webauthn_credential",
+        "cn1_one_time_token", "cn1_mfa_email", "cn1_verified_email",
         "cn1_security_schema_history"};
 
     private final List<DataSource> opened = new ArrayList<DataSource>();
@@ -142,7 +143,7 @@ class WebAuthnStoresTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"MEMORY", "SQLITE", "POSTGRES", "MYSQL"})
+    @ValueSource(strings = {"MEMORY", "SQLITE", "POSTGRES", "MYSQL", "SQLSERVER"})
     void aUserHasOneHandleAndAHandleOneUser(String engine) throws Exception {
         PublicKeyCredentialUserEntityRepository users = users(open(engine));
         assertNull(users.findByUsername("Ada"));
@@ -189,7 +190,7 @@ class WebAuthnStoresTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"SQLITE", "POSTGRES", "MYSQL"})
+    @ValueSource(strings = {"SQLITE", "POSTGRES", "MYSQL", "SQLSERVER"})
     void serversThatMakeAHandleAtOnceAgreeOnOne(String engine) throws Exception {
         open(engine);
         final int servers = 6;
@@ -237,7 +238,7 @@ class WebAuthnStoresTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"MEMORY", "SQLITE", "POSTGRES", "MYSQL"})
+    @ValueSource(strings = {"MEMORY", "SQLITE", "POSTGRES", "MYSQL", "SQLSERVER"})
     void credentials(String engine) throws Exception {
         UserCredentialRepository credentials = credentials(open(engine));
         byte[] ada = bytes(32, 1);
@@ -307,7 +308,7 @@ class WebAuthnStoresTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"MEMORY", "SQLITE", "POSTGRES", "MYSQL"})
+    @ValueSource(strings = {"MEMORY", "SQLITE", "POSTGRES", "MYSQL", "SQLSERVER"})
     void theCounterMovesForwardAndNeverBack(String engine) throws Exception {
         UserCredentialRepository credentials = credentials(open(engine));
         byte[] id = bytes(32, 4);
@@ -336,7 +337,7 @@ class WebAuthnStoresTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"SQLITE", "POSTGRES", "MYSQL"})
+    @ValueSource(strings = {"SQLITE", "POSTGRES", "MYSQL", "SQLSERVER"})
     void ofServersThatTakeTheSameCountOrTheSameIdOneWins(String engine) throws Exception {
         open(engine);
         final int servers = 6;
@@ -399,7 +400,7 @@ class WebAuthnStoresTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"SQLITE", "POSTGRES", "MYSQL"})
+    @ValueSource(strings = {"SQLITE", "POSTGRES", "MYSQL", "SQLSERVER"})
     void theCeremoniesOverTheDatabase(String engine) throws Exception {
         DataSource pool = open(engine);
         WebAuthnRelyingPartyOperations ops = new WebAuthnRelyingPartyOperations(

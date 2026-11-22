@@ -137,6 +137,24 @@ public class DemoField {
         }
         build(signIns);
         planner.optimize("system");
+        // Two jobs late in the week are held at intake, so the intake board
+        // has something in each column: one waits for a part, one for access.
+        hold("t110", Catalog.AWAITING_PARTS);
+        hold("t112", Catalog.BLOCKED);
+    }
+
+    private void hold(String techId, String status) throws IOException {
+        Horizon h = planner.horizon();
+        Job last = null;
+        for (Job job : jobRows.inSpan(h.origin(), h.end())) {
+            if (techId.equals(job.getTechId()) && Catalog.SCHEDULED.equals(job.getStatus())
+                    && (last == null || job.getPlannedStart() > last.getPlannedStart())) {
+                last = job;
+            }
+        }
+        if (last != null) {
+            jobs.intake(last.getId(), status);
+        }
     }
 
     @Transactional(rollbackFor = IOException.class)
