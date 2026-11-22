@@ -109,8 +109,19 @@ import java.io.IOException;
 ///   device's polling is answered `authorization_pending`,
 ///   `slow_down`, `access_denied` or `expired_token` until it is.
 ///
-/// A client is never granted a scope it was not registered with, and there is
-/// no consent page: registering a client with a scope is the consent.
+/// A client is never granted a scope it was not registered with. Unless the
+/// client's settings or [#authorizationConsent] ask for one, there is no
+/// consent page: registering a client with a scope is the consent. Where one
+/// is asked for, the user sees the client's name, where it will send them and
+/// each scope it asked for, and the grant carries only the scopes they left
+/// ticked; `prompt=none` is then answered `consent_required`.
+///
+/// ## Client registration
+///
+/// Off unless [#clientRegistration] turns it on. Clients then register
+/// themselves (RFC 7591) at `/oauth2/register`, which the metadata names as
+/// `registration_endpoint`; each is a public PKCE client that must ask for
+/// consent, saved in the client repository.
 ///
 /// ## Tokens and keys
 ///
@@ -155,7 +166,8 @@ import java.io.IOException;
 ///
 /// ## Not here
 ///
-/// A consent page, dynamic client registration, token introspection, opaque
+/// Remembered consent, the RFC 7592 registration management endpoint, token
+/// introspection, opaque
 /// access tokens, `private_key_jwt` and mutual TLS client authentication,
 /// pushed authorization requests, DPoP, encrypted tokens, the implicit and
 /// password grants, and back-channel or RP-initiated logout.
@@ -179,6 +191,11 @@ public final class AuthorizationServerConfigurer extends SecurityConfigurer {
     private OidcUserInfoMapper userInfo;
     private RateLimiter verificationLimiter;
     private Clock clock;
+    private com.codename1.backend.security.oauth2.server.authorization.ClientRegistrationPolicy
+            registration;
+    private com.codename1.backend.security.oauth2.server.authorization.AuthorizationConsentPolicy
+            consent;
+    private String consentPage;
 
     AuthorizationServerConfigurer() {
     }
@@ -259,6 +276,46 @@ public final class AuthorizationServerConfigurer extends SecurityConfigurer {
         return this;
     }
 
+    /// Turns on client registration (RFC 7591) at
+    /// [AuthorizationServerSettings#getClientRegistrationEndpoint], for
+    /// clients that register themselves -- an MCP client is the usual one.
+    /// Off unless called. The policy names the scopes a registered client may
+    /// have and is the hook that validates and limits each registration; what
+    /// a registered client always is (public, PKCE, consent on every
+    /// authorization, loopback or https redirects) is listed on
+    /// [com.codename1.backend.security.oauth2.server.authorization.ClientRegistrationPolicy].
+    ///
+    /// The endpoint is advertised as `registration_endpoint` in the server's
+    /// metadata, takes no CSRF token (a client calls it, not a browser
+    /// session), and saves each client in the repository -- which must keep
+    /// them outside this process, such as a `JdbcRegisteredClientRepository`;
+    /// the in-memory one is refused when the chain is built.
+    public AuthorizationServerConfigurer clientRegistration(
+            com.codename1.backend.security.oauth2.server.authorization.ClientRegistrationPolicy
+                    policy) {
+        this.registration = policy;
+        return this;
+    }
+
+    /// Asks the signed-in user to approve an authorization on a consent page
+    /// before a code is issued: for every client whose `ClientSettings` sets
+    /// `requireAuthorizationConsent` (every registered client does), and for
+    /// any other the policy picks. The grant carries exactly the scopes the
+    /// user left ticked.
+    ///
+    /// @param policy which further authorizations to ask about, or null
+    /// @param consentPage the application's own consent page, or null for the
+    /// built-in one; see
+    /// [OAuth2AuthorizationServer#authorizationConsent] for what it is sent
+    /// and must post back
+    public AuthorizationServerConfigurer authorizationConsent(
+            com.codename1.backend.security.oauth2.server.authorization.AuthorizationConsentPolicy
+                    policy, String consentPage) {
+        this.consent = policy;
+        this.consentPage = consentPage;
+        return this;
+    }
+
     /// The clock every lifetime is measured on; for tests.
     public AuthorizationServerConfigurer clock(Clock clock) {
         this.clock = clock;
@@ -320,7 +377,8 @@ public final class AuthorizationServerConfigurer extends SecurityConfigurer {
                     AntPathRequestMatcher.antMatcher("POST", s.getTokenEndpoint()),
                     AntPathRequestMatcher.antMatcher("POST", s.getTokenRevocationEndpoint()),
                     AntPathRequestMatcher.antMatcher("POST", s.getDeviceAuthorizationEndpoint()),
-                    AntPathRequestMatcher.antMatcher("POST", s.getOidcUserInfoEndpoint()));
+                    AntPathRequestMatcher.antMatcher("POST", s.getOidcUserInfoEndpoint()),
+                    AntPathRequestMatcher.antMatcher("POST", s.getClientRegistrationEndpoint()));
         }
     }
 
@@ -458,6 +516,8 @@ public final class AuthorizationServerConfigurer extends SecurityConfigurer {
                 clients,
                 authorizations, keys, encoder, secrets, customizer, userInfo, verificationLimiter,
                 verificationAttempts, verificationWindow, clock);
+        server.clientRegistration(registration);
+        server.authorizationConsent(consent, consentPage);
         http.addFilter(new OAuth2AuthorizationServerFilter(server),
                 HttpSecurity.ORDER_AUTHORIZATION_SERVER);
         http.addFilter(new OAuth2AuthorizationEndpointFilter(server),

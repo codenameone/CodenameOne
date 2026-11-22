@@ -104,6 +104,14 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
             throw new IllegalArgumentException("Query exceeds the portable limit of 999 bound parameters");
         }
     }
+    /// Whether ORDER BY may name a selected expression by its position. Only
+    /// PostgreSQL needs it -- it sees two equal-valued parameters as different
+    /// expressions, so a grouped expression with a literal cannot be repeated
+    /// in ORDER BY -- and only there is it safe inside [#orderBy], which on
+    /// MySQL wraps the term in `(term IS NULL)`, where a position is a constant.
+    boolean ordersBySelectedPosition() {
+        return "postgresql".equals(sql.dialect());
+    }
     String integralSum(String expression) {
         return "CAST(" + expression + " AS " + ("mysql".equals(sql.dialect()) ? "SIGNED" : "BIGINT") + ")";
     }

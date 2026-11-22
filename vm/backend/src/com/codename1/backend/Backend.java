@@ -1100,6 +1100,9 @@ public final class Backend {
             request.setAttribute(com.codename1.backend.web.RequestDispatcher.ERROR_METHOD,
                     request.getMethod());
             Object[] saved = request.retarget(errorPath);
+            // The error route is not the request's route: a dispatch-as-user
+            // capture must report no match, not the error page's template.
+            Object previousCapture = Tracing.beginRouteCapture(new String[1]);
             HttpServer.Response page = null;
             try {
                 for (int i = 0 ; page == null && i < chain.length ; i++) {
@@ -1108,6 +1111,7 @@ public final class Backend {
                     }
                 }
             } finally {
+                Tracing.endRouteCapture(previousCapture);
                 request.restoreTarget(saved);
             }
             if (page != null && page.getStatus() == 200) {
@@ -1133,6 +1137,9 @@ public final class Backend {
             String[] route = new String[1];
             Object previousCapture = Tracing.beginRouteCapture(route);
             Object previousTasks = Tasks.enter(tasks);
+            // The same session bracket as any request: a session the handler
+            // touches is this request's while it runs, and is released after.
+            Object previousServing = HttpSession.enterRequest(request);
             Object previousSecurity = security.enter();
             Object previous = null;
             if (track) {
@@ -1158,13 +1165,19 @@ public final class Backend {
                 try {
                     endRequestBeans(request, response);
                 } finally {
-                    // A session the handler touched is never stored: nothing was
-                    // signed in, and the caller's own request owns its session.
-                    request.forgetSession();
-                    if (track) {
-                        CURRENT_REQUEST.set(previous);
+                    try {
+                        sessions.leave(request);
+                    } finally {
+                        // A session the handler touched is never stored: nothing
+                        // was signed in, and the caller's own request owns its
+                        // session.
+                        request.forgetSession();
+                        if (track) {
+                            CURRENT_REQUEST.set(previous);
+                        }
+                        security.leave(previousSecurity);
+                        HttpSession.leaveRequest(previousServing);
                     }
-                    security.leave(previousSecurity);
                     Tasks.leave(previousTasks);
                     Tracing.endRouteCapture(previousCapture);
                 }

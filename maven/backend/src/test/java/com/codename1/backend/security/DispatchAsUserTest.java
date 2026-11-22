@@ -42,6 +42,17 @@ class DispatchAsUserTest {
     /// generated router reports it; and, on /outer, a nested dispatch.
     private static final HttpServer.Handler APP = request -> {
         String path = request.pathFrom(0);
+        if ("/missing".equals(path)) {
+            return null;
+        }
+        if ("/error".equals(path)) {
+            // The error route, as its generated router reports itself.
+            Tracing.route("/error");
+            return HttpServer.Response.text(404, "error page");
+        }
+        if ("/touch-session".equals(path)) {
+            request.getSession(true).setAttribute("seen", "yes");
+        }
         if (path.startsWith("/api/")) {
             Tracing.route(path.startsWith("/api/admin/") ? "/api/admin/{x}" : "/api/apps/{id}");
         }
@@ -123,6 +134,17 @@ class DispatchAsUserTest {
             r = as("GET", "/nowhere", user("ann", "ROLE_USER"), null);
             assertEquals("GET /nowhere as ann", text(r));
             assertNull(r.getMatchedRoute());
+
+            // Served by the error route: still no template of the request's own
+            // -- the error page's is not the route the request matched.
+            r = as("GET", "/missing", user("ann", "ROLE_USER"), null);
+            assertEquals(404, r.getStatus());
+            assertEquals("error page", text(r));
+            assertNull(r.getMatchedRoute());
+
+            // A handler may touch a session; the bracket releases it.
+            r = as("GET", "/touch-session", user("ann", "ROLE_USER"), null);
+            assertEquals(200, r.getStatus());
 
             // Over the wire nothing changed: the same path wants credentials.
             assertEquals(401, server.get("/api/apps/7").status);

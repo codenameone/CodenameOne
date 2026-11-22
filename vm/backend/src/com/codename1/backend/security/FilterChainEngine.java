@@ -380,7 +380,7 @@ final class FilterChainEngine implements RequestSecurity {
     /// the third is the second without the slash a trailing dot segment
     /// leaves. A path with a NUL is also read as ending there.
     static List<String> readings(String path) {
-        List<String> out = new java.util.ArrayList<String>(6);
+        List<String> out = new ArrayList<String>(6);
         String decoded = decodeAll(path);
         addReadings(out, decoded);
         int nul = decoded.indexOf((char) 0);
@@ -408,7 +408,7 @@ final class FilterChainEngine implements RequestSecurity {
             }
         }
         add(out, plain.toString());
-        List<String> kept = new java.util.ArrayList<String>();
+        List<String> kept = new ArrayList<String>();
         boolean trailing = false;
         for (String segment : AntPathRequestMatcher.split(plain.toString())) {
             trailing = false;

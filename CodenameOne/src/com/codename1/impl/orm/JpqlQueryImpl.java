@@ -715,7 +715,21 @@ public final class JpqlQueryImpl<T> implements com.codename1.orm.session.JpqlQue
                     if (ascending) {
                         take("ASC");
                     }
-                    String rendered = session.orderBy(term.sql, ascending, sqlKind(term));
+                    String sorted = term.sql;
+                    if (!termBindings.isEmpty() && term.kind != Attribute.TEXT
+                            && session.ordersBySelectedPosition()) {
+                        // As for GROUP BY: a selected expression carrying a
+                        // parameter is named by its position, or PostgreSQL
+                        // reads `group by floor(x / 3) order by floor(x / 3)`
+                        // as ordering by an ungrouped column.
+                        for (int i = 0; i < selections.size(); i++) {
+                            if (sameExpression(term, selections.get(i))) {
+                                sorted = String.valueOf(i + 1);
+                                break;
+                            }
+                        }
+                    }
+                    String rendered = session.orderBy(sorted, ascending, sqlKind(term));
                     out.append(rendered);
                 } while (take(","));
                 order = " ORDER BY " + out;
