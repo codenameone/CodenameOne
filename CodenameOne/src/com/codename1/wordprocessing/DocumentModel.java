@@ -766,6 +766,26 @@ public class DocumentModel {
     private int resolveRevisions(String revisionId, boolean accept) {
         List<String> ids = new ArrayList<String>();
         collectIds(document.blocks, ids);
+        // a deletion that spans a paragraph break takes the break too: accepted, the
+        // paragraphs on both sides become one, as they would had it not been tracked. A break
+        // counts as deleted when the characters on both sides of it carry the same deletion;
+        // one delete is one revision, so that holds exactly for the breaks inside its range
+        List<String> joins = new ArrayList<String>();
+        if (accept) {
+            for (int k = 1; k < ids.size(); k++) {
+                RichText before = findParagraph(ids.get(k - 1)).text;
+                RichText after = findParagraph(ids.get(k)).text;
+                if (before.length() == 0 || after.length() == 0) {
+                    continue;
+                }
+                Revision end = before.styleAt(before.length() - 1).revision;
+                Revision start = after.styleAt(0).revision;
+                if (end != null && start != null && end.isDeletion() && end.id.equals(start.id)
+                        && (revisionId == null || revisionId.equals(end.id))) {
+                    joins.add(ids.get(k));
+                }
+            }
+        }
         int changed = 0;
         beginGroup();
         try {
@@ -789,6 +809,10 @@ public class DocumentModel {
                 if (!t.equals(p.text)) {
                     replace(p.withText(t), null, Anchors.removed(p.id, removed));
                 }
+            }
+            for (String id : joins) {
+                // null when the paragraph opens its list (a cell, a note): nothing to join
+                joinWithPrevious(id);
             }
         } finally {
             endGroup();

@@ -574,7 +574,9 @@ public final class DocumentLayout {
         TextStyle base = scaled(styled(p.headingLevel(), p.text.runCount() > 0
                 ? p.text.runStyle(0) : TextStyle.DEFAULT), scale);
         float paraTop = flow.y;
-        float before = p.before * scale;
+        // spacing never exceeds a page: Word caps it there too, and more would only add pages
+        // of nothing
+        float before = Math.min(p.before * scale, bodyHeight());
         Slice floatHolder = new Slice(0);
         for (Anchored a : floats) {
             addFloat(flow, a.picture, paraTop + before, floatHolder, paraTop, p.id, a.start);
@@ -673,7 +675,7 @@ public final class DocumentLayout {
         firstSlice.extent = Math.max(firstSlice.extent, floatHolder.extent);
         firstSlice.breakBefore = p.pageBreak;
         Slice lastSlice = out.get(out.size() - 1);
-        lastSlice.height += p.after * scale;
+        lastSlice.height += Math.min(p.after * scale, bodyHeight());
         lastSlice.keepNext = p.keepNext;
         float total = 0;
         for (Slice s : out) {
@@ -1007,6 +1009,17 @@ public final class DocumentLayout {
                         cut = item.y;
                     }
                 }
+                // a line taller than the page itself, starting the piece, cannot move up: it
+                // takes one overfull piece, clipped at the page edge as Word clips it, instead
+                // of leaving a blank page for every page-height of it
+                for (LayoutItem item : s.items) {
+                    boolean whole = item.kind == LayoutItem.TEXT || item.kind == LayoutItem.PICTURE
+                            || item.kind == LayoutItem.COMPONENT;
+                    if (whole && item.y >= from - 0.01f && item.y <= from + 0.01f
+                            && item.y + item.height > cut) {
+                        cut = Math.min(s.height, Math.max(cut, item.y + item.height));
+                    }
+                }
             }
             Slice part = new Slice(cut - from);
             part.table = s.table;
@@ -1029,7 +1042,10 @@ public final class DocumentLayout {
                 part.notes.addAll(s.notes);
                 part.breakBefore = s.breakBefore;
             }
-            out.add(part);
+            // nothing but the space after an overfull line: no page of its own
+            if (from == 0 || !part.items.isEmpty()) {
+                out.add(part);
+            }
             from = cut;
         }
         out.get(out.size() - 1).keepNext = s.keepNext;

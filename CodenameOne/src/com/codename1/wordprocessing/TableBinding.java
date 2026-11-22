@@ -48,10 +48,10 @@ public final class TableBinding {
     private final String tableId;
     private final Sheet sheet;
     private boolean syncing;
-    /// Guards `disposed` and every sync from the sheet. A sheet changed off the EDT is
-    /// followed on it, so a sync can be under way while another thread disposes and goes on
-    /// changing the sheet; checking a flag alone let such a sync read the later value and copy
-    /// it into the document after the dispose. Holding the lock, dispose waits for the sync.
+    /// Guards `disposed` and every read of the sheet. A sheet changed off the EDT is followed
+    /// on it, so a sync can be under way while another thread disposes and goes on changing
+    /// the sheet; checking a flag alone let such a sync read the later value and copy it into
+    /// the document after the dispose. Holding the lock, dispose waits for the read.
     private final Object lock = new Object();
     private boolean disposed;
     private final DataChangedListener sheetListener = new DataChangedListener() {
@@ -149,30 +149,30 @@ public final class TableBinding {
     }
 
     void sheetChanged() {
-        synchronized (lock) {
-            if (!disposed) {
-                syncFromSheet();
-            }
-        }
-    }
-
-    private void syncFromSheet() {
-        if (syncing) {
-            return;
-        }
-        Document d = model.getDocument();
-        Table t = table(d);
-        if (t == null) {
-            // the table was deleted; an undo can bring it back, so keep listening
-            return;
-        }
+        Document d;
+        Table t;
         Table u;
-        syncing = true;
-        try {
-            // reading the sheet can fire its listeners (the header row is switched off and on)
-            u = TableSheets.update(t, sheet);
-        } finally {
-            syncing = false;
+        // the lock covers reading the sheet and nothing else: a dispose waits for a read under
+        // way, so no value written after it reaches the document, while the document's own
+        // listeners run outside it -- one that blocks cannot hold up a dispose on the EDT
+        synchronized (lock) {
+            if (disposed || syncing) {
+                return;
+            }
+            d = model.getDocument();
+            t = table(d);
+            if (t == null) {
+                // the table was deleted; an undo can bring it back, so keep listening
+                return;
+            }
+            syncing = true;
+            try {
+                // reading the sheet can fire its listeners (the header row is switched off
+                // and on)
+                u = TableSheets.update(t, sheet);
+            } finally {
+                syncing = false;
+            }
         }
         if (u != t) { //NOPMD CompareObjectsWithEquals - update returns the same table when nothing changed
             syncing = true;
@@ -185,10 +185,12 @@ public final class TableBinding {
     }
 
     void modelChanged(Document before, Document after) {
+        boolean live;
         synchronized (lock) {
-            if (!disposed) {
-                syncFromModel(before, after);
-            }
+            live = !disposed;
+        }
+        if (live) {
+            syncFromModel(before, after);
         }
     }
 

@@ -90,8 +90,9 @@ class ReviewTest extends UITestBase {
         assertEquals(2, revs.size());
         Revision del = revs.get(0).isDeletion() ? revs.get(0) : revs.get(1);
         assertEquals(2, m.acceptRevisions(del.id));
-        assertEquals("ab", text(m, "p0"));
-        assertEquals("ef!", text(m, "p1"));
+        // the deletion took the paragraph break with it, so accepting it joins the two
+        assertEquals("abef!", text(m, "p0"));
+        assertNull(m.findParagraph("p1"));
         assertEquals(1, m.getRevisions().size());
     }
 
