@@ -45,7 +45,12 @@ final class DiscountsPane extends MerchantPane {
     void load() {
         clearTools();
         tool(FontImage.MATERIAL_ADD, "Add discount", "discount-add", () -> edit(null));
-        Api.discounts().list(MerchantState.storeId(), Net.to(this::fill, Ui::fail));
+        final String store = MerchantState.storeId();
+        Api.discounts().list(store, Net.to(list -> {
+            if (store.equals(MerchantState.storeId())) {
+                fill(list);
+            }
+        }, Ui::fail));
     }
 
     static String describe(DiscountDto d) {
@@ -73,8 +78,11 @@ final class DiscountsPane extends MerchantPane {
                     : FontImage.MATERIAL_SELL, d.automatic() ? d.title() : d.code(),
                     describe(d) + Ui.DOT + uses, MUi.badge(d.active() ? "ACTIVE" : "DISABLED")),
                     "discount-" + d.id(), e -> edit(d));
-            RowMenus.attach(tap, Command.create(Lang.tr("Delete"), null, e -> Api.discounts()
-                    .delete(MerchantState.storeId(), d.id(), Net.to(x -> load(), Ui::fail))),
+            RowMenus.attach(tap, Command.create(Lang.tr("Delete"), null, e -> {
+                if (MUi.confirm("Delete discount", "Customers can no longer use it.", "Delete")) {
+                    Api.discounts().delete(MerchantState.storeId(), d.id(), Net.to(x -> load(), Ui::fail));
+                }
+            }),
                     Command.create(Lang.tr("Generate unique codes"), null, e -> codes(d)));
             card.add(tap);
         }

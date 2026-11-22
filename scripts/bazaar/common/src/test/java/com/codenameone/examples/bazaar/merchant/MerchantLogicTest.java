@@ -186,6 +186,29 @@ class MerchantLogicTest {
     }
 
     @Test
+    void minusCountsOnlyFirstAndOverflowIsInvalid() {
+        assertEquals(0, ProductCsv.cents("12-5"));
+        assertEquals(0, ProductCsv.cents("1-"));
+        assertEquals(-1250, ProductCsv.cents("-12.50"));
+        assertEquals(0, ProductCsv.cents("9999999999999"));
+        assertEquals(0, ProductCsv.typedInteger("12-5"));
+        assertEquals(-12, ProductCsv.typedInteger(" -12 "));
+        assertEquals(125, ProductCsv.typedInteger("125"));
+        assertEquals(0, ProductCsv.typedInteger("99999999999"));
+        assertEquals(Integer.MAX_VALUE, ProductCsv.typedInteger(String.valueOf(Integer.MAX_VALUE)));
+        assertEquals(0, ProductCsv.typedInteger(null));
+    }
+
+    @Test
+    void smallNegativeAmountsKeepTheirSign() {
+        // What the plain pipeline money and the forecast's hundredths format.
+        assertEquals("-0.50", ProductCsv.major(-50));
+        assertEquals("-0.99", ProductCsv.major(-99));
+        assertEquals("-1.01", ProductCsv.major(-101));
+        assertEquals("0.07", ProductCsv.major(7));
+    }
+
+    @Test
     void ruleBuilderRoundTrips() {
         List<SmartRules.Rule> rules = SmartRules.parse("tag:Sale and TYPE: Shirts AND price<2000");
         assertEquals(3, rules.size());

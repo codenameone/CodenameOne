@@ -188,6 +188,10 @@ final class CartPane extends ShopPane {
         return swipe;
     }
 
+    /// Bumped by every cart write; only the newest one's answer is applied,
+    /// so a slow change cannot bring back a line a later remove took out.
+    private int sent;
+
     private void change(CartLineDto line, int quantity) {
         if (quantity <= 0) {
             remove(line);
@@ -198,10 +202,13 @@ final class CartPane extends ShopPane {
         }
         busy = true;
         ShopUi.tap();
+        final int t = ++sent;
         Api.cart().update(ShopState.store().id(), line.id(), ShopState.token(),
                 new CartLineChangeDto(line.variantId(), quantity), Net.to(cart -> {
                     busy = false;
-                    ShopState.setCart(cart);
+                    if (t == sent) {
+                        ShopState.setCart(cart);
+                    }
                 }, (status, message) -> {
                     busy = false;
                     Ui.fail(status, message);
@@ -213,8 +220,13 @@ final class CartPane extends ShopPane {
             return;
         }
         ShopUi.tap();
+        final int t = ++sent;
         Api.cart().remove(ShopState.store().id(), line.id(), ShopState.token(),
-                Net.to(ShopState::setCart, Ui::fail));
+                Net.to(cart -> {
+                    if (t == sent) {
+                        ShopState.setCart(cart);
+                    }
+                }, Ui::fail));
     }
 
     private Container summary(final CartDto cart) {

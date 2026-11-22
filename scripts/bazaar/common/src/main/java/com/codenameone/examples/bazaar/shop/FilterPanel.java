@@ -135,9 +135,9 @@ final class FilterPanel {
     private void price(FacetsDto facets) {
         panel.add(Ui.label("Price", "ShopFilterTitle"));
         Container row = new Container(new com.codename1.ui.layouts.GridLayout(1, 2));
-        final TextField min = new TextField(query.min >= 0 ? String.valueOf(query.min / 100) : "",
+        final TextField min = new TextField(query.min >= 0 ? Money.typed(query.min) : "",
                 ShopState.money(facets.minPriceCents()), 8, TextField.DECIMAL);
-        final TextField max = new TextField(query.max >= 0 ? String.valueOf(query.max / 100) : "",
+        final TextField max = new TextField(query.max >= 0 ? Money.typed(query.max) : "",
                 ShopState.money(facets.maxPriceCents()), 8, TextField.DECIMAL);
         min.setUIID("SvField");
         max.setUIID("SvField");

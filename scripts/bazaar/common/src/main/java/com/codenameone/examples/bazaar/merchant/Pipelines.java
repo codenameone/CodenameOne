@@ -55,8 +55,8 @@ final class Pipelines {
 
         @Override
         public String money(long cents, String currency) {
-            long part = Math.abs(cents % 100);
-            return cents / 100 + "." + (part < 10 ? "0" : "") + part + " " + currency;
+            // Signed from the whole value: -50 is "-0.50", not "0.50".
+            return ProductCsv.major(cents) + " " + currency;
         }
     };
 

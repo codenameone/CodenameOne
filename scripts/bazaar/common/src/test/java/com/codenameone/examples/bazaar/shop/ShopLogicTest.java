@@ -59,6 +59,15 @@ class ShopLogicTest {
     }
 
     @Test
+    void filterPrefillKeepsCents() {
+        assertEquals("12", Money.typed(1200));
+        assertEquals("12.50", Money.typed(1250));
+        assertEquals("0.05", Money.typed(5));
+        assertEquals(1250, Money.parse(Money.typed(1250)));
+        assertEquals(1205, Money.parse(Money.typed(1205)));
+    }
+
+    @Test
     void addressesRoundTripAndDedupe() {
         AddressDto a = new AddressDto("Dana Levi", "12 Main St", "", "Springfield", "IL", "62701",
                 "US", "555", 0, 0);

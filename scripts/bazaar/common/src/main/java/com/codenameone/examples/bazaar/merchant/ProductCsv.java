@@ -213,8 +213,36 @@ public final class ProductCsv {
     }
 
     /// "12.5", "12,50", "$12" or "1,299.00" as cents; 0 for anything that is
-    /// not a price. A comma followed by exactly one or two digits at the end
+    /// not a price, including a minus sign anywhere but first ("12-5") and a
+    /// value too large to hold. A comma followed by exactly one or two digits at the end
     /// is a decimal comma; any other comma groups thousands.
+    /// A whole number typed by hand; 0 for anything that is not one, so
+    /// "12-5" is not -125 and a number past `int` is not a wrapped value. A
+    /// minus sign counts only first; other characters are ignored.
+    public static int typedInteger(String text) {
+        if (text == null) {
+            return 0;
+        }
+        String t = text.trim();
+        long out = 0;
+        boolean negative = false;
+        for (int iter = 0; iter < t.length(); iter++) {
+            char c = t.charAt(iter);
+            if (c == '-') {
+                if (iter != 0) {
+                    return 0;
+                }
+                negative = true;
+            } else if (c >= '0' && c <= '9') {
+                out = out * 10 + (c - '0');
+                if (out > Integer.MAX_VALUE) {
+                    return 0;
+                }
+            }
+        }
+        return (int) (negative ? -out : out);
+    }
+
     public static long cents(String text) {
         if (text == null) {
             return 0;
@@ -231,6 +259,9 @@ public final class ProductCsv {
         for (int iter = 0; iter < t.length(); iter++) {
             char c = t.charAt(iter);
             if (c == '-') {
+                if (iter != 0) {
+                    return 0;
+                }
                 negative = true;
             } else if (c == '.' || (c == ',' && decimalComma && iter == lastComma)) {
                 if (fracDigits >= 0) {

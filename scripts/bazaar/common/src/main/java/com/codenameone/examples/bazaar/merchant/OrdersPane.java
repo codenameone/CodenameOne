@@ -173,15 +173,20 @@ final class OrdersPane extends MerchantPane {
         return ALL.equals(code) ? null : code;
     }
 
+    /// Bumped by every reload; an answer for an older one is dropped, so a slow
+    /// first search cannot paint over a newer one.
+    private int asked;
+
     private void reload() {
         if (search == null) {
             return;
         }
         String q = search.getText().trim();
         final String store = MerchantState.storeId();
+        final int t = ++asked;
         if (archived) {
             Api.orderTools().archived(store, Net.to(found -> {
-                if (store.equals(MerchantState.storeId())) {
+                if (t == asked && store.equals(MerchantState.storeId())) {
                     fill(found);
                 }
             }, Ui::fail));
@@ -189,7 +194,7 @@ final class OrdersPane extends MerchantPane {
         }
         Api.orders().list(store, chosen(status), chosen(financial), chosen(fulfilment),
                 chosen(channel), null, null, q.length() == 0 ? null : q, Net.to(found -> {
-                    if (store.equals(MerchantState.storeId())) {
+                    if (t == asked && store.equals(MerchantState.storeId())) {
                         fill(found);
                     }
                 }, Ui::fail));

@@ -221,16 +221,26 @@ public final class UsersForm {
         final boolean[] settling = new boolean[1];
         // The roles as the server last confirmed them: merchant, admin.
         final boolean[] held = {user.merchant(), user.admin()};
+        // Bumped by every request; only the newest one's answer is applied, so
+        // two quick flips cannot be settled by the older reply.
+        final int[] asked = new int[1];
         final Runnable roles = () -> {
             if (settling[0]) {
                 return;
             }
+            final int t = ++asked[0];
             RoleChangeDto change = new RoleChangeDto(merchant.isValue(), admin.isValue());
             Api.admin().setRoles(user.username(), change, Net.to(saved -> {
+                if (t != asked[0]) {
+                    return;
+                }
                 held[0] = saved.merchant();
                 held[1] = saved.admin();
             }, (status, message) -> {
                 Ui.fail(status, message);
+                if (t != asked[0]) {
+                    return;
+                }
                 settling[0] = true;
                 merchant.setValue(held[0]);
                 admin.setValue(held[1]);

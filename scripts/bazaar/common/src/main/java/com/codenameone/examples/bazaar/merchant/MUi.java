@@ -121,19 +121,7 @@ final class MUi {
     }
 
     static int integer(TextField f) {
-        String t = f.getText().trim();
-        long out = 0;
-        boolean negative = t.startsWith("-");
-        for (int iter = 0; iter < t.length(); iter++) {
-            char c = t.charAt(iter);
-            if (c >= '0' && c <= '9') {
-                out = out * 10 + (c - '0');
-                if (out > Integer.MAX_VALUE) {
-                    return 0;
-                }
-            }
-        }
-        return (int) (negative ? -out : out);
+        return ProductCsv.typedInteger(f.getText());
     }
 
     /// Asks before something that cannot be undone.

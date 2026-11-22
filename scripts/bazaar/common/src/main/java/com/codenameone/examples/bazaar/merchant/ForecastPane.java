@@ -39,9 +39,8 @@ final class ForecastPane extends MerchantPane {
     }
 
     static String hundredths(long x100) {
-        long whole = x100 / 100;
-        long frac = Math.abs(x100 % 100);
-        return whole + "." + (frac < 10 ? "0" : "") + frac;
+        // Signed from the whole value: -5 is "-0.05", not "0.05".
+        return ProductCsv.major(x100);
     }
 
     static String cover(int days) {

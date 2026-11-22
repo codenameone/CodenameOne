@@ -63,6 +63,17 @@ public final class Money {
         return (int) ((compareAt - price) * 100 / compareAt);
     }
 
+    /// `cents` as a price filter shows it back for editing: `12`, or `12.50`
+    /// when there are cents, so what `parse` reads is what was typed.
+    public static String typed(long cents) {
+        long whole = cents / 100;
+        long part = cents % 100;
+        if (part == 0) {
+            return String.valueOf(whole);
+        }
+        return whole + "." + (part < 10 ? "0" : "") + part;
+    }
+
     /// Dollars as typed into a price filter (`12`, `12.5`, `12.50`) to cents;
     /// -1 for anything that is not an amount.
     public static long parse(String text) {

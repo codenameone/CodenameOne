@@ -143,6 +143,9 @@ final class OrdersPane extends ShopPane {
             detail.add(BorderLayout.CENTER, new Skeleton(6, "SvSkeleton"));
             Ui.relayout(detail);
         }
+        // A phone pushes a form for the answer; if the user has gone elsewhere
+        // by the time it arrives, nothing must be pushed over where they are.
+        final Form asking = CN.getCurrentForm();
         Api.orders().mineDetail(id, Net.to(order -> {
             if (!id.equals(shown)) {
                 return;
@@ -159,13 +162,21 @@ final class OrdersPane extends ShopPane {
                 pushed.removeAll();
                 pushed.add(BorderLayout.CENTER, view);
                 Ui.refresh(pushed);
-            } else {
-                final Form home = CN.getCurrentForm();
+            } else if (CN.getCurrentForm() == asking) {
+                final Form home = asking;
                 pushed = Ui.form(Lang.tr("Order #{0}", String.valueOf(order.number())), "Order");
-                Ui.back(pushed, home);
-                pushed.addKeyListener(27, e -> home.showBack());
+                Ui.back(pushed, () -> {
+                    shown = null;
+                    home.showBack();
+                });
+                pushed.addKeyListener(27, e -> {
+                    shown = null;
+                    home.showBack();
+                });
                 pushed.add(BorderLayout.CENTER, view);
                 pushed.show();
+            } else {
+                shown = null;
             }
         }, Ui::fail));
     }

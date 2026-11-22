@@ -304,20 +304,39 @@ final class OrderDetail extends Container {
         }
     }
 
+    /// The order a cancel is in flight for, so a second tap while it is on
+    /// the way does not send another.
+    private static String cancelling;
+
+    /// True while a refund is on its way; a second submit is refused until it
+    /// is answered.
+    private boolean refunding;
+
     static void cancel(final OrderDto o, final Runnable done) {
+        if (o.id().equals(cancelling)) {
+            return;
+        }
         if (!MUi.confirm("Cancel order", "The stock is released and any payment is voided "
                 + "or refunded.", "Cancel order")) {
             return;
         }
+        cancelling = o.id();
         Api.orders().cancel(MerchantState.storeId(), o.id(), Net.to(cancelled -> {
+            cancelling = null;
             Ui.say("Order cancelled");
             done.run();
-        }, Ui::fail));
+        }, (status, message) -> {
+            cancelling = null;
+            Ui.fail(status, message);
+        }));
     }
 
     /// The refund dialog: how many of each line, whether they go back on the
     /// shelf, how much shipping, and why -- with the amount it comes to.
     void refund() {
+        if (refunding) {
+            return;
+        }
         final OrderDto o = order;
         final boolean inclusive = MerchantState.store() != null
                 && MerchantState.store().taxInclusive();
@@ -383,11 +402,16 @@ final class OrderDetail extends Container {
             Ui.say("Nothing to refund");
             return;
         }
+        refunding = true;
         Api.orders().refund(MerchantState.storeId(), o.id(), new RefundRequestDto(lines,
                 Math.min(ship, o.shippingCents()), restock.isSelected(), reason.getText()),
                 Net.to(refunded -> {
+                    refunding = false;
                     Ui.say("Refunded");
                     updated(refunded);
-                }, Ui::fail));
+                }, (status, message) -> {
+                    refunding = false;
+                    Ui.fail(status, message);
+                }));
     }
 }
