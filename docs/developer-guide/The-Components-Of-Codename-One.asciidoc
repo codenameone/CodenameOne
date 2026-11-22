@@ -339,6 +339,29 @@ By default the dialog is placed on the form's layered pane, but you can switch b
 
 Finally, recent updates added animation toggles so you can fine-tune presentation. `setAnimateShow(boolean)` turns the show/dispose animations on or off, while `setRepositionAnimation(boolean)` enables a "grow/shrink" reposition effect during those animations when you want a more dynamic transition.
 
+[[coach-marks-section]]
+=== CoachMarks: feature tours and onboarding
+
+https://www.codenameone.com/javadoc/com/codename1/components/CoachMarks.html[CoachMarks] walks a user through a screen one component at a time. This pattern is also called a feature tour, a product walkthrough, an onboarding overlay, a spotlight or a showcase view. The screen dims, the component of the current step shows through a cut-out, and a bubble beside it gives a title, a line of explanation, the step count and *Next* and *Skip* buttons.
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/LoadingAndOnboardingSnippets.java[tag=coach-marks,indent=0]
+----
+
+A tap on the dim or on *Next* moves to the next step, *Skip* ends the tour, and the last step's button reads *Done*. While the tour is up, touches go to it and never reach the form underneath. Each step is announced to screen readers, and a component inside a scrolling container is scrolled into view before its step shows.
+
+`showOnce(key)` shows the tour the first time and records that in `Preferences`, which is what an onboarding tour usually wants; `show()` shows it every time. A tour with one step is a single feature highlight, for instance pointing at a button a release just added. To offer "show the tips again" in your settings, forget the key:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/LoadingAndOnboardingSnippets.java[tag=coach-marks-reset,indent=0]
+----
+
+The look comes from the UIIDs `CoachMarkOverlay` (its background color and transparency are the dim), `CoachMarkBubble`, `CoachMarkTitle`, `CoachMarkText`, `CoachMarkStep` and `CoachMarkButton`. A theme that doesn't style them gets a light or dark bubble matching the device appearance. The button labels are localized through the keys `CoachMarkNext`, `CoachMarkDone` and `CoachMarkSkip`.
+
+NOTE: `CoachMarks` replaces the deprecated `GlassTutorial`. For a non-blocking popup that isn't part of a tour, use the `InteractionDialog` above.
+
 [[label-section]]
 === Label
 
@@ -966,6 +989,70 @@ The image used in the `InfiniteProgress` animation is defined by the native them
 
 NOTE: Despite the name of the method `setAnimation` expects a static image that will be rotated internally. Don't use an animated image.
 
+
+[[skeleton-section]]
+=== Skeleton: loading placeholders and shimmer
+
+https://www.codenameone.com/javadoc/com/codename1/components/Skeleton.html[Skeleton] is a skeleton screen placeholder, also known as a shimmer loader, a content placeholder or a ghost element. It draws the gray outline of content that's still loading, with a light band sweeping across it. Put one where the content will land: the screen says "loading" without a spinner, and it doesn't jump when the content arrives because the content takes the place the outline held.
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/LoadingAndOnboardingSnippets.java[tag=skeleton-list,indent=0]
+----
+
+The factory methods give the common shapes. Combine them to outline a whole screen:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/LoadingAndOnboardingSnippets.java[tag=skeleton-shapes,indent=0]
+----
+
+`rows(n)`:: a list: per row, a round icon, a title, a shorter second line and a value at the far end
+`text(n)`:: lines of a paragraph, the last one shorter
+`circle(mm)`:: an avatar or an icon
+`rect(widthMM, heightMM)`:: an image, a button or a chart; a width of 0 takes the full width
+`card()`:: an image across the top, then a title and two lines of text
+`new Skeleton()`:: a block that fills whatever size it's given
+
+To hide a component that already exists until its data is ready, mask it. `Skeleton.show` swaps the component out of its parent for a placeholder of the same preferred size, and `Skeleton.hide` swaps it back, optionally with a transition:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/LoadingAndOnboardingSnippets.java[tag=skeleton-mask,indent=0]
+----
+
+The shapes use the foreground color of the `Skeleton` UIID. A theme that doesn't style it gets the theme's text color at a low opacity, which works in light and dark themes alike. Give a placeholder its own UIID with `uiid(String)` to color it differently. The shimmer runs only while the placeholder is on screen; `shimmer(false)` turns it off, which also keeps screenshot tests deterministic.
+
+TIP: `Skeleton` is a `CommonProgressAnimations.ProgressAnimation`, so it works with the older `CommonProgressAnimations.ProgressAnimation.markComponentLoading` and `markComponentReady` API as well. Prefer `Skeleton` in new code; `CircleProgress` and `LoadingTextAnimation` remain for existing apps.
+
+[[empty-state-section]]
+=== EmptyState: nothing to show
+
+https://www.codenameone.com/javadoc/com/codename1/components/EmptyState.html[EmptyState] is the counterpart of `Skeleton`: what fills the same place when loading finished with nothing to show, or failed. Also known as a zero state, blank slate or "no results" view, it centers an icon, a title, a line of explanation and an optional action button. The `Skeleton` sample above shows the empty case; after an error, offer a retry:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/LoadingAndOnboardingSnippets.java[tag=empty-state-retry,indent=0]
+----
+
+The UIIDs are `EmptyState`, `EmptyStateIcon`, `EmptyStateTitle`, `EmptyStateText` and `EmptyStateButton`. A theme that doesn't style them falls back to the `Label`, `SpanLabelText` and `Button` looks.
+
+[[loading-feedback-section]]
+=== Choosing a loading, feedback or onboarding component
+
+[cols="1,2",options="header"]
+|===
+|When you need to |Use
+|Show that content is on its way, in its place |`Skeleton`
+|Block the screen during a short operation |`InfiniteProgress.showInfiniteBlocking()`
+|Show a spinner inside the UI |`InfiniteProgress`
+|Show progress with a known end, such as a download |`Slider`, or `SliderBridge` for a `NetworkManager` download
+|Say that a list or a screen has nothing in it, or failed to load |`EmptyState`
+|Report a transient status, such as "Saved" or "Offline" |`ToastBar`
+|Load more rows as the user scrolls |`InfiniteScrollAdapter` or `InfiniteContainer`
+|Swipe through banners, photos or intro pages |`Carousel`, or `Tabs` with a `PageIndicator`
+|Point out features on a screen, once |`CoachMarks`
+|===
 
 === InfiniteScrollAdapter and InfiniteContainer
 
@@ -1703,6 +1790,27 @@ over the configured duration (200ms default, matching Material 3's
 spec). Rapid double-taps start the animation from the *current
 interpolated position* rather than from a stale baseline, so the
 indicator chains cleanly.
+
+[[carousel-section]]
+=== Carousel and PageIndicator
+
+https://www.codenameone.com/javadoc/com/codename1/components/Carousel.html[Carousel] shows pages that the user swipes between, with page dots under them and optional auto play. This component is also called an image slider, a view pager, a banner rotator or an onboarding pager.
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/LoadingAndOnboardingSnippets.java[tag=carousel,indent=0]
+----
+
+`Carousel` is the swipeable `Tabs` described above with the tab bar hidden, plus a `PageIndicator`. It swipes, snaps and mirrors for right-to-left languages exactly as `Tabs` does, and `getTabs()` gives access to anything the class doesn't wrap. Auto play advances one page per interval while the carousel is on screen, waits a full interval after the user touches it, and wraps from the last page to the first unless `setLoop(false)` is set. `setIndicatorPosition` moves the dots to `BorderLayout.NORTH`, or hides them with `null`. Each page change is announced to screen readers.
+
+https://www.codenameone.com/javadoc/com/codename1/components/PageIndicator.html[PageIndicator] is the row of dots on its own, the current page drawn as a wider pill. Older code built this out of a row of radio buttons kept in step with `Tabs` by hand; `bind(Tabs)` replaces all of that:
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/LoadingAndOnboardingSnippets.java[tag=page-indicator,indent=0]
+----
+
+The dots use the foreground color of the `PageIndicator` UIID, the current one at full opacity and the rest faded. A tap on a dot selects its page.
 
 [[mediamanager-section]]
 === MediaManager & MediaPlayer

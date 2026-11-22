@@ -28,6 +28,11 @@ import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.plaf.Style;
 
 /// A collection of useful progress animations and utility methods.
+///
+/// For skeleton screens, shimmer placeholders and other "content is on its way"
+/// outlines, prefer `com.codename1.components.Skeleton`: it is a
+/// `ProgressAnimation` too, so `markComponentLoading` and `markComponentReady`
+/// work with it, and `Skeleton#show` / `Skeleton#hide` are shorthands for them.
 public class CommonProgressAnimations {
 
     /// Base class for ProgressAnimations
@@ -70,6 +75,32 @@ public class CommonProgressAnimations {
                 Log.e(t);
                 throw new RuntimeException("Failed to create progress component: " + t.getMessage(), t);
             }
+        }
+
+        /// Marks a component as "loading" with a progress animation you already
+        /// created, such as a configured `com.codename1.components.Skeleton`.
+        /// Behaves like `#markComponentLoading(Component, Class)` otherwise: if
+        /// the component is already loading, the animation that occupies its
+        /// place is returned and `progress` is not used.
+        ///
+        /// #### Parameters
+        ///
+        /// - `cmp`: The component to be replaced by the progress animation.
+        ///
+        /// - `progress`: The animation to show in its place.
+        ///
+        /// #### Returns
+        ///
+        /// The ProgressAnimation that is currently occupying the component's space.
+        public static ProgressAnimation markComponentLoading(Component cmp, ProgressAnimation progress) {
+            ProgressAnimation existing = getProgressAnimation(cmp);
+            if (existing != null) {
+                return existing;
+            }
+            progress.setPreferredH(cmp.getPreferredH());
+            progress.setPreferredW(cmp.getPreferredW());
+            replaceUntilReady(cmp, progress);
+            return progress;
         }
 
         private static void replaceUntilReady(Component cmp, ProgressAnimation progress) {

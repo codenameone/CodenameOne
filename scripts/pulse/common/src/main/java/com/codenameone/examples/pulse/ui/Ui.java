@@ -18,7 +18,7 @@
  */
 package com.codenameone.examples.pulse.ui;
 
-import com.codename1.appkit.Skeleton;
+import com.codename1.components.Skeleton;
 
 import com.codename1.components.SpanLabel;
 import com.codename1.components.Switch;
@@ -551,7 +551,7 @@ public final class Ui {
         list.setScrollVisible(false);
         list.setName(name);
         // Until it is filled: every list is emptied by what fills it.
-        list.add(new Skeleton(5, "SvSkeleton"));
+        list.add(Skeleton.rows(5).shimmer(false).uiid("SvSkeleton"));
         return list;
     }
 
@@ -766,7 +766,7 @@ public final class Ui {
             if (load != null) {
                 list.add(FlowLayout.encloseCenter(link("Try again", "retry", e -> {
                     list.removeAll();
-                    list.add(new Skeleton(5, "SvSkeleton"));
+                    list.add(Skeleton.rows(5).shimmer(false).uiid("SvSkeleton"));
                     list.revalidate();
                     load.run();
                 })));

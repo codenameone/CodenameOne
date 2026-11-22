@@ -32,7 +32,7 @@ import com.codenameone.examples.pulse.net.Api;
 import com.codename1.appkit.Net;
 import com.codename1.appkit.Chart;
 import com.codenameone.examples.pulse.ui.Lang;
-import com.codename1.appkit.Skeleton;
+import com.codename1.components.Skeleton;
 import com.codenameone.examples.pulse.ui.StatRow;
 import com.codenameone.examples.pulse.ui.Ui;
 import java.util.List;
@@ -57,7 +57,7 @@ public final class MemberDetailForm {
     public static void into(final Form form, final Container page, final String id) {
         page.setName("member");
         page.removeAll();
-        page.add(new Skeleton(6, "SvSkeleton"));
+        page.add(Skeleton.rows(6).shimmer(false).uiid("SvSkeleton"));
         page.revalidate();
         final Runnable[] load = new Runnable[1];
         load[0] = () -> Api.owner().member(id, Net.to(found -> {

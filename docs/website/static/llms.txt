@@ -38,7 +38,7 @@ Windows (PowerShell): `$c = irm https://www.codenameone.com/agents/create-app.ps
 
 ## What the framework covers
 
-- UI: native-looking components, CSS theming, iOS and Material native themes, animations, charts, maps, media, camera, barcode scanning, 3D and GPU graphics.
+- UI: native-looking components (including skeleton/shimmer loading placeholders, empty states, carousels and coach-mark feature tours), CSS theming, iOS and Material native themes, animations, charts, maps, media, camera, barcode scanning, 3D and GPU graphics.
 - Device: push notifications, biometrics, in-app purchase, location, contacts, Bluetooth, NFC, background tasks, widgets, Apple Watch.
 - Backend: a Java server in the same project, ORM over SQL and NoSQL databases, REST, WebSockets, sign-in.
 - Porting: existing Android, Swing/JavaFX, Flutter, Kotlin Multiplatform and Unity code.

@@ -47,7 +47,7 @@ import com.codenameone.examples.savor.pay.WalletForm;
 import com.codenameone.examples.savor.ui.Lang;
 import com.codenameone.examples.savor.ui.Menu;
 import com.codenameone.examples.savor.ui.Nav;
-import com.codename1.appkit.Skeleton;
+import com.codename1.components.Skeleton;
 import com.codenameone.examples.savor.ui.ProfileForm;
 import com.codenameone.examples.savor.ui.Ui;
 
@@ -292,7 +292,7 @@ public final class CustomerForm extends LiveChannel.Adapter implements Nav.Home,
             loadRestaurants();
         }));
         restaurants = new Container(BoxLayout.y());
-        restaurants.add(new Skeleton(3, "SvSkeleton"));
+        restaurants.add(Skeleton.rows(3).shimmer(false).uiid("SvSkeleton"));
         page.add(restaurants);
         Ui.pull(page, () -> {
             loadActive();
@@ -394,7 +394,7 @@ public final class CustomerForm extends LiveChannel.Adapter implements Nav.Home,
             }
             LatLng to = destination();
             results.removeAll();
-            results.add(new Skeleton(3, "SvSkeleton"));
+            results.add(Skeleton.rows(3).shimmer(false).uiid("SvSkeleton"));
             results.revalidate();
             // An answer for an earlier term that arrives late is dropped: the
             // results are always for what is in the field.

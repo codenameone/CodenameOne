@@ -84,7 +84,7 @@ public final class PassForm {
         qr.setName("pass-qr");
         digits.setName("pass-code");
         form.add(BorderLayout.CENTER, body);
-        body.add(new com.codename1.appkit.Skeleton(3, "SvSkeleton"));
+        body.add(com.codename1.components.Skeleton.rows(3).shimmer(false).uiid("SvSkeleton"));
         form.show();
         if (memberId != null) {
             load(memberId);
