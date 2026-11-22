@@ -255,7 +255,8 @@ class ReturnResolutionsTest {
         Shop s = shop("rr-race");
         OrderDto o = s.buy(People.customer(accounts, "rr-race-buyer"), 2);
         long total = orders.detailOf(o.id()).totalCents();
-        // Four refunds of the whole order at once: exactly one may pay.
+        // Four refunds of the whole order at once: together they may pay
+        // no more than the order took (a late one is capped at what is left).
         Thread[] runs = new Thread[4];
         final int[] ok = new int[1];
         for (int iter = 0; iter < runs.length; iter++) {
@@ -274,7 +275,7 @@ class ReturnResolutionsTest {
         for (Thread r : runs) {
             r.join();
         }
-        assertEquals(1, ok[0]);
+        assertTrue(ok[0] >= 1);
         assertTrue(orders.detailOf(o.id()).refundedCents() <= total);
         assertTrue(count("SELECT COALESCE(SUM(refunded_cents), 0) AS n FROM payment "
                 + "WHERE order_id = ?", o.id()) <= total);
@@ -289,7 +290,10 @@ class ReturnResolutionsTest {
         assertTrue(giftCards.redeem(card.id(), o.id(), 500));
         // No card charge to take the refund: all of it asks the gift card,
         // which paid 500 of the order. It used to get nothing at all.
-        db.execute("DELETE FROM payment WHERE order_id = ?", new Object[] {o.id()});
+        db.execute("UPDATE payment SET refunded_cents = amount_cents WHERE order_id = ?",
+                new Object[] {o.id()});
+        db.execute("UPDATE store_order SET financial = ? WHERE id = ?",
+                new Object[] {Orders.PAID, o.id()});
         long[] parts = orders.refundParts(s.owner, s.storeId, o.id(), mugs(o, 1), false,
                 StoreAccess.MANAGERS);
         assertEquals(500, parts[2]);
