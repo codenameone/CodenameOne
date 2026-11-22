@@ -334,6 +334,8 @@ public class Quoter {
                     locationById, country, hasPoint, hasPoint ? address.lat() : 0,
                     hasPoint ? address.lng() : 0, afterDiscounts, weight,
                     quote.discounts.freeShipping, live);
+            quote.options = pickupsInStock(quote, quote.options, locationById,
+                    bundleParts.keySet());
             quote.shipping = ShippingCalculator.find(quote.options, rateId);
             if (quote.shipping == null) {
                 if (rateId != null && rateId.length() > 0) {
@@ -473,6 +475,60 @@ public class Quoter {
     /// less the pre-ordered units already sold and not yet shipped. Zero when
     /// the variant is not on pre-order.
     @Transactional(readOnly = true)
+    /// Keeps a pickup only where its location has every line on the shelf,
+    /// titled "Pick up at" the location. A line that needs no stock there
+    /// (digital, untracked, sold past the shelf, on pre-order, a bundle)
+    /// does not hold a pickup back.
+    List<ShippingCalculator.Option> pickupsInStock(Quote quote,
+            List<ShippingCalculator.Option> options, Map<String, Location> locationById,
+            Set<String> bundles) {
+        List<String> counted = new ArrayList<String>();
+        Map<String, Integer> wanted = new HashMap<String, Integer>();
+        for (int iter = 0; iter < quote.lines.size(); iter++) {
+            Quote.Line l = quote.lines.get(iter);
+            Variant v = l.variant;
+            if (v == null || v.getId().length() == 0 || v.isDigital() || !v.isTrackInventory()
+                    || v.isAllowBackorder() || l.preorder || l.availableQty == Integer.MAX_VALUE
+                    || bundles.contains(v.getId())) {
+                continue;
+            }
+            Integer had = wanted.get(v.getId());
+            if (had == null) {
+                counted.add(v.getId());
+            }
+            wanted.put(v.getId(), Integer.valueOf((had == null ? 0 : had.intValue())
+                    + l.price.quantity));
+        }
+        Map<String, Integer> shelf = new HashMap<String, Integer>();
+        if (!counted.isEmpty()) {
+            List<InventoryLevel> found = levels.findByVariantIdIn(counted);
+            for (int iter = 0; iter < found.size(); iter++) {
+                InventoryLevel level = found.get(iter);
+                shelf.put(level.getVariantId() + "|" + level.getLocationId(), Integer.valueOf(
+                        Math.max(0, level.getOnHand() - level.getCommitted())));
+            }
+        }
+        List<ShippingCalculator.Option> out = new ArrayList<ShippingCalculator.Option>();
+        for (int iter = 0; iter < options.size(); iter++) {
+            ShippingCalculator.Option o = options.get(iter);
+            if (!ShippingCalculator.PICKUP.equals(o.rate.getKind())) {
+                out.add(o);
+                continue;
+            }
+            String at = o.rate.getLocationId();
+            boolean stocked = true;
+            for (int v = 0; stocked && v < counted.size(); v++) {
+                Integer has = shelf.get(counted.get(v) + "|" + at);
+                stocked = has != null && has.intValue() >= wanted.get(counted.get(v)).intValue();
+            }
+            Location location = locationById.get(at);
+            if (stocked && location != null) {
+                out.add(ShippingCalculator.renamed(o, "Pick up at " + location.getName()));
+            }
+        }
+        return out;
+    }
+
     public int preorderAllowance(String variantId) throws IOException {
         Preorder p = variantId == null ? null : preorders.findByVariantId(variantId);
         int cap = com.codenameone.examples.bazaar.alerts.StockAlerts.preorderable(p,

@@ -216,6 +216,93 @@ final class TenderSheet {
         if (amount <= 0) {
             return;
         }
+        reader(amount);
+    }
+
+    /// The register's paired card reader, driven by the server: the amount
+    /// is pushed to the reader, and the register asks until the card is
+    /// taken or refused. With no reader at the register, or offline, the
+    /// standalone terminal takes the card instead.
+    private void reader(final long amount) {
+        final String clientId = UUID.randomUUID().toString();
+        final Sheet wait = new Sheet(sheet, Lang.tr("Card reader"));
+        wait.setName("pos-reader");
+        Container c = wait.getContentPane();
+        c.setLayout(BoxLayout.y());
+        c.add(PosUi.data(PosState.money(amount), "PosAmount"));
+        final Label state = PosUi.label("Sending to the card reader...", "PosMuted");
+        c.add(state);
+        c.add(new InfiniteProgress());
+        final String[] paymentId = {null};
+        final boolean[] over = {false};
+        c.add(PosUi.key(Lang.tr("Cancel"), "pos-reader-cancel", "PosChoice", e -> {
+            over[0] = true;
+            if (paymentId[0] != null) {
+                Api.posCounter().cancelCardPayment(PosState.storeId(), paymentId[0],
+                        Net.to(p -> { }, (st, m) -> { }));
+            }
+            wait.back();
+        }));
+        Api.posCounter().startCardPayment(PosState.storeId(), PosState.registerId(),
+                new com.codenameone.examples.bazaar.api.CardPaymentDto(null, null, null, clientId,
+                    amount, PosState.currency(), null, null, null), Net.to(p -> {
+                        if (over[0]) {
+                            return;
+                        }
+                        paymentId[0] = p.id();
+                        wait.show();
+                        state.setText(Lang.tr("Tap, insert or swipe the card"));
+                        poll(wait, state, p.id(), amount, over, 0, 0);
+                    }, (status, message) -> {
+                        if (ReaderPoll.standalone(status)) {
+                            standalone(amount);
+                        } else {
+                            Ui.fail(status, message);
+                        }
+                    }));
+    }
+
+    private void poll(final Sheet wait, final Label state, final String id, final long amount,
+            final boolean[] over, final int asks, final int misses) {
+        CN.setTimeout(ReaderPoll.EVERY_MS, () -> {
+            if (over[0]) {
+                return;
+            }
+            Api.posCounter().cardPayment(PosState.storeId(), id, Net.to(p -> {
+                if (!over[0]) {
+                    decide(wait, state, id, amount, over, p.status(), p.message(), p.cardLabel(),
+                            asks + 1, 0);
+                }
+            }, (status, message) -> {
+                if (!over[0]) {
+                    decide(wait, state, id, amount, over, null, message, null, asks + 1,
+                            misses + 1);
+                }
+            }));
+        });
+    }
+
+    private void decide(Sheet wait, Label state, String id, long amount, boolean[] over,
+            String status, String message, String card, int asks, int misses) {
+        int next = ReaderPoll.next(status, asks, misses);
+        if (next == ReaderPoll.WAIT) {
+            poll(wait, state, id, amount, over, asks, misses);
+            return;
+        }
+        over[0] = true;
+        wait.back();
+        if (next == ReaderPoll.PAID) {
+            // The payment's id is the tender's reference: the server spends it
+            // on this sale, once.
+            tender(Tenders.CARD, amount, id);
+        } else {
+            Ui.say(message == null || message.length() == 0 ? "The card was not accepted"
+                    : message);
+        }
+    }
+
+    /// A simulated standalone terminal: "present the card", a moment, approved.
+    private void standalone(final long amount) {
         final Sheet terminal = new Sheet(sheet, Lang.tr("Card terminal"));
         terminal.setName("pos-terminal");
         Container c = terminal.getContentPane();

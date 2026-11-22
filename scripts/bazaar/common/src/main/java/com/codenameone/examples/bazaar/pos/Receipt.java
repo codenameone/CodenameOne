@@ -39,6 +39,8 @@ final class Receipt {
     final long when;
     final List<String[]> lines = new ArrayList<String[]>();
     final List<String[]> totals = new ArrayList<String[]>();
+    /// Whether the sale took cash, which opens the drawer.
+    boolean cash;
 
     private Receipt(String clientId, String store, String register, long when) {
         this.clientId = clientId;
@@ -70,6 +72,7 @@ final class Receipt {
         r.totals.add(new String[] {"Total", PosState.money(t.totalCents)});
         for (int iter = 0; iter < sale.tenders().size(); iter++) {
             PosTenderDto td = sale.tenders().get(iter);
+            r.cash |= "CASH".equals(td.kind());
             r.totals.add(new String[] {TenderSheet.kindName(td.kind()),
                 PosState.money(td.amountCents())});
         }

@@ -594,6 +594,34 @@ the PIN, because it may wait offline. `pos.Layaways` keeps a layaway as an open
 order with its units reserved, and `order.OrderEdits` recomputes totals and tax,
 moves reservations and settles the difference.
 
+The counter's hardware and its links to the online store live beside it.
+`pay.CardTerminal` is the reader interface, written after Stripe Terminal's
+server-driven integration: register a reader with its pairing code, create a
+`card_present` PaymentIntent, hand it to the reader, then poll it (or take the
+`terminal.reader.action_*` webhook through `pay.PaymentEvents`).
+`pay.StripeTerminal` makes those API calls over the same transport as
+`StripePayments` and needs `bazaar.payments.stripe.terminal-location`;
+`pay.SimulatedTerminal` answers in development and tests, declining amounts that end
+in 01. `pos.CardReaders` keeps readers per register and payments per register
+`clientId`; a sale names the payment as its card tender's reference, and the
+payment is claimed with a conditional update so it pays one sale only. Refunds of
+such a sale go back through the processor. The app's `pos.EscPos` builds ESC/POS
+bytes (text, alignment, bold, size, cut, the `ESC p` drawer kick) and
+`pos.SocketPrinter` writes them to the printer's raw port with
+`com.codename1.io.Socket`; both are plain classes behind `pos.PrinterSink`, so the
+bytes are tested without a printer.
+
+Checkout keeps a pickup rate only where its location has every stocked line on the
+shelf (`cart.Quoter`), titled "Pick up at" the location. `pos.Pickups` is the
+register's queue of those orders; making one ready creates the pickup fulfilment
+and marks it packed, which mails the shopper (`Emails.pickupReady`). A sale shipped
+from the counter (`PosSales.shipSale`) is priced with the chosen rate and the
+destination's tax, stays open and unfulfilled with its units reserved at the
+register's location, and goes through `fulfil.Fulfillments` like an online order.
+A counter sale records the seller's commission rate on the order
+(`commission_bp`), so the report in `PosTools` pays each sale at the rate of its
+day.
+
 === Tests
 
 [source,bash]

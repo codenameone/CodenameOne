@@ -70,6 +70,18 @@ final class ReceiptView {
         actions.add(PosUi.icon(FontImage.MATERIAL_SMS, "Text", "pos-receipt-sms", "PosChoice",
                 e -> send(r, true)));
         c.add(actions);
+        if (CounterDevices.printer() != null) {
+            // The till's own printer and the drawer wired to it.
+            Container till = new Container(new GridLayout(1, 2));
+            till.add(PosUi.icon(FontImage.MATERIAL_RECEIPT_LONG, "Receipt printer",
+                    "pos-receipt-escpos", "PosChoice", e -> CounterDevices.print(r, false)));
+            till.add(PosUi.icon(FontImage.MATERIAL_POINT_OF_SALE, "Open drawer",
+                    "pos-receipt-drawer", "PosChoice", e -> CounterDevices.kick()));
+            c.add(till);
+            if (r.cash) {
+                CounterDevices.print(r, true);
+            }
+        }
         c.add(PosUi.key(Lang.tr("New sale"), "pos-new-sale", "PosPay", e -> sheet.back()));
         final Runnable update = () -> {
             int n = r.number();

@@ -221,7 +221,12 @@ class MerchantIdorTest {
         // Label sheets and bulk packing slips.
         "GET /label-sheets.pdf", "GET /purchase-orders/{purchaseOrderId}/labels.pdf",
         "GET /bulk-orders/packing-slips.pdf",
-    };
+        "GET /pos/readers", "POST /pos/readers", "POST /pos/readers/{readerId}/remove",
+        "POST /pos/registers/{registerId}/card-payments", "GET /pos/card-payments/{paymentId}",
+        "POST /pos/card-payments/{paymentId}/cancel", "GET /pos/registers/{registerId}/pickups",
+        "POST /pos/pickups/{orderId}/ready", "POST /pos/pickups/{orderId}/picked-up",
+        "POST /pos/registers/{registerId}/ship-quote",
+        "POST /pos/registers/{registerId}/ship-sales"};
 
     /// Routes of [#ROUTES] served as documents by `DocumentPages` rather than
     /// declared by a shared API interface.
@@ -235,6 +240,8 @@ class MerchantIdorTest {
         {"download-grants", "download_grant"},
         {"discounts", "discount"}, {"locations", "location"}, {"photos", "product_photo"},
         {"parked", "parked_cart"}, {"layaways", "layaway"},
+        {"readers", "card_reader"}, {"card-payments", "card_payment"},
+        {"pickups", "store_order"},
         {"products", "product"}, {"rates", "shipping_rate"}, {"zones", "shipping_zone"},
         {"staff", "store_staff"}, {"suppliers", "supplier"}, {"tax-rates", "tax_rate"},
         {"webhooks", "webhook"}, {"customers", "customer"}, {"fulfillments", "fulfillment"},

@@ -56,9 +56,12 @@ public class PaymentEvents {
     private final StoreOrderRepository orderRows;
     private final PaymentRepository paymentRows;
     private final String secret;
+    private final com.codenameone.examples.bazaar.pos.CardReaders readers;
 
     public PaymentEvents(Payments payments, Orders orders, StoreOrderRepository orderRows,
-            PaymentRepository paymentRows, Config config) throws IOException {
+            PaymentRepository paymentRows, Config config,
+            com.codenameone.examples.bazaar.pos.CardReaders readers) throws IOException {
+        this.readers = readers;
         this.payments = payments;
         this.orders = orders;
         this.orderRows = orderRows;
@@ -87,6 +90,17 @@ public class PaymentEvents {
             throw new ResponseStatusException(400, "Not JSON");
         }
         String type = text(event.get("type"));
+        if (type.startsWith("terminal.reader.action_")) {
+            // A card reader finished (or failed) what it was handed: the
+            // register's next poll would learn it, this learns it now.
+            Object data = event.get("data");
+            Object object = data instanceof Map ? ((Map) data).get("object") : null;
+            String reader = object instanceof Map ? text(((Map) object).get("id")) : "";
+            if (reader.length() > 0 && reader.length() <= 64) {
+                readers.readerEvent(reader);
+            }
+            return "";
+        }
         if (!type.startsWith("payment.") && !type.startsWith("payment_intent.")) {
             return "";
         }

@@ -715,6 +715,21 @@ public class Payments {
         return reference;
     }
 
+    /// Records a card payment a register's paired reader took through the
+    /// processor ([CardTerminal]) for a counter sale. The reader captured it
+    /// already, so it is kept as PAID under the processor's own reference and
+    /// a refund goes back through the processor like an online one.
+    public String reader(String orderId, String staff, long amountCents, String currency,
+            String intentRef, String cardLabel) throws IOException {
+        if (amountCents <= 0 || intentRef == null || intentRef.length() == 0) {
+            throw new ResponseStatusException(400, "That is not a card payment");
+        }
+        keepPayment(orderId, staff, new String[] {"reader", cardLabel == null
+                || cardLabel.length() == 0 ? "Card reader" : cardLabel}, amountCents, currency,
+                cut(intentRef, 64), PAID);
+        return intentRef;
+    }
+
     private void keepPayment(String orderId, String username, String[] method, long amount,
             String currency, String reference) {
         keepPayment(orderId, username, method, amount, currency, reference, AUTHORIZED);

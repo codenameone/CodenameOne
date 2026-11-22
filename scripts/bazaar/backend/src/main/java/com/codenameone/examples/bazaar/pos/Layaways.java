@@ -129,6 +129,7 @@ public class Layaways {
         order.setRegisterId(s.register.getId());
         order.setShiftId(s.shift == null ? "" : s.shift.getId());
         order.setStaffUsername(username);
+        order.setCommissionBp(tools.rateFor(storeId, username));
         order.setCustomerId(s.customer.getId());
         order.setNote("Layaway");
         final String who = username;

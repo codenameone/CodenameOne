@@ -168,7 +168,7 @@ on a row.
 | Shipping profiles (per-product rates) | &#8211; | core | core | core | no | 
 | Fulfillment network / 3PL integration | &#8211; | app/plugin | app/plugin | app/plugin | no | 
 | Fulfillment orders / routing rules across locations | &#9681; | core | app/plugin | app/plugin | no | Multiple locations; no automatic routing.
-| Ship from store / BOPIS from POS | &#9681; | core | app/plugin | app/plugin | core | Local pickup online; not started from the register.
+| Ship from store / BOPIS from POS | &#10003; | core | app/plugin | app/plugin | core | Checkout offers "Pick up at <location>" only where that location has every line in stock; the register's pickup queue makes orders ready (the shopper is mailed) and hands them over.
 | Customs forms / international docs | &#8211; | core | app/plugin | app/plugin | no | 
 | Returns label generation | &#8211; | core | app/plugin | app/plugin | no | 
 |===
@@ -195,13 +195,13 @@ on a row.
 | Refund to store credit | &#10003; | core | app/plugin | app/plugin | no | 
 | Park / hold carts | &#10003; | core | app/plugin | app/plugin | core | Parked carts keep their customer across a restart, offline too. 
 | Tipping | &#10003; | core | app/plugin | app/plugin | core | Tips at the register, counted in the shift. 
-| Card reader hardware (tap/chip) | &#8211; | core | app/plugin | app/plugin | core | 
+| Card reader hardware (tap/chip) | &#10003; | core | app/plugin | app/plugin | core | Server-driven like Stripe Terminal: pair a reader to a register, push a card-present PaymentIntent, poll or take the webhook; real Stripe Terminal API calls with Stripe, a simulated reader otherwise.
 | Tap to pay on phone | &#8211; | core | app/plugin | app/plugin | core | 
-| Cash drawer / receipt printer hardware | &#9681; | core | app/plugin | app/plugin | core | Receipts are PDF, e-mail or text; no device drivers.
+| Cash drawer / receipt printer hardware | &#10003; | core | app/plugin | app/plugin | core | ESC/POS receipts and the drawer kick sent to a network printer's raw port (host:port, 9100 by default) over a socket; the drawer opens on cash sales.
 | Customer lookup & attach to sale | &#10003; | core | app/plugin | app/plugin | core | 
 | Loyalty at POS | &#10003; | core | app/plugin | app/plugin | core | Member cards are scanned at the register.
-| Ship to customer / order from other location | &#8211; | core | app/plugin | app/plugin | core | 
-| Staff commissions / performance reports | &#9681; | app/plugin | app/plugin | app/plugin | app/plugin | Sales by register and staff; no commission payouts.
+| Ship to customer / order from other location | &#10003; | core | app/plugin | app/plugin | core | The register ships the sale to an address: shipping quoted from the store's rates, taxed where it goes, paid at the counter, held at the location and fulfilled like an online order.
+| Staff commissions / performance reports | &#10003; | app/plugin | app/plugin | app/plugin | app/plugin | Per-staff commission rate; each counter sale keeps the seller's rate of that day; the Commissions section reports sales, net and commission per staff member. No payouts.
 | Multiple registers per location | &#10003; | core | app/plugin | app/plugin | core | 
 | Live tickets / kitchen-style queue | &#10003; | app/plugin | app/plugin | no | core | 
 |===

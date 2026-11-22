@@ -22,7 +22,11 @@ import com.codename1.backend.ResponseStatusException;
 import com.codename1.backend.annotations.Component;
 import com.codename1.backend.annotations.Transactional;
 import com.codenameone.examples.bazaar.Ids;
+import com.codenameone.examples.bazaar.api.AddressDto;
 import com.codenameone.examples.bazaar.api.PosLineDto;
+import com.codenameone.examples.bazaar.api.PosShipQuoteDto;
+import com.codenameone.examples.bazaar.api.PosShipSaleDto;
+import com.codenameone.examples.bazaar.api.PosShipOptionDto;
 import com.codenameone.examples.bazaar.api.PosSaleDto;
 import com.codenameone.examples.bazaar.api.PosSaleResultDto;
 import com.codenameone.examples.bazaar.api.PosSyncDto;
@@ -32,6 +36,8 @@ import com.codenameone.examples.bazaar.cart.Codes;
 import com.codenameone.examples.bazaar.cart.Quote;
 import com.codenameone.examples.bazaar.cart.Quoter;
 import com.codenameone.examples.bazaar.domain.AuditEvent;
+import com.codenameone.examples.bazaar.domain.CardPayment;
+import com.codenameone.examples.bazaar.domain.Location;
 import com.codenameone.examples.bazaar.domain.Customer;
 import com.codenameone.examples.bazaar.domain.Discount;
 import com.codenameone.examples.bazaar.domain.DiscountUse;
@@ -53,15 +59,19 @@ import com.codenameone.examples.bazaar.order.Orders;
 import com.codenameone.examples.bazaar.pay.Payments;
 import com.codenameone.examples.bazaar.pricing.DiscountEngine;
 import com.codenameone.examples.bazaar.pricing.PriceLine;
+import com.codenameone.examples.bazaar.pricing.ShippingCalculator;
 import com.codenameone.examples.bazaar.pricing.TaxCalculator;
 import com.codenameone.examples.bazaar.repository.AuditEventRepository;
 import com.codenameone.examples.bazaar.repository.CustomerRepository;
 import com.codenameone.examples.bazaar.repository.DiscountRepository;
 import com.codenameone.examples.bazaar.repository.DiscountUseRepository;
 import com.codenameone.examples.bazaar.repository.GiftCardRepository;
+import com.codenameone.examples.bazaar.repository.LocationRepository;
 import com.codenameone.examples.bazaar.repository.OrderLineRepository;
 import com.codenameone.examples.bazaar.repository.ProductRepository;
 import com.codenameone.examples.bazaar.repository.ShiftRepository;
+import com.codenameone.examples.bazaar.repository.ShippingRateRepository;
+import com.codenameone.examples.bazaar.repository.ShippingZoneRepository;
 import com.codenameone.examples.bazaar.repository.StoreOrderRepository;
 import com.codenameone.examples.bazaar.repository.StoreRepository;
 import com.codenameone.examples.bazaar.repository.TaxRateRepository;
@@ -128,6 +138,10 @@ public class PosSales {
     private final Payments payments;
     private final StoreEvents storeEvents;
     private final PosTools tools;
+    private final CardReaders readers;
+    private final ShippingZoneRepository zones;
+    private final ShippingRateRepository rates;
+    private final LocationRepository locations;
 
     public PosSales(Pos pos, StoreAccess access, StoreRepository stores,
             VariantRepository variants, ProductRepository products, TaxRateRepository taxes,
@@ -136,7 +150,9 @@ public class PosSales {
             StoreOrderRepository orderRows, OrderLineRepository lineRows,
             TenderRepository tenders, ShiftRepository shifts, AuditEventRepository audits,
             Quoter quoter, Orders orders, Inventory inventory, GiftCards giftCards,
-            Payments payments, StoreEvents storeEvents, PosTools tools) {
+            Payments payments, StoreEvents storeEvents, PosTools tools, CardReaders readers,
+            ShippingZoneRepository zones, ShippingRateRepository rates,
+            LocationRepository locations) {
         this.pos = pos;
         this.access = access;
         this.stores = stores;
@@ -159,6 +175,10 @@ public class PosSales {
         this.payments = payments;
         this.storeEvents = storeEvents;
         this.tools = tools;
+        this.readers = readers;
+        this.zones = zones;
+        this.rates = rates;
+        this.locations = locations;
     }
 
     /// Records a batch; one result per sale, in the order sent. A sale that
@@ -222,6 +242,11 @@ public class PosSales {
         StoreStaff seller;
         PosApproval approval;
         long tipCents;
+        /// The payment the register's paired reader took, when the card
+        /// tender names one ([CardReaders]); null for a standalone terminal.
+        CardPayment readerPayment;
+        /// Where a sale shipped to the customer goes, or null for one handed over.
+        AddressDto shipTo;
     }
 
     /// How far a register's total may fall short of this server's before the
@@ -235,6 +260,12 @@ public class PosSales {
 
     private PosSaleResultDto sale(String username, String storeId, Register register,
             PosSaleDto sale) throws IOException {
+        return sale(username, storeId, register, sale, null, null);
+    }
+
+    /// One sale; `shipTo` and `rateId` make it a sale shipped to the customer.
+    private PosSaleResultDto sale(String username, String storeId, Register register,
+            PosSaleDto sale, AddressDto shipTo, String rateId) throws IOException {
         if (sale == null || sale.clientId() == null || sale.clientId().trim().length() == 0
                 || sale.clientId().length() > 100) {
             throw new ResponseStatusException(400, "A sale needs its register's id for it");
@@ -244,19 +275,24 @@ public class PosSales {
         if (again != null) {
             return duplicate(sale, again);
         }
-        final Quote quote = price(storeId, register.getTaxCountry(), register.getTaxRegion(),
-                sale.lines(), sale.discountCode());
+        final Quote quote = shipTo == null ? price(storeId, register.getTaxCountry(),
+                register.getTaxRegion(), sale.lines(), sale.discountCode())
+                : shipped(storeId, register, sale.lines(), sale.discountCode(), shipTo, rateId);
         final Shift shift = shiftFor(storeId, register, sale.shiftId());
         final Plan plan = plan(username, storeId, register, sale, quote);
+        plan.shipTo = shipTo;
         final String staffName = plan.seller.getUsername();
         StoreOrder order = orders.newOrder(quote, Orders.POS,
                 plan.customer == null ? "" : plan.customer.getUsername(),
                 sale.email() != null && sale.email().trim().length() > 0 ? sale.email().trim()
                         : plan.customer == null ? "" : plan.customer.getEmail(),
-                null, clientId);
-        order.setStatus(Orders.CLOSED);
+                shipTo, clientId);
+        // Shipped from the register's location, the sale stays open until it
+        // is packed and shipped like an online order.
+        order.setStatus(shipTo == null ? Orders.CLOSED : Orders.OPEN);
         order.setFinancial(Orders.PAID);
-        order.setFulfilment(Orders.FULFILLED);
+        order.setFulfilment(shipTo == null ? Orders.FULFILLED : Orders.UNFULFILLED);
+        order.setCommissionBp(tools.rateFor(storeId, plan.seller.getUsername()));
         order.setLocationId(register.getLocationId());
         order.setRegisterId(register.getId());
         order.setShiftId(shift.getId());
@@ -269,7 +305,9 @@ public class PosSales {
         Instant at = sale.createdAt() > 0 && sale.createdAt() <= now + 300000L
                 ? Instant.ofEpochMilli(sale.createdAt()) : Instant.ofEpochMilli(now);
         order.setCreatedAt(at);
-        order.setClosedAt(at);
+        if (shipTo == null) {
+            order.setClosedAt(at);
+        }
         final String[] where = new String[quote.lines.size()];
         for (int iter = 0; iter < where.length; iter++) {
             where[iter] = register.getLocationId();
@@ -346,6 +384,14 @@ public class PosSales {
     @Transactional(readOnly = true)
     public Quote price(String storeId, String taxCountry, String taxRegion, List<PosLineDto> wanted,
             String discountCode) throws IOException {
+        return price(storeId, taxCountry, taxRegion, wanted, discountCode, null);
+    }
+
+    /// [#price], with `shipping` added to the total and taxed as the store
+    /// taxes shipping.
+    @Transactional(readOnly = true)
+    Quote price(String storeId, String taxCountry, String taxRegion, List<PosLineDto> wanted,
+            String discountCode, ShippingCalculator.Option shipping) throws IOException {
         if (wanted == null || wanted.isEmpty()) {
             throw new ResponseStatusException(400, "The sale has no lines");
         }
@@ -408,14 +454,112 @@ public class PosSales {
         quote.discounts = DiscountEngine.apply(priceLines,
                 discounts.findByStoreIdAndAutomatic(storeId, true), typed,
                 code.length() > 0 ? code : null, Instant.now(), new HashSet<String>(), 0);
-        quote.shippingCents = 0;
+        quote.shipping = shipping;
+        quote.shippingCents = shipping == null ? 0 : shipping.priceCents;
         String country = taxCountry == null ? "" : taxCountry;
-        quote.tax = TaxCalculator.apply(priceLines, 0,
+        quote.tax = TaxCalculator.apply(priceLines, quote.shippingCents,
                 country.length() == 0 ? null : taxes.findByStoreId(storeId),
                 country.length() == 0 ? null : country, taxRegion,
                 store.isTaxInclusive());
-        quote.totalCents = quote.subtotalCents - quote.discountCents() + quote.tax.addedCents();
+        quote.totalCents = quote.subtotalCents - quote.discountCents() + quote.shippingCents
+                + quote.tax.addedCents();
         return quote;
+    }
+
+    // --------------------------------------------------------- ship to customer
+
+    /// The ways the lines can be sent to `address`, from the store's own
+    /// zones and rates; never a pickup, which is the counter itself.
+    @Transactional(readOnly = true)
+    public List<PosShipOptionDto> shipQuote(String username, String storeId, String registerId,
+            PosShipQuoteDto ask) throws IOException {
+        Register register = check(username, storeId, registerId);
+        if (ask == null) {
+            throw new ResponseStatusException(400, "Send the lines and the address");
+        }
+        Quote goods = price(storeId, register.getTaxCountry(), register.getTaxRegion(),
+                ask.lines(), "");
+        List<ShippingCalculator.Option> options = shipOptions(storeId, goods, ask.address());
+        List<PosShipOptionDto> out = new ArrayList<PosShipOptionDto>();
+        for (int iter = 0; iter < options.size(); iter++) {
+            ShippingCalculator.Option o = options.get(iter);
+            Quote whole = price(storeId, ask.address().country().trim(), ask.address().region(),
+                    ask.lines(), "", o);
+            out.add(new PosShipOptionDto(o.id, o.name, o.priceCents, whole.tax.addedCents(),
+                    whole.totalCents, o.etaDaysMin, o.etaDaysMax));
+        }
+        return out;
+    }
+
+    /// Records a sale shipped to the customer: paid at the counter, open
+    /// until the register's location packs and ships it.
+    public PosSaleResultDto shipSale(String username, String storeId, String registerId,
+            PosShipSaleDto in) throws IOException {
+        Register register = check(username, storeId, registerId);
+        if (in == null) {
+            throw new ResponseStatusException(400, "Send the sale");
+        }
+        PosSaleDto sale = new PosSaleDto(in.clientId(), in.shiftId(), in.customerId(), in.email(),
+                "", in.note(), System.currentTimeMillis(), in.lines(), in.tenders(),
+                in.staffUsername(), 0, in.approvalId());
+        try {
+            return sale(username, storeId, register, sale, in.address(), in.shippingRateId());
+        } catch (ResponseStatusException refused) {
+            return new PosSaleResultDto(in.clientId(), approvalRefusal(refused) ? APPROVAL : ERROR,
+                    "", 0, 0, 0, false, refused.getMessage());
+        }
+    }
+
+    /// The quote of a sale shipped to `address` by rate `rateId`: taxed
+    /// where it goes, with the shipping in the total.
+    private Quote shipped(String storeId, Register register, List<PosLineDto> lines,
+            String discountCode, AddressDto address, String rateId) throws IOException {
+        if (address == null || blank(address.name()) || blank(address.line1())
+                || blank(address.city()) || blank(address.country())) {
+            throw new ResponseStatusException(400, "A shipped sale needs a name, street, city "
+                    + "and country");
+        }
+        Quote goods = price(storeId, register.getTaxCountry(), register.getTaxRegion(), lines,
+                discountCode);
+        ShippingCalculator.Option chosen = ShippingCalculator.find(
+                shipOptions(storeId, goods, address), rateId);
+        if (chosen == null) {
+            throw new ResponseStatusException(400, "That delivery option is not available for "
+                    + "this address");
+        }
+        return price(storeId, address.country().trim(), address.region(), lines, discountCode,
+                chosen);
+    }
+
+    @Transactional(readOnly = true)
+    private List<ShippingCalculator.Option> shipOptions(String storeId, Quote goods,
+            AddressDto address) {
+        List<ShippingCalculator.Option> out = new ArrayList<ShippingCalculator.Option>();
+        if (address == null || blank(address.country())) {
+            return out;
+        }
+        Map<String, Location> byId = new HashMap<String, Location>();
+        List<Location> all = locations.findByStoreIdOrderByPositionAsc(storeId);
+        for (int iter = 0; iter < all.size(); iter++) {
+            byId.put(all.get(iter).getId(), all.get(iter));
+        }
+        boolean point = address.lat() != 0 || address.lng() != 0;
+        List<ShippingCalculator.Option> options = ShippingCalculator.options(
+                zones.findByStoreIdOrderByPositionAsc(storeId),
+                rates.findByStoreIdOrderByPositionAsc(storeId), byId, address.country().trim(),
+                point, address.lat(), address.lng(), goods.subtotalCents - goods.discountCents(),
+                PriceLine.weight(goods.priceLines()), goods.discounts != null
+                    && goods.discounts.freeShipping, null);
+        for (int iter = 0; iter < options.size(); iter++) {
+            if (!ShippingCalculator.PICKUP.equals(options.get(iter).rate.getKind())) {
+                out.add(options.get(iter));
+            }
+        }
+        return out;
+    }
+
+    private static boolean blank(String text) {
+        return text == null || text.trim().length() == 0;
     }
 
     /// Whether a line is a custom sale item: a title and a price, no SKU.
@@ -482,6 +626,8 @@ public class PosSales {
                 }
                 plan.cardCents = t.amountCents();
                 plan.cardReference = t.reference() == null ? "" : Codes.cut(t.reference(), 40);
+                plan.readerPayment = readers.forSale(storeId, plan.cardReference,
+                        plan.cardCents);
             } else if ("GIFT_CARD".equalsIgnoreCase(kind)) {
                 if (plan.giftCard != null) {
                     throw new ResponseStatusException(400, "One gift card per sale");
@@ -620,7 +766,7 @@ public class PosSales {
         String storeId = o.getStoreId();
         orders.insertLines(o, quote, where);
         List<OrderLine> written = lineRows.findByOrderId(o.getId());
-        for (int iter = 0; iter < written.size(); iter++) {
+        for (int iter = 0; plan.shipTo == null && iter < written.size(); iter++) {
             OrderLine line = written.get(iter);
             line.setFulfilledQty(line.getQuantity());
             lineRows.save(line);
@@ -628,6 +774,16 @@ public class PosSales {
         for (int iter = 0; iter < quote.lines.size(); iter++) {
             Quote.Line l = quote.lines.get(iter);
             if (l.variant.getId().length() == 0) {
+                continue;
+            }
+            if (plan.shipTo != null) {
+                // Held at the register's location for packing, as an online
+                // order's stock is; shipping it takes it off the shelf.
+                if (inventory.reserveCounted(storeId, l.variant.getId(), register.getLocationId(),
+                        l.price.quantity, o.getId(), staffName) < 0) {
+                    throw new ResponseStatusException(409, "Not enough " + l.product.getTitle()
+                            + " at this location to ship");
+                }
                 continue;
             }
             inventory.recordPosSale(storeId, l.variant.getId(), register.getLocationId(),
@@ -665,7 +821,15 @@ public class PosSales {
             }
             tender(o.getId(), "STORE_CREDIT", plan.creditCents, 0, "");
         }
-        if (plan.cardCents > 0) {
+        if (plan.readerPayment != null) {
+            if (!readers.claim(plan.readerPayment.getId(), o.getId())) {
+                throw new ResponseStatusException(409, "That card payment paid another sale");
+            }
+            String reference = payments.reader(o.getId(), staffName, plan.cardCents,
+                    o.getCurrency(), plan.readerPayment.getIntentRef(),
+                    plan.readerPayment.getCardLabel());
+            tender(o.getId(), "CARD", plan.cardCents, 0, reference);
+        } else if (plan.cardCents > 0) {
             String reference = payments.terminal(o.getId(), staffName, plan.cardCents,
                     o.getCurrency(), plan.cardReference);
             tender(o.getId(), "CARD", plan.cardCents, 0, reference);
@@ -694,7 +858,8 @@ public class PosSales {
         }
         shifts.addTotals(shift.getId(), plan.cashCents, plan.cardCents,
                 plan.giftCents + plan.creditCents, 0, plan.cashCents, 1);
-        orders.event(o.getId(), "PLACED", "Sold at " + register.getName(), staffName);
+        orders.event(o.getId(), "PLACED", "Sold at " + register.getName()
+                + (plan.shipTo == null ? "" : ", to ship to the customer"), staffName);
         if (plan.overCents > 0) {
             orders.event(o.getId(), plan.overCents > tolerance(o.getTotalCents())
                     ? "OVER_TENDERED" : "TOTAL_ADJUSTED",

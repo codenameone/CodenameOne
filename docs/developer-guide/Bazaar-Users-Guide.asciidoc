@@ -258,6 +258,23 @@ register was offline, can be retried after it's sorted out. Returns are taken
 against a receipt. At the end of the shift the cashier counts the drawer, and the
 shift report shows the expected and counted cash.
 
+The register works with the counter's hardware. Under Devices, a manager pairs a
+card reader by typing the code it shows (`simulated-front` pairs the demo's
+simulated reader); with a reader at the register, Card sends the amount to it and
+the sale waits for the tap, and without one the standalone terminal is used. The
+same screen takes the network address of an ESC/POS receipt printer
+(`192.168.1.50` or `192.168.1.50:9100`): the receipt then prints on it, and a cash
+sale opens the drawer wired to the printer.
+
+Pickups lists the online orders the shopper chose to collect at this register's
+location. Ready for pickup tells the shopper by e-mail and notification, and Picked
+up hands the order over. Ship to customer sends the sale on the register to an
+address instead: it quotes the store's delivery options with the total each makes,
+takes payment, and the order is packed and shipped from this location like an
+online order. In the back office, Commissions sets each staff member's rate and
+reports what they sold at the counter in the last 30 days; a sale keeps the rate of
+the day it was made.
+
 === The administrator
 
 The platform console shows the number of stores, orders and the total sold across

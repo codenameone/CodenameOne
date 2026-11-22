@@ -27,6 +27,7 @@ import com.codenameone.examples.bazaar.api.CheckoutApi;
 import com.codenameone.examples.bazaar.api.DiscountApi;
 import com.codenameone.examples.bazaar.api.FulfillmentApi;
 import com.codenameone.examples.bazaar.api.PosApi;
+import com.codenameone.examples.bazaar.api.PosCounterApi;
 import com.codenameone.examples.bazaar.api.PosToolsApi;
 import com.codenameone.examples.bazaar.api.LayawayApi;
 import com.codenameone.examples.bazaar.api.OrderEditApi;
@@ -88,6 +89,7 @@ public final class Api {
     private static ReturnApi returns;
     private static PosApi pos;
     private static PosToolsApi posTools;
+    private static PosCounterApi posCounter;
     private static LayawayApi layaways;
     private static OrderEditApi orderEdits;
     private static AutomationApi automations;
@@ -135,6 +137,7 @@ public final class Api {
         returns = RestClients.create(ReturnApi.class, baseUrl);
         pos = RestClients.create(PosApi.class, baseUrl);
         posTools = RestClients.create(PosToolsApi.class, baseUrl);
+        posCounter = RestClients.create(PosCounterApi.class, baseUrl);
         layaways = RestClients.create(LayawayApi.class, baseUrl);
         orderEdits = RestClients.create(OrderEditApi.class, baseUrl);
         automations = RestClients.create(AutomationApi.class, baseUrl);
@@ -233,6 +236,11 @@ public final class Api {
     }
 
     /// Policy, approvals, parked carts and the smart grid.
+    /// Card readers, the pickup queue and sales shipped from the counter.
+    public static PosCounterApi posCounter() {
+        return posCounter;
+    }
+
     public static PosToolsApi posTools() {
         return posTools;
     }

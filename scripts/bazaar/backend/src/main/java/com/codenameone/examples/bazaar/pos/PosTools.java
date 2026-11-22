@@ -240,6 +240,14 @@ public class PosTools {
         return out;
     }
 
+    /// `username`'s commission rate now, in basis points (0 when none is set):
+    /// what a counter sale they make is attributed at.
+    @Transactional(readOnly = true)
+    public long rateFor(String storeId, String username) {
+        StaffRate r = username == null ? null : rates.findByStoreIdAndUsername(storeId, username);
+        return r == null ? 0 : Math.max(0, r.getRateBp());
+    }
+
     private Map<String, Long> rateMap(String storeId) {
         Map<String, Long> out = new HashMap<String, Long>();
         List<StaffRate> rows = rates.findByStoreId(storeId);
@@ -282,6 +290,9 @@ public class PosTools {
     /// Counter sales per staff member who made them, closed between `from`
     /// and `to`. Net is the total less tax and refunds (the refund's share of
     /// tax taken out pro rata); a tip is reported apart and earns nothing.
+    /// The commission is each sale's net at the rate kept on the sale when it
+    /// was made, so a rate changed later earns from then on; `rateBp` is the
+    /// rate now.
     @Transactional(readOnly = true)
     public List<CommissionDto> commissions(String username, String storeId, String fromText,
             String toText) throws IOException {
@@ -300,19 +311,26 @@ public class PosTools {
         for (int iter = 0; iter < rows.size(); iter++) {
             StoreOrder o = rows.get(iter);
             if (o.getCreatedAt().toEpochMilli() >= to || !Orders.POS.equals(o.getChannel())
-                    || !Orders.CLOSED.equals(o.getStatus())
+                    || !(Orders.CLOSED.equals(o.getStatus()) || shipped(o))
                     || o.getStaffUsername().length() == 0) {
                 continue;
             }
             long[] s = sums.get(o.getStaffUsername());
             if (s == null) {
-                s = new long[3];
+                s = new long[4];
                 sums.put(o.getStaffUsername(), s);
                 order.add(o.getStaffUsername());
             }
+            long net = net(o);
             s[0]++;
-            s[1] += net(o);
+            s[1] += net;
             s[2] += o.getTipCents();
+            // Each sale earns at the rate it was made at; one made before
+            // sales kept their rate earns at the current one.
+            Long current = rateOf.get(o.getStaffUsername());
+            long bp = o.getCommissionBp() >= 0 ? o.getCommissionBp()
+                    : current == null ? 0 : current.longValue();
+            s[3] += Money.basisPoints(net, bp);
         }
         List<CommissionDto> out = new ArrayList<CommissionDto>();
         for (int iter = 0; iter < order.size(); iter++) {
@@ -322,9 +340,16 @@ public class PosTools {
             long bp = r == null ? 0 : r.longValue();
             StoreStaff m = staff.findByStoreIdAndUsername(storeId, who);
             out.add(new CommissionDto(who, m == null ? who : m.getDisplayName(), (int) s[0], s[1],
-                    s[2], bp, Money.basisPoints(s[1], bp)));
+                    s[2], bp, s[3]));
         }
         return out;
+    }
+
+    /// A sale at the counter shipped to the customer: open until it ships,
+    /// but paid in full and earned when it was made.
+    static boolean shipped(StoreOrder o) {
+        return Orders.OPEN.equals(o.getStatus()) && Orders.PAID.equals(o.getFinancial())
+                && o.getShipLine1().length() > 0;
     }
 
     /// An order's sales net of tax and of what was refunded.

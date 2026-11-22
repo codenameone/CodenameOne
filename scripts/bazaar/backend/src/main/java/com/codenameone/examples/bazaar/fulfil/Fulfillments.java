@@ -221,7 +221,13 @@ public class Fulfillments {
 
     private static boolean awaitsShipping(StoreOrder o) {
         return Orders.OPEN.equals(o.getStatus()) && !Orders.FULFILLED.equals(o.getFulfilment())
-                && !Orders.isUnconvertedDraft(o) && !Orders.POS.equals(o.getChannel());
+                && !Orders.isUnconvertedDraft(o) && !handedOver(o);
+    }
+
+    /// A sale at the counter, handed over there; one shipped to the customer
+    /// from the store has an address and goes out like an online order.
+    private static boolean handedOver(StoreOrder o) {
+        return Orders.POS.equals(o.getChannel()) && o.getShipLine1().length() == 0;
     }
 
     /// Units of each line already in a fulfilment that has not left yet.
@@ -420,6 +426,32 @@ public class Fulfillments {
     public FulfillmentDto pickupReady(String username, String storeId, String id)
             throws IOException {
         access.requireStaff(username, storeId, StoreAccess.STOCK);
+        return ready(username, storeId, id);
+    }
+
+    /// [#pickupReady] from the register's pickup queue, where any of the
+    /// store's staff, cashiers included, hands orders over.
+    public FulfillmentDto pickupReadyAtCounter(String username, String storeId, String id)
+            throws IOException {
+        access.requireStaff(username, storeId, StoreAccess.ANYONE);
+        return ready(username, storeId, id);
+    }
+
+    /// A pickup fulfilment of every line still to send, made at the register
+    /// for an order collected there. Only a pickup: shipping stays with the
+    /// staff who pack.
+    public FulfillmentDto createPickupAtCounter(String username, String storeId, String orderId,
+            NewFulfillmentDto req) throws IOException {
+        access.requireStaff(username, storeId, StoreAccess.ANYONE);
+        if (req == null || !PICKUP.equalsIgnoreCase(req.method())) {
+            throw new ResponseStatusException(400, "Only a pickup is made at the register");
+        }
+        Fulfillment f = createTx(storeId, orderId, req, username);
+        orderService.publish(orders.findById(orderId));
+        return detail(f.getId());
+    }
+
+    private FulfillmentDto ready(String username, String storeId, String id) throws IOException {
         Fulfillment f = fulfillmentIn(storeId, id);
         if (!PICKUP.equals(method(f))) {
             throw new ResponseStatusException(409, "That is not a pickup");
@@ -431,6 +463,7 @@ public class Fulfillments {
         }
         notifyShopper(f.getOrderId(), "push.pickup.title", "push.pickup.body",
                 locationName(f.getLocationId()));
+        emails.pickupReady(id, locationName(f.getLocationId()));
         return published(id);
     }
 
@@ -664,7 +697,7 @@ public class Fulfillments {
         for (int iter = 0; iter < rows.size(); iter++) {
             StoreOrder o = rows.get(iter);
             if (!Orders.OPEN.equals(o.getStatus()) || Orders.isUnconvertedDraft(o)
-                    || Orders.POS.equals(o.getChannel())) {
+                    || handedOver(o)) {
                 continue;
             }
             OrderCardDto card = card(o);

@@ -268,6 +268,31 @@ public class Emails {
         return builder(s, o.getEmail(), b.f("mail.shipped.subject", o.getNumber()), b).build();
     }
 
+    /// An order is ready to collect at `location`.
+    public void pickupReady(String fulfillmentId, String location) {
+        try {
+            send(pickupMail(fulfillmentId, location));
+        } catch (IOException | RuntimeException failed) {
+            log("pickup notice", fulfillmentId, failed);
+        }
+    }
+
+    @Transactional(readOnly = true)
+    private Mail pickupMail(String fulfillmentId, String location) throws IOException {
+        Fulfillment f = fulfillments.findById(fulfillmentId);
+        StoreOrder o = f == null ? null : orders.findById(f.getOrderId());
+        if (o == null || !Mail.isAddress(o.getEmail())) {
+            return null;
+        }
+        Store s = stores.findById(o.getStoreId());
+        Body b = new Body(s, language.of(o), "mail.pickup.title");
+        b.para(b.f("mail.pickup.body", o.getNumber(), location));
+        b.lines(lines.findByOrderId(o.getId()), o.getCurrency());
+        b.button(b.f("mail.seeOrder"), track(o));
+        return builder(s, o.getEmail(), b.f("mail.pickup.subject", o.getNumber(), location), b)
+                .build();
+    }
+
     /// A parcel arrived: the delivery notice and, beside it, a request to
     /// review what came.
     public void delivered(String fulfillmentId) {

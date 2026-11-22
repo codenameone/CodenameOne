@@ -35,6 +35,17 @@ final class GlobalSeed {
         db.execute("INSERT INTO checkout_field (id, store_id, sort_order, label, kind, choices, "
                 + "required, created_at) VALUES (?, ?, 0, 'IDOR field', 'text', '', 0, 0)",
                 new Object[] {Ids.next(), s.storeId});
+        // A card reader and a card payment it took, for the card reader routes.
+        String reader = Ids.next();
+        db.execute("INSERT INTO card_reader (id, store_id, register_id, provider, provider_ref, "
+                + "label, serial, status, created_at) VALUES (?, ?, '', 'simulated', ?, "
+                + "'IDOR reader', 'SIM-IDOR', 'ACTIVE', 0)",
+                new Object[] {reader, s.storeId, "tmr_sim_" + reader});
+        db.execute("INSERT INTO card_payment (id, store_id, register_id, reader_id, client_id, "
+                + "intent_ref, amount_cents, currency, status, message, card_label, order_id, "
+                + "created_at, updated_at) VALUES (?, ?, '', ?, ?, ?, 100, 'USD', 'PENDING', '', "
+                + "'', '', 0, 0)",
+                new Object[] {Ids.next(), s.storeId, reader, Ids.next(), "sim_tpi_" + reader});
         // A bundle component and a publishing window, for the bundle and
         // schedule routes.
         db.execute("INSERT INTO bundle_component (id, store_id, product_id, variant_id, quantity, "

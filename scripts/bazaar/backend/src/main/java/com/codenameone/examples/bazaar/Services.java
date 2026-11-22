@@ -195,6 +195,29 @@ public class Services {
     }
     // end::bazaar-payment-choice[]
 
+    /// The card readers at the registers follow `bazaar.payments.provider`:
+    /// [com.codenameone.examples.bazaar.pay.SimulatedTerminal] when it is
+    /// `simulated` (or unset on a development profile), and
+    /// [com.codenameone.examples.bazaar.pay.StripeTerminal] when it is
+    /// `stripe`, which registers readers to the Terminal location in
+    /// `bazaar.payments.stripe.terminal-location`. Kept with the payments, so a
+    /// card taken at a reader is refunded by the processor that took it.
+    @Bean
+    public com.codenameone.examples.bazaar.pay.CardTerminal cardTerminal(Config config,
+            @Value("${bazaar.payments.provider:}") String chosen,
+            @Value("${bazaar.payments.stripe.secret:}") String secret,
+            @Value("${bazaar.payments.stripe.terminal-location:}") String location) {
+        String kind = chosen.trim().length() > 0 ? chosen.trim()
+                : config.isDevelopmentProfile() ? "simulated" : "stripe";
+        // Never a simulated reader in place of Stripe: without the secret
+        // Stripe refuses each request, and the register says so.
+        if ("stripe".equalsIgnoreCase(kind)) {
+            return com.codenameone.examples.bazaar.pay.StripeTerminal.live(secret.trim(),
+                    location.trim());
+        }
+        return new com.codenameone.examples.bazaar.pay.SimulatedTerminal();
+    }
+
     // tag::bazaar-push-choice[]
     /// `bazaar.push.provider` is one of:
     ///

@@ -38,6 +38,9 @@ public final class PosSections {
     public static final String PARKED = "pos-parked";
     public static final String LAYAWAYS = "pos-layaways";
     public static final String EDITS = "pos-order-edit";
+    public static final String PICKUPS = "pos-pickups";
+    public static final String SHIP = "pos-ship";
+    public static final String DEVICES = "pos-devices";
 
     private static boolean installed;
 
@@ -60,6 +63,12 @@ public final class PosSections {
                 LayawayPane::create));
         Sections.register(Nav.POS, new Section(EDITS, "Edit order", FontImage.MATERIAL_EDIT_NOTE,
                 OrderEditPane::create));
+        Sections.register(Nav.POS, new Section(PICKUPS, "Pickups", FontImage.MATERIAL_STOREFRONT,
+                PickupPane::create));
+        Sections.register(Nav.POS, new Section(SHIP, "Ship to customer",
+                FontImage.MATERIAL_LOCAL_SHIPPING, ShipPane::create));
+        Sections.register(Nav.POS, new Section(DEVICES, "Devices", FontImage.MATERIAL_PRINT,
+                DevicesPane::create));
         Sections.register(Nav.POS, new Section(OUTBOX, "Outbox", FontImage.MATERIAL_CLOUD_UPLOAD,
                 OutboxPane::create));
         Sections.content(Nav.MERCHANT, Sections.POS, PosSections::launcher);

@@ -437,6 +437,11 @@ public class StripePayments implements PaymentProvider {
     /// Stripe wants a currency code in lower case. Folded by hand, because
     /// `toLowerCase()` follows the server's locale and a currency code must not.
     private static String asciiLower(String text) {
+        return lowerAscii(text);
+    }
+
+    /// [#asciiLower] for [StripeTerminal], which speaks to the same API.
+    static String lowerAscii(String text) {
         char[] chars = text.toCharArray();
         for (int iter = 0; iter < chars.length; iter++) {
             if (chars[iter] >= 'A' && chars[iter] <= 'Z') {

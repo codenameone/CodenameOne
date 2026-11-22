@@ -47,6 +47,7 @@ public final class MerchantSections {
     public static final String WAREHOUSE = "warehouse";
     public static final String FORECAST = "forecast";
     public static final String REPORTS = "reports";
+    public static final String COMMISSIONS = "commissions";
     public static final String PERMISSIONS = "permissions";
     public static final String INBOX = "inbox";
     public static final String LISTINGS = "listings";
@@ -109,6 +110,8 @@ public final class MerchantSections {
                 FontImage.MATERIAL_TRENDING_UP, ForecastPane::new));
         Sections.register(Nav.MERCHANT, new Section(REPORTS, "Reports", manage,
                 FontImage.MATERIAL_INSIGHTS, ReportsPane::new));
+        Sections.register(Nav.MERCHANT, new Section(COMMISSIONS, "Commissions", manage,
+                FontImage.MATERIAL_BADGE, CommissionsPane::new));
         Sections.register(Nav.MERCHANT, new Section(INBOX, "Inbox", store,
                 FontImage.MATERIAL_FORUM, InboxPane::new));
         Sections.register(Nav.MERCHANT, new Section(PERMISSIONS, "Permissions", manage,

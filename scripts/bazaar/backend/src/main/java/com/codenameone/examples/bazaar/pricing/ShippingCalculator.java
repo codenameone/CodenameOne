@@ -258,6 +258,12 @@ public final class ShippingCalculator {
 
     /// The option for `rateId` (an [Option#id]), or null when the address
     /// does not get it.
+    /// `o` named `name`, for a pickup the checkout titles by its location.
+    public static Option renamed(Option o, String name) {
+        return new Option(o.rate, o.priceCents, o.id, name, o.service, o.etaDaysMin,
+                o.etaDaysMax);
+    }
+
     public static Option find(List<Option> options, String rateId) {
         if (rateId == null) {
             return null;

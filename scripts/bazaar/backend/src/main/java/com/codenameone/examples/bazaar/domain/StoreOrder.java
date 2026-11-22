@@ -84,6 +84,12 @@ public class StoreOrder {
     @Column(nullable = false)
     private long tipCents;
 
+    /// The seller's commission rate, in basis points, when a counter sale was
+    /// made; -1 for an order that kept none (the report then uses the
+    /// current rate).
+    @Column(nullable = false)
+    private long commissionBp = -1;
+
     @Column(nullable = false, type = "VARCHAR(3)")
     private String currency = "";
 
@@ -306,6 +312,14 @@ public class StoreOrder {
 
     public void setTotalCents(long totalCents) {
         this.totalCents = totalCents;
+    }
+
+    public long getCommissionBp() {
+        return commissionBp;
+    }
+
+    public void setCommissionBp(long commissionBp) {
+        this.commissionBp = commissionBp;
     }
 
     public long getTipCents() {
