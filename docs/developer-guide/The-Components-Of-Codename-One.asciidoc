@@ -340,7 +340,7 @@ By default the dialog is placed on the form's layered pane, but you can switch b
 Finally, recent updates added animation toggles so you can fine-tune presentation. `setAnimateShow(boolean)` turns the show/dispose animations on or off, while `setRepositionAnimation(boolean)` enables a "grow/shrink" reposition effect during those animations when you want a more dynamic transition.
 
 [[coach-marks-section]]
-=== CoachMarks: feature tours and onboarding
+=== CoachMarks: Feature tours and onboarding
 
 https://www.codenameone.com/javadoc/com/codename1/components/CoachMarks.html[CoachMarks] walks a user through a screen one component at a time. This pattern is also called a feature tour, a product walkthrough, an onboarding overlay, a spotlight or a showcase view. The screen dims, the component of the current step shows through a cut-out, and a bubble beside it gives a title, a line of explanation, the step count and *Next* and *Skip* buttons.
 
@@ -991,7 +991,7 @@ NOTE: Despite the name of the method `setAnimation` expects a static image that 
 
 
 [[skeleton-section]]
-=== Skeleton: loading placeholders and shimmer
+=== Skeleton: Loading placeholders and shimmer
 
 https://www.codenameone.com/javadoc/com/codename1/components/Skeleton.html[Skeleton] is a skeleton screen placeholder, also known as a shimmer loader, a content placeholder or a ghost element. It draws the gray outline of content that's still loading, with a light band sweeping across it. Put one where the content will land: the screen says "loading" without a spinner, and it doesn't jump when the content arrives because the content takes the place the outline held.
 
@@ -1026,7 +1026,7 @@ The shapes use the foreground color of the `Skeleton` UIID. A theme that doesn't
 TIP: `Skeleton` is a `CommonProgressAnimations.ProgressAnimation`, so it works with the older `CommonProgressAnimations.ProgressAnimation.markComponentLoading` and `markComponentReady` API as well. Prefer `Skeleton` in new code; `CircleProgress` and `LoadingTextAnimation` remain for existing apps.
 
 [[empty-state-section]]
-=== EmptyState: nothing to show
+=== EmptyState: Nothing to show
 
 https://www.codenameone.com/javadoc/com/codename1/components/EmptyState.html[EmptyState] is the counterpart of `Skeleton`: what fills the same place when loading finished with nothing to show, or failed. Also known as a zero state, blank slate or "no results" view, it centers an icon, a title, a line of explanation and an optional action button. The `Skeleton` sample above shows the empty case; after an error, offer a retry:
 
@@ -1803,7 +1803,7 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/L
 
 `Carousel` is the swipeable `Tabs` described above with the tab bar hidden, plus a `PageIndicator`. It swipes, snaps and mirrors for right-to-left languages exactly as `Tabs` does, and `getTabs()` gives access to anything the class doesn't wrap. Auto play advances one page per interval while the carousel is on screen, waits a full interval after the user touches it, and wraps from the last page to the first unless `setLoop(false)` is set. `setIndicatorPosition` moves the dots to `BorderLayout.NORTH`, or hides them with `null`. Each page change is announced to screen readers.
 
-https://www.codenameone.com/javadoc/com/codename1/components/PageIndicator.html[PageIndicator] is the row of dots on its own, the current page drawn as a wider pill. Older code built this out of a row of radio buttons kept in step with `Tabs` by hand; `bind(Tabs)` replaces all of that:
+https://www.codenameone.com/javadoc/com/codename1/components/PageIndicator.html[PageIndicator] is the row of dots on its own, the current page drawn as a wider pill. Older code built this out of a row of radio buttons kept in step with `Tabs` by hand; `bind(Tabs)` replaces that code:
 
 [source,java]
 ----
