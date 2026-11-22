@@ -691,7 +691,9 @@ public class DocumentView extends ScrollSurface implements TextInputClient {
             return;
         }
         TextStyle st = it.style;
-        int px = Math.max(1, Math.round(PdfMeasurer.drawnSize(st) * scale));
+        // rounded down: a font drawn a pixel larger than the size it was measured at spills
+        // each word into the space after it and glues short gaps shut ("Westrecovered")
+        int px = Math.max(1, (int) (PdfMeasurer.drawnSize(st) * scale + 0.001f));
         Font f = font(st, px);
         Revision r = st.revision;
         int color = r == null ? st.color : r.isDeletion() ? DELETE_COLOR : INSERT_COLOR;
@@ -705,12 +707,23 @@ public class DocumentView extends ScrollSurface implements TextInputClient {
         // word; only the line's last item stops at its last glyph
         int textW = offset(it, paintLastOnLine ? rtrim(s).length() : s.length(), scale);
         int thick = Math.max(1, px / 14);
-        if (st.underline || r != null && !r.isDeletion()
-                || st.link != null && st.link.length() > 0) {
-            g.fillRect(x, baseline + Math.max(1, px / 8), textW, thick);
+        // a revision mark stays off the spaces at its ends: struck through, the space before a
+        // deleted word reads as no space at all ("Westrecovered")
+        int lead = 0;
+        while (lead < s.length() && s.charAt(lead) == ' ') {
+            lead++;
         }
-        if (st.strike || r != null && r.isDeletion()) {
+        int markX = x + offset(it, lead, scale);
+        int markW = offset(it, rtrim(s).length(), scale) - (markX - x);
+        if (st.underline || st.link != null && st.link.length() > 0) {
+            g.fillRect(x, baseline + Math.max(1, px / 8), textW, thick);
+        } else if (r != null && !r.isDeletion() && markW > 0) {
+            g.fillRect(markX, baseline + Math.max(1, px / 8), markW, thick);
+        }
+        if (st.strike) {
             g.fillRect(x, baseline - px / 3, textW, thick);
+        } else if (r != null && r.isDeletion() && markW > 0) {
+            g.fillRect(markX, baseline - px / 3, markW, thick);
         }
         if (proofreader != null && it.paragraphId != null) {
             paintIssues(g, it, scale, x, baseline + Math.max(2, px / 6), Math.max(2, px / 8));
@@ -768,11 +781,16 @@ public class DocumentView extends ScrollSurface implements TextInputClient {
             int at = x + offset(it, start, scale);
             int box = x + offset(it, end, scale) - at;
             String word = s.substring(start, end);
-            if (repeated(word)) {
+            if (repeated(word) || ScreenMeasurer.isMonospace(it.style)) {
                 // a tab leader: every dot at its own measured place, so a run of them cannot
                 // drift into the text after the tab
+                // drift into the text after the tab; monospaced text the same way, each
+                // character centred in its cell of the grid
                 for (int k = start; k < end; k++) {
-                    g.drawString(s.substring(k, k + 1), x + offset(it, k, scale), y);
+                    String c = s.substring(k, k + 1);
+                    int cx = x + offset(it, k, scale);
+                    int cell = x + offset(it, k + 1, scale) - cx;
+                    g.drawString(c, cx + (cell - g.getFont().stringWidth(c)) / 2, y);
                 }
             } else {
                 // the font is drawn at a whole pixel size, so a word is a little wider or

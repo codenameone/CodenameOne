@@ -48,9 +48,12 @@ public final class TableBinding {
     private final String tableId;
     private final Sheet sheet;
     private boolean syncing;
-    /// Volatile: a sheet changed off the EDT is followed on it, and must see a dispose made on
-    /// the thread that changed it.
-    private volatile boolean disposed; //NOPMD AvoidUsingVolatile - read on the EDT after a dispose on another thread
+    /// Guards `disposed` and every sync from the sheet. A sheet changed off the EDT is
+    /// followed on it, so a sync can be under way while another thread disposes and goes on
+    /// changing the sheet; checking a flag alone let such a sync read the later value and copy
+    /// it into the document after the dispose. Holding the lock, dispose waits for the sync.
+    private final Object lock = new Object();
+    private boolean disposed;
     private final DataChangedListener sheetListener = new DataChangedListener() {
         @Override
         public void dataChanged(int type, int index) {
@@ -126,11 +129,14 @@ public final class TableBinding {
 
     /// Stops following: the sheet keeps its cells, the model no longer changes with it.
     public void dispose() {
-        if (!disposed) {
+        synchronized (lock) {
+            if (disposed) {
+                return;
+            }
             disposed = true;
-            sheet.removeDataChangeListener(sheetListener);
-            model.removeDocumentListener(modelListener);
         }
+        sheet.removeDataChangeListener(sheetListener);
+        model.removeDocumentListener(modelListener);
     }
 
     private Table table(Document d) {
@@ -143,7 +149,15 @@ public final class TableBinding {
     }
 
     void sheetChanged() {
-        if (syncing || disposed) {
+        synchronized (lock) {
+            if (!disposed) {
+                syncFromSheet();
+            }
+        }
+    }
+
+    private void syncFromSheet() {
+        if (syncing) {
             return;
         }
         Document d = model.getDocument();
@@ -171,7 +185,15 @@ public final class TableBinding {
     }
 
     void modelChanged(Document before, Document after) {
-        if (syncing || disposed) {
+        synchronized (lock) {
+            if (!disposed) {
+                syncFromModel(before, after);
+            }
+        }
+    }
+
+    private void syncFromModel(Document before, Document after) {
+        if (syncing) {
             return;
         }
         Table t = table(after);

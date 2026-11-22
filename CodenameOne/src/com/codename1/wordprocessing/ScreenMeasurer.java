@@ -37,6 +37,9 @@ import java.util.Map;
 /// Widths are measured at [#PIXELS_PER_POINT] pixels per point and scaled back, so they do
 /// not depend on the size the view happens to draw at.
 public class ScreenMeasurer implements Measurer {
+    /// Courier's advance, in ems, for every character.
+    static final float MONO_ADVANCE = 0.6f;
+
     /// The pixel size per point text is measured at.
     static final int PIXELS_PER_POINT = 4;
 
@@ -65,9 +68,7 @@ public class ScreenMeasurer implements Measurer {
 
     private static Font create(TextStyle style, int px) {
         int s = (style.bold ? Font.STYLE_BOLD : 0) | (style.italic ? Font.STYLE_ITALIC : 0);
-        String fam = style.font == null ? "" : Ids.asciiLower(style.font);
-        boolean mono = fam.indexOf("mono") >= 0 || fam.indexOf("courier") >= 0;
-        if (mono) {
+        if (isMonospace(style)) {
             // the system monospace font comes in three sizes only: use the nearest, unless
             // even that is far off, where a proportional font of the right size reads better
             Font best = null;
@@ -95,8 +96,24 @@ public class ScreenMeasurer implements Measurer {
         return font(style, Math.max(1, Math.round(points * PIXELS_PER_POINT)));
     }
 
+    /// True for a style in a monospaced family. Its text is measured on a fixed grid of
+    /// Courier's advance, which the PDF export uses too, and drawn a character per cell.
+    static boolean isMonospace(TextStyle style) {
+        if (style.font == null) {
+            return false;
+        }
+        String f = Ids.asciiLower(style.font);
+        return f.indexOf("mono") >= 0 || f.indexOf("courier") >= 0 || f.indexOf("consol") >= 0
+                || f.indexOf("menlo") >= 0 || f.indexOf("code") >= 0;
+    }
+
     @Override
     public float width(String text, TextStyle style) {
+        if (isMonospace(style)) {
+            // no port has a monospaced font at every size, so the grid is Courier's: columns
+            // of code line up, and the page breaks exactly where the PDF's do
+            return text.length() * MONO_ADVANCE * PdfMeasurer.drawnSize(style);
+        }
         return measuring(style, PdfMeasurer.drawnSize(style)).stringWidth(text) / (float) PIXELS_PER_POINT;
     }
 

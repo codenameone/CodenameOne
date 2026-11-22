@@ -107,6 +107,9 @@ public class DocumentPagesScreenshotTest extends DualAppearanceBaseTest {
                 .append("The first line starts at the margin and every following line is indented, "
                         + "the way a bibliography or a definition list is set.", plain).build())
                 .withIndents(36, -36, 0));
+        TextStyle code = plain.withFont("Courier New").withSize(10).withBackground(0xf2f4f7);
+        b.add(p("code", RichText.of("int total = 0;\nfor (int v : values) {\n    total += v;\n}",
+                code)));
         b.add(new SectionBreak("s1", PageSpec.A4.withColumns(2, 18), false));
         b.add(p("c1", RichText.of(COLUMNS)));
         b.add(p("c2", RichText.of("The second paragraph continues in whichever column has room.")));
