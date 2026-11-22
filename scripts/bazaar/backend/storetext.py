@@ -586,6 +586,19 @@ T = [
 ("mail.downloads.title", "Your downloads are ready", "Tus descargas están listas", "Vos téléchargements sont prêts", "Ihre Downloads sind bereit", "ההורדות שלך מוכנות"),
 ("mail.downloads.body", "Order #{0} is paid. Here is what you bought.", "El pedido n.º {0} está pagado. Esto es lo que compraste.", "La commande n° {0} est payée. Voici vos achats.", "Bestellung Nr. {0} ist bezahlt. Hier ist Ihr Kauf.", "הזמנה מס' {0} שולמה. הנה מה שרכשת."),
 ("mail.downloads.subject", "Downloads for order #{0}", "Descargas del pedido n.º {0}", "Téléchargements de la commande n° {0}", "Downloads zu Bestellung Nr. {0}", "הורדות להזמנה מס' {0}"),
+("tip", "Add a tip", "Añade una propina", "Ajouter un pourboire", "Trinkgeld geben", "הוספת טיפ"),
+("tip.none", "No tip", "Sin propina", "Pas de pourboire", "Kein Trinkgeld", "ללא טיפ"),
+("tip.note", "The tip goes to the shop and is not taxed or discounted.", "La propina va a la tienda y no lleva impuestos ni descuentos.", "Le pourboire va à la boutique, sans taxe ni remise.", "Das Trinkgeld geht an den Shop und wird weder besteuert noch rabattiert.", "הטיפ עובר לחנות, ללא מס וללא הנחה."),
+("tip.line", "Tip", "Propina", "Pourboire", "Trinkgeld", "טיפ"),
+("questions", "A few questions", "Algunas preguntas", "Quelques questions", "Ein paar Fragen", "כמה שאלות"),
+("payType.note", "Pay later and bank payments are finished on the next page.", "Los pagos a plazos y bancarios se completan en la página siguiente.", "Les paiements différés et bancaires se terminent sur la page suivante.", "Später- und Bankzahlungen werden auf der nächsten Seite abgeschlossen.", "תשלום מאוחר ותשלום בנקאי מסתיימים בדף הבא."),
+("express.or", "Or pay in one step", "O paga en un paso", "Ou payez en une étape", "Oder in einem Schritt bezahlen", "או לשלם בצעד אחד"),
+("express.dev", "Pay with the test wallet", "Pagar con el monedero de prueba", "Payer avec le portefeuille de test", "Mit der Test-Wallet bezahlen", "תשלום בארנק הבדיקה"),
+("express.error", "The payment did not go through.", "El pago no se completó.", "Le paiement n'a pas abouti.", "Die Zahlung ist nicht durchgegangen.", "התשלום לא עבר."),
+("pay.pending", "Finish paying", "Termina el pago", "Terminez le paiement", "Zahlung abschließen", "השלמת התשלום"),
+("pay.simulated", "Test mode: choose how the bank answers.", "Modo de prueba: elige la respuesta del banco.", "Mode test : choisissez la réponse de la banque.", "Testmodus: Wählen Sie die Antwort der Bank.", "מצב בדיקה: בחרו איך הבנק עונה."),
+("pay.approve", "Approve payment", "Aprobar el pago", "Approuver le paiement", "Zahlung genehmigen", "אישור התשלום"),
+("pay.decline", "Decline payment", "Rechazar el pago", "Refuser le paiement", "Zahlung ablehnen", "דחיית התשלום"),
 ]
 
 

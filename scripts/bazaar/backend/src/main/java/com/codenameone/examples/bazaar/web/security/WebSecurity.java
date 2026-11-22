@@ -132,6 +132,9 @@ public class WebSecurity {
             .rateLimit(AntPathRequestMatcher.antMatcher("POST", "/s/*/checkout/**"),
                     RateLimitKeys.firstOf(RateLimitKeys.principal(), RateLimitKeys.clientAddress()),
                     throttle.limiter("checkout"))
+            .rateLimit(AntPathRequestMatcher.antMatcher("POST", "/s/*/orders/**"),
+                    RateLimitKeys.firstOf(RateLimitKeys.principal(), RateLimitKeys.clientAddress()),
+                    throttle.limiter("checkout"))
             .rateLimit(AntPathRequestMatcher.antMatcher("POST", "/auth/sms/**"),
                     RateLimitKeys.clientAddress(), throttle.limiter("sms"))
             .authorizeHttpRequests(auth -> auth

@@ -93,6 +93,7 @@ public class Checkouts {
     private final com.codenameone.examples.bazaar.taxes.TaxExemptions exemptions;
 
     private final com.codenameone.examples.bazaar.ops.Attribution attribution;
+    private final CheckoutSettings settings;
 
     public Checkouts(Carts carts, Quoter quoter, Inventory inventory, Orders orders,
             Payments payments, GiftCards giftCards, DiscountRepository discounts,
@@ -101,8 +102,10 @@ public class Checkouts {
             com.codenameone.examples.bazaar.risk.RiskHolds holds,
             com.codenameone.examples.bazaar.risk.Fraud fraud,
             com.codenameone.examples.bazaar.taxes.TaxExemptions exemptions,
-            com.codenameone.examples.bazaar.ops.Attribution attribution) {
+            com.codenameone.examples.bazaar.ops.Attribution attribution,
+            CheckoutSettings settings) {
         this.attribution = attribution;
+        this.settings = settings;
         this.carts = carts;
         this.quoter = quoter;
         this.inventory = inventory;
@@ -159,6 +162,50 @@ public class Checkouts {
     ///     currency) to charge the store's currency
     public OrderDto place(String username, String storeId, String headerKey, PlaceOrderDto req,
             Cart given, Payments.OneOffCard card, Markets.Pricer pricer) throws IOException {
+        return place(username, storeId, headerKey, req, given, card, pricer, null);
+    }
+
+    /// How an order is paid when it is not a saved or typed card: a wallet's
+    /// hold the browser already made (an express checkout), or a payment
+    /// method that is not a card, finished in the browser after the order is
+    /// placed.
+    public static final class Via {
+        String heldReference;
+        long heldCents;
+        String heldLabel = "";
+        String methodType;
+        /// For a [#method], the intent opened for the order: the pay page
+        /// hands its client secret to the processor's script.
+        public com.codenameone.examples.bazaar.pay.PaymentProvider.Intent intent;
+
+        private Via() {
+        }
+
+        /// A hold of `cents` (in the charge currency) the processor already
+        /// made under `reference`. The order is placed only if it comes to
+        /// exactly that.
+        public static Via held(String reference, long cents, String label) {
+            Via v = new Via();
+            v.heldReference = reference;
+            v.heldCents = cents;
+            v.heldLabel = label == null ? "" : label;
+            return v;
+        }
+
+        /// Paid with processor payment method `type` (`klarna`, `ideal`): the
+        /// order is placed as payment pending and the webhook settles it.
+        public static Via method(String type) {
+            Via v = new Via();
+            v.methodType = type;
+            return v;
+        }
+    }
+
+    /// [#place] paid `via` a wallet hold or a payment method that is not a
+    /// card; null pays as [#place] always has.
+    public OrderDto place(String username, String storeId, String headerKey, PlaceOrderDto req,
+            Cart given, Payments.OneOffCard card, Markets.Pricer pricer, Via via)
+            throws IOException {
         if (req == null) {
             throw new ResponseStatusException(400, "Say where the order goes");
         }
@@ -205,9 +252,24 @@ public class Checkouts {
                 || empty(address.city()))) {
             throw new ResponseStatusException(400, "The address needs a name, a street and a city");
         }
+        // The tip and the checkout fields, both checked against the store's
+        // settings before anything is reserved. The tip is a share of the
+        // goods after discounts, outside the total, and never taxed.
+        com.codenameone.examples.bazaar.api.CheckoutSettingsDto rules = settings.of(storeId);
+        final long tip = CheckoutSettings.tip(rules, req.tip(),
+                quote.subtotalCents - quote.discountCents());
+        final List<com.codenameone.examples.bazaar.api.OrderFieldDto> answers =
+                CheckoutSettings.answers(rules, req.fields());
+        String payCurrency = pricer != null ? pricer.currency() : quote.store.getCurrency();
+        if (via != null && via.methodType != null && (!rules.methods().contains(via.methodType)
+                || !com.codenameone.examples.bazaar.pay.PaymentTypes.allowed(via.methodType,
+                    payCurrency, hasCountry ? address.country().trim() : ""))) {
+            throw new ResponseStatusException(400, "That payment method is not offered here");
+        }
         final StoreOrder order = orders.newOrder(quote, Orders.ONLINE, username,
                 empty(req.email()) ? username : req.email(), address, clientId);
         order.setNote(Codes.cut(req.note(), 1000));
+        order.setTipCents(tip);
         // The language its mail goes out in: the storefront's, or what the
         // app or API client asked for (Accept-Language), else the cart's.
         String language = ShopperLanguage.fromRequest();
@@ -259,6 +321,7 @@ public class Checkouts {
                                 q.giftCard.getLastFour());
                     }
                     orders.insertLines(o, q, at, back);
+                    settings.keep(o.getId(), o.getStoreId(), answers);
                     orders.event(o.getId(), "PLACED", "Order placed", who);
                 }
             });
@@ -276,8 +339,10 @@ public class Checkouts {
             throw new ResponseStatusException(409, "The order is being placed; try again");
         }
 
-        long due = quote.dueCents();
+        // The tip rides on what the card pays, beside the total.
+        long due = quote.dueCents() + tip;
         String reference = "";
+        boolean pending = false;
         String chargeCurrency = quote.store.getCurrency();
         long charge = due;
         long rate = 0;
@@ -292,11 +357,29 @@ public class Checkouts {
             String method = empty(req.paymentMethodId()) ? payments.defaultMethod(username)
                     : req.paymentMethodId();
             try {
-                reference = card != null
-                        ? payments.authorizeCard(orderId, username, card, charge,
-                            chargeCurrency)
-                        : payments.authorize(orderId, username, method, charge,
+                if (via != null && via.heldReference != null) {
+                    if (charge != via.heldCents) {
+                        // The wallet approved a different amount than the
+                        // order comes to (the cart changed after the last
+                        // re-quote): never place it on a hold that does not
+                        // match.
+                        throw new ResponseStatusException(409,
+                                "The total changed; look at the order again");
+                    }
+                    reference = payments.keepHeld(orderId, username, via.heldReference, charge,
+                            chargeCurrency, via.heldLabel);
+                } else if (via != null && via.methodType != null) {
+                    via.intent = payments.startIntent(orderId, username, via.methodType, charge,
                             chargeCurrency);
+                    reference = via.intent.reference;
+                    pending = true;
+                } else {
+                    reference = card != null
+                            ? payments.authorizeCard(orderId, username, card, charge,
+                                chargeCurrency)
+                            : payments.authorize(orderId, username, method, charge,
+                                chargeCurrency);
+                }
             } catch (IOException | RuntimeException failed) {
                 // The fraud score counts refused payments; the order itself is erased.
                 holds.recordFailure(storeId, username);
@@ -305,7 +388,7 @@ public class Checkouts {
                 throw failed;
             }
         }
-        StoreOrder done = finish(orderId, quote, due, reference, username);
+        StoreOrder done = finish(orderId, quote, due, reference, username, pending);
         if (rate > 0) {
             done = presentment(orderId, chargeCurrency, presentmentTotal, rate,
                     pricer.source());
@@ -416,9 +499,12 @@ public class Checkouts {
 
     @Transactional(rollbackFor = IOException.class)
     private StoreOrder finish(String orderId, Quote quote, long due, String reference,
-            String username) throws IOException {
+            String username, boolean pending) throws IOException {
         StoreOrder order = orderRows.findById(orderId);
-        if (due <= 0) {
+        if (pending) {
+            // Paid in the browser after this: the webhook settles it.
+            order.setFinancial(Orders.PENDING);
+        } else if (due <= 0) {
             order.setFinancial(Orders.PAID);
         } else if (Payments.CASH.equals(reference)) {
             // Paid on pickup or delivery: the money is taken by hand.
@@ -456,9 +542,10 @@ public class Checkouts {
         order.setCustomerId(customer.getId());
         order.setUpdatedAt(Instant.now());
         orderRows.save(order);
-        orders.event(orderId, Orders.AUTHORIZED.equals(order.getFinancial()) ? "AUTHORIZED"
-                : "PAYMENT", Orders.AUTHORIZED.equals(order.getFinancial())
-                    ? "Payment held on the card" : "Payment recorded", username);
+        boolean held = Orders.AUTHORIZED.equals(order.getFinancial());
+        orders.event(orderId, pending ? "PAYMENT_PENDING" : held ? "AUTHORIZED" : "PAYMENT",
+                pending ? "Payment pending" : held ? "Payment held on the card"
+                    : "Payment recorded", username);
         return order;
     }
 }

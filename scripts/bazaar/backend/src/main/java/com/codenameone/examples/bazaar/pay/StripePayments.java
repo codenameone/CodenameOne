@@ -245,6 +245,71 @@ public class StripePayments implements PaymentProvider {
         }
     }
 
+    // ------------------------------------------------------------- intents
+
+    private String publishableKey = "";
+
+    /// The account's publishable key (`bazaar.payments.stripe.publishable-key`),
+    /// which Stripe.js in the shopper's browser is started with. It is public
+    /// by design; the secret key never leaves the server.
+    public void setPublishableKey(String key) {
+        publishableKey = key == null ? "" : key;
+    }
+
+    @Override
+    public String publicKey() {
+        return publishableKey;
+    }
+
+    /// A PaymentIntent the browser confirms with Stripe.js: the Payment
+    /// Request Button for a wallet (`card`, held with `capture_method=manual`)
+    /// or the Payment Element for one other method type, taken at once.
+    /// `metadata[bazaar_order]` names the order for the webhook.
+    @Override
+    public Intent createIntent(String key, long amountCents, String currency, String methodType,
+            boolean manualCapture, String orderId) throws IOException {
+        Map intent = ask("POST", "/v1/payment_intents", form("amount",
+                String.valueOf(amountCents), "currency", asciiLower(currency),
+                "payment_method_types[]", methodType,
+                "capture_method", manualCapture ? "manual" : "automatic",
+                "metadata[bazaar_charge]", key, "metadata[bazaar_order]", orderId), key);
+        return intentOf(intent, methodType);
+    }
+
+    @Override
+    public void updateIntent(String reference, long amountCents) throws IOException {
+        ask("POST", "/v1/payment_intents/" + URLEncoder.encode(reference, "UTF-8"),
+                form("amount", String.valueOf(amountCents)), null);
+    }
+
+    @Override
+    public Intent intent(String reference) throws IOException {
+        return intentOf(ask("GET", "/v1/payment_intents/" + URLEncoder.encode(reference, "UTF-8"),
+                null, null), "");
+    }
+
+    /// Stripe's intent statuses folded into the five the server tells apart:
+    /// one still waiting on the shopper (`requires_action`,
+    /// `requires_confirmation`) is open, and `canceled` failed.
+    private static Intent intentOf(Map answer, String methodType) throws IOException {
+        Intent out = new Intent();
+        out.reference = id(answer);
+        out.clientSecret = text(answer, "client_secret");
+        out.amountCents = number(answer, "amount");
+        out.currency = text(answer, "currency");
+        out.methodType = methodType;
+        String status = text(answer, "status");
+        if (INTENT_HELD.equals(status) || INTENT_SUCCEEDED.equals(status)
+                || INTENT_PROCESSING.equals(status)) {
+            out.status = status;
+        } else if ("canceled".equals(status)) {
+            out.status = INTENT_FAILED;
+        } else {
+            out.status = INTENT_OPEN;
+        }
+        return out;
+    }
+
     @Override
     public void release(String reference) throws IOException {
         String path = "/v1/payment_intents/" + URLEncoder.encode(reference, "UTF-8");

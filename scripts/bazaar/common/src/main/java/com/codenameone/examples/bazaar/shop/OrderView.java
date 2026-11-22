@@ -80,6 +80,15 @@ final class OrderView {
                 order.shippingCents() == 0 ? Lang.tr("Free") : ShopState.money(order.shippingCents())));
         page.add(Ui.fact(Lang.tr("Tax"), ShopState.money(order.taxCents())));
         page.add(Ui.fact(Lang.tr("Total"), ShopState.money(order.totalCents()), "SvTotal"));
+        if (order.tipCents() > 0) {
+            page.add(Ui.fact(Lang.tr("Tip"), ShopState.money(order.tipCents())));
+        }
+        if (order.fields() != null && !order.fields().isEmpty()) {
+            Ui.section(page, "Your answers");
+            for (int iter = 0; iter < order.fields().size(); iter++) {
+                page.add(Ui.fact(order.fields().get(iter).label(), order.fields().get(iter).value()));
+            }
+        }
         if (order.refundedCents() > 0) {
             page.add(Ui.fact(Lang.tr("Refunded"), ShopState.money(-order.refundedCents()),
                     "SvDiscount"));

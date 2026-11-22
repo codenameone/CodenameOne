@@ -89,14 +89,14 @@ on a row.
 | Customer accounts (login, saved addresses) | &#10003; | core | core | core | core | 
 | Passwordless / code sign-in | &#10003; | core | app/plugin | app/plugin | no | 
 | One-page / accelerated checkout | &#8211; | core | core | core | core | 
-| Apple Pay / Google Pay | &#9681; | core | core | core | core | Through the card provider when it offers wallets.
+| Apple Pay / Google Pay | &#10003; | core | core | core | core | Stripe's payment request button on the product page, cart and checkout; the server re-quotes shipping and tax as the wallet's address changes and places the order once. A test button drives the same flow with the simulated provider; the app uses the hosted page.
 | Discount code field | &#10003; | core | core | core | core | 
 | Gift card redemption at checkout | &#10003; | core | core | core | core | 
 | Address autocomplete / validation | &#10003; | core | app/plugin | app/plugin | no | 
 | Abandoned checkout recovery | &#10003; | core | app/plugin | core | core | 
 | Checkout customization / extensibility (UI extensions) | &#8211; | core | core | core | no | 
-| Order notes / custom attributes at checkout | &#9681; | core | core | core | core | Order notes are merchant-side.
-| Tipping at online checkout | &#8211; | app/plugin | app/plugin | app/plugin | core | 
+| Order notes / custom attributes at checkout | &#10003; | core | core | core | core | Owner-defined text, checkbox and select fields, optionally required, kept on the order and shown in its detail, the confirmation mail and the app.
+| Tipping at online checkout | &#10003; | app/plugin | app/plugin | app/plugin | core | Up to four percent or fixed presets; the tip is charged outside the order total, never taxed or discounted, and reported as Tips.
 | Post-purchase upsell | &#8211; | app/plugin | app/plugin | app/plugin | no | 
 | Marketing consent checkbox | &#10003; | core | core | core | core | 
 | Bot protection / rate limiting | &#10003; | core | core | core | core | Rate limits, honeypot fields and a timing bot guard on signup and checkout; no CAPTCHA. 
@@ -108,9 +108,9 @@ on a row.
 | Payouts / balance | &#10003; | core | core | core | core | 
 | Refunds (full/partial) | &#10003; | core | core | core | core | 
 | Chargeback / dispute management | &#10003; | core | app/plugin | app/plugin | core | Disputes are recorded with evidence and deadlines. 
-| Buy now pay later / installments | &#8211; | core | app/plugin | core | core | 
+| Buy now pay later / installments | &#10003; | core | app/plugin | core | core | Klarna and Afterpay/Clearpay through Stripe, enabled per store and offered by currency and country; the order waits as payment pending until the processor's webhook settles or cancels it.
 | Multi-currency payouts | &#8211; | core | app/plugin | app/plugin | no | 
-| Local payment methods (iDEAL etc.) | &#8211; | core | core | core | no | 
+| Local payment methods (iDEAL etc.) | &#10003; | core | core | core | no | iDEAL, Bancontact, SEPA debit and others through Stripe, by the same per-store rules; a failed payment cancels the order and releases its stock. 
 | Fraud analysis / risk score | &#10003; | core | app/plugin | app/plugin | core | Each order gets a risk score from address, velocity and value signals. 
 | Fraud filter rules / automatic cancellation | &#9681; | core | app/plugin | app/plugin | core | Risky orders are held for review; there is no rule editor. 
 | Chargeback protection | &#8211; | core | no | no | no | 

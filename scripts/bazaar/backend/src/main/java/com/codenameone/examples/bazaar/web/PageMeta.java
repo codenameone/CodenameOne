@@ -24,6 +24,15 @@ package com.codenameone.examples.bazaar.web;
 public final class PageMeta {
     /// The CSP nonce of this response (see web.security.WebHeaders).
     public String nonce = com.codenameone.examples.bazaar.web.security.WebHeaders.currentNonce();
+    /// Express checkout (Apple Pay, Google Pay) on this page: the endpoint
+    /// `pay.js` talks to, or empty when it is not offered ([ExpressButton]).
+    public String express = "";
+    /// The processor's browser key; empty shows the development wallet.
+    public String expressKey = "";
+    public String expressCountry = "";
+    public String expressCurrency = "";
+    /// The sheet's first total in cents, before an address is priced.
+    public String expressAmount = "0";
     public String title = "Bazaar";
     /// The interface language ([StoreText]): the `lang` of the page.
     public String lang = "en";

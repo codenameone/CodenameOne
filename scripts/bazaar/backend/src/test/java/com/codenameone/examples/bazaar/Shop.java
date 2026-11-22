@@ -102,6 +102,6 @@ final class Shop {
         }
         Map card = Rest.addCard(mvc, user, Rest.VISA);
         return checkouts.place(user, storeId, Ids.next(), new PlaceOrderDto(NY, rate,
-                (String) card.get("id"), email, "", null));
+                (String) card.get("id"), email, "", null, 0, null));
     }
 }

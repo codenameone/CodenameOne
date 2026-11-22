@@ -89,6 +89,16 @@ import java.util.Map;
 public class CheckoutPages {
     @Autowired
     private com.codenameone.examples.bazaar.catalog.Downloads downloads;
+    @Autowired
+    private com.codenameone.examples.bazaar.checkout.CheckoutSettings checkoutSettings;
+    @Autowired
+    private com.codenameone.examples.bazaar.pay.PaymentEvents paymentEvents;
+    @Autowired
+    private SiteUrls siteUrls;
+    @Autowired
+    private ExpressButton expressButton;
+    @Autowired
+    private com.codenameone.examples.bazaar.repository.PaymentRepository paymentRows;
     static final String GUEST = "guest:";
     /// The countries the form offers: ISO code, name.
     static final String[][] COUNTRIES = {
@@ -280,7 +290,11 @@ public class CheckoutPages {
                 || view.countryError.length() == 0 && dto.shippingRateId().length() == 0) {
             view.rateError = "The store does not deliver to that address";
         }
-        boolean card = dto.dueCents() > 0 && (me == null || f.methodId.length() == 0);
+        // A payment method other than a card (pay later, a bank) is finished
+        // on the order page after placing; no card is asked for.
+        boolean later = dto.dueCents() > 0 && f.payType.length() > 0
+                && !com.codenameone.examples.bazaar.pay.PaymentTypes.CARD.equals(f.payType);
+        boolean card = !later && dto.dueCents() > 0 && (me == null || f.methodId.length() == 0);
         CardDto typed = null;
         if (card) {
             typed = typedCard(f, view);
@@ -295,9 +309,12 @@ public class CheckoutPages {
             AddressDto address = address(f);
             OrderDto placed = checkouts.place(payer, store.getId(), null,
                     new PlaceOrderDto(address, dto.shippingRateId(),
-                        card ? null : f.methodId, f.email, f.note, f.idempotencyKey),
+                        card || later ? null : f.methodId, f.email, f.note, f.idempotencyKey,
+                        tipChoice(f.tip), answers(store, f)),
                     cart(store, request), oneOff,
-                    markets.pricer(store, StorefrontMarkets.cookie(request)));
+                    markets.pricer(store, StorefrontMarkets.cookie(request)),
+                    later ? com.codenameone.examples.bazaar.checkout.Checkouts.Via.method(f.payType)
+                        : null);
             StoreOrder row = orderRows.findById(placed.id());
             return SiteUrls.order(store.getHandle(), placed.number(), linkToken(row));
         } catch (ResponseStatusException refused) {
@@ -611,9 +628,16 @@ public class CheckoutPages {
                 }
             }
         }
+        extras(store, f, view, dto);
         view.invalid = view.invalid || anyFieldError(view);
         PageMeta meta = pages.meta(store, request, base);
+        if (!view.empty && !view.nothingDue) {
+            expressButton.decorate(meta, store, f.country, dto == null ? 0 : dto.dueCents());
+        }
         meta.title = meta.t.get("checkout") + " - " + store.getName();
+        if (!view.tips.isEmpty()) {
+            view.tips.get(0).label = meta.t.get("tip.none");
+        }
         meta.noindex = true;
         // The field errors were written in English; show them in the page's language.
         view.emailError = StoreText.translate(meta.t, view.emailError);
@@ -691,6 +715,115 @@ public class CheckoutPages {
 
     /// Trims every field and cuts it to a length no real value needs, so a
     /// megabyte typed into a field is not carried into every page drawn.
+    /// The tip presets, the store's checkout fields, the payment method types
+    /// for this currency and country.
+    private void extras(Store store, CheckoutForm f, CheckoutView view, CartDto dto)
+            throws IOException {
+        com.codenameone.examples.bazaar.api.CheckoutSettingsDto s =
+                checkoutSettings.of(store.getId());
+        String currency = store.getCurrency();
+        if (dto != null && s.tipsEnabled()) {
+            int chosen = tipChoice(f.tip);
+            view.tips.add(new CheckoutView.Option("0", "No tip", "", chosen == 0));
+            List<com.codenameone.examples.bazaar.api.TipOptionDto> on =
+                    com.codenameone.examples.bazaar.checkout.CheckoutSettings.tipOptions(s,
+                        dto.subtotalCents() - dto.discountCents(), currency);
+            for (int iter = 0; iter < on.size(); iter++) {
+                com.codenameone.examples.bazaar.api.TipOptionDto t = on.get(iter);
+                view.tips.add(new CheckoutView.Option(String.valueOf(t.choice()), t.label(),
+                        Money.format(t.amountCents(), currency), chosen == t.choice()));
+            }
+        }
+        for (int iter = 0; iter < s.fields().size(); iter++) {
+            com.codenameone.examples.bazaar.api.CheckoutFieldDto d = s.fields().get(iter);
+            CheckoutView.Field fv = new CheckoutView.Field();
+            fv.name = "f" + iter;
+            fv.label = d.label();
+            fv.kind = d.kind();
+            fv.text = com.codenameone.examples.bazaar.checkout.CheckoutSettings.TEXT.equals(fv.kind);
+            fv.checkbox = com.codenameone.examples.bazaar.checkout.CheckoutSettings.CHECKBOX
+                    .equals(fv.kind);
+            fv.select = com.codenameone.examples.bazaar.checkout.CheckoutSettings.SELECT
+                    .equals(fv.kind);
+            fv.required = d.required();
+            fv.value = f.field(iter);
+            fv.checked = fv.value.length() > 0;
+            List<String> choices = com.codenameone.examples.bazaar.checkout.CheckoutSettings
+                    .options(d.options());
+            for (int c = 0; c < choices.size(); c++) {
+                fv.choices.add(new CheckoutView.Option(choices.get(c), choices.get(c), "",
+                        choices.get(c).equals(fv.value)));
+            }
+            view.fields.add(fv);
+        }
+        if (dto != null && dto.dueCents() > 0) {
+            List<com.codenameone.examples.bazaar.api.PaymentTypeDto> types =
+                    com.codenameone.examples.bazaar.pay.PaymentTypes.offered(s.methods(),
+                        currency, f.country);
+            if (types.size() > 1) {
+                for (int iter = 0; iter < types.size(); iter++) {
+                    com.codenameone.examples.bazaar.api.PaymentTypeDto t = types.get(iter);
+                    boolean card = com.codenameone.examples.bazaar.pay.PaymentTypes.CARD
+                            .equals(t.type());
+                    view.payTypes.add(new CheckoutView.Option(t.type(), t.label(), "",
+                            card ? f.payType.length() == 0 || f.payType.equals(t.type())
+                                : f.payType.equals(t.type())));
+                }
+            }
+        }
+    }
+
+    /// The tip preset a form chose, 0 for none or anything unreadable.
+    static int tipChoice(String tip) {
+        if (tip == null || tip.length() != 1 || tip.charAt(0) < '0' || tip.charAt(0) > '9') {
+            return 0;
+        }
+        return tip.charAt(0) - '0';
+    }
+
+    /// The form's answers to the store's fields, in the settings' order.
+    private List<com.codenameone.examples.bazaar.api.FieldAnswerDto> answers(Store store,
+            CheckoutForm f) throws IOException {
+        List<com.codenameone.examples.bazaar.api.CheckoutFieldDto> fields =
+                checkoutSettings.of(store.getId()).fields();
+        List<com.codenameone.examples.bazaar.api.FieldAnswerDto> out =
+                new java.util.ArrayList<com.codenameone.examples.bazaar.api.FieldAnswerDto>();
+        for (int iter = 0; iter < fields.size(); iter++) {
+            out.add(new com.codenameone.examples.bazaar.api.FieldAnswerDto(fields.get(iter).id(),
+                    f.field(iter)));
+        }
+        return out;
+    }
+
+    /// A payment pending order's two simulated outcomes (the simulated
+    /// processor only): `approve` pays it, `decline` fails it, each through
+    /// the same settling as the processor's webhook.
+    public String simulatePayment(String handle, String number, String token, String outcome)
+            throws IOException {
+        StoreOrder row = visible(handle, number, token);
+        if (!(payments.provider()
+                instanceof com.codenameone.examples.bazaar.pay.SimulatedPayments)) {
+            throw new ResponseStatusException(404, "Not found");
+        }
+        com.codenameone.examples.bazaar.pay.SimulatedPayments sim =
+                (com.codenameone.examples.bazaar.pay.SimulatedPayments) payments.provider();
+        com.codenameone.examples.bazaar.domain.Payment p = paymentRow(row.getId());
+        if (p != null && Orders.PENDING.equals(row.getFinancial())) {
+            boolean ok = "approve".equals(outcome);
+            sim.complete(p.getProviderRef(), ok);
+            if (ok) {
+                sim.settle(p.getProviderRef(), true);
+            }
+            paymentEvents.settle(row.getId());
+        }
+        return SiteUrls.order(handle, row.getNumber(), linkToken(row));
+    }
+
+    private com.codenameone.examples.bazaar.domain.Payment paymentRow(String orderId)
+            throws IOException {
+        return paymentRows.findById(orderId);
+    }
+
     static CheckoutForm clean(CheckoutForm in) {
         CheckoutForm f = in == null ? new CheckoutForm() : in;
         f.email = cut(f.email, 190);
@@ -713,6 +846,18 @@ public class CheckoutPages {
         f.cardExpiry = cut(f.cardExpiry, 8);
         f.cardCvc = cut(f.cardCvc, 4);
         f.idempotencyKey = cut(f.idempotencyKey, 64);
+        f.tip = cut(f.tip, 2);
+        f.payType = cut(f.payType, 32);
+        f.f0 = cut(f.f0, 500);
+        f.f1 = cut(f.f1, 500);
+        f.f2 = cut(f.f2, 500);
+        f.f3 = cut(f.f3, 500);
+        f.f4 = cut(f.f4, 500);
+        f.f5 = cut(f.f5, 500);
+        f.f6 = cut(f.f6, 500);
+        f.f7 = cut(f.f7, 500);
+        f.f8 = cut(f.f8, 500);
+        f.f9 = cut(f.f9, 500);
         return f;
     }
 
@@ -805,7 +950,33 @@ public class CheckoutPages {
         view.shipping = Money.format(o.shippingCents(), currency);
         view.tax = Money.format(o.taxCents(), currency);
         view.total = Money.format(o.totalCents(), currency);
+        view.tip = o.tipCents() > 0 ? Money.format(o.tipCents(), currency) : "";
+        for (int iter = 0; o.fields() != null && iter < o.fields().size(); iter++) {
+            view.fields.add(new CheckoutView.Option(o.fields().get(iter).value(),
+                    o.fields().get(iter).label(), "", false));
+        }
         String t = linkToken(row);
+        com.codenameone.examples.bazaar.domain.Payment pay = paymentRow(row.getId());
+        if (Orders.PENDING.equals(o.financial()) && Orders.OPEN.equals(o.status()) && pay != null
+                && com.codenameone.examples.bazaar.pay.Payments.PROCESSING.equals(pay.getStatus())) {
+            view.payPending = true;
+            String self = "/s/" + SiteUrls.encode(store.getHandle()) + "/orders/" + o.number();
+            if (payments.provider()
+                    instanceof com.codenameone.examples.bazaar.pay.SimulatedPayments) {
+                view.paySimulated = true;
+                view.payAction = self + "/pay?t=" + t;
+            } else {
+                com.codenameone.examples.bazaar.pay.PaymentProvider.Intent intent =
+                        payments.openIntent(row.getId());
+                if (intent != null && com.codenameone.examples.bazaar.pay.PaymentProvider
+                        .INTENT_OPEN.equals(intent.status)) {
+                    view.payKey = payments.provider().publicKey();
+                    view.paySecret = intent.clientSecret;
+                    view.payReturn = siteUrls.absolute(request, self + "?t=" + t);
+                    com.codenameone.examples.bazaar.web.security.WebHeaders.allowStripe();
+                }
+            }
+        }
         view.invoiceUrl = "/s/" + SiteUrls.encode(store.getHandle()) + "/orders/" + o.number()
                 + "/invoice.pdf?t=" + t;
         view.storeUrl = StorefrontPages.storeUrl(store.getHandle());

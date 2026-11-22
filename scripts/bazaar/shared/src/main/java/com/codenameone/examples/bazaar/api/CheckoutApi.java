@@ -19,9 +19,11 @@
 package com.codenameone.examples.bazaar.api;
 
 import com.codename1.annotations.rest.Body;
+import com.codename1.annotations.rest.GET;
 import com.codename1.annotations.rest.Header;
 import com.codename1.annotations.rest.POST;
 import com.codename1.annotations.rest.Path;
+import com.codename1.annotations.rest.Query;
 import com.codename1.annotations.rest.RestClient;
 import com.codename1.io.rest.Response;
 import com.codename1.util.OnComplete;
@@ -37,4 +39,12 @@ public interface CheckoutApi {
     @POST("/api/checkout/{storeId}")
     void place(@Path("storeId") String storeId, @Header("Idempotency-Key") String key,
             @Body PlaceOrderDto order, OnComplete<Response<OrderDto>> callback);
+
+    /// What the store's checkout offers the signed-in shopper now: payment
+    /// method types for `country` (two letters, or empty for the store's own),
+    /// tips worked out on the cart, the checkout fields, and the storefront
+    /// checkout page for the methods the app hands to it.
+    @GET("/api/checkout/{storeId}/options")
+    void options(@Path("storeId") String storeId, @Query("country") String country,
+            OnComplete<Response<CheckoutOptionsDto>> callback);
 }

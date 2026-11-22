@@ -57,7 +57,7 @@ public class Reports {
         {"month", "Month"}, {"channel", "Channel"}, {"source", "Source"}, {"medium", "Medium"},
         {"campaign", "Campaign"}, {"product", "Product"}, {"location", "Location"}};
     public static final String[][] METRICS = {{"sales", "Sales"}, {"orders", "Orders"},
-        {"units", "Units"}, {"aov", "Average order"}, {"customers", "Customers"}};
+        {"units", "Units"}, {"aov", "Average order"}, {"customers", "Customers"}, {"tips", "Tips"}};
     static final int MAX_DAYS = 400;
     static final int MAX_ORDERS = 20000;
     static final int MAX_ROWS = 500;
@@ -161,6 +161,8 @@ public class Reports {
         final Map<String, Boolean> customers = new HashMap<String, Boolean>();
         long sales;
         long units;
+        /// Online and counter tips: outside sales, never taxed, the staff's.
+        long tips;
     }
 
     private String key(String dim, Map o, Map attr, String product, Map<String, String> locs) {
@@ -209,7 +211,7 @@ public class Reports {
         Map currency = db.queryOne("SELECT currency FROM store WHERE id = ?", new Object[] {storeId});
         String cur = currency == null ? "USD" : Rows.text(currency.get("currency"));
         List orders = db.query("SELECT id, created_at, channel, location_id, subtotal_cents, "
-                + "discount_cents, refunded_cents, customer_id, email FROM store_order WHERE store_id = ? "
+                + "discount_cents, refunded_cents, tip_cents, customer_id, email FROM store_order WHERE store_id = ? "
                 + "AND created_at >= ? AND created_at < ? AND status <> 'CANCELLED' AND status <> 'DRAFT' "
                 + "ORDER BY created_at", new Object[] {storeId, Long.valueOf(from), Long.valueOf(to)});
         Map<String, Map> attrs = new HashMap<String, Map>();
@@ -315,7 +317,7 @@ public class Reports {
                     first = v;
                 }
                 String mm = metrics.get(m);
-                cells.add("sales".equals(mm) || "aov".equals(mm) ? Money.format(v, cur)
+                cells.add("sales".equals(mm) || "aov".equals(mm) || "tips".equals(mm) ? Money.format(v, cur)
                         : String.valueOf(v));
             }
             total += first;
@@ -344,6 +346,9 @@ public class Reports {
             accs.put(k, acc);
             order.add(k);
         }
+        if (!acc.orders.containsKey(orderId)) {
+            acc.tips += Rows.number(o.get("tip_cents"));
+        }
         acc.orders.put(orderId, Boolean.TRUE);
         if (customer.length() > 0) {
             acc.customers.put(customer, Boolean.TRUE);
@@ -353,6 +358,9 @@ public class Reports {
     }
 
     private static long value(String metric, Acc acc) {
+        if ("tips".equals(metric)) {
+            return acc.tips;
+        }
         if ("orders".equals(metric)) {
             return acc.orders.size();
         }

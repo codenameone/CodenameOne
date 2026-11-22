@@ -160,6 +160,9 @@ public class SecurityConfig {
             // malformed address before anything is written.
             .rateLimit(SIGNUP_SUBMIT, RateLimitKeys.clientAddress(), throttle.limiter("form"))
             .rateLimit(STOCK_ALERT, RateLimitKeys.clientAddress(), throttle.limiter("form"))
+            // The payment processor's payment events: signed, not signed in.
+            .rateLimit(com.codenameone.examples.bazaar.pay.PaymentEvents.PATH,
+                    RateLimitKeys.clientAddress(), new InMemoryRateLimiter(120, 60))
             // The payment processor's dispute events: signed, not signed in.
             .rateLimit(com.codenameone.examples.bazaar.dispute.DisputeWebhook.PATH,
                     RateLimitKeys.clientAddress(), new InMemoryRateLimiter(120, 60))
@@ -184,6 +187,8 @@ public class SecurityConfig {
                     .requestMatchers(AntPathRequestMatcher.antMatcher("POST", STOCK_ALERT)).permitAll()
                     .requestMatchers(AntPathRequestMatcher.antMatcher("POST",
                             com.codenameone.examples.bazaar.dispute.DisputeWebhook.PATH)).permitAll()
+                    .requestMatchers(AntPathRequestMatcher.antMatcher("POST",
+                            com.codenameone.examples.bazaar.pay.PaymentEvents.PATH)).permitAll()
                     .requestMatchers(AntPathRequestMatcher.antMatcher("POST",
                             com.codenameone.examples.bazaar.channel.ChannelWebhook.PATH)).permitAll()
                     .requestMatchers(AntPathRequestMatcher.antMatcher("POST",

@@ -271,4 +271,74 @@ class WebCheckoutTest {
         assertEquals(404, two.get("/s/wc-idor/orders/99?t=" + firstToken).getStatus());
         assertEquals(200, two.get(second.substring(second.indexOf("/s/"))).getStatus());
     }
+
+    private void checkoutSettings(Shop s, String methods, String tips, String fieldKind,
+            boolean required) throws Exception {
+        db.execute("INSERT INTO checkout_settings (store_id, methods, tips_enabled, tip_presets, "
+                + "updated_at) VALUES (?, ?, ?, ?, 0)",
+                new Object[] {s.storeId, methods, tips.length() > 0 ? 1 : 0, tips});
+        if (fieldKind != null) {
+            db.execute("INSERT INTO checkout_field (id, store_id, sort_order, label, kind, "
+                    + "choices, required, created_at) VALUES (?, ?, 0, 'Gate code', ?, '', ?, 0)",
+                    new Object[] {Ids.next(), s.storeId, fieldKind, required ? 1 : 0});
+        }
+    }
+
+    private String orderColumn(Shop s, String column) throws Exception {
+        return String.valueOf(db.queryOne("SELECT " + column + " FROM store_order "
+                + "WHERE store_id = ?", new Object[] {s.storeId}).get(column));
+    }
+
+    @Test
+    void aTipAndTheStoresQuestionGoThroughTheHtmlCheckout() throws Exception {
+        Shop s = shop("wc-tip");
+        checkoutSettings(s, "", "p1500", "text", true);
+        Browser b = guest(s, "wc-tip", 2);
+        String html = b.last.getContentAsString();
+        assertTrue(html.contains("Add a tip"), "the tip presets are offered");
+        assertTrue(html.contains("Gate code *"), "the required question is asked");
+        // The simulated processor's wallet is a test button, and the policy
+        // never names Stripe.
+        assertTrue(html.contains("Pay with the test wallet"));
+        assertFalse(b.last.getHeader("Content-Security-Policy").contains("stripe.com"));
+        String key = key(html);
+        MockResponse missing = b.post("/s/wc-tip/checkout/place", address(key, "tip", "1"));
+        assertFalse(missing.getStatus() == 303, "an unanswered required question is refused");
+        assertEquals(0L, orders(s));
+        MockResponse placed = b.post("/s/wc-tip/checkout/place",
+                address(key, "tip", "1", "f0", "4321#"));
+        assertEquals(303, placed.getStatus(), placed.getContentAsString());
+        assertTrue(Long.parseLong(orderColumn(s, "tip_cents")) > 0,
+                "the tip is kept beside the total");
+        String location = placed.getRedirectedUrl();
+        String confirmation = b.get(location.substring(location.indexOf("/s/")))
+                .getContentAsString();
+        assertTrue(confirmation.contains("Gate code"), confirmation);
+        assertTrue(confirmation.contains("4321#"), "the answer shows on the order");
+    }
+
+    @Test
+    void aPayLaterOrderWaitsUntilTheBankAnswers() throws Exception {
+        Shop s = shop("wc-later");
+        checkoutSettings(s, "klarna", "", null, false);
+        Browser b = guest(s, "wc-later", 3);
+        assertTrue(b.last.getContentAsString().contains("Klarna"), "Klarna is offered in USD");
+        MockResponse placed = b.post("/s/wc-later/checkout/place",
+                address(key(b.last.getContentAsString()), "payType", "klarna",
+                    "cardNumber", "", "cardExpiry", "", "cardCvc", ""));
+        assertEquals(303, placed.getStatus(), placed.getContentAsString());
+        assertEquals("PENDING", orderColumn(s, "financial"));
+        assertEquals(3, committed(s), "the stock is held while the payment is pending");
+        String location = placed.getRedirectedUrl();
+        String page = b.get(location.substring(location.indexOf("/s/"))).getContentAsString();
+        assertTrue(page.contains("Finish paying"), page);
+        String marker = "action=\"";
+        int at = page.indexOf(marker, page.indexOf("pay-pending"));
+        String action = page.substring(at + marker.length(),
+                page.indexOf('"', at + marker.length())).replace("&amp;", "&");
+        MockResponse declined = b.post(action, "outcome", "decline");
+        assertEquals(303, declined.getStatus(), declined.getContentAsString());
+        assertEquals("CANCELLED", orderColumn(s, "status"));
+        assertEquals(0, committed(s), "a failed payment releases the stock");
+    }
 }

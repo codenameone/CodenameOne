@@ -90,6 +90,30 @@ public final class CheckoutView {
     /// Whether any error is shown, for the summary at the top.
     public boolean invalid;
 
+    /// The tips on offer, "none" first; empty with tips off.
+    public List<Option> tips = new ArrayList<Option>();
+    /// The store's own questions ([Field]).
+    public List<Field> fields = new ArrayList<Field>();
+    public String fieldError = "";
+    /// The payment method types beside the card, for this currency and
+    /// country; empty when only cards are taken.
+    public List<Option> payTypes = new ArrayList<Option>();
+
+    /// One of the store's checkout fields, named `f<n>` in the form.
+    public static final class Field {
+        public String name = "";
+        public String label = "";
+        public String kind = "";
+        public boolean required;
+        public String value = "";
+        public boolean checked;
+        public List<Option> choices = new ArrayList<Option>();
+        /// Which of the three kinds it is.
+        public boolean text;
+        public boolean checkbox;
+        public boolean select;
+    }
+
     /// A choice of a select or a radio group.
     public static final class Option {
         public String value = "";

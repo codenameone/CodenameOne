@@ -125,7 +125,7 @@ class CheckoutTest {
             throws Exception {
         carts.add(s[0], user, null, new CartLineChangeDto(s[2], qty));
         return checkouts.place(user, s[0], key, new PlaceOrderDto(NY, express(s[0], user), method,
-                user + "@example.com", "", null));
+                user + "@example.com", "", null, 0, null));
     }
 
     private static int status(Throwable t) {
@@ -194,7 +194,7 @@ class CheckoutTest {
         carts.applyDiscount(s[0], user, null, "WELCOME10");
         try {
             checkouts.place(user, s[0], "d1", new PlaceOrderDto(NY, express(s[0], user),
-                    "no-such-card", "", "", null));
+                    "no-such-card", "", "", null, 0, null));
             fail("refused");
         } catch (ResponseStatusException e) {
             assertTrue(e.getStatus() >= 400 && e.getStatus() < 500, "status " + e.getStatus());
@@ -208,7 +208,7 @@ class CheckoutTest {
         assertEquals(1, carts.get(s[0], user, null).lines().size(), "the cart is kept");
         // And the same cart then goes through.
         OrderDto o = checkouts.place(user, s[0], "d2", new PlaceOrderDto(NY, express(s[0], user),
-                card(user), "", "", null));
+                card(user), "", "", null, 0, null));
         assertEquals(200, o.discountCents());
     }
 
@@ -229,7 +229,7 @@ class CheckoutTest {
         carts.add(s[0], user, null, new CartLineChangeDto(empty, 1));
         try {
             checkouts.place(user, s[0], "o1", new PlaceOrderDto(NY, express(s[0], user), card(user),
-                    "", "", null));
+                    "", "", null, 0, null));
             fail("out of stock");
         } catch (ResponseStatusException e) {
             assertEquals(409, e.getStatus());
@@ -255,7 +255,7 @@ class CheckoutTest {
             @Override
             public void run(int i) throws Exception {
                 checkouts.place(users[i], s[0], "last", new PlaceOrderDto(NY, rates[i],
-                        methods[i], "", "", null));
+                        methods[i], "", "", null, 0, null));
             }
         });
         assertEquals(1, frequency(outcomes, 200), "outcomes " + outcomes);
@@ -284,7 +284,7 @@ class CheckoutTest {
             @Override
             public void run(int i) throws Exception {
                 checkouts.place(users[i], s[0], "limit", new PlaceOrderDto(NY, rates[i],
-                        methods[i], "", "", null));
+                        methods[i], "", "", null, 0, null));
             }
         });
         assertEquals(2, frequency(outcomes, 200), "outcomes " + outcomes);

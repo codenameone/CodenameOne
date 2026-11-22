@@ -139,14 +139,18 @@ public class Orders {
     @com.codename1.backend.annotations.Autowired
     private OrderSettings orderSettings;
 
+    private final com.codenameone.examples.bazaar.checkout.CheckoutSettings checkoutSettings;
+
     public Orders(StoreOrderRepository orders, OrderLineRepository lines,
             OrderEventRepository events, TenderRepository tenders,
             FulfillmentRepository fulfillments, RefundRepository refunds,
             RefundLineRepository refundLines, PaymentRepository paymentRows,
             StoreRepository stores, StoreStaffRepository staff, Payments payments,
             Inventory inventory, GiftCards giftCards, StoreAccess access, LiveHub live,
-            Quoter quoter, StoreEvents storeEvents, CustomerRepository customers, SaleEvents saleEvents) {
+            Quoter quoter, StoreEvents storeEvents, CustomerRepository customers, SaleEvents saleEvents,
+            com.codenameone.examples.bazaar.checkout.CheckoutSettings checkoutSettings) {
         this.saleEvents = saleEvents;
+        this.checkoutSettings = checkoutSettings;
         this.orders = orders;
         this.lines = lines;
         this.events = events;
@@ -399,6 +403,41 @@ public class Orders {
             tender(orderId, "CASH", paid, "manual");
         }
         event(orderId, "PAID", "Marked as paid", username);
+        return orders.findById(orderId);
+    }
+
+    /// Records that the processor settled an order's payment-pending payment
+    /// (`payment` is [Payments#PAID], or [Payments#AUTHORIZED] for a hold):
+    /// the order moves from [#PENDING] and gets its tender. Safe to repeat;
+    /// answers false when the order was not waiting.
+    public boolean settledOnline(String orderId, String payment, String label)
+            throws IOException {
+        StoreOrder done = recordSettled(orderId, payment, label);
+        if (done == null) {
+            return false;
+        }
+        publish(done);
+        if (PAID.equals(done.getFinancial())) {
+            storeEvents.orderPaid(orderId);
+        }
+        return true;
+    }
+
+    @Transactional(rollbackFor = IOException.class)
+    private StoreOrder recordSettled(String orderId, String payment, String label)
+            throws IOException {
+        StoreOrder order = orders.findById(orderId);
+        String to = Payments.AUTHORIZED.equals(payment) ? AUTHORIZED : PAID;
+        if (order == null || !PENDING.equals(order.getFinancial())
+                || CANCELLED.equals(order.getStatus())
+                || orders.claimFinancial(orderId, PENDING, to) != 1) {
+            return null;
+        }
+        long paid = order.getTotalCents() + order.getTipCents() - giftCards.spentOn(orderId);
+        Payment row = paymentRows.findById(orderId);
+        tender(orderId, "CARD", paid, row == null ? "" : row.getProviderRef());
+        event(orderId, PAID.equals(to) ? "PAID" : "AUTHORIZED", (PAID.equals(to)
+                ? "Paid with " : "Payment held by ") + label, "processor");
         return orders.findById(orderId);
     }
 
@@ -1244,6 +1283,7 @@ public class Orders {
         List<OrderEventDto> es = null;
         List<TenderDto> ts = null;
         List<FulfillmentSummaryDto> fs = null;
+        List<com.codenameone.examples.bazaar.api.OrderFieldDto> answers = null;
         String paymentStatus = "";
         if (full) {
             ls = new ArrayList<OrderLineDto>();
@@ -1278,6 +1318,7 @@ public class Orders {
             }
             Payment payment = paymentRows.findById(o.getId());
             paymentStatus = payment == null ? "" : payment.getStatus();
+            answers = checkoutSettings.answersOf(o.getId());
         }
         AddressDto address = new AddressDto(o.getShipName(), o.getShipLine1(), o.getShipLine2(),
                 o.getShipCity(), o.getShipRegion(), o.getShipPostal(), o.getShipCountry(),
@@ -1288,6 +1329,6 @@ public class Orders {
                 o.getTotalCents(), o.getRefundedCents(), o.getCurrency(), o.getDiscountCode(),
                 address, o.getShippingRateId(), o.getShippingTitle(), o.getNote(), o.getTags(),
                 o.getCreatedAt() == null ? 0 : o.getCreatedAt().toEpochMilli(), paymentStatus, ls,
-                es, ts, fs);
+                es, ts, fs, o.getTipCents(), answers);
     }
 }

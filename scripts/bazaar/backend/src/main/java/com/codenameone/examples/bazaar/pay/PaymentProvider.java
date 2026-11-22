@@ -106,6 +106,66 @@ public interface PaymentProvider {
     void release(String reference) throws IOException;
     // end::bazaar-payment-provider[]
 
+    // tag::bazaar-payment-intents[]
+    /// Opens a payment the shopper completes in the browser -- a wallet sheet
+    /// (Apple Pay, Google Pay) or a payment method that is not a card (Klarna,
+    /// iDEAL) -- rather than one the server charges on a saved card.
+    ///
+    /// @param key names this intent and no other, as [#charge]'s key does
+    /// @param methodType the processor's payment method type: `card` for a
+    ///     wallet, or `klarna`, `ideal` and the like
+    /// @param manualCapture whether the money is only held, to be taken with
+    ///     [#capture] when the order ships (cards and wallets); an
+    ///     asynchronous method is taken at once
+    /// @param orderId the order the intent pays for, or empty while there is
+    ///     none yet (an express checkout); the processor sends it back with
+    ///     its events
+    default Intent createIntent(String key, long amountCents, String currency,
+            String methodType, boolean manualCapture, String orderId) throws IOException {
+        throw new IOException(name() + " takes no payments in the browser");
+    }
+
+    /// Changes what an intent not yet confirmed asks for: the wallet sheet's
+    /// shopper chose another address or delivery.
+    default void updateIntent(String reference, long amountCents) throws IOException {
+        throw new IOException(name() + " takes no payments in the browser");
+    }
+
+    /// The intent as the processor has it now, [Intent#status] one of the
+    /// `INTENT_` states.
+    default Intent intent(String reference) throws IOException {
+        throw new IOException(name() + " takes no payments in the browser");
+    }
+
+    /// The key the browser needs to talk to the processor (a Stripe
+    /// publishable key), or empty for a processor with no browser half.
+    default String publicKey() {
+        return "";
+    }
+    // end::bazaar-payment-intents[]
+
+    /// Waiting for the shopper to pay.
+    String INTENT_OPEN = "requires_payment_method";
+    /// Paid by a card or wallet and held, waiting for [#capture].
+    String INTENT_HELD = "requires_capture";
+    /// Paid and taken.
+    String INTENT_SUCCEEDED = "succeeded";
+    /// The shopper finished; the result arrives later (a bank debit).
+    String INTENT_PROCESSING = "processing";
+    /// Refused, abandoned or cancelled.
+    String INTENT_FAILED = "failed";
+
+    /// A payment the shopper completes in the browser.
+    final class Intent {
+        public String reference = "";
+        /// What the browser hands the processor to complete it; never stored.
+        public String clientSecret = "";
+        public String status = INTENT_OPEN;
+        public long amountCents;
+        public String currency = "";
+        public String methodType = "";
+    }
+
     String REFUND_SUCCEEDED = "succeeded";
     String REFUND_PENDING = "pending";
     String REFUND_FAILED = "failed";

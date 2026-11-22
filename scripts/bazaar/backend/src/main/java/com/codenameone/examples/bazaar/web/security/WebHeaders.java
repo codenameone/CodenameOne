@@ -46,6 +46,8 @@ public final class WebHeaders implements SecurityFilter {
     public static final String SOURCES = "bazaar.cspSources";
     /// Set on the exchange of a page that shows a 3D model ([#allowModelViewer()]).
     public static final String MODELS = "bazaar.cspModels";
+    /// Set by [#allowStripe].
+    public static final String STRIPE = "bazaar.cspStripe";
     /// Set by a response that wrote its own policy (the widget sandbox).
     public static final String OWN_POLICY = "X-Bazaar-Own-Policy";
 
@@ -114,6 +116,32 @@ public final class WebHeaders implements SecurityFilter {
         }
     }
 
+    /// Widens the policy of the request being served for Stripe.js, the one
+    /// third party the storefront loads, and only on the pages that take a
+    /// payment in the browser (the wallet button, a pay-later or bank form)
+    /// of a store whose processor is Stripe: the script and its frames from
+    /// `js.stripe.com`, 3-D Secure frames from `hooks.stripe.com`, its calls
+    /// to `api.stripe.com`, and the Payment Request API for its frame.
+    public static void allowStripe() {
+        CspSources s = new CspSources();
+        s.add(CspSources.SCRIPT, "https://js.stripe.com");
+        s.add(CspSources.FRAME, "https://js.stripe.com");
+        s.add(CspSources.FRAME, "https://hooks.stripe.com");
+        s.add(CspSources.CONNECT, "https://api.stripe.com");
+        allow(s);
+        SecurityExchange exchange = SecurityExchange.current();
+        if (exchange != null) {
+            exchange.setAttribute(STRIPE, "1");
+        }
+    }
+
+    /// The Permissions-Policy: payments for this origin, and for Stripe's
+    /// frame on a page that loads it.
+    static String permissions(boolean stripe) {
+        return "camera=(self), microphone=(self), geolocation=(), usb=(), payment=(self"
+                + (stripe ? " \"https://js.stripe.com\")" : ")");
+    }
+
     @Override
     public HttpServer.Response doFilter(HttpServer.Request request, FilterChain chain)
             throws Exception {
@@ -129,7 +157,7 @@ public final class WebHeaders implements SecurityFilter {
         exchange.setResponseHeader("X-Content-Type-Options", "nosniff");
         exchange.setResponseHeader("Referrer-Policy", "strict-origin-when-cross-origin");
         exchange.setResponseHeader("Permissions-Policy",
-                "camera=(self), microphone=(self), geolocation=(), usb=(), payment=(self)");
+                permissions(exchange.getAttribute(STRIPE) != null));
         if (hsts) {
             exchange.setResponseHeader("Strict-Transport-Security",
                     "max-age=31536000; includeSubDomains");

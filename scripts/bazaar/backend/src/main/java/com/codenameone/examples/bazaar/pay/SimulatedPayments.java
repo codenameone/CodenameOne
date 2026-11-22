@@ -23,6 +23,8 @@ import com.codenameone.examples.bazaar.Ids;
 import com.codenameone.examples.bazaar.api.CardDto;
 
 import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
 
 /// A processor that moves no money. What the sample runs on until it is given
 /// a real one's key, and what every test but that provider's own runs against.
@@ -191,6 +193,92 @@ public class SimulatedPayments implements PaymentProvider {
     public String refundStatus(String refundReference) throws IOException {
         return refundReference.startsWith(REFUND + LOST_REFUND_CHARGE) ? REFUND_FAILED
                 : REFUND_SUCCEEDED;
+    }
+
+    // ------------------------------------------------------------- intents
+
+    /// The prefix of a simulated intent's reference.
+    static final String INTENT = "sim_pi_";
+
+    /// The intents opened since the server started, by reference. Nothing
+    /// survives a restart, as nothing of a simulated card does.
+    private final Map<String, Intent> intents = new HashMap<String, Intent>();
+
+    @Override
+    public synchronized Intent createIntent(String key, long amountCents, String currency,
+            String methodType, boolean manualCapture, String orderId) {
+        String reference = INTENT + key;
+        Intent had = intents.get(reference);
+        if (had != null) {
+            // Keyed: asking twice opens one intent.
+            return copy(had);
+        }
+        Intent intent = new Intent();
+        intent.reference = reference;
+        intent.clientSecret = reference + "_secret";
+        intent.amountCents = amountCents;
+        intent.currency = currency;
+        intent.methodType = methodType;
+        intent.status = INTENT_OPEN;
+        intents.put(reference, intent);
+        return copy(intent);
+    }
+
+    @Override
+    public synchronized void updateIntent(String reference, long amountCents) throws IOException {
+        Intent intent = known(reference);
+        if (!INTENT_OPEN.equals(intent.status)) {
+            throw new IOException("The intent was already confirmed");
+        }
+        intent.amountCents = amountCents;
+    }
+
+    @Override
+    public synchronized Intent intent(String reference) throws IOException {
+        return copy(known(reference));
+    }
+
+    /// What the shopper does in the simulated wallet sheet or bank page: pays
+    /// (`approve`) or gives up. A card or wallet payment is then held; a
+    /// method that is not a card is processing until [#settle] says how the
+    /// bank answered, as a debit or a pay-later check does.
+    public synchronized void complete(String reference, boolean approve) throws IOException {
+        Intent intent = known(reference);
+        if (!INTENT_OPEN.equals(intent.status)) {
+            return;
+        }
+        if (!approve) {
+            intent.status = INTENT_FAILED;
+        } else {
+            intent.status = "card".equals(intent.methodType) ? INTENT_HELD : INTENT_PROCESSING;
+        }
+    }
+
+    /// The bank's late answer for a processing intent.
+    public synchronized void settle(String reference, boolean ok) throws IOException {
+        Intent intent = known(reference);
+        if (INTENT_PROCESSING.equals(intent.status) || INTENT_OPEN.equals(intent.status)) {
+            intent.status = ok ? INTENT_SUCCEEDED : INTENT_FAILED;
+        }
+    }
+
+    private Intent known(String reference) throws IOException {
+        Intent intent = reference == null ? null : intents.get(reference);
+        if (intent == null) {
+            throw new IOException("No such intent");
+        }
+        return intent;
+    }
+
+    private static Intent copy(Intent from) {
+        Intent out = new Intent();
+        out.reference = from.reference;
+        out.clientSecret = from.clientSecret;
+        out.status = from.status;
+        out.amountCents = from.amountCents;
+        out.currency = from.currency;
+        out.methodType = from.methodType;
+        return out;
     }
 
     /// The digits of what was typed, with the spaces and dashes people put in a

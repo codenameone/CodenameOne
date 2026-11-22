@@ -105,6 +105,17 @@ public class CheckoutController {
         return "order";
     }
 
+    /// The simulated processor's "bank page" for an order left payment
+    /// pending: `outcome` `approve` or `decline` ([CheckoutPages#simulatePayment]).
+    @PostMapping("/s/{handle}/orders/{number}/pay")
+    public String pay(@PathVariable("handle") String handle,
+            @PathVariable("number") String number,
+            @RequestParam(value = "t", required = false) String token,
+            @RequestParam(value = "outcome", required = false) String outcome)
+            throws IOException {
+        return "redirect:" + pages.simulatePayment(handle, number, token, outcome);
+    }
+
     @GetMapping("/s/{handle}/orders/{number}/invoice.pdf")
     public HttpServer.Response invoice(@PathVariable("handle") String handle,
             @PathVariable("number") String number,

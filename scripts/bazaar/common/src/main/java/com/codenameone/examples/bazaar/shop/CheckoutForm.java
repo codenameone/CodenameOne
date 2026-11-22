@@ -33,6 +33,7 @@ import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.layouts.GridLayout;
 import com.codenameone.examples.bazaar.api.AddressDto;
 import com.codenameone.examples.bazaar.api.CartDto;
+import com.codenameone.examples.bazaar.api.CheckoutOptionsDto;
 import com.codenameone.examples.bazaar.api.EstimateDto;
 import com.codenameone.examples.bazaar.api.PaymentMethodDto;
 import com.codenameone.examples.bazaar.api.PlaceOrderDto;
@@ -72,6 +73,9 @@ final class CheckoutForm {
     private String methodId;
     private boolean cashPicked;
     private CartDto quoted;
+    /// What the store's hosted checkout adds (see [CheckoutHandoff]); null
+    /// until the server answers.
+    private CheckoutOptionsDto options;
     private int step;
     private boolean placing;
     /// Whether the default saved address was taken without asking already.
@@ -113,6 +117,12 @@ final class CheckoutForm {
         checkout.drawSteps();
         checkout.drawAddress();
         checkout.form.show();
+        Api.checkout().options(ShopState.store().id(), "", Net.to(o -> {
+            checkout.options = o;
+            if (checkout.step >= 3) {
+                checkout.drawReview();
+            }
+        }, (status, message) -> { }));
     }
 
     // ----------------------------------------------------------------- steps
@@ -348,9 +358,18 @@ final class CheckoutForm {
         note = Ui.field(noteBox, "Note for the store (optional)", "order-note", "");
         reviewBox.add(noteBox);
         Button place = Ui.primary("Place order", "place-order", null);
-        place.setEnabled(methodId != null && rateId != null && address != null);
+        place.setEnabled(methodId != null && rateId != null && address != null
+                && !CheckoutHandoff.required(options));
         place.addActionListener(e -> place(place));
         reviewBox.add(place);
+        if (CheckoutHandoff.offersMore(options)) {
+            // Wallets, pay later, tips and the store's questions are taken
+            // on the store's own checkout page, by the same server flow.
+            final String url = options.webCheckoutUrl();
+            Button web = Ui.secondary("Pay another way", "pay-another-way", null);
+            web.addActionListener(e -> CN.execute(url));
+            reviewBox.add(web);
+        }
         // Cash is not authorized anywhere: say what happens to it instead.
         reviewBox.add(Ui.text(cashPicked
                 ? "You pay in cash when the order is handed over."
@@ -369,7 +388,7 @@ final class CheckoutForm {
         final String storeId = ShopState.store().id();
         String mail = text(email).length() > 0 ? text(email) : emailOf();
         Api.checkout().place(storeId, key, new PlaceOrderDto(address, rateId, methodId, mail,
-                text(note), key), Net.to(order -> {
+                text(note), key, 0, null), Net.to(order -> {
                     placing = false;
                     ShopState.rememberAddress(address);
                     ShopState.loadCart(null);

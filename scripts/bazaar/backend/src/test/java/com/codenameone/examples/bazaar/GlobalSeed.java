@@ -28,6 +28,13 @@ final class GlobalSeed {
     }
 
     static void seed(Shop s, String orderId, DataSource db) throws Exception {
+        // Checkout settings and a checkout field, for the checkout settings
+        // routes.
+        db.execute("INSERT INTO checkout_settings (store_id, methods, tips_enabled, tip_presets, "
+                + "updated_at) VALUES (?, 'klarna', 1, 'p1500', 0)", new Object[] {s.storeId});
+        db.execute("INSERT INTO checkout_field (id, store_id, sort_order, label, kind, choices, "
+                + "required, created_at) VALUES (?, ?, 0, 'IDOR field', 'text', '', 0, 0)",
+                new Object[] {Ids.next(), s.storeId});
         // A bundle component and a publishing window, for the bundle and
         // schedule routes.
         db.execute("INSERT INTO bundle_component (id, store_id, product_id, variant_id, quantity, "

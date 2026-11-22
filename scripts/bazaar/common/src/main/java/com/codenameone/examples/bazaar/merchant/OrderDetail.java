@@ -128,6 +128,14 @@ final class OrderDetail extends Container {
         totals.add(Ui.fact(Lang.tr("Shipping"), MerchantState.money(o.shippingCents())));
         totals.add(Ui.fact(Lang.tr("Tax"), MerchantState.money(o.taxCents())));
         totals.add(Ui.fact(Lang.tr("Total"), MerchantState.money(o.totalCents()), "SvFactTotal"));
+        if (o.tipCents() > 0) {
+            totals.add(Ui.fact(Lang.tr("Tip"), MerchantState.money(o.tipCents())));
+        }
+        if (o.fields() != null) {
+            for (int iter = 0; iter < o.fields().size(); iter++) {
+                totals.add(Ui.fact(o.fields().get(iter).label(), o.fields().get(iter).value()));
+            }
+        }
         if (o.refundedCents() > 0) {
             totals.add(Ui.fact(Lang.tr("Refunded"), "-" + MerchantState.money(o.refundedCents())));
         }

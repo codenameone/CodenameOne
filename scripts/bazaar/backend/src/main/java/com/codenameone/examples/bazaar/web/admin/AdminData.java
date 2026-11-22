@@ -376,6 +376,16 @@ public class AdminData {
         if (o.refundedCents() != 0) {
             total(v, "Refunded", -o.refundedCents(), cur);
         }
+        if (o.tipCents() > 0) {
+            total(v, "Tip", o.tipCents(), cur);
+        }
+        // The shopper's answers to the store's checkout fields.
+        for (int iter = 0; o.fields() != null && iter < o.fields().size(); iter++) {
+            AdminRow r = new AdminRow();
+            r.title = o.fields().get(iter).label();
+            r.amount = o.fields().get(iter).value();
+            v.totals.add(r);
+        }
         List<OrderEventDto> ev = o.events() == null ? new ArrayList<OrderEventDto>() : o.events();
         for (int iter = 0; iter < ev.size(); iter++) {
             AdminRow r = new AdminRow();

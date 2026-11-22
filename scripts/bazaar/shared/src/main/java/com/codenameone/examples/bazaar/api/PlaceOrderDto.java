@@ -20,7 +20,7 @@ package com.codenameone.examples.bazaar.api;
 
 import com.codename1.annotations.Mapped;
 
-/// Places the cart as an order. `idempotencyKey` makes a retried request answer the first one's order; it may come in the `Idempotency-Key` header instead.
+/// Places the cart as an order. `idempotencyKey` makes a retried request answer the first one's order; it may come in the `Idempotency-Key` header instead. `tip` is 0 for none or the number of a tip preset the store offers (1 for the first); `fields` answer the store's checkout fields.
 @Mapped
 public record PlaceOrderDto(
         AddressDto address,
@@ -28,5 +28,7 @@ public record PlaceOrderDto(
         String paymentMethodId,
         String email,
         String note,
-        String idempotencyKey) {
+        String idempotencyKey,
+        int tip,
+        java.util.List<FieldAnswerDto> fields) {
 }

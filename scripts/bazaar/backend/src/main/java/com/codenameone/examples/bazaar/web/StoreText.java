@@ -909,6 +909,19 @@ public final class StoreText {
         "mail.downloads.title", "Your downloads are ready",
         "mail.downloads.body", "Order #{0} is paid. Here is what you bought.",
         "mail.downloads.subject", "Downloads for order #{0}",
+        "tip", "Add a tip",
+        "tip.none", "No tip",
+        "tip.note", "The tip goes to the shop and is not taxed or discounted.",
+        "tip.line", "Tip",
+        "questions", "A few questions",
+        "payType.note", "Pay later and bank payments are finished on the next page.",
+        "express.or", "Or pay in one step",
+        "express.dev", "Pay with the test wallet",
+        "express.error", "The payment did not go through.",
+        "pay.pending", "Finish paying",
+        "pay.simulated", "Test mode: choose how the bank answers.",
+        "pay.approve", "Approve payment",
+        "pay.decline", "Decline payment",
     };
 
     private static final String[] ES = {
@@ -1464,6 +1477,19 @@ public final class StoreText {
         "mail.downloads.title", "Tus descargas est\u00e1n listas",
         "mail.downloads.body", "El pedido n.\u00ba {0} est\u00e1 pagado. Esto es lo que compraste.",
         "mail.downloads.subject", "Descargas del pedido n.\u00ba {0}",
+        "tip", "A\u00f1ade una propina",
+        "tip.none", "Sin propina",
+        "tip.note", "La propina va a la tienda y no lleva impuestos ni descuentos.",
+        "tip.line", "Propina",
+        "questions", "Algunas preguntas",
+        "payType.note", "Los pagos a plazos y bancarios se completan en la p\u00e1gina siguiente.",
+        "express.or", "O paga en un paso",
+        "express.dev", "Pagar con el monedero de prueba",
+        "express.error", "El pago no se complet\u00f3.",
+        "pay.pending", "Termina el pago",
+        "pay.simulated", "Modo de prueba: elige la respuesta del banco.",
+        "pay.approve", "Aprobar el pago",
+        "pay.decline", "Rechazar el pago",
     };
 
     private static final String[] FR = {
@@ -2019,6 +2045,19 @@ public final class StoreText {
         "mail.downloads.title", "Vos t\u00e9l\u00e9chargements sont pr\u00eats",
         "mail.downloads.body", "La commande n\u00b0 {0} est pay\u00e9e. Voici vos achats.",
         "mail.downloads.subject", "T\u00e9l\u00e9chargements de la commande n\u00b0 {0}",
+        "tip", "Ajouter un pourboire",
+        "tip.none", "Pas de pourboire",
+        "tip.note", "Le pourboire va \u00e0 la boutique, sans taxe ni remise.",
+        "tip.line", "Pourboire",
+        "questions", "Quelques questions",
+        "payType.note", "Les paiements diff\u00e9r\u00e9s et bancaires se terminent sur la page suivante.",
+        "express.or", "Ou payez en une \u00e9tape",
+        "express.dev", "Payer avec le portefeuille de test",
+        "express.error", "Le paiement n'a pas abouti.",
+        "pay.pending", "Terminez le paiement",
+        "pay.simulated", "Mode test : choisissez la r\u00e9ponse de la banque.",
+        "pay.approve", "Approuver le paiement",
+        "pay.decline", "Refuser le paiement",
     };
 
     private static final String[] DE = {
@@ -2574,6 +2613,19 @@ public final class StoreText {
         "mail.downloads.title", "Ihre Downloads sind bereit",
         "mail.downloads.body", "Bestellung Nr. {0} ist bezahlt. Hier ist Ihr Kauf.",
         "mail.downloads.subject", "Downloads zu Bestellung Nr. {0}",
+        "tip", "Trinkgeld geben",
+        "tip.none", "Kein Trinkgeld",
+        "tip.note", "Das Trinkgeld geht an den Shop und wird weder besteuert noch rabattiert.",
+        "tip.line", "Trinkgeld",
+        "questions", "Ein paar Fragen",
+        "payType.note", "Sp\u00e4ter- und Bankzahlungen werden auf der n\u00e4chsten Seite abgeschlossen.",
+        "express.or", "Oder in einem Schritt bezahlen",
+        "express.dev", "Mit der Test-Wallet bezahlen",
+        "express.error", "Die Zahlung ist nicht durchgegangen.",
+        "pay.pending", "Zahlung abschlie\u00dfen",
+        "pay.simulated", "Testmodus: W\u00e4hlen Sie die Antwort der Bank.",
+        "pay.approve", "Zahlung genehmigen",
+        "pay.decline", "Zahlung ablehnen",
     };
 
     private static final String[] HE = {
@@ -3129,6 +3181,19 @@ public final class StoreText {
         "mail.downloads.title", "\u05d4\u05d4\u05d5\u05e8\u05d3\u05d5\u05ea \u05e9\u05dc\u05da \u05de\u05d5\u05db\u05e0\u05d5\u05ea",
         "mail.downloads.body", "\u05d4\u05d6\u05de\u05e0\u05d4 \u05de\u05e1' {0} \u05e9\u05d5\u05dc\u05de\u05d4. \u05d4\u05e0\u05d4 \u05de\u05d4 \u05e9\u05e8\u05db\u05e9\u05ea.",
         "mail.downloads.subject", "\u05d4\u05d5\u05e8\u05d3\u05d5\u05ea \u05dc\u05d4\u05d6\u05de\u05e0\u05d4 \u05de\u05e1' {0}",
+        "tip", "\u05d4\u05d5\u05e1\u05e4\u05ea \u05d8\u05d9\u05e4",
+        "tip.none", "\u05dc\u05dc\u05d0 \u05d8\u05d9\u05e4",
+        "tip.note", "\u05d4\u05d8\u05d9\u05e4 \u05e2\u05d5\u05d1\u05e8 \u05dc\u05d7\u05e0\u05d5\u05ea, \u05dc\u05dc\u05d0 \u05de\u05e1 \u05d5\u05dc\u05dc\u05d0 \u05d4\u05e0\u05d7\u05d4.",
+        "tip.line", "\u05d8\u05d9\u05e4",
+        "questions", "\u05db\u05de\u05d4 \u05e9\u05d0\u05dc\u05d5\u05ea",
+        "payType.note", "\u05ea\u05e9\u05dc\u05d5\u05dd \u05de\u05d0\u05d5\u05d7\u05e8 \u05d5\u05ea\u05e9\u05dc\u05d5\u05dd \u05d1\u05e0\u05e7\u05d0\u05d9 \u05de\u05e1\u05ea\u05d9\u05d9\u05de\u05d9\u05dd \u05d1\u05d3\u05e3 \u05d4\u05d1\u05d0.",
+        "express.or", "\u05d0\u05d5 \u05dc\u05e9\u05dc\u05dd \u05d1\u05e6\u05e2\u05d3 \u05d0\u05d7\u05d3",
+        "express.dev", "\u05ea\u05e9\u05dc\u05d5\u05dd \u05d1\u05d0\u05e8\u05e0\u05e7 \u05d4\u05d1\u05d3\u05d9\u05e7\u05d4",
+        "express.error", "\u05d4\u05ea\u05e9\u05dc\u05d5\u05dd \u05dc\u05d0 \u05e2\u05d1\u05e8.",
+        "pay.pending", "\u05d4\u05e9\u05dc\u05de\u05ea \u05d4\u05ea\u05e9\u05dc\u05d5\u05dd",
+        "pay.simulated", "\u05de\u05e6\u05d1 \u05d1\u05d3\u05d9\u05e7\u05d4: \u05d1\u05d7\u05e8\u05d5 \u05d0\u05d9\u05da \u05d4\u05d1\u05e0\u05e7 \u05e2\u05d5\u05e0\u05d4.",
+        "pay.approve", "\u05d0\u05d9\u05e9\u05d5\u05e8 \u05d4\u05ea\u05e9\u05dc\u05d5\u05dd",
+        "pay.decline", "\u05d3\u05d7\u05d9\u05d9\u05ea \u05d4\u05ea\u05e9\u05dc\u05d5\u05dd",
     };
     // END GENERATED
 }

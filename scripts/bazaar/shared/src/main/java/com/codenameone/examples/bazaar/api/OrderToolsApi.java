@@ -59,6 +59,17 @@ public interface OrderToolsApi {
     void saveSettings(@Path("storeId") String storeId, @Body OrderSettingsDto settings,
             OnComplete<Response<OrderSettingsDto>> callback);
 
+    /// The checkout settings: payment method types beside cards, tip presets
+    /// and the fields shoppers fill in.
+    @GET("/api/merchant/stores/{storeId}/checkout-settings")
+    void checkoutSettings(@Path("storeId") String storeId,
+            OnComplete<Response<CheckoutSettingsDto>> callback);
+
+    @POST("/api/merchant/stores/{storeId}/checkout-settings")
+    void saveCheckoutSettings(@Path("storeId") String storeId,
+            @Body CheckoutSettingsDto settings,
+            OnComplete<Response<CheckoutSettingsDto>> callback);
+
     /// Sends the draft to its customer as a signed checkout link.
     @POST("/api/merchant/stores/{storeId}/drafts/{orderId}/pay-link")
     void payLink(@Path("storeId") String storeId, @Path("orderId") String orderId,

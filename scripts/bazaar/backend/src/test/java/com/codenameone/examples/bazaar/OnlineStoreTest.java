@@ -348,7 +348,7 @@ class OnlineStoreTest {
         }
         Map card = Rest.addCard(mvc, user, Rest.VISA);
         OrderDto o = checkouts.place(user, s.storeId, "os-fx-key", new PlaceOrderDto(Shop.NY,
-                rate, (String) card.get("id"), user + "@example.com", "", null), null, null,
+                rate, (String) card.get("id"), user + "@example.com", "", null, 0, null), null, null,
                 pricer);
         Map row = db.queryOne("SELECT presentment_currency, presentment_total_cents, "
                 + "fx_rate_micros, total_cents FROM store_order WHERE id = ?",

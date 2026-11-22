@@ -98,7 +98,7 @@ class ShopRulesTest {
         }
         return new OrderDto("o", "s", 7, "online", status, financial, fulfilment, "u", "e", 0, 0, 0,
                 0, 0, 0, "USD", null, null, null, null, null, null, 0, null, null, null, null,
-                Arrays.asList(f));
+                Arrays.asList(f), 0, null);
     }
 
     @Test

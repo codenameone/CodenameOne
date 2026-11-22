@@ -51,4 +51,36 @@ public class CheckoutForm {
     /// Names this checkout's order: a second submit of the same page finds
     /// the order the first one placed.
     public String idempotencyKey = "";
+    /// The tip preset chosen, 0 for none.
+    public String tip = "";
+    /// The payment method type, empty or `card` for a card.
+    public String payType = "";
+    /// The store's checkout fields, in their order.
+    public String f0 = "";
+    public String f1 = "";
+    public String f2 = "";
+    public String f3 = "";
+    public String f4 = "";
+    public String f5 = "";
+    public String f6 = "";
+    public String f7 = "";
+    public String f8 = "";
+    public String f9 = "";
+
+    /// The answer to field `n`.
+    public String field(int n) {
+        switch (n) {
+            case 0: return f0;
+            case 1: return f1;
+            case 2: return f2;
+            case 3: return f3;
+            case 4: return f4;
+            case 5: return f5;
+            case 6: return f6;
+            case 7: return f7;
+            case 8: return f8;
+            case 9: return f9;
+            default: return "";
+        }
+    }
 }

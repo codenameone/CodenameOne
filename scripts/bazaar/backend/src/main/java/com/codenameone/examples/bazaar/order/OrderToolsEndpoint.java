@@ -39,9 +39,12 @@ public class OrderToolsEndpoint implements OrderToolsApiServer {
     private final OrderSettings settings;
     private final PayLinks payLinks;
     private final Templates templates;
+    private final com.codenameone.examples.bazaar.checkout.CheckoutSettings checkout;
 
     public OrderToolsEndpoint(Orders orders, BulkOrders bulk, OrderSettings settings,
-            PayLinks payLinks, Templates templates) {
+            PayLinks payLinks, Templates templates,
+            com.codenameone.examples.bazaar.checkout.CheckoutSettings checkout) {
+        this.checkout = checkout;
         this.orders = orders;
         this.bulk = bulk;
         this.settings = settings;
@@ -104,5 +107,18 @@ public class OrderToolsEndpoint implements OrderToolsApiServer {
     @Override
     public TemplateDto previewTemplate(String storeId, TemplateDto template) throws Exception {
         return templates.preview(Caller.name(), storeId, template);
+    }
+
+    @Override
+    public com.codenameone.examples.bazaar.api.CheckoutSettingsDto checkoutSettings(
+            String storeId) throws Exception {
+        return checkout.read(Caller.name(), storeId);
+    }
+
+    @Override
+    public com.codenameone.examples.bazaar.api.CheckoutSettingsDto saveCheckoutSettings(
+            String storeId, com.codenameone.examples.bazaar.api.CheckoutSettingsDto wanted)
+            throws Exception {
+        return checkout.save(Caller.name(), storeId, wanted);
     }
 }

@@ -215,7 +215,8 @@ class MerchantIdorTest {
         // Archiving, bulk actions, return rules, pay links and templates.
         "POST /orders/{orderId}/archive", "POST /orders/{orderId}/unarchive",
         "GET /archived-orders", "POST /bulk-orders", "GET /order-settings",
-        "POST /order-settings", "POST /drafts/{orderId}/pay-link", "GET /templates",
+        "POST /order-settings", "GET /checkout-settings", "POST /checkout-settings",
+        "POST /drafts/{orderId}/pay-link", "GET /templates",
         "POST /templates", "POST /templates/reset", "POST /templates/preview",
         // Label sheets and bulk packing slips.
         "GET /label-sheets.pdf", "GET /purchase-orders/{purchaseOrderId}/labels.pdf",

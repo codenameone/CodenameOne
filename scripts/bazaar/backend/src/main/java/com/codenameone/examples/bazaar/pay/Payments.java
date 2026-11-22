@@ -576,6 +576,118 @@ public class Payments {
         return reference;
     }
 
+    // ------------------------------------------------- payments in the browser
+
+    /// A payment the shopper is finishing with the processor (a bank debit, a
+    /// pay-later check); the processor's webhook ends it in [#PAID] or
+    /// [#FAILED]. Nothing is held that [#voidOrder] could let go.
+    public static final String PROCESSING = "PROCESSING";
+
+    /// The processor this server pays through.
+    public PaymentProvider provider() {
+        return provider;
+    }
+
+    /// Records the hold an express checkout's wallet already made (an intent
+    /// the browser confirmed, checked by the caller) as the order's payment:
+    /// from here it is captured, voided and refunded like any card hold.
+    public String keepHeld(String orderId, String payer, String reference, long amountCents,
+            String currency, String label) {
+        Payment kept = payment(orderId);
+        if (kept != null) {
+            return kept.getProviderRef();
+        }
+        keepPayment(orderId, payer, new String[] {"wallet", label}, amountCents, currency,
+                cut(reference, 64));
+        return reference;
+    }
+
+    /// Opens a processor intent of `methodType` for an order just written,
+    /// and records the payment as [#PROCESSING]: the order waits as payment
+    /// pending until the webhook settles it ([#settleIntent]). Keyed by the
+    /// order, so asking again opens no second intent.
+    public PaymentProvider.Intent startIntent(String orderId, String payer, String methodType,
+            long amountCents, String currency) throws IOException {
+        PaymentProvider.Intent intent;
+        try {
+            intent = provider.createIntent("order-" + orderId, amountCents, currency, methodType,
+                    false, orderId);
+        } catch (PaymentDeclinedException declined) {
+            throw new ResponseStatusException(402, declined.getMessage());
+        } catch (IOException unknown) {
+            throw unavailable("payment", unknown);
+        }
+        keepPayment(orderId, payer, new String[] {methodType, PaymentTypes.label(methodType)},
+                amountCents, currency, cut(intent.reference, 64), PROCESSING);
+        return intent;
+    }
+
+    /// What the order's intent is waiting for the browser to finish, or null
+    /// when the order has no payment in progress: the client secret the pay
+    /// page hands Stripe.js, asked of the processor each time and never kept.
+    public PaymentProvider.Intent openIntent(String orderId) throws IOException {
+        Payment p = payment(orderId);
+        if (p == null || !PROCESSING.equals(p.getStatus())) {
+            return null;
+        }
+        try {
+            PaymentProvider.Intent intent = provider.intent(p.getProviderRef());
+            if (intent.clientSecret.length() == 0) {
+                // Stripe answers a retrieve with the secret as well; a
+                // processor that does not is asked by the key again.
+                intent = provider.createIntent("order-" + orderId, p.getAmountCents(),
+                        p.getCurrency(), p.getMethodId(), false, orderId);
+            }
+            return intent;
+        } catch (IOException unknown) {
+            throw unavailable("payment", unknown);
+        }
+    }
+
+    /// Settles an order's [#PROCESSING] payment from what the processor says
+    /// of its intent now -- never from what an event or a browser claims.
+    /// Answers [#PAID], [#FAILED], [#PROCESSING] while it still waits, or the
+    /// payment's status when it was not processing (settled already: a
+    /// repeated event changes nothing).
+    public String settleIntent(String orderId) throws IOException {
+        Payment p = payment(orderId);
+        if (p == null) {
+            return "";
+        }
+        if (!PROCESSING.equals(p.getStatus())) {
+            return p.getStatus();
+        }
+        PaymentProvider.Intent intent;
+        try {
+            intent = provider.intent(p.getProviderRef());
+        } catch (IOException unknown) {
+            throw unavailable("payment", unknown);
+        }
+        if (PaymentProvider.INTENT_SUCCEEDED.equals(intent.status)
+                || PaymentProvider.INTENT_HELD.equals(intent.status)) {
+            if (intent.amountCents != p.getAmountCents()) {
+                // Paid, but not what the order asks: never settle on it.
+                System.err.println("intent for order " + orderId + " paid " + intent.amountCents
+                        + ", the order asks " + p.getAmountCents());
+                return PROCESSING;
+            }
+            if (PaymentProvider.INTENT_HELD.equals(intent.status)) {
+                return claim(orderId, PROCESSING, AUTHORIZED) == null ? payment(orderId).getStatus()
+                        : AUTHORIZED;
+            }
+            if (claim(orderId, PROCESSING, CAPTURING) == null) {
+                return payment(orderId).getStatus();
+            }
+            finish(orderId, CAPTURING, PAID);
+            return PAID;
+        }
+        if (PaymentProvider.INTENT_FAILED.equals(intent.status)) {
+            return claim(orderId, PROCESSING, FAILED) == null ? payment(orderId).getStatus()
+                    : FAILED;
+        }
+        return PROCESSING;
+    }
+
     /// The prefix of a card payment taken on a register's card terminal. The
     /// terminal settled it with the processor itself, so nothing here asks
     /// the processor about it: capture, void and refund only move the row.
@@ -603,9 +715,14 @@ public class Payments {
         return reference;
     }
 
-    @Transactional
     private void keepPayment(String orderId, String username, String[] method, long amount,
             String currency, String reference) {
+        keepPayment(orderId, username, method, amount, currency, reference, AUTHORIZED);
+    }
+
+    @Transactional
+    private void keepPayment(String orderId, String username, String[] method, long amount,
+            String currency, String reference, String status) {
         if (payments.findById(orderId) != null) {
             // Written while this request was at the processor.
             return;
@@ -617,7 +734,7 @@ public class Payments {
         row.setMethodLabel(cut(method[1], 64));
         row.setAmountCents(amount);
         row.setCurrency(currency);
-        row.setStatus(AUTHORIZED);
+        row.setStatus(status);
         row.setProviderRef(reference);
         row.setCreatedAt(Instant.now());
         payments.insert(row);

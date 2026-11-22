@@ -162,14 +162,14 @@ class CarrierCheckoutTest {
         ResponseStatusException refused = assertThrows(ResponseStatusException.class,
                 () -> checkouts.place(user, s.storeId, Ids.next(), new PlaceOrderDto(Shop.NY,
                     rate + "~OVERNIGHT", (String) card.get("id"), user + "@example.com", "",
-                    null)));
+                    null, 0, null)));
         assertEquals(409, refused.getStatus());
         assertThrows(ResponseStatusException.class, () -> checkouts.place(user, s.storeId,
                 Ids.next(), new PlaceOrderDto(Shop.NY, rate, (String) card.get("id"),
-                    user + "@example.com", "", null)), "the fallback is not offered either");
+                    user + "@example.com", "", null, 0, null)), "the fallback is not offered either");
 
         OrderDto placed = checkouts.place(user, s.storeId, Ids.next(), new PlaceOrderDto(Shop.NY,
-                rate + "~GROUND", (String) card.get("id"), user + "@example.com", "", null));
+                rate + "~GROUND", (String) card.get("id"), user + "@example.com", "", null, 0, null));
         assertEquals(881, shippingOf(placed));
     }
 
@@ -190,9 +190,9 @@ class CarrierCheckoutTest {
         Map card = Rest.addCard(mvc, user, Rest.VISA);
         assertThrows(ResponseStatusException.class, () -> checkouts.place(user, s.storeId,
                 Ids.next(), new PlaceOrderDto(DOWN, rate + "~GROUND", (String) card.get("id"),
-                    user + "@example.com", "", null)), "a quote the carrier never gave is refused");
+                    user + "@example.com", "", null, 0, null)), "a quote the carrier never gave is refused");
         OrderDto placed = checkouts.place(user, s.storeId, Ids.next(), new PlaceOrderDto(DOWN,
-                rate, (String) card.get("id"), user + "@example.com", "", null));
+                rate, (String) card.get("id"), user + "@example.com", "", null, 0, null));
         assertEquals(1500, shippingOf(placed));
     }
 

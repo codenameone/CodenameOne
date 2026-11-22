@@ -102,6 +102,8 @@ public class Emails {
     @Autowired
     private com.codenameone.examples.bazaar.market.ProductText productText;
 
+    @Autowired
+    private com.codenameone.examples.bazaar.checkout.CheckoutSettings checkoutSettings;
 
     public Emails(MailSender mail, StoreRepository stores, StoreOrderRepository orders,
             OrderLineRepository lines, CustomerRepository customers, RefundRepository refunds,
@@ -145,6 +147,14 @@ public class Emails {
         b.para(b.f("mail.order.body", o.getNumber()));
         b.lines(ls, o.getCurrency());
         b.total(b.f("total"), o.getTotalCents(), o.getCurrency());
+        if (o.getTipCents() > 0) {
+            b.total(b.f("tip.line"), o.getTipCents(), o.getCurrency());
+        }
+        List<com.codenameone.examples.bazaar.api.OrderFieldDto> answers =
+                checkoutSettings.answersOf(orderId);
+        for (int iter = 0; iter < answers.size(); iter++) {
+            b.para(answers.get(iter).label() + ": " + answers.get(iter).value());
+        }
         downloadsBlock(b, orderId);
         b.para(b.f("mail.invoice"));
         b.button(b.f("mail.track"), track(o));

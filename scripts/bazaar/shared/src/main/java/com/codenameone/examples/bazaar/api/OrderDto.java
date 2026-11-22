@@ -20,7 +20,7 @@ package com.codenameone.examples.bazaar.api;
 
 import com.codename1.annotations.Mapped;
 
-/// An order. Lists carry no lines, events, tenders or fulfilments; a detail carries all four. `paymentStatus` is the card payment's state, empty when nothing was charged to a card.
+/// An order. Lists carry no lines, events, tenders or fulfilments; a detail carries all four. `paymentStatus` is the card payment's state, empty when nothing was charged to a card. `tipCents` is the tip, outside the total and never taxed or discounted; `fields` are the answers to the store's checkout fields.
 @Mapped
 public record OrderDto(
         String id,
@@ -50,5 +50,7 @@ public record OrderDto(
         java.util.List<OrderLineDto> lines,
         java.util.List<OrderEventDto> events,
         java.util.List<TenderDto> tenders,
-        java.util.List<FulfillmentSummaryDto> fulfillments) {
+        java.util.List<FulfillmentSummaryDto> fulfillments,
+        long tipCents,
+        java.util.List<OrderFieldDto> fields) {
 }

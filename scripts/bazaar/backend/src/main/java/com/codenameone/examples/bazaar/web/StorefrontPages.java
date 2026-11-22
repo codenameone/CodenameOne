@@ -70,6 +70,8 @@ import java.util.Map;
 /// read JavaBean properties and fields, not record accessors.
 @Component
 public class StorefrontPages {
+    @com.codename1.backend.annotations.Autowired
+    private ExpressButton expressButton;
     /// Products on a page of a collection or of search results.
     static final int PAGE_SIZE = 24;
     /// The session attribute a store's cart token is kept under, plus its id.
@@ -539,6 +541,9 @@ public class StorefrontPages {
         if (view.hasModel) {
             com.codenameone.examples.bazaar.web.security.WebHeaders.allowModelViewer();
         }
+        if (view.available) {
+            expressButton.decorate(meta, store, null, 0);
+        }
         meta.jsonLd = productLd(p, view, meta, images, rs);
         model.addAttribute("page", meta).addAttribute("product", view);
     }
@@ -694,6 +699,9 @@ public class StorefrontPages {
             view.problems = dto.problems() == null ? new ArrayList<String>() : dto.problems();
         }
         view.empty = view.lines.isEmpty();
+        if (!view.empty) {
+            expressButton.decorate(meta, store, null, dto == null ? 0 : dto.dueCents());
+        }
         view.checkoutUrl = SiteUrls.checkout(store.getHandle());
         model.addAttribute("page", meta).addAttribute("cart", view);
     }

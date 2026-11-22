@@ -223,6 +223,27 @@ Stripe's own page, so a card number never reaches the app or this server.
 include::../../scripts/bazaar/backend/src/main/java/com/codenameone/examples/bazaar/pay/PaymentProvider.java[tag=bazaar-payment-provider,indent=0]
 ----
 
+Wallets, pay-later and bank methods use the same provider:
+
+* *Express checkout* (`ExpressCheckouts`, `ExpressPages`) creates a manual
+  capture intent for the cart, re-prices it through the `Quoter` on every
+  address or shipping change the wallet sheet reports, and places the order
+  once with the idempotency key `express-<id>`. A repeated confirm answers the
+  order already placed; a cart that changed since the last quote is refused.
+  Stripe.js is allowed in the page's policy (`WebHeaders.allowStripe`) only on
+  pages that show the button and only when the provider is Stripe.
+* *Payment method types* (`PaymentTypes`) are a table of Stripe method types
+  with the currencies and countries each one accepts. A store enables some in
+  `CheckoutSettings`; checkout offers those the order's currency and country
+  allow. An asynchronous method leaves the order payment pending, and
+  `PaymentEvents` settles it from the signed webhook at
+  `/api/payments/webhooks/payments`: paid, or cancelled with its stock
+  released.
+* *Tips and checkout fields* also live in `CheckoutSettings`. A tip is stored in
+  `tip_cents` beside the total, so tax and discounts never see it, and is
+  charged with the order. Answers are kept per order with the label as it read
+  when the order was placed.
+
 === Who may call what
 
 The security configuration is the one place that says which routes are public,

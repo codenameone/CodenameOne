@@ -219,7 +219,7 @@ class MerchantLogicTest {
             long refunded) {
         return new OrderDto("o", "s", 1, "ONLINE", "OPEN", "PAID", "UNFULFILLED", "u", "e", 0, 0,
                 shipping, 0, total, refunded, "USD", null, null, null, null, null, null, 0, null,
-                lines, null, null, null);
+                lines, null, null, null, 0, null);
     }
 
     @Test

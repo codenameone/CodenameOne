@@ -166,6 +166,7 @@ public class Services {
     public PaymentProvider paymentProvider(Config config,
             @Value("${bazaar.payments.provider:}") String chosen,
             @Value("${bazaar.payments.stripe.secret:}") String secret,
+            @Value("${bazaar.payments.stripe.publishable-key:}") String publishable,
             @Value("${bazaar.public.url:}") String publicUrl,
             @Value("${" + AccountSecurity.ISSUER_KEY + ":}") String issuer) {
         String kind = chosen.trim().length() > 0 ? chosen.trim()
@@ -186,7 +187,11 @@ public class Services {
         while (address.endsWith("/")) {
             address = address.substring(0, address.length() - 1);
         }
-        return new StripePayments(secret, address + "/pay/return");
+        StripePayments stripe = new StripePayments(secret, address + "/pay/return");
+        // The wallet button and the Payment Element run Stripe.js, which needs
+        // it; without one the storefront offers neither and cards still work.
+        stripe.setPublishableKey(publishable.trim());
+        return stripe;
     }
     // end::bazaar-payment-choice[]
 

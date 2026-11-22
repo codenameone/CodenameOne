@@ -128,7 +128,7 @@ class DigitalGoodsTest {
         assertTrue(c.shippingOptions().isEmpty());
         Map card = Rest.addCard(mvc, user, Rest.VISA);
         return checkouts.place(user, s.storeId, Ids.next(), new PlaceOrderDto(null, null,
-                (String) card.get("id"), user, "", null));
+                (String) card.get("id"), user, "", null, 0, null));
     }
 
     private MockResponse fetch(String url) throws Exception {
@@ -329,10 +329,10 @@ class DigitalGoodsTest {
         Map card = Rest.addCard(mvc, user, Rest.VISA);
         assertThrows(ResponseStatusException.class, () -> checkouts.place(user, s.storeId,
                 Ids.next(), new PlaceOrderDto(null, null, (String) card.get("id"),
-                    user, "", null)), "a parcel needs an address");
+                    user, "", null, 0, null)), "a parcel needs an address");
         OrderDto o = checkouts.place(user, s.storeId, Ids.next(), new PlaceOrderDto(Shop.NY,
                 c.shippingOptions().get(0).rateId(), (String) card.get("id"),
-                user, "", null));
+                user, "", null, 0, null));
         assertEquals(1, downloads.mine(user, o.id()).size());
         assertEquals(9, inventory.available(s.variantId, s.locationId), "the mug was taken");
     }

@@ -37,6 +37,20 @@ public final class OrderView {
     public String tax = "";
     public String total = "";
     public String payment = "";
+    /// The tip, or empty for none.
+    public String tip = "";
+    /// The store's checkout fields as the shopper answered them: each
+    /// [CheckoutView.Option#label] and its answer in `value`.
+    public List<CheckoutView.Option> fields = new ArrayList<CheckoutView.Option>();
+    /// The order waits for a payment method that finishes in the browser
+    /// (a bank redirect, pay later): the processor's form, or with the
+    /// simulated processor its two buttons.
+    public boolean payPending;
+    public boolean paySimulated;
+    public String payAction = "";
+    public String payKey = "";
+    public String paySecret = "";
+    public String payReturn = "";
     public String invoiceUrl = "";
     public String storeUrl = "";
     public List<LinkView> tracking = new ArrayList<LinkView>();

@@ -11,6 +11,7 @@
 <div>
 <div class="alert" role="alert" th:if="${checkout.invalid or !checkout.problems.empty}" tabindex="-1"><strong th:if="${checkout.invalid}" th:text="${page.t['checkout.invalid']}">Please check the highlighted fields.</strong><ul th:unless="${checkout.problems.empty}"><li th:each="m : ${checkout.problems}" th:text="${m}">Problem</li></ul></div>
 
+<div th:replace="~{layout :: express}"></div>
 <fieldset><legend th:text="${page.t['contact']}">Contact</legend>
 <div class="field"><label for="email" th:text="${page.t['email']}">Email</label><input id="email" name="email" type="email" autocomplete="email" required th:value="${checkout.email}" th:attr="aria-invalid=${!checkout.emailError.empty},aria-describedby=${checkout.emailError.empty ? '' : 'email-error'}"><p class="err" id="email-error" th:unless="${checkout.emailError.empty}" th:text="${checkout.emailError}">Error</p></div>
 <p class="meta" th:unless="${checkout.signedIn}"><span th:text="${page.t['guest']}">Checking out as a guest.</span> <a href="/auth/signin" th:text="${page.t['signIn']}">Sign in</a> <span th:text="${page.t['guest.saved']}">to use your saved addresses.</span></p>
@@ -34,6 +35,7 @@
 <fieldset><legend th:text="${page.t['payment']}">Payment</legend>
 <p th:if="${checkout.nothingDue}" th:text="${page.t['nothingDue']}">Nothing is left to pay.</p>
 <div th:unless="${checkout.nothingDue}">
+<div class="pay-types" th:unless="${checkout.payTypes.empty}"><div class="choice" th:each="p : ${checkout.payTypes}"><input type="radio" name="payType" th:attr="id=${'pay-' + p.value}" th:value="${p.value}" th:checked="${p.chosen}"><label th:attr="for=${'pay-' + p.value}" th:text="${p.label}">Card</label></div><p class="meta" th:text="${page.t['payType.note']}">Pay later and bank payments are finished on the next page.</p></div>
 <div class="choice" th:each="m : ${checkout.methods}"><input type="radio" name="methodId" th:attr="id=${'method-' + m.value}" th:value="${m.value}" th:checked="${m.chosen}"><label th:attr="for=${'method-' + m.value}" th:text="${m.label}">Card</label></div>
 <div class="choice" th:if="${checkout.signedIn and checkout.typedCards}"><input type="radio" name="methodId" id="method-new" value="" th:checked="${checkout.typedChosen}"><label for="method-new" th:text="${page.t['newCard']}">A new card</label></div>
 <div th:if="${checkout.typedCards}">
@@ -45,6 +47,8 @@
 </div>
 <div class="field"><label for="note" th:text="${page.t['note']}">Note for the store (optional)</label><textarea id="note" name="note" rows="2" th:text="${checkout.note}"></textarea></div>
 </fieldset>
+<fieldset th:unless="${checkout.tips.empty}"><legend th:text="${page.t['tip']}">Add a tip</legend><div class="choice" th:each="t : ${checkout.tips}"><input type="radio" name="tip" th:attr="id=${'tip-' + t.value}" th:value="${t.value}" th:checked="${t.chosen}"><label th:attr="for=${'tip-' + t.value}"><span th:text="${t.label}">15%</span> <span class="meta" th:text="${t.detail}">$3.00</span></label></div><p class="meta" th:text="${page.t['tip.note']}">The tip is added to the payment, outside the order total.</p></fieldset>
+<fieldset th:unless="${checkout.fields.empty}"><legend th:text="${page.t['questions']}">A few questions</legend><div class="field" th:each="q : ${checkout.fields}"><th:block th:if="${q.text}"><label th:attr="for=${q.name}" th:text="${q.required ? q.label + ' *' : q.label}">Label</label><input th:attr="id=${q.name},name=${q.name},required=${q.required ? 'required' : null}" maxlength="500" th:value="${q.value}"></th:block><th:block th:if="${q.select}"><label th:attr="for=${q.name}" th:text="${q.required ? q.label + ' *' : q.label}">Label</label><select th:attr="id=${q.name},name=${q.name}"><option value="" th:text="${page.t['choose']}">Choose</option><option th:each="c : ${q.choices}" th:value="${c.value}" th:selected="${c.chosen}" th:text="${c.label}">Choice</option></select></th:block><div class="choice" th:if="${q.checkbox}"><input type="checkbox" value="on" th:attr="id=${q.name},name=${q.name}" th:checked="${q.checked}"><label th:attr="for=${q.name}" th:text="${q.label}">Label</label></div></div></fieldset>
 </div>
 
 <aside id="summary" class="summary" aria-live="polite"><h2 th:text="${page.t['summary']}">Order summary</h2>

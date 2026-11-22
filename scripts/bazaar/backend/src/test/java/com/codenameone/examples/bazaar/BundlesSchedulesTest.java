@@ -141,7 +141,7 @@ class BundlesSchedulesTest {
         }
         Map card = Rest.addCard(mvc, user, Rest.VISA);
         return checkouts.place(user, s.storeId, Ids.next(), new PlaceOrderDto(Shop.NY, rate,
-                (String) card.get("id"), user + "@example.com", "", null));
+                (String) card.get("id"), user + "@example.com", "", null, 0, null));
     }
 
     private int status(String path) throws Exception {
@@ -313,7 +313,7 @@ class BundlesSchedulesTest {
         schedules.tick(now);
         ResponseStatusException refused = assertThrows(ResponseStatusException.class,
                 () -> checkouts.place(user, s.storeId, Ids.next(), new PlaceOrderDto(Shop.NY, rate,
-                    (String) card.get("id"), user + "@example.com", "", null)));
+                    (String) card.get("id"), user + "@example.com", "", null, 0, null)));
         // The cart drops a line no longer sold, or the quote refuses it.
         String why = String.valueOf(refused.getMessage());
         assertTrue(why.contains("no longer sold") || why.contains("cart is empty"), why);
