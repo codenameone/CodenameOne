@@ -115,6 +115,24 @@ The account tab holds the profile, saved addresses, the wallet of cards and the
 settings. Store staff and administrators sign in from the account tab too; their
 role decides which home they land on.
 
+image::img/bazaar-shop-home-phone.png["The shop on a phone: a search box, stores to follow and popular products",scaledwidth=35%]
+
+image::img/bazaar-shop-search-phone.png["Search results across every store, with ratings and prices",scaledwidth=35%]
+
+image::img/bazaar-shop-product-phone.png["A product page with its gallery, rating, price, quantity and the add-to-cart button",scaledwidth=35%]
+
+image::img/bazaar-shop-cart-phone.png["The cart with a discount code, a gift card and the summary",scaledwidth=35%]
+
+image::img/bazaar-shop-checkout-shipping-phone.png["Checkout: the shipping address in steps",scaledwidth=35%]
+
+image::img/bazaar-shop-checkout-payment-phone.png["Checkout: the delivery options and the payment method",scaledwidth=35%]
+
+image::img/bazaar-shop-order-placed-phone.png["The order placed, with its number and total",scaledwidth=35%]
+
+image::img/bazaar-shop-order-phone.png["The order with its progress, items, total and shipping address",scaledwidth=35%]
+
+image::img/bazaar-shop-account-phone.png["The account: profile, wallet, saved addresses, wishlist, followed stores and returns",scaledwidth=35%]
+
 === The merchant
 
 ==== Dashboard and analytics
@@ -139,6 +157,14 @@ days. In the product editor, Draft description writes a first description from
 the title, vendor, type, tags and options for you to edit. Both use the AI
 provider the store's server is set up with, and give simpler answers without
 one.
+
+image::img/bazaar-merchant-dashboard-tablet.png["The merchant dashboard on a tablet: sales, orders, average order, low stock and recent orders",scaledwidth=90%]
+
+image::img/bazaar-merchant-analytics-tablet.png["Analytics against the previous period: sales and orders by day, by channel and by location",scaledwidth=90%]
+
+image::img/bazaar-merchant-assistant-tablet.png["The store assistant answering how sales are this month from the store data",scaledwidth=90%]
+
+image::img/bazaar-merchant-pipeline-desktop.png["The sales pipeline: open carts and orders in columns, with purchase intent",scaledwidth=90%]
 
 ==== Products and collections
 
@@ -173,6 +199,8 @@ g, priced per 100 g), so shoppers see "$4.00 / 100 g" beside the price.
 Collections are either chosen by hand or smart, defined by rules such as a tag or
 a price range.
 
+image::img/bazaar-merchant-products-tablet.png["The product list with status, type, vendor, inventory, variants and price",scaledwidth=90%]
+
 ==== Inventory
 
 The inventory screen shows what's on hand, committed and available for each
@@ -188,6 +216,8 @@ Variants can be tracked by serial number or by lot with an expiry date, and
 lots are picked first-expiring-first. Barcode labels print as a PDF, on Avery
 30-up sheets or 2x1 inch thermal labels, for chosen variants or for everything
 a purchase order brought in.
+
+image::img/bazaar-merchant-inventory-tablet.png["Inventory levels per variant and location, with transfers, purchase orders and suppliers",scaledwidth=90%]
 
 ==== Orders and fulfilment
 
@@ -213,6 +243,10 @@ where returned goods are received and refunded. Packing slips, labels, invoices,
 credit notes and purchase orders can be previewed, printed, shared or, on a
 desktop, dragged out of the window as files.
 
+image::img/bazaar-merchant-orders-tablet.png["The order list with channel, payment and fulfilment status",scaledwidth=90%]
+
+image::img/bazaar-merchant-fulfilment-tablet.png["The fulfilment board: to pack, packed and shipped",scaledwidth=90%]
+
 ==== Customers, discounts and gift cards
 
 The customers screen lists the store's customers with their orders, total spent,
@@ -233,6 +267,10 @@ The store mails some messages by itself: a shopper who looked at a product and
 left without buying hears about it once (only with marketing consent, and at
 most once a week), and a review request with a one-click link goes a week after
 an order is delivered.
+
+image::img/bazaar-merchant-customers-tablet.png["Customers with segments, orders, spend and store credit",scaledwidth=90%]
+
+image::img/bazaar-merchant-discounts-tablet.png["Discounts: member prices, free shipping, codes and a bundle",scaledwidth=90%]
 
 ==== Shipping, taxes and settings
 
@@ -278,6 +316,8 @@ app. Shoppers with Apple Pay or Google Pay see a wallet button on the product
 page, the cart and the checkout. The app pays by card and offers *Pay another
 way*, which opens the store's web checkout.
 
+image::img/bazaar-merchant-settings-tablet.png["Store settings: name, tagline, contact details and address",scaledwidth=90%]
+
 ==== Automations
 
 An automation is drawn as a graph: a trigger, such as an order being paid or
@@ -287,6 +327,8 @@ emailing the customer, creating a discount code, drafting a reorder, sending a
 webhook or waiting. Nodes are added from the palette and joined by dragging from
 an output to an input. The store starts with two examples. An automation is saved
 as a draft until it's switched on, and its activity log shows what each run did.
+
+image::img/bazaar-merchant-automations-tablet.png["Automations: a low-stock reorder flow and a VIP order flow, each switched on",scaledwidth=90%]
 
 ==== Webhooks
 
@@ -328,6 +370,18 @@ online order. In the back office, Commissions sets each staff member's rate and
 reports what they sold at the counter in the last 30 days; a sale keeps the rate of
 the day it was made.
 
+image::img/bazaar-pos-home-tablet.png["Choosing the register for the shift",scaledwidth=90%]
+
+image::img/bazaar-pos-shift-tablet.png["Opening a shift: the cashier counts the float into the drawer",scaledwidth=90%]
+
+image::img/bazaar-pos-sell-tablet.png["The register: the product grid, an empty sale and the charge button",scaledwidth=90%]
+
+image::img/bazaar-pos-cart-tablet.png["A sale of three items with member prices applied",scaledwidth=90%]
+
+image::img/bazaar-pos-tender-tablet.png["Taking payment: suggested cash amounts, card, gift card and store credit",scaledwidth=90%]
+
+image::img/bazaar-pos-receipt-tablet.png["The sale complete, with printed, emailed and texted receipts",scaledwidth=90%]
+
 === The administrator
 
 The platform console shows the number of stores, orders and the total sold across
@@ -335,6 +389,12 @@ the platform. The stores screen approves pending stores and suspends or reinstat
 active ones, with a reason that stays in the store's history. The users screen
 finds accounts, grants and removes roles, and flags or blocks an account. The
 payments screen lists payments and payouts across the stores.
+
+image::img/bazaar-admin-overview-desktop.png["The administrator overview on a desktop: accounts, stores, orders and trends",scaledwidth=90%]
+
+image::img/bazaar-admin-stores-desktop.png["Stores on the platform with their orders and status",scaledwidth=90%]
+
+image::img/bazaar-admin-users-desktop.png["Accounts filtered by role, with a flagged shopper",scaledwidth=90%]
 
 === In a browser
 
@@ -392,6 +452,33 @@ signed in, `/account` holds:
   signing out every other session.
 
 [[bazaar-web-b2b]]
+
+image::img/bazaar-web-marketplace.png["The web marketplace listing the stores",scaledwidth=90%]
+
+image::img/bazaar-web-store.png["A store front rendered on the server",scaledwidth=90%]
+
+image::img/bazaar-web-store-dark.png["The same store front in dark mode",scaledwidth=90%]
+
+image::img/bazaar-web-search.png["Search results in a store",scaledwidth=90%]
+
+image::img/bazaar-web-product.png["A product page on the web with variants and reviews",scaledwidth=90%]
+
+image::img/bazaar-web-cart.png["The web cart",scaledwidth=90%]
+
+image::img/bazaar-web-checkout.png["The web checkout: address, delivery and payment on one page",scaledwidth=90%]
+
+image::img/bazaar-web-order-placed.png["The order confirmation on the web",scaledwidth=90%]
+
+image::img/bazaar-web-account.png["The customer account on the web",scaledwidth=90%]
+
+image::img/bazaar-web-account-orders.png["Orders in the web account",scaledwidth=90%]
+
+image::img/bazaar-web-account-order.png["An order with its timeline",scaledwidth=90%]
+
+image::img/bazaar-web-account-loyalty.png["Loyalty points and tier",scaledwidth=90%]
+
+image::img/bazaar-web-account-security.png["Account security: password and two-step sign-in",scaledwidth=90%]
+
 ==== Buying for a company
 
 A buyer the merchant has added to a company sees the company's prices in the
@@ -423,7 +510,8 @@ each item's stock will last at each location at its recent rate of sale, and
 drafts the purchase orders and transfers that would cover the shortfall.
 
 *Selling.* Discounts and sales have editors; a sale changes prices when it starts
-and puts them back when it ends. The promotions calendar shows a month of sales,
+and puts them back when it ends. A flash sale can cap the units it sells, and
+the storefront counts down to its end. The promotions calendar shows a month of sales,
 campaigns and launches, and an event can be moved to another day. Subscriptions
 are set up as selling plans on a product, with renewals and failed payments
 listed. Companies hold sites, buyers, a price list and payment terms; quotes
@@ -436,7 +524,9 @@ a segment, with a test send to yourself first and an optional A/B test of two
 subjects. Journeys are flowcharts that walk each customer through waits,
 messages and branches, with the number of customers at each step. The loyalty
 page sets how points are earned and the tiers; clubs are paid memberships that
-unlock member prices, members-only products and early access. Signup forms collect
+unlock member prices, members-only products and early access. At the register a
+cashier scans the member card to earn points, and a reward is redeemed as a
+single-use code or as store credit. Signup forms collect
 email addresses, and only people who agreed receive marketing.
 
 *Markets and tax.* A market groups countries under a currency and language, with
@@ -495,6 +585,34 @@ replies from the conversation page, and rings with Accept and Decline when a
 shopper calls, answering voice and video calls on the phone or tablet. A call
 that one member of staff answers stops ringing for everyone else. The listings page imports a marketplace CSV
 as draft products, combining the colors of one item into a single listing.
+
+image::img/bazaar-web-admin-dashboard.png["The web back office dashboard",scaledwidth=90%]
+
+image::img/bazaar-web-admin-dashboard-dark.png["The web back office dashboard in dark mode",scaledwidth=90%]
+
+image::img/bazaar-web-admin-orders.png["Orders in the web back office",scaledwidth=90%]
+
+image::img/bazaar-web-admin-order.png["An order in the web back office",scaledwidth=90%]
+
+image::img/bazaar-web-admin-products.png["Products in the web back office",scaledwidth=90%]
+
+image::img/bazaar-web-admin-product.png["The web product editor",scaledwidth=90%]
+
+image::img/bazaar-web-admin-inventory.png["Inventory in the web back office",scaledwidth=90%]
+
+image::img/bazaar-web-admin-pipeline.png["The sales pipeline on the web",scaledwidth=90%]
+
+image::img/bazaar-web-admin-sales.png["Scheduled sales",scaledwidth=90%]
+
+image::img/bazaar-web-admin-reports.png["Reports",scaledwidth=90%]
+
+image::img/bazaar-web-admin-fulfilment.png["Fulfilment on the web",scaledwidth=90%]
+
+image::img/bazaar-web-admin-inbox.png["The inbox on the web",scaledwidth=90%]
+
+image::img/bazaar-web-admin-customers.png["Customers on the web",scaledwidth=90%]
+
+image::img/bazaar-web-admin-discounts.png["Discounts on the web",scaledwidth=90%]
 
 ==== The register's extras
 

@@ -127,6 +127,9 @@ continues selling reserves with `reserveCounted`, which answers how many units
 it could not cover; the order line keeps that as `backorderedQty`.
 
 [[bazaar-order-tools]]
+
+image::img/bazaar-merchant-inventory-tablet.png["Inventory levels per location",scaledwidth=80%]
+
 === Pay links, returns and templates
 
 A pay link (`PayLinks`) is a row in `pay_link` holding a token of the link id,
@@ -299,6 +302,8 @@ moves a total by cents, so only a shortfall past `tolerance()` is refused:
 include::../../scripts/bazaar/backend/src/main/java/com/codenameone/examples/bazaar/pos/PosSales.java[tag=bazaar-pos-sync,indent=0]
 ----
 
+image::img/bazaar-pos-tender-tablet.png["The register taking a cash payment",scaledwidth=70%]
+
 === Fulfilment
 
 The merchant's fulfilment board shows every open order as a card in To pack,
@@ -314,6 +319,8 @@ list for the cards in the first column is made on the device, with the same
 ----
 include::../../scripts/bazaar/common/src/main/java/com/codenameone/examples/bazaar/merchant/PickListPdf.java[tag=bazaar-picklist-pdf,indent=0]
 ----
+
+image::img/bazaar-merchant-fulfilment-tablet.png["The fulfilment board",scaledwidth=80%]
 
 === Sales pipeline, insights and the merchant AI
 
@@ -362,6 +369,10 @@ result carries a `summary` sentence. With no provider, `AiFallback` answers in
 the same response shape: it picks the tool a question's words point to, then
 answers with the tool's summary, and drafts descriptions from the product's
 fields. The tests run against that fallback.
+
+image::img/bazaar-merchant-pipeline-desktop.png["The pipeline built from carts and orders",scaledwidth=80%]
+
+image::img/bazaar-merchant-assistant-tablet.png["The assistant answering from the store data",scaledwidth=80%]
 
 === Profiles, routing and fulfilment services
 
@@ -472,6 +483,9 @@ orders over a set amount as VIP, and notifying staff and drafting a purchase
 order when stock runs low.
 
 [[bazaar-storefront]]
+
+image::img/bazaar-merchant-automations-tablet.png["Automations in the app",scaledwidth=80%]
+
 === A storefront search engines can read
 
 The app is a Codename One application, and a crawler that doesn't run
@@ -490,6 +504,9 @@ Pages that are the same for every visitor are sent with
 front of the server can absorb a crawl. Checkout runs on the same pages; see <<bazaar-web>>.
 
 [[bazaar-web]]
+
+image::img/bazaar-web-product.png["A server-rendered product page",scaledwidth=80%]
+
 === The web application
 
 Beside the server-rendered storefront, the backend serves a full web version of
@@ -536,6 +553,9 @@ order, which is how a guest returns to it. A cart reminder links back with a
 recovery token that `Carts.recover` turns into that cart in the new session.
 
 [[bazaar-online-store]]
+
+image::img/bazaar-web-admin-pipeline-dark.png["The web back office in dark mode",scaledwidth=80%]
+
 === The online store
 
 The `content` package holds what a merchant edits about the storefront itself:

@@ -87,6 +87,11 @@ public abstract class E2e extends AbstractTest {
     }
 
     private boolean mine() {
+        // A recording run (-Dbazaar.demo.tour, see DemoTourTest) runs the tour and nothing else.
+        String tour = System.getProperty("bazaar.demo.tour");
+        if (tour != null && tour.length() > 0 && !(this instanceof DemoTourTest)) {
+            return false;
+        }
         return desktop() == desktopRun();
     }
 
