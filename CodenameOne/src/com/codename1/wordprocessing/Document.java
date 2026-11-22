@@ -151,6 +151,18 @@ public final class Document {
     /// Whether edits made through an editor are recorded as revisions.
     public final boolean trackChanges;
 
+    /// The blocks at the top of every page; empty for none.
+    public final List<Block> header;
+
+    /// The blocks at the bottom of every page; empty for none.
+    public final List<Block> footer;
+
+    /// The header of the first page, or null when the first page uses `header`.
+    public final List<Block> firstHeader;
+
+    /// The footer of the first page, or null when the first page uses `footer`.
+    public final List<Block> firstFooter;
+
     /// A document with one empty paragraph, on A4.
     public Document() {
         this(single(new Paragraph("p1", RichText.EMPTY)), PageSpec.A4, "Untitled", 2);
@@ -190,6 +202,12 @@ public final class Document {
     /// - `trackChanges`: whether edits are recorded as revisions
     public Document(List<Block> blocks, PageSpec page, String title, long nextId,
             List<Comment> comments, boolean trackChanges) {
+        this(blocks, page, title, nextId, comments, trackChanges, null, null, null, null);
+    }
+
+    private Document(List<Block> blocks, PageSpec page, String title, long nextId,
+            List<Comment> comments, boolean trackChanges, List<Block> header, List<Block> footer,
+            List<Block> firstHeader, List<Block> firstFooter) {
         List<Block> b = new ArrayList<Block>(blocks == null ? Collections.<Block>emptyList()
                 : blocks);
         long next = Math.max(1, nextId);
@@ -217,7 +235,47 @@ public final class Document {
         }
         this.comments = Collections.unmodifiableList(c);
         this.trackChanges = trackChanges;
+        this.header = furniture(header, false);
+        this.footer = furniture(footer, false);
+        this.firstHeader = furniture(firstHeader, true);
+        this.firstFooter = furniture(firstFooter, true);
         this.nextId = next;
+    }
+
+    private static List<Block> furniture(List<Block> value, boolean nullable) {
+        if (value == null) {
+            return nullable ? null : Collections.<Block>emptyList();
+        }
+        List<Block> out = new ArrayList<Block>();
+        for (Block b : value) {
+            if (b != null && !(b instanceof SectionBreak)) {
+                out.add(b);
+            }
+        }
+        return Collections.unmodifiableList(out);
+    }
+
+    /// A copy with different page headers and footers. Their paragraphs may hold `PAGE` and
+    /// `NUMPAGES` fields, which show the number of the page they are drawn on.
+    ///
+    /// #### Parameters
+    ///
+    /// - `pageHeader`: the blocks at the top of every page, or null for none
+    ///
+    /// - `pageFooter`: the blocks at the bottom of every page, or null for none
+    ///
+    /// - `firstPageHeader`: the first page's header, or null to use `pageHeader`; an empty list
+    /// leaves the first page without one
+    ///
+    /// - `firstPageFooter`: the first page's footer, or null to use `pageFooter`
+    ///
+    /// #### Returns
+    ///
+    /// the copy
+    public Document withHeaders(List<Block> pageHeader, List<Block> pageFooter,
+            List<Block> firstPageHeader, List<Block> firstPageFooter) {
+        return new Document(blocks, page, title, nextId, comments, trackChanges, pageHeader,
+                pageFooter, firstPageHeader, firstPageFooter);
     }
 
     private static List<Block> single(Block b) {
@@ -310,7 +368,7 @@ public final class Document {
     ///
     /// the copy
     public Document withBlocks(List<Block> value) {
-        return new Document(value, page, title, nextId, comments, trackChanges);
+        return new Document(value, page, title, nextId, comments, trackChanges, header, footer, firstHeader, firstFooter);
     }
 
     /// A copy with one block replaced.
@@ -372,7 +430,7 @@ public final class Document {
     ///
     /// the copy
     public Document withPage(PageSpec value) {
-        return new Document(blocks, value, title, nextId, comments, trackChanges);
+        return new Document(blocks, value, title, nextId, comments, trackChanges, header, footer, firstHeader, firstFooter);
     }
 
     /// A copy with a different title.
@@ -385,7 +443,7 @@ public final class Document {
     ///
     /// the copy
     public Document withTitle(String value) {
-        return new Document(blocks, page, value, nextId, comments, trackChanges);
+        return new Document(blocks, page, value, nextId, comments, trackChanges, header, footer, firstHeader, firstFooter);
     }
 
     /// A copy with a different next id.
@@ -398,7 +456,7 @@ public final class Document {
     ///
     /// the copy
     public Document withNextId(long value) {
-        return new Document(blocks, page, title, value, comments, trackChanges);
+        return new Document(blocks, page, title, value, comments, trackChanges, header, footer, firstHeader, firstFooter);
     }
 
     /// A copy with different review comments.
@@ -411,7 +469,7 @@ public final class Document {
     ///
     /// the new document
     public Document withComments(List<Comment> value) {
-        return new Document(blocks, page, title, nextId, value, trackChanges);
+        return new Document(blocks, page, title, nextId, value, trackChanges, header, footer, firstHeader, firstFooter);
     }
 
     /// A copy with change tracking turned on or off.
@@ -424,7 +482,7 @@ public final class Document {
     ///
     /// the new document
     public Document withTrackChanges(boolean value) {
-        return new Document(blocks, page, title, nextId, comments, value);
+        return new Document(blocks, page, title, nextId, comments, value, header, footer, firstHeader, firstFooter);
     }
 
     /// The comment with an id.
@@ -641,7 +699,13 @@ public final class Document {
         }
         Document d = (Document) o;
         return blocks.equals(d.blocks) && page.equals(d.page) && title.equals(d.title)
-                && comments.equals(d.comments) && trackChanges == d.trackChanges;
+                && comments.equals(d.comments) && trackChanges == d.trackChanges
+                && header.equals(d.header) && footer.equals(d.footer)
+                && same(firstHeader, d.firstHeader) && same(firstFooter, d.firstFooter);
+    }
+
+    private static boolean same(List<Block> a, List<Block> b) {
+        return a == null ? b == null : a.equals(b);
     }
 
     /// A hash consistent with `equals`.

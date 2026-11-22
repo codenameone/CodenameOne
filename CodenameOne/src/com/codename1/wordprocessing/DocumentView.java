@@ -393,10 +393,9 @@ public class DocumentView extends ScrollSurface implements TextInputClient {
     public float getScale() {
         float natural = Display.getInstance().convertToPixels(254f) / 720f;
         float s = natural;
-        PageSpec spec = getLayout().getPageSpec();
         int w = getWidth();
         if (fitWidth && w > 0) {
-            float fit = (w - 2f * gap()) / spec.width;
+            float fit = (w - 2f * gap()) / widestPage();
             if (fit > 0 && fit < natural) {
                 s = fit;
             }
@@ -411,12 +410,26 @@ public class DocumentView extends ScrollSurface implements TextInputClient {
         return gapPx;
     }
 
-    private int pageWidthPx() {
-        return Math.round(getLayout().getPageSpec().width * getScale());
+    /// The widest page, in points: sections may turn pages or change their size.
+    private float widestPage() {
+        DocumentLayout l = getLayout();
+        float w = 1;
+        for (int p = 0; p < l.getPageCount(); p++) {
+            w = Math.max(w, l.getPage(p).getWidth());
+        }
+        return w;
     }
 
-    private int pageHeightPx() {
-        return Math.round(getLayout().getPageSpec().height * getScale());
+    private int pageWidthPx() {
+        return Math.round(widestPage() * getScale());
+    }
+
+    private int pageWidthPx(int page) {
+        return Math.round(getLayout().getPage(page).getWidth() * getScale());
+    }
+
+    private int pageHeightPx(int page) {
+        return Math.round(getLayout().getPage(page).getHeight() * getScale());
     }
 
     /// Told when what the view shows moves: a scroll, a zoom or a new layout.
@@ -449,18 +462,22 @@ public class DocumentView extends ScrollSurface implements TextInputClient {
     /// `{x, y, width, height}` in pixels
     public int[] itemBounds(int page, LayoutItem item) {
         float scale = getScale();
-        int x = pageLeft() + Math.round(item.x * scale) - getOffsetX();
+        int x = pageLeft(page) + Math.round(item.x * scale) - getOffsetX();
         int y = pageTop(page) + Math.round(item.y * scale) - getOffsetY();
         return new int[] {x, y, Math.max(1, Math.round(item.width * scale)),
             Math.max(1, Math.round(item.height * scale))};
     }
 
-    private int pageLeft() {
-        return Math.max(gap(), (getContentWidth() - pageWidthPx()) / 2);
+    private int pageLeft(int page) {
+        return Math.max(gap(), (getContentWidth() - pageWidthPx(page)) / 2);
     }
 
     private int pageTop(int page) {
-        return gap() + page * (pageHeightPx() + gap());
+        int y = gap();
+        for (int p = 0; p < page; p++) {
+            y += pageHeightPx(p) + gap();
+        }
+        return y;
     }
 
     @Override
@@ -475,7 +492,7 @@ public class DocumentView extends ScrollSurface implements TextInputClient {
 
     @Override
     protected int getContentHeight() {
-        return gap() + getLayout().getPageCount() * (pageHeightPx() + gap());
+        return pageTop(getLayout().getPageCount());
     }
 
     @Override
@@ -555,9 +572,6 @@ public class DocumentView extends ScrollSurface implements TextInputClient {
         g.fillRect(x, y, getContentWidth(), getContentHeight());
         DocumentLayout l = getLayout();
         float scale = getScale();
-        int pw = pageWidthPx();
-        int ph = pageHeightPx();
-        int left = x + pageLeft();
         int clipY = g.getClipY();
         int clipH = g.getClipHeight();
         TextPosition[] sel = getSelection();
@@ -565,6 +579,9 @@ public class DocumentView extends ScrollSurface implements TextInputClient {
                 ? l.caretRect(caret) : null;
         for (int p = 0; p < l.getPageCount(); p++) {
             int top = y + pageTop(p);
+            int pw = pageWidthPx(p);
+            int ph = pageHeightPx(p);
+            int left = x + pageLeft(p);
             if (top > clipY + clipH || top + ph < clipY) {
                 continue;
             }
@@ -879,10 +896,12 @@ public class DocumentView extends ScrollSurface implements TextInputClient {
     public TextPosition positionAt(int x, int y) {
         int cx = x + getOffsetX();
         int cy = y + getOffsetY();
-        int ph = pageHeightPx() + gap();
-        int page = Math.max(0, Math.min(getLayout().getPageCount() - 1, (cy - gap()) / ph));
+        int page = 0;
+        while (page + 1 < getLayout().getPageCount() && cy >= pageTop(page + 1) - gap() / 2) {
+            page++;
+        }
         float scale = getScale();
-        return getLayout().positionAt(page, (cx - pageLeft()) / scale,
+        return getLayout().positionAt(page, (cx - pageLeft(page)) / scale,
                 (cy - pageTop(page)) / scale);
     }
 
@@ -1122,7 +1141,7 @@ public class DocumentView extends ScrollSurface implements TextInputClient {
         }
         int page = (int) r[0];
         float y = down ? r[2] + r[3] + 1 : r[2] - 1;
-        float limit = getLayout().getPageSpec().height;
+        float limit = getLayout().getPage(page).getHeight();
         if (y > limit && page + 1 < getLayout().getPageCount()) {
             page++;
             y = 0;
@@ -1400,7 +1419,7 @@ public class DocumentView extends ScrollSurface implements TextInputClient {
             return new int[] {getAbsoluteX(), getAbsoluteY(), 1, 1};
         }
         float scale = getScale();
-        int x = getAbsoluteX() - getOffsetX() + pageLeft() + Math.round(r[1] * scale);
+        int x = getAbsoluteX() - getOffsetX() + pageLeft((int) r[0]) + Math.round(r[1] * scale);
         int y = getAbsoluteY() - getOffsetY() + pageTop((int) r[0]) + Math.round(r[2] * scale);
         return new int[] {x, y, 1, Math.max(1, Math.round(r[3] * scale))};
     }

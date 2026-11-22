@@ -40,6 +40,43 @@ public final class Picture implements Block, Inline {
     /// Alternative text for readers that cannot show the picture.
     public final String description;
 
+    /// Laid out in the line like a large character; the default.
+    public static final String INLINE = "inline";
+
+    /// Floats at a side of the column; text wraps around its box.
+    public static final String SQUARE = "square";
+
+    /// Floats on lines of its own; no text beside it.
+    public static final String TOP_BOTTOM = "topAndBottom";
+
+    /// Floats behind the text, which ignores it.
+    public static final String BEHIND = "behind";
+
+    /// Floats over the text, which ignores it.
+    public static final String IN_FRONT = "inFront";
+
+    /// Horizontal placement of a floating picture: at the left edge of the column.
+    public static final String LEFT = "left";
+
+    /// Horizontal placement of a floating picture: centered in the column.
+    public static final String CENTER = "center";
+
+    /// Horizontal placement of a floating picture: at the right edge of the column.
+    public static final String RIGHT = "right";
+
+    /// How text flows around the picture: `INLINE`, `SQUARE`, `TOP_BOTTOM`, `BEHIND` or
+    /// `IN_FRONT`.
+    public final String wrap;
+
+    /// Where a floating picture sits across the column: `LEFT`, `CENTER` or `RIGHT`.
+    public final String align;
+
+    /// How far below the top of its anchor paragraph a floating picture starts, in points.
+    public final float offsetY;
+
+    /// The gap kept between a floating picture and the text wrapped around it, in points.
+    public final float distance;
+
     private final byte[] data;
 
     /// Creates a picture.
@@ -59,6 +96,11 @@ public final class Picture implements Block, Inline {
     /// - `description`: alternative text, or null
     public Picture(String id, byte[] data, String mimeType, float width, float height,
             String description) {
+        this(id, data, mimeType, width, height, description, INLINE, LEFT, 0, 9);
+    }
+
+    private Picture(String id, byte[] data, String mimeType, float width, float height,
+            String description, String wrap, String align, float offsetY, float distance) {
         if (id == null || id.length() == 0) {
             throw new IllegalArgumentException("Picture id is required");
         }
@@ -76,6 +118,41 @@ public final class Picture implements Block, Inline {
         this.width = width;
         this.height = height;
         this.description = description == null ? "" : description;
+        this.wrap = SQUARE.equals(wrap) || TOP_BOTTOM.equals(wrap) || BEHIND.equals(wrap)
+                || IN_FRONT.equals(wrap) ? wrap : INLINE;
+        this.align = CENTER.equals(align) || RIGHT.equals(align) ? align : LEFT;
+        // hostile values from a file must not push the picture off every page
+        this.offsetY = Float.isNaN(offsetY) ? 0 : Math.max(-2000, Math.min(2000, offsetY));
+        this.distance = Float.isNaN(distance) ? 0 : Math.max(0, Math.min(72, distance));
+    }
+
+    /// Whether the picture floats instead of sitting in a line.
+    ///
+    /// #### Returns
+    ///
+    /// true unless the wrap is `INLINE`
+    public boolean isFloating() {
+        return !INLINE.equals(wrap);
+    }
+
+    /// A copy placed differently.
+    ///
+    /// #### Parameters
+    ///
+    /// - `wrapMode`: `INLINE`, `SQUARE`, `TOP_BOTTOM`, `BEHIND` or `IN_FRONT`
+    ///
+    /// - `alignment`: `LEFT`, `CENTER` or `RIGHT`
+    ///
+    /// - `offset`: points below the top of the anchor paragraph
+    ///
+    /// - `gap`: points kept between the picture and wrapped text, 0 to 72
+    ///
+    /// #### Returns
+    ///
+    /// the copy
+    public Picture withWrap(String wrapMode, String alignment, float offset, float gap) {
+        return new Picture(id, data, mimeType, width, height, description, wrapMode, alignment,
+                offset, gap);
     }
 
     private static boolean isToken(String s) {
@@ -160,10 +237,11 @@ public final class Picture implements Block, Inline {
     ///
     /// the copy
     public Picture withSize(float w, float h) {
-        return new Picture(id, data, mimeType, w, h, description);
+        return new Picture(id, data, mimeType, w, h, description, wrap, align, offsetY,
+                distance);
     }
 
-    /// Two pictures are equal when their id, bytes, type, size and description are.
+    /// Two pictures are equal when their id, bytes, type, size, description and placement are.
     ///
     /// #### Parameters
     ///
@@ -184,7 +262,9 @@ public final class Picture implements Block, Inline {
         if (!id.equals(p.id) || !mimeType.equals(p.mimeType) || !description.equals(p.description)
                 || Float.floatToIntBits(width) != Float.floatToIntBits(p.width)
                 || Float.floatToIntBits(height) != Float.floatToIntBits(p.height)
-                || data.length != p.data.length) {
+                || data.length != p.data.length || !wrap.equals(p.wrap) || !align.equals(p.align)
+                || Float.floatToIntBits(offsetY) != Float.floatToIntBits(p.offsetY)
+                || Float.floatToIntBits(distance) != Float.floatToIntBits(p.distance)) {
             return false;
         }
         for (int i = 0; i < data.length; i++) {

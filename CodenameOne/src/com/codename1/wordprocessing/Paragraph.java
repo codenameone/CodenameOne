@@ -22,6 +22,10 @@
  */
 package com.codename1.wordprocessing;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
 /// An immutable paragraph: styled text plus the paragraph's own layout. Distances are in points.
 ///
 /// Every `with...` method returns a copy that keeps the id, so the copy replaces the original in
@@ -92,6 +96,15 @@ public final class Paragraph implements Block {
     /// The paragraph's text.
     public final RichText text;
 
+    /// The first line's indent relative to `indent`; negative for a hanging indent.
+    public final float firstLine;
+
+    /// The right indent, in points.
+    public final float rightIndent;
+
+    /// The tab stops, ordered by position; empty for the default stops every half inch.
+    public final List<TabStop> tabs;
+
     /// A `Normal` paragraph with default layout.
     ///
     /// #### Parameters
@@ -135,6 +148,14 @@ public final class Paragraph implements Block {
     public Paragraph(String id, String style, String align, String list, int listLevel,
             int listStart, float before, float after, float indent, float lineSpacing,
             boolean pageBreak, boolean keepNext, RichText text) {
+        this(id, style, align, list, listLevel, listStart, before, after, indent, lineSpacing,
+                pageBreak, keepNext, text, 0, 0, null);
+    }
+
+    private Paragraph(String id, String style, String align, String list, int listLevel,
+            int listStart, float before, float after, float indent, float lineSpacing,
+            boolean pageBreak, boolean keepNext, RichText text, float firstLine,
+            float rightIndent, List<TabStop> tabs) {
         if (id == null || id.length() == 0) {
             throw new IllegalArgumentException("Paragraph id is required");
         }
@@ -152,6 +173,63 @@ public final class Paragraph implements Block {
         this.pageBreak = pageBreak;
         this.keepNext = keepNext;
         this.text = text == null ? RichText.EMPTY : text;
+        this.firstLine = finite(firstLine);
+        this.rightIndent = finite(rightIndent);
+        List<TabStop> t = new ArrayList<TabStop>();
+        if (tabs != null) {
+            for (TabStop s : tabs) {
+                if (s == null || t.size() >= 64) {
+                    continue;
+                }
+                int i = 0;
+                while (i < t.size() && t.get(i).position < s.position) {
+                    i++;
+                }
+                if (i < t.size() && t.get(i).position == s.position) {
+                    t.set(i, s);
+                } else {
+                    t.add(i, s);
+                }
+            }
+        }
+        this.tabs = Collections.unmodifiableList(t);
+    }
+
+    private static float finite(float v) {
+        return Float.isNaN(v) || Float.isInfinite(v) ? 0 : Math.max(-2000, Math.min(2000, v));
+    }
+
+    /// A copy with different indents.
+    ///
+    /// #### Parameters
+    ///
+    /// - `left`: the left indent
+    ///
+    /// - `first`: the first line's indent relative to `left`; negative hangs
+    ///
+    /// - `right`: the right indent
+    ///
+    /// #### Returns
+    ///
+    /// the copy
+    public Paragraph withIndents(float left, float first, float right) {
+        return new Paragraph(id, style, align, list, listLevel, listStart, before, after, left,
+                lineSpacing, pageBreak, keepNext, text, first, right, tabs);
+    }
+
+    /// A copy with different tab stops.
+    ///
+    /// #### Parameters
+    ///
+    /// - `value`: the stops in any order, or null for the default ones; at most 64 are kept and
+    /// a later stop at the same position replaces an earlier one
+    ///
+    /// #### Returns
+    ///
+    /// the copy
+    public Paragraph withTabs(List<TabStop> value) {
+        return new Paragraph(id, style, align, list, listLevel, listStart, before, after, indent,
+                lineSpacing, pageBreak, keepNext, text, firstLine, rightIndent, value);
     }
 
     /// The block id.
@@ -212,7 +290,7 @@ public final class Paragraph implements Block {
     /// the copy
     public Paragraph withText(RichText value) {
         return new Paragraph(id, style, align, list, listLevel, listStart, before, after, indent,
-                lineSpacing, pageBreak, keepNext, value);
+                lineSpacing, pageBreak, keepNext, value, firstLine, rightIndent, tabs);
     }
 
     /// A copy with a different named style.
@@ -226,7 +304,7 @@ public final class Paragraph implements Block {
     /// the copy
     public Paragraph withStyle(String value) {
         return new Paragraph(id, value, align, list, listLevel, listStart, before, after, indent,
-                lineSpacing, pageBreak, keepNext, text);
+                lineSpacing, pageBreak, keepNext, text, firstLine, rightIndent, tabs);
     }
 
     /// A copy with a different alignment.
@@ -240,7 +318,7 @@ public final class Paragraph implements Block {
     /// the copy
     public Paragraph withAlign(String value) {
         return new Paragraph(id, style, value, list, listLevel, listStart, before, after, indent,
-                lineSpacing, pageBreak, keepNext, text);
+                lineSpacing, pageBreak, keepNext, text, firstLine, rightIndent, tabs);
     }
 
     /// A copy with different list membership.
@@ -256,7 +334,7 @@ public final class Paragraph implements Block {
     /// the copy
     public Paragraph withList(String kind, int level) {
         return new Paragraph(id, style, align, kind, level, listStart, before, after, indent,
-                lineSpacing, pageBreak, keepNext, text);
+                lineSpacing, pageBreak, keepNext, text, firstLine, rightIndent, tabs);
     }
 
     /// A copy whose numbered list restarts.
@@ -270,7 +348,7 @@ public final class Paragraph implements Block {
     /// the copy
     public Paragraph withListStart(int value) {
         return new Paragraph(id, style, align, list, listLevel, value, before, after, indent,
-                lineSpacing, pageBreak, keepNext, text);
+                lineSpacing, pageBreak, keepNext, text, firstLine, rightIndent, tabs);
     }
 
     /// A copy with different spacing.
@@ -288,7 +366,7 @@ public final class Paragraph implements Block {
     /// the copy
     public Paragraph withSpacing(float spaceBefore, float spaceAfter, float lines) {
         return new Paragraph(id, style, align, list, listLevel, listStart, spaceBefore, spaceAfter,
-                indent, lines, pageBreak, keepNext, text);
+                indent, lines, pageBreak, keepNext, text, firstLine, rightIndent, tabs);
     }
 
     /// A copy with a different left indent.
@@ -302,7 +380,7 @@ public final class Paragraph implements Block {
     /// the copy
     public Paragraph withIndent(float value) {
         return new Paragraph(id, style, align, list, listLevel, listStart, before, after, value,
-                lineSpacing, pageBreak, keepNext, text);
+                lineSpacing, pageBreak, keepNext, text, firstLine, rightIndent, tabs);
     }
 
     /// A copy with the page break switched.
@@ -316,7 +394,7 @@ public final class Paragraph implements Block {
     /// the copy
     public Paragraph withPageBreak(boolean value) {
         return new Paragraph(id, style, align, list, listLevel, listStart, before, after, indent,
-                lineSpacing, value, keepNext, text);
+                lineSpacing, value, keepNext, text, firstLine, rightIndent, tabs);
     }
 
     /// A copy with keep-with-next switched.
@@ -330,7 +408,7 @@ public final class Paragraph implements Block {
     /// the copy
     public Paragraph withKeepNext(boolean value) {
         return new Paragraph(id, style, align, list, listLevel, listStart, before, after, indent,
-                lineSpacing, pageBreak, value, text);
+                lineSpacing, pageBreak, value, text, firstLine, rightIndent, tabs);
     }
 
     /// A copy with another id, used when a paragraph is duplicated.
@@ -344,7 +422,7 @@ public final class Paragraph implements Block {
     /// the copy
     public Paragraph withId(String value) {
         return new Paragraph(value, style, align, list, listLevel, listStart, before, after, indent,
-                lineSpacing, pageBreak, keepNext, text);
+                lineSpacing, pageBreak, keepNext, text, firstLine, rightIndent, tabs);
     }
 
     /// Two paragraphs are equal when every attribute, the id included, is.
@@ -371,7 +449,10 @@ public final class Paragraph implements Block {
                 && Float.floatToIntBits(after) == Float.floatToIntBits(p.after)
                 && Float.floatToIntBits(indent) == Float.floatToIntBits(p.indent)
                 && Float.floatToIntBits(lineSpacing) == Float.floatToIntBits(p.lineSpacing)
-                && pageBreak == p.pageBreak && keepNext == p.keepNext && text.equals(p.text);
+                && pageBreak == p.pageBreak && keepNext == p.keepNext && text.equals(p.text)
+                && Float.floatToIntBits(firstLine) == Float.floatToIntBits(p.firstLine)
+                && Float.floatToIntBits(rightIndent) == Float.floatToIntBits(p.rightIndent)
+                && tabs.equals(p.tabs);
     }
 
     /// A hash consistent with `equals`.

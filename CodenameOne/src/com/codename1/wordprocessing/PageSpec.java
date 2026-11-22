@@ -64,6 +64,11 @@ public final class PageSpec {
     ///
     /// - `left`: the left margin
     public PageSpec(float width, float height, float top, float right, float bottom, float left) {
+        this(width, height, top, right, bottom, left, 1, 36);
+    }
+
+    private PageSpec(float width, float height, float top, float right, float bottom, float left,
+            int columns, float columnGap) {
         if (!ok(width) || !ok(height) || !ok(top) || !ok(right) || !ok(bottom) || !ok(left)
                 || width < 72 || height < 72 || top + bottom >= height || left + right >= width) {
             throw new IllegalArgumentException("Invalid page geometry");
@@ -74,6 +79,54 @@ public final class PageSpec {
         this.right = right;
         this.bottom = bottom;
         this.left = left;
+        // every column keeps at least 36 points of text, whatever a file asks for
+        float body = width - left - right;
+        float gap = Float.isNaN(columnGap) ? 36 : Math.max(0, Math.min(144, columnGap));
+        int n = Math.max(1, Math.min(12, columns));
+        while (n > 1 && (body - gap * (n - 1)) / n < 36) {
+            n--;
+        }
+        this.columns = n;
+        this.columnGap = gap;
+    }
+
+    /// The number of text columns, 1 to 12.
+    public final int columns;
+
+    /// The space between columns, in points.
+    public final float columnGap;
+
+    /// A copy with the text set in columns.
+    ///
+    /// #### Parameters
+    ///
+    /// - `count`: 1 to 12; fewer are used when the columns would be narrower than 36 points
+    ///
+    /// - `gap`: the space between columns, 0 to 144 points
+    ///
+    /// #### Returns
+    ///
+    /// the copy
+    public PageSpec withColumns(int count, float gap) {
+        return new PageSpec(width, height, top, right, bottom, left, count, gap);
+    }
+
+    /// A copy turned to the other orientation, margins rotating with the paper.
+    ///
+    /// #### Returns
+    ///
+    /// the copy
+    public PageSpec rotated() {
+        return new PageSpec(height, width, left, top, right, bottom, columns, columnGap);
+    }
+
+    /// The width of one column.
+    ///
+    /// #### Returns
+    ///
+    /// the width in points
+    public float columnWidth() {
+        return (contentWidth() - columnGap * (columns - 1)) / columns;
     }
 
     private static boolean ok(float x) {
@@ -118,7 +171,9 @@ public final class PageSpec {
                 && Float.floatToIntBits(top) == Float.floatToIntBits(p.top)
                 && Float.floatToIntBits(right) == Float.floatToIntBits(p.right)
                 && Float.floatToIntBits(bottom) == Float.floatToIntBits(p.bottom)
-                && Float.floatToIntBits(left) == Float.floatToIntBits(p.left);
+                && Float.floatToIntBits(left) == Float.floatToIntBits(p.left)
+                && columns == p.columns
+                && Float.floatToIntBits(columnGap) == Float.floatToIntBits(p.columnGap);
     }
 
     /// A hash consistent with `equals`.

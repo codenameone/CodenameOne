@@ -115,6 +115,12 @@ public final class LayoutItem {
                 paragraphId, start, picture, component, color, field);
     }
 
+    /// A copy that belongs to no paragraph, for repeated page furniture the caret never enters.
+    LayoutItem detached() {
+        return new LayoutItem(kind, x, y, width, height, baseline, text, style, null, start,
+                picture, component, color, field);
+    }
+
     LayoutItem withText(String value) {
         return new LayoutItem(kind, x, y, width, height, baseline, value, style, paragraphId,
                 start, picture, component, color, field);

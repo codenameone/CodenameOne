@@ -53,8 +53,13 @@ public final class DocumentLayout {
     private static final int HEADER_FILL = 0xeef1f4;
     private static final float NOTE_SCALE = 0.8f;
 
+    private static final float MIN_LINE = 36;
+
     private final Measurer measurer;
     private final PageSpec spec;
+    private final Document doc;
+    /// The page of the section being sliced or paged.
+    private PageSpec cur;
     private final List<LayoutPage> pages = new ArrayList<LayoutPage>();
     private final int[] listCounters = new int[9];
     private int noteCounter;
@@ -73,7 +78,9 @@ public final class DocumentLayout {
             throw new IllegalArgumentException("Document and measurer are required");
         }
         this.measurer = measurer;
+        this.doc = doc;
         this.spec = doc.page == null ? PageSpec.A4 : doc.page;
+        this.cur = spec;
         run(doc);
         if (hasFields && digits(pages.size()) > fieldDigits) {
             // page numbers grew wider than the room the fields were given: lay out again
@@ -93,7 +100,24 @@ public final class DocumentLayout {
         }
         noteCounter = 0;
         List<Note> endnotes = new ArrayList<Note>();
-        List<Slice> slices = blocks(doc.blocks, bodyWidth(), endnotes);
+        List<Slice> slices = new ArrayList<Slice>();
+        cur = spec;
+        List<Block> section = new ArrayList<Block>();
+        for (Block b : doc.blocks) {
+            if (b instanceof SectionBreak) {
+                slices.addAll(blocks(section, new Flow(bodyWidth()), endnotes));
+                section.clear();
+                SectionBreak br = (SectionBreak) b;
+                Slice mark = new Slice(0);
+                mark.section = br.page;
+                mark.sectionNewPage = br.newPage;
+                slices.add(mark);
+                cur = br.page;
+            } else {
+                section.add(b);
+            }
+        }
+        slices.addAll(blocks(section, new Flow(bodyWidth()), endnotes));
         if (!endnotes.isEmpty()) {
             Slice rule = new Slice(12);
             rule.items.add(LayoutItem.line(0, 6, bodyWidth() / 3, 0, BORDER));
@@ -145,12 +169,13 @@ public final class DocumentLayout {
         return measurer;
     }
 
+    /// The width of a column of the section being laid out.
     private float bodyWidth() {
-        return spec.width - spec.left - spec.right;
+        return cur.columnWidth();
     }
 
     private float bodyHeight() {
-        return spec.height - spec.top - spec.bottom;
+        return cur.contentHeight();
     }
 
     // ------------------------------------------------------------------ slices
@@ -165,6 +190,11 @@ public final class DocumentLayout {
         boolean breakBefore;
         Table table;
         boolean header;
+        /// How far floating pictures reach below the slice's top; at least `height` is needed.
+        float extent;
+        /// The page of a section that starts here, on a marker slice of no height.
+        PageSpec section;
+        boolean sectionNewPage;
 
         Slice(float height) {
             this.height = height;
@@ -174,26 +204,128 @@ public final class DocumentLayout {
             for (int i = 0; i < items.size(); i++) {
                 items.set(i, items.get(i).moved(dx, dy));
             }
+            extent += dy;
+        }
+
+        float need() {
+            return Math.max(height, extent);
+        }
+    }
+
+    /// One column-wide stream being sliced: how far down it has got and the floating pictures
+    /// its text wraps around, each `{left, top, right, bottom}` in the stream's coordinates.
+    static final class Flow {
+        final float width;
+        float y;
+        final List<float[]> floats = new ArrayList<float[]>();
+
+        Flow(float width) {
+            this.width = width;
+        }
+
+        /// The free stretch `{left, right}` of a band, between `lo` and `hi`. A float takes the
+        /// side of the band it sits nearer to, so text runs down the wider side.
+        float[] free(float top, float h, float lo, float hi) {
+            float l = lo;
+            float r = hi;
+            for (int i = 0; i < floats.size(); i++) {
+                float[] f = floats.get(i);
+                if (f[3] <= top + 0.01f || f[1] >= top + h - 0.01f || f[2] <= l || f[0] >= r) {
+                    continue;
+                }
+                if (f[0] - l <= r - f[2]) {
+                    l = Math.max(l, f[2]);
+                } else {
+                    r = Math.min(r, f[0]);
+                }
+            }
+            return new float[] {l, Math.max(l, r)};
+        }
+
+        /// The nearest float bottom below `top` among the floats that cross the band, or
+        /// `top` when none does.
+        float nextClear(float top, float h) {
+            float best = Float.MAX_VALUE;
+            for (int i = 0; i < floats.size(); i++) {
+                float[] f = floats.get(i);
+                if (f[3] > top + 0.01f && f[1] < top + h - 0.01f) {
+                    best = Math.min(best, f[3]);
+                }
+            }
+            return best == Float.MAX_VALUE ? top : best;
+        }
+
+        /// The bottom of the lowest float, or `y` when that is higher.
+        float clearAll() {
+            float b = y;
+            for (int i = 0; i < floats.size(); i++) {
+                b = Math.max(b, floats.get(i)[3]);
+            }
+            return b;
         }
     }
 
     private List<Slice> blocks(List<Block> list, float width, List<Note> endnotes) {
+        return blocks(list, new Flow(width), endnotes);
+    }
+
+    private List<Slice> blocks(List<Block> list, Flow flow, List<Note> endnotes) {
         List<Slice> out = new ArrayList<Slice>();
+        float width = flow.width;
         for (Block b : list) {
             if (b instanceof Paragraph) {
-                out.addAll(paragraph((Paragraph) b, width, endnotes, 1));
-            } else if (b instanceof Table) {
-                out.addAll(table((Table) b, width, endnotes));
+                out.addAll(paragraph((Paragraph) b, flow, endnotes, 1));
+                continue;
+            }
+            List<Slice> made = new ArrayList<Slice>();
+            if (b instanceof Table) {
+                // a table is not wrapped: it starts below every float
+                float clear = flow.clearAll();
+                if (clear > flow.y + 0.01f) {
+                    made.add(new Slice(clear - flow.y));
+                }
+                made.addAll(table((Table) b, width, endnotes));
             } else if (b instanceof Picture) {
                 Picture p = (Picture) b;
-                float[] size = fit(p.width, p.height, width, bodyHeight());
-                Slice s = new Slice(size[1] + 6);
-                s.items.add(new LayoutItem(LayoutItem.PICTURE, 0, 3, size[0], size[1], 0, null,
-                        null, p.id, 0, p, null, 0, null));
+                if (p.isFloating()) {
+                    Slice s = new Slice(0);
+                    addFloat(flow, p, flow.y, s, flow.y, p.id, 0);
+                    made.add(s);
+                } else {
+                    float[] size = fit(p.width, p.height, width, bodyHeight());
+                    Slice s = new Slice(size[1] + 6);
+                    s.items.add(new LayoutItem(LayoutItem.PICTURE, 0, 3, size[0], size[1], 0,
+                            null, null, p.id, 0, p, null, 0, null));
+                    made.add(s);
+                }
+            }
+            for (Slice s : made) {
+                flow.y += s.height;
                 out.add(s);
             }
         }
         return out;
+    }
+
+    /// Places a floating picture in a slice and, unless it lies behind or over the text, keeps
+    /// its box out of the lines that follow.
+    private void addFloat(Flow flow, Picture pic, float top, Slice slice, float sliceTop,
+            String paragraphId, int start) {
+        float[] size = fit(pic.width, pic.height, flow.width, bodyHeight() * 0.9f);
+        float w = size[0];
+        float h = size[1];
+        float x = Picture.CENTER.equals(pic.align) ? (flow.width - w) / 2
+                : Picture.RIGHT.equals(pic.align) ? flow.width - w : 0;
+        float y = top + Math.max(0, pic.offsetY);
+        slice.items.add(new LayoutItem(LayoutItem.PICTURE, x, y - sliceTop, w, h, 0, null, null,
+                paragraphId, start, pic, null, 0, null));
+        slice.extent = Math.max(slice.extent, y - sliceTop + h);
+        float d = pic.distance;
+        if (Picture.SQUARE.equals(pic.wrap)) {
+            flow.floats.add(new float[] {x - d, y, x + w + d, y + h + d});
+        } else if (Picture.TOP_BOTTOM.equals(pic.wrap)) {
+            flow.floats.add(new float[] {-1, y - d, flow.width + 1, y + h + d});
+        }
     }
 
     private static float[] fit(float w, float h, float maxW, float maxH) {
@@ -220,6 +352,18 @@ public final class DocumentLayout {
         EmbeddedComponent component;
         String field;
         Note note;
+        char leader;
+    }
+
+    /// A picture that floats out of a paragraph, with the offset of its character.
+    static final class Anchored {
+        final Picture picture;
+        final int start;
+
+        Anchored(Picture picture, int start) {
+            this.picture = picture;
+            this.start = start;
+        }
     }
 
     private String marker(Paragraph p) {
@@ -278,12 +422,31 @@ public final class DocumentLayout {
         return scale == 1 ? s : s.withSize(Math.max(1, s.size * scale));
     }
 
-    private List<Piece> pieces(RichText text, float avail, float scale) {
+    /// A run's style under its paragraph's named style. A heading's runs that carry no size or
+    /// weight of their own take the heading's; anything set directly on a run wins.
+    static TextStyle styled(int heading, TextStyle s) {
+        if (heading <= 0) {
+            return s;
+        }
+        TextStyle out = s;
+        if (Float.floatToIntBits(s.size) == Float.floatToIntBits(TextStyle.DEFAULT.size)) {
+            out = out.withSize(HtmlFormat.headingSize(heading));
+        }
+        return out.bold ? out : out.withBold(true);
+    }
+
+    private List<Piece> pieces(RichText text, float avail, float scale, int heading,
+            List<Anchored> floats) {
         List<Piece> out = new ArrayList<Piece>();
         for (int r = 0, at = 0; r < text.runCount(); r++) {
             String s = text.runText(r);
-            TextStyle st = scaled(text.runStyle(r), scale);
+            TextStyle st = scaled(styled(heading, text.runStyle(r)), scale);
             Inline obj = text.runObject(r);
+            if (obj instanceof Picture && ((Picture) obj).isFloating()) {
+                floats.add(new Anchored((Picture) obj, at));
+                at++;
+                continue;
+            }
             if (obj != null) {
                 out.add(objectPiece(obj, st, at, avail, scale));
                 at++;
@@ -393,24 +556,63 @@ public final class DocumentLayout {
     }
 
     /// A paragraph's lines, each a slice. The first carries the space before and the last the
-    /// space after.
-    private List<Slice> paragraph(Paragraph p, float width, List<Note> endnotes, float scale) {
+    /// space after. Each line takes the stretch of the column the floats leave free at its
+    /// height, and moves down past them when that stretch is too narrow to hold text.
+    private List<Slice> paragraph(Paragraph p, Flow flow, List<Note> endnotes, float scale) {
+        float width = flow.width;
         String marker = marker(p);
-        float left = Math.min(width * 0.8f, p.indent * scale);
+        float left = Math.min(width * 0.8f, Math.max(0, p.indent * scale));
         if (marker != null) {
             left = Math.min(width * 0.8f, left + LIST_INDENT * (Math.max(0, p.listLevel) + 1));
         }
-        float avail = Math.max(10, width - left);
-        List<Piece> pieces = pieces(p.text, avail, scale);
+        float right = Math.max(0, Math.min(width * 0.5f, p.rightIndent * scale));
+        if (left + right > width - 10) {
+            right = Math.max(0, width - 10 - left);
+        }
+        List<Anchored> floats = new ArrayList<Anchored>();
+        List<Piece> pieces = pieces(p.text, Math.max(10, width - left - right), scale,
+                p.headingLevel(), floats);
         List<Slice> out = new ArrayList<Slice>();
-        TextStyle base = scaled(p.text.runCount() > 0 ? p.text.runStyle(0) : TextStyle.DEFAULT,
-                scale);
+        TextStyle base = scaled(styled(p.headingLevel(), p.text.runCount() > 0
+                ? p.text.runStyle(0) : TextStyle.DEFAULT), scale);
+        float paraTop = flow.y;
+        float before = p.before * scale;
+        Slice floatHolder = new Slice(0);
+        for (Anchored a : floats) {
+            addFloat(flow, a.picture, paraTop + before, floatHolder, paraTop, p.id, a.start);
+        }
+        float lineGuess = (measurer.ascent(base) + measurer.descent(base))
+                * Math.max(0.5f, p.lineSpacing);
+        float y = paraTop + before;
         int i = 0;
         boolean first = true;
+        float carry = 0;
         do {
+            float lineLeft = left;
+            if (first) {
+                lineLeft = Math.max(0, Math.min(width * 0.8f, left + p.firstLine * scale));
+            }
+            float hi = width - right;
+            float[] fr = flow.free(y, lineGuess, lineLeft, hi);
+            float gap = carry;
+            carry = 0;
+            for (int guard = 0; fr[1] - fr[0] < Math.min(MIN_LINE, hi - lineLeft) && guard < 64;
+                    guard++) {
+                float next = flow.nextClear(y, lineGuess);
+                if (next <= y + 0.01f) {
+                    break;
+                }
+                gap += next - y;
+                y = next;
+                fr = flow.free(y, lineGuess, lineLeft, hi);
+            }
+            float x0 = fr[0];
+            float avail = Math.max(10, fr[1] - fr[0]);
             List<Piece> line = new ArrayList<Piece>();
             float x = 0;
             boolean hard = false;
+            boolean narrowed = fr[1] - fr[0] < hi - lineLeft - 0.01f;
+            boolean pushDown = false;
             while (i < pieces.size()) {
                 Piece q = pieces.get(i);
                 if (q.kind == Piece.BREAK) {
@@ -419,11 +621,16 @@ public final class DocumentLayout {
                     hard = true;
                     break;
                 }
-                float w = q.kind == Piece.TAB ? TAB - x % TAB : q.width;
                 if (q.kind == Piece.TAB) {
-                    q.width = w;
+                    q.width = tabWidth(p, pieces, i, x0 + x, left, scale);
                 }
+                float w = q.width;
                 if (x + w - q.spaceWidth > avail + 0.01f && !line.isEmpty()) {
+                    break;
+                }
+                if (x + w - q.spaceWidth > avail + 0.01f && narrowed && line.isEmpty()) {
+                    // too wide for the room beside a float: go below it instead of breaking
+                    pushDown = true;
                     break;
                 }
                 if (x + w - q.spaceWidth > avail + 0.01f && q.kind == Piece.WORD
@@ -438,20 +645,86 @@ public final class DocumentLayout {
                 x += w;
                 i++;
             }
+            if (pushDown) {
+                float next = flow.nextClear(y, lineGuess);
+                if (next > y + 0.01f) {
+                    carry = gap + next - y;
+                    y = next;
+                    continue;
+                }
+                // nothing to go below: break the word after all
+                Piece head = splitWord(pieces.get(i), avail);
+                line.add(head);
+            }
             boolean last = i >= pieces.size();
-            out.add(line(p, line, marker != null && first ? marker : null, left, avail, base,
-                    hard || last, endnotes));
+            Slice s = line(p, line, marker != null && first ? marker : null, left, x0, avail,
+                    base, hard || last, endnotes);
+            float pre = gap + (first ? before : 0);
+            if (pre > 0) {
+                s.height += pre;
+                s.shift(0, pre);
+                s.extent = 0;
+            }
+            y += s.height - pre;
+            out.add(s);
             first = false;
         } while (i < pieces.size());
         Slice firstSlice = out.get(0);
-        float before = p.before * scale;
-        firstSlice.height += before;
-        firstSlice.shift(0, before);
+        for (LayoutItem it : floatHolder.items) {
+            firstSlice.items.add(it);
+        }
+        firstSlice.extent = Math.max(firstSlice.extent, floatHolder.extent);
         firstSlice.breakBefore = p.pageBreak;
         Slice lastSlice = out.get(out.size() - 1);
         lastSlice.height += p.after * scale;
         lastSlice.keepNext = p.keepNext;
+        float total = 0;
+        for (Slice s : out) {
+            total += s.height;
+        }
+        flow.y = paraTop + total;
         return out;
+    }
+
+    /// The width a tab takes: up to the next stop past `at`, less the text the stop aligns.
+    private float tabWidth(Paragraph p, List<Piece> pieces, int index, float at, float left,
+            float scale) {
+        Piece tab = pieces.get(index);
+        tab.leader = 0;
+        TabStop stop = null;
+        for (TabStop t : p.tabs) {
+            if (left + t.position * scale > at + 0.5f) {
+                stop = t;
+                break;
+            }
+        }
+        if (stop == null) {
+            float rel = at - left;
+            float next = left + ((int) Math.floor(rel / TAB) + 1) * TAB;
+            return Math.max(1, next - at);
+        }
+        tab.leader = stop.leader;
+        float target = left + stop.position * scale - at;
+        if (TabStop.LEFT.equals(stop.alignment)) {
+            return Math.max(1, target);
+        }
+        float seg = 0;
+        boolean decimal = TabStop.DECIMAL.equals(stop.alignment);
+        for (int k = index + 1; k < pieces.size(); k++) {
+            Piece q = pieces.get(k);
+            if (q.kind == Piece.TAB || q.kind == Piece.BREAK) {
+                break;
+            }
+            int dot = decimal ? q.text.indexOf('.') : -1;
+            if (dot >= 0) {
+                seg += measurer.width(q.text.substring(0, dot), q.style);
+                break;
+            }
+            boolean lastOfSegment = k + 1 >= pieces.size() || pieces.get(k + 1).kind != Piece.WORD;
+            seg += lastOfSegment ? q.width - q.spaceWidth : q.width;
+        }
+        float w = TabStop.CENTER.equals(stop.alignment) ? target - seg / 2 : target - seg;
+        return Math.max(1, w);
     }
 
     private Piece splitWord(Piece q, float room) {
@@ -476,8 +749,8 @@ public final class DocumentLayout {
         return head;
     }
 
-    private Slice line(Paragraph p, List<Piece> line, String marker, float left, float avail,
-            TextStyle base, boolean lastLine, List<Note> endnotes) {
+    private Slice line(Paragraph p, List<Piece> line, String marker, float left, float x0,
+            float avail, TextStyle base, boolean lastLine, List<Note> endnotes) {
         float ascent = measurer.ascent(base);
         float descent = measurer.descent(base);
         float used = 0;
@@ -502,7 +775,7 @@ public final class DocumentLayout {
             used -= tail.spaceWidth;
         }
         float extra = Math.max(0, avail - used);
-        float x = left;
+        float x = x0;
         float gapExtra = 0;
         if (Paragraph.CENTER.equals(p.align)) {
             x += extra / 2;
@@ -531,6 +804,9 @@ public final class DocumentLayout {
                 continue;
             }
             float w = q.width + (q.spaceWidth > 0 && k < line.size() - 1 ? gapExtra : 0);
+            if (q.kind == Piece.TAB && q.leader != 0) {
+                s.items.add(leader(q, x, w, height, baseline));
+            }
             if (q.kind == Piece.BOX) {
                 float top = baseline - q.ascent;
                 if (q.picture != null) {
@@ -563,6 +839,23 @@ public final class DocumentLayout {
         return s;
     }
 
+    /// The dots, dashes or rule that fill a tab with a leader. The item belongs to no paragraph,
+    /// so the caret and the hit testing never land on it.
+    private LayoutItem leader(Piece q, float x, float w, float height, float baseline) {
+        TextStyle ls = q.style.withUnderline(false).withStrike(false).withLink(null)
+                .withRevision(null).withBackground(TextStyle.NO_BACKGROUND);
+        float one = Math.max(0.5f, measurer.width(String.valueOf(q.leader), ls));
+        int n = (int) Math.floor((w - one) / one);
+        StringBuilder b = new StringBuilder();
+        for (int k = 0; k < n && k < 2000; k++) {
+            b.append(q.leader);
+        }
+        String t = b.toString();
+        float tw = measurer.width(t, ls);
+        return new LayoutItem(LayoutItem.TEXT, x + w - tw - one * 0.5f, 0, tw, height, baseline,
+                t, ls, null, 0, null, null, 0, null);
+    }
+
     /// A note whose first paragraph starts with its reference mark.
     private static Note markedNote(Note n, String mark) {
         List<Block> blocks = new ArrayList<Block>(n.blocks);
@@ -585,7 +878,8 @@ public final class DocumentLayout {
         List<Slice> out = new ArrayList<Slice>();
         for (Block b : n.blocks) {
             if (b instanceof Paragraph) {
-                out.addAll(paragraph((Paragraph) b, width, new ArrayList<Note>(), NOTE_SCALE));
+                out.addAll(paragraph((Paragraph) b, new Flow(width), new ArrayList<Note>(),
+                        NOTE_SCALE));
             } else {
                 List<Block> one = new ArrayList<Block>();
                 one.add(b);
@@ -730,71 +1024,205 @@ public final class DocumentLayout {
 
     // ------------------------------------------------------------------ pages
 
-    private static final class PageBuilder {
+    /// A page being filled: its frame (the body between header and footer), its columns and
+    /// what each column holds so far.
+    private final class PageBuilder {
         final List<LayoutItem> items = new ArrayList<LayoutItem>();
-        final List<Slice> notes = new ArrayList<Slice>();
-        float y;
-        float notesHeight;
+        final List<LayoutItem> behind = new ArrayList<LayoutItem>();
+        final PageSpec page;
+        final int number;
+        final float top;
+        final float bottom;
+        final List<Slice> head;
+        final List<Slice> foot;
+        PageSpec section;
+        int column;
+        float[] y;
+        final List<List<Slice>> notes = new ArrayList<List<Slice>>();
+        float[] notesHeight;
+        boolean[] columnEmpty;
         boolean empty = true;
+        float sectionTop;
+        int sectionItems;
+        final List<Slice> sectionSlices = new ArrayList<Slice>();
+        boolean sectionHasNotes;
+
+        PageBuilder(PageSpec page, int number) {
+            this.page = page;
+            this.number = number;
+            boolean first = number == 1;
+            head = furniture(first && doc.firstHeader != null ? doc.firstHeader : doc.header,
+                    page);
+            foot = furniture(first && doc.firstFooter != null ? doc.firstFooter : doc.footer,
+                    page);
+            float edge = Math.min(36, page.top * 0.5f);
+            float t = page.top;
+            if (!head.isEmpty()) {
+                t = Math.max(t, edge + height(head) + 6);
+            }
+            float footEdge = Math.min(36, page.bottom * 0.5f);
+            float b = page.height - page.bottom;
+            if (!foot.isEmpty()) {
+                b = Math.min(b, page.height - footEdge - height(foot) - 6);
+            }
+            // a header or footer may not take more than half the page from the body
+            float minBody = page.contentHeight() * 0.5f;
+            if (b - t < minBody) {
+                t = page.top;
+                b = page.height - page.bottom;
+            }
+            top = t;
+            bottom = b;
+            startSection(page, 0);
+        }
+
+        void startSection(PageSpec s, float at) {
+            section = s;
+            column = 0;
+            y = new float[s.columns];
+            notesHeight = new float[s.columns];
+            columnEmpty = new boolean[s.columns];
+            notes.clear();
+            for (int c = 0; c < s.columns; c++) {
+                y[c] = at;
+                // only a column at the top of the frame must take what it is given
+                columnEmpty[c] = at <= 0.01f;
+                notes.add(new ArrayList<Slice>());
+            }
+            sectionTop = at;
+            sectionItems = items.size();
+            sectionSlices.clear();
+            sectionHasNotes = false;
+        }
+
+        float columnX(int c) {
+            return section.left + c * (section.columnWidth() + section.columnGap);
+        }
+
+        float frame() {
+            return bottom - top;
+        }
+
+        float lowest() {
+            float m = sectionTop;
+            for (int c = 0; c < y.length; c++) {
+                m = Math.max(m, y[c]);
+            }
+            return m;
+        }
+    }
+
+    private List<Slice> furniture(List<Block> blocks, PageSpec page) {
+        if (blocks.isEmpty()) {
+            return new ArrayList<Slice>();
+        }
+        PageSpec saved = cur;
+        cur = page.withColumns(1, page.columnGap);
+        try {
+            return blocks(blocks, page.contentWidth(), new ArrayList<Note>());
+        } finally {
+            cur = saved;
+        }
+    }
+
+    private static float height(List<Slice> slices) {
+        float h = 0;
+        for (Slice s : slices) {
+            h += s.height;
+        }
+        return h;
+    }
+
+    private static boolean sameSheet(PageSpec a, PageSpec b) {
+        return Float.floatToIntBits(a.width) == Float.floatToIntBits(b.width)
+                && Float.floatToIntBits(a.height) == Float.floatToIntBits(b.height)
+                && Float.floatToIntBits(a.top) == Float.floatToIntBits(b.top)
+                && Float.floatToIntBits(a.bottom) == Float.floatToIntBits(b.bottom)
+                && Float.floatToIntBits(a.left) == Float.floatToIntBits(b.left)
+                && Float.floatToIntBits(a.right) == Float.floatToIntBits(b.right);
     }
 
     private void paginate(List<Slice> all) {
-        float bodyH = bodyHeight();
-        List<Slice> slices = new ArrayList<Slice>();
-        for (Slice s : all) {
-            if (s.height > bodyH) {
-                slices.addAll(split(s, bodyH));
-            } else {
-                slices.add(s);
-            }
-        }
-        PageBuilder page = new PageBuilder();
+        List<Slice> slices = new ArrayList<Slice>(all);
+        PageSpec sheet = spec;
+        PageBuilder page = new PageBuilder(sheet, 1);
         List<Slice> headers = new ArrayList<Slice>();
         Table headersOf = null;
         for (int i = 0; i < slices.size(); i++) {
             Slice s = slices.get(i);
+            if (s.section != null) {
+                balance(page);
+                PageSpec next = s.section;
+                if (!page.empty && (s.sectionNewPage || !sameSheet(next, page.page))) {
+                    finish(page);
+                    page = new PageBuilder(next, pages.size() + 1);
+                } else if (page.empty && !sameSheet(next, page.page)) {
+                    page = new PageBuilder(next, pages.size() + 1);
+                } else {
+                    page.startSection(next, page.lowest());
+                }
+                continue;
+            }
+            float colH = page.frame() - page.sectionTop;
+            if (s.need() > page.frame() + 0.01f && s.height > 0) {
+                List<Slice> parts = split(s, Math.max(10, page.frame()));
+                slices.remove(i);
+                slices.addAll(i, parts);
+                s = slices.get(i);
+            }
             if (s.table != headersOf) { //NOPMD CompareObjectsWithEquals - identity of the table being paged
                 headers.clear();
                 headersOf = s.table;
             }
+            float noteW = page.section.columnWidth();
             List<Slice> noteParts = new ArrayList<Slice>();
             float noteH = 0;
             for (Note n : s.notes) {
-                for (Slice ns : noteSlices(n, bodyWidth())) {
+                for (Slice ns : noteSlices(n, noteW)) {
                     noteParts.add(ns);
                     noteH += ns.height;
                 }
             }
-            float separator = noteParts.isEmpty() || !page.notes.isEmpty() ? 0 : 10;
-            float need = s.height;
+            float need = s.need();
             float chain = s.height;
-            for (int k = i; k < slices.size() - 1 && slices.get(k).keepNext; k++) {
-                chain += slices.get(k + 1).height;
+            for (int k = i; k < slices.size() - 1 && slices.get(k).keepNext
+                    && slices.get(k + 1).section == null; k++) {
+                chain += slices.get(k + 1).need();
             }
-            if (chain <= bodyH * 0.8f) {
-                need = chain;
+            if (chain <= colH * 0.8f) {
+                need = Math.max(need, chain);
             }
-            float room = bodyH - page.y - page.notesHeight - separator - noteH;
-            if (!page.empty && (s.breakBefore || need > room + 0.01f)) {
+            int c = page.column;
+            float separator = noteParts.isEmpty() || !page.notes.get(c).isEmpty() ? 0 : 10;
+            float room = page.frame() - page.y[c] - page.notesHeight[c] - separator - noteH;
+            if (s.breakBefore && !page.empty) {
                 finish(page);
-                page = new PageBuilder();
+                page = new PageBuilder(page.section, pages.size() + 1);
+            } else if (need > room + 0.01f && !page.columnEmpty[c]) {
+                if (c + 1 < page.section.columns) {
+                    page.column = c + 1;
+                } else {
+                    finish(page);
+                    page = new PageBuilder(page.section, pages.size() + 1);
+                }
                 if (s.table != null && !s.header && !headers.isEmpty()) {
                     for (Slice h : headers) {
                         place(page, h);
                     }
                 }
-                separator = noteParts.isEmpty() ? 0 : 10;
             }
             place(page, s);
             if (s.header && s.table != null) {
                 headers.add(s);
             }
             if (!noteParts.isEmpty()) {
-                if (page.notes.isEmpty()) {
-                    page.notesHeight += separator;
+                int col = page.column;
+                if (page.notes.get(col).isEmpty()) {
+                    page.notesHeight[col] += 10;
                 }
-                page.notes.addAll(noteParts);
-                page.notesHeight += noteH;
+                page.notes.get(col).addAll(noteParts);
+                page.notesHeight[col] += noteH;
+                page.sectionHasNotes = true;
             }
         }
         finish(page);
@@ -817,28 +1245,99 @@ public final class DocumentLayout {
         }
     }
 
+    /// Evens out the columns of the section that ends on this page, as a continuous section
+    /// break does, so the text below starts under the shortest arrangement rather than under
+    /// a full first column.
+    private void balance(PageBuilder page) {
+        int cols = page.section.columns;
+        if (cols < 2 || page.sectionSlices.isEmpty() || page.sectionHasNotes) {
+            return;
+        }
+        float total = 0;
+        for (Slice s : page.sectionSlices) {
+            total += s.height;
+        }
+        float target = total / cols;
+        List<LayoutItem> placed = new ArrayList<LayoutItem>();
+        float[] y = new float[cols];
+        for (int c = 0; c < cols; c++) {
+            y[c] = page.sectionTop;
+        }
+        int c = 0;
+        boolean columnEmpty = true;
+        for (Slice s : page.sectionSlices) {
+            if (!columnEmpty && c < cols - 1 && y[c] - page.sectionTop + s.height > target + 0.5f) {
+                c++;
+                columnEmpty = true;
+            }
+            if (y[c] + s.need() > page.frame() + 0.01f) {
+                return;
+            }
+            addItems(page, placed, s, page.columnX(c), page.top + y[c]);
+            y[c] += s.height;
+            columnEmpty = false;
+        }
+        while (page.items.size() > page.sectionItems) {
+            page.items.remove(page.items.size() - 1);
+        }
+        page.items.addAll(placed);
+        page.y = y;
+        page.column = c;
+    }
+
     private void place(PageBuilder page, Slice s) {
-        String number = String.valueOf(pages.size() + 1);
+        int c = page.column;
+        addItems(page, page.items, s, page.columnX(c), page.top + page.y[c]);
+        page.y[c] += s.height;
+        page.empty = false;
+        page.columnEmpty[c] = false;
+        page.sectionSlices.add(s);
+    }
+
+    private void addItems(PageBuilder page, List<LayoutItem> into, Slice s, float dx, float dy) {
+        String number = String.valueOf(page.number);
         for (LayoutItem item : s.items) {
-            LayoutItem moved = item.moved(spec.left, spec.top + page.y);
+            LayoutItem moved = item.moved(dx, dy);
             if ("PAGE".equals(moved.field)) {
                 moved = moved.withText(number);
             }
-            page.items.add(moved);
+            if (moved.picture != null && Picture.BEHIND.equals(moved.picture.wrap)
+                    && moved.kind == LayoutItem.PICTURE && into == page.items) {
+                page.behind.add(moved);
+            } else {
+                into.add(moved);
+            }
         }
-        page.y += s.height;
-        page.empty = false;
+    }
+
+    private void addFurniture(PageBuilder page, List<Slice> slices, float y) {
+        String number = String.valueOf(page.number);
+        for (Slice s : slices) {
+            for (LayoutItem item : s.items) {
+                LayoutItem moved = item.moved(page.page.left, y).detached();
+                if ("PAGE".equals(moved.field)) {
+                    moved = moved.withText(number);
+                }
+                page.items.add(moved);
+            }
+            y += s.height;
+        }
     }
 
     private void finish(PageBuilder page) {
-        if (!page.notes.isEmpty()) {
-            float y = spec.height - spec.bottom - page.notesHeight;
-            page.items.add(LayoutItem.line(spec.left, y + 4, bodyWidth() / 3, 0, BORDER));
+        for (int c = 0; c < page.notes.size(); c++) {
+            List<Slice> list = page.notes.get(c);
+            if (list.isEmpty()) {
+                continue;
+            }
+            float x = page.columnX(c);
+            float y = page.bottom - page.notesHeight[c];
+            page.items.add(LayoutItem.line(x, y + 4, page.section.columnWidth() / 3, 0, BORDER));
             y += 10;
-            String number = String.valueOf(pages.size() + 1);
-            for (Slice ns : page.notes) {
+            String number = String.valueOf(page.number);
+            for (Slice ns : list) {
                 for (LayoutItem item : ns.items) {
-                    LayoutItem moved = item.moved(spec.left, y);
+                    LayoutItem moved = item.moved(x, y);
                     if ("PAGE".equals(moved.field)) {
                         moved = moved.withText(number);
                     }
@@ -847,7 +1346,16 @@ public final class DocumentLayout {
                 y += ns.height;
             }
         }
-        pages.add(new LayoutPage(pages.size(), spec.width, spec.height, page.items));
+        if (!page.head.isEmpty()) {
+            addFurniture(page, page.head, Math.min(36, page.page.top * 0.5f));
+        }
+        if (!page.foot.isEmpty()) {
+            addFurniture(page, page.foot, page.page.height - Math.min(36, page.page.bottom * 0.5f)
+                    - height(page.foot));
+        }
+        List<LayoutItem> all = new ArrayList<LayoutItem>(page.behind);
+        all.addAll(page.items);
+        pages.add(new LayoutPage(pages.size(), page.page.width, page.page.height, all));
     }
 
     // ------------------------------------------------------------------ hit testing
@@ -877,6 +1385,9 @@ public final class DocumentLayout {
                 continue;
             }
             float dy = y < it.y ? it.y - y : y > it.y + it.height ? y - it.y - it.height : 0;
+            // with columns or text beside a float, several lines share a height: the nearest
+            // box wins, not the first line found at that height
+            dy += x < it.x ? it.x - x : x > it.x + it.width ? x - it.x - it.width : 0;
             if (dy < bestDy) {
                 bestDy = dy;
                 bestLine = it;
