@@ -464,10 +464,11 @@
       "id": "documents",
       "category": "Rich components",
       "name": "Word processing documents",
-      "description": "Checks a reviewed document with lists, a formula table, a footnote, an embedded slider, tracked changes, a comment and proofing squiggles, HTML read back through DOCX and ODT beside Markdown, and paragraph and page layout: alignment, justification, indents, nested lists, scripts, an inline picture, merged cells and a page break.",
+      "description": "Checks a reviewed document with lists, a formula table, a footnote, an embedded slider, tracked changes, a comment and proofing squiggles, HTML read back through DOCX and ODT beside Markdown, and paragraph and page layout: alignment, justification, indents, nested lists, scripts, an inline picture, merged cells and a page break, and pages with sections, columns, headers and footers and floating pictures.",
       "tests": [
         "DocumentFormatsScreenshotTest",
         "DocumentLayoutScreenshotTest",
+        "DocumentPagesScreenshotTest",
         "DocumentReviewScreenshotTest"
       ]
     },
@@ -1563,6 +1564,10 @@
     {
       "pattern": "DocumentFormats*",
       "test": "DocumentFormatsScreenshotTest"
+    },
+    {
+      "pattern": "DocumentPages*",
+      "test": "DocumentPagesScreenshotTest"
     },
     {
       "pattern": "DocumentLayout*",
