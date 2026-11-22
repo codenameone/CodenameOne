@@ -61,6 +61,30 @@ public final class Tenders {
         return tip;
     }
 
+    /// Takes the tip back off what is due, when the card it was meant for
+    /// was cancelled, declined or failed. A card already taken keeps it.
+    public void dropTip() {
+        if (has(CARD)) {
+            return;
+        }
+        due -= tip;
+        tip = 0;
+    }
+
+    /// The tip the sale carries: the server takes a tip only on a card, so
+    /// a sale finished without one carries none.
+    public long saleTipCents() {
+        return has(CARD) ? tip : 0;
+    }
+
+    /// Whether the cashier may take a payment back off the sale. A card
+    /// payment cannot be: the reader has charged it, and dropping it would
+    /// leave the charge with no sale or charge the card twice.
+    public boolean removable(int index) {
+        return index >= 0 && index < tenders.size()
+                && !CARD.equals(tenders.get(index).kind());
+    }
+
     public long due() {
         return due;
     }
@@ -110,6 +134,9 @@ public final class Tenders {
         if (amountCents <= 0) {
             return "Enter an amount";
         }
+        if (complete() && !tenders.isEmpty()) {
+            return "The sale is paid";
+        }
         if (CASH.equals(kind)) {
             tenders.add(new PosTenderDto(CASH, amountCents, ""));
             return null;
@@ -130,7 +157,7 @@ public final class Tenders {
     }
 
     public void remove(int index) {
-        if (index >= 0 && index < tenders.size()) {
+        if (removable(index)) {
             tenders.remove(index);
         }
     }

@@ -129,7 +129,7 @@ on a row.
 | Draft orders | &#10003; | core | core | core | core | 
 | Invoices (PDF) / send invoice | &#10003; | core | core | core | core | 
 | Payment links for drafts | &#10003; | core | core | core | core | A signed pay link with an expiry, sent by email and paid on the storefront.
-| Manual capture / authorize-only | &#10003; | core | core | core | core | Online orders are authorized at checkout and captured when paid in full.
+| Manual capture / authorize-only | &#10003; | core | core | core | core | Online orders are authorized at checkout and captured when the first item ships (or earlier, when the order is refunded or edited).
 | Partial fulfillment | &#10003; | core | core | core | core | 
 | Order archiving / cancel | &#10003; | core | core | core | core | Archive and unarchive, an archived filter, and optional auto-archive once an order is fulfilled and paid.
 | Order export CSV | &#10003; | core | core | core | core | 
@@ -194,7 +194,7 @@ on a row.
 | Returns & exchanges at POS | &#10003; | core | app/plugin | app/plugin | core | 
 | Refund to store credit | &#10003; | core | app/plugin | app/plugin | no | 
 | Park / hold carts | &#10003; | core | app/plugin | app/plugin | core | Parked carts keep their customer across a restart, offline too. 
-| Tipping | &#10003; | core | app/plugin | app/plugin | core | Tips at the register, counted in the shift. 
+| Tipping | &#10003; | core | app/plugin | app/plugin | core | Tips at the register, taken on the card and included in the shift's card sales. 
 | Card reader hardware (tap/chip) | &#10003; | core | app/plugin | app/plugin | core | Server-driven like Stripe Terminal: pair a reader to a register, push a card-present PaymentIntent, poll or take the webhook; real Stripe Terminal API calls with Stripe, a simulated reader otherwise.
 | Tap to pay on phone | &#8211; | core | app/plugin | app/plugin | core | 
 | Cash drawer / receipt printer hardware | &#10003; | core | app/plugin | app/plugin | core | ESC/POS receipts and the drawer kick sent to a network printer's raw port (host:port, 9100 by default) over a socket; the drawer opens on cash sales.

@@ -49,6 +49,9 @@ final class TenderSheet {
     private final PosPricing.Totals totals;
     private final Container paid = new Container(BoxLayout.y());
     private final Label left;
+    /// Set once the sale is recorded, so a fast second tap cannot record it
+    /// twice.
+    private boolean finished;
 
     private TenderSheet() {
         totals = PosState.totals();
@@ -116,10 +119,12 @@ final class TenderSheet {
             row.add(BorderLayout.WEST, PosUi.label(kindName(t.kind()), "PosTotalRowLabel"));
             Container east = new Container(BoxLayout.x());
             east.add(PosUi.data(PosState.money(t.amountCents()), "PosTotalRowValue"));
-            east.add(Ui.flat(FontImage.MATERIAL_CLOSE, "pos-tender-remove-" + iter, e -> {
-                tenders.remove(index);
-                refresh();
-            }));
+            if (tenders.removable(index)) {
+                east.add(Ui.flat(FontImage.MATERIAL_CLOSE, "pos-tender-remove-" + iter, e -> {
+                    tenders.remove(index);
+                    refresh();
+                }));
+            }
             row.add(BorderLayout.EAST, east);
             paid.add(row);
         }
@@ -150,6 +155,9 @@ final class TenderSheet {
     }
 
     private void tender(String kind, long cents, String ref) {
+        if (finished) {
+            return;
+        }
         String problem = tenders.add(kind, cents, ref);
         if (problem != null) {
             Ui.say(problem);
@@ -242,6 +250,7 @@ final class TenderSheet {
                         Net.to(p -> { }, (st, m) -> { }));
             }
             wait.back();
+            cardLost();
         }));
         Api.posCounter().startCardPayment(PosState.storeId(), PosState.registerId(),
                 new com.codenameone.examples.bazaar.api.CardPaymentDto(null, null, null, clientId,
@@ -254,9 +263,13 @@ final class TenderSheet {
                         state.setText(Lang.tr("Tap, insert or swipe the card"));
                         poll(wait, state, p.id(), amount, over, 0, 0);
                     }, (status, message) -> {
+                        if (over[0]) {
+                            return;
+                        }
                         if (ReaderPoll.standalone(status)) {
                             standalone(amount);
                         } else {
+                            cardLost();
                             Ui.fail(status, message);
                         }
                     }));
@@ -296,6 +309,7 @@ final class TenderSheet {
             // on this sale, once.
             tender(Tenders.CARD, amount, id);
         } else {
+            cardLost();
             Ui.say(message == null || message.length() == 0 ? "The card was not accepted"
                     : message);
         }
@@ -316,6 +330,7 @@ final class TenderSheet {
         c.add(PosUi.key(Lang.tr("Cancel"), "pos-terminal-cancel", "PosChoice", e -> {
             cancelled[0] = true;
             terminal.back();
+            cardLost();
         }));
         terminal.show();
         CN.setTimeout(1800, () -> {
@@ -378,8 +393,20 @@ final class TenderSheet {
         tender(Tenders.STORE_CREDIT, Math.min(cu.storeCreditCents(), tenders.remaining()), "");
     }
 
+    /// The card was cancelled, declined or failed: the tip it carried goes.
+    private void cardLost() {
+        tenders.dropTip();
+        PosState.cart().setTipCents(tenders.tipCents());
+        refresh();
+    }
+
     private void finish() {
+        if (finished) {
+            return;
+        }
+        finished = true;
         PosCart cart = PosState.cart();
+        cart.setTipCents(tenders.saleTipCents());
         PosCustomerDto cu = cart.customer();
         PosSaleDto sale = new PosSaleDto(UUID.randomUUID().toString(), PosState.shiftId(),
                 cu == null ? "" : cu.id(), cu == null || cu.email() == null ? "" : cu.email(),
