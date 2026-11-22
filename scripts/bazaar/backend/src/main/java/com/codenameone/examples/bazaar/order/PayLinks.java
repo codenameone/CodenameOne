@@ -209,7 +209,7 @@ public class PayLinks {
     }
 
     /// A draft not yet turned into an order, or an open one awaiting payment.
-    static boolean payable(StoreOrder o) {
+    public static boolean payable(StoreOrder o) {
         if (!Orders.OPEN.equals(o.getStatus())) {
             return false;
         }

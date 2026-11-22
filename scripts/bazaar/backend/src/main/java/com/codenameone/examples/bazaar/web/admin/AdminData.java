@@ -80,6 +80,8 @@ public class AdminData {
     static final String[] PRODUCT_STATUSES = {"ACTIVE", "DRAFT", "ARCHIVED"};
 
     private final OrderEndpoint orders;
+    @com.codename1.backend.annotations.Autowired
+    private com.codenameone.examples.bazaar.repository.StoreOrderRepository orderRows;
     private final FulfillmentEndpoint fulfillments;
     private final CatalogEndpoint catalog;
     private final InventoryEndpoint inventory;
@@ -226,7 +228,18 @@ public class AdminData {
         t.searchLabel = "Search orders";
         t.empty = "No orders match.";
         t.filters.add(filter("status", "Status", status, new String[][] {
-            {"", "Any status"}, {"OPEN", "Open"}, {"CLOSED", "Closed"}, {"CANCELLED", "Cancelled"}}));
+            {"", "Any status"}, {"OPEN", "Open"}, {"CLOSED", "Closed"}, {"CANCELLED", "Cancelled"},
+            {"ARCHIVED", "Archived"}}));
+        // Archived orders are left out of this list; their own page lists
+        // them (the status filter's "Archived" goes there).
+        com.codenameone.examples.bazaar.web.table.Grid.bulk(t, "/admin/" + storeId + "/orders/bulk",
+                "Fulfil", com.codenameone.examples.bazaar.order.BulkOrders.FULFIL,
+                "Buy labels", com.codenameone.examples.bazaar.order.BulkOrders.LABELS,
+                "Packing slips", com.codenameone.examples.bazaar.order.BulkOrders.PACKING_SLIPS,
+                "Mark paid", com.codenameone.examples.bazaar.order.BulkOrders.MARK_PAID,
+                "Archive", com.codenameone.examples.bazaar.order.BulkOrders.ARCHIVE,
+                "Tag", com.codenameone.examples.bazaar.order.BulkOrders.TAG);
+        t.bulkTag = true;
         t.filters.add(filter("since", "Placed", since, new String[][] {
             {"", "Any time"}, {"7", "Last 7 days"}, {"30", "Last 30 days"}, {"90", "Last 90 days"},
             {"365", "Last year"}}));
@@ -278,6 +291,13 @@ public class AdminData {
     static HttpServer.Response csv(byte[] body, String name) {
         return new HttpServer.Response(200, "text/csv; charset=utf-8", body)
                 .header("Content-Disposition", "attachment; filename=\"" + name + ".csv\"");
+    }
+
+    private static AdminRow tool(String title, String action) {
+        AdminRow r = new AdminRow();
+        r.title = title;
+        r.action = action;
+        return r;
     }
 
     void order(String storeId, String orderId, AdminView v) throws Exception {
@@ -345,6 +365,14 @@ public class AdminData {
         v.canFulfil = open && anyOpen && !"PENDING".equals(o.financial());
         v.canRefund = paid && anyRefundable;
         v.canCancel = open && !shippedAny;
+        com.codenameone.examples.bazaar.domain.StoreOrder row = orderRows.findById(o.id());
+        if (row != null) {
+            if (com.codenameone.examples.bazaar.order.PayLinks.payable(row)) {
+                v.orderTools.add(tool("Send pay link", base + "/pay-link"));
+            }
+            v.orderTools.add(row.isArchived() ? tool("Unarchive", base + "/unarchive")
+                    : tool("Archive", base + "/archive"));
+        }
         if (v.canFulfil) {
             List<LocationDto> places = storeApi.locations(storeId);
             for (int iter = 0; iter < places.size(); iter++) {

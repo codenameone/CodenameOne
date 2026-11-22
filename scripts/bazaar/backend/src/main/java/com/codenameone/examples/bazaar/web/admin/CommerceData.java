@@ -623,6 +623,8 @@ public class CommerceData {
             k.url = "/admin/" + storeId + "/orders/" + t.orderId();
             if (!Trade.PAID.equals(t.status())) {
                 k.button("Mark paid", base + t.orderId() + "/paid", false);
+                k.button("Send pay link", "/admin/" + storeId + "/orders/" + t.orderId()
+                        + "/pay-link?back=invoices", false);
             }
             v.cards.add(k);
         }

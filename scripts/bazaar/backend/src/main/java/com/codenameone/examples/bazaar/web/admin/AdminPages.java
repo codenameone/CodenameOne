@@ -169,6 +169,10 @@ public class AdminPages {
     @GetMapping("/admin/{storeId}/orders")
     public String orders(@PathVariable("storeId") String storeId, Model model,
             HttpServer.Request request) throws Exception {
+        if ("ARCHIVED".equals(AdminForms.field(request, "status"))) {
+            pages.admin(request, storeId, "");
+            return "redirect:/admin/" + storeId + "/archived-orders";
+        }
         DataTable t = data.orders(storeId, request, "/admin/" + storeId + "/orders", false).table;
         return render(model, request, storeId, "Orders", view("orders"), t);
     }

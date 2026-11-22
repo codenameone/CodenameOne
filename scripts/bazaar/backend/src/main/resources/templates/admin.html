@@ -37,7 +37,7 @@
 <p><button type="submit">Save app</button></p></form>
 <form method="post" class="card" th:unless="${view.appNew}" th:action="${view.deleteAction}" hx-confirm="Delete this app?"><h2>Delete</h2><p>The app leaves every page at once.</p><button class="danger" type="submit">Delete app</button></form></th:block>
 
-<th:block th:if="${view.page == 'order'}"><p><a th:href="${view.base + '/orders'}">Orders</a></p><h1 th:text="${view.order.title}">Order #1</h1>
+<th:block th:if="${view.page == 'order'}"><p><a th:href="${view.base + '/orders'}">Orders</a></p><h1 th:text="${view.order.title}">Order #1</h1><div class="row" th:unless="${view.orderTools.empty}"><form th:each="b : ${view.orderTools}" method="post" th:action="${b.action}"><button type="submit" class="quiet" th:text="${b.title}">Archive</button></form></div>
 <p><span class="pill" th:text="${view.order.status}">Open</span> <span class="muted" th:text="${view.order.detail + ' - placed ' + view.order.meta}">Paid</span></p>
 <div class="grid2">
 <section class="card"><h2>Items</h2><div class="table-wrap"><table class="data"><caption class="sr">Items</caption><thead><tr><th scope="col">Item</th><th scope="col">SKU</th><th scope="col" class="num">Qty</th><th scope="col" class="num">Price</th><th scope="col" class="num">Total</th></tr></thead><tbody>

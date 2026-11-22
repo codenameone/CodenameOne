@@ -354,8 +354,10 @@ public class Fulfillments {
         StoreOrder order = orders.findById(orderId);
         for (int iter = 0; iter < ls.size(); iter++) {
             OrderLine line = ls.get(iter);
-            Integer left = waiting.get(line.getId());
-            if (left == null || left.intValue() <= 0) {
+            // What is left is the line less what was refunded, sent or is
+            // already in an open shipment -- not the open shipments themselves.
+            int left = openQty(line, waiting);
+            if (left <= 0) {
                 continue;
             }
             String at = line.getLocationId().length() > 0 ? line.getLocationId()
@@ -366,7 +368,7 @@ public class Fulfillments {
                 byLocation.put(at, into);
             }
             into.add(new FulfilLineDto(line.getId(), line.getTitle(), line.getSku(),
-                    left.intValue()));
+                    left));
         }
         if (byLocation.isEmpty()) {
             throw new ResponseStatusException(409, "The order has nothing to send");
@@ -375,6 +377,12 @@ public class Fulfillments {
         for (Map.Entry<String, List<FulfilLineDto>> e : byLocation.entrySet()) {
             FulfillmentDto made = create(username, storeId, orderId,
                     new NewFulfillmentDto(e.getKey(), null, e.getValue()));
+            // A carrier parcel only leaves with a label: buy it on the way, at
+            // the order's own rate, as fulfilling it one by one would.
+            Fulfillment f = fulfillmentIn(storeId, made.id());
+            if (SHIP.equals(method(f)) && f.getTrackingNumber().length() == 0) {
+                buyLabel(username, storeId, made.id(), new LabelRequestDto(null));
+            }
             out.add(ship(username, storeId, made.id()));
         }
         return out;
@@ -444,14 +452,36 @@ public class Fulfillments {
         if (f.getTrackingNumber().length() > 0) {
             throw new ResponseStatusException(409, "The parcel already has a label");
         }
-        if (req == null || empty(req.service())) {
-            throw new ResponseStatusException(400, "Choose a service");
+        String service = req == null || empty(req.service()) ? null : req.service().trim();
+        if (service == null) {
+            // No service named (labels bought in bulk): the cheapest one the
+            // carrier quotes for this parcel.
+            List<RateQuoteDto> quoted = carrier.rates(new CarrierProvider.Parcel(
+                    f.getWeightGrams()), from(f.getLocationId()), to(orders.findById(
+                    f.getOrderId())));
+            for (int iter = 0; iter < quoted.size(); iter++) {
+                if (service == null || quoted.get(iter).cents() < cheapest(quoted, service)) {
+                    service = quoted.get(iter).service();
+                }
+            }
+            if (service == null) {
+                throw new ResponseStatusException(400, "Choose a service");
+            }
         }
         CarrierProvider.Label label = carrier.buyLabel(
                 new CarrierProvider.Parcel(f.getWeightGrams()), from(f.getLocationId()),
-                to(orders.findById(f.getOrderId())), req.service().trim(), f.getId());
+                to(orders.findById(f.getOrderId())), service, f.getId());
         labelTx(id, label, username);
         return published(id);
+    }
+
+    private static long cheapest(List<RateQuoteDto> quoted, String service) {
+        for (int iter = 0; iter < quoted.size(); iter++) {
+            if (quoted.get(iter).service().equals(service)) {
+                return quoted.get(iter).cents();
+            }
+        }
+        return Long.MAX_VALUE;
     }
 
     @Transactional(rollbackFor = IOException.class)

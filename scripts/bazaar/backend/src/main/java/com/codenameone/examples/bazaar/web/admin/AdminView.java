@@ -62,6 +62,9 @@ public class AdminView {
     public boolean canFulfil;
     public boolean canRefund;
     public boolean canCancel;
+    /// One-click order actions shown under the title: archive or unarchive,
+    /// send a pay link. Each is a post form: title, action, flag = danger.
+    public List<AdminRow> orderTools = new ArrayList<AdminRow>();
     /// The order's fulfilments ([Parcels]) and its packing slip.
     public List<ParcelView> parcels = new ArrayList<ParcelView>();
     public String slipUrl = "";

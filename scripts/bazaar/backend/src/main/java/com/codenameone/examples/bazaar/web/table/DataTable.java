@@ -56,6 +56,8 @@ public class DataTable {
     /// `bulkUrl` with `action` and every checked `ids`.
     public boolean selectable;
     public String bulkUrl = "";
+    /// The bulk toolbar also takes a tag, for an action that adds one.
+    public boolean bulkTag;
     public List<NavItem> actions = new ArrayList<NavItem>();
     public String empty = "Nothing here yet.";
 
