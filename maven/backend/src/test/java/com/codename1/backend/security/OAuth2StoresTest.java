@@ -92,6 +92,7 @@ class OAuth2StoresTest {
         "cn1_persistent_logins", "cn1_mfa_totp", "cn1_mfa_recovery_code", "cn1_rate_limit",
         "cn1_federated_identity", "cn1_oauth2_registered_client", "cn1_oauth2_authorization",
         "cn1_oauth2_token", "cn1_webauthn_user", "cn1_webauthn_credential",
+        "cn1_one_time_token", "cn1_mfa_email", "cn1_verified_email",
         "cn1_security_schema_history"};
 
     private final List<DataSource> opened = new ArrayList<DataSource>();
@@ -152,7 +153,7 @@ class OAuth2StoresTest {
     // ------------------------------------------------- federated identities
 
     @ParameterizedTest
-    @ValueSource(strings = {"SQLITE", "POSTGRES", "MYSQL"})
+    @ValueSource(strings = {"SQLITE", "POSTGRES", "MYSQL", "SQLSERVER"})
     void federatedIdentities(String engine) throws Exception {
         DataSource pool = open(engine);
         JdbcFederatedIdentityRepository identities = new JdbcFederatedIdentityRepository(pool);
@@ -212,7 +213,7 @@ class OAuth2StoresTest {
     // --------------------------------------------------- registered clients
 
     @ParameterizedTest
-    @ValueSource(strings = {"SQLITE", "POSTGRES", "MYSQL"})
+    @ValueSource(strings = {"SQLITE", "POSTGRES", "MYSQL", "SQLSERVER"})
     void registeredClients(String engine) throws Exception {
         DataSource pool = open(engine);
         JdbcRegisteredClientRepository clients = new JdbcRegisteredClientRepository(pool);
@@ -278,7 +279,7 @@ class OAuth2StoresTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"SQLITE", "POSTGRES", "MYSQL"})
+    @ValueSource(strings = {"SQLITE", "POSTGRES", "MYSQL", "SQLSERVER"})
     void malformedClientSettingsNeverRestorePermissiveDefaults(String engine) throws Exception {
         DataSource pool = open(engine);
         JdbcRegisteredClientRepository clients = new JdbcRegisteredClientRepository(pool);
@@ -318,7 +319,7 @@ class OAuth2StoresTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"SQLITE", "POSTGRES", "MYSQL"})
+    @ValueSource(strings = {"SQLITE", "POSTGRES", "MYSQL", "SQLSERVER"})
     void tokenIssuanceCannotResurrectRevokedGrants(String engine) throws Exception {
         DataSource pool = open(engine);
         JdbcOAuth2AuthorizationService issuer = new JdbcOAuth2AuthorizationService(pool);
@@ -375,7 +376,7 @@ class OAuth2StoresTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"SQLITE", "POSTGRES", "MYSQL"})
+    @ValueSource(strings = {"SQLITE", "POSTGRES", "MYSQL", "SQLSERVER"})
     void authorizations(String engine) throws Exception {
         DataSource pool = open(engine);
         JdbcOAuth2AuthorizationService service = new JdbcOAuth2AuthorizationService(pool);
@@ -487,7 +488,7 @@ class OAuth2StoresTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"SQLITE", "POSTGRES", "MYSQL"})
+    @ValueSource(strings = {"SQLITE", "POSTGRES", "MYSQL", "SQLSERVER"})
     void oneCodeIsUsedUpByExactlyOneOfManyProcesses(String engine) throws Exception {
         final DataSource one = open(engine);
         final DataSource two = again(engine);
@@ -527,7 +528,7 @@ class OAuth2StoresTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"SQLITE", "POSTGRES", "MYSQL"})
+    @ValueSource(strings = {"SQLITE", "POSTGRES", "MYSQL", "SQLSERVER"})
     void devicePollingClaimsOneIntervalAcrossProcesses(String engine) throws Exception {
         DataSource one = open(engine);
         DataSource two = again(engine);
@@ -617,7 +618,7 @@ class OAuth2StoresTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"SQLITE", "POSTGRES", "MYSQL"})
+    @ValueSource(strings = {"SQLITE", "POSTGRES", "MYSQL", "SQLSERVER"})
     void twoProcessesRedeemOneCode(String engine) throws Exception {
         DataSource one = open(engine);
         DataSource two = again(engine);

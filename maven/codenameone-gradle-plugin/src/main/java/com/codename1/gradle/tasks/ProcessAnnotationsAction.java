@@ -94,6 +94,15 @@ public final class ProcessAnnotationsAction implements Action<Task> {
         return this;
     }
 
+    /// A `cn1.datasource.url` given to the build (`-Pcn1.datasource.url=...`),
+    /// whose engine the generated backend wiring registers too.
+    public ProcessAnnotationsAction withDatasourceUrl(org.gradle.api.provider.Provider<String> url) {
+        this.datasourceUrl = url;
+        return this;
+    }
+
+    private org.gradle.api.provider.Provider<String> datasourceUrl;
+
     public ProcessAnnotationsAction withSourceEncoding(org.gradle.api.provider.Provider<String> encoding) {
         this.sourceEncoding = encoding;
         return this;
@@ -228,6 +237,7 @@ public final class ProcessAnnotationsAction implements Action<Task> {
                             ? java.util.Collections.<File>emptyList()
                             : java.util.Collections.singletonList(pending))
                     .withBackendLibraries(backendLibraries)
+                    .withDatasourceUrl(datasourceUrl == null ? null : datasourceUrl.getOrNull())
                     .run();
         } catch (BuildExecutionException ex) {
             throw new GradleException(ex.getMessage(), ex.getCause() == null ? ex : ex.getCause());

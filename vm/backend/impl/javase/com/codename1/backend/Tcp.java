@@ -138,6 +138,33 @@ public final class Tcp {
     /// a certificate for anybody.
     public void startTls(String host, String caFile, boolean verifyHost)
             throws IOException {
+        upgrade(host, caFile, verifyHost, null, null);
+    }
+
+    /// [#startTls(String, String, boolean)] offering one ALPN protocol, which
+    /// TDS 8.0 asks for as `tds/8.0`.
+    public void startTls(String host, String caFile, boolean verifyHost, String alpn)
+            throws IOException {
+        upgrade(host, caFile, verifyHost, null, alpn);
+    }
+
+    /// Starts TLS with the handshake carried INSIDE TDS packets, which is how
+    /// SQL Server negotiates encryption before TDS 8.0: every handshake flight
+    /// travels as the payload of packets of type `packetType` (PRELOGIN), each
+    /// under the eight-byte TDS header, and once the handshake completes the
+    /// connection is ordinary TLS with no framing at all.
+    ///
+    /// The certificate and host name rules are [#startTls(String, String, boolean)]'s.
+    /// The handshake is held to TLS 1.2: a server that tunnels it does not
+    /// speak 1.3 this way, and TDS 8.0, which does, starts TLS before anything
+    /// else and uses [#startTls(String, String, boolean)].
+    public void startTlsTunnelled(String host, String caFile, boolean verifyHost,
+                                  int packetType) throws IOException {
+        upgrade(host, caFile, verifyHost, new TunnelSocket(socket, packetType), null);
+    }
+
+    private void upgrade(String host, String caFile, boolean verifyHost, TunnelSocket tunnel, String alpn)
+            throws IOException {
         if (!verifyHost && caFile == null) {
             throw new IOException("Skipping the host name check needs a trust "
                     + "root of its own (sslrootcert)");
@@ -163,7 +190,7 @@ public final class Tcp {
         // Checked rather than cast: an SSLSocketFactory that answered with a plain
         // Socket would otherwise surface as a ClassCastException, not as the
         // IOException every caller of startTls handles, and the socket would leak.
-        Socket created = factory.createSocket(socket, host, socket.getPort(), true); //NOPMD CloseResource - closed below unless it is TLS, and then it becomes this connection's socket
+        Socket created = factory.createSocket(tunnel == null ? socket : tunnel, host, socket.getPort(), true); //NOPMD CloseResource - closed below unless it is TLS, and then it becomes this connection's socket
         if (!(created instanceof SSLSocket)) {
             created.close();
             throw new IOException("The TLS socket factory did not produce a TLS socket");
@@ -173,7 +200,13 @@ public final class Tcp {
         if (verifyHost) {
             parameters.setEndpointIdentificationAlgorithm("HTTPS");
         }
+        if (alpn != null) {
+            parameters.setApplicationProtocols(new String[] {alpn});
+        }
         upgraded.setSSLParameters(parameters);
+        if (tunnel != null) {
+            upgraded.setEnabledProtocols(new String[] {"TLSv1.2"});
+        }
         // BOUNDED, for the reason the packaged arm's comment gives at its own
         // SSL_connect: connectTimeout was spent reaching the port, and a peer that
         // accepts TCP and then stops talking holds this thread for as long as it
@@ -196,11 +229,211 @@ public final class Tcp {
             if (handshakeMillis > 0) {
                 // Back to what it was, or an idle connection's first read after
                 // the handshake would inherit a deadline nobody asked for.
-                upgraded.setSoTimeout(previousTimeout);
+                try {
+                    upgraded.setSoTimeout(previousTimeout);
+                } catch (IOException closedByFailure) { //NOPMD EmptyCatchBlock - see below
+                    // A handshake that failed has closed the socket, and the
+                    // complaint about that would replace the reason it failed:
+                    // the certificate error the caller needs to read.
+                }
             }
+        }
+        if (alpn != null && !alpn.equals(upgraded.getApplicationProtocol())) {
+            // An endpoint that ignored ALPN (a TLS terminator, a server that
+            // does not speak the protocol) is not what this connection is for.
+            upgraded.close();
+            throw new IOException("The server did not select ALPN protocol " + alpn);
+        }
+        if (tunnel != null) {
+            // The handshake is over, and so is the framing: from here the TLS
+            // records go to the socket as they are.
+            tunnel.passThrough();
         }
         rebind(upgraded);
         secure = true;
+    }
+
+    /// The socket a tunnelled handshake is layered over: the real one, except
+    /// that while the handshake runs its streams wrap what is written in TDS
+    /// packets and unwrap what is read.
+    private static final class TunnelSocket extends Socket {
+        private static final int PACKET = 4096;
+        private final Socket real;
+        private final int packetType;
+        private final InputStream realIn;
+        private final OutputStream realOut;
+        private boolean framed = true;
+        private int remaining;
+        private final java.io.ByteArrayOutputStream pending = new java.io.ByteArrayOutputStream();
+
+        TunnelSocket(Socket real, int packetType) throws IOException {
+            this.real = real;
+            this.packetType = packetType;
+            this.realIn = real.getInputStream();
+            this.realOut = real.getOutputStream();
+        }
+
+        void passThrough() {
+            framed = false;
+        }
+
+        private final InputStream in = new InputStream() {
+            @Override
+            public int read() throws IOException {
+                byte[] one = new byte[1];
+                int got = read(one, 0, 1);
+                return got < 0 ? -1 : one[0] & 0xff;
+            }
+
+            @Override
+            public int read(byte[] buffer, int offset, int length) throws IOException {
+                if (!framed) {
+                    return realIn.read(buffer, offset, length);
+                }
+                while (remaining == 0) {
+                    byte[] header = new byte[8];
+                    int have = 0;
+                    while (have < 8) {
+                        int got = realIn.read(header, have, 8 - have);
+                        if (got < 0) {
+                            return -1;
+                        }
+                        have += got;
+                    }
+                    int total = ((header[2] & 0xff) << 8) | (header[3] & 0xff);
+                    if (total < 8) {
+                        throw new IOException("A malformed packet arrived during the TLS handshake");
+                    }
+                    remaining = total - 8;
+                }
+                int got = realIn.read(buffer, offset, Math.min(length, remaining));
+                if (got > 0) {
+                    remaining -= got;
+                }
+                return got;
+            }
+        };
+
+        private final OutputStream out = new OutputStream() {
+            @Override
+            public void write(int b) throws IOException {
+                write(new byte[] {(byte) b}, 0, 1);
+            }
+
+            @Override
+            public void write(byte[] buffer, int offset, int length) throws IOException {
+                if (framed) {
+                    pending.write(buffer, offset, length);
+                } else {
+                    realOut.write(buffer, offset, length);
+                }
+            }
+
+            /// A flight is complete when the TLS layer flushes it, and that is
+            /// when it goes out, as one message of as many packets as it needs.
+            @Override
+            public void flush() throws IOException {
+                if (framed && pending.size() > 0) {
+                    byte[] data = pending.toByteArray();
+                    pending.reset();
+                    int at = 0;
+                    int id = 1;
+                    while (at < data.length) {
+                        int chunk = Math.min(PACKET - 8, data.length - at);
+                        byte[] header = new byte[8];
+                        header[0] = (byte) packetType;
+                        header[1] = (byte) (at + chunk == data.length ? 1 : 0);
+                        header[2] = (byte) ((chunk + 8) >> 8);
+                        header[3] = (byte) (chunk + 8);
+                        header[6] = (byte) id++;
+                        realOut.write(header, 0, 8);
+                        realOut.write(data, at, chunk);
+                        at += chunk;
+                    }
+                }
+                realOut.flush();
+            }
+        };
+
+        @Override
+        public InputStream getInputStream() {
+            return in;
+        }
+
+        @Override
+        public OutputStream getOutputStream() {
+            return out;
+        }
+
+        @Override
+        public void close() throws IOException {
+            real.close();
+        }
+
+        @Override
+        public boolean isClosed() {
+            return real.isClosed();
+        }
+
+        @Override
+        public boolean isConnected() {
+            return real.isConnected();
+        }
+
+        @Override
+        public void setSoTimeout(int timeout) throws java.net.SocketException {
+            real.setSoTimeout(timeout);
+        }
+
+        @Override
+        public int getSoTimeout() throws java.net.SocketException {
+            return real.getSoTimeout();
+        }
+
+        @Override
+        public java.net.InetAddress getInetAddress() {
+            return real.getInetAddress();
+        }
+
+        @Override
+        public int getPort() {
+            return real.getPort();
+        }
+
+        @Override
+        public int getLocalPort() {
+            return real.getLocalPort();
+        }
+
+        @Override
+        public java.net.SocketAddress getRemoteSocketAddress() {
+            return real.getRemoteSocketAddress();
+        }
+
+        @Override
+        public void setTcpNoDelay(boolean on) throws java.net.SocketException {
+            real.setTcpNoDelay(on);
+        }
+
+        @Override
+        public void shutdownInput() throws IOException {
+            real.shutdownInput();
+        }
+
+        @Override
+        public void shutdownOutput() throws IOException {
+            real.shutdownOutput();
+        }
+
+        @Override
+        public boolean isInputShutdown() {
+            return real.isInputShutdown();
+        }
+
+        @Override
+        public boolean isOutputShutdown() {
+            return real.isOutputShutdown();
+        }
     }
 
     /// Whether this connection is encrypted.

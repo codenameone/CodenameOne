@@ -435,3 +435,9 @@ rive-runtime's MIT licence header:
     LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
     IN THE SOFTWARE.
+
+CodenameOne/src/com/codename1/db/sql/Oracle.java is a Java rewrite of the
+thin-mode protocol layer of python-oracledb
+(https://github.com/oracle/python-oracledb), Copyright (c) 2020, 2024, Oracle
+and/or its affiliates, dual-licensed under the Universal Permissive License
+1.0 and the Apache License 2.0. The file keeps that notice verbatim.

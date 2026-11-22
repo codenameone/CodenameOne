@@ -304,6 +304,7 @@
                         <sourceDirectory>${backend.dir}/src</sourceDirectory>
                         <sourceDirectory>${backend.dir}/impl/javase</sourceDirectory>
                         <sourceDirectory>${backend.dir}/impl/parparvm</sourceDirectory>
+                        <sourceDirectory>${backend.dir}/engines</sourceDirectory>
                     </sourceDirectories>
                 </configuration>
                 <executions>

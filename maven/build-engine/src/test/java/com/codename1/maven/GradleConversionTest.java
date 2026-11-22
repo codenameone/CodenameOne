@@ -880,4 +880,14 @@ class GradleConversionTest {
         assertTrue(new File(out, "backend/src/main/java/a/backend/Api.java").isFile(),
                 "a changed route body is someone's work, and is converted");
     }
+    /// The engines a backend reaches are read from its application.properties
+    /// at build time, so no Gradle property names one.
+    @Test
+    void anAddedBackendDeclaresNoDatabaseEngine() throws Exception {
+        File backend = new File(tmp.toFile(), "app/backend");
+        GradleProjectTemplate.writeBackendFiles(backend, "a.backend", ":backend:");
+        File properties = new File(backend, "gradle.properties");
+        assertFalse(properties.exists() && read(properties).contains("cn1.backend.database"),
+                "a backend declares no engine property");
+    }
 }

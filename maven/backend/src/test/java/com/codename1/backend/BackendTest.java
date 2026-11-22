@@ -36,7 +36,7 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.Properties;
 
-import com.codename1.backend.sql.Dialect;
+import com.codename1.db.sql.Dialect;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;

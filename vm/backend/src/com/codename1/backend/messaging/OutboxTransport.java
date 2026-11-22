@@ -26,7 +26,7 @@ import com.codename1.backend.Base64;
 import com.codename1.backend.DataSource;
 import com.codename1.backend.Json;
 import com.codename1.backend.Transactions;
-import com.codename1.backend.sql.Dialect;
+import com.codename1.db.sql.Dialect;
 import com.codename1.impl.backend.BackendAccess;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -112,7 +112,7 @@ final class OutboxTransport extends MessageTransport {
         Dialect d = db.dialect();
         db.execute("CREATE TABLE IF NOT EXISTS " + TABLE + " (id "
                 + d.generatedKeyColumn(Dialect.BIGINT)
-                + ", destination VARCHAR(255) NOT NULL, msg_key VARCHAR(255), headers "
+                + ", destination " + d.varchar(255) + " NOT NULL, msg_key " + d.varchar(255) + ", headers "
                 + d.columnType(Dialect.TEXT) + ", payload " + d.columnType(Dialect.TEXT)
                 + ", created_at " + d.columnType(Dialect.BIGINT) + " NOT NULL)", new Object[0]);
         synchronized (this) {

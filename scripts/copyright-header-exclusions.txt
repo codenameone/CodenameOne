@@ -611,3 +611,4 @@ maven/rive-runtime/src/main/java/com/codename1/impl/rive/Weight.java | Rive obje
 maven/rive-runtime/src/main/java/com/codename1/impl/rive/WorldTransformComponent.java | Rive object model derived from rive-runtime (MIT, Copyright (c) 2020 Rive); keeps the upstream notice
 maven/rive-transcoder/src/main/java/com/codename1/rive/transcoder/RiveReader.java | Rive object model derived from rive-runtime (MIT, Copyright (c) 2020 Rive); keeps the upstream notice
 maven/rive-transcoder/src/main/java/com/codename1/rive/transcoder/RiveTranscoder.java | Rive object model derived from rive-runtime (MIT, Copyright (c) 2020 Rive); keeps the upstream notice
+CodenameOne/src/com/codename1/db/sql/Oracle.java | Rewrite of python-oracledb thin mode (UPL 1.0 / Apache-2.0), retaining its original Oracle notice

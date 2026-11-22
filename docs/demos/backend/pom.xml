@@ -19,6 +19,7 @@
        iOS, Android and the browser, and codenameone-backend is a server library that
        has no business on those classpaths.
   -->
+
   <dependencies>
     <dependency>
       <groupId>com.codenameone</groupId>

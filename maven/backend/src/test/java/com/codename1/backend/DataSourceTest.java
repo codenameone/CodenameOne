@@ -32,7 +32,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 
-import com.codename1.backend.sql.Dialect;
+import com.codename1.db.sql.Dialect;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;

@@ -93,6 +93,23 @@ final class BackendTestSupport {
         return build(mainClass, demoDir, binary, jdk8, false);
     }
 
+    /// The binary of `mainClass`, building it on first use and reusing it for
+    /// every URL: a binary carries every engine's wire client, and the demo
+    /// registers each. Skips or fails, as [#skipOrFail], when the build does.
+    static Path binaryFor(Map<String, Path> built, String url, String mainClass, String demoDir,
+            Path work, Path jdk8) throws Exception {
+        Path binary = built.get(mainClass);
+        if (binary == null) {
+            binary = work.resolve(mainClass.toLowerCase(java.util.Locale.ROOT));
+            String failure = build(mainClass, demoDir, binary, jdk8, false);
+            if (failure != null) {
+                skipOrFail(failure);
+            }
+            built.put(mainClass, binary);
+        }
+        return binary;
+    }
+
     /// As [#build(String, String, Path, Path)]; `standalone` builds a demo that needs
     /// neither the shared contract nor demo/common (CN1_BACKEND_STANDALONE_DEMO).
     static String build(String mainClass, String demoDir, Path binary, Path jdk8, boolean standalone)

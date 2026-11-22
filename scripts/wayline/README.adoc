@@ -168,7 +168,10 @@ to the deployment.
 
 `backend/application.properties` lists every setting a deployment supplies. The
 database is the one named by `DATABASE_URL`: a `postgres://` or `mysql://`
-address, or the path of a SQLite file. The SMS and payment settings are listed
+address, or the path of a SQLite file. The server carries the client of each
+engine a `cn1.datasource.url` in its properties files names; for a URL known
+only when it starts, build with `-Dcn1.datasource.url=postgres://...` (or
+`mysql://...`) so that engine's client is included. The SMS and payment settings are listed
 there too, each also read from the environment in upper case with `_` for every
 dot (`WAYLINE_SMS_TWILIO_TOKEN`).
 

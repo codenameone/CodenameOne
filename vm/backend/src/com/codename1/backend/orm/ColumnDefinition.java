@@ -28,7 +28,7 @@ package com.codename1.backend.orm;
 /// Built by the generated code at class-initialization time and never changed,
 /// so one instance is shared by every request that touches the entity.
 ///
-/// The SQL type is deliberately NOT here. It is the [com.codename1.backend.sql.Dialect] that turns a kind into a type name, because
+/// The SQL type is deliberately NOT here. It is the [com.codename1.db.sql.Dialect] that turns a kind into a type name, because
 /// the same entity has to declare TEXT on SQLite, TEXT on PostgreSQL and VARCHAR
 /// on MySQL. [#getDeclaredType()] is the escape hatch for the schema that
 /// needs a specific one, and it carries the cost of naming an engine.
@@ -63,7 +63,7 @@ public final class ColumnDefinition {
         return column;
     }
 
-    /// One of the kind constants on [com.codename1.backend.sql.Dialect].
+    /// One of the kind constants on [com.codename1.db.sql.Dialect].
     public int getKind() {
         return kind;
     }

@@ -122,6 +122,17 @@ public final class AnnotationProcessing {
         return this;
     }
 
+    /// The `cn1.datasource.url` the build was given, or null.
+    private String datasourceUrl;
+
+    /// The `cn1.datasource.url` given to the build itself (a Maven or Gradle
+    /// property), so the backend registers that URL's engine as well as the
+    /// ones its `application.properties` files name.
+    public AnnotationProcessing withDatasourceUrl(String url) {
+        this.datasourceUrl = url == null || url.trim().length() == 0 ? null : url.trim();
+        return this;
+    }
+
     /// The compile classpath without [#ownClassDirectories].
     private List<String> dependencyClasspath() {
         if (ownClassDirectories.isEmpty()) {
@@ -240,6 +251,9 @@ public final class AnnotationProcessing {
                 // a member sets from the annotation rather than from a generated
                 // table naming each of them.
                 compileClasspath);
+        if (datasourceUrl != null) {
+            ctx.setAttribute("cn1.datasource.url", datasourceUrl);
+        }
 
         // start()
         for (Iterator<AnnotationProcessor> it = processors.iterator(); it.hasNext(); ) {

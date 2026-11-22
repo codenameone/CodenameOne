@@ -116,7 +116,13 @@ def expected():
     css = tree(main / 'css', '')
     modules = {}
     modules.update(tree(sample / 'shared', 'shared/', skip=('target',)))
-    modules.update(tree(sample / 'backend', 'backend/', skip=('target',)))
+    # A generated project builds with the RELEASED plugin, which refuses a
+    # migration directory for an engine it does not know. The Oracle and SQL
+    # Server scripts stay in the sample, where this tree's plugin builds them,
+    # and join the template once a release reads those directories.
+    modules.update(tree(sample / 'backend', 'backend/', skip=(
+        'target', 'src/main/resources/db/migration/oracle',
+        'src/main/resources/db/migration/sqlserver')))
     # Logic both halves run (a game's simulation) lives in `shared`, never in a
     # module of its own: a sample with any other module is refused below.
     for extra in sorted(p.name for p in sample.iterdir() if (p / 'pom.xml').is_file()):
