@@ -290,6 +290,16 @@ class WebCheckoutTest {
     }
 
     @Test
+    void theTestWalletIsOfferedWhenNothingMustBeAsked() throws Exception {
+        Shop s = shop("wc-wallet");
+        checkoutSettings(s, "", "", null, false);
+        Browser b = guest(s, "wc-wallet", 1);
+        String html = b.last.getContentAsString();
+        assertTrue(html.contains("Pay with the test wallet"), "the simulated wallet is offered");
+        assertFalse(b.last.getHeader("Content-Security-Policy").contains("stripe.com"));
+    }
+
+    @Test
     void aTipAndTheStoresQuestionGoThroughTheHtmlCheckout() throws Exception {
         Shop s = shop("wc-tip");
         checkoutSettings(s, "", "p1500", "text", true);
@@ -297,9 +307,11 @@ class WebCheckoutTest {
         String html = b.last.getContentAsString();
         assertTrue(html.contains("Add a tip"), "the tip presets are offered");
         assertTrue(html.contains("Gate code *"), "the required question is asked");
-        // The simulated processor's wallet is a test button, and the policy
-        // never names Stripe.
-        assertTrue(html.contains("Pay with the test wallet"));
+        // A wallet sheet cannot ask the store's required question, so the
+        // express button stays off; and the simulated processor's policy never
+        // names Stripe.
+        assertFalse(html.contains("Pay with the test wallet"),
+                "no express wallet while a required question must be answered");
         assertFalse(b.last.getHeader("Content-Security-Policy").contains("stripe.com"));
         String key = key(html);
         MockResponse missing = b.post("/s/wc-tip/checkout/place", address(key, "tip", "1"));
