@@ -127,6 +127,9 @@ class MerchantIdorTest {
         "POST /webhooks", "POST /webhooks/{webhookId}", "POST /webhooks/{webhookId}/test",
         "PUT ", "PUT /collections/{collectionId}", "PUT /locations/{locationId}",
         "PUT /products/{productId}",
+        // Bundles and per-channel publishing.
+        "GET /products/{productId}/bundle", "PUT /products/{productId}/bundle",
+        "GET /products/{productId}/schedule", "PUT /products/{productId}/schedule",
         // The growth features: loyalty, clubs, sales, alerts, marketing, journeys.
         "DELETE /clubs/{clubId}/items/{itemId}", "DELETE /segments/{segmentId}",
         "GET /campaigns", "GET /campaigns/{campaignId}/stats", "GET /clubs",

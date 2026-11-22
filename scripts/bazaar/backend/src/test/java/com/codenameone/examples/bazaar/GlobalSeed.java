@@ -28,6 +28,14 @@ final class GlobalSeed {
     }
 
     static void seed(Shop s, String orderId, DataSource db) throws Exception {
+        // A bundle component and a publishing window, for the bundle and
+        // schedule routes.
+        db.execute("INSERT INTO bundle_component (id, store_id, product_id, variant_id, quantity, "
+                + "position) VALUES (?, ?, ?, ?, 1, 0)",
+                new Object[] {Ids.next(), s.storeId, Ids.next(), s.variantId});
+        db.execute("INSERT INTO channel_schedule (id, store_id, product_id, channel, publish_at, "
+                + "unpublish_at, visible, updated_at) VALUES (?, ?, ?, 'POS', 1, 0, 1, 0)",
+                new Object[] {Ids.next(), s.storeId, s.productId});
         // The online store's rows: a page, a post, a menu link, a redirect, a
         // metafield and a metaobject type with one entry.
         db.execute("INSERT INTO content_page (id, store_id, kind, handle, title, body, published, "
