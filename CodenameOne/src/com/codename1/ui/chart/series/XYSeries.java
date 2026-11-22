@@ -24,6 +24,7 @@ package com.codename1.ui.chart.series;
 
 import com.codename1.ui.chart.Chart;
 import com.codename1.ui.chart.ChartContext;
+import com.codename1.ui.chart.axis.Axis;
 import com.codename1.ui.chart.ChartPoint;
 import com.codename1.ui.chart.Series;
 
@@ -40,6 +41,10 @@ public abstract class XYSeries extends Series {
     double[] ys = new double[16];
     int count;
     private double[] fromY;
+    // true while the series' entry runs: its values grow out of zero, and zero is moved onto
+    // the value axis when the axis does not reach it (a price axis from 90 to 120). Growing out
+    // of a zero below the plot drew nothing at all for the first part of the entry
+    private boolean entering;
     // the x of each fromY slot, so a transition matches old values to new ones by x; null matches by index
     private double[] fromX;
     // each extra channel's offset from its point's value where the last transition started, per
@@ -649,7 +654,7 @@ public abstract class XYSeries extends Series {
         double t = ctx.getProgress();
         int j = fromSlot(i);
         if (fromPainted != null && t < 1 && j >= 0 && j < fromPainted.length) {
-            return lerp(fromPainted[j], ys[i] * (isVisible() ? 1 : 0), t);
+            return lerp(entryStart(ctx, fromPainted[j]), ys[i] * (isVisible() ? 1 : 0), t);
         }
         float f = getVisibilityFraction();
         if (f >= 0 && f < 1) {
@@ -677,7 +682,30 @@ public abstract class XYSeries extends Series {
             return target;
         }
         int j = fromSlot(i);
-        return j < 0 ? target : lerp(fromY[j], target, t);
+        return j < 0 ? target : lerp(entryStart(ctx, fromY[j]), target, t);
+    }
+
+    // where an entering value starts: v, moved onto the visible range of the value axis
+    private double entryStart(ChartContext ctx, double v) {
+        if (!entering || ctx == null) {
+            return v;
+        }
+        Axis a = ctx.getValueAxis(this);
+        if (a == null) {
+            return v;
+        }
+        double lo = Math.min(a.getVisibleMin(), a.getVisibleMax());
+        double hi = Math.max(a.getVisibleMin(), a.getVisibleMax());
+        if (!(lo <= hi)) { //NOPMD LogicInversion - also true for a NaN bound
+            return v;
+        }
+        // raised onto an axis that starts above it; lowered only from the zero an entry grows
+        // out of (an axis of negative values), never from a painted stack a layer is added onto,
+        // which the axis is still growing to show
+        if (v < lo) {
+            return lo;
+        }
+        return v > hi && v == 0 ? hi : v; //NOPMD CompareDoubles - the exact zero of an entry
     }
 
     // the slot of fromY that point i animates from, or -1 for none. Matched by x when the
@@ -793,7 +821,7 @@ public abstract class XYSeries extends Series {
         // group all slide instead of snapping
         double target = targetBase(i);
         int j = fromSlot(i);
-        return j < 0 || j >= fromBase.length ? target : lerp(fromBase[j], target, t);
+        return j < 0 || j >= fromBase.length ? target : lerp(entryStart(ctx, fromBase[j]), target, t);
     }
 
     /// The base point `i` settles on once the running transition ends: the stack of the earlier
@@ -889,6 +917,7 @@ public abstract class XYSeries extends Series {
             System.arraycopy(xs, 0, fx, 0, count);
         }
         fromY = fy;
+        entering = false;
         fromX = fx;
         fromAux = fa;
         fromBase = fb;
@@ -898,6 +927,7 @@ public abstract class XYSeries extends Series {
 
     @Override
     protected void transitionEnded() {
+        entering = false;
         fromY = null;
         fromX = null;
         fromAux = null;
@@ -909,6 +939,7 @@ public abstract class XYSeries extends Series {
     @Override
     protected void captureEntryStart() {
         fromY = new double[count];
+        entering = true;
         fromX = null;
         fromAux = null;
         fromMap = null;
@@ -1177,7 +1208,7 @@ public abstract class XYSeries extends Series {
                 // a gap has no value to read out; a row of NaN would be noise
                 continue;
             }
-            String item = c == null ? com.codename1.ui.chart.axis.Axis.formatNumber(xs[i], 2) : c.getXAxis().format(xs[i], 0);
+            String item = c == null ? Axis.formatNumber(xs[i], 2) : c.getXAxis().format(xs[i], 0);
             rows.add(new String[]{getName(), item, tableValue(i)});
         }
     }
