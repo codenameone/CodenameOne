@@ -292,7 +292,7 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 
 The image plays the first artboard of the file. It runs the artboard's
 first state machine, or its first animation when the artboard has no state
-machine, and it fits itself into whatever area it is drawn into, keeping
+machine, and it fits itself into whatever area it's drawn into, keeping
 its aspect ratio. Its own size is the artboard's size, taking one artboard
 unit as one density-independent pixel. `scaled(width, height)` returns a
 separate image of the same file in its initial state, so one file can play
@@ -337,17 +337,17 @@ Rive listeners react to touches by themselves. Show the image as the icon
 of a `Label`, a `Button` or a `ScaleImageLabel` and the component hands the
 pointer events that land on it to the image, in the coordinates of the
 image. While the state machine has listeners, `isInteractive()` is true
-and a drag on the image belongs to it, so it does not scroll the form.
-Hover is not delivered.
+and a drag on the image belongs to it, so it doesn't scroll the form.
+Hover isn't delivered.
 
 ==== The clock
 
-The image plays from the moment it is shown. `setAnimationPlaying(false)`
+The image plays from the moment it's shown. `setAnimationPlaying(false)`
 stops the clock on the current frame and `setAnimationPlaying(true)`
 resumes it, starting a one-shot animation that has finished over again.
 A paused image still reacts: an input, a property or a pointer event takes
 effect at once, at the paused time. `advanceAnimation(seconds)` moves time
-by hand, which together with pausing gives a frame that does not depend on
+by hand, which together with pausing gives a frame that doesn't depend on
 the clock, for example in a screenshot test:
 
 [source,java]
@@ -367,7 +367,7 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 | Bones, skins, IK and the other constraints | Supported
 | Embedded images, meshes | Supported, drawn as image triangles
 | Nested artboards, trim paths, dashes | Supported
-| Text with embedded TrueType fonts | Supported: kerning, wrapping, alignment, overflow, modifier ranges. No OpenType CFF fonts, right-to-left text or ligatures, and fonts the file references without embedding them are not loaded
+| Text with embedded TrueType fonts | Supported: kerning, wrapping, alignment, overflow, modifier ranges. No OpenType CFF fonts, right-to-left text or ligatures, and fonts the file references without embedding them aren't loaded
 | Layouts | Flex layout, sizing to content, layout animation. No grid, stack or scrolling
 | Data binding | View models, two-way binds, converters, formulas, conditions, artboard lists
 | Audio events | Played through the media API
@@ -375,14 +375,14 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 |===
 
 The build step prints a warning for every type of object in a file that
-the runtime does not handle, by type name: types it has no class for, and
+the runtime doesn't handle, by type name: types it has no class for, and
 types it builds but gives no behaviour yet (focus, grid, scroll physics,
 artboard transition conditions). A file that relies on a missing feature
 says so when it builds.
 
 ==== How it works
 
-Rive cannot be reduced to SVG the way Lottie is. A state machine blends
+Rive can't be reduced to SVG the way Lottie is. A state machine blends
 several animations on one artboard while it runs, bones and meshes move
 geometry on every frame, and listeners respond to touches. Codename One
 therefore ships a runtime written in pure Java, translated from the open
@@ -390,9 +390,9 @@ source Rive runtime. The build translates each `.riv` file into a Java
 class that builds the objects of the file directly, so nothing is parsed
 on the device, and registers it with the image registry the SVG images
 use. The generated class names only the runtime classes the file uses: an
-application with no `.riv` file does not carry the runtime, and one with a
+application with no `.riv` file doesn't carry the runtime, and one with a
 single simple animation carries only what that animation needs. The build
-adds the runtime by itself; it is not an API an application calls.
+adds the runtime by itself; it's not an API an application calls.
 
 === Troubleshooting
 
