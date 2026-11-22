@@ -638,7 +638,8 @@ public class Translations {
         String c = at < row.size() && row.get(at) != null ? row.get(at) : "";
         // Undo the export's guard against a spreadsheet reading a formula.
         // A plain number is never guarded, so "'-5" is the author's own text.
-        if (c.length() > 1 && c.charAt(0) == '\'' && "=+-@\t\r".indexOf(c.charAt(1)) >= 0
+        // Text that itself began with a quote was exported with one more.
+        if (c.length() > 1 && c.charAt(0) == '\'' && "'=+-@\t\r".indexOf(c.charAt(1)) >= 0
                 && !com.codenameone.examples.bazaar.web.table.Grid.plainNumber(c.substring(1))) {
             c = c.substring(1);
         }
@@ -648,9 +649,11 @@ public class Translations {
     static void csvLine(StringBuilder sb, String[] cells) {
         for (int iter = 0; iter < cells.length; iter++) {
             String c = cells[iter] == null ? "" : cells[iter];
-            // A leading = + - @, tab or CR would be read as a formula by a spreadsheet.
-            if (c.length() > 0 && "=+-@\t\r".indexOf(c.charAt(0)) >= 0
-                    && !com.codenameone.examples.bazaar.web.table.Grid.plainNumber(c)) {
+            // A leading = + - @, tab or CR would be read as a formula by a
+            // spreadsheet. A leading quote is guarded too, so the import's
+            // strip of one quote gives the text back as it was.
+            if (c.length() > 0 && ("'=+-@\t\r".indexOf(c.charAt(0)) >= 0)
+                    && (c.charAt(0) == '\'' || !com.codenameone.examples.bazaar.web.table.Grid.plainNumber(c))) {
                 c = "'" + c;
             }
             sb.append(iter == 0 ? "" : ",").append('"');

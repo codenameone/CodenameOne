@@ -519,7 +519,13 @@ fingerprinted assets under `/static/**` cached as immutable; signed-in pages wit
 a session cookie, CSRF tokens, session id rotation at sign-in, an optional TOTP
 second step, sign-out by POST only, and rate limits per address plus a lockout per
 account and address, with looser ones per address across accounts and per
-account from every address (`Throttle`); and the public storefront. Signed-in
+account from every address (`Throttle`). Anyone can trip the per-account one by
+failing on purpose from enough addresses, so it refuses only browsers that never
+signed in to the account: each successful sign-in sets a year-long, HttpOnly,
+SameSite=Lax known-device cookie (Secure when HSTS is on), an HMAC of the
+account under a server secret, and an attempt carrying a valid one for the
+account it names skips that rule while still meeting the other two
+(`KnownDevices`). The third chain is the public storefront. Signed-in
 pages carry a
 per-request CSP nonce. Public pages carry none, so they can be cached: their one
 inline style is allowed by its hash, which the build writes into `InlineHashes`.
@@ -912,6 +918,10 @@ business contracts for. Plan for these before taking real orders:
 * *A real payment service provider.* The Stripe provider has to be tried against
   a test account before it handles money, and a deployment may need another
   provider, wallets or local payment methods behind the same `PaymentProvider`.
+* *A store time zone.* Analytics and reports bucket days and hours in UTC
+  (`Analytics.daily`, `Analytics.hourly`, `Days`). A store far from UTC sees
+  evening sales on the next day's bar until each store keeps a time zone and
+  the buckets follow it.
 * *A tax engine.* The tax rates are a table the merchant edits. Real sales tax and
   VAT depend on the product category, the destination, thresholds per
   jurisdiction and filing obligations, which a tax service tracks.

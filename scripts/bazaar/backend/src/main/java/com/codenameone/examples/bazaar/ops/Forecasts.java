@@ -111,7 +111,7 @@ public class Forecasts {
         List sold = db.query("SELECT l.variant_id, l.location_id AS lloc, o.location_id AS oloc, "
                 + "l.quantity, o.created_at FROM order_line l JOIN store_order o ON o.id = l.order_id "
                 + "WHERE o.store_id = ? AND o.created_at >= ? AND o.status <> 'CANCELLED' "
-                + "AND o.status <> 'DRAFT'", new Object[] {storeId, Long.valueOf(firstDay * Days.MILLIS)});
+                + "AND (o.channel <> 'DRAFT' OR o.location_id <> '')", new Object[] {storeId, Long.valueOf(firstDay * Days.MILLIS)});
         for (int iter = 0; iter < sold.size() && iter < MAX_LINES; iter++) {
             Map r = (Map) sold.get(iter);
             String loc = Rows.text(r.get("lloc"));

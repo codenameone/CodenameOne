@@ -138,7 +138,7 @@ public class KeyApi {
 
     List<Object> orderList(String storeId, String since, int max) throws IOException {
         String owner = owner(storeId);
-        List rows = db.query("SELECT id AS id FROM store_order WHERE store_id = ? AND status <> ? "
+        List rows = db.query("SELECT id AS id FROM store_order WHERE store_id = ? AND (channel <> ? OR location_id <> '') "
                 + "AND created_at > ? ORDER BY created_at", new Object[] {storeId, Orders.DRAFT,
                     Long.valueOf(number(since))});
         List<Object> out = new ArrayList<Object>();

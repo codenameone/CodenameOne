@@ -42,6 +42,8 @@ final class Browser {
     String market;
     /// The storefront language cookie to send, or null.
     String lang;
+    /// The sign-in known-device cookie (web.security.KnownDevices), or null.
+    String device;
     /// The Accept-Language header to send, or null.
     String acceptLanguage;
 
@@ -64,6 +66,9 @@ final class Browser {
         if (lang != null) {
             b.cookie("lang", lang);
         }
+        if (device != null) {
+            b.cookie("bazaar_device", device);
+        }
         if (acceptLanguage != null) {
             b.header("Accept-Language", acceptLanguage);
         }
@@ -71,6 +76,10 @@ final class Browser {
         String s = r.getCookie("CN1SESSION");
         if (s != null) {
             session = s.length() == 0 ? null : s;
+        }
+        String d = r.getCookie("bazaar_device");
+        if (d != null && d.length() > 0) {
+            device = d;
         }
         String type = r.getContentType();
         if (type != null && type.startsWith("text/html")) {

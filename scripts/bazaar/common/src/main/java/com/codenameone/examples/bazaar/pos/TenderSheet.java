@@ -252,6 +252,9 @@ final class TenderSheet {
             wait.back();
             cardLost();
         }));
+        // Shown before the payment starts, so Cancel is there while the
+        // server reaches the reader; a Cancel then is caught below.
+        wait.show();
         Api.posCounter().startCardPayment(PosState.storeId(), PosState.registerId(),
                 new com.codenameone.examples.bazaar.api.CardPaymentDto(null, null, null, clientId,
                     amount, PosState.currency(), null, null, null), Net.to(p -> {
@@ -264,13 +267,13 @@ final class TenderSheet {
                             return;
                         }
                         paymentId[0] = p.id();
-                        wait.show();
                         state.setText(Lang.tr("Tap, insert or swipe the card"));
                         poll(wait, state, p.id(), amount, over, 0, 0);
                     }, (status, message) -> {
                         if (over[0]) {
                             return;
                         }
+                        wait.back();
                         if (ReaderPoll.standalone(status)) {
                             standalone(amount);
                         } else {

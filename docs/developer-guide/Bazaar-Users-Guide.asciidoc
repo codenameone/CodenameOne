@@ -143,6 +143,13 @@ store, app, register, marketplaces and draft orders), top products, the
 conversion funnel from product views to orders and customer segments, and
 exports what it shows as CSV.
 
+Days and hours in analytics and reports are UTC days and hours, not the
+store's local time. Analytics counts a refund on the day it was made, whatever
+the day of the order, and leaves out refunds of cancelled orders. Reports count
+an order on the day it was placed and subtract the merchandise part of its
+refunds (never tax or shipping, and never more than the order's sales), so the
+two can differ for a period with refunds of older orders.
+
 The sales pipeline shows every open cart and order on one board: shoppers
 browsing, checkouts started, carts already reminded, then paid, fulfilling,
 shipped, delivered and return requested. Each cart has a purchase-intent score

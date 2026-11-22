@@ -89,6 +89,41 @@ class WebFoundationTest {
         assertNotEquals(200, after.getStatus());
     }
 
+    @Autowired
+    com.codenameone.examples.bazaar.web.security.Throttle throttle;
+
+    /// Failing on purpose from many addresses trips the account-wide sign-in
+    /// lockout; a browser that signed in to the account before carries a
+    /// known-device cookie and still signs in, a new browser is refused.
+    @Test
+    void theAccountLockoutSparesAKnownDevice() throws Exception {
+        Browser known = new Browser(mvc);
+        known.get("/auth/signin");
+        assertNotNull(known.signIn(DemoAccounts.SECOND_CUSTOMER, DemoAccounts.PASSWORD));
+        assertNotNull(known.device, "a sign-in sets the known-device cookie");
+        known.post("/auth/signout");
+        String account = com.codenameone.examples.bazaar.marketing.Tokens.fold(
+                DemoAccounts.SECOND_CUSTOMER);
+        try {
+            for (int iter = 0; iter < 60; iter++) {
+                throttle.fail("signin-failures-account", account);
+            }
+            Browser fresh = new Browser(mvc);
+            fresh.get("/auth/signin");
+            MockResponse refused = fresh.post("/auth/signin", "username",
+                    DemoAccounts.SECOND_CUSTOMER, "password", DemoAccounts.PASSWORD);
+            assertTrue(refused.getRedirectedUrl() != null
+                    && refused.getRedirectedUrl().contains("locked"), "" + refused.getRedirectedUrl());
+            known.get("/auth/signin");
+            MockResponse in = known.post("/auth/signin", "username",
+                    DemoAccounts.SECOND_CUSTOMER, "password", DemoAccounts.PASSWORD);
+            assertFalse(in.getRedirectedUrl() == null || in.getRedirectedUrl().contains("locked")
+                    || in.getRedirectedUrl().contains("error"), "" + in.getRedirectedUrl());
+        } finally {
+            throttle.succeed("signin-failures-account", account);
+        }
+    }
+
     @Test
     void wrongPasswordGoesBackToTheForm() throws Exception {
         Browser b = new Browser(mvc);

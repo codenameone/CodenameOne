@@ -205,6 +205,29 @@ public class Reports {
         return report(storeId, s);
     }
 
+    /// The merchandise part of an order's refund. `store_order.refunded_cents`
+    /// also carries refunded tax and shipping, which were never sales, so a
+    /// report subtracts at most the order's merchandise (`gross`, subtotal
+    /// less discount) and never goes below zero. Reports count an order on
+    /// the day it was placed, refunds included; Analytics counts a refund on
+    /// the day it was made.
+    static long merchandiseRefund(long gross, long refunded) {
+        if (gross <= 0 || refunded <= 0) {
+            return 0;
+        }
+        return Math.min(refunded, gross);
+    }
+
+    /// The part of `refund` that falls on a line worth `lineSales` of an
+    /// order whose merchandise is `gross`, so the lines of a product report
+    /// add up to the order's net sales.
+    static long lineShare(long refund, long lineSales, long gross) {
+        if (refund <= 0 || lineSales <= 0 || gross <= 0) {
+            return 0;
+        }
+        return Math.min(lineSales, refund * lineSales / gross);
+    }
+
     ReportDto report(String storeId, ReportSpecDto s) throws IOException {
         long from = millisOf(s.from());
         long to = millisOf(s.to()) + Days.MILLIS;
@@ -212,7 +235,7 @@ public class Reports {
         String cur = currency == null ? "USD" : Rows.text(currency.get("currency"));
         List orders = db.query("SELECT id, created_at, channel, location_id, subtotal_cents, "
                 + "discount_cents, refunded_cents, tip_cents, customer_id, email FROM store_order WHERE store_id = ? "
-                + "AND created_at >= ? AND created_at < ? AND status <> 'CANCELLED' AND status <> 'DRAFT' "
+                + "AND created_at >= ? AND created_at < ? AND status <> 'CANCELLED' AND (channel <> 'DRAFT' OR location_id <> '') "
                 + "ORDER BY created_at", new Object[] {storeId, Long.valueOf(from), Long.valueOf(to)});
         Map<String, Map> attrs = new HashMap<String, Map>();
         List a = db.query("SELECT a.subject_id, a.last_source, a.last_medium, a.last_campaign FROM "
@@ -266,12 +289,15 @@ public class Reports {
                 customer = Rows.text(o.get("email"));
             }
             List<Map> mine = lines.get(id);
+            long gross = Rows.number(o.get("subtotal_cents")) - Rows.number(o.get("discount_cents"));
+            long merchRefund = merchandiseRefund(gross, Rows.number(o.get("refunded_cents")));
             if (productDim) {
                 for (int li = 0; mine != null && li < mine.size(); li++) {
                     Map line = mine.get(li);
                     long q = Rows.number(line.get("quantity"));
                     long sales = Rows.number(line.get("price_cents")) * q
                             - Rows.number(line.get("discount_cents"));
+                    sales -= lineShare(merchRefund, sales, gross);
                     add(accs, order, s, o, attr, Rows.text(line.get("title")), locs, id, customer,
                             sales, q);
                 }
@@ -280,8 +306,7 @@ public class Reports {
                 for (int li = 0; mine != null && li < mine.size(); li++) {
                     units += Rows.number(mine.get(li).get("quantity"));
                 }
-                long sales = Rows.number(o.get("subtotal_cents")) - Rows.number(o.get("discount_cents"))
-                        - Rows.number(o.get("refunded_cents"));
+                long sales = gross - merchRefund;
                 add(accs, order, s, o, attr, "", locs, id, customer, sales, units);
             }
         }
@@ -508,7 +533,7 @@ public class Reports {
         // Every order of the last two years: older cohorts are not shown.
         long since = now - 2 * 366 * Days.MILLIS;
         List rows = db.query("SELECT customer_id, email, created_at FROM store_order WHERE store_id = ? "
-                + "AND created_at >= ? AND status <> 'CANCELLED' AND status <> 'DRAFT'",
+                + "AND created_at >= ? AND status <> 'CANCELLED' AND (channel <> 'DRAFT' OR location_id <> '')",
                 new Object[] {storeId, Long.valueOf(since)});
         int n = Math.min(rows.size(), MAX_ORDERS * 5);
         String[] customers = new String[n];
@@ -547,14 +572,14 @@ public class Reports {
                 + "a.first_source, a.first_medium, a.last_source, a.last_medium FROM store_order o "
                 + "LEFT JOIN attribution a ON a.subject_id = o.id AND a.subject_kind = 'ORDER' "
                 + "WHERE o.store_id = ? AND o.created_at >= ? AND o.created_at < ? AND o.status <> "
-                + "'CANCELLED' AND o.status <> 'DRAFT'",
+                + "'CANCELLED' AND (o.channel <> 'DRAFT' OR o.location_id <> '')",
                 new Object[] {storeId, Long.valueOf(from), Long.valueOf(to)});
         Map<String, long[]> sums = new HashMap<String, long[]>();
         List<String> keys = new ArrayList<String>();
         for (int iter = 0; iter < rows.size() && iter < MAX_ORDERS; iter++) {
             Map r = (Map) rows.get(iter);
-            long sales = Rows.number(r.get("subtotal_cents")) - Rows.number(r.get("discount_cents"))
-                    - Rows.number(r.get("refunded_cents"));
+            long gross = Rows.number(r.get("subtotal_cents")) - Rows.number(r.get("discount_cents"));
+            long sales = gross - merchandiseRefund(gross, Rows.number(r.get("refunded_cents")));
             String[] touches = {"FIRST", "LAST"};
             for (int t = 0; t < 2; t++) {
                 String pre = t == 0 ? "first_" : "last_";

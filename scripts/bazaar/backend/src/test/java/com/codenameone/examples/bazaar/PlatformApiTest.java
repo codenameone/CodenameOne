@@ -70,6 +70,10 @@ class PlatformApiTest {
     private Checkouts checkouts;
     @Autowired
     private BulkJobs bulk;
+    @Autowired
+    private com.codenameone.examples.bazaar.order.Orders orderService;
+    @Autowired
+    private com.codenameone.examples.bazaar.ops.Reports reports;
 
     private Shop shop(String name) throws Exception {
         return new Shop(name, 10, accounts, stores, pricing, db, inventory, carts, checkouts, mvc);
@@ -221,6 +225,17 @@ class PlatformApiTest {
         Shop a = shop("pk-ord");
         String buyer = People.customer(accounts, "pk-ord-buyer");
         a.buy(buyer, 1);
+        // A draft not yet turned into an order is OPEN on the DRAFT channel:
+        // no export, key API or report counts it.
+        orderService.createDraft(a.owner, a.storeId, new com.codenameone.examples.bazaar.api
+                .DraftOrderDto("draft@example.com", java.util.Collections.singletonList(
+                    new com.codenameone.examples.bazaar.api.CartLineChangeDto(a.variantId, 1)),
+                    null, null, "phone sale"));
+        String today = java.time.LocalDate.now(java.time.ZoneOffset.UTC).toString();
+        String tomorrow = java.time.LocalDate.now(java.time.ZoneOffset.UTC).plusDays(1).toString();
+        assertEquals(1, reports.run(a.owner, a.storeId,
+                new com.codenameone.examples.bazaar.api.ReportSpecDto("Orders", "channel", "",
+                    "orders", "", "", today, tomorrow)).total());
         String secret = (String) key(a, "read_orders").get("secret");
         List orders = (List) Json.parse(mvc.perform(withKey(get("/api/v1/stores/" + a.storeId
                 + "/orders"), secret)).andReturn().getResponse().getContentAsString());

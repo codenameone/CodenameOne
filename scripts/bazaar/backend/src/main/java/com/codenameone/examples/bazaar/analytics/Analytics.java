@@ -240,12 +240,14 @@ public class Analytics {
         return 0;
     }
 
-    /// The rows a dashboard reads, from `since` on; every counted order of
-    /// the store is kept apart to know who was a customer before.
+    /// The rows a dashboard reads, from `since` on (the start of the
+    /// comparison window), plus the customers who had a counted order before
+    /// it, to know who was a customer before.
     static final class Data {
         final List<StoreOrder> counted = new ArrayList<StoreOrder>();
         final List<Refund> refunds = new ArrayList<Refund>();
         final List<Cart> carts = new ArrayList<Cart>();
+        final Set<String> customersBefore = new HashSet<String>();
 
         List<StoreOrder> between(long from, long to) {
             List<StoreOrder> out = new ArrayList<StoreOrder>();
@@ -259,20 +261,44 @@ public class Analytics {
         }
     }
 
-    private Data load(String storeId, long since) {
+    @com.codename1.backend.annotations.Autowired
+    private com.codename1.backend.DataSource db;
+
+    /// The SQL twin of [#counts]: not cancelled and not an unconverted draft
+    /// (channel DRAFT with no order-level location).
+    private static final String COUNTED_SQL = "o.status <> 'CANCELLED' AND (o.channel <> 'DRAFT' "
+            + "OR o.location_id <> '')";
+
+    private Data load(String storeId, long since) throws IOException {
         Data d = new Data();
         List<StoreOrder> all = orders.findByStoreIdAndCreatedAtGreaterThanEqual(storeId,
-                Instant.EPOCH);
-        List<String> ids = new ArrayList<String>();
+                Instant.ofEpochMilli(since));
         for (int iter = 0; iter < all.size(); iter++) {
             StoreOrder o = all.get(iter);
             if (counts(o)) {
                 d.counted.add(o);
             }
-            ids.add(o.getId());
         }
-        if (!ids.isEmpty()) {
-            d.refunds.addAll(refunds.findByOrderIdIn(ids));
+        Long at = Long.valueOf(since);
+        List before = db.query("SELECT DISTINCT o.customer_id AS customer_id FROM store_order o "
+                + "WHERE o.store_id = ? AND o.created_at < ? AND o.customer_id <> '' AND "
+                + COUNTED_SQL, new Object[] {storeId, at});
+        for (int iter = 0; before != null && iter < before.size(); iter++) {
+            d.customersBefore.add(text(((Map) before.get(iter)).get("customer_id")));
+        }
+        // Refunds count on the day they were made, whenever the order was
+        // placed; a refund of a cancelled order (or an unconverted draft) was
+        // never a sale and is left out.
+        List rs = db.query("SELECT r.amount_cents AS amount_cents, r.created_at AS created_at "
+                + "FROM refund r JOIN store_order o ON o.id = r.order_id WHERE o.store_id = ? AND "
+                + "r.created_at >= ? AND " + COUNTED_SQL, new Object[] {storeId, at});
+        for (int iter = 0; rs != null && iter < rs.size(); iter++) {
+            Map r = (Map) rs.get(iter);
+            Refund refund = new Refund();
+            refund.setAmountCents(number(r.get("amount_cents")));
+            long m = com.codenameone.examples.bazaar.Rows.millis(r.get("created_at"));
+            refund.setCreatedAt(Instant.ofEpochMilli(m != 0 ? m : number(r.get("created_at"))));
+            d.refunds.add(refund);
         }
         d.carts.addAll(carts.findByStoreIdAndCreatedAtGreaterThanEqual(storeId,
                 Instant.ofEpochMilli(since)));
@@ -304,7 +330,7 @@ public class Analytics {
                 who.add(o.getCustomerId());
             }
         }
-        Set<String> earlier = new HashSet<String>();
+        Set<String> earlier = new HashSet<String>(d.customersBefore);
         for (int iter = 0; iter < d.counted.size(); iter++) {
             StoreOrder o = d.counted.get(iter);
             if (o.getCreatedAt().toEpochMilli() < from && o.getCustomerId().length() > 0) {

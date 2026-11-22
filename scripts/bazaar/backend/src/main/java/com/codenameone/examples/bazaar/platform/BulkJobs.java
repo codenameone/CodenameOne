@@ -262,7 +262,7 @@ public class BulkJobs {
 
     private void exportOrders(String owner, String storeId, StringBuilder out, int[] lines)
             throws IOException {
-        List rows = db.query("SELECT id AS id FROM store_order WHERE store_id = ? AND status <> ? "
+        List rows = db.query("SELECT id AS id FROM store_order WHERE store_id = ? AND (channel <> ? OR location_id <> '') "
                 + "ORDER BY created_at", new Object[] {storeId, Orders.DRAFT});
         for (int iter = 0; rows != null && iter < rows.size() && lines[0] < MAX_LINES; iter++) {
             String orderId = Rows.text(((Map) rows.get(iter)).get("id"));

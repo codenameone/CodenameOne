@@ -41,9 +41,11 @@ import java.util.Map;
 /// has run, whatever the next attempt holds. Signing in with a password uses
 /// it three ways: per account and address (`signin-failures`, five a quarter
 /// hour), per address across accounts (`signin-failures-ip`), and per account
-/// from every address (`signin-failures-account`), looser so a stranger
-/// cannot cheaply lock an owner out, yet still bounding guessing one user's
-/// password from many addresses.
+/// from every address (`signin-failures-account`), bounding guessing one
+/// user's password from many addresses. A stranger can trip that last one
+/// on purpose, so a browser holding the account's known-device cookie
+/// (`KnownDevices`, set on each successful sign-in) skips it: the lockout
+/// then refuses only browsers that never signed in to the account.
 ///
 /// Counts live in this process. A deployment of several instances multiplies
 /// each allowance by the instance count -- still a bound, just a looser one.

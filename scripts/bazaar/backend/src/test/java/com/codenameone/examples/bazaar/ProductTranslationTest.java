@@ -294,6 +294,16 @@ class ProductTranslationTest {
         translations.importCsv(s.owner, s.storeId, formula);
         assertEquals("=Becher", translations.fields(s.storeId, Translations.PRODUCT,
                 s.productId, "de").get("description"));
+        // Text that itself begins with a quote survives export and import.
+        String[] quoted = {"'=Becher", "'Becher", "'-5"};
+        for (int iter = 0; iter < quoted.length; iter++) {
+            put(s, Translations.PRODUCT, s.productId, "description", quoted[iter]);
+            String line = translations.exportCsv(s.owner, s.storeId, "de");
+            put(s, Translations.PRODUCT, s.productId, "description", "x");
+            translations.importCsv(s.owner, s.storeId, line);
+            assertEquals(quoted[iter], translations.fields(s.storeId, Translations.PRODUCT,
+                    s.productId, "de").get("description"), line);
+        }
     }
 
     private static String status(List<TranslationFieldDto> sheet, String kind, String field) {

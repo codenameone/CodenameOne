@@ -117,7 +117,10 @@ public class WebSecurity {
     public SecurityFilterChain webAppChain(HttpSecurity http, TotpService totp,
             RecoveryCodeService recoveryCodes, final Throttle throttle, BotGuard bots,
             @Value("${bazaar.web.hsts:true}") boolean hsts,
-            com.codenameone.examples.bazaar.staff.SsoProviders sso) throws IOException {
+            com.codenameone.examples.bazaar.staff.SsoProviders sso,
+            com.codenameone.examples.bazaar.marketing.Campaigns campaigns) throws IOException {
+        final KnownDevices devices = new KnownDevices(campaigns);
+        final boolean secureCookie = hsts;
         final SavedRequestAwareAuthenticationSuccessHandler saved =
                 new SavedRequestAwareAuthenticationSuccessHandler();
         saved.setDefaultTargetUrl("/account");
@@ -128,7 +131,7 @@ public class WebSecurity {
             .addFilterBefore(ErrorPages.filter(), RateLimitFilter.class)
             .addFilterBefore(new WebHeaders(hsts), CsrfFilter.class)
             .addFilterBefore(new PageEtags(), CsrfFilter.class)
-            .addFilterBefore(lockout(throttle), CsrfFilter.class)
+            .addFilterBefore(lockout(throttle, devices), CsrfFilter.class)
             .addFilterAfter(bots.filter(), CsrfFilter.class)
             .rateLimit(AntPathRequestMatcher.antMatcher("POST", SIGN_IN),
                     RateLimitKeys.clientAddress(), throttle.limiter("signin"))
@@ -154,6 +157,14 @@ public class WebSecurity {
                     .successHandler((request, who) -> {
                         throttle.succeed("signin-failures", key(request));
                         throttle.succeed("signin-failures-account", account(request));
+                        // This browser now knows the account: its later
+                        // attempts skip the account-wide lockout (KnownDevices).
+                        try {
+                            SecurityExchange.current().addResponseHeader("Set-Cookie",
+                                    devices.cookie(account(request), secureCookie));
+                        } catch (IOException noSecret) {
+                            // Signed in all the same; the browser stays unknown.
+                        }
                         return saved.onAuthenticationSuccess(request, who);
                     })
                     .failureHandler((request, refused) -> {
@@ -228,10 +239,13 @@ public class WebSecurity {
         return account(request) + "|" + Throttle.client(request);
     }
 
-    /// The account a sign-in attempt names, folded. The key of the loose
+    /// The account a sign-in attempt names, folded. The key of the
     /// `signin-failures-account` lockout, which bounds guessing one account
-    /// from many addresses; it is set high enough that failing on purpose to
-    /// lock its owner out takes far more than five tries.
+    /// from many addresses. Anyone can trip it by failing on purpose from
+    /// enough addresses, so it binds only browsers that have not signed in
+    /// to the account before: an attempt carrying a valid known-device cookie
+    /// for the account ([KnownDevices]) skips it, and its owner keeps signing
+    /// in from their own browsers while a new browser is refused.
     static String account(HttpServer.Request request) {
         String u;
         try {
@@ -243,19 +257,23 @@ public class WebSecurity {
         // alone would let anyone who knows a username keep its owner locked
         // out by failing five times every quarter hour. Guessing across many
         // accounts from one address is held by "signin-failures-ip", and one
-        // account from many addresses by "signin-failures-account".
+        // account from many addresses by "signin-failures-account", which a
+        // browser with the account's known-device cookie skips.
         return u == null ? "" : Ascii.lower(u.trim());
     }
 
     /// Refuses a password for an account with too many wrong ones lately --
     /// before the password is even looked at, so a right guess during the
-    /// lockout is no different from a wrong one.
-    static SecurityFilter lockout(final Throttle throttle) {
+    /// lockout is no different from a wrong one. The account-wide rule is
+    /// skipped for a browser holding the account's known-device cookie; the
+    /// per account and address rule and the per address rule never are.
+    static SecurityFilter lockout(final Throttle throttle, final KnownDevices devices) {
         return (request, chain) -> {
             if ("POST".equals(request.getMethod()) && SIGN_IN.equals(request.pathFrom(0))
                     && (throttle.lockout("signin-failures", key(request))
                     || throttle.lockout("signin-failures-ip", Throttle.client(request))
-                    || throttle.lockout("signin-failures-account", account(request)))) {
+                    || (throttle.lockout("signin-failures-account", account(request))
+                        && !devices.known(request, account(request))))) {
                 SecurityExchange.current().setResponseHeader("Cache-Control", "no-store");
                 return HttpServer.Response.text(303, "").header("Location", SIGN_IN + "?locked=1");
             }
