@@ -3214,6 +3214,8 @@ public class GeneratorModel {
                 || path.endsWith(".bat")
                 || path.endsWith(".cmd")
                 || path.endsWith(".sh")
+                // Bazaar's storefront text generator names the app in its rows.
+                || path.endsWith(".py")
                 || path.endsWith(".kts")
                 || "mvnw".equals(path);
     }

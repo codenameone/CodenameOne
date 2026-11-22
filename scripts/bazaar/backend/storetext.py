@@ -17,8 +17,17 @@ native speakers. Review them before shipping.
 import os
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-TARGET = os.path.join(HERE, "src", "main", "java", "com", "codenameone", "examples",
-                      "bazaar", "web", "StoreText.java")
+
+
+def find_target():
+    # Found, not spelled out: a project made from this sample has its own package.
+    for d, _, files in os.walk(os.path.join(HERE, "src", "main", "java")):
+        if "StoreText.java" in files and os.path.basename(d) == "web":
+            return os.path.join(d, "StoreText.java")
+    raise SystemExit("web/StoreText.java not found under src/main/java")
+
+
+TARGET = find_target()
 LANGS = ["en", "es", "fr", "de", "he"]
 
 T = [
