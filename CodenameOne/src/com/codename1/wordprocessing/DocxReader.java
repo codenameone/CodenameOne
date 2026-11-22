@@ -1599,11 +1599,24 @@ final class DocxReader {
         List<int[]> kinds = new ArrayList<int[]>();
         int headerRows = 0;
         boolean headerRun = true;
+        List<Float> grid = new ArrayList<Float>();
         for (int e = x.next(); e != XmlScanner.END; e = x.next()) {
             if (e == XmlScanner.EOF) {
                 throw new IOException("The Word document is truncated");
             }
             if (e != XmlScanner.START) {
+                continue;
+            }
+            if ("tblGrid".equals(x.name)) {
+                // its own loop: the scan of the table ends at the first END it is handed
+                for (int g = x.next(); g != XmlScanner.END && g != XmlScanner.EOF; g = x.next()) {
+                    if (g == XmlScanner.START) {
+                        if ("gridCol".equals(x.name) && grid.size() < MAX_COLUMNS) {
+                            grid.add(Float.valueOf(x.intAttr("w", 0) / 20f));
+                        }
+                        x.skipElement();
+                    }
+                }
                 continue;
             }
             if (!"tr".equals(x.name)) {
@@ -1761,6 +1774,23 @@ final class DocxReader {
                 }
             }
         }
-        return new Table(id, rows, merges, Math.min(headerRows, rows.size()));
+        Table t = new Table(id, rows, merges, Math.min(headerRows, rows.size()));
+        return withGrid(t, grid);
+    }
+
+    /// The table with the widths of its grid, when the grid has one usable width per column.
+    static Table withGrid(Table t, List<Float> grid) {
+        if (grid.size() != t.columns()) {
+            return t;
+        }
+        float[] w = new float[grid.size()];
+        for (int i = 0; i < w.length; i++) {
+            float f = grid.get(i).floatValue();
+            if (!(f > 0) || Float.isInfinite(f)) {
+                return t;
+            }
+            w[i] = f;
+        }
+        return t.withColumnWidths(w);
     }
 }

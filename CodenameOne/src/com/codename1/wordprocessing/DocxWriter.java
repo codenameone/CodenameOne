@@ -851,7 +851,13 @@ final class DocxWriter {
 
     private void table(StringBuilder b, Table t) {
         int columns = t.columns();
-        int width = 9000 / Math.max(1, columns);
+        // twips per column: the table's own widths, or 6.25in shared equally
+        int[] width = new int[columns];
+        List<Float> widths = t.columnWidths();
+        for (int c = 0; c < columns; c++) {
+            width[c] = widths.size() == columns ? Math.max(1, Math.round(widths.get(c).floatValue() * 20))
+                    : 9000 / Math.max(1, columns);
+        }
         b.append("<w:tbl><w:tblPr><w:tblW w:w=\"0\" w:type=\"auto\"/><w:tblBorders>");
         String[] sides = {"top", "left", "bottom", "right", "insideH", "insideV"};
         for (String side : sides) {
@@ -860,7 +866,7 @@ final class DocxWriter {
         }
         b.append("</w:tblBorders></w:tblPr><w:tblGrid>");
         for (int c = 0; c < columns; c++) {
-            b.append("<w:gridCol w:w=\"").append(width).append("\"/>");
+            b.append("<w:gridCol w:w=\"").append(width[c]).append("\"/>");
         }
         b.append("</w:tblGrid>");
         for (int r = 0; r < t.rows(); r++) {
@@ -884,7 +890,11 @@ final class DocxWriter {
                     }
                     c = m.column;
                 }
-                b.append("<w:tc><w:tcPr><w:tcW w:w=\"").append(width * span)
+                int cellWidth = 0;
+                for (int k = c; k < Math.min(columns, c + span); k++) {
+                    cellWidth += width[k];
+                }
+                b.append("<w:tc><w:tcPr><w:tcW w:w=\"").append(cellWidth)
                         .append("\" w:type=\"dxa\"/>");
                 if (span > 1) {
                     b.append("<w:gridSpan w:val=\"").append(span).append("\"/>");

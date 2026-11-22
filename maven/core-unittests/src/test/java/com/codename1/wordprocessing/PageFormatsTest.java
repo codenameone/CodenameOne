@@ -185,4 +185,70 @@ class PageFormatsTest {
             }
         }
     }
+
+    private static Table widths() {
+        return Table.ofText("tw", new String[][] {{"a", "b", "c"}, {"d", "e", "f"}})
+                .withColumnWidths(72, 144, 36);
+    }
+
+    private static Table firstTable(Document d) {
+        for (int i = 0; i < d.size(); i++) {
+            if (d.get(i) instanceof Table) {
+                return (Table) d.get(i);
+            }
+        }
+        throw new AssertionError("no table");
+    }
+
+    @Test
+    void columnWidthsSurviveEveryFormat() throws IOException {
+        List<Block> b = new ArrayList<Block>();
+        b.add(widths());
+        Document d = new Document(b, PageSpec.A4, "W", 10);
+        Document.Format[] formats = {Document.Format.NATIVE, Document.Format.DOCX,
+            Document.Format.ODT};
+        for (Document.Format f : formats) {
+            List<Float> w = firstTable(roundTrip(d, f)).columnWidths();
+            assertEquals(3, w.size(), f.toString());
+            assertEquals(72f, w.get(0).floatValue(), 0.01f, f.toString());
+            assertEquals(144f, w.get(1).floatValue(), 0.01f, f.toString());
+            assertEquals(36f, w.get(2).floatValue(), 0.01f, f.toString());
+        }
+    }
+
+    @Test
+    void columnWidthsFollowColumnEdits() {
+        Table t = widths();
+        assertEquals(Arrays.asList(72f, 144f, 144f, 36f), t.insertColumn(1).columnWidths());
+        assertEquals(Arrays.asList(72f, 36f), t.deleteColumn(1).columnWidths());
+        assertEquals(t.columnWidths(), t.withCell(0, 0, t.cell(1, 1)).columnWidths());
+        assertTrue(t.withColumnWidths().columnWidths().isEmpty());
+        assertTrue(!t.equals(t.withColumnWidths()));
+        try {
+            t.withColumnWidths(1, 2);
+            throw new AssertionError("wrong count accepted");
+        } catch (IllegalArgumentException expected) {
+            // one width per column
+        }
+        try {
+            t.withColumnWidths(1, 0, 2);
+            throw new AssertionError("zero width accepted");
+        } catch (IllegalArgumentException expected) {
+            // widths are positive
+        }
+    }
+
+    @Test
+    void layoutHonoursColumnWidths() {
+        float[] fits = DocumentLayout.columnEdges(widths(), 3, 500);
+        assertEquals(72f, fits[1], 0.01f);
+        assertEquals(216f, fits[2], 0.01f);
+        assertEquals(252f, fits[3], 0.01f);
+        float[] narrowed = DocumentLayout.columnEdges(widths(), 3, 126);
+        assertEquals(36f, narrowed[1], 0.01f);
+        assertEquals(126f, narrowed[3], 0.01f);
+        float[] equal = DocumentLayout.columnEdges(Table.ofText("e", new String[][] {{"a", "b"}}),
+                2, 100);
+        assertEquals(50f, equal[1], 0.01f);
+    }
 }

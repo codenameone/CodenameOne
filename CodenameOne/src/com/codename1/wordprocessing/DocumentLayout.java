@@ -891,7 +891,7 @@ public final class DocumentLayout {
     private List<Slice> table(Table t, float width, List<Note> endnotes) {
         int rows = t.rows();
         int cols = Math.max(1, t.columns());
-        float colW = width / cols;
+        float[] colX = columnEdges(t, cols, width);
         float[] rowH = new float[rows];
         List<List<Slice>> content = new ArrayList<List<Slice>>();
         List<int[]> anchors = new ArrayList<int[]>();
@@ -904,7 +904,7 @@ public final class DocumentLayout {
                 Table.Merge m = t.span(r, c);
                 int spanR = m == null ? 1 : m.rows;
                 int spanC = m == null ? 1 : m.columns;
-                List<Slice> cell = blocks(t.cell(r, c), Math.max(4, colW * spanC - 2 * CELL_PAD),
+                List<Slice> cell = blocks(t.cell(r, c), Math.max(4, colX[Math.min(cols, c + spanC)] - colX[c] - 2 * CELL_PAD),
                         endnotes);
                 float h = 2 * CELL_PAD;
                 for (Slice s : cell) {
@@ -950,8 +950,8 @@ public final class DocumentLayout {
             for (int r = a[0]; r < Math.min(rows, a[0] + a[2]) - 1; r++) {
                 out.get(r).keepNext = true;
             }
-            float x = a[1] * colW;
-            float w = colW * a[3];
+            float x = colX[a[1]];
+            float w = colX[Math.min(cols, a[1] + a[3])] - x;
             if (s.header) {
                 s.items.add(LayoutItem.fill(x, 0, w, h, HEADER_FILL));
             }
@@ -973,6 +973,23 @@ public final class DocumentLayout {
             gap.height += 6;
         }
         return out;
+    }
+
+    /// Where each column of a table starts, plus where the last one ends. Columns without
+    /// widths share the space equally; with widths, a table that fits keeps them and one that
+    /// does not is narrowed in proportion, as Word fits a table to its column.
+    static float[] columnEdges(Table t, int cols, float width) {
+        float[] x = new float[cols + 1];
+        List<Float> w = t.columnWidths();
+        float total = 0;
+        for (Float f : w) {
+            total += f.floatValue();
+        }
+        float scale = w.size() == cols && total > width ? width / total : 1;
+        for (int c = 0; c < cols; c++) {
+            x[c + 1] = x[c] + (w.size() == cols ? w.get(c).floatValue() * scale : width / cols);
+        }
+        return x;
     }
 
     /// Splits a band taller than a page into page-high pieces. No text line is cut: a cut that

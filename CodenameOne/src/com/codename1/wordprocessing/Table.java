@@ -122,6 +122,7 @@ public final class Table implements Block {
 
     private final List<List<List<Block>>> cells;
     private final int columnCount;
+    private final List<Float> widths;
 
     /// Creates a table.
     ///
@@ -136,6 +137,11 @@ public final class Table implements Block {
     ///
     /// - `headerRows`: the number of header rows
     public Table(String id, List<List<List<Block>>> cells, List<Merge> merges, int headerRows) {
+        this(id, cells, merges, headerRows, null);
+    }
+
+    private Table(String id, List<List<List<Block>>> cells, List<Merge> merges, int headerRows,
+            List<Float> widths) {
         if (id == null || id.length() == 0) {
             throw new IllegalArgumentException("Table id is required");
         }
@@ -176,6 +182,51 @@ public final class Table implements Block {
         }
         this.merges = Collections.unmodifiableList(m);
         this.headerRows = Math.max(0, Math.min(rows.size(), headerRows));
+        List<Float> w = new ArrayList<Float>();
+        if (widths != null && widths.size() == columnCount) {
+            for (Float f : widths) {
+                if (f == null || !(f.floatValue() > 0) || Float.isInfinite(f.floatValue())) {
+                    throw new IllegalArgumentException("Column widths must be positive");
+                }
+                w.add(f);
+            }
+        }
+        this.widths = Collections.unmodifiableList(w);
+    }
+
+    /// The preferred column widths in points, one per column, or an empty list when the
+    /// columns share the width equally. A table wider or narrower than the space it is laid
+    /// out in keeps the proportions.
+    ///
+    /// #### Returns
+    ///
+    /// the widths, unmodifiable
+    public List<Float> columnWidths() {
+        return widths;
+    }
+
+    /// A copy with preferred column widths.
+    ///
+    /// #### Parameters
+    ///
+    /// - `points`: one positive width per column, in points; null or empty for equal columns
+    ///
+    /// #### Returns
+    ///
+    /// the copy
+    public Table withColumnWidths(float... points) {
+        if (points == null || points.length == 0) {
+            return new Table(id, cells, merges, headerRows, null);
+        }
+        if (points.length != columnCount) {
+            throw new IllegalArgumentException("Expected " + columnCount + " widths, got "
+                    + points.length);
+        }
+        List<Float> w = new ArrayList<Float>(points.length);
+        for (float f : points) {
+            w.add(Float.valueOf(f));
+        }
+        return new Table(id, cells, merges, headerRows, w);
     }
 
     private static boolean overlaps(Merge a, Merge b) {
@@ -313,7 +364,7 @@ public final class Table implements Block {
     public Table withCell(int row, int column, List<Block> blocks) {
         List<List<List<Block>>> c = mutableCells();
         c.get(row).set(column, blocks);
-        return new Table(id, c, merges, headerRows);
+        return new Table(id, c, merges, headerRows, widths);
     }
 
     /// A copy with different merges.
@@ -326,7 +377,7 @@ public final class Table implements Block {
     ///
     /// the copy
     public Table withMerges(List<Merge> value) {
-        return new Table(id, cells, value, headerRows);
+        return new Table(id, cells, value, headerRows, widths);
     }
 
     /// A copy with a different number of header rows.
@@ -339,7 +390,7 @@ public final class Table implements Block {
     ///
     /// the copy
     public Table withHeaderRows(int value) {
-        return new Table(id, cells, merges, value);
+        return new Table(id, cells, merges, value, widths);
     }
 
     /// A copy with a row of empty cells inserted. Merges below move down; a merge the new row
@@ -369,7 +420,7 @@ public final class Table implements Block {
                 m.add(x);
             }
         }
-        return new Table(id, c, m, at < headerRows ? headerRows + 1 : headerRows);
+        return new Table(id, c, m, at < headerRows ? headerRows + 1 : headerRows, widths);
     }
 
     /// A copy without one row. Merges shrink or disappear with it.
@@ -400,7 +451,7 @@ public final class Table implements Block {
                 m.add(new Merge(row, x.column, rows, x.columns));
             }
         }
-        return new Table(id, c, m, at < headerRows ? headerRows - 1 : headerRows);
+        return new Table(id, c, m, at < headerRows ? headerRows - 1 : headerRows, widths);
     }
 
     /// A copy with a column of empty cells inserted.
@@ -427,7 +478,13 @@ public final class Table implements Block {
                 m.add(x);
             }
         }
-        return new Table(id, c, m, headerRows);
+        List<Float> w = null;
+        if (!widths.isEmpty()) {
+            // the new column takes the width of the one it pushes right, as Word inserts left
+            w = new ArrayList<Float>(widths);
+            w.add(at, widths.get(Math.min(at, widths.size() - 1)));
+        }
+        return new Table(id, c, m, headerRows, w);
     }
 
     /// A copy without one column.
@@ -460,7 +517,12 @@ public final class Table implements Block {
                 m.add(new Merge(x.row, column, x.rows, columns));
             }
         }
-        return new Table(id, c, m, headerRows);
+        List<Float> w = null;
+        if (!widths.isEmpty()) {
+            w = new ArrayList<Float>(widths);
+            w.remove(at);
+        }
+        return new Table(id, c, m, headerRows, w);
     }
 
     /// Creates a table whose cells each hold one paragraph of plain text. Paragraph ids are
@@ -494,7 +556,7 @@ public final class Table implements Block {
         return new Table(id, rows, null, 0);
     }
 
-    /// Two tables are equal when their id, cells, merges and header rows are.
+    /// Two tables are equal when their id, cells, merges, header rows and column widths are.
     ///
     /// #### Parameters
     ///
@@ -513,7 +575,7 @@ public final class Table implements Block {
         }
         Table t = (Table) o;
         return id.equals(t.id) && headerRows == t.headerRows && merges.equals(t.merges)
-                && cells.equals(t.cells);
+                && cells.equals(t.cells) && widths.equals(t.widths);
     }
 
     /// A hash consistent with `equals`.

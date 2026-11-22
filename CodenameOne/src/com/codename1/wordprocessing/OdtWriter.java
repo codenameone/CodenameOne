@@ -72,6 +72,9 @@ final class OdtWriter {
     private int tableCount;
     private boolean lastSpace;
     private final Map<String, String> graphicStyles = new LinkedHashMap<String, String>();
+    /// Table column styles by width (`12.5pt`), written to both parts like the graphic ones
+    /// since a table can sit in a header too.
+    private final Map<String, String> columnStyles = new LinkedHashMap<String, String>();
     /// The page of every section that starts on a new page, by its master page's name.
     private final Map<String, PageSpec> masters = new LinkedHashMap<String, PageSpec>();
     private final List<String> sectionStyles = new ArrayList<String>();
@@ -144,6 +147,7 @@ final class OdtWriter {
             content.append("<style:style style:name=\"").append(g.getValue()).append('"')
                     .append(g.getKey());
         }
+        columnStyles(content);
         for (String g : sectionStyles) {
             content.append(g);
         }
@@ -309,6 +313,7 @@ final class OdtWriter {
             b.append("<style:style style:name=\"").append(g.getValue()).append('"')
                     .append(g.getKey());
         }
+        columnStyles(b);
         int n = 0;
         for (PageSpec p : masters.values()) {
             n++;
@@ -880,11 +885,32 @@ final class OdtWriter {
 
     // ------------------------------------------------------------------ tables
 
+    private void columnStyles(StringBuilder b) {
+        for (Map.Entry<String, String> c : columnStyles.entrySet()) {
+            b.append("<style:style style:name=\"").append(c.getValue())
+                    .append("\" style:family=\"table-column\"><style:table-column-properties")
+                    .append(" style:column-width=\"").append(c.getKey()).append("\"/></style:style>");
+        }
+    }
+
     private void table(StringBuilder b, Table t) {
         int columns = t.columns();
-        b.append("<table:table table:name=\"Table").append(++tableCount)
-                .append("\"><table:table-column table:number-columns-repeated=\"")
-                .append(Math.max(1, columns)).append("\"/>");
+        b.append("<table:table table:name=\"Table").append(++tableCount).append("\">");
+        List<Float> widths = t.columnWidths();
+        if (widths.size() == columns) {
+            for (Float w : widths) {
+                String key = pt(w.floatValue());
+                String name = columnStyles.get(key);
+                if (name == null) {
+                    name = "co" + (columnStyles.size() + 1);
+                    columnStyles.put(key, name);
+                }
+                b.append("<table:table-column table:style-name=\"").append(name).append("\"/>");
+            }
+        } else {
+            b.append("<table:table-column table:number-columns-repeated=\"")
+                    .append(Math.max(1, columns)).append("\"/>");
+        }
         for (int r = 0; r < t.rows(); r++) {
             if (r == 0 && t.headerRows > 0) {
                 b.append("<table:table-header-rows>");

@@ -198,6 +198,9 @@ final class NativeFormat {
             x.attr("headerRows", t.headerRows);
         }
         x.raw(">");
+        for (Float w : t.columnWidths()) {
+            x.raw("<col").attr("width", Ids.fmt(w.floatValue())).raw("/>");
+        }
         for (int r = 0; r < t.rows(); r++) {
             x.raw("<row>");
             for (int c = 0; c < t.columns(); c++) {
@@ -564,6 +567,7 @@ final class NativeFormat {
         int headerRows = x.intAttr("headerRows", 0);
         List<List<List<Block>>> rows = new ArrayList<List<List<Block>>>();
         List<Table.Merge> merges = new ArrayList<Table.Merge>();
+        List<Float> widths = new ArrayList<Float>();
         for (int ev = x.next(); ev != XmlScanner.END; ev = x.next()) {
             if (ev == XmlScanner.EOF) {
                 throw new IOException("Truncated table " + id);
@@ -573,6 +577,9 @@ final class NativeFormat {
             }
             if ("row".equals(x.name)) {
                 rows.add(readRow(x, ids));
+            } else if ("col".equals(x.name)) {
+                widths.add(Float.valueOf((float) x.doubleAttr("width", 0)));
+                x.skipElement();
             } else if ("merge".equals(x.name)) {
                 try {
                     merges.add(new Table.Merge(x.intAttr("row", -1), x.intAttr("column", -1),
@@ -589,7 +596,7 @@ final class NativeFormat {
             throw new IOException("Table " + id + " has no rows");
         }
         try {
-            return new Table(id, rows, merges, headerRows);
+            return DocxReader.withGrid(new Table(id, rows, merges, headerRows), widths);
         } catch (IllegalArgumentException e) {
             throw damaged("Table " + id, e);
         }

@@ -86,6 +86,7 @@ final class OdtReader {
         float distance = -1;
         int columns;
         float columnGap = 36;
+        float columnWidth;
         final DocxReader.Props run = new DocxReader.Props();
         final DocxReader.Para para = new DocxReader.Para();
     }
@@ -298,6 +299,8 @@ final class OdtReader {
                     } else if ("section-properties".equals(c)) {
                         s.columns = columnsOf(x, s);
                         continue;
+                    } else if ("table-column-properties".equals(c)) {
+                        s.columnWidth = length(x.attr("column-width"), 0);
                     }
                     x.skipElement();
                 }
@@ -1167,6 +1170,7 @@ final class OdtReader {
         List<List<List<Block>>> rows = new ArrayList<List<List<Block>>>();
         List<int[]> anchors = new ArrayList<int[]>();
         int headerRows = 0;
+        List<Float> grid = new ArrayList<Float>();
         for (int e = x.next(); e != XmlScanner.END; e = x.next()) {
             if (e == XmlScanner.EOF) {
                 throw new IOException("The OpenDocument file is truncated");
@@ -1175,7 +1179,14 @@ final class OdtReader {
                 continue;
             }
             String n = x.name;
-            if ("table-header-rows".equals(n)) {
+            if ("table-column".equals(n)) {
+                Style st = styles.get(x.attr("style-name"));
+                int repeat = Math.max(1, Math.min(MAX_COLUMNS, x.intAttr("number-columns-repeated", 1)));
+                for (int i = 0; i < repeat && grid.size() < MAX_COLUMNS; i++) {
+                    grid.add(Float.valueOf(st == null ? 0 : st.columnWidth));
+                }
+                x.skipElement();
+            } else if ("table-header-rows".equals(n)) {
                 int before = rows.size();
                 rows(x, rows, anchors);
                 headerRows = before == 0 ? rows.size() : headerRows;
@@ -1225,7 +1236,8 @@ final class OdtReader {
             }
             merges.add(new Table.Merge(r, c, h, w));
         }
-        return new Table(id, rows, merges, Math.min(headerRows, rows.size()));
+        return DocxReader.withGrid(new Table(id, rows, merges, Math.min(headerRows, rows.size())),
+                grid);
     }
 
     private void rows(XmlScanner x, List<List<List<Block>>> rows, List<int[]> anchors)

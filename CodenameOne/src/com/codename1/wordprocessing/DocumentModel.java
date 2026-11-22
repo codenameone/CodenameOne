@@ -443,15 +443,8 @@ public class DocumentModel {
     }
 
     static Table withCell(Table t, int row, int column, List<Block> cell) {
-        List<List<List<Block>>> rows = new ArrayList<List<List<Block>>>();
-        for (int r = 0; r < t.rows(); r++) {
-            List<List<Block>> cells = new ArrayList<List<Block>>();
-            for (int c = 0; c < t.columns(); c++) {
-                cells.add(r == row && c == column ? cell : t.cell(r, c));
-            }
-            rows.add(cells);
-        }
-        return new Table(t.id, rows, t.merges, t.headerRows);
+        // the table's own copy keeps everything else about it, column widths included
+        return t.withCell(row, column, cell);
     }
 
     private Document withList(String id, ListEdit e) {
