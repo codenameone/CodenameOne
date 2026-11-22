@@ -317,6 +317,25 @@ class ClientRegistrationConsentTest {
     }
 
     @Test
+    void onlyTheNewestEightQuestionsWait() throws Exception {
+        try (SecuredServer server = startRegistering()) {
+            String client = registered(server);
+            String verifier = OAuth2Parameters.random(32);
+            Reply[] pages = new Reply[9];
+            for (int i = 0; i < pages.length; i++) {
+                pages[i] = signedIn(server, authorizeUrl(client, "read", verifier, "t" + i, null));
+            }
+            String csrf = OAuth2Testing.field(pages[8].body, "_csrf");
+            Reply oldest = server.call("POST", action(pages[0].body), form("_csrf", csrf, "ticket",
+                    OAuth2Testing.field(pages[0].body, "ticket"), "decision", "approve", "scope", "read"), FORM);
+            assertEquals(400, oldest.status, oldest.toString());
+            Reply newest = server.call("POST", action(pages[8].body), form("_csrf", csrf, "ticket",
+                    OAuth2Testing.field(pages[8].body, "ticket"), "decision", "approve", "scope", "read"), FORM);
+            assertEquals(302, newest.status, newest.toString());
+        }
+    }
+
+    @Test
     void anAnswerCountsOnlyForTheRequestItWasAskedAbout() throws Exception {
         try (SecuredServer server = startRegistering()) {
             String client = registered(server);

@@ -87,6 +87,8 @@ public final class OAuth2AuthorizationServer {
     /// Session attribute holding the consent question this server last put to
     /// the session's user: its ticket and a digest of who and which request.
     private static final String CONSENT_TICKET = "cn1.security.oauth2.consentTicket";
+    /// How many consent questions one session may have waiting at once.
+    private static final int MAX_PENDING_CONSENTS = 8;
     private static final int MAX_REGISTERED_REDIRECTS = 5;
     private static final int MAX_CLIENT_NAME = 100;
     /// The attribute of a grant that holds the resource servers it is for.
@@ -572,7 +574,24 @@ public final class OAuth2AuthorizationServer {
                 String ticket = OAuth2Parameters.random(32);
                 // One attribute per ticket: two authorizations pending in one
                 // session (two tabs, two clients) each keep their own question.
-                request.getSession(true).setAttribute(CONSENT_TICKET + "." + ticket, digest);
+                HttpSession asking = request.getSession(true);
+                asking.setAttribute(CONSENT_TICKET + "." + ticket, digest);
+                // At most MAX_PENDING_CONSENTS questions wait in one session, the
+                // oldest dropped first, so unanswered pages cannot grow it forever.
+                Object order = asking.getAttribute(CONSENT_TICKET);
+                List<String> pending = new ArrayList<String>();
+                if (order instanceof String && ((String) order).length() > 0) {
+                    pending.addAll(java.util.Arrays.asList(((String) order).split(" ")));
+                }
+                pending.add(ticket);
+                while (pending.size() > MAX_PENDING_CONSENTS) {
+                    asking.removeAttribute(CONSENT_TICKET + "." + pending.remove(0));
+                }
+                StringBuilder joined = new StringBuilder();
+                for (String t : pending) {
+                    joined.append(joined.length() == 0 ? "" : " ").append(t);
+                }
+                asking.setAttribute(CONSENT_TICKET, joined.toString());
                 return askConsent(request, client, scopes, redirectUri, ticket, authentication,
                         csrfParameter, csrfToken);
             }

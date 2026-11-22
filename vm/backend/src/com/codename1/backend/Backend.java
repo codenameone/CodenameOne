@@ -1075,6 +1075,9 @@ public final class Backend {
                 try {
                     page = errorPage(request, status, message, true);
                 } catch (Exception pageErr) {
+                    // The original failure is rethrown below; the page's own is
+                    // logged here or nobody could find out the page is broken.
+                    HttpServer.handlerFailed(pageErr);
                     page = null;
                 }
                 if (page == null) {

@@ -101,6 +101,14 @@ class DispatchAsUserTest {
                                         && !"acme".equals(request.getHeader("X-Tenant"))
                                         ? HttpServer.Response.text(403, "wrong tenant") : chain.doFilter(request),
                                 AuthorizationFilter.class)
+                        // The application's own sign-in filter, as a JWT one would
+                        // be: it refuses a request with no token. Under dispatch it
+                        // must not run, or it would undo the vouched principal.
+                        .addFilterBefore((request, chain) -> request.getHeader("X-Token") == null
+                                        && request.pathFrom(0).startsWith("/api/")
+                                        && request.getHeader("Authorization") == null
+                                        ? HttpServer.Response.text(401, "no token") : chain.doFilter(request),
+                                BasicAuthenticationFilter.class)
                         .build());
     }
 

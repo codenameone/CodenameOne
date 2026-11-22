@@ -115,10 +115,27 @@ final class FilterChainEngine implements RequestSecurity {
         // an in-process call is not. The application's own filters all run:
         // one added with addFilterBefore may be what enforces a tenant or a
         // scope, and dropping it would serve what it exists to refuse.
+        // An application filter placed among the sign-in filters is itself a
+        // sign-in filter (addFilterBefore(jwt, UsernamePasswordAuthentication
+        // Filter.class)) and would replace the vouched principal or answer 401
+        // for a missing header: only those after the last framework
+        // authentication filter run, which is where a tenant or scope check sits.
+        List<SecurityFilter> all = chain.getFilters();
+        DefaultSecurityFilterChain declared = chain instanceof DefaultSecurityFilterChain
+                ? (DefaultSecurityFilterChain) chain : null;
+        int lastSignIn = -1;
+        for (int i = 0; i < all.size(); i++) {
+            SecurityFilter filter = all.get(i);
+            if ((declared == null || !declared.isApplicationFilter(filter))
+                    && filter.getClass().getName().endsWith("AuthenticationFilter")) {
+                lastSignIn = i;
+            }
+        }
         List<SecurityFilter> authorization = new ArrayList<SecurityFilter>();
-        for (SecurityFilter filter : chain.getFilters()) {
-            if (filter instanceof AuthorizationFilter || (chain instanceof DefaultSecurityFilterChain
-                    && ((DefaultSecurityFilterChain) chain).isApplicationFilter(filter))) {
+        for (int i = 0; i < all.size(); i++) { // NOPMD ForLoopCanBeForeach - the position is the test
+            SecurityFilter filter = all.get(i);
+            if (filter instanceof AuthorizationFilter
+                    || (declared != null && i > lastSignIn && declared.isApplicationFilter(filter))) {
                 authorization.add(filter);
             }
         }
