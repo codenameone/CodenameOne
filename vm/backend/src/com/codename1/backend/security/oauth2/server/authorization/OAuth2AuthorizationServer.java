@@ -581,7 +581,17 @@ public final class OAuth2AuthorizationServer {
                 Object order = asking.getAttribute(CONSENT_TICKET);
                 List<String> pending = new ArrayList<String>();
                 if (order instanceof String && ((String) order).length() > 0) {
-                    pending.addAll(java.util.Arrays.asList(((String) order).split(" ")));
+                    // No String.split on the compiled runtime: walk the spaces.
+                    String all = (String) order;
+                    int from = 0;
+                    while (from <= all.length()) {
+                        int space = all.indexOf(' ', from);
+                        int end = space < 0 ? all.length() : space;
+                        if (end > from) {
+                            pending.add(all.substring(from, end));
+                        }
+                        from = end + 1;
+                    }
                 }
                 pending.add(ticket);
                 while (pending.size() > MAX_PENDING_CONSENTS) {
