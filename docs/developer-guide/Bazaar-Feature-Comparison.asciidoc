@@ -13,7 +13,8 @@ The tables read as follows.
   (the Notes column says what differs) and &#8211; means absent.
 * In the other columns, "core" means the platform includes it and "app/plugin"
   means stores commonly add it through the platform's app store or plugin
-  directory. An empty cell means the table makes no claim either way.
+  directory, and "no" means the platform has neither and stores generally
+  cannot add it. An empty cell means the table makes no claim either way.
 * Where Bazaar talks to an outside service, such as a card processor or a
   shipping carrier, it does so through an interface. The sample ships a
   simulated implementation beside the real one, and the Notes say so where it
@@ -31,30 +32,30 @@ on a row.
 | Products with title/description/price | &#10003; | core | core | core | core | 
 | Variants & options matrix | &#10003; | core | core | core | core | 
 | Product media (multiple photos) | &#10003; | core | core | core | core | 
-| Product video / 3D models | &#8211; | core |  | core |  | 
+| Product video / 3D models | &#8211; | core | app/plugin | core | no | 
 | Compare-at price | &#10003; | core | core | core | core | 
 | Cost per item / margin | &#9681; | core | core | core | core | Cost is kept on purchase lines; margin isn't shown per variant.
 | SKU / barcode | &#10003; | core | core | core | core | 
 | Weight / dimensions | &#10003; | core | core | core | core | 
 | Vendor / product type / tags | &#10003; | core | core | core | core | 
 | Manual collections | &#10003; | core | core | core | core | 
-| Smart (rule-based) collections | &#10003; | core | app/plugin |  |  | 
+| Smart (rule-based) collections | &#10003; | core | app/plugin | app/plugin | no | 
 | Product status draft/active/archived | &#10003; | core | core | core | core | 
-| Scheduled publishing per channel | &#8211; | core |  |  |  | 
+| Scheduled publishing per channel | &#8211; | core | core | app/plugin | no | 
 | Bulk editor | &#10003; | core | core | core | core | 
 | CSV import/export of products | &#10003; | core | core | core | core | 
 | Gift card products | &#10003; | core | core | core | core | 
-| Digital products / downloads | &#8211; | core | core |  | core | 
-| Bundles (fixed bundles / mix-and-match) | &#9681; | app/plugin | app/plugin |  |  | A BUNDLE discount prices a set of items together; there is no bundle product type.
-| Combined listings (parent/child products) | &#10003; | core |  |  |  | Combined listings group separate products under one parent page. 
-| Metafields on products/variants | &#10003; | core |  | core |  | Typed metafield definitions; values show in a specs section on the product page. 
-| Metaobjects (custom content types) | &#10003; | core |  |  |  | Owner-defined types with entries. 
-| Product taxonomy / standardized categories | &#8211; | core |  |  |  | 
-| Customs info (HS code, country of origin) | &#8211; | core |  |  |  | 
-| Unit pricing (per kg/l) | &#8211; | core |  |  |  | 
-| Product reviews | &#10003; | app/plugin | core | core |  | 
-| Wishlist | &#10003; | app/plugin | app/plugin | core | app/plugin | 
-| Product translations | &#9681; | core | app/plugin |  |  | Pages, policies and blog posts translate per market; product fields do not yet. 
+| Digital products / downloads | &#8211; | app/plugin | core | core | core | 
+| Bundles (fixed bundles / mix-and-match) | &#9681; | app/plugin | app/plugin | app/plugin | no | A BUNDLE discount prices a set of items together; there is no bundle product type.
+| Combined listings (parent/child products) | &#10003; | core | core | no | no | Combined listings group separate products under one parent page. 
+| Metafields on products/variants | &#10003; | core | app/plugin | core | no | Typed metafield definitions; values show in a specs section on the product page. 
+| Metaobjects (custom content types) | &#10003; | core | app/plugin | no | no | Owner-defined types with entries. 
+| Product taxonomy / standardized categories | &#8211; | core | no | no | no | 
+| Customs info (HS code, country of origin) | &#8211; | core | app/plugin | core | no | 
+| Unit pricing (per kg/l) | &#8211; | core | app/plugin | app/plugin | no | 
+| Product reviews | &#10003; | app/plugin | core | core | no | 
+| Wishlist | &#10003; | app/plugin | app/plugin | core | no | 
+| Product translations | &#9681; | core | app/plugin | core | no | Pages, policies and blog posts translate per market; product fields do not yet. 
 |===
 
 === Inventory
@@ -64,18 +65,18 @@ on a row.
 | Feature | Bazaar | Shopify | WooCommerce | BigCommerce | Square | Notes
 
 | Track quantity per variant | &#10003; | core | core | core | core | 
-| Multi-location inventory | &#10003; | core | app/plugin | core |  | 
+| Multi-location inventory | &#10003; | core | app/plugin | core | core | 
 | Inventory adjustments with reasons / history | &#10003; | core | core | core | core | 
-| Stock transfers between locations | &#10003; | core | app/plugin |  | core | 
-| Purchase orders & receiving | &#10003; | core | app/plugin |  | core | 
-| Suppliers | &#10003; | core |  |  | core | 
-| Stocktakes / counts | &#10003; | core |  |  | core | 
+| Stock transfers between locations | &#10003; | core | app/plugin | app/plugin | core | 
+| Purchase orders & receiving | &#10003; | core | app/plugin | app/plugin | core | 
+| Suppliers | &#10003; | core | app/plugin | app/plugin | core | 
+| Stocktakes / counts | &#10003; | core | app/plugin | app/plugin | core | 
 | Low-stock alerts / reorder points | &#10003; | core | core | core | core | 
-| Continue selling when out of stock (oversell) | &#9681; | core |  | core |  | Stock is reserved atomically and never oversold; an open pre-order sells past stock up to its limit.
-| Committed / unavailable / incoming states | &#9681; | core |  | core |  | Reserved and incoming (from purchase orders) are tracked.
-| Inventory value report | &#10003; | core |  |  | core | 
-| Barcode label printing | &#9681; | core |  | core |  | Code 128 barcodes are drawn; no label-sheet layout.
-| Serial / lot tracking | &#8211; |  |  |  |  | 
+| Continue selling when out of stock (oversell) | &#9681; | core | core | core | no | Stock is reserved atomically and never oversold; an open pre-order sells past stock up to its limit.
+| Committed / unavailable / incoming states | &#9681; | core | no | no | no | Reserved and incoming (from purchase orders) are tracked.
+| Inventory value report | &#10003; | core | app/plugin | app/plugin | core | 
+| Barcode label printing | &#9681; | app/plugin | app/plugin | app/plugin | core | Code 128 barcodes are drawn; no label-sheet layout.
+| Serial / lot tracking | &#8211; | app/plugin | app/plugin | app/plugin | no | 
 |===
 
 === Checkout and payments
@@ -86,33 +87,33 @@ on a row.
 
 | Guest checkout | &#10003; | core | core | core | core | 
 | Customer accounts (login, saved addresses) | &#10003; | core | core | core | core | 
-| Passwordless / code sign-in | &#10003; | core |  |  |  | 
-| One-page / accelerated checkout | &#8211; | core |  |  |  | 
+| Passwordless / code sign-in | &#10003; | core | app/plugin | app/plugin | no | 
+| One-page / accelerated checkout | &#8211; | core | core | core | core | 
 | Apple Pay / Google Pay | &#9681; | core | core | core | core | Through the card provider when it offers wallets.
 | Discount code field | &#10003; | core | core | core | core | 
 | Gift card redemption at checkout | &#10003; | core | core | core | core | 
-| Address autocomplete / validation | &#10003; | core |  |  |  | 
-| Abandoned checkout recovery | &#10003; | core | core | core |  | 
-| Checkout customization / extensibility (UI extensions) | &#8211; | core | core |  |  | 
+| Address autocomplete / validation | &#10003; | core | app/plugin | app/plugin | no | 
+| Abandoned checkout recovery | &#10003; | core | app/plugin | core | core | 
+| Checkout customization / extensibility (UI extensions) | &#8211; | core | core | core | no | 
 | Order notes / custom attributes at checkout | &#9681; | core | core | core | core | Order notes are merchant-side.
-| Tipping at online checkout | &#8211; | core |  |  | core | 
-| Post-purchase upsell | &#8211; | app/plugin | app/plugin |  |  | 
+| Tipping at online checkout | &#8211; | app/plugin | app/plugin | app/plugin | core | 
+| Post-purchase upsell | &#8211; | app/plugin | app/plugin | app/plugin | no | 
 | Marketing consent checkbox | &#10003; | core | core | core | core | 
 | Bot protection / rate limiting | &#10003; | core | core | core | core | Rate limits, honeypot fields and a timing bot guard on signup and checkout; no CAPTCHA. 
-| Server-rendered SEO cart/session | &#10003; |  |  |  |  | 
+| Server-rendered SEO cart/session | &#10003; | core | core | core | core | 
 | Integrated card processing | &#10003; | core | core | core | core | 
 | Third-party gateways | &#9681; | core | core | core | &#8211; | One provider interface with a Stripe implementation and a simulated one.
 | Manual payment methods (COD, bank) | &#9681; | core | core | core | core | Manual tenders at the register only.
 | Saved cards | &#10003; | core | core | core | core | 
 | Payouts / balance | &#10003; | core | core | core | core | 
 | Refunds (full/partial) | &#10003; | core | core | core | core | 
-| Chargeback / dispute management | &#10003; | core |  |  | core | Disputes are recorded with evidence and deadlines. 
-| Buy now pay later / installments | &#8211; | core | core | core | core | 
-| Multi-currency payouts | &#8211; |  |  |  |  | 
-| Local payment methods (iDEAL etc.) | &#8211; | core | core | core |  | 
-| Fraud analysis / risk score | &#10003; | core |  |  |  | Each order gets a risk score from address, velocity and value signals. 
-| Fraud filter rules / automatic cancellation | &#9681; | core |  |  |  | Risky orders are held for review; there is no rule editor. 
-| Chargeback protection | &#8211; | core |  |  |  | 
+| Chargeback / dispute management | &#10003; | core | app/plugin | app/plugin | core | Disputes are recorded with evidence and deadlines. 
+| Buy now pay later / installments | &#8211; | core | app/plugin | core | core | 
+| Multi-currency payouts | &#8211; | core | app/plugin | app/plugin | no | 
+| Local payment methods (iDEAL etc.) | &#8211; | core | core | core | no | 
+| Fraud analysis / risk score | &#10003; | core | app/plugin | app/plugin | core | Each order gets a risk score from address, velocity and value signals. 
+| Fraud filter rules / automatic cancellation | &#9681; | core | app/plugin | app/plugin | core | Risky orders are held for review; there is no rule editor. 
+| Chargeback protection | &#8211; | core | no | no | no | 
 |===
 
 === Orders and fulfilment
@@ -124,7 +125,7 @@ on a row.
 | Order list, filters, search | &#10003; | core | core | core | core | 
 | Order detail timeline / notes | &#10003; | core | core | core | core | 
 | Order tags | &#10003; | core | core | core | core | 
-| Edit order after placement | &#10003; | core | core |  |  | Add, remove and re-price lines; the difference is charged or refunded. 
+| Edit order after placement | &#10003; | core | core | core | no | Add, remove and re-price lines; the difference is charged or refunded. 
 | Draft orders | &#10003; | core | core | core | core | 
 | Invoices (PDF) / send invoice | &#10003; | core | core | core | core | 
 | Payment links for drafts | &#9681; | core | core | core | core | Draft orders exist; there is no pay link for the buyer.
@@ -134,14 +135,14 @@ on a row.
 | Order export CSV | &#10003; | core | core | core | core | 
 | Order status page for buyer | &#10003; | core | core | core | core | 
 | Bulk order actions (bulk fulfil/print) | &#9681; | core | core | core | core | Pick lists print for many orders.
-| Kanban fulfilment board | &#10003; |  |  |  |  | Receiving to dispatch, per location, with bins and pick lists. 
-| Customer self-serve return requests | &#10003; | core |  |  |  | 
-| Return reasons | &#10003; | core |  |  |  | 
-| Receive & restock returns | &#10003; | core |  |  |  | 
-| Exchanges (online) | &#9681; | core |  |  |  | Exchanges at the register.
-| Return rules / windows / fees | &#8211; | core |  |  |  | 
-| Draft order creation | &#10003; | core |  | core |  | 
-| Send invoice / checkout link | &#9681; | core |  | core |  | PDF invoices; no pay link.
+| Kanban fulfilment board | &#10003; | app/plugin | app/plugin | no | no | Receiving to dispatch, per location, with bins and pick lists. 
+| Customer self-serve return requests | &#10003; | core | app/plugin | core | no | 
+| Return reasons | &#10003; | core | app/plugin | core | no | 
+| Receive & restock returns | &#10003; | core | core | core | core | 
+| Exchanges (online) | &#9681; | core | app/plugin | app/plugin | no | Exchanges at the register.
+| Return rules / windows / fees | &#8211; | core | app/plugin | app/plugin | no | 
+| Draft order creation | &#10003; | core | core | core | core | 
+| Send invoice / checkout link | &#9681; | core | core | core | core | PDF invoices; no pay link.
 | Transactional email notifications | &#10003; | core | core | core | core | 
 | SMS notifications | &#10003; | core | core | core | core | 
 | Editable notification templates | &#8211; | core | core | core | core | 
@@ -156,20 +157,20 @@ on a row.
 
 | Shipping zones & rates | &#10003; | core | core | core | core | 
 | Weight/price-based rates | &#10003; | core | core | core | core | 
-| Carrier-calculated rates | &#10003; | core | app/plugin | core |  | A `CARRIER` zone rate prices checkout live through the store's carrier (EasyPost, or the deterministic simulated carrier in development), per service with the merchant's markup and handling fee; the choice is re-priced on the server at order time, quotes are cached briefly, and a carrier outage falls back to a set price or the zone's other rates.
-| Buy & print shipping labels | &#10003; | core | app/plugin | core |  | Labels bought through EasyPost, with tracking from its signed webhook and polling; local PDF labels 4 by 6 inches with the simulated carrier.
+| Carrier-calculated rates | &#10003; | core | app/plugin | core | core | A `CARRIER` zone rate prices checkout live through the store's carrier (EasyPost, or the deterministic simulated carrier in development), per service with the merchant's markup and handling fee; the choice is re-priced on the server at order time, quotes are cached briefly, and a carrier outage falls back to a set price or the zone's other rates.
+| Buy & print shipping labels | &#10003; | core | app/plugin | app/plugin | core | Labels bought through EasyPost, with tracking from its signed webhook and polling; local PDF labels 4 by 6 inches with the simulated carrier.
 | Local pickup | &#10003; | core | core | core | core | 
-| Local delivery (radius/zip) | &#10003; | core | app/plugin | core |  | 
+| Local delivery (radius/zip) | &#10003; | core | app/plugin | app/plugin | core | 
 | Free-shipping threshold | &#10003; | core | core | core | core | 
 | Packing slips / pick lists | &#10003; | core | core | core | core | 
 | Tracking numbers & tracking events | &#10003; | core | core | core | core | 
 | Delivery date estimates | &#10003; | core | core | core | core | 
-| Shipping profiles (per-product rates) | &#8211; | core |  | core |  | 
-| Fulfillment network / 3PL integration | &#8211; | app/plugin | app/plugin | app/plugin |  | 
-| Fulfillment orders / routing rules across locations | &#9681; | core | core | core | core | Multiple locations; no automatic routing.
-| Ship from store / BOPIS from POS | &#9681; | core | core | core | core | Local pickup online; not started from the register.
-| Customs forms / international docs | &#8211; | core |  |  |  | 
-| Returns label generation | &#8211; | core |  |  |  | 
+| Shipping profiles (per-product rates) | &#8211; | core | core | core | no | 
+| Fulfillment network / 3PL integration | &#8211; | app/plugin | app/plugin | app/plugin | no | 
+| Fulfillment orders / routing rules across locations | &#9681; | core | app/plugin | app/plugin | no | Multiple locations; no automatic routing.
+| Ship from store / BOPIS from POS | &#9681; | core | app/plugin | app/plugin | core | Local pickup online; not started from the register.
+| Customs forms / international docs | &#8211; | core | app/plugin | app/plugin | no | 
+| Returns label generation | &#8211; | core | app/plugin | app/plugin | no | 
 |===
 
 === Point of sale
@@ -178,31 +179,31 @@ on a row.
 |===
 | Feature | Bazaar | Shopify | WooCommerce | BigCommerce | Square | Notes
 
-| Sell screen with product grid & search | &#10003; | core |  |  | core | 
-| Barcode scanning (camera / scanner) | &#10003; | core |  |  | core | 
-| Custom sale / custom amount | &#10003; | core |  |  | core | 
-| Line & cart discounts | &#10003; | core |  |  | core | 
-| Split tender / multiple payments | &#10003; | core |  |  | core | 
-| Cash management (float, cash in/out, counts) | &#10003; | core |  |  | core | 
-| Shifts / register sessions / Z report | &#10003; | core |  |  | core | 
-| Staff PIN login | &#10003; | core |  |  | core | 
-| Staff roles (OWNER/MANAGER/FULFILMENT/CASHIER) | &#10003; | core |  |  | core | 
-| Receipts print/email/SMS | &#10003; | core |  |  | core | 
-| Customer-facing display | &#10003; | core |  |  | core | 
-| Offline mode with sync | &#10003; | core |  |  | core | 
-| Returns & exchanges at POS | &#10003; | core |  |  | core | 
-| Refund to store credit | &#10003; | core |  |  | core | 
-| Park / hold carts | &#10003; | core |  |  | core | Parked carts keep their customer across a restart, offline too. 
-| Tipping | &#10003; | core |  |  | core | Tips at the register, counted in the shift. 
-| Card reader hardware (tap/chip) | &#8211; | core |  |  | core | 
-| Tap to pay on phone | &#8211; | core |  |  | core | 
-| Cash drawer / receipt printer hardware | &#9681; | core |  |  | core | Receipts are PDF, e-mail or text; no device drivers.
-| Customer lookup & attach to sale | &#10003; | core |  |  | core | 
-| Loyalty at POS | &#10003; | core |  |  | core | Member cards are scanned at the register.
-| Ship to customer / order from other location | &#8211; | core |  |  | core | 
-| Staff commissions / performance reports | &#9681; |  |  |  |  | Sales by register and staff; no commission payouts.
-| Multiple registers per location | &#10003; | core |  |  | core | 
-| Live tickets / kitchen-style queue | &#10003; |  |  |  | core | 
+| Sell screen with product grid & search | &#10003; | core | app/plugin | app/plugin | core | 
+| Barcode scanning (camera / scanner) | &#10003; | core | app/plugin | app/plugin | core | 
+| Custom sale / custom amount | &#10003; | core | app/plugin | app/plugin | core | 
+| Line & cart discounts | &#10003; | core | app/plugin | app/plugin | core | 
+| Split tender / multiple payments | &#10003; | core | app/plugin | app/plugin | core | 
+| Cash management (float, cash in/out, counts) | &#10003; | core | app/plugin | app/plugin | core | 
+| Shifts / register sessions / Z report | &#10003; | core | app/plugin | app/plugin | core | 
+| Staff PIN login | &#10003; | core | app/plugin | app/plugin | core | 
+| Staff roles (OWNER/MANAGER/FULFILMENT/CASHIER) | &#10003; | core | app/plugin | app/plugin | core | 
+| Receipts print/email/SMS | &#10003; | core | app/plugin | app/plugin | core | 
+| Customer-facing display | &#10003; | core | no | no | core | 
+| Offline mode with sync | &#10003; | core | app/plugin | app/plugin | core | 
+| Returns & exchanges at POS | &#10003; | core | app/plugin | app/plugin | core | 
+| Refund to store credit | &#10003; | core | app/plugin | app/plugin | no | 
+| Park / hold carts | &#10003; | core | app/plugin | app/plugin | core | Parked carts keep their customer across a restart, offline too. 
+| Tipping | &#10003; | core | app/plugin | app/plugin | core | Tips at the register, counted in the shift. 
+| Card reader hardware (tap/chip) | &#8211; | core | app/plugin | app/plugin | core | 
+| Tap to pay on phone | &#8211; | core | app/plugin | app/plugin | core | 
+| Cash drawer / receipt printer hardware | &#9681; | core | app/plugin | app/plugin | core | Receipts are PDF, e-mail or text; no device drivers.
+| Customer lookup & attach to sale | &#10003; | core | app/plugin | app/plugin | core | 
+| Loyalty at POS | &#10003; | core | app/plugin | app/plugin | core | Member cards are scanned at the register.
+| Ship to customer / order from other location | &#8211; | core | app/plugin | app/plugin | core | 
+| Staff commissions / performance reports | &#9681; | app/plugin | app/plugin | app/plugin | app/plugin | Sales by register and staff; no commission payouts.
+| Multiple registers per location | &#10003; | core | app/plugin | app/plugin | core | 
+| Live tickets / kitchen-style queue | &#10003; | app/plugin | app/plugin | no | core | 
 |===
 
 === Customers and accounts
@@ -213,25 +214,25 @@ on a row.
 
 | Customer profiles | &#10003; | core | core | core | core | 
 | Customer tags & notes | &#10003; | core | core | core | core | 
-| Customer segments (built-in) | &#10003; | core |  |  | core | Saved segments built from a rule tree, evaluated when used.
-| Segment query editor | &#9681; | core |  |  |  | A rule-tree editor rather than a query language.
+| Customer segments (built-in) | &#10003; | core | app/plugin | core | core | Saved segments built from a rule tree, evaluated when used.
+| Segment query editor | &#9681; | core | no | no | no | A rule-tree editor rather than a query language.
 | Customer import/export CSV | &#10003; | core | core | core | core | 
 | Customer accounts self-service (orders, addresses) | &#10003; | core | core | core | core | 
 | Account deletion / GDPR data requests | &#10003; | core | core | core | core | 
 | Customer lifetime value / order count | &#10003; | core | core | core | core | 
-| Customer merge | &#8211; | core |  |  |  | 
-| Tax exemptions per customer | &#10003; | core | app/plugin | core |  | Exempt customers pay no tax; in tax-inclusive stores the included tax comes off. 
-| Store credit | &#10003; | core | core | core | core | 
-| Live chat widget | &#10003; | core | app/plugin |  |  | A storefront chat that works without JavaScript, answered from the merchant inbox. 
-| Unified inbox (email/social messages) | &#9681; | core |  |  |  | One inbox for storefront chat with assignment and canned replies; no e-mail or social channels. 
-| AI assistant | &#8211; | core |  |  |  | 
-| Issue/adjust store credit | &#10003; | core |  |  |  | 
-| Redeem at checkout | &#9681; | core |  |  |  | Store credit pays at the register.
-| Expiring credit | &#8211; | core |  |  |  | 
+| Customer merge | &#8211; | core | app/plugin | no | core | 
+| Tax exemptions per customer | &#10003; | core | app/plugin | core | no | Exempt customers pay no tax; in tax-inclusive stores the included tax comes off. 
+| Store credit | &#10003; | core | app/plugin | core | no | 
+| Live chat widget | &#10003; | core | app/plugin | app/plugin | no | A storefront chat that works without JavaScript, answered from the merchant inbox. 
+| Unified inbox (email/social messages) | &#9681; | core | app/plugin | app/plugin | core | One inbox for storefront chat with assignment and canned replies; no e-mail or social channels. 
+| AI assistant | &#8211; | core | app/plugin | app/plugin | core | 
+| Issue/adjust store credit | &#10003; | core | app/plugin | core | no | 
+| Redeem at checkout | &#9681; | core | app/plugin | core | no | Store credit pays at the register.
+| Expiring credit | &#8211; | core | app/plugin | no | no | 
 | Privacy / terms / refund policies | &#10003; | core | core | core | core | 
-| Cookie consent banner / privacy API | &#10003; | core | app/plugin | core |  | A consent banner by category gates the scripts in app slots.
-| Customer data export (GDPR) | &#9681; | core | core |  |  | Account closure removes personal data; there is no export download.
-| Accessibility (storefront) | &#9681; |  |  |  |  | Semantic HTML pages.
+| Cookie consent banner / privacy API | &#10003; | core | app/plugin | core | core | A consent banner by category gates the scripts in app slots.
+| Customer data export (GDPR) | &#9681; | core | core | core | core | Account closure removes personal data; there is no export download.
+| Accessibility (storefront) | &#9681; | core | core | core | core | Semantic HTML pages.
 |===
 
 === Marketing and loyalty
@@ -244,28 +245,28 @@ on a row.
 | Automatic discounts | &#10003; | core | core | core | core | 
 | Buy X get Y | &#10003; | core | core | core | core | 
 | Free shipping discount | &#10003; | core | core | core | core | 
-| Tiered / volume discounts | &#10003; | core | app/plugin |  |  | TIERED and VOLUME discount kinds with quantity or spend breaks.
-| Bulk-generated unique codes | &#9681; | core | core | core | core | Single-use codes are issued per reward and per signup; there is no bulk generator.
+| Tiered / volume discounts | &#10003; | app/plugin | app/plugin | app/plugin | no | TIERED and VOLUME discount kinds with quantity or spend breaks.
+| Bulk-generated unique codes | &#9681; | core | app/plugin | core | no | Single-use codes are issued per reward and per signup; there is no bulk generator.
 | Min requirements / usage limits / once per customer | &#10003; | core | core | core | core | 
-| Discount combinations rules | &#10003; | core | core | core | core | 
+| Discount combinations rules | &#10003; | core | core | core | no | 
 | Scheduled discounts (start/end) | &#10003; | core | core | core | core | 
 | Scheduled sale price changes (compare-at bulk schedule) | &#10003; | core | core | core | core | Sale events on a promotions calendar, with start and end times.
-| Flash sales with countdown | &#10003; | app/plugin | app/plugin |  |  | Sale events with an optional unit cap and a storefront countdown.
-| Email marketing campaigns (editor, templates) | &#10003; | app/plugin | app/plugin |  | core | Campaigns to a segment, scheduled, with A/B subjects, open and click tracking and signed unsubscribe links.
-| SMS marketing campaigns | &#10003; | app/plugin |  |  | core | Campaigns can go by text message to consenting customers.
-| Push notifications to shoppers | &#10003; |  |  |  |  | 
-| Marketing automations (graph-based) | &#10003; | app/plugin | app/plugin |  |  | 
-| Welcome / win-back / post-purchase flows | &#10003; | app/plugin | app/plugin |  |  | Journeys enter on a trigger or a segment, wait, branch and send e-mail, text or push.
-| Browse abandonment | &#8211; | app/plugin | app/plugin |  |  | 
-| Signup forms / popups | &#10003; | app/plugin | app/plugin |  |  | Newsletter forms with double opt-in, a honeypot, rate limits and an optional welcome code.
-| Campaign attribution / UTM reports | &#10003; | core |  |  |  | UTM and referrer captured on the storefront and stamped on orders, with an attribution report. 
+| Flash sales with countdown | &#10003; | app/plugin | app/plugin | app/plugin | no | Sale events with an optional unit cap and a storefront countdown.
+| Email marketing campaigns (editor, templates) | &#10003; | core | app/plugin | app/plugin | core | Campaigns to a segment, scheduled, with A/B subjects, open and click tracking and signed unsubscribe links.
+| SMS marketing campaigns | &#10003; | core | app/plugin | app/plugin | core | Campaigns can go by text message to consenting customers.
+| Push notifications to shoppers | &#10003; | app/plugin | app/plugin | app/plugin | no | 
+| Marketing automations (graph-based) | &#10003; | core | app/plugin | app/plugin | core | 
+| Welcome / win-back / post-purchase flows | &#10003; | core | app/plugin | app/plugin | core | Journeys enter on a trigger or a segment, wait, branch and send e-mail, text or push.
+| Browse abandonment | &#8211; | app/plugin | app/plugin | app/plugin | no | 
+| Signup forms / popups | &#10003; | core | app/plugin | app/plugin | core | Newsletter forms with double opt-in, a honeypot, rate limits and an optional welcome code.
+| Campaign attribution / UTM reports | &#10003; | core | app/plugin | core | no | UTM and referrer captured on the storefront and stamped on orders, with an attribution report. 
 | Ads integrations (Google/Meta) | &#8211; | core | app/plugin | core | app/plugin | 
-| Customer reviews requests | &#9681; | app/plugin | app/plugin |  |  | Reviews are collected; no automatic request message.
+| Customer reviews requests | &#9681; | app/plugin | app/plugin | app/plugin | no | Reviews are collected; no automatic request message.
 | Points programs | &#10003; | app/plugin | app/plugin | app/plugin | core | Points earned on paid orders, reversed on refunds, with expiry.
 | VIP tiers / membership clubs | &#10003; | app/plugin | app/plugin | app/plugin | core | Loyalty tiers with member prices and free shipping; clubs with member-only products and early access.
-| Referral programs | &#10003; | app/plugin | app/plugin | app/plugin | core | 
-| Rewards redemption at POS | &#9681; | app/plugin |  |  | core | A register scans the member card and earns points; rewards redeem as single-use codes.
-| Paid membership | &#10003; | app/plugin | app/plugin |  |  | Clubs can charge for membership.
+| Referral programs | &#10003; | app/plugin | app/plugin | app/plugin | no | 
+| Rewards redemption at POS | &#9681; | app/plugin | app/plugin | app/plugin | core | A register scans the member card and earns points; rewards redeem as single-use codes.
+| Paid membership | &#10003; | app/plugin | app/plugin | app/plugin | no | Clubs can charge for membership.
 | Issue / sell gift cards | &#10003; | core | app/plugin | core | core | 
 | Balance check & transactions | &#10003; | core | app/plugin | core | core | 
 | Digital gift card delivery to recipient with message/scheduled date | &#9681; | core | app/plugin | core | core | Cards are issued and e-mailed; no scheduled send.
@@ -278,13 +279,13 @@ on a row.
 |===
 | Feature | Bazaar | Shopify | WooCommerce | BigCommerce | Square | Notes
 
-| Company accounts with locations/buyers | &#10003; | core | app/plugin | core |  | Companies with sites and buyer customers. EU VAT numbers are checked against VIES, and the outcome, trader name and date are kept on the company.
-| Price lists / catalogs per company | &#10003; | core | app/plugin | core |  | Fixed price per variant or a percentage off, applied in buyer quotes.
-| Net payment terms | &#10003; | core | app/plugin |  |  | Net 15, 30 or 60 with a due date, an invoice PDF and mark-paid.
-| Quantity rules / min order | &#10003; | core | app/plugin | core |  | Minimum, maximum and step per variant.
-| Quotes / draft-to-order for B2B | &#10003; |  |  |  |  | Quotes move from draft to sent, accepted, then ordered or declined.
-| B2B storefront / customer-specific catalog | &#8211; |  |  |  |  | 
-| Vaulted card / pay on account | &#9681; |  |  |  |  | Pay on account through net terms; no card vault. 
+| Company accounts with locations/buyers | &#10003; | core | app/plugin | core | no | Companies with sites and buyer customers. EU VAT numbers are checked against VIES, and the outcome, trader name and date are kept on the company.
+| Price lists / catalogs per company | &#10003; | core | app/plugin | core | no | Fixed price per variant or a percentage off, applied in buyer quotes.
+| Net payment terms | &#10003; | core | app/plugin | core | no | Net 15, 30 or 60 with a due date, an invoice PDF and mark-paid.
+| Quantity rules / min order | &#10003; | core | app/plugin | core | no | Minimum, maximum and step per variant.
+| Quotes / draft-to-order for B2B | &#10003; | app/plugin | app/plugin | core | core | Quotes move from draft to sent, accepted, then ordered or declined.
+| B2B storefront / customer-specific catalog | &#8211; | core | app/plugin | core | no | 
+| Vaulted card / pay on account | &#9681; | core | app/plugin | core | no | Pay on account through net terms; no card vault. 
 |===
 
 === Subscriptions and pre-orders
@@ -294,9 +295,9 @@ on a row.
 | Feature | Bazaar | Shopify | WooCommerce | BigCommerce | Square | Notes
 
 | Subscriptions / selling plans | &#10003; | app/plugin | app/plugin | app/plugin | core | Daily, weekly or monthly plans at a discount; failed renewals retry, then pause.
-| Pre-orders | &#10003; | app/plugin | app/plugin |  |  | Per variant, with a ship date and a choice to charge now or later; checkout sells a short line as a pre-order up to the allowance.
-| Back-in-stock alerts to shoppers | &#10003; | app/plugin | app/plugin |  |  | Shoppers subscribe on the product page; the alert is sent once when stock returns.
-| Try before you buy / deferred payment | &#8211; | app/plugin |  |  |  | 
+| Pre-orders | &#10003; | app/plugin | app/plugin | core | no | Per variant, with a ship date and a choice to charge now or later; checkout sells a short line as a pre-order up to the allowance.
+| Back-in-stock alerts to shoppers | &#10003; | app/plugin | app/plugin | core | no | Shoppers subscribe on the product page; the alert is sent once when stock returns.
+| Try before you buy / deferred payment | &#8211; | app/plugin | app/plugin | no | no | 
 |===
 
 === Markets and tax
@@ -305,18 +306,18 @@ on a row.
 |===
 | Feature | Bazaar | Shopify | WooCommerce | BigCommerce | Square | Notes
 
-| Multi-currency storefront | &#10003; | core | app/plugin | core |  | Market prices in the local currency; checkout and refunds are charged in that currency. Rates are the merchant's own or the European Central Bank's daily feed, per market, and each order keeps the rate it used. 
-| Multi-language storefront content | &#10003; | core | app/plugin | core |  | Pages, policies and posts translate per market, with hreflang alternates in the sitemap. 
-| Per-market pricing / price adjustments | &#10003; | core |  | core |  | Per-market price lists and adjustments. 
-| Duties & import taxes at checkout | &#8211; | core |  |  |  | 
-| Domains / subfolders per market | &#8211; | core |  |  |  | 
-| Geolocation redirects / country selector | &#10003; | core |  |  |  | A market selector with a cookie, and a banner suggesting the market of the visitor's country from trusted CDN headers or an IP range table. It never redirects, so crawlers and canonical URLs are unaffected. 
+| Multi-currency storefront | &#10003; | core | app/plugin | core | no | Market prices in the local currency; checkout and refunds are charged in that currency. Rates are the merchant's own or the European Central Bank's daily feed, per market, and each order keeps the rate it used. 
+| Multi-language storefront content | &#10003; | core | app/plugin | core | no | Pages, policies and posts translate per market, with hreflang alternates in the sitemap. 
+| Per-market pricing / price adjustments | &#10003; | core | app/plugin | core | no | Per-market price lists and adjustments. 
+| Duties & import taxes at checkout | &#8211; | core | app/plugin | app/plugin | no | 
+| Domains / subfolders per market | &#8211; | core | app/plugin | core | no | 
+| Geolocation redirects / country selector | &#10003; | core | app/plugin | app/plugin | no | A market selector with a cookie, and a banner suggesting the market of the visitor's country from trusted CDN headers or an IP range table. It never redirects, so crawlers and canonical URLs are unaffected. 
 | Tax rates by region | &#10003; | core | core | core | core | 
 | Tax-inclusive pricing | &#10003; | core | core | core | core | 
-| Automatic tax calculation (United States and European Union) | &#8211; | core | app/plugin | core |  | 
-| Tax overrides per product/collection | &#8211; | core |  | core |  | 
+| Automatic tax calculation (United States and European Union) | &#8211; | core | app/plugin | core | core | 
+| Tax overrides per product/collection | &#8211; | core | core | core | core | 
 | Tax exemptions | &#10003; | core | core | core | core | Per customer, with certificate details. 
-| VAT/GST registration & reports | &#8211; |  |  |  |  | VAT numbers of business customers are verified with VIES; registration and filing reports are not covered.
+| VAT/GST registration & reports | &#8211; | core | app/plugin | app/plugin | no | VAT numbers of business customers are verified with VIES; registration and filing reports are not covered.
 |===
 
 === Storefront, web and SEO
@@ -328,29 +329,29 @@ on a row.
 | Themes / theme editor | &#10003; | core | core | core | core | Palette, font, corners, logo and section order, with a signed preview link before publishing. 
 | Theme customization (sections/blocks) | &#9681; | core | core | core | core | Home sections can be ordered and toggled; no block editor. 
 | Custom pages | &#10003; | core | core | core | core | Sanitized rich pages and four policy pages. 
-| Blog / articles | &#10003; | core | core | core |  | Posts with tags and author, Atom and RSS feeds. 
+| Blog / articles | &#10003; | core | core | core | no | Posts with tags and author, Atom and RSS feeds. 
 | Navigation menus editor | &#10003; | core | core | core | core | Two-level main and footer menus. 
 | SEO titles/meta/canonical | &#10003; | core | core | core | core | 
-| JSON-LD structured data | &#10003; | core |  |  |  | 
+| JSON-LD structured data | &#10003; | core | core | core | core | 
 | Sitemap / robots.txt | &#10003; | core | core | core | core | 
-| URL redirects manager | &#10003; | core | app/plugin | core |  | 301 redirects for paths no route matches. 
+| URL redirects manager | &#10003; | core | app/plugin | core | no | 301 redirects for paths no route matches. 
 | Storefront search | &#10003; | core | core | core | core | 
 | Search filters / facets | &#10003; | core | core | core | core | 
-| Predictive search / autocomplete | &#8211; | core |  | core |  | 
+| Predictive search / autocomplete | &#8211; | core | app/plugin | core | no | 
 | Product recommendations (related) | &#9681; | core | core | core | core | Related products from the same collection.
-| Synonyms / boosts (search tuning) | &#8211; | core |  | core |  | 
+| Synonyms / boosts (search tuning) | &#8211; | core | app/plugin | core | no | 
 | Custom domain | &#8211; | core | core | core | core | 
-| Password page / pre-launch | &#8211; | core |  | core |  | 
-| Files library | &#10003; | core |  |  |  | 
-| Metafields / metaobjects | &#10003; | core |  |  |  | 
-| Content translation | &#10003; | core |  |  |  | Pages, policies, posts, menu labels, metafield names and metaobject entries, per market language with fallback. 
+| Password page / pre-launch | &#8211; | core | app/plugin | core | core | 
+| Files library | &#10003; | core | core | core | core | 
+| Metafields / metaobjects | &#10003; | core | app/plugin | core | no | 
+| Content translation | &#10003; | core | app/plugin | core | no | Pages, policies, posts, menu labels, metafield names and metaobject entries, per market language with fallback. 
 | Facebook/Instagram shop | &#8211; | core | app/plugin | core | core | 
 | Google & YouTube | &#9681; | core | app/plugin | core | core | A per-market product feed in XML and CSV for shopping channels; no direct API connection. 
-| TikTok / Pinterest | &#8211; | core | app/plugin |  |  | 
-| Amazon/eBay/Walmart marketplace connect | &#10003; | app/plugin | app/plugin | core |  | Live sync behind a connector interface (eBay-style connector, simulated by default): stock and price push, order pull with signed notifications, tracking push back; plus CSV import. 
-| Supplier and retailer dropship network | &#8211; | core |  |  |  | 
-| Buy button / embeddable | &#8211; | core |  |  |  | 
-| Marketplace (multi-merchant browse) | &#9681; | core |  |  |  | The platform hosts many stores and the app lists them.
+| TikTok / Pinterest | &#8211; | core | app/plugin | core | no | 
+| Amazon/eBay/Walmart marketplace connect | &#10003; | app/plugin | app/plugin | core | no | Live sync behind a connector interface (eBay-style connector, simulated by default): stock and price push, order pull with signed notifications, tracking push back; plus CSV import. 
+| Supplier and retailer dropship network | &#8211; | core | app/plugin | app/plugin | no | 
+| Buy button / embeddable | &#8211; | core | app/plugin | core | core | 
+| Marketplace (multi-merchant browse) | &#9681; | core | app/plugin | app/plugin | no | The platform hosts many stores and the app lists them.
 |===
 
 === Extensibility and apps
@@ -360,12 +361,12 @@ on a row.
 | Feature | Bazaar | Shopify | WooCommerce | BigCommerce | Square | Notes
 
 | REST/HTTP API | &#10003; | core | core | core | core | 
-| GraphQL API | &#8211; | core |  | core |  | 
+| GraphQL API | &#8211; | core | app/plugin | core | no | 
 | Webhooks with delivery log & retries | &#10003; | core | core | core | core | 
-| App store / third-party app installs | &#9681; | core | core | core |  | App slots place owner-approved snippets and sandboxed widgets; there is no app marketplace.
+| App store / third-party app installs | &#9681; | core | core | core | core | App slots place owner-approved snippets and sandboxed widgets; there is no app marketplace.
 | API access tokens / custom apps | &#9681; | core | core | core | core | Session and OAuth 2 tokens; no per-app scoped keys.
-| Bulk operations API | &#8211; | core |  |  |  | 
-| Functions / checkout scripts | &#8211; | core |  |  |  | 
+| Bulk operations API | &#8211; | core | no | no | no | 
+| Functions / checkout scripts | &#8211; | core | core | app/plugin | no | 
 |===
 
 === Analytics
@@ -378,13 +379,13 @@ on a row.
 | Sales over time / breakdowns | &#10003; | core | core | core | core | 
 | Conversion funnel | &#10003; | core | core | core | core | 
 | Top products / items | &#10003; | core | core | core | core | 
-| Live view (real-time) | &#9681; | core |  |  |  | A live channel streams sales to the dashboard.
-| Custom reports / report builder | &#10003; | core |  | core |  | Pick measures, dimensions and filters; save reports. 
-| Cohort / retention analysis | &#10003; | core |  |  |  | 
+| Live view (real-time) | &#9681; | core | app/plugin | no | core | A live channel streams sales to the dashboard.
+| Custom reports / report builder | &#10003; | core | app/plugin | core | core | Pick measures, dimensions and filters; save reports. 
+| Cohort / retention analysis | &#10003; | core | app/plugin | no | no | 
 | Inventory / sell-through reports | &#9681; | core | core | core | core | Inventory value only.
 | Finance / tax / payout reports | &#9681; | core | core | core | core | Payout list; no tax liability report.
 | Session / traffic source analytics | &#10003; | core | core | core | core | Traffic sources from UTM tags and referrers. 
-| Benchmarks vs peers | &#8211; | core |  |  |  | 
+| Benchmarks vs peers | &#8211; | core | no | no | no | 
 |===
 
 === Staff and security
@@ -395,10 +396,10 @@ on a row.
 
 | Staff accounts & invites | &#10003; | core | core | core | core | 
 | Roles & permissions | &#10003; | core | core | core | core | Granular permission sets per staff member on top of the four roles. 
-| Audit log / activity | &#10003; | core |  |  |  | 
-| Two-factor authentication | &#8211; | core |  | core | core | 
-| SSO / SAML | &#8211; | core |  | core |  | 
-| Organization admin across stores | &#9681; | core |  |  |  | A platform administrator manages all stores.
+| Audit log / activity | &#10003; | core | app/plugin | core | core | 
+| Two-factor authentication | &#8211; | core | app/plugin | core | core | 
+| SSO / SAML | &#8211; | core | app/plugin | core | no | 
+| Organization admin across stores | &#9681; | core | app/plugin | core | core | A platform administrator manages all stores.
 |===
 
 === Platform
@@ -407,10 +408,10 @@ on a row.
 |===
 | Feature | Bazaar | Shopify | WooCommerce | BigCommerce | Square | Notes
 
-| Storefront caching / CDN | &#10003; | core |  | core |  | 
-| Headless storefront API | &#10003; | core | core | core |  | 
-| Multiple stores per account | &#10003; |  |  | core |  | 
-| Native mobile shopping app | &#10003; |  |  |  |  | 
+| Storefront caching / CDN | &#10003; | core | app/plugin | core | core | 
+| Headless storefront API | &#10003; | core | core | core | core | 
+| Multiple stores per account | &#10003; | core | app/plugin | core | no | 
+| Native mobile shopping app | &#10003; | core | app/plugin | app/plugin | no | 
 |===
 
 === Beyond the usual feature list
