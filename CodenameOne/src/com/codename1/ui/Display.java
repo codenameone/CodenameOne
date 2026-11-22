@@ -809,6 +809,11 @@ public final class Display extends CN1Constants {
         return simd;
     }
 
+    /// True if `g` is the graphics that paints the display.
+    boolean isScreenGraphics(Graphics g) {
+        return g == codenameOneGraphics; //NOPMD CompareObjectsWithEquals
+    }
+
     /// Returns true if the current platform provides a hardware accelerated 3D
     /// GPU backend for `com.codename1.gpu.RenderView`.
     public boolean isGpuSupported() {

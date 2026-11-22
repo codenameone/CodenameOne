@@ -22,6 +22,9 @@
  */
 package com.codename1.impl.rive;
 
+import com.codename1.gpu.GpuImage;
+import com.codename1.gpu.GraphicsDevice;
+import com.codename1.gpu.Renderer;
 import com.codename1.ui.CN;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.events.AnimationEvent;
@@ -45,13 +48,18 @@ import java.util.Map;
 /// still reacts to inputs, view model properties and pointer events,
 /// settling them at the current time without moving it.
 ///
-/// Image meshes draw through `Graphics`; an image has no GPU surface of its
-/// own.
-public class RiveImage extends com.codename1.ui.Image {
+/// An artboard with image meshes (deformed, possibly skinned images) draws
+/// through `com.codename1.gpu` where the platform has a GPU backend: as a
+/// `GpuImage`, it places a GPU surface over the rectangle it is drawn into
+/// and records each frame for `GpuRiveRenderer`. Everything else, and every
+/// platform without a GPU backend, draws through `Graphics`.
+public class RiveImage extends GpuImage {
     private final RiveFile file;
     private final Artboard artboard;
     private final GraphicsRiveRenderer renderer = new GraphicsRiveRenderer();
     private final Mat2D base = new Mat2D();
+    private final boolean meshes;
+    private GpuRiveRenderer gpu;
     private final int width;
     private final int height;
     private LinearAnimationInstance animation;
@@ -75,7 +83,6 @@ public class RiveImage extends com.codename1.ui.Image {
     }
 
     private RiveImage(RiveFile file, int w, int h) {
-        super(null);
         this.file = file;
         artboard = file.instance((String) null);
         if (artboard == null) {
@@ -89,6 +96,7 @@ public class RiveImage extends com.codename1.ui.Image {
         }
         width = Math.max(1, w);
         height = Math.max(1, h);
+        meshes = containsMesh(artboard, 0);
         ArrayList<LinearAnimation> anims = artboard.getAnimations();
         ArrayList<StateMachine> machines = artboard.getStateMachines();
         if (!machines.isEmpty()) {
@@ -123,18 +131,8 @@ public class RiveImage extends com.codename1.ui.Image {
     }
 
     @Override
-    public boolean requiresDrawImage() {
-        return true;
-    }
-
-    @Override
     public boolean isAnimation() {
         return true;
-    }
-
-    @Override
-    public boolean isOpaque() {
-        return false;
     }
 
     // ------------------------------------------------------------ inputs
@@ -407,15 +405,44 @@ public class RiveImage extends com.codename1.ui.Image {
 
     // ------------------------------------------------------------ drawing
 
+    /// Draws through the GPU when the artboard has a mesh; vectors alone
+    /// draw as well through `Graphics`.
     @Override
-    protected void drawImage(Graphics g, Object nativeGraphics, int x, int y) {
-        drawImage(g, nativeGraphics, x, y, width, height);
+    protected boolean usesGpu() {
+        return meshes;
+    }
+
+    @Override
+    protected Renderer createRenderer() {
+        if (gpu == null) {
+            gpu = new GpuRiveRenderer();
+        }
+        return new GpuDraw(gpu);
+    }
+
+    /// Records the artboard, fitted into the `width` by `height` rectangle at
+    /// `offsetX`, `offsetY` of the surface, for the render thread.
+    @Override
+    protected void prepareFrame(int surfaceWidth, int surfaceHeight, int offsetX, int offsetY,
+                                int width, int height) {
+        float aw = artboard.getWidth();
+        float ah = artboard.getHeight();
+        if (gpu == null || aw <= 0 || ah <= 0) {
+            return;
+        }
+        float scale = Math.min(width / aw, height / ah);
+        float ox = (width - aw * scale) / 2f;
+        float oy = (height - ah * scale) / 2f;
+        base.set(scale, 0, 0, scale, offsetX + ox, offsetY + oy);
+        gpu.beginFrame(surfaceWidth, surfaceHeight, base);
+        artboard.draw(gpu);
+        gpu.endFrame(0);
     }
 
     /// Draws the artboard fitted into `w` by `h` at `x`, `y`: scaled to fit,
     /// keeping its aspect ratio, and centered.
     @Override
-    protected void drawImage(Graphics g, Object nativeGraphics, int x, int y, int w, int h) {
+    protected void drawFallback(Graphics g, int x, int y, int w, int h) {
         float aw = artboard.getWidth();
         float ah = artboard.getHeight();
         if (aw <= 0 || ah <= 0 || w <= 0 || h <= 0) {
@@ -428,6 +455,55 @@ public class RiveImage extends com.codename1.ui.Image {
         renderer.begin(g, base);
         artboard.draw(renderer);
         renderer.end();
+    }
+
+    /// Whether `artboard`, or an artboard nested in it, has an image mesh.
+    static boolean containsMesh(Artboard artboard, int depth) {
+        if (artboard == null || depth > 8) {
+            return false;
+        }
+        ArrayList<Core> objects = artboard.getObjects();
+        for (int i = 0; i < objects.size(); i++) { // NOPMD ForLoopCanBeForeach - indexed
+            Core c = objects.get(i);
+            if (c instanceof Mesh) {
+                return true;
+            }
+            if (c instanceof NestedArtboard
+                    && containsMesh(((NestedArtboard) c).getArtboardInstance(), depth + 1)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// Draws what the EDT recorded; advancing and recording happen on the
+    /// EDT, never on the render thread.
+    private static final class GpuDraw implements Renderer {
+        private final GpuRiveRenderer r;
+
+        GpuDraw(GpuRiveRenderer r) {
+            this.r = r;
+        }
+
+        @Override
+        public void onInit(GraphicsDevice device) {
+            r.contextLost();
+        }
+
+        @Override
+        public void onResize(GraphicsDevice device, int width, int height) {
+            device.setViewport(0, 0, width, height);
+        }
+
+        @Override
+        public void onFrame(GraphicsDevice device) {
+            r.render(device);
+        }
+
+        @Override
+        public void onDispose(GraphicsDevice device) {
+            r.dispose(device);
+        }
     }
 
     // ------------------------------------------------------------ pointer

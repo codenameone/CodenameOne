@@ -917,6 +917,18 @@ public final class Graphics {
         }
     }
 
+    /// Whether this graphics paints the display itself, as opposed to a
+    /// mutable image (a transition, `Component.toImage`). An image that
+    /// places a native surface where it is drawn, such as
+    /// `com.codename1.gpu.GpuImage`, does so only on the display.
+    ///
+    /// #### Returns
+    ///
+    /// true for the display's graphics
+    public boolean isScreenGraphics() {
+        return Display.getInstance().isScreenGraphics(this);
+    }
+
     /// Draws the image so its top left coordinate corresponds to x/y
     ///
     /// #### Parameters
