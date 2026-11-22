@@ -204,11 +204,21 @@ class MerchantIdorTest {
         "GET /inventory/states", "POST /inventory/unavailable", "GET /tracking",
         "POST /tracking", "POST /tracking/receive", "GET /serials", "GET /lots",
         "POST /orders/{orderId}/serials",
+        // Archiving, bulk actions, return rules, pay links and templates.
+        "POST /orders/{orderId}/archive", "POST /orders/{orderId}/unarchive",
+        "GET /archived-orders", "POST /bulk-orders", "GET /order-settings",
+        "POST /order-settings", "POST /drafts/{orderId}/pay-link", "GET /templates",
+        "POST /templates", "POST /templates/reset", "POST /templates/preview",
+        // Label sheets and bulk packing slips.
+        "GET /label-sheets.pdf", "GET /purchase-orders/{purchaseOrderId}/labels.pdf",
+        "GET /bulk-orders/packing-slips.pdf",
     };
 
     /// Routes of [#ROUTES] served as documents by `DocumentPages` rather than
     /// declared by a shared API interface.
-    static final String[] DOCUMENT_ROUTES = {"GET /pos/labels.pdf"};
+    static final String[] DOCUMENT_ROUTES = {"GET /pos/labels.pdf",
+        "GET /label-sheets.pdf", "GET /purchase-orders/{purchaseOrderId}/labels.pdf",
+        "GET /bulk-orders/packing-slips.pdf"};
 
     /// The table an id placeholder names, by the path segment before it.
     private static final String[][] TABLES = {

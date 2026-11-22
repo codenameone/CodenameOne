@@ -58,6 +58,7 @@ import com.codenameone.examples.bazaar.domain.StoreOrder;
 import com.codenameone.examples.bazaar.domain.StoreStaff;
 import com.codenameone.examples.bazaar.domain.TaxRate;
 import com.codenameone.examples.bazaar.domain.Variant;
+import com.codenameone.examples.bazaar.notify.Templates;
 import com.codenameone.examples.bazaar.order.Orders;
 import com.codenameone.examples.bazaar.rates.RateSettings;
 import com.codenameone.examples.bazaar.repository.CashMoveRepository;
@@ -92,6 +93,10 @@ import java.util.Map;
 /// for [#LOCK_MILLIS], whoever typed them.
 @Component
 public class Pos {
+    /// The store's own opening line of a texted receipt.
+    @com.codename1.backend.annotations.Autowired
+    private Templates templates;
+
     public static final String OPEN = "OPEN";
     public static final String CLOSED = "CLOSED";
     /// Wrong PINs in a row before the PIN is locked.
@@ -674,8 +679,11 @@ public class Pos {
         if (!empty(to.phone())) {
             // The till shows the receipt in English (the staff's working
             // text); the shopper's copy is in the shopper's language.
-            sms.send(to.phone().trim(), documents.receiptText(storeId, orderId,
-                    language.of(orderRows.findById(orderId))));
+            String lang = language.of(orderRows.findById(orderId));
+            String intro = templates.overrides(storeId, lang).get(Templates.SMS_RECEIPT);
+            String body = documents.receiptText(storeId, orderId, lang);
+            sms.send(to.phone().trim(), intro == null || intro.length() == 0 ? body
+                    : intro + "\n" + body);
             texted = true;
             orders.event(orderId, "RECEIPT_TEXTED", "Receipt texted", username);
         }

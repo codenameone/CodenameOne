@@ -181,6 +181,10 @@ public class Documents {
             }, false);
         }
         sheet.space(6).heading(paymentLine(o));
+        String link = payLink(orderId);
+        if (link != null) {
+            sheet.text("Pay online: " + link);
+        }
         if (s.getPolicies().length() > 0) {
             sheet.space(8).muted(s.getPolicies());
         }
@@ -200,6 +204,37 @@ public class Documents {
         Store s = stores.findById(storeId);
         Sheet sheet = new Sheet(s.getName(), "PACKING SLIP", "Order #" + o.getNumber(),
                 s.getAccentColor(), footer(s));
+        slip(sheet, storeId, o, fulfillmentId);
+        return sheet.finish();
+    }
+
+    /// The packing slips of several orders, one after another, each on a
+    /// page of its own. Every order must be the store's.
+    @Transactional(readOnly = true)
+    public byte[] packingSlips(String storeId, List<String> orderIds) throws IOException {
+        if (orderIds == null || orderIds.isEmpty() || orderIds.size() > 200) {
+            throw new ResponseStatusException(400, "Choose 1 to 200 orders");
+        }
+        List<StoreOrder> os = new java.util.ArrayList<StoreOrder>();
+        for (int iter = 0; iter < orderIds.size(); iter++) {
+            os.add(order(storeId, orderIds.get(iter)));
+        }
+        Store s = stores.findById(storeId);
+        Sheet sheet = new Sheet(s.getName(), "PACKING SLIPS", os.size() + " orders",
+                s.getAccentColor(), footer(s));
+        for (int iter = 0; iter < os.size(); iter++) {
+            if (iter > 0) {
+                sheet.layout.addPageBreak();
+            }
+            sheet.heading("Order #" + os.get(iter).getNumber());
+            slip(sheet, storeId, os.get(iter), null);
+        }
+        return sheet.finish();
+    }
+
+    private void slip(Sheet sheet, String storeId, StoreOrder o, String fulfillmentId)
+            throws IOException {
+        String orderId = o.getId();
         sheet.blocks("SHIP TO", shipTo(o), "ORDER", new String[] {
             "Order #" + o.getNumber(),
             "Placed " + Sheet.date(millis(o.getCreatedAt())),
@@ -238,7 +273,6 @@ public class Documents {
             sheet.space(6).heading("Note").text(o.getNote());
         }
         sheet.space(10).muted("Packed by ____________________    Checked by ____________________");
-        return sheet.finish();
     }
 
     // ---------------------------------------------------------------- label
@@ -365,6 +399,148 @@ public class Documents {
         }
         return doc.toByteArray();
     }
+
+    // ---------------------------------------------------------- label sheets
+
+    /// Avery 5160 and compatible: US letter, 3 columns of 10 labels, each
+    /// 2 5/8 by 1 inch, 3/16 inch side margins, 1/2 inch top margin and an
+    /// 1/8 inch gap between columns.
+    public static final String AVERY_30 = "AVERY_30";
+    /// A roll of 2 by 1 inch thermal labels, one label to a page.
+    public static final String THERMAL_2X1 = "THERMAL_2X1";
+    static final float LETTER_W = 612;
+    static final float LETTER_H = 792;
+    static final float AVERY_W = 189;
+    static final float AVERY_H = 72;
+    static final float AVERY_LEFT = 13.5f;
+    static final float AVERY_TOP = 36;
+    static final float AVERY_PITCH = 198;
+    static final float THERMAL_W = 144;
+    static final float THERMAL_H = 72;
+
+    /// Barcode labels: `quantities[i]` labels of `variantIds[i]`, each with
+    /// the product's title, the variant, the price and the barcode (or SKU)
+    /// as Code 128, laid out for `layout` ([#AVERY_30], the default, or
+    /// [#THERMAL_2X1]).
+    @Transactional(readOnly = true)
+    public byte[] labelSheet(String storeId, List<String> variantIds, List<Integer> quantities,
+            String layout) throws IOException {
+        boolean avery = layout == null || layout.length() == 0 || AVERY_30.equals(layout);
+        if (!avery && !THERMAL_2X1.equals(layout)) {
+            throw new ResponseStatusException(400, "A sheet is AVERY_30 or THERMAL_2X1");
+        }
+        if (variantIds == null || variantIds.isEmpty()
+                || quantities == null || quantities.size() != variantIds.size()) {
+            throw new ResponseStatusException(400, "Name the variants and how many of each");
+        }
+        long total = 0;
+        for (int iter = 0; iter < quantities.size(); iter++) {
+            int q = quantities.get(iter).intValue();
+            if (q < 0) {
+                throw new ResponseStatusException(400, "A quantity cannot be negative");
+            }
+            total += q;
+        }
+        if (total == 0 || total > MAX_TAGS) {
+            throw new ResponseStatusException(400, "1 to " + MAX_TAGS + " labels at once");
+        }
+        Store s = stores.findById(storeId);
+        PdfDocument doc = new PdfDocument();
+        doc.setTitle("Barcode labels").setAuthor(s.getName()).setCreator("Bazaar");
+        PdfCanvas page = null;
+        int slot = 0;
+        for (int iter = 0; iter < variantIds.size(); iter++) {
+            Variant v = variants.findById(variantIds.get(iter));
+            if (v == null || !storeId.equals(v.getStoreId())) {
+                throw new ResponseStatusException(404, "No such variant");
+            }
+            Product p = products.findById(v.getProductId());
+            String name = p == null ? "" : p.getTitle();
+            String code = v.getBarcode().length() > 0 ? v.getBarcode()
+                    : v.getSku().length() > 0 ? v.getSku() : v.getId();
+            String price = Sheet.money(v.getPriceCents(), s.getCurrency());
+            for (int copy = 0; copy < quantities.get(iter).intValue(); copy++) {
+                if (avery) {
+                    int at = slot % 30;
+                    if (at == 0) {
+                        page = doc.addPage(LETTER_W, LETTER_H).getCanvas();
+                    }
+                    label(page, AVERY_LEFT + (at % 3) * AVERY_PITCH, AVERY_TOP + (at / 3) * AVERY_H,
+                            AVERY_W, AVERY_H, name, v.getTitle(), price, code);
+                } else {
+                    label(doc.addPage(THERMAL_W, THERMAL_H).getCanvas(), 0, 0, THERMAL_W,
+                            THERMAL_H, name, v.getTitle(), price, code);
+                }
+                slot++;
+            }
+        }
+        return doc.toByteArray();
+    }
+
+    /// One label in the box at `x`, `y`: the title and the price on the first
+    /// line, the variant under them, then the barcode and its text.
+    private static void label(PdfCanvas c, float x, float y, float w, float h, String name,
+            String variant, String price, String code) {
+        float m = 6;
+        float inner = w - 2 * m;
+        float pw = PdfFont.HELVETICA_BOLD.getStringWidth(price, 9);
+        c.setFillColor(0x000000).setFont(PdfFont.HELVETICA_BOLD, 7.5f)
+                .drawText(Sheet.fit(name, PdfFont.HELVETICA_BOLD, 7.5f, inner - pw - 4), x + m,
+                        y + m + 6);
+        c.setFont(PdfFont.HELVETICA_BOLD, 9).drawText(price, x + w - m - pw, y + m + 7);
+        if (variant.length() > 0) {
+            c.setFont(PdfFont.HELVETICA, 6.5f)
+                    .drawText(Sheet.fit(variant, PdfFont.HELVETICA, 6.5f, inner), x + m,
+                            y + m + 14);
+        }
+        Code128.draw(c, code, x + m, y + 25, inner, h - 25 - 14);
+        c.setFont(PdfFont.COURIER, 6).drawText(Sheet.fit(code, PdfFont.COURIER, 6, inner),
+                x + m, y + h - 5);
+    }
+
+    /// Labels for what a purchase order brought in: one per unit received,
+    /// or per unit ordered while nothing has arrived.
+    @Transactional(readOnly = true)
+    public byte[] purchaseOrderLabels(String storeId, String purchaseOrderId, String layout)
+            throws IOException {
+        PurchaseOrder po = purchaseOrderId == null ? null
+                : purchaseOrders.findById(purchaseOrderId);
+        if (po == null || !storeId.equals(po.getStoreId())) {
+            throw new ResponseStatusException(404, "No such purchase order");
+        }
+        List<PurchaseLine> pl = purchaseLines.findByPurchaseOrderId(po.getId());
+        boolean anyReceived = false;
+        for (int iter = 0; iter < pl.size(); iter++) {
+            anyReceived |= pl.get(iter).getReceived() > 0;
+        }
+        List<String> ids = new java.util.ArrayList<String>();
+        List<Integer> qty = new java.util.ArrayList<Integer>();
+        for (int iter = 0; iter < pl.size(); iter++) {
+            int q = anyReceived ? pl.get(iter).getReceived() : pl.get(iter).getQuantity();
+            if (q > 0 && pl.get(iter).getVariantId().length() > 0) {
+                ids.add(pl.get(iter).getVariantId());
+                qty.add(Integer.valueOf(q));
+            }
+        }
+        if (ids.isEmpty()) {
+            throw new ResponseStatusException(409, "The purchase order has nothing to label");
+        }
+        return labelSheet(storeId, ids, qty, layout);
+    }
+
+    /// The active checkout link of an order, for its invoice; null for none.
+    private String payLink(String orderId) throws IOException {
+        java.util.Map r = db.queryOne("SELECT token FROM pay_link WHERE order_id = ? AND "
+                + "status = ? AND expires_at > ?", new Object[] {orderId, "ACTIVE",
+                    Long.valueOf(System.currentTimeMillis())});
+        return r == null ? null : urls.absolute(null, "/pay/"
+                + com.codenameone.examples.bazaar.Rows.text(r.get("token")));
+    }
+
+    @com.codename1.backend.annotations.Autowired
+    private com.codename1.backend.DataSource db;
+    @com.codename1.backend.annotations.Autowired
+    private com.codenameone.examples.bazaar.web.SiteUrls urls;
 
     // ------------------------------------------------------- purchase order
 

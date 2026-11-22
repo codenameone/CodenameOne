@@ -94,6 +94,8 @@ public class Emails {
     /// documents, so the constructor stays as it was.
     @Autowired
     private ShopperLanguage language;
+    @Autowired
+    private Templates templates;
 
     public Emails(MailSender mail, StoreRepository stores, StoreOrderRepository orders,
             OrderLineRepository lines, CustomerRepository customers, RefundRepository refunds,
@@ -143,6 +145,41 @@ public class Emails {
                 .attach("invoice-" + o.getNumber() + ".pdf", "application/pdf",
                         documents.invoice(o.getStoreId(), orderId))
                 .build();
+    }
+
+    /// A checkout link for a draft or an unpaid order: the lines, the total
+    /// and a button that pays it. True when a mail went out.
+    public boolean payLink(String orderId, String url, long expiresAt) {
+        try {
+            Mail m = payLinkMail(orderId, url, expiresAt);
+            send(m);
+            return m != null;
+        } catch (IOException | RuntimeException failed) {
+            log("checkout link", orderId, failed);
+            return false;
+        }
+    }
+
+    @Transactional(readOnly = true)
+    private Mail payLinkMail(String orderId, String url, long expiresAt) throws IOException {
+        StoreOrder o = orders.findById(orderId);
+        if (o == null || !Mail.isAddress(o.getEmail())) {
+            return null;
+        }
+        Store s = stores.findById(o.getStoreId());
+        Body b = new Body(s, language.of(o), "mail.paylink.title");
+        b.para(b.f("mail.paylink.body", s.getName(), o.getNumber()));
+        b.lines(lines.findByOrderId(orderId), o.getCurrency());
+        b.total(b.f("total"), o.getTotalCents(), o.getCurrency());
+        b.button(b.f("mail.paylink.button"), url);
+        b.para(b.f("mail.paylink.expires", day(expiresAt)));
+        return builder(s, o.getEmail(), b.f("mail.paylink.subject", o.getNumber(), s.getName()),
+                b).build();
+    }
+
+    /// `yyyy-mm-dd` of an instant, in UTC.
+    static String day(long millis) {
+        return java.time.Instant.ofEpochMilli(millis).toString().substring(0, 10);
     }
 
     /// A parcel left with its carrier, or with the store's driver.
@@ -736,8 +773,16 @@ public class Emails {
 
         /// The text of `key` in this mail's language, with `args` filled in.
         String f(String key, Object... args) {
-            return StoreText.format(t, key, args);
+            if (overrides == null) {
+                overrides = templates == null || store == null ? java.util.Collections
+                        .<String, String>emptyMap() : templates.overrides(store.getId(), lang);
+            }
+            String own = overrides.get(key);
+            return own == null ? StoreText.format(t, key, args) : StoreText.fill(own, args);
         }
+
+        /// The store's own wording of this mail's texts, read on first use.
+        private Map<String, String> overrides;
 
         void heading(String heading) {
             html.append("<h1 style=\"font-size:22px;margin:0 0 16px;color:#0f172a\">")

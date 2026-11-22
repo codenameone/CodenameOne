@@ -6,6 +6,7 @@ CREATE TABLE pay_link (
     order_id VARCHAR(32) NOT NULL,
     expires_at BIGINT NOT NULL,
     status VARCHAR(12) NOT NULL,
+    token VARCHAR(200) NOT NULL,
     created_by VARCHAR(200) NOT NULL,
     created_at BIGINT NOT NULL
 );

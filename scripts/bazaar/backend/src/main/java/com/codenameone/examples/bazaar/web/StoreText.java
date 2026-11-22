@@ -318,6 +318,12 @@ public final class StoreText {
         if (s == null) {
             return key;
         }
+        return fill(s, args);
+    }
+
+    /// `s` with `{0}`, `{1}`... replaced by `args`; a placeholder with no
+    /// argument becomes empty.
+    public static String fill(String s, Object... args) {
         StringBuilder out = new StringBuilder();
         int at = 0;
         while (at < s.length()) {
@@ -774,6 +780,11 @@ public final class StoreText {
         "mail.cart.button", "Back to your cart",
         "mail.cart.app", "Shopping in the app? Open your cart there: {0}",
         "mail.cart.subject", "Your cart at {0} is waiting",
+        "mail.paylink.title", "Your order is ready to pay",
+        "mail.paylink.body", "{0} prepared order #{1} for you. Pay for it securely online.",
+        "mail.paylink.button", "Pay now",
+        "mail.paylink.expires", "This link works until {0}.",
+        "mail.paylink.subject", "Order #{0} from {1}: pay online",
         "mail.gift.title", "A gift card for you",
         "mail.gift.worth", "Worth",
         "mail.gift.body", "Use the code at checkout, or show the QR code at the till.",
@@ -1249,6 +1260,11 @@ public final class StoreText {
         "mail.cart.button", "Volver a tu carrito",
         "mail.cart.app", "\u00bfCompras en la app? Abre tu carrito all\u00ed: {0}",
         "mail.cart.subject", "Tu carrito en {0} te espera",
+        "mail.paylink.title", "Tu pedido est\u00e1 listo para pagar",
+        "mail.paylink.body", "{0} prepar\u00f3 el pedido n.\u00ba {1} para ti. P\u00e1galo en l\u00ednea de forma segura.",
+        "mail.paylink.button", "Pagar ahora",
+        "mail.paylink.expires", "Este enlace funciona hasta el {0}.",
+        "mail.paylink.subject", "Pedido n.\u00ba {0} de {1}: paga en l\u00ednea",
         "mail.gift.title", "Una tarjeta regalo para ti",
         "mail.gift.worth", "Valor",
         "mail.gift.body", "Usa el c\u00f3digo al pagar o muestra el c\u00f3digo QR en caja.",
@@ -1724,6 +1740,11 @@ public final class StoreText {
         "mail.cart.button", "Retour \u00e0 votre panier",
         "mail.cart.app", "Vous utilisez l'appli ? Ouvrez-y votre panier : {0}",
         "mail.cart.subject", "Votre panier chez {0} vous attend",
+        "mail.paylink.title", "Votre commande est pr\u00eate \u00e0 \u00eatre r\u00e9gl\u00e9e",
+        "mail.paylink.body", "{0} a pr\u00e9par\u00e9 la commande n\u00b0 {1} pour vous. R\u00e9glez-la en ligne en toute s\u00e9curit\u00e9.",
+        "mail.paylink.button", "Payer maintenant",
+        "mail.paylink.expires", "Ce lien est valable jusqu'au {0}.",
+        "mail.paylink.subject", "Commande n\u00b0 {0} de {1} : payez en ligne",
         "mail.gift.title", "Une carte cadeau pour vous",
         "mail.gift.worth", "Valeur",
         "mail.gift.body", "Utilisez le code au paiement ou pr\u00e9sentez le code QR en caisse.",
@@ -2199,6 +2220,11 @@ public final class StoreText {
         "mail.cart.button", "Zur\u00fcck zum Warenkorb",
         "mail.cart.app", "Kaufen Sie in der App ein? \u00d6ffnen Sie den Warenkorb dort: {0}",
         "mail.cart.subject", "Ihr Warenkorb bei {0} wartet",
+        "mail.paylink.title", "Ihre Bestellung ist bereit zur Zahlung",
+        "mail.paylink.body", "{0} hat Bestellung Nr. {1} f\u00fcr Sie vorbereitet. Bezahlen Sie sie sicher online.",
+        "mail.paylink.button", "Jetzt bezahlen",
+        "mail.paylink.expires", "Dieser Link gilt bis {0}.",
+        "mail.paylink.subject", "Bestellung Nr. {0} von {1}: online bezahlen",
         "mail.gift.title", "Eine Geschenkkarte f\u00fcr Sie",
         "mail.gift.worth", "Wert",
         "mail.gift.body", "Geben Sie den Code an der Kasse ein oder zeigen Sie den QR-Code vor.",
@@ -2674,6 +2700,11 @@ public final class StoreText {
         "mail.cart.button", "\u05d7\u05d6\u05e8\u05d4 \u05dc\u05e2\u05d2\u05dc\u05d4",
         "mail.cart.app", "\u05e7\u05d5\u05e0\u05d9\u05dd \u05d1\u05d0\u05e4\u05dc\u05d9\u05e7\u05e6\u05d9\u05d4? \u05e4\u05ea\u05d7\u05d5 \u05e9\u05dd \u05d0\u05ea \u05d4\u05e2\u05d2\u05dc\u05d4: {0}",
         "mail.cart.subject", "\u05d4\u05e2\u05d2\u05dc\u05d4 \u05e9\u05dc\u05da \u05d1-{0} \u05de\u05d7\u05db\u05d4",
+        "mail.paylink.title", "\u05d4\u05d4\u05d6\u05de\u05e0\u05d4 \u05e9\u05dc\u05da \u05de\u05d5\u05db\u05e0\u05d4 \u05dc\u05ea\u05e9\u05dc\u05d5\u05dd",
+        "mail.paylink.body", "{0} \u05d4\u05db\u05d9\u05e0\u05d4 \u05e2\u05d1\u05d5\u05e8\u05da \u05d0\u05ea \u05d4\u05d6\u05de\u05e0\u05d4 \u05de\u05e1\u05f3 {1}. \u05d0\u05e4\u05e9\u05e8 \u05dc\u05e9\u05dc\u05dd \u05e2\u05dc\u05d9\u05d4 \u05d1\u05d0\u05d5\u05e4\u05df \u05de\u05d0\u05d5\u05d1\u05d8\u05d7 \u05d1\u05d0\u05d9\u05e0\u05d8\u05e8\u05e0\u05d8.",
+        "mail.paylink.button", "\u05dc\u05ea\u05e9\u05dc\u05d5\u05dd",
+        "mail.paylink.expires", "\u05d4\u05e7\u05d9\u05e9\u05d5\u05e8 \u05d1\u05ea\u05d5\u05e7\u05e3 \u05e2\u05d3 {0}.",
+        "mail.paylink.subject", "\u05d4\u05d6\u05de\u05e0\u05d4 \u05de\u05e1\u05f3 {0} \u05de-{1}: \u05ea\u05e9\u05dc\u05d5\u05dd \u05d1\u05d0\u05d9\u05e0\u05d8\u05e8\u05e0\u05d8",
         "mail.gift.title", "\u05db\u05e8\u05d8\u05d9\u05e1 \u05de\u05ea\u05e0\u05d4 \u05d1\u05e9\u05d1\u05d9\u05dc\u05da",
         "mail.gift.worth", "\u05e9\u05d5\u05d5\u05d9",
         "mail.gift.body", "\u05d4\u05e9\u05ea\u05de\u05e9\u05d5 \u05d1\u05e7\u05d5\u05d3 \u05d1\u05e7\u05d5\u05e4\u05d4 \u05d1\u05d0\u05ea\u05e8, \u05d0\u05d5 \u05d4\u05e6\u05d9\u05d2\u05d5 \u05d0\u05ea \u05e7\u05d5\u05d3 \u05d4-QR \u05d1\u05e7\u05d5\u05e4\u05d4 \u05d1\u05d7\u05e0\u05d5\u05ea.",

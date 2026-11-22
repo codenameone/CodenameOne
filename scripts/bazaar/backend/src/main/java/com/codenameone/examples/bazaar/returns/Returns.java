@@ -38,6 +38,8 @@ import com.codenameone.examples.bazaar.domain.Store;
 import com.codenameone.examples.bazaar.domain.StoreOrder;
 import com.codenameone.examples.bazaar.fulfil.Fulfillments;
 import com.codenameone.examples.bazaar.inventory.Inventory;
+import com.codenameone.examples.bazaar.api.OrderSettingsDto;
+import com.codenameone.examples.bazaar.order.OrderSettings;
 import com.codenameone.examples.bazaar.order.Orders;
 import com.codenameone.examples.bazaar.repository.OrderLineRepository;
 import com.codenameone.examples.bazaar.repository.ReturnLineRepository;
@@ -60,8 +62,10 @@ import java.util.Map;
 /// one way. The refund never restocks: receiving did that already.
 ///
 /// Only delivered (or collected) units can come back, within
-/// [#WINDOW_DAYS] of the last delivery. A per-store window would be one more
-/// store setting; every store here uses thirty days.
+/// the store's return window ([OrderSettings], thirty days unless it set
+/// another) of the last delivery, and never a final-sale product. How the
+/// money goes back -- to the card, as store credit, or onto an exchange --
+/// is the shopper's choice, settled by [Resolutions].
 @Component
 public class Returns {
     public static final String REQUESTED = "REQUESTED";
@@ -69,8 +73,13 @@ public class Returns {
     public static final String DECLINED = "DECLINED";
     public static final String RECEIVED = "RECEIVED";
     public static final String REFUNDED = "REFUNDED";
-    public static final int WINDOW_DAYS = 30;
-    private static final long WINDOW_MILLIS = WINDOW_DAYS * 86400000L;
+    /// The window a store that set none has, in days.
+    public static final int WINDOW_DAYS = OrderSettings.WINDOW_DAYS;
+    private static final long DAY_MILLIS = 86400000L;
+    @com.codename1.backend.annotations.Autowired
+    private OrderSettings settings;
+    @com.codename1.backend.annotations.Autowired
+    private Resolutions resolutions;
 
     private final ReturnRequestRepository returns;
     private final ReturnLineRepository returnLines;
@@ -109,9 +118,22 @@ public class Returns {
         if (delivered == 0) {
             throw new ResponseStatusException(409, "Nothing of the order has arrived yet");
         }
-        if (System.currentTimeMillis() - delivered > WINDOW_MILLIS) {
-            throw new ResponseStatusException(409, "Returns are accepted for " + WINDOW_DAYS
-                    + " days after delivery");
+        StoreOrder order = orders.findById(orderId);
+        OrderSettingsDto rules = settings.of(order.getStoreId());
+        if (!withinWindow(delivered, rules)) {
+            throw new ResponseStatusException(409, "Returns are accepted for "
+                    + rules.returnWindowDays() + " days after delivery");
+        }
+        if (req != null && req.lines() != null) {
+            List<OrderLine> ls = lines.findByOrderId(orderId);
+            for (int iter = 0; iter < req.lines().size(); iter++) {
+                FulfilLineDto w = req.lines().get(iter);
+                OrderLine line = w == null ? null : find(ls, w.orderLineId());
+                if (line != null && settings.finalSale(rules, line.getProductId())) {
+                    throw new ResponseStatusException(409, line.getTitle()
+                            + " is final sale and cannot be returned");
+                }
+            }
         }
         Map<String, Integer> arrived = fulfillments.deliveredUnits(orderId);
         String id = requestTx(username, orderId, req, arrived);
@@ -128,7 +150,10 @@ public class Returns {
     public Map<String, Integer> returnable(String orderId) throws IOException {
         Map<String, Integer> out = new HashMap<String, Integer>();
         long delivered = fulfillments.deliveredAt(orderId);
-        if (delivered == 0 || System.currentTimeMillis() - delivered > WINDOW_MILLIS) {
+        StoreOrder order = orders.findById(orderId);
+        OrderSettingsDto rules = order == null ? OrderSettings.DEFAULTS
+                : settings.of(order.getStoreId());
+        if (delivered == 0 || !withinWindow(delivered, rules)) {
             return out;
         }
         Map<String, Integer> arrived = fulfillments.deliveredUnits(orderId);
@@ -138,11 +163,16 @@ public class Returns {
             OrderLine line = ls.get(iter);
             int left = count(arrived, line.getId()) - line.getRefundedQty()
                     - count(asked, line.getId());
-            if (left > 0) {
+            if (left > 0 && !settings.finalSale(rules, line.getProductId())) {
                 out.put(line.getId(), Integer.valueOf(left));
             }
         }
         return out;
+    }
+
+    /// Whether `delivered` is within the store's return window.
+    public static boolean withinWindow(long delivered, OrderSettingsDto rules) {
+        return System.currentTimeMillis() - delivered <= rules.returnWindowDays() * DAY_MILLIS;
     }
 
     @Transactional(rollbackFor = IOException.class)
@@ -299,7 +329,7 @@ public class Returns {
             for (int iter = 0; iter < ls.size(); iter++) {
                 wanted.add(new RefundLineDto(ls.get(iter).orderLineId(), ls.get(iter).quantity()));
             }
-            orderService.refund(username, storeId, r.getOrderId(), new RefundRequestDto(wanted,
+            resolutions.settle(username, storeId, r, new RefundRequestDto(wanted,
                     req == null ? 0 : req.shippingCents(), false, "Return " + id));
         } catch (IOException | RuntimeException err) {
             claim(id, REFUNDED, from);

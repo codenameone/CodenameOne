@@ -340,6 +340,62 @@ public class Fulfillments {
 
     // ---------------------------------------------------------- transitions
 
+    /// Everything of an order still waiting to go, in one shipment per
+    /// location its lines are held at, each created and marked shipped. For
+    /// fulfilling many orders at once from the order list.
+    public List<FulfillmentDto> fulfilAll(String username, String storeId, String orderId)
+            throws IOException {
+        access.requireStaff(username, storeId, StoreAccess.STOCK);
+        orderIn(storeId, orderId);
+        Map<String, Integer> waiting = waiting(orderId);
+        List<OrderLine> ls = lines.findByOrderId(orderId);
+        Map<String, List<FulfilLineDto>> byLocation = new java.util.LinkedHashMap<String,
+                List<FulfilLineDto>>();
+        StoreOrder order = orders.findById(orderId);
+        for (int iter = 0; iter < ls.size(); iter++) {
+            OrderLine line = ls.get(iter);
+            Integer left = waiting.get(line.getId());
+            if (left == null || left.intValue() <= 0) {
+                continue;
+            }
+            String at = line.getLocationId().length() > 0 ? line.getLocationId()
+                    : order.getLocationId();
+            List<FulfilLineDto> into = byLocation.get(at);
+            if (into == null) {
+                into = new ArrayList<FulfilLineDto>();
+                byLocation.put(at, into);
+            }
+            into.add(new FulfilLineDto(line.getId(), line.getTitle(), line.getSku(),
+                    left.intValue()));
+        }
+        if (byLocation.isEmpty()) {
+            throw new ResponseStatusException(409, "The order has nothing to send");
+        }
+        List<FulfillmentDto> out = new ArrayList<FulfillmentDto>();
+        for (Map.Entry<String, List<FulfilLineDto>> e : byLocation.entrySet()) {
+            FulfillmentDto made = create(username, storeId, orderId,
+                    new NewFulfillmentDto(e.getKey(), null, e.getValue()));
+            out.add(ship(username, storeId, made.id()));
+        }
+        return out;
+    }
+
+    /// The order's shipments waiting for a label: parcels not yet sent.
+    @Transactional(readOnly = true)
+    public List<String> needingLabels(String storeId, String orderId) throws IOException {
+        orderIn(storeId, orderId);
+        List<Fulfillment> fs = fulfillments.findByOrderId(orderId);
+        List<String> out = new ArrayList<String>();
+        for (int iter = 0; iter < fs.size(); iter++) {
+            Fulfillment f = fs.get(iter);
+            if (SHIP.equals(method(f)) && isOpen(f.getStatus())
+                    && f.getTrackingNumber().length() == 0) {
+                out.add(f.getId());
+            }
+        }
+        return out;
+    }
+
     public FulfillmentDto pack(String username, String storeId, String id, PackDto pack)
             throws IOException {
         access.requireStaff(username, storeId, StoreAccess.STOCK);

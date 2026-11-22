@@ -26,6 +26,7 @@ import com.codename1.backend.annotations.RequestParam;
 import com.codename1.backend.annotations.RestController;
 import com.codenameone.examples.bazaar.api.OrderDto;
 import com.codenameone.examples.bazaar.order.Orders;
+import com.codenameone.examples.bazaar.ops.Perms;
 import com.codenameone.examples.bazaar.store.StoreAccess;
 
 import java.util.ArrayList;
@@ -110,6 +111,46 @@ public class DocumentPages {
             @RequestParam(value = "copies", required = false) String copies) throws Exception {
         access.requireStaff(Caller.name(), storeId, StoreAccess.ANYONE);
         return pdf(documents.priceLabels(storeId, ids(variants), count(copies)), "labels");
+    }
+
+    /// Barcode labels for a sheet or a thermal roll. `items` is
+    /// `variantId:quantity` pairs separated by commas; `layout` is
+    /// `AVERY_30` (the default) or `THERMAL_2X1`. For the store's
+    /// inventory staff.
+    @GetMapping("/api/merchant/stores/{storeId}/label-sheets.pdf")
+    public HttpServer.Response labelSheet(@PathVariable("storeId") String storeId,
+            @RequestParam(value = "items", required = false) String items,
+            @RequestParam(value = "layout", required = false) String layout) throws Exception {
+        access.requireArea(Caller.name(), storeId, Perms.INVENTORY, false, StoreAccess.ANYONE);
+        List<String> pairs = items == null || items.length() > 20000 ? new ArrayList<String>()
+                : com.codenameone.examples.bazaar.content.Lists.split(items);
+        List<String> variants = new ArrayList<String>();
+        List<Integer> quantities = new ArrayList<Integer>();
+        for (int iter = 0; iter < pairs.size(); iter++) {
+            String pair = pairs.get(iter);
+            int colon = pair.indexOf(':');
+            variants.add(colon < 0 ? pair : pair.substring(0, colon));
+            quantities.add(Integer.valueOf(colon < 0 ? 1 : count(pair.substring(colon + 1))));
+        }
+        return pdf(documents.labelSheet(storeId, variants, quantities, layout), "labels");
+    }
+
+    /// Barcode labels for what a purchase order brought in.
+    @GetMapping("/api/merchant/stores/{storeId}/purchase-orders/{purchaseOrderId}/labels.pdf")
+    public HttpServer.Response purchaseOrderLabels(@PathVariable("storeId") String storeId,
+            @PathVariable("purchaseOrderId") String purchaseOrderId,
+            @RequestParam(value = "layout", required = false) String layout) throws Exception {
+        access.requireArea(Caller.name(), storeId, Perms.INVENTORY, false, StoreAccess.ANYONE);
+        return pdf(documents.purchaseOrderLabels(storeId, purchaseOrderId, layout), "labels");
+    }
+
+    /// The packing slips of the orders in `orders` (ids separated by commas),
+    /// one document, for the store's staff.
+    @GetMapping("/api/merchant/stores/{storeId}/bulk-orders/packing-slips.pdf")
+    public HttpServer.Response packingSlips(@PathVariable("storeId") String storeId,
+            @RequestParam(value = "orders", required = false) String orders) throws Exception {
+        access.requireStaff(Caller.name(), storeId, StoreAccess.ANYONE);
+        return pdf(documents.packingSlips(storeId, ids(orders)), "packing-slips");
     }
 
     /// The ids of a comma separated list, blanks dropped.

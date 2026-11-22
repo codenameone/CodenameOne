@@ -54,6 +54,7 @@ import com.codenameone.examples.bazaar.domain.Customer;
 import com.codenameone.examples.bazaar.events.StoreEvents;
 import com.codenameone.examples.bazaar.repository.CustomerRepository;
 import com.codenameone.examples.bazaar.live.LiveHub;
+import com.codenameone.examples.bazaar.ops.Perms;
 import com.codenameone.examples.bazaar.pay.Payments;
 import com.codenameone.examples.bazaar.pricing.Money;
 import com.codenameone.examples.bazaar.repository.FulfillmentRepository;
@@ -133,6 +134,11 @@ public class Orders {
     private final CustomerRepository customers;
     private final SaleEvents saleEvents;
 
+    @com.codename1.backend.annotations.Autowired
+    private com.codename1.backend.DataSource db;
+    @com.codename1.backend.annotations.Autowired
+    private OrderSettings orderSettings;
+
     public Orders(StoreOrderRepository orders, OrderLineRepository lines,
             OrderEventRepository events, TenderRepository tenders,
             FulfillmentRepository fulfillments, RefundRepository refunds,
@@ -210,6 +216,10 @@ public class Orders {
         List<OrderDto> out = new ArrayList<OrderDto>();
         for (int iter = 0; iter < rows.size() && out.size() < 500; iter++) {
             StoreOrder o = rows.get(iter);
+            if (o.isArchived()) {
+                // Out of the working list; [#archived] lists these.
+                continue;
+            }
             long at = o.getCreatedAt() == null ? 0 : o.getCreatedAt().toEpochMilli();
             if (!matches(status, o.getStatus()) || !matches(financial, o.getFinancial())
                     || !matches(fulfilment, o.getFulfilment()) || !matches(channel, o.getChannel())
@@ -224,6 +234,69 @@ public class Orders {
             out.add(dto(o, false));
         }
         return out;
+    }
+
+    /// The store's archived orders, newest first.
+    @Transactional(readOnly = true)
+    public List<OrderDto> archived(String username, String storeId) throws IOException {
+        access.requireStaff(username, storeId, StoreAccess.ANYONE);
+        List<StoreOrder> rows = orders.findByStoreIdOrderByCreatedAtDesc(storeId);
+        List<OrderDto> out = new ArrayList<OrderDto>();
+        for (int iter = 0; iter < rows.size() && out.size() < 500; iter++) {
+            if (rows.get(iter).isArchived()) {
+                out.add(dto(rows.get(iter), false));
+            }
+        }
+        return out;
+    }
+
+    /// Archives or unarchives an order. Archiving changes nothing about the
+    /// order but where it is listed; unarchiving by hand also keeps
+    /// auto-archiving from taking it again.
+    public OrderDto archive(String username, String storeId, String orderId, boolean archived)
+            throws IOException {
+        access.requireArea(username, storeId, Perms.ORDERS, true, StoreAccess.ANYONE);
+        StoreOrder order = inStoreRead(storeId, orderId);
+        if (order.isArchived() != archived) {
+            archiveTx(orderId, archived, username, archived ? "Archived" : "Unarchived");
+            publish(orders.findById(orderId));
+        }
+        return detailOf(orderId);
+    }
+
+    @Transactional(rollbackFor = IOException.class)
+    private void archiveTx(String orderId, boolean archived, String username, String message)
+            throws IOException {
+        db.execute("UPDATE store_order SET archived = ? WHERE id = ?",
+                new Object[] {Integer.valueOf(archived ? 1 : 0), orderId});
+        event(orderId, archived ? "ARCHIVED" : "UNARCHIVED", message, username);
+    }
+
+    /// Archives an order that has just closed -- the register's, or one
+    /// fulfilled and paid (or refunded) -- when its store archives closed
+    /// orders, unless someone unarchived it by hand.
+    private void autoArchive(StoreOrder order) throws IOException {
+        if (order.isArchived() || !closed(order)
+                || !orderSettings.of(order.getStoreId()).autoArchive()) {
+            return;
+        }
+        if (db.queryOne("SELECT id FROM order_event WHERE order_id = ? AND kind = ?",
+                new Object[] {order.getId(), "UNARCHIVED"}) != null) {
+            return;
+        }
+        archiveTx(order.getId(), true, "", "Archived when it closed");
+        order.setArchived(true);
+    }
+
+    /// Whether nothing is left to do on an order.
+    public static boolean closed(StoreOrder o) {
+        if (CLOSED.equals(o.getStatus())) {
+            return true;
+        }
+        String money = o.getFinancial();
+        return OPEN.equals(o.getStatus()) && FULFILLED.equals(o.getFulfilment())
+                && (PAID.equals(money) || PARTIALLY_REFUNDED.equals(money)
+                    || REFUNDED.equals(money));
     }
 
     private static boolean matches(String wanted, String value) {
@@ -509,6 +582,17 @@ public class Orders {
     /// drawer. Otherwise what neither takes (cash, store credit) is by hand.
     public long[] refundParts(String username, String storeId, String orderId,
             RefundRequestDto req, boolean byHand, String... roles) throws IOException {
+        return refundParts(username, storeId, orderId, req, byHand, 0, roles);
+    }
+
+    /// [#refundParts] keeping `keepCents` of the returned goods' value: a
+    /// restocking fee, a return shipping fee, or what an exchange moves onto
+    /// the replacement order. Only the rest goes back (and is recorded as the
+    /// refund); the lines still count as returned. The answer's first element
+    /// is what went back.
+    public long[] refundParts(String username, String storeId, String orderId,
+            RefundRequestDto req, boolean byHand, long keepCents, String... roles)
+            throws IOException {
         access.requireStaff(username, storeId, roles);
         StoreOrder order = inStoreRead(storeId, orderId);
         if (req == null) {
@@ -525,7 +609,8 @@ public class Orders {
             throw new ResponseStatusException(409, "Nothing has been paid to refund");
         }
         Store store = stores.findById(storeId);
-        long amount = refundAmount(order, req, store.isTaxInclusive());
+        long amount = Math.max(0, refundAmount(order, req, store.isTaxInclusive())
+                - Math.max(0, keepCents));
         Payment payment = paymentRows.findById(orderId);
         long cardPart = 0;
         long presentmentPart = 0;
@@ -605,6 +690,14 @@ public class Orders {
 
     /// What a refund request is worth; 400 for one that asks for more than
     /// is left.
+    /// What refunding `req` would come to, without refunding anything: the
+    /// same arithmetic and checks as [#refund].
+    @Transactional(readOnly = true)
+    public long quoteRefund(String orderId, RefundRequestDto req) throws IOException {
+        StoreOrder order = orders.findById(orderId);
+        return refundAmount(order, req, stores.findById(order.getStoreId()).isTaxInclusive());
+    }
+
     private long refundAmount(StoreOrder order, RefundRequestDto req, boolean inclusive)
             throws IOException {
         long amount = 0;
@@ -791,7 +884,15 @@ public class Orders {
     public OrderDto convertDraft(String username, String storeId, String orderId)
             throws IOException {
         access.requireStaff(username, storeId, StoreAccess.MANAGERS);
-        StoreOrder order = inStoreRead(storeId, orderId);
+        convert(inStoreRead(storeId, orderId), username);
+        return detailOf(orderId);
+    }
+
+    /// [#convertDraft] with no access check, for a draft its buyer pays
+    /// through a checkout link and for an exchange's replacement order.
+    public void convert(StoreOrder order, String username) throws IOException {
+        String storeId = order.getStoreId();
+        String orderId = order.getId();
         if (!isUnconvertedDraft(order) || !OPEN.equals(order.getStatus())) {
             throw new ResponseStatusException(409, "That is not a draft");
         }
@@ -813,7 +914,80 @@ public class Orders {
         StoreOrder done = convertedTx(orderId, held, username);
         publish(done);
         storeEvents.orderPlaced(orderId);
+    }
+
+    /// Pays an order awaiting payment with a card typed by its buyer, through
+    /// a checkout link ([com.codenameone.examples.bazaar.order.PayLinks]). A
+    /// draft is turned into an order first. What is due is the total less
+    /// gift cards and earlier part payments (an exchange's credit).
+    public OrderDto payOnline(String orderId, String payer, Payments.OneOffCard card)
+            throws IOException {
+        StoreOrder order = orders.findById(orderId);
+        if (order == null) {
+            throw new ResponseStatusException(404, "No such order");
+        }
+        if (isUnconvertedDraft(order)) {
+            convert(order, payer);
+            order = orders.findById(orderId);
+        }
+        if (!OPEN.equals(order.getStatus()) || !PENDING.equals(order.getFinancial())) {
+            throw new ResponseStatusException(409, "The order is not awaiting payment");
+        }
+        long due = order.getTotalCents() - giftCards.spentOn(orderId) - tendered(orderId);
+        String reference = "";
+        if (due > 0) {
+            reference = payments.authorizeCard(orderId, payer, card, due, order.getCurrency());
+            payments.capture(orderId);
+        }
+        StoreOrder done = settleTx(orderId, "CARD", due, reference, payer,
+                "Paid through a checkout link");
+        publish(done);
+        storeEvents.orderPaid(orderId);
         return detailOf(orderId);
+    }
+
+    /// Records a part payment that is not money taken now -- an exchange's
+    /// credit moved onto its replacement order -- and marks the order paid
+    /// once nothing is left due.
+    public void partPay(String orderId, String method, long cents, String reference,
+            String actor) throws IOException {
+        StoreOrder order = orders.findById(orderId);
+        long left = order.getTotalCents() - giftCards.spentOn(orderId) - tendered(orderId);
+        long paid = Math.min(Math.max(0, cents), Math.max(0, left));
+        if (paid >= left) {
+            StoreOrder done = settleTx(orderId, method, paid, reference, actor,
+                    "Paid by " + method);
+            publish(done);
+            storeEvents.orderPaid(orderId);
+        } else if (paid > 0) {
+            tender(orderId, method, paid, reference);
+            event(orderId, "PART_PAID", "Part paid by " + method, actor);
+        }
+    }
+
+    /// What the order's tenders already hold, gift cards and cards aside.
+    private long tendered(String orderId) throws IOException {
+        List<com.codenameone.examples.bazaar.domain.Tender> ts = tenders.findByOrderId(orderId);
+        long out = 0;
+        for (int iter = 0; iter < ts.size(); iter++) {
+            if ("EXCHANGE".equals(ts.get(iter).getKind())) {
+                out += ts.get(iter).getAmountCents();
+            }
+        }
+        return out;
+    }
+
+    @Transactional(rollbackFor = IOException.class)
+    private StoreOrder settleTx(String orderId, String method, long cents, String reference,
+            String actor, String message) throws IOException {
+        if (orders.claimFinancial(orderId, PENDING, PAID) != 1) {
+            throw new ResponseStatusException(409, "The order is not awaiting payment");
+        }
+        if (cents > 0) {
+            tender(orderId, method, cents, reference);
+        }
+        event(orderId, "PAID", message, actor);
+        return orders.findById(orderId);
     }
 
     @Transactional(rollbackFor = IOException.class)
@@ -1022,6 +1196,11 @@ public class Orders {
     public void publish(StoreOrder order) {
         if (order == null) {
             return;
+        }
+        try {
+            autoArchive(order);
+        } catch (IOException | RuntimeException ignored) {
+            // Archiving is housekeeping; the change it follows already stands.
         }
         try {
             List<String> users = new ArrayList<String>();
