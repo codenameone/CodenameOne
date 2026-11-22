@@ -221,6 +221,9 @@ final class ProductEditor extends Container {
         seoDescription.setUIID("SvField");
         seoDescription.setName("product-seo-description");
         seo.add(seoDescription);
+        if (p != null && p.id() != null) {
+            ProductChannels.add(card(main, "Bundle"), card(side, "Publishing schedule"), p.id());
+        }
 
         Container bottom = MUi.buttons();
         if (p != null) {
