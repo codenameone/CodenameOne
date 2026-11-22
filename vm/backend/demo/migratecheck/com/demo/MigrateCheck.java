@@ -59,6 +59,12 @@ public class MigrateCheck {
         "cn1_mc_schema_history", "mc_default_history", "cn1_mclib_schema_history"};
 
     public static void main(String[] args) throws Exception {
+        // A hand-written main has no generated wiring, so it registers the
+        // engines its URL may name itself.
+        com.codename1.backend.Database.useEngine(com.codename1.db.sql.Postgres.CONNECTOR);
+        com.codename1.backend.Database.useEngine(com.codename1.db.sql.MySql.CONNECTOR);
+        com.codename1.backend.Database.useEngine(com.codename1.db.sql.SqlServer.CONNECTOR);
+        com.codename1.backend.Database.useEngine(com.codename1.db.sql.Oracle.CONNECTOR);
         String url = System.getenv("CN1_MIGRATECHECK_URL");
         if(url == null || url.length() == 0) {
             url = ":memory:";
