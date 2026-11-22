@@ -110,7 +110,7 @@ public class SvgTranscodeRunnerRiveTest {
         assertEquals("OffRoadCarRive", SvgTranscodeRunner.riveClassNameFor("off_road_car.riv"));
         assertEquals("HeroRive", SvgTranscodeRunner.riveClassNameFor("hero-rive.riv"));
         // generated sources are ASCII only: a letter outside ASCII folds to '_'
-        String folded = SvgTranscodeRunner.riveClassNameFor("café.riv");
+        String folded = SvgTranscodeRunner.riveClassNameFor("caf\u00e9.riv");
         assertEquals("Caf_Rive", folded);
     }
 
