@@ -159,7 +159,7 @@ public class ProductText {
         return new ProductDto(p.id(), p.storeId(), p.handle(), title, description, p.vendor(),
                 p.productType(), p.tags(), p.status(), text(tr, "seoTitle", p.seoTitle()),
                 text(tr, "seoDescription", p.seoDescription()), p.photoId(), p.rating(),
-                p.ratingCount(), options, variants, photos, p.collectionIds());
+                p.ratingCount(), options, variants, photos, p.collectionIds(), p.categoryId());
     }
 
     /// Per option position, original value to translated value; an option
@@ -191,7 +191,8 @@ public class ProductText {
         return new VariantDto(d.id(), d.productId(), title, o1, o2, o3, d.sku(), d.barcode(),
                 d.priceCents(), d.compareAtCents(), d.costCents(), d.weightGrams(), d.taxable(),
                 d.trackInventory(), d.allowBackorder(), d.position(), d.available(), d.stock(),
-                d.digital());
+                d.digital(), d.hsCode(), d.originCountry(), d.unitQuantity(), d.unitName(),
+                d.unitReference(), d.unitReferenceName());
     }
 
     private static String choice(List<Map<String, String>> values, int at, String original) {
