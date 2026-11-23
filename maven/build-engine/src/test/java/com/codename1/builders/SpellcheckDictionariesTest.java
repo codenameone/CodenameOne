@@ -132,6 +132,38 @@ class SpellcheckDictionariesTest {
 
     /// The class path hides the dictionaries, as a customer's build tool's does: only the
     /// on-demand fetch can supply them.
+    private static File packDirectory(File root) {
+        try {
+            File jar = File.createTempFile("cn1dict", ".jar");
+            jar.deleteOnExit();
+            java.util.zip.ZipOutputStream out = new java.util.zip.ZipOutputStream(new java.io.FileOutputStream(jar));
+            try {
+                pack(out, root, "");
+            } finally {
+                out.close();
+            }
+            return jar;
+        } catch (java.io.IOException e) {
+            throw new java.io.UncheckedIOException(e);
+        }
+    }
+
+    private static void pack(java.util.zip.ZipOutputStream out, File dir, String prefix) throws java.io.IOException {
+        File[] files = dir.listFiles();
+        if (files == null) {
+            return;
+        }
+        for (File f : files) {
+            if (f.isDirectory()) {
+                pack(out, f, prefix + f.getName() + "/");
+            } else {
+                out.putNextEntry(new java.util.zip.ZipEntry(prefix + f.getName()));
+                java.nio.file.Files.copy(f.toPath(), out);
+                out.closeEntry();
+            }
+        }
+    }
+
     private static final class CustomerExecutor extends Executor {
         int fetches;
 
@@ -142,8 +174,13 @@ class SpellcheckDictionariesTest {
                     fetches++;
                     assertEquals("codenameone-spellcheck-dictionaries", artifactId);
                     String u = SpellcheckDictionaries.class.getResource("/cn1dict/languages.txt").toString();
-                    // jar:file:/.../x.jar!/cn1dict/languages.txt
-                    return new File(java.net.URI.create(u.substring(4, u.indexOf("!/"))));
+                    if (u.startsWith("jar:")) {
+                        // jar:file:/.../x.jar!/cn1dict/languages.txt
+                        return new File(java.net.URI.create(u.substring(4, u.indexOf("!/"))));
+                    }
+                    // a reactor build puts the dictionaries on the class path as a directory;
+                    // the host hands the build a jar, so pack one
+                    return packDirectory(new File(java.net.URI.create(u)).getParentFile().getParentFile());
                 }
             });
         }
