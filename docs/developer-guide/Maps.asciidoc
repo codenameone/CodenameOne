@@ -1,3 +1,4 @@
+[[maps]]
 == Maps
 
 Codename One ships a modern mapping API in the `com.codename1.maps` package built around two components:
@@ -63,6 +64,58 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 ----
 
 To route through a different provider entirely -- Google Directions, Mapbox Directions, GraphHopper, your own server -- implement `RouteService` and install it the same way. Every provider of that kind returns the route as an *encoded polyline*, which `Polyline.fromEncoded(geometry)` turns straight into something drawable (`PolylineCodec` also handles the `polyline6` variant used by Valhalla).
+
+=== Finding places: geocoding
+
+Turning an address into a coordinate, and a coordinate back into an address, is
+the job of `com.codename1.maps.geocoding`. `NominatimGeocoder` speaks the
+https://nominatim.org[Nominatim] API that OpenStreetMap's own search uses:
+
+[source,java,role=cn1-no-try]
+----
+NominatimGeocoder geocoder = new NominatimGeocoder();
+geocoder.search("10 Downing Street, London", 5, new GeocodeCallback() {
+    public void placesFound(List<Place> places) {
+        if (!places.isEmpty()) {
+            map.moveCamera(places.get(0).getLocation(), 17);
+        }
+    }
+    public void geocodeFailed(String message, Throwable error) {
+        ToastBar.showErrorMessage(message);
+    }
+});
+----
+
+`reverse(LatLng, callback)` answers the address at a point. Each `Place` carries
+a display name, the location, its category and type, and the address parts
+(house number, road, city and postcode) when the data has them. The callback
+runs on the EDT.
+
+CAUTION: The default endpoint is the public Nominatim server, whose
+https://operations.osmfoundation.org/policies/nominatim/[usage policy] allows at
+most one request per second and forbids autocomplete-as-you-type and bulk
+geocoding. Pass your own server's URL to the constructor before shipping.
+
+=== Serving maps yourself
+
+The tile, routing and geocoding endpoints above are community services meant
+for development. A Codename One backend can answer all three from OpenStreetMap
+files on its own disk, and the client classes work against it unchanged:
+`MvtTileSource` against the backend's tiles, `OsrmRouteService` against its
+routing and `NominatimGeocoder` against its search. <<backend-maps>> walks
+through downloading the data, adding the handlers and pointing the app at them.
+
+=== Attribution
+
+Every map built from OpenStreetMap data must credit it. The
+https://osmfoundation.org/wiki/Licence/Attribution_Guidelines[OSMF guidelines]
+ask for "© OpenStreetMap contributors" where the map is visible -- by convention
+in the lower-right corner, legible and not covered by controls -- with a link to
+https://www.openstreetmap.org/copyright. The same applies to OpenFreeMap tiles,
+to routes computed by OSRM and to Nominatim results, which are all derived from
+OpenStreetMap, and to a map you serve yourself. A provider's own tiles (Google,
+Apple, Mapbox) come with that provider's attribution, which its SDK draws.
+<<backend-maps-attribution>> lists what applies when you host the data.
 
 === Tile sources and styles (MapView)
 

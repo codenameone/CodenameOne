@@ -522,12 +522,18 @@ public final class FileIo {
 
     public static int pread(int fd, byte[] buffer, int offset, int length, long position) {
         Object entry = Descriptors.get(fd);
-        if (!(entry instanceof SpoolFile)) {
+        // A read-only file from openRead too, as the native pread(2) twin
+        // accepts any descriptor: MapTiles reads archive directories this way.
+        FileChannel channel; //NOPMD CloseResource - owned by the descriptor table
+        if (entry instanceof SpoolFile) {
+            channel = ((SpoolFile) entry).channel;
+        } else if (entry instanceof OpenFile && ((OpenFile) entry).channel != null) {
+            channel = ((OpenFile) entry).channel;
+        } else {
             return -1;
         }
         try {
-            int n = ((SpoolFile) entry).channel.read(ByteBuffer.wrap(buffer, offset, length),
-                    position);
+            int n = channel.read(ByteBuffer.wrap(buffer, offset, length), position);
             return n < 0 ? 0 : n;
         } catch (IOException | RuntimeException err) {
             return -1;
