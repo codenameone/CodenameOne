@@ -103,7 +103,7 @@ on a row.
 | Server-rendered SEO cart/session | &#10003; | core | core | core | core | 
 | Integrated card processing | &#10003; | core | core | core | core | 
 | Third-party gateways | &#9681; | core | core | core | &#8211; | One provider interface with a Stripe implementation and a simulated one.
-| Manual payment methods (COD, bank) | &#9681; | core | core | core | core | Manual tenders at the register only.
+| Manual payment methods (COD, bank) | &#10003; | core | core | core | core | Cash on delivery and bank transfer at online checkout; placed unpaid, marked paid by the merchant.
 | Saved cards | &#10003; | core | core | core | core | 
 | Payouts / balance | &#10003; | core | core | core | core | 
 | Refunds (full/partial) | &#10003; | core | core | core | core | 
@@ -112,7 +112,7 @@ on a row.
 | Multi-currency payouts | &#8211; | core | app/plugin | app/plugin | no | 
 | Local payment methods (iDEAL etc.) | &#10003; | core | core | core | no | iDEAL, Bancontact, SEPA debit and others through Stripe, by the same per-store rules; a failed payment cancels the order and releases its stock. 
 | Fraud analysis / risk score | &#10003; | core | app/plugin | app/plugin | core | Each order gets a risk score from address, velocity and value signals. 
-| Fraud filter rules / automatic cancellation | &#9681; | core | app/plugin | app/plugin | core | Risky orders are held for review; there is no rule editor. 
+| Fraud filter rules / automatic cancellation | &#10003; | core | app/plugin | app/plugin | core | Merchant rules (total over, orders per hour per customer, country mismatch) hold or cancel, beside the risk score. 
 | Chargeback protection | &#8211; | core | no | no | no | 
 |===
 

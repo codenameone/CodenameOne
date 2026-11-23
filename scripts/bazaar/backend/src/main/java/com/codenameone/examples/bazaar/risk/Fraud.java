@@ -28,7 +28,10 @@ import com.codenameone.examples.bazaar.Ids;
 import com.codenameone.examples.bazaar.api.OrderRiskDto;
 import com.codenameone.examples.bazaar.domain.OrderRisk;
 import com.codenameone.examples.bazaar.domain.StoreOrder;
+import com.codenameone.examples.bazaar.api.FraudRuleDto;
+import com.codenameone.examples.bazaar.domain.FraudRule;
 import com.codenameone.examples.bazaar.order.Orders;
+import com.codenameone.examples.bazaar.repository.FraudRuleRepository;
 import com.codenameone.examples.bazaar.repository.CheckoutFailureRepository;
 import com.codenameone.examples.bazaar.repository.OrderRiskRepository;
 import com.codenameone.examples.bazaar.repository.StoreOrderRepository;
@@ -81,10 +84,12 @@ public class Fraud {
     private final Orders orderService;
     private final StoreAccess access;
     private final String countryHeader;
+    private final FraudRuleRepository rules;
 
     public Fraud(OrderRiskRepository risks, CheckoutFailureRepository failures,
-            StoreOrderRepository orders, Orders orderService, StoreAccess access, Config config)
-            throws IOException {
+            StoreOrderRepository orders, Orders orderService, StoreAccess access, Config config,
+            FraudRuleRepository rules) throws IOException {
+        this.rules = rules;
         this.risks = risks;
         this.failures = failures;
         this.orders = orders;
@@ -203,11 +208,20 @@ public class Fraud {
         r.setScore(s.points);
         r.setLevel(s.level());
         r.setReasons(join(s.reasons));
-        r.setStatus(HIGH.equals(s.level()) ? HELD : CLEAR);
+        // The merchant's own rules run beside the score: any HOLD match
+        // holds the order, any CANCEL match cancels it.
+        String ruled = applyRules(rules.findByStoreIdOrderByCreatedAtAsc(order.getStoreId()),
+                order, history, clientCountry(), now, s.reasons);
+        r.setReasons(join(s.reasons));
+        r.setStatus(CANCELLED.equals(ruled) ? CANCELLED
+                : HIGH.equals(s.level()) || HELD.equals(ruled) ? HELD : CLEAR);
         r.setCreatedAt(Instant.ofEpochMilli(now));
         r.setUpdatedAt(r.getCreatedAt());
         risks.insert(r);
-        if (HELD.equals(r.getStatus())) {
+        if (CANCELLED.equals(r.getStatus())) {
+            orderService.cancelOrder(order, "risk");
+            orderService.event(orderId, "RISK_CANCELLED", "Cancelled by a fraud rule", "risk");
+        } else if (HELD.equals(r.getStatus())) {
             orderService.event(orderId, "RISK_HELD", "Held for a fraud review (score "
                     + s.points + ")", "risk");
         }
@@ -305,5 +319,112 @@ public class Fraud {
         orderService.cancel(username, storeId, orderId);
         risks.move(r.getId(), HELD, CANCELLED, username, Instant.now());
         return detail(username, storeId, orderId);
+    }
+
+    public static final String TOTAL_OVER = "TOTAL_OVER";
+    public static final String ORDERS_PER_HOUR = "ORDERS_PER_HOUR";
+    public static final String COUNTRY_MISMATCH = "COUNTRY_MISMATCH";
+    public static final String HOLD = "HOLD";
+    public static final String CANCEL = "CANCEL";
+
+    /// What the store's `list` of rules does to `order`: [#CANCELLED] when a
+    /// CANCEL rule matches, else [#HELD] when a HOLD rule does, else null.
+    /// Every match adds its reason to `reasons`. `history` is the
+    /// customer's orders in the store; the order itself counts towards
+    /// ORDERS_PER_HOUR. Orders keep no client address, so "orders from one
+    /// IP" is counted per signed-in customer instead.
+    static String applyRules(List<FraudRule> list, StoreOrder order, List<StoreOrder> history,
+            String clientCountry, long now, List<String> reasons) {
+        String out = null;
+        for (int iter = 0; iter < list.size(); iter++) {
+            FraudRule rule = list.get(iter);
+            String why = null;
+            if (TOTAL_OVER.equals(rule.getKind())) {
+                if (order.getTotalCents() > rule.getThreshold()) {
+                    why = "Rule: total over " + rule.getThreshold() + " cents";
+                }
+            } else if (ORDERS_PER_HOUR.equals(rule.getKind())) {
+                int recent = 1;
+                for (int h = 0; h < history.size(); h++) {
+                    StoreOrder o = history.get(h);
+                    if (!o.getId().equals(order.getId())
+                            && now - o.getCreatedAt().toEpochMilli() < HOUR) {
+                        recent++;
+                    }
+                }
+                if (recent >= rule.getThreshold()) {
+                    why = "Rule: " + recent + " orders within an hour";
+                }
+            } else if (COUNTRY_MISMATCH.equals(rule.getKind())) {
+                String ship = order.getShipCountry();
+                if (clientCountry != null && ship != null && ship.length() == 2
+                        && !clientCountry.equalsIgnoreCase(ship)) {
+                    why = "Rule: connected from " + clientCountry + ", ships to " + ship;
+                }
+            }
+            if (why != null) {
+                reasons.add(why);
+                if (CANCEL.equals(rule.getAction())) {
+                    out = CANCELLED;
+                } else if (out == null) {
+                    out = HELD;
+                }
+            }
+        }
+        return out;
+    }
+
+    /// The store's rules, oldest first.
+    @Transactional(readOnly = true)
+    public List<FraudRuleDto> rules(String username, String storeId) throws IOException {
+        access.requireStaff(username, storeId, StoreAccess.ANYONE);
+        List<FraudRule> list = rules.findByStoreIdOrderByCreatedAtAsc(storeId);
+        List<FraudRuleDto> out = new ArrayList<FraudRuleDto>();
+        for (int iter = 0; iter < list.size(); iter++) {
+            FraudRule r = list.get(iter);
+            out.add(new FraudRuleDto(r.getId(), r.getKind(), r.getThreshold(), r.getAction()));
+        }
+        return out;
+    }
+
+    /// Adds a rule, checked: a known kind, a known action, a positive
+    /// threshold where the kind reads one. At most 20 per store.
+    public List<FraudRuleDto> addRule(String username, String storeId, FraudRuleDto dto)
+            throws IOException {
+        access.requireStaff(username, storeId, StoreAccess.MANAGERS);
+        if (dto == null || !(TOTAL_OVER.equals(dto.kind()) || ORDERS_PER_HOUR.equals(dto.kind())
+                || COUNTRY_MISMATCH.equals(dto.kind()))) {
+            throw new ResponseStatusException(400, "Unknown rule");
+        }
+        if (!HOLD.equals(dto.action()) && !CANCEL.equals(dto.action())) {
+            throw new ResponseStatusException(400, "A rule holds or cancels");
+        }
+        if (!COUNTRY_MISMATCH.equals(dto.kind()) && dto.threshold() <= 0) {
+            throw new ResponseStatusException(400, "The rule needs a threshold above zero");
+        }
+        if (rules.findByStoreIdOrderByCreatedAtAsc(storeId).size() >= 20) {
+            throw new ResponseStatusException(409, "A store keeps at most 20 rules");
+        }
+        FraudRule r = new FraudRule();
+        r.setId(Ids.next());
+        r.setStoreId(storeId);
+        r.setKind(dto.kind());
+        r.setThreshold(COUNTRY_MISMATCH.equals(dto.kind()) ? 0 : dto.threshold());
+        r.setAction(dto.action());
+        r.setCreatedAt(Instant.now());
+        rules.insert(r);
+        return rules(username, storeId);
+    }
+
+    /// Removes one of the store's rules.
+    public List<FraudRuleDto> removeRule(String username, String storeId, String ruleId)
+            throws IOException {
+        access.requireStaff(username, storeId, StoreAccess.MANAGERS);
+        FraudRule r = ruleId == null ? null : rules.findById(ruleId);
+        if (r == null || !storeId.equals(r.getStoreId())) {
+            throw new ResponseStatusException(404, "No such rule");
+        }
+        rules.delete(r);
+        return rules(username, storeId);
     }
 }

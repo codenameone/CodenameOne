@@ -20,6 +20,7 @@ package com.codenameone.examples.bazaar.risk;
 
 import com.codename1.appkit.server.Caller;
 import com.codename1.backend.annotations.Component;
+import com.codenameone.examples.bazaar.api.FraudRuleDto;
 import com.codenameone.examples.bazaar.api.OrderRiskDto;
 import com.codenameone.examples.bazaar.api.RiskApiServer;
 import java.util.List;
@@ -51,5 +52,20 @@ public class RiskEndpoint implements RiskApiServer {
     @Override
     public OrderRiskDto cancelOrderRisk(String storeId, String orderId) throws Exception {
         return fraud.cancel(Caller.name(), storeId, orderId);
+    }
+
+    @Override
+    public List<FraudRuleDto> fraudRules(String storeId) throws Exception {
+        return fraud.rules(Caller.name(), storeId);
+    }
+
+    @Override
+    public List<FraudRuleDto> addFraudRule(String storeId, FraudRuleDto rule) throws Exception {
+        return fraud.addRule(Caller.name(), storeId, rule);
+    }
+
+    @Override
+    public List<FraudRuleDto> removeFraudRule(String storeId, String ruleId) throws Exception {
+        return fraud.removeRule(Caller.name(), storeId, ruleId);
     }
 }

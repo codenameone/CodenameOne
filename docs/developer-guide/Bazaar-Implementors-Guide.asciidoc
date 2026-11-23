@@ -645,7 +645,13 @@ velocity, recent refused payments, an unusual delivery country, and a mismatch
 between delivery country and the client's country, read from a header a trusted
 proxy sets (`bazaar.risk.country-header`). Sixty points or more holds the order,
 and `RiskHolds` makes fulfilment refuse it until a manager approves or cancels.
-No single rule holds an order. `dispute.Disputes` takes the processor's signed,
+No single signal holds an order. The merchant's own rules (`fraud_rule`,
+migration V180, `RiskApi` `fraud-rules`) run in the same `Fraud.assess`: a
+HOLD match holds the order like a high score, a CANCEL match cancels it with
+`Orders.cancelOrder`. The per-hour rule counts the signed-in customer, since
+orders keep no client IP. Manual tenders online are two rows of
+`PaymentTypes` (`cod`, `bank_transfer`) that open no processor intent: the
+order is placed PENDING and `Orders.markPaid` settles it. `dispute.Disputes` takes the processor's signed,
 idempotent webhook events and moves a dispute from needs-response through review
 to won or lost, refusing evidence after the deadline.
 

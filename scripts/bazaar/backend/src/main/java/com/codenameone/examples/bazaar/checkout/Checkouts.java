@@ -402,6 +402,11 @@ public class Checkouts {
                     }
                     reference = payments.keepHeld(orderId, username, via.heldReference, charge,
                             chargeCurrency, via.heldLabel);
+                } else if (via != null && com.codenameone.examples.bazaar.pay.PaymentTypes.manual(via.methodType)) {
+                    // Cash on delivery or a bank transfer: placed unpaid,
+                    // and the merchant marks it paid when the money arrives.
+                    reference = "";
+                    pending = true;
                 } else if (via != null && via.methodType != null) {
                     via.intent = payments.startIntent(orderId, username, via.methodType, charge,
                             chargeCurrency);

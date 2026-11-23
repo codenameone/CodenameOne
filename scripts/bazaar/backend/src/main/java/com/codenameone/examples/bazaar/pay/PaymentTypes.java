@@ -55,9 +55,21 @@ public final class PaymentTypes {
         {"sepa_debit", "SEPA Direct Debit", "EUR",
             "AT,BE,BG,CH,CY,CZ,DE,DK,EE,ES,FI,FR,GB,GR,HR,HU,IE,IS,IT,LI,LT,LU,LV,MT,NL,NO,PL,PT,"
             + "RO,SE,SI,SK"},
+        // Manual tenders: no processor is involved. The order is placed
+        // payment pending and the merchant marks it paid ([Orders#markPaid])
+        // when the cash or the transfer arrives. Empty lists take any
+        // currency and any country.
+        {"cod", "Cash on delivery", "", ""},
+        {"bank_transfer", "Bank transfer", "", ""},
     };
 
     private PaymentTypes() {
+    }
+
+    /// Whether `type` is paid by hand (cash on delivery, bank transfer):
+    /// nothing is opened at a processor, and the merchant marks it paid.
+    public static boolean manual(String type) {
+        return "cod".equals(type) || "bank_transfer".equals(type);
     }
 
     /// Whether `type` is one a store may turn on.

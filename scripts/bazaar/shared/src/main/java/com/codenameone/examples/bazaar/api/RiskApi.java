@@ -18,6 +18,8 @@
  */
 package com.codenameone.examples.bazaar.api;
 
+import com.codename1.annotations.rest.Body;
+import com.codename1.annotations.rest.DELETE;
 import com.codename1.annotations.rest.GET;
 import com.codename1.annotations.rest.POST;
 import com.codename1.annotations.rest.Path;
@@ -49,4 +51,19 @@ public interface RiskApi {
     void cancelOrderRisk(@Path("storeId") String storeId,
             @Path("orderId") String orderId,
             OnComplete<Response<OrderRiskDto>> callback);
+
+    /// The store's fraud filter rules, oldest first.
+    @GET("/api/merchant/stores/{storeId}/fraud-rules")
+    void fraudRules(@Path("storeId") String storeId,
+            OnComplete<Response<List<FraudRuleDto>>> callback);
+
+    /// Adds a rule; answers every rule of the store.
+    @POST("/api/merchant/stores/{storeId}/fraud-rules")
+    void addFraudRule(@Path("storeId") String storeId, @Body FraudRuleDto rule,
+            OnComplete<Response<List<FraudRuleDto>>> callback);
+
+    /// Removes a rule; answers the rules left.
+    @DELETE("/api/merchant/stores/{storeId}/fraud-rules/{ruleId}")
+    void removeFraudRule(@Path("storeId") String storeId, @Path("ruleId") String ruleId,
+            OnComplete<Response<List<FraudRuleDto>>> callback);
 }
