@@ -22,6 +22,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 /// PieChart Segment Selection Management.
+///
+/// @deprecated Use the `com.codename1.ui.chart` package instead.
+@Deprecated
 public class PieMapper {
 
     private final List<PieSegment> mPieSegmentList = new ArrayList<PieSegment>();

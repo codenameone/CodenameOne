@@ -17,6 +17,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 /// A series that includes 0 to many XYSeries.
+///
+/// @deprecated Use the `com.codename1.ui.chart` package instead.
+@Deprecated
 public class XYMultipleSeriesDataset {
     /// The included series.
     private final List<XYSeries> mSeries = new ArrayList<XYSeries>();
