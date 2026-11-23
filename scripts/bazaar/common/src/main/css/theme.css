@@ -1934,7 +1934,7 @@ PosMethod {
     color: var(--text);
     background-color: var(--surface);
     font-family: "native:MainBold";
-    font-size: 2.6mm;
+    font-size: 2.3mm;
     text-align: center;
     padding: 2.4mm 0.5mm 2.4mm 0.5mm;
     margin: 1mm;
@@ -2000,7 +2000,7 @@ PosTool.pressed {
 PosCartTool {
     color: var(--text);
     background-color: transparent;
-    font-size: 2.2mm;
+    font-size: 1.9mm;
     text-align: center;
     padding: 1.5mm 0 1.5mm 0;
     margin: 0;
@@ -2025,7 +2025,7 @@ PosScan {
     color: var(--text);
     background-color: var(--surface);
     font-size: 3.4mm;
-    padding: 2.2mm 3mm 2.2mm 3mm;
+    padding: 0 2mm 0 2.5mm;
     margin: 1mm;
     border: 1px solid var(--line-strong);
     border-radius: var(--radius);
@@ -2080,7 +2080,7 @@ PosGrid {
 
 PosTile {
     background-color: var(--surface);
-    padding: 1.5mm;
+    padding: 0;
     margin: 1mm;
     border: 1px solid var(--line);
     border-radius: var(--radius);
@@ -2891,4 +2891,17 @@ ShopCardTitle { color: var(--text); background-color: transparent; font-family: 
 TextHint { color: var(--text-muted); font-family: "native:MainRegular"; font-size: 2.9mm; padding: 2.7mm 3mm 2.7mm 3mm; margin: 0; background-color: transparent; }
 @media (prefers-color-scheme: dark) {
     TextHint { color: var(--text-muted-dark); }
+}
+
+/* ==== POS register polish, round 2: sell screen tiles, search box, pay bar ==== */
+PosScanField { color: var(--text); background-color: transparent; font-size: 3.4mm; padding: 2.4mm 1mm 2.4mm 1.5mm; margin: 0; border: none; }
+PosScanIcon { color: var(--text-muted); background-color: transparent; padding: 0; margin: 0; }
+PosTileBody { background-color: transparent; padding: 1.5mm 2mm 2mm 2mm; margin: 0; }
+PosPayIdle { color: var(--text-muted); background-color: var(--surface); font-size: 3.2mm; text-align: center; padding: 3.2mm 2mm 3.2mm 2mm; margin: 0; border-top: 1px solid var(--line); }
+PosPayIdle.disabled { color: var(--text-muted); background-color: var(--surface); }
+@media (prefers-color-scheme: dark) {
+    PosScanField { color: var(--text-dark); background-color: transparent; }
+    PosScanIcon { color: var(--text-muted-dark); }
+    PosPayIdle { color: var(--text-muted-dark); background-color: var(--surface-dark); border-top: 1px solid var(--line-dark); }
+    PosPayIdle.disabled { color: var(--text-muted-dark); background-color: var(--surface-dark); }
 }

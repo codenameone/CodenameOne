@@ -21,6 +21,7 @@ package com.codenameone.examples.bazaar.pos;
 import com.codename1.appkit.Net;
 import com.codename1.codescan.CodeScanner;
 import com.codename1.codescan.ScanResult;
+import com.codename1.components.SpanLabel;
 import com.codename1.ui.Button;
 import com.codename1.ui.CN;
 import com.codename1.ui.Component;
@@ -42,7 +43,6 @@ import com.codenameone.examples.bazaar.api.PosCustomerDto;
 import com.codenameone.examples.bazaar.api.PosItemDto;
 import com.codenameone.examples.bazaar.api.PosLineDto;
 import com.codenameone.examples.bazaar.net.Api;
-import com.codenameone.examples.bazaar.shop.Money;
 import com.codenameone.examples.bazaar.ui.Lang;
 import com.codenameone.examples.bazaar.ui.Layouts;
 import com.codenameone.examples.bazaar.ui.ProductArt;
@@ -76,7 +76,7 @@ final class SellScreen {
         root.setName("pos-sell");
         root.setUIID("PosRoot");
         scan = new TextField("", Lang.tr("Scan or search"), 20, TextField.ANY);
-        scan.setUIID("PosScan");
+        scan.setUIID("PosScanField");
         scan.getHintLabel().setUIID("PosScanHint");
         scan.setName("pos-scan");
         scan.setDoneListener(e -> entered());
@@ -110,7 +110,15 @@ final class SellScreen {
         products.setUIID("PosProducts");
         Container top = new Container(new BorderLayout());
         top.setUIID("PosScanRow");
-        top.add(BorderLayout.CENTER, scan);
+        // The field sits in a rounded box with a search glyph ahead of it,
+        // so the hint never touches the border.
+        Container field = new Container(new BorderLayout());
+        field.setUIID("PosScan");
+        Label glass = new Label("", "PosScanIcon");
+        FontImage.setMaterialIcon(glass, FontImage.MATERIAL_SEARCH, 4f);
+        field.add(BorderLayout.WEST, glass);
+        field.add(BorderLayout.CENTER, scan);
+        top.add(BorderLayout.CENTER, field);
         // Centred on the row, so the status pill keeps its own height
         // instead of stretching to the search field's.
         Container tools = new Container(new FlowLayout(Component.RIGHT, Component.CENTER));
@@ -214,7 +222,7 @@ final class SellScreen {
         int width = PosUi.wide() ? CN.getDisplayWidth() * 3 / 5 : CN.getDisplayWidth();
         int cols = Layouts.columns(width, 30f, 6);
         grid.setLayout(new GridLayout(Math.max(1, (products.size() + cols - 1) / cols), cols));
-        int side = CN.convertToPixels(22);
+        int side = tileSide(width, cols);
         for (int iter = 0; iter < products.size(); iter++) {
             grid.add(tile(products.get(iter), side));
         }
@@ -253,7 +261,7 @@ final class SellScreen {
     private void fillHome(PosCatalogDto c, List<GridTileDto> tiles) {
         int width = PosUi.wide() ? CN.getDisplayWidth() * 3 / 5 : CN.getDisplayWidth();
         int cols = Layouts.columns(width, 30f, 6);
-        int side = CN.convertToPixels(22);
+        int side = tileSide(width, cols);
         List<Component> shown = new ArrayList<Component>();
         for (int iter = 0; iter < tiles.size(); iter++) {
             final GridTileDto t = tiles.get(iter);
@@ -332,14 +340,39 @@ final class SellScreen {
         }
     }
 
+    /// The width of a tile's photo: the grid's share per column, less the
+    /// grid's padding and each tile's border and margin.
+    private static int tileSide(int width, int cols) {
+        int inner = width - CN.convertToPixels(3);
+        return Math.max(CN.convertToPixels(18), inner / Math.max(1, cols) - CN.convertToPixels(2) - 2);
+    }
+
+    /// A product name cut to what two tile lines hold.
+    static String twoLines(String title) {
+        String t = title == null ? "" : title;
+        int max = 34;
+        if (t.length() <= max) {
+            return t;
+        }
+        int cut = t.lastIndexOf(' ', max - 1);
+        return t.substring(0, cut > 12 ? cut : max - 1) + "...";
+    }
+
     private Component tile(final List<PosItemDto> variants, int side) {
         PosItemDto first = variants.get(0);
         Container tile = new Container(BoxLayout.y());
         tile.setUIID("PosTile");
+        // The photo runs edge to edge across the card's top, 4:3, with the
+        // text in a padded block below it.
         Label art = ProductArt.label(first.productId(), first.title(), "", first.photoId(), side,
-                side, "PosTileArt");
+                side * 3 / 4, "PosTileArt");
         tile.add(art);
-        tile.add(PosUi.data(first.title(), "PosTileTitle"));
+        Container text = new Container(BoxLayout.y());
+        text.setUIID("PosTileBody");
+        SpanLabel name = new SpanLabel(twoLines(first.title()));
+        name.setTextUIID("PosTileTitle");
+        name.setUIID("Container");
+        text.add(name);
         long min = first.priceCents();
         long max = first.priceCents();
         int stock = 0;
@@ -353,9 +386,12 @@ final class SellScreen {
                 stock += v.available();
             }
         }
-        tile.add(PosUi.data(Money.range(min, max, PosState.currency(), "USD"), "PosTilePrice"));
+        // A range never fits a tile; the lowest price says enough.
+        String price = min == max ? PosState.money(min) : Lang.tr("From {0}", PosState.money(min));
+        text.add(PosUi.data(price, "PosTilePrice"));
+        tile.add(text);
         if (tracked) {
-            tile.add(PosUi.data(stock <= 0 ? Lang.tr("Out of stock") : Lang.tr("{0} left", stock),
+            text.add(PosUi.data(stock <= 0 ? Lang.tr("Out of stock") : Lang.tr("{0} left", stock),
                     stock <= 3 ? "PosTileLow" : "PosTileStock"));
         }
         Button lead = new Button();
@@ -562,8 +598,17 @@ final class SellScreen {
                     : t.taxCents, "PosTotalRow");
         }
         total("Total", t.totalCents, "PosGrand");
-        pay.setText(cart.isEmpty() ? Lang.tr("Charge")
-                : Lang.tr("Charge {0}", PosState.money(t.totalCents)));
+        // An empty sale reads as a quiet hint, not a dead grey slab; a full
+        // one says what it will charge and for how many items.
+        if (cart.isEmpty()) {
+            pay.setText(Lang.tr("Add items to charge"));
+            pay.setUIID("PosPayIdle");
+        } else {
+            int count = cart.units();
+            pay.setText(Lang.tr("Charge {0}", PosState.money(t.totalCents)) + Ui.DOT
+                    + (count == 1 ? Lang.tr("1 item") : Lang.tr("{0} items", count)));
+            pay.setUIID("PosPay");
+        }
         pay.setEnabled(!cart.isEmpty());
         root.revalidateLater();
         if (cartSheetContent != null) {
