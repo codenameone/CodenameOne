@@ -123,6 +123,7 @@ class CoachMarksTest extends UITestBase {
         CoachMarks tour = new CoachMarks(f).add(a, "A", "First").setOnFinish(() -> finished[0]++);
         tour.show();
         new Form().show();
+        flushSerialCalls();
         assertFalse(tour.isShowing());
         assertEquals(1, finished[0]);
     }
@@ -139,6 +140,24 @@ class CoachMarksTest extends UITestBase {
         assertTrue(tour.showOnce("empty-tour"));
         tour.dismiss();
         CoachMarks.resetShowOnce("empty-tour");
+    }
+
+    @FormTest
+    void aDialogDoesNotEndTheTour() {
+        Form f = new Form(BoxLayout.y());
+        Button a = new Button("A");
+        f.add(a);
+        f.show();
+        CoachMarks tour = new CoachMarks(f).add(a, "A", "First");
+        tour.show();
+        com.codename1.ui.Dialog d = new com.codename1.ui.Dialog("Error");
+        d.showModeless();
+        flushSerialCalls();
+        assertTrue(tour.isShowing(), "a dialog over the form keeps the tour");
+        d.dispose();
+        flushSerialCalls();
+        assertTrue(tour.isShowing());
+        tour.dismiss();
     }
 
     private static Button findButton(com.codename1.ui.Container root, String text) {

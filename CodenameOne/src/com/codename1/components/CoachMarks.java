@@ -27,6 +27,7 @@ import com.codename1.ui.Button;
 import com.codename1.ui.CN;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
+import com.codename1.ui.Dialog;
 import com.codename1.ui.Font;
 import com.codename1.ui.Form;
 import com.codename1.ui.Graphics;
@@ -386,9 +387,19 @@ public class CoachMarks {
             super.deinitialize();
             // The form went away (back, another form shown): end the tour
             // rather than leave it, and its pointer listeners, on the form.
-            if (overlay == this) { //NOPMD CompareObjectsWithEquals - identity: is this overlay the one showing
-                dismiss();
-            }
+            // A Dialog is a Form too, so showing one deinitializes this form
+            // while the tour should survive it. Decide once the change has
+            // settled: still off screen and no Dialog on top means the user
+            // really left.
+            CN.callSerially(new Runnable() {
+                @Override
+                public void run() {
+                    if (overlay == Overlay.this && !isInitialized() //NOPMD CompareObjectsWithEquals - identity: is this overlay the one showing
+                            && !(CN.getCurrentForm() instanceof Dialog)) {
+                        dismiss();
+                    }
+                }
+            });
         }
 
         void showStep(Step step) {
