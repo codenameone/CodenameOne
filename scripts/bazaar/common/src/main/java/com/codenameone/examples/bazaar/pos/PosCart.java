@@ -320,4 +320,17 @@ public final class PosCart {
         }
         return out;
     }
+
+    /// The list price of each line, as the approval rule compares it: the
+    /// catalog price, or for a custom line the price it goes up at, which is
+    /// what the server compares it with too.
+    public long[] listUnits() {
+        long[] units = unitPrices();
+        long[] list = new long[items.size()];
+        for (int iter = 0; iter < list.length; iter++) {
+            PosItemDto it = items.get(iter).item;
+            list[iter] = custom(it) ? units[iter] : it.priceCents();
+        }
+        return list;
+    }
 }

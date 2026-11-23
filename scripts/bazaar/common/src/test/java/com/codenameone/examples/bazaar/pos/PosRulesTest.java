@@ -144,4 +144,22 @@ class PosRulesTest {
         assertEquals(4, ParkedPane.units(parked));
         assertEquals(2150, ParkedPane.total(parked));
     }
+
+    @Test
+    void aSaleDiscountTakenOffAgainNeedsNoManager() {
+        PosPolicyDto p = policy(2000, false, false, false);
+        PosCart cart = new PosCart();
+        cart.add(new PosItemDto("v1", "p1", "Mug", "Default", "", "", 8999, 0, true, false, 0,
+                ""), 1);
+        cart.add(new PosItemDto("v2", "p2", "Tee", "M", "", "", 4599, 0, true, false, 0, ""), 2);
+        cart.add(PosCart.customItem("Gift wrap", 500, true), 1);
+        cart.orderPercent(2000);
+        assertNull(PosRules.saleApproval(p, "CASHIER", cart.uploadLines(), cart.listUnits(), 0));
+        cart.orderPercent(2500);
+        assertEquals(PosRules.DISCOUNT, PosRules.saleApproval(p, "CASHIER", cart.uploadLines(),
+                cart.listUnits(), 0));
+        cart.orderAmount(0);
+        cart.setCode("");
+        assertNull(PosRules.saleApproval(p, "CASHIER", cart.uploadLines(), cart.listUnits(), 0));
+    }
 }

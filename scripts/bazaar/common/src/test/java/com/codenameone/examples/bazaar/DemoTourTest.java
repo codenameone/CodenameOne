@@ -590,10 +590,8 @@ public class DemoTourTest extends E2e {
             tap("pos-order-none");
             pause(1500);
         }
-        // The rest of the sale goes through without a manager.
-        onEdt(() -> com.codenameone.examples.bazaar.pos.PosState.policy(
-                new com.codenameone.examples.bazaar.api.PosPolicyDto(0, false, false, false,
-                        1500, 1800, 2000, 2000, 0)));
+        // With the discount taken off again the sale is under the threshold,
+        // so the tender opens without a manager.
         reopen("pos-tender", "pos-pay");
         if (tap("pos-tender")) {
             pause(2500);

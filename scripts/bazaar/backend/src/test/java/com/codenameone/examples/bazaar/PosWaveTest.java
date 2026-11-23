@@ -73,6 +73,8 @@ class PosWaveTest {
     private CustomerRepository customers;
     @Autowired
     private PaymentRepository paymentRows;
+    @Autowired
+    private com.codenameone.examples.bazaar.repository.DiscountRepository discountRows;
 
     /// A shop with a register taxed as New York (4%), a shift open on it, a
     /// cashier with PIN 1234 and a manager with PIN 4321.
@@ -247,6 +249,36 @@ class PosWaveTest {
         Map ok = Rest.json(mvc, t.as(post(t.reg() + "/approvals"), ask, t.cashier));
         Map sold = t.sync(t.sale("wd-1", fifthOff, tender("CASH", 1000),
                 seller + "\"approvalId\":\"" + ok.get("id") + "\","));
+        assertEquals("OK", sold.get("status"), String.valueOf(sold.get("message")));
+    }
+
+    /// The store's own automatic discount is a promotion, not the clerk's:
+    /// a quarter off through one passes a 10% threshold without a manager.
+    @Test
+    void anAutomaticDiscountDoesNotCountTowardsTheApprovalThreshold() throws Exception {
+        Till t = new Till("pw-auto", 10);
+        t.owner(post(t.base + "/policy"), "{\"discountApprovalBp\":1000,"
+                + "\"approvePriceOverrides\":false,\"approveRefunds\":false,"
+                + "\"approveOrderEdits\":false,\"tip1Bp\":1500,\"tip2Bp\":1800,\"tip3Bp\":2000,"
+                + "\"layawayDepositBp\":2000,\"layawayCancelFeeBp\":0}");
+        com.codenameone.examples.bazaar.domain.Discount d =
+                new com.codenameone.examples.bazaar.domain.Discount();
+        d.setId(com.codenameone.examples.bazaar.Ids.next());
+        d.setStoreId(t.shop.storeId);
+        d.setCode("");
+        d.setTitle("Spring sale");
+        d.setKind(com.codenameone.examples.bazaar.pricing.DiscountEngine.PERCENT);
+        d.setAmount(2500);
+        d.setAppliesTo(com.codenameone.examples.bazaar.pricing.DiscountEngine.ALL);
+        d.setTargetId("");
+        d.setAutomatic(true);
+        d.setActive(true);
+        d.setCreatedAt(java.time.Instant.now());
+        discountRows.insert(d);
+        String seller = "\"staffUsername\":\"" + t.cashier + "\",";
+        String full = "{\"variantId\":\"" + t.shop.variantId
+                + "\",\"quantity\":1,\"unitCents\":1000,\"overridden\":false}";
+        Map sold = t.sync(t.sale("au-1", full, tender("CASH", 1000), seller));
         assertEquals("OK", sold.get("status"), String.valueOf(sold.get("message")));
     }
 

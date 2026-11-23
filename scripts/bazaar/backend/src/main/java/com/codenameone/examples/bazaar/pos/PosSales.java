@@ -736,7 +736,18 @@ public class PosSales {
             }
         }
         boolean needs = overridden && policy.isApprovePriceOverrides();
-        long off = byHand + quote.discountCents();
+        // The store's automatic discounts are a promotion it runs, not one
+        // the clerk gives, so they never count towards the threshold; a
+        // typed code still does. The register leaves them out the same way.
+        long automatic = 0;
+        for (int iter = 0; quote.discounts != null && iter < quote.discounts.applied.size();
+                iter++) {
+            DiscountEngine.Applied a = quote.discounts.applied.get(iter);
+            if (a.discount.isAutomatic()) {
+                automatic += a.amountCents;
+            }
+        }
+        long off = byHand + Math.max(0, quote.discountCents() - automatic);
         long bp = policy.getDiscountApprovalBp();
         if (bp > 0 && list > 0 && off * 10000L > bp * list) {
             needs = true;

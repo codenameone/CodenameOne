@@ -393,4 +393,32 @@ class PosLogicTest {
         assertEquals(165000, CashCount.total(new int[] {1, 1, 0, 0, 3, 0, 0, 0, 0, 0}) * 10);
         assertEquals(-50, CashCount.variance(950, 1000));
     }
+
+    /// A store's automatic discount is its own promotion, not the clerk's:
+    /// a sale whose only discount is one needs no manager, whatever the
+    /// threshold, while a typed code still counts.
+    @Test
+    void anAutomaticDiscountIsNotTheClerksToApprove() {
+        com.codenameone.examples.bazaar.api.PosPolicyDto p =
+                new com.codenameone.examples.bazaar.api.PosPolicyDto(2000, false, false, false,
+                        1500, 1800, 2000, 2000, 0);
+        PosCart cart = new PosCart();
+        cart.add(new PosItemDto("v1", "p1", "Lamp", "Default", "", "", 15900, 0, true, false, 0,
+                ""), 1);
+        cart.add(new PosItemDto("v2", "p2", "Mug", "Default", "", "", 5900, 0, true, false, 0,
+                ""), 2);
+        List<DiscountDto> store = Arrays.asList(discount("SPRING", "PERCENT", 2500, true, false));
+        PosPricing.Totals t = PosPricing.price(cart.pricingLines(null), store, "", null, null,
+                null, false, 0);
+        assertEquals(6925, t.discountCents);
+        assertEquals(6925, t.automaticCents);
+        assertNull(PosRules.saleApproval(p, "CASHIER", cart.uploadLines(), cart.listUnits(),
+                t.discountCents - t.automaticCents));
+        List<DiscountDto> typed = Arrays.asList(discount("STAFF", "PERCENT", 2500, false, false));
+        PosPricing.Totals c = PosPricing.price(cart.pricingLines(null), typed, "STAFF", null, null,
+                null, false, 0);
+        assertEquals(0, c.automaticCents);
+        assertEquals(PosRules.DISCOUNT, PosRules.saleApproval(p, "CASHIER", cart.uploadLines(),
+                cart.listUnits(), c.discountCents - c.automaticCents));
+    }
 }

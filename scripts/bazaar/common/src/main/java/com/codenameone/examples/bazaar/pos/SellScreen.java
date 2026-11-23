@@ -934,16 +934,9 @@ final class SellScreen {
         final PosCart cart = PosState.cart();
         if (cart.approvalId().length() == 0) {
             List<PosLineDto> lines = cart.uploadLines();
-            long[] list = new long[cart.items().size()];
-            for (int iter = 0; iter < list.length; iter++) {
-                // A custom line has no list price but the one it goes up at,
-                // which is what the server compares it with too.
-                list[iter] = PosCart.custom(cart.items().get(iter).item)
-                        ? lines.get(iter).unitCents() : cart.items().get(iter).item.priceCents();
-            }
             PosPricing.Totals t = PosState.totals();
             String kind = PosRules.saleApproval(PosState.policy(), PosState.role(),
-                    lines, list, t.discountCents);
+                    lines, cart.listUnits(), t.discountCents - t.automaticCents);
             if (kind != null) {
                 ManagerApproval.ask(kind, t.totalCents, "Sale", id -> {
                     cart.setApprovalId(id);

@@ -85,6 +85,10 @@ public final class PosPricing {
     public static final class Totals {
         public long subtotalCents;
         public long discountCents;
+        /// The part of [#discountCents] the store's automatic discounts
+        /// gave: a promotion the store runs, never the clerk's to give, so it
+        /// does not count towards the manager's discount threshold.
+        public long automaticCents;
         public long taxCents;
         /// Whether the tax is inside the prices (and so adds nothing).
         public boolean taxInclusive;
@@ -251,6 +255,7 @@ public final class PosPricing {
             }
         }
         if (best != null) {
+            t.automaticCents = automatic(lines, best);
             t.discountCents = run(lines, best, t.applied);
         } else {
             clear(lines);
@@ -284,6 +289,20 @@ public final class PosPricing {
             }
         }
         return saved;
+    }
+
+    /// What the automatic discounts of `chosen` give when `chosen` is run
+    /// in order, as [#run] runs it.
+    private static long automatic(List<Line> lines, List<DiscountDto> chosen) {
+        clear(lines);
+        long auto = 0;
+        for (int iter = 0; iter < chosen.size(); iter++) {
+            long amount = applyOne(lines, chosen.get(iter));
+            if (chosen.get(iter).automatic()) {
+                auto += amount;
+            }
+        }
+        return auto;
     }
 
     private static void clear(List<Line> lines) {
