@@ -72,7 +72,7 @@ import java.util.List;
 /// bubble to match the platform's appearance. The button labels are localized
 /// through the keys `CoachMarkNext`, `CoachMarkDone` and `CoachMarkSkip`.
 ///
-/// This replaces the deprecated `com.codename1.ui.util.GlassTutorial`.
+/// This replaces the deprecated [com.codename1.ui.util.GlassTutorial].
 public class CoachMarks {
     private static final String PREFERENCE_PREFIX = "cn1.coachMarks.";
     private static final int DEFAULT_DIM = 0x000000;
@@ -186,8 +186,11 @@ public class CoachMarks {
         if (Preferences.get(pref, false)) {
             return false;
         }
-        Preferences.set(pref, true);
         show();
+        if (overlay == null) {
+            return false;
+        }
+        Preferences.set(pref, true);
         return true;
     }
 
@@ -255,13 +258,14 @@ public class CoachMarks {
         form.removePointerPressedListener(pressListener);
         form.removePointerDraggedListener(pressListener);
         form.removePointerReleasedListener(releaseListener);
-        Container parent = overlay.getParent();
-        if (parent != null) {
-            parent.removeComponent(overlay);
-            parent.repaint();
-        }
+        Overlay o = overlay;
         overlay = null;
         current = -1;
+        Container parent = o.getParent();
+        if (parent != null) {
+            parent.removeComponent(o);
+            parent.repaint();
+        }
         if (onFinish != null) {
             onFinish.run();
         }
@@ -322,6 +326,7 @@ public class CoachMarks {
         final Button skip = new Button();
         final Button next = new Button();
         Step step;
+        int[] laidOutHole;
 
         Overlay() {
             setLayout(new BubbleLayout());
@@ -359,6 +364,31 @@ public class CoachMarks {
             row.setUIID("Container");
             bubble.add(title).add(text).add(row);
             add(bubble);
+            // Taps reach these through released(); the press is consumed so a
+            // tap never fires them twice. A key, D-pad or screen reader
+            // activation fires the button itself and lands here.
+            next.addActionListener(new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent evt) {
+                    CoachMarks.this.next();
+                }
+            });
+            skip.addActionListener(new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent evt) {
+                    dismiss();
+                }
+            });
+        }
+
+        @Override
+        protected void deinitialize() {
+            super.deinitialize();
+            // The form went away (back, another form shown): end the tour
+            // rather than leave it, and its pointer listeners, on the form.
+            if (overlay == this) { //NOPMD CompareObjectsWithEquals - identity: is this overlay the one showing
+                dismiss();
+            }
         }
 
         void showStep(Step step) {
@@ -388,6 +418,9 @@ public class CoachMarks {
                 return null;
             }
             Component t = step.target;
+            if (t.getWidth() <= 0 || t.getHeight() <= 0) {
+                return null;
+            }
             int pad = CN.convertToPixels(1.5f);
             int x = t.getAbsoluteX() - getAbsoluteX() + getX() - pad;
             int y = t.getAbsoluteY() - getAbsoluteY() + getY() - pad;
@@ -409,6 +442,13 @@ public class CoachMarks {
             int w = getWidth();
             int h = getHeight();
             int[] hole = hole();
+            if (!sameHole(hole, laidOutHole)) {
+                // The target moved since the bubble was placed (a smooth
+                // scroll into view, a rotation); place it again.
+                laidOutHole = hole;
+                setShouldLayout(true);
+                revalidateLater();
+            }
             if (hole == null) {
                 g.fillRect(x, y, w, h);
             } else {
@@ -431,6 +471,13 @@ public class CoachMarks {
         }
     }
 
+    private static boolean sameHole(int[] a, int[] b) {
+        if (a == null || b == null) {
+            return a == null && b == null;
+        }
+        return a[0] == b[0] && a[1] == b[1] && a[2] == b[2] && a[3] == b[3];
+    }
+
     /// Places the bubble under the lit target when there is room, otherwise
     /// over it, centred on it and kept inside the overlay.
     private static final class BubbleLayout extends Layout {
@@ -448,6 +495,7 @@ public class CoachMarks {
             bubble.setShouldCalcPreferredSize(true);
             int h = bubble.getPreferredH();
             int[] hole = o.hole();
+            o.laidOutHole = hole;
             int x;
             int y;
             if (hole == null) {

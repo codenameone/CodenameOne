@@ -48,7 +48,7 @@ import com.codename1.ui.util.UITimer;
 /// carousel.addSelectionListener((oldPage, newPage) -> track(newPage));
 /// ```
 ///
-/// It is swipeable `Tabs` with the tab bar hidden plus a `PageIndicator`, so
+/// It is swipeable `Tabs` with the tab bar hidden plus a [PageIndicator], so
 /// it swipes, snaps and mirrors for right to left languages as `Tabs` does.
 /// `#getTabs()` and `#getIndicator()` give access to both for anything this
 /// class does not wrap.
@@ -57,7 +57,7 @@ import com.codename1.ui.util.UITimer;
 /// waits a full interval after the user touches it, and wraps from the last
 /// page to the first when `#setLoop(boolean)` is on (the default).
 ///
-/// UIIDs: `Carousel` for the container, `PageIndicator` for the dots.
+/// UIIDs: [Carousel] for the container, [PageIndicator] for the dots.
 public class Carousel extends Container {
     private final Tabs tabs = new Tabs();
     private final PageIndicator indicator = new PageIndicator();
@@ -90,7 +90,10 @@ public class Carousel extends Container {
         tabs.addSelectionListener(new SelectionListener() {
             @Override
             public void selectionChanged(int oldSelected, int newSelected) {
-                lastTouch = System.currentTimeMillis();
+                // No lastTouch update here: Tabs fires this when an auto play
+                // slide ends, which would push every other tick back. User
+                // swipes and taps start with a press, which the form pointer
+                // listener records.
                 announce(newSelected);
             }
         });
@@ -119,7 +122,13 @@ public class Carousel extends Container {
     ///
     /// - `index`: the zero based page
     public void removePage(int index) {
+        // Tabs.removeTabAt always steps back one page; keep the page the user
+        // is looking at unless that is the one removed.
+        int current = tabs.getSelectedIndex();
         tabs.removeTabAt(index);
+        if (index > current && current < tabs.getTabCount()) {
+            tabs.setSelectedIndex(current);
+        }
         indicator.setPageCount(tabs.getTabCount());
         indicator.setCurrentPage(tabs.getSelectedIndex());
     }

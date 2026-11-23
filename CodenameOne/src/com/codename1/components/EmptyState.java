@@ -50,10 +50,10 @@ import com.codename1.ui.layouts.FlowLayout;
 ///         .setAction("Retry", e -> reload()));
 /// ```
 ///
-/// It is the counterpart of `Skeleton`, which fills the same place while the
+/// It is the counterpart of [Skeleton], which fills the same place while the
 /// content is still loading.
 ///
-/// UIIDs: `EmptyState` for the container, `EmptyStateIcon`, `EmptyStateTitle`,
+/// UIIDs: [EmptyState] for the container, `EmptyStateIcon`, `EmptyStateTitle`,
 /// `EmptyStateText` and `EmptyStateButton`. Unstyled, they fall back to the
 /// theme's `Label`, `SpanLabel` and `Button` looks.
 public class EmptyState extends Container {
@@ -61,6 +61,7 @@ public class EmptyState extends Container {
     private final SpanLabel title = new SpanLabel();
     private final SpanLabel text = new SpanLabel();
     private final Button action = new Button();
+    private ActionListener actionListener;
 
     /// An empty state with a material icon, a title and an explanation.
     ///
@@ -145,6 +146,7 @@ public class EmptyState extends Container {
     }
 
     /// Adds a button under the explanation, such as "Retry" or "Add an item".
+    /// Calling it again replaces the label and the listener.
     ///
     /// #### Parameters
     ///
@@ -157,6 +159,10 @@ public class EmptyState extends Container {
     /// this, for chaining
     public EmptyState setAction(String label, ActionListener listener) {
         action.setText(label);
+        if (actionListener != null) {
+            action.removeActionListener(actionListener);
+        }
+        actionListener = listener;
         action.addActionListener(listener);
         action.setHidden(false);
         return this;

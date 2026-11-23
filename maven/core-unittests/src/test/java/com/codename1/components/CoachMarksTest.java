@@ -96,4 +96,64 @@ class CoachMarksTest extends UITestBase {
         second.dismiss();
         CoachMarks.resetShowOnce("test-tour");
     }
+
+    @FormTest
+    void buttonActionsDriveTheTourWithoutAPointer() {
+        Form f = new Form(BoxLayout.y());
+        Button a = new Button("A");
+        f.add(a);
+        f.show();
+        CoachMarks tour = new CoachMarks(f).add(a, "A", "First").add(a, "A", "Again");
+        tour.show();
+        Button next = findButton(f, "Next");
+        assertNotNull(next);
+        next.pressed();
+        next.released();
+        assertEquals(1, tour.getCurrentStep());
+        tour.dismiss();
+    }
+
+    @FormTest
+    void leavingTheFormEndsTheTour() {
+        Form f = new Form(BoxLayout.y());
+        Button a = new Button("A");
+        f.add(a);
+        f.show();
+        final int[] finished = {0};
+        CoachMarks tour = new CoachMarks(f).add(a, "A", "First").setOnFinish(() -> finished[0]++);
+        tour.show();
+        new Form().show();
+        assertFalse(tour.isShowing());
+        assertEquals(1, finished[0]);
+    }
+
+    @FormTest
+    void showOnceWithoutStepsIsNotRemembered() {
+        Form f = new Form(BoxLayout.y());
+        f.show();
+        CoachMarks.resetShowOnce("empty-tour");
+        assertFalse(new CoachMarks(f).showOnce("empty-tour"));
+        Button a = new Button("A");
+        f.add(a);
+        CoachMarks tour = new CoachMarks(f).add(a, "A", "First");
+        assertTrue(tour.showOnce("empty-tour"));
+        tour.dismiss();
+        CoachMarks.resetShowOnce("empty-tour");
+    }
+
+    private static Button findButton(com.codename1.ui.Container root, String text) {
+        for (int i = 0; i < root.getComponentCount(); i++) {
+            com.codename1.ui.Component c = root.getComponentAt(i);
+            if (c instanceof Button && text.equals(((Button) c).getText())) {
+                return (Button) c;
+            }
+            if (c instanceof com.codename1.ui.Container) {
+                Button b = findButton((com.codename1.ui.Container) c, text);
+                if (b != null) {
+                    return b;
+                }
+            }
+        }
+        return null;
+    }
 }

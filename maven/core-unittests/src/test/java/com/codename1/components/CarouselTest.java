@@ -89,4 +89,28 @@ class CarouselTest extends UITestBase {
         c.setIndicatorPosition(null);
         assertNull(c.getIndicator().getParent());
     }
+
+    @FormTest
+    void finishedSlideDoesNotDelayTheNextTick() throws Exception {
+        Form f = new Form(new BorderLayout());
+        Carousel c = carousel(3);
+        f.add(BorderLayout.CENTER, c);
+        f.show();
+        c.setAutoPlay(60);
+        Thread.sleep(120);
+        // What Tabs does when an auto play slide ends: commit the index, which
+        // fires the selection listeners.
+        c.getTabs().setSelectedIndex(1);
+        c.tick();
+        assertEquals(2, c.getIndicator().getCurrentPage(), "the tick after a finished slide advances");
+    }
+
+    @FormTest
+    void removingALaterPageKeepsTheCurrentOne() {
+        Carousel c = carousel(4);
+        c.setSelectedIndex(1, false);
+        c.removePage(3);
+        assertEquals(1, c.getSelectedIndex());
+        assertEquals(1, c.getIndicator().getCurrentPage());
+    }
 }

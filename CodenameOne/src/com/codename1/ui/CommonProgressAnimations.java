@@ -30,7 +30,7 @@ import com.codename1.ui.plaf.Style;
 /// A collection of useful progress animations and utility methods.
 ///
 /// For skeleton screens, shimmer placeholders and other "content is on its way"
-/// outlines, prefer `com.codename1.components.Skeleton`: it is a
+/// outlines, prefer [com.codename1.components.Skeleton]: it is a
 /// `ProgressAnimation` too, so `markComponentLoading` and `markComponentReady`
 /// work with it, and `Skeleton#show` / `Skeleton#hide` are shorthands for them.
 public class CommonProgressAnimations {
@@ -78,7 +78,7 @@ public class CommonProgressAnimations {
         }
 
         /// Marks a component as "loading" with a progress animation you already
-        /// created, such as a configured `com.codename1.components.Skeleton`.
+        /// created, such as a configured [com.codename1.components.Skeleton].
         /// Behaves like `#markComponentLoading(Component, Class)` otherwise: if
         /// the component is already loading, the animation that occupies its
         /// place is returned and `progress` is not used.

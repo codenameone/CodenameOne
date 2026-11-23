@@ -60,16 +60,16 @@ import com.codename1.ui.plaf.Style;
 /// });
 /// ```
 ///
-/// The shapes are drawn in the foreground colour of the `Skeleton` UIID. A
+/// The shapes are drawn in the foreground colour of the [Skeleton] UIID. A
 /// theme that does not style that UIID gets the theme's text colour at a low
 /// opacity, which suits light and dark themes alike. Restyle the UIID, or pass
 /// your own with `setUIID`, to change the colour, padding or margin. The shimmer runs only while
 /// the placeholder is on screen; turn it off with `#shimmer(boolean)`.
 ///
-/// `Skeleton` is a `CommonProgressAnimations.ProgressAnimation`, so it also works
+/// [Skeleton] is a `CommonProgressAnimations.ProgressAnimation`, so it also works
 /// with `CommonProgressAnimations.ProgressAnimation#markComponentLoading`.
 ///
-/// See also `InfiniteProgress` for a blocking spinner and `EmptyState` for what
+/// See also [InfiniteProgress] for a blocking spinner and [EmptyState] for what
 /// to show when loading finished with nothing to show.
 public class Skeleton extends CommonProgressAnimations.ProgressAnimation {
     private static final int BLOCK = 0;
@@ -248,11 +248,12 @@ public class Skeleton extends CommonProgressAnimations.ProgressAnimation {
     /// #### Returns
     ///
     /// the placeholder showing; when the component was already masked by a
-    /// `Skeleton`, that one
+    /// [Skeleton], that one; null when another kind of progress animation
+    /// already masks it
     public static Skeleton show(Component cmp, Skeleton placeholder) {
         CommonProgressAnimations.ProgressAnimation p =
                 CommonProgressAnimations.ProgressAnimation.markComponentLoading(cmp, placeholder);
-        return p instanceof Skeleton ? (Skeleton) p : placeholder;
+        return p instanceof Skeleton ? (Skeleton) p : null;
     }
 
     /// Puts a component masked by `#show(Component)` back in its place. Does

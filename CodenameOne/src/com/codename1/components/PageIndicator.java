@@ -37,7 +37,7 @@ import com.codename1.ui.util.EventDispatcher;
 /// page of a pager, carousel or onboarding flow is on screen. The current page
 /// is drawn as a wider pill; tapping a dot selects its page.
 ///
-/// `Carousel` includes one. Use it on its own with swipeable `Tabs`:
+/// [Carousel] includes one. Use it on its own with swipeable `Tabs`:
 ///
 /// ```java
 /// Tabs pages = new Tabs();
@@ -49,7 +49,7 @@ import com.codename1.ui.util.EventDispatcher;
 /// form.add(BorderLayout.CENTER, pages).add(BorderLayout.SOUTH, dots);
 /// ```
 ///
-/// The dots are drawn in the foreground colour of the `PageIndicator` UIID, the
+/// The dots are drawn in the foreground colour of the [PageIndicator] UIID, the
 /// current one at full opacity and the rest faded, so they suit light and dark
 /// themes without styling.
 public class PageIndicator extends Component {

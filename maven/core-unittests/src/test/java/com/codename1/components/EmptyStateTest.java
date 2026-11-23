@@ -49,4 +49,16 @@ class EmptyStateTest extends UITestBase {
         EmptyState e = new EmptyState((char) 0, null, null);
         assertTrue(e.getPreferredH() >= 0);
     }
+
+    @FormTest
+    void setActionReplacesTheListener() {
+        EmptyState e = new EmptyState(FontImage.MATERIAL_INBOX, "Nothing", "Here");
+        final int[] taps = {0, 0};
+        e.setAction("Retry", ev -> taps[0]++);
+        e.setAction("Reload", ev -> taps[1]++);
+        e.getActionButton().pressed();
+        e.getActionButton().released();
+        assertEquals(0, taps[0]);
+        assertEquals(1, taps[1]);
+    }
 }

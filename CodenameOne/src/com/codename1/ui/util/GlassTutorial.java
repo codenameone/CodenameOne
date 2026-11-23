@@ -50,7 +50,7 @@ import java.util.Vector;
 ///
 /// #### Deprecated
 ///
-/// use `com.codename1.components.CoachMarks`, which dims the screen, lights one
+/// use [com.codename1.components.CoachMarks], which dims the screen, lights one
 /// component at a time and walks through the steps with Next and Skip
 public class GlassTutorial implements Painter {
     private static final String DEST = "$$GLSDESTHINT$$";
