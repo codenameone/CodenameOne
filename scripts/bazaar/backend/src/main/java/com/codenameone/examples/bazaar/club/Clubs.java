@@ -428,9 +428,12 @@ public class Clubs {
                 status = Payments.PAID;
             }
         } catch (ResponseStatusException refused) {
-            if (refused.getStatus() != 402) {
-                // Only a definite decline counts against the member. An
-                // unreachable or ambiguous processor (502, 503) leaves
+            int code = refused.getStatus();
+            if (code == 502 || code == 503) {
+                // Only an outage is held back. A decline (402) or a card the
+                // member removed (400 from Payments.choose) counts against the
+                // member, so a membership with no way to pay still lapses.
+                // An unreachable or ambiguous processor (502, 503) leaves
                 // `failures` as it was, so the next pass derives the same
                 // charge id and the processor's idempotency answers it rather
                 // than charging twice. The claim only records that id, so
