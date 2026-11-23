@@ -47,7 +47,7 @@ final class OrdersPane extends ShopPane {
     /// An order to open when the pane is next built: the one just placed.
     static String open;
 
-    private final boolean wide = Layouts.wide();
+    private final boolean wide = Layouts.split();
     private final Container list = Ui.list("orders");
     private final Container detail = new Container(new BorderLayout());
     private String shown;

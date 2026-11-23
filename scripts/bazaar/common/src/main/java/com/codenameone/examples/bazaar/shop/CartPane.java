@@ -53,7 +53,7 @@ import java.util.List;
 /// priced it. Lines on the left and the summary on the right on a wide
 /// screen.
 final class CartPane extends ShopPane {
-    private final boolean wide = Layouts.wide();
+    private final boolean wide = Layouts.split();
     private boolean busy;
 
     CartPane() {

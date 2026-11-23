@@ -380,4 +380,9 @@ final class ProductsPane extends MerchantPane {
             return text;
         }
     }
+
+    @Override
+    boolean splits() {
+        return true;
+    }
 }

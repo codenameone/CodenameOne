@@ -205,6 +205,16 @@ public final class Ui {
         return page;
     }
 
+    /// A scrolling page of form fields, its column no wider than
+    /// [Layouts#formColumn()] and centred in the room there is.
+    public static Container formPage(String uiid) {
+        Column page = new Column();
+        page.most = Layouts.formColumn();
+        page.setUIID(uiid);
+        page.setScrollableY(true);
+        return page;
+    }
+
     public static Container card() {
         Container card = new Container(BoxLayout.y());
         card.setUIID("SvCard");
@@ -526,6 +536,8 @@ public final class Ui {
     private static final class Column extends Container {
         private String styled;
         private int margin;
+        /// The widest the content is drawn; 0 for [Layouts#column()].
+        private int most;
 
         Column() {
             super(BoxLayout.y());
@@ -539,7 +551,7 @@ public final class Ui {
                 styled = getUIID();
                 margin = getUnselectedStyle().getPaddingLeftNoRTL();
             }
-            Layouts.centre(this, margin);
+            Layouts.centre(this, margin, most > 0 ? most : Layouts.column());
             super.layoutContainer();
         }
 

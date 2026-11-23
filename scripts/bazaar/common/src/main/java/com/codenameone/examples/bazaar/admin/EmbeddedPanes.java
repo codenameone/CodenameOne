@@ -41,7 +41,7 @@ final class EmbeddedPanes extends Panes {
 
     private final Container host = new Container(new BorderLayout());
     private final Container detail = new Container(new BorderLayout());
-    private final boolean wide = Layouts.wide();
+    private final boolean wide = Layouts.split();
     private final List<Object[]> open = new ArrayList<Object[]>();
     private final List<Form> screens = new ArrayList<Form>();
     private Runnable shown;

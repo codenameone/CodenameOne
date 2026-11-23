@@ -457,4 +457,9 @@ final class InventoryPane extends MerchantPane {
         }
         return id == null ? "" : id;
     }
+
+    @Override
+    boolean splits() {
+        return true;
+    }
 }

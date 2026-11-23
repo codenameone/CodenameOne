@@ -100,7 +100,7 @@ final class ProductForm {
         form.setLayout(new BorderLayout());
         form.setScrollable(false);
         Ui.back(form, previous);
-        final ProductForm view = new ProductForm(form, Layouts.wide());
+        final ProductForm view = new ProductForm(form, Layouts.split());
         form.add(BorderLayout.CENTER, view.root);
         final ActionListener<ActionEvent> esc = e -> {
             if (previous != null) {

@@ -180,6 +180,9 @@ final class CustomersPane extends MerchantPane {
             root.add(BorderLayout.CENTER, grid);
         } else {
             Container list = Ui.list("customers-list");
+            // The rows are already here: drop the loading placeholder a new
+            // list starts with, which otherwise sat above them.
+            list.removeAll();
             if (customers.isEmpty()) {
                 list.add(Ui.empty(FontImage.MATERIAL_GROUP, "No customers",
                         "Nobody matches these filters."));
@@ -511,5 +514,10 @@ final class CustomersPane extends MerchantPane {
             rows[iter + 1] = cells == null ? new String[0] : cells.toArray(new String[cells.size()]);
         }
         Files.saveCsv("customers" + (segment == null ? "" : "-" + segment) + ".csv", rows);
+    }
+
+    @Override
+    boolean splits() {
+        return true;
     }
 }

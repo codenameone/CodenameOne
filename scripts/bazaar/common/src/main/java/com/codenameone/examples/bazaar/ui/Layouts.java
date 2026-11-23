@@ -98,6 +98,24 @@ public final class Layouts {
 
     private static final float WIDE_COLUMN_MM = 176f;
 
+    /// Whether a section has room for two panes side by side: a list beside
+    /// its detail, a gallery beside the details, a cart beside its summary.
+    /// True on a tablet held upright, which keeps the phone's tab bar but has
+    /// twice a phone's width, and on everything [#wide()] is true for.
+    public static boolean split() {
+        return CN.getDisplayWidth() >= CN.convertToPixels(SPLIT_MM);
+    }
+
+    private static final float SPLIT_MM = 120f;
+
+    /// The widest a column of form fields is drawn, in pixels: a text field
+    /// across a whole tablet is a line the eye loses its place on.
+    public static int formColumn() {
+        return CN.convertToPixels(FORM_MM);
+    }
+
+    private static final float FORM_MM = 118f;
+
     /// Keeps the content of `holder` no wider than `most` pixels, in the
     /// middle of however much room there is, with its side padding. Called
     /// by the holder as it is laid out.
@@ -191,7 +209,7 @@ public final class Layouts {
         centre(page, margin, column());
     }
 
-    private static void centre(Container page, int margin, int most) {
+    static void centre(Container page, int margin, int most) {
         int side = Math.max(margin, (page.getWidth() - most) / 2);
         Style style = page.getAllStyles();
         Style now = page.getUnselectedStyle();

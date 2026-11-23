@@ -3063,3 +3063,32 @@ PosError { background-color: transparent; }
 PosCountLabel { background-color: transparent; }
 PosMuted { background-color: transparent; }
 /* ---- end REGISTER ROUND 6 ---- */
+
+/* TABLET ROUND 7: a merchant list beside its detail (MerchantPane.beside),
+   and secondary buttons that stay visible on a page of surface-alt, the
+   colour they were filled with, in both modes. */
+SvSecondary {
+    background-color: var(--surface);
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius);
+}
+
+MeSplitList {
+    background-color: var(--surface);
+    border-right: 1px solid var(--line);
+    padding: 0;
+    margin: 0;
+}
+
+MeSplitDetail {
+    background-color: var(--surface-alt);
+    padding: 0;
+    margin: 0;
+}
+
+@media (prefers-color-scheme: dark) {
+    MeSplitList { background-color: var(--surface-dark); border-right: 1px solid var(--line-dark); }
+    MeSplitDetail { background-color: var(--surface-alt-dark); }
+    SvSecondary { color: var(--text-dark); background-color: var(--surface-press-dark); border: 1px solid var(--line-strong-dark); border-radius: var(--radius); }
+    SvSecondary.pressed { background-color: var(--line-strong-dark); }
+}

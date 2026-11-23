@@ -26,6 +26,7 @@ import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Display;
 import com.codename1.ui.Form;
+import com.codenameone.examples.bazaar.net.Session;
 import com.codenameone.examples.bazaar.merchant.MerchantSections;
 import com.codenameone.examples.bazaar.ui.Sections;
 import com.codenameone.examples.bazaar.ui.Shell;
@@ -693,7 +694,7 @@ public class DemoTourTest extends E2e {
             pause(3000);
             visualShot("reg-reports-run" + mode);
         }
-        if (tap("reports-profit-loss")) {
+        if (tapTool("reports-profit-loss", "Profit and loss")) {
             pause(3000);
         }
         visualShot("reg-pnl" + mode);
@@ -823,7 +824,7 @@ private void screens() throws Exception {
         }
         go(MerchantSections.REPORTS);
         pause(2500);
-        if (tap("reports-profit-loss")) {
+        if (tapTool("reports-profit-loss", "Profit and loss")) {
             pause(3000);
             visualShot("merchant-profit-loss");
             safeBack();
@@ -847,6 +848,11 @@ private void screens() throws Exception {
         go(Sections.HOME);
         pause(2500);
         visualShot("shop-home");
+        // Collections belong to a store: the home page lists stores, and the
+        // page of a store has the row of collections.
+        if (tapFirst("store-")) {
+            pause(2500);
+        }
         if (tapRowWhenLoaded("collection-", true)) {
             pause(2500);
             visualShot("shop-collection");
@@ -908,8 +914,24 @@ private void screens() throws Exception {
         tap("menu-more");
         pause(1500);
         visualShot("admin-menu-sheet");
-        safeBack();
+        dismiss();
         pause(1000);
+        // Closing the menu with the back command of the screen under it signs
+        // the admin out, and every admin shot after it was the guest Account
+        // tab: come back as the admin when that happened.
+        final String[] at = new String[1];
+        onEdt(() -> {
+            Form f = Display.getInstance().getCurrent();
+            at[0] = f == null ? null : f.getName();
+        });
+        if (!"home-admin".equals(at[0])) {
+            log("screens: menu sheet left " + at[0] + ", signing the admin in again");
+            if (Session.user() != null) {
+                signOut();
+            }
+            signIn(ADMIN, "home-admin");
+            pause(2500);
+        }
         go(Sections.STORES);
         pause(2500);
         if (tapRowWhenLoaded("store-", false) || tapText("Northwind Outfitters")) {
@@ -918,7 +940,7 @@ private void screens() throws Exception {
             safeBack();
             pause(1200);
         } else {
-            log("screens: no store row to open");
+            log("screens: no store row to open"); visualShot("admin-stores");
         }
         go(Sections.USERS);
         pause(2500);
@@ -1113,6 +1135,19 @@ private void screens() throws Exception {
     }
 
     /// Taps the label that reads `text`, the first one on the screen.
+    /// Taps a merchant bar action, which a phone bar keeps in its overflow
+    /// menu once it holds two icons.
+    private boolean tapTool(String name, String text) {
+        if (tap(name)) {
+            return true;
+        }
+        if (tap("tools-more")) {
+            pause(800);
+            return tapText(text);
+        }
+        return false;
+    }
+
     private boolean tapText(final String text) {
         final Component[] found = new Component[1];
         onEdt(() -> found[0] = withText(Display.getInstance().getCurrent(), text));

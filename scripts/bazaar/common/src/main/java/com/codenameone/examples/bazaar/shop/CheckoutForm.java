@@ -97,7 +97,7 @@ final class CheckoutForm {
         form.addKeyListener(ESC, e -> previous.showBack());
         steps.setUIID("SvSteps");
         page.setName("checkout");
-        if (Layouts.wide()) {
+        if (Layouts.split()) {
             Container split = new Container(new GridLayout(1, 2));
             Container left = new Container(BoxLayout.y());
             left.add(addressBox).add(shippingBox).add(paymentBox);

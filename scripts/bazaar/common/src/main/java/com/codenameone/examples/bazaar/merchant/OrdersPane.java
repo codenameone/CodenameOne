@@ -396,4 +396,9 @@ final class OrdersPane extends MerchantPane {
             return Long.valueOf(ProductCsv.cents(text));
         }
     }
+
+    @Override
+    boolean splits() {
+        return true;
+    }
 }

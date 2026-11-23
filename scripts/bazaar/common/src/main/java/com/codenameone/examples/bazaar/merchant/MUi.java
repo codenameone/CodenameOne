@@ -41,9 +41,7 @@ final class MUi {
 
     /// A scrolling page for a form.
     static Container page(String name) {
-        Container page = new Container(BoxLayout.y());
-        page.setUIID("MePage");
-        page.setScrollableY(true);
+        Container page = Ui.formPage("MePage");
         page.setName(name);
         return page;
     }

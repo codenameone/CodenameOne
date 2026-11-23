@@ -38,6 +38,7 @@ import com.codenameone.examples.bazaar.ui.Ui;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import com.codename1.ui.geom.Dimension;
 
 /// A merchant section: a bar with the store switcher, the section's title and
 /// its actions, over the section's content.
@@ -56,6 +57,8 @@ abstract class MerchantPane extends Container {
     private final List<Object[]> stack = new ArrayList<Object[]>();
     private final List<Form> screens = new ArrayList<Form>();
     final boolean wide = Layouts.wide();
+    /// Whether a detail opens beside the list instead of over it.
+    private final boolean split = Layouts.split() && splits();
     private boolean loaded;
 
     MerchantPane(String title, String name) {
@@ -78,6 +81,8 @@ abstract class MerchantPane extends Container {
     /// The section's content, replacing whatever is shown.
     final void content(Component c) {
         stack.clear();
+        listShowing = false;
+        c.remove();
         body.removeAll();
         body.add(BorderLayout.CENTER, c);
         paintBar();
@@ -132,6 +137,16 @@ abstract class MerchantPane extends Container {
 
     /// Opens a detail screen over the content.
     final void push(String heading, Component detail) {
+        if (split && root != null) {
+            if (!stack.isEmpty() && Boolean.TRUE.equals(stack.get(stack.size() - 1)[2])) {
+                // A second row picked from the list replaces the detail
+                // beside it; a screen the detail opens goes over it.
+                stack.remove(stack.size() - 1);
+            }
+            stack.add(new Object[] {heading, detail, Boolean.valueOf(listShowing)});
+            beside(detail);
+            return;
+        }
         if (wide) {
             stack.add(new Object[] {heading, detail});
             body.removeAll();
@@ -150,6 +165,18 @@ abstract class MerchantPane extends Container {
 
     /// Goes back from the detail screen on top.
     final void pop() {
+        if (split && root != null) {
+            if (stack.isEmpty()) {
+                return;
+            }
+            stack.remove(stack.size() - 1);
+            if (stack.isEmpty()) {
+                content(root);
+            } else {
+                beside((Component) stack.get(stack.size() - 1)[1]);
+            }
+            return;
+        }
         if (wide) {
             if (stack.isEmpty()) {
                 return;
@@ -191,6 +218,43 @@ abstract class MerchantPane extends Container {
 
     private Component root;
 
+    /// Whether the section's list is on screen beside the detail, so a row
+    /// picked now replaces that detail rather than stacking over it.
+    private boolean listShowing;
+
+    /// Whether this section's root is a list whose rows open a detail, which
+    /// a wide screen shows beside it.
+    boolean splits() {
+        return false;
+    }
+
+    /// The list on the left, two fifths of the width, and `detail` beside it.
+    private void beside(Component detail) {
+        body.removeAll();
+        root.remove();
+        detail.remove();
+        Container side = new Container(new BorderLayout()) {
+            @Override
+            protected Dimension calcPreferredSize() {
+                Dimension d = super.calcPreferredSize();
+                int w = Math.max(CN.convertToPixels(55), MerchantPane.this.getWidth() * 2 / 5);
+                return new Dimension(w, d.getHeight());
+            }
+        };
+        side.setUIID("MeSplitList");
+        side.add(BorderLayout.CENTER, root);
+        Container pair = new Container(new BorderLayout());
+        pair.add(BorderLayout.WEST, side);
+        Container right = new Container(new BorderLayout());
+        right.setUIID("MeSplitDetail");
+        right.add(BorderLayout.CENTER, detail);
+        pair.add(BorderLayout.CENTER, right);
+        body.add(BorderLayout.CENTER, pair);
+        listShowing = true;
+        paintBar();
+        Ui.relayout(this);
+    }
+
     /// The section's own content, kept to come back to from a detail screen.
     final void root(Component c) {
         root = c;
@@ -200,7 +264,7 @@ abstract class MerchantPane extends Container {
     private void paintBar() {
         bar.removeAll();
         Container start = new Container(BoxLayout.x());
-        if (wide && !stack.isEmpty()) {
+        if ((wide || split) && !stack.isEmpty()) {
             Button back = new Button("", "MeTool");
             back.setName("merchant-back");
             FontImage.setMaterialIcon(back, FontImage.MATERIAL_ARROW_BACK, 3.6f);
@@ -220,7 +284,7 @@ abstract class MerchantPane extends Container {
         // adding them again while they have a parent throws. A store change
         // repaints the bar of a pane that is already showing.
         tools.remove();
-        if (stack.isEmpty()) {
+        if (stack.isEmpty() || split) {
             end.add(tools);
         }
         Component switcher = switcher();
