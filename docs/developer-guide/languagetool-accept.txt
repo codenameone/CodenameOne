@@ -929,3 +929,7 @@ Papercut
 Gochi
 Pillow
 ffmpeg
+treemap
+Treemap
+sparklines
+Sparklines

@@ -2594,7 +2594,7 @@ Reading the picture from top to bottom:
 * The **title** is the bold text at the top, set with `setTitle`.
 * The **legend** is the row of colored symbols with series names. It names each series, and tapping an entry hides or shows that series.
 * The **plot** is the area the data is drawn in, with light **grid lines** at each tick.
-* The **axes** run along the left and the bottom. Their **tick labels** are the numbers and the month names, and the **axis titles** ("Units", "Month") say what is measured.
+* The **axes** run along the left and the bottom. Their **tick labels** are the numbers and the month names, and the **axis titles**, Units and Month, say what each axis measures.
 * The horizontal line marked "Target" is an **annotation**: a fixed mark behind the data.
 * The box over the May bar is the **tooltip** for the selected point.
 
@@ -2736,7 +2736,7 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/charts/Mod
 .Range bars
 image::img/generated/chart-range-bars.png["Floating bars from each day's lowest to highest temperature",scaledwidth=40%]
 
-`ErrorBarSeries` marks a value and the interval around it:
+`ErrorBarSeries` marks each value with its error interval:
 
 [source,java]
 ----
@@ -2746,7 +2746,7 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/charts/Mod
 .Error bars
 image::img/generated/chart-error-bars.png["A dot per group with a vertical line through it showing its range",scaledwidth=40%]
 
-`BoxPlotSeries` summarizes a spread of values in five numbers: the whiskers are the minimum and maximum, the box runs between the quartiles and the line inside it is the median:
+`BoxPlotSeries` summarizes a spread of values in five numbers: the whiskers are the minimum and maximum, the box runs between the quartiles and the line inside marks the median:
 
 [source,java]
 ----
@@ -2891,7 +2891,7 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/charts/Mod
 ----
 
 .A Sankey diagram
-image::img/generated/chart-sankey.png["Bands flowing from energy sources through the grid to where it is used",scaledwidth=40%]
+image::img/generated/chart-sankey.png["Bands flowing from energy sources through the grid to the places that use it",scaledwidth=40%]
 
 `GaugeSeries` shows one value on a dial, with colored bands for its ranges:
 
