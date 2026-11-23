@@ -240,10 +240,9 @@ public final class SystemLlmClient extends LlmClient {
         }
         for (int i = 0; i < roles.length; i++) {
             ChatMessage m = messages.get(i);
-            // Never null: an image-only message has no text, and the ports
-            // hand the text to APIs that refuse null.
-            String text = m.getText();
-            contents[i] = text == null ? "" : text;
+            // getText() is never null (an image-only message answers ""),
+            // which matters: the ports hand it to APIs that refuse null.
+            contents[i] = m.getText();
             List<MessagePart> parts = m.getParts();
             for (int p = 0; p < parts.size(); p++) {
                 MessagePart part = parts.get(p);

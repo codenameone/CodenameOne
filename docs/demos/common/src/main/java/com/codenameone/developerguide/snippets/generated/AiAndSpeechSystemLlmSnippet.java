@@ -31,10 +31,10 @@ import com.codename1.io.Log;
 import com.codename1.ui.Label;
 
 class AiAndSpeechSystemLlmSnippet {
-    private Label answer;
 
     void chat() {
         // tag::ai-and-speech-system-llm[]
+        Label answer = new Label();
         if (SystemLlmClient.getStatus(SystemLlmFeature.CHAT).isAvailable()) {
             SystemLlmClient llm = LlmClient.system();
             llm.chat(ChatRequest.builder()

@@ -791,11 +791,11 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 
 Availability is a property of the device, not of the app, so ask before
 offering the feature. `getStatus(feature)` answers `AVAILABLE`,
-`DOWNLOADABLE` or `DOWNLOADING` when the model is not on the device yet,
+`DOWNLOADABLE` or `DOWNLOADING` when the model isn't on the device yet,
 `DISABLED` when the user switched Apple Intelligence off, or
 `UNSUPPORTED`. `getStatusReason(feature)` explains the answer in words
 fit for a log, and `getSupportedFeatures()` lists what the device offers.
-On Android, `download(feature)` asks AICore to fetch a model that is
+On Android, `download(feature)` asks AICore to fetch a model that's
 downloadable.
 
 Besides chat and streaming chat, the client has task methods:
@@ -804,15 +804,15 @@ Besides chat and streaming chat, the client has task methods:
 API, which has its own model and its own status; on Apple targets
 summarize, proofread and rewrite are prompts to the same model, and image
 description reports `UNSUPPORTED`. Embeddings, tool calling and JSON mode
-are not offered by these models and fail with `INVALID_REQUEST`.
+aren't offered by these models and fail with `INVALID_REQUEST`.
 
 The builders add this only to apps that call `LlmClient.system()`; an
-app that checks the status without ever calling it is told
+app that only checks the status gets
 `UNSUPPORTED`. On Android they add the
 ML Kit GenAI artifacts and raise the minimum SDK to 26. On iOS and macOS
 they inject a small Swift bridge into the project; it compiles to a stub
 with an Xcode whose SDK lacks Foundation Models, and the framework is
-weakly linked, so the app still installs and runs on older OS versions
+linked as optional, so the app still installs and runs on older OS versions
 and reports `UNSUPPORTED` there. The simulator, JavaScript, Windows,
 Linux, watchOS and tvOS report `UNSUPPORTED`; `LlmClient.ollama()` is the
 usual stand-in while developing in the simulator.
