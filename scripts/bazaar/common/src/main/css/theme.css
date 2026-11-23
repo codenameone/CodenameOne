@@ -2961,3 +2961,17 @@ PosQty { color: var(--text); font-family: "native:MainBold"; font-size: 3.4mm; t
     PosCartTool.pressed { background-color: var(--surface-press-dark); }
     PosCartHead { background-color: var(--surface-dark); border-bottom: 1px solid var(--line-dark); }
 }
+
+/* ---- dark4: analytics period header is a card (and its dark twin) ---- */
+MeAnalyticsHead { background-color: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 2.4mm 3mm 2.4mm 3mm; margin: 0 0 2.4mm 0; }
+
+@media (prefers-color-scheme: dark) {
+    MeAnalyticsHead { background-color: var(--surface-dark); border: 1px solid var(--line-dark); border-radius: var(--radius); }
+}
+/* The register's tile labels named no background, so in dark they took the
+   default label's white plate behind light text. */
+PosTileTitle, PosTilePrice, PosTileStock, PosTileLow { background-color: transparent; }
+@media (prefers-color-scheme: dark) {
+    PosTileTitle, PosTilePrice, PosTileStock, PosTileLow { background-color: transparent; }
+}
+/* ---- end dark4 ---- */

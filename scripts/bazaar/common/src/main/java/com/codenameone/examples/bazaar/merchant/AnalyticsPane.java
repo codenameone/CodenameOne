@@ -164,6 +164,16 @@ final class AnalyticsPane extends MerchantPane {
                 : MerchantState.currency());
     }
 
+    /// "Sep 1": the compared range as two of these fits beside the Compare
+    /// switch on a phone, where two ISO dates were cut off. The day is the UTC
+    /// day [Period] counts in; the month's name comes from the device's locale,
+    /// read off the 15th so no time zone can move it into the next month.
+    private static String shortDay(long millis) {
+        int[] ymd = Period.civil(Period.start(millis) / Period.DAY);
+        long mid = (Period.days(ymd[0], ymd[1], 15) * Period.DAY) + Period.DAY / 2;
+        return new com.codename1.l10n.SimpleDateFormat("MMM").format(new java.util.Date(mid)) + " " + ymd[2];
+    }
+
     private void paint() {
         if (data == null) {
             return;
@@ -177,8 +187,13 @@ final class AnalyticsPane extends MerchantPane {
         range.setShouldLocalize(false);
         Container rangeBox = new Container(BoxLayout.y());
         rangeBox.add(range);
-        rangeBox.add(Ui.plain(Lang.tr("Compared with {0} - {1}", Period.iso(data.previousFrom()),
-                Period.iso(data.from() - Period.DAY)), "SvMuted"));
+        // Wraps rather than cutting the end date off beside the Compare switch.
+        com.codename1.components.SpanLabel compared = new com.codename1.components.SpanLabel(
+                Lang.tr("Compared with {0} - {1}", shortDay(data.previousFrom()),
+                shortDay(data.from() - Period.DAY)));
+        compared.setUIID("Container");
+        compared.setTextUIID("SvMuted");
+        rangeBox.add(compared);
         head.add(BorderLayout.CENTER, Ui.tap(rangeBox, "analytics-range", e -> pickPeriod()));
         Container cmp = new Container(BoxLayout.x());
         cmp.add(Ui.plain(Lang.tr("Compare"), "SvLabel"));

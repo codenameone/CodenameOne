@@ -357,7 +357,12 @@ public final class Account {
             if (from.language() != null && from.language().length() > 0) {
                 Prefs.setLanguage(from.language());
             }
-            Prefs.setTheme(from.theme());
+            // An account that has never chosen a theme leaves the device's: the
+            // look picked on this device before signing in is not reset to
+            // light by the first sign-in.
+            if (from.theme() != null && from.theme().length() > 0) {
+                Prefs.setTheme(from.theme());
+            }
             Prefs.setUnits(from.units());
             Prefs.setNotifyOrderUpdates(from.notifyOrderUpdates());
             Prefs.setNotifyReceipts(from.notifyReceipts());

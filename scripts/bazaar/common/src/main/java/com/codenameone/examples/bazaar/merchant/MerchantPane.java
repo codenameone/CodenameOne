@@ -179,9 +179,12 @@ abstract class MerchantPane extends Container {
             back.addActionListener(e -> pop());
             start.add(back);
             start.add(Ui.plain(Lang.tr((String) stack.get(stack.size() - 1)[0]), "MeTitle"));
-        } else {
+        } else if (wide) {
             start.add(Ui.plain(Lang.tr(title), "MeTitle"));
         }
+        // On a phone the form's toolbar already names the section, so the bar
+        // is only the section's action icons and the store switcher: a second,
+        // larger copy of the title under the toolbar said the same thing twice.
         bar.add(BorderLayout.WEST, start);
         Container end = new Container(BoxLayout.x());
         // The tools outlive the bar: they are still inside the previous

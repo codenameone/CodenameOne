@@ -15,12 +15,12 @@ if [ "${2:-}" != "--inside" ]; then
   NAME="bazaar-visual-$$"
   podman build -q -t localhost/bazaar-visual-sim "$HERE/visual" >/dev/null
   trap 'podman rm -f "$NAME" >/dev/null 2>&1 || true' EXIT
-  podman run --name "$NAME" --rm -v "$REPO:/ro-repo:ro" -v "$HERE:/app" localhost/bazaar-visual-sim \
+  podman run --name "$NAME" --rm -e "BAZAAR_VISUAL_OUT=${BAZAAR_VISUAL_OUT:-visual}" -e "BAZAAR_VISUAL_MODES=${BAZAAR_VISUAL_MODES:-false true}" -v "$REPO:/ro-repo:ro" -v "$HERE:/app" localhost/bazaar-visual-sim \
     bash -c 'cp -a /ro-repo /repo && (Xvfb :99 -screen 0 1600x1200x24 -nolisten tcp &) && sleep 2 && DISPLAY=:99 bash /app/visual/capture.sh /repo --inside'
   exit 0
 fi
 PORT="${BAZAAR_VISUAL_PORT:-18083}"
-OUT="$HERE/common/target/visual"
+OUT="$HERE/common/target/${BAZAAR_VISUAL_OUT:-visual}"
 mkdir -p "$OUT" "$HERE/target"
 WRAP="$HERE/target/visual-mvn"
 printf '%s\n' '#!/bin/sh' "exec mvn -Dmaven.repo.local=$REPO \"\$@\"" >"$WRAP"
@@ -38,7 +38,7 @@ for _ in $(seq 1 120); do
 done
 
 BASE="-Xmx1g -Dbazaar.server.url=http://localhost:$PORT -Dbazaar.shots.dir=$OUT -Dbazaar.demo.tour=visual"
-for dark in false true; do
+for dark in ${BAZAAR_VISUAL_MODES:-false true}; do
   echo "[visual] dark=$dark"
   JAVA_TOOL_OPTIONS="$BASE -Dbazaar.visual.dark=$dark" "$WRAP" -B -f "$HERE/pom.xml" \
     -Dcodename1.platform=javase -Ptest verify >"$HERE/target/visual-$dark.log" 2>&1 \

@@ -66,8 +66,10 @@ public class Preferences {
         String language = profile.getLanguage();
         String method = payments.defaultMethod(username);
         if (row == null) {
-            // What someone who never opened the settings gets.
-            return new PreferencesDto(language, THEMES[0], UNITS[0], true, true, false, method);
+            // What someone who never opened the settings gets. The theme is
+            // empty, not "system": the device keeps the look it already has
+            // (a Dark chosen there before signing in), as it keeps its language.
+            return new PreferencesDto(language, "", UNITS[0], true, true, false, method);
         }
         return new PreferencesDto(language, row.getTheme(), row.getUnits(), row.isNotifyOrders(),
                 row.isNotifyReceipts(), row.isNotifyPromotions(), method);
