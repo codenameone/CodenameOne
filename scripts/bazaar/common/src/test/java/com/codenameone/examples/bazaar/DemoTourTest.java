@@ -75,7 +75,7 @@ public class DemoTourTest extends E2e {
             } else if (tour.startsWith("screens")) {
                 screens();
             } else if (tour.startsWith("visual")) {
-                visual();
+                visual(tour.indexOf("register") > 0);
             }
             if (recorder != null) {
                 SimulatorRecorder.Result r = recorder.stop();
@@ -380,7 +380,7 @@ public class DemoTourTest extends E2e {
     /// sheets and the merchant charts, with no captions and no recording.
     /// `bazaar.visual.dark` draws them dark; each capture's name says which,
     /// so a light and a dark run share one directory.
-    private void visual() throws Exception {
+    private void visual(boolean registerOnly) throws Exception {
         final boolean dark = Boolean.getBoolean("bazaar.visual.dark");
         onEdt(() -> {
             com.codenameone.examples.bazaar.Prefs.setTheme(dark ? com.codenameone.examples.bazaar.Prefs.THEME_DARK
@@ -392,6 +392,10 @@ public class DemoTourTest extends E2e {
             pause(1500);
         }
         String mode = dark ? "-dark" : "-light";
+        if (registerOnly) {
+            visualRegister(mode);
+            return;
+        }
         signIn(MERCHANT, "home-merchant");
         pause(2000);
         go(Sections.DASHBOARD);
@@ -480,9 +484,175 @@ public class DemoTourTest extends E2e {
         }
     }
 
+    /// The register flows the main visual tour does not reach: every tender,
+    /// the approval keypad, layaways, the shift and the P&L waterfall.
+    private void visualRegister(String mode) throws Exception {
+        signIn(CASHIER, "home-pos");
+        pause(2000);
+        tapFirst("pos-store-");
+        pause(1500);
+        tapFirst("pos-register-");
+        pause(1500);
+        if (findByName("pos-pin-1") != null) {
+            for (String k : new String[] {"1", "2", "3", "4", "OK"}) {
+                tap("pos-pin-" + k);
+                pause(250);
+            }
+            pause(2000);
+        }
+        if (findByName("pos-open-shift") != null) {
+            visualShot("reg-shift-open" + mode);
+            for (String k : new String[] {"1", "5", "0", "00"}) {
+                tap("pos-float-" + k);
+                pause(200);
+            }
+            tap("pos-open-shift");
+            pause(2000);
+        }
+        tap("pos-sell");
+        pause(2500);
+        for (int i = 0; i < 4; i++) {
+            // Through the tile's accessibility action, as a screen reader or
+            // an agent opens it: what the tour holds is that this works.
+            activateNth("pos-tile-", i);
+            pause(1800);
+            if (activateNth("pos-variant-", 0)) {
+                pause(1800);
+            }
+        }
+        pause(1200);
+        visualShot("reg-sell" + mode);
+        if (findByName("pos-discount") == null && tap("pos-pay")) {
+            pause(1500);
+        }
+        visualShot("reg-cart-sheet" + mode);
+        for (String s : new String[] {"pos-clear", "pos-discount", "pos-customer"}) {
+            if (tap(s)) {
+                pause(1800);
+                visualShot("reg-" + s.substring(4) + mode);
+                if (s.equals("pos-discount") && tapFirst("pos-chip-")) {
+                    pause(1200);
+                    tap("pos-amount-apply");
+                    pause(2000);
+                    visualShot("reg-approval" + mode);
+                    for (String k : new String[] {"1", "2"}) {
+                        tapFirst("pos-approval-key");
+                        pause(200);
+                    }
+                    pause(600);
+                    visualShot("reg-approval-2" + mode);
+                    tap("pos-approval-cancel");
+                    pause(1200);
+                }
+                dismiss();
+                pause(1200);
+            }
+        }
+        if (findByName("pos-tender") == null) {
+            tap("pos-pay");
+            pause(1500);
+        }
+        if (tap("pos-tender") || tap("pos-pay")) {
+            pause(2500);
+            visualShot("reg-tender" + mode);
+            if (tapNth("pos-tip-", 1)) {
+                pause(1200);
+                visualShot("reg-tender-tip" + mode);
+            }
+            if (tap("pos-cash-other")) {
+                pause(1800);
+                visualShot("reg-tender-cash-keypad" + mode);
+                dismiss();
+                pause(1200);
+            }
+            if (tap("pos-gift")) {
+                pause(1800);
+                visualShot("reg-tender-gift" + mode);
+                dismiss();
+                pause(1200);
+            }
+            if (tap("pos-card")) {
+                pause(3500);
+                visualShot("reg-tender-card" + mode);
+                pause(4000);
+                visualShot("reg-receipt" + mode);
+                tap("pos-new-sale");
+                pause(1500);
+            }
+        }
+        if (tap("pos-layaways")) {
+            pause(2500);
+            visualShot("reg-layaways" + mode);
+            if (tapFirst("pos-layaway-0")) {
+                pause(2000);
+                visualShot("reg-layaway-paid-by" + mode);
+                dismiss();
+                pause(1200);
+            }
+        }
+        if (tap("pos-shift")) {
+            pause(2500);
+            visualShot("reg-shift" + mode);
+            if (tap("pos-close-shift")) {
+                pause(2000);
+                visualShot("reg-shift-close" + mode);
+            }
+        }
+        signOut();
+        pause(1500);
+        signIn(MERCHANT, "home-merchant");
+        pause(2000);
+        go(MerchantSections.REPORTS);
+        pause(3500);
+        visualShot("reg-pnl" + mode);
+        scrollDown(2);
+        visualShot("reg-pnl-2" + mode);
+    }
+
     /// Design-review captures of the screens no other tour reaches: the
     /// merchant's lists and their detail screens, checkout, and the admin's.
-    private void screens() throws Exception {
+        /// Closes the sheet on top, or goes back when there is none. Not waited
+    /// on: closing one sheet can reopen the one under it.
+    private void dismiss() {
+        com.codename1.ui.CN.callSerially(() -> {
+            com.codename1.ui.Sheet sheet = com.codename1.ui.Sheet.getCurrentSheet();
+            Form f = Display.getInstance().getCurrent();
+            if (sheet != null) {
+                sheet.back();
+            } else if (f != null && f.getBackCommand() != null) {
+                f.getBackCommand().actionPerformed(null);
+            }
+        });
+        waitFor(1200);
+    }
+
+    /// Fires the activate action of the row or card whose hidden lead is the
+    /// `n`th component named with `prefix`: the action [Ui#accessible]
+    /// exposes. Not waited on, as a tap is not.
+    private boolean activateNth(final String prefix, final int n) {
+        final com.codename1.ui.accessibility.AccessibilityAction[] act =
+                new com.codename1.ui.accessibility.AccessibilityAction[1];
+        final Component[] host = new Component[1];
+        onEdt(() -> {
+            Component c = byPrefix(Display.getInstance().getCurrent(), prefix, n);
+            while (c != null && act[0] == null) {
+                for (com.codename1.ui.accessibility.AccessibilityAction a : c.getSemantics().getActions()) {
+                    if (com.codename1.ui.accessibility.AccessibilityAction.ACTIVATE.equals(a.getId())) {
+                        act[0] = a;
+                        host[0] = c;
+                    }
+                }
+                c = c.getParent();
+            }
+        });
+        if (act[0] == null) {
+            return false;
+        }
+        com.codename1.ui.CN.callSerially(() -> act[0].perform(host[0], null));
+        return true;
+    }
+
+private void screens() throws Exception {
         signIn(MERCHANT, "home-merchant");
         pause(2000);
         go(Sections.ORDERS);
@@ -737,7 +907,7 @@ public class DemoTourTest extends E2e {
 
     /// Back, when the screen has somewhere to go back to.
     private void safeBack() {
-        onEdt(() -> {
+        com.codename1.ui.CN.callSerially(() -> {
             Form f = Display.getInstance().getCurrent();
             if (f != null && f.getBackCommand() != null) {
                 f.getBackCommand().actionPerformed(null);
@@ -785,7 +955,7 @@ public class DemoTourTest extends E2e {
             waitFor(33);
         }
         waitFor(300);
-        onEdt(() -> {
+        com.codename1.ui.CN.callSerially(() -> {
             overlay.released(at[2], at[3]);
             Display.getInstance().getCurrent().pointerReleased(at[2], at[3]);
         });
@@ -952,7 +1122,9 @@ public class DemoTourTest extends E2e {
             Display.getInstance().getCurrent().pointerPressed(x, y);
         });
         waitFor(140);
-        onEdt(() -> {
+        // Not waited on: a release that opens a sheet or a dialog blocks in
+        // invokeAndBlock until it closes, and a tour waiting on it would hang.
+        com.codename1.ui.CN.callSerially(() -> {
             overlay.released(x, y);
             Display.getInstance().getCurrent().pointerReleased(x, y);
         });
@@ -1021,7 +1193,7 @@ public class DemoTourTest extends E2e {
             });
             waitFor(33);
         }
-        onEdt(() -> {
+        com.codename1.ui.CN.callSerially(() -> {
             overlay.released(x1, y1);
             Display.getInstance().getCurrent().pointerReleased(x1, y1);
         });

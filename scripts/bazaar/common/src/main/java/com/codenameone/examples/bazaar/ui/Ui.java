@@ -647,7 +647,29 @@ public final class Ui {
         }
         row.add(BorderLayout.SOUTH, lead);
         row.setLeadComponent(lead);
+        accessible(row, lead);
         return row;
+    }
+
+    /// Exposes `row`, whose taps go to the hidden `lead`, to a screen reader
+    /// or an agent as one button: its label is the text it shows, its
+    /// identifier the lead's name, and activating it fires the lead.
+    ///
+    /// Without this the hidden lead is left out of the accessibility tree
+    /// and the row reads as loose static text nobody can open.
+    public static void accessible(Container row, final Button lead) {
+        com.codename1.ui.accessibility.AccessibilityNode node = row.getSemantics();
+        node.setRole(com.codename1.ui.accessibility.AccessibilityRole.BUTTON);
+        node.setGrouping(com.codename1.ui.accessibility.AccessibilityGrouping.MERGE_DESCENDANTS);
+        if (lead.getName() != null) {
+            node.setIdentifier(lead.getName());
+        }
+        node.addAction(new com.codename1.ui.accessibility.AccessibilityAction(
+                com.codename1.ui.accessibility.AccessibilityAction.ACTIVATE, null, (c, arg) -> {
+                    lead.pressed();
+                    lead.released();
+                    return true;
+                }));
     }
 
     /// A day, without the time.

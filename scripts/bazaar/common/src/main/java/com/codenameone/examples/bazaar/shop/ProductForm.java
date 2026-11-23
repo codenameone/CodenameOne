@@ -367,6 +367,7 @@ final class ProductForm {
             Label more = new Label(Lang.tr("See reviews"), "ShopRatingMore");
             tap.add(BorderLayout.EAST, more);
             tap.setLeadComponent(rating);
+            com.codenameone.examples.bazaar.ui.Ui.accessible(tap, rating);
             tap.add(BorderLayout.WEST, rating);
             rating.addActionListener(e -> ProductReviews.showAll(product.id(), product.title()));
             info.add(tap);

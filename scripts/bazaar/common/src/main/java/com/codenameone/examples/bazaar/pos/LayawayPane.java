@@ -79,6 +79,7 @@ final class LayawayPane {
                 row.add(BorderLayout.SOUTH, lead);
                 lead.setHidden(true);
                 row.setLeadComponent(lead);
+                com.codenameone.examples.bazaar.ui.Ui.accessible(row, lead);
                 page.add(row);
             }
             if (list == null || list.isEmpty()) {

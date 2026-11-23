@@ -371,6 +371,10 @@ final class SellScreen {
         SpanLabel name = new SpanLabel(twoLines(first.title()));
         name.setTextUIID("PosTileTitle");
         name.setUIID("Container");
+        // Always two lines tall: a grid row is as tall as its first tile, so
+        // a one-line title beside a two-line one used to cut off the price.
+        name.getTextComponent().setRows(2);
+        name.getTextComponent().setGrowByContent(false);
         text.add(name);
         long min = first.priceCents();
         long max = first.priceCents();
@@ -405,6 +409,7 @@ final class SellScreen {
         tile.add(lead);
         lead.setHidden(true);
         tile.setLeadComponent(lead);
+        com.codenameone.examples.bazaar.ui.Ui.accessible(tile, lead);
         return tile;
     }
 
@@ -436,6 +441,7 @@ final class SellScreen {
             card.add(b);
             b.setHidden(true);
             card.setLeadComponent(b);
+            com.codenameone.examples.bazaar.ui.Ui.accessible(card, b);
             content.add(card);
         }
         sheet.show();
@@ -676,6 +682,7 @@ final class SellScreen {
         text.add(lead);
         lead.setHidden(true);
         text.setLeadComponent(lead);
+        com.codenameone.examples.bazaar.ui.Ui.accessible(text, lead);
         top.add(BorderLayout.CENTER, text);
         top.add(BorderLayout.EAST, PosUi.data(PosState.money(unit * item.quantity), "PosLineTotal"));
         row.add(top);
@@ -902,6 +909,10 @@ final class SellScreen {
             cartSheet.setName("pos-cart-sheet");
             Container content = cartSheet.getContentPane();
             content.setLayout(new BorderLayout());
+            // The tool row sits right under the title's rule: the sheet's own
+            // top padding left an empty band between them.
+            content.getAllStyles().setPaddingTop(0);
+            content.getAllStyles().setMarginTop(0);
             if (cartSheetContent.getParent() != null) {
                 cartSheetContent.remove();
             }
