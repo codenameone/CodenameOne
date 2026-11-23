@@ -124,6 +124,42 @@ class WebFoundationTest {
         }
     }
 
+    @Autowired
+    com.codename1.backend.security.core.userdetails.JdbcUserDetailsManager users;
+    @Autowired
+    com.codename1.backend.security.crypto.PasswordEncoder encoder;
+
+    @Test
+    void aPasswordChangeRevokesTheKnownDevice() throws Exception {
+        Browser known = new Browser(mvc);
+        known.get("/auth/signin");
+        assertNotNull(known.signIn(DemoAccounts.SECOND_CUSTOMER, DemoAccounts.PASSWORD));
+        assertNotNull(known.device);
+        known.post("/auth/signout");
+        String account = com.codenameone.examples.bazaar.marketing.Tokens.fold(
+                DemoAccounts.SECOND_CUSTOMER);
+        com.codename1.backend.security.core.userdetails.UserDetails before =
+                users.loadUserByUsername(account);
+        try {
+            // The same password, hashed afresh: a reset to anything changes the
+            // stored hash, and with it every device cookie's signed text.
+            users.updateUser(com.codename1.backend.security.core.userdetails.User
+                    .withUserDetails(before).password(encoder.encode(DemoAccounts.PASSWORD))
+                    .build());
+            for (int iter = 0; iter < 60; iter++) {
+                throttle.fail("signin-failures-account", account);
+            }
+            known.get("/auth/signin");
+            MockResponse refused = known.post("/auth/signin", "username",
+                    DemoAccounts.SECOND_CUSTOMER, "password", DemoAccounts.PASSWORD);
+            assertTrue(refused.getRedirectedUrl() != null
+                    && refused.getRedirectedUrl().contains("locked"), "" + refused.getRedirectedUrl());
+        } finally {
+            throttle.succeed("signin-failures-account", account);
+            users.updateUser(before);
+        }
+    }
+
     @Test
     void wrongPasswordGoesBackToTheForm() throws Exception {
         Browser b = new Browser(mvc);

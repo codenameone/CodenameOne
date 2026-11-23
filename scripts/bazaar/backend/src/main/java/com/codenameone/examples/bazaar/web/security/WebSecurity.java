@@ -118,8 +118,10 @@ public class WebSecurity {
             RecoveryCodeService recoveryCodes, final Throttle throttle, BotGuard bots,
             @Value("${bazaar.web.hsts:true}") boolean hsts,
             com.codenameone.examples.bazaar.staff.SsoProviders sso,
-            com.codenameone.examples.bazaar.marketing.Campaigns campaigns) throws IOException {
-        final KnownDevices devices = new KnownDevices(campaigns);
+            com.codenameone.examples.bazaar.marketing.Campaigns campaigns,
+            com.codename1.backend.security.core.userdetails.JdbcUserDetailsManager users)
+            throws IOException {
+        final KnownDevices devices = new KnownDevices(campaigns, users);
         final boolean secureCookie = hsts;
         final SavedRequestAwareAuthenticationSuccessHandler saved =
                 new SavedRequestAwareAuthenticationSuccessHandler();
@@ -159,12 +161,11 @@ public class WebSecurity {
                         throttle.succeed("signin-failures-account", account(request));
                         // This browser now knows the account: its later
                         // attempts skip the account-wide lockout (KnownDevices).
-                        try {
-                            SecurityExchange.current().addResponseHeader("Set-Cookie",
-                                    devices.cookie(account(request), secureCookie));
-                        } catch (IOException noSecret) {
-                            // Signed in all the same; the browser stays unknown.
-                        }
+                        // The framework calls this handler only for a sign-in
+                        // with no second factor pending (SessionSignIn holds a
+                        // TOTP user back before it); mfa() below sets the
+                        // cookie when the code completes the sign-in.
+                        rememberDevice(devices, account(request), secureCookie);
                         return saved.onAuthenticationSuccess(request, who);
                     })
                     .failureHandler((request, refused) -> {
@@ -192,7 +193,16 @@ public class WebSecurity {
             .mfa(mfa -> mfa.totpService(totp).recoveryCodeService(recoveryCodes)
                     .secondFactorPage(SECOND_FACTOR)
                     .processingUrl(SECOND_FACTOR)
-                    .defaultSuccessUrl("/account"))
+                    .successHandler((request, who) -> {
+                        // Fully signed in only now; the password step set no
+                        // cookie. SSO (oauth2Login above) and passkeys keep
+                        // their own success handling and set none: no single
+                        // hook there knows the folded account without
+                        // replacing their redirects, and the lockout guards
+                        // only password attempts.
+                        rememberDevice(devices, Ascii.lower(who.getName().trim()), secureCookie);
+                        return saved.onAuthenticationSuccess(request, who);
+                    }))
             .logout(logout -> logout
                     .logoutRequestMatcher(AntPathRequestMatcher.antMatcher("POST", SIGN_OUT))
                     .logoutSuccessUrl("/"));
@@ -246,6 +256,18 @@ public class WebSecurity {
     /// to the account before: an attempt carrying a valid known-device cookie
     /// for the account ([KnownDevices]) skips it, and its owner keeps signing
     /// in from their own browsers while a new browser is refused.
+    /// Sets the known-device cookie for `account` on the current response.
+    static void rememberDevice(KnownDevices devices, String account, boolean secure) {
+        try {
+            String c = devices.cookie(account, secure);
+            if (c != null) {
+                SecurityExchange.current().addResponseHeader("Set-Cookie", c);
+            }
+        } catch (IOException noSecret) {
+            // Signed in all the same; the browser stays unknown.
+        }
+    }
+
     static String account(HttpServer.Request request) {
         String u;
         try {

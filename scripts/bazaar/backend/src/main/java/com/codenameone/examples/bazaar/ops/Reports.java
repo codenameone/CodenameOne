@@ -211,21 +211,54 @@ public class Reports {
     /// less discount) and never goes below zero. Reports count an order on
     /// the day it was placed, refunds included; Analytics counts a refund on
     /// the day it was made.
-    static long merchandiseRefund(long gross, long refunded) {
+    public static long merchandiseRefund(long gross, long refunded) {
         if (gross <= 0 || refunded <= 0) {
             return 0;
         }
         return Math.min(refunded, gross);
     }
 
-    /// The part of `refund` that falls on a line worth `lineSales` of an
-    /// order whose merchandise is `gross`, so the lines of a product report
-    /// add up to the order's net sales.
-    static long lineShare(long refund, long lineSales, long gross) {
-        if (refund <= 0 || lineSales <= 0 || gross <= 0) {
-            return 0;
+    /// Splits `refund` over lines worth `lineSales` (each line's price times
+    /// quantity less its own discount), in proportion to their worth. The
+    /// shares add up to exactly `refund` (or to the lines' total, if the
+    /// refund is larger), the cents rounding leaves over going to the lines
+    /// with the largest remainders, so the refund a product report subtracts
+    /// equals the one the order report subtracts. An order-level discount is
+    /// not spread over the lines: a product row counts its line's own sales.
+    static long[] lineShares(long refund, long[] lineSales) {
+        long[] out = new long[lineSales.length];
+        long total = 0;
+        for (int iter = 0; iter < lineSales.length; iter++) {
+            total += Math.max(0, lineSales[iter]);
         }
-        return Math.min(lineSales, refund * lineSales / gross);
+        if (refund <= 0 || total <= 0) {
+            return out;
+        }
+        long r = Math.min(refund, total);
+        long[] rest = new long[lineSales.length];
+        long given = 0;
+        for (int iter = 0; iter < lineSales.length; iter++) {
+            long sales = Math.max(0, lineSales[iter]);
+            out[iter] = r * sales / total;
+            rest[iter] = r * sales % total;
+            given += out[iter];
+        }
+        while (given < r) {
+            int best = -1;
+            for (int iter = 0; iter < lineSales.length; iter++) {
+                if (out[iter] < Math.max(0, lineSales[iter])
+                        && (best < 0 || rest[iter] > rest[best])) {
+                    best = iter;
+                }
+            }
+            if (best < 0) {
+                break;
+            }
+            out[best]++;
+            rest[best] = -1;
+            given++;
+        }
+        return out;
     }
 
     ReportDto report(String storeId, ReportSpecDto s) throws IOException {
@@ -292,12 +325,19 @@ public class Reports {
             long gross = Rows.number(o.get("subtotal_cents")) - Rows.number(o.get("discount_cents"));
             long merchRefund = merchandiseRefund(gross, Rows.number(o.get("refunded_cents")));
             if (productDim) {
-                for (int li = 0; mine != null && li < mine.size(); li++) {
+                int count = mine == null ? 0 : mine.size();
+                long[] lineSales = new long[count];
+                for (int li = 0; li < count; li++) {
+                    Map line = mine.get(li);
+                    lineSales[li] = Rows.number(line.get("price_cents"))
+                            * Rows.number(line.get("quantity"))
+                            - Rows.number(line.get("discount_cents"));
+                }
+                long[] shares = lineShares(merchRefund, lineSales);
+                for (int li = 0; li < count; li++) {
                     Map line = mine.get(li);
                     long q = Rows.number(line.get("quantity"));
-                    long sales = Rows.number(line.get("price_cents")) * q
-                            - Rows.number(line.get("discount_cents"));
-                    sales -= lineShare(merchRefund, sales, gross);
+                    long sales = lineSales[li] - shares[li];
                     add(accs, order, s, o, attr, Rows.text(line.get("title")), locs, id, customer,
                             sales, q);
                 }

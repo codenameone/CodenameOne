@@ -39,10 +39,20 @@ class ReportsRefundTest {
     @Test
     void aProductLineTakesItsShareOfTheRefund() {
         // Lines of 30.00 and 10.00, 20.00 refunded: 15.00 and 5.00.
-        assertEquals(1500, Reports.lineShare(2000, 3000, 4000));
-        assertEquals(500, Reports.lineShare(2000, 1000, 4000));
-        assertEquals(1000, Reports.lineShare(4000, 1000, 4000));
-        assertEquals(0, Reports.lineShare(0, 1000, 4000));
-        assertEquals(0, Reports.lineShare(2000, 1000, 0));
+        long[] two = Reports.lineShares(2000, new long[] {3000, 1000});
+        assertEquals(1500, two[0]);
+        assertEquals(500, two[1]);
+        assertEquals(0, Reports.lineShares(0, new long[] {1000})[0]);
+        assertEquals(1000, Reports.lineShares(5000, new long[] {1000})[0]);
+    }
+
+    @Test
+    void lineSharesAddUpToTheRefund() {
+        // Three lines of 1.00, 1.00 refunded: flooring alone would give 99.
+        long[] s = Reports.lineShares(100, new long[] {100, 100, 100});
+        assertEquals(100, s[0] + s[1] + s[2]);
+        long[] odd = Reports.lineShares(1001, new long[] {333, 777, 1, 0});
+        assertEquals(1001, odd[0] + odd[1] + odd[2] + odd[3]);
+        assertEquals(0, odd[3]);
     }
 }

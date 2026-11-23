@@ -61,6 +61,45 @@ class AnalyticsMathTest {
         return c;
     }
 
+    private static java.util.Map<String, Object> refundRow(String order, long amount, long at) {
+        java.util.Map<String, Object> m = new java.util.HashMap<String, Object>();
+        m.put("order_id", order);
+        m.put("amount_cents", Long.valueOf(amount));
+        m.put("created_at", Long.valueOf(at));
+        m.put("subtotal_cents", Long.valueOf(10000));
+        m.put("discount_cents", Long.valueOf(0));
+        return m;
+    }
+
+    @Test
+    void refundsCountOnlyTheMerchandiseLikeReports() {
+        // 100.00 of goods and 10.00 shipping, refunded in full: net 0, as
+        // Reports.merchandiseRefund subtracts.
+        long[] p = Analytics.period(T0, T0 + 7 * DAY, 0);
+        Analytics.Data d = new Analytics.Data();
+        d.counted.add(order("alice", T0 + DAY, 10000, 0, Orders.ONLINE));
+        List<Object> rows = new java.util.ArrayList<Object>();
+        rows.add(refundRow("o1", 11000, T0 + 2 * DAY));
+        Analytics.addRefunds(d, rows, T0);
+        KpiDto k = Analytics.kpis(d, d.between(p[0], p[1]), p[0], p[1]);
+        assertEquals(10000, k.refundsCents());
+        assertEquals(0, k.netSalesCents());
+        assertEquals(com.codenameone.examples.bazaar.ops.Reports.merchandiseRefund(10000, 11000),
+                k.refundsCents());
+
+        // Partial refunds of 60.00, 30.00 and 20.00: together never past 100.00,
+        // and a refund made before the window still uses up its share.
+        Analytics.Data parts = new Analytics.Data();
+        rows.clear();
+        rows.add(refundRow("o2", 6000, T0 - DAY));
+        rows.add(refundRow("o2", 3000, T0 + DAY));
+        rows.add(refundRow("o2", 2000, T0 + 2 * DAY));
+        Analytics.addRefunds(parts, rows, T0);
+        assertEquals(2, parts.refunds.size());
+        assertEquals(3000, parts.refunds.get(0).getAmountCents());
+        assertEquals(1000, parts.refunds.get(1).getAmountCents());
+    }
+
     @Test
     void kpisComparePeriods() {
         long[] p = Analytics.period(T0, T0 + 7 * DAY, 0);

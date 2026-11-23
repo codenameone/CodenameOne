@@ -50,6 +50,7 @@ import com.codenameone.examples.bazaar.repository.VariantRepository;
 import com.codenameone.examples.bazaar.ops.Perms;
 import com.codenameone.examples.bazaar.store.StoreAccess;
 
+import com.codenameone.examples.bazaar.ops.Reports;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -285,22 +286,49 @@ public class Analytics {
         }
         // Refunds count on the day they were made, whenever the order was
         // placed; a refund of a cancelled order (or an unconverted draft) was
-        // never a sale and is left out.
-        List rs = db.query("SELECT r.amount_cents AS amount_cents, r.created_at AS created_at "
-                + "FROM refund r JOIN store_order o ON o.id = r.order_id WHERE o.store_id = ? AND "
-                + "r.created_at >= ? AND " + COUNTED_SQL, new Object[] {storeId, at});
-        for (int iter = 0; rs != null && iter < rs.size(); iter++) {
-            Map r = (Map) rs.get(iter);
-            Refund refund = new Refund();
-            refund.setAmountCents(number(r.get("amount_cents")));
-            long m = com.codenameone.examples.bazaar.Rows.millis(r.get("created_at"));
-            refund.setCreatedAt(Instant.ofEpochMilli(m != 0 ? m : number(r.get("created_at"))));
-            d.refunds.add(refund);
-        }
+        // never a sale and is left out. Every refund of an order refunded in
+        // the window is read, earlier ones included, so the merchandise cap
+        // below is applied to the order's running total.
+        List rs = db.query("SELECT r.order_id AS order_id, r.amount_cents AS amount_cents, "
+                + "r.created_at AS created_at, o.subtotal_cents AS subtotal_cents, "
+                + "o.discount_cents AS discount_cents FROM refund r JOIN store_order o "
+                + "ON o.id = r.order_id WHERE o.store_id = ? AND r.order_id IN (SELECT order_id "
+                + "FROM refund WHERE created_at >= ?) AND " + COUNTED_SQL
+                + " ORDER BY r.created_at, r.id", new Object[] {storeId, at});
+        addRefunds(d, rs, since);
         d.carts.addAll(carts.findByStoreIdAndCreatedAtGreaterThanEqual(storeId,
                 Instant.ofEpochMilli(since)));
         return d;
     }
+
+    /// Adds the refunds made at or after `since` from `rows` (oldest first,
+    /// with `order_id`, `amount_cents`, `created_at`, `subtotal_cents` and
+    /// `discount_cents`), each counted only for the merchandise it refunded:
+    /// an order's refunds together subtract at most its subtotal less
+    /// discount ([Reports#merchandiseRefund]), tax and shipping never, as the
+    /// reports count them.
+    static void addRefunds(Data d, List rows, long since) {
+        Map<String, Long> sofar = new HashMap<String, Long>();
+        for (int iter = 0; rows != null && iter < rows.size(); iter++) {
+            Map r = (Map) rows.get(iter);
+            String order = text(r.get("order_id"));
+            long gross = number(r.get("subtotal_cents")) - number(r.get("discount_cents"));
+            Long before = sofar.get(order);
+            long done = before == null ? 0 : before.longValue();
+            long counted = Reports.merchandiseRefund(gross - done, number(r.get("amount_cents")));
+            sofar.put(order, Long.valueOf(done + counted));
+            long m = com.codenameone.examples.bazaar.Rows.millis(r.get("created_at"));
+            long when = m != 0 ? m : number(r.get("created_at"));
+            if (when < since) {
+                continue;
+            }
+            Refund refund = new Refund();
+            refund.setAmountCents(counted);
+            refund.setCreatedAt(Instant.ofEpochMilli(when));
+            d.refunds.add(refund);
+        }
+    }
+
 
     static boolean counts(StoreOrder o) {
         return !"CANCELLED".equals(o.getStatus()) && !Orders.isUnconvertedDraft(o);
