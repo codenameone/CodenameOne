@@ -2488,7 +2488,7 @@ read by the build, because it decides what's linked into the server.
   and the fixation strategy, and nothing else.
 * **Ways of signing in beyond this chapter's.** Form, HTTP Basic, OAuth2 and
   OpenID Connect, SAML 2.0, LDAP and Active Directory, passkeys, API keys,
-  bearer tokens (JWTs) and remember-me are covered. Anything else is a filter
+  bearer tokens (JWTs) and `remember-me` are covered. Anything else is a filter
   or an `AuthenticationProvider` of your own.
 * **Other password schemes.** The delegating encoder knows `{pbkdf2-sha256}`,
   `{bcrypt}`, the two Spring PBKDF2 schemes and `{noop}`. A password stored
