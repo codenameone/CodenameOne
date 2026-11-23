@@ -58,6 +58,8 @@ class AndroidGLSurface extends GLSurfaceView {
     private static void trace(String s) {
         if (TRACE.incrementAndGet() < 60) {
             System.out.println("CN1GPU: " + s);
+            // give logcat time to flush before a possible emulator death
+            try { Thread.sleep(150); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
         }
     }
 
@@ -72,6 +74,26 @@ class AndroidGLSurface extends GLSurfaceView {
         setZOrderMediaOverlay(true);
         setRenderer(new SurfaceRenderer());
         setRenderMode(RENDERMODE_WHEN_DIRTY);
+    }
+
+    @Override
+    protected void onAttachedToWindow() {
+        trace("onAttachedToWindow");
+        super.onAttachedToWindow();
+        trace("onAttachedToWindow done");
+    }
+
+    @Override
+    public void surfaceCreated(android.view.SurfaceHolder holder) {
+        trace("holder surfaceCreated");
+        super.surfaceCreated(holder);
+        trace("holder surfaceCreated done");
+    }
+
+    @Override
+    public void surfaceChanged(android.view.SurfaceHolder holder, int format, int w, int h) {
+        trace("holder surfaceChanged " + w + "x" + h);
+        super.surfaceChanged(holder, format, w, h);
     }
 
     /// Returns the most recently rendered frame read back from the GPU, or null
