@@ -36,12 +36,25 @@ public final class Money {
         long abs = negative ? -cents : cents;
         long whole = abs / 100;
         long part = abs % 100;
-        String amount = whole + "." + (part < 10 ? "0" : "") + part;
+        String amount = grouped(whole) + "." + (part < 10 ? "0" : "") + part;
         String sign = negative ? "-" : "";
         if (code == null || code.length() == 0 || "USD".equalsIgnoreCase(code)) {
             return sign + "$" + amount;
         }
         return sign + amount + " " + code;
+    }
+
+    /// `whole` with a comma between each group of three digits: `4,952`.
+    static String grouped(long whole) {
+        String digits = String.valueOf(whole);
+        StringBuilder out = new StringBuilder();
+        for (int iter = 0; iter < digits.length(); iter++) {
+            if (iter > 0 && (digits.length() - iter) % 3 == 0) {
+                out.append(',');
+            }
+            out.append(digits.charAt(iter));
+        }
+        return out.toString();
     }
 
     /// A price that depends on the variant: `$10.00 - $14.00`, or one price

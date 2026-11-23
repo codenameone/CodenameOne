@@ -725,13 +725,7 @@ public final class Ui {
             // in the one the server is configured for (bazaar.currency).
             currency = Ui.currency;
         }
-        long whole = cents / 100;
-        long part = Math.abs(cents % 100);
-        String amount = whole + "." + (part < 10 ? "0" : "") + part;
-        if (currency == null || currency.length() == 0 || "USD".equals(currency)) {
-            return "$" + amount;
-        }
-        return amount + " " + currency;
+        return com.codenameone.examples.bazaar.shop.Money.format(cents, currency, "USD");
     }
 
     /// A distance, in the units chosen in Settings.
