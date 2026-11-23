@@ -130,3 +130,11 @@ You must have authorized the Codename One Crash Protection GitHub App for at lea
 . Open the console, go to *Repo mappings*, click *Connect on GitHub*, and install the App on the repo you want crashes to land in.
 . Add a mapping for your package -> repo.
 . Crashes from your release builds will now appear as GitHub issues on the mapped repo.
+
+=== Triaging crashes with an AI agent
+
+Because every crash is an ordinary GitHub issue with a symbolicated stack trace, a coding agent needs no extra integration to work on them. It lists the open issues in the mapped repository with the GitHub CLI or the GitHub MCP server, ranks them by occurrence count and last-seen date, reads the trace from the first frame in your own package, and fixes the code. The commit or pull request references the issue, so the fix and the crash stay linked. If the crash repository is separate from your source, the reference uses the full `owner/repo#number` form.
+
+The agent can then ship the fix through the BuildCloud MCP server (see <<buildcloud-mcp>>). A recurrence after the fix is live shows up on the same issue with a newer app version, which tells you whether the fix held.
+
+The Codename One agent skill in every generated project covers this workflow in `references/crash-triage.md`, including how to check that Crash Protection is set up. The issues hold scrubbed data, but the repository may still be private for a reason: the skill tells agents not to copy traces or device details anywhere public.
