@@ -37,8 +37,12 @@ import java.util.Map;
 /// that the user can tap, drag and type into.
 ///
 /// ```java
-/// DocumentEditor editor = new DocumentEditor(new DocumentModel(doc));
+/// DocumentModel model = new DocumentModel(new Document());
+/// model.insertBlock(0, new Paragraph(model.newId('p'), RichText.of("Quarterly review")));
+/// DocumentEditor editor = new DocumentEditor(model);
+/// Form form = new Form("Editor", new BorderLayout());
 /// form.add(BorderLayout.CENTER, editor);
+/// form.show();
 /// ```
 ///
 /// Only the components in view exist. One that scrolls out of view, or is replaced by an edit,

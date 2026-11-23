@@ -29,8 +29,11 @@ import com.codename1.util.SuccessCallback;
 /// one can work on the same text.
 ///
 /// ```java
-/// RichTextDocuments.show(doc, editor);
-/// ...
+/// final DocumentModel model = new DocumentModel(new Document());
+/// model.insertBlock(0, new Paragraph(model.newId('p'), RichText.of("Edit me")));
+/// RichTextArea editor = new RichTextArea();
+/// RichTextDocuments.show(model.getDocument(), editor);
+/// // later, once the user has edited the text
 /// RichTextDocuments.read(editor, new SuccessCallback<Document>() {
 ///     public void onSucess(Document d) {
 ///         model.setDocument(d);

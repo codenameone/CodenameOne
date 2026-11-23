@@ -33,8 +33,14 @@ import java.util.Map;
 /// Results are remembered per text, so a paragraph is checked again only when it changes.
 ///
 /// ```java
-/// Proofreader p = new Proofreader(SpellChecker.create(dictionary), GrammarChecker.english());
+/// DocumentModel model = new DocumentModel(new Document());
+/// model.insertBlock(0, new Paragraph(model.newId('p'), RichText.of("Quarterly review")));
+/// Proofreader p = new Proofreader(SpellChecker.forLanguage("en_US"), GrammarChecker.english());
+/// DocumentView view = new DocumentView(model);
 /// view.setProofreader(p);
+/// Form form = new Form("Proofreading", new BorderLayout());
+/// form.add(BorderLayout.CENTER, view);
+/// form.show();
 /// ```
 public final class Proofreader {
     private static final int CACHE = 512;

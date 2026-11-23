@@ -35,8 +35,16 @@ import java.util.Map;
 /// Writes a laid out document as PDF, page for page as `DocumentView` shows it.
 ///
 /// ```java
+/// DocumentModel model = new DocumentModel(new Document());
+/// model.insertBlock(0, new Paragraph(model.newId('p'), RichText.of("Quarterly review")));
 /// PdfMeasurer fonts = new PdfMeasurer();
-/// PdfExport.write(new DocumentLayout(doc, fonts), fonts, out);
+/// ByteArrayOutputStream out = new ByteArrayOutputStream();
+/// try {
+///     PdfExport.write(new DocumentLayout(model.getDocument(), fonts), fonts, out);
+///     Log.p("PDF bytes: " + out.size());
+/// } catch (IOException e) {
+///     Log.e(e);
+/// }
 /// ```
 ///
 /// Links become link annotations, tracked insertions are underlined and deletions struck

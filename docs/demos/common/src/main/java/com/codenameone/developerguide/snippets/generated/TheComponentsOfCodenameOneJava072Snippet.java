@@ -39,7 +39,7 @@ class TheComponentsOfCodenameOneJava072Snippet {
                     {"Row 3", "Row C", 7.5},
                     {"Row 4", "Row D", 2.24},
                 });
-        Table table = new Table(model);
+        com.codename1.ui.table.Table table = new com.codename1.ui.table.Table(model);
         table.setSortSupported(true);
         hi.add(BorderLayout.CENTER, table);
         hi.add(BorderLayout.NORTH, new Button("Button"));

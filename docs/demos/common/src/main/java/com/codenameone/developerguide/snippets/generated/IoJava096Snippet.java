@@ -152,7 +152,7 @@ class IoJava096Snippet {
                                 }
                                 Object[][] arr = new Object[data.size()][];
                                 data.toArray(arr);
-                                hi.add(BorderLayout.CENTER, new Table(new DefaultTableModel(columnNames, arr)));
+                                hi.add(BorderLayout.CENTER, new com.codename1.ui.table.Table(new DefaultTableModel(columnNames, arr)));
                             } else {
                                 hi.add(BorderLayout.CENTER, "Query returned no results");
                             }

@@ -39,8 +39,26 @@ import java.util.List;
 /// text is one.
 ///
 /// ```java
-/// Document d = TableSheets.recalculate(doc);   // every formula field shows its value
-/// Sheet s = TableSheets.toSheet(table, new Workbook(), "Table 1");
+/// DocumentModel model = new DocumentModel(new Document());
+/// try {
+///     model.setDocument(Document.read(new ByteArrayInputStream(("<table><tr><th>Region</th>"
+///             + "<th>Q1</th></tr><tr><td>North</td><td>120</td></tr></table>").getBytes()),
+///             Document.Format.HTML));
+/// } catch (IOException e) {
+///     Log.e(e);
+/// }
+/// // wordprocessing has a Table, and so does com.codename1.ui.table
+/// com.codename1.wordprocessing.Table table = null;
+/// for (int i = 0; i < model.size(); i++) {
+///     if (model.getDocument().get(i) instanceof com.codename1.wordprocessing.Table) {
+///         table = (com.codename1.wordprocessing.Table) model.getDocument().get(i);
+///     }
+/// }
+/// // every formula field shows its value
+/// Document recalculated = TableSheets.recalculate(model.getDocument());
+/// // com.codename1.ui has a Sheet too, hence the full name
+/// com.codename1.spreadsheet.Sheet s = TableSheets.toSheet(table, new Workbook(), "Table 1");
+/// Log.p(s.getCellText(1, 1));
 /// ```
 public final class TableSheets {
     private TableSheets() {

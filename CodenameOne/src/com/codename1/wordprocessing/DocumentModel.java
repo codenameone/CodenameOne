@@ -36,10 +36,10 @@ import java.util.Map;
 /// into one undo step.
 ///
 /// ```java
-/// DocumentModel model = new DocumentModel(Document.read(in, Document.Format.NATIVE));
+/// DocumentModel model = new DocumentModel(new Document());
 /// model.addDocumentListener(new DocumentListener() {
 ///     public void documentChanged(DocumentModel m, Document before, Document after) {
-///         markDirty();
+///         Log.p("now " + after.size() + " blocks");
 ///     }
 /// });
 /// model.insertBlock(model.size(), new Paragraph(model.newId('p'), RichText.of("The end")));

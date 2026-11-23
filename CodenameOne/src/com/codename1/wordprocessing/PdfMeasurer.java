@@ -37,9 +37,19 @@ import java.util.Map;
 ///
 /// ```java
 /// PdfMeasurer m = new PdfMeasurer();
-/// m.register("Serif", false, false, PdfFont.loadTrueType(regularBytes));
-/// m.register("Serif", true, false, PdfFont.loadTrueType(boldBytes));
-/// DocumentLayout layout = new DocumentLayout(doc, m);
+/// try {
+///     // fonts bundled with the application, in its resources
+///     InputStream regular = CN.getResourceAsStream("/NotoSerif-Regular.ttf");
+///     InputStream bold = CN.getResourceAsStream("/NotoSerif-Bold.ttf");
+///     if (regular != null && bold != null) {
+///         m.register("Serif", false, false, PdfFont.loadTrueType(Util.readInputStream(regular)));
+///         m.register("Serif", true, false, PdfFont.loadTrueType(Util.readInputStream(bold)));
+///     }
+/// } catch (IOException e) {
+///     Log.e(e);
+/// }
+/// DocumentLayout layout = new DocumentLayout(new Document(), m);
+/// Log.p("pages: " + layout.getPageCount());
 /// ```
 public final class PdfMeasurer implements Measurer {
     private final Map<String, PdfFont> fonts = new HashMap<String, PdfFont>();

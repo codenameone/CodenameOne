@@ -45,8 +45,12 @@ import java.util.Set;
 /// `COMPOUNDRULE` or the `CHECKCOMPOUND*` restrictions are reported as misspelled.
 ///
 /// ```java
-/// HunspellDictionary d = HunspellDictionary.fromBytes(affBytes, dicBytes);
+/// // the .aff and .dic files of a Hunspell dictionary, here as two tiny strings
+/// byte[] aff = "SET UTF-8\nSFX S Y 1\nSFX S 0 s .\n".getBytes();
+/// byte[] dic = "2\ncat/S\ndog/S\n".getBytes();
+/// HunspellDictionary d = HunspellDictionary.fromBytes(aff, dic);
 /// SpellChecker spell = SpellChecker.create(d);
+/// Log.p("cats: " + spell.isCorrect("cats") + ", cots: " + spell.isCorrect("cots"));
 /// ```
 public final class HunspellDictionary {
     private static final String LATIN2 =

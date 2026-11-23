@@ -41,8 +41,15 @@ import java.util.List;
 /// Reading and writing:
 ///
 /// ```java
-/// Document d = Document.read(in, Document.Format.MARKDOWN);
-/// d.write(out, Document.Format.NATIVE);
+/// try {
+///     Document d = Document.read(new ByteArrayInputStream("# Notes\n\nSome *text*.".getBytes()),
+///             Document.Format.MARKDOWN);
+///     ByteArrayOutputStream out = new ByteArrayOutputStream();
+///     d.write(out, Document.Format.DOCX);
+///     Log.p("DOCX bytes: " + out.size());
+/// } catch (IOException e) {
+///     Log.e(e);
+/// }
 /// ```
 public final class Document {
     /// The file formats `read` and `write` understand.

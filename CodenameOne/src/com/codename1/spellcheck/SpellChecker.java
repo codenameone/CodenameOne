@@ -51,12 +51,16 @@ import java.util.Set;
 /// platform checker.
 ///
 /// ```java
+/// String text = "Teh quick brown fox";
 /// SpellChecker spell = SpellChecker.forLanguage("en_US");
 /// if (spell == null) {
-///     spell = SpellChecker.create(HunspellDictionary.fromBytes(aff, dic));
+///     // no dictionary on this device: bring one, as a Hunspell .aff and .dic pair
+///     spell = SpellChecker.create(HunspellDictionary.fromBytes(
+///             "SET UTF-8\n".getBytes(), "3\nquick\nbrown\nfox\n".getBytes()));
 /// }
 /// for (ProofIssue i : spell.check(text)) {
-///     List<String> fixes = spell.suggest(text.substring(i.start, i.end), 5);
+///     java.util.List<String> fixes = spell.suggest(text.substring(i.start, i.end), 5);
+///     Log.p(text.substring(i.start, i.end) + " -> " + fixes);
 /// }
 /// ```
 public abstract class SpellChecker {

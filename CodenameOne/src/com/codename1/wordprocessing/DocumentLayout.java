@@ -31,10 +31,12 @@ import java.util.List;
 /// same result paints `DocumentView`, is written by the PDF export, and can run on a server.
 ///
 /// ```java
-/// DocumentLayout layout = new DocumentLayout(doc, new PdfMeasurer());
+/// DocumentModel model = new DocumentModel(new Document());
+/// model.insertBlock(0, new Paragraph(model.newId('p'), RichText.of("Quarterly review")));
+/// DocumentLayout layout = new DocumentLayout(model.getDocument(), new PdfMeasurer());
 /// for (int i = 0; i < layout.getPageCount(); i++) {
 ///     for (LayoutItem item : layout.getPage(i).getItems()) {
-///         // draw it
+///         Log.p("page " + i + ": item at " + item.x + ", " + item.y);
 ///     }
 /// }
 /// ```

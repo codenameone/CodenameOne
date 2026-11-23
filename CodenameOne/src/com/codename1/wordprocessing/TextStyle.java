@@ -28,7 +28,10 @@ package com.codename1.wordprocessing;
 /// A style is changed by deriving a new one, never in place:
 ///
 /// ```java
-/// TextStyle heading = TextStyle.DEFAULT.withSize(18).withBold(true);
+/// // com.codename1.ui.editor has a TextStyle too, hence the full name
+/// com.codename1.wordprocessing.TextStyle heading =
+///         com.codename1.wordprocessing.TextStyle.DEFAULT.withSize(18).withBold(true);
+/// Log.p("heading at " + heading.size + "pt");
 /// ```
 public final class TextStyle {
     /// Marks the absence of a highlight color.

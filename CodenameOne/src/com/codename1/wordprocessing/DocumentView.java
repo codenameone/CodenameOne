@@ -44,9 +44,12 @@ import java.util.Map;
 /// Shows a document as pages and edits it, the way `DataGrid` shows and edits a `Sheet`.
 ///
 /// ```java
-/// DocumentModel model = new DocumentModel(Document.read(in, Document.Format.DOCX));
+/// DocumentModel model = new DocumentModel(new Document());
+/// model.insertBlock(0, new Paragraph(model.newId('p'), RichText.of("Quarterly review")));
 /// DocumentView view = new DocumentView(model);
+/// Form form = new Form("Document", new BorderLayout());
 /// form.add(BorderLayout.CENTER, view);
+/// form.show();
 /// ```
 ///
 /// The view subscribes to its model while it is on a form and lays the document out again on
