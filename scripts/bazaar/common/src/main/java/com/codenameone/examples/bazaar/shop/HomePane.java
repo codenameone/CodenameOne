@@ -44,6 +44,7 @@ import com.codenameone.examples.bazaar.ui.Nav;
 import com.codenameone.examples.bazaar.ui.ProductArt;
 import com.codenameone.examples.bazaar.ui.SignInGate;
 import com.codenameone.examples.bazaar.ui.Ui;
+import com.codenameone.examples.bazaar.api.BlockDto;
 import java.util.List;
 
 /// The home tab, in one of two places.
@@ -390,6 +391,10 @@ final class HomePane extends ShopPane {
         categories.setScrollableX(true);
         categories.setHidden(true);
         top.add(categories);
+        final Container blocks = new Container(BoxLayout.y());
+        blocks.setName("home-blocks");
+        blocks.setHidden(true);
+        top.add(blocks);
         top.add(Ui.label("New arrivals", "ShopSectionTitle"));
         featured.type = null;
         featured.category = 0;
@@ -399,6 +404,11 @@ final class HomePane extends ShopPane {
         Api.catalog().collections(store.handle(), Net.to(list -> fill(collections, list),
                 (status, message) -> collections.setHidden(true)));
         final int ticket = built;
+        Api.content().blocks(store.handle(), Net.to(list -> {
+            if (ticket == built) {
+                blocks(blocks, list);
+            }
+        }, (status, message) -> { }));
         Api.catalog().facets(store.handle(), null, null, null, null, null, null, null, null,
                 Net.to(facets -> {
                     if (ticket == built) {
@@ -407,6 +417,39 @@ final class HomePane extends ShopPane {
                     }
                 }, (status, message) -> { }));
         Ui.relayout(this);
+    }
+
+    /// The store's home page blocks, as the merchant ordered them in the theme: headings,
+    /// text, images, products (a tap opens one), collections and buttons (a tap opens the
+    /// link). Merchant words, so nothing here is translated.
+    private static void blocks(Container box, List<BlockDto> list) {
+        box.removeAll();
+        int width = Math.max(1, CN.getDisplayWidth() - CN.convertToPixels(6));
+        for (int iter = 0; list != null && iter < list.size(); iter++) {
+            final BlockDto b = list.get(iter);
+            if ("heading".equals(b.kind())) {
+                box.add(Ui.label(b.text(), "ShopSectionTitle"));
+            } else if ("text".equals(b.kind())) {
+                box.add(Ui.text(b.text(), "SvText"));
+            } else if ("image".equals(b.kind())) {
+                box.add(ProductArt.label("block-" + b.ref(), b.text(), ProductArt.NO_GLYPH,
+                        b.ref(), width, width / 2, "Container"));
+            } else if ("product".equals(b.kind()) && b.target().length() > 0) {
+                box.add(Ui.link(b.text(), "block-product",
+                        e -> ProductForm.show(b.target(), b.text())));
+            } else if ("collection".equals(b.kind())) {
+                box.add(Ui.label(b.text().length() > 0 ? b.text() : b.ref(), "SvText"));
+            } else if ("button".equals(b.kind())) {
+                final String url = b.ref();
+                box.add(Ui.secondary(b.text(), "block-button", e -> {
+                    if (url.startsWith("https://")) {
+                        CN.execute(url);
+                    }
+                }));
+            }
+        }
+        box.setHidden(box.getComponentCount() == 0);
+        Ui.relayout(box);
     }
 
     /// The category row: "All" and each category; a tap narrows the grid

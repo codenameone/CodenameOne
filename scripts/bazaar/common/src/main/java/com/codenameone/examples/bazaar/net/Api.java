@@ -79,6 +79,7 @@ public final class Api {
     private static AdminApi admin;
     private static PaymentApi payments;
     private static StoreApi stores;
+    private static com.codenameone.examples.bazaar.api.ContentApi content;
     private static CatalogApi catalog;
     private static CartApi cart;
     private static CheckoutApi checkout;
@@ -134,6 +135,8 @@ public final class Api {
         admin = RestClients.create(AdminApi.class, baseUrl);
         payments = RestClients.create(PaymentApi.class, baseUrl);
         stores = RestClients.create(StoreApi.class, baseUrl);
+        content = RestClients.create(com.codenameone.examples.bazaar.api.ContentApi.class,
+                baseUrl);
         catalog = RestClients.create(CatalogApi.class, baseUrl);
         cart = RestClients.create(CartApi.class, baseUrl);
         checkout = RestClients.create(CheckoutApi.class, baseUrl);
@@ -193,6 +196,11 @@ public final class Api {
 
     public static PaymentApi payments() {
         return payments;
+    }
+
+    /// The online store content API; the app reads only the home page blocks.
+    public static com.codenameone.examples.bazaar.api.ContentApi content() {
+        return content;
     }
 
     public static StoreApi stores() {

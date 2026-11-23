@@ -59,6 +59,15 @@ public class StoreEndpoint implements StoreApiServer {
         return stores.myStores(Caller.name());
     }
 
+    @com.codename1.backend.annotations.Autowired
+    private com.codenameone.examples.bazaar.admin.Platform platform;
+
+    @Override
+    public List<com.codenameone.examples.bazaar.api.StoreStatsDto> organization()
+            throws Exception {
+        return platform.organization(Caller.name());
+    }
+
     @Override
     public StoreDto storeSettings(String storeId) throws Exception {
         return stores.settings(Caller.name(), storeId);

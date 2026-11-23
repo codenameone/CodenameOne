@@ -34,6 +34,7 @@ import com.codenameone.examples.bazaar.api.MetafieldDefDto;
 import com.codenameone.examples.bazaar.api.MetaobjectEntryDto;
 import com.codenameone.examples.bazaar.api.MetaobjectTypeDto;
 import com.codenameone.examples.bazaar.api.RedirectDto;
+import com.codenameone.examples.bazaar.api.BlockDto;
 import com.codenameone.examples.bazaar.api.ThemeDto;
 import com.codenameone.examples.bazaar.content.ContentEndpoint;
 import com.codenameone.examples.bazaar.content.Lists;
@@ -191,7 +192,12 @@ public class OnlineStorePages {
         f.add("logoPhotoId", "Logo photo id", "text", draft.logoPhotoId())
                 .hint("A photo uploaded to one of the store's products");
         f.add("sections", "Home sections, in order", "text", Lists.join(draft.sections()))
-                .hint("Any of: hero, collections, featured, blog, about");
+                .hint("Any of: hero, collections, featured, blog, about, blocks");
+        f.add("blocks", "Blocks of the blocks section", "textarea",
+                blockText(draft.blocks()))
+                .hint("One block a line, in order: kind | text | reference. Kinds: heading, "
+                        + "text, image (a photo id), product (a handle), collection (a "
+                        + "handle), button (a /path or https link)");
         v.forms.add(f);
         FormView pub = new FormView("publish", "Publish the draft", b + "/theme/publish",
                 "Publish");
@@ -235,7 +241,55 @@ public class OnlineStorePages {
         return change(request, base(storeId), "Draft saved", () -> content.saveTheme(storeId,
                 new ThemeDto(Themes.DRAFT, p(request, "accent"), p(request, "palette"),
                     p(request, "font"), p(request, "radius"), p(request, "logoPhotoId"),
-                    Lists.split(p(request, "sections")))));
+                    Lists.split(p(request, "sections")), blocks(p(request, "blocks")))));
+    }
+
+    /// The blocks as the form shows them: `kind | text | reference`, one a line.
+    static String blockText(List<BlockDto> blocks) {
+        StringBuilder b = new StringBuilder();
+        for (int iter = 0; blocks != null && iter < blocks.size(); iter++) {
+            BlockDto k = blocks.get(iter);
+            if (b.length() > 0) {
+                b.append('\n');
+            }
+            b.append(k.kind()).append(" | ").append(k.text());
+            if (k.ref().length() > 0) {
+                b.append(" | ").append(k.ref());
+            }
+        }
+        return b.toString();
+    }
+
+    /// Reads the form's block lines back; a missing field is empty, so the service names
+    /// what a block lacks.
+    public static List<BlockDto> blocks(String text) {
+        List<BlockDto> out = new ArrayList<BlockDto>();
+        String all = text == null ? "" : text;
+        int start = 0;
+        while (start < all.length()) {
+            int end = all.indexOf('\n', start);
+            if (end < 0) {
+                end = all.length();
+            }
+            String line = all.substring(start, end).trim();
+            start = end + 1;
+            if (line.length() == 0) {
+                continue;
+            }
+            int a = line.indexOf('|');
+            String kind = a < 0 ? line : line.substring(0, a);
+            String rest = a < 0 ? "" : line.substring(a + 1);
+            int c = rest.lastIndexOf('|');
+            String words = c < 0 ? rest : rest.substring(0, c);
+            String ref = c < 0 ? "" : rest.substring(c + 1);
+            String k = kind.trim();
+            if (c < 0 && ("image".equals(k) || "product".equals(k) || "collection".equals(k))) {
+                ref = rest;
+                words = "";
+            }
+            out.add(new BlockDto(k, words.trim(), ref.trim(), ""));
+        }
+        return out;
     }
 
     @com.codename1.backend.annotations.Autowired

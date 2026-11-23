@@ -597,6 +597,13 @@ or accepts the dispute.
 
 *Online store.* The theme page picks colors, font, corner style and logo, shows
 the result on a preview link that can be shared for an hour, and publishes it.
+The home page's sections can be reordered or left out, and the `blocks` section
+holds up to ten blocks in order (a heading, text, an image, a product, a
+collection or a button), written one a line as `kind | text | reference`; the
+web storefront and the app's store home both show them once the theme is
+published. An owner of more than one store finds *Organization overview* in the
+store switcher, in the app and the web back office: every store they own, with
+its orders and sales.
 Pages and policies, blog posts, the header and footer menus, and redirects from
 old addresses are edited here too. Metafields add typed fields to products,
 customers and orders (a care note, a material from a list), and those marked

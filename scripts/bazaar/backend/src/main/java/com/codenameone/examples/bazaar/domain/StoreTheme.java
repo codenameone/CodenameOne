@@ -54,6 +54,9 @@ public class StoreTheme {
     @Column(nullable = false, type = "VARCHAR(200)")
     private String sections = "";
 
+    @Column(nullable = false, type = "VARCHAR(4000)")
+    private String blocks = "";
+
     @Column(nullable = false)
     private Instant updatedAt = Instant.EPOCH;
 
@@ -130,6 +133,15 @@ public class StoreTheme {
 
     public void setSections(String sections) {
         this.sections = sections;
+    }
+
+    /// The home page's blocks, one a line: kind, text and reference split by tabs.
+    public String getBlocks() {
+        return blocks;
+    }
+
+    public void setBlocks(String blocks) {
+        this.blocks = blocks;
     }
 
     public Instant getUpdatedAt() {

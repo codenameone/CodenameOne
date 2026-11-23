@@ -227,6 +227,14 @@ public class WebPages {
         if (s.storeId.length() == 0) {
             throw new ResponseStatusException(404, "No such store");
         }
+        if (mine.size() > 1) {
+            NavItem org = new NavItem("Organization overview", "/admin/" + storeId
+                    + "/organization", "");
+            if (path.endsWith("/organization")) {
+                org.current = "page";
+            }
+            s.stores.add(org);
+        }
         String base = "/admin/" + storeId;
         for (int iter = 0; iter < ADMIN.length; iter++) {
             NavItem n = new NavItem(StoreText.translate(s.t, ADMIN[iter][0]),

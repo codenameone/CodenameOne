@@ -34,4 +34,6 @@ public interface StoreRepository extends CrudRepository<Store, String> {
     List<Store> findByStatusOrderByNameAsc(String status);
 
     List<Store> findByStatusNotOrderByNameAsc(String status);
+
+    List<Store> findByOwnerUsernameOrderByNameAsc(String ownerUsername);
 }

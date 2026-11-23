@@ -132,6 +132,38 @@ public class AdminPages {
         return "redirect:/admin/" + mine.get(0).store().id();
     }
 
+    @com.codename1.backend.annotations.Autowired
+    private com.codenameone.examples.bazaar.admin.Platform platform;
+
+    /// The organization overview, reached from any store's switcher: every store the caller
+    /// owns with its orders and sales, each in its own currency.
+    @GetMapping("/admin/{storeId}/organization")
+    public String organization(@PathVariable("storeId") String storeId, Model model,
+            HttpServer.Request request) throws Exception {
+        AdminView v = view("organization");
+        List<com.codenameone.examples.bazaar.api.StoreStatsDto> rows =
+                platform.organization(Caller.name());
+        for (int iter = 0; iter < rows.size(); iter++) {
+            com.codenameone.examples.bazaar.api.StoreStatsDto r = rows.get(iter);
+            AdminRow row = new AdminRow();
+            row.title = r.name();
+            row.url = "/admin/" + r.storeId();
+            row.quantity = String.valueOf(r.orders());
+            row.amount = money(r.gmvCents(), r.currency());
+            row.status = r.status();
+            v.facts.add(row);
+        }
+        return render(model, request, storeId, "Organization", v, null);
+    }
+
+    /// `cents` as `12.34 EUR`.
+    static String money(long cents, String currency) {
+        long abs = Math.abs(cents);
+        long frac = abs % 100;
+        return (cents < 0 ? "-" : "") + (abs / 100) + "." + (frac < 10 ? "0" : "") + frac
+                + " " + currency;
+    }
+
     @GetMapping("/admin/{storeId}")
     public String dashboard(@PathVariable("storeId") String storeId, Model model,
             HttpServer.Request request) throws Exception {

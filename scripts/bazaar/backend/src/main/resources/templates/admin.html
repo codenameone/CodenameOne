@@ -104,6 +104,7 @@
 <p><button type="submit">Save schedule</button></p></form>
 </th:block>
 
+<th:block th:if="${view.page == 'organization'}"><h1>Organization</h1><p class="muted">Every store you own, with its orders and sales less refunds, each in the store's own currency.</p><div class="card"><table><thead><tr><th scope="col">Store</th><th scope="col">Status</th><th scope="col">Orders</th><th scope="col">Sales</th></tr></thead><tbody><tr th:each="r : ${view.facts}"><td><a th:href="${r.url}" th:text="${r.title}">Store</a></td><td th:text="${r.status}">ACTIVE</td><td th:text="${r.quantity}">0</td><td th:text="${r.amount}">0.00</td></tr></tbody></table></div></th:block>
 <th:block th:if="${view.page == 'customer'}"><p><a th:href="${view.base + '/customers'}">Customers</a></p><h1 th:text="${shell.heading}">Customer</h1>
 <div class="grid2"><section class="card"><h2>Details</h2><dl class="facts"><th:block th:each="f : ${view.facts}"><dt th:text="${f.title}">Email</dt><dd th:text="${f.detail}">ada@example.com</dd></th:block></dl>
 <h2>Addresses</h2><p th:if="${view.addresses.empty}" class="muted">None saved.</p><ul th:unless="${view.addresses.empty}"><li th:each="a : ${view.addresses}"><span th:text="${a.title}">Address</span> <span th:if="${a.flag}" class="pill">Default</span></li></ul></section>

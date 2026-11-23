@@ -47,6 +47,11 @@ public interface ContentApi {
     void publishTheme(@Path("storeId") String storeId,
             OnComplete<Response<ThemeDto>> callback);
 
+    /// The live theme's home page blocks, for the app's store home.
+    @GET("/api/shop/stores/{handle}/blocks")
+    void blocks(@Path("handle") String handle,
+            OnComplete<Response<List<BlockDto>>> callback);
+
     @GET("/api/merchant/stores/{storeId}/pages")
     void contentPages(@Path("storeId") String storeId,
             OnComplete<Response<List<ContentPageDto>>> callback);

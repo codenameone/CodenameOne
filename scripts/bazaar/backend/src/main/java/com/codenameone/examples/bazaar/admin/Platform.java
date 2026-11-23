@@ -147,6 +147,29 @@ public class Platform {
         return dto(st, s);
     }
 
+    /// The organization overview: every store `owner` owns, by name, with its counted
+    /// orders and sales less refunds, each in that store's own currency.
+    @Transactional(readOnly = true)
+    public List<StoreStatsDto> organization(String owner) {
+        List<Store> owned = stores.findByOwnerUsernameOrderByNameAsc(owner);
+        List<StoreStatsDto> out = new ArrayList<StoreStatsDto>();
+        for (int iter = 0; iter < owned.size(); iter++) {
+            Store st = owned.get(iter);
+            long[] s = new long[2];
+            List<StoreOrder> rows = orders.findByStoreIdAndCreatedAtGreaterThanEqual(st.getId(),
+                    Instant.EPOCH);
+            for (int o = 0; o < rows.size(); o++) {
+                StoreOrder order = rows.get(o);
+                if (!"CANCELLED".equals(order.getStatus()) && !Orders.isUnconvertedDraft(order)) {
+                    s[0]++;
+                    s[1] += order.getTotalCents() - order.getRefundedCents();
+                }
+            }
+            out.add(dto(st, s));
+        }
+        return out;
+    }
+
     private static StoreStatsDto dto(Store st, long[] s) {
         return new StoreStatsDto(st.getId(), st.getHandle(), st.getName(), st.getStatus(),
                 st.getOwnerUsername(), s == null ? 0 : (int) s[0], s == null ? 0 : s[1],

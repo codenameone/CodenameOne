@@ -945,6 +945,9 @@ public class StorefrontPages {
         }
         page.logoUrl = logo.length() > 0 ? "/media/" + logo : "";
         page.sections = com.codenameone.examples.bazaar.content.Themes.sectionList(theme);
+        if (page.sections.contains("blocks")) {
+            page.blocks = blocks(store, theme);
+        }
         List<com.codenameone.examples.bazaar.domain.MenuLink> links =
                 navigation.ordered(store.getId());
         // Menu labels in the market's language: only a store that translated
@@ -1131,5 +1134,51 @@ public class StorefrontPages {
     static String moment(Instant at) {
         String s = at == null ? "" : at.toString();
         return s.length() >= 16 ? s.substring(0, 10) + " " + s.substring(11, 16) + " UTC" : s;
+    }
+
+    /// The theme's blocks with their links resolved; a product or collection that is gone
+    /// (or a product not on sale) drops its block rather than linking nowhere.
+    private List<PageMeta.Block> blocks(Store store,
+            com.codenameone.examples.bazaar.domain.StoreTheme theme) throws IOException {
+        List<com.codenameone.examples.bazaar.api.BlockDto> in =
+                com.codenameone.examples.bazaar.content.Themes.blockList(theme);
+        List<PageMeta.Block> out = new java.util.ArrayList<PageMeta.Block>();
+        String base = "/s/" + store.getHandle();
+        for (int iter = 0; iter < in.size(); iter++) {
+            com.codenameone.examples.bazaar.api.BlockDto b = in.get(iter);
+            PageMeta.Block v = new PageMeta.Block();
+            v.kind = b.kind();
+            v.text = b.text();
+            if ("image".equals(b.kind())) {
+                v.img = "/media/" + SiteUrls.encode(b.ref());
+            } else if ("product".equals(b.kind())) {
+                com.codenameone.examples.bazaar.domain.Product p =
+                        products.findByStoreIdAndHandle(store.getId(), b.ref());
+                if (p == null || !"ACTIVE".equals(p.getStatus())) {
+                    continue;
+                }
+                v.url = base + "/products/" + SiteUrls.encode(p.getHandle());
+                if (v.text.length() == 0) {
+                    v.text = p.getTitle();
+                }
+            } else if ("collection".equals(b.kind())) {
+                com.codenameone.examples.bazaar.domain.Collection c =
+                        collections.findByStoreIdAndHandle(store.getId(), b.ref());
+                if (c == null) {
+                    continue;
+                }
+                v.url = base + "/collections/" + SiteUrls.encode(c.getHandle());
+                if (v.text.length() == 0) {
+                    v.text = c.getTitle();
+                }
+            } else if ("button".equals(b.kind())) {
+                if (!com.codenameone.examples.bazaar.content.Themes.safeLink(b.ref())) {
+                    continue;
+                }
+                v.url = b.ref();
+            }
+            out.add(v);
+        }
+        return out;
     }
 }

@@ -54,6 +54,11 @@ public interface StoreApi {
     @GET("/api/merchant/stores")
     void myStores(OnComplete<Response<List<StoreRoleDto>>> callback);
 
+    /// The organization overview: every store the caller owns, with its counted orders and
+    /// sales (less refunds) in that store's currency.
+    @GET("/api/merchant/organization")
+    void organization(OnComplete<Response<List<StoreStatsDto>>> callback);
+
     @GET("/api/merchant/stores/{storeId}")
     void storeSettings(@Path("storeId") String storeId, OnComplete<Response<StoreDto>> callback);
 

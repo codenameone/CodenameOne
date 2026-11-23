@@ -21,7 +21,7 @@ package com.codenameone.examples.bazaar.api;
 import com.codename1.annotations.Mapped;
 import java.util.List;
 
-/// A store's storefront look: `status` LIVE or DRAFT, `accent` a #rrggbb colour, `palette`, `font` and `radius` keys from the safe lists, the logo photo and the home page's sections in order.
+/// A store's storefront look: `status` LIVE or DRAFT, `accent` a #rrggbb colour, `palette`, `font` and `radius` keys from the safe lists, the logo photo and the home page's sections in order, and the blocks of its `blocks` section in order.
 @Mapped
 public record ThemeDto(
         String status,
@@ -30,5 +30,6 @@ public record ThemeDto(
         String font,
         String radius,
         String logoPhotoId,
-        List<String> sections) {
+        List<String> sections,
+        List<BlockDto> blocks) {
 }

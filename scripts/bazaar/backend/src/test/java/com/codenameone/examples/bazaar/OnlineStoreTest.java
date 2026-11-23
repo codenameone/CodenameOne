@@ -57,6 +57,8 @@ import com.codenameone.examples.bazaar.taxes.TaxExemptions;
 import com.codenameone.examples.bazaar.web.security.BotGuard;
 import org.junit.jupiter.api.Test;
 
+import com.codenameone.examples.bazaar.api.BlockDto;
+import com.codenameone.examples.bazaar.api.StoreStatsDto;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -82,6 +84,8 @@ class OnlineStoreTest {
     private Accounts accounts;
     @Autowired
     private Stores stores;
+    @Autowired
+    private com.codenameone.examples.bazaar.admin.Platform platform;
     @Autowired
     private DemoPricing pricing;
     @Autowired
@@ -202,7 +206,7 @@ class OnlineStoreTest {
         assertEquals(200, visit("/s/os-page/policies/refund").getStatus());
         // The theme: a draft is not live; the signed preview shows it, never cached.
         themes.saveDraft(s.owner, s.storeId, new ThemeDto(Themes.DRAFT, "#aa3300", "dark",
-                "serif", "round", "", Arrays.asList("featured", "hero")));
+                "serif", "round", "", Arrays.asList("featured", "hero"), null));
         assertFalse(visit("/s/os-page").getContentAsString().contains("th-dark"));
         String token = themes.previewToken(s.owner, s.storeId);
         MockResponse preview = visit("/s/os-page?preview=" + token);
@@ -218,9 +222,60 @@ class OnlineStoreTest {
         // Roles and stores.
         String packer = packer(s, "os-page-packer");
         assertEquals(403, status(() -> themes.saveDraft(packer, s.storeId, new ThemeDto(
-                Themes.DRAFT, "#000000", "light", "system", "soft", "", null))));
+                Themes.DRAFT, "#000000", "light", "system", "soft", "", null, null))));
         Shop o = shop("os-page-other");
         assertEquals(404, status(() -> pages.list(o.owner, s.storeId)));
+    }
+
+    @Test
+    void homeBlocksAreCheckedPublishedAndRendered() throws Exception {
+        Shop s = shop("os-blocks");
+        List<BlockDto> blocks = Arrays.asList(
+                new BlockDto("heading", "Spring sale", "", ""),
+                new BlockDto("text", "Everything <b>half</b> off", "", ""),
+                new BlockDto("button", "Shop the sale", "/s/os-blocks/search", ""));
+        ThemeDto saved = themes.saveDraft(s.owner, s.storeId, new ThemeDto(Themes.DRAFT, "",
+                "light", "system", "soft", "", Arrays.asList("hero", "blocks"), blocks));
+        assertEquals(3, saved.blocks().size());
+        assertEquals("button", saved.blocks().get(2).kind());
+        assertFalse(visit("/s/os-blocks").getContentAsString().contains("Spring sale"),
+                "a draft's blocks are not live");
+        themes.publish(s.owner, s.storeId);
+        String home = visit("/s/os-blocks").getContentAsString();
+        assertTrue(home.contains("<h2>Spring sale</h2>"), home);
+        assertTrue(home.contains("href=\"/s/os-blocks/search\""));
+        assertFalse(home.contains("<b>half</b>"), "block text is escaped");
+        assertEquals(400, status(() -> themes.saveDraft(s.owner, s.storeId, new ThemeDto(
+                Themes.DRAFT, "", "light", "system", "soft", "", Arrays.asList("blocks"),
+                Arrays.asList(new BlockDto("button", "Go", "javascript:alert(1)", ""))))));
+        assertEquals(400, status(() -> themes.saveDraft(s.owner, s.storeId, new ThemeDto(
+                Themes.DRAFT, "", "light", "system", "soft", "", Arrays.asList("blocks"),
+                Arrays.asList(new BlockDto("image", "", "nope", ""))))));
+        assertEquals(400, status(() -> themes.saveDraft(s.owner, s.storeId, new ThemeDto(
+                Themes.DRAFT, "", "light", "system", "soft", "", Arrays.asList("blocks"),
+                Arrays.asList(new BlockDto("marquee", "x", "", ""))))));
+        // The admin form's line format reads back the same blocks.
+        List<BlockDto> parsed = com.codenameone.examples.bazaar.web.admin.OnlineStorePages
+                .blocks("heading | Hi\nproduct | mug\nbutton | Go | https://example.com");
+        assertEquals(3, parsed.size());
+        assertEquals("mug", parsed.get(1).ref());
+        assertEquals("https://example.com", parsed.get(2).ref());
+    }
+
+    @Test
+    void anOwnerSeesEveryStoreTheyOwnInTheOrganizationOverview() throws Exception {
+        Shop s = shop("os-org");
+        stores.create(s.owner, "Org Second", "os-org-second", "EUR");
+        List<StoreStatsDto> org = platform.organization(s.owner);
+        assertEquals(2, org.size());
+        assertEquals("Org Second", org.get(0).name());
+        assertEquals("EUR", org.get(0).currency());
+        assertEquals(0, org.get(0).orders());
+        assertTrue(platform.organization("os-org-nobody").isEmpty());
+        Browser owner = signedIn(s.owner);
+        String page = owner.get("/admin/" + s.storeId + "/organization").getContentAsString();
+        assertTrue(page.contains("Org Second"), page);
+        assertTrue(page.contains("Organization overview"));
     }
 
     @Test

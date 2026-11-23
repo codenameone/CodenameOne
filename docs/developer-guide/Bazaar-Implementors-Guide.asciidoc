@@ -601,6 +601,15 @@ The `content` package holds what a merchant edits about the storefront itself:
   checked `#rrggbb` color, mapped to classes in `web-src/shop.css`, because the
   public pages allow no inline style; nothing a merchant types reaches CSS. A
   preview is an address signed with the store and an expiry, valid for an hour.
+  Home page blocks live on the theme row (`blocks`, one a line, kind, text and
+  reference split by tabs), so a draft's blocks publish with the rest of it. A
+  button links only to a site path or an `https` address and an image only to
+  one of the store's photos; a product or collection that is gone drops its
+  block when the page renders. The app reads them from
+  `/api/shop/stores/{handle}/blocks`.
+* `Platform.organization`: the stores an owner owns (`Store.ownerUsername`), with
+  counted orders and sales less refunds, behind `/api/merchant/organization` and
+  `/admin/{storeId}/organization`.
 * `Pages` and `RichText`: pages, the four policies and blog posts, sanitized when
   saved, so what is stored is already clean.
 * `Navigation`: the `main` and `footer` menus, two levels deep, and the redirect

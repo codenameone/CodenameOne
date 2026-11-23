@@ -286,7 +286,7 @@ on a row.
 | Quantity rules / min order | &#10003; | core | app/plugin | core | no | Minimum, maximum and step per variant.
 | Quotes / draft-to-order for B2B | &#10003; | app/plugin | app/plugin | core | core | Quotes move from draft to sent, accepted, then ordered or declined.
 | B2B storefront / customer-specific catalog | &#8211; | core | app/plugin | core | no | 
-| Vaulted card / pay on account | &#9681; | core | app/plugin | core | no | Pay on account through net terms; no card vault. 
+| Vaulted card / pay on account | &#10003; | core | app/plugin | core | no | Saved cards (provider tokens) pay for Buy now and the post-purchase upsell; B2B companies pay on account through net terms.
 |===
 
 === Subscriptions and pre-orders
@@ -328,7 +328,7 @@ on a row.
 | Feature | Bazaar | Shopify | WooCommerce | BigCommerce | Square | Notes
 
 | Themes / theme editor | &#10003; | core | core | core | core | Palette, font, corners, logo and section order, with a signed preview link before publishing. 
-| Theme customization (sections/blocks) | &#9681; | core | core | core | core | Home sections can be ordered and toggled; no block editor. 
+| Theme customization (sections/blocks) | &#10003; | core | core | core | core | Home sections can be ordered and toggled; a blocks section holds ordered heading, text, image, product, collection and button blocks, shown by the storefront and the app home. No drag-and-drop editor.
 | Custom pages | &#10003; | core | core | core | core | Sanitized rich pages and four policy pages. 
 | Blog / articles | &#10003; | core | core | core | no | Posts with tags and author, Atom and RSS feeds. 
 | Navigation menus editor | &#10003; | core | core | core | core | Two-level main and footer menus. 
@@ -405,7 +405,7 @@ on a row.
 | Audit log / activity | &#10003; | core | app/plugin | core | core | 
 | Two-factor authentication | &#10003; | core | app/plugin | core | core | Authenticator-app codes (TOTP) with a QR code on the web and in the app, single-use recovery codes, and a store setting that requires them of every staff member.
 | SSO / SAML | &#10003; | core | app/plugin | core | no | OpenID Connect from any provider: authorization code with PKCE, the ID token checked against the provider's keys, and a verified email's domain mapped to a staff role. SAML is not supported.
-| Organization admin across stores | &#9681; | core | app/plugin | core | core | A platform administrator manages all stores.
+| Organization admin across stores | &#10003; | core | app/plugin | core | core | An owner runs several stores, switches between them in the app and the web back office, and sees an organization overview of sales per store; a platform administrator manages all stores.
 |===
 
 === Platform

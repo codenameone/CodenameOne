@@ -114,6 +114,16 @@ public final class PageMeta {
     public java.util.List<LinkView> footerLinks = new java.util.ArrayList<LinkView>();
     /// The home page's sections in the theme's order.
     public java.util.List<String> sections = new java.util.ArrayList<String>();
+    /// The home page's blocks section, resolved for rendering.
+    public java.util.List<Block> blocks = new java.util.ArrayList<Block>();
+
+    /// One rendered block: its kind, its words, where it links and the image it shows.
+    public static final class Block {
+        public String kind = "";
+        public String text = "";
+        public String url = "";
+        public String img = "";
+    }
     /// Whether this is a signed theme preview (never cached, never indexed).
     public boolean preview;
 }

@@ -22,6 +22,7 @@ import com.codename1.backend.ResponseStatusException;
 import com.codename1.backend.annotations.Component;
 import com.codename1.backend.annotations.Transactional;
 import com.codenameone.examples.bazaar.Ids;
+import com.codenameone.examples.bazaar.api.BlockDto;
 import com.codenameone.examples.bazaar.api.ThemeDto;
 import com.codenameone.examples.bazaar.domain.Photo;
 import com.codenameone.examples.bazaar.domain.Store;
@@ -58,7 +59,16 @@ public class Themes {
     public static final String[] FONTS = {"system", "serif", "mono", "humanist", "rounded"};
     public static final String[] RADII = {"soft", "square", "round"};
     /// The home page sections, in their default order.
-    public static final String[] SECTIONS = {"hero", "collections", "featured", "blog", "about"};
+    public static final String[] SECTIONS = {"hero", "collections", "featured", "blog", "about",
+        "blocks"};
+    /// The kinds of block the `blocks` section holds.
+    public static final String[] BLOCK_KINDS = {"heading", "text", "image", "product",
+        "collection", "button"};
+    /// At most this many blocks, each with at most these many characters of text and of
+    /// reference, so the encoded list fits its VARCHAR(4000) column.
+    static final int MAX_BLOCKS = 10;
+    static final int MAX_BLOCK_TEXT = 240;
+    static final int MAX_BLOCK_REF = 120;
     static final long PREVIEW_MILLIS = 3600L * 1000L;
 
     private final StoreThemeRepository rows;
@@ -106,6 +116,7 @@ public class Themes {
         }
         t.setLogoPhotoId(logo);
         t.setSections(sections(in.sections()));
+        t.setBlocks(encodeBlocks(storeId, in.blocks()));
         t.setUpdatedAt(Instant.now());
         if (fresh) {
             rows.insert(t);
@@ -230,13 +241,14 @@ public class Themes {
         t.setRadius(from.getRadius());
         t.setLogoPhotoId(from.getLogoPhotoId());
         t.setSections(from.getSections());
+        t.setBlocks(from.getBlocks());
         t.setUpdatedAt(Instant.now());
         return t;
     }
 
     static ThemeDto dto(StoreTheme t) {
         return new ThemeDto(t.getStatus(), t.getAccent(), t.getPalette(), t.getFont(),
-                t.getRadius(), t.getLogoPhotoId(), sectionList(t));
+                t.getRadius(), t.getLogoPhotoId(), sectionList(t), blockList(t));
     }
 
     /// `#rrggbb` (lower case), empty for the store's own colour, or 400.
@@ -291,5 +303,98 @@ public class Themes {
             return "hero,collections,featured,about";
         }
         return Lists.join(out);
+    }
+
+    /// The blocks of `t` in order; the stored form is one block a line, its kind, text and
+    /// reference split by tabs (input never carries either character).
+    public static List<BlockDto> blockList(StoreTheme t) {
+        List<BlockDto> out = new ArrayList<BlockDto>();
+        String all = t.getBlocks() == null ? "" : t.getBlocks();
+        int start = 0;
+        while (start < all.length()) {
+            int end = all.indexOf('\n', start);
+            if (end < 0) {
+                end = all.length();
+            }
+            String line = all.substring(start, end);
+            start = end + 1;
+            int a = line.indexOf('\t');
+            int b = a < 0 ? -1 : line.indexOf('\t', a + 1);
+            if (b > 0) {
+                out.add(new BlockDto(line.substring(0, a), line.substring(a + 1, b),
+                        line.substring(b + 1), ""));
+            }
+        }
+        return out;
+    }
+
+    /// Checks and encodes the blocks: a known kind, text where the kind shows text, a
+    /// reference where it needs one (one of this store's photos for an image, a handle for
+    /// a product or collection, a site path or https link for a button), or 400.
+    String encodeBlocks(String storeId, List<BlockDto> in) throws IOException {
+        if (in == null || in.isEmpty()) {
+            return "";
+        }
+        if (in.size() > MAX_BLOCKS) {
+            throw new ResponseStatusException(400, "At most " + MAX_BLOCKS + " blocks");
+        }
+        StringBuilder out = new StringBuilder();
+        for (int iter = 0; iter < in.size(); iter++) {
+            BlockDto b = in.get(iter);
+            String kind = b == null || b.kind() == null ? "" : b.kind().trim();
+            pick(kind, BLOCK_KINDS, "block kind");
+            String text = flat(b.text(), MAX_BLOCK_TEXT);
+            String ref = flat(b.ref(), MAX_BLOCK_REF);
+            if (("heading".equals(kind) || "text".equals(kind) || "button".equals(kind))
+                    && text.length() == 0) {
+                throw new ResponseStatusException(400, "A " + kind + " block needs text");
+            }
+            if ("heading".equals(kind) || "text".equals(kind)) {
+                ref = "";
+            } else if (ref.length() == 0) {
+                throw new ResponseStatusException(400, "A " + kind + " block needs a reference");
+            }
+            if ("image".equals(kind)) {
+                Photo p = ref.length() > 32 ? null : photos.findById(ref);
+                if (p == null || !storeId.equals(p.getOwnerId())) {
+                    throw new ResponseStatusException(400,
+                            "An image block must use one of this store's photos");
+                }
+            }
+            if ("button".equals(kind) && !safeLink(ref)) {
+                throw new ResponseStatusException(400,
+                        "A button links to a path on this site or an https address");
+            }
+            if (out.length() > 0) {
+                out.append('\n');
+            }
+            out.append(kind).append('\t').append(text).append('\t').append(ref);
+        }
+        return out.toString();
+    }
+
+    /// A path on this site (one leading slash) or an https address; never a script URL.
+    public static boolean safeLink(String ref) {
+        if (ref == null) {
+            return false;
+        }
+        if (ref.startsWith("/")) {
+            return !ref.startsWith("//") && ref.indexOf('\\') < 0;
+        }
+        return ref.regionMatches(true, 0, "https://", 0, 8) && ref.length() > 8;
+    }
+
+    /// `s` trimmed, with tabs and line breaks turned into spaces, at most `max` long.
+    private static String flat(String s, int max) {
+        if (s == null) {
+            return "";
+        }
+        StringBuilder b = new StringBuilder(s.length());
+        for (int iter = 0; iter < s.length(); iter++) {
+            char c = s.charAt(iter);
+            b.append(c == '\t' || c == '\n' || c == '\r' ? ' ' : c);
+        }
+        String out = b.toString().trim();
+        return out.length() > max ? out.substring(0, max).trim() : out;
     }
 }

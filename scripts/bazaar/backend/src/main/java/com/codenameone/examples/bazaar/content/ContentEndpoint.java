@@ -48,6 +48,38 @@ public class ContentEndpoint implements ContentApiServer {
         this.metafields = metafields;
     }
 
+    @com.codename1.backend.annotations.Autowired
+    private com.codenameone.examples.bazaar.store.Stores stores;
+
+    @com.codename1.backend.annotations.Autowired
+    private com.codenameone.examples.bazaar.repository.ProductRepository products;
+
+    /// The live home page blocks of an active store, each product block carrying the
+    /// product's id; a product that is gone or not active drops its block.
+    @Override
+    public List<com.codenameone.examples.bazaar.api.BlockDto> blocks(String handle)
+            throws Exception {
+        com.codenameone.examples.bazaar.domain.Store store = stores.activeStore(handle);
+        List<com.codenameone.examples.bazaar.api.BlockDto> in =
+                Themes.blockList(themes.liveOf(store.getId()));
+        List<com.codenameone.examples.bazaar.api.BlockDto> out =
+                new java.util.ArrayList<com.codenameone.examples.bazaar.api.BlockDto>();
+        for (int iter = 0; iter < in.size(); iter++) {
+            com.codenameone.examples.bazaar.api.BlockDto b = in.get(iter);
+            if ("product".equals(b.kind())) {
+                com.codenameone.examples.bazaar.domain.Product p =
+                        products.findByStoreIdAndHandle(store.getId(), b.ref());
+                if (p == null || !"ACTIVE".equals(p.getStatus())) {
+                    continue;
+                }
+                b = new com.codenameone.examples.bazaar.api.BlockDto(b.kind(),
+                        b.text().length() > 0 ? b.text() : p.getTitle(), b.ref(), p.getId());
+            }
+            out.add(b);
+        }
+        return out;
+    }
+
     @Override
     public ThemeDto theme(String storeId, String status) throws Exception {
         return themes.get(Caller.name(), storeId, status);

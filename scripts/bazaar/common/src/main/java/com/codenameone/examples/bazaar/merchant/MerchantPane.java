@@ -216,15 +216,46 @@ abstract class MerchantPane extends Container {
             return b;
         }
         b.addActionListener(e -> {
-            Command[] items = new Command[stores.size()];
+            Command[] items = new Command[stores.size() + 1];
             for (int iter = 0; iter < stores.size(); iter++) {
                 final StoreRoleDto s = stores.get(iter);
                 items[iter] = Command.create(s.store().name() + Ui.DOT + Lang.tr(Words.role(s.role())),
                         null, ev -> MerchantState.use(s));
             }
+            items[stores.size()] = Command.create(Lang.tr("Organization overview"), null,
+                    ev -> organization());
             com.codename1.ui.ContextMenu.show(b, b.getWidth() / 2, b.getHeight(), items);
         });
         return b;
+    }
+
+    /// The organization overview: every store the merchant owns, with its orders and
+    /// sales, each in its own currency; a tap on a store switches to it.
+    private void organization() {
+        com.codenameone.examples.bazaar.net.Api.stores().organization(
+                com.codename1.appkit.Net.to(list -> {
+            final com.codename1.ui.Dialog d = new com.codename1.ui.Dialog(
+                    Lang.tr("Organization overview"), BoxLayout.y());
+            for (int iter = 0; iter < list.size(); iter++) {
+                final com.codenameone.examples.bazaar.api.StoreStatsDto s = list.get(iter);
+                Button row = new Button(s.name() + Ui.DOT + s.orders() + " " + Lang.tr("Orders")
+                        + Ui.DOT + com.codenameone.examples.bazaar.shop.Money.format(
+                                s.gmvCents(), s.currency(), ""), "MeStore");
+                row.setName("org-" + s.handle());
+                row.addActionListener(e -> {
+                    d.dispose();
+                    List<StoreRoleDto> mine = MerchantState.stores();
+                    for (int k = 0; k < mine.size(); k++) {
+                        if (mine.get(k).store().id().equals(s.storeId())) {
+                            MerchantState.use(mine.get(k));
+                        }
+                    }
+                });
+                d.add(row);
+            }
+            d.setDisposeWhenPointerOutOfBounds(true);
+            d.showPacked(BorderLayout.CENTER, true);
+        }, (status, message) -> { }));
     }
 
     @Override
