@@ -349,6 +349,9 @@ https://www.codenameone.com/javadoc/com/codename1/components/CoachMarks.html[Coa
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/LoadingAndOnboardingSnippets.java[tag=coach-marks,indent=0]
 ----
 
+.The first step of a CoachMarks tour
+image::img/generated/components-coach-marks.png[The first step of a CoachMarks tour,scaledwidth=20%]
+
 A tap on the dim or on *Next* moves to the next step, *Skip* ends the tour, and the last step's button reads *Done*. While the tour is up, touches go to it and never reach the form underneath. Each step is announced to screen readers, and a component inside a scrolling container is scrolled into view before its step shows.
 
 `showOnce(key)` shows the tour the first time and records that in `Preferences`, which is what an onboarding tour usually wants; `show()` shows it every time. A tour with one step is a single feature highlight, for instance pointing at a button a release just added. To offer "show the tips again" in your settings, forget the key:
@@ -1009,6 +1012,9 @@ The factory methods give the common shapes. Combine them to outline a whole scre
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/LoadingAndOnboardingSnippets.java[tag=skeleton-shapes,indent=0]
 ----
 
+.Skeleton rows, an avatar beside text, and a card
+image::img/generated/components-skeleton.png[Skeleton rows, an avatar beside text, and a card,scaledwidth=20%]
+
 `rows(n)`:: a list: per row, a round icon, a title, a shorter second line and a value at the far end
 `text(n)`:: lines of a paragraph, the last one shorter
 `circle(mm)`:: an avatar or an icon
@@ -1036,6 +1042,9 @@ https://www.codenameone.com/javadoc/com/codename1/components/EmptyState.html[Emp
 ----
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/LoadingAndOnboardingSnippets.java[tag=empty-state-retry,indent=0]
 ----
+
+.An EmptyState with a retry action
+image::img/generated/components-empty-state.png[An EmptyState with a retry action,scaledwidth=20%]
 
 The UIIDs are `EmptyState`, `EmptyStateIcon`, `EmptyStateTitle`, `EmptyStateText` and `EmptyStateButton`. A theme that doesn't style them falls back to the `Label`, `SpanLabelText` and `Button` looks.
 
@@ -1806,6 +1815,9 @@ https://www.codenameone.com/javadoc/com/codename1/components/Carousel.html[Carou
 ----
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/LoadingAndOnboardingSnippets.java[tag=carousel,indent=0]
 ----
+
+.A Carousel on its second page, with its page dots
+image::img/generated/components-carousel.png[A Carousel on its second page, with its page dots,scaledwidth=20%]
 
 `Carousel` is the swipeable `Tabs` described above with the tab bar hidden, plus a `PageIndicator`. It swipes, snaps and mirrors for right-to-left languages exactly as `Tabs` does, and `getTabs()` gives access to anything the class doesn't wrap. Auto play advances one page per interval while the carousel is on screen, waits at least one interval after the user touches it, and wraps from the last page to the first unless `setLoop(false)` is set. `setIndicatorPosition` moves the dots to `BorderLayout.NORTH`, or hides them with `null`. Each page change is announced to screen readers.
 

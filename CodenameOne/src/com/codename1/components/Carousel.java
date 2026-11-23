@@ -32,6 +32,7 @@ import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.events.SelectionListener;
 import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.plaf.Style;
 import com.codename1.ui.util.UITimer;
 
 /// A carousel (also called an image slider, view pager, banner rotator or
@@ -59,6 +60,17 @@ import com.codename1.ui.util.UITimer;
 ///
 /// UIIDs: [Carousel] for the container, [PageIndicator] for the dots.
 public class Carousel extends Container {
+
+    @Override
+    protected void initUnselectedStyle(Style unselectedStyle) {
+        super.initUnselectedStyle(unselectedStyle);
+        // A UIID the theme does not define gets a default style that is
+        // opaque white, which reads as a white box in dark mode. Unstyled,
+        // this component draws only what it paints itself.
+        if (unselectedStyle != null && !getUIManager().isThemeStyleDefined(getUIID())) {
+            unselectedStyle.setBgTransparency(0);
+        }
+    }
     private final Tabs tabs = new Tabs();
     private final PageIndicator indicator = new PageIndicator();
     private String indicatorPosition = BorderLayout.SOUTH;

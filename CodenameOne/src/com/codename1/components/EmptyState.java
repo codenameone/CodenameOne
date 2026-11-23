@@ -30,6 +30,7 @@ import com.codename1.ui.Label;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.layouts.FlowLayout;
+import com.codename1.ui.plaf.Style;
 
 /// An empty state (also called a zero state, blank slate or "no results"
 /// view): an icon, a title, a line of explanation and an optional action,
@@ -57,6 +58,17 @@ import com.codename1.ui.layouts.FlowLayout;
 /// `EmptyStateText` and `EmptyStateButton`. Unstyled, they fall back to the
 /// theme's `Label`, `SpanLabel` and `Button` looks.
 public class EmptyState extends Container {
+
+    @Override
+    protected void initUnselectedStyle(Style unselectedStyle) {
+        super.initUnselectedStyle(unselectedStyle);
+        // A UIID the theme does not define gets a default style that is
+        // opaque white, which reads as a white box in dark mode. Unstyled,
+        // this component draws only what it paints itself.
+        if (unselectedStyle != null && !getUIManager().isThemeStyleDefined(getUIID())) {
+            unselectedStyle.setBgTransparency(0);
+        }
+    }
     private final Label icon = new Label();
     private final SpanLabel title = new SpanLabel();
     private final SpanLabel text = new SpanLabel();

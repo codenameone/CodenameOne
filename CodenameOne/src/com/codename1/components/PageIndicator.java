@@ -53,6 +53,17 @@ import com.codename1.ui.util.EventDispatcher;
 /// current one at full opacity and the rest faded, so they suit light and dark
 /// themes without styling.
 public class PageIndicator extends Component {
+
+    @Override
+    protected void initUnselectedStyle(Style unselectedStyle) {
+        super.initUnselectedStyle(unselectedStyle);
+        // A UIID the theme does not define gets a default style that is
+        // opaque white, which reads as a white box in dark mode. Unstyled,
+        // this component draws only what it paints itself.
+        if (unselectedStyle != null && !getUIManager().isThemeStyleDefined(getUIID())) {
+            unselectedStyle.setBgTransparency(0);
+        }
+    }
     private static final float DOT_MM = 1.6f;
     private static final float GAP_MM = 1.6f;
     private static final int FADED_ALPHA = 0x59;

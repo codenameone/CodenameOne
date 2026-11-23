@@ -77,11 +77,10 @@ public class CoachMarksScreenshotTest extends DualAppearanceBaseTest {
                 .add(search, "Search", "Find any order by number or name.")
                 .add(filter, "Filters", "Narrow the list to what is still open.")
                 .add(list, null, "Tap an order to see where it is.");
-        form.addShowListener(e -> {
-            if (!tour.isShowing()) {
-                tour.show();
-            }
-        });
+        // Started here rather than from a show listener: the base test's form
+        // overrides onShowCompleted, so show listeners never fire. The
+        // overlay places its bubble again once the targets are laid out.
+        tour.show();
     }
 
     @Override

@@ -61,4 +61,14 @@ class EmptyStateTest extends UITestBase {
         assertEquals(0, taps[0]);
         assertEquals(1, taps[1]);
     }
+
+    @FormTest
+    void unthemedComponentsPaintNoBackground() {
+        // An undefined UIID gets an opaque white default style, which showed
+        // as white boxes in dark mode.
+        assertEquals(0, new EmptyState(FontImage.MATERIAL_INBOX, "a", "b").getStyle().getBgTransparency() & 0xff);
+        assertEquals(0, Skeleton.rows(2).getStyle().getBgTransparency() & 0xff);
+        assertEquals(0, new Carousel().getStyle().getBgTransparency() & 0xff);
+        assertEquals(0, new PageIndicator().getStyle().getBgTransparency() & 0xff);
+    }
 }

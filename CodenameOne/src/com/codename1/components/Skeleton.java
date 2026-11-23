@@ -72,6 +72,17 @@ import com.codename1.ui.plaf.Style;
 /// See also [InfiniteProgress] for a blocking spinner and [EmptyState] for what
 /// to show when loading finished with nothing to show.
 public class Skeleton extends CommonProgressAnimations.ProgressAnimation {
+
+    @Override
+    protected void initUnselectedStyle(Style unselectedStyle) {
+        super.initUnselectedStyle(unselectedStyle);
+        // A UIID the theme does not define gets a default style that is
+        // opaque white, which reads as a white box in dark mode. Unstyled,
+        // this component draws only what it paints itself.
+        if (unselectedStyle != null && !getUIManager().isThemeStyleDefined(getUIID())) {
+            unselectedStyle.setBgTransparency(0);
+        }
+    }
     private static final int BLOCK = 0;
     private static final int ROWS = 1;
     private static final int TEXT = 2;

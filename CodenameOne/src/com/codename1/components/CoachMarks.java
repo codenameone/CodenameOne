@@ -329,6 +329,16 @@ public class CoachMarks {
         Step step;
         int[] laidOutHole;
 
+        @Override
+        protected void initUnselectedStyle(Style unselectedStyle) {
+            super.initUnselectedStyle(unselectedStyle);
+            // Unthemed, the UIID's default style is opaque white; paint()
+            // draws the dim itself.
+            if (unselectedStyle != null && !getUIManager().isThemeStyleDefined(getUIID())) {
+                unselectedStyle.setBgTransparency(0);
+            }
+        }
+
         Overlay() {
             setLayout(new BubbleLayout());
             setUIID("CoachMarkOverlay");
