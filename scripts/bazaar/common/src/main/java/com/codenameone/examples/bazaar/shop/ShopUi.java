@@ -64,6 +64,40 @@ final class ShopUi {
 
     /// A light tap under the finger, where the device has a motor and is not
     /// a desktop.
+    /// Says a product went into the cart, with a "View cart" action, over
+    /// the foot of the form; it leaves by itself after a few seconds.
+    static void added(String title) {
+        final Form form = CN.getCurrentForm();
+        if (form == null) {
+            Ui.say(Lang.tr("Added {0} to your cart", title));
+            return;
+        }
+        final Container layer = form.getLayeredPane(ShopUi.class, true);
+        layer.setLayout(new com.codename1.ui.layouts.BorderLayout());
+        layer.removeAll();
+        // One line: a long title ends in an ellipsis rather than growing the bar.
+        Label text = new Label(Lang.tr("Added {0} to your cart", title), "CartToastText");
+        text.setEndsWith3Points(true);
+        final com.codename1.ui.Button view = new com.codename1.ui.Button(Lang.tr("View cart"));
+        view.setUIID("CartToastAction");
+        view.setName("toast-view-cart");
+        final Container toast = com.codename1.ui.layouts.BorderLayout.centerEastWest(text, view, null);
+        toast.setUIID("CartToast");
+        view.addActionListener(e -> {
+            layer.removeAll();
+            form.repaint();
+            ShopSections.show(com.codenameone.examples.bazaar.ui.Sections.CART);
+        });
+        layer.add(com.codename1.ui.layouts.BorderLayout.SOUTH, toast);
+        form.revalidate();
+        com.codename1.ui.util.UITimer.timer(3500, false, form, () -> {
+            if (toast.getParent() == layer) {
+                layer.removeAll();
+                form.revalidate();
+            }
+        });
+    }
+
     static void tap() {
         if (!CN.isDesktop() && !CN.isSimulator()) {
             Display.getInstance().vibrate(12);

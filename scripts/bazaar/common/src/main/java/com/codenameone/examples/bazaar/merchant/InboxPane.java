@@ -437,7 +437,7 @@ final class InboxPane extends MerchantPane {
         com.codename1.ui.Button accept = Ui.primary(Lang.tr("Accept"), "inbox-accept",
                 e -> accept(ringing));
         accept.setEnabled(ringing.canAccept() && RtcMedia.supported());
-        banner.add(MUi.buttons(accept, Ui.secondary(Lang.tr("Decline"), "inbox-decline", e -> {
+        banner.add(MUi.cardButtons(accept, Ui.secondary(Lang.tr("Decline"), "inbox-decline", e -> {
             ringing.decline();
             if (call == ringing) {
                 call = null;

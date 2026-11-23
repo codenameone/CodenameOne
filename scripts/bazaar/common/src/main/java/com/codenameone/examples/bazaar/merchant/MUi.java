@@ -192,6 +192,15 @@ final class MUi {
         return row;
     }
 
+    /// Actions that sit inside a card: left aligned, no bar and no divider,
+    /// so they read as part of the card rather than the foot of the screen.
+    static Container cardButtons(Component... buttons) {
+        Container row = buttons(buttons);
+        ((com.codename1.ui.layouts.FlowLayout) row.getLayout()).setAlign(Component.LEFT);
+        row.setUIID("MeCardButtons");
+        return row;
+    }
+
     /// A search field that runs `typed` as the user types, after a short pause.
     static TextField search(String name, final Runnable typed) {
         final TextField f = new TextField("", Lang.tr("Search"), 20, TextArea.ANY);

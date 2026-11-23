@@ -165,7 +165,7 @@ final class OrderDetail extends Container {
         note.setName("order-note");
         notes.add(note);
         final TextField tags = MUi.text(notes, "Tags", "order-tags", o.tags());
-        notes.add(MUi.buttons(Ui.secondary(Lang.tr("Save note"), "order-note-save", e ->
+        notes.add(MUi.cardButtons(Ui.secondary(Lang.tr("Save note"), "order-note-save", e ->
                 Api.orders().note(MerchantState.storeId(), o.id(),
                         new OrderNoteDto(note.getText(), tags.getText()), Net.to(saved -> {
                             Ui.say("Saved");

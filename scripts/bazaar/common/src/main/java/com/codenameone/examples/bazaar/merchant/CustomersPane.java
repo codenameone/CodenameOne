@@ -346,7 +346,7 @@ final class CustomersPane extends MerchantPane {
         marketing.setName("customer-marketing");
         marketing.setSelected(c.acceptsMarketing());
         card.add(marketing);
-        card.add(MUi.buttons(Ui.primary(Lang.tr("Save"), "customer-save", e -> {
+        card.add(MUi.cardButtons(Ui.primary(Lang.tr("Save"), "customer-save", e -> {
             Api.customers().edit(MerchantState.storeId(), c.id(), new CustomerEditDto(
                     note.getText(), tags(tagField.getText()), marketing.isSelected()),
                     Net.to(saved -> {

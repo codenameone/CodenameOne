@@ -181,7 +181,7 @@ final class ProductEditor extends Container {
             row.add(optionNames[iter]).add(optionValues[iter]);
             opts.add(row);
         }
-        opts.add(MUi.buttons(Ui.secondary(Lang.tr("Update variants"), "variants-update",
+        opts.add(MUi.cardButtons(Ui.secondary(Lang.tr("Update variants"), "variants-update",
                 e -> regenerate())));
 
         Container vars = card(main, "Variants");

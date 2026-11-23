@@ -98,7 +98,7 @@ final class ShippingPane extends MerchantPane {
             card.setUIID("MeCard");
             card.add(Ui.text(Lang.tr("{0} products", String.valueOf(p.productIds().size())),
                     "SvMuted"));
-            card.add(MUi.buttons(
+            card.add(MUi.cardButtons(
                     Ui.secondary(Lang.tr("Edit profile"), "profile-edit-" + p.id(), e -> profile(p)),
                     Ui.secondary(Lang.tr("Add zone"), "profile-zone-add-" + p.id(),
                             e -> zone(null, p.id()))));
@@ -126,7 +126,7 @@ final class ShippingPane extends MerchantPane {
                     .deleteRate(MerchantState.storeId(), r.id(), Net.to(x -> load(), Ui::fail))));
             card.add(tap);
         }
-        card.add(MUi.buttons(
+        card.add(MUi.cardButtons(
                 Ui.secondary(Lang.tr("Edit zone"), "zone-edit-" + z.id(), e -> zone(z, z.profileId())),
                 Ui.secondary(Lang.tr("Add rate"), "rate-add-" + z.id(), e -> rate(z, null))));
         page.add(card);
@@ -232,7 +232,7 @@ final class ShippingPane extends MerchantPane {
                 card.add(tap);
             }
         }
-        card.add(MUi.buttons(
+        card.add(MUi.cardButtons(
                 Ui.secondary(Lang.tr("Routing settings"), "routing-settings", e -> settings()),
                 Ui.secondary(Lang.tr("Add rule"), "routing-rule-add", e -> rule(null))));
         card.add(Ui.secondary(Lang.tr("Fulfilment service orders"), "routing-service-orders",

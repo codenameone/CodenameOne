@@ -57,7 +57,7 @@ final class ProductTranslations {
         language.setUIID("SvField");
         language.setName("translation-locale");
         card.add(language);
-        card.add(MUi.buttons(Ui.secondary(Lang.tr("Open translation"), "translation-open",
+        card.add(MUi.cardButtons(Ui.secondary(Lang.tr("Open translation"), "translation-open",
                 e -> load(language.getText().trim()))));
         Ui.relayout(card);
     }
@@ -85,7 +85,7 @@ final class ProductTranslations {
             card.add(value);
             fields.add(value);
         }
-        card.add(MUi.buttons(Ui.primary(Lang.tr("Save translation"), "translation-save",
+        card.add(MUi.cardButtons(Ui.primary(Lang.tr("Save translation"), "translation-save",
                 e -> save(locale, rows, fields, 0))));
         Ui.relayout(card);
     }

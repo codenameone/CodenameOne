@@ -133,7 +133,7 @@ final class ProductForm {
                 ShopState.add(variants.get(0).id(), 1, () -> {
                     ShopUi.tap();
                     ShopUi.badge(CN.getCurrentForm());
-                    Ui.say(Lang.tr("Added {0} to your cart", p.title()));
+                    ShopUi.added(p.title());
                 }, Ui::fail);
             } else {
                 show(p.id(), p.title());
@@ -587,7 +587,7 @@ final class ProductForm {
             final Form form = host != null ? host : CN.getCurrentForm();
             ShopUi.fly(form, picture, gallery, add, () -> {
                 ShopUi.badge(CN.getCurrentForm());
-                Ui.say(Lang.tr("Added {0} to your cart", product.title()));
+                ShopUi.added(product.title());
             });
         }, (status, message) -> {
             add.setEnabled(true);

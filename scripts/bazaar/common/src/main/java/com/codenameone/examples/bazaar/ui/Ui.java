@@ -416,7 +416,9 @@ public final class Ui {
 
     /// The heading over a group of settings or facts.
     public static void section(Container page, String title) {
-        page.add(label(title, "SvSection"));
+        // The first heading of a page sits under the page padding, so the
+        // gap a heading keeps from the block above it is not needed there.
+        page.add(label(title, page.getComponentCount() == 0 ? "SvSectionFirst" : "SvSection"));
     }
 
     /// A label for text that is a name or a number, not a word to translate.

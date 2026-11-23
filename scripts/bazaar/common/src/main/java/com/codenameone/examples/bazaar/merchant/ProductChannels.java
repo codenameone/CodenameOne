@@ -103,7 +103,7 @@ final class ProductChannels {
             }
             fields.add(new TextField[] {sku, qty});
         }
-        bundleCard.add(MUi.buttons(Ui.secondary(Lang.tr("Save bundle"), "bundle-save", e -> {
+        bundleCard.add(MUi.cardButtons(Ui.secondary(Lang.tr("Save bundle"), "bundle-save", e -> {
             List<BundlePartDto> parts = new ArrayList<BundlePartDto>();
             for (int iter = 0; iter < fields.size(); iter++) {
                 String sku = fields.get(iter)[0].getText().trim();
@@ -155,7 +155,7 @@ final class ProductChannels {
             scheduleCard.add(block);
             fields.add(new TextField[] {pub, unpub});
         }
-        scheduleCard.add(MUi.buttons(Ui.secondary(Lang.tr("Save schedule"), "schedule-save",
+        scheduleCard.add(MUi.cardButtons(Ui.secondary(Lang.tr("Save schedule"), "schedule-save",
                 e -> saveSchedule(windows, fields, 0, false))));
         Ui.relayout(scheduleCard);
     }

@@ -113,11 +113,14 @@ public final class UsersForm {
                 continue;
             }
             shown++;
-            Container marks = new Container(new FlowLayout(Label.RIGHT, Label.CENTER));
+            // Badges stack rather than sit side by side: two in a row took
+            // the width the e-mail needed, and it wrapped a letter a line.
+            Container marks = new Container(com.codename1.ui.layouts.BoxLayout.y());
             if (user.flagged()) {
-                marks.add(Ui.badge("Flagged", "SvBadgeWarn"));
+                marks.add(FlowLayout.encloseRight(Ui.badge("Flagged", "SvBadgeWarn")));
             }
-            marks.add(Ui.badge(roles(user), user.suspended() ? "SvBadgeBad" : "SvBadge"));
+            marks.add(FlowLayout.encloseRight(
+                    Ui.badge(roles(user), user.suspended() ? "SvBadgeBad" : "SvBadge")));
             Container row = Ui.row((char) 0, user.displayName(), user.username(), marks);
             row.add(BorderLayout.WEST, FlowLayout.encloseCenterMiddle(
                     Ui.avatar(user.displayName())));

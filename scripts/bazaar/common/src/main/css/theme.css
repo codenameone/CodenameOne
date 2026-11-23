@@ -2905,3 +2905,33 @@ PosPayIdle.disabled { color: var(--text-muted); background-color: var(--surface)
     PosPayIdle { color: var(--text-muted-dark); background-color: var(--surface-dark); border-top: 1px solid var(--line-dark); }
     PosPayIdle.disabled { color: var(--text-muted-dark); background-color: var(--surface-dark); }
 }
+
+/* ==================================================================== */
+/* POLISH ROUND 2 -- shopper, merchant panes and admin console.          */
+/* ==================================================================== */
+/* Scroll thumbs: a thin, rounded, quiet thumb instead of the platform's
+   hard black bar, and no track at all. */
+Scroll { background-color: transparent; border: none; padding: 0; margin: 0; }
+ScrollThumb { background-color: var(--line-strong); border-radius: 1mm; padding: 0; margin: 0.4mm; }
+HorizontalScroll { background-color: transparent; border: none; padding: 0; margin: 0; }
+HorizontalScrollThumb { background-color: var(--line-strong); border-radius: 1mm; padding: 0; margin: 0.4mm; }
+@media (prefers-color-scheme: dark) {
+    ScrollThumb { background-color: var(--line-strong-dark); }
+    HorizontalScrollThumb { background-color: var(--line-strong-dark); }
+}
+/* Actions inside a card: a plain left-aligned row, no bar and no divider. */
+MeCardButtons { background-color: transparent; border: none; padding: 2mm 0 0 0; margin: 0; }
+/* The cart toast: message and its action on one line, no blank band. */
+CartToast { background-color: var(--text); border-radius: var(--radius); padding: 1.6mm 2mm 1.6mm 3mm; margin: 2.4mm 3.6mm 17mm 3.6mm; }
+CartToastText { color: var(--surface); background-color: transparent; font-family: "native:MainRegular"; font-size: 2.5mm; padding: 1.2mm 0 1.2mm 0; margin: 0; }
+CartToastAction { color: var(--brand-dark); background-color: transparent; font-family: "native:MainBold"; font-size: 2.5mm; padding: 1.2mm 2mm 1.2mm 2mm; margin: 0; }
+@media (prefers-color-scheme: dark) {
+    CartToast { background-color: var(--text-dark); }
+    CartToastText { color: var(--surface-dark); }
+    CartToastAction { color: var(--brand); }
+}
+/* A heading that opens a page needs no gap above it. */
+SvSectionFirst { color: var(--text); background-color: transparent; font-family: "native:MainBold"; font-size: 3.1mm; text-align: left; padding: 0.6mm 0 0.8mm 0; margin: 0; }
+@media (prefers-color-scheme: dark) {
+    SvSectionFirst { color: var(--text-dark); }
+}
