@@ -130,6 +130,11 @@ public final class Config {
     /// `webapp` in the working directory, and is served only when it holds an
     /// `index.html`; a directory named here that does not is a start-up error.
     public static final String WEBAPP_ROOT = "cn1.webapp.root";
+    /// The application route a request nothing served is dispatched to, with the
+    /// [com.codename1.backend.web.RequestDispatcher] attributes set, as Spring
+    /// Boot forwards to its error controller. Defaults to /error; empty turns
+    /// the dispatch off. Ignored when no route answers that path.
+    public static final String ERROR_PATH = "cn1.server.error.path";
     /// The path the web build is served under. Defaults to /.
     public static final String WEBAPP_PATH = "cn1.webapp.path";
     /// The Cache-Control header the web build's files carry. Defaults to

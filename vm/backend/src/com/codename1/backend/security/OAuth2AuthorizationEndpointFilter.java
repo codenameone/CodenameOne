@@ -56,10 +56,14 @@ public final class OAuth2AuthorizationEndpointFilter implements SecurityFilter {
                 || authentication != sessionAuthentication) { //NOPMD CompareObjectsWithEquals - session provenance
             authentication = null;
         }
-        if (path.equals(server.getSettings().getAuthorizationEndpoint())) {
-            return server.authorize(request, authentication);
-        }
         CsrfToken token = CsrfFilter.getToken(request);
+        if (path.equals(server.getSettings().getAuthorizationEndpoint())) {
+            // The token goes into the consent page's forms; the chain's CSRF
+            // protection has already checked the post that answers one.
+            return server.authorize(request, authentication,
+                    token == null ? null : token.getParameterName(),
+                    token == null ? null : token.getToken());
+        }
         return server.deviceVerification(request, authentication,
                 token == null ? null : token.getParameterName(),
                 token == null ? null : token.getHeaderName(),

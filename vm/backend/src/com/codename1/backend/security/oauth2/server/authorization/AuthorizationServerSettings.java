@@ -51,6 +51,7 @@ public final class AuthorizationServerSettings {
     private final String deviceAuthorizationEndpoint;
     private final String deviceVerificationEndpoint;
     private final String oidcUserInfoEndpoint;
+    private final String clientRegistrationEndpoint;
 
     private AuthorizationServerSettings(Builder b) {
         this.issuer = b.issuer;
@@ -62,6 +63,7 @@ public final class AuthorizationServerSettings {
         this.deviceAuthorizationEndpoint = b.deviceAuthorizationEndpoint;
         this.deviceVerificationEndpoint = b.deviceVerificationEndpoint;
         this.oidcUserInfoEndpoint = b.oidcUserInfoEndpoint;
+        this.clientRegistrationEndpoint = b.clientRegistrationEndpoint;
     }
 
     public static Builder builder() {
@@ -114,6 +116,14 @@ public final class AuthorizationServerSettings {
         return oidcUserInfoEndpoint;
     }
 
+    /// `/oauth2/register` unless set: where clients register themselves
+    /// (RFC 7591), once registration is turned on with
+    /// `clientRegistration(...)` on the configurer. Nothing answers there
+    /// until then.
+    public String getClientRegistrationEndpoint() {
+        return clientRegistrationEndpoint;
+    }
+
     /// Builds an [AuthorizationServerSettings].
     public static final class Builder {
         private String issuer;
@@ -125,6 +135,7 @@ public final class AuthorizationServerSettings {
         private String deviceAuthorizationEndpoint = "/oauth2/device_authorization";
         private String deviceVerificationEndpoint = "/oauth2/device_verification";
         private String oidcUserInfoEndpoint = "/userinfo";
+        private String clientRegistrationEndpoint = "/oauth2/register";
 
         Builder() {
         }
@@ -193,6 +204,11 @@ public final class AuthorizationServerSettings {
 
         public Builder oidcUserInfoEndpoint(String path) {
             this.oidcUserInfoEndpoint = path(path, "oidcUserInfoEndpoint");
+            return this;
+        }
+
+        public Builder clientRegistrationEndpoint(String path) {
+            this.clientRegistrationEndpoint = path(path, "clientRegistrationEndpoint");
             return this;
         }
 

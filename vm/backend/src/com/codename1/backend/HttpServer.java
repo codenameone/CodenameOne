@@ -129,6 +129,10 @@ public final class HttpServer {
         private boolean canonicalChecked;
         /// The sessions of the server serving this request; set by Backend.
         Sessions sessions;
+        /// What a handler or the server attached to this request; see
+        /// [#getAttribute]. Null until the first set, so a request that never
+        /// carries one allocates nothing.
+        private Map attributes;
         /// See [#endedSessions].
         private List endedSessions;
         /// The sessions this request counts as using; see Sessions.enter.
@@ -526,6 +530,33 @@ public final class HttpServer {
         ///
         /// `new Response(...)` still works and still allocates; a handler that
         /// needs its Response to outlive the call must use it.
+        /// An error the generated router answers on its own -- a malformed
+        /// request target, a body or parameter it cannot bind, an unsupported
+        /// content type -- rather than the application's handler. The
+        /// application's error route (`cn1.server.error.path`) is given the
+        /// request in its place, as Spring Boot forwards these to its error
+        /// controller; with no such route this answer is sent (issue 6310).
+        /// Generated code calls it; a handler answering an error of its own uses
+        /// [#respond], which is sent as it is.
+        public Response frameworkError(int status, String message) {
+            return frameworkError(status, "text/plain; charset=utf-8", utf8Bytes(message));
+        }
+
+        /// [#frameworkError(int, String)] with the body already encoded.
+        public Response frameworkError(int status, String contentType, byte[] body) {
+            Response response = respond(status, contentType, body);
+            response.frameworkError = true;
+            return response;
+        }
+
+        private static byte[] utf8Bytes(String text) {
+            try {
+                return text.getBytes("UTF-8");
+            } catch (java.io.UnsupportedEncodingException err) {
+                throw new IllegalStateException(err.toString(), err);
+            }
+        }
+
         public Response respond(int status, String contentType, byte[] body) {
             if (conn == null) {
                 return new Response(status, contentType, body);   // HTTP/2 path
@@ -632,6 +663,7 @@ public final class HttpServer {
             this.endedSessions = null;
             this.sessionsInUse = null;
             this.sessionIdsFound = null;
+            this.attributes = null;
         }
 
         private byte[] peer() {
@@ -689,6 +721,14 @@ public final class HttpServer {
             }
             return forwarded != null
                     && forwarded.secure(peer(), getHeader("X-Forwarded-Proto"));
+        }
+
+        /// Answers this request as one that presented no session cookie: an
+        /// in-process dispatch runs as a principal it was handed, and must not
+        /// pick up the session a forwarded Cookie header names.
+        void ignoreSessionCookie() {
+            sessionResolved = true;
+            session = null;
         }
 
         /// The session of this request, creating one if it has none.
@@ -865,6 +905,7 @@ public final class HttpServer {
             this.endedSessions = null;
             this.sessionsInUse = null;
             this.sessionIdsFound = null;
+            this.attributes = null;
         }
 
         /// For HTTP/2, whose headers arrive already decoded from the HPACK state --
@@ -925,6 +966,68 @@ public final class HttpServer {
         /// Path plus query string, exactly as it arrived.
         public String getTarget() {
             return target;
+        }
+
+        /// A value attached to this request by name, or null: what the server
+        /// records for an error dispatch (the
+        /// [com.codename1.backend.web.RequestDispatcher] names), or what one
+        /// filter or interceptor leaves for the handler, as a servlet request
+        /// attribute does. Lives only as long as the request.
+        public Object getAttribute(String name) {
+            return attributes == null ? null : attributes.get(name);
+        }
+
+        /// Attaches `value` under `name`; null removes it.
+        public void setAttribute(String name, Object value) {
+            if (value == null) {
+                if (attributes != null) {
+                    attributes.remove(name);
+                }
+                return;
+            }
+            if (attributes == null) {
+                attributes = new LinkedHashMap();
+            }
+            attributes.put(name, value);
+        }
+
+        /// Points this request at `newTarget` for an internal dispatch -- the
+        /// error page a path nothing served is forwarded to -- and returns what
+        /// [#restoreTarget] needs to put it back. The same object rather than a
+        /// copy, so the dispatch keeps the request's session, connection and
+        /// scoped beans, as a servlet forward does.
+        Object[] retarget(String newTarget) {
+            Object[] saved = new Object[] {target,
+                    new int[] {targetStart, targetLength, pathLength, canonicalLength,
+                            canonicalChecked ? 1 : 0}, canonicalTarget};
+            this.target = newTarget;
+            // Zero length makes every byte read come from the String target.
+            this.targetStart = 0;
+            this.targetLength = 0;
+            this.pathLength = -1;
+            this.canonicalTarget = null;
+            this.canonicalLength = 0;
+            this.canonicalChecked = false;
+            return saved;
+        }
+
+        /// Swaps the method for an error dispatch; returns the one it replaced.
+        String remethod(String newMethod) {
+            String was = method;
+            method = newMethod;
+            return was;
+        }
+
+        /// Undoes [#retarget].
+        void restoreTarget(Object[] saved) {
+            this.target = (String) saved[0];
+            int[] ints = (int[]) saved[1];
+            this.targetStart = ints[0];
+            this.targetLength = ints[1];
+            this.pathLength = ints[2];
+            this.canonicalLength = ints[3];
+            this.canonicalChecked = ints[4] != 0;
+            this.canonicalTarget = (byte[]) saved[2];
         }
 
         /// The headers as a Map, lower-cased names to values.
@@ -1480,6 +1583,11 @@ public final class HttpServer {
         long fileOffset;
         long fileLength;
         Map extraHeaders;
+        /// Set by [Request#frameworkError]: an answer the generated router made
+        /// itself (a body it could not decode, a content type the route does not
+        /// consume), which the application's error route may replace. Cleared on
+        /// reuse, so a handler's own 400 on the same connection stands.
+        boolean frameworkError;
         /// Serialised into the connection buffer at write time; see jsonValue.
         Object deferredJson;
         boolean hasDeferredJson;
@@ -1579,6 +1687,7 @@ public final class HttpServer {
             this.fileOffset = fileOffset;
             this.fileLength = fileLength;
             this.extraHeaders = extraHeaders;
+            this.frameworkError = false;
             this.deferredJson = null;
             this.hasDeferredJson = false;
             this.deferredEncoder = null;
@@ -1619,6 +1728,20 @@ public final class HttpServer {
         /// request, and writing into it would hand one client's cookie to the next.
         /// Only one of the two is ever sent, so a file descriptor it carries still
         /// has exactly one owner.
+        /// The route template that answered, such as `/api/v2/apps/{id}`, on a
+        /// response from [com.codename1.backend.Backend#dispatch(Request,
+        /// com.codename1.backend.security.Authentication)]; null for any other
+        /// response, and when no route matched.
+        String matchedRoute;
+
+        /// The template of the route that answered an in-process dispatch as a
+        /// user, or null; see the field.
+        ///
+        /// @return the route template, or null
+        public String getMatchedRoute() {
+            return matchedRoute;
+        }
+
         Response withHeaders(Map headers) {
             Response copy = new Response(status, contentType, body, fileFd, fileOffset,
                     fileLength, headers);

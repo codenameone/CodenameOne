@@ -214,6 +214,29 @@ class OAuth2StoresTest {
 
     @ParameterizedTest
     @ValueSource(strings = {"SQLITE", "POSTGRES", "MYSQL", "SQLSERVER"})
+    void consentRequirementSurvivesTheTable(String engine) throws Exception {
+        // A client that must ask for consent, read back without the flag,
+        // would silently stop asking (#6310).
+        DataSource pool = open(engine);
+        JdbcRegisteredClientRepository clients = new JdbcRegisteredClientRepository(pool);
+        clients.save(RegisteredClient.withId("c-1").clientId("asks").clientName("Asks")
+                .clientAuthenticationMethod(ClientAuthenticationMethod.NONE)
+                .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
+                .redirectUri("http://127.0.0.1/cb").scope("read")
+                .clientSettings(ClientSettings.builder().requireProofKey(true)
+                        .requireAuthorizationConsent(true).build()).build());
+        clients.save(RegisteredClient.withId("c-2").clientId("silent").clientName("Silent")
+                .clientAuthenticationMethod(ClientAuthenticationMethod.NONE)
+                .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
+                .redirectUri("http://127.0.0.1/cb").scope("read").build());
+        assertTrue(clients.findByClientId("asks").getClientSettings()
+                .isRequireAuthorizationConsent());
+        assertFalse(clients.findByClientId("silent").getClientSettings()
+                .isRequireAuthorizationConsent());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"SQLITE", "POSTGRES", "MYSQL", "SQLSERVER"})
     void registeredClients(String engine) throws Exception {
         DataSource pool = open(engine);
         JdbcRegisteredClientRepository clients = new JdbcRegisteredClientRepository(pool);

@@ -78,6 +78,10 @@ public final class JdbcRegisteredClientRepository implements RegisteredClientRep
         Map<String, Object> settings = new LinkedHashMap<String, Object>();
         settings.put("requireProofKey",
                 Boolean.valueOf(client.getClientSettings().isRequireProofKey()));
+        // Persisted: a client that must ask for consent, read back without
+        // the flag, would silently stop asking.
+        settings.put("requireAuthorizationConsent",
+                Boolean.valueOf(client.getClientSettings().isRequireAuthorizationConsent()));
         TokenSettings t = client.getTokenSettings();
         settings.put("authorizationCodeTimeToLive", Long.valueOf(t.getAuthorizationCodeTimeToLive()));
         settings.put("accessTokenTimeToLive", Long.valueOf(t.getAccessTokenTimeToLive()));
@@ -196,7 +200,8 @@ public final class JdbcRegisteredClientRepository implements RegisteredClientRep
             b.scope(scope);
         }
         Map settings = Json.parseObject(SecuritySupport.storedText(row.get("settings")));
-        b.clientSettings(ClientSettings.builder().requireProofKey(flag(settings, "requireProofKey")).build());
+        b.clientSettings(ClientSettings.builder().requireProofKey(flag(settings, "requireProofKey"))
+                .requireAuthorizationConsent(flag(settings, "requireAuthorizationConsent")).build());
         TokenSettings.Builder t = TokenSettings.builder();
         t.authorizationCodeTimeToLive(seconds(settings, "authorizationCodeTimeToLive", 300));
         t.accessTokenTimeToLive(seconds(settings, "accessTokenTimeToLive", 300));
