@@ -584,6 +584,15 @@ public class GpuRiveRenderer implements RiveRenderer {
         render(device, true);
     }
 
+    // TEMPORARY trace for the RiveGpu emulator crash; removed once found.
+    private static final AtomicInteger TRACE = new AtomicInteger();
+
+    private static void trace(String s) {
+        if (TRACE.incrementAndGet() < 200) {
+            System.out.println("CN1GPU: rive " + s);
+        }
+    }
+
     private void render(GraphicsDevice device, boolean clear) {
         releaseDropped(device);
         Frame f = pending.getAndSet(null);
@@ -612,8 +621,12 @@ public class GpuRiveRenderer implements RiveRenderer {
         camera.setOrthographic(h, -1f, 1f).setAspect(w / (float) h)
                 .setPosition(w / 2f, h / 2f, -0.5f).setTarget(w / 2f, h / 2f, 0f).setUp(0, -1, 0);
         device.setCamera(camera);
+        trace("frame " + w + "x" + h + " ops=" + fr.count);
         for (int i = 0; i < fr.count; i++) {
             Op o = fr.ops.get(i);
+            trace("op " + i + " kind=" + o.kind + " layer=" + o.lw + "x" + o.lh + " verts=" + o.vertexCount
+                    + " image=" + (o.image instanceof com.codename1.ui.Image
+                    ? ((com.codename1.ui.Image) o.image).getWidth() + "x" + ((com.codename1.ui.Image) o.image).getHeight() : "-"));
             if (o.resourceContext != context) {
                 // handles from a lost context: forget, never dispose
                 o.layerTexture = null;
@@ -634,6 +647,7 @@ public class GpuRiveRenderer implements RiveRenderer {
                 drawMesh(device, o);
             }
         }
+        trace("frame done");
         TOTAL_FRAMES_DRAWN.incrementAndGet();
     }
 

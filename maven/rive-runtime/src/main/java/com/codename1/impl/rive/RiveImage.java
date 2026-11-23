@@ -429,6 +429,8 @@ public class RiveImage extends GpuImage {
 
     /// Records the artboard, fitted into the `width` by `height` rectangle at
     /// `offsetX`, `offsetY` of the surface, for the render thread.
+    private int prepareTrace;
+
     @Override
     protected void prepareFrame(int surfaceWidth, int surfaceHeight, int offsetX, int offsetY,
                                 int width, int height) {
@@ -436,6 +438,11 @@ public class RiveImage extends GpuImage {
         float ah = artboard.getHeight();
         if (gpu == null || aw <= 0 || ah <= 0) {
             return;
+        }
+        // TEMPORARY trace for the RiveGpu emulator crash; removed once found.
+        if (prepareTrace++ < 10) {
+            System.out.println("CN1GPU: prepareFrame surface=" + surfaceWidth + "x" + surfaceHeight
+                    + " at " + offsetX + "," + offsetY + " image=" + width + "x" + height);
         }
         float scale = Math.min(width / aw, height / ah);
         float ox = (width - aw * scale) / 2f;
