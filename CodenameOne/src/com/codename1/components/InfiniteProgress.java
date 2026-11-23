@@ -67,6 +67,11 @@ import com.codename1.ui.TopLevelContainer;
 ///
 /// ip.dispose();
 /// ```
+///
+/// #### See also
+///
+/// - `Skeleton`: placeholder shapes with a shimmer, shown where content is loading.
+/// - `EmptyState`: what to show when loading finished with nothing, or failed.
 public class InfiniteProgress extends Component {
     /// Indicates whether infinite progress and pull to refresh work in the material
     /// design mode by default

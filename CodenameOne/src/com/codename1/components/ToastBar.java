@@ -115,6 +115,11 @@ import static com.codename1.ui.ComponentSelector.$;
 /// Status with a multi-line message:
 ///
 /// ![A status message that wraps over several lines](https://www.codenameone.com/developer-guide/img/components-statusbar-multiline.png)
+///
+/// #### See also
+///
+/// - `EmptyState`: a persistent message, with an optional retry action, for a
+///   screen that loaded nothing.
 public final class ToastBar {
 
     /// The default timeout for info/error messages

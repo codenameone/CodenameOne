@@ -968,6 +968,8 @@ The https://www.codenameone.com/javadoc/com/codename1/components/InfiniteProgres
 
 TIP: This style of animation is often nicknamed "washing machine" as it spins endlessly.
 
+TIP: A spinner tells the user that something is happening, not what is coming. When the layout of the content is known, a <<skeleton-section,Skeleton>> placeholder usually reads better. The <<loading-feedback-section,decision table>> below compares the loading, feedback and onboarding components.
+
 `InfiniteProgress` can be used in one of two ways either by embedding the component into the UI through something like this:
 
 [source,java]
@@ -1057,6 +1059,8 @@ The UIIDs are `EmptyState`, `EmptyStateIcon`, `EmptyStateTitle`, `EmptyStateText
 === InfiniteScrollAdapter and InfiniteContainer
 
 https://www.codenameone.com/javadoc/com/codename1/components/InfiniteScrollAdapter.html[InfiniteScrollAdapter] & https://www.codenameone.com/javadoc/com/codename1/ui/InfiniteContainer.html[InfiniteContainer] allow you to create a scrolling effect that "never" ends with the typical `Container`/`Component` paradigm.
+
+TIP: While the first page loads, `Skeleton.rows(n)` fills the list with placeholder rows (see <<skeleton-section>>), and an <<empty-state-section,EmptyState>> covers a fetch that returns nothing or fails.
 
 The motivation behind these classes is simple, say you have a lot of data to fetch from storage or from the internet. You can fetch the data in batches and show progress sign while you do this.
 
@@ -1746,6 +1750,8 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/screenshot
 image::img/generated/components-tabs.png[Simple usage of Tabs,scaledwidth=20%]
 
 A common usage for `Tabs` is the swipe to proceed effect which is common in iOS applications. In the code below you use https://www.codenameone.com/javadoc/com/codename1/ui/RadioButton.html[RadioButton] and https://www.codenameone.com/javadoc/com/codename1/ui/layouts/LayeredLayout.html[LayeredLayout] with hidden tabs to produce that effect:
+
+TIP: The <<carousel-section,Carousel>> component packages this pattern, with dots, auto play and accessibility announcements. Use the code below only when you need a layout `Carousel` doesn't support, and even then prefer binding a `PageIndicator` to the `Tabs` over a row of radio buttons.
 
 [source,java]
 ----
@@ -2817,6 +2823,8 @@ image::img/generated/components-calendar.png[The Calendar component,scaledwidth=
 === ToastBar
 
 The https://www.codenameone.com/javadoc/com/codename1/components/ToastBar.html[ToastBar] class allows you to display none-obtrusive status messages to the user at the bottom of the screen. This is useful for such things as informing the user of a long-running task (like downloading a file in the background), or popping up an error message that doesn't require a response from the user.
+
+TIP: For a list or screen that loaded nothing, an <<empty-state-section,EmptyState>> with a retry action is clearer than a toast that disappears. See the <<loading-feedback-section,decision table>> for the other choices.
 
 Simple usage of the `ToastBar` class looks something like this:
 

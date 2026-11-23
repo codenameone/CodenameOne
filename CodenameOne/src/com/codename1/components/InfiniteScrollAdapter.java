@@ -95,6 +95,11 @@ import com.codename1.ui.layouts.FlowLayout;
 ///     }
 /// }
 /// ```
+///
+/// #### See also
+///
+/// - `Skeleton#rows(int)`: placeholder rows to show while the first page loads.
+/// - `EmptyState`: what to show when the first fetch returns nothing or fails.
 public final class InfiniteScrollAdapter {
     private final Component ip;
     private final InfiniteProgress progress;

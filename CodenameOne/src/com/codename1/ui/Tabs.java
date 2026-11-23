@@ -92,6 +92,12 @@ import com.codename1.ui.util.EventDispatcher;
 /// hi.add(BorderLayout.NORTH, GridLayout.encloseIn(2, swipeXBtn, swipeYBtn));
 /// hi.add(BorderLayout.CENTER, tabs);
 /// ```
+///
+/// #### See also
+///
+/// - `com.codename1.components.Carousel`: swipeable pages with page dots, auto play and
+///   looping, built on hidden tabs. Prefer it to hand-building a carousel from `Tabs`.
+/// - `com.codename1.components.PageIndicator`: page dots that `bind` to any `Tabs`.
 public class Tabs extends Container {
     private final Container contentPane = new Container(new TabsLayout());
     private final Container tabsContainer;

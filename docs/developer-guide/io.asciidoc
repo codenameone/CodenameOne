@@ -1643,6 +1643,8 @@ Codename One provides many tools to simplify the path between networking/IO & GU
 include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/IoJava147Snippet.java[tag=io-java-147,indent=0]
 ----
 
+TIP: A blocking dialog stops the user from doing anything while the request runs. To keep the screen usable, show a <<skeleton-section,Skeleton>> in place of the content that is loading, and an <<empty-state-section,EmptyState>> with a retry action if the request fails.
+
 The process of showing a progress bar for a long IO operation such as downloading is automatically mapped to the IO stream in Codename One using the https://www.codenameone.com/javadoc/com/codename1/components/SliderBridge.html[SliderBridge] class.
 
 TIP: You can simulate network delays and disconnected network in the #Simulator# menu
