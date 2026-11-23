@@ -561,6 +561,8 @@
         "AppReviewDialogScreenshotTest",
         "CenteredDialogTitleScreenshotTest",
         "CenteredInteractionDialogTitleScreenshotTest",
+        "CoachMarksScreenshotTest",
+        "LoadingPlaceholdersScreenshotTest",
         "DialogThemeScreenshotTest",
         "FloatingActionButtonThemeScreenshotTest",
         "SpanLabelThemeScreenshotTest"
@@ -1600,6 +1602,14 @@
     {
       "pattern": "CenteredInteractionDialogTitle*",
       "test": "CenteredInteractionDialogTitleScreenshotTest"
+    },
+    {
+      "pattern": "CoachMarks*",
+      "test": "CoachMarksScreenshotTest"
+    },
+    {
+      "pattern": "LoadingPlaceholders*",
+      "test": "LoadingPlaceholdersScreenshotTest"
     },
     {
       "pattern": "AppReviewDialog",
