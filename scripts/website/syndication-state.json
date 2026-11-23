@@ -3512,6 +3512,18 @@
         "url": "https://dev.to/codenameone/subscriptions-paywalls-and-a-customer-center-and-we-dont-take-a-cut-199a",
         "syndicated_at": "2026-11-22T14:05:08+00:00"
       }
+    },
+    "kafka-mail-and-records-in-your-java-backend": {
+      "hashnode": {
+        "url": "https://debugagent.com/kafka-listeners-mail-and-live-streams-in-your-backend-with-records-as-entities",
+        "published": true,
+        "draft_url": "https://hashnode.com/draft/6b03901ff955df5d094729a3",
+        "cover_set": true,
+        "subheading_set": true,
+        "tags_set": true,
+        "canonical_set": true,
+        "syndicated_at": "2026-11-23T01:01:11+00:00"
+      }
     }
   }
 }
