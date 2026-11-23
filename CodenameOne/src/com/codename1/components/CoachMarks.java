@@ -370,12 +370,13 @@ public class CoachMarks {
             fallback(bubble, "CoachMarkBubble", fg, bg, true);
             if (!UIManager.getInstance().isThemeStyleDefined("CoachMarkBubble")) {
                 Style s = bubble.getAllStyles();
-                s.setBorder(RoundRectBorder.create().cornerRadius(3f).shadowOpacity(60));
-                // Millimetres, so the padding clears the border's shadow
-                // inset at every density; dips were too thin on high density
-                // screens and the text spilled past the drawn bubble.
-                s.setPaddingUnit(Style.UNIT_TYPE_MM);
-                s.setPadding(3f, 3f, 3.5f, 3.5f);
+                // No shadow: a shadow insets the drawn shape by a fixed number of
+                // pixels, and where millimetres are small (the JavaScript port)
+                // the padding no longer cleared it and the text spilled past
+                // the drawn bubble. The dim already sets the bubble apart.
+                s.setBorder(RoundRectBorder.create().cornerRadius(3f));
+                s.setPaddingUnit(Style.UNIT_TYPE_DIPS);
+                s.setPadding(4, 4, 4, 4);
             }
             title.setTextUIID("CoachMarkTitle");
             text.setTextUIID("CoachMarkText");
