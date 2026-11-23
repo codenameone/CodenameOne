@@ -968,7 +968,7 @@ The https://www.codenameone.com/javadoc/com/codename1/components/InfiniteProgres
 
 TIP: This style of animation is often nicknamed "washing machine" as it spins endlessly.
 
-TIP: A spinner tells the user that something is happening, not what is coming. When the layout of the content is known, a <<skeleton-section,Skeleton>> placeholder usually reads better. The <<loading-feedback-section,decision table>> below compares the loading, feedback and onboarding components.
+TIP: A spinner tells the user that something is happening, not what's coming. When the layout of the content is known, a <<skeleton-section,Skeleton>> placeholder usually reads better. The <<loading-feedback-section,decision table>> below compares the loading, feedback and onboarding components.
 
 `InfiniteProgress` can be used in one of two ways either by embedding the component into the UI through something like this:
 
