@@ -12,4 +12,4 @@ scp backend/application.properties "$HOST:$RELEASE/"
 [ -d backend/target/webapp ] && scp -r backend/target/webapp "$HOST:$RELEASE/"
 ssh "$HOST" "ln -sfn $RELEASE /opt/myapp/current &&
              sudo systemctl restart myapp &&
-             sleep 2 && curl -fsS http://127.0.0.1:8080/manage/health/readiness"
+             sleep 2 && curl -fsS https://app.example.com/manage/health/readiness"

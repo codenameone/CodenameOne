@@ -1,5 +1,5 @@
 [[buildcloud-mcp]]
-== Shipping from an AI agent: the BuildCloud MCP server
+== Shipping from an AI agent: The BuildCloud MCP server
 
 The MCP Headless API lets an agent drive the application while it runs. BuildCloud takes the agent through the rest of the release. The build console at `https://cloud.codenameone.com` is also a Model Context Protocol server, so a coding agent can do the same things you do there: run and inspect cloud builds, read a failed build's log, create Apple signing assets, configure push, submit a build to the App Store or Google Play, and follow its review. The agent gets no access you didn't approve.
 
@@ -21,7 +21,7 @@ The approval page has a checkbox for each kind of extra access:
 |Store submission |Submitting a finished build to the App Store or Google Play
 |===
 
-Without them the agent can still read everything and make everyday changes. Anything beyond that, such as an unticked area, revoking a certificate, reading a stored key, or billing and organization changes, is still possible. But each such call waits for you: the agent opens an approval page in your browser that shows the exact request, with secrets masked, and the request runs once if you allow it.
+Without them the agent can still read everything and make everyday changes. Anything beyond that, such as an area whose box you left clear, revoking a certificate, reading a stored key, or billing and organization changes, is still possible. But each such call waits for you: the agent opens an approval page in your browser that shows the exact request, with secrets masked, and the request runs once if you allow it.
 
 === What the agent can do
 

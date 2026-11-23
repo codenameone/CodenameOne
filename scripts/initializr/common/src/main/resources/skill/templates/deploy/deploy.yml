@@ -1,7 +1,7 @@
 # Codename One deployment template -- see ../../references/deployment.md.
 # Replace myapp with the project's name and app.example.com with the domain. The binary
 # is named after the backend module's artifactId: backend/target/myapp-backend here.
-# Copy to .github/workflows/deploy.yml. Needs the DEPLOY_KEY secret and deploy.sh.
+# Copy to .github/workflows/deploy.yml. Needs the DEPLOY_KEY and KNOWN_HOSTS secrets and deploy.sh.
 # .github/workflows/deploy.yml
 name: deploy
 on:
@@ -14,12 +14,13 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
         with: { distribution: temurin, java-version: '17', cache: maven }
-      - run: sudo apt-get install -y clang libssl-dev libnghttp2-dev libcurl4-openssl-dev
+      - run: sudo apt-get update && sudo apt-get install -y clang libssl-dev libnghttp2-dev libcurl4-openssl-dev
       - run: ./mvnw -B -pl backend -Dcodename1.platform=backend cn1:backend-webapp
       - run: ./mvnw -B -pl backend -Dcodename1.platform=backend cn1:backend-package
       - run: |
           mkdir -p ~/.ssh && echo "$DEPLOY_KEY" > ~/.ssh/id_ed25519 && chmod 600 ~/.ssh/id_ed25519
-          ssh-keyscan app.example.com >> ~/.ssh/known_hosts
+          echo "$KNOWN_HOSTS" > ~/.ssh/known_hosts
           sh deploy.sh
         env:
           DEPLOY_KEY: ${{ secrets.DEPLOY_KEY }}
+          KNOWN_HOSTS: ${{ secrets.KNOWN_HOSTS }}   # ssh-keyscan app.example.com, checked once by hand

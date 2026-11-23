@@ -9,7 +9,7 @@ to end" is the long form; this file is the procedure and the traps.
 
 Copy-ready files are in `templates/deploy/` beside this directory: `build-linux.sh`,
 `server-setup.sh`, `myapp.service`, `env.example`, `Caddyfile`, `native-tls.txt`,
-`deploy.sh`, `Dockerfile` and `deploy.yml` (GitHub Actions). In each one, replace
+`deploy.sh`, `rollback.sh`, `Dockerfile` and `deploy.yml` (GitHub Actions). In each one, replace
 `myapp` with the project's name and `app.example.com` with the real domain. The
 binary is named after the backend module's **artifactId**: `backend/target/<name>-backend`
 in a Maven app with a backend, `target/<name>` in a backend-only project; the
@@ -41,7 +41,10 @@ Program, and accept store agreements.
 5. HTTPS: `Caddyfile` in front, the default, or the server's own TLS (`native-tls.txt`).
 6. `cn1:backend-webapp` if the server hosts the browser app, then `deploy.sh`.
 7. Verify (below). Only then switch the apps to the HTTPS address and build releases.
-8. Optionally, `deploy.yml` so every push to `main` redeploys.
+8. Optionally, `deploy.yml` so every push to `main` redeploys. It needs its own key:
+   `ssh-keygen -t ed25519 -f deploy_key -N ''`, append `deploy_key.pub` to
+   `/home/deploy/.ssh/authorized_keys`, store the private half as the `DEPLOY_KEY`
+   secret and the checked output of `ssh-keyscan app.example.com` as `KNOWN_HOSTS`.
 
 ## Packaging for Linux: the trap
 
@@ -95,6 +98,9 @@ Every key maps by upper-casing and replacing `.` with `_`:
   directory**, which is why the unit sets `WorkingDirectory=/opt/myapp/current`.
 - A SQLite file: put it under `/var/lib/myapp` and add `StateDirectory=myapp` to the
   unit. `ProtectSystem=strict` makes everything else read-only.
+- The server's own TLS instead of Caddy: install certbot, and **remove**
+  `CN1_SERVER_ADDRESS`, `CN1_SERVER_FORWARDHEADERS`, `CN1_SERVER_TRUSTEDPROXIES` and
+  `CN1_SESSION_SECURE` from the env file (bound to 127.0.0.1 the server is unreachable).
 - The server's own TLS on 443 runs as a non-root user only with
   `AmbientCapabilities=CAP_NET_BIND_SERVICE`. It reads the PEM files at startup,
   so a renewed certificate needs a restart (the certbot hook in `native-tls.txt`).

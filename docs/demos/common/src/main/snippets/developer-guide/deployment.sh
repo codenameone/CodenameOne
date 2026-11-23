@@ -29,6 +29,7 @@ apt-get update && apt-get upgrade -y
 apt-get install -y libssl3t64 libnghttp2-14 libcurl4t64 caddy
 useradd --system --no-create-home --shell /usr/sbin/nologin myapp   # runs the server
 useradd --create-home --shell /bin/bash deploy                      # copies releases
+usermod -aG systemd-journal deploy                                  # may read the logs
 mkdir -p /home/deploy/.ssh /opt/myapp/releases /etc/myapp
 cp ~/.ssh/authorized_keys /home/deploy/.ssh/ && chown -R deploy:deploy /home/deploy/.ssh
 chown -R deploy:deploy /opt/myapp
@@ -48,13 +49,18 @@ scp backend/application.properties "$HOST:$RELEASE/"
 [ -d backend/target/webapp ] && scp -r backend/target/webapp "$HOST:$RELEASE/"
 ssh "$HOST" "ln -sfn $RELEASE /opt/myapp/current &&
              sudo systemctl restart myapp &&
-             sleep 2 && curl -fsS http://127.0.0.1:8080/manage/health/readiness"
+             sleep 2 && curl -fsS https://app.example.com/manage/health/readiness"
 // end::deploy-ship[]
 
 // tag::deploy-rollback[]
+# Moves current to the release before the one it points at, and deletes the
+# release that failed, so nothing that sorts by name picks it again.
 ssh deploy@app.example.com '
-  PREVIOUS=$(ls -1d /opt/myapp/releases/* | tail -2 | head -1)
-  ln -sfn "$PREVIOUS" /opt/myapp/current && sudo systemctl restart myapp'
+  cd /opt/myapp
+  BAD=$(readlink current)
+  PREVIOUS=$(ls -1d releases/* | sed "s#^#/opt/myapp/#" | grep -B1 -x "$BAD" | head -1)
+  [ "$PREVIOUS" != "$BAD" ] && ln -sfn "$PREVIOUS" current &&
+  sudo systemctl restart myapp && rm -rf "$BAD"'
 // end::deploy-rollback[]
 
 // tag::deploy-check[]

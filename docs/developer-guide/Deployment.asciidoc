@@ -147,7 +147,8 @@ include::../demos/common/src/main/snippets/developer-guide/deployment.sh[tag=dep
 That installs the server's three runtime libraries and Caddy, which terminates
 HTTPS (see <<Serving HTTPS>>). It creates two users: `myapp`, which runs the
 server and can't log in, and `deploy`, which copies releases over SSH with the
-key you logged in with and may restart the service and nothing else. Finally it
+key you logged in with, may read the server's log, and may restart the service
+and nothing else. Finally it
 lets in only SSH, HTTP, and HTTPS. The server's own port, 8080, stays closed to
 the outside; Caddy reaches it on the loopback address. On Debian 12 the library
 packages are named `libssl3`, `libnghttp2-14` and `libcurl4`.
@@ -259,7 +260,8 @@ takes effect at the next restart, which a certbot deploy hook does:
 include::../demos/common/src/main/snippets/developer-guide/deployment.txt[tag=deploy-native-tls,indent=0]
 ----
 
-Obtain the certificate with `certbot certonly --standalone -d app.example.com`
+Install certbot (`apt-get install -y certbot`) and obtain the certificate with
+`certbot certonly --standalone -d app.example.com`
 before the server first starts, since both need port 80 or 443 at that moment,
 then run the hook once by hand: certbot runs deploy hooks on renewals, and the
 first copy has to be made too. The hook copies each renewal where the server can read it, because
@@ -288,9 +290,12 @@ A deployment copies a release to the server, moves the link and restarts:
 include::../demos/common/src/main/snippets/developer-guide/deployment.sh[tag=deploy-ship,indent=0]
 ----
 
-The last line fails the deployment when the new server doesn't become ready. A
+The last line fails the deployment when the new server doesn't become ready
+through its public address, which works the same behind Caddy and with the
+server's own TLS. A
 release that fails to start, or starts and fails its checks, goes back with the
-link:
+link. The one-liner moves `current` to the release before it and deletes the
+failed one:
 
 [source,bash]
 ----
@@ -478,9 +483,13 @@ can then link to them.
 
 === Automating the server half
 
-The server's build and deployment fit one CI job. A GitHub Actions workflow on
-the same Ubuntu release as the server, with its SSH key stored as a repository
-secret:
+The server's build and deployment fit one CI job. Give it a key of its own:
+generate one with `ssh-keygen -t ed25519 -f deploy_key -N ''`, append
+`deploy_key.pub` to `/home/deploy/.ssh/authorized_keys` on the server, and store
+the private half as the repository secret `DEPLOY_KEY`. Store the server's host
+key as `KNOWN_HOSTS`, from `ssh-keyscan app.example.com` checked against the
+provider's console once, so the job never trusts whatever answers. A GitHub
+Actions workflow on the same Ubuntu release as the server:
 
 [source,text]
 ----
