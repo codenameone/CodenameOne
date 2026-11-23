@@ -532,6 +532,46 @@ public final class QueryImpl<T> implements com.codename1.orm.session.Query<T> {
         joins.put(path, created);
         return created;
     }
+    /// JPQL `SIZE(path)`: the number of elements in the collection at `path`,
+    /// as a correlated COUNT, so an entity with none answers 0 rather than
+    /// dropping out of the result the way a join would (issue 6310). Covers
+    /// every collection a query can navigate -- a foreign key on the target,
+    /// either side of a join table -- and element collections.
+    String size(String path) {
+        int dot = path.lastIndexOf('.');
+        Join parent = dot < 0 ? new Join(model, rootAlias, "") : ensureJoin(path.substring(0, dot), true);
+        String field = dot < 0 ? path : path.substring(dot + 1);
+        Relationship relation = parent.model.relationships()[parent.model.queryRelationIndex(field)];
+        if (!relation.many) {
+            throw new IllegalArgumentException("SIZE requires a collection: " + path);
+        }
+        String alias = session.nextAlias();
+        String[] parentKey = session.keyColumns(parent.model);
+        if (relation.element) {
+            return "(SELECT COUNT(*) FROM " + session.q(relation.joinTable) + " " + alias + " WHERE "
+                    + session.joinEquality(session.joinColumns(relation.joinColumn, parent.model), alias,
+                            parentKey, parent.alias) + ")";
+        }
+        EntityModel target = session.model(relation.target);
+        Relationship owning = relation;
+        boolean inverse = relation.mappedBy.length() > 0;
+        if (inverse) {
+            owning = target.relationships()[target.relationIndex(relation.mappedBy)];
+        }
+        if (owning.column >= 0) {
+            return "(SELECT COUNT(*) FROM " + session.tableSource(target) + " " + alias + " WHERE "
+                    + session.joinEquality(session.foreignColumns(target, owning), alias, parentKey, parent.alias)
+                    + ")";
+        }
+        // A join table: its rows are the collection, one per element. The
+        // target table is not read: the schema gives each join row a foreign
+        // key to its element, so a row cannot outlive the entity it names.
+        // (tableSource above applies a subtype's discriminator.)
+        String ownerColumn = inverse ? owning.inverseJoinColumn : owning.joinColumn;
+        return "(SELECT COUNT(*) FROM " + session.q(owning.joinTable) + " " + alias + " WHERE "
+                + session.joinEquality(session.joinColumns(ownerColumn, parent.model), alias, parentKey,
+                        parent.alias) + ")";
+    }
     boolean readsTable(String table) {
         if (model.table().equalsIgnoreCase(table)) {
             return true;

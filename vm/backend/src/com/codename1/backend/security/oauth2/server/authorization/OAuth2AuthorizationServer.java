@@ -53,8 +53,10 @@ import com.codename1.backend.security.oauth2.jwt.JwtException;
 import com.codename1.backend.security.ratelimit.RateLimiter;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -82,6 +84,13 @@ public final class OAuth2AuthorizationServer {
     /// into an access token that needs it.
     public static final String AUTH_METHODS = "cn1.security.oauth2.authMethods";
     private static final String DEVICE_TICKET = "cn1.security.oauth2.deviceTicket";
+    /// Session attribute holding the consent question this server last put to
+    /// the session's user: its ticket and a digest of who and which request.
+    private static final String CONSENT_TICKET = "cn1.security.oauth2.consentTicket";
+    /// How many consent questions one session may have waiting at once.
+    private static final int MAX_PENDING_CONSENTS = 8;
+    private static final int MAX_REGISTERED_REDIRECTS = 5;
+    private static final int MAX_CLIENT_NAME = 100;
     /// The attribute of a grant that holds the resource servers it is for.
     private static final String RESOURCE = "resource";
     private static final String[] FORM_PARAMETERS = {"client_id", "client_secret", "grant_type",
@@ -103,6 +112,9 @@ public final class OAuth2AuthorizationServer {
     private final Clock clock;
     private final Attempts attempts;
     private long purgedAt;
+    private ClientRegistrationPolicy registration;
+    private AuthorizationConsentPolicy consent;
+    private String consentPage;
 
     /// @param fixedIssuer the issuer, or null to read it off each request: a
     /// development profile only
@@ -147,6 +159,68 @@ public final class OAuth2AuthorizationServer {
                 new JwsAlgorithm[] {SignatureAlgorithm.RS256, SignatureAlgorithm.ES256}).build();
     }
 
+    /// Turns on client registration (RFC 7591) at
+    /// [AuthorizationServerSettings#getClientRegistrationEndpoint], governed
+    /// by `policy`; see [ClientRegistrationPolicy] for what a registered
+    /// client may be. Registered clients are saved in the repository, so it
+    /// must be one that keeps them somewhere other than this process: a
+    /// repository that answers [RegisteredClientRepository#findAll] with a
+    /// list -- the in-memory one -- is refused, since every stranger's client
+    /// would then be kept in memory for as long as the process runs.
+    ///
+    /// Call before the server answers its first request.
+    public void clientRegistration(ClientRegistrationPolicy policy) {
+        if (policy == null) {
+            this.registration = null;
+            return;
+        }
+        if (clients.findAll() != null) {
+            throw new IllegalStateException("Client registration needs a RegisteredClientRepository "
+                    + "that keeps clients outside this process, such as "
+                    + "JdbcRegisteredClientRepository; "
+                    + clients.getClass().getName() + " would keep every registered client in "
+                    + "memory");
+        }
+        Set<String> allowed = policy.allowedScopes();
+        if (allowed == null || allowed.isEmpty()) {
+            throw new IllegalStateException("The ClientRegistrationPolicy must name the scopes a "
+                    + "registered client may be given");
+        }
+        this.registration = policy;
+    }
+
+    /// Asks the user to approve an authorization when `policy` says so, as
+    /// well as for every client whose
+    /// [ClientSettings#isRequireAuthorizationConsent] is set, and shows
+    /// `page` to do it instead of the built-in one.
+    ///
+    /// `page`, when given, is a path or address the browser is sent to with
+    /// the query parameters `client_id`, `scope` (the scopes asked for,
+    /// separated by spaces), `ticket` and `action`. The page posts a form to
+    /// `action` -- with the session's CSRF token, as any post in the chain --
+    /// carrying `ticket`, `decision` (`approve` or `deny`) and one `scope`
+    /// field per approved scope (a field may also hold several, separated by
+    /// spaces). The grant carries the approved scopes that were asked for and
+    /// nothing else; the scopes of a request that asked for some, with none
+    /// approved, are a denial.
+    ///
+    /// @param policy which authorizations to ask about; null for only the
+    /// clients that require it
+    /// @param page the consent page; null for the built-in one
+    public void authorizationConsent(AuthorizationConsentPolicy policy, String page) {
+        // The ticket travels to the page in its query string, so the page is
+        // this server's own path or an https address: never plain http, where
+        // the ticket could be read on the way, and never a "//host" path,
+        // which a browser reads as another origin.
+        if (page != null && (page.length() == 0 || page.indexOf('#') >= 0 || page.startsWith("//")
+                || !(page.startsWith("/") || page.startsWith("https://")))) {
+            throw new IllegalArgumentException("The consent page must be a path or an https "
+                    + "address without a fragment: " + page);
+        }
+        this.consent = policy;
+        this.consentPage = page;
+    }
+
     public AuthorizationServerSettings getSettings() {
         return settings;
     }
@@ -175,6 +249,9 @@ public final class OAuth2AuthorizationServer {
             }
             if (path.equals(settings.getOidcUserInfoEndpoint())) {
                 return userInfo(request);
+            }
+            if (registration != null && path.equals(settings.getClientRegistrationEndpoint())) {
+                return register(request);
             }
             if ("/.well-known/openid-configuration".equals(path)
                     || "/.well-known/oauth-authorization-server".equals(path)) {
@@ -233,6 +310,9 @@ public final class OAuth2AuthorizationServer {
         m.put("userinfo_endpoint", issuer + settings.getOidcUserInfoEndpoint());
         m.put("revocation_endpoint", issuer + settings.getTokenRevocationEndpoint());
         m.put("device_authorization_endpoint", issuer + settings.getDeviceAuthorizationEndpoint());
+        if (registration != null) {
+            m.put("registration_endpoint", issuer + settings.getClientRegistrationEndpoint());
+        }
         m.put("response_types_supported", list("code"));
         m.put("response_modes_supported", list("query"));
         m.put("grant_types_supported", list("authorization_code", "refresh_token",
@@ -358,8 +438,18 @@ public final class OAuth2AuthorizationServer {
     /// @param authentication who is signed in; null for nobody
     public HttpServer.Response authorize(HttpServer.Request request,
                                          Authentication authentication) {
+        return authorize(request, authentication, null, null);
+    }
+
+    /// [#authorize(HttpServer.Request, Authentication)], told the CSRF token
+    /// the built-in consent page's forms must carry.
+    ///
+    /// @param csrfParameter the name of the CSRF form field, or null
+    /// @param csrfToken its value
+    public HttpServer.Response authorize(HttpServer.Request request,
+            Authentication authentication, String csrfParameter, String csrfToken) {
         try {
-            return authorizeChecked(request, authentication);
+            return authorizeChecked(request, authentication, csrfParameter, csrfToken);
         } catch (Refusal refusal) {
             return refusal.response();
         } catch (IllegalStateException failed) {
@@ -370,8 +460,15 @@ public final class OAuth2AuthorizationServer {
     }
 
     private HttpServer.Response authorizeChecked(HttpServer.Request request,
-                                                 Authentication authentication) {
-        requireMethod(request, "GET");
+            Authentication authentication, String csrfParameter, String csrfToken) {
+        // A POST is an answer to the consent page, and is the same request
+        // again: every parameter below is read from, and checked in, the
+        // query it posts to -- the form carries only the answer.
+        boolean consentAnswer = "POST".equals(request.getMethod());
+        if (!consentAnswer && !"GET".equals(request.getMethod())) {
+            throw new Refusal(405, OAuth2ErrorCodes.INVALID_REQUEST, "This endpoint takes GET, "
+                    + "and POST for an answer to its consent page").header("Allow", "GET, POST");
+        }
         String clientId = request.queryParam("client_id");
         RegisteredClient client = clientId == null ? null : clients.findByClientId(clientId);
         if (client == null) {
@@ -466,6 +563,93 @@ public final class OAuth2AuthorizationServer {
             throw new InsufficientAuthenticationException(
                     "Full authentication is required to authorize a client");
         }
+        if (consentAnswer || needsConsent(client, scopes, authentication)) {
+            String digest = OAuth2Parameters.sha256(authentication.getName() + "\n"
+                    + query(request));
+            if (!consentAnswer) {
+                if (prompts.contains("none")) {
+                    return redirectError(redirectUri, state, issuer, "consent_required",
+                            "The user has to approve this client");
+                }
+                String ticket = OAuth2Parameters.random(32);
+                // One attribute per ticket: two authorizations pending in one
+                // session (two tabs, two clients) each keep their own question.
+                HttpSession asking = request.getSession(true);
+                asking.setAttribute(CONSENT_TICKET + "." + ticket, digest);
+                // At most MAX_PENDING_CONSENTS questions wait in one session, the
+                // oldest dropped first, so unanswered pages cannot grow it forever.
+                Object order = asking.getAttribute(CONSENT_TICKET);
+                List<String> pending = new ArrayList<String>();
+                if (order instanceof String && ((String) order).length() > 0) {
+                    // No String.split on the compiled runtime: walk the spaces.
+                    String all = (String) order;
+                    int from = 0;
+                    while (from <= all.length()) {
+                        int space = all.indexOf(' ', from);
+                        int end = space < 0 ? all.length() : space;
+                        if (end > from) {
+                            pending.add(all.substring(from, end));
+                        }
+                        from = end + 1;
+                    }
+                }
+                pending.add(ticket);
+                while (pending.size() > MAX_PENDING_CONSENTS) {
+                    asking.removeAttribute(CONSENT_TICKET + "." + pending.remove(0));
+                }
+                StringBuilder joined = new StringBuilder();
+                for (String t : pending) {
+                    joined.append(joined.length() == 0 ? "" : " ").append(t);
+                }
+                asking.setAttribute(CONSENT_TICKET, joined.toString());
+                return askConsent(request, client, scopes, redirectUri, ticket, authentication,
+                        csrfParameter, csrfToken);
+            }
+            String sent = form(request);
+            String ticket = OAuth2Parameters.parse(sent).get("ticket");
+            HttpSession held = request.getSession(false);
+            Object question = held == null || ticket == null ? null
+                    : held.getAttribute(CONSENT_TICKET + "." + ticket);
+            if (question != null) {
+                // Once, right or wrong: a ticket cannot be tried twice.
+                held.removeAttribute(CONSENT_TICKET + "." + ticket);
+                // And out of the order, so an answered question stops counting
+                // toward the cap of waiting ones.
+                Object order = held.getAttribute(CONSENT_TICKET);
+                if (order instanceof String) {
+                    String rest = (" " + order + " ").replace(" " + ticket + " ", " ").trim();
+                    held.setAttribute(CONSENT_TICKET, rest);
+                }
+            }
+            // The ticket is 32 random bytes, single use and bound to this user
+            // and this exact request: it is found by its own value, and what it
+            // holds must be the digest of who is answering and which request.
+            if (!(question instanceof String) || !question.equals(digest)) {
+                throw new Refusal(400, OAuth2ErrorCodes.INVALID_REQUEST, "This is not an answer to "
+                        + "a consent question this server asked; start the sign-in again");
+            }
+            if (!"approve".equals(OAuth2Parameters.parse(sent).get("decision"))) {
+                return redirectError(redirectUri, state, issuer, OAuth2ErrorCodes.ACCESS_DENIED,
+                        "The user denied access");
+            }
+            Set<String> ticked = new java.util.HashSet<String>();
+            for (String field : OAuth2Parameters.values(sent, "scope")) {
+                ticked.addAll(OAuth2Parameters.scopes(field));
+            }
+            // In the order asked for; openid is the sign-in itself, which the
+            // page shows as given.
+            Set<String> approved = new LinkedHashSet<String>();
+            for (String scope : scopes) {
+                if ("openid".equals(scope) || ticked.contains(scope)) {
+                    approved.add(scope);
+                }
+            }
+            if (!scopes.isEmpty() && approved.isEmpty()) {
+                return redirectError(redirectUri, state, issuer, OAuth2ErrorCodes.ACCESS_DENIED,
+                        "The user approved none of the scopes asked for");
+            }
+            scopes = approved;
+        }
         Map<String, Object> attributes = new LinkedHashMap<String, Object>();
         attributes.put("redirect_uri", redirectUri);
         attributes.put("redirect_uri_sent", Boolean.valueOf(asked != null));
@@ -503,6 +687,279 @@ public final class OAuth2AuthorizationServer {
         answer.put("state", state);
         answer.put("iss", issuer);
         return redirect(OAuth2Parameters.append(redirectUri, answer));
+    }
+
+    private boolean needsConsent(RegisteredClient client, Set<String> scopes,
+            Authentication authentication) {
+        return client.getClientSettings().isRequireAuthorizationConsent()
+                || (consent != null && consent.requiresConsent(client,
+                        Collections.unmodifiableSet(scopes), authentication));
+    }
+
+    /// The consent question: the application's page, or the built-in one.
+    private HttpServer.Response askConsent(HttpServer.Request request, RegisteredClient client,
+            Set<String> scopes, String redirectUri, String ticket, Authentication authentication,
+            String csrfParameter, String csrfToken) {
+        String action = settings.getAuthorizationEndpoint() + "?" + query(request);
+        if (consentPage != null) {
+            Map<String, Object> sent = new LinkedHashMap<String, Object>();
+            sent.put("client_id", client.getClientId());
+            sent.put("scope", OAuth2Parameters.scopes(scopes));
+            sent.put("ticket", ticket);
+            sent.put("action", action);
+            return redirect(OAuth2Parameters.append(consentPage, sent));
+        }
+        String hidden = (csrfParameter == null || csrfToken == null ? ""
+                : "<input type=\"hidden\" name=\"" + escape(csrfParameter) + "\" value=\""
+                        + escape(csrfToken) + "\">\n")
+                + "<input type=\"hidden\" name=\"ticket\" value=\"" + escape(ticket) + "\">\n";
+        String loopback = loopbackWithoutPort(redirectUri);
+        String destination = loopback != null ? "an application on this computer"
+                : host(redirectUri);
+        StringBuilder body = new StringBuilder();
+        body.append("<h2>Allow access</h2>\n<p>An application calling itself <strong>");
+        body.append(escape(client.getClientName()));
+        body.append("</strong> is asking to act as <strong>");
+        body.append(escape(authentication.getName()));
+        body.append("</strong>.</p>\n<p>It will be signed in through <strong>");
+        body.append(escape(destination));
+        body.append("</strong>. Allow it only if you just started this from that "
+                + "application.</p>\n<form method=\"post\" action=\"");
+        body.append(escape(action));
+        body.append("\">\n");
+        body.append(hidden);
+        boolean any = false;
+        for (String scope : scopes) {
+            if ("openid".equals(scope)) {
+                continue;
+            }
+            if (!any) {
+                body.append("<fieldset>\n<legend>It may:</legend>\n");
+                any = true;
+            }
+            body.append("<p><label><input type=\"checkbox\" name=\"scope\" value=\"");
+            body.append(escape(scope));
+            body.append("\" checked> ");
+            body.append(escape(scope));
+            body.append("</label></p>\n");
+        }
+        if (any) {
+            body.append("</fieldset>\n");
+        }
+        body.append("<button type=\"submit\" name=\"decision\" value=\"approve\">Allow</button>\n"
+                + "</form>\n<form method=\"post\" action=\"");
+        body.append(escape(action));
+        body.append("\">\n");
+        body.append(hidden);
+        body.append("<button type=\"submit\" name=\"decision\" value=\"deny\">Deny</button>\n"
+                + "</form>\n");
+        return page(200, "Allow access", body.toString());
+    }
+
+    /// The host of an absolute address, for showing; the address itself when
+    /// it names none.
+    private static String host(String uri) {
+        int start = uri.indexOf("://");
+        if (start < 0) {
+            return uri;
+        }
+        start += 3;
+        int end = start;
+        while (end < uri.length() && "/?#".indexOf(uri.charAt(end)) < 0) {
+            end++;
+        }
+        return uri.substring(start, end);
+    }
+
+    // ----------------------------------------------------------- registration
+
+    /// RFC 7591: a client registering itself; see [ClientRegistrationPolicy].
+    private HttpServer.Response register(HttpServer.Request request) {
+        requireMethod(request, "POST");
+        if (!isJson(request.getHeader("Content-Type"))) {
+            throw new Refusal(400, ClientRegistrationException.INVALID_CLIENT_METADATA,
+                    "The client metadata must be sent as application/json");
+        }
+        Object parsed;
+        try {
+            parsed = Json.parse(request.getBody());
+        } catch (IOException malformed) {
+            parsed = null;
+        } catch (RuntimeException malformed) {
+            // The parser's own refusal of what it was sent; answered below
+            // like any other body that is not an object.
+            parsed = null;
+        }
+        if (!(parsed instanceof Map)) {
+            throw new Refusal(400, ClientRegistrationException.INVALID_CLIENT_METADATA,
+                    "The client metadata is not a JSON object");
+        }
+        Map<String, Object> metadata = new LinkedHashMap<String, Object>();
+        for (Object entry : ((Map) parsed).entrySet()) {
+            if (entry instanceof Map.Entry) {
+                Map.Entry e = (Map.Entry) entry;
+                metadata.put(String.valueOf(e.getKey()), e.getValue());
+            }
+        }
+        RegisteredClient client;
+        try {
+            client = registration.validate(request, Collections.unmodifiableMap(metadata),
+                    proposedClient(metadata));
+        } catch (ClientRegistrationException refused) {
+            throw new Refusal(400, refused.getError(), refused.getMessage(), refused);
+        }
+        requireSelfRegistered(client);
+        clients.save(client);
+        Map<String, Object> out = new LinkedHashMap<String, Object>();
+        out.put("client_id", client.getClientId());
+        out.put("client_id_issued_at", Long.valueOf(clock.currentTimeMillis() / 1000L));
+        out.put("client_name", client.getClientName());
+        out.put("redirect_uris", new ArrayList<Object>(client.getRedirectUris()));
+        List<Object> grants = new ArrayList<Object>();
+        for (AuthorizationGrantType grant : client.getAuthorizationGrantTypes()) {
+            grants.add(grant.getValue());
+        }
+        out.put("grant_types", grants);
+        out.put("response_types", list("code"));
+        out.put("token_endpoint_auth_method", "none");
+        out.put("scope", OAuth2Parameters.scopes(client.getScopes()));
+        return json(201, out);
+    }
+
+    /// The client a request's metadata describes, checked against what a
+    /// self-registered client may be.
+    private RegisteredClient proposedClient(Map<String, Object> metadata) {
+        String metadataError = ClientRegistrationException.INVALID_CLIENT_METADATA;
+        Object uris = metadata.get("redirect_uris");
+        if (!(uris instanceof List) || ((List) uris).isEmpty()
+                || ((List) uris).size() > MAX_REGISTERED_REDIRECTS) {
+            throw new Refusal(400, ClientRegistrationException.INVALID_REDIRECT_URI,
+                    "redirect_uris must list one to " + MAX_REGISTERED_REDIRECTS + " addresses");
+        }
+        String id = OAuth2Parameters.random(16);
+        RegisteredClient.Builder b = RegisteredClient.withId(id).clientId(id)
+                .clientAuthenticationMethod(ClientAuthenticationMethod.NONE)
+                .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
+                .clientSettings(ClientSettings.builder().requireProofKey(true)
+                        .requireAuthorizationConsent(true).build());
+        for (Object uri : (List) uris) {
+            if (!(uri instanceof String) || !selfRegisteredRedirect((String) uri)) {
+                throw new Refusal(400, ClientRegistrationException.INVALID_REDIRECT_URI,
+                        "Each redirect address must be https, or http on 127.0.0.1 or [::1], "
+                        + "with no fragment or user information");
+            }
+            b.redirectUri((String) uri);
+        }
+        Object name = metadata.get("client_name");
+        if (name == null) {
+            b.clientName("Unnamed client");
+        } else if (!(name instanceof String) || !printable((String) name, MAX_CLIENT_NAME)
+                || ((String) name).trim().length() == 0) {
+            throw new Refusal(400, metadataError, "client_name must be text of at most "
+                    + MAX_CLIENT_NAME + " characters");
+        } else {
+            b.clientName(((String) name).trim());
+        }
+        Object method = metadata.get("token_endpoint_auth_method");
+        if (method != null && !"none".equals(method)) {
+            throw new Refusal(400, metadataError, "Only public clients may register: "
+                    + "token_endpoint_auth_method must be none");
+        }
+        Object grants = metadata.get("grant_types");
+        if (grants != null) {
+            if (!(grants instanceof List) || !((List) grants).contains("authorization_code")) {
+                throw new Refusal(400, metadataError, "grant_types must include "
+                        + "authorization_code");
+            }
+            for (Object grant : (List) grants) {
+                if ("refresh_token".equals(grant)) {
+                    b.authorizationGrantType(AuthorizationGrantType.REFRESH_TOKEN);
+                } else if (!"authorization_code".equals(grant)) {
+                    throw new Refusal(400, metadataError, "grant_types may only be "
+                            + "authorization_code and refresh_token");
+                }
+            }
+        }
+        Object responses = metadata.get("response_types");
+        if (responses != null && !(responses instanceof List && ((List) responses).size() == 1
+                && "code".equals(((List) responses).get(0)))) {
+            throw new Refusal(400, metadataError, "response_types must be [\"code\"]");
+        }
+        Set<String> allowed = registration.allowedScopes();
+        Object scope = metadata.get("scope");
+        if (scope == null) {
+            for (String s : allowed) {
+                b.scope(s);
+            }
+        } else {
+            if (!(scope instanceof String)) {
+                throw new Refusal(400, metadataError, "scope must be a string");
+            }
+            for (String s : OAuth2Parameters.scopes((String) scope)) {
+                if (!allowed.contains(s)) {
+                    throw new Refusal(400, metadataError, "The scope " + s + " is not one a "
+                            + "registered client may have");
+                }
+                b.scope(s);
+            }
+        }
+        return b.build();
+    }
+
+    /// What a policy's client must still be: a mistake there is the server's,
+    /// so it is answered 500 rather than saved.
+    private void requireSelfRegistered(RegisteredClient client) {
+        boolean redirectsOk = client != null && !client.getRedirectUris().isEmpty()
+                && client.getRedirectUris().size() <= MAX_REGISTERED_REDIRECTS;
+        if (redirectsOk) {
+            for (String uri : client.getRedirectUris()) {
+                redirectsOk &= selfRegisteredRedirect(uri);
+            }
+        }
+        Set<AuthorizationGrantType> grants = client == null ? null
+                : client.getAuthorizationGrantTypes();
+        if (!redirectsOk || !client.isPublic() || client.getClientSecret() != null
+                || !client.getClientSettings().isRequireProofKey()
+                || !client.getClientSettings().isRequireAuthorizationConsent()
+                || !client.getResources().isEmpty() || client.getAudience() != null
+                || !registration.allowedScopes().containsAll(client.getScopes())
+                || !grants.contains(AuthorizationGrantType.AUTHORIZATION_CODE)
+                || grants.size() > (grants.contains(AuthorizationGrantType.REFRESH_TOKEN) ? 2 : 1)
+                || clients.findByClientId(client.getClientId()) != null) {
+            throw new IllegalStateException("the ClientRegistrationPolicy returned a client a "
+                    + "registration may not create, or one whose client_id is taken");
+        }
+    }
+
+    /// An https address, or an http one on a loopback address (RFC 8252);
+    /// either with no fragment and no user information.
+    private static boolean selfRegisteredRedirect(String uri) {
+        if (!printable(uri, 2000) || uri.indexOf('#') >= 0 || uri.indexOf(' ') >= 0) {
+            return false;
+        }
+        String rest;
+        if (uri.startsWith("https://")) {
+            rest = uri.substring(8);
+        } else if (loopbackWithoutPort(uri) != null) {
+            return host(uri).indexOf('@') < 0;
+        } else {
+            return false;
+        }
+        String host = host(uri);
+        return host.length() > 0 && host.indexOf('@') < 0 && rest.length() >= host.length();
+    }
+
+    private static boolean printable(String value, int max) {
+        if (value.length() > max) {
+            return false;
+        }
+        for (int iter = 0 ; iter < value.length() ; iter++) {
+            char c = value.charAt(iter);
+            if (c < 0x20 || c == 0x7f) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /// When this session completed a credential check, in epoch seconds, or
@@ -1719,6 +2176,10 @@ public final class OAuth2AuthorizationServer {
     }
 
     private static HttpServer.Response page(int status, String body) {
+        return page(status, "Sign in a device", body);
+    }
+
+    private static HttpServer.Response page(int status, String title, String body) {
         Map<String, Object> headers = new LinkedHashMap<String, Object>();
         headers.put("Cache-Control", "no-store");
         // Beside the chain's own X-Frame-Options, and there even if the chain
@@ -1727,7 +2188,7 @@ public final class OAuth2AuthorizationServer {
         return new HttpServer.Response(status, "text/html; charset=utf-8", OAuth2Parameters.utf8(
                 "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n"
                 + "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n"
-                + "<title>Sign in a device</title>\n</head>\n<body>\n" + body
+                + "<title>" + title + "</title>\n</head>\n<body>\n" + body
                 + "</body>\n</html>\n"), headers);
     }
 
@@ -1826,7 +2287,16 @@ public final class OAuth2AuthorizationServer {
         private final Map<String, Object> headers = new LinkedHashMap<String, Object>();
 
         Refusal(int status, String code, String description) {
+            this(status, code, description, null);
+        }
+
+        Refusal(int status, String code, String description, Throwable cause) {
             super(code);
+            if (cause != null) {
+                // Only when there is one: a cause set to null here could not
+                // be set later by initCause.
+                initCause(cause);
+            }
             this.status = status;
             this.code = code;
             this.description = description;

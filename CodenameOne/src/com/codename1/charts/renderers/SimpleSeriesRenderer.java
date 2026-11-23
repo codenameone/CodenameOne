@@ -17,6 +17,9 @@ import com.codename1.charts.util.NumberFormat;
 
 
 /// A simple series renderer.
+///
+/// @deprecated Use the `com.codename1.ui.chart` package instead.
+@Deprecated
 public class SimpleSeriesRenderer {
     /// The series color.
     private int mColor = 0x0000ff;

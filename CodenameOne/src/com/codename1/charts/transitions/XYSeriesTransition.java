@@ -28,6 +28,9 @@ import com.codename1.charts.ChartComponent;
 import com.codename1.charts.models.XYSeries;
 
 /// A transition for enabling animations between different values in an XYSeries.
+///
+/// @deprecated Use the `com.codename1.ui.chart` package instead.
+@Deprecated
 public class XYSeriesTransition extends SeriesTransition {
 
 

@@ -142,6 +142,14 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
             throw new IllegalArgumentException("Query exceeds the portable limit of 999 bound parameters");
         }
     }
+    /// Whether ORDER BY may name a selected expression by its position. Only
+    /// PostgreSQL needs it -- it sees two equal-valued parameters as different
+    /// expressions, so a grouped expression with a literal cannot be repeated
+    /// in ORDER BY -- and only there is it safe inside [#orderBy], which on
+    /// MySQL wraps the term in `(term IS NULL)`, where a position is a constant.
+    boolean ordersBySelectedPosition() {
+        return "postgresql".equals(sql.dialect());
+    }
     String integralSum(String expression) {
         return "CAST(" + expression + " AS " + integralType() + ")";
     }
@@ -163,6 +171,161 @@ public final class SessionImpl implements com.codename1.orm.session.Session {
             return "DATALENGTH(CONVERT(NVARCHAR(MAX), ";
         }
         return "mysql".equals(sql.dialect()) ? "CHAR_LENGTH" : function;
+    }
+    /// JPQL CONCAT. `||` where it is concatenation; MySQL parses `||` as OR,
+    /// so it gets CONCAT(), which answers NULL for a NULL operand exactly as
+    /// `||` does. (PostgreSQL's own concat() skips NULLs, so it is not used.)
+    ///
+    /// SQL Server concatenates with `+`, NULL for a NULL operand like `||`.
+    /// Oracle's `||` skips a NULL operand, so it is spelled out: NULL when any
+    /// operand is NULL. (Oracle stores '' as NULL, so an empty operand is a
+    /// NULL one there; that is Oracle's, as everywhere else.)
+    String concat(String[] values) {
+        if (oracle()) {
+            StringBuilder test = new StringBuilder("(CASE WHEN ");
+            StringBuilder joined = new StringBuilder();
+            for (int i = 0; i < values.length; i++) {
+                test.append(i > 0 ? " OR " : "").append(values[i]).append(" IS NULL");
+                joined.append(i > 0 ? " || " : "").append(values[i]);
+            }
+            return test.append(" THEN NULL ELSE ").append(joined).append(" END)").toString();
+        }
+        if (sqlServer()) {
+            StringBuilder out = new StringBuilder("(");
+            for (int i = 0; i < values.length; i++) {
+                out.append(i > 0 ? " + " : "").append("CONVERT(NVARCHAR(MAX), ").append(values[i]).append(')');
+            }
+            return out.append(')').toString();
+        }
+        boolean mysql = "mysql".equals(sql.dialect());
+        StringBuilder out = new StringBuilder(mysql ? "CONCAT(" : "(");
+        for (int i = 0; i < values.length; i++) {
+            if (i > 0) {
+                out.append(mysql ? ", " : " || ");
+            }
+            out.append(values[i]);
+        }
+        return out.append(')').toString();
+    }
+    /// JPQL SUBSTRING(value, start[, length]), 1-based. PostgreSQL's substr
+    /// takes INTEGER positions, and a bound number is typed BIGINT.
+    ///
+    /// The dialects disagree outside the range JPQL defines: below 1 SQLite and
+    /// MySQL count from the end while PostgreSQL counts from before the first
+    /// character, and a negative length is an error on PostgreSQL alone. Both
+    /// are pinned here so every dialect gives one answer: a start below 1 is
+    /// the empty string, a negative length is 0. NULL stays NULL.
+    String substring(String value, String start, String length) {
+        boolean postgres = "postgresql".equals(sql.dialect());
+        // T-SQL spells it SUBSTRING and requires the length; the longest
+        // NVARCHAR(MAX) is 2^30 characters, so 2^31-1 means "to the end".
+        String name = sqlServer() ? "SUBSTRING(" : "SUBSTR(";
+        if (sqlServer() && length == null) {
+            length = "2147483647";
+        }
+        String from = position(start, postgres);
+        StringBuilder out = new StringBuilder("(CASE WHEN ").append(from).append(" < 1 THEN ").append(name)
+                .append(value).append(", 1, 0) ELSE ").append(name).append(value).append(", ").append(from);
+        if (length != null) {
+            String count = position(length, postgres);
+            out.append(", (CASE WHEN ").append(count).append(" < 0 THEN 0 ELSE ").append(count).append(" END)");
+        }
+        return out.append(") END)").toString();
+    }
+    /// JPQL LOCATE(search, value[, start]): the 1-based position of `search`
+    /// in `value` at or after `start`, 0 when it is not there. MySQL has it;
+    /// SQLite and PostgreSQL search with instr/strpos, which take no start.
+    String locate(String search, String value, String start) {
+        String dialect = sql.dialect();
+        if ("mysql".equals(dialect)) {
+            return "LOCATE(" + search + ", " + value + (start == null ? "" : ", " + start) + ")";
+        }
+        if (sqlServer() || oracle()) {
+            // CHARINDEX and INSTR both take a start: CHARINDEX reads one below
+            // 1 as 1, and INSTR searches backwards from a negative one, so a
+            // start below 1 is answered 0 here as MySQL's LOCATE does. Oracle's
+            // NUMBER and CHARINDEX's INT are cast to the 64-bit type.
+            String found = sqlServer()
+                    ? "CHARINDEX(" + search + ", " + value + (start == null ? "" : ", " + start) + ")"
+                    : "INSTR(" + value + ", " + search + (start == null ? "" : ", " + start) + ")";
+            if (start != null) {
+                found = "(CASE WHEN " + start + " < 1 THEN 0 ELSE " + found + " END)";
+            }
+            return "CAST(" + found + " AS " + integralType() + ")";
+        }
+        boolean postgres = "postgresql".equals(dialect);
+        if (start == null) {
+            return postgres ? "CAST(STRPOS(" + value + ", " + search + ") AS BIGINT)"
+                    : "instr(" + value + ", " + search + ")";
+        }
+        String from = position(start, postgres);
+        String tail = "SUBSTR(" + value + ", " + from + ")";
+        String found = postgres ? "STRPOS(" + tail + ", " + search + ")" : "instr(" + tail + ", " + search + ")";
+        // A start below 1 finds nothing, as MySQL's LOCATE answers; substr
+        // there would count from the end (SQLite) or from before the string
+        // (PostgreSQL) and report a position that is not one.
+        String located = "(CASE WHEN " + from + " < 1 THEN 0 WHEN " + found + " = 0 THEN 0 ELSE "
+                + found + " + " + from + " - 1 END)";
+        return postgres ? "CAST(" + located + " AS BIGINT)" : located;
+    }
+    private static String position(String value, boolean postgres) {
+        return postgres ? "CAST(" + value + " AS INTEGER)" : value;
+    }
+    /// FLOOR, CEILING and ROUND of a REAL operand, as a REAL. ROUND rounds half
+    /// away from zero on every dialect -- SQLite's round() does, and PostgreSQL
+    /// and MySQL do it for exact numerics, so the double goes through NUMERIC /
+    /// DECIMAL there rather than their round-half-even double paths. SQLite's
+    /// platform builds have no FLOOR or CEILING, so both are spelled with a
+    /// truncating cast.
+    ///
+    /// A double of magnitude 2^52 or more is already integral, and the paths
+    /// above cannot take it: SQLite's integer cast saturates at 2^63, MySQL's
+    /// DECIMAL(65,15) holds 50 integer digits, and PostgreSQL before 14 cannot
+    /// cast an infinity to NUMERIC. Such a value is answered as it is.
+    String roundingFunction(String function, String value, int digits) {
+        return "(CASE WHEN ABS(" + value + ") >= 4503599627370496.0 THEN " + value + " ELSE "
+                + rounding(function, value, digits) + " END)";
+    }
+    private String rounding(String function, String value, int digits) {
+        String dialect = sql.dialect();
+        if ("sqlite".equals(dialect)) {
+            if ("ROUND".equals(function)) {
+                return "round(" + value + ", " + digits + ")";
+            }
+            String truncated = "CAST(" + value + " AS INTEGER)";
+            boolean floor = "FLOOR".equals(function);
+            return "CAST((CASE WHEN " + value + (floor ? " < " : " > ") + truncated + " THEN " + truncated
+                    + (floor ? " - 1" : " + 1") + " ELSE " + truncated + " END) AS REAL)";
+        }
+        if (sqlServer() || oracle()) {
+            // Exact decimal rounding, half away from zero, as on the others:
+            // T-SQL's float ROUND and Oracle's BINARY_DOUBLE ROUND do not
+            // promise it. The guard above keeps every value under 2^52, which
+            // DECIMAL(38,15) and NUMBER hold exactly. Oracle spells CEILING
+            // as CEIL.
+            String back = sqlServer() ? "FLOAT(53)" : "BINARY_DOUBLE";
+            if ("ROUND".equals(function)) {
+                return "CAST(ROUND(CAST(" + value + " AS " + (sqlServer() ? "DECIMAL(38,15)" : "NUMBER")
+                        + "), " + digits + ") AS " + back + ")";
+            }
+            return "CAST(" + (oracle() && "CEILING".equals(function) ? "CEIL" : function)
+                    + "(" + value + ") AS " + back + ")";
+        }
+        if ("ROUND".equals(function)) {
+            if ("mysql".equals(dialect)) {
+                return "(1e0 * ROUND(CAST(" + value + " AS DECIMAL(65,15)), " + digits + "))";
+            }
+            return "CAST(ROUND(CAST(" + value + " AS NUMERIC), " + digits + ") AS DOUBLE PRECISION)";
+        }
+        String rounded = function + "(" + value + ")";
+        return "mysql".equals(dialect) ? "(1e0 * " + rounded + ")" : rounded;
+    }
+    /// JPQL SQRT; NULL for a negative argument on every dialect, where
+    /// PostgreSQL would otherwise fail the statement and the others answer
+    /// NULL. SQLite's sqrt() needs its math functions, which the backend's
+    /// SQLite has and a device's system SQLite may not.
+    String squareRoot(String value) {
+        return "(CASE WHEN " + value + " < 0 THEN NULL ELSE SQRT(" + value + ") END)";
     }
     String numericOperand(String value, int kind) {
         if ("postgresql".equals(sql.dialect())) {

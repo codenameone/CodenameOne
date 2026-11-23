@@ -446,10 +446,38 @@ public final class Tracing {
         return SUPPRESSED.get() != null;
     }
 
+    /// How many in-process dispatches as a user are recording their route,
+    /// process wide: zero keeps every other request off the thread local.
+    private static final java.util.concurrent.atomic.AtomicInteger ROUTE_CAPTURES =
+            new java.util.concurrent.atomic.AtomicInteger();
+    /// The calling thread's dispatch-as-user route slot: a one-element array the
+    /// first matched route fills.
+    private static final ThreadLocal ROUTE_CAPTURE = new ThreadLocal();
+
+    /// Starts recording the route matched on this thread into `slot`; returns
+    /// what to hand [#endRouteCapture]. Nests: an inner dispatch has its own slot.
+    static Object beginRouteCapture(String[] slot) {
+        Object previous = ROUTE_CAPTURE.get();
+        ROUTE_CAPTURE.set(slot);
+        ROUTE_CAPTURES.incrementAndGet();
+        return previous;
+    }
+
+    static void endRouteCapture(Object previous) {
+        ROUTE_CAPTURES.decrementAndGet();
+        ROUTE_CAPTURE.set(previous);
+    }
+
     /// Names the current server span after the route that matched. Called by the
     /// generated routers, which are the only code that knows the TEMPLATE -- the
     /// path alone would make every pet id its own operation.
     public static void route(String template) {
+        if (ROUTE_CAPTURES.get() > 0) {
+            String[] capture = (String[]) ROUTE_CAPTURE.get();
+            if (capture != null && capture[0] == null) {
+                capture[0] = template;
+            }
+        }
         // The request histogram's label, when metrics are on: one static read
         // when they are not.
         com.codename1.impl.backend.MetricsAccess.get().route(template);
