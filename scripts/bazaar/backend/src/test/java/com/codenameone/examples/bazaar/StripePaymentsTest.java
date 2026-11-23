@@ -30,6 +30,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
@@ -302,8 +303,38 @@ class StripePaymentsTest {
         try {
             stripe.refund("pi_1", 1840L, "refund-pi_1-0-1840");
             fail("A refund that failed was taken as made");
-        } catch (IOException expected) {
+        } catch (com.codenameone.examples.bazaar.pay.RefundRefused expected) {
             assertTrue(expected.getMessage().indexOf("failed") > 0);
+        }
+    }
+
+    @Test
+    void onlyADefiniteNoIsARefusedRefund() throws Exception {
+        // A 4xx says no refund was made; a 5xx, a 409 (the key is still in
+        // flight) or a 429 says nothing either way, and must not release
+        // the claim.
+        Script script = new Script()
+                .reply(400, "{\"error\":{\"type\":\"invalid_request_error\","
+                        + "\"code\":\"charge_already_refunded\"}}")
+                .reply(500, "{\"error\":{\"type\":\"api_error\"}}")
+                .reply(409, "{\"error\":{\"type\":\"idempotency_error\"}}")
+                .reply(429, "{\"error\":{\"type\":\"rate_limit_error\"}}");
+        StripePayments stripe = new StripePayments(script, RETURN);
+        try {
+            stripe.refund("pi_7", 100L, "k1");
+            fail("A refused refund was taken as made");
+        } catch (com.codenameone.examples.bazaar.pay.RefundRefused expected) {
+            // refused
+        }
+        for (int iter = 0; iter < 3; iter++) {
+            try {
+                stripe.refund("pi_7", 100L, "k1");
+                fail("An unanswered refund was taken as made");
+            } catch (com.codenameone.examples.bazaar.pay.RefundRefused wrong) {
+                fail("An ambiguous answer was read as a refusal: " + wrong.getMessage());
+            } catch (IOException expected) {
+                // ambiguous
+            }
         }
     }
 
@@ -316,10 +347,10 @@ class StripePaymentsTest {
                 .reply(200, "{\"id\":\"re_a\",\"object\":\"refund\",\"status\":\"succeeded\"}")
                 .reply(200, "{\"id\":\"re_b\",\"object\":\"refund\",\"status\":\"succeeded\"}");
         StripePayments stripe = new StripePayments(script, RETURN);
-        stripe.refund("pi_9", 500L, Payments.refundKey("pi_9", 0L, 500L));
-        stripe.refund("pi_9", 500L, Payments.refundKey("pi_9", 500L, 500L));
-        assertEquals("refund-pi_9-0-500", script.keys.get(0));
-        assertEquals("refund-pi_9-500-500", script.keys.get(1));
+        stripe.refund("pi_9", 500L, Payments.refundKey("pi_9", 0L, 500L, 0));
+        stripe.refund("pi_9", 500L, Payments.refundKey("pi_9", 500L, 500L, 0));
+        assertEquals("refund-pi_9-0-500-0", script.keys.get(0));
+        assertEquals("refund-pi_9-500-500-0", script.keys.get(1));
     }
 
     @Test
@@ -356,16 +387,20 @@ class StripePaymentsTest {
                 .reply(200, "{\"id\":\"pi_2\",\"status\":\"requires_capture\"}");
         StripePayments stripe = new StripePayments(script, RETURN);
         try {
-            stripe.authorize(Payments.authorizeKey("o1", "pm_bad", 1840L), "cus_1", "pm_bad",
+            stripe.authorize(Payments.authorizeKey("o1", "pm_bad", 1840L, 0), "cus_1", "pm_bad",
                     1840L, "USD", "Bazaar order");
             fail("A declined card was held");
         } catch (PaymentDeclinedException expected) {
             // declined
         }
-        stripe.authorize(Payments.authorizeKey("o1", "pm_good", 1840L), "cus_1", "pm_good",
+        stripe.authorize(Payments.authorizeKey("o1", "pm_good", 1840L, 0), "cus_1", "pm_good",
                 1840L, "USD", "Bazaar order");
         assertFalse(script.keys.get(0).equals(script.keys.get(1)), script.keys.toString());
-        assertEquals(Payments.authorizeKey("o1", "pm_good", 1840L),
-                Payments.authorizeKey("o1", "pm_good", 1840L));
+        assertEquals(Payments.authorizeKey("o1", "pm_good", 1840L, 0),
+                Payments.authorizeKey("o1", "pm_good", 1840L, 0));
+        // The same card after a decline is a new attempt too: the order's
+        // decline count is part of the key.
+        assertNotEquals(Payments.authorizeKey("o1", "pm_bad", 1840L, 0),
+                Payments.authorizeKey("o1", "pm_bad", 1840L, 1));
     }
 }

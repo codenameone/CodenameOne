@@ -35,6 +35,8 @@ final class ScriptedPayments extends SimulatedPayments {
     /// run inside another answers before it. True fails one without saying
     /// whether it was made; once the list is empty every refund succeeds.
     final List<Boolean> refundFailures = new ArrayList<Boolean>();
+    /// Refunds the processor definitely refuses (a 4xx), one entry each.
+    final List<Boolean> refundRefusals = new ArrayList<Boolean>();
     /// Whether detaching a card fails the same way.
     boolean detachFails;
     /// The idempotency key of every refund asked for, in order, failed or not.
@@ -48,6 +50,7 @@ final class ScriptedPayments extends SimulatedPayments {
         keys.clear();
         duringRefund = null;
         refundFailures.clear();
+        refundRefusals.clear();
         detachFails = false;
         detached.clear();
     }
@@ -62,6 +65,10 @@ final class ScriptedPayments extends SimulatedPayments {
         }
         if (!refundFailures.isEmpty() && refundFailures.remove(0).booleanValue()) {
             throw new IOException("The scripted processor did not answer");
+        }
+        if (!refundRefusals.isEmpty() && refundRefusals.remove(0).booleanValue()) {
+            throw new com.codenameone.examples.bazaar.pay.RefundRefused(
+                    "The scripted processor refused the refund");
         }
         return super.refund(chargeReference, amountCents, key);
     }

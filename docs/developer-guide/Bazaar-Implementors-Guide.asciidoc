@@ -247,6 +247,37 @@ Wallets, pay-later and bank methods use the same provider:
   charged with the order. Answers are kept per order with the label as it read
   when the order was placed.
 
+*Refunds and processor failures.* A refund first claims what it takes: the
+order's cents and line quantities (`Orders.refundParts`, one conditional update
+each), then the payment (`REFUNDING`, with the amount, the reason and the time).
+For a refund with a card part the request is also kept in `order_refund_claim`.
+The processor gets an idempotency key made of the charge, the amount refunded
+before, the amount asked for and an attempt counter (`Payments.refundKey`).
+What happens next depends on how the processor answers:
+
+* *A definite refusal* (`RefundRefused`, a 4xx answer from Stripe other than
+  409 and 429) means no money moved. The payment claim and the order claims
+  are released, the attempt counter goes up, and the merchant's next try sends
+  a new key, so it is never answered with Stripe's cached refusal.
+* *An ambiguous failure* (a timeout, a 5xx, an unreadable answer) may have
+  moved money. Every claim stays, the order's timeline gets `REFUND_PENDING`,
+  and the caller gets 409 "The refund is being confirmed with the processor".
+  Any other refund of that order is refused until the processor answers.
+* *The sweep* (`Orders.resumeRefunds`, plus `Payments.resumeRefunds` for
+  cancellation and edit refunds) asks again after ten minutes, with the same
+  key. When the processor confirms the refund, the payment row is recorded in one
+  conditional update that matches only that claim. A late answer to the
+  original request therefore records nothing a second time. The sweep then
+  finishes the order side through the same `finishRefund` path as an immediate
+  answer: the refund record, release or restock, the timeline and the
+  notices. When the processor refuses, the sweep releases the order's claims. An
+  order claim that no payment claim followed (the server stopped between the
+  two) is released after fifteen minutes.
+
+Authorization keys work the same way. A definite decline increments the
+order's count in `payment_decline`, and that count is part of
+`Payments.authorizeKey`.
+
 === Who may call what
 
 The security configuration is the one place that says which routes are public,
