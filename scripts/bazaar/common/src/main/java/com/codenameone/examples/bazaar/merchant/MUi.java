@@ -145,9 +145,14 @@ final class MUi {
         tile.setUIID("MeTile");
         tile.setName(name);
         Container words = new Container(BoxLayout.y());
-        words.add(Ui.plain(caption, "MeTileCaption"));
+        // Both lines shrink to fit half a phone width rather than ending in
+        // "..." ("$3720...." and "Returning cust..." did).
+        Label c = Ui.plain(caption, "MeTileCaption");
+        c.setAutoSizeMode(true);
+        words.add(c);
         Label v = new Label(value, "MeTileValue");
         v.setShouldLocalize(false);
+        v.setAutoSizeMode(true);
         words.add(v);
         tile.add(BorderLayout.CENTER, words);
         if (trailing != null) {

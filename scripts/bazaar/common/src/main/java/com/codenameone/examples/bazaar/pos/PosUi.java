@@ -174,6 +174,9 @@ final class PosUi {
         Container bar = new Container(new BorderLayout());
         bar.setUIID("PosHeader");
         Label t = label(title, "PosTitle");
+        // A phone header shares its row with the status pill (and sometimes a
+        // link); the title shrinks to fit there rather than ending in "...".
+        t.setAutoSizeMode(true);
         bar.add(BorderLayout.CENTER, t);
         Container right = new Container(BoxLayout.x());
         if (extra != null) {

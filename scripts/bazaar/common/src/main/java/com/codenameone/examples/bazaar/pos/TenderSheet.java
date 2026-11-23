@@ -21,6 +21,7 @@ package com.codenameone.examples.bazaar.pos;
 import com.codename1.appkit.Net;
 import com.codename1.components.InfiniteProgress;
 import com.codename1.ui.Button;
+import com.codename1.ui.Component;
 import com.codename1.ui.CN;
 import com.codename1.ui.Container;
 import com.codename1.ui.FontImage;
@@ -85,14 +86,18 @@ final class TenderSheet {
         Container c = sheet.getContentPane();
         c.setLayout(BoxLayout.y());
         c.setScrollableY(true);
+        c.setScrollVisible(false);
         c.add(left);
         c.add(paid);
         c.add(PosUi.label("Cash", "PosGroup"));
         long[] quick = Tenders.quickCash(totals.totalCents);
-        Container cash = new Container(new GridLayout((quick.length + 3) / 4, 4));
+        // Three across on a phone: four "$213.16" keys do not fit a phone
+        // sheet's width and were all cut to "$...".
+        int cols = PosUi.wide() ? 4 : 3;
+        Container cash = new Container(new GridLayout((quick.length + cols - 1) / cols, cols));
         for (int iter = 0; iter < quick.length; iter++) {
             final long q = quick[iter];
-            cash.add(PosUi.key(PosState.money(q), "pos-cash-" + q, "PosKey", e -> cash(q)));
+            cash.add(PosUi.key(PosState.money(q), "pos-cash-" + q, "PosCashKey", e -> cash(q)));
         }
         c.add(cash);
         c.add(PosUi.key(Lang.tr("Other cash amount"), "pos-cash-other", "PosChoice",
@@ -104,6 +109,12 @@ final class TenderSheet {
                 e -> gift()));
         other.add(PosUi.icon(FontImage.MATERIAL_ACCOUNT_BALANCE_WALLET, "Store credit",
                 "pos-credit", "PosChoice", e -> credit()));
+        // Icon over label, so "Store credit" fits a third of a phone sheet.
+        for (int iter = 0; iter < other.getComponentCount(); iter++) {
+            Button m = (Button) other.getComponentAt(iter);
+            m.setUIID("PosMethod");
+            m.setTextPosition(Component.BOTTOM);
+        }
         c.add(other);
         refresh();
     }
@@ -194,7 +205,7 @@ final class TenderSheet {
         for (int iter = 0; iter < presets.length; iter++) {
             final long cents = PosCart.tipFor(totals.totalCents, presets[iter]);
             row.add(PosUi.key(presets[iter] / 100 + "% " + PosState.money(cents),
-                    "pos-tip-" + presets[iter], "PosKey", e -> {
+                    "pos-tip-" + presets[iter], "PosCashKey", e -> {
                         ask.back();
                         charge(cents);
                     }));

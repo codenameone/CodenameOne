@@ -256,6 +256,8 @@ final class PosHome {
         }));
         box.add(links);
         Container center = new Container(new FlowLayout(Component.CENTER));
+        center.setScrollableY(true);
+        center.setScrollVisible(false);
         center.add(box);
         page.add(BorderLayout.CENTER, center);
         dots.setText("\u25cb \u25cb \u25cb \u25cb \u25cb \u25cb");
@@ -303,10 +305,17 @@ final class PosHome {
                         Ui.fail(status, status <= 0 ? "Opening a shift needs the network" : text);
                     }));
         });
-        box.add(open);
+        // The button stays pinned under the pad, outside the scrolling area,
+        // so a short phone screen can never push it out of reach.
         Container center = new Container(new FlowLayout(Component.CENTER));
+        center.setScrollableY(true);
+        center.setScrollVisible(false);
         center.add(box);
         page.add(BorderLayout.CENTER, center);
+        Container south = new Container(new BorderLayout());
+        south.setUIID("PosPinFooter");
+        south.add(BorderLayout.CENTER, open);
+        page.add(BorderLayout.SOUTH, south);
         return page;
     }
 }

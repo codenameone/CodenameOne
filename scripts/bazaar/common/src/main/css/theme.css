@@ -1486,7 +1486,7 @@ MeDrop { color: var(--text-muted); background-color: var(--surface-alt); border:
 MeLowStock { color: var(--danger); background-color: transparent; font-family: "native:MainBold"; padding: 0; margin: 0; }
 MeSwatch { background-color: var(--brand); border: 1px solid var(--line-strong); border-radius: var(--radius-small); padding: 2.4mm; margin: 0 1.2mm 1.2mm 0; }
 MeAccentPreview { background-color: var(--brand); border-radius: var(--radius); padding: 3mm; margin: 1.6mm 0 1.6mm 0; }
-MeAccentName { color: var(--brand-contrast); background-color: transparent; font-family: "native:MainBold"; font-size: 4.4mm; padding: 0; margin: 0; }
+MeAccentName { color: var(--brand-contrast); background-color: transparent; font-family: "native:MainBold"; font-size: 4mm; padding: 0; margin: 0; }
 MeAccentTagline { color: var(--brand-contrast); background-color: transparent; font-size: 2.8mm; padding: 0.6mm 0 0 0; margin: 0; }
 
 
@@ -1816,7 +1816,7 @@ PosHeader {
 PosTitle {
     color: var(--text);
     font-family: "native:MainBold";
-    font-size: 4mm;
+    font-size: 3.6mm;
     padding: 1mm;
     margin: 0;
 }
@@ -1848,18 +1848,23 @@ PosError {
 PosAmount {
     color: var(--text);
     font-family: "native:MainBold";
-    font-size: 7mm;
+    font-size: 6.4mm;
     text-align: center;
-    padding: 2mm;
+    padding: 1.5mm;
     margin: 0;
 }
 
 PosPinBox {
     background-color: var(--surface);
-    padding: 4mm;
+    padding: 3mm;
     margin: 2mm;
     border: 1px solid var(--line);
     border-radius: var(--radius);
+}
+
+PosPinFooter {
+    padding: 1mm 3mm 2mm 3mm;
+    margin: 0;
 }
 
 PosPinDots {
@@ -1879,9 +1884,9 @@ PosKey {
     color: var(--text);
     background-color: var(--surface);
     font-family: "native:MainBold";
-    font-size: 5mm;
+    font-size: 4.6mm;
     text-align: center;
-    padding: 4mm 2mm 4mm 2mm;
+    padding: 2mm 2mm 2mm 2mm;
     margin: 1mm;
     border: 1px solid var(--line);
     border-radius: var(--radius);
@@ -1897,7 +1902,7 @@ PosChoice {
     font-family: "native:MainBold";
     font-size: 3.8mm;
     text-align: center;
-    padding: 4mm 2mm 4mm 2mm;
+    padding: 3mm 2mm 3mm 2mm;
     margin: 1.2mm;
     border: 1px solid var(--line-strong);
     border-radius: var(--radius);
@@ -1905,6 +1910,57 @@ PosChoice {
 
 PosChoice.pressed {
     background-color: var(--surface-press);
+}
+
+PosCashKey {
+    color: var(--text);
+    background-color: var(--surface);
+    font-family: "native:MainBold";
+    font-size: 3.4mm;
+    text-align: center;
+    padding: 2.6mm 0.5mm 2.6mm 0.5mm;
+    margin: 1mm;
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius);
+}
+
+PosCashKey.pressed {
+    background-color: var(--surface-press);
+}
+
+PosMethod {
+    color: var(--text);
+    background-color: var(--surface);
+    font-family: "native:MainBold";
+    font-size: 2.6mm;
+    text-align: center;
+    padding: 2.4mm 0.5mm 2.4mm 0.5mm;
+    margin: 1mm;
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius);
+}
+
+PosMethod.pressed {
+    background-color: var(--surface-press);
+}
+
+PosChoiceTitle {
+    color: var(--text);
+    background-color: transparent;
+    font-family: "native:MainBold";
+    font-size: 3.3mm;
+    text-align: center;
+    padding: 0;
+    margin: 0;
+}
+
+PosChoiceMeta {
+    color: var(--text-muted);
+    background-color: transparent;
+    font-size: 2.8mm;
+    text-align: center;
+    padding: 0.8mm 0 0 0;
+    margin: 0;
 }
 
 PosPay {
@@ -1939,6 +1995,20 @@ PosTool.pressed {
     background-color: var(--surface-press);
 }
 
+PosCartTool {
+    color: var(--text);
+    background-color: transparent;
+    font-size: 2.2mm;
+    text-align: center;
+    padding: 1.5mm 0 1.5mm 0;
+    margin: 0;
+    border-radius: var(--radius-small);
+}
+
+PosCartTool.pressed {
+    background-color: var(--surface-press);
+}
+
 PosField {
     color: var(--text);
     background-color: var(--surface);
@@ -1952,8 +2022,8 @@ PosField {
 PosScan {
     color: var(--text);
     background-color: var(--surface);
-    font-size: 4mm;
-    padding: 3mm;
+    font-size: 3.4mm;
+    padding: 2.2mm 3mm 2.2mm 3mm;
     margin: 1mm;
     border: 1px solid var(--line-strong);
     border-radius: var(--radius);
@@ -1961,7 +2031,7 @@ PosScan {
 
 PosScanHint {
     color: var(--text-muted);
-    font-size: 4mm;
+    font-size: 3.4mm;
 }
 
 PosScanRow {
@@ -2190,8 +2260,8 @@ PosPill {
     background-color: var(--success-tint);
     font-family: "native:MainBold";
     font-size: 2.6mm;
-    padding: 1.5mm 3mm 1.5mm 3mm;
-    margin: 0.5mm;
+    padding: 1.2mm 2.5mm 1.2mm 2.5mm;
+    margin: 0.5mm 0.5mm 0.5mm 1.5mm;
     border-radius: var(--radius);
 }
 
@@ -2200,7 +2270,7 @@ PosPillOffline {
     background-color: var(--danger-tint);
     font-family: "native:MainBold";
     font-size: 2.6mm;
-    padding: 1.5mm 3mm 1.5mm 3mm;
+    padding: 1.2mm 2.5mm 1.2mm 2.5mm;
     margin: 0.5mm;
     border-radius: var(--radius);
 }
@@ -2359,6 +2429,36 @@ PosDisplayTotal {
         background-color: var(--surface-press-dark);
     }
 
+    PosCashKey {
+        color: var(--text-dark);
+        background-color: var(--surface-dark);
+        border: 1px solid var(--line-strong-dark);
+        border-radius: var(--radius);
+    }
+
+    PosCashKey.pressed {
+        background-color: var(--surface-press-dark);
+    }
+
+    PosMethod {
+        color: var(--text-dark);
+        background-color: var(--surface-dark);
+        border: 1px solid var(--line-strong-dark);
+        border-radius: var(--radius);
+    }
+
+    PosMethod.pressed {
+        background-color: var(--surface-press-dark);
+    }
+
+    PosChoiceTitle {
+        color: var(--text-dark);
+    }
+
+    PosChoiceMeta {
+        color: var(--text-muted-dark);
+    }
+
     PosPay {
         color: var(--brand-contrast-dark);
         background-color: var(--brand-dark);
@@ -2379,6 +2479,14 @@ PosDisplayTotal {
     }
 
     PosTool.pressed {
+        background-color: var(--surface-press-dark);
+    }
+
+    PosCartTool {
+        color: var(--text-dark);
+    }
+
+    PosCartTool.pressed {
         background-color: var(--surface-press-dark);
     }
 
@@ -2603,7 +2711,7 @@ MeAutoInspector { background-color: var(--surface); border-left: 1px solid var(-
 MeAutoKind { color: var(--text-muted); background-color: transparent; font-family: "native:MainBold"; font-size: 2mm; padding: 1.6mm 0 0.6mm 0; margin: 0; }
 MeAutoProblems { background-color: var(--danger-tint); padding: 1.2mm 2.4mm 1.2mm 2.4mm; margin: 0; }
 MeAutoProblem { color: var(--danger); background-color: transparent; font-size: 2.2mm; padding: 0.4mm 0 0.4mm 0; margin: 0; }
-MeAnalyticsHead { padding: 0 0 1.6mm 0; margin: 0; }
+MeAnalyticsHead { padding: 0 3mm 1.6mm 3mm; margin: 0; }
 MeAnalyticsRange { color: var(--text); background-color: transparent; font-family: "native:MainBold"; font-size: 3.4mm; padding: 0; margin: 0; }
 MeCardTitle { color: var(--text); background-color: transparent; font-family: "native:MainBold"; font-size: 2.6mm; padding: 0 0 1.6mm 0; margin: 0; }
 MeDeltaUp { color: var(--success); background-color: transparent; font-family: "native:MainBold"; font-size: 2.1mm; padding: 0.6mm 0 0 0; margin: 0; }
@@ -2731,7 +2839,7 @@ PosSheet {
     margin: 0;
 }
 PosSheetTitleBar { background-color: transparent; padding: 1.6mm 0 2mm 0; margin: 0; border-bottom: 1px solid var(--line); }
-PosSheetTitle { color: var(--text); background-color: transparent; font-family: "native:MainBold"; font-size: 4.4mm; padding: 0; margin: 0; }
+PosSheetTitle { color: var(--text); background-color: transparent; font-family: "native:MainBold"; font-size: 4mm; padding: 0; margin: 0; }
 PosSheetBackButton { color: var(--text-muted); background-color: var(--surface-alt); border-radius: 3mm; padding: 1.6mm; margin: 0; }
 PosSheetBackButton.pressed { background-color: var(--surface-press); }
 PosSheetBody { background-color: transparent; padding: 3mm 0 0 0; margin: 0; }

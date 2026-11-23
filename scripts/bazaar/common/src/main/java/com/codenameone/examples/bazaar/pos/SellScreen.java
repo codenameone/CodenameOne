@@ -111,7 +111,9 @@ final class SellScreen {
         Container top = new Container(new BorderLayout());
         top.setUIID("PosScanRow");
         top.add(BorderLayout.CENTER, scan);
-        Container tools = new Container(BoxLayout.x());
+        // Centred on the row, so the status pill keeps its own height
+        // instead of stretching to the search field's.
+        Container tools = new Container(new FlowLayout(Component.RIGHT, Component.CENTER));
         if (cameraScan()) {
             tools.add(PosUi.icon(FontImage.MATERIAL_QR_CODE_SCANNER, "", "pos-camera", "PosTool",
                     e -> camera()));
@@ -123,11 +125,13 @@ final class SellScreen {
         tools.add(PosUi.pill());
         top.add(BorderLayout.EAST, tools);
         chips.setScrollableX(true);
+        chips.setScrollVisible(false);
         chips.setUIID("PosChips");
         Container north = new Container(BoxLayout.y());
         north.add(top).add(chips);
         products.add(BorderLayout.NORTH, north);
         grid.setScrollableY(true);
+        grid.setScrollVisible(false);
         grid.setUIID("PosGrid");
         products.add(BorderLayout.CENTER, grid);
 
@@ -376,16 +380,28 @@ final class SellScreen {
         content.setLayout(new GridLayout((variants.size() + 1) / 2, 2));
         for (int iter = 0; iter < variants.size(); iter++) {
             final PosItemDto v = variants.get(iter);
-            String stock = v.trackInventory() ? "  (" + v.available() + ")" : "";
-            Button b = new Button(v.variantTitle() + "  " + PosState.money(v.priceCents()) + stock,
-                    "PosChoice");
-            b.setShouldLocalize(false);
+            // Two lines: the option on top, the price and stock under it, so
+            // "M / Charcoal" is never cut off to make room for the price.
+            Container card = new Container(BoxLayout.y());
+            card.setUIID("PosChoice");
+            Label name = PosUi.data(v.variantTitle(), "PosChoiceTitle");
+            name.setAutoSizeMode(true);
+            card.add(name);
+            String meta = PosState.money(v.priceCents());
+            if (v.trackInventory()) {
+                meta += Ui.DOT + Lang.tr("{0} left", v.available());
+            }
+            card.add(PosUi.data(meta, "PosChoiceMeta"));
+            Button b = new Button();
             b.setName("pos-variant-" + iter);
             b.addActionListener(e -> {
                 sheet.back();
                 add(v, 1);
             });
-            content.add(b);
+            card.add(b);
+            b.setHidden(true);
+            card.setLeadComponent(b);
+            content.add(card);
         }
         sheet.show();
     }
@@ -470,21 +486,25 @@ final class SellScreen {
     private Container cartPanel() {
         Container panel = new Container(new BorderLayout());
         panel.setUIID("PosCart");
-        Container head = new Container(BoxLayout.x());
+        // One even row of icon-over-label tools, so all six fit a phone
+        // sheet instead of the last ones scrolling off the edge.
+        Container head = new Container(new GridLayout(1, 6));
         head.setUIID("PosCartHead");
-        head.add(PosUi.icon(FontImage.MATERIAL_PERSON_ADD, "Customer", "pos-customer", "PosTool",
+        head.add(PosUi.icon(FontImage.MATERIAL_PERSON_ADD, "Customer", "pos-customer", "PosCartTool",
                 e -> customer()));
-        head.add(PosUi.icon(FontImage.MATERIAL_LOCAL_OFFER, "Discount", "pos-discount", "PosTool",
+        head.add(PosUi.icon(FontImage.MATERIAL_LOCAL_OFFER, "Discount", "pos-discount", "PosCartTool",
                 e -> orderDiscount()));
-        head.add(PosUi.icon(FontImage.MATERIAL_DELETE_SWEEP, "Clear", "pos-clear", "PosTool",
+        head.add(PosUi.icon(FontImage.MATERIAL_DELETE_SWEEP, "Clear", "pos-clear", "PosCartTool",
                 e -> clearSale()));
-        head.add(PosUi.icon(FontImage.MATERIAL_POST_ADD, "Custom", "pos-custom", "PosTool",
+        head.add(PosUi.icon(FontImage.MATERIAL_POST_ADD, "Custom", "pos-custom", "PosCartTool",
                 e -> customItem()));
-        head.add(PosUi.icon(FontImage.MATERIAL_PAUSE_CIRCLE, "Park", "pos-park", "PosTool",
+        head.add(PosUi.icon(FontImage.MATERIAL_PAUSE_CIRCLE, "Park", "pos-park", "PosCartTool",
                 e -> park()));
-        head.add(PosUi.icon(FontImage.MATERIAL_SELL, "Labels", "pos-labels", "PosTool",
+        head.add(PosUi.icon(FontImage.MATERIAL_SELL, "Labels", "pos-labels", "PosCartTool",
                 e -> labels()));
-        head.setScrollableX(true);
+        for (int iter = 0; iter < head.getComponentCount(); iter++) {
+            ((Button) head.getComponentAt(iter)).setTextPosition(Component.BOTTOM);
+        }
         panel.add(BorderLayout.NORTH, head);
         cartBox.setScrollableY(true);
         cartBox.setName("pos-cart-lines");
@@ -568,7 +588,9 @@ final class SellScreen {
     private void totalRow(String caption, long cents, String uiid) {
         Container row = new Container(new BorderLayout());
         row.setUIID(uiid);
-        row.add(BorderLayout.WEST, PosUi.data(caption, uiid + "Label"));
+        // CENTER, not WEST: a long promotion name ends in "..." before the
+        // amount instead of running underneath it.
+        row.add(BorderLayout.CENTER, PosUi.data(caption, uiid + "Label"));
         row.add(BorderLayout.EAST, PosUi.data(PosState.money(cents), uiid + "Value"));
         totalsBox.add(row);
     }
@@ -589,8 +611,11 @@ final class SellScreen {
     }
 
     private Component line(final int index, final PosCart.Item item, long unit) {
-        Container row = new Container(new BorderLayout());
+        // The name gets the full width on top, with the line total beside it;
+        // the stepper sits under it, so a phone sheet never cuts the name.
+        Container row = new Container(BoxLayout.y());
         row.setUIID("PosCartRow");
+        Container top = new Container(new BorderLayout());
         row.setName("pos-line-" + index);
         Container text = new Container(BoxLayout.y());
         text.add(PosUi.data(item.item.title(), "PosCartTitle"));
@@ -607,8 +632,10 @@ final class SellScreen {
         text.add(lead);
         lead.setHidden(true);
         text.setLeadComponent(lead);
-        row.add(BorderLayout.CENTER, text);
-        Container step = new Container(BoxLayout.x());
+        top.add(BorderLayout.CENTER, text);
+        top.add(BorderLayout.EAST, PosUi.data(PosState.money(unit * item.quantity), "PosLineTotal"));
+        row.add(top);
+        Container step = new Container(new FlowLayout(Component.LEFT, Component.CENTER));
         step.setUIID("PosStepper");
         step.add(PosUi.icon(FontImage.MATERIAL_REMOVE, "", "pos-minus-" + index, "PosStep", e -> {
             PosState.cart().setQuantity(index, item.quantity - 1);
@@ -619,8 +646,7 @@ final class SellScreen {
             PosState.cart().setQuantity(index, item.quantity + 1);
             PosState.fireCart();
         }));
-        step.add(PosUi.data(PosState.money(unit * item.quantity), "PosLineTotal"));
-        row.add(BorderLayout.EAST, step);
+        row.add(step);
         return row;
     }
 
