@@ -59,7 +59,9 @@ class PlatformFeatureCatalogTest {
         for (PlatformFeatureCatalog.Entry e : sys.hits()) {
             if (e.androidGradleDeps().contains("com.google.mlkit:genai-prompt:1.0.0-beta5")) {
                 prompt = true;
-                assertEquals(26, e.androidMinimumSdk());
+                // Not GenAI's own 26, which the builder overrides: raising the
+                // app to 26 turns off java.time desugaring.
+                assertEquals(23, e.androidMinimumSdk());
                 assertTrue(e.iosFrameworks().isEmpty(),
                         "FoundationModels must be autolinked weakly, never listed");
             }
@@ -553,9 +555,10 @@ class PlatformFeatureCatalogTest {
                         || dependency.startsWith(
                                 "org.tensorflow:tensorflow-lite")) {
                     checked++;
-                    // ML Kit GenAI (Gemini Nano through AICore) declares
-                    // minSdk 26 in every artifact; the rest of ML Kit 21.
-                    assertEquals(dependency.startsWith("com.google.mlkit:genai-") ? 26 : 21,
+                    // ML Kit GenAI declares 26, accepted with
+                    // tools:overrideLibrary; its play-services-basement needs
+                    // 23, which is the floor. The rest of ML Kit 21.
+                    assertEquals(dependency.startsWith("com.google.mlkit:genai-") ? 23 : 21,
                             entry.androidMinimumSdk(), dependency);
                 }
             }

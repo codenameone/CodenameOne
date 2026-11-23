@@ -809,7 +809,8 @@ aren't offered by these models and fail with `INVALID_REQUEST`.
 The builders add this only to apps that call `LlmClient.system()`; an
 app that only checks the status gets
 `UNSUPPORTED`. On Android they add the
-ML Kit GenAI artifacts and raise the minimum SDK to 26. On iOS and macOS
+ML Kit GenAI artifacts and raise the minimum SDK to 23; the model
+itself needs Android 8, and older versions report `UNSUPPORTED`. On iOS and macOS
 they inject a small Swift bridge into the project; it compiles to a stub
 with an Xcode whose SDK lacks Foundation Models, and the framework is
 linked as optional, so the app still installs and runs on older OS versions

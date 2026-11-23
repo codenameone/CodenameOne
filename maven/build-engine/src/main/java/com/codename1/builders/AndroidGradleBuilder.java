@@ -4847,6 +4847,20 @@ public class AndroidGradleBuilder extends Executor {
             }
         }
 
+        // ML Kit GenAI declares minSdk 26, but raising the app to 26 changes more than the
+        // floor: D8 stops backporting java.time below 26, so the app silently switches to the
+        // platform's own java.time, which still has OpenJDK 8 bugs the backport fixed
+        // (Duration.ofMillis(-500) prints PT0.5S -- measured, hellocodenameone's TimeApiTest).
+        // The libraries are only ever touched through AndroidSystemLlmImpl, which the port
+        // loads on API 26 and newer alone, so the app keeps its floor and accepts theirs.
+        // Through android.xmanifest, because every manifest the builder writes reads it: the
+        // phone's, the Wear module's (which merges the same dependencies) and AGP 9's.
+        if (systemLlmSupport) {
+            request.putArgument("android.xmanifest", withOverrideLibraries(
+                    request.getArg("android.xmanifest", ""),
+                    PlatformFeatureCatalog.MLKIT_GENAI_MANIFEST_PACKAGES));
+        }
+
         // Android Auto glue: when the app references com.codename1.car, copy the injected
         // CarAppService / Session / Screen + the CarBridge converter (typed against androidx.car.app)
         // into the generated project and add the car-app gradle dependency. These ship as real .java
@@ -9691,6 +9705,28 @@ public class AndroidGradleBuilder extends Executor {
                 // here, so the attribute was stripped and nothing replaced it.
                 "android:maxSdkVersion\\s*=\\s*[\"']\\s*([0-9]+)\\s*[\"']").matcher(xmanifest);
         return m.find() ? m.group(1) : null;
+    }
+
+    /// `xmanifest` (the android.xmanifest value) with `packages` added to its
+    /// tools:overrideLibrary, which is created when absent and extended when the project
+    /// already declares one -- a second attribute of the same name would not parse.
+    static String withOverrideLibraries(String xmanifest, String packages) {
+        String value = xmanifest == null ? "" : xmanifest;
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile(
+                "tools:overrideLibrary\\s*=\\s*([\"'])([^\"']*)\\1").matcher(value);
+        if (!m.find()) {
+            return value + " tools:overrideLibrary=\"" + packages + "\"";
+        }
+        StringBuilder merged = new StringBuilder(m.group(2).trim());
+        for (String pkg : packages.split(",")) {
+            if (!("," + merged + ",").replace(" ", "").contains("," + pkg + ",")) {
+                if (merged.length() > 0) {
+                    merged.append(',');
+                }
+                merged.append(pkg);
+            }
+        }
+        return value.substring(0, m.start(2)) + merged + value.substring(m.end(2));
     }
 
     static String wearUsesSdk(BuildRequest request) {

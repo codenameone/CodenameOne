@@ -65,7 +65,8 @@ import java.util.List;
 ///   predates Foundation Models.
 /// - **Android 8 or newer**, on a device AICore supports with Gemini Nano --
 ///   recent Pixel, Samsung Galaxy and other flagship phones. Using this class
-///   raises the application's minimum SDK to 26.
+///   raises the application's minimum SDK to 23; older
+///   Android versions report [SystemLlmStatus#UNSUPPORTED].
 /// - Everywhere else, the simulator included, every feature is
 ///   [SystemLlmStatus#UNSUPPORTED] and requests fail with
 ///   [LlmException.ErrorType#INVALID_REQUEST]. Use [LlmClient#ollama()] to
