@@ -109,6 +109,12 @@ public class CatalogEndpoint implements CatalogApiServer {
     private com.codenameone.examples.bazaar.analytics.Views views;
 
     @Override
+    public java.util.List<com.codenameone.examples.bazaar.api.ProductCardDto> together(String id)
+            throws Exception {
+        return catalog.together(id, 4);
+    }
+
+    @Override
     public ProductDto product(String id) throws Exception {
         ProductDto p = catalog.publicProduct(id);
         automations.viewed(p.storeId(), com.codenameone.examples.bazaar.cart.Codes.callerOrNull(),

@@ -2,7 +2,7 @@
 <!-- cn1:model cart com.codenameone.examples.bazaar.web.CartView -->
 <!doctype html>
 <html th:attr="lang=${page.lang},dir=${page.dir}" xmlns:th="http://www.thymeleaf.org"><head th:replace="~{layout :: head}"></head><body th:class="${page.themeClass}" th:attr="data-accent=${page.accent}"><header th:replace="~{layout :: header}"></header>
-<main class="wrap"><h1 th:text="${page.t['cart.title']}">Your cart</h1>
+<main id="main" tabindex="-1" class="wrap"><h1 th:text="${page.t['cart.title']}">Your cart</h1>
 <ul class="problems" th:unless="${cart.problems.empty}"><li th:each="m : ${cart.problems}" th:text="${m}">Problem</li></ul>
 <div class="empty-state" th:if="${cart.empty}"><p th:text="${page.t['cart.empty']}">Your cart is empty.</p><a class="button" th:href="${page.home}" th:text="${page.t['keepShopping']}">Keep shopping</a></div>
 <table class="lines" th:unless="${cart.empty}"><thead><tr><th th:text="${page.t['item']}">Item</th><th th:text="${page.t['quantity']}">Quantity</th><th th:text="${page.t['total']}">Total</th><th><span class="sr" th:text="${page.t['remove']}">Remove</span></th></tr></thead><tbody>

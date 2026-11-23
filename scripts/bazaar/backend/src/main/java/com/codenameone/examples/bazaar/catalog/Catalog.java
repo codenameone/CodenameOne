@@ -493,6 +493,60 @@ public class Catalog {
     }
 
 
+    /// "Frequently bought together": up to `max` other products that shoppers
+    /// bought in the same paid order (captured or authorized) as `productId`, the most often first, then
+    /// filled from the product's own collections. Only products the shopper
+    /// could open themselves are returned (active, published, not hidden by a
+    /// membership or a schedule), so a recommendation never leaks a draft.
+    @Transactional(readOnly = true)
+    public List<ProductCardDto> together(String productId, int max) throws IOException {
+        String storeId = publicProduct(productId).storeId();
+        Snapshot snapshot = new Snapshot(storeId, ACTIVE, true).forViewer(storeId);
+        Map<String, Product> visible = new HashMap<String, Product>();
+        for (int iter = 0; iter < snapshot.list.size(); iter++) {
+            visible.put(snapshot.list.get(iter).getId(), snapshot.list.get(iter));
+        }
+        List rows = db.query("SELECT b.product_id, COUNT(DISTINCT b.order_id) AS n "
+                + "FROM order_line a JOIN order_line b ON b.order_id = a.order_id "
+                + "AND b.product_id <> a.product_id JOIN store_order o ON o.id = a.order_id "
+                + "WHERE a.product_id = ? AND o.store_id = ? AND o.status <> 'CANCELLED' "
+                + "AND o.financial IN ('AUTHORIZED', 'PAID', 'PARTIALLY_REFUNDED') "
+                + "AND (o.channel <> 'DRAFT' OR o.location_id <> '') "
+                + "GROUP BY b.product_id ORDER BY n DESC, b.product_id",
+                new Object[] {productId, storeId});
+        List<String> ids = new ArrayList<String>();
+        for (int iter = 0; iter < rows.size(); iter++) {
+            ids.add(com.codenameone.examples.bazaar.Rows.text(((Map) rows.get(iter)).get("product_id")));
+        }
+        List<String> mine = snapshot.membership.get(productId);
+        for (int c = 0; mine != null && c < mine.size(); c++) {
+            for (int iter = 0; iter < snapshot.list.size(); iter++) {
+                String other = snapshot.list.get(iter).getId();
+                List<String> in = snapshot.membership.get(other);
+                if (in != null && in.contains(mine.get(c))) {
+                    ids.add(other);
+                }
+            }
+        }
+        return togetherCards(snapshot, visible, ids, productId, max);
+    }
+
+    /// The first `max` distinct, visible ids of `ranked` other than `self`, as cards.
+    private static List<ProductCardDto> togetherCards(Snapshot snapshot,
+            Map<String, Product> visible, List<String> ranked, String self, int max) {
+        List<ProductCardDto> out = new ArrayList<ProductCardDto>();
+        Set<String> seen = new HashSet<String>();
+        seen.add(self);
+        for (int iter = 0; iter < ranked.size() && out.size() < max; iter++) {
+            String id = ranked.get(iter);
+            Product p = visible.get(id);
+            if (p != null && seen.add(id)) {
+                out.add(snapshot.card(p));
+            }
+        }
+        return out;
+    }
+
     @Transactional(readOnly = true)
     public FacetsDto facets(String handle, String collection, Search search) throws IOException {
         Store store = storeService.activeStore(handle);

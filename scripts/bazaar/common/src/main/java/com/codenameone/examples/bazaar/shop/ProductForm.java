@@ -201,6 +201,7 @@ final class ProductForm {
             Ui.section(page, "About this product");
             page.add(Ui.text(product.description(), "SvText"));
         }
+        page.add(together(product.id()));
         Ui.section(page, "Reviews");
         page.add(ProductReviews.create(product.id(), product.title()));
         root.add(BorderLayout.CENTER, page);
@@ -592,5 +593,26 @@ final class ProductForm {
             add.setEnabled(true);
             Ui.fail(status, message);
         });
+    }
+
+    /// "Frequently bought together": a horizontal row of cards, filled when the
+    /// answer arrives and hidden (title included) when there is nothing to show.
+    private static Container together(String id) {
+        final Container box = new Container(BoxLayout.y());
+        box.setName("product-together");
+        box.setHidden(true);
+        Ui.section(box, "Frequently bought together");
+        final Container row = new Container(BoxLayout.x());
+        row.setScrollableX(true);
+        box.add(row);
+        Api.catalog().together(id, Net.to(found -> {
+            int width = Math.min(CN.convertToPixels(40), CN.getDisplayWidth() * 2 / 5);
+            for (int iter = 0; iter < found.size(); iter++) {
+                row.add(ProductCard.create(found.get(iter), width));
+            }
+            box.setHidden(row.getComponentCount() == 0);
+            Ui.relayout(box);
+        }, (status, message) -> box.setHidden(true)));
+        return box;
     }
 }

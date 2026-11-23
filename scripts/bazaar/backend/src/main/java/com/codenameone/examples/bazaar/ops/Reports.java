@@ -27,6 +27,7 @@ import com.codenameone.examples.bazaar.Ids;
 import com.codenameone.examples.bazaar.Rows;
 import com.codenameone.examples.bazaar.api.AttributionDto;
 import com.codenameone.examples.bazaar.api.CohortRowDto;
+import com.codenameone.examples.bazaar.api.ProfitLossDto;
 import com.codenameone.examples.bazaar.api.ReportDto;
 import com.codenameone.examples.bazaar.api.ReportRowDto;
 import com.codenameone.examples.bazaar.api.ReportSpecDto;
@@ -653,5 +654,88 @@ public class Reports {
             out.add(j, d);
         }
         return out;
+    }
+
+    // ---------------------------------------------------------- profit and loss
+
+    /// The profit and loss statement over a period (`yyyy-MM-dd`, both days
+    /// included; blank means the report default). Orders are counted on the
+    /// day they were placed, refunds included, as every other report here;
+    /// cancelled orders and unfinished drafts are left out. Cost of goods uses
+    /// each variant's cost as recorded now, since an order line keeps no cost
+    /// of its own.
+    @Transactional(readOnly = true)
+    public ProfitLossDto profitLoss(String username, String storeId, String fromIso,
+            String toIso) throws IOException {
+        access.requireArea(username, storeId, Perms.REPORTS, false, StoreAccess.MANAGERS);
+        ReportSpecDto s = clean(new ReportSpecDto("", "day", "", "sales", "", "", fromIso, toIso),
+                System.currentTimeMillis());
+        Object[] args = {storeId, Long.valueOf(millisOf(s.from())),
+            Long.valueOf(millisOf(s.to()) + Days.MILLIS)};
+        String where = " WHERE o.store_id = ? AND o.created_at >= ? AND o.created_at < ? AND "
+                + "o.status <> 'CANCELLED' AND (o.channel <> 'DRAFT' OR o.location_id <> '')";
+        List rows = db.query("SELECT o.subtotal_cents, o.discount_cents, o.refunded_cents, "
+                + "o.shipping_cents, o.tax_cents FROM store_order o" + where, args);
+        long[] totals = new long[6];
+        for (int iter = 0; iter < rows.size() && iter < MAX_ORDERS; iter++) {
+            Map r = (Map) rows.get(iter);
+            long sub = Rows.number(r.get("subtotal_cents"));
+            long disc = Rows.number(r.get("discount_cents"));
+            totals[0]++;
+            totals[1] += sub;
+            totals[2] += disc;
+            totals[3] += merchandiseRefund(sub - disc, Rows.number(r.get("refunded_cents")));
+            totals[4] += Rows.number(r.get("shipping_cents"));
+            totals[5] += Rows.number(r.get("tax_cents"));
+        }
+        List lines = db.query("SELECT l.quantity, l.refunded_qty, v.cost_cents FROM order_line l "
+                + "JOIN store_order o ON o.id = l.order_id LEFT JOIN variant v ON v.id = l.variant_id"
+                + where, args);
+        long cogs = 0;
+        int uncosted = 0;
+        for (int iter = 0; iter < lines.size(); iter++) {
+            Map r = (Map) lines.get(iter);
+            long kept = Math.max(0, Rows.number(r.get("quantity")) - Rows.number(r.get("refunded_qty")));
+            long cost = Rows.number(r.get("cost_cents"));
+            if (cost <= 0) {
+                uncosted += (int) kept;
+            } else {
+                cogs += kept * cost;
+            }
+        }
+        return statement(s.from(), s.to(), (int) totals[0], totals[1], totals[2], totals[3], cogs,
+                totals[4], totals[5], uncosted);
+    }
+
+    /// Derives net sales, gross margin and the margin share from the raw sums.
+    static ProfitLossDto statement(String from, String to, int orders, long gross, long discounts,
+            long refunds, long cogs, long shipping, long tax, int uncosted) {
+        long net = gross - discounts - refunds;
+        long margin = net - cogs;
+        int bp = net <= 0 ? 0 : (int) (margin * 10000 / net);
+        return new ProfitLossDto(from, to, orders, gross, discounts, refunds, net, cogs, margin, bp,
+                shipping, tax, uncosted);
+    }
+
+    /// The statement as CSV, one `line,amount` row per figure, amounts as
+    /// plain decimals. Labels are fixed text, but every cell goes through the
+    /// same quoting and formula guard as the other exports.
+    public static String profitLossCsv(ProfitLossDto p) {
+        String[] labels = {"from", "to", "orders", "gross_sales", "discounts", "refunds",
+            "net_sales", "cost_of_goods", "gross_margin", "gross_margin_percent", "shipping",
+            "tax_collected", "uncosted_units"};
+        String[] values = {p.from(), p.to(), String.valueOf(p.orders()),
+            Money.plain(p.grossSalesCents()), Money.plain(p.discountsCents()),
+            Money.plain(p.refundsCents()), Money.plain(p.netSalesCents()),
+            Money.plain(p.cogsCents()), Money.plain(p.grossMarginCents()),
+            Money.plain(p.marginBp()), Money.plain(p.shippingCents()), Money.plain(p.taxCents()),
+            String.valueOf(p.uncostedUnits())};
+        StringBuilder out = new StringBuilder("line,amount\r\n");
+        for (int iter = 0; iter < labels.length; iter++) {
+            out.append(com.codenameone.examples.bazaar.web.table.Grid.csvCell(labels[iter]))
+                    .append(',').append(com.codenameone.examples.bazaar.web.table.Grid.csvCell(
+                            values[iter])).append("\r\n");
+        }
+        return out.toString();
     }
 }

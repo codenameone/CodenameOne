@@ -112,6 +112,10 @@ public interface OpsApi {
     void cohorts(@Path("storeId") String storeId,
             OnComplete<Response<List<CohortRowDto>>> callback);
 
+    @GET("/api/merchant/stores/{storeId}/profit-loss")
+    void profitLoss(@Path("storeId") String storeId, @Query("from") String from,
+            @Query("to") String to, OnComplete<Response<ProfitLossDto>> callback);
+
     @GET("/api/merchant/stores/{storeId}/attribution")
     void attribution(@Path("storeId") String storeId, @Query("from") String from,
             @Query("to") String to, OnComplete<Response<List<AttributionDto>>> callback);

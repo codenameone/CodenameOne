@@ -58,9 +58,12 @@ public class GlobalData {
     private final Fraud fraud;
     private final Disputes disputes;
     private final AdminData admin;
+    private final com.codenameone.examples.bazaar.ops.Reports reports;
 
     public GlobalData(Markets markets, Translations translations, TaxExemptions taxes,
-            Fraud fraud, Disputes disputes, AdminData admin) {
+            Fraud fraud, Disputes disputes, AdminData admin,
+            com.codenameone.examples.bazaar.ops.Reports reports) {
+        this.reports = reports;
         this.markets = markets;
         this.translations = translations;
         this.taxes = taxes;
@@ -531,6 +534,8 @@ public class GlobalData {
         v.forms.add(period);
         v.links.add(link("Download CSV", base + "/report.csv?from=" + (from == null ? ""
                 : from) + "&to=" + (to == null ? "" : to)));
+        v.links.add(link("Profit and loss CSV", base + "/profit-loss.csv?from=" + (from == null
+                ? "" : from) + "&to=" + (to == null ? "" : to)));
         List<TaxReportRowDto> rows = taxes.report(me(), storeId, from, to);
         String currency = admin.currency(storeId);
         v.rowsTitle = "Tax by region";
@@ -575,6 +580,12 @@ public class GlobalData {
                     .append(Money.plain(r.taxCents())).append("\r\n");
         }
         return out.toString();
+    }
+
+    /// The profit and loss statement for the same period as the tax report, as CSV.
+    String profitLossCsv(String storeId, String from, String to) throws IOException {
+        return com.codenameone.examples.bazaar.ops.Reports.profitLossCsv(
+                reports.profitLoss(me(), storeId, periodStart(from, to), periodEnd(to)));
     }
 
     void addExemption(String storeId, HttpServer.Request request) throws IOException {

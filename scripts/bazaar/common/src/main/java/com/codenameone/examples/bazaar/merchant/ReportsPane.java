@@ -26,6 +26,7 @@ import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.spinner.Picker;
 import com.codenameone.examples.bazaar.api.AttributionDto;
 import com.codenameone.examples.bazaar.api.CohortRowDto;
+import com.codenameone.examples.bazaar.api.ProfitLossDto;
 import com.codenameone.examples.bazaar.api.ReportDto;
 import com.codenameone.examples.bazaar.api.ReportRowDto;
 import com.codenameone.examples.bazaar.api.ReportSpecDto;
@@ -38,7 +39,7 @@ import java.util.List;
 
 /// The report builder (dimensions, metrics and a range to a table and a bar
 /// chart; reports can be saved), the cohort retention grid and sales by
-/// first and last touch.
+/// first and last touch, and the profit and loss statement.
 final class ReportsPane extends MerchantPane {
     static final String[] DIMENSIONS = {"day", "week", "month", "channel", "source", "medium",
         "campaign", "product", "location"};
@@ -53,6 +54,8 @@ final class ReportsPane extends MerchantPane {
         clearTools();
         tool(FontImage.MATERIAL_GRID_ON, "Cohorts", "reports-cohorts", this::cohorts);
         tool(FontImage.MATERIAL_CAMPAIGN, "Attribution", "reports-attribution", this::attribution);
+        tool(FontImage.MATERIAL_ACCOUNT_BALANCE, "Profit and loss", "reports-profit-loss",
+                this::profitLoss);
         final Container page = new Container(BoxLayout.y());
         page.setName("reports-page");
         final Picker d1 = MUi.picker(page, Lang.tr("Group by"), "report-dimension", DIMENSIONS, "day");
@@ -163,6 +166,39 @@ final class ReportsPane extends MerchantPane {
             rows.set(found);
             page.add(MUi.grid(rows, "attribution-grid"));
             push(Lang.tr("Attribution"), page);
+        }, Ui::fail));
+    }
+
+    /// The profit and loss statement's lines, as label and amount pairs.
+    /// Labels are bundle keys; the caller translates them.
+    static String[][] profitLossLines(ProfitLossDto p) {
+        return new String[][] {
+            {"Orders", String.valueOf(p.orders())},
+            {"Gross sales", MerchantState.money(p.grossSalesCents())},
+            {"Discounts", MerchantState.money(-p.discountsCents())},
+            {"Refunds", MerchantState.money(-p.refundsCents())},
+            {"Net sales", MerchantState.money(p.netSalesCents())},
+            {"Cost of goods", MerchantState.money(-p.cogsCents())},
+            {"Gross margin", MerchantState.money(p.grossMarginCents()) + " ("
+                    + percent(p.marginBp()) + ")"},
+            {"Shipping charged", MerchantState.money(p.shippingCents())},
+            {"Tax collected", MerchantState.money(p.taxCents())},
+            {"Units without a cost", String.valueOf(p.uncostedUnits())}
+        };
+    }
+
+    private void profitLoss() {
+        Api.ops().profitLoss(MerchantState.storeId(), "", "", Net.to(p -> {
+            List<String[]> lines = new ArrayList<String[]>();
+            String[][] all = profitLossLines(p);
+            for (int iter = 0; iter < all.length; iter++) {
+                lines.add(all[iter]);
+            }
+            Rows<String[]> rows = new Rows<String[]>()
+                    .col(Lang.tr("Line"), r -> Lang.tr(r[0]))
+                    .col(Lang.tr("Amount"), r -> r[1]);
+            rows.set(lines);
+            push(Lang.tr("Profit and loss"), MUi.grid(rows, "profit-loss-grid"));
         }, Ui::fail));
     }
 }

@@ -79,6 +79,11 @@ public interface CatalogApi {
     @GET("/api/shop/products/{id}")
     void product(@Path("id") String id, OnComplete<Response<ProductDto>> callback);
 
+    /// "Frequently bought together": up to four products bought in the same
+    /// paid orders as this one, then others from its collections.
+    @GET("/api/shop/products/{id}/together")
+    void together(@Path("id") String id, OnComplete<Response<List<ProductCardDto>>> callback);
+
     @GET("/api/shop/stores/{handle}/products/{productHandle}")
     void productByHandle(@Path("handle") String handle,
             @Path("productHandle") String productHandle,

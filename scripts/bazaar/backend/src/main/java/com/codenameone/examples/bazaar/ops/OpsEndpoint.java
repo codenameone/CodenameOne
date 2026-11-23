@@ -34,6 +34,7 @@ import com.codenameone.examples.bazaar.api.ImportResultDto;
 import com.codenameone.examples.bazaar.api.OpsApiServer;
 import com.codenameone.examples.bazaar.api.PermissionSetDto;
 import com.codenameone.examples.bazaar.api.PickLineDto;
+import com.codenameone.examples.bazaar.api.ProfitLossDto;
 import com.codenameone.examples.bazaar.api.PurchaseOrderDto;
 import com.codenameone.examples.bazaar.api.ReportDto;
 import com.codenameone.examples.bazaar.api.ReportSpecDto;
@@ -161,6 +162,11 @@ public class OpsEndpoint implements OpsApiServer {
     @Override
     public List<CohortRowDto> cohorts(String s) throws Exception {
         return reports.cohorts(Caller.name(), s);
+    }
+
+    @Override
+    public ProfitLossDto profitLoss(String s, String from, String to) throws Exception {
+        return reports.profitLoss(Caller.name(), s, from, to);
     }
 
     @Override

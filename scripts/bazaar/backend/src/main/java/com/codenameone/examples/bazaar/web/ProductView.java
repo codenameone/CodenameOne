@@ -74,5 +74,7 @@ public final class ProductView {
     /// it. Empty when it is sold only once.
     public java.util.List<VariantView> plans = new java.util.ArrayList<VariantView>();
     public java.util.List<ReviewView> reviews = new java.util.ArrayList<ReviewView>();
+    /// True when the related list starts with products bought together with this one.
+    public boolean together;
     public java.util.List<CardView> related = new java.util.ArrayList<CardView>();
 }

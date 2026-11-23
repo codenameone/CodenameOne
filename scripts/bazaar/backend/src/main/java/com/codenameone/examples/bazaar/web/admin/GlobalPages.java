@@ -288,6 +288,17 @@ public class GlobalPages {
                 .header("Content-Disposition", "attachment; filename=\"tax-report.csv\"");
     }
 
+    @GetMapping("/admin/{storeId}/tax/profit-loss.csv")
+    public HttpServer.Response profitLossCsv(@PathVariable("storeId") String storeId,
+            @RequestParam(value = "from", required = false) String from,
+            @RequestParam(value = "to", required = false) String to,
+            HttpServer.Request request) throws Exception {
+        pages.admin(request, storeId, "Tax");
+        return new HttpServer.Response(200, "text/csv; charset=utf-8",
+                global.profitLossCsv(storeId, from, to).getBytes("UTF-8"))
+                .header("Content-Disposition", "attachment; filename=\"profit-loss.csv\"");
+    }
+
     @PostMapping("/admin/{storeId}/tax/exemptions")
     public String addExemption(@PathVariable("storeId") String storeId,
             HttpServer.Request request) throws Exception {

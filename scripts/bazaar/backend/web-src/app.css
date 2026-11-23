@@ -97,3 +97,4 @@ iframe.widget{width:100%;border:1px solid var(--line);border-radius:var(--r);bac
 .live-msg small{display:block;margin:2px 6px;color:var(--muted);font-size:.75rem}
 .live-read{margin-left:6px;font-weight:600}
 .live-typing{margin:6px 0 0;font-size:.85rem}
+.skip{position:absolute;left:-9999px;top:0;z-index:100;padding:8px 12px;background:var(--accent);color:#fff}.skip:focus{left:8px;top:8px}main:focus{outline:none}

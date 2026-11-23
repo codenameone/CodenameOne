@@ -754,7 +754,12 @@ The `ops` package holds the warehouse board (`Warehouse`, stage moves checked by
 `WarehouseFlow` and made conditionally), transfer and purchase order timelines
 (`Timelines`, written by `Stock`), forecasts (`Forecasts`, whose drafts go through
 `Stock`), the report builder and cohorts (`Reports`, where every dimension and
-metric is matched against a fixed list and never written into SQL), UTM and
+metric is matched against a fixed list and never written into SQL; `profitLoss`
+sums net sales, refunds through `merchandiseRefund` and cost of goods from the
+variant's current `cost_cents`, since an order line keeps no cost; no processor
+fees are recorded, so there is no fee line), "frequently bought together"
+(`Catalog.together`, co-purchase counts over paid orders, then the product's
+collections, and only products the shopper could open), UTM and
 referral attribution (`Attribution`, first and last touch carried from the landing
 page through the cart to the order, held in the session only when there is a
 touch so plain visits stay cacheable), permission sets (`Permissions`, per area

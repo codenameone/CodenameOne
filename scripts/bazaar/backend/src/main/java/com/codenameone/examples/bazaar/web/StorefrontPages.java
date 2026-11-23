@@ -531,9 +531,25 @@ public class StorefrontPages {
             rv.verified = r.isVerified();
             view.reviews.add(rv);
         }
-        ProductPageDto more = catalog.browse(store.getHandle(), null, null, "rating", 0, 5,
-                market.locale == null ? "" : market.locale);
-        view.related = cards(store, more.items(), p.id());
+        // Frequently bought together first, then the store's best rated to fill four.
+        List<ProductCardDto> picks = new java.util.ArrayList<ProductCardDto>(
+                catalog.together(p.id(), 4));
+        view.together = !picks.isEmpty();
+        if (picks.size() < 4) {
+            ProductPageDto more = catalog.browse(store.getHandle(), null, null, "rating", 0, 5,
+                    market.locale == null ? "" : market.locale);
+            for (int iter = 0; iter < more.items().size(); iter++) {
+                ProductCardDto c = more.items().get(iter);
+                boolean dup = false;
+                for (int j = 0; j < picks.size() && !dup; j++) {
+                    dup = picks.get(j).id().equals(c.id());
+                }
+                if (!dup) {
+                    picks.add(c);
+                }
+            }
+        }
+        view.related = cards(store, picks, p.id());
         while (view.related.size() > 4) {
             view.related.remove(view.related.size() - 1);
         }

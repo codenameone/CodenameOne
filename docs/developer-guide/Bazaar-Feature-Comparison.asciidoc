@@ -233,7 +233,7 @@ on a row.
 | Privacy / terms / refund policies | &#10003; | core | core | core | core | 
 | Cookie consent banner / privacy API | &#10003; | core | app/plugin | core | core | A consent banner by category gates the scripts in app slots.
 | Customer data export (GDPR) | &#10003; | core | core | core | core | A zip of JSON files: shoppers download theirs from the account page, and the store downloads a customer's from the customer page.
-| Accessibility (storefront) | &#9681; | core | core | core | core | Semantic HTML pages.
+| Accessibility (storefront) | &#10003; | core | core | core | core | Note: landmarks, a skip link on every page, labelled inputs, alt text and focus styles, checked by `StoreInsightsTest`. The cart link shows no count, so there is nothing to announce.
 |===
 
 === Marketing and loyalty
@@ -339,7 +339,7 @@ on a row.
 | Storefront search | &#10003; | core | core | core | core | 
 | Search filters / facets | &#10003; | core | core | core | core | 
 | Predictive search / autocomplete | &#10003; | core | app/plugin | core | no | Prefix suggestions from titles, tags and collections, in the web search box and under the app's in-store search field (debounced; a tap opens the product or collection).
-| Product recommendations (related) | &#9681; | core | core | core | core | Related products from the same collection.
+| Product recommendations (related) | &#10003; | core | core | core | core | Note: frequently bought together from paid orders, then the same collection, on the web and app product pages.
 | Synonyms / boosts (search tuning) | &#10003; | core | app/plugin | core | no | Merchant synonym groups and per-product boosts, edited on the web admin online store page.
 | Custom domain | &#10003; | core | core | core | core | A store setting for its own hostname; that host serves the store at the root, and canonical links, the sitemap and structured data name it. DNS and TLS are the operator's.
 | Password page / pre-launch | &#10003; | core | app/plugin | core | core | Staff pass; a locked store leaves the sitemap and is disallowed in robots.txt.
@@ -389,7 +389,7 @@ on a row.
 | Custom reports / report builder | &#10003; | core | app/plugin | core | core | Pick measures, dimensions and filters; save reports. 
 | Cohort / retention analysis | &#10003; | core | app/plugin | no | no | 
 | Inventory / sell-through reports | &#10003; | core | core | core | core | Stock on hand at cost and at price, low-stock count and sell-through for the period.
-| Finance / tax / payout reports | &#9681; | core | core | core | core | Payout list, tax collected by region and the OSS VAT report as CSV; no profit and loss statement.
+| Finance / tax / payout reports | &#10003; | core | core | core | core | Note: payout list, tax by region, the OSS VAT report and a profit and loss statement (in the app and as CSV). No processor fee line: fees are not recorded.
 | Session / traffic source analytics | &#10003; | core | core | core | core | Traffic sources from UTM tags and referrers. 
 | Benchmarks vs peers | &#8211; | core | no | no | no | 
 |===

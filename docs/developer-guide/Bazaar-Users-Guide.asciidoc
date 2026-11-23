@@ -611,7 +611,14 @@ only for shoppers who accepted that category.
 *Operations.* The report builder groups sales by up to two dimensions (day,
 product, channel, source) and saves the result. The cohort grid shows how many
 customers of each month came back, and the attribution page shows sales by the
-campaign or site the customer came from. Permission sets give a staff member
+campaign or site the customer came from. The profit and loss statement (the
+Reports section's Profit and loss button in the app, or the CSV link on the web
+admin's tax page) shows net sales after discounts and refunds, the cost of goods
+from each variant's cost, gross margin, and the shipping and tax shoppers paid,
+and counts the units sold without a cost. A product page, on the web and in the
+app, recommends the products most often bought in the same order, then others
+from its collections. Every storefront page starts with a "Skip to content"
+link. Permission sets give a staff member
 access to only some areas, at one location or all of them. The inbox answers
 chat messages live, with assignment and saved replies: a conversation page shows
 the shopper typing and reading, and a call from the storefront rings anywhere in

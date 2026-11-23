@@ -2,7 +2,7 @@
 <!-- cn1:model privacy com.codenameone.examples.bazaar.web.slots.PrivacyView -->
 <!doctype html>
 <html th:attr="lang=${page.lang},dir=${page.dir}" xmlns:th="http://www.thymeleaf.org"><head th:replace="~{layout :: head}"></head><body th:class="${page.themeClass}" th:attr="data-accent=${page.accent}"><header th:replace="~{layout :: header}"></header>
-<main class="wrap"><h1 th:text="${page.t['privacy']}">Privacy and cookies</h1><p class="policy" th:unless="${privacy.policies.empty}" th:text="${privacy.policies}">Policies</p>
+<main id="main" tabindex="-1" class="wrap"><h1 th:text="${page.t['privacy']}">Privacy and cookies</h1><p class="policy" th:unless="${privacy.policies.empty}" th:text="${privacy.policies}">Policies</p>
 <h2 th:text="${page.t['cookiesApps']}">Cookies and apps</h2><p th:text="${page.t['cookiesText']}">Necessary cookies keep your cart and checkout working and always load. Analytics and marketing apps load only if you accept them, and never at checkout.</p>
 <p th:if="${privacy.apps.empty}" th:text="${page.t['noApps']}">This shop uses no third-party apps.</p><ul th:unless="${privacy.apps.empty}"><li th:each="a : ${privacy.apps}"><span th:text="${a.title}">App</span> (<span th:text="${a.kind}">analytics</span>)</li></ul>
 <h2 th:text="${page.t['yourChoice']}">Your choice</h2><p th:text="${privacy.current}">You have not chosen yet.</p>
