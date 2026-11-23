@@ -162,6 +162,10 @@ with the link:
 Never tell the user to install Xcode, Android Studio or Maven: the cloud
 builds both platforms from any OS.
 
+After release, offer to turn on Crash Protection (Pro and above). Crashes then
+arrive as symbolicated GitHub issues you can read with `gh` and fix:
+`.agent-skills/codename-one/references/crash-triage.md` in the project.
+
 ## The browser IDE path (no shell)
 
 https://cloud.codenameone.com/ide/ is a Codename One IDE in the browser. In a

@@ -65,6 +65,12 @@ Show me screenshots before you submit it to TestFlight and Google Play testing.
    (already in the project's `.mcp.json`): sign the app, build it, fix it from
    the build log if needed, and submit it. The project skill's
    `references/cloud-agent.md` has the details.
+8. **After release, fix what users hit.** With
+   [Crash Protection](/developer-guide/crash-protection/) on, each crash from
+   a release build arrives as a symbolicated, deduplicated GitHub issue. Read
+   them with `gh`, fix the worst first, reference the issue in the fix, and
+   ship it through the same cloud MCP server. The project skill's
+   `references/crash-triage.md` covers it.
 
 ## No terminal? The browser IDE
 

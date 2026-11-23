@@ -100,6 +100,16 @@ TIP: Submitting to *Production* on Apple opens an App Store review submission
 automatically. Submitting to *Beta* delivers to TestFlight without opening a
 review.
 
+=== Submitting from an AI agent
+
+A coding agent can make the same submission through the BuildCloud MCP server,
+once you've ticked *Store submission* on its approval page. It picks a finished
+build, submits it to Beta or Production with release notes, uploads screenshots
+and listing text, and follows the Apple review state, all through the endpoints
+the console uses. The store credentials described above must already be stored.
+Agents are instructed to confirm a production submission with you, and listing
+text waits for your approval because it carries public URLs. See <<buildcloud-mcp>>.
+
 === Metadata as code
 
 Release metadata -- the store listing text and screenshots -- can live in your

@@ -1,0 +1,52 @@
+[[buildcloud-mcp]]
+== Shipping from an AI agent: the BuildCloud MCP server
+
+The MCP Headless API lets an agent drive the application while it runs. BuildCloud takes the agent through the rest of the release. The build console at `https://cloud.codenameone.com` is also a Model Context Protocol server, so a coding agent can do the same things you do there: run and inspect cloud builds, read a failed build's log, create Apple signing assets, configure push, submit a build to the App Store or Google Play, and follow its review. The agent gets no access you didn't approve.
+
+Cloud builds run Xcode, the Android SDK and the platform toolchains on Codename One's servers. An agent working on a Windows or Linux machine can therefore build and ship an iOS application, the same way you can.
+
+=== Connecting an agent
+
+Every generated project carries a `.mcp.json` file that names the server `codenameone-cloud` at `https://cloud.codenameone.com/api/v1/mcp`, over HTTP. Claude Code asks you to approve project MCP servers the first time it opens the project. Other MCP clients take the same URL.
+
+There is no API key to copy. The first call is refused with an HTTP 401, and the client handles the rest: it registers itself, opens your browser, and you sign in and approve it. The connection stays valid until you disconnect it in the console.
+
+The approval page has a checkbox for each kind of extra access:
+
+[cols="1,3",options="header"]
+|===
+|Checkbox |Allows
+|Apple signing |Creating certificates, App IDs, devices and provisioning profiles, and downloading the `.p12` and profile a build needs
+|Push setup |Creating a push application and storing its APNs and FCM credentials
+|Store submission |Submitting a finished build to the App Store or Google Play
+|===
+
+Without them the agent can still read everything and make everyday changes. Anything beyond that, such as an unticked area, revoking a certificate, reading a stored key, or billing and organization changes, is still possible. But each such call waits for you: the agent opens an approval page in your browser that shows the exact request, with secrets masked, and the request runs once if you allow it.
+
+=== What the agent can do
+
+The server publishes a few direct tools and a general one:
+
+* `whoami` reports the account, the plan and the builds left.
+* `list_builds`, `get_build` and `cancel_build` follow builds. `get_build_log` returns the error log of a failed build.
+* `list_api_endpoints` and `call_api` reach every other console action. These are the same endpoints the console calls, so signing, push setup, store listing text and screenshots, and submission all go through them.
+* `await_approval` waits for your answer on a request that needs one.
+
+Builds themselves are sent from the project with the usual `mvn package` goals, as described in the build chapters. The agent then follows them with `list_builds` and `get_build`.
+
+=== The release loop
+
+Put together, an agent can take a change from source to the store without you opening the console:
+
+. Build in the cloud. If the build fails, read the log with `get_build_log`, fix the project and build again.
+. Sign the iOS build with your App Store Connect key, which you store once (see <<app-store-submission>>).
+. Make store screenshots from the running application with the MCP Headless API, and upload them and the listing text. The listing text carries public URLs, so it waits for your approval.
+. Submit the build to `BETA` (TestFlight or the Play internal track) or `PRODUCTION`. Agents are instructed to confirm a production submission with you first.
+. Follow the Apple review state through the submissions endpoint.
+. When the application is live, read its crashes. Crash Protection files them as GitHub issues the agent reads with its usual GitHub tools (see <<crash-protection>>).
+
+=== Instructions for the agent
+
+Generated projects include the Codename One agent skill in `.agent-skills/codename-one/`. Its `references/cloud-agent.md` describes every step above in detail for the agent: the endpoints, the signing sequence, plan limits, and how to classify a failed build. `references/store-review.md` is a checklist the agent goes through before a first submission, and `references/crash-triage.md` covers fixing crashes after release. You don't need to read these yourself. They're written for the agent.
+
+What only you can do stays with you: the Apple Developer Program and Google Play developer accounts, the browser approval, and the final say on production submissions and listing text.
