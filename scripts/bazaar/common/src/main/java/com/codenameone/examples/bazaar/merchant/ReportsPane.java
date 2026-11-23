@@ -59,6 +59,7 @@ final class ReportsPane extends MerchantPane {
                 this::profitLoss);
         final Container page = new Container(BoxLayout.y());
         page.setName("reports-page");
+        page.setUIID("ReportsPage");
         final Picker d1 = MUi.picker(page, Lang.tr("Group by"), "report-dimension", DIMENSIONS, "day");
         final Picker metrics = MUi.picker(page, Lang.tr("Measure"), "report-metrics", METRICS, "sales");
         final TextField from = MUi.text(page, Lang.tr("From (yyyy-MM-dd)"), "report-from", "");

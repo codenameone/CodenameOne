@@ -72,6 +72,8 @@ public class DemoTourTest extends E2e {
                 pos();
             } else if (tour.startsWith("admin")) {
                 admin();
+            } else if (tour.startsWith("visual")) {
+                visual();
             }
             if (recorder != null) {
                 SimulatorRecorder.Result r = recorder.stop();
@@ -368,6 +370,100 @@ public class DemoTourTest extends E2e {
         }
         caption("Sales made offline sync when the network is back", 3000);
         pause(3200);
+    }
+
+    // ------------------------------------------------------------ visual
+
+    /// The design-review captures (`visual/capture.sh`): the register's
+    /// sheets and the merchant charts, with no captions and no recording.
+    /// `bazaar.visual.dark` draws them dark; each capture's name says which,
+    /// so a light and a dark run share one directory.
+    private void visual() throws Exception {
+        final boolean dark = Boolean.getBoolean("bazaar.visual.dark");
+        onEdt(() -> com.codename1.ui.CN.setDarkMode(dark ? Boolean.TRUE : Boolean.FALSE));
+        if (desktopRun()) {
+            onEdt(() -> Display.getInstance().setWindowSize(1440, 1080));
+            pause(1500);
+        }
+        String mode = dark ? "-dark" : "-light";
+        signIn(MERCHANT, "home-merchant");
+        pause(2000);
+        go(Sections.DASHBOARD);
+        pause(3000);
+        visualShot("merchant-dashboard" + mode);
+        go(Sections.ANALYTICS);
+        pause(3500);
+        visualShot("merchant-analytics" + mode);
+        scrollDown(2);
+        visualShot("merchant-analytics-2" + mode);
+        scrollDown(2);
+        visualShot("merchant-analytics-3" + mode);
+        go(MerchantSections.REPORTS);
+        pause(3500);
+        visualShot("merchant-reports" + mode);
+        scrollDown(2);
+        visualShot("merchant-reports-2" + mode);
+        signOut();
+        pause(1500);
+
+        signIn(CASHIER, "home-pos");
+        pause(2000);
+        tapFirst("pos-store-");
+        pause(1500);
+        tapFirst("pos-register-");
+        pause(1500);
+        if (findByName("pos-pin-1") != null) {
+            for (String k : new String[] {"1", "2", "3", "4", "OK"}) {
+                tap("pos-pin-" + k);
+                pause(250);
+            }
+            pause(2000);
+        }
+        if (findByName("pos-open-shift") != null) {
+            for (String k : new String[] {"1", "5", "0", "00"}) {
+                tap("pos-float-" + k);
+                pause(200);
+            }
+            tap("pos-open-shift");
+            pause(2000);
+        }
+        tap("pos-sell");
+        pause(2000);
+        for (int i = 0; i < 3; i++) {
+            if (!tapNth("pos-tile-", i)) {
+                tapNth("pos-grid-", i);
+            }
+            pause(1000);
+            tapFirst("pos-variant-");
+            pause(700);
+        }
+        pause(1200);
+        visualShot("pos-cart" + mode);
+        String[] sheets = {"pos-park", "pos-clear", "pos-discount", "pos-customer"};
+        for (String s : sheets) {
+            if (tap(s)) {
+                pause(1500);
+                visualShot("sheet-" + s.substring(4) + mode);
+                back();
+                pause(1200);
+            }
+        }
+        if (tap("pos-pay") || tap("pos-tender")) {
+            pause(2500);
+            visualShot("sheet-tender" + mode);
+            tapFirst("pos-tip-none");
+            pause(1000);
+            visualShot("sheet-tender-2" + mode);
+            if (!tapFirst("pos-cash-")) {
+                tap("pos-cash-other");
+            }
+            pause(3500);
+            visualShot("pos-receipt" + mode);
+        }
+    }
+
+    private void visualShot(String name) {
+        shot("visual-" + name + "-" + device());
     }
 
     private void admin() throws Exception {
