@@ -130,7 +130,9 @@ public class CheckoutPages {
             StorefrontPages pages, com.codenameone.examples.bazaar.trade.Trade trade,
             com.codenameone.examples.bazaar.web.security.BotGuard bots,
             com.codenameone.examples.bazaar.market.Markets markets,
-            com.codenameone.examples.bazaar.taxes.TaxExemptions exemptions) {
+            com.codenameone.examples.bazaar.taxes.TaxExemptions exemptions,
+            com.codenameone.examples.bazaar.checkout.Upsells upsells) {
+        this.upsells = upsells;
         this.trade = trade;
         this.bots = bots;
         this.markets = markets;
@@ -814,6 +816,19 @@ public class CheckoutPages {
     /// A payment pending order's two simulated outcomes (the simulated
     /// processor only): `approve` pays it, `decline` fails it, each through
     /// the same settling as the processor's webhook.
+    /// Takes the post-purchase offer on an order: a separate order on the
+    /// same saved card ([com.codenameone.examples.bazaar.checkout.Upsells#accept]).
+    /// Answers the confirmation page to go back to.
+    public String acceptUpsell(String handle, String number, String token) throws IOException {
+        StoreOrder row = visible(handle, number, token);
+        String shopper = signedIn();
+        if (shopper == null) {
+            throw new ResponseStatusException(404, "Not found");
+        }
+        upsells.accept(shopper, row.getStoreId(), row.getId());
+        return SiteUrls.order(handle, row.getNumber(), linkToken(row));
+    }
+
     public String simulatePayment(String handle, String number, String token, String outcome)
             throws IOException {
         StoreOrder row = visible(handle, number, token);
@@ -924,6 +939,8 @@ public class CheckoutPages {
         return order;
     }
 
+    private final com.codenameone.examples.bazaar.checkout.Upsells upsells;
+
     public void confirmation(String handle, String number, String token, Model model,
             HttpServer.Request request) throws IOException {
         StoreOrder row = visible(handle, number, token);
@@ -973,6 +990,21 @@ public class CheckoutPages {
         }
         String t = linkToken(row);
         com.codenameone.examples.bazaar.domain.Payment pay = paymentRow(row.getId());
+        // The post-purchase offer, for the shopper who placed the order only:
+        // it is charged to their saved card, so a link holder never sees it.
+        String shopper = signedIn();
+        if (shopper != null && shopper.equals(row.getUsername())) {
+            com.codenameone.examples.bazaar.api.UpsellDto offer =
+                    upsells.offer(shopper, store.getId(), row.getId());
+            if (offer != null && offer.orderNumber() > 0) {
+                view.upsellTaken = offer.orderNumber();
+            } else if (offer != null) {
+                view.upsellTitle = offer.title();
+                view.upsellPrice = Money.format(offer.priceCents(), currency);
+                view.upsellAction = "/s/" + SiteUrls.encode(store.getHandle()) + "/orders/"
+                        + o.number() + "/upsell?t=" + t;
+            }
+        }
         if (Orders.PENDING.equals(o.financial()) && Orders.OPEN.equals(o.status()) && pay != null
                 && com.codenameone.examples.bazaar.pay.Payments.PROCESSING.equals(pay.getStatus())) {
             view.payPending = true;

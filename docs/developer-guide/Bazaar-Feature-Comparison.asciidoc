@@ -88,7 +88,7 @@ on a row.
 | Guest checkout | &#10003; | core | core | core | core | 
 | Customer accounts (login, saved addresses) | &#10003; | core | core | core | core | 
 | Passwordless / code sign-in | &#10003; | core | app/plugin | app/plugin | no | 
-| One-page / accelerated checkout | &#8211; | core | core | core | core | 
+| One-page / accelerated checkout | &#10003; | core | core | core | core | The web checkout is one page: contact, address, delivery and payment, with rates and totals re-quoted in place when the country, postal code or saved address changes. In the app a signed-in shopper with a saved address and card gets "Buy now" on the product page: that item alone, as its own order, leaving the cart as it was.
 | Apple Pay / Google Pay | &#10003; | core | core | core | core | Stripe's payment request button on the product page, cart and checkout; the server re-quotes shipping and tax as the wallet's address changes and places the order once. A test button drives the same flow with the simulated provider; the app uses the hosted page.
 | Discount code field | &#10003; | core | core | core | core | 
 | Gift card redemption at checkout | &#10003; | core | core | core | core | 
@@ -97,7 +97,7 @@ on a row.
 | Checkout customization / extensibility (UI extensions) | &#8211; | core | core | core | no | 
 | Order notes / custom attributes at checkout | &#10003; | core | core | core | core | Owner-defined text, checkbox and select fields, optionally required, kept on the order and shown in its detail, the confirmation mail and the app.
 | Tipping at online checkout | &#10003; | app/plugin | app/plugin | app/plugin | core | Up to four percent or fixed presets; the tip is charged outside the order total, never taxed or discounted, and reported as Tips.
-| Post-purchase upsell | &#8211; | app/plugin | app/plugin | app/plugin | no | 
+| Post-purchase upsell | &#10003; | app/plugin | app/plugin | app/plugin | no | One product per store, picked in the product editor, is offered on the order placed screen and the web confirmation page. "Add to my order" places it as a separate order on the saved card the order was paid with, authorized like any checkout, and both orders carry a note naming the other.
 | Marketing consent checkbox | &#10003; | core | core | core | core | 
 | Bot protection / rate limiting | &#10003; | core | core | core | core | Rate limits, honeypot fields and a timing bot guard on signup and checkout; no CAPTCHA. 
 | Server-rendered SEO cart/session | &#10003; | core | core | core | core | 
@@ -298,7 +298,7 @@ on a row.
 | Subscriptions / selling plans | &#10003; | app/plugin | app/plugin | app/plugin | core | Daily, weekly or monthly plans at a discount; failed renewals retry, then pause.
 | Pre-orders | &#10003; | app/plugin | app/plugin | core | no | Per variant, with a ship date and a choice to charge now or later; checkout sells a short line as a pre-order up to the allowance.
 | Back-in-stock alerts to shoppers | &#10003; | app/plugin | app/plugin | core | no | Shoppers subscribe on the product page; the alert is sent once when stock returns.
-| Try before you buy / deferred payment | &#10003; | app/plugin | app/plugin | no | no | Per product, 1 to 6 days: checkout only authorizes the card, a scheduled job captures when the trial ends, and a return inside the trial voids the hold. Capped at 6 days because card authorizations expire after about 7.
+| Try before you buy / deferred payment | &#10003; | app/plugin | app/plugin | no | no | Per product, 1 to 6 days: checkout only authorizes the card, a scheduled job captures when the trial ends, and a return inside the trial voids the hold. Capped at 6 days because card authorizations expire after about 7. Set in the merchant app's product editor (Offers card).
 |===
 
 === Markets and tax

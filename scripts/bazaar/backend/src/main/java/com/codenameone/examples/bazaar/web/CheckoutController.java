@@ -48,6 +48,8 @@ import java.io.IOException;
 /// - `POST /s/{handle}/checkout/place` -- the order; 303 to its page.
 /// - `GET /s/{handle}/orders/{number}?t=` -- the confirmation, and
 ///   `.../invoice.pdf?t=` its invoice.
+/// - `POST /s/{handle}/orders/{number}/upsell?t=` -- the post-purchase offer,
+///   taken as a separate order on the same card.
 @Controller
 public class CheckoutController {
     private final CheckoutPages pages;
@@ -103,6 +105,14 @@ public class CheckoutController {
             HttpServer.Request request) throws IOException {
         pages.confirmation(handle, number, token, model, request);
         return "order";
+    }
+
+    /// "Add to my order": the post-purchase offer, placed as its own order.
+    @PostMapping("/s/{handle}/orders/{number}/upsell")
+    public String upsell(@PathVariable("handle") String handle,
+            @PathVariable("number") String number,
+            @RequestParam(value = "t", required = false) String token) throws IOException {
+        return "redirect:" + pages.acceptUpsell(handle, number, token);
     }
 
     /// The simulated processor's "bank page" for an order left payment

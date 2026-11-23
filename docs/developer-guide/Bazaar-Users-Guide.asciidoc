@@ -583,6 +583,14 @@ shopper's card is only held at checkout, shipping doesn't charge it, and the
 money is taken when the trial ends unless the shopper asked to return the
 goods first, which lets the hold go. Six days is the limit because a card
 hold expires after about a week.
+The trial is set in the product editor's Offers card, which also marks the
+product as the store's post-purchase offer: after checkout a signed-in
+shopper who paid with a saved card sees it on the order placed screen (and
+the web confirmation page) and can add it in one tap. It becomes a separate
+small order on the same card, and each order's note names the other.
+On a product page a signed-in shopper with a saved address and card can tap
+Buy now to order that item alone, without going through the cart. The web
+checkout is a single page whose delivery rates refresh as the address changes.
 Payment disputes reported by the processor appear with their deadline; the
 merchant attaches evidence (the order's own details are one click), submits it,
 or accepts the dispute.

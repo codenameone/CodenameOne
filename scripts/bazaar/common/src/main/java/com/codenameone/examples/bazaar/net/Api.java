@@ -88,6 +88,8 @@ public final class Api {
     private static DiscountApi discounts;
     private static TaxApi taxes;
     private static OrderToolsApi orderTools;
+    private static com.codenameone.examples.bazaar.api.TrialApi trials;
+    private static com.codenameone.examples.bazaar.api.UpsellApi upsells;
     private static StockStatesApi stockStates;
     private static ShippingApi shipping;
     private static RoutingApi routing;
@@ -141,6 +143,9 @@ public final class Api {
         discounts = RestClients.create(DiscountApi.class, baseUrl);
         taxes = RestClients.create(TaxApi.class, baseUrl);
         orderTools = RestClients.create(OrderToolsApi.class, baseUrl);
+        trials = RestClients.create(com.codenameone.examples.bazaar.api.TrialApi.class, baseUrl);
+        upsells = RestClients.create(com.codenameone.examples.bazaar.api.UpsellApi.class,
+                baseUrl);
         stockStates = RestClients.create(StockStatesApi.class, baseUrl);
         shipping = RestClients.create(ShippingApi.class, baseUrl);
         routing = RestClients.create(RoutingApi.class, baseUrl);
@@ -224,6 +229,14 @@ public final class Api {
 
     public static OrderToolsApi orderTools() {
         return orderTools;
+    }
+
+    public static com.codenameone.examples.bazaar.api.TrialApi trials() {
+        return trials;
+    }
+
+    public static com.codenameone.examples.bazaar.api.UpsellApi upsells() {
+        return upsells;
     }
 
     public static StockStatesApi stockStates() {

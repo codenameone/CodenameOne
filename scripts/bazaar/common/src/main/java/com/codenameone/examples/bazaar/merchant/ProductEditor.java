@@ -251,6 +251,7 @@ final class ProductEditor extends Container {
         if (p != null && p.id() != null) {
             ProductChannels.add(card(main, "Bundle"), card(side, "Publishing schedule"), p.id());
             ProductTranslations.add(card(side, "Translations"), p.id());
+            ProductOffers.add(card(side, "Offers"), p.id());
         }
 
         Container bottom = MUi.buttons();

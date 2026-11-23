@@ -24,6 +24,7 @@ import com.codename1.ui.Button;
 import com.codename1.ui.CN;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
+import com.codename1.ui.Dialog;
 import com.codename1.ui.FontImage;
 import com.codename1.ui.Form;
 import com.codename1.ui.Image;
@@ -36,6 +37,8 @@ import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.layouts.FlowLayout;
 import com.codename1.ui.layouts.GridLayout;
 import com.codename1.ui.layouts.LayeredLayout;
+import com.codenameone.examples.bazaar.api.AddressDto;
+import com.codenameone.examples.bazaar.api.BuyNowDto;
 import com.codenameone.examples.bazaar.api.OptionDto;
 import com.codenameone.examples.bazaar.api.ProductDto;
 import com.codenameone.examples.bazaar.api.ProductPhotoDto;
@@ -43,6 +46,7 @@ import com.codenameone.examples.bazaar.api.StockDto;
 import com.codenameone.examples.bazaar.api.VariantDto;
 import com.codenameone.examples.bazaar.live.LiveChannel;
 import com.codenameone.examples.bazaar.net.Api;
+import com.codenameone.examples.bazaar.net.Session;
 import com.codenameone.examples.bazaar.ui.Lang;
 import com.codenameone.examples.bazaar.ui.Layouts;
 import com.codenameone.examples.bazaar.ui.ProductArt;
@@ -75,6 +79,10 @@ final class ProductForm {
     private final Label stock = new Label("", "ShopStock");
     private final Label count = new Label("1", "ShopStepValue");
     private Button add;
+    private Button buyNow;
+    /// One key per product page, so a repeated "Buy now" tap answers one order.
+    private final String buyKey = Long.toString(System.currentTimeMillis()) + "-"
+            + Integer.toHexString(System.identityHashCode(this));
     private Component gallery;
     private Image picture;
 
@@ -371,6 +379,10 @@ final class ProductForm {
         add = Ui.primary("Add to cart", "add-to-cart", e -> addToCart());
         FontImage.setMaterialIcon(add, FontImage.MATERIAL_ADD_SHOPPING_CART, 3.4f);
         info.add(add);
+        if (Session.user() != null && !ShopState.addresses().isEmpty()) {
+            buyNow = Ui.secondary("Buy now", "buy-now", e -> buyNow());
+            info.add(buyNow);
+        }
         drawOptions();
         return info;
     }
@@ -524,6 +536,42 @@ final class ProductForm {
         }
         quantity = Math.max(1, quantity);
         count.setText(String.valueOf(quantity));
+    }
+
+    /// One tap for a signed-in shopper with a saved address and card: this
+    /// variant alone, to the first saved address, on the default card, as an
+    /// order of its own; the cart is left as it is.
+    private void buyNow() {
+        final VariantDto v = variant();
+        if (v == null) {
+            return;
+        }
+        final AddressDto to = ShopState.addresses().get(0);
+        buyNow.setEnabled(false);
+        Api.payments().methods(Net.to(cards -> {
+            if (cards == null || cards.isEmpty()) {
+                buyNow.setEnabled(true);
+                Ui.say(Lang.tr("Add a card in your account to buy in one tap"));
+                return;
+            }
+            if (!Dialog.show(Lang.tr("Buy now"), Lang.tr("{0} x {1} to {2}, on your saved card",
+                    String.valueOf(quantity), product.title(), to.line1()), Lang.tr("Buy"),
+                    Lang.tr("Cancel"))) {
+                buyNow.setEnabled(true);
+                return;
+            }
+            Api.upsells().buyNow(ShopState.store().id(), new BuyNowDto(v.id(), quantity, to,
+                    buyKey), Net.to(order -> {
+                        buyNow.setEnabled(true);
+                        OrderPlaced.show(order, CN.getCurrentForm());
+                    }, (status, message) -> {
+                        buyNow.setEnabled(true);
+                        Ui.fail(status, message);
+                    }));
+        }, (status, message) -> {
+            buyNow.setEnabled(true);
+            Ui.fail(status, message);
+        }));
     }
 
     private void addToCart() {

@@ -217,6 +217,17 @@ its `trial_order` row is OPEN, the `bazaar-trial-captures` scheduled job
 captures once the trial ends, and `Returns.request` inside the trial calls
 `Orders.voidHeld`. A trial lasts at most 6 days from checkout, since a card
 authorization expires after about 7.
+The merchant app sets it from `merchant.ProductOffers` through `Api.trials()`.
+
+Post-purchase upsell and Buy now (`checkout.Upsells`, migration V210,
+`UpsellApi`): `store_upsell` holds one product per store; `accept` places one
+unit as a new order through `Checkouts.place` with a scratch cart, the
+original's address and the `Payment.methodId` it was paid with (no saved card,
+no offer), so it is reserved, quoted and authorized like any checkout and the
+paid order is never mutated. `upsell_order` links the two and makes the offer
+single use; notes on both orders name the other. `buyNow` is the same
+single-line order to a saved address on the default card, keyed for
+idempotency, leaving the shopper's cart alone.
 
 [source,java]
 ----

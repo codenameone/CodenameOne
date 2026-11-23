@@ -48,6 +48,12 @@ public final class OrderView {
     public boolean payPending;
     public boolean paySimulated;
     public String payAction = "";
+    /// The post-purchase offer for its signed-in shopper: empty title for none.
+    public String upsellTitle = "";
+    public String upsellPrice = "";
+    public String upsellAction = "";
+    /// The add-on order's number once the offer was taken, 0 before.
+    public int upsellTaken;
     public String payKey = "";
     public String paySecret = "";
     public String payReturn = "";
