@@ -484,11 +484,24 @@ public class DemoTourTest extends E2e {
         }
     }
 
+    /// Puts the look back to the one `bazaar.visual.dark` asks for.
+    private void visualTheme() {
+        final boolean dark = Boolean.getBoolean("bazaar.visual.dark");
+        onEdt(() -> {
+            com.codenameone.examples.bazaar.Prefs.setTheme(dark ? com.codenameone.examples.bazaar.Prefs.THEME_DARK
+                    : com.codenameone.examples.bazaar.Prefs.THEME_LIGHT);
+            com.codenameone.examples.bazaar.ui.Look.apply();
+        });
+    }
+
     /// The register flows the main visual tour does not reach: every tender,
     /// the approval keypad, layaways, the shift and the P&L waterfall.
     private void visualRegister(String mode) throws Exception {
         signIn(CASHIER, "home-pos");
         pause(2000);
+        // Signing in applies the account's saved theme, which put a dark run
+        // back to light; the run's own mode wins again from here on.
+        visualTheme();
         tapFirst("pos-store-");
         pause(1500);
         tapFirst("pos-register-");
@@ -509,6 +522,11 @@ public class DemoTourTest extends E2e {
             tap("pos-open-shift");
             pause(2000);
         }
+        // A store policy that asks a manager for any discount past 20%, as
+        // the register caches it when it opens, so the approval keypad shows.
+        onEdt(() -> com.codenameone.examples.bazaar.pos.PosState.policy(
+                new com.codenameone.examples.bazaar.api.PosPolicyDto(2000, false, false, false,
+                        1500, 1800, 2000, 2000, 0)));
         tap("pos-sell");
         pause(2500);
         for (int i = 0; i < 4; i++) {
@@ -526,40 +544,59 @@ public class DemoTourTest extends E2e {
             pause(1500);
         }
         visualShot("reg-cart-sheet" + mode);
-        for (String s : new String[] {"pos-clear", "pos-discount", "pos-customer"}) {
+        for (String s : new String[] {"pos-clear", "pos-customer"}) {
             reopen(s, "pos-pay");
             if (tap(s)) {
                 pause(1800);
                 visualShot("reg-" + s.substring(4) + mode);
-                if (s.equals("pos-discount") && tapFirst("pos-chip-")) {
-                    pause(1200);
-                    tap("pos-amount-apply");
-                    pause(2000);
-                    visualShot("reg-approval" + mode);
-                    for (String k : new String[] {"1", "2"}) {
-                        tapFirst("pos-approval-key");
-                        pause(200);
-                    }
-                    pause(600);
-                    visualShot("reg-approval-2" + mode);
-                    tap("pos-approval-cancel");
-                    pause(1200);
-                }
                 dismiss();
                 pause(1200);
             }
         }
-        if (findByName("pos-tender") == null) {
-            tap("pos-pay");
+        // Half off the sale is past the store's approval threshold, so the
+        // pay button asks for a manager's PIN before the tender opens.
+        reopen("pos-discount", "pos-pay");
+        if (tap("pos-discount")) {
+            pause(1800);
+            visualShot("reg-discount" + mode);
+            if (tap("pos-order-percent")) {
+                pause(1500);
+                tap("pos-amount-5");
+                pause(200);
+                tap("pos-amount-0");
+                pause(400);
+                visualShot("reg-discount-amount" + mode);
+                tap("pos-amount-apply");
+                pause(1800);
+            }
+        }
+        reopen("pos-tender", "pos-pay");
+        if (tap("pos-tender")) {
+            pause(2000);
+            visualShot("reg-approval" + mode);
+            for (String k : new String[] {"1", "2"}) {
+                tap("pos-approval-key-" + k);
+                pause(200);
+            }
+            pause(600);
+            visualShot("reg-approval-2" + mode);
+            tap("pos-approval-cancel");
             pause(1500);
         }
-        if (tap("pos-tender") || tap("pos-pay")) {
+        reopen("pos-discount", "pos-pay");
+        if (tap("pos-discount")) {
+            pause(1500);
+            tap("pos-order-none");
+            pause(1500);
+        }
+        // The rest of the sale goes through without a manager.
+        onEdt(() -> com.codenameone.examples.bazaar.pos.PosState.policy(
+                new com.codenameone.examples.bazaar.api.PosPolicyDto(0, false, false, false,
+                        1500, 1800, 2000, 2000, 0)));
+        reopen("pos-tender", "pos-pay");
+        if (tap("pos-tender")) {
             pause(2500);
             visualShot("reg-tender" + mode);
-            if (tapNth("pos-tip-", 1)) {
-                pause(1200);
-                visualShot("reg-tender-tip" + mode);
-            }
             if (tap("pos-cash-other")) {
                 pause(1800);
                 visualShot("reg-tender-cash-keypad" + mode);
@@ -575,31 +612,75 @@ public class DemoTourTest extends E2e {
             }
             reopen("pos-card", "pos-tender");
             if (tap("pos-card")) {
-                pause(3500);
+                // The tip is asked after the card is chosen, before the reader.
+                pause(1800);
+                visualShot("reg-tip" + mode);
+                tap("pos-tip-1800");
+                pause(3000);
                 visualShot("reg-tender-card" + mode);
-                pause(4000);
+                for (int i = 0; i < 20 && findByName("pos-new-sale") == null; i++) {
+                    pause(500);
+                }
+                pause(800);
                 visualShot("reg-receipt" + mode);
                 tap("pos-new-sale");
                 pause(1500);
             }
         }
-        if (tap("pos-layaways")) {
-            pause(2500);
-            visualShot("reg-layaways" + mode);
-            if (tapFirst("pos-layaway-0")) {
-                pause(2000);
-                visualShot("reg-layaway-paid-by" + mode);
-                dismiss();
-                pause(1200);
+        // A layaway needs a sale with a customer: ring two items up, find
+        // the customer, then lay it away on a deposit from the layaways page.
+        for (int i = 0; i < 2; i++) {
+            activateNth("pos-tile-", i);
+            pause(1500);
+            if (activateNth("pos-variant-", 0)) {
+                pause(1500);
             }
         }
-        if (tap("pos-shift")) {
+        reopen("pos-customer", "pos-pay");
+        if (tap("pos-customer")) {
+            pause(1500);
+            type("pos-customer-q", "Riley");
+            onEdt(() -> {
+                Component q = findByName("pos-customer-q");
+                if (q instanceof com.codename1.ui.TextArea) {
+                    ((com.codename1.ui.TextArea) q).fireDoneEvent();
+                }
+            });
             pause(2500);
-            visualShot("reg-shift" + mode);
-            if (tap("pos-close-shift")) {
-                pause(2000);
-                visualShot("reg-shift-close" + mode);
+            if (!tap("pos-customer-0")) {
+                dismiss();
             }
+            pause(1500);
+        }
+        dismiss();
+        pause(1000);
+        go(com.codenameone.examples.bazaar.pos.PosSections.LAYAWAYS);
+        pause(2500);
+        if (tap("pos-layaway-new")) {
+            pause(1500);
+            for (String k : new String[] {"2", "0", "00"}) {
+                tap("pos-amount-" + k);
+                pause(200);
+            }
+            tap("pos-amount-apply");
+            pause(1500);
+            visualShot("reg-layaway-paid-by" + mode);
+            tap("pos-layaway-kind-first");
+            pause(2500);
+        }
+        visualShot("reg-layaways" + mode);
+        if (tapFirst("pos-layaway-0")) {
+            pause(2000);
+            visualShot("reg-layaway" + mode);
+        }
+        go(com.codenameone.examples.bazaar.pos.PosSections.SHIFT);
+        pause(2500);
+        visualShot("reg-shift" + mode);
+        scrollDown(2);
+        visualShot("reg-shift-2" + mode);
+        if (tap("pos-close-shift")) {
+            pause(2000);
+            visualShot("reg-shift-close" + mode);
         }
         signOut();
         pause(1500);

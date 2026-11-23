@@ -15,7 +15,7 @@ if [ "${2:-}" != "--inside" ]; then
   NAME="bazaar-visual-$$"
   podman build -q -t localhost/bazaar-visual-sim "$HERE/visual" >/dev/null
   trap 'podman rm -f "$NAME" >/dev/null 2>&1 || true' EXIT
-  podman run --name "$NAME" --rm -e "BAZAAR_VISUAL_OUT=${BAZAAR_VISUAL_OUT:-visual}" -e "BAZAAR_VISUAL_TOUR=${BAZAAR_VISUAL_TOUR:-visual}" -e "BAZAAR_VISUAL_MODES=${BAZAAR_VISUAL_MODES:-false true}" -v "$REPO:/ro-repo:ro" -v "$HERE:/app" localhost/bazaar-visual-sim \
+  podman run --name "$NAME" --rm -e "BAZAAR_VISUAL_OUT=${BAZAAR_VISUAL_OUT:-visual}" -e "BAZAAR_VISUAL_TOUR=${BAZAAR_VISUAL_TOUR:-visual}" -e "BAZAAR_VISUAL_MODES=${BAZAAR_VISUAL_MODES:-false true}" -e "BAZAAR_VISUAL_SKIN=${BAZAAR_VISUAL_SKIN:-}" -v "$REPO:/ro-repo:ro" -v "$HERE:/app" localhost/bazaar-visual-sim \
     bash -c 'cp -a /ro-repo /repo && (Xvfb :99 -screen 0 1600x1200x24 -nolisten tcp &) && sleep 2 && DISPLAY=:99 bash /app/visual/capture.sh /repo --inside'
   exit 0
 fi
@@ -38,10 +38,32 @@ for _ in $(seq 1 120); do
 done
 
 BASE="-Xmx1g -Dbazaar.server.url=http://localhost:$PORT -Dbazaar.shots.dir=$OUT -Dbazaar.demo.tour=${BAZAAR_VISUAL_TOUR:-visual}"
+# cn1:test runs every test class in one simulator JVM and has no filter of
+# its own (-Dtest only narrows surefire); the other classes pass without doing
+# anything on a tour run, but each re-initialises the display and reloads the
+# skin until the heap is gone and the run hangs. So the run is started in a
+# process group of its own (this is inside the container) and that group is
+# stopped once the tour is through.
+SKIN_OPT=""
+if [ -n "${BAZAAR_VISUAL_SKIN:-}" ]; then
+  SKIN_OPT="-Dskin=$BAZAAR_VISUAL_SKIN -Ddskin=$BAZAAR_VISUAL_SKIN"
+fi
 for dark in ${BAZAAR_VISUAL_MODES:-false true}; do
   echo "[visual] dark=$dark"
-  JAVA_TOOL_OPTIONS="$BASE -Dbazaar.visual.dark=$dark" "$WRAP" -B -f "$HERE/pom.xml" \
-    -Dcodename1.platform=javase -Ptest verify >"$HERE/target/visual-$dark.log" 2>&1 \
-    || { echo "[visual] run failed, see target/visual-$dark.log"; tail -20 "$HERE/target/visual-$dark.log"; }
+  LOG="$HERE/target/visual-$dark.log"
+  JAVA_TOOL_OPTIONS="$BASE $SKIN_OPT -Dbazaar.visual.dark=$dark" setsid "$WRAP" -B -f "$HERE/pom.xml" \
+    -Dcodename1.platform=javase -Ptest -Dtest=DemoTourTest -Dsurefire.failIfNoSpecifiedTests=false \
+    verify >"$LOG" 2>&1 &
+  RUNPID=$!
+  while kill -0 "$RUNPID" 2>/dev/null; do
+    if grep -qE 'DemoTourTest (passed|failed)' "$LOG"; then
+      sleep 2
+      kill -- "-$RUNPID" 2>/dev/null || true
+      break
+    fi
+    sleep 2
+  done
+  wait "$RUNPID" 2>/dev/null || true
+  grep -E 'DemoTourTest (passed|failed)' "$LOG" || { echo "[visual] tour did not finish, see $LOG"; tail -20 "$LOG"; }
 done
 ls "$OUT"

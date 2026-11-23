@@ -204,11 +204,18 @@ final class TenderSheet {
         Container row = new Container(new GridLayout(1, presets.length));
         for (int iter = 0; iter < presets.length; iter++) {
             final long cents = PosCart.tipFor(totals.totalCents, presets[iter]);
-            row.add(PosUi.key(presets[iter] / 100 + "% " + PosState.money(cents),
-                    "pos-tip-" + presets[iter], "PosCashKey", e -> {
+            // Two lines, the share large and the amount under it: on one line
+            // "15% $3.40" did not fit a third of a phone and was cut off.
+            Button pick = PosUi.key(presets[iter] / 100 + "%", "pos-tip-" + presets[iter],
+                    "PosTipShare", e -> {
                         ask.back();
                         charge(cents);
-                    }));
+                    });
+            Container key = new Container(BoxLayout.y(), "PosTipKey");
+            key.add(pick);
+            key.add(PosUi.label(PosState.money(cents), "PosTipAmount"));
+            key.setLeadComponent(pick);
+            row.add(key);
         }
         c.add(row);
         c.add(PosUi.key(Lang.tr("Custom tip"), "pos-tip-custom", "PosChoice",

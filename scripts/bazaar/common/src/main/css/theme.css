@@ -3025,3 +3025,41 @@ MeActionGrid {
     padding: 1mm 0 1mm 0;
     margin: 0;
 }
+/* ---- REGISTER ROUND 6 -- tip keys, approval, layaways, shift, tablet ---- */
+PosTipKey {
+    background-color: var(--surface);
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius);
+    padding: 2mm 0.5mm 2mm 0.5mm;
+    margin: 1mm;
+}
+PosTipKey.pressed { background-color: var(--surface-press); }
+PosTipShare {
+    color: var(--text);
+    font-family: "native:MainBold";
+    font-size: 4.6mm;
+    text-align: center;
+    padding: 0;
+    margin: 0;
+}
+PosTipAmount {
+    color: var(--text-muted);
+    font-family: "native:MainRegular";
+    font-size: 2.8mm;
+    text-align: center;
+    padding: 0.6mm 0 0 0;
+    margin: 0;
+}
+@media (prefers-color-scheme: dark) {
+    PosTipKey { background-color: var(--surface-dark); border: 1px solid var(--line-strong-dark); border-radius: var(--radius); }
+    PosTipKey.pressed { background-color: var(--surface-press-dark); }
+    PosTipShare { color: var(--text-dark); }
+    PosTipAmount { color: var(--text-muted-dark); }
+}
+/* Page labels sit on the grey page: an opaque default background drew a
+   white box behind "Shift closed", a variance and each denomination. */
+PosTitle { background-color: transparent; }
+PosError { background-color: transparent; }
+PosCountLabel { background-color: transparent; }
+PosMuted { background-color: transparent; }
+/* ---- end REGISTER ROUND 6 ---- */

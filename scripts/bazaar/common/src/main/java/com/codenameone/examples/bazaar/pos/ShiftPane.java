@@ -127,11 +127,15 @@ final class ShiftPane {
             variance.setUIID(v == 0 ? "PosMuted" : "PosError");
             total.getParent().revalidateLater();
         };
-        Container grid = new Container(new GridLayout((CashCount.DENOMINATIONS.length + 1) / 2, 2));
+        // Two columns only where there is room: on a phone half a row could
+        // not hold "$100.00" and its field, and the label ran under the field.
+        int cols = PosUi.wide() ? 2 : 1;
+        Container grid = new Container(new GridLayout((CashCount.DENOMINATIONS.length + cols - 1) / cols,
+                cols));
         for (int iter = 0; iter < CashCount.DENOMINATIONS.length; iter++) {
             final int index = iter;
             Container cell = new Container(new BorderLayout());
-            cell.add(BorderLayout.WEST, PosUi.data(PosState.money(CashCount.DENOMINATIONS[iter]),
+            cell.add(BorderLayout.CENTER, PosUi.data(PosState.money(CashCount.DENOMINATIONS[iter]),
                     "PosCountLabel"));
             final TextField f = new TextField("", "0", 4, TextField.NUMERIC);
             f.setUIID("PosField");

@@ -20,6 +20,7 @@ package com.codenameone.examples.bazaar.pos;
 
 import com.codename1.appkit.Net;
 import com.codename1.ui.Container;
+import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.Label;
 import com.codename1.ui.Sheet;
 import com.codename1.ui.Label;
@@ -46,7 +47,14 @@ final class ManagerApproval {
     static void ask(final String kind, final long amountCents, final String reason,
             final Approved done) {
         final Sheet d = PosSheet.open(Lang.tr("Manager approval"), "pos-approval");
-        final Container c = d.getContentPane();
+        // The keypad and the actions are taller than a phone's sheet: the
+        // form scrolls and Cancel / Approve stay pinned under it, where they
+        // were scrolled out of sight before.
+        final Container pane = d.getContentPane();
+        pane.setLayout(new BorderLayout());
+        final Container c = new Container(BoxLayout.y());
+        c.setScrollableY(true);
+        pane.add(BorderLayout.CENTER, c);
         c.add(PosUi.label(why(kind), "PosSheetText"));
         if (amountCents > 0) {
             c.add(PosUi.data(PosState.money(amountCents), "PosSheetAmount"));
@@ -76,7 +84,7 @@ final class ManagerApproval {
             c.revalidateLater();
         }));
         c.add(message);
-        c.add(PosSheet.actions(
+        pane.add(BorderLayout.SOUTH, PosSheet.actions(
                 PosUi.key(Lang.tr("Cancel"), "pos-approval-cancel", "PosSecondary", e -> d.back()),
                 PosUi.key(Lang.tr("Approve"), "pos-approval-ok", "PosPrimary", e -> {
                     String p = pin.toString();
