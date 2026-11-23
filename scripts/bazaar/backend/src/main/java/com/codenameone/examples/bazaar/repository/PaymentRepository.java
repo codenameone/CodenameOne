@@ -65,23 +65,9 @@ public interface PaymentRepository extends CrudRepository<Payment, String> {
     /// @return 1 for the one caller that moved it
     @Modifying
     @Query("update Payment p set p.status = 'REFUNDING', p.pendingRefundCents = :amount, "
-            + "p.refundClaimedAt = :at, p.refundReason = :reason "
-            + "where p.orderId = :id and p.status = :from and p.refundedCents = :refunded")
+            + "p.refundClaimedAt = :at where p.orderId = :id and p.status = :from")
     int claimRefund(@Param("id") String orderId, @Param("from") String from,
-            @Param("refunded") long refundedBefore, @Param("amount") long amount,
-            @Param("at") Instant at,
-            @Param("reason") String reason);
-
-    /// Gives a refund claim back after the processor definitely refused it,
-    /// moving the attempt on so the next refund gets a key of its own.
-    ///
-    /// @return 1 when the claim was still this one
-    @Modifying
-    @Query("update Payment p set p.status = :to, p.pendingRefundCents = 0, "
-            + "p.refundAttempt = p.refundAttempt + 1 where p.orderId = :id "
-            + "and p.status = 'REFUNDING' and p.refundClaimedAt = :at")
-    int refuseRefund(@Param("id") String orderId, @Param("to") String to,
-            @Param("at") Instant at);
+            @Param("amount") long amount, @Param("at") Instant at);
 
     /// Refunds claimed before `before` and still under way.
     List<Payment> findByStatusAndRefundClaimedAtLessThan(String status, Instant before);

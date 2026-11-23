@@ -22,7 +22,6 @@ import com.codename1.backend.ResponseStatusException;
 import com.codename1.backend.annotations.Component;
 import com.codename1.backend.annotations.Transactional;
 import com.codenameone.examples.bazaar.Ids;
-import com.codenameone.examples.bazaar.Rows;
 import com.codenameone.examples.bazaar.api.AddressDto;
 import com.codenameone.examples.bazaar.api.CartLineChangeDto;
 import com.codenameone.examples.bazaar.api.DraftOrderDto;
@@ -704,55 +703,58 @@ public class Orders {
             // part when it asked for more stranded what the card did pay.
             giftPart = Math.min(giftPart, giftCards.spentOn(orderId));
         }
-        // Claims the amount and the units on the order before any money moves
-        // (claimOrderRefund), so two refunds racing each other cannot both
-        // pass the "is anything left" check above. recordRefund then counts
+        // Claims the amount on the order before any money moves: one
+        // conditional UPDATE, so two refunds of one order racing each other
+        // cannot both pass the "is anything left" check above and together
+        // pay out more than the order took. Plain arithmetic in the WHERE
+        // clause runs the same on SQLite, PostgreSQL and MySQL, as the gift
+        // card debit and the inventory reserve do. recordRefund then counts
         // the claim instead of adding the amount again.
+        if (db.execute("UPDATE store_order SET refunded_cents = refunded_cents + ? WHERE id = ? "
+                + "AND refunded_cents + ? <= total_cents", new Object[] {Long.valueOf(amount),
+                orderId, Long.valueOf(amount)}) != 1) {
+            throw new ResponseStatusException(409, "Another refund of this order got there first");
+        }
+        // The units too: each line's refunded_qty is claimed the same way, so
+        // two refunds racing for one unit cannot both restock or release it.
+        // A line that lost the race gives back everything claimed so far.
         List<RefundLineDto> claimLines = req.lines() == null ? new ArrayList<RefundLineDto>()
                 : req.lines();
-        boolean cardLeg = cardPart > 0 && presentmentPart > 0;
-        long presentmentCents = foreign ? presentmentPart : 0;
-        claimOrderRefund(orderId, amount, claimLines, cardLeg, req, username, cardPart,
-                presentmentCents, giftPart);
-        if (cardLeg) {
-            try {
-                payments.refund(orderId, presentmentPart, Codes.cut(req.reason(), 200));
-            } catch (Payments.RefundUnconfirmed unconfirmed) {
-                // The processor may have made it: the claims stay, and the
-                // refund sweep (resumeRefunds) finishes or releases them once
-                // the processor answers under the same key.
-                event(orderId, "REFUND_PENDING", "A refund of " + amount
-                        + " cents is being confirmed with the processor", username);
-                throw unconfirmed;
-            } catch (IOException | RuntimeException failed) {
-                // A definite refusal, or the payment could not be claimed:
-                // nothing went back, so the refund can be tried again.
-                releaseOrderRefund(orderId, amount, claimLines);
-                throw failed;
+        for (int iter = 0; iter < claimLines.size(); iter++) {
+            RefundLineDto w = claimLines.get(iter);
+            if (w == null || w.quantity() <= 0) {
+                continue;
+            }
+            if (db.execute("UPDATE order_line SET refunded_qty = refunded_qty + ? WHERE id = ? "
+                    + "AND order_id = ? AND refunded_qty + ? <= quantity", new Object[] {
+                    Integer.valueOf(w.quantity()), w.orderLineId(), orderId,
+                    Integer.valueOf(w.quantity())}) != 1) {
+                for (int back = 0; back < iter; back++) {
+                    RefundLineDto undo = claimLines.get(back);
+                    if (undo != null && undo.quantity() > 0) {
+                        db.execute("UPDATE order_line SET refunded_qty = refunded_qty - ? "
+                                + "WHERE id = ?", new Object[] {Integer.valueOf(undo.quantity()),
+                                undo.orderLineId()});
+                    }
+                }
+                db.execute("UPDATE store_order SET refunded_cents = refunded_cents - ? "
+                        + "WHERE id = ?", new Object[] {Long.valueOf(amount), orderId});
+                throw new ResponseStatusException(409,
+                        "Another refund of this order got there first");
             }
         }
-        return finishRefund(orderId, req, amount, cardLeg, cardPart, giftPart, byHand,
-                presentmentCents, username);
-    }
-
-    /// The order side of a refund whose card part (if any) went back: the
-    /// gift card and store credit legs, the refund record, the stock, and the
-    /// notices. The request and the refund sweep both end here, so a refund
-    /// the sweep confirms is recorded exactly as one answered at once.
-    private long[] finishRefund(String orderId, RefundRequestDto req, long amount,
-            boolean cardMoved, long cardPart, long giftPart, boolean byHand,
-            long presentmentCents, String username) throws IOException {
-        if (cardMoved && db.execute("DELETE FROM order_refund_claim WHERE order_id = ?",
-                new Object[] {orderId}) != 1) {
-            // The request and the sweep both got the card's answer; the other
-            // one is finishing it.
-            return new long[] {amount, cardPart, 0, 0};
-        }
-        String card = giftCards.cardOf(orderId);
+        // Each irreversible leg is tracked by itself: a refund with no card
+        // part whose gift card credit fails has moved nothing, and must give
+        // its claims back exactly as a refused card refund does.
+        boolean cardMoved = false;
         boolean giftMoved = false;
         long creditPart;
         try {
-            if (giftPart > 0 && card != null) {
+            if (cardPart > 0 && presentmentPart > 0) {
+                payments.refund(orderId, presentmentPart, Codes.cut(req.reason(), 200));
+                cardMoved = true;
+            }
+            if (giftPart > 0) {
                 giftCards.credit(card, orderId, giftPart, "Refund");
                 giftMoved = true;
             }
@@ -764,7 +766,16 @@ public class Orders {
             if (!cardMoved && !giftMoved) {
                 // Nothing went back: release the claims so the refund can be
                 // tried again.
-                releaseOrderRefund(orderId, amount, req.lines());
+                db.execute("UPDATE store_order SET refunded_cents = refunded_cents - ? "
+                        + "WHERE id = ?", new Object[] {Long.valueOf(amount), orderId});
+                for (int back = 0; back < claimLines.size(); back++) {
+                    RefundLineDto undo = claimLines.get(back);
+                    if (undo != null && undo.quantity() > 0) {
+                        db.execute("UPDATE order_line SET refunded_qty = refunded_qty - ? "
+                                + "WHERE id = ?", new Object[] {Integer.valueOf(undo.quantity()),
+                                undo.orderLineId()});
+                    }
+                }
             } else {
                 // A leg moved money and a later one failed: the claims stay,
                 // since that money is gone, and the timeline says exactly what
@@ -779,156 +790,11 @@ public class Orders {
             }
             throw failed;
         }
-        StoreOrder done = recordRefund(orderId, req, amount, username, presentmentCents);
+        StoreOrder done = recordRefund(orderId, req, amount, username,
+                foreign ? presentmentPart : 0);
         publish(done);
         storeEvents.refunded(orderId, amount);
         return new long[] {amount, cardPart, giftPart, amount - cardPart - giftPart - creditPart};
-    }
-
-    /// Claims a refund's cents and units on the order, all or nothing: one
-    /// conditional UPDATE each, plain arithmetic in the WHERE clause that runs
-    /// the same on SQLite, PostgreSQL and MySQL. A refund with a card part also
-    /// keeps what it asked for in order_refund_claim, with when, so the sweep
-    /// can finish the order side once the processor confirms the card refund,
-    /// or release a claim that no payment claim followed.
-    @Transactional(rollbackFor = IOException.class)
-    private void claimOrderRefund(String orderId, long amount, List<RefundLineDto> claimLines,
-            boolean cardLeg, RefundRequestDto req, String username, long cardPart,
-            long presentmentCents, long giftPart) throws IOException {
-        if (db.queryOne("SELECT order_id FROM order_refund_claim WHERE order_id = ?",
-                new Object[] {orderId}) != null) {
-            throw new ResponseStatusException(409,
-                    "The refund is being confirmed with the processor");
-        }
-        if (db.execute("UPDATE store_order SET refunded_cents = refunded_cents + ? WHERE id = ? "
-                + "AND refunded_cents + ? <= total_cents", new Object[] {Long.valueOf(amount),
-                orderId, Long.valueOf(amount)}) != 1) {
-            throw new ResponseStatusException(409, "Another refund of this order got there first");
-        }
-        StringBuilder kept = new StringBuilder();
-        for (int iter = 0; iter < claimLines.size(); iter++) {
-            RefundLineDto w = claimLines.get(iter);
-            if (w == null || w.quantity() <= 0) {
-                continue;
-            }
-            if (db.execute("UPDATE order_line SET refunded_qty = refunded_qty + ? WHERE id = ? "
-                    + "AND order_id = ? AND refunded_qty + ? <= quantity", new Object[] {
-                    Integer.valueOf(w.quantity()), w.orderLineId(), orderId,
-                    Integer.valueOf(w.quantity())}) != 1) {
-                // The transaction rolls back every claim made so far.
-                throw new ResponseStatusException(409,
-                        "Another refund of this order got there first");
-            }
-            if (kept.length() > 0) {
-                kept.append(';');
-            }
-            kept.append(w.orderLineId()).append(':').append(w.quantity());
-        }
-        if (cardLeg) {
-            db.execute("INSERT INTO order_refund_claim (order_id, username, amount_cents, "
-                    + "card_cents, presentment_cents, gift_cents, line_list, "
-                    + "shipping_cents, restock, reason, claimed_at, card_done) "
-                    + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)", new Object[] {orderId,
-                    Codes.cut(username, 190), Long.valueOf(amount), Long.valueOf(cardPart),
-                    Long.valueOf(presentmentCents), Long.valueOf(giftPart), kept.toString(),
-                    Long.valueOf(req.shippingCents()), Integer.valueOf(req.restock() ? 1 : 0),
-                    Codes.cut(req.reason() == null ? "" : req.reason(), 500),
-                    Long.valueOf(System.currentTimeMillis())});
-        }
-    }
-
-    /// Gives back a refund's claims on the order's cents and units, and its
-    /// claim record: nothing went back, so it can be tried again.
-    @Transactional(rollbackFor = IOException.class)
-    private void releaseOrderRefund(String orderId, long amount, List<RefundLineDto> claimLines)
-            throws IOException {
-        db.execute("UPDATE store_order SET refunded_cents = refunded_cents - ? "
-                + "WHERE id = ?", new Object[] {Long.valueOf(amount), orderId});
-        List<RefundLineDto> back = claimLines == null ? new ArrayList<RefundLineDto>() : claimLines;
-        for (int iter = 0; iter < back.size(); iter++) {
-            RefundLineDto undo = back.get(iter);
-            if (undo != null && undo.quantity() > 0) {
-                db.execute("UPDATE order_line SET refunded_qty = refunded_qty - ? "
-                        + "WHERE id = ? AND order_id = ?", new Object[] {
-                        Integer.valueOf(undo.quantity()), undo.orderLineId(), orderId});
-            }
-        }
-        db.execute("DELETE FROM order_refund_claim WHERE order_id = ?", new Object[] {orderId});
-    }
-
-    /// How long an order refund claim waits with no payment claim behind it
-    /// before the sweep takes it for one a crash left between the two.
-    static final long ORPHAN_REFUND_CLAIM_MILLIS = 15L * 60L * 1000L;
-
-    /// Settles order refunds left in flight for more than ten minutes: a
-    /// processor answer that was lost, or a server that stopped mid-refund.
-    /// The card refund is asked about again under its own key; once the
-    /// processor confirms it the order side is finished through
-    /// [#finishRefund], as an immediate answer would have, and once it refuses
-    /// the order's claims are released. A claim no payment claim followed is
-    /// released after fifteen minutes.
-    @com.codename1.backend.annotations.Scheduled(fixedDelay = 300000, initialDelay = 100000,
-            lock = "bazaar-order-refunds")
-    public void resumeRefunds() throws IOException {
-        long now = System.currentTimeMillis();
-        List rows = db.query("SELECT * FROM order_refund_claim WHERE claimed_at < ?",
-                new Object[] {Long.valueOf(now - Payments.STALE_REFUND_MILLIS)});
-        for (int iter = 0; iter < rows.size(); iter++) {
-            Map r = (Map) rows.get(iter);
-            try {
-                resumeRefund(r, now);
-            } catch (IOException | RuntimeException failed) {
-                System.err.println("the refund of order " + r.get("order_id")
-                        + " was not settled: " + failed.getMessage());
-            }
-        }
-    }
-
-    private void resumeRefund(Map r, long now) throws IOException {
-        String orderId = String.valueOf(r.get("order_id"));
-        String username = String.valueOf(r.get("username"));
-        long amount = Rows.number(r.get("amount_cents"));
-        List<RefundLineDto> claimed = new ArrayList<RefundLineDto>();
-        String list = String.valueOf(r.get("line_list"));
-        int start = 0;
-        while (start < list.length()) {
-            int end = list.indexOf(';', start);
-            String pair = list.substring(start, end < 0 ? list.length() : end);
-            int colon = pair.lastIndexOf(':');
-            if (colon > 0) {
-                claimed.add(new RefundLineDto(pair.substring(0, colon),
-                        Integer.parseInt(pair.substring(colon + 1))));
-            }
-            start = end < 0 ? list.length() : end + 1;
-        }
-        if (Rows.number(r.get("card_done")) == 0) {
-            Payment payment = paymentRows.findById(orderId);
-            if (payment == null || !Payments.REFUNDING.equals(payment.getStatus())) {
-                if (Rows.number(r.get("claimed_at")) < now - ORPHAN_REFUND_CLAIM_MILLIS) {
-                    releaseOrderRefund(orderId, amount, claimed);
-                    event(orderId, "REFUND_RELEASED", "A refund of " + amount
-                            + " cents was interrupted before the card was asked; nothing went back",
-                            username);
-                }
-                return;
-            }
-            int outcome = payments.resumeRefund(orderId,
-                    Instant.ofEpochMilli(now - Payments.STALE_REFUND_MILLIS));
-            if (outcome == Payments.RESUME_REFUSED) {
-                releaseOrderRefund(orderId, amount, claimed);
-                event(orderId, "REFUND_REFUSED", "The processor refused the refund of " + amount
-                        + " cents; nothing went back", username);
-                return;
-            }
-            if (outcome != Payments.RESUME_CONFIRMED) {
-                return;
-            }
-        }
-        RefundRequestDto req = new RefundRequestDto(claimed, Rows.number(r.get("shipping_cents")),
-                Rows.number(r.get("restock")) != 0, String.valueOf(r.get("reason")));
-        finishRefund(orderId, req, amount, true, Rows.number(r.get("card_cents")),
-                Rows.number(r.get("gift_cents")), false, Rows.number(r.get("presentment_cents")),
-                username);
     }
 
     /// Whether the order was charged in a currency other than the store's.

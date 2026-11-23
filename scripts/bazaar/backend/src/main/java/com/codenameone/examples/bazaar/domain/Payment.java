@@ -79,11 +79,6 @@ public class Payment {
     @Column(nullable = false)
     private Instant refundClaimedAt = Instant.EPOCH;
 
-    /// How many refunds the processor definitely refused; part of the refund
-    /// idempotency key, so a cached refusal never answers the next attempt.
-    @Column(nullable = false)
-    private int refundAttempt;
-
     public Payment() {
     }
 
@@ -189,14 +184,6 @@ public class Payment {
 
     public void setRefundReason(String refundReason) {
         this.refundReason = refundReason;
-    }
-
-    public int getRefundAttempt() {
-        return refundAttempt;
-    }
-
-    public void setRefundAttempt(int refundAttempt) {
-        this.refundAttempt = refundAttempt;
     }
 
     public long getPendingRefundCents() {

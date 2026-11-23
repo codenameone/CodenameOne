@@ -325,16 +325,11 @@ public class StripePayments implements PaymentProvider {
     /// while a second partial refund names a different key and moves money.
     @Override
     public Refund refund(String chargeReference, long amountCents, String key) throws IOException {
-        Map answer;
-        try {
-            answer = ask("POST", "/v1/refunds", form("payment_intent", chargeReference,
-                    "amount", String.valueOf(amountCents)), key);
-        } catch (PaymentDeclinedException declined) {
-            throw new RefundRefused(declined.getMessage());
-        }
+        Map answer = ask("POST", "/v1/refunds", form("payment_intent", chargeReference,
+                "amount", String.valueOf(amountCents)), key);
         String status = refundState(text(answer, "status"));
         if (REFUND_FAILED.equals(status)) {
-            throw new RefundRefused("The refund was not accepted: " + text(answer, "status"));
+            throw new IOException("The refund was not accepted: " + text(answer, "status"));
         }
         Refund refund = new Refund();
         refund.reference = id(answer);
@@ -390,26 +385,10 @@ public class StripePayments implements PaymentProvider {
                 throw new PaymentDeclinedException(message.length() > 0 ? message
                         : "Your card was declined");
             }
-            String said = "The payment processor answered " + reply.status + " "
-                    + text(details, "type") + " " + text(details, "code");
-            if (definiteRefundRefusal(path, reply.status)) {
-                throw new RefundRefused(said);
-            }
-            throw new IOException(said);
-        }
-        if (definiteRefundRefusal(path, reply.status)) {
-            throw new RefundRefused("The payment processor answered " + reply.status);
+            throw new IOException("The payment processor answered " + reply.status + " "
+                    + text(details, "type") + " " + text(details, "code"));
         }
         throw new IOException("The payment processor answered " + reply.status);
-    }
-
-    /// Whether an error answer to a refund means Stripe made no refund: any
-    /// 4xx but 409 (another request with the key is still running) and 429
-    /// (rate limited), which say nothing about whether it was made. A 5xx, a
-    /// timeout or an unreadable answer stays ambiguous.
-    private static boolean definiteRefundRefusal(String path, int status) {
-        return path.startsWith("/v1/refunds") && status >= 400 && status < 500
-                && status != 409 && status != 429;
     }
 
     /// A form body from names and values in turn. Both are escaped: a name
