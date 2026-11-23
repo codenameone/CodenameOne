@@ -247,7 +247,10 @@ class MerchantIdorTest {
         "GET /bulk-jobs/{jobId}/result.jsonl",
         "GET /tax-settings", "POST /tax-settings", "GET /tax-overrides", "POST /tax-overrides",
         "DELETE /tax-overrides/{overrideId}", "POST /products/{productId}/tax-category",
-        "GET /vat-rates", "GET /oss-report", "GET /oss-report.csv"};
+        "GET /vat-rates", "GET /oss-report", "GET /oss-report.csv",
+        "GET /trials", "PUT /trials/{productId}", "GET /upsell", "PUT /upsell",
+        "GET /fraud-rules", "POST /fraud-rules", "DELETE /fraud-rules/{ruleId}",
+        "GET /profit-loss"};
 
     /// Routes of [#ROUTES] served by a controller rather than declared by a
     /// shared API interface: documents (`DocumentPages`) and the merchant AI

@@ -385,7 +385,7 @@ public class DemoTourTest extends E2e {
         caption("Stores: review, verify and suspend merchants", 3000);
         pause(3200);
         shotAs("admin-" + Sections.STORES);
-        if (tapText("Northwind Outfitters")) {
+        if (tapText("Northwind Outfitters") || tap("store-0")) {
             caption("A store's standing, volume and history", 3000);
             pause(3400);
             scrollDown(1);
