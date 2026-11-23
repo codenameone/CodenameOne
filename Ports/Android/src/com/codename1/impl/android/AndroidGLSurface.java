@@ -90,13 +90,6 @@ class AndroidGLSurface extends GLSurfaceView {
     }
 
     @Override
-    protected void onAttachedToWindow() {
-        trace("onAttachedToWindow");
-        super.onAttachedToWindow();
-        trace("onAttachedToWindow done");
-    }
-
-    @Override
     public void surfaceCreated(android.view.SurfaceHolder holder) {
         trace("holder surfaceCreated");
         super.surfaceCreated(holder);
@@ -126,7 +119,9 @@ class AndroidGLSurface extends GLSurfaceView {
 
     @Override
     protected void onAttachedToWindow() {
+        trace("onAttachedToWindow");
         super.onAttachedToWindow();
+        trace("onAttachedToWindow done");
         ACTIVE.add(this);
     }
 
