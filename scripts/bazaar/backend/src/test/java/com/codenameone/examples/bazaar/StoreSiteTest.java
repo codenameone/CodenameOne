@@ -19,6 +19,8 @@
  */
 package com.codenameone.examples.bazaar;
 
+import com.codenameone.examples.bazaar.web.SiteUrls;
+
 import com.codename1.backend.DataSource;
 import com.codename1.backend.annotations.Autowired;
 import com.codename1.backend.test.BackendTest;
@@ -78,6 +80,8 @@ class StoreSiteTest {
         assertTrue(json.contains("\"title\":\"Mug\""), json);
         assertTrue(json.contains("/s/ss-sug/products/ss-sug-mug"), json);
         assertEquals("[]", fetch("/s/ss-sug/suggest?q=zebra").getContentAsString());
+        String app = fetch("/api/shop/stores/ss-sug/suggest?q=mu").getContentAsString();
+        assertTrue(app.contains("\"handle\":\"ss-sug-mug\""), app);
         assertTrue(fetch("/s/ss-sug/search?q=mu").getContentAsString()
                 .contains("data-suggest=\"/s/ss-sug/suggest\""));
         assertTrue(fetch("/suggest.js").getContentAsString().contains("q-suggest"));
@@ -135,5 +139,42 @@ class StoreSiteTest {
         assertTrue(r.getHeader("Content-Security-Policy").contains("frame-ancestors *"));
         assertEquals(null, r.getHeader("X-Frame-Options"));
         assertEquals(404, fetch("/s/ss-emb/embed/nothing").getStatus());
+    }
+
+    private MockResponse onHost(String host, String path) throws Exception {
+        return mvc.perform(get(path).header("Host", host)).andReturn().getResponse();
+    }
+
+    @Test
+    void aCustomDomainServesItsStoreAtTheRoot() throws Exception {
+        Shop s = shop("ss-cd");
+        db.execute("UPDATE store SET custom_domain = ? WHERE id = ?",
+                new Object[] {"shop.ss-cd.example", s.storeId});
+        String host = "Shop.SS-CD.example:443";
+        MockResponse product = onHost(host, "/products/ss-cd-mug");
+        assertEquals(200, product.getStatus());
+        String html = product.getContentAsString();
+        assertTrue(html.contains("https://shop.ss-cd.example/products/ss-cd-mug"), html);
+        assertTrue(onHost(host, "/").getContentAsString().contains("ss-cd-mug"));
+        assertEquals(200, onHost(host, "/search?q=mu").getStatus());
+        assertEquals(200, onHost(host, "/cart").getStatus());
+        assertTrue(onHost(host, "/sitemap.xml").getContentAsString()
+                .contains("<loc>https://shop.ss-cd.example/products/ss-cd-mug</loc>"));
+        assertTrue(onHost(host, "/robots.txt").getContentAsString()
+                .contains("Sitemap: https://shop.ss-cd.example/sitemap.xml"));
+        // Unknown hosts fall through to the platform as before.
+        assertEquals(404, onHost("elsewhere.example", "/products/ss-cd-mug").getStatus());
+        assertFalse(fetch("/sitemap.xml").getContentAsString().contains("ss-cd-mug"));
+    }
+
+    @Test
+    void customDomainsAreFoldedAndValidated() {
+        assertEquals("shop.example.com", SiteUrls.domain(" Shop.Example.COM. "));
+        assertEquals("", SiteUrls.domain(""));
+        assertEquals(null, SiteUrls.domain("localhost"));
+        assertEquals(null, SiteUrls.domain("10.0.0.1"));
+        assertEquals(null, SiteUrls.domain("-bad.example.com"));
+        assertEquals(null, SiteUrls.domain("a b.example.com"));
+        assertEquals(null, SiteUrls.domain("evil.example/path"));
     }
 }

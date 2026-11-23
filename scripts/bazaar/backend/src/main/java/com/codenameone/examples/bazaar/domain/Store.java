@@ -92,6 +92,11 @@ public class Store {
     @Column(nullable = false, type = "VARCHAR(100)")
     private String storefrontPassword = "";
 
+    /// The store's own hostname (`shop.example.com`), lower case, or null
+    /// to serve only under `/s/{handle}`. Unique across stores.
+    @Column(type = "VARCHAR(253)")
+    private String customDomain;
+
     @Column(nullable = false)
     private Instant createdAt = Instant.EPOCH;
 
@@ -275,5 +280,14 @@ public class Store {
 
     public void setStorefrontPassword(String storefrontPassword) {
         this.storefrontPassword = storefrontPassword == null ? "" : storefrontPassword;
+    }
+
+    public String getCustomDomain() {
+        return customDomain;
+    }
+
+    public void setCustomDomain(String customDomain) {
+        this.customDomain = customDomain == null || customDomain.length() == 0 ? null
+                : customDomain;
     }
 }

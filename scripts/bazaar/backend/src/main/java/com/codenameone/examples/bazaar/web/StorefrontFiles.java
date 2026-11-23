@@ -76,6 +76,17 @@ public class StorefrontFiles {
     @GetMapping("/robots.txt")
     @Transactional(readOnly = true)
     public HttpServer.Response robots(HttpServer.Request request) throws IOException {
+        String own = urls.storeForHost(request);
+        if (own != null) {
+            // A custom domain is one store's site: its own rules and sitemap.
+            Store store = stores.findByHandle(own);
+            String rules = store.getStorefrontPassword().length() > 0 ? "Disallow: /\n"
+                    : "Disallow: /cart\nDisallow: /search\nAllow: /\n";
+            String body = "User-agent: *\n" + rules + "\nSitemap: https://"
+                    + store.getCustomDomain() + "/sitemap.xml\n";
+            return Conditional.answer(request, "text/plain; charset=utf-8",
+                    body.getBytes("UTF-8"), "public, max-age=3600", 0);
+        }
         String body = "User-agent: *\n"
                 + "Disallow: /api/\n"
                 + "Disallow: /oauth2/\n"
@@ -120,8 +131,15 @@ public class StorefrontFiles {
                 .append("xmlns:xhtml=\"http://www.w3.org/1999/xhtml\">\n");
         long newest = 0;
         List<Store> active = stores.findByStatusOrderByNameAsc(Stores.ACTIVE);
+        // On a custom domain the sitemap lists that store alone; the
+        // platform's lists the stores without one (a sitemap names its own
+        // host's pages only).
+        String own = urls.storeForHost(request);
         for (int s = 0; s < active.size(); s++) {
             Store store = active.get(s);
+            if (own != null ? !own.equals(store.getHandle()) : store.getCustomDomain() != null) {
+                continue;
+            }
             if (store.getStorefrontPassword().length() > 0) {
                 // A store behind its pre-launch password is not announced.
                 continue;

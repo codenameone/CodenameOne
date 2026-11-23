@@ -167,6 +167,7 @@ public class StoreSite {
                 Map<String, Object> m = new LinkedHashMap<String, Object>();
                 m.put("kind", s[0]);
                 m.put("title", s[1]);
+                m.put("handle", s[2]);
                 m.put("url", "product".equals(s[0]) ? StorefrontPages.productUrl(handle, s[2])
                         : StorefrontPages.collectionUrl(handle, s[2]));
                 out.add(m);
@@ -243,8 +244,28 @@ public class StoreSite {
     @Transactional
     public void saveSettings(String storeId, String synonyms, String password, String boosts)
             throws IOException {
+        saveSettings(storeId, synonyms, password, boosts, null);
+    }
+
+    /// As above, plus the store's custom domain (`domain`; null leaves it as
+    /// it is, empty removes it). A value that is not a hostname, or that
+    /// another store already uses, is refused with a 400.
+    @Transactional
+    public void saveSettings(String storeId, String synonyms, String password, String boosts,
+            String domain) throws IOException {
         access.requireStaff(Caller.name(), storeId, StoreAccess.MANAGERS);
         Store store = stores.findById(storeId);
+        if (domain != null) {
+            String folded = SiteUrls.domain(domain);
+            if (folded == null) {
+                throw new ResponseStatusException(400, "That is not a hostname");
+            }
+            Store holder = folded.length() == 0 ? null : stores.findByCustomDomain(folded);
+            if (holder != null && !holder.getId().equals(storeId)) {
+                throw new ResponseStatusException(400, "Another store uses that domain");
+            }
+            store.setCustomDomain(folded);
+        }
         store.setSearchSynonyms(synonyms == null ? "" : synonyms.trim());
         store.setStorefrontPassword(password == null ? "" : password.trim());
         stores.save(store);

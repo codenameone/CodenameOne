@@ -29,6 +29,8 @@ import java.util.List;
 public interface StoreRepository extends CrudRepository<Store, String> {
     Store findByHandle(String handle);
 
+    Store findByCustomDomain(String customDomain);
+
     List<Store> findByStatusOrderByNameAsc(String status);
 
     List<Store> findByStatusNotOrderByNameAsc(String status);

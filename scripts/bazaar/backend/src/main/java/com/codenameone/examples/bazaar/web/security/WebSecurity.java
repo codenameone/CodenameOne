@@ -229,7 +229,8 @@ public class WebSecurity {
             @Value("${bazaar.web.hsts:true}") boolean hsts,
             com.codenameone.examples.bazaar.web.StorefrontRedirects redirects, Throttle throttle)
             throws IOException {
-        http.securityMatcher("/", "/s/**", "/track/**", "/review/**", "/consent", "/consent/**",
+        http.securityMatcher("/", "/s/**", "/collections/**", "/products/**", "/search",
+                "/cart", "/track/**", "/review/**", "/consent", "/consent/**",
                 "/lang")
             .csrf(c -> c.disable())
             // A review posted through an e-mailed link ([ReviewLinks]): the

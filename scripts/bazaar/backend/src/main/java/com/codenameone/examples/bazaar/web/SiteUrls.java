@@ -92,9 +92,124 @@ public class SiteUrls {
         return true;
     }
 
-    /// `path` (absolute, starting with a slash) made absolute.
+    /// Finds stores by their custom domain; null outside the container.
+    @com.codename1.backend.annotations.Autowired
+    private com.codenameone.examples.bazaar.repository.StoreRepository stores;
+
+    /// The storefront paths a custom domain serves at its root
+    /// ([Storefront]); every other store page keeps its `/s/{handle}` path,
+    /// which answers on any host.
+    private static final String[] ROOT_PATHS = {"/collections/", "/products/", "/search",
+        "/cart"};
+
+    /// `path` (absolute, starting with a slash) made absolute. A store page
+    /// of a store with a custom domain is addressed on that domain, over
+    /// HTTPS, so canonical links, the sitemap and structured data name it.
     public String absolute(HttpServer.Request request, String path) {
-        return base(request) + path;
+        String own = ownDomain(path);
+        return own != null ? own : base(request) + path;
+    }
+
+    private String ownDomain(String path) {
+        if (stores == null || path == null || !path.startsWith("/s/")) {
+            return null;
+        }
+        int slash = path.indexOf('/', 3);
+        int end = slash < 0 ? path.length() : slash;
+        int q = path.indexOf('?', 3);
+        if (q >= 0 && q < end) {
+            end = q;
+        }
+        String handle = path.substring(3, end);
+        if (handle.length() == 0) {
+            return null;
+        }
+        com.codenameone.examples.bazaar.domain.Store store = stores.findByHandle(handle);
+        if (store == null || store.getCustomDomain() == null) {
+            return null;
+        }
+        String rest = path.substring(end);
+        String site = "https://" + store.getCustomDomain();
+        if (rest.length() == 0 || rest.charAt(0) == '?') {
+            return site + "/" + rest;
+        }
+        for (int iter = 0; iter < ROOT_PATHS.length; iter++) {
+            if (rest.startsWith(ROOT_PATHS[iter])) {
+                return site + rest;
+            }
+        }
+        return site + path;
+    }
+
+    /// The handle of the active store whose custom domain the request's
+    /// `Host` names, or null for the platform's own host and any other.
+    public String storeForHost(HttpServer.Request request) {
+        String host = request == null ? null : request.getHeader("Host");
+        if (stores == null || host == null) {
+            return null;
+        }
+        int colon = host.lastIndexOf(':');
+        if (colon > 0 && host.indexOf(']') < colon) {
+            host = host.substring(0, colon);
+        }
+        String domain = domain(host);
+        if (domain == null || domain.length() == 0) {
+            return null;
+        }
+        com.codenameone.examples.bazaar.domain.Store store = stores.findByCustomDomain(domain);
+        return store == null || !com.codenameone.examples.bazaar.store.Stores.ACTIVE.equals(
+                store.getStatus()) ? null : store.getHandle();
+    }
+
+    /// `raw` as a custom domain: trimmed, ASCII lower case, without a
+    /// trailing dot; "" for empty, null when it is not a hostname (labels
+    /// of letters, digits and inner dashes, at least two, 253 at most, and
+    /// a top-level label that is not all digits, so no IP address).
+    public static String domain(String raw) {
+        if (raw == null) {
+            return "";
+        }
+        String s = raw.trim();
+        if (s.endsWith(".")) {
+            s = s.substring(0, s.length() - 1);
+        }
+        if (s.length() == 0) {
+            return "";
+        }
+        if (s.length() > 253) {
+            return null;
+        }
+        StringBuilder b = new StringBuilder(s.length());
+        int labelStart = 0;
+        int labels = 0;
+        boolean digitsOnly = true;
+        for (int iter = 0; iter <= s.length(); iter++) {
+            char c = iter == s.length() ? '.' : s.charAt(iter);
+            if (c == '.') {
+                int len = iter - labelStart;
+                if (len == 0 || len > 63 || s.charAt(labelStart) == '-'
+                        || s.charAt(iter - 1) == '-') {
+                    return null;
+                }
+                labels++;
+                if (iter < s.length()) {
+                    digitsOnly = true;
+                    labelStart = iter + 1;
+                    b.append('.');
+                }
+                continue;
+            }
+            if (c >= 'A' && c <= 'Z') {
+                c = (char) (c + ('a' - 'A'));
+            }
+            boolean digit = c >= '0' && c <= '9';
+            if (!(c >= 'a' && c <= 'z' || digit || c == '-')) {
+                return null;
+            }
+            digitsOnly &= digit;
+            b.append(c);
+        }
+        return labels < 2 || digitsOnly ? null : b.toString();
     }
 
     /// A store's HTML checkout ([CheckoutController]), relative: the session

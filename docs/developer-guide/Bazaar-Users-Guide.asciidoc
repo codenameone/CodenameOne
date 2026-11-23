@@ -421,10 +421,13 @@ those pages; most of what they do is also on the app's screens.
 
 Each store lives at `/s/<handle>`: home, collections, search, product pages, the
 store's own pages and blog, and a cart. The search box suggests products and collections as the
-shopper types. On the web admin's online store page the merchant sets synonym
+shopper types, and so does the app's search field inside a store: tapping a
+suggestion opens the product or the collection. On the web admin's online store page the merchant sets synonym
 groups and per-product boosts for search, a storefront password that keeps the
 store behind a pre-launch page until launch (staff always get in), and copies
-an embed code that puts a product's buy button on another site. The header has a globe menu for the
+an embed code that puts a product's buy button on another site. The same form
+takes a custom domain such as `shop.example.com`: once its DNS points at the
+server, that address serves the store at its root. The header has a globe menu for the
 language (English, Spanish, French, German and Hebrew, each named in its own
 language) and, when the store sells in more than one market, a market menu
 beside it. A shopper who picks a market sees prices in that market's currency

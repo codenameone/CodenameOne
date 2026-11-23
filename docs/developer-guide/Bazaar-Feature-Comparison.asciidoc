@@ -311,7 +311,7 @@ on a row.
 | Multi-language storefront content | &#10003; | core | app/plugin | core | no | Pages, policies and posts translate per market, with hreflang alternates in the sitemap. 
 | Per-market pricing / price adjustments | &#10003; | core | app/plugin | core | no | Per-market price lists and adjustments. 
 | Duties & import taxes at checkout | &#9681; | core | app/plugin | app/plugin | no | Checkout estimates duties from HS codes and per-country rates; the carrier collects them on delivery, so they are not charged at checkout.
-| Domains / subfolders per market | &#8211; | core | app/plugin | core | no | 
+| Domains / subfolders per market | &#8211; | core | app/plugin | core | no | One custom domain per store; markets share it and switch with a query parameter.
 | Geolocation redirects / country selector | &#10003; | core | app/plugin | app/plugin | no | A market selector with a cookie, and a banner suggesting the market of the visitor's country from trusted CDN headers or an IP range table. It never redirects, so crawlers and canonical URLs are unaffected. 
 | Tax rates by region | &#10003; | core | core | core | core | 
 | Tax-inclusive pricing | &#10003; | core | core | core | core | 
@@ -338,10 +338,10 @@ on a row.
 | URL redirects manager | &#10003; | core | app/plugin | core | no | 301 redirects for paths no route matches. 
 | Storefront search | &#10003; | core | core | core | core | 
 | Search filters / facets | &#10003; | core | core | core | core | 
-| Predictive search / autocomplete | &#10003; | core | app/plugin | core | no | Prefix suggestions from titles, tags and collections in the web search box; the app search field is not wired yet.
+| Predictive search / autocomplete | &#10003; | core | app/plugin | core | no | Prefix suggestions from titles, tags and collections, in the web search box and under the app's in-store search field (debounced; a tap opens the product or collection).
 | Product recommendations (related) | &#9681; | core | core | core | core | Related products from the same collection.
 | Synonyms / boosts (search tuning) | &#10003; | core | app/plugin | core | no | Merchant synonym groups and per-product boosts, edited on the web admin online store page.
-| Custom domain | &#8211; | core | core | core | core | 
+| Custom domain | &#10003; | core | core | core | core | A store setting for its own hostname; that host serves the store at the root, and canonical links, the sitemap and structured data name it. DNS and TLS are the operator's.
 | Password page / pre-launch | &#10003; | core | app/plugin | core | core | Staff pass; a locked store leaves the sitemap and is disallowed in robots.txt.
 | Files library | &#10003; | core | core | core | core | 
 | Metafields / metaobjects | &#10003; | core | app/plugin | core | no | 

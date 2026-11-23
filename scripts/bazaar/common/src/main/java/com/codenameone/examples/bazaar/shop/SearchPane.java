@@ -53,6 +53,10 @@ final class SearchPane extends ShopPane {
     private ProductGrid grid;
     private FilterPanel panel;
     private UITimer typing;
+    /// Predictive search (`/s/{handle}/suggest`), under the search bar.
+    private final Container suggestions = new Container(BoxLayout.y());
+    private final SuggestGate gate = new SuggestGate();
+    private boolean scopedSearch;
     private final ActionListener<com.codename1.ui.events.ActionEvent> escape = e -> {
         if (words.getText().length() > 0) {
             words.setText("");
@@ -133,6 +137,7 @@ final class SearchPane extends ShopPane {
             Form f = getComponentForm();
             if (f != null) {
                 typing = UITimer.timer(DEBOUNCE_MS, false, f, () -> {
+                    suggest(words.getText());
                     if (!words.getText().equals(query.q)) {
                         query.q = words.getText();
                         changed();
@@ -146,6 +151,7 @@ final class SearchPane extends ShopPane {
                 typing.cancel();
             }
             query.q = words.getText();
+            clearSuggestions();
             changed();
         });
 
@@ -174,6 +180,12 @@ final class SearchPane extends ShopPane {
 
         Container north = new Container(BoxLayout.y());
         north.add(bar);
+        scopedSearch = scoped;
+        suggestions.setName("search-suggestions");
+        if (suggestions.getParent() != null) {
+            suggestions.remove();
+        }
+        north.add(suggestions);
         if (query.collection != null) {
             Container on = new Container(new BorderLayout());
             on.setUIID("ShopFilterOn");
@@ -210,6 +222,64 @@ final class SearchPane extends ShopPane {
             panel.load();
         }
         marks();
+    }
+
+    /// Asks the store for suggestions for `text`; only the newest answer is
+    /// shown. Across every store there is no suggestion endpoint.
+    private void suggest(String text) {
+        if (!scopedSearch || !SuggestGate.worthAsking(text)) {
+            clearSuggestions();
+            return;
+        }
+        final int ticket = gate.issue();
+        final String store = ShopState.store().handle();
+        com.codenameone.examples.bazaar.net.Api.catalog().suggest(store, text.trim(),
+                com.codename1.appkit.Net.to(list -> {
+                    if (!gate.current(ticket)) {
+                        return;
+                    }
+                    suggestions.removeAll();
+                    if (list != null) {
+                        for (int iter = 0; iter < list.size(); iter++) {
+                            suggestions.add(suggestion(store, list.get(iter)));
+                        }
+                    }
+                    Ui.relayout(this);
+                }, (status, message) -> { }));
+    }
+
+    private Button suggestion(String store,
+            com.codenameone.examples.bazaar.api.SearchSuggestionDto s) {
+        Button b = new Button(s.title(), "ShopSuggestion");
+        b.setName("suggest-" + s.handle());
+        boolean product = "product".equals(s.kind());
+        FontImage.setMaterialIcon(b, product ? FontImage.MATERIAL_SELL
+                : FontImage.MATERIAL_COLLECTIONS, 3f);
+        b.addActionListener(e -> {
+            clearSuggestions();
+            if (product) {
+                com.codenameone.examples.bazaar.net.Api.catalog().productByHandle(store,
+                        s.handle(), com.codename1.appkit.Net.to(p -> {
+                            if (p != null) {
+                                ProductForm.show(p.id(), p.title());
+                            }
+                        }, (status, message) -> { }));
+            } else {
+                query.collection = s.handle();
+                query.q = "";
+                build();
+                Ui.relayout(this);
+            }
+        });
+        return b;
+    }
+
+    private void clearSuggestions() {
+        gate.invalidate();
+        if (suggestions.getComponentCount() > 0) {
+            suggestions.removeAll();
+            Ui.relayout(this);
+        }
     }
 
     /// The query changed: new results, new facets.

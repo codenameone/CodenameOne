@@ -63,10 +63,58 @@ public class Storefront {
     @com.codename1.backend.annotations.Autowired
     private StoreSite site;
 
+    /// Custom domains ([SiteUrls#storeForHost]).
+    @com.codename1.backend.annotations.Autowired
+    private SiteUrls urls;
+
     @GetMapping("/")
-    public String index(Model model, HttpServer.Request request) {
+    public String index(Model model, HttpServer.Request request) throws IOException {
+        String own = urls.storeForHost(request);
+        if (own != null) {
+            return home(own, model, request);
+        }
         pages.index(model, request);
         return "index";
+    }
+
+    // A custom domain serves its store at the root: each route below maps
+    // onto the `/s/{handle}` handler it stands for, so there is one handler
+    // per page whichever address reached it. On any other host they 404.
+
+    private String ownStore(HttpServer.Request request) {
+        String own = urls.storeForHost(request);
+        if (own == null) {
+            throw new ResponseStatusException(404, "Not found");
+        }
+        return own;
+    }
+
+    @GetMapping("/collections/{collection}")
+    public String domainCollection(@PathVariable("collection") String collection,
+            @RequestParam(value = "sort", required = false) String sort,
+            @RequestParam(value = "page", required = false) String page,
+            Model model, HttpServer.Request request) throws IOException {
+        return collection(ownStore(request), collection, sort, page, model, request);
+    }
+
+    @GetMapping("/search")
+    public String domainSearch(@RequestParam(value = "q", required = false) String q,
+            @RequestParam(value = "sort", required = false) String sort,
+            @RequestParam(value = "page", required = false) String page,
+            Model model, HttpServer.Request request) throws IOException {
+        return search(ownStore(request), q, sort, page, model, request);
+    }
+
+    @GetMapping("/products/{product}")
+    public String domainProduct(@PathVariable("product") String product,
+            @RequestParam(value = "variant", required = false) String variant,
+            Model model, HttpServer.Request request) throws IOException {
+        return product(ownStore(request), product, variant, model, request);
+    }
+
+    @GetMapping("/cart")
+    public String domainCart(Model model, HttpServer.Request request) throws IOException {
+        return cart(ownStore(request), model, request);
     }
 
     @GetMapping("/s/{handle}")

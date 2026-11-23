@@ -1351,6 +1351,8 @@ ShopStoreRow { background-color: var(--surface); border-bottom: 1px solid var(--
 ShopStoreRow.pressed { background-color: var(--surface-alt); }
 ShopStoreLogo { background-color: transparent; border-radius: var(--radius); padding: 0 2.4mm 0 0; margin: 0; }
 ShopSearchBar { background-color: var(--surface); border-bottom: 1px solid var(--line); padding: 2mm 3mm 2mm 3mm; margin: 0; }
+ShopSuggestion { color: var(--text); background-color: var(--surface); border-bottom: 1px solid var(--line); text-align: left; padding: 2mm 3mm 2mm 3mm; margin: 0; }
+ShopSuggestion.pressed { background-color: var(--surface-press); }
 ShopToolButton { color: var(--text); background-color: transparent; padding: 1.6mm; margin: 0 0 0 1mm; }
 ShopToolButton.pressed { background: cn1-pill-border; background-color: var(--surface-press); }
 ShopFilterOn { background-color: var(--brand-tint); padding: 1mm 3mm 1mm 3mm; margin: 0; }
@@ -1712,6 +1714,7 @@ MeAccentTagline { color: var(--brand-contrast); background-color: transparent; f
     ShopStoreRow.pressed { background-color: var(--surface-alt-dark); }
     ShopSearchBar { background-color: var(--surface-dark); border-bottom: 1px solid var(--line-dark); }
     ShopToolButton { color: var(--text-dark); }
+    ShopSuggestion { color: var(--text-dark); background-color: var(--surface-dark); border-bottom: 1px solid var(--line-dark); }
     ShopToolButton.pressed { background: cn1-pill-border; background-color: var(--surface-press-dark); }
     ShopFilterOn { background-color: var(--brand-tint-dark); }
     ShopFilterSide { background-color: var(--surface-alt-dark); border-right: 1px solid var(--line-dark); }

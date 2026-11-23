@@ -1069,11 +1069,11 @@ public class StorefrontPages {
         return "/s/" + SiteUrls.encode(handle);
     }
 
-    static String collectionUrl(String handle, String collection) {
+    public static String collectionUrl(String handle, String collection) {
         return storeUrl(handle) + "/collections/" + SiteUrls.encode(collection);
     }
 
-    static String productUrl(String handle, String product) {
+    public static String productUrl(String handle, String product) {
         return storeUrl(handle) + "/products/" + SiteUrls.encode(product);
     }
 

@@ -68,6 +68,13 @@ public interface CatalogApi {
     void collections(@Path("handle") String handle,
             OnComplete<Response<List<CollectionDto>>> callback);
 
+    /// Predictive search: up to eight products and collections whose titles
+    /// start with the words typed, best first; empty for a store behind its
+    /// pre-launch password. The same answers as the web's `/s/{handle}/suggest`.
+    @GET("/api/shop/stores/{handle}/suggest")
+    void suggest(@Path("handle") String handle, @Query("q") String q,
+            OnComplete<Response<List<SearchSuggestionDto>>> callback);
+
     /// A product by id.
     @GET("/api/shop/products/{id}")
     void product(@Path("id") String id, OnComplete<Response<ProductDto>> callback);

@@ -75,6 +75,34 @@ public class CatalogEndpoint implements CatalogApiServer {
     }
 
     @com.codename1.backend.annotations.Autowired
+    private com.codenameone.examples.bazaar.repository.StoreRepository storeRepository;
+
+    /// Predictive search for the app, from the same [Catalog#suggest] the
+    /// storefront's search box reads; nothing for a store behind its
+    /// pre-launch password.
+    @Override
+    public List<com.codenameone.examples.bazaar.api.SearchSuggestionDto> suggest(String handle,
+            String q) throws Exception {
+        List<com.codenameone.examples.bazaar.api.SearchSuggestionDto> out =
+                new java.util.ArrayList<com.codenameone.examples.bazaar.api.SearchSuggestionDto>();
+        com.codenameone.examples.bazaar.domain.Store store = storeRepository.findByHandle(handle);
+        if (store == null || store.getStorefrontPassword().length() > 0) {
+            return out;
+        }
+        List<String[]> found = catalog.suggest(handle, q == null ? "" : q, 8);
+        for (int iter = 0; iter < found.size(); iter++) {
+            String[] s = found.get(iter);
+            boolean product = "product".equals(s[0]);
+            out.add(new com.codenameone.examples.bazaar.api.SearchSuggestionDto(s[0], s[1], s[2],
+                    product ? com.codenameone.examples.bazaar.web.StorefrontPages.productUrl(
+                            handle, s[2])
+                            : com.codenameone.examples.bazaar.web.StorefrontPages.collectionUrl(
+                                    handle, s[2])));
+        }
+        return out;
+    }
+
+    @com.codename1.backend.annotations.Autowired
     private com.codenameone.examples.bazaar.marketing.MarketingMails automations;
 
     @com.codename1.backend.annotations.Autowired

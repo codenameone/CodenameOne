@@ -205,6 +205,10 @@ public class OnlineStorePages {
                     .hint("product-handle=N, one a line, -100 to 100; higher ranks first");
             sf.add("password", "Storefront password", "text", store.getStorefrontPassword())
                     .hint("Empty opens the store; staff always get in");
+            sf.add("domain", "Custom domain", "text",
+                    store.getCustomDomain() == null ? "" : store.getCustomDomain())
+                    .hint("shop.example.com; point its DNS and TLS certificate at this "
+                            + "server first. Empty serves only under /s/" + store.getHandle());
             v.forms.add(sf);
             ActionCard embed = card("Buy button", "Paste this on another site to sell a "
                     + "product there; replace the handle with the product's.");
@@ -241,7 +245,8 @@ public class OnlineStorePages {
     public String saveSearch(@PathVariable("storeId") String storeId,
             HttpServer.Request request) throws Exception {
         return change(request, base(storeId), "Search settings saved", () -> site.saveSettings(
-                storeId, p(request, "synonyms"), p(request, "password"), p(request, "boosts")));
+                storeId, p(request, "synonyms"), p(request, "password"), p(request, "boosts"),
+                p(request, "domain")));
     }
 
     @PostMapping("/admin/{storeId}/online-store/theme/publish")

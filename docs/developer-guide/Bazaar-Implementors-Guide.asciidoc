@@ -495,6 +495,16 @@ store leaves the sitemap and gets a robots.txt `Disallow`), and
 `/s/<handle>/embed/<product>`, the one page that sets its own policy with
 `frame-ancestors *`. Synonym groups (`Store.searchSynonyms`) widen each search
 word in `Search.matches`, and `Product.searchBoost` is added to the relevance score.
+The app's search field asks the same endpoint through `CatalogApi.suggest`, after
+the typing pause, and `SuggestGate` drops any answer a newer request outran.
+
+`Store.customDomain` (unique, validated and folded by `SiteUrls.domain`) is a
+store's own hostname. `SiteUrls.storeForHost` matches the `Host` header against
+it, `Storefront` maps `/`, `/collections/`, `/products/`, `/search` and `/cart` on
+that host onto the `/s/<handle>` handlers, and `StorefrontFiles` answers that
+store's own `robots.txt` and `sitemap.xml`. `SiteUrls.absolute` addresses those
+pages as `https://<domain>/...`, so canonical links and structured data follow.
+Other hosts see the platform as before.
 
 The app is a Codename One application, and a crawler that doesn't run
 JavaScript sees nothing of it in a browser. The backend therefore also serves
@@ -939,6 +949,11 @@ stay the same. The fraud rule keeps its own header, `bazaar.risk.country-header`
 
 Bazaar runs a store end to end, but several parts are stand-ins for services a
 business contracts for. Plan for these before taking real orders:
+
+* *Custom domain DNS and TLS.* Bazaar only matches the `Host` header. Pointing a
+  merchant's DNS at the server, issuing and renewing its certificate and
+  terminating TLS for it are the operator's job, as is proving the merchant owns
+  the domain before it is saved.
 
 * *A real payment service provider.* The Stripe provider has to be tried against
   a test account before it handles money, and a deployment may need another
