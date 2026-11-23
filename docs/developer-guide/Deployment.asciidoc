@@ -290,9 +290,10 @@ A deployment copies a release to the server, moves the link and restarts:
 include::../demos/common/src/main/snippets/developer-guide/deployment.sh[tag=deploy-ship,indent=0]
 ----
 
-The last line fails the deployment when the new server doesn't become ready
-through its public address, which works the same behind Caddy and with the
-server's own TLS. A
+The loop at the end fails the deployment when the new server doesn't become
+ready through its public address within two minutes. It retries because
+readiness answers 503 while migrations run at start-up, and because Caddy may
+hold the restarted server out of rotation until its next health check. A
 release that fails to start, or starts and fails its checks, goes back with the
 link. The one-liner moves `current` to the release before it and deletes the
 failed one:

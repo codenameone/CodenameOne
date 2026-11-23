@@ -49,7 +49,10 @@ scp backend/application.properties "$HOST:$RELEASE/"
 [ -d backend/target/webapp ] && scp -r backend/target/webapp "$HOST:$RELEASE/"
 ssh "$HOST" "ln -sfn $RELEASE /opt/myapp/current &&
              sudo systemctl restart myapp &&
-             sleep 2 && curl -fsS https://app.example.com/manage/health/readiness"
+             for i in \$(seq 60); do
+               curl -fsS https://app.example.com/manage/health/readiness && exit 0
+               sleep 2
+             done; exit 1"
 // end::deploy-ship[]
 
 // tag::deploy-rollback[]
