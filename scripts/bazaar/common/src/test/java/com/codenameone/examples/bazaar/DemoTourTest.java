@@ -262,7 +262,7 @@ public class DemoTourTest extends E2e {
         caption("Products: search, filter and bulk edit", 2600);
         pause(2800);
         shotAs("merchant-products");
-        if (tapText("Alpine Softshell") || openFirstGridRow("products-grid")) {
+        if (openFirstGridRow("products-grid") || tapText("Alpine Softshell")) {
             caption("The product editor: media, variants, SEO and channels", 3000);
             pause(3200);
             shotAs("merchant-product-editor");
@@ -643,7 +643,8 @@ public class DemoTourTest extends E2e {
             if (sheet != null) {
                 sheet.back();
             } else if (f != null && f.getBackCommand() != null) {
-                f.getBackCommand().actionPerformed(null);
+                f.getBackCommand().actionPerformed(
+                        new com.codename1.ui.events.ActionEvent(f.getBackCommand()));
             }
         });
         waitFor(1200);
@@ -681,7 +682,7 @@ private void screens() throws Exception {
         go(Sections.ORDERS);
         pause(2500);
         visualShot("merchant-orders");
-        if (tapFirst("order-")) {
+        if (tapRow("order-")) {
             pause(2500);
             visualShot("merchant-order-detail");
             scrollDown(2);
@@ -692,7 +693,7 @@ private void screens() throws Exception {
         go(Sections.CUSTOMERS);
         pause(2500);
         visualShot("merchant-customers");
-        if (tapFirst("customer-")) {
+        if (tapRow("customer-")) {
             pause(2500);
             visualShot("merchant-customer-detail");
             safeBack();
@@ -712,7 +713,7 @@ private void screens() throws Exception {
         visualShot("merchant-settings");
         scrollDown(3);
         visualShot("merchant-settings-2");
-        if (tapFirst("fraud-rule-")) {
+        if (tap("fraud-rule-add")) {
             pause(2000);
             visualShot("merchant-fraud-rule-editor");
             safeBack();
@@ -729,6 +730,14 @@ private void screens() throws Exception {
             safeBack();
             pause(1200);
         }
+        if (tap("store-switcher")) {
+            pause(1200);
+            if (tapText("Organization overview")) {
+                pause(2500);
+                visualShot("merchant-organization");
+            }
+            dismiss();
+        }
         signOut();
         pause(1500);
 
@@ -736,7 +745,7 @@ private void screens() throws Exception {
         pause(2000);
         go(Sections.HOME);
         pause(1500);
-        if (tapFirst("collection-")) {
+        if (tapRow("collection-")) {
             pause(2500);
             visualShot("shop-collection");
             safeBack();
@@ -777,6 +786,8 @@ private void screens() throws Exception {
                 }
                 pause(3000);
                 visualShot("shop-order-tracking");
+                safeBack();
+                pause(1500);
             }
         }
         go(Sections.ACCOUNT);
@@ -794,7 +805,7 @@ private void screens() throws Exception {
         pause(1000);
         go(Sections.STORES);
         pause(2500);
-        if (tapText("Northwind Outfitters") || tap("store-0")) {
+        if (tapRow("store-") || tapText("Northwind Outfitters")) {
             pause(2500);
             visualShot("admin-store-detail");
             safeBack();
@@ -932,8 +943,12 @@ private void screens() throws Exception {
     private void safeBack() {
         com.codename1.ui.CN.callSerially(() -> {
             Form f = Display.getInstance().getCurrent();
-            if (f != null && f.getBackCommand() != null) {
-                f.getBackCommand().actionPerformed(null);
+            if (f instanceof com.codename1.ui.Dialog) {
+                // A dialog's back command may carry no listener of its own.
+                ((com.codename1.ui.Dialog) f).dispose();
+            } else if (f != null && f.getBackCommand() != null) {
+                f.getBackCommand().actionPerformed(
+                        new com.codename1.ui.events.ActionEvent(f.getBackCommand()));
             }
         });
         waitFor(1200);
@@ -1053,7 +1068,36 @@ private void screens() throws Exception {
     private boolean tapNth(final String prefix, final int n) {
         final Component[] found = new Component[1];
         onEdt(() -> found[0] = byPrefix(Display.getInstance().getCurrent(), prefix, n));
-        return found[0] != null && tapComponent(found[0]);
+        if (found[0] == null) {
+            return false;
+        }
+        // A row's hidden lead has no area of its own to touch; fire the
+        // activate action Ui.accessible gives the row instead.
+        if (activateNth(prefix, n)) {
+            waitFor(700);
+            return true;
+        }
+        return tapComponent(found[0]);
+    }
+
+    /// Opens the first list row named `prefix` followed by its key, skipping
+    /// toolbar buttons that share the prefix ("order-draft").
+    private boolean tapRow(final String prefix) {
+        final String[] name = new String[1];
+        onEdt(() -> {
+            java.util.List<Component> out = new java.util.ArrayList<Component>();
+            collect(Display.getInstance().getCurrent(), prefix, out);
+            for (Component c : out) {
+                String nm = c.getName();
+                char ch = nm.length() > prefix.length() ? nm.charAt(prefix.length()) : ' ';
+                boolean key = ch == '#' || Character.isDigit(ch)
+                        || (prefix.startsWith("collection") && !nm.endsWith("-add") && !nm.endsWith("-clear"));
+                if (key && name[0] == null) {
+                    name[0] = nm;
+                }
+            }
+        });
+        return name[0] != null && tapFirst(name[0]);
     }
 
     private boolean tapComponent(final Component c) {

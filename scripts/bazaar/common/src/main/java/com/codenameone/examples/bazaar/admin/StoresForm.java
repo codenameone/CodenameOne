@@ -82,9 +82,16 @@ public final class StoresForm {
         page.add(Ui.stats(2)
                 .stat(Ui.money(s.gmvCents(), s.currency()), "Gross sales", "storeGmv")
                 .stat(String.valueOf(s.orders()), "Orders", "storeOrders"));
-        page.add(Ui.text(Lang.tr("Owner: {0}", s.ownerUsername() == null ? "-"
-                : s.ownerUsername()), "SvMuted"));
         final boolean suspended = SUSPENDED.equals(s.status());
+        // Who runs it and whether it sells, as rows in a card of the same
+        // inset as the stat cards above, not a loose line under them.
+        Container facts = new Container(BoxLayout.y());
+        facts.setUIID("SvStoreFacts");
+        facts.add(Ui.row(FontImage.MATERIAL_PERSON, "Owner",
+                s.ownerUsername() == null ? "-" : s.ownerUsername(), null));
+        facts.add(Ui.row(suspended ? FontImage.MATERIAL_BLOCK : FontImage.MATERIAL_CHECK_CIRCLE,
+                "Status", Lang.tr(suspended ? "Suspended" : "Active"), null));
+        page.add(facts);
         page.add(suspended
                 ? Ui.primary(Lang.tr("Activate store"), "store-activate",
                         e -> setStatus(s, ACTIVE, null, reload))

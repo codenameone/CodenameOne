@@ -94,12 +94,40 @@ abstract class MerchantPane extends Container {
             b.setText("");
         }
         b.addActionListener(e -> run.run());
-        tools.add(b);
+        if (!wide && tools.getComponentCount() >= PHONE_TOOLS) {
+            // A phone bar holds two icons and the store switcher; four or
+            // five icons in a row read as noise and crowd the switcher. The
+            // rest go, with their words, into one menu at the end.
+            if (overflow.isEmpty()) {
+                final Button more = new Button("", "MeTool");
+                more.setName("tools-more");
+                FontImage.setMaterialIcon(more, FontImage.MATERIAL_MORE_HORIZ, 3.4f);
+                more.getSemantics().setLabel(Lang.tr("More actions"));
+                more.addActionListener(e -> com.codename1.ui.ContextMenu.show(more,
+                        more.getWidth() / 2, more.getHeight(),
+                        overflow.toArray(new Command[overflow.size()])));
+                tools.add(more);
+            }
+            overflow.add(Command.create(Lang.tr(text), null, e -> run.run()));
+            return b;
+        }
+        if (!overflow.isEmpty()) {
+            tools.addComponent(tools.getComponentCount() - 1, b);
+        } else {
+            tools.add(b);
+        }
         return b;
     }
 
+    /// How many action icons a phone bar shows before the rest go into a menu.
+    private static final int PHONE_TOOLS = 2;
+
+    /// The actions a phone bar had no room for, in the order they were added.
+    private final java.util.List<Command> overflow = new java.util.ArrayList<Command>();
+
     final void clearTools() {
         tools.removeAll();
+        overflow.clear();
     }
 
     /// Opens a detail screen over the content.
@@ -241,11 +269,14 @@ abstract class MerchantPane extends Container {
                     Lang.tr("Organization overview"), BoxLayout.y());
             for (int iter = 0; iter < list.size(); iter++) {
                 final com.codenameone.examples.bazaar.api.StoreStatsDto s = list.get(iter);
-                Button row = new Button(s.name() + Ui.DOT + s.orders() + " " + Lang.tr("Orders")
-                        + Ui.DOT + com.codenameone.examples.bazaar.shop.Money.format(
-                                s.gmvCents(), s.currency(), ""), "MeStore");
-                row.setName("org-" + s.handle());
-                row.addActionListener(e -> {
+                // A row per store: its name over its orders and its sales in
+                // its own currency, the whole row one button. A dialog is
+                // narrow, so the sales share the second line with the orders.
+                Container line = Ui.row(FontImage.MATERIAL_STORE, s.name(),
+                        s.orders() + " " + Lang.tr("Orders") + Ui.DOT
+                        + com.codenameone.examples.bazaar.shop.Money.format(
+                                s.gmvCents(), s.currency(), ""), null);
+                Container row = Ui.tap(line, "org-" + s.handle(), e -> {
                     d.dispose();
                     List<StoreRoleDto> mine = MerchantState.stores();
                     for (int k = 0; k < mine.size(); k++) {

@@ -480,6 +480,22 @@ public final class Ui {
         return box;
     }
 
+    /// An empty section in the flow of a page: a tinted icon, a title and a
+    /// line saying how it fills, in a quiet dashed card. [#empty] is for a
+    /// screen with nothing else on it.
+    public static Container emptyRow(char icon, String title, String text) {
+        Container box = new Container(new BorderLayout());
+        box.setUIID("SvEmptyRow");
+        Label image = new Label("", "SvEmptyRowIcon");
+        icon(image, icon, 3.4f);
+        box.add(BorderLayout.WEST, FlowLayout.encloseCenterMiddle(image));
+        Container lines = new Container(BoxLayout.y());
+        lines.add(label(title, "SvRowTitle"));
+        lines.add(text(text, "SvRowDetail"));
+        box.add(BorderLayout.CENTER, lines);
+        return box;
+    }
+
     public static Container empty(char icon, String title, String text) {
         return banner(icon, title, text, "SvBannerIcon");
     }

@@ -2975,3 +2975,40 @@ PosTileTitle, PosTilePrice, PosTileStock, PosTileLow { background-color: transpa
     PosTileTitle, PosTilePrice, PosTileStock, PosTileLow { background-color: transparent; }
 }
 /* ---- end dark4 ---- */
+
+/* ---- app5: merchant, shopper and admin polish, round 5 ---- */
+SvEmptyRow {
+    background-color: var(--surface-alt);
+    border-radius: var(--radius);
+    padding: 2.6mm 3mm 2.6mm 2.6mm;
+    margin: 1.2mm 0 1.2mm 0;
+}
+SvEmptyRowIcon {
+    color: var(--brand);
+    background-color: var(--brand-tint);
+    border-radius: 50%;
+    padding: 1.6mm;
+    margin: 0 2.6mm 0 0;
+}
+SvStoreFacts {
+    background-color: var(--surface);
+    border-radius: var(--radius);
+    padding: 1mm 3mm 1mm 3mm;
+    margin: 1.2mm 0 1.2mm 0;
+}
+@media (prefers-color-scheme: dark) {
+    SvEmptyRow { background-color: var(--surface-alt-dark); }
+    SvEmptyRowIcon { color: var(--brand-dark); background-color: var(--brand-tint-dark); }
+    SvStoreFacts { background-color: var(--surface-dark); }
+}
+MeSearch { color: var(--text); background-color: var(--surface-alt); border: 1px solid var(--line); border-radius: var(--radius-small); padding: 1.4mm 2mm 1.4mm 2mm; margin: 2mm 3mm 0 3mm; }
+MeSearchBar { background-color: var(--surface); padding: 0; margin: 0; }
+@media (prefers-color-scheme: dark) {
+    MeSearchBar { background-color: var(--surface-dark); }
+    MeFilters { background-color: var(--surface-dark); border-bottom: 1px solid var(--line-dark); }
+    MeFilter { color: var(--text-dark); background-color: var(--surface-alt-dark); border: 1px solid var(--line-dark); border-radius: var(--radius-small); }
+    MeSearch { color: var(--text-dark); background-color: var(--surface-alt-dark); border: 1px solid var(--line-dark); border-radius: var(--radius-small); }
+}
+MeFilter { color: var(--text); background-color: var(--surface-alt); border: 1px solid var(--line); border-radius: var(--radius-small); font-size: 2.8mm; padding: 1.2mm 2mm 1.2mm 2mm; margin: 0 1.2mm 1.2mm 0; }
+MeFilters { background-color: var(--surface); border-bottom: 1px solid var(--line); padding: 1.6mm 3mm 0.4mm 3mm; margin: 0; }
+/* ---- end app5 ---- */

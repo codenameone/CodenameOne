@@ -162,7 +162,8 @@ final class AccountPane extends ShopPane {
         Ui.section(into, "Saved addresses");
         List<AddressDto> saved = ShopState.addresses();
         if (saved.isEmpty()) {
-            into.add(Ui.text("Addresses you ship to are saved here at checkout.", "SvMuted"));
+            into.add(Ui.emptyRow(FontImage.MATERIAL_LOCATION_ON, "No saved addresses",
+                    "Addresses you ship to are saved here at checkout."));
             return;
         }
         for (final AddressDto a : saved) {
@@ -181,7 +182,8 @@ final class AccountPane extends ShopPane {
         wishes.removeAll();
         List<String> ids = ShopState.wishlist();
         if (ids.isEmpty()) {
-            wishes.add(Ui.text("Tap the heart on a product to save it for later.", "SvMuted"));
+            wishes.add(Ui.emptyRow(FontImage.MATERIAL_FAVORITE_BORDER, "No favorites yet",
+                    "Tap the heart on a product to save it for later."));
             return;
         }
         // Two across: a phone's width, or half the column beside the others.
@@ -264,7 +266,8 @@ final class AccountPane extends ShopPane {
             followed.add(whole);
         }
         if (followed.getComponentCount() == 0) {
-            followed.add(Ui.text("Follow a store to see its new products first.", "SvMuted"));
+            followed.add(Ui.emptyRow(FontImage.MATERIAL_STOREFRONT, "No stores followed",
+                    "Follow a store to see its new products first."));
         }
         Ui.relayout(page);
     }
@@ -280,8 +283,8 @@ final class AccountPane extends ShopPane {
                 returned.add(returnRow(list.get(iter)));
             }
             if (returned.getComponentCount() == 0) {
-                returned.add(Ui.text("Returns you start from a delivered order show here.",
-                        "SvMuted"));
+                returned.add(Ui.emptyRow(FontImage.MATERIAL_ASSIGNMENT_RETURN, "No returns",
+                        "Returns you start from a delivered order show here."));
             }
             Ui.relayout(page);
         }, (status, message) -> {

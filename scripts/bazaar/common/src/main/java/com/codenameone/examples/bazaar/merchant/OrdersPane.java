@@ -119,6 +119,9 @@ final class OrdersPane extends MerchantPane {
         fulfilment = filter(filters, "orders-fulfilment", Words.FULFILMENT, "Any fulfilment");
         channel = filter(filters, "orders-channel", Words.CHANNELS, "Any channel");
         Container top = new Container(BoxLayout.y());
+        // One surface behind the search and the filters, so the inset field
+        // does not float on the page colour above the filter row.
+        top.setUIID("MeSearchBar");
         top.add(search);
         top.add(filters);
         Container all = new Container(new BorderLayout());
