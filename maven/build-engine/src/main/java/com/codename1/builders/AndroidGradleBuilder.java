@@ -8393,6 +8393,30 @@ public class AndroidGradleBuilder extends Executor {
                 }
             }
         }
+        // ML Kit GenAI (LlmClient.system()) is compiled with a newer Kotlin than the
+        // builder's defaults and brings that kotlin-stdlib along, so the Kotlin compiler
+        // refuses its metadata ("compiled with an incompatible version of Kotlin") the
+        // moment the app has Kotlin sources of its own. The same rule as coroutines above:
+        // raise the compiler to read it. On Gradle 9 this also replaces AGP's built-in
+        // compiler, which is older still. A Java-only app compiles no Kotlin and is left
+        // as it is.
+        if (hasKotlinSources && systemLlmSupport && (useGradle8 || useGradle9)) {
+            String comparable = HealthManifestFragments.numericVersionPrefix(kotlinVersion);
+            if (comparable == null
+                    || compareVersions(comparable, KOTLIN_FOR_ML_KIT_GENAI) < 0) {
+                if (request.getArg("android.topDependency", "").contains("kotlin-gradle-plugin")) {
+                    log("WARNING: LlmClient.system() brings ML Kit GenAI, whose kotlin-stdlib"
+                            + " needs Kotlin " + KOTLIN_FOR_ML_KIT_GENAI + " or newer, but"
+                            + " android.topDependency pins its own kotlin-gradle-plugin; raise"
+                            + " it if :app:compileDebugKotlin reports an incompatible Kotlin"
+                            + " version");
+                } else {
+                    log("LlmClient.system() brings ML Kit GenAI, whose kotlin-stdlib needs"
+                            + " Kotlin " + KOTLIN_FOR_ML_KIT_GENAI + "; compiling with it");
+                    kotlinVersion = KOTLIN_FOR_ML_KIT_GENAI;
+                }
+            }
+        }
         String kotlinPluginApply = "";
         String kotlinRuntimeDependency = "";
         if (hasKotlinSources && kotlinVersion.length() > 0) {
@@ -12813,6 +12837,11 @@ public class AndroidGradleBuilder extends Executor {
     /// GRADLE_PROVIDED_LIBRARIES is declared: the stdlib that coroutines version depends
     /// on, or newer. Raise it together with that coordinate.
     private static final String KOTLIN_FOR_GRADLE_PROVIDED_COROUTINES = "2.1.21";
+
+    /// The Kotlin compiler a Kotlin app gets when it calls LlmClient.system(): the
+    /// kotlin-stdlib the ML Kit GenAI artifacts in PlatformFeatureCatalog depend on (the
+    /// genai-prompt pom), or newer. Raise it together with those coordinates.
+    private static final String KOTLIN_FOR_ML_KIT_GENAI = "2.4.0";
 
     private String gradleProvidedLibraryDependencies = "";
 

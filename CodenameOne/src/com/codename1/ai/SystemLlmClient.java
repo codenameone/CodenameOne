@@ -243,9 +243,7 @@ public final class SystemLlmClient extends LlmClient {
             // getText() is never null (an image-only message answers ""),
             // which matters: the ports hand it to APIs that refuse null.
             contents[i] = m.getText();
-            List<MessagePart> parts = m.getParts();
-            for (int p = 0; p < parts.size(); p++) {
-                MessagePart part = parts.get(p);
+            for (MessagePart part : m.getParts()) {
                 if (part instanceof ImagePart) {
                     // The OS models take the image with the newest user turn
                     // only; anywhere else it would be moved silently.
