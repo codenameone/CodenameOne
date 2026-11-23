@@ -247,6 +247,8 @@ final class MCharts {
 
     /// A dashboard sparkline: a filled trend in the `MeSpark` colour, its last
     /// point marked.
+    /// Daily columns, not a line: a fortnight of a small store has days with
+    /// no orders, and a line through them is a saw edge that reads as noise.
     static Component sparkline(double[] values, String name) {
         Sparkline spark = new Sparkline(values) {
             @Override
@@ -254,7 +256,7 @@ final class MCharts {
                 return new Dimension(CN.convertToPixels(30f), CN.convertToPixels(9f));
             }
         };
-        spark.setType(Sparkline.AREA).setColor(color("MeSpark")).setShowLast(true);
+        spark.setType(Sparkline.BARS).setColor(color("MeSpark")).setShowLast(true);
         spark.setUIID("MeSpark");
         spark.setName(name);
         return spark;
