@@ -297,13 +297,26 @@ class StripePaymentsTest {
         assertEquals("POST /v1/refunds", script.asked.get(0));
         has(script.forms.get(0), "payment_intent=pi_1");
         has(script.forms.get(0), "amount=1840");
-        assertEquals("refund-pi_1", script.keys.get(0));
+        assertTrue(script.keys.get(0).startsWith("refund-pi_1-1840-"), script.keys.get(0));
         try {
             stripe.refund("pi_1", 1840L);
             fail("A refund that failed was taken as made");
         } catch (IOException expected) {
             assertTrue(expected.getMessage().indexOf("failed") > 0);
         }
+    }
+
+    @Test
+    void twoPartialRefundsOfOnePaymentNeverShareAKey() throws Exception {
+        // Stripe answers a reused key with the first refund's result, so a
+        // second $5 refund on the same key would move no money.
+        Script script = new Script()
+                .reply(200, "{\"id\":\"re_a\",\"object\":\"refund\",\"status\":\"succeeded\"}")
+                .reply(200, "{\"id\":\"re_b\",\"object\":\"refund\",\"status\":\"succeeded\"}");
+        StripePayments stripe = new StripePayments(script, RETURN);
+        stripe.refund("pi_9", 500L);
+        stripe.refund("pi_9", 500L);
+        assertFalse(script.keys.get(0).equals(script.keys.get(1)), script.keys.toString());
     }
 
     @Test
