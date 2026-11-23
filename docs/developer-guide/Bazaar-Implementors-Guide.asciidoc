@@ -211,6 +211,12 @@ An online order holds its total on the card when it's placed and takes the
 money when the first fulfilment ships. A cancelled order voids the hold, and
 refunds can be partial, line by line or by amount. Point of sale orders and
 pickup orders capture at once.
+Try before you buy (`order.Trials`, migration V190, `TrialApi`) keeps an
+order with a trial product AUTHORIZED: `Orders.capturePayment` waits while
+its `trial_order` row is OPEN, the `bazaar-trial-captures` scheduled job
+captures once the trial ends, and `Returns.request` inside the trial calls
+`Orders.voidHeld`. A trial lasts at most 6 days from checkout, since a card
+authorization expires after about 7.
 
 [source,java]
 ----

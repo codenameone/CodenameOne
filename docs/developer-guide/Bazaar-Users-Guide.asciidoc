@@ -573,6 +573,13 @@ it can't be fulfilled until a manager approves or cancels it from the risk page.
 Managers can add fraud filter rules beside the score (order total over an
 amount, several orders from one customer within an hour, connected from a
 country other than the delivery one), each holding or cancelling the order.
+The rules are listed, added and removed in the merchant app under Settings,
+Fraud filter rules; long-press a rule to remove it.
+A product can also be offered as try before you buy, for 1 to 6 days: the
+shopper's card is only held at checkout, shipping doesn't charge it, and the
+money is taken when the trial ends unless the shopper asked to return the
+goods first, which lets the hold go. Six days is the limit because a card
+hold expires after about a week.
 Payment disputes reported by the processor appear with their deadline; the
 merchant attaches evidence (the order's own details are one click), submits it,
 or accepts the dispute.

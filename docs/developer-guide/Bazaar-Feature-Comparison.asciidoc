@@ -112,7 +112,7 @@ on a row.
 | Multi-currency payouts | &#8211; | core | app/plugin | app/plugin | no | 
 | Local payment methods (iDEAL etc.) | &#10003; | core | core | core | no | iDEAL, Bancontact, SEPA debit and others through Stripe, by the same per-store rules; a failed payment cancels the order and releases its stock. 
 | Fraud analysis / risk score | &#10003; | core | app/plugin | app/plugin | core | Each order gets a risk score from address, velocity and value signals. 
-| Fraud filter rules / automatic cancellation | &#10003; | core | app/plugin | app/plugin | core | Merchant rules (total over, orders per hour per customer, country mismatch) hold or cancel, beside the risk score. 
+| Fraud filter rules / automatic cancellation | &#10003; | core | app/plugin | app/plugin | core | Merchant rules (total over, orders per hour per customer, country mismatch) hold or cancel, beside the risk score; the merchant app edits them under Settings, Fraud filter rules. 
 | Chargeback protection | &#8211; | core | no | no | no | 
 |===
 
@@ -298,7 +298,7 @@ on a row.
 | Subscriptions / selling plans | &#10003; | app/plugin | app/plugin | app/plugin | core | Daily, weekly or monthly plans at a discount; failed renewals retry, then pause.
 | Pre-orders | &#10003; | app/plugin | app/plugin | core | no | Per variant, with a ship date and a choice to charge now or later; checkout sells a short line as a pre-order up to the allowance.
 | Back-in-stock alerts to shoppers | &#10003; | app/plugin | app/plugin | core | no | Shoppers subscribe on the product page; the alert is sent once when stock returns.
-| Try before you buy / deferred payment | &#8211; | app/plugin | app/plugin | no | no | 
+| Try before you buy / deferred payment | &#10003; | app/plugin | app/plugin | no | no | Per product, 1 to 6 days: checkout only authorizes the card, a scheduled job captures when the trial ends, and a return inside the trial voids the hold. Capped at 6 days because card authorizations expire after about 7.
 |===
 
 === Markets and tax

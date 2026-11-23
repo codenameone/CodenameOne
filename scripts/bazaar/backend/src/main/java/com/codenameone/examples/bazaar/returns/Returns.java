@@ -87,6 +87,7 @@ public class Returns {
     private final OrderLineRepository lines;
     private final StoreRepository stores;
     private final Orders orderService;
+    private final com.codenameone.examples.bazaar.order.Trials trials;
     private final Fulfillments fulfillments;
     private final Inventory inventory;
     private final StoreAccess access;
@@ -97,7 +98,9 @@ public class Returns {
     public Returns(ReturnRequestRepository returns, ReturnLineRepository returnLines,
             StoreOrderRepository orders, OrderLineRepository lines, StoreRepository stores,
             Orders orderService, Fulfillments fulfillments, Inventory inventory,
-            StoreAccess access, Emails emails, ReturnLabels returnLabels) {
+            StoreAccess access, Emails emails, ReturnLabels returnLabels,
+            com.codenameone.examples.bazaar.order.Trials trials) {
+        this.trials = trials;
         this.returnLabels = returnLabels;
         this.emails = emails;
         this.returns = returns;
@@ -140,6 +143,8 @@ public class Returns {
         }
         Map<String, Integer> arrived = fulfillments.deliveredUnits(orderId);
         String id = requestTx(username, orderId, req, arrived);
+        // Sent back inside a try-before-you-buy trial: nothing is charged.
+        trials.returned(orderId);
         orderService.publish(orders.findById(orderId));
         return read(id);
     }

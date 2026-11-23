@@ -123,6 +123,7 @@ public class Orders {
     private static final int NUMBER_ATTEMPTS = 8;
 
     private final StoreOrderRepository orders;
+    private final com.codenameone.examples.bazaar.repository.TrialOrderRepository trialOrders;
     private final OrderLineRepository lines;
     private final OrderEventRepository events;
     private final TenderRepository tenders;
@@ -159,7 +160,9 @@ public class Orders {
             Inventory inventory, GiftCards giftCards, StoreAccess access, LiveHub live,
             Quoter quoter, StoreEvents storeEvents, CustomerRepository customers, SaleEvents saleEvents,
             com.codenameone.examples.bazaar.checkout.CheckoutSettings checkoutSettings,
-            com.codenameone.examples.bazaar.routing.OrderRouting routing) {
+            com.codenameone.examples.bazaar.routing.OrderRouting routing,
+            com.codenameone.examples.bazaar.repository.TrialOrderRepository trialOrders) {
+        this.trialOrders = trialOrders;
         this.routing = routing;
         this.saleEvents = saleEvents;
         this.checkoutSettings = checkoutSettings;
@@ -558,6 +561,11 @@ public class Orders {
         if (!AUTHORIZED.equals(order.getFinancial())) {
             return order.getFinancial();
         }
+        if (Trials.holding(trialOrders.findById(orderId), Instant.now())) {
+            // Try before you buy: shipping does not charge; Trials does
+            // when the trial ends.
+            return AUTHORIZED;
+        }
         String result = payments.capture(orderId);
         if (Payments.PAID.equals(result)) {
             capturedTx(orderId, actor);
@@ -569,6 +577,19 @@ public class Orders {
             event(orderId, "PAYMENT_FAILED", "The card could not be charged", actor);
         }
         return orders.findById(orderId).getFinancial();
+    }
+
+    /// Lets go of an order's held payment without cancelling the order: a
+    /// try-before-you-buy order whose goods came back inside the trial.
+    public void voidHeld(String orderId, String actor) throws IOException {
+        if (!AUTHORIZED.equals(orders.findById(orderId).getFinancial())) {
+            return;
+        }
+        payments.voidOrder(orderId);
+        if (orders.claimFinancial(orderId, AUTHORIZED, VOIDED) == 1) {
+            event(orderId, "VOIDED", "Returned inside the trial: nothing charged", actor);
+        }
+        publish(orders.findById(orderId));
     }
 
     @Transactional(rollbackFor = IOException.class)

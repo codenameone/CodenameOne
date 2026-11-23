@@ -102,6 +102,8 @@ class OnlineFeaturesTest {
     @Autowired
     private com.codenameone.examples.bazaar.ops.Reports reports;
     @Autowired
+    private com.codenameone.examples.bazaar.order.Trials trials;
+    @Autowired
     private MockMvc mvc;
     @Autowired
     private DataSource db;
@@ -218,5 +220,35 @@ class OnlineFeaturesTest {
         }
         assertEquals(1, fraud.addRule(s.owner, s.storeId,
                 new FraudRuleDto(null, Fraud.COUNTRY_MISMATCH, 0, Fraud.CANCEL)).size());
+    }
+
+    // ================================================= try before you buy
+
+    @Test
+    void aTrialOrderIsCapturedOnlyAfterTheTrialAndVoidedOnReturn() throws Exception {
+        com.codenameone.examples.bazaar.order.Trials t = trials;
+        Shop s = shop("of-trial");
+        try {
+            t.set(s.owner, s.storeId, s.productId, 7);
+            throw new AssertionError("a 7 day trial outlives the card hold");
+        } catch (ResponseStatusException e) {
+            assertEquals(400, e.getStatus());
+        }
+        assertEquals(1, t.set(s.owner, s.storeId, s.productId, 3).size());
+        OrderDto kept = place(s, People.customer(accounts, "of-trial-a"), 1, 0, null, null);
+        assertEquals(Orders.AUTHORIZED, kept.financial());
+        // Shipping would capture; inside the trial it does not.
+        assertEquals(Orders.AUTHORIZED, orders.capturePayment(kept.id(), s.owner));
+        java.time.Instant now = java.time.Instant.now();
+        assertEquals(0, t.settleDue(now.plus(java.time.Duration.ofDays(2))));
+        assertEquals(Orders.AUTHORIZED, orders.detail(s.owner, s.storeId, kept.id()).financial());
+
+        OrderDto back = place(s, People.customer(accounts, "of-trial-b"), 1, 0, null, null);
+        t.returned(back.id());
+        assertEquals(Orders.VOIDED, orders.detail(s.owner, s.storeId, back.id()).financial());
+
+        assertEquals(1, t.settleDue(now.plus(java.time.Duration.ofDays(4))));
+        assertEquals(Orders.PAID, orders.detail(s.owner, s.storeId, kept.id()).financial());
+        assertEquals(Orders.VOIDED, orders.detail(s.owner, s.storeId, back.id()).financial());
     }
 }

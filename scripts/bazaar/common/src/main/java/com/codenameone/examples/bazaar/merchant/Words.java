@@ -69,7 +69,10 @@ final class Words {
             {"PUBLISHED", "Published"}, {"REJECTED", "Rejected"}, {"SUSPENDED", "Suspended"},
             {"FAILED", "Failed"}, {"SIMULATED", "Simulated marketplace"}, {"EBAY", "eBay"},
             {"CLOSEST", "Closest location"}, {"PRIORITY", "Location priority"},
-            {"MOST_STOCK", "Most stock"}, {"ACCEPTED", "Accepted"}
+            {"MOST_STOCK", "Most stock"}, {"ACCEPTED", "Accepted"},
+            {"TOTAL_OVER", "Order total over"}, {"ORDERS_PER_HOUR", "Orders per hour over"},
+            {"COUNTRY_MISMATCH", "Shipping and billing countries differ"},
+            {"HOLD", "Hold for review"}, {"CANCEL", "Cancel automatically"}
         };
         for (int iter = 0; iter < words.length; iter++) {
             if (words[iter][0].equals(code)) {

@@ -32,6 +32,7 @@ import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.layouts.FlowLayout;
 import com.codename1.ui.spinner.Picker;
+import com.codenameone.examples.bazaar.api.FraudRuleDto;
 import com.codenameone.examples.bazaar.api.LocationDto;
 import com.codenameone.examples.bazaar.api.StaffDto;
 import com.codenameone.examples.bazaar.api.StoreDto;
@@ -224,6 +225,11 @@ final class SettingsPane extends MerchantPane {
                 "settings-webhooks", e -> new WebhooksPage(this).show()));
         page.add(hooks);
 
+        Ui.section(page, "Fraud filter rules");
+        final Container rules = new Container(BoxLayout.y());
+        rules.setUIID("MeCard");
+        page.add(rules);
+
         Ui.section(page, "Locations");
         final Container locations = new Container(BoxLayout.y());
         locations.setUIID("MeCard");
@@ -235,6 +241,67 @@ final class SettingsPane extends MerchantPane {
         root(page);
         loadLocations(locations);
         loadStaff(staff);
+        loadRules(rules);
+    }
+
+    private static final String[] RULE_KINDS = {"TOTAL_OVER", "ORDERS_PER_HOUR", "COUNTRY_MISMATCH"};
+    private static final String[] RULE_ACTIONS = {"HOLD", "CANCEL"};
+
+    /// The store's fraud filter rules: each a condition and whether a match
+    /// holds the order for review or cancels it.
+    private void loadRules(final Container to) {
+        Api.risk().fraudRules(MerchantState.storeId(), Net.to(found -> showRules(to, found), Ui::fail));
+    }
+
+    private void showRules(final Container to, List<FraudRuleDto> found) {
+        to.removeAll();
+        if (found.isEmpty()) {
+            to.add(Ui.text(Lang.tr("No rules. Orders are only scored."), "SvMuted"));
+        }
+        for (final FraudRuleDto r : found) {
+            String limit = "TOTAL_OVER".equals(r.kind())
+                    ? MerchantState.money(r.threshold())
+                    : "ORDERS_PER_HOUR".equals(r.kind()) ? String.valueOf(r.threshold()) : "";
+            Container row = Ui.row(FontImage.MATERIAL_SECURITY, Lang.tr(Words.of(r.kind()))
+                    + (limit.length() == 0 ? "" : " " + limit), Lang.tr(Words.of(r.action())), null);
+            row.setName("fraud-rule-" + r.id());
+            RowMenus.attach(row, Command.create(Lang.tr("Remove"), null, e -> Api.risk()
+                    .removeFraudRule(MerchantState.storeId(), r.id(),
+                            Net.to(left -> showRules(to, left), Ui::fail))));
+            to.add(row);
+        }
+        to.add(Ui.secondary(Lang.tr("Add rule"), "fraud-rule-add", e -> addRule(to)));
+        Ui.relayout(to);
+    }
+
+    private void addRule(final Container to) {
+        Container body = new Container(BoxLayout.y());
+        Picker kind = MUi.picker(body, Lang.tr("Condition"), "fraud-rule-kind", RULE_KINDS, "TOTAL_OVER");
+        TextField threshold = MUi.number(body, Lang.tr("Threshold (amount or orders)"),
+                "fraud-rule-threshold", 0);
+        Picker action = MUi.picker(body, Lang.tr("Action"), "fraud-rule-action", RULE_ACTIONS, "HOLD");
+        Command ok = Command.create(Lang.tr("Add"), null, null);
+        Command cancel = Command.create(Lang.tr("Cancel"), null, null);
+        if (Dialog.show(Lang.tr("Fraud filter rule"), body, cancel, ok) != ok) {
+            return;
+        }
+        String k = MUi.code(kind, RULE_KINDS);
+        long limit = "TOTAL_OVER".equals(k) ? MUi.cents(threshold) : wholeNumber(threshold.getText());
+        Api.risk().addFraudRule(MerchantState.storeId(),
+                new FraudRuleDto(null, k, limit, MUi.code(action, RULE_ACTIONS)),
+                Net.to(all -> showRules(to, all), Ui::fail));
+    }
+
+    /// The digits of `text` as a number; 0 when it has none.
+    static long wholeNumber(String text) {
+        long out = 0;
+        for (int iter = 0; iter < text.length() && out < 100000000L; iter++) {
+            char c = text.charAt(iter);
+            if (c >= '0' && c <= '9') {
+                out = out * 10 + (c - '0');
+            }
+        }
+        return out;
     }
 
     static boolean light(int rgb) {

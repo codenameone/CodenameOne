@@ -94,6 +94,7 @@ public class Checkouts {
     private final StoreEvents storeEvents;
     private final com.codenameone.examples.bazaar.risk.RiskHolds holds;
     private final com.codenameone.examples.bazaar.risk.Fraud fraud;
+    private final com.codenameone.examples.bazaar.order.Trials trials;
     private final com.codenameone.examples.bazaar.taxes.TaxExemptions exemptions;
 
     private final com.codenameone.examples.bazaar.ops.Attribution attribution;
@@ -109,7 +110,9 @@ public class Checkouts {
             com.codenameone.examples.bazaar.taxes.TaxExemptions exemptions,
             com.codenameone.examples.bazaar.ops.Attribution attribution,
             CheckoutSettings settings,
-            com.codenameone.examples.bazaar.routing.OrderRouting routing) {
+            com.codenameone.examples.bazaar.routing.OrderRouting routing,
+            com.codenameone.examples.bazaar.order.Trials trials) {
+        this.trials = trials;
         this.routing = routing;
         this.attribution = attribution;
         this.settings = settings;
@@ -436,6 +439,7 @@ public class Checkouts {
             exemptions.recordUse(storeId, orderId, quote.exemptCertificate);
         }
         fraud.assess(orderId, username);
+        trials.begin(orderId);
         attribution.stampOrder(storeId, cart.getId(), orderId);
         carts.clear(cart.getId());
         orders.publish(done);

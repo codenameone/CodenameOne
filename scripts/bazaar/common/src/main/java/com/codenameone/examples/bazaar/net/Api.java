@@ -46,6 +46,7 @@ import com.codenameone.examples.bazaar.api.AutomationApi;
 import com.codenameone.examples.bazaar.api.AnalyticsApi;
 import com.codenameone.examples.bazaar.api.PipelineApi;
 import com.codenameone.examples.bazaar.api.CustomerApi;
+import com.codenameone.examples.bazaar.api.RiskApi;
 import com.codenameone.examples.bazaar.api.WebhookApi;
 import com.codenameone.examples.bazaar.api.StoreMediaApi;
 import com.codenameone.examples.bazaar.api.PlatformApi;
@@ -102,6 +103,7 @@ public final class Api {
     private static PipelineApi pipeline;
     private static CustomerApi customers;
     private static WebhookApi webhooks;
+    private static RiskApi risk;
     private static StoreMediaApi storeMedia;
     private static PlatformApi platform;
     private static ReviewApi reviews;
@@ -154,6 +156,7 @@ public final class Api {
         pipeline = RestClients.create(PipelineApi.class, baseUrl);
         customers = RestClients.create(CustomerApi.class, baseUrl);
         webhooks = RestClients.create(WebhookApi.class, baseUrl);
+        risk = RestClients.create(RiskApi.class, baseUrl);
         storeMedia = RestClients.create(StoreMediaApi.class, baseUrl);
         platform = RestClients.create(PlatformApi.class, baseUrl);
         reviews = RestClients.create(ReviewApi.class, baseUrl);
@@ -373,5 +376,10 @@ public final class Api {
 
     public static LoyaltyApi loyalty() {
         return loyalty;
+    }
+
+    /// Order fraud scores and the store's fraud filter rules.
+    public static RiskApi risk() {
+        return risk;
     }
 }
