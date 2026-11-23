@@ -25,6 +25,7 @@ import com.codename1.orm.repository.Param;
 import com.codename1.orm.repository.Modifying;
 import com.codename1.orm.repository.Repository;
 import com.codenameone.examples.bazaar.domain.GiftCard;
+import java.time.Instant;
 import java.util.List;
 
 /// Reads and writes [GiftCard] rows.
@@ -34,13 +35,17 @@ public interface GiftCardRepository extends CrudRepository<GiftCard, String> {
 
     List<GiftCard> findByStoreIdOrderByCreatedAtDesc(String storeId);
 
-    /// Takes `amount` off a card that is active and has that much.
+    /// Takes `amount` off a card that is active, unexpired at `now` and has
+    /// that much. An expiry at the epoch means the card never expires, as in
+    /// `Quoter.usable`.
     ///
     /// @return 1 when taken
     @Modifying
     @Query("update GiftCard g set g.balanceCents = g.balanceCents - :amount where g.id = :id "
-            + "and g.active = true and g.balanceCents >= :amount")
-    int debitIf(@Param("id") String id, @Param("amount") long amount);
+            + "and g.active = true and g.balanceCents >= :amount "
+            + "and (g.expiresAt <= :epoch or g.expiresAt > :now)")
+    int debitIf(@Param("id") String id, @Param("amount") long amount,
+            @Param("epoch") Instant epoch, @Param("now") Instant now);
 
     /// Puts `amount` back on a card.
     @Modifying

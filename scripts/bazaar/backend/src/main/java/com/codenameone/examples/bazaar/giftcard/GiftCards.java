@@ -183,7 +183,7 @@ public class GiftCards {
         if (amount <= 0) {
             return true;
         }
-        if (cards.debitIf(cardId, amount) != 1) {
+        if (cards.debitIf(cardId, amount, Instant.EPOCH, Instant.now()) != 1) {
             return false;
         }
         record(cardId, orderId, -amount, "Spent");
