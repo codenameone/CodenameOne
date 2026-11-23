@@ -59,19 +59,6 @@ public interface PaymentRepository extends CrudRepository<Payment, String> {
     @Query("update Payment p set p.status = :to where p.orderId = :id and p.status = :from")
     int claim(@Param("id") String orderId, @Param("from") String from, @Param("to") String to);
 
-    /// Claims a payment for a refund of `amount`, as [#claim] does, keeping
-    /// what is asked for and when so an interrupted refund can be finished.
-    ///
-    /// @return 1 for the one caller that moved it
-    @Modifying
-    @Query("update Payment p set p.status = 'REFUNDING', p.pendingRefundCents = :amount, "
-            + "p.refundClaimedAt = :at where p.orderId = :id and p.status = :from")
-    int claimRefund(@Param("id") String orderId, @Param("from") String from,
-            @Param("amount") long amount, @Param("at") Instant at);
-
-    /// Refunds claimed before `before` and still under way.
-    List<Payment> findByStatusAndRefundClaimedAtLessThan(String status, Instant before);
-
     /// Records how a pending refund ended.
     ///
     /// @return 1 for the one caller that recorded it

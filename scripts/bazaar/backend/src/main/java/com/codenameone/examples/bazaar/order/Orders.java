@@ -465,8 +465,20 @@ public class Orders {
         if (payment != null) {
             String now = payments.voidOrder(order.getId());
             if (Payments.PAID.equals(now) || Payments.PARTIALLY_REFUNDED.equals(now)) {
-                payments.refund(order.getId(), 0, "Order cancelled");
-                refunded = true;
+                try {
+                    payments.refund(order.getId(), 0, "Order cancelled");
+                    refunded = true;
+                } catch (ResponseStatusException failed) {
+                    if (!Payments.unconfirmed(failed)) {
+                        throw failed;
+                    }
+                    // The cancel stands (it is claimed and the stock goes back
+                    // either way): the payment stays REFUNDING, refusing
+                    // another refund, and the timeline tells staff to settle
+                    // the card leg at the processor.
+                    event(order.getId(), "REFUND_UNCONFIRMED", unconfirmedNote(
+                            payment.getAmountCents() - payment.getRefundedCents()), actor);
+                }
             }
         }
         String card = giftCards.cardOf(order.getId());
@@ -763,6 +775,14 @@ public class Orders {
             creditPart = byHand ? 0 : storeCredit.restore(orderId,
                     Math.max(0, amount - cardPart - giftPart));
         } catch (IOException | RuntimeException failed) {
+            if (!cardMoved && Payments.unconfirmed(failed)) {
+                // Fail closed: the card leg may or may not have moved money, so
+                // the claims stay (releasing them could refund the goods twice)
+                // and staff settle the card leg at the processor. Nothing after
+                // the card leg ran.
+                event(orderId, "REFUND_UNCONFIRMED", unconfirmedNote(presentmentPart), username);
+                throw failed;
+            }
             if (!cardMoved && !giftMoved) {
                 // Nothing went back: release the claims so the refund can be
                 // tried again.
@@ -795,6 +815,13 @@ public class Orders {
         publish(done);
         storeEvents.refunded(orderId, amount);
         return new long[] {amount, cardPart, giftPart, amount - cardPart - giftPart - creditPart};
+    }
+
+    /// The timeline note of a card refund whose outcome is unknown.
+    static String unconfirmedNote(long cents) {
+        return "The card refund of " + cents + " cents may or may not have reached the customer; "
+                + "settle it at the payment processor. The payment refuses further refunds "
+                + "until then.";
     }
 
     /// Whether the order was charged in a currency other than the store's.

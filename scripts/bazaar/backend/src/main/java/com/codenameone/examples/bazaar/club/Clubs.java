@@ -428,6 +428,15 @@ public class Clubs {
                 status = Payments.PAID;
             }
         } catch (ResponseStatusException refused) {
+            if (refused.getStatus() != 402) {
+                // Only a definite decline counts against the member. An
+                // unreachable or ambiguous processor (502, 503) leaves
+                // `failures` as it was, so the next pass derives the same
+                // charge id and the processor's idempotency answers it rather
+                // than charging twice. The claim only records that id, so
+                // there is nothing to release.
+                return false;
+            }
             status = Payments.FAILED;
         }
         return settle(m.getId(), due, c.getPeriodDays(), Payments.PAID.equals(status));

@@ -771,7 +771,12 @@ server-driven integration: register a reader with its pairing code, create a
 in 01. `pos.CardReaders` keeps readers per register and payments per register
 `clientId`; a sale names the payment as its card tender's reference, and the
 payment is claimed with a conditional update so it pays one sale only. Refunds of
-such a sale go back through the processor. The app's `pos.EscPos` builds ESC/POS
+such a sale go back through the processor. A refund call that fails without a
+definite answer fails closed: the payment stays `REFUNDING` and refuses another
+refund, the order keeps its refund claims, and the timeline records
+`REFUND_UNCONFIRMED` so staff settle the card leg at the processor. Each refund
+sends an idempotency key derived from the charge, what was refunded before and the
+amount, so asking for the same refund again never moves money twice. The app's `pos.EscPos` builds ESC/POS
 bytes (text, alignment, bold, size, cut, the `ESC p` drawer kick) and
 `pos.SocketPrinter` writes them to the printer's raw port with
 `com.codename1.io.Socket`; both are plain classes behind `pos.PrinterSink`, so the
@@ -918,6 +923,14 @@ business contracts for. Plan for these before taking real orders:
 * *A real payment service provider.* The Stripe provider has to be tried against
   a test account before it handles money, and a deployment may need another
   provider, wallets or local payment methods behind the same `PaymentProvider`.
+* *Reconciliation with the processor.* A refund or capture whose answer was lost
+  is left for staff to settle. A product reconciles such answers against the
+  processor's records and finishes or reverses the operation itself.
+* *Crash recovery.* An operation interrupted by a server crash between the claim
+  and the processor's answer stays claimed. A product resumes or rolls back such
+  operations.
+* *Idempotency key lifetime.* Stripe forgets an idempotency key after 24 hours, so
+  a retry after a longer outage is a new request; reconcile before retrying.
 * *A store time zone.* Analytics and reports bucket days and hours in UTC
   (`Analytics.daily`, `Analytics.hourly`, `Days`). A store far from UTC sees
   evening sales on the next day's bar until each store keeps a time zone and

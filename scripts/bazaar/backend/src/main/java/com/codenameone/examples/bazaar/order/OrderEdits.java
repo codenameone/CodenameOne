@@ -448,7 +448,18 @@ public class OrderEdits {
             }
             if (back > 0) {
                 // Never 0: Payments.refund reads 0 as "everything left".
-                payments.refund(o.getId(), back, "Order edited");
+                try {
+                    payments.refund(o.getId(), back, "Order edited");
+                } catch (ResponseStatusException failed) {
+                    if (!Payments.unconfirmed(failed)) {
+                        throw failed;
+                    }
+                    // The edit stands: the payment stays REFUNDING, refusing
+                    // another refund, and the timeline tells staff to settle
+                    // the difference at the processor.
+                    orderService.event(o.getId(), "REFUND_UNCONFIRMED",
+                            Orders.unconfirmedNote(back), username);
+                }
             }
         }
     }

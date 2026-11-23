@@ -165,7 +165,7 @@ class ProcessorFaultsTest {
     }
 
     @Test
-    void aRefundThatFailsGivesItsClaimBackAndRefusesOneThatOverlapsIt() throws Exception {
+    void aRefundThatFailsWithoutAnAnswerStaysClaimedAndRefusesAnother() throws Exception {
         processor.reset();
         String customer = People.customer(accounts, "overlap-customer");
         String card = (String) Rest.addCard(mvc, customer, Rest.VISA).get("id");
@@ -175,7 +175,7 @@ class ProcessorFaultsTest {
 
         // While a refund is at the processor a second one is refused: the
         // first has claimed the payment. The first then fails without an
-        // answer, and gives the claim back.
+        // answer, and fails closed: the claim stays until staff settle it.
         processor.duringRefund = new Runnable() {
             @Override
             public void run() {
@@ -183,44 +183,21 @@ class ProcessorFaultsTest {
             }
         };
         processor.refundFailures.add(Boolean.TRUE);
-        assertEquals(502, refusal(refund(order)));
-        assertEquals(Payments.PAID, payments.receipt(customer, false, order).status());
+        assertEquals(409, refusal(refund(order)));
+        assertEquals("REFUNDING", payments.receipt(customer, false, order).status());
+        processor.duringRefund = null;
 
-        // Asked again, it goes through.
-        assertEquals(200, refusal(refund(order)));
-        assertEquals(Payments.REFUNDED, payments.receipt(customer, false, order).status());
+        // Asked again, it is refused without reaching the processor.
+        assertEquals(409, refusal(refund(order)));
+        assertEquals(1, processor.keys.size());
+        assertEquals(0L, payments.receipt(customer, false, order).refunded());
         processor.reset();
     }
 
     @Test
-    void aRefundAskedAgainAfterALostAnswerSendsTheSameKey() throws Exception {
+    void eachRefundIntentHasItsOwnStableKey() throws Exception {
         processor.reset();
         String customer = People.customer(accounts, "refund-retrier");
-        String card = (String) Rest.addCard(mvc, customer, Rest.VISA).get("id");
-        final String order = Ids.next();
-        payments.authorize(order, customer, card, 3000L, "USD");
-        assertEquals(Payments.PAID, payments.capture(order));
-
-        // The processor made the refund but the answer was lost: asked again,
-        // it must see the same key, or it would return the money twice.
-        processor.refundFailures.add(Boolean.TRUE);
-        assertEquals(502, refusal(partial(order, 1000L)));
-        assertEquals(200, refusal(partial(order, 1000L)));
-        assertEquals(2, processor.keys.size());
-        assertEquals(processor.keys.get(0), processor.keys.get(1));
-
-        // A second partial refund of the same amount is a new refund.
-        assertEquals(200, refusal(partial(order, 1000L)));
-        assertEquals(3, processor.keys.size());
-        assertNotEquals(processor.keys.get(1), processor.keys.get(2));
-        assertEquals(2000L, payments.receipt(customer, false, order).refunded());
-        processor.reset();
-    }
-
-    @Test
-    void aRefundLeftClaimedIsFinishedUnderItsOwnKey() throws Exception {
-        processor.reset();
-        String customer = People.customer(accounts, "refund-stranded");
         String card = (String) Rest.addCard(mvc, customer, Rest.VISA).get("id");
         final String order = Ids.next();
         payments.authorize(order, customer, card, 3000L, "USD");
@@ -228,22 +205,17 @@ class ProcessorFaultsTest {
         String ref = (String) db.queryOne("SELECT provider_ref FROM payment WHERE order_id = ?",
                 new Object[] {order}).get("provider_ref");
 
-        // The server stopped after claiming a refund of 1200: the row stays
-        // REFUNDING until the sweep asks again with the same key.
-        db.execute("UPDATE payment SET status = 'REFUNDING', pending_refund_cents = 1200, "
-                + "refund_claimed_at = 1 WHERE order_id = ?", new Object[] {order});
-        payments.resumeRefunds();
-        assertEquals(Payments.PARTIALLY_REFUNDED, payments.receipt(customer, false, order).status());
-        assertEquals(1200L, payments.receipt(customer, false, order).refunded());
-        assertEquals(Payments.refundKey(ref, 0L, 1200L), processor.keys.get(0));
+        // The key is derived from the intent, so the same refund asked again
+        // (once staff settled it) names the same key and the processor
+        // answers it instead of moving money twice.
+        assertEquals(200, refusal(partial(order, 1000L)));
+        assertEquals(Payments.refundKey(ref, 0L, 1000L), processor.keys.get(0));
 
-        // One the processor refuses goes back to where it was.
-        db.execute("UPDATE payment SET status = 'REFUNDING', pending_refund_cents = 500, "
-                + "refund_claimed_at = 1 WHERE order_id = ?", new Object[] {order});
-        processor.refundFailures.add(Boolean.TRUE);
-        payments.resumeRefunds();
-        assertEquals(Payments.PARTIALLY_REFUNDED, payments.receipt(customer, false, order).status());
-        assertEquals(1200L, payments.receipt(customer, false, order).refunded());
+        // A second partial refund of the same amount is a new refund.
+        assertEquals(200, refusal(partial(order, 1000L)));
+        assertEquals(Payments.refundKey(ref, 1000L, 1000L), processor.keys.get(1));
+        assertNotEquals(processor.keys.get(0), processor.keys.get(1));
+        assertEquals(2000L, payments.receipt(customer, false, order).refunded());
         processor.reset();
     }
 

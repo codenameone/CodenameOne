@@ -78,9 +78,6 @@ public class Payments {
     private static final String CAPTURING = "CAPTURING";
     private static final String VOIDING = "VOIDING";
     private static final String REFUNDING = "REFUNDING";
-
-    /// How long a refund may stay claimed before [#resumeRefunds] finishes it.
-    static final long STALE_REFUND_MILLIS = 10L * 60L * 1000L;
     /// The id and the label of the method every account has.
     public static final String CASH = "cash";
     public static final String CASH_LABEL = "Cash";
@@ -835,7 +832,7 @@ public class Payments {
         if (amount > left || amount <= 0) {
             throw new ResponseStatusException(400, "That is more than is left to refund");
         }
-        Payment payment = claimRefund(orderId, from, amount);
+        Payment payment = claim(orderId, from, REFUNDING);
         if (payment == null) {
             throw new ResponseStatusException(409, "That payment is changing; try again");
         }
@@ -845,11 +842,31 @@ public class Payments {
                 done = provider.refund(payment.getProviderRef(), amount,
                         refundKey(payment.getProviderRef(), payment.getRefundedCents(), amount));
             } catch (IOException failed) {
-                finish(orderId, REFUNDING, from);
-                throw unavailable("refund", failed);
+                // Fail closed. A failed call does not say whether the processor
+                // made the refund (a timeout after it did looks the same), so
+                // the payment stays REFUNDING and refuses further refunds until
+                // staff settle it at the processor. Reconciling such answers
+                // against the processor's records is product work, listed under
+                // "Before it's a product" in the Implementors Guide.
+                System.err.println("the refund of order " + orderId + " is unconfirmed: "
+                        + failed.getMessage());
+                throw new ResponseStatusException(409, UNCONFIRMED_REFUND);
             }
         }
         return receipt(keepRefund(orderId, amount, reason, done), true);
+    }
+
+    /// The 409 [#refund] answers when the processor call failed and the
+    /// refund's outcome is unknown; callers match it to keep their claims.
+    public static final String UNCONFIRMED_REFUND =
+            "The refund is being confirmed with the processor; settle it there before refunding again";
+
+    /// Whether `failed` is [#refund]'s answer for a refund whose outcome at the
+    /// processor is unknown.
+    public static boolean unconfirmed(Throwable failed) {
+        return failed instanceof ResponseStatusException
+                && ((ResponseStatusException) failed).getStatus() == 409
+                && UNCONFIRMED_REFUND.equals(((ResponseStatusException) failed).getReason());
     }
 
     /// The idempotency key of one refund intent: the charge, what had been
@@ -863,58 +880,10 @@ public class Payments {
     }
 
     @Transactional
-    private Payment claimRefund(String orderId, String from, long amount) {
-        if (payment(orderId) == null || payments.claimRefund(orderId, from, amount, Instant.now()) != 1) {
-            return null;
-        }
-        return payments.findById(orderId);
-    }
-
-    /// Finishes refunds left REFUNDING for more than ten minutes -- the server
-    /// stopped, or keeping the result failed, after the claim. Each is asked
-    /// for again under its own key, so a refund the processor already made is
-    /// answered, not repeated, and is then recorded as any refund is. One the
-    /// processor refuses, or one claimed with no amount kept, goes back to
-    /// where it was, for the merchant to ask again.
-    @Scheduled(fixedDelay = 300000, initialDelay = 90000, lock = "bazaar-stale-refunds")
-    public void resumeRefunds() {
-        List<Payment> stale = staleRefunds(Instant.now().minusMillis(STALE_REFUND_MILLIS));
-        for (int iter = 0; iter < stale.size(); iter++) {
-            Payment row = stale.get(iter);
-            String orderId = row.getOrderId();
-            String from = row.getRefundedCents() > 0 ? PARTIALLY_REFUNDED : PAID;
-            long amount = row.getPendingRefundCents();
-            if (amount <= 0 || amount > row.getAmountCents() - row.getRefundedCents()) {
-                finish(orderId, REFUNDING, from);
-                continue;
-            }
-            PaymentProvider.Refund done = null;
-            if (atProcessor(row.getProviderRef())) {
-                try {
-                    done = provider.refund(row.getProviderRef(), amount,
-                            refundKey(row.getProviderRef(), row.getRefundedCents(), amount));
-                } catch (IOException failed) {
-                    System.err.println("the interrupted refund of order " + orderId
-                            + " was not finished: " + failed.getMessage());
-                    finish(orderId, REFUNDING, from);
-                    continue;
-                }
-            }
-            keepRefund(orderId, amount, row.getRefundReason(), done);
-        }
-    }
-
-    @Transactional(readOnly = true)
-    private List<Payment> staleRefunds(Instant before) {
-        return payments.findByStatusAndRefundClaimedAtLessThan(REFUNDING, before);
-    }
-
-    @Transactional
     private Payment keepRefund(String orderId, long amount, String reason, PaymentProvider.Refund done) {
         Payment row = payments.findById(orderId);
         long refunded = row.getRefundedCents() + amount;
         row.setRefundedCents(refunded);
-        row.setPendingRefundCents(0L);
         row.setRefundReason(cut(reason == null ? "" : reason, 255));
         row.setRefundedAt(Instant.now());
         if (done != null) {
