@@ -40,6 +40,46 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class PlatformFeatureCatalogTest {
 
     @Test
+    void systemLlmAddsMlKitGenAiOnlyWhenUsed() {
+        // LlmClient alone (a cloud client) must not pull Gemini Nano in.
+        PlatformFeatureCatalog.Accumulator cloud = new PlatformFeatureCatalog.Accumulator();
+        cloud.consume("com/codename1/ai/LlmClient");
+        cloud.consumeMethod("com/codename1/ai/LlmClient", "openAi");
+        for (PlatformFeatureCatalog.Entry e : cloud.hits()) {
+            for (String dep : e.androidGradleDeps()) {
+                assertFalse(dep.startsWith("com.google.mlkit:genai"), dep);
+            }
+        }
+        assertFalse(PlatformFeatureCatalog.isSystemLlmUse("com/codename1/ai/LlmClient", "openAi"));
+
+        PlatformFeatureCatalog.Accumulator sys = new PlatformFeatureCatalog.Accumulator();
+        sys.consume("com/codename1/ai/LlmClient");
+        sys.consumeMethod("com/codename1/ai/LlmClient", "system");
+        boolean prompt = false;
+        for (PlatformFeatureCatalog.Entry e : sys.hits()) {
+            if (e.androidGradleDeps().contains("com.google.mlkit:genai-prompt:1.0.0-beta5")) {
+                prompt = true;
+                assertEquals(26, e.androidMinimumSdk());
+                assertTrue(e.iosFrameworks().isEmpty(),
+                        "FoundationModels must be autolinked weakly, never listed");
+            }
+        }
+        assertTrue(prompt, "LlmClient.system() must add the ML Kit GenAI prompt API");
+        assertTrue(PlatformFeatureCatalog.isSystemLlmUse("com/codename1/ai/LlmClient", "system"));
+        // Never by class: LlmClient.system() constructs a SystemLlmClient, so
+        // that reference is in every application's framework classes.
+        assertFalse(PlatformFeatureCatalog.isSystemLlmUse("com/codename1/ai/SystemLlmClient", "<init>"));
+        assertFalse(PlatformFeatureCatalog.isSystemLlmUse("com/codename1/ai/SystemLlmClient", "isSupported"));
+        PlatformFeatureCatalog.Accumulator framework = new PlatformFeatureCatalog.Accumulator();
+        framework.consume("com/codename1/ai/SystemLlmClient");
+        framework.consumeMethod("com/codename1/ai/SystemLlmClient", "<init>");
+        for (PlatformFeatureCatalog.Entry e : framework.hits()) {
+            assertFalse(e.androidGradleDeps().contains("com.google.mlkit:genai-prompt:1.0.0-beta5"),
+                    "SystemLlmClient by class must not add Gemini Nano");
+        }
+    }
+
+    @Test
     void builtInTextRecognizerMapsToAppleVisionAndAndroidMlKit() {
         List<PlatformFeatureCatalog.Entry> hits = PlatformFeatureCatalog.matchesFor(
                 "com/codename1/ai/vision/TextRecognizer");
@@ -513,14 +553,18 @@ class PlatformFeatureCatalogTest {
                         || dependency.startsWith(
                                 "org.tensorflow:tensorflow-lite")) {
                     checked++;
-                    assertEquals(21, entry.androidMinimumSdk(), dependency);
+                    // ML Kit GenAI (Gemini Nano through AICore) declares
+                    // minSdk 26 in every artifact; the rest of ML Kit 21.
+                    assertEquals(dependency.startsWith("com.google.mlkit:genai-") ? 26 : 21,
+                            entry.androidMinimumSdk(), dependency);
                 }
             }
         }
         // 27 since CodeScanner carries its own barcode-scanning entry: the
         // ready-made screen builds a BarcodeScanner internally, and an app
-        // that never names BarcodeScanner still needs the artifact.
-        assertEquals(27, checked,
+        // that never names BarcodeScanner still needs the artifact. 37 since
+        // the system language model's five ML Kit GenAI artifacts.
+        assertEquals(32, checked,
                 "If an AI dependency is intentionally added or removed, "
                 + "update this lock count after verifying its Android floor");
     }

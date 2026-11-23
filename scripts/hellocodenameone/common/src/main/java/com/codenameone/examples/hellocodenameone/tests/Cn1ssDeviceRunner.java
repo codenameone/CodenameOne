@@ -604,6 +604,10 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new VisionOnDeviceApiTest(),
             new LanguageOnDeviceApiTest(),
             new InferenceOnDeviceApiTest(),
+            // LlmClient.system(): proves the builders kept the Gemini Nano
+            // backend on Android and injected the Foundation Models bridge on
+            // iOS, and that status queries and an unsupported request settle.
+            new SystemLlmOnDeviceApiTest(),
             // Exercises com.codename1.ar end-to-end: the unsupported
             // contract on the CI platforms (none has an AR runtime) and a
             // full session round trip when a backend is present.

@@ -105,6 +105,20 @@ public final class PlatformFeatureCatalog {
 
     static final String LOCAL_LLM_OWNER = "com/codename1/ai/LlmClient";
     static final String LOCAL_LLM_METHOD = "local";
+    static final String SYSTEM_LLM_METHOD = "system";
+    /**
+     * ML Kit GenAI: Gemini Nano through AICore. Each artifact is one task
+     * model; none ships a native library (the model runs inside AICore), and
+     * each needs minSdk 26. The task APIs are at beta1 and the prompt API is
+     * at beta5, the newest published when this was written.
+     */
+    private static final String[] MLKIT_GENAI = {
+        "com.google.mlkit:genai-prompt:1.0.0-beta5",
+        "com.google.mlkit:genai-summarization:1.0.0-beta1",
+        "com.google.mlkit:genai-proofreading:1.0.0-beta1",
+        "com.google.mlkit:genai-rewriting:1.0.0-beta1",
+        "com.google.mlkit:genai-image-description:1.0.0-beta1"
+    };
     private static final String WHISPER_ANDROID =
             AI_NATIVES_GROUP + ":cn1-whisper-android:" + WHISPER_NATIVES_VERSION + "@aar";
     private static final String WHISPER_IOS =
@@ -147,6 +161,22 @@ public final class PlatformFeatureCatalog {
                 // llama.cpp calls posix_madvise, which bionic has from API 23.
                 .androidMinimumSdk(23)
                 .description("On-device LLM (llama.cpp)"));
+        // The operating system's own model: Gemini Nano on Android, Foundation
+        // Models on Apple platforms. Keyed on the LlmClient.system call alone,
+        // never on SystemLlmClient by class: system() itself constructs one,
+        // so a scan that reaches the framework's own classes would see that
+        // reference in every application and turn every Android app into a
+        // minSdk 26 app with five GenAI artifacts. Both builders read the same
+        // call through isSystemLlmUse to inject their bridge. FoundationModels
+        // is deliberately not listed: catalog frameworks go on the link line,
+        // which fails on an Xcode whose SDK lacks it, while the injected Swift
+        // autolinks it, weakly (see SystemLlmInjector).
+        Entry sys = new Entry(LOCAL_LLM_OWNER).requiresMethod(LOCAL_LLM_OWNER, SYSTEM_LLM_METHOD);
+        for (String gav : MLKIT_GENAI) {
+            sys.androidGradle(gav);
+        }
+        e.add(sys.androidMinimumSdk(26)
+                .description("Operating system LLM (Gemini Nano / Foundation Models)"));
         e.add(new Entry("com/codename1/ai/OpenAiClient").description("OpenAI client"));
         e.add(new Entry("com/codename1/ai/AnthropicClient").description("Anthropic client"));
         e.add(new Entry("com/codename1/ai/GeminiClient").description("Gemini client"));
@@ -1012,6 +1042,23 @@ public final class PlatformFeatureCatalog {
     public static boolean isLocalLlmCall(String internalClassName, String methodName) {
         return LOCAL_LLM_OWNER.equals(internalClassName)
                 && LOCAL_LLM_METHOD.equals(methodName);
+    }
+
+    /**
+     * Whether a method reference opts an application into the operating
+     * system's language model: {@code LlmClient.system}. A reference to
+     * {@code SystemLlmClient} alone does not count, because the framework's
+     * own {@code system()} makes one in every application; an application
+     * that only asks for the status without ever calling {@code system()}
+     * has no bridge and is told {@code UNSUPPORTED}, as documented there.
+     *
+     * @param internalClassName JVM internal-form owner name
+     * @param methodName referenced method name
+     * @return {@code true} for a use of the operating system model
+     */
+    public static boolean isSystemLlmUse(String internalClassName, String methodName) {
+        return LOCAL_LLM_OWNER.equals(internalClassName)
+                && SYSTEM_LLM_METHOD.equals(methodName);
     }
 
     /**

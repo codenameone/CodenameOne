@@ -1652,6 +1652,9 @@ public class AndroidGradleBuilder extends Executor {
     /// The app calls `LlmClient.local`; keeps `AndroidLocalLlmImpl`, whose
     /// native library the catalog's llama AAR supplies.
     private boolean localLlmSupport;
+    /// The app uses `SystemLlmClient`; keeps `AndroidSystemLlmImpl`, which
+    /// compiles against the ML Kit GenAI artifacts the catalog adds.
+    private boolean systemLlmSupport;
     private boolean languageSupport;
     private final Set<String> includedAiAdapterSources =
             new HashSet<String>();
@@ -2752,6 +2755,7 @@ public class AndroidGradleBuilder extends Executor {
         visionSupport = false;
         inferenceSupport = false;
         localLlmSupport = false;
+        systemLlmSupport = false;
         usesCodenameOneNatives = false;
         languageSupport = false;
         includedAiAdapterSources.clear();
@@ -3246,6 +3250,9 @@ public class AndroidGradleBuilder extends Executor {
                     aiAcc.consumeMethod(cls, method);
                     if (PlatformFeatureCatalog.isLocalLlmCall(cls, method)) {
                         localLlmSupport = true;
+                    }
+                    if (PlatformFeatureCatalog.isSystemLlmUse(cls, method)) {
+                        systemLlmSupport = true;
                     }
                     String scriptAdapter =
                             androidTextScriptAdapterSource(cls, method);
@@ -7997,7 +8004,7 @@ public class AndroidGradleBuilder extends Executor {
         String keepFirebase = "-keep class com.google.android.gms.** { *; }\n\n" +
                 "-keep class com.google.firebase.** { *; }\n\n";
         String keepAi = visionSupport || languageSupport || inferenceSupport
-                || localLlmSupport
+                || localLlmSupport || systemLlmSupport
                 ? "-keep class com.codename1.impl.android.ai.** { *; }\n\n"
                 : "";
         String keepInferenceRuntime =
@@ -9021,6 +9028,9 @@ public class AndroidGradleBuilder extends Executor {
         }
         if (!localLlmSupport) {
             new File(aiDir, "AndroidLocalLlmImpl.java").delete();
+        }
+        if (!systemLlmSupport) {
+            new File(aiDir, "AndroidSystemLlmImpl.java").delete();
         }
     }
 

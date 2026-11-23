@@ -6387,6 +6387,16 @@ public class IOSImplementation extends CodenameOneImplementation {
         return localLlm;
     }
 
+    private com.codename1.impl.SystemLlmImpl systemLlm;
+
+    @Override
+    public com.codename1.impl.SystemLlmImpl createSystemLlmImpl() {
+        if (systemLlm == null && nativeInstance.cn1SystemLlmIsLinked()) {
+            systemLlm = new IOSSystemLlmImpl();
+        }
+        return systemLlm;
+    }
+
     @Override
     public com.codename1.impl.InferenceImpl createInferenceImpl() {
         return nativeInstance.cn1InferenceIsSupported()

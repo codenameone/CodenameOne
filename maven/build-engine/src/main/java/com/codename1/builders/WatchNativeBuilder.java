@@ -261,7 +261,11 @@ class WatchNativeBuilder {
             // Linked on the iOS slice when the app references com.codename1.webrtc. MetalKit and
             // VideoToolbox are absent from the watchOS SDK; Network is present (verified against
             // WatchOS26.2) but unused there, as CN1_INCLUDE_WEBRTC is undone for TARGET_OS_WATCH.
-            + "MetalKit.framework;VideoToolbox.framework;Network.framework";
+            + "MetalKit.framework;VideoToolbox.framework;Network.framework;"
+            // Linked on the iOS slice for SystemLlmClient. watchOS gains it a release later than
+            // iOS, and the watch never calls it: INCLUDE_CN1_SYSTEM_LLM is undone for
+            // TARGET_OS_WATCH and the Swift bridge is not part of the watch target.
+            + "FoundationModels.framework";
 
     /**
      * Frameworks the watch target MAY link, so that every framework this builder can emit is

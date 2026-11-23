@@ -775,6 +775,48 @@ Mac native and the other unsupported targets return `false` from the
 language service `isSupported()` checks. Completion and failure callbacks
 arrive on the EDT.
 
+=== The operating system's language model
+
+Recent phones and Macs ship a language model as part of the operating
+system: Apple Intelligence's Foundation Models on iOS and macOS, and Gemini
+Nano on Android devices that carry Google's AICore service, including
+current Pixel and Samsung Galaxy phones. `LlmClient.system()` reaches
+whichever one the device has. Nothing is bundled with the app, no API key
+is involved, and the prompt never leaves the device.
+
+[source,java]
+----
+include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/generated/AiAndSpeechSystemLlmSnippet.java[tag=ai-and-speech-system-llm,indent=0]
+----
+
+Availability is a property of the device, not of the app, so ask before
+offering the feature. `getStatus(feature)` answers `AVAILABLE`,
+`DOWNLOADABLE` or `DOWNLOADING` when the model is not on the device yet,
+`DISABLED` when the user switched Apple Intelligence off, or
+`UNSUPPORTED`. `getStatusReason(feature)` explains the answer in words
+fit for a log, and `getSupportedFeatures()` lists what the device offers.
+On Android, `download(feature)` asks AICore to fetch a model that is
+downloadable.
+
+Besides chat and streaming chat, the client has task methods:
+`summarize(text, bullets)`, `proofread(text)`, `rewrite(text, style)` and
+`describeImage(image)`. On Android each maps to ML Kit's dedicated task
+API, which has its own model and its own status; on Apple targets
+summarize, proofread and rewrite are prompts to the same model, and image
+description reports `UNSUPPORTED`. Embeddings, tool calling and JSON mode
+are not offered by these models and fail with `INVALID_REQUEST`.
+
+The builders add this only to apps that call `LlmClient.system()`; an
+app that checks the status without ever calling it is told
+`UNSUPPORTED`. On Android they add the
+ML Kit GenAI artifacts and raise the minimum SDK to 26. On iOS and macOS
+they inject a small Swift bridge into the project; it compiles to a stub
+with an Xcode whose SDK lacks Foundation Models, and the framework is
+weakly linked, so the app still installs and runs on older OS versions
+and reports `UNSUPPORTED` there. The simulator, JavaScript, Windows,
+Linux, watchOS and tvOS report `UNSUPPORTED`; `LlmClient.ollama()` is the
+usual stand-in while developing in the simulator.
+
 === Platform availability
 
 The public API and the unsupported fallback are present on every
