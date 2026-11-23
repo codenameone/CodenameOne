@@ -124,11 +124,11 @@ final class DashboardPane extends MerchantPane {
         tiles.setUIID("MeTiles");
         if (stats != null) {
             tiles.add(MUi.tile(MerchantState.money(todaySales), Lang.tr("Sales today"),
-                    MUi.sparkline(sales, "spark-sales"), "tile-sales"));
+                    MCharts.sparkline(sales, "spark-sales"), "tile-sales"));
             tiles.add(MUi.tile(String.valueOf(todayOrders), Lang.tr("Orders today"),
-                    MUi.sparkline(counts, "spark-orders"), "tile-orders"));
+                    MCharts.sparkline(counts, "spark-orders"), "tile-orders"));
             tiles.add(MUi.tile(MerchantState.money(todayAov), Lang.tr("Average order"),
-                    MUi.sparkline(aov, "spark-aov"), "tile-aov"));
+                    MCharts.sparkline(aov, "spark-aov"), "tile-aov"));
         }
         Container low = MUi.tile(lowStock < 0 ? "-" : String.valueOf(lowStock),
                 Lang.tr("Low stock"), null, "tile-low");

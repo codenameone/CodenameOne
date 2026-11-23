@@ -19,6 +19,7 @@
 package com.codenameone.examples.bazaar.merchant;
 
 import com.codename1.appkit.Net;
+import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.FontImage;
 import com.codename1.ui.TextField;
@@ -105,7 +106,7 @@ final class ReportsPane extends MerchantPane {
                 labels[iter] = r.rows().get(iter).cells().get(0);
                 values[iter] = r.rows().get(iter).value();
             }
-            result.add(MCharts.bars("report-chart", labels, values));
+            result.add(MCharts.bars("report-chart", labels, values, MCharts.COUNT));
         }
         result.add(MUi.grid(rows, "report-grid"));
         Ui.relayout(result);
@@ -145,7 +146,7 @@ final class ReportsPane extends MerchantPane {
                 AttributionDto a = found.get(iter);
                 if ("LAST".equals(a.touch()) && labels.size() < 8) {
                     labels.add(a.source());
-                    values.add(Double.valueOf(a.salesCents() / 100.0));
+                    values.add(Double.valueOf(a.salesCents()));
                 }
             }
             if (!labels.isEmpty()) {
@@ -187,6 +188,18 @@ final class ReportsPane extends MerchantPane {
         };
     }
 
+    /// The statement as a waterfall: gross sales, discounts and refunds off it,
+    /// net sales as a total, the cost of goods off that, and the gross margin it
+    /// ends on.
+    static Component profitLossChart(ProfitLossDto p) {
+        String[] labels = {Lang.tr("Gross sales"), Lang.tr("Discounts"), Lang.tr("Refunds"),
+            Lang.tr("Net sales"), Lang.tr("Cost of goods"), Lang.tr("Gross margin")};
+        double[] steps = {p.grossSalesCents(), -p.discountsCents(), -p.refundsCents(), 0,
+            -p.cogsCents(), 0};
+        boolean[] totals = {false, false, false, true, false, true};
+        return MCharts.waterfall("profit-loss-chart", labels, steps, totals);
+    }
+
     private void profitLoss() {
         Api.ops().profitLoss(MerchantState.storeId(), "", "", Net.to(p -> {
             List<String[]> lines = new ArrayList<String[]>();
@@ -198,7 +211,11 @@ final class ReportsPane extends MerchantPane {
                     .col(Lang.tr("Line"), r -> Lang.tr(r[0]))
                     .col(Lang.tr("Amount"), r -> r[1]);
             rows.set(lines);
-            push(Lang.tr("Profit and loss"), MUi.grid(rows, "profit-loss-grid"));
+            Container page = new Container(BoxLayout.y());
+            page.setName("profit-loss-page");
+            page.add(profitLossChart(p));
+            page.add(MUi.grid(rows, "profit-loss-grid"));
+            push(Lang.tr("Profit and loss"), page);
         }, Ui::fail));
     }
 }

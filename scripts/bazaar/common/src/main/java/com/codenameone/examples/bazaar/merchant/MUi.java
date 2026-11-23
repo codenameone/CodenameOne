@@ -18,20 +18,12 @@
  */
 package com.codenameone.examples.bazaar.merchant;
 
-import com.codename1.charts.ChartComponent;
-import com.codename1.charts.models.XYMultipleSeriesDataset;
-import com.codename1.charts.models.XYSeries;
-import com.codename1.charts.renderers.XYMultipleSeriesRenderer;
-import com.codename1.charts.renderers.XYSeriesRenderer;
-import com.codename1.charts.views.LineChart;
-import com.codename1.ui.CN;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Dialog;
 import com.codename1.ui.Label;
 import com.codename1.ui.TextArea;
 import com.codename1.ui.TextField;
-import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.plaf.Style;
@@ -140,52 +132,6 @@ final class MUi {
         grid.setSelectionMode(DataGrid.SelectionMode.MULTIPLE_ROWS);
         grid.setEmptyText(Lang.tr("Nothing here yet"));
         return grid;
-    }
-
-    /// A sparkline: one line, no axes, no labels, the `MeSpark` style's colour
-    /// with a faint fill under it.
-    static Component sparkline(double[] values, String name) {
-        XYSeries series = new XYSeries("");
-        double max = 1;
-        for (int iter = 0; iter < values.length; iter++) {
-            series.add(iter, values[iter]);
-            max = Math.max(max, values[iter]);
-        }
-        XYMultipleSeriesDataset data = new XYMultipleSeriesDataset();
-        data.addSeries(series);
-        int color = color("MeSpark");
-        XYSeriesRenderer line = new XYSeriesRenderer();
-        line.setColor(color);
-        line.setLineWidth(CN.convertToPixels(0.4f));
-        XYSeriesRenderer.FillOutsideLine fill = new XYSeriesRenderer.FillOutsideLine(
-                XYSeriesRenderer.FillOutsideLine.Type.BOUNDS_ALL);
-        fill.setColor((color & 0xffffff) | 0x30000000);
-        line.addFillOutsideLine(fill);
-        XYMultipleSeriesRenderer renderer = new XYMultipleSeriesRenderer();
-        renderer.addSeriesRenderer(line);
-        renderer.setShowAxes(false);
-        renderer.setShowLabels(false);
-        renderer.setShowLegend(false);
-        renderer.setShowGrid(false);
-        renderer.setPanEnabled(false, false);
-        renderer.setZoomEnabled(false, false);
-        // No background and no margins: the chart paints colours without their alpha,
-        // so a "transparent" 0 background or margin came out as a solid black block.
-        renderer.setApplyBackgroundColor(false);
-        renderer.setMargins(new int[] {0, 0, 0, 0});
-        renderer.setYAxisMin(0);
-        renderer.setYAxisMax(max * 1.1);
-        renderer.setXAxisMin(0);
-        renderer.setXAxisMax(Math.max(1, values.length - 1));
-        ChartComponent chart = new ChartComponent(new LineChart(data, renderer)) {
-            @Override
-            protected Dimension calcPreferredSize() {
-                return new Dimension(CN.convertToPixels(30f), CN.convertToPixels(9f));
-            }
-        };
-        chart.setName(name);
-        chart.setUIID("Container");
-        return chart;
     }
 
     static int color(String uiid) {

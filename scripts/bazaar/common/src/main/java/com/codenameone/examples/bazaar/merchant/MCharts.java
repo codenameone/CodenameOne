@@ -18,25 +18,23 @@
  */
 package com.codenameone.examples.bazaar.merchant;
 
-import com.codename1.charts.ChartComponent;
-import com.codename1.charts.models.MultipleCategorySeries;
-import com.codename1.charts.models.XYMultipleSeriesDataset;
-import com.codename1.charts.models.XYSeries;
-import com.codename1.charts.renderers.DefaultRenderer;
-import com.codename1.charts.renderers.SimpleSeriesRenderer;
-import com.codename1.charts.renderers.XYMultipleSeriesRenderer;
-import com.codename1.charts.renderers.XYSeriesRenderer;
-import com.codename1.charts.util.NumberFormat;
-import com.codename1.charts.views.BarChart;
-import com.codename1.charts.views.DoughnutChart;
-import com.codename1.charts.views.LineChart;
-import com.codename1.charts.views.PointStyle;
 import com.codename1.ui.CN;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
-import com.codename1.ui.Font;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Label;
+import com.codename1.ui.chart.Chart;
+import com.codename1.ui.chart.ChartTheme;
+import com.codename1.ui.chart.Sparkline;
+import com.codename1.ui.chart.ValueFormatter;
+import com.codename1.ui.chart.axis.Axis;
+import com.codename1.ui.chart.axis.CategoryAxis;
+import com.codename1.ui.chart.axis.NumberAxis;
+import com.codename1.ui.chart.series.BarSeries;
+import com.codename1.ui.chart.series.FunnelSeries;
+import com.codename1.ui.chart.series.LineSeries;
+import com.codename1.ui.chart.series.PieSeries;
+import com.codename1.ui.chart.series.WaterfallSeries;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
@@ -44,23 +42,57 @@ import com.codename1.ui.plaf.Style;
 import com.codename1.ui.plaf.UIManager;
 import com.codenameone.examples.bazaar.ui.Lang;
 
-/// The analytics screen's charts, coloured from the `MeChart*` UIIDs so they
-/// follow the theme and dark mode: a line of sales with the period before
-/// dashed behind it, bars of orders, a donut of channels, a funnel and a
-/// meter for a share.
+/// The merchant screens' charts, on `com.codename1.ui.chart` and coloured from
+/// the `MeChart*` UIIDs so they follow the theme and dark mode: sales over time
+/// with the period before dashed behind it, bars, a donut of shares, the
+/// conversion funnel, the profit and loss waterfall, the dashboard sparklines
+/// and a meter for a share. Money is long cents everywhere and is written by
+/// `MerchantState.money`.
 final class MCharts {
     private static final float HEIGHT_MM = 40f;
+
+    /// Cents written as the store's money.
+    static final ValueFormatter MONEY = (value, step) ->
+            MerchantState.money((long) Math.floor(value + 0.5));
+
+    /// Cents written short for an axis: 1.2k.
+    static final ValueFormatter MONEY_AXIS = (value, step) -> compact(value / 100.0);
+
+    /// A count written short.
+    static final ValueFormatter COUNT = (value, step) -> compact(value);
 
     private MCharts() {
     }
 
     static int color(String uiid) {
         Style style = UIManager.getInstance().getComponentStyle(uiid);
-        return 0xff000000 | style.getFgColor();
+        return style.getFgColor() & 0xffffff;
     }
 
-    private static int paper() {
-        return 0xff000000 | UIManager.getInstance().getComponentStyle("MeChartBox").getBgColor();
+    /// The chart theme from the app's own UIIDs: labels in `MeChartText`, grid in
+    /// `MeChartGrid`, series in the `MeChartSlice` colours, the tooltip in the
+    /// inverse of the surface. Built whenever a chart is, so a light or dark
+    /// switch, which rebuilds the screens, is followed.
+    static ChartTheme theme() {
+        int text = color("MeChartText");
+        int r = (text >> 16) & 0xff;
+        int g = (text >> 8) & 0xff;
+        int b = text & 0xff;
+        boolean dark = r * 299 + g * 587 + b * 114 > 128000;
+        int paper = UIManager.getInstance().getComponentStyle("MeChartBox").getBgColor() & 0xffffff;
+        int ink = color("MeLegend");
+        return new ChartTheme(dark)
+                .setPalette(color("MeChartSlice1"), color("MeChartSlice2"),
+                        color("MeChartSlice3"), color("MeChartSlice4"))
+                .setTextColor(ink)
+                .setSecondaryTextColor(text)
+                .setLegendTextColor(text)
+                .setGridColor(color("MeChartGrid"))
+                .setAxisColor(color("MeChartGrid"))
+                .setTooltipBackground(ink)
+                .setTooltipText(paper)
+                .setPositiveColor(color("MeChartSlice2"))
+                .setNegativeColor(color("MeChartSlice4"));
     }
 
     /// A short number: 1.2k, 3.4M.
@@ -81,51 +113,6 @@ final class MCharts {
                 : (tenths / 10) + "." + Math.abs(tenths % 10);
     }
 
-    private static XYMultipleSeriesRenderer frame(String[] labels) {
-        XYMultipleSeriesRenderer r = new XYMultipleSeriesRenderer();
-        int grid = color("MeChartGrid");
-        int text = color("MeChartText");
-        r.setAxesColor(grid);
-        r.setGridColor(grid);
-        r.setShowGridY(true);
-        r.setShowGridX(false);
-        r.setLabelsColor(text);
-        r.setXLabelsColor(text);
-        r.setYLabelsColor(0, text);
-        r.setLabelsTextSize(CN.convertToPixels(2.3f));
-        r.setShowLegend(false);
-        r.setPanEnabled(false, false);
-        r.setZoomEnabled(false, false);
-        r.setInScroll(true);
-        r.setApplyBackgroundColor(true);
-        r.setBackgroundColor(paper());
-        r.setMarginsColor(paper());
-        r.setXLabels(0);
-        r.setYLabels(4);
-        r.setYLabelsAlign(Component.RIGHT);
-        r.setYLabelsPadding(CN.convertToPixels(1f));
-        r.setAxisTitleTextSize(0);
-        int m = CN.convertToPixels(1f);
-        r.setMargins(new int[] {m * 2, CN.convertToPixels(10f), 0, m * 4});
-        r.setPointSize(0);
-        r.setYLabelFormat(new NumberFormat() {
-            @Override
-            public String format(double value) {
-                return compact(value);
-            }
-        }, 0);
-        if (labels.length > 0) {
-            int[] at = labels.length < 3 ? new int[] {0, labels.length - 1}
-                    : new int[] {0, labels.length / 2, labels.length - 1};
-            for (int iter = 0; iter < at.length; iter++) {
-                r.addTextLabel(at[iter], shortDay(labels[at[iter]]));
-            }
-        }
-        r.setXAxisMin(-0.5);
-        r.setXAxisMax(Math.max(0.5, labels.length - 0.5));
-        return r;
-    }
-
     /// `2026-11-20` as `11-20`; anything else as it is.
     static String shortDay(String label) {
         if (label != null && label.length() == 10 && label.charAt(4) == '-') {
@@ -134,103 +121,87 @@ final class MCharts {
         return label == null ? "" : label;
     }
 
-    private static void range(XYMultipleSeriesRenderer r, double[] a, double[] b) {
-        double hi = 1;
-        for (int iter = 0; iter < a.length; iter++) {
-            hi = Math.max(hi, a[iter]);
+    private static String[] shortDays(String[] labels) {
+        String[] out = new String[labels.length];
+        for (int iter = 0; iter < labels.length; iter++) {
+            out[iter] = shortDay(labels[iter]);
         }
-        for (int iter = 0; b != null && iter < b.length; iter++) {
-            hi = Math.max(hi, b[iter]);
-        }
-        r.setYAxisMin(0);
-        r.setYAxisMax(hi * 1.1);
+        return out;
     }
 
-    /// Sales by day, with the period before as a dashed line when given.
-    static Component line(String name, String[] labels, double[] now, double[] before) {
-        XYMultipleSeriesDataset data = new XYMultipleSeriesDataset();
-        XYMultipleSeriesRenderer r = frame(labels);
-        if (before != null) {
-            XYSeries prev = new XYSeries(Lang.tr("Previous period"));
-            for (int iter = 0; iter < before.length; iter++) {
-                prev.add(iter, before[iter]);
+    private static Chart chart(String name, float heightMm) {
+        final int h = CN.convertToPixels(heightMm);
+        Chart chart = new Chart() {
+            @Override
+            protected Dimension calcPreferredSize() {
+                return new Dimension(CN.convertToPixels(50f), h);
             }
-            data.addSeries(prev);
-            XYSeriesRenderer p = new XYSeriesRenderer();
-            p.setColor(color("MeChartPrevious"));
-            p.setLineWidth(CN.convertToPixels(0.3f));
-            p.setPointStyle(PointStyle.POINT);
-            r.addSeriesRenderer(p);
-        }
-        XYSeries series = new XYSeries(Lang.tr("This period"));
-        for (int iter = 0; iter < now.length; iter++) {
-            series.add(iter, now[iter]);
-        }
-        data.addSeries(series);
-        XYSeriesRenderer one = new XYSeriesRenderer();
-        int brand = color("MeChartLine");
-        one.setColor(brand);
-        one.setLineWidth(CN.convertToPixels(0.5f));
-        XYSeriesRenderer.FillOutsideLine fill = new XYSeriesRenderer.FillOutsideLine(
-                XYSeriesRenderer.FillOutsideLine.Type.BOUNDS_ALL);
-        fill.setColor((brand & 0x00ffffff) | 0x33000000);
-        one.addFillOutsideLine(fill);
-        r.addSeriesRenderer(one);
-        range(r, now, before);
-        Container box = box(name, new ChartComponent(new LineChart(data, r)));
-        if (before != null) {
-            box.add(BorderLayout.NORTH, legend(new String[] {"This period", "Previous period"},
-                    new String[] {"MeChartLine", "MeChartPrevious"}));
-        }
+        };
+        chart.setName(name);
+        chart.setUIID("MeChart");
+        chart.setRTL(false);
+        chart.setTheme(theme());
+        chart.setZoomEnabled(false);
+        chart.setTooltipMode(Chart.TOOLTIP_POINT);
+        chart.setLegendPosition(Chart.LEGEND_NONE);
+        return chart;
+    }
+
+    private static Chart cartesian(String name, String[] labels, ValueFormatter values) {
+        Chart chart = chart(name, HEIGHT_MM);
+        chart.setXAxis(new CategoryAxis(Axis.BOTTOM, shortDays(labels)).setGridVisible(false));
+        chart.setYAxis(new NumberAxis(Axis.LEFT).setIncludeZero(true).setFormatter(values));
+        return chart;
+    }
+
+    private static Container box(Component chart) {
+        Container box = new Container(new BorderLayout(), "MeChartBox");
+        box.setRTL(false);
+        box.add(BorderLayout.CENTER, chart);
         return box;
     }
 
-    /// Orders by day as bars.
-    static Component bars(String name, String[] labels, double[] values) {
-        XYMultipleSeriesDataset data = new XYMultipleSeriesDataset();
-        XYSeries series = new XYSeries("");
-        for (int iter = 0; iter < values.length; iter++) {
-            series.add(iter, values[iter]);
+    /// Sales by day in cents, with the period before as a dashed line when given;
+    /// a tap shows the day's amount.
+    static Component line(String name, String[] labels, double[] now, double[] before) {
+        Chart chart = cartesian(name, labels, MONEY_AXIS);
+        if (before != null) {
+            chart.addSeries(new LineSeries(Lang.tr("Previous period")).setDashed(true)
+                    .setLineWidth(0.3f).setData(null, before)
+                    .setColor(color("MeChartPrevious")).setValueFormatter(MONEY));
         }
-        data.addSeries(series);
-        XYMultipleSeriesRenderer r = frame(labels);
-        XYSeriesRenderer bar = new XYSeriesRenderer();
-        bar.setColor(color("MeChartBar"));
-        r.addSeriesRenderer(bar);
-        r.setBarSpacing(0.25);
-        range(r, values, null);
-        return box(name, new ChartComponent(new BarChart(data, r, BarChart.Type.DEFAULT)));
+        chart.addSeries(new LineSeries(Lang.tr("This period")).setMode(LineSeries.SPLINE)
+                .setFilled(true).setFillAlpha(50).setLineWidth(0.5f).setData(null, now)
+                .setColor(color("MeChartLine")).setValueFormatter(MONEY));
+        if (before != null) {
+            chart.setTooltipMode(Chart.TOOLTIP_SHARED);
+            chart.setLegendPosition(Chart.LEGEND_TOP);
+        }
+        return box(chart);
     }
 
-    /// Shares of a whole as a donut with its legend.
+    /// Bars of `values`, written with `format`; a tap selects a bar and shows it.
+    static Component bars(String name, String[] labels, double[] values, ValueFormatter format) {
+        Chart chart = cartesian(name, labels, format == MONEY ? MONEY_AXIS : format);
+        chart.addSeries(new BarSeries("").setCornerRadius(0.6f).setData(null, values)
+                .setColor(color("MeChartBar")).setValueFormatter(format));
+        return box(chart);
+    }
+
+    /// Shares of a whole in cents as a donut, with the legend beside it carrying
+    /// each part's written share.
     static Component donut(String name, String[] labels, double[] values, String[] shares) {
-        MultipleCategorySeries series = new MultipleCategorySeries("");
-        series.add("", labels, values);
-        DefaultRenderer renderer = new DefaultRenderer();
-        String[] uiids = new String[labels.length];
-        for (int iter = 0; iter < labels.length; iter++) {
-            uiids[iter] = "MeChartSlice" + (iter % 4 + 1);
-            SimpleSeriesRenderer slice = new SimpleSeriesRenderer();
-            slice.setColor(color(uiids[iter]));
-            renderer.addSeriesRenderer(slice);
-        }
-        renderer.setShowLabels(false);
-        renderer.setShowLegend(false);
-        renderer.setPanEnabled(false);
-        renderer.setZoomEnabled(false);
-        renderer.setInScroll(true);
-        renderer.setApplyBackgroundColor(false);
-        renderer.setMargins(new int[] {0, 0, 0, 0});
-        ChartComponent chart = new ChartComponent(new DoughnutChart(series, renderer));
-        chart.setFocusable(false);
-        chart.setName(name);
-        int size = CN.convertToPixels(28f);
-        chart.setPreferredSize(new Dimension(size, size));
-        chart.setUIID("MeChart");
+        PieSeries pie = new PieSeries("").setInnerRadius(0.62f).setPadAngle(1.5f)
+                .setLabelMode(PieSeries.LABELS_NONE);
+        pie.setData(labels, values);
+        pie.setValueFormatter(MONEY);
+        Chart chart = chart(name, 30f);
+        chart.addSeries(pie);
+        chart.setPreferredW(CN.convertToPixels(30f));
         Container legend = new Container(BoxLayout.y());
         for (int iter = 0; iter < labels.length; iter++) {
             Container row = new Container(new BorderLayout());
-            row.add(BorderLayout.WEST, swatch(uiids[iter]));
+            row.add(BorderLayout.WEST, swatch(color("MeChartSlice" + (iter % 4 + 1))));
             row.add(BorderLayout.CENTER, new Label(labels[iter], "MeLegend"));
             Label share = new Label(shares[iter], "MeLegendValue");
             share.setShouldLocalize(false);
@@ -243,79 +214,50 @@ final class MCharts {
         return box;
     }
 
-    private static Label swatch(String uiid) {
+    private static Label swatch(int rgb) {
         Label swatch = new Label(" ", "MeSwatchDot");
-        swatch.getAllStyles().setBgColor(color(uiid) & 0xffffff);
+        swatch.getAllStyles().setBgColor(rgb);
         swatch.getAllStyles().setBgTransparency(255);
         return swatch;
     }
 
-    static Container legend(String[] labels, String[] uiids) {
-        Container row = new Container(BoxLayout.x());
-        for (int iter = 0; iter < labels.length; iter++) {
-            row.add(swatch(uiids[iter]));
-            row.add(new Label(Lang.tr(labels[iter]), "MeLegend"));
+    /// The conversion funnel: one band per step, narrowing with its count, each
+    /// step's count written on it and its share of the first in the tooltip.
+    static Component funnel(String name, String[] labels, int[] counts) {
+        double[] values = new double[counts.length];
+        for (int iter = 0; iter < counts.length; iter++) {
+            values[iter] = Math.max(0, counts[iter]);
         }
-        return row;
+        FunnelSeries funnel = new FunnelSeries(Lang.tr("Conversion funnel"));
+        funnel.setData(labels, values);
+        funnel.setShowValues(true);
+        funnel.setValueFormatter(COUNT);
+        return box(chart(name, 9f * Math.max(3, labels.length)).addSeries(funnel));
     }
 
-    private static Container box(String name, ChartComponent chart) {
-        chart.setName(name);
-        chart.setFocusable(false);
-        chart.setUIID("MeChart");
-        chart.setPreferredH(CN.convertToPixels(HEIGHT_MM));
-        Container box = new Container(new BorderLayout(), "MeChartBox");
-        box.setRTL(false);
-        chart.setRTL(false);
-        box.add(BorderLayout.CENTER, chart);
-        return box;
+    /// The profit and loss statement as a waterfall. `steps` are cents, negative
+    /// for what is taken off; a step marked in `totals` shows the running total.
+    static Component waterfall(String name, String[] labels, double[] steps, boolean[] totals) {
+        Chart chart = cartesian(name, labels, MONEY_AXIS);
+        chart.addSeries(new WaterfallSeries(Lang.tr("Profit and loss"))
+                .setSteps(steps, totals).setConnectors(true)
+                .setColor(color("MeChartBar")).setValueFormatter(MONEY));
+        return box(chart);
     }
 
-    /// A funnel: one band per step, as wide as its count against the first,
-    /// with the step's name, count and share of the first written on it.
-    static Component funnel(final String name, final String[] labels, final int[] counts) {
-        Component c = new Component() {
+    /// A dashboard sparkline: a filled trend in the `MeSpark` colour, its last
+    /// point marked.
+    static Component sparkline(double[] values, String name) {
+        Sparkline spark = new Sparkline(values) {
             @Override
             protected Dimension calcPreferredSize() {
-                return new Dimension(CN.convertToPixels(60f),
-                        CN.convertToPixels(9f) * Math.max(1, labels.length));
-            }
-
-            @Override
-            public void paint(Graphics g) {
-                int n = labels.length;
-                if (n == 0) {
-                    return;
-                }
-                int band = getHeight() / n;
-                int gap = Math.max(1, CN.convertToPixels(0.8f));
-                int top = Math.max(1, counts[0]);
-                Font font = UIManager.getInstance().getComponentStyle("MeFunnel").getFont();
-                g.setFont(font);
-                int[] fills = {color("MeChartSlice1"), color("MeChartSlice2"),
-                    color("MeChartSlice3"), color("MeChartSlice4")};
-                int ink = color("MeFunnel");
-                for (int iter = 0; iter < n; iter++) {
-                    double share = Math.min(1.0, Math.max(0, counts[iter]) / (double) top);
-                    int w = Math.max(CN.convertToPixels(2f), (int) (getWidth() * share));
-                    int x = getX() + (getWidth() - w) / 2;
-                    int y = getY() + iter * band;
-                    g.setColor(fills[iter % fills.length] & 0xffffff);
-                    g.setAlpha(255);
-                    g.fillRoundRect(x, y, w, band - gap, gap * 2, gap * 2);
-                    String pct = counts[0] <= 0 ? "" : "  " + Period.percent(
-                            (int) (Math.max(0, counts[iter]) * 10000L / counts[0]));
-                    String text = labels[iter] + "  " + counts[iter] + pct;
-                    g.setColor(ink & 0xffffff);
-                    int tw = font.stringWidth(text);
-                    g.drawString(text, getX() + Math.max(0, (getWidth() - tw) / 2),
-                            y + (band - gap - font.getHeight()) / 2);
-                }
+                return new Dimension(CN.convertToPixels(30f), CN.convertToPixels(9f));
             }
         };
-        c.setName(name);
-        c.setUIID("MeFunnelBox");
-        return c;
+        spark.setType(Sparkline.AREA).setColor(color("MeSpark")).setShowLast(true);
+        spark.setUIID("MeSpark");
+        spark.setName(name);
+        return spark;
     }
 
     /// A thin bar filled to `share` (0 to 1).
@@ -328,9 +270,9 @@ final class MCharts {
 
             @Override
             public void paint(Graphics g) {
-                g.setColor(color("MeChartGrid") & 0xffffff);
+                g.setColor(color("MeChartGrid"));
                 g.fillRoundRect(getX(), getY(), getWidth(), getHeight(), getHeight(), getHeight());
-                g.setColor(color("MeChartBar") & 0xffffff);
+                g.setColor(color("MeChartBar"));
                 int w = (int) (getWidth() * Math.max(0, Math.min(1, share)));
                 if (w > 0) {
                     g.fillRoundRect(getX(), getY(), w, getHeight(), getHeight(), getHeight());

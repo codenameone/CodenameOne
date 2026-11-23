@@ -219,14 +219,14 @@ final class AnalyticsPane extends MerchantPane {
         double[] orders = new double[n];
         for (int iter = 0; iter < n; iter++) {
             labels[iter] = daily.get(iter).label();
-            sales[iter] = daily.get(iter).salesCents() / 100.0;
+            sales[iter] = daily.get(iter).salesCents();
             orders[iter] = daily.get(iter).orders();
         }
         double[] prior = null;
         if (compare && before != null && before.daily() != null) {
             prior = new double[n];
             for (int iter = 0; iter < n && iter < before.daily().size(); iter++) {
-                prior[iter] = before.daily().get(iter).salesCents() / 100.0;
+                prior[iter] = before.daily().get(iter).salesCents();
             }
         }
         Container charts = new Container(new GridLayout(1, wideNow ? 2 : 1));
@@ -234,7 +234,7 @@ final class AnalyticsPane extends MerchantPane {
             charts.setLayout(BoxLayout.y());
         }
         charts.add(card("Sales by day", MCharts.line("chart-sales", labels, sales, prior)));
-        charts.add(card("Orders by day", MCharts.bars("chart-orders", labels, orders)));
+        charts.add(card("Orders by day", MCharts.bars("chart-orders", labels, orders, MCharts.COUNT)));
         page.add(charts);
 
         Container splits = new Container(wideNow ? new GridLayout(1, 2) : BoxLayout.y());
@@ -288,7 +288,7 @@ final class AnalyticsPane extends MerchantPane {
         for (int iter = 0; iter < list.size(); iter++) {
             BreakdownDto b = list.get(iter);
             labels[iter] = Lang.tr(b.label() == null ? Words.of(b.key()) : b.label());
-            values[iter] = Math.max(0, b.salesCents()) / 100.0;
+            values[iter] = Math.max(0, b.salesCents());
             shares[iter] = money(b.salesCents()) + "  " + (total <= 0 ? "0%"
                     : Period.percent((int) (b.salesCents() * 10000L / total)));
         }
