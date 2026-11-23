@@ -999,6 +999,15 @@
       ]
     },
     {
+      "id": "on-device-system-llm",
+      "category": "On-device AI",
+      "name": "Operating system language model",
+      "description": "Checks that the build keeps the platform's own language model backend (Gemini Nano, Apple Foundation Models), that every feature reports a status in bounded time, and that a device without the model refuses a request instead of hanging.",
+      "tests": [
+        "SystemLlmOnDeviceApiTest"
+      ]
+    },
+    {
       "id": "calendar-integration",
       "category": "Platform-dependent APIs",
       "name": "Calendar integration",

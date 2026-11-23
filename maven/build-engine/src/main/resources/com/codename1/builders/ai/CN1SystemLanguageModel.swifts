@@ -1,0 +1,367 @@
+// Copyright (c) 2026, Codename One and/or its affiliates. All rights reserved.
+// DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+// This code is free software; you can redistribute it and/or modify it
+// under the terms of the GNU General Public License version 2 only, as
+// published by the Free Software Foundation.  Codename One designates this
+// particular file as subject to the "Classpath" exception as provided
+// by Oracle in the LICENSE file that accompanied this code.
+//
+// This code is distributed in the hope that it will be useful, but WITHOUT
+// ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+// FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+// version 2 for more details (a copy is included in the LICENSE file that
+// accompanied this code).
+//
+// You should have received a copy of the GNU General Public License version
+// 2 along with this work; if not, write to the Free Software Foundation,
+// Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+//
+// Please contact Codename One through http://www.codenameone.com/ if you
+// need additional information or have any questions.
+
+// Apple's Foundation Models for com.codename1.ai.SystemLlmClient. The builder
+// copies this file into the app target only for an app that uses
+// SystemLlmClient; CN1SystemLlm.m finds the class with NSClassFromString.
+//
+// Two fences keep it building everywhere:
+// - #if canImport(FoundationModels): an Xcode that predates the framework
+//   compiles the stub branch, whose class answers "unsupported" for everything.
+//   The class exists in both branches, so the Objective-C side never changes.
+// - if #available: the deployment target is far below iOS/macOS 26, so the
+//   framework is weak-linked and only touched on an OS that has it.
+//
+// Feature and status numbers are com.codename1.impl.SystemLlmImpl's constants.
+
+import Foundation
+#if canImport(FoundationModels) && !os(tvOS) && !os(watchOS)
+import FoundationModels
+#endif
+
+@objc(CN1SystemLanguageModel)
+final class CN1SystemLanguageModel: NSObject {
+    private static let featureChat: Int32 = 0
+    private static let featureSummarize: Int32 = 1
+    private static let featureProofread: Int32 = 2
+    private static let featureRewrite: Int32 = 3
+
+    private static let statusUnsupported: Int32 = 0
+    private static let statusDisabled: Int32 = 1
+    private static let statusDownloading: Int32 = 3
+    private static let statusAvailable: Int32 = 4
+
+    /// One generation: pieces are produced by a Task and consumed by the
+    /// Java worker thread, which blocks in next() until one arrives.
+    final class Generation {
+        let lock = NSLock()
+        let signal = DispatchSemaphore(value: 0)
+        var pieces: [String] = []
+        var finished = false
+        var error: String?
+        var task: Task<Void, Never>?
+
+        func push(_ piece: String) {
+            lock.lock()
+            pieces.append(piece)
+            lock.unlock()
+            signal.signal()
+        }
+
+        func finish(_ failure: String?) {
+            lock.lock()
+            if !finished {
+                finished = true
+                error = failure
+            }
+            lock.unlock()
+            signal.signal()
+        }
+
+        /// nil once the generation has ended and every piece was taken.
+        func take() -> String? {
+            while true {
+                lock.lock()
+                if !pieces.isEmpty {
+                    let p = pieces.removeFirst()
+                    lock.unlock()
+                    return p
+                }
+                if finished {
+                    lock.unlock()
+                    return nil
+                }
+                lock.unlock()
+                signal.wait()
+            }
+        }
+    }
+
+    private let lock = NSLock()
+    private var generations: [Int32: Generation] = [:]
+    private var nextHandle: Int32 = 1
+    private var lastFailure: String?
+
+    @objc(providerName)
+    func providerName() -> String {
+        return "apple-foundation-models"
+    }
+
+    @objc(statusFor:)
+    func status(for feature: Int32) -> Int32 {
+        if feature > CN1SystemLanguageModel.featureRewrite {
+            // Images reach the model only through iOS/macOS 27 attachments,
+            // which this bridge does not use yet.
+            return CN1SystemLanguageModel.statusUnsupported
+        }
+#if canImport(FoundationModels) && !os(tvOS) && !os(watchOS)
+        if #available(iOS 26.0, macOS 26.0, visionOS 26.0, *) {
+            switch SystemLanguageModel.default.availability {
+            case .available:
+                return CN1SystemLanguageModel.statusAvailable
+            case .unavailable(.appleIntelligenceNotEnabled):
+                return CN1SystemLanguageModel.statusDisabled
+            case .unavailable(.modelNotReady):
+                return CN1SystemLanguageModel.statusDownloading
+            default:
+                return CN1SystemLanguageModel.statusUnsupported
+            }
+        }
+#endif
+        return CN1SystemLanguageModel.statusUnsupported
+    }
+
+    @objc(statusReasonFor:)
+    func statusReason(for feature: Int32) -> String? {
+        if feature > CN1SystemLanguageModel.featureRewrite {
+            return "Images are not supported by Apple's on-device model in this version"
+        }
+#if canImport(FoundationModels) && !os(tvOS) && !os(watchOS)
+        if #available(iOS 26.0, macOS 26.0, visionOS 26.0, *) {
+            switch SystemLanguageModel.default.availability {
+            case .available:
+                return nil
+            case .unavailable(.deviceNotEligible):
+                return "This device does not support Apple Intelligence"
+            case .unavailable(.appleIntelligenceNotEnabled):
+                return "Apple Intelligence is turned off in Settings"
+            case .unavailable(.modelNotReady):
+                return "The model is downloading or not ready yet"
+            default:
+                return "The on-device model is unavailable"
+            }
+        }
+        return "Apple's on-device model needs iOS or macOS 26 or newer"
+#else
+        return "The app was built with an Xcode that has no Foundation Models"
+#endif
+    }
+
+    /// The OS downloads the model on its own; there is nothing to start.
+    @objc(downloadFeature:)
+    func download(feature: Int32) -> Bool {
+        let s = status(for: feature)
+        if s == CN1SystemLanguageModel.statusAvailable
+            || s == CN1SystemLanguageModel.statusDownloading {
+            return true
+        }
+        lock.lock()
+        lastFailure = statusReason(for: feature) ?? "The model cannot be downloaded"
+        lock.unlock()
+        return false
+    }
+
+    @objc(startFeature:roles:contents:image:option:maxTokens:temperature:seed:)
+    func start(feature: Int32, roles: [String], contents: [String], image: Data?,
+               option: Int32, maxTokens: Int32, temperature: Float, seed: Int32) -> Int32 {
+#if canImport(FoundationModels) && !os(tvOS) && !os(watchOS)
+        if #available(iOS 26.0, macOS 26.0, visionOS 26.0, *) {
+            if status(for: feature) != CN1SystemLanguageModel.statusAvailable {
+                return fail(statusReason(for: feature) ?? "The on-device model is unavailable")
+            }
+            let gen = Generation()
+            lock.lock()
+            let handle = nextHandle
+            nextHandle += 1
+            generations[handle] = gen
+            lock.unlock()
+            let (transcript, prompt) = CN1SystemLanguageModel.conversation(
+                feature: feature, roles: roles, contents: contents, option: option)
+            var options = GenerationOptions()
+            if temperature >= 0 {
+                options.temperature = Double(temperature)
+            }
+            if maxTokens > 0 {
+                options.maximumResponseTokens = Int(maxTokens)
+            }
+            gen.task = Task.detached {
+                await CN1SystemLanguageModel.run(gen, transcript: transcript, prompt: prompt,
+                                                 options: options)
+            }
+            return handle
+        }
+#endif
+        return fail(statusReason(for: feature) ?? "The on-device model is unavailable")
+    }
+
+    @objc(nextFor:)
+    func next(handle: Int32) -> String? {
+        lock.lock()
+        let gen = generations[handle]
+        lock.unlock()
+        return gen?.take()
+    }
+
+    @objc(lastErrorFor:)
+    func lastError(handle: Int32) -> String? {
+        lock.lock()
+        defer { lock.unlock() }
+        if handle == 0 {
+            return lastFailure
+        }
+        guard let gen = generations[handle] else {
+            return nil
+        }
+        gen.lock.lock()
+        defer { gen.lock.unlock() }
+        return gen.error
+    }
+
+    @objc(closeHandle:)
+    func close(handle: Int32) {
+        lock.lock()
+        let gen = generations.removeValue(forKey: handle)
+        lock.unlock()
+        gen?.task?.cancel()
+        gen?.finish(nil)
+    }
+
+    private func fail(_ message: String) -> Int32 {
+        lock.lock()
+        lastFailure = message
+        lock.unlock()
+        return 0
+    }
+
+    /// The instructions a single-text feature runs under. Apple has no task
+    /// APIs like ML Kit's, so these are prompts to the general model.
+    private static func taskInstructions(_ feature: Int32, _ option: Int32) -> String? {
+        switch feature {
+        case featureSummarize:
+            let n = max(1, min(3, Int(option)))
+            return "Summarize the text the user gives you in at most \(n) short bullet "
+                + "point\(n == 1 ? "" : "s"), each starting with \"- \". Reply with the "
+                + "bullet points only."
+        case featureProofread:
+            return "Correct the grammar, spelling and punctuation of the text the user "
+                + "gives you. Keep the meaning, the voice and the language. Reply with the "
+                + "corrected text only."
+        case featureRewrite:
+            let styles = ["Rewrite the text with more detail, making it longer.",
+                          "Rewrite the text with fitting emoji added.",
+                          "Rewrite the text to be shorter, keeping its meaning.",
+                          "Rewrite the text in a friendly, casual tone.",
+                          "Rewrite the text in a professional, polished tone.",
+                          "Rephrase the text, keeping its meaning and length."]
+            let i = Int(option)
+            let style = i >= 0 && i < styles.count ? styles[i] : styles[5]
+            return style + " Keep the language of the original. Reply with the rewritten "
+                + "text only."
+        default:
+            return nil
+        }
+    }
+
+#if canImport(FoundationModels) && !os(tvOS) && !os(watchOS)
+    @available(iOS 26.0, macOS 26.0, visionOS 26.0, *)
+    private static func segment(_ text: String) -> [Transcript.Segment] {
+        return [.text(Transcript.TextSegment(content: text))]
+    }
+
+    /// Splits a Codename One conversation into a transcript and the prompt
+    /// that continues it: system messages become the instructions, earlier
+    /// turns become transcript entries, and the last user message is the
+    /// prompt.
+    @available(iOS 26.0, macOS 26.0, visionOS 26.0, *)
+    private static func conversation(feature: Int32, roles: [String], contents: [String],
+                                     option: Int32) -> (Transcript, String) {
+        var instructions: [String] = []
+        if let task = taskInstructions(feature, option) {
+            instructions.append(task)
+        }
+        var turns: [(String, String)] = []
+        for i in 0..<min(roles.count, contents.count) {
+            if roles[i] == "system" {
+                instructions.append(contents[i])
+            } else {
+                turns.append((roles[i], contents[i]))
+            }
+        }
+        var prompt = ""
+        if let last = turns.last, last.0 == "user" {
+            prompt = last.1
+            turns.removeLast()
+        }
+        var entries: [Transcript.Entry] = []
+        if !instructions.isEmpty {
+            entries.append(.instructions(Transcript.Instructions(
+                segments: segment(instructions.joined(separator: "\n\n")),
+                toolDefinitions: [])))
+        }
+        for turn in turns {
+            if turn.0 == "assistant" {
+                entries.append(.response(Transcript.Response(assetIDs: [],
+                                                             segments: segment(turn.1))))
+            } else {
+                entries.append(.prompt(Transcript.Prompt(segments: segment(turn.1))))
+            }
+        }
+        return (Transcript(entries: entries), prompt)
+    }
+
+    @available(iOS 26.0, macOS 26.0, visionOS 26.0, *)
+    private static func run(_ gen: Generation, transcript: Transcript, prompt: String,
+                            options: GenerationOptions) async {
+        let session = LanguageModelSession(model: SystemLanguageModel.default, tools: [],
+                                           transcript: transcript)
+        var sent = ""
+        do {
+            // Each snapshot holds the whole response so far; pass on what is new.
+            for try await snapshot in session.streamResponse(to: prompt, options: options) {
+                if Task.isCancelled {
+                    break
+                }
+                let text = snapshot.content
+                if text.hasPrefix(sent) {
+                    let delta = String(text.dropFirst(sent.count))
+                    if !delta.isEmpty {
+                        gen.push(delta)
+                    }
+                    sent = text
+                }
+            }
+            gen.finish(nil)
+        } catch let error as LanguageModelSession.GenerationError {
+            gen.finish(describe(error))
+        } catch {
+            gen.finish(error.localizedDescription)
+        }
+    }
+
+    @available(iOS 26.0, macOS 26.0, visionOS 26.0, *)
+    private static func describe(_ error: LanguageModelSession.GenerationError) -> String {
+        switch error {
+        case .exceededContextWindowSize:
+            return "The context window is full"
+        case .guardrailViolation:
+            return "The request was blocked by the model's safety guardrails"
+        case .unsupportedLanguageOrLocale:
+            return "The model does not support this language"
+        case .assetsUnavailable:
+            return "The model is not available right now"
+        case .rateLimited:
+            return "The model is rate limited; try again later"
+        default:
+            return error.localizedDescription
+        }
+    }
+#endif
+}
