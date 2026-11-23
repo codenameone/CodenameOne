@@ -3540,23 +3540,21 @@ public class Component implements Animation, StyleListener, Editable {
         }
 
         g.clipRect(translateX + getX(), translateY + getY(), getWidth(), getHeight());
-        // which form's tree is painting: a dialog paints the form behind it
-        // through here as well (Graphics.getPaintingForm())
-        Form previousPaintingForm = g.paintingForm;
-        g.paintingForm = getComponentForm();
-        try {
-            if (background) {
-                paintBackgrounds(g);
-            }
-
-            g.translate(translateX, translateY);
-            paintInternal(g);
-            g.translate(-translateX, -translateY);
-
-            paintGlassImpl(g);
-        } finally {
-            g.paintingForm = previousPaintingForm;
+        // The repaint root, so an image drawn below it can ask which form's
+        // tree is painting (Graphics.getPaintingForm()). Only a field write:
+        // the form is looked up by the rare caller, never here.
+        Component previousPaintingRoot = g.paintingRoot;
+        g.paintingRoot = this;
+        if (background) {
+            paintBackgrounds(g);
         }
+
+        g.translate(translateX, translateY);
+        paintInternal(g);
+        g.translate(-translateX, -translateY);
+
+        paintGlassImpl(g);
+        g.paintingRoot = previousPaintingRoot;
 
         g.setClip(clipX, clipY, clipW, clipH);
         //g.popClip();
@@ -10629,7 +10627,12 @@ public class Component implements Animation, StyleListener, Editable {
         public void paint(Graphics g, Rectangle rect) {
             if (painter != null) {
                 if (previousTint != null) {
+                    // the form behind a dialog paints here, outside any
+                    // paintComponent of its own: name it as the painting tree
+                    Component previousRoot = g.paintingRoot;
+                    g.paintingRoot = previousTint;
                     previousTint.paint(g);
+                    g.paintingRoot = previousRoot;
                 }
             } else {
                 Style s;

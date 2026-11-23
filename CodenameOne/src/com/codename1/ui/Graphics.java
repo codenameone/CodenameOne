@@ -53,8 +53,9 @@ public final class Graphics {
     /// call clearRect() for its bounds to "poke a hole" in the graphics context
     /// to see through to the native layer.
     boolean paintPeersBehind;
-    /// The form whose tree is being painted, set by `Component.paintComponent`.
-    Form paintingForm;
+    /// The repaint root `Component.paintComponent` is painting; its form is
+    /// resolved only when asked (`getPaintingForm()`).
+    Component paintingRoot;
     /// The label whose paint is under way, so an interactive icon it draws
     /// records where it went (`Label.paintedIcon`).
     Label paintingLabel;
@@ -950,7 +951,8 @@ public final class Graphics {
     ///
     /// the form being painted, or null
     public Form getPaintingForm() {
-        return paintingForm;
+        Component root = paintingRoot;
+        return root == null ? null : root.getComponentForm();
     }
 
     /// A number that changes with every paint pass of the display, so code

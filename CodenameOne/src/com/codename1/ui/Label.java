@@ -1655,7 +1655,7 @@ public class Label extends Component implements IconHolder, TextHolder {
     /// rectangle actually drawn rather than a second copy of the look and
     /// feel's placement math.
     private Image paintedIcon;
-    private final int[] paintedIconBounds = new int[4];
+    private int[] paintedIconBounds;
     /// True from a press inside the painted icon until the release: only
     /// then do drags and the release go to the icon.
     private boolean iconPressActive;
@@ -1664,6 +1664,9 @@ public class Label extends Component implements IconHolder, TextHolder {
     /// this label paints, in the graphics' coordinates (the label's parent's).
     void iconPainted(Image img, int x, int y, int w, int h) {
         paintedIcon = img;
+        if (paintedIconBounds == null) {
+            paintedIconBounds = new int[4];
+        }
         paintedIconBounds[0] = x - getX();
         paintedIconBounds[1] = y - getY();
         paintedIconBounds[2] = w;
@@ -1674,22 +1677,20 @@ public class Label extends Component implements IconHolder, TextHolder {
     /// background image) and the paint of every subclass's look and feel.
     @Override
     void internalPaintImpl(Graphics g, boolean paintIntersects) {
+        // Field writes only, no calls: Graphics.drawImage records an
+        // interactive image this paint draws (iconPainted), and forgetting the
+        // last one first keeps a replaced icon from being held or receiving
+        // pointer input.
+        paintedIcon = null;
         Label previous = g.paintingLabel;
         g.paintingLabel = this;
-        try {
-            super.internalPaintImpl(g, paintIntersects);
-        } finally {
-            g.paintingLabel = previous;
-        }
+        super.internalPaintImpl(g, paintIntersects);
+        g.paintingLabel = previous;
     }
 
-    /// Hands a pointer event to the interactive icon, in the icon's own pixel
-    /// coordinates. A press goes to it only when it lands on the rectangle
-    /// the icon was painted into; drags and the release only while such a
-    /// press is active. Returns true if the event went to the icon.
     boolean forwardPointerToIcon(int kind, int x, int y) {
         Image icon = paintedIcon;
-        if (icon == null || !icon.isInteractive()) {
+        if (icon == null || paintedIconBounds == null || !icon.isInteractive()) {
             iconPressActive = false;
             return false;
         }
