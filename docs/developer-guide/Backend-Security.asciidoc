@@ -1264,10 +1264,10 @@ consent page: registering a client with a scope is the consent.
 an authorization before a code is issued. It applies to every client whose
 `ClientSettings` sets `requireAuthorizationConsent`, and to any other client
 the policy picks. Pass `null` as the policy to ask only for those clients. The
-user sees the client's name, the address it will send them to and each scope it
+user sees the client's name, the site it will send them to and each scope it
 asked for, and the grant carries only the scopes they leave ticked. A request
 with `prompt=none` is then answered `consent_required`. Pass `null` as the
-page to use the built-in one, or the address of your own page.
+page to use the built-in one, or the path or `https` address of your own page.
 
 A consent isn't remembered: the user is asked again on every authorization.
 
@@ -1277,7 +1277,9 @@ A consent isn't remembered: the user is asked again on every authorization.
 `/oauth2/register`, and the server's metadata names it as
 `registration_endpoint`. It's off until it's called. An MCP client is the usual
 caller: it finds the server and registers itself without anyone setting it up
-first.
+first. It needs a client repository that keeps clients outside the process,
+such as `JdbcRegisteredClientRepository`; with the in-memory repository the
+server doesn't start.
 
 Anybody can call the endpoint, so a client registered there is always
 restricted, whatever the policy says:
@@ -1293,8 +1295,9 @@ restricted, whatever the policy says:
   or an `http` address on `127.0.0.1` or `[::1]`, which may then use any port.
 
 The `ClientRegistrationPolicy` names the scopes a registered client may have
-(`allowedScopes()`, required and never empty). Its `validate` method sees each
-request after these checks. It refuses a registration by throwing
+(`allowedScopes()`, required and never empty). A request that names no scope
+gets every one of them, and one that names a scope outside them is refused.
+Its `validate` method sees each request after these checks. It refuses a registration by throwing
 `ClientRegistrationException`, or it returns the client to save, possibly with
 fewer redirects, scopes or token lifetime. Count registrations per address there
 and refuse past a limit: every registration the endpoint accepts is a saved
@@ -2483,9 +2486,9 @@ read by the build, because it decides what's linked into the server.
 * **Concurrent-session control.** `sessionManagement` sets the creation policy
   and the fixation strategy, and nothing else.
 * **Ways of signing in beyond this chapter's.** Form, HTTP Basic, OAuth2 and
-  OpenID Connect, SAML 2.0, LDAP and Active Directory, passkeys, API keys and
-  remember-me are covered. Anything else is a filter or an
-  `AuthenticationProvider` of your own.
+  OpenID Connect, SAML 2.0, LDAP and Active Directory, passkeys, API keys,
+  bearer tokens (JWTs) and remember-me are covered. Anything else is a filter
+  or an `AuthenticationProvider` of your own.
 * **Other password schemes.** The delegating encoder knows `{pbkdf2-sha256}`,
   `{bcrypt}`, the two Spring PBKDF2 schemes and `{noop}`. A password stored
   under another id, such as `{argon2}` or `{scrypt}`, is refused unless you register
