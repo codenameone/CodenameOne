@@ -136,4 +136,22 @@ class GpuImageTest extends UITestBase {
         assertArrayEquals(new int[]{0, 0, 20, 10}, p.last);
         assertTrue(p.requiresDrawImage());
     }
+
+    @Test
+    void placementFillsTheLayeredPaneThatIsNeverLaidOut() {
+        // the layered pane never lays out its children; a 0x0 placement
+        // clips its surface away and the peer is never painted on screen
+        com.codename1.ui.Form f = new com.codename1.ui.Form();
+        f.show();
+        com.codename1.ui.Container pane = f.getFormLayeredPane(GpuImage.class, true);
+        com.codename1.ui.Container placement = new com.codename1.ui.Container();
+        pane.addComponent(placement);
+        f.revalidate();
+        assertTrue(pane.getWidth() > 0 && pane.getHeight() > 0);
+        GpuImage.fillParent(placement);
+        assertEquals(0, placement.getX());
+        assertEquals(0, placement.getY());
+        assertEquals(pane.getWidth(), placement.getWidth());
+        assertEquals(pane.getHeight(), placement.getHeight());
+    }
 }

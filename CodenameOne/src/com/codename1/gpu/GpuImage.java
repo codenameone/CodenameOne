@@ -333,6 +333,7 @@ public abstract class GpuImage extends Image {
             }
             pane.addComponent(p);
         }
+        fillParent(p);
         p.failed = p.view.peerFailed();
         passPointerEvents(p);
         // repaint so the Graphics frames drawn meanwhile give way to the surface
@@ -356,6 +357,7 @@ public abstract class GpuImage extends Image {
                 // move only the surface: a revalidate and full repaint of the
                 // form on every frame a scrolled image moves is far too much
                 SurfaceView v = p.view;
+                fillParent(p);
                 int ox = v.getAbsoluteX();
                 int oy = v.getAbsoluteY();
                 int ow = v.getWidth();
@@ -371,6 +373,22 @@ public abstract class GpuImage extends Image {
                 f.repaint(x1, y1, x2 - x1, y2 - y1);
             }
         });
+    }
+
+    /// Sizes the placement to the layered pane it is on. The pane is never
+    /// laid out (`setShouldLayout(false)`), so a placement left to it stays
+    /// 0x0, the surface it positions falls outside its parent's clip and is
+    /// never painted -- and a native peer that is never painted is never put
+    /// on screen: no GL surface on Android, no frames anywhere.
+    static void fillParent(Container p) {
+        Container parent = p.getParent();
+        if (parent == null) {
+            return;
+        }
+        p.setX(0);
+        p.setY(0);
+        p.setWidth(parent.getWidth());
+        p.setHeight(parent.getHeight());
     }
 
     private void detach(Placement p) {
