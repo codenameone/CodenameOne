@@ -390,8 +390,9 @@ part of the build. Keep it in one place, a constant or a value read at start-up,
 so a release build and a development run differ in one line:
 
 * Release builds use `https://app.example.com`.
-* The simulator uses `http://127.0.0.1:8080` against `cn1:backend`, the Android
-  emulator `http://10.0.2.2:8080`.
+* The simulator uses `http://127.0.0.1:8080` against `cn1:backend`. The Android
+  emulator reaches the same server on port 8080 of `10.0.2.2`, its address for the
+  host machine.
 
 Wayline's `AppConfig` shows one way: a system property for tests, then an
 address saved from a settings screen, then the page's origin in a browser, then
