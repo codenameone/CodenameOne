@@ -1296,12 +1296,13 @@ restricted, whatever the policy says:
 
 The `ClientRegistrationPolicy` names the scopes a registered client may have
 (`allowedScopes()`, required and never empty). A request that names no scope
-gets every one of them, and one that names a scope outside them is refused.
-Its `validate` method sees each request after these checks. It refuses a registration by throwing
-`ClientRegistrationException`, or it returns the client to save, possibly with
-fewer redirects, scopes or token lifetime. Count registrations per address there
-and refuse past a limit: every registration the endpoint accepts is a saved
-client, so a policy that accepts everything lets anyone fill the client table.
+gets every one of them, and one that names a scope outside them is refused. Its
+`validate` method sees each request after these checks. It refuses a
+registration by throwing `ClientRegistrationException`, or it returns the
+client to save, possibly with fewer redirects, scopes or token lifetime. Count
+registrations per address there and refuse past a limit: every registration the
+endpoint accepts is a saved client, so a policy that accepts everything lets
+anyone fill the client table.
 
 The registration management endpoint of RFC 7592 isn't provided.
 
