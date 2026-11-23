@@ -51,7 +51,8 @@ class SettingsTest {
                 // Signed up with no language known: none, so the app keeps
                 // (and sends) the device's.
                 .andExpect(jsonPath("$.language").value(""))
-                .andExpect(jsonPath("$.theme").value("system"))
+                // Nor a theme: the device keeps the look it has.
+                .andExpect(jsonPath("$.theme").value(""))
                 .andExpect(jsonPath("$.units").value("km"))
                 .andExpect(jsonPath("$.notifyOrderUpdates").value(true))
                 .andExpect(jsonPath("$.defaultPaymentMethodId").value("cash"));
