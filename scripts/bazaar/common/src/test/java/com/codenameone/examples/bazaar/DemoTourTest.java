@@ -527,6 +527,7 @@ public class DemoTourTest extends E2e {
         }
         visualShot("reg-cart-sheet" + mode);
         for (String s : new String[] {"pos-clear", "pos-discount", "pos-customer"}) {
+            reopen(s, "pos-pay");
             if (tap(s)) {
                 pause(1800);
                 visualShot("reg-" + s.substring(4) + mode);
@@ -565,12 +566,14 @@ public class DemoTourTest extends E2e {
                 dismiss();
                 pause(1200);
             }
+            reopen("pos-gift", "pos-tender");
             if (tap("pos-gift")) {
                 pause(1800);
                 visualShot("reg-tender-gift" + mode);
                 dismiss();
                 pause(1200);
             }
+            reopen("pos-card", "pos-tender");
             if (tap("pos-card")) {
                 pause(3500);
                 visualShot("reg-tender-card" + mode);
@@ -604,6 +607,14 @@ public class DemoTourTest extends E2e {
         pause(2000);
         go(MerchantSections.REPORTS);
         pause(3500);
+        visualShot("reg-reports" + mode);
+        if (tap("report-run")) {
+            pause(3000);
+            visualShot("reg-reports-run" + mode);
+        }
+        if (tap("reports-profit-loss")) {
+            pause(3000);
+        }
         visualShot("reg-pnl" + mode);
         scrollDown(2);
         visualShot("reg-pnl-2" + mode);
@@ -611,7 +622,19 @@ public class DemoTourTest extends E2e {
 
     /// Design-review captures of the screens no other tour reaches: the
     /// merchant's lists and their detail screens, checkout, and the admin's.
-        /// Closes the sheet on top, or goes back when there is none. Not waited
+        /// Opens the sheet holding `name` again through `opener` (the pay
+    /// button opens the cart, then the tender) when a closed child sheet took
+    /// it down with it.
+    private void reopen(String name, String opener) {
+        for (int i = 0; i < 2 && findByName(name) == null; i++) {
+            if (!tap(opener) && !tap("pos-pay")) {
+                return;
+            }
+            pause(1800);
+        }
+    }
+
+    /// Closes the sheet on top, or goes back when there is none. Not waited
     /// on: closing one sheet can reopen the one under it.
     private void dismiss() {
         com.codename1.ui.CN.callSerially(() -> {

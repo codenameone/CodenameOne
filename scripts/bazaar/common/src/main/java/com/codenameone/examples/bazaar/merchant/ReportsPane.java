@@ -19,6 +19,7 @@
 package com.codenameone.examples.bazaar.merchant;
 
 import com.codename1.appkit.Net;
+import com.codename1.l10n.SimpleDateFormat;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.FontImage;
@@ -36,6 +37,7 @@ import com.codenameone.examples.bazaar.net.Api;
 import com.codenameone.examples.bazaar.ui.Lang;
 import com.codenameone.examples.bazaar.ui.Ui;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 
 /// The report builder (dimensions, metrics and a range to a table and a bar
@@ -45,6 +47,53 @@ final class ReportsPane extends MerchantPane {
     static final String[] DIMENSIONS = {"day", "week", "month", "channel", "source", "medium",
         "campaign", "product", "location"};
     static final String[] METRICS = {"sales", "sales,orders", "orders,units", "aov,customers"};
+    /// What the pickers show for [#DIMENSIONS] and [#METRICS], in order; bundle keys.
+    static final String[] DIMENSION_LABELS = {"Day", "Week", "Month", "Channel", "Source", "Medium",
+        "Campaign", "Product", "Location"};
+    static final String[] METRIC_LABELS = {"Sales", "Sales and orders", "Orders and units",
+        "Average order and customers"};
+    private static final long DAY = 24L * 60 * 60 * 1000;
+
+    /// A picker of readable choices, the first selected; read back with
+    /// [MUi#code] against the matching codes.
+    private static Picker choice(Container to, String caption, String name, String[] keys) {
+        String[] labels = new String[keys.length];
+        for (int iter = 0; iter < keys.length; iter++) {
+            labels[iter] = Lang.tr(keys[iter]);
+        }
+        Picker p = MUi.picker(to, caption, name, keys, keys[0]);
+        p.setStrings(labels);
+        p.setSelectedStringIndex(0);
+        trailing(p, FontImage.MATERIAL_EXPAND_MORE);
+        return p;
+    }
+
+    /// A date picker showing its date as "Sep 25, 2026".
+    private static Picker date(Container to, String caption, String name, long at) {
+        Picker p = new Picker();
+        p.setType(com.codename1.ui.Display.PICKER_TYPE_DATE);
+        p.setUIID("SvField");
+        p.setName(name);
+        p.setFormatter(new SimpleDateFormat("MMM d, yyyy"));
+        p.setDate(new Date(at));
+        trailing(p, FontImage.MATERIAL_CALENDAR_TODAY);
+        to.add(Ui.label(caption, "SvLabel"));
+        to.add(p);
+        return p;
+    }
+
+    /// An icon at the far end of a picker, so it reads as a choice and not
+    /// as a field to type in.
+    private static void trailing(Picker p, char icon) {
+        FontImage.setMaterialIcon(p, icon);
+        p.setTextPosition(Component.LEFT);
+    }
+
+    /// A date picker's date as the "yyyy-MM-dd" the report takes.
+    static String iso(Picker p) {
+        Date d = p.getDate();
+        return d == null ? "" : new SimpleDateFormat("yyyy-MM-dd").format(d);
+    }
 
     ReportsPane() {
         super("Reports", "merchant-reports");
@@ -60,16 +109,17 @@ final class ReportsPane extends MerchantPane {
         final Container page = new Container(BoxLayout.y());
         page.setName("reports-page");
         page.setUIID("ReportsPage");
-        final Picker d1 = MUi.picker(page, Lang.tr("Group by"), "report-dimension", DIMENSIONS, "day");
-        final Picker metrics = MUi.picker(page, Lang.tr("Measure"), "report-metrics", METRICS, "sales");
-        final TextField from = MUi.text(page, Lang.tr("From (yyyy-MM-dd)"), "report-from", "");
-        final TextField to = MUi.text(page, Lang.tr("To (yyyy-MM-dd)"), "report-to", "");
+        final Picker d1 = choice(page, Lang.tr("Group by"), "report-dimension", DIMENSION_LABELS);
+        final Picker metrics = choice(page, Lang.tr("Measure"), "report-metrics", METRIC_LABELS);
+        long now = System.currentTimeMillis();
+        final Picker from = date(page, Lang.tr("From"), "report-from", now - 30L * DAY);
+        final Picker to = date(page, Lang.tr("To"), "report-to", now);
         final TextField name = MUi.text(page, Lang.tr("Save as"), "report-name", "");
         final Container result = new Container(BoxLayout.y());
         result.setName("report-result");
-        page.add(MUi.buttons(Ui.primary(Lang.tr("Run"), "report-run", e -> {
+        page.add(MUi.cardButtons(Ui.primary(Lang.tr("Run report"), "report-run", e -> {
             ReportSpecDto spec = new ReportSpecDto(name.getText().trim(), MUi.code(d1, DIMENSIONS), "",
-                    MUi.code(metrics, METRICS), "", "", from.getText().trim(), to.getText().trim());
+                    MUi.code(metrics, METRICS), "", "", iso(from), iso(to));
             Api.ops().runReport(MerchantState.storeId(), spec, Net.to(r -> {
                 show(result, r);
                 if (spec.name().length() > 0) {
