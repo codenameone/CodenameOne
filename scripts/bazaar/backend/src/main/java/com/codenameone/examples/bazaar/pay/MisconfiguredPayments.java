@@ -96,7 +96,7 @@ public class MisconfiguredPayments implements PaymentProvider {
     }
 
     @Override
-    public Refund refund(String chargeReference, long amountCents) throws IOException {
+    public Refund refund(String chargeReference, long amountCents, String key) throws IOException {
         throw fail();
     }
 

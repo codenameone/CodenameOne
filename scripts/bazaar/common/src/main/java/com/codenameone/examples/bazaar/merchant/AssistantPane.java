@@ -62,6 +62,8 @@ final class AssistantPane extends MerchantPane {
     private ChatView chat;
     private final List<ChatMessage> history = new ArrayList<ChatMessage>();
     private boolean asking;
+    /// The store the conversation is about; another store starts a new one.
+    private String chatStore;
 
     AssistantPane() {
         super("Assistant", "assistant-pane");
@@ -71,6 +73,16 @@ final class AssistantPane extends MerchantPane {
     @Override
     void load() {
         final String store = MerchantState.storeId();
+        if (chat != null && chatStore != null && !chatStore.equals(store)) {
+            // Another store's numbers and answers must not carry over.
+            history.clear();
+            data = null;
+            insights = null;
+            board = null;
+            asking = false;
+            chat = null;
+        }
+        chatStore = store;
         Period p = Period.preset(Period.LAST_30, System.currentTimeMillis());
         Api.analytics().dashboard(store, p.fromParam(), p.toParam(), Net.to(found -> {
             data = found;
@@ -123,9 +135,13 @@ final class AssistantPane extends MerchantPane {
                 data != null && data.currency() != null ? data.currency()
                         : MerchantState.currency());
         final List<ChatMessage> before = new ArrayList<ChatMessage>(history);
+        final ChatView askedIn = chat;
         new AssistantRun(client(), tools).ask(before, question, new AssistantRun.Done() {
             @Override
             public void answered(String answer) {
+                if (askedIn != chat) {
+                    return;
+                }
                 asking = false;
                 chat.setTypingIndicatorVisible(false);
                 String shown = answer.length() == 0
@@ -138,6 +154,9 @@ final class AssistantPane extends MerchantPane {
 
             @Override
             public void failed(Throwable error) {
+                if (askedIn != chat) {
+                    return;
+                }
                 asking = false;
                 chat.setTypingIndicatorVisible(false);
                 chat.addMessage(ChatMessage.assistant(Lang.tr(

@@ -71,6 +71,14 @@ public class Payment {
     @Column(nullable = false)
     private Instant refundedAt = Instant.EPOCH;
 
+    /// What the refund under way (status REFUNDING) asks for; 0 otherwise.
+    @Column(nullable = false)
+    private long pendingRefundCents;
+
+    /// When the refund under way was claimed.
+    @Column(nullable = false)
+    private Instant refundClaimedAt = Instant.EPOCH;
+
     public Payment() {
     }
 
@@ -176,6 +184,22 @@ public class Payment {
 
     public void setRefundReason(String refundReason) {
         this.refundReason = refundReason;
+    }
+
+    public long getPendingRefundCents() {
+        return pendingRefundCents;
+    }
+
+    public void setPendingRefundCents(long pendingRefundCents) {
+        this.pendingRefundCents = pendingRefundCents;
+    }
+
+    public Instant getRefundClaimedAt() {
+        return refundClaimedAt;
+    }
+
+    public void setRefundClaimedAt(Instant refundClaimedAt) {
+        this.refundClaimedAt = refundClaimedAt;
     }
 
     public Instant getRefundedAt() {

@@ -178,7 +178,7 @@ public class SimulatedPayments implements PaymentProvider {
     }
 
     @Override
-    public Refund refund(String chargeReference, long amountCents) throws IOException {
+    public Refund refund(String chargeReference, long amountCents, String key) throws IOException {
         // Named after the charge, as a real processor's refund is keyed by
         // it: asking twice is one refund, which is what lets a refund whose
         // answer was lost be asked for again.

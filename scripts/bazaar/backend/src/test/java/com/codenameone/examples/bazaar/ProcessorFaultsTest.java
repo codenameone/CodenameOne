@@ -38,6 +38,7 @@ import static com.codename1.backend.test.MockMvcRequestBuilders.post;
 import static com.codename1.backend.test.MockMvcResultMatchers.jsonPath;
 import static com.codename1.backend.test.MockMvcResultMatchers.status;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 
 /// Paying, against a processor that fails when a test says so: what is left
 /// behind when a request to it fails part way, alone or overlapping another.
@@ -189,5 +190,73 @@ class ProcessorFaultsTest {
         assertEquals(200, refusal(refund(order)));
         assertEquals(Payments.REFUNDED, payments.receipt(customer, false, order).status());
         processor.reset();
+    }
+
+    @Test
+    void aRefundAskedAgainAfterALostAnswerSendsTheSameKey() throws Exception {
+        processor.reset();
+        String customer = People.customer(accounts, "refund-retrier");
+        String card = (String) Rest.addCard(mvc, customer, Rest.VISA).get("id");
+        final String order = Ids.next();
+        payments.authorize(order, customer, card, 3000L, "USD");
+        assertEquals(Payments.PAID, payments.capture(order));
+
+        // The processor made the refund but the answer was lost: asked again,
+        // it must see the same key, or it would return the money twice.
+        processor.refundFailures.add(Boolean.TRUE);
+        assertEquals(502, refusal(partial(order, 1000L)));
+        assertEquals(200, refusal(partial(order, 1000L)));
+        assertEquals(2, processor.keys.size());
+        assertEquals(processor.keys.get(0), processor.keys.get(1));
+
+        // A second partial refund of the same amount is a new refund.
+        assertEquals(200, refusal(partial(order, 1000L)));
+        assertEquals(3, processor.keys.size());
+        assertNotEquals(processor.keys.get(1), processor.keys.get(2));
+        assertEquals(2000L, payments.receipt(customer, false, order).refunded());
+        processor.reset();
+    }
+
+    @Test
+    void aRefundLeftClaimedIsFinishedUnderItsOwnKey() throws Exception {
+        processor.reset();
+        String customer = People.customer(accounts, "refund-stranded");
+        String card = (String) Rest.addCard(mvc, customer, Rest.VISA).get("id");
+        final String order = Ids.next();
+        payments.authorize(order, customer, card, 3000L, "USD");
+        assertEquals(Payments.PAID, payments.capture(order));
+        String ref = (String) db.queryOne("SELECT provider_ref FROM payment WHERE order_id = ?",
+                new Object[] {order}).get("provider_ref");
+
+        // The server stopped after claiming a refund of 1200: the row stays
+        // REFUNDING until the sweep asks again with the same key.
+        db.execute("UPDATE payment SET status = 'REFUNDING', pending_refund_cents = 1200, "
+                + "refund_claimed_at = 1 WHERE order_id = ?", new Object[] {order});
+        payments.resumeRefunds();
+        assertEquals(Payments.PARTIALLY_REFUNDED, payments.receipt(customer, false, order).status());
+        assertEquals(1200L, payments.receipt(customer, false, order).refunded());
+        assertEquals(Payments.refundKey(ref, 0L, 1200L), processor.keys.get(0));
+
+        // One the processor refuses goes back to where it was.
+        db.execute("UPDATE payment SET status = 'REFUNDING', pending_refund_cents = 500, "
+                + "refund_claimed_at = 1 WHERE order_id = ?", new Object[] {order});
+        processor.refundFailures.add(Boolean.TRUE);
+        payments.resumeRefunds();
+        assertEquals(Payments.PARTIALLY_REFUNDED, payments.receipt(customer, false, order).status());
+        assertEquals(1200L, payments.receipt(customer, false, order).refunded());
+        processor.reset();
+    }
+
+    private Runnable partial(final String orderId, final long cents) {
+        return new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    payments.refund(orderId, cents, "Part");
+                } catch (IOException e) {
+                    throw new IllegalStateException(e);
+                }
+            }
+        };
     }
 }

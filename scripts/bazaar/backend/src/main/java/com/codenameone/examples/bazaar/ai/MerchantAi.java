@@ -193,18 +193,29 @@ public class MerchantAi {
             return out;
         }
         List list = (List) raw;
-        int from = Math.max(0, list.size() - MAX_MESSAGES);
-        if (!list.isEmpty() && from > 0) {
-            out.add(copy(list.get(0)));
+        // The first message names the task (a system message the caller
+        // removes before the server writes its own prompt); it is always
+        // kept. Any other system message is the client's and never reaches
+        // the model, where it could override the server's rules.
+        Map<String, Object> first = list.isEmpty() ? null : copy(list.get(0));
+        if (first != null) {
+            out.add(first);
         }
+        int from = Math.max(1, list.size() - MAX_MESSAGES);
+        boolean head = true;
         for (int iter = from; iter < list.size(); iter++) {
             Map<String, Object> m = copy(list.get(iter));
-            if (m != null) {
-                out.add(m);
+            if (m == null || "system".equals(m.get("role"))) {
+                continue;
             }
-        }
-        while (out.remove(null)) {
-            // drops what was not a message
+            // A tool answer whose assistant tool_calls message was cut off
+            // is refused by the completion API, so a cut tail starts after
+            // any such orphans.
+            if (head && from > 1 && "tool".equals(m.get("role"))) {
+                continue;
+            }
+            head = false;
+            out.add(m);
         }
         return out;
     }

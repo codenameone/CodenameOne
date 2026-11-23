@@ -37,11 +37,15 @@ final class ScriptedPayments extends SimulatedPayments {
     final List<Boolean> refundFailures = new ArrayList<Boolean>();
     /// Whether detaching a card fails the same way.
     boolean detachFails;
+    /// The idempotency key of every refund asked for, in order, failed or not.
+    final List<String> keys = new ArrayList<String>();
+
     /// The tokens of the cards detached, in order.
     final List<String> detached = new ArrayList<String>();
 
     /// Back to a processor that does what the simulated one does.
     void reset() {
+        keys.clear();
         duringRefund = null;
         refundFailures.clear();
         detachFails = false;
@@ -49,7 +53,8 @@ final class ScriptedPayments extends SimulatedPayments {
     }
 
     @Override
-    public Refund refund(String chargeReference, long amountCents) throws IOException {
+    public Refund refund(String chargeReference, long amountCents, String key) throws IOException {
+        keys.add(key);
         Runnable during = duringRefund;
         duringRefund = null;
         if (during != null) {
@@ -58,7 +63,7 @@ final class ScriptedPayments extends SimulatedPayments {
         if (!refundFailures.isEmpty() && refundFailures.remove(0).booleanValue()) {
             throw new IOException("The scripted processor did not answer");
         }
-        return super.refund(chargeReference, amountCents);
+        return super.refund(chargeReference, amountCents, key);
     }
 
     @Override

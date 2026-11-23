@@ -78,6 +78,9 @@ public class Payments {
     private static final String CAPTURING = "CAPTURING";
     private static final String VOIDING = "VOIDING";
     private static final String REFUNDING = "REFUNDING";
+
+    /// How long a refund may stay claimed before [#resumeRefunds] finishes it.
+    static final long STALE_REFUND_MILLIS = 10L * 60L * 1000L;
     /// The id and the label of the method every account has.
     public static final String CASH = "cash";
     public static final String CASH_LABEL = "Cash";
@@ -498,7 +501,8 @@ public class Payments {
                 throw new ResponseStatusException(402, "The card is no longer on the account");
             }
             try {
-                reference = cut(provider.authorize("order-" + orderId, references[0], references[1],
+                reference = cut(provider.authorize(authorizeKey(orderId, references[1], amountCents),
+                        references[0], references[1],
                         amountCents, currency, "Bazaar order"), 64);
             } catch (PaymentDeclinedException declined) {
                 throw new ResponseStatusException(402, declined.getMessage());
@@ -554,6 +558,16 @@ public class Payments {
         return out;
     }
 
+    /// The idempotency key of one hold: the order, the card and the amount. A
+    /// retry after a lost answer with the same card is answered with the first
+    /// hold; a retry with another card after a decline is a new attempt, never
+    /// the cached decline (or Stripe's idempotency error for changed
+    /// parameters) of the first.
+    public static String authorizeKey(String orderId, String token, long amountCents) {
+        return "order-" + orderId + "-" + Integer.toHexString(token == null ? 0 : token.hashCode())
+                + "-" + amountCents;
+    }
+
     /// [#authorize] for a [OneOffCard]: holds the amount on it and records the
     /// payment, keyed by the order as every payment is.
     public String authorizeCard(String orderId, String payer, OneOffCard card, long amountCents,
@@ -564,7 +578,8 @@ public class Payments {
         }
         String reference;
         try {
-            reference = cut(provider.authorize("order-" + orderId, card.customer, card.token,
+            reference = cut(provider.authorize(authorizeKey(orderId, card.token, amountCents),
+                    card.customer, card.token,
                     amountCents, currency, "Bazaar order"), 64);
         } catch (PaymentDeclinedException declined) {
             throw new ResponseStatusException(402, declined.getMessage());
@@ -820,14 +835,15 @@ public class Payments {
         if (amount > left || amount <= 0) {
             throw new ResponseStatusException(400, "That is more than is left to refund");
         }
-        Payment payment = claim(orderId, from, REFUNDING);
+        Payment payment = claimRefund(orderId, from, amount);
         if (payment == null) {
             throw new ResponseStatusException(409, "That payment is changing; try again");
         }
         PaymentProvider.Refund done = null;
         if (atProcessor(payment.getProviderRef())) {
             try {
-                done = provider.refund(payment.getProviderRef(), amount);
+                done = provider.refund(payment.getProviderRef(), amount,
+                        refundKey(payment.getProviderRef(), payment.getRefundedCents(), amount));
             } catch (IOException failed) {
                 finish(orderId, REFUNDING, from);
                 throw unavailable("refund", failed);
@@ -836,11 +852,69 @@ public class Payments {
         return receipt(keepRefund(orderId, amount, reason, done), true);
     }
 
+    /// The idempotency key of one refund intent: the charge, what had been
+    /// refunded before it and what it asks for. A retry of a refund whose
+    /// answer was lost (a timeout after the processor made it) names the same
+    /// key and is answered with the first refund, never a second; a genuine
+    /// further partial refund starts from a larger refunded total and gets a
+    /// key of its own.
+    public static String refundKey(String chargeReference, long refundedBefore, long amountCents) {
+        return "refund-" + chargeReference + "-" + refundedBefore + "-" + amountCents;
+    }
+
+    @Transactional
+    private Payment claimRefund(String orderId, String from, long amount) {
+        if (payment(orderId) == null || payments.claimRefund(orderId, from, amount, Instant.now()) != 1) {
+            return null;
+        }
+        return payments.findById(orderId);
+    }
+
+    /// Finishes refunds left REFUNDING for more than ten minutes -- the server
+    /// stopped, or keeping the result failed, after the claim. Each is asked
+    /// for again under its own key, so a refund the processor already made is
+    /// answered, not repeated, and is then recorded as any refund is. One the
+    /// processor refuses, or one claimed with no amount kept, goes back to
+    /// where it was, for the merchant to ask again.
+    @Scheduled(fixedDelay = 300000, initialDelay = 90000, lock = "bazaar-stale-refunds")
+    public void resumeRefunds() {
+        List<Payment> stale = staleRefunds(Instant.now().minusMillis(STALE_REFUND_MILLIS));
+        for (int iter = 0; iter < stale.size(); iter++) {
+            Payment row = stale.get(iter);
+            String orderId = row.getOrderId();
+            String from = row.getRefundedCents() > 0 ? PARTIALLY_REFUNDED : PAID;
+            long amount = row.getPendingRefundCents();
+            if (amount <= 0 || amount > row.getAmountCents() - row.getRefundedCents()) {
+                finish(orderId, REFUNDING, from);
+                continue;
+            }
+            PaymentProvider.Refund done = null;
+            if (atProcessor(row.getProviderRef())) {
+                try {
+                    done = provider.refund(row.getProviderRef(), amount,
+                            refundKey(row.getProviderRef(), row.getRefundedCents(), amount));
+                } catch (IOException failed) {
+                    System.err.println("the interrupted refund of order " + orderId
+                            + " was not finished: " + failed.getMessage());
+                    finish(orderId, REFUNDING, from);
+                    continue;
+                }
+            }
+            keepRefund(orderId, amount, row.getRefundReason(), done);
+        }
+    }
+
+    @Transactional(readOnly = true)
+    private List<Payment> staleRefunds(Instant before) {
+        return payments.findByStatusAndRefundClaimedAtLessThan(REFUNDING, before);
+    }
+
     @Transactional
     private Payment keepRefund(String orderId, long amount, String reason, PaymentProvider.Refund done) {
         Payment row = payments.findById(orderId);
         long refunded = row.getRefundedCents() + amount;
         row.setRefundedCents(refunded);
+        row.setPendingRefundCents(0L);
         row.setRefundReason(cut(reason == null ? "" : reason, 255));
         row.setRefundedAt(Instant.now());
         if (done != null) {

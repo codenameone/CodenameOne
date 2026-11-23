@@ -20,6 +20,7 @@ package com.codenameone.examples.bazaar;
 
 import com.codenameone.examples.bazaar.pay.PaymentDeclinedException;
 import com.codenameone.examples.bazaar.pay.PaymentProvider;
+import com.codenameone.examples.bazaar.pay.Payments;
 import com.codenameone.examples.bazaar.pay.StripePayments;
 import org.junit.jupiter.api.Test;
 
@@ -291,15 +292,15 @@ class StripePaymentsTest {
                 .reply(200, "{\"id\":\"re_1\",\"object\":\"refund\",\"status\":\"succeeded\"}")
                 .reply(200, "{\"id\":\"re_2\",\"object\":\"refund\",\"status\":\"failed\"}");
         StripePayments stripe = new StripePayments(script, RETURN);
-        PaymentProvider.Refund made = stripe.refund("pi_1", 1840L);
+        PaymentProvider.Refund made = stripe.refund("pi_1", 1840L, "refund-pi_1-0-1840");
         assertEquals("re_1", made.reference);
         assertFalse(made.pending);
         assertEquals("POST /v1/refunds", script.asked.get(0));
         has(script.forms.get(0), "payment_intent=pi_1");
         has(script.forms.get(0), "amount=1840");
-        assertTrue(script.keys.get(0).startsWith("refund-pi_1-1840-"), script.keys.get(0));
+        assertEquals("refund-pi_1-0-1840", script.keys.get(0));
         try {
-            stripe.refund("pi_1", 1840L);
+            stripe.refund("pi_1", 1840L, "refund-pi_1-0-1840");
             fail("A refund that failed was taken as made");
         } catch (IOException expected) {
             assertTrue(expected.getMessage().indexOf("failed") > 0);
@@ -308,15 +309,17 @@ class StripePaymentsTest {
 
     @Test
     void twoPartialRefundsOfOnePaymentNeverShareAKey() throws Exception {
-        // Stripe answers a reused key with the first refund's result, so a
-        // second $5 refund on the same key would move no money.
+        // Stripe is sent exactly the caller's key: Payments names each refund
+        // intent by the amount already refunded, so a retry after a lost
+        // answer replays while a second partial refund moves money.
         Script script = new Script()
                 .reply(200, "{\"id\":\"re_a\",\"object\":\"refund\",\"status\":\"succeeded\"}")
                 .reply(200, "{\"id\":\"re_b\",\"object\":\"refund\",\"status\":\"succeeded\"}");
         StripePayments stripe = new StripePayments(script, RETURN);
-        stripe.refund("pi_9", 500L);
-        stripe.refund("pi_9", 500L);
-        assertFalse(script.keys.get(0).equals(script.keys.get(1)), script.keys.toString());
+        stripe.refund("pi_9", 500L, Payments.refundKey("pi_9", 0L, 500L));
+        stripe.refund("pi_9", 500L, Payments.refundKey("pi_9", 500L, 500L));
+        assertEquals("refund-pi_9-0-500", script.keys.get(0));
+        assertEquals("refund-pi_9-500-500", script.keys.get(1));
     }
 
     @Test
@@ -331,15 +334,38 @@ class StripePaymentsTest {
                 .reply(200, "{\"id\":\"re_5\",\"object\":\"refund\",\"status\":\"failed\"}");
         StripePayments stripe = new StripePayments(script, RETURN);
         // Taken, but not yet money back: neither is a refund to record as made.
-        PaymentProvider.Refund pending = stripe.refund("pi_3", 900L);
+        PaymentProvider.Refund pending = stripe.refund("pi_3", 900L, "refund-pi_3-0-900");
         assertEquals("re_3", pending.reference);
         assertTrue(pending.pending);
-        assertTrue(stripe.refund("pi_4", 900L).pending);
+        assertTrue(stripe.refund("pi_4", 900L, "refund-pi_4-0-900").pending);
         assertEquals(PaymentProvider.REFUND_PENDING, stripe.refundStatus("re_3"));
         assertEquals("GET /v1/refunds/re_3", script.asked.get(2));
         assertEquals(PaymentProvider.REFUND_SUCCEEDED, stripe.refundStatus("re_3"));
         // Canceled returned no more money than failed did.
         assertEquals(PaymentProvider.REFUND_FAILED, stripe.refundStatus("re_4"));
         assertEquals(PaymentProvider.REFUND_FAILED, stripe.refundStatus("re_5"));
+    }
+
+    @Test
+    void aHoldRetriedWithAnotherCardIsANewAttempt() throws Exception {
+        // A decline is cached under its key: the shopper's next card must not
+        // be answered with it, while the same card asked again after a lost
+        // answer must replay the first hold.
+        Script script = new Script()
+                .reply(402, "{\"error\":{\"type\":\"card_error\",\"message\":\"declined\"}}")
+                .reply(200, "{\"id\":\"pi_2\",\"status\":\"requires_capture\"}");
+        StripePayments stripe = new StripePayments(script, RETURN);
+        try {
+            stripe.authorize(Payments.authorizeKey("o1", "pm_bad", 1840L), "cus_1", "pm_bad",
+                    1840L, "USD", "Bazaar order");
+            fail("A declined card was held");
+        } catch (PaymentDeclinedException expected) {
+            // declined
+        }
+        stripe.authorize(Payments.authorizeKey("o1", "pm_good", 1840L), "cus_1", "pm_good",
+                1840L, "USD", "Bazaar order");
+        assertFalse(script.keys.get(0).equals(script.keys.get(1)), script.keys.toString());
+        assertEquals(Payments.authorizeKey("o1", "pm_good", 1840L),
+                Payments.authorizeKey("o1", "pm_good", 1840L));
     }
 }

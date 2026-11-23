@@ -81,10 +81,15 @@ public interface PaymentProvider {
     /// returned the money: such a refund comes back [Refund#pending], and is
     /// asked about with [#refundStatus] until it has an answer.
     ///
+    /// `key` names this one refund: the caller sends the same key when it asks
+    /// again for a refund whose answer was lost, and a processor that honours
+    /// idempotency answers that with the first refund rather than making a
+    /// second one.
+    ///
     /// @return the refund as the processor took it
     /// - `IOException`: when the processor could not be asked, or refused the
     ///   refund outright
-    Refund refund(String chargeReference, long amountCents) throws IOException;
+    Refund refund(String chargeReference, long amountCents, String key) throws IOException;
 
     /// What became of a refund that was [Refund#pending]: [#REFUND_SUCCEEDED],
     /// [#REFUND_PENDING] while the processor still does not know, or

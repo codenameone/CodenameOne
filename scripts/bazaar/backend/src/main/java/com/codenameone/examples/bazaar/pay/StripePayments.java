@@ -319,19 +319,14 @@ public class StripePayments implements PaymentProvider {
         ask("POST", path + "/cancel", form(), "release-" + reference);
     }
 
-    /// One key per refund, never per payment: a payment is refunded in parts,
-    /// and Stripe answers a reused key with the FIRST refund's result -- a
-    /// second $5 refund would be recorded with no money moving. Nothing here
-    /// resends a request, and Payments claims the payment (REFUNDING) for the
-    /// call, so a fresh key per call cannot double a refund.
-    static String refundKey(String chargeReference, long amountCents) throws IOException {
-        return "refund-" + chargeReference + "-" + amountCents + "-" + com.codenameone.examples.bazaar.Ids.next();
-    }
-
+    /// The key is the caller's (Payments.refundKey), one per refund intent:
+    /// a retry of a refund whose answer was lost sends the same key, and
+    /// Stripe replays its first answer instead of returning the money twice,
+    /// while a second partial refund names a different key and moves money.
     @Override
-    public Refund refund(String chargeReference, long amountCents) throws IOException {
+    public Refund refund(String chargeReference, long amountCents, String key) throws IOException {
         Map answer = ask("POST", "/v1/refunds", form("payment_intent", chargeReference,
-                "amount", String.valueOf(amountCents)), refundKey(chargeReference, amountCents));
+                "amount", String.valueOf(amountCents)), key);
         String status = refundState(text(answer, "status"));
         if (REFUND_FAILED.equals(status)) {
             throw new IOException("The refund was not accepted: " + text(answer, "status"));

@@ -55,7 +55,14 @@ public final class TwoFactorForm {
     private static void askCode(final Form previous, final Net.Ok<String> code,
             final Runnable cancelled) {
         final Form form = Ui.form("Authenticator code", "TwoFactorCode");
+        // One answer per prompt: a double tap on Continue (or Back after it)
+        // would hand the waiting request a second answer.
+        final boolean[] answered = new boolean[1];
         Ui.back(form, () -> {
+            if (answered[0]) {
+                return;
+            }
+            answered[0] = true;
             previous.showBack();
             cancelled.run();
         });
@@ -64,6 +71,10 @@ public final class TwoFactorForm {
                 + "codes.", "SvText"));
         final TextField field = Ui.field(page, "Code", "code", "123456", TextArea.ANY);
         page.add(Ui.primary("Continue", "submitCode", e -> {
+            if (answered[0]) {
+                return;
+            }
+            answered[0] = true;
             previous.showBack();
             code.got(SecondFactor.clean(field.getText()));
         }));
