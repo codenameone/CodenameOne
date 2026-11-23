@@ -72,6 +72,8 @@ public class DemoTourTest extends E2e {
                 pos();
             } else if (tour.startsWith("admin")) {
                 admin();
+            } else if (tour.startsWith("screens")) {
+                screens();
             } else if (tour.startsWith("visual")) {
                 visual();
             }
@@ -460,6 +462,138 @@ public class DemoTourTest extends E2e {
             pause(3500);
             visualShot("pos-receipt" + mode);
         }
+    }
+
+    /// Design-review captures of the screens no other tour reaches: the
+    /// merchant's lists and their detail screens, checkout, and the admin's.
+    private void screens() throws Exception {
+        signIn(MERCHANT, "home-merchant");
+        pause(2000);
+        go(Sections.ORDERS);
+        pause(2500);
+        visualShot("merchant-orders");
+        if (tapFirst("order-")) {
+            pause(2500);
+            visualShot("merchant-order-detail");
+            scrollDown(2);
+            visualShot("merchant-order-detail-2");
+            safeBack();
+            pause(1200);
+        }
+        go(Sections.CUSTOMERS);
+        pause(2500);
+        visualShot("merchant-customers");
+        if (tapFirst("customer-")) {
+            pause(2500);
+            visualShot("merchant-customer-detail");
+            safeBack();
+            pause(1200);
+        }
+        go(Sections.INVENTORY);
+        pause(2500);
+        visualShot("merchant-inventory");
+        go(Sections.DISCOUNTS);
+        pause(2500);
+        visualShot("merchant-discounts");
+        go(MerchantSections.INBOX);
+        pause(2500);
+        visualShot("merchant-inbox");
+        go(Sections.SETTINGS);
+        pause(2500);
+        visualShot("merchant-settings");
+        scrollDown(3);
+        visualShot("merchant-settings-2");
+        if (tapFirst("fraud-rule-")) {
+            pause(2000);
+            visualShot("merchant-fraud-rule-editor");
+            safeBack();
+            pause(1200);
+        }
+        go(Sections.PRODUCTS);
+        pause(2500);
+        if (tapText("Alpine Softshell") || openFirstGridRow("products-grid")) {
+            pause(2500);
+            scrollDown(4);
+            visualShot("merchant-product-editor-lower");
+            scrollDown(3);
+            visualShot("merchant-product-editor-offers");
+            safeBack();
+            pause(1200);
+        }
+        signOut();
+        pause(1500);
+
+        signIn(CUSTOMER, "home-shop");
+        pause(2000);
+        go(Sections.HOME);
+        pause(1500);
+        if (tapFirst("collection-")) {
+            pause(2500);
+            visualShot("shop-collection");
+            safeBack();
+            pause(1200);
+        }
+        go(Sections.SEARCH);
+        pause(2500);
+        if (tapChild("product-grid", 0)) {
+            pause(2500);
+            tapFirst("option-");
+            tap("add-to-cart");
+            pause(1200);
+            visualShot("shop-cart-toast");
+            pause(1500);
+            safeBack();
+            pause(1200);
+        }
+        go(Sections.CART);
+        pause(2000);
+        if (tap("checkout")) {
+            pause(1500);
+            fill("ship-line1", "1 Market St");
+            fill("ship-city", "San Francisco");
+            fill("ship-region", "CA");
+            fill("ship-postal", "94105");
+            visualShot("shop-checkout-address");
+            tap("address-continue");
+            pause(2500);
+            tapFirst("rate-");
+            pause(2000);
+            tapFirst("method-");
+            pause(1500);
+            visualShot("shop-checkout-payment");
+            if (tap("place-order")) {
+                pause(4000);
+                if (!tap("view-order")) {
+                    safeBack();
+                }
+                pause(3000);
+                visualShot("shop-order-tracking");
+            }
+        }
+        go(Sections.ACCOUNT);
+        pause(2000);
+        visualShot("shop-account-signed-in");
+        signOut();
+        pause(1500);
+
+        signIn(ADMIN, "home-admin");
+        pause(2500);
+        tap("menu-more");
+        pause(1500);
+        visualShot("admin-menu-sheet");
+        safeBack();
+        pause(1000);
+        go(Sections.STORES);
+        pause(2500);
+        if (tapText("Northwind Outfitters") || tap("store-0")) {
+            pause(2500);
+            visualShot("admin-store-detail");
+            safeBack();
+            pause(1200);
+        }
+        go(Sections.USERS);
+        pause(2500);
+        visualShot("admin-users");
     }
 
     private void visualShot(String name) {

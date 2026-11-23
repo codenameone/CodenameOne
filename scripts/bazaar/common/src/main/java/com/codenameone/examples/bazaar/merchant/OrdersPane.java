@@ -114,10 +114,10 @@ final class OrdersPane extends MerchantPane {
         search = MUi.search("orders-search", this::reload);
         Container filters = new Container(new FlowLayout());
         filters.setUIID("MeFilters");
-        status = filter(filters, "orders-status", Words.ORDER_STATUSES);
-        financial = filter(filters, "orders-financial", Words.FINANCIAL);
-        fulfilment = filter(filters, "orders-fulfilment", Words.FULFILMENT);
-        channel = filter(filters, "orders-channel", Words.CHANNELS);
+        status = filter(filters, "orders-status", Words.ORDER_STATUSES, "Any status");
+        financial = filter(filters, "orders-financial", Words.FINANCIAL, "Any payment");
+        fulfilment = filter(filters, "orders-fulfilment", Words.FULFILMENT, "Any fulfilment");
+        channel = filter(filters, "orders-channel", Words.CHANNELS, "Any channel");
         Container top = new Container(BoxLayout.y());
         top.add(search);
         top.add(filters);
@@ -148,13 +148,15 @@ final class OrdersPane extends MerchantPane {
         root(all);
     }
 
-    private Picker filter(Container to, String name, String[] codes) {
+    /// `anyLabel` names the unfiltered choice by what it filters: four chips
+    /// that all read "All" told the merchant nothing.
+    private Picker filter(Container to, String name, String[] codes, String anyLabel) {
         String[] withAll = new String[codes.length + 1];
         withAll[0] = ALL;
         System.arraycopy(codes, 0, withAll, 1, codes.length);
         Picker p = MUi.picker(null, null, name, withAll, ALL);
         String[] labels = new String[withAll.length];
-        labels[0] = Lang.tr("All");
+        labels[0] = Lang.tr(anyLabel);
         for (int iter = 1; iter < withAll.length; iter++) {
             labels[iter] = Lang.tr(Words.of(withAll[iter]));
         }

@@ -25,6 +25,7 @@ import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.FontImage;
 import com.codename1.ui.Form;
+import com.codename1.ui.Sheet;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
@@ -280,25 +281,54 @@ public final class Shell implements Nav.Home {
     }
 
     /// The phone's title bar menu: other modes, Settings and Sign out.
+    ///
+    /// It is a named title bar button that raises a sheet, not the toolbar's
+    /// own overflow menu. That button is built around an empty command, so it
+    /// reached the accessibility tree with no name -- a screen reader said
+    /// nothing -- and its menu is a modal dialog that blocks whoever presses
+    /// it, so an assistive or automated activation never came back.
     private void overflow() {
-        UserDto user = Session.user();
+        final UserDto user = Session.user();
+        Command open = form.getToolbar().addMaterialCommandToRightBar("",
+                FontImage.MATERIAL_MORE_VERT, e -> menuSheet(user));
+        open.putClientProperty("name", "menu-more");
+        Button button = form.getToolbar().findCommandComponent(open);
+        if (button != null) {
+            button.setName("menu-more");
+            button.setAccessibilityText(Lang.tr("More options"));
+        }
+    }
+
+    private void menuSheet(UserDto user) {
+        final Sheet sheet = new Sheet(null, Lang.tr("More options"));
+        Container list = sheet.getContentPane();
+        list.setLayout(BoxLayout.y());
         for (String other : Nav.modes(user)) {
             if (!other.equals(mode)) {
                 final String to = other;
-                Command go = form.getToolbar().addCommandToOverflowMenu(
-                        Lang.tr(Nav.label(to)), null, e -> Nav.switchTo(to));
-                go.putClientProperty("name", "switch-" + to);
+                list.add(menuRow(sheet, FontImage.MATERIAL_SWAP_HORIZ, Lang.tr(Nav.label(to)),
+                        "switch-" + to, () -> Nav.switchTo(to)));
             }
         }
         if (user == null) {
             // A guest: settings are the account's, and there is nobody to sign out.
-            form.getToolbar().addCommandToOverflowMenu(Lang.tr("Sign in"), null,
-                    e -> SignInGate.signIn(form)).putClientProperty("name", "menu-signIn");
-            return;
+            list.add(menuRow(sheet, FontImage.MATERIAL_LOGIN, Lang.tr("Sign in"), "menu-signIn",
+                    () -> SignInGate.signIn(form)));
+        } else {
+            list.add(menuRow(sheet, FontImage.MATERIAL_SETTINGS, Lang.tr("Settings"), "menu-settings",
+                    () -> SettingsForm.show(form)));
+            list.add(menuRow(sheet, FontImage.MATERIAL_LOGOUT, Lang.tr("Sign out"), "menu-signOut",
+                    Nav::signOut));
         }
-        form.getToolbar().addCommandToOverflowMenu(Lang.tr("Settings"), null,
-                e -> SettingsForm.show(form));
-        form.getToolbar().addCommandToOverflowMenu(Lang.tr("Sign out"), null, e -> Nav.signOut());
+        sheet.show();
+    }
+
+    private static Component menuRow(final Sheet sheet, char icon, String title, String name,
+            final Runnable go) {
+        return Ui.tap(Ui.row(icon, title, null, null), name, e -> {
+            sheet.back();
+            go.run();
+        });
     }
 
     // ------------------------------------------------------------------- wide
