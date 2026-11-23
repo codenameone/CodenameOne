@@ -591,11 +591,11 @@ public final class Document {
     public static Document read(InputStream in, Format format) throws IOException {
         try {
             return readFormat(in, format);
+        } catch (OutOfMemoryError ex) {
+            throw ex;
         } catch (VirtualMachineError ex) {
-            // StackOverflowError is not in the CLDC library the core compiles against
-            if (ex instanceof OutOfMemoryError) {
-                throw ex;
-            }
+            // StackOverflowError is not in the CLDC library the core compiles against; out of
+            // memory is rethrown above, so this is the stack overflow
             // the readers bound their nesting; this is the backstop for a thread whose stack
             // is smaller than those bounds assume
             IOException e = new IOException("The document is nested too deeply: " + ex);

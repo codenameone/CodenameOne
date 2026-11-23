@@ -371,11 +371,11 @@ final class DocReader {
             return new DocReader(streams).build();
         } catch (RuntimeException ex) {
             throw damaged("Damaged .doc file: " + ex, ex);
+        } catch (OutOfMemoryError ex) {
+            throw ex;
         } catch (VirtualMachineError ex) {
-            // StackOverflowError is not in the CLDC library the core compiles against
-            if (ex instanceof OutOfMemoryError) {
-                throw ex;
-            }
+            // StackOverflowError is not in the CLDC library the core compiles against; out of
+            // memory is rethrown above, so this is the stack overflow
             throw damaged("Damaged .doc file: " + ex, ex);
         }
     }
