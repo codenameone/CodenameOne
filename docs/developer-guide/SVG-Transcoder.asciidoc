@@ -333,12 +333,22 @@ include::../demos/common/src/main/java/com/codenameone/developerguide/snippets/g
 
 ==== Touch
 
-Rive listeners react to touches by themselves. Show the image as the icon
-of a `Label`, a `Button` or a `ScaleImageLabel` and the component hands the
-pointer events that land on it to the image, in the coordinates of the
-image. While the state machine has listeners, `isInteractive()` is true
-and a drag on the image belongs to it, so it doesn't scroll the form.
-Hover isn't delivered.
+Rive listeners react to touches by themselves, once the image receives
+them. Show the image in a `com.codename1.impl.rive.RiveView` and the view
+hands the pointer events that land on it to the image, fitted the way it
+draws; a drag on the view belongs to the animation, so it doesn't scroll
+the form. An image shown as an icon or a background is only drawn: it gets
+no pointer events unless the application calls `pointerPressed`,
+`pointerDragged` and `pointerReleased` on the image itself, in the image's
+pixel coordinates. `isInteractive()` is true while the state machine has
+listeners. Hover isn't delivered.
+
+==== Meshes on the GPU
+
+An artboard with image meshes draws through `Graphics` wherever it's drawn.
+In a `RiveView` on a platform with a GPU backend it renders on a GPU surface
+instead. The surface is a native peer, so a `Dialog` shown over the view
+appears under it: use an `InteractionDialog` placed away from the view.
 
 ==== The clock
 

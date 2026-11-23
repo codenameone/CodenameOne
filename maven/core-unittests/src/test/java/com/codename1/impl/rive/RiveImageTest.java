@@ -151,37 +151,57 @@ class RiveImageTest extends UITestBase {
     }
 
     @FormTest
-    void tapOnALabelIconMapsThroughPaddingAndLetterboxing() throws Exception {
+    void tapOnARiveViewMapsThroughPaddingAndLetterboxing() throws Exception {
         Form f = form();
         f.setLayout(new BorderLayout());
         RiveImage img = (RiveImage) new RiveImage(file(0)).scaled(300, 200);
         img.setAnimationPlaying(false);
         assertTrue(img.isInteractive());
-        Label l = new Label(img);
-        l.getAllStyles().setPadding(10, 20, 30, 40);
-        l.getAllStyles().setPaddingUnit(com.codename1.ui.plaf.Style.UNIT_TYPE_PIXELS);
-        l.getAllStyles().setAlignment(com.codename1.ui.Component.CENTER);
-        l.setGap(0);
-        f.add(BorderLayout.CENTER, l);
+        RiveView v = new RiveView(img);
+        v.getAllStyles().setPadding(10, 20, 30, 40);
+        v.getAllStyles().setPaddingUnit(com.codename1.ui.plaf.Style.UNIT_TYPE_PIXELS);
+        f.add(BorderLayout.CENTER, v);
         f.revalidate();
-        // the hit test is where the icon was painted
         paintOnce(f);
+        assertFalse(v.isOnGpuSurface(), "vectors alone draw through Graphics");
         Artboard a = file(0).instance(null);
-        float scale = Math.min(300 / a.getWidth(), 200 / a.getHeight());
-        // the icon is centered in the label's inner area
-        int iconX = 40 + (l.getWidth() - 40 - 20 - 300) / 2;
-        int iconY = 10 + (l.getHeight() - 10 - 30 - 200) / 2;
-        int sx = Math.round(l.getAbsoluteX() + iconX + (300 - a.getWidth() * scale) / 2f + 150 * scale);
-        int sy = Math.round(l.getAbsoluteY() + iconY + (200 - a.getHeight() * scale) / 2f + 258 * scale);
+        // the artboard is fitted into the view's inner area
+        int iw = v.getWidth() - 40 - 20;
+        int ih = v.getHeight() - 10 - 30;
+        float scale = Math.min(iw / a.getWidth(), ih / a.getHeight());
+        int sx = Math.round(v.getAbsoluteX() + 40 + (iw - a.getWidth() * scale) / 2f + 150 * scale);
+        int sy = Math.round(v.getAbsoluteY() + 10 + (ih - a.getHeight() * scale) / 2f + 258 * scale);
         StateMachineInstance m = img.machineInstance();
         boolean on = m.getBoolean("On");
-        // a tap on the padding, outside the icon, never reaches it
-        l.pointerPressed(l.getAbsoluteX() + 2, l.getAbsoluteY() + 2);
-        l.pointerReleased(sx, sy);
-        assertEquals(on, m.getBoolean("On"), "a press outside the icon is not the icon's");
-        l.pointerPressed(sx, sy);
-        l.pointerReleased(sx, sy);
+        // a tap on the padding, outside the artboard, never reaches its listener
+        v.pointerPressed(v.getAbsoluteX() + 2, v.getAbsoluteY() + 2);
+        v.pointerReleased(sx, sy);
+        assertEquals(on, m.getBoolean("On"), "a press outside the artboard is not the listener's");
+        v.pointerPressed(sx, sy);
+        v.pointerReleased(sx, sy);
         assertEquals(!on, m.getBoolean("On"), "the tap reached the listener");
+    }
+
+    @FormTest
+    void drawingAnImageNeverRoutesInput() throws Exception {
+        // only a RiveView forwards pointer events; a label icon is a picture
+        Form f = form();
+        f.setLayout(new BorderLayout());
+        RiveImage img = (RiveImage) new RiveImage(file(0)).scaled(300, 200);
+        img.setAnimationPlaying(false);
+        Label l = new Label(img);
+        f.add(BorderLayout.CENTER, l);
+        f.revalidate();
+        paintOnce(f);
+        StateMachineInstance m = img.machineInstance();
+        boolean on = m.getBoolean("On");
+        for (int y = 0; y < l.getHeight(); y += 8) {
+            for (int x = 0; x < l.getWidth(); x += 8) {
+                l.pointerPressed(l.getAbsoluteX() + x, l.getAbsoluteY() + y);
+                l.pointerReleased(l.getAbsoluteX() + x, l.getAbsoluteY() + y);
+            }
+        }
+        assertEquals(on, m.getBoolean("On"), "a label never hands its icon pointer events");
     }
 
     private static void paintOnce(Form f) {
@@ -196,7 +216,7 @@ class RiveImageTest extends UITestBase {
         drag(plain, plain.getAbsoluteY() + plain.getHeight() * 3 / 4);
         assertTrue(plain.getScrollY() > 0, "a drag over a plain row scrolls");
 
-        Label v = new com.codename1.components.ScaleImageLabel(image(0));
+        RiveView v = new RiveView((RiveImage) image(0));
         Container content = scrollingForm(v);
         drag(content, v.getAbsoluteY() + v.getHeight() * 3 / 4);
         assertEquals(0, content.getScrollY(), "the state machine owns the drag");
@@ -210,13 +230,13 @@ class RiveImageTest extends UITestBase {
         top.advance(0);
         assertTrue(top.getStateMachine().getListenerDefs().isEmpty(), "top-level machine has no listeners");
         assertTrue(top.hasPointerListeners(), "a row machine's listener counts");
-        Label v = new com.codename1.components.ScaleImageLabel(image(4));
+        RiveView v = new RiveView((RiveImage) image(4));
         Container content = scrollingForm(v);
         drag(content, v.getAbsoluteY() + v.getHeight() * 3 / 4);
         assertEquals(0, content.getScrollY(), "a row machine's listener owns the drag");
     }
 
-    private Container scrollingForm(Label v) {
+    private Container scrollingForm(com.codename1.ui.Component v) {
         Form f = new Form("drag", BoxLayout.y());
         Container content = f.getContentPane();
         content.setScrollableY(true);

@@ -2142,16 +2142,15 @@ public class Image implements ActionSource {
     // ------------------------------------------------- interactive animation
 
     /// Whether this image reacts to pointer events, as an interactive Rive
-    /// animation whose state machine listens to the pointer does. A `Label`
-    /// (and so a `Button`) showing such an image as its icon hands it the
-    /// pointer events that land on it, and keeps drags on it from scrolling
-    /// the parent. Images are not interactive by default.
+    /// animation whose state machine listens to the pointer does. Drawing an
+    /// image never routes input to it: a component that shows it (the Rive
+    /// module's view) or the application hands it pointer events through
+    /// [#pointerPressed(int, int)] and its siblings. Images are not
+    /// interactive by default.
     ///
     /// An interactive image is one animation however many places show it:
     /// one instance shown twice at once shares its state (inputs, pointer
-    /// presses, playback), and where it draws through a GPU surface
-    /// (`com.codename1.gpu.GpuImage`) only one placement per paint pass gets
-    /// the surface while the others draw through `Graphics`.
+    /// presses, playback).
     ///
     /// #### Returns
     ///

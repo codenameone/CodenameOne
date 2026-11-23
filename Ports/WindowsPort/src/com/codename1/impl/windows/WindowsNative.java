@@ -434,7 +434,6 @@ public final class WindowsNative {
     public static native void drawLine(long graphics, int x1, int y1, int x2, int y2);
 
     public static native void fillRect(long graphics, int x, int y, int width, int height);
-    public static native void clearRect(long graphics, int x, int y, int width, int height);
 
     public static native void drawRect(long graphics, int x, int y, int width, int height);
 

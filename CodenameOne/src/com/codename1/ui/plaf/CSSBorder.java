@@ -2450,26 +2450,6 @@ public class CSSBorder extends Border {
 
         }
 
-        // The tile a repeating background was last scaled to. Scaling on every
-        // paint makes a new image each time, which costs an allocation per
-        // frame and restarts an animated image (a Rive or Lottie animation)
-        // on every frame.
-        private Image scaledTile;
-        private Image scaledTileSource;
-        private int scaledTileWidth;
-        private int scaledTileHeight;
-
-        private Image scaledTile(int w, int h) {
-            if (scaledTile == null || scaledTileSource != image //NOPMD CompareObjectsWithEquals - the same instance
-                    || scaledTileWidth != w || scaledTileHeight != h) {
-                scaledTile = image.scaled(w, h);
-                scaledTileSource = image;
-                scaledTileWidth = w;
-                scaledTileHeight = h;
-            }
-            return scaledTile;
-        }
-
         void paint(Graphics g, Component c, Rectangle2D contentRect) {
             // Note:  This assumes that a shape clip has already happened f
 
@@ -2482,7 +2462,7 @@ public class CSSBorder extends Border {
                     }
                     case REPEAT_X: {
                         Rectangle2D targetRect = getTargetRect(c, new Rectangle2D(), contentRect);
-                        Image scaled = scaledTile((int) targetRect.getWidth(), (int) targetRect.getHeight());
+                        Image scaled = image.scaled((int) targetRect.getWidth(), (int) targetRect.getHeight());
                         double offX = targetRect.getX() - contentRect.getX();
                         while (offX > 0) {
                             offX -= targetRect.getWidth();
@@ -2494,7 +2474,7 @@ public class CSSBorder extends Border {
                     }
                     case REPEAT_Y: {
                         Rectangle2D targetRect = getTargetRect(c, new Rectangle2D(), contentRect);
-                        Image scaled = scaledTile((int) targetRect.getWidth(), (int) targetRect.getHeight());
+                        Image scaled = image.scaled((int) targetRect.getWidth(), (int) targetRect.getHeight());
                         double offY = targetRect.getY() - contentRect.getY();
                         while (offY > 0) {
                             offY -= targetRect.getHeight();
@@ -2507,7 +2487,7 @@ public class CSSBorder extends Border {
 
                     case REPEAT_BOTH: {
                         Rectangle2D targetRect = getTargetRect(c, new Rectangle2D(), contentRect);
-                        Image scaled = scaledTile((int) targetRect.getWidth(), (int) targetRect.getHeight());
+                        Image scaled = image.scaled((int) targetRect.getWidth(), (int) targetRect.getHeight());
                         double offY = targetRect.getY() - contentRect.getY();
                         while (offY > 0) {
                             offY -= targetRect.getHeight();

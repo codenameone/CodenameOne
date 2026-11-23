@@ -82,6 +82,25 @@ public final class GraphicsRiveRenderer implements RiveRenderer {
         g.setAntiAliased(true);
     }
 
+    /// Moves a frame in progress onto `graphics`, carrying over the color,
+    /// alpha, anti-aliasing and clip of the current graphics. The state saved
+    /// by [#begin(Graphics, Mat2D)] is restored onto `graphics` at
+    /// [#end()]. Does nothing outside a frame.
+    void retarget(Graphics graphics) {
+        if (g == null) {
+            return;
+        }
+        int cx = g.getClipX();
+        int cy = g.getClipY();
+        int cw = g.getClipWidth();
+        int ch = g.getClipHeight();
+        graphics.setColor(g.getColor());
+        graphics.setAlpha(g.getAlpha());
+        graphics.setAntiAliased(g.isAntiAliased());
+        g = graphics;
+        restoreClip(cx, cy, cw, ch);
+    }
+
     /// Ends the frame, giving the graphics back the color, alpha,
     /// anti-aliasing and clip it had at [#begin(Graphics, Mat2D)].
     public void end() {

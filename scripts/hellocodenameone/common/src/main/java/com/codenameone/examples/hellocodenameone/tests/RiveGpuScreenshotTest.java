@@ -22,7 +22,8 @@
  */
 package com.codenameone.examples.hellocodenameone.tests;
 
-import com.codename1.gpu.GpuImage;
+import com.codename1.impl.rive.RiveImage;
+import com.codename1.impl.rive.RiveView;
 import com.codename1.ui.CN;
 import com.codename1.ui.Form;
 import com.codename1.ui.Image;
@@ -30,10 +31,12 @@ import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.util.UITimer;
 
 /// A Rive file with an image mesh skinned to bones (`jellyfish_test`), shown
-/// on a form as an image in a label. Where the port has a GPU backend the
-/// image is a `GpuImage`: it places a GPU surface over the label's area and
-/// draws there, which is the path this captures; `RiveAnimatedScreenshotTest`
-/// draws the same file through `Graphics`. The image is paused and advanced
+/// on a form in a `RiveView`. Where the port has a GPU backend the view holds
+/// a GPU surface and the image draws there, which is the path this captures
+/// (an image in a label always draws through `Graphics`);
+/// `RiveAnimatedScreenshotTest` draws the same file through `Graphics`.
+/// `RiveView` is the Rive runtime's class, which the build puts on the class
+/// path of a module with `.riv` files. The image is paused and advanced
 /// to a fixed point, so the capture does not depend on the animation clock.
 public class RiveGpuScreenshotTest extends BaseTest {
     // cn1ss-skip: macos, watchos -- captures nothing on these ports (the guard below);
@@ -47,14 +50,14 @@ public class RiveGpuScreenshotTest extends BaseTest {
             return true;
         }
         Image img = RiveFeaturesScreenshotTest.fresh("jellyfish_test.riv");
-        image = img;
         RiveAnimatedScreenshotTest.step(img, 0.5f);
-        form.add(BorderLayout.CENTER, RiveFeaturesScreenshotTest.holder(img));
+        view = new RiveView((RiveImage) img);
+        form.add(BorderLayout.CENTER, view);
         form.show();
         return true;
     }
 
-    private Image image;
+    private RiveView view;
 
     @Override
     public boolean shouldTakeScreenshot() {
@@ -63,7 +66,7 @@ public class RiveGpuScreenshotTest extends BaseTest {
 
     @Override
     protected void registerReadyCallback(Form parent, Runnable run) {
-        // the surface is placed after the first paint and compiles its
+        // the surface's peer is created when the form shows and compiles its
         // programs on its first frame, which can take seconds on a slow
         // emulator: poll until it has rendered a frame, then give it one more
         // tick to reach the screen. The cap stays well inside the suite's own
@@ -75,15 +78,13 @@ public class RiveGpuScreenshotTest extends BaseTest {
         UITimer.timer(100, false, form, new Runnable() {
             @Override
             public void run() {
-                boolean drawn = image instanceof GpuImage
-                        && ((GpuImage) image).getFramesRendered() > 0;
+                boolean drawn = view != null && view.getFramesRendered() > 0;
                 boolean late = System.currentTimeMillis() > deadline;
-                if (late && image instanceof GpuImage) {
-                    GpuImage gi = (GpuImage) image;
+                if (late && view != null) {
                     System.out.println("CN1SS:WARN:RiveGpu no GPU frame: onSurface="
-                            + gi.isOnGpuSurface() + " frames=" + gi.getFramesRendered());
+                            + view.isOnGpuSurface() + " frames=" + view.getFramesRendered());
                 }
-                if (drawn || !(image instanceof GpuImage) || late) {
+                if (drawn || view == null || late) {
                     UITimer.timer(200, false, form, ready);
                 } else {
                     UITimer.timer(100, false, form, this);

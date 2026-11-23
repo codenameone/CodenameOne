@@ -259,8 +259,6 @@ public final class Display extends CN1Constants {
     /// is common in Android devices
     private boolean pureTouch;
     private Graphics codenameOneGraphics;
-    /// Counts the display's paint passes (`Graphics.getPaintPass()`).
-    int paintPass;
     /// Indicates whether this is a touch device
     private boolean touchScreen;
     private HashMap<String, String> localProperties;
@@ -809,11 +807,6 @@ public final class Display extends CN1Constants {
             simd = created;
         }
         return simd;
-    }
-
-    /// True if `g` is the graphics that paints the display.
-    boolean isScreenGraphics(Graphics g) {
-        return g == codenameOneGraphics; //NOPMD CompareObjectsWithEquals
     }
 
     /// Returns true if the current platform provides a hardware accelerated 3D
@@ -2005,7 +1998,6 @@ public final class Display extends CN1Constants {
             // before the next paint cycle.
             current.flushRevalidateQueue();
         }
-        paintPass++;
         impl.paintDirty();
 
         // draw the animations

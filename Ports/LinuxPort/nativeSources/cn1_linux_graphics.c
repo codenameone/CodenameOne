@@ -271,17 +271,6 @@ JAVA_VOID com_codename1_impl_linux_LinuxNative_fillRect___long_int_int_int_int(C
     cn1End(g);
 }
 
-/* Graphics.clearRect: writes fully transparent pixels (no blending) inside the
- * current clip, under the current transform like fillRect. */
-JAVA_VOID com_codename1_impl_linux_LinuxNative_clearRect___long_int_int_int_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG graphics, JAVA_INT x, JAVA_INT y, JAVA_INT width, JAVA_INT height) {
-    CN1Graphics* g = CN1G(graphics);
-    cn1Begin(g);
-    cairo_set_operator(g->cr, CAIRO_OPERATOR_CLEAR);
-    cairo_rectangle(g->cr, x, y, width, height);
-    cairo_fill(g->cr);
-    cn1End(g);
-}
-
 JAVA_VOID com_codename1_impl_linux_LinuxNative_drawRect___long_int_int_int_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG graphics, JAVA_INT x, JAVA_INT y, JAVA_INT width, JAVA_INT height) {
     CN1Graphics* g = CN1G(graphics);
     cn1Begin(g);

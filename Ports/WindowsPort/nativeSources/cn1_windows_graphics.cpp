@@ -489,34 +489,6 @@ JAVA_VOID com_codename1_impl_windows_WindowsNative_fillRect___long_int_int_int_i
     cn1WinPopClip(g);
 }
 
-/* Graphics.clearRect: ID2D1RenderTarget::Clear replaces pixels (no blending)
- * and is limited to the active axis-aligned clips, so the current clip goes on
- * first and the requested rectangle (under the current transform, as fillRect
- * draws it) is intersected with it. Clear ignores the world transform, so a
- * rotated transform clears the rectangle's bounding box. Limitation: under a
- * shape clip (pushed as a layer) the clear lands in the layer, which is then
- * composited source-over, so nothing is erased; a rectangular clip works. */
-JAVA_VOID com_codename1_impl_windows_WindowsNative_clearRect___long_int_int_int_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG __cn1Arg1, JAVA_INT __cn1Arg2, JAVA_INT __cn1Arg3, JAVA_INT __cn1Arg4, JAVA_INT __cn1Arg5) {
-    CN1Graphics* g = (CN1Graphics*)__cn1Arg1;
-    D2D1_RECT_F rect;
-    D2D1_COLOR_F transparent;
-    cn1WinBeginFrame(g);
-    rect.left = (FLOAT)__cn1Arg2;
-    rect.top = (FLOAT)__cn1Arg3;
-    rect.right = (FLOAT)(__cn1Arg2 + __cn1Arg4);
-    rect.bottom = (FLOAT)(__cn1Arg3 + __cn1Arg5);
-    transparent.r = 0.0f;
-    transparent.g = 0.0f;
-    transparent.b = 0.0f;
-    transparent.a = 0.0f;
-    cn1WinPushClip(g);
-    ID2D1RenderTarget_SetTransform(g->target, &g->transform);
-    ID2D1RenderTarget_PushAxisAlignedClip(g->target, &rect, D2D1_ANTIALIAS_MODE_ALIASED);
-    ID2D1RenderTarget_Clear(g->target, &transparent);
-    ID2D1RenderTarget_PopAxisAlignedClip(g->target);
-    cn1WinPopClip(g);
-}
-
 JAVA_VOID com_codename1_impl_windows_WindowsNative_drawRect___long_int_int_int_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG __cn1Arg1, JAVA_INT __cn1Arg2, JAVA_INT __cn1Arg3, JAVA_INT __cn1Arg4, JAVA_INT __cn1Arg5) {
     CN1Graphics* g = (CN1Graphics*)__cn1Arg1;
     ID2D1SolidColorBrush* brush;

@@ -3519,11 +3519,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
     @Override
-    public void clearRect(Object graphics, int x, int y, int width, int height) {
-        ((AndroidGraphics) graphics).clearRect(x, y, width, height);
-    }
-
-    @Override
     public void fillRect(Object graphics, int x, int y, int w, int h, byte alpha) {
         ((AndroidGraphics) graphics).fillRect(x, y, w, h, alpha);
     }

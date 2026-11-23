@@ -22,11 +22,11 @@
  */
 package com.codename1.impl.rive;
 
-import com.codename1.gpu.GpuImage;
 import com.codename1.gpu.GraphicsDevice;
 import com.codename1.gpu.Renderer;
 import com.codename1.ui.CN;
 import com.codename1.ui.Graphics;
+import com.codename1.ui.Image;
 import com.codename1.ui.events.AnimationEvent;
 
 import java.util.ArrayList;
@@ -48,19 +48,17 @@ import java.util.Map;
 /// still reacts to inputs, view model properties and pointer events,
 /// settling them at the current time without moving it.
 ///
-/// An artboard with image meshes (deformed, possibly skinned images) draws
-/// through `com.codename1.gpu` where the platform has a GPU backend: as a
-/// `GpuImage`, it places a GPU surface over the rectangle it is drawn into
-/// and records each frame for `GpuRiveRenderer`. Everything else, and every
-/// platform without a GPU backend, draws through `Graphics`.
+/// Drawn through `Graphics` -- as an icon, a background, in a `paint`
+/// method -- it always renders through `Graphics`. Only a [RiveView] renders
+/// it on a GPU surface, and only when the artboard has image meshes
+/// (deformed, possibly skinned images) and the platform has a GPU backend.
+/// Pointer events reach the image through a `RiveView`, or through the
+/// application calling [#pointerPressed(int, int)] and its siblings itself.
 ///
-/// One instance is one animation. Shown in two places at once (two labels,
-/// or twice in one `paint`), both show the
-/// same state and react to the same inputs and pointer events, and only the
-/// first placement drawn in a pass gets the GPU surface; a second
-/// simultaneous placement draws through `Graphics`. Use
+/// One instance is one animation. Shown in two places at once, both show the
+/// same state and react to the same inputs and pointer events. Use
 /// [#scaled(int, int)] for an independent copy.
-public class RiveImage extends GpuImage {
+public class RiveImage extends Image {
     private final RiveFile file;
     private final Artboard artboard;
     private final GraphicsRiveRenderer renderer = new GraphicsRiveRenderer();
@@ -90,6 +88,7 @@ public class RiveImage extends GpuImage {
     }
 
     private RiveImage(RiveFile file, int w, int h) {
+        super(null);
         this.file = file;
         artboard = file.instance((String) null);
         if (artboard == null) {
@@ -412,42 +411,59 @@ public class RiveImage extends GpuImage {
 
     // ------------------------------------------------------------ drawing
 
-    /// Draws through the GPU when the artboard has a mesh; vectors alone
-    /// draw as well through `Graphics`.
     @Override
-    protected boolean usesGpu() {
-        return meshes;
+    public boolean requiresDrawImage() {
+        return true;
     }
 
     @Override
-    protected Renderer createRenderer() {
+    public boolean isOpaque() {
+        return false;
+    }
+
+    @Override
+    protected void drawImage(Graphics g, Object nativeGraphics, int x, int y) {
+        drawFallback(g, x, y, width, height);
+    }
+
+    @Override
+    protected void drawImage(Graphics g, Object nativeGraphics, int x, int y, int w, int h) {
+        drawFallback(g, x, y, w, h);
+    }
+
+    /// Whether a [RiveView] should show this image on a GPU surface: only an
+    /// artboard with a mesh needs one; vectors alone draw as well through
+    /// `Graphics`.
+    boolean usesGpu() {
+        return meshes;
+    }
+
+    /// The renderer of a [RiveView]'s surface.
+    Renderer createRenderer() {
         if (gpu == null) {
             gpu = new GpuRiveRenderer();
         }
         return new GpuDraw(gpu);
     }
 
-    /// Records the artboard, fitted into the `width` by `height` rectangle at
-    /// `offsetX`, `offsetY` of the surface, for the render thread.
     private int prepareTrace;
 
-    @Override
-    protected void prepareFrame(int surfaceWidth, int surfaceHeight, int offsetX, int offsetY,
-                                int width, int height) {
+    /// Records the artboard, fitted into a `surfaceWidth` by `surfaceHeight` surface, for
+    /// the render thread. EDT side.
+    void prepareFrame(int surfaceWidth, int surfaceHeight) {
         float aw = artboard.getWidth();
         float ah = artboard.getHeight();
-        if (gpu == null || aw <= 0 || ah <= 0) {
+        if (gpu == null || aw <= 0 || ah <= 0 || surfaceWidth <= 0 || surfaceHeight <= 0) {
             return;
         }
         // TEMPORARY trace for the RiveGpu emulator crash; removed once found.
         if (prepareTrace++ < 10) {
-            System.out.println("CN1GPU: prepareFrame surface=" + surfaceWidth + "x" + surfaceHeight
-                    + " at " + offsetX + "," + offsetY + " image=" + width + "x" + height);
+            System.out.println("CN1GPU: prepareFrame surface=" + surfaceWidth + "x" + surfaceHeight);
         }
-        float scale = Math.min(width / aw, height / ah);
-        float ox = (width - aw * scale) / 2f;
-        float oy = (height - ah * scale) / 2f;
-        base.set(scale, 0, 0, scale, offsetX + ox, offsetY + oy);
+        float scale = Math.min(surfaceWidth / aw, surfaceHeight / ah);
+        float ox = (surfaceWidth - aw * scale) / 2f;
+        float oy = (surfaceHeight - ah * scale) / 2f;
+        base.set(scale, 0, 0, scale, ox, oy);
         gpu.beginFrame(surfaceWidth, surfaceHeight, base);
         artboard.draw(gpu);
         gpu.endFrame(0);
@@ -455,8 +471,7 @@ public class RiveImage extends GpuImage {
 
     /// Draws the artboard fitted into `w` by `h` at `x`, `y`: scaled to fit,
     /// keeping its aspect ratio, and centered.
-    @Override
-    protected void drawFallback(Graphics g, int x, int y, int w, int h) {
+    void drawFallback(Graphics g, int x, int y, int w, int h) {
         float aw = artboard.getWidth();
         float ah = artboard.getHeight();
         if (aw <= 0 || ah <= 0 || w <= 0 || h <= 0) {
@@ -522,47 +537,45 @@ public class RiveImage extends GpuImage {
 
     // ------------------------------------------------------------ pointer
 
+    static final int POINTER_PRESSED = 0;
+    static final int POINTER_DRAGGED = 1;
+    static final int POINTER_RELEASED = 2;
+
     @Override
     public void pointerPressed(int x, int y) {
-        if (machine != null) {
-            machine.pointerDown(artboardX(x), artboardY(y));
-            afterPointer();
-        }
+        pointer(POINTER_PRESSED, x, y, width, height);
     }
 
     @Override
     public void pointerDragged(int x, int y) {
-        if (machine != null) {
-            machine.pointerMove(artboardX(x), artboardY(y));
-            afterPointer();
-        }
+        pointer(POINTER_DRAGGED, x, y, width, height);
     }
 
     @Override
     public void pointerReleased(int x, int y) {
-        if (machine != null) {
-            machine.pointerUp(artboardX(x), artboardY(y));
-            afterPointer();
-        }
+        pointer(POINTER_RELEASED, x, y, width, height);
     }
 
-    private float fitScale() {
+    /// A pointer event at `x`, `y` relative to a `w` by `h` rectangle the
+    /// artboard is fitted into, as [#drawFallback(Graphics, int, int, int, int)]
+    /// and [#prepareFrame(int, int)] fit it.
+    void pointer(int type, int x, int y, int w, int h) {
+        if (machine == null) {
+            return;
+        }
         float aw = artboard.getWidth();
         float ah = artboard.getHeight();
-        if (aw <= 0 || ah <= 0) {
-            return 0;
+        float s = aw <= 0 || ah <= 0 || w <= 0 || h <= 0 ? 0 : Math.min(w / aw, h / ah);
+        float ax = s == 0 ? 0 : (x - (w - aw * s) / 2f) / s;
+        float ay = s == 0 ? 0 : (y - (h - ah * s) / 2f) / s;
+        if (type == POINTER_PRESSED) {
+            machine.pointerDown(ax, ay);
+        } else if (type == POINTER_DRAGGED) {
+            machine.pointerMove(ax, ay);
+        } else {
+            machine.pointerUp(ax, ay);
         }
-        return Math.min(width / aw, height / ah);
-    }
-
-    private float artboardX(int x) {
-        float s = fitScale();
-        return s == 0 ? 0 : (x - (width - artboard.getWidth() * s) / 2f) / s;
-    }
-
-    private float artboardY(int y) {
-        float s = fitScale();
-        return s == 0 ? 0 : (y - (height - artboard.getHeight() * s) / 2f) / s;
+        afterPointer();
     }
 
     private void afterPointer() {

@@ -219,8 +219,9 @@ public class GpuRiveRenderer implements RiveRenderer {
         filling.width = frameWidth;
         filling.height = frameHeight;
         if (openLayer() && layerGraphics != null) {
+            // the layer is transparent here: new, or replaced by the last
+            // flushLayer() that read what was drawn into it
             layerGraphics.setClip(0, 0, width, height);
-            clearLayer();
             cpu.begin(layerGraphics, base);
         }
     }
@@ -322,8 +323,15 @@ public class GpuRiveRenderer implements RiveRenderer {
         return true;
     }
 
-    private void clearLayer() {
-        layerGraphics.clearRect(0, 0, width, height);
+    /// Replaces the layer with a transparent one. `Graphics` has no portable
+    /// way to erase pixels of a mutable image (a transparent fill blends to
+    /// nothing), so a layer whose content was read out is replaced, and the
+    /// CPU renderer, which may be mid-frame, moves onto the new graphics.
+    private void freshLayer() {
+        layer = com.codename1.ui.Image.createImage(width, height, 0);
+        layerGraphics = layer.getGraphics();
+        layerGraphics.setClip(0, 0, width, height);
+        cpu.retarget(layerGraphics);
     }
 
     private void resetBounds() {
@@ -528,6 +536,9 @@ public class GpuRiveRenderer implements RiveRenderer {
         int y1 = Math.min(height, ((int) Math.ceil(maxY) + 31) & ~31);
         resetBounds();
         if (filling == null || layer == null || !recording || x1 <= x0 || y1 <= y0) {
+            if (layer != null) {
+                freshLayer();
+            }
             return;
         }
         int cw = x1 - x0;
@@ -566,13 +577,7 @@ public class GpuRiveRenderer implements RiveRenderer {
             o.lh = ch;
             o.layerContent++;
         }
-        int cx = layerGraphics.getClipX();
-        int cy = layerGraphics.getClipY();
-        int ccw = layerGraphics.getClipWidth();
-        int cch = layerGraphics.getClipHeight();
-        layerGraphics.setClip(0, 0, width, height);
-        layerGraphics.clearRect(x0, y0, cw, ch);
-        layerGraphics.setClip(cx, cy, ccw, cch);
+        freshLayer();
     }
 
     // --------------------------------------------------------- render thread

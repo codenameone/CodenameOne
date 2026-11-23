@@ -441,24 +441,6 @@ class AndroidGraphics {
 
     }
 
-    private Paint clearPaint;
-
-    /// Makes the rectangle fully transparent (PorterDuff CLEAR, no blending),
-    /// honouring the current clip and transform like fillRect does.
-    public void clearRect(int x, int y, int width, int height) {
-        if (clearPaint == null) {
-            clearPaint = new Paint();
-            clearPaint.setStyle(Paint.Style.FILL);
-            clearPaint.setAntiAlias(false);
-            clearPaint.setXfermode(new android.graphics.PorterDuffXfermode(android.graphics.PorterDuff.Mode.CLEAR));
-        }
-        canvas.save();
-        applyTransform();
-        canvas.drawRect(x, y, x + width, y + height, clearPaint);
-        unapplyTransform();
-        canvas.restore();
-    }
-
    public void fillRect(int x, int y, int w, int h, byte alpha) {
         if(alpha != 0) {
             int oldAlpha = getAlpha();
