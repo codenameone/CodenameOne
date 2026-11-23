@@ -148,11 +148,16 @@ final class MUi {
         // Both lines shrink to fit half a phone width rather than ending in
         // "..." ("$3720...." and "Returning cust..." did).
         Label c = Ui.plain(caption, "MeTileCaption");
+        // Auto-size only ever shrinks: uncapped it grows a short caption or
+        // value ("Orders", "0%") until it is clipped out of the tile, which
+        // left most analytics tiles blank. The caps are the styles' sizes.
         c.setAutoSizeMode(true);
+        c.setMaxAutoSize(2.6f);
         words.add(c);
         Label v = new Label(value, "MeTileValue");
         v.setShouldLocalize(false);
         v.setAutoSizeMode(true);
+        v.setMaxAutoSize(5f);
         words.add(v);
         tile.add(BorderLayout.CENTER, words);
         if (trailing != null) {

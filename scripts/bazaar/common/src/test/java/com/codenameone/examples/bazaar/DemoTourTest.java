@@ -382,7 +382,11 @@ public class DemoTourTest extends E2e {
     /// so a light and a dark run share one directory.
     private void visual() throws Exception {
         final boolean dark = Boolean.getBoolean("bazaar.visual.dark");
-        onEdt(() -> com.codename1.ui.CN.setDarkMode(dark ? Boolean.TRUE : Boolean.FALSE));
+        onEdt(() -> {
+            com.codenameone.examples.bazaar.Prefs.setTheme(dark ? com.codenameone.examples.bazaar.Prefs.THEME_DARK
+                    : com.codenameone.examples.bazaar.Prefs.THEME_LIGHT);
+            com.codenameone.examples.bazaar.ui.Look.apply();
+        });
         if (desktopRun()) {
             onEdt(() -> Display.getInstance().setWindowSize(1440, 1080));
             pause(1500);
@@ -430,7 +434,8 @@ public class DemoTourTest extends E2e {
             pause(2000);
         }
         tap("pos-sell");
-        pause(2000);
+        pause(2500);
+        visualShot("pos-sell-empty" + mode);
         for (int i = 0; i < 3; i++) {
             if (!tapNth("pos-tile-", i)) {
                 tapNth("pos-grid-", i);
@@ -442,7 +447,14 @@ public class DemoTourTest extends E2e {
         pause(1200);
         visualShot("pos-cart" + mode);
         String[] sheets = {"pos-park", "pos-clear", "pos-discount", "pos-customer"};
+        // On a phone the cart and its tools are behind the Charge bar, in a sheet.
         for (String s : sheets) {
+            if (findByName(s) == null && tap("pos-pay")) {
+                pause(1500);
+                if (s.equals("pos-park")) {
+                    visualShot("sheet-cart" + mode);
+                }
+            }
             if (tap(s)) {
                 pause(1500);
                 visualShot("sheet-" + s.substring(4) + mode);
@@ -450,7 +462,11 @@ public class DemoTourTest extends E2e {
                 pause(1200);
             }
         }
-        if (tap("pos-pay") || tap("pos-tender")) {
+        if (findByName("pos-tender") == null) {
+            tap("pos-pay");
+            pause(1500);
+        }
+        if (tap("pos-tender") || tap("pos-pay")) {
             pause(2500);
             visualShot("sheet-tender" + mode);
             tapFirst("pos-tip-none");

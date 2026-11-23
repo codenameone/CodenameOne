@@ -45,7 +45,6 @@ import com.codenameone.examples.bazaar.api.PosLineDto;
 import com.codenameone.examples.bazaar.net.Api;
 import com.codenameone.examples.bazaar.ui.Lang;
 import com.codenameone.examples.bazaar.ui.Layouts;
-import com.codenameone.examples.bazaar.ui.ProductArt;
 import com.codenameone.examples.bazaar.ui.Shell;
 import com.codenameone.examples.bazaar.ui.Ui;
 import com.codenameone.examples.bazaar.ui.Windows;
@@ -364,8 +363,8 @@ final class SellScreen {
         tile.setUIID("PosTile");
         // The photo runs edge to edge across the card's top, 4:3, with the
         // text in a padded block below it.
-        Label art = ProductArt.label(first.productId(), first.title(), "", first.photoId(), side,
-                side * 3 / 4, "PosTileArt");
+        Label art = TileArt.create(first.productId(), first.title(), first.photoId(), side,
+                side * 3 / 4);
         tile.add(art);
         Container text = new Container(BoxLayout.y());
         text.setUIID("PosTileBody");
@@ -536,7 +535,7 @@ final class SellScreen {
                 e -> customItem()));
         head.add(PosUi.icon(FontImage.MATERIAL_PAUSE_CIRCLE, "Park", "pos-park", "PosCartTool",
                 e -> park()));
-        head.add(PosUi.icon(FontImage.MATERIAL_SELL, "Labels", "pos-labels", "PosCartTool",
+        head.add(PosUi.icon(FontImage.MATERIAL_PRINT, "Labels", "pos-labels", "PosCartTool",
                 e -> labels()));
         for (int iter = 0; iter < head.getComponentCount(); iter++) {
             ((Button) head.getComponentAt(iter)).setTextPosition(Component.BOTTOM);

@@ -2935,3 +2935,29 @@ SvSectionFirst { color: var(--text); background-color: transparent; font-family:
 @media (prefers-color-scheme: dark) {
     SvSectionFirst { color: var(--text-dark); }
 }
+
+/* ---- POS polish, round 3 ------------------------------------------------ */
+/* Tile text: a tighter title, the price set apart from it, stock quieter.  */
+PosTileTitle { color: var(--text); font-family: "native:MainBold"; font-size: 2.8mm; padding: 0; margin: 0; }
+PosTilePrice { color: var(--text); font-size: 2.8mm; padding: 1mm 0 0 0; margin: 0; }
+PosTileStock { color: var(--text-muted); font-size: 2.2mm; padding: 0.5mm 0 0 0; margin: 0; }
+PosTileLow { color: var(--warning); font-family: "native:MainBold"; font-size: 2.2mm; padding: 0.5mm 0 0 0; margin: 0; }
+/* Cart tools: room between the captions so neighbours never touch. */
+PosCartTool { color: var(--text); background-color: transparent; font-size: 1.9mm; text-align: center; padding: 1.5mm 0.6mm 1.5mm 0.6mm; margin: 0; }
+/* The quantity sits on the stepper buttons' optical centre. */
+/* Chart labels and legend: the default font read as a headline. */
+MeChart { color: var(--brand); background-color: var(--surface); font-size: 2.2mm; padding: 0; margin: 0; }
+PosQty { color: var(--text); font-family: "native:MainBold"; font-size: 3.4mm; text-align: center; padding: 2.5mm 2mm 1.5mm 2mm; margin: 0; }
+@media (prefers-color-scheme: dark) {
+    PosTileTitle { color: var(--text-dark); }
+    PosTilePrice { color: var(--text-dark); }
+    PosTileStock { color: var(--text-muted-dark); }
+    PosTileLow { color: var(--warning-dark); }
+    PosTile { background-color: var(--surface-dark); border: 1px solid var(--line-dark); }
+    PosTile.pressed { background-color: var(--surface-press-dark); }
+    PosStep { color: var(--text-dark); background-color: var(--surface-alt-dark); }
+    PosQty { color: var(--text-dark); }
+    PosCartTool { color: var(--text-dark); }
+    PosCartTool.pressed { background-color: var(--surface-press-dark); }
+    PosCartHead { background-color: var(--surface-dark); border-bottom: 1px solid var(--line-dark); }
+}
