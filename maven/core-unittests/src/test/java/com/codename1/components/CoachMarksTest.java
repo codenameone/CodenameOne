@@ -67,6 +67,28 @@ class CoachMarksTest extends UITestBase {
     }
 
     @FormTest
+    void showBeforeTheFormIsShownStillPaints() {
+        Form f = new Form(BoxLayout.y());
+        Button a = new Button("A");
+        f.add(a);
+        CoachMarks tour = new CoachMarks(f).add(a, "A", "First");
+        tour.show();
+        f.show();
+        flushSerialCalls();
+        f.revalidate();
+        assertTrue(tour.isShowing(), "showing the form must not end a tour started before it");
+        com.codename1.ui.Container pane = f.getFormLayeredPane(CoachMarks.class, false);
+        assertEquals(1, pane.getComponentCount());
+        com.codename1.ui.Component overlay = pane.getComponentAt(0);
+        assertTrue(overlay.isVisible());
+        assertSame(f, overlay.getComponentForm());
+        assertTrue(overlay.getWidth() > 0 && overlay.getHeight() > 0,
+                "overlay " + overlay.getWidth() + "x" + overlay.getHeight()
+                + " pane " + pane.getWidth() + "x" + pane.getHeight()
+                + " parent " + pane.getParent());
+    }
+
+    @FormTest
     void dismissEndsAtOnce() {
         Form f = new Form(BoxLayout.y());
         Button a = new Button("A");

@@ -78,6 +78,7 @@ public class LoadingPlaceholdersScreenshotTest extends DualAppearanceBaseTest {
 
         Container body = new Container(BoxLayout.y());
         body.setScrollableY(true);
+        body.setScrollVisible(false);
         body.add(carousel);
         body.add(BorderLayout.centerEastWest(Skeleton.text(2).shimmer(false), null,
                 Skeleton.circle(10).shimmer(false)));

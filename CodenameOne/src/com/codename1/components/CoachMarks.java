@@ -38,6 +38,7 @@ import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.layouts.FlowLayout;
+import com.codename1.ui.layouts.LayeredLayout;
 import com.codename1.ui.layouts.Layout;
 import com.codename1.ui.plaf.RoundRectBorder;
 import com.codename1.ui.plaf.Style;
@@ -223,7 +224,12 @@ public class CoachMarks {
         form.addPointerPressedListener(pressListener);
         form.addPointerDraggedListener(pressListener);
         form.addPointerReleasedListener(releaseListener);
-        form.getFormLayeredPane(CoachMarks.class, true).add(overlay);
+        // The layer starts with a flow layout that is never laid out again,
+        // which left the overlay 0x0 when the tour began before the form was
+        // shown. The layer is this class's own, so make it fill-the-parent.
+        Container layer = form.getFormLayeredPane(CoachMarks.class, true);
+        layer.setLayout(new LayeredLayout());
+        layer.add(overlay);
         current = -1;
         next();
     }
@@ -328,6 +334,21 @@ public class CoachMarks {
         final Button next = new Button();
         Step step;
         int[] laidOutHole;
+
+        @Override
+        protected void initComponent() {
+            super.initComponent();
+            // Fill the layer even when it was sized before this was added.
+            Container parent = getParent();
+            if (parent != null && (getWidth() != parent.getWidth() || getHeight() != parent.getHeight())) {
+                setX(0);
+                setY(0);
+                setWidth(parent.getWidth());
+                setHeight(parent.getHeight());
+                setShouldLayout(true);
+                revalidateLater();
+            }
+        }
 
         @Override
         protected void initUnselectedStyle(Style unselectedStyle) {
