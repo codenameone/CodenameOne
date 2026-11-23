@@ -378,7 +378,7 @@ final class ProductForm {
         info.add(stock);
         info.add(stepper());
         add = Ui.primary("Add to cart", "add-to-cart", e -> addToCart());
-        FontImage.setMaterialIcon(add, FontImage.MATERIAL_ADD_SHOPPING_CART, 3.4f);
+        Ui.icon(add, FontImage.MATERIAL_ADD_SHOPPING_CART, 3.4f);
         info.add(add);
         if (Session.user() != null && !ShopState.addresses().isEmpty()) {
             buyNow = Ui.secondary("Buy now", "buy-now", e -> buyNow());

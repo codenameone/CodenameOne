@@ -176,6 +176,8 @@ final class ProductEditor extends Container {
             optionValues[iter].setUIID("SvField");
             optionValues[iter].setName("option-values-" + iter);
             optionValues[iter].setDoneListener(e -> regenerate());
+            // The two fields of a row, and the rows, touched without a gap.
+            MUi.pairGap(optionNames[iter], row);
             row.add(optionNames[iter]).add(optionValues[iter]);
             opts.add(row);
         }
@@ -195,10 +197,10 @@ final class ProductEditor extends Container {
         Container photoButtons = new Container(new FlowLayout());
         Button camera = Ui.secondary(Lang.tr("Take photo"), "photo-camera",
                 e -> Photos.camera((jpeg, image) -> upload(jpeg)));
-        FontImage.setMaterialIcon(camera, FontImage.MATERIAL_ADD_A_PHOTO, 3.2f);
+        Ui.icon(camera, FontImage.MATERIAL_ADD_A_PHOTO, 3.2f);
         Button pick = Ui.secondary(Lang.tr("From gallery"), "photo-gallery",
                 e -> Photos.gallery((jpeg, image) -> upload(jpeg)));
-        FontImage.setMaterialIcon(pick, FontImage.MATERIAL_PHOTO_LIBRARY, 3.2f);
+        Ui.icon(pick, FontImage.MATERIAL_PHOTO_LIBRARY, 3.2f);
         camera.setEnabled(com.codename1.capture.Capture.hasCamera());
         photoButtons.add(camera).add(pick);
         photos.add(photoButtons);
@@ -262,6 +264,24 @@ final class ProductEditor extends Container {
             }
         }
         bottom.add(Ui.primary(Lang.tr("Save"), "product-save", e -> save()));
+        // Equal thirds: flowed, three buttons wrapped Save onto a line of its
+        // own on a phone.
+        bottom.setLayout(new GridLayout(1, bottom.getComponentCount()));
+        int pad = CN.convertToPixels(1f);
+        for (int iter = 0; iter < bottom.getComponentCount(); iter++) {
+            // A third of a phone is narrow; the buttons' wide side padding
+            // cut "Duplicate" to "Dupli...".
+            com.codename1.ui.plaf.Style s = bottom.getComponentAt(iter).getAllStyles();
+            // CSS gave these paddings in millimetres; the pixels below need
+            // pixel units or they read as 30mm and push the words out.
+            int top = bottom.getComponentAt(iter).getUnselectedStyle().getPaddingTop();
+            int foot = bottom.getComponentAt(iter).getUnselectedStyle().getPaddingBottom();
+            s.setPaddingUnit(com.codename1.ui.plaf.Style.UNIT_TYPE_PIXELS);
+            s.setPaddingTop(top);
+            s.setPaddingBottom(foot);
+            s.setPaddingLeft(pad);
+            s.setPaddingRight(pad);
+        }
         add(BorderLayout.CENTER, page);
         add(BorderLayout.SOUTH, bottom);
         Ui.relayout(this);

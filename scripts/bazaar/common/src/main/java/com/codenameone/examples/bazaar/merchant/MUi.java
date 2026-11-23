@@ -162,8 +162,29 @@ final class MUi {
     }
 
     /// A line of buttons at the end of a form.
+    /// Spaces a two-field grid row: `first` gets a gap to its right and
+    /// `row` one under it. A grid has no gap of its own, so two SvFields side
+    /// by side, and the row beneath them, drew their borders touching.
+    static void pairGap(Component first, Container row) {
+        int gap = com.codename1.ui.CN.convertToPixels(1.2f);
+        first.getAllStyles().setMarginRight(gap);
+        row.getAllStyles().setMarginBottom(gap);
+    }
+
     static Container buttons(Component... buttons) {
-        Container row = new Container(new com.codename1.ui.layouts.FlowLayout(Component.RIGHT));
+        // A flow has no gap of its own, and callers add buttons after this
+        // returns, so the space between them is set when the row is shown:
+        // without it Duplicate, Archive and Save touched edge to edge.
+        Container row = new Container(new com.codename1.ui.layouts.FlowLayout(Component.RIGHT)) {
+            @Override
+            protected void initComponent() {
+                super.initComponent();
+                int gap = com.codename1.ui.CN.convertToPixels(1.6f);
+                for (int iter = 1; iter < getComponentCount(); iter++) {
+                    getComponentAt(iter).getAllStyles().setMarginLeft(gap);
+                }
+            }
+        };
         row.setUIID("MeButtons");
         for (int iter = 0; iter < buttons.length; iter++) {
             row.add(buttons[iter]);

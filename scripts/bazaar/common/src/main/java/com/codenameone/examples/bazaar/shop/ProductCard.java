@@ -67,13 +67,16 @@ final class ProductCard {
         if (p.vendor() != null && p.vendor().length() > 0) {
             text.add(Ui.plain(p.vendor(), "ShopVendor"));
         }
-        Container price = new Container(new com.codename1.ui.layouts.FlowLayout());
+        // Stacked, never flowed: a flow wrapped the struck price on one card
+        // and kept it inline on its neighbour, so prices in a row of the grid
+        // no longer lined up.
+        Container price = new Container(com.codename1.ui.layouts.BoxLayout.y());
         price.setUIID("ShopPriceRow");
         price.add(Ui.plain(p.maxPriceCents() > p.minPriceCents()
                 ? Lang.tr("From {0}", ShopState.money(p.storeId(), p.minPriceCents()))
                 : ShopState.money(p.storeId(), p.minPriceCents()), "SvProductPrice"));
         if (off > 0) {
-            price.add(Ui.plain(ShopState.money(p.storeId(), p.compareAtCents()), "ShopCompareAt"));
+            price.add(Ui.plain(ShopState.money(p.storeId(), p.compareAtCents()), "ShopCardCompareAt"));
         }
         text.add(price);
         if (p.ratingCount() > 0) {

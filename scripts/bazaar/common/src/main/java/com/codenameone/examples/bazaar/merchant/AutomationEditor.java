@@ -202,7 +202,7 @@ final class AutomationEditor extends Container {
     private Button icon(char icon, String text, String name, Runnable run) {
         Button b = new Button(wide ? Lang.tr(text) : "", "MeTool");
         b.setName(name);
-        FontImage.setMaterialIcon(b, icon, 3.2f);
+        Ui.icon(b, icon, 3.2f);
         b.addActionListener(e -> run.run());
         return b;
     }

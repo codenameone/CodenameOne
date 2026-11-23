@@ -73,13 +73,13 @@ final class ProductMedia {
         Button video = Ui.secondary(Lang.tr("Add video"), "media-video",
                 e -> CN.openGallery(picked -> upload(productId, "VIDEO", picked == null ? null
                     : picked.getSource(), changed), Display.GALLERY_VIDEO));
-        FontImage.setMaterialIcon(video, FontImage.MATERIAL_VIDEO_LIBRARY, 3.2f);
+        Ui.icon(video, FontImage.MATERIAL_VIDEO_LIBRARY, 3.2f);
         Button link = Ui.secondary(Lang.tr("Add video link"), "media-link",
                 e -> askLink(productId, changed));
         Button model = Ui.secondary(Lang.tr("Add 3D model"), "media-model",
                 e -> CN.openGallery(picked -> upload(productId, "MODEL", picked == null ? null
                     : picked.getSource(), changed), Display.GALLERY_ALL));
-        FontImage.setMaterialIcon(model, FontImage.MATERIAL_VIEW_IN_AR, 3.2f);
+        Ui.icon(model, FontImage.MATERIAL_VIEW_IN_AR, 3.2f);
         return row.add(video).add(link).add(model);
     }
 

@@ -178,7 +178,7 @@ final class FulfilmentFlow extends Container {
 
     private static Button doc(String text, String name, Runnable run) {
         Button b = Ui.secondary(Lang.tr(text), name, e -> run.run());
-        FontImage.setMaterialIcon(b, FontImage.MATERIAL_PICTURE_AS_PDF, 3.2f);
+        Ui.icon(b, FontImage.MATERIAL_PICTURE_AS_PDF, 3.2f);
         return b;
     }
 

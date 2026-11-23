@@ -60,7 +60,7 @@ final class Scan {
     static Button button(String name, final TextField into, final Runnable then) {
         Button b = new Button(Lang.tr("Scan"), "SvSecondary");
         b.setName(name);
-        FontImage.setMaterialIcon(b, FontImage.MATERIAL_QR_CODE_SCANNER, 3.2f);
+        Ui.icon(b, FontImage.MATERIAL_QR_CODE_SCANNER, 3.2f);
         if (!supported()) {
             b.setEnabled(false);
             return b;

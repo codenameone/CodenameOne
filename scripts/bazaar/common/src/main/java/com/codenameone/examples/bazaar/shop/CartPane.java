@@ -235,7 +235,9 @@ final class CartPane extends ShopPane {
         box.setName("cart-summary");
         codes(box, cart);
         credit(box, cart);
-        Ui.section(box, "Summary");
+        // A card heading, not a page section: SvSection opens a new part of a
+        // page with 5mm above it, which left a hole inside the card.
+        box.add(Ui.label("Summary", "ShopCardTitle"));
         rows(box, cart);
         box.add(Ui.primary("Checkout", "checkout", e -> checkout()));
         return box;

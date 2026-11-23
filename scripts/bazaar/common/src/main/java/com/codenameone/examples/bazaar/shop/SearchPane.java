@@ -253,7 +253,7 @@ final class SearchPane extends ShopPane {
         Button b = new Button(s.title(), "ShopSuggestion");
         b.setName("suggest-" + s.handle());
         boolean product = "product".equals(s.kind());
-        FontImage.setMaterialIcon(b, product ? FontImage.MATERIAL_SELL
+        Ui.icon(b, product ? FontImage.MATERIAL_SELL
                 : FontImage.MATERIAL_COLLECTIONS, 3f);
         b.addActionListener(e -> {
             clearSuggestions();

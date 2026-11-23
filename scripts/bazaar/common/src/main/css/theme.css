@@ -1464,7 +1464,9 @@ MeStore.pressed { background-color: var(--surface-press); }
 MePage { background-color: var(--surface-alt); padding: 2.4mm 3mm 3mm 3mm; margin: 0; }
 MeCard { background-color: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 2.6mm 3mm 2.6mm 3mm; margin: 0 0 2.4mm 0; }
 MeSide { background-color: transparent; padding: 0 0 0 2.4mm; margin: 0; }
-MeListRow { background-color: var(--surface); border-bottom: 1px solid var(--line); padding: 2.2mm 3mm 2.2mm 3mm; margin: 0; }
+/* Rows sit inside SvList, which already gives the page margin; a second
+   inset here pushed every thumbnail 3mm in from the heading above it. */
+MeListRow { background-color: var(--surface); border-bottom: 1px solid var(--line); padding: 2.4mm 0 2.4mm 0; margin: 0; }
 MeListRow.pressed { background-color: var(--surface-press); }
 MeRuleRow { background-color: transparent; padding: 0.8mm 0 0.8mm 0; margin: 0; }
 MeTiles { background-color: transparent; padding: 0; margin: 0 0 2.4mm 0; }
@@ -1477,7 +1479,7 @@ MeFilter { color: var(--text); background-color: var(--surface-alt); border: 1px
 MeSearch { color: var(--text); background-color: var(--surface-alt); border: 1px solid var(--line); border-radius: var(--radius-small); padding: 1.4mm 2mm 1.4mm 2mm; margin: 0; }
 MeBulk { background-color: var(--brand-tint); padding: 1.2mm 3mm 1.2mm 3mm; margin: 0; }
 MeBulkText { color: var(--brand); background-color: transparent; font-family: "native:MainBold"; padding: 1.4mm 2mm 1.4mm 0; margin: 0; }
-MeButtons { background-color: transparent; padding: 1.6mm 3mm 1.6mm 3mm; margin: 0; }
+MeButtons { background-color: var(--surface); border-top: 1px solid var(--line); padding: 1.6mm 3.6mm 1.6mm 3.6mm; margin: 0; }
 MeTimelineRow { background-color: transparent; padding: 1.2mm 0 1.2mm 0; margin: 0; }
 MeTimelineDot { color: var(--brand); background-color: transparent; padding: 0 1.6mm 0 0; margin: 0; }
 MeThumb { background-color: var(--surface-alt); border-radius: var(--radius-small); padding: 0; margin: 0 2mm 0 0; }
@@ -2873,3 +2875,20 @@ PosSecondary.pressed { background-color: var(--surface-press); }
 
 /* The reports form: the same side gutter as the other merchant pages. */
 ReportsPage { background-color: transparent; padding: 0 4mm 4mm 4mm; margin: 0; }
+
+/* ==== Shopper/merchant/admin polish (simulator captures) ==== */
+ShopCardCompareAt { color: var(--text-muted); font-family: "native:MainRegular"; font-size: 2.1mm; text-decoration: line-through; padding: 0 2mm 0 2mm; margin: 0; background-color: transparent; }
+ShopCardTitle { color: var(--text); background-color: transparent; font-family: "native:MainBold"; font-size: 3.1mm; text-align: left; padding: 3mm 0 0.8mm 0; margin: 0; }
+@media (prefers-color-scheme: dark) {
+    ShopCardCompareAt { color: var(--text-muted-dark); }
+    ShopCardTitle { color: var(--text-dark); }
+}
+@media (prefers-color-scheme: dark) {
+    MeButtons { background-color: var(--surface-dark); border-top: 1px solid var(--line-dark); }
+}
+/* A field given SvField without its own hint style fell back to the
+   default hint, a size larger than the text it stands in for. */
+TextHint { color: var(--text-muted); font-family: "native:MainRegular"; font-size: 2.9mm; padding: 2.7mm 3mm 2.7mm 3mm; margin: 0; background-color: transparent; }
+@media (prefers-color-scheme: dark) {
+    TextHint { color: var(--text-muted-dark); }
+}

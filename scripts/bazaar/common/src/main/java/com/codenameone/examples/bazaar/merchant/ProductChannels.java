@@ -95,6 +95,7 @@ final class ProductChannels {
                     Lang.tr("Units"), 4, TextArea.NUMERIC);
             qty.setUIID("SvField");
             qty.setName("bundle-qty-" + iter);
+            MUi.pairGap(sku, row);
             row.add(sku).add(qty);
             bundleCard.add(row);
             if (part != null && part.title() != null) {
@@ -148,6 +149,7 @@ final class ProductChannels {
                     Lang.tr("Unpublish at"), 16, TextArea.ANY);
             unpub.setUIID("SvField");
             unpub.setName("schedule-unpublish-" + iter);
+            MUi.pairGap(pub, row);
             row.add(pub).add(unpub);
             block.add(row);
             scheduleCard.add(block);

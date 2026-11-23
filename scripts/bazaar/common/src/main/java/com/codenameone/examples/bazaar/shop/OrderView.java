@@ -136,7 +136,7 @@ final class OrderView {
         Button invoice = Ui.secondary("Download invoice", "invoice", e ->
                 com.codenameone.examples.bazaar.docs.Pdfs.open("Invoice", "invoice-"
                         + order.number() + ".pdf", "/api/orders/" + order.id() + "/invoice.pdf"));
-        FontImage.setMaterialIcon(invoice, FontImage.MATERIAL_PICTURE_AS_PDF, 3.2f);
+        Ui.icon(invoice, FontImage.MATERIAL_PICTURE_AS_PDF, 3.2f);
         actions.add(sideBySide ? cell(invoice, "SvPairLeft") : invoice);
         if (OrderSteps.cancellable(order)) {
             Button cancel = Ui.danger("Cancel order", "cancel-order", e -> {

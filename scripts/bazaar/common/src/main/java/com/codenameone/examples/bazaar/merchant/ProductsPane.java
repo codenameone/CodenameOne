@@ -202,8 +202,11 @@ final class ProductsPane extends MerchantPane {
                     com.codename1.ui.CN.convertToPixels(11f), "MeThumb"));
             Container words = new Container(BoxLayout.y());
             words.add(Ui.plain(p.title(), "SvRowTitle"));
-            words.add(Ui.plain(Lang.tr("{0} in stock", String.valueOf(p.available()))
-                    + Ui.DOT + Lang.tr("{0} variants", String.valueOf(p.variantCount())),
+            // Two short lines rather than one joined by a dot: on a phone the
+            // joined line was cut to "8 var..." beside the price column.
+            words.add(Ui.plain(Lang.tr("{0} in stock", String.valueOf(p.available())),
+                    "SvRowDetail"));
+            words.add(Ui.plain(Lang.tr("{0} variants", String.valueOf(p.variantCount())),
                     "SvRowDetail"));
             row.add(BorderLayout.CENTER, words);
             Container end = new Container(BoxLayout.y());
