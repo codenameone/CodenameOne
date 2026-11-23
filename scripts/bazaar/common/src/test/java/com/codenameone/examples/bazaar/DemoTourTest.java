@@ -677,6 +677,13 @@ public class DemoTourTest extends E2e {
     }
 
 private void screens() throws Exception {
+        final boolean dark = Boolean.getBoolean("bazaar.visual.dark");
+        screensMode = dark ? "-dark" : "";
+        onEdt(() -> {
+            com.codenameone.examples.bazaar.Prefs.setTheme(dark ? com.codenameone.examples.bazaar.Prefs.THEME_DARK
+                    : com.codenameone.examples.bazaar.Prefs.THEME_LIGHT);
+            com.codenameone.examples.bazaar.ui.Look.apply();
+        });
         signIn(MERCHANT, "home-merchant");
         pause(2000);
         go(Sections.ORDERS);
@@ -693,11 +700,13 @@ private void screens() throws Exception {
         go(Sections.CUSTOMERS);
         pause(2500);
         visualShot("merchant-customers");
-        if (tapRow("customer-")) {
+        if (tapRowWhenLoaded("customer-", false)) {
             pause(2500);
             visualShot("merchant-customer-detail");
             safeBack();
             pause(1200);
+        } else {
+            log("screens: no customer row to open");
         }
         go(Sections.INVENTORY);
         pause(2500);
@@ -723,6 +732,7 @@ private void screens() throws Exception {
         pause(2500);
         if (tapText("Alpine Softshell") || openFirstGridRow("products-grid")) {
             pause(2500);
+            visualShot("merchant-product-editor");
             scrollDown(4);
             visualShot("merchant-product-editor-lower");
             scrollDown(3);
@@ -730,6 +740,16 @@ private void screens() throws Exception {
             safeBack();
             pause(1200);
         }
+        go(MerchantSections.REPORTS);
+        pause(2500);
+        if (tap("reports-profit-loss")) {
+            pause(3000);
+            visualShot("merchant-profit-loss");
+            safeBack();
+            pause(1200);
+        }
+        go(Sections.PRODUCTS);
+        pause(2000);
         if (tap("store-switcher")) {
             pause(1200);
             if (tapText("Organization overview")) {
@@ -744,17 +764,21 @@ private void screens() throws Exception {
         signIn(CUSTOMER, "home-shop");
         pause(2000);
         go(Sections.HOME);
-        pause(1500);
-        if (tapRow("collection-")) {
+        pause(2500);
+        visualShot("shop-home");
+        if (tapRowWhenLoaded("collection-", true)) {
             pause(2500);
             visualShot("shop-collection");
             safeBack();
             pause(1200);
+        } else {
+            log("screens: no collection tile to open");
         }
         go(Sections.SEARCH);
         pause(2500);
         if (tapChild("product-grid", 0)) {
             pause(2500);
+            visualShot("shop-product");
             tapFirst("option-");
             tap("add-to-cart");
             pause(1200);
@@ -765,6 +789,7 @@ private void screens() throws Exception {
         }
         go(Sections.CART);
         pause(2000);
+        visualShot("shop-cart");
         if (tap("checkout")) {
             pause(1500);
             fill("ship-line1", "1 Market St");
@@ -798,6 +823,7 @@ private void screens() throws Exception {
 
         signIn(ADMIN, "home-admin");
         pause(2500);
+        visualShot("admin-overview");
         tap("menu-more");
         pause(1500);
         visualShot("admin-menu-sheet");
@@ -805,19 +831,24 @@ private void screens() throws Exception {
         pause(1000);
         go(Sections.STORES);
         pause(2500);
-        if (tapRow("store-") || tapText("Northwind Outfitters")) {
+        if (tapRowWhenLoaded("store-", false) || tapText("Northwind Outfitters")) {
             pause(2500);
             visualShot("admin-store-detail");
             safeBack();
             pause(1200);
+        } else {
+            log("screens: no store row to open");
         }
         go(Sections.USERS);
         pause(2500);
         visualShot("admin-users");
     }
 
+    /// "-dark" while [#screens] runs dark, so both modes share one folder.
+    private String screensMode = "";
+
     private void visualShot(String name) {
-        shot("visual-" + name + "-" + device());
+        shot("visual-" + name + screensMode + "-" + device());
     }
 
     private void admin() throws Exception {
@@ -1082,6 +1113,21 @@ private void screens() throws Exception {
 
     /// Opens the first list row named `prefix` followed by its key, skipping
     /// toolbar buttons that share the prefix ("order-draft").
+    /// [#tapRow] for a list that is still loading: retries for up to twelve
+    /// seconds, scrolling down between tries when the row may sit lower.
+    private boolean tapRowWhenLoaded(String prefix, boolean scroll) {
+        for (int iter = 0; iter < 12; iter++) {
+            if (tapRow(prefix)) {
+                return true;
+            }
+            if (scroll) {
+                scrollDown(1);
+            }
+            pause(1000);
+        }
+        return false;
+    }
+
     private boolean tapRow(final String prefix) {
         final String[] name = new String[1];
         onEdt(() -> {

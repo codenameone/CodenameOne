@@ -102,6 +102,7 @@ public class DemoMarketing {
         if (!audienceRows.findByStoreIdOrderByNameAsc(storeId).isEmpty()) {
             return;
         }
+        customersFromOrders(storeId);
         Instant now = Instant.now();
         List<LoyaltyTierDto> tiers = new ArrayList<LoyaltyTierDto>();
         tiers.add(new LoyaltyTierDto(null, "Bronze", 0, 0, false, 0, "#a0522d", 0));
@@ -169,6 +170,52 @@ public class DemoMarketing {
     /// Marks a campaign sent and writes the sends it would have made, so
     /// its stats show something: each customer opened about every other
     /// message, clicked one in four, and one in eight ordered.
+    /// The seeded orders were placed by no account, so nothing made a
+    /// customer of their buyers and the Customers screen, the segments and
+    /// the campaigns all read empty. One customer per buyer email, with the
+    /// orders and spend those orders add up to, linked back to each order.
+    private void customersFromOrders(String storeId) throws IOException {
+        if (!customers.findByStoreIdOrderByLastNameAsc(storeId).isEmpty()) {
+            return;
+        }
+        java.util.Map<String, Customer> byEmail = new java.util.LinkedHashMap<String, Customer>();
+        List<StoreOrder> linked = new ArrayList<StoreOrder>();
+        for (StoreOrder o : orders.findByStoreIdOrderByCreatedAtDesc(storeId)) {
+            String email = o.getEmail();
+            if (email == null || email.indexOf('@') < 0) {
+                continue;
+            }
+            Customer c = byEmail.get(email);
+            if (c == null) {
+                c = new Customer();
+                c.setId(Ids.next());
+                c.setStoreId(storeId);
+                c.setUsername(email);
+                c.setEmail(email);
+                String name = o.getShipName();
+                if (name == null || name.length() == 0) {
+                    name = email.substring(0, email.indexOf('@'));
+                }
+                int space = name.lastIndexOf(' ');
+                c.setFirstName(space > 0 ? name.substring(0, space) : name);
+                c.setLastName(space > 0 ? name.substring(space + 1) : "");
+                c.setCreatedAt(o.getCreatedAt());
+                byEmail.put(email, c);
+            }
+            c.setOrdersCount(c.getOrdersCount() + 1);
+            c.setSpentCents(c.getSpentCents() + o.getTotalCents());
+            c.setUpdatedAt(o.getCreatedAt());
+            o.setCustomerId(c.getId());
+            linked.add(o);
+        }
+        for (Customer c : byEmail.values()) {
+            customers.insert(c);
+        }
+        for (StoreOrder o : linked) {
+            orders.save(o);
+        }
+    }
+
     void sent(String storeId, String campaignId, String winner, Instant at) throws IOException {
         Campaign c = campaignRows.findById(campaignId);
         c.setStatus(Campaigns.SENT);

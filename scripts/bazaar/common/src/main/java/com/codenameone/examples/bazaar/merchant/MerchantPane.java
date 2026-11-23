@@ -276,6 +276,9 @@ abstract class MerchantPane extends Container {
                         s.orders() + " " + Lang.tr("Orders") + Ui.DOT
                         + com.codenameone.examples.bazaar.shop.Money.format(
                                 s.gmvCents(), s.currency(), ""), null);
+                // A packed dialog is exactly as wide as its widest row, so the
+                // row carries its own end inset or the name meets the edge.
+                line.setUIID("SvOrgRow");
                 Container row = Ui.tap(line, "org-" + s.handle(), e -> {
                     d.dispose();
                     List<StoreRoleDto> mine = MerchantState.stores();

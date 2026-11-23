@@ -53,15 +53,24 @@ final class OrderView {
     private OrderView() {
     }
 
-    static Container create(final OrderDto order, final Changed changed) {
+    /// `titled` is false where a toolbar or window title already names the
+    /// order: the page then opens on its date and status instead of saying
+    /// "Order #1015" a second time under the same words.
+    static Container create(final OrderDto order, final boolean titled, final Changed changed) {
         Container page = Ui.page();
         page.setName("order-" + order.number());
         Container head = new Container(new BorderLayout());
-        head.add(BorderLayout.CENTER, Ui.label(Lang.tr("Order #{0}", String.valueOf(order.number())),
-                "SvTitle"));
+        if (titled) {
+            head.add(BorderLayout.CENTER, Ui.label(Lang.tr("Order #{0}", String.valueOf(order.number())),
+                    "SvTitle"));
+        } else {
+            head.add(BorderLayout.CENTER, Ui.plain(Ui.when(order.createdAt()), "SvMuted"));
+        }
         head.add(BorderLayout.EAST, Ui.badge(Lang.tr(OrderSteps.label(order)), badge(order)));
         page.add(head);
-        page.add(Ui.plain(Ui.when(order.createdAt()), "SvMuted"));
+        if (titled) {
+            page.add(Ui.plain(Ui.when(order.createdAt()), "SvMuted"));
+        }
         page.add(timeline(order));
 
         Ui.section(page, "Items");

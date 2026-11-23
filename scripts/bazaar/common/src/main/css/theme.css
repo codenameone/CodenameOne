@@ -3012,3 +3012,16 @@ MeSearchBar { background-color: var(--surface); padding: 0; margin: 0; }
 MeFilter { color: var(--text); background-color: var(--surface-alt); border: 1px solid var(--line); border-radius: var(--radius-small); font-size: 2.8mm; padding: 1.2mm 2mm 1.2mm 2mm; margin: 0 1.2mm 1.2mm 0; }
 MeFilters { background-color: var(--surface); border-bottom: 1px solid var(--line); padding: 1.6mm 3mm 0.4mm 3mm; margin: 0; }
 /* ---- end app5 ---- */
+
+/* ==================================================================== */
+/* APP ROUND 6: dark, tablet and detail screens                         */
+/* ==================================================================== */
+SvOrgRow {
+    cn1-derive: SvRow;
+    padding: 2.6mm 3mm 2.6mm 1mm;
+}
+MeActionGrid {
+    background-color: transparent;
+    padding: 1mm 0 1mm 0;
+    margin: 0;
+}

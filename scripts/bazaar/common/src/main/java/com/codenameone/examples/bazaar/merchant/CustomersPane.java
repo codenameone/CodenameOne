@@ -327,11 +327,17 @@ final class CustomersPane extends MerchantPane {
         tiles.add(MUi.tile(MerchantState.money(c.storeCreditCents()), Lang.tr("Store credit"),
                 null, "customer-credit"));
         page.add(tiles);
-        page.add(MUi.buttons(Ui.secondary(Lang.tr("Adjust store credit"), "customer-adjust",
-                e -> credit(c, () -> open(c))),
-                Ui.secondary(Lang.tr("Merge a duplicate"), "customer-merge", e -> merge(c)),
-                Ui.secondary(Lang.tr("Export data"), "customer-data-export", e -> exportData(c)),
-                Ui.secondary(Lang.tr("Erase personal data"), "customer-erase", e -> erase(c))));
+        // Four actions of different widths in a right-aligned flow wrapped
+        // into a ragged staircase, and two columns cut "Adjust store credit"
+        // short on a phone: one full-width button per line.
+        Container actions = new Container(BoxLayout.y());
+        actions.setUIID("MeActionGrid");
+        actions.add(Ui.secondary(Lang.tr("Adjust store credit"), "customer-adjust",
+                e -> credit(c, () -> open(c))));
+        actions.add(Ui.secondary(Lang.tr("Merge a duplicate"), "customer-merge", e -> merge(c)));
+        actions.add(Ui.secondary(Lang.tr("Export data"), "customer-data-export", e -> exportData(c)));
+        actions.add(Ui.secondary(Lang.tr("Erase personal data"), "customer-erase", e -> erase(c)));
+        page.add(actions);
 
         Ui.section(page, "Notes and tags");
         Container card = new Container(BoxLayout.y());

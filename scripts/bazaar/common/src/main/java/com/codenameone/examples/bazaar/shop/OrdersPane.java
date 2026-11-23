@@ -150,7 +150,7 @@ final class OrdersPane extends ShopPane {
             if (!id.equals(shown)) {
                 return;
             }
-            Container view = OrderView.create(order, changed -> {
+            Container view = OrderView.create(order, wide, changed -> {
                 reload();
                 show(changed.id());
             });
@@ -183,7 +183,7 @@ final class OrdersPane extends ShopPane {
 
     private void window(final String id) {
         Api.orders().mineDetail(id, Net.to(order -> {
-            Container view = OrderView.create(order, changed -> reload());
+            Container view = OrderView.create(order, false, changed -> reload());
             if (Windows.open(Lang.tr("Order #{0}", String.valueOf(order.number())), view,
                     120f, 150f) == null) {
                 show(id);
