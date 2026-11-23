@@ -55,6 +55,7 @@ final class BuildHintsGeneral {
         h.add(new Hint("spellcheck.languages")
                 .group(HintGroup.GENERAL)
                 .type(HintType.STRING_LIST)
+                .separator(",")
                 .def("en_US")
                 .platform("general")
                 .doc("The languages whose Hunspell dictionaries the build adds to an application "
