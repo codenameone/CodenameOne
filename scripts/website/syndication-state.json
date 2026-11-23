@@ -3523,6 +3523,11 @@
         "tags_set": true,
         "canonical_set": true,
         "syndicated_at": "2026-11-23T01:01:11+00:00"
+      },
+      "devto": {
+        "id": 5101557,
+        "url": "https://dev.to/codenameone/kafka-listeners-mail-and-live-streams-in-your-backend-with-records-as-entities-13ae",
+        "syndicated_at": "2026-11-23T15:48:51+00:00"
       }
     }
   }
