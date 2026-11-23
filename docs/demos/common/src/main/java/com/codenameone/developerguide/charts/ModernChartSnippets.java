@@ -294,8 +294,8 @@ public class ModernChartSnippets {
 
     public Chart heikinAshi() {
         Chart chart = candlestick();
-        // tag::chart-heikin-ashi[]
         CandlestickSeries prices = (CandlestickSeries) chart.getSeries().get(0);
+        // tag::chart-heikin-ashi[]
         prices.setStyle(CandlestickSeries.HEIKIN_ASHI);
         // end::chart-heikin-ashi[]
         chart.setTitle("Heikin-Ashi");

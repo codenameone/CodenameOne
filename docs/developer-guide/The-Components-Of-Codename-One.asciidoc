@@ -2787,7 +2787,7 @@ Heikin-Ashi candles average each period with the one before it, which smooths ou
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/charts/ModernChartSnippets.java[tag=chart-heikin-ashi,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/charts/ModernChartSnippets.java[tags=chart-candlestick;chart-heikin-ashi,indent=0]
 ----
 
 .Heikin-Ashi candles
@@ -2875,7 +2875,7 @@ image::img/generated/chart-flame-graph.png["Rows of warm colored blocks stacked 
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/charts/ModernChartSnippets.java[tag=chart-icicle,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/charts/ModernChartSnippets.java[tags=chart-flame-graph;chart-icicle,indent=0]
 ----
 
 .An icicle chart
@@ -2965,7 +2965,7 @@ The legend goes at the top by default. `setLegendPosition` moves it to the botto
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/charts/ModernChartSnippets.java[tag=chart-legend-right,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/charts/ModernChartSnippets.java[tags=chart-line;chart-legend-right,indent=0]
 ----
 
 .The legend on the right
@@ -2980,7 +2980,7 @@ image::img/generated/chart-tooltip.png["A vertical line through Thursday and a b
 
 [source,java]
 ----
-include::../demos/common/src/main/java/com/codenameone/developerguide/charts/ModernChartSnippets.java[tag=chart-loading,indent=0]
+include::../demos/common/src/main/java/com/codenameone/developerguide/charts/ModernChartSnippets.java[tags=chart-grouped-bars;chart-loading,indent=0]
 ----
 
 .A chart while it loads

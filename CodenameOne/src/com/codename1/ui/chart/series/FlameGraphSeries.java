@@ -51,6 +51,7 @@ import com.codename1.ui.chart.layout.LabelLayout;
 /// TreeNode render = main.add(new TreeNode("render"));
 /// render.add(new TreeNode("layout", 25));
 /// render.add(new TreeNode("paint", 15));
+/// Chart chart = new Chart();
 /// chart.addSeries(new FlameGraphSeries("CPU", main));
 /// ```
 ///
