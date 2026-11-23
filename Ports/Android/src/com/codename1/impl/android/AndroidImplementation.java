@@ -5470,24 +5470,12 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             }
             // The GLSurfaceView must be constructed on the UI thread; block until
             // it exists so we can wrap and return its peer to the caller.
-            // Bounded: a UI thread that is itself waiting on the EDT would
-            // otherwise hold the EDT here forever with no trace. On timeout the
-            // UI thread's stack is printed, the view gets no peer and draws its
-            // Graphics fallback, and a surface built late is disposed of.
             final AndroidGLSurface[] holder = new AndroidGLSurface[1];
-            final boolean[] abandoned = new boolean[1];
             final java.util.concurrent.CountDownLatch latch = new java.util.concurrent.CountDownLatch(1);
             a.runOnUiThread(new Runnable() {
                 public void run() {
                     try {
-                        AndroidGLSurface s = new AndroidGLSurface(a, view);
-                        synchronized (holder) {
-                            if (abandoned[0]) {
-                                s.disposeSurface();
-                            } else {
-                                holder[0] = s;
-                            }
-                        }
+                        holder[0] = new AndroidGLSurface(a, view);
                     } catch (Throwable t) {
                         t.printStackTrace();
                     } finally {
@@ -5495,29 +5483,12 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
                     }
                 }
             });
-            boolean done = false;
             try {
-                done = latch.await(8, java.util.concurrent.TimeUnit.SECONDS);
+                latch.await();
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
             }
-            if (!done) {
-                synchronized (holder) {
-                    if (holder[0] == null) {
-                        abandoned[0] = true;
-                    }
-                }
-                Thread ui = android.os.Looper.getMainLooper().getThread();
-                System.out.println("CN1 GPU: UI thread did not build the GL surface in 8s; state=" + ui.getState());
-                StackTraceElement[] st = ui.getStackTrace();
-                for (int i = 0; i < st.length && i < 40; i++) {
-                    System.out.println("CN1 GPU:   at " + st[i]);
-                }
-            }
-            AndroidGLSurface surface;
-            synchronized (holder) {
-                surface = holder[0];
-            }
+            AndroidGLSurface surface = holder[0];
             if (surface == null) {
                 return null;
             }
