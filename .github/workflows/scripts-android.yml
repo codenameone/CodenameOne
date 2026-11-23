@@ -369,11 +369,6 @@ jobs:
           script: |
             ${{ matrix.emulator_setup || 'true' }}
             CN1SS_EMULATOR_SETUP="${{ matrix.emulator_setup }}" ./scripts/run-android-instrumentation-tests.sh "${{ steps.build-android-app.outputs.gradle_project_dir }}"
-      # TEMPORARY: the host kernel log names a crashed or OOM-killed emulator
-      # process, which the device logcat cannot.
-      - name: Host kernel log after a failed emulator run
-        if: failure()
-        run: sudo dmesg -T | tail -150 || true
       # After the emulator, deliberately: the instrumentation suite runs against
       # the APK the primary build produced, and this rewrites that project in
       # place. It is the end-to-end half of the API 37 coverage -- the offline

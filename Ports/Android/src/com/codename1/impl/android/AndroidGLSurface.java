@@ -65,20 +65,8 @@ class AndroidGLSurface extends GLSurfaceView {
     private volatile Bitmap lastFrame;
     private ByteBuffer readbackBuffer;
 
-    // TEMPORARY trace for the RiveGpu emulator crash; removed once found.
-    private static final java.util.concurrent.atomic.AtomicInteger TRACE = new java.util.concurrent.atomic.AtomicInteger();
-
-    private static void trace(String s) {
-        if (TRACE.incrementAndGet() < 60) {
-            System.out.println("CN1GPU: " + s);
-            // give logcat time to flush before a possible emulator death
-            try { Thread.sleep(150); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
-        }
-    }
-
     AndroidGLSurface(Context context, RenderView view) {
         super(context);
-        trace("construct " + view.getRenderer().getClass().getName());
         this.view = view;
         this.renderer = view.getRenderer();
         setEGLContextClientVersion(2);
@@ -87,19 +75,6 @@ class AndroidGLSurface extends GLSurfaceView {
         setZOrderMediaOverlay(true);
         setRenderer(new SurfaceRenderer());
         setRenderMode(RENDERMODE_WHEN_DIRTY);
-    }
-
-    @Override
-    public void surfaceCreated(android.view.SurfaceHolder holder) {
-        trace("holder surfaceCreated");
-        super.surfaceCreated(holder);
-        trace("holder surfaceCreated done");
-    }
-
-    @Override
-    public void surfaceChanged(android.view.SurfaceHolder holder, int format, int w, int h) {
-        trace("holder surfaceChanged " + w + "x" + h);
-        super.surfaceChanged(holder, format, w, h);
     }
 
     /// Returns the most recently rendered frame read back from the GPU, or null
@@ -119,9 +94,7 @@ class AndroidGLSurface extends GLSurfaceView {
 
     @Override
     protected void onAttachedToWindow() {
-        trace("onAttachedToWindow");
         super.onAttachedToWindow();
-        trace("onAttachedToWindow done");
         ACTIVE.add(this);
     }
 
@@ -165,7 +138,6 @@ class AndroidGLSurface extends GLSurfaceView {
 
     private final class SurfaceRenderer implements GLSurfaceView.Renderer {
         public void onSurfaceCreated(GL10 unused, EGLConfig config) {
-            trace("onSurfaceCreated");
             device = new AndroidGraphicsDevice();
             lastW = -1;
             lastH = -1;
@@ -180,7 +152,6 @@ class AndroidGLSurface extends GLSurfaceView {
             if (device == null) {
                 return;
             }
-            trace("onSurfaceChanged " + width + "x" + height);
             lastW = width;
             lastH = height;
             try {
@@ -194,19 +165,16 @@ class AndroidGLSurface extends GLSurfaceView {
             if (device == null) {
                 return;
             }
-            trace("onDrawFrame begin " + lastW + "x" + lastH);
             try {
                 renderer.onFrame(device);
             } catch (Throwable t) {
                 t.printStackTrace();
             }
-            trace("onDrawFrame rendered; readback");
             try {
                 readbackFrame();
             } catch (Throwable t) {
                 t.printStackTrace();
             }
-            trace("onDrawFrame done");
         }
     }
 

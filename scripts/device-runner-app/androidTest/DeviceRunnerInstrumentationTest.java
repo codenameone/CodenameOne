@@ -194,17 +194,6 @@ public class DeviceRunnerInstrumentationTest {
         }
     }
 
-    private static void dumpThreads() {
-        System.out.println("CN1STALL no suite output for 60s; thread dump follows");
-        for (java.util.Map.Entry<Thread, StackTraceElement[]> e : Thread.getAllStackTraces().entrySet()) {
-            Thread t = e.getKey();
-            System.out.println("CN1STALL thread \"" + t.getName() + "\" " + t.getState());
-            for (StackTraceElement el : e.getValue()) {
-                System.out.println("CN1STALL   at " + el);
-            }
-        }
-    }
-
     private SuiteOutcome waitForDeviceRunner() throws Exception {
         final long timeoutMs = 900_000L;
         final String endMarker = "CN1SS:SUITE:FINISHED";
@@ -213,9 +202,6 @@ public class DeviceRunnerInstrumentationTest {
         long deadline = System.currentTimeMillis() + timeoutMs;
         // Set when a back is injected; nothing answering by then is the answer.
         long backAnswerDeadline = 0L;
-        // The suite prints at least once per test, each capped at 30s; a
-        // minute of silence is a wedged app, and the threads say where.
-        long lastSuiteLine = System.currentTimeMillis();
         UiAutomation automation = InstrumentationRegistry.getInstrumentation().getUiAutomation();
         ParcelFileDescriptor pfd = automation.executeShellCommand("logcat -v brief");
         try (FileInputStream fis = new FileInputStream(pfd.getFileDescriptor());
@@ -234,14 +220,7 @@ public class DeviceRunnerInstrumentationTest {
                     Log.w(TAG, "No answer to the injected back within the probe window");
                     return outcome;
                 }
-                if (System.currentTimeMillis() - lastSuiteLine > 60_000L) {
-                    dumpThreads();
-                    lastSuiteLine = System.currentTimeMillis() + 120_000L;
-                }
                 if (reader.ready() && (line = reader.readLine()) != null) {
-                    if (line.contains("CN1SS:")) {
-                        lastSuiteLine = System.currentTimeMillis();
-                    }
                     if (line.contains(SUITE_TEST_MARKER)) {
                         outcome.sawSuiteOutput = true;
                     }
