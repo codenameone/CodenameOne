@@ -371,8 +371,11 @@ public class CoachMarks {
             if (!UIManager.getInstance().isThemeStyleDefined("CoachMarkBubble")) {
                 Style s = bubble.getAllStyles();
                 s.setBorder(RoundRectBorder.create().cornerRadius(3f).shadowOpacity(60));
-                s.setPaddingUnit(Style.UNIT_TYPE_DIPS);
-                s.setPadding(4, 4, 4, 4);
+                // Millimetres, so the padding clears the border's shadow
+                // inset at every density; dips were too thin on high density
+                // screens and the text spilled past the drawn bubble.
+                s.setPaddingUnit(Style.UNIT_TYPE_MM);
+                s.setPadding(3f, 3f, 3.5f, 3.5f);
             }
             title.setTextUIID("CoachMarkTitle");
             text.setTextUIID("CoachMarkText");
