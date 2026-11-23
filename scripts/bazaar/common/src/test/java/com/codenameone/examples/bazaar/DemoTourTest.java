@@ -215,6 +215,11 @@ public class DemoTourTest extends E2e {
         } catch (RuntimeException err) {
             log("Could not seed the board: " + err);
         }
+        try {
+            seedChat();
+        } catch (Exception err) {
+            log("Could not seed the inbox: " + err);
+        }
         signIn(MERCHANT, "home-merchant");
         pause(1500);
         record("bazaar-merchant-" + device());
@@ -253,7 +258,7 @@ public class DemoTourTest extends E2e {
         caption("Products: search, filter and bulk edit", 2600);
         pause(2800);
         shotAs("merchant-products");
-        if (tapText("Alpine Softshell")) {
+        if (tapText("Alpine Softshell") || openFirstGridRow("products-grid")) {
             caption("The product editor: media, variants, SEO and channels", 3000);
             pause(3200);
             shotAs("merchant-product-editor");
@@ -369,12 +374,87 @@ public class DemoTourTest extends E2e {
         signIn(ADMIN, "home-admin");
         pause(2500);
         record("bazaar-admin-" + device());
-        String[] sections = {Sections.OVERVIEW, Sections.STORES, Sections.USERS, Sections.PAYMENTS};
-        for (String s : sections) {
-            go(s);
-            pause(2600);
-            shotAs("admin-" + s);
+        go(Sections.OVERVIEW);
+        caption("The platform console: every store on the marketplace at a glance", 3400);
+        pause(3600);
+        shotAs("admin-" + Sections.OVERVIEW);
+        scrollDown(1);
+        pause(1800);
+
+        go(Sections.STORES);
+        caption("Stores: review, verify and suspend merchants", 3000);
+        pause(3200);
+        shotAs("admin-" + Sections.STORES);
+        if (tapText("Northwind Outfitters")) {
+            caption("A store's standing, volume and history", 3000);
+            pause(3400);
+            scrollDown(1);
+            pause(1600);
         }
+
+        go(Sections.USERS);
+        caption("Users: search accounts, see their standing and activity", 3000);
+        pause(3200);
+        shotAs("admin-" + Sections.USERS);
+        scrollDown(1);
+        pause(1600);
+
+        go(Sections.PAYMENTS);
+        caption("Payments: payouts and fees across the platform", 3000);
+        pause(3400);
+        shotAs("admin-" + Sections.PAYMENTS);
+        caption("Bazaar: the marketplace's own back office, in the same app", 3000);
+        pause(3200);
+    }
+
+    /// A shopper writing to the store from the storefront's chat widget, so
+    /// the inbox has a conversation to show: the widget's own session post,
+    /// then its socket.
+    private void seedChat() throws Exception {
+        String base = System.getProperty("bazaar.server.url");
+        java.net.http.HttpClient http = java.net.http.HttpClient.newHttpClient();
+        java.net.http.HttpResponse<String> session = http.send(java.net.http.HttpRequest
+                .newBuilder(java.net.URI.create(base + "/s/" + STORE + "/chat/session"))
+                .POST(java.net.http.HttpRequest.BodyPublishers.noBody()).build(),
+                java.net.http.HttpResponse.BodyHandlers.ofString());
+        String ticket = Actor.text(new com.codename1.io.JSONParser()
+                .parseJSON(new java.io.StringReader(session.body())), "ticket");
+        final java.util.concurrent.CountDownLatch acked = new java.util.concurrent.CountDownLatch(2);
+        java.net.http.WebSocket ws = http.newWebSocketBuilder().buildAsync(
+                java.net.URI.create(base.replaceFirst("^http", "ws") + "/ws/chat?ticket=" + ticket),
+                new java.net.http.WebSocket.Listener() {
+                    @Override
+                    public java.util.concurrent.CompletionStage<?> onText(java.net.http.WebSocket w,
+                            CharSequence data, boolean last) {
+                        if (data.toString().contains("\"sent\"")) {
+                            acked.countDown();
+                        }
+                        w.request(1);
+                        return null;
+                    }
+                }).get(10, java.util.concurrent.TimeUnit.SECONDS);
+        ws.sendText("{\"op\":\"send\",\"ref\":\"1\",\"name\":\"Sam Shopper\",\"email\":\"sam@example.com\","
+                + "\"body\":\"Hi! Does the Alpine Softshell run true to size? I'm between a M and a L.\"}", true).get();
+        Thread.sleep(800);
+        ws.sendText("{\"op\":\"send\",\"ref\":\"2\",\"body\":\"Also, can I pick it up at the Portland store?\"}",
+                true).get();
+        acked.await(10, java.util.concurrent.TimeUnit.SECONDS);
+        ws.sendClose(java.net.http.WebSocket.NORMAL_CLOSURE, "").get();
+    }
+
+    /// Opens the first row of the data grid called `name`, as a double tap does.
+    private boolean openFirstGridRow(final String name) {
+        final boolean[] ok = new boolean[1];
+        onEdt(() -> {
+            Component c = findByName(name);
+            if (c instanceof com.codename1.ui.table.DataGrid) {
+                com.codename1.ui.table.DataGrid g = (com.codename1.ui.table.DataGrid) c;
+                g.setSelectedRow(0);
+                g.keyPressed(Display.getInstance().getKeyCode(Display.GAME_FIRE));
+                ok[0] = true;
+            }
+        });
+        return ok[0];
     }
 
     /// Signs in through the Account tab, with the taps on screen.

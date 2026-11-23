@@ -208,6 +208,8 @@ a price range.
 
 image::img/bazaar-merchant-products-tablet.png["The product list with status, type, vendor, inventory, variants and price",scaledwidth=90%]
 
+image::img/bazaar-merchant-product-editor-tablet.png["The product editor: status, type, vendor, tags and category",scaledwidth=90%]
+
 ==== Inventory
 
 The inventory screen shows what's on hand, committed and available for each
@@ -592,6 +594,8 @@ replies from the conversation page, and rings with Accept and Decline when a
 shopper calls, answering voice and video calls on the phone or tablet. A call
 that one member of staff answers stops ringing for everyone else. The listings page imports a marketplace CSV
 as draft products, combining the colors of one item into a single listing.
+
+image::img/bazaar-merchant-inbox-tablet.png["The app's inbox with a storefront chat waiting, its unread count beside it",scaledwidth=90%]
 
 image::img/bazaar-web-admin-dashboard.png["The web back office dashboard",scaledwidth=90%]
 

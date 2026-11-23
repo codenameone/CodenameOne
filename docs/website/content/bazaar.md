@@ -20,6 +20,11 @@ Bazaar is a complete, full-stack commerce platform in Java. Shoppers browse inde
 <a href="/bazaar/bazaar-pos-desktop.mp4">Download the video</a>.
 </video>
 
+<video controls playsinline preload="metadata" poster="/bazaar/bazaar-admin-desktop-poster.jpg" style="width:100%;max-width:960px;height:auto;display:block;margin:1.5rem auto 0" aria-label="The platform console as a desktop app: the marketplace overview, the stores, the users and the payments">
+<source src="/bazaar/bazaar-admin-desktop.mp4" type="video/mp4">
+<a href="/bazaar/bazaar-admin-desktop.mp4">Download the video</a>.
+</video>
+
 <video controls playsinline preload="metadata" poster="/bazaar/bazaar-shopper-phone-poster.jpg" style="width:100%;max-width:960px;height:auto;display:block;margin:1.5rem auto 0" aria-label="A shopper on a phone: browsing as a guest, search, a product, the cart, signing in, checkout with shipping and payment, and the placed order">
 <source src="/bazaar/bazaar-shopper-phone.mp4" type="video/mp4">
 <a href="/bazaar/bazaar-shopper-phone.mp4">Download the video</a>.
