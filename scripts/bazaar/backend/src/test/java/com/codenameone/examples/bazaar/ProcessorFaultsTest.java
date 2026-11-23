@@ -27,10 +27,22 @@ import com.codename1.backend.test.BackendTest;
 import com.codename1.backend.test.MockMvc;
 import com.codename1.backend.test.TestConfiguration;
 import com.codenameone.examples.bazaar.account.Accounts;
+import com.codenameone.examples.bazaar.api.OrderDto;
+import com.codenameone.examples.bazaar.api.RefundLineDto;
+import com.codenameone.examples.bazaar.api.RefundRequestDto;
+import com.codenameone.examples.bazaar.cart.Carts;
+import com.codenameone.examples.bazaar.checkout.Checkouts;
+import com.codenameone.examples.bazaar.inventory.Inventory;
+import com.codenameone.examples.bazaar.order.Orders;
+import com.codenameone.examples.bazaar.pricing.DemoPricing;
+import com.codenameone.examples.bazaar.store.StoreAccess;
+import com.codenameone.examples.bazaar.store.Stores;
 import com.codenameone.examples.bazaar.pay.Payments;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 
 import static com.codename1.backend.test.MockMvcRequestBuilders.get;
@@ -56,6 +68,18 @@ class ProcessorFaultsTest {
     private ScriptedPayments processor;
     @Autowired
     private DataSource db;
+    @Autowired
+    private Stores stores;
+    @Autowired
+    private DemoPricing pricing;
+    @Autowired
+    private Inventory inventory;
+    @Autowired
+    private Carts carts;
+    @Autowired
+    private Checkouts checkouts;
+    @Autowired
+    private Orders orders;
 
     @TestConfiguration
     static class Processor {
@@ -230,5 +254,77 @@ class ProcessorFaultsTest {
                 }
             }
         };
+    }
+
+    /// A shop of its own, ten mugs in stock.
+    private Shop shop(String name) throws Exception {
+        return new Shop(name, 10, accounts, stores, pricing, db, inventory, carts, checkouts, mvc);
+    }
+
+    private long number(String sql, String arg) throws Exception {
+        return Rows.number(db.queryOne(sql, new Object[] {arg}).get("n"));
+    }
+
+    private long unconfirmedEvents(String orderId) throws Exception {
+        return number("SELECT COUNT(*) AS n FROM order_event WHERE order_id = ? "
+                + "AND kind = 'REFUND_UNCONFIRMED'", orderId);
+    }
+
+    private Runnable refundOneMug(final Shop s, final OrderDto o) {
+        return new Runnable() {
+            @Override
+            public void run() {
+                List<RefundLineDto> ls = new ArrayList<RefundLineDto>();
+                ls.add(new RefundLineDto(o.lines().get(0).id(), 1));
+                try {
+                    orders.refundParts(s.owner, s.storeId, o.id(),
+                            new RefundRequestDto(ls, 0, true, ""), false, StoreAccess.MANAGERS);
+                } catch (IOException err) {
+                    throw new IllegalStateException(err);
+                }
+            }
+        };
+    }
+
+    @Test
+    void anOrderRefundThatFailsWithoutAnAnswerKeepsItsClaims() throws Exception {
+        processor.reset();
+        Shop s = shop("unconfirmed-refund");
+        OrderDto o = s.buy(People.customer(accounts, "unconfirmed-refunder"), 2);
+        orders.capturePayment(o.id(), s.owner);
+        assertEquals(Orders.PAID, (String) db.queryOne("SELECT financial FROM store_order WHERE id = ?", new Object[] {o.id()}).get("financial"));
+
+        // The processor fails without saying whether it moved money: the
+        // refund is refused as unconfirmed, and its claims on the order and
+        // the line stay, so the goods cannot be refunded twice.
+        processor.refundFailures.add(Boolean.TRUE);
+        assertEquals(409, refusal(refundOneMug(s, o)));
+        assertNotEquals(0L, number("SELECT refunded_cents AS n FROM store_order WHERE id = ?",
+                o.id()));
+        assertEquals(1L, number("SELECT refunded_qty AS n FROM order_line WHERE id = ?",
+                o.lines().get(0).id()));
+        assertEquals(1L, unconfirmedEvents(o.id()));
+
+        // Asked again, it is refused without reaching the processor.
+        assertEquals(409, refusal(refundOneMug(s, o)));
+        assertEquals(1, processor.keys.size());
+        processor.reset();
+    }
+
+    @Test
+    void aCancelWhoseRefundFailsWithoutAnAnswerStands() throws Exception {
+        processor.reset();
+        Shop s = shop("unconfirmed-cancel");
+        final OrderDto o = s.buy(People.customer(accounts, "unconfirmed-canceller"), 2);
+        orders.capturePayment(o.id(), s.owner);
+        assertEquals(Orders.PAID, (String) db.queryOne("SELECT financial FROM store_order WHERE id = ?", new Object[] {o.id()}).get("financial"));
+
+        processor.refundFailures.add(Boolean.TRUE);
+        orders.cancel(s.owner, s.storeId, o.id());
+        assertEquals(Orders.CANCELLED, (String) db.queryOne(
+                "SELECT status FROM store_order WHERE id = ?", new Object[] {o.id()}).get("status"));
+        assertEquals(1L, unconfirmedEvents(o.id()));
+        assertEquals(1, processor.keys.size());
+        processor.reset();
     }
 }
