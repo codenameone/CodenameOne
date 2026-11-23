@@ -258,7 +258,7 @@ final class OrderEditPane {
         }
 
         private void addItem() {
-            final Sheet sheet = new Sheet(null, Lang.tr("Add an item"));
+            final Sheet sheet = PosSheet.open(Lang.tr("Add an item"));
             sheet.setName("pos-edit-add-sheet");
             Container c = sheet.getContentPane();
             c.setLayout(new BorderLayout());

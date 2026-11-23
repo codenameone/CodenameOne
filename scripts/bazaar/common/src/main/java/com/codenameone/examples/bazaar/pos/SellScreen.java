@@ -25,7 +25,6 @@ import com.codename1.ui.Button;
 import com.codename1.ui.CN;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
-import com.codename1.ui.Dialog;
 import com.codename1.ui.FontImage;
 import com.codename1.ui.Label;
 import com.codename1.ui.Sheet;
@@ -371,7 +370,7 @@ final class SellScreen {
     }
 
     private void pickVariant(List<PosItemDto> variants) {
-        final Sheet sheet = new Sheet(null, variants.get(0).title());
+        final Sheet sheet = PosSheet.open(variants.get(0).title());
         sheet.setName("pos-variants");
         Container content = sheet.getContentPane();
         content.setLayout(new GridLayout((variants.size() + 1) / 2, 2));
@@ -634,7 +633,7 @@ final class SellScreen {
     }
 
     static void askAmount(String title, final boolean percent, final Amount got) {
-        final Sheet sheet = new Sheet(null, Lang.tr(title));
+        final Sheet sheet = PosSheet.open(Lang.tr(title));
         Container c = sheet.getContentPane();
         c.setLayout(BoxLayout.y());
         final long[] value = {0};
@@ -665,7 +664,7 @@ final class SellScreen {
             return;
         }
         PosCart.Item item = cart.items().get(index);
-        final Sheet sheet = new Sheet(null, item.item.title());
+        final Sheet sheet = PosSheet.open(item.item.title());
         sheet.setName("pos-line-sheet");
         Container c = sheet.getContentPane();
         c.setLayout(new GridLayout(3, 2));
@@ -709,7 +708,7 @@ final class SellScreen {
 
     private void orderDiscount() {
         final PosCart cart = PosState.cart();
-        final Sheet sheet = new Sheet(null, Lang.tr("Discount"));
+        final Sheet sheet = PosSheet.open(Lang.tr("Discount"));
         sheet.setName("pos-order-discount");
         Container c = sheet.getContentPane();
         c.setLayout(BoxLayout.y());
@@ -768,7 +767,7 @@ final class SellScreen {
     }
 
     private void customer() {
-        final Sheet sheet = new Sheet(null, Lang.tr("Customer"));
+        final Sheet sheet = PosSheet.open(Lang.tr("Customer"));
         sheet.setName("pos-customer-sheet");
         Container c = sheet.getContentPane();
         c.setLayout(new BorderLayout());
@@ -815,12 +814,12 @@ final class SellScreen {
         if (PosState.cart().isEmpty()) {
             return;
         }
-        if (Dialog.show(Lang.tr("Clear sale"), Lang.tr("Remove every item from this sale?"),
-                Lang.tr("Clear"), Lang.tr("Keep"))) {
-            PosState.cart().clear();
-            PosState.fireCart();
-        }
-        refocus();
+        PosSheet.confirm(Lang.tr("Clear sale"), Lang.tr("Remove every item from this sale?"),
+                Lang.tr("Clear"), Lang.tr("Keep"), "pos-clear", true, () -> {
+                    PosState.cart().clear();
+                    PosState.fireCart();
+                    refocus();
+                });
     }
 
     private void pay() {
@@ -829,7 +828,7 @@ final class SellScreen {
         }
         if (!PosUi.wide() && (cartSheet == null || Sheet.getCurrentSheet() != cartSheet)) {
             // On a phone the cart is behind the bar: show it with Pay in it.
-            cartSheet = new Sheet(null, Lang.tr("Cart"));
+            cartSheet = PosSheet.open(Lang.tr("Cart"));
             cartSheet.setName("pos-cart-sheet");
             Container content = cartSheet.getContentPane();
             content.setLayout(new BorderLayout());
@@ -878,7 +877,7 @@ final class SellScreen {
     // ---------------------------------------------------------------- tools
     /// A sale line of a typed title and price, for something not in the catalog.
     private void customItem() {
-        final Sheet sheet = new Sheet(null, Lang.tr("Custom item"));
+        final Sheet sheet = PosSheet.open(Lang.tr("Custom item"));
         sheet.setName("pos-custom-sheet");
         Container c = sheet.getContentPane();
         c.setLayout(BoxLayout.y());

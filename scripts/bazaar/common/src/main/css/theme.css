@@ -2721,3 +2721,44 @@ ShopRatingMore { color: var(--brand); font-family: "native:MainBold"; font-size:
     ShopScanTitleNow { color: var(--text-dark); }
     ShopScanDetail { color: var(--text-muted-dark); }
 }
+
+/* Register panels: what used to be popups opens in the register's layout,
+   a right-hand panel on a wide screen and a bottom sheet on a phone. */
+PosSheet {
+    background-color: var(--surface);
+    border-radius: var(--radius-sheet) var(--radius-sheet) 0 0;
+    padding: 1mm 4mm 4mm 4mm;
+    margin: 0;
+}
+PosSheetTitleBar { background-color: transparent; padding: 1.6mm 0 2mm 0; margin: 0; border-bottom: 1px solid var(--line); }
+PosSheetTitle { color: var(--text); background-color: transparent; font-family: "native:MainBold"; font-size: 4.4mm; padding: 0; margin: 0; }
+PosSheetBackButton { color: var(--text-muted); background-color: var(--surface-alt); border-radius: 3mm; padding: 1.6mm; margin: 0; }
+PosSheetBackButton.pressed { background-color: var(--surface-press); }
+PosSheetBody { background-color: transparent; padding: 3mm 0 0 0; margin: 0; }
+PosSheetText { color: var(--text-muted); background-color: transparent; font-size: 3.4mm; padding: 0 0 3mm 0; margin: 0; }
+PosSheetLabel { color: var(--text-muted); background-color: transparent; font-family: "native:MainBold"; font-size: 2.6mm; padding: 2mm 0 0.6mm 0; margin: 0; }
+PosSheetAmount { color: var(--text); background-color: var(--surface-alt); font-family: "native:MainBold"; font-size: 7mm; text-align: center; border-radius: var(--radius); padding: 3mm; margin: 0 0 3mm 0; }
+PosSheetActions { background-color: transparent; padding: 3mm 0 0 0; margin: 0; }
+PosPrimary { color: var(--brand-contrast); background-color: var(--brand); font-family: "native:MainBold"; font-size: 3.8mm; text-align: center; border-radius: var(--radius); padding: 4mm 2mm 4mm 2mm; margin: 0 0 0 1.2mm; }
+PosPrimary.pressed { background-color: var(--brand-pressed); }
+PosDanger { color: #ffffff; background-color: var(--danger); font-family: "native:MainBold"; font-size: 3.8mm; text-align: center; border-radius: var(--radius); padding: 4mm 2mm 4mm 2mm; margin: 0 0 0 1.2mm; }
+PosDanger.pressed { background-color: var(--danger-tint); color: var(--danger); }
+PosSecondary { color: var(--text); background-color: var(--surface); font-family: "native:MainBold"; font-size: 3.8mm; text-align: center; border: 1px solid var(--line-strong); border-radius: var(--radius); padding: 4mm 2mm 4mm 2mm; margin: 0 1.2mm 0 0; }
+PosSecondary.pressed { background-color: var(--surface-press); }
+
+@media (prefers-color-scheme: dark) {
+    PosSheet { background-color: var(--surface-dark); border-radius: var(--radius-sheet) var(--radius-sheet) 0 0; }
+    PosSheetTitleBar { border-bottom: 1px solid var(--line-dark); }
+    PosSheetTitle { color: var(--text-dark); }
+    PosSheetBackButton { color: var(--text-muted-dark); background-color: var(--surface-alt-dark); }
+    PosSheetBackButton.pressed { background-color: var(--surface-press-dark); }
+    PosSheetText { color: var(--text-muted-dark); }
+    PosSheetLabel { color: var(--text-muted-dark); }
+    PosSheetAmount { color: var(--text-dark); background-color: var(--surface-alt-dark); }
+    PosPrimary { color: var(--brand-contrast-dark); background-color: var(--brand-dark); }
+    PosPrimary.pressed { background-color: var(--brand-pressed-dark); }
+    PosDanger { color: var(--brand-contrast-dark); background-color: var(--danger-dark); }
+    PosDanger.pressed { background-color: var(--danger-tint-dark); color: var(--danger-dark); }
+    PosSecondary { color: var(--text-dark); background-color: var(--surface-dark); border: 1px solid var(--line-strong-dark); border-radius: var(--radius); }
+    PosSecondary.pressed { background-color: var(--surface-press-dark); }
+}

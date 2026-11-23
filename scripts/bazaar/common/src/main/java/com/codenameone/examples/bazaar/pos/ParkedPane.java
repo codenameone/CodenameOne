@@ -20,10 +20,9 @@ package com.codenameone.examples.bazaar.pos;
 
 import com.codename1.appkit.Net;
 import com.codename1.mapping.Mappers;
-import com.codename1.ui.Command;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
-import com.codename1.ui.Dialog;
+import com.codename1.ui.Sheet;
 import com.codename1.ui.FontImage;
 import com.codename1.ui.TextField;
 import com.codename1.ui.layouts.BorderLayout;
@@ -56,15 +55,25 @@ final class ParkedPane {
         if (cart.isEmpty()) {
             return;
         }
-        TextField label = new TextField("", Lang.tr("Label, e.g. a name"), 20, TextField.ANY);
+        final TextField label = new TextField("", Lang.tr("Label, e.g. a name"), 20, TextField.ANY);
         label.setUIID("PosField");
         label.setName("pos-park-label");
-        Command park = new Command(Lang.tr("Park"));
-        if (Dialog.show(Lang.tr("Park this sale"), label, park, new Command(Lang.tr("Cancel")))
-                != park) {
-            return;
-        }
-        String text = label.getText().trim();
+        final Sheet sheet = PosSheet.open(Lang.tr("Park this sale"), "pos-park");
+        sheet.getContentPane().add(PosUi.label(Lang.tr("A label helps find it again"),
+                "PosSheetText"));
+        sheet.getContentPane().add(label);
+        sheet.getContentPane().add(PosSheet.actions(
+                PosUi.key(Lang.tr("Cancel"), "pos-park-cancel", "PosSecondary", e -> sheet.back()),
+                PosUi.key(Lang.tr("Park"), "pos-park-ok", "PosPrimary", e -> {
+                    sheet.back();
+                    park(cart, label.getText().trim());
+                })));
+        sheet.show();
+        label.startEditingAsync();
+    }
+
+    private static void park(PosCart cart, String typed) {
+        String text = typed;
         if (text.length() == 0) {
             text = Lang.tr("Sale of {0} items", cart.units());
         }
@@ -118,12 +127,13 @@ final class ParkedPane {
                     "PosChoice", ev -> resume(e)));
             acts.add(PosUi.icon(FontImage.MATERIAL_DELETE, "Discard", "pos-parked-discard-" + iter,
                     "PosChoice", ev -> {
-                        if (Dialog.show(Lang.tr("Discard"), Lang.tr("Discard this parked sale?"),
-                                Lang.tr("Discard"), Lang.tr("Keep"))) {
-                            PosState.parked().discard(e.clientId());
-                            PosState.fireStatus();
-                            sync();
-                        }
+                        PosSheet.confirm(Lang.tr("Discard"),
+                                Lang.tr("Discard this parked sale?"), Lang.tr("Discard"),
+                                Lang.tr("Keep"), "pos-parked-confirm", true, () -> {
+                                    PosState.parked().discard(e.clientId());
+                                    PosState.fireStatus();
+                                    sync();
+                                });
                     }));
             row.add(BorderLayout.EAST, acts);
             page.add(row);
@@ -133,11 +143,17 @@ final class ParkedPane {
 
     private static void resume(ParkedCarts.Entry e) {
         PosCart cart = PosState.cart();
-        if (!cart.isEmpty() && !Dialog.show(Lang.tr("Resume"),
-                Lang.tr("The sale on the register is replaced. Resume anyway?"), Lang.tr("Resume"),
-                Lang.tr("Keep"))) {
+        if (cart.isEmpty()) {
+            resumeNow(e);
             return;
         }
+        PosSheet.confirm(Lang.tr("Resume"),
+                Lang.tr("The sale on the register is replaced. Resume anyway?"), Lang.tr("Resume"),
+                Lang.tr("Keep"), "pos-resume", false, () -> resumeNow(e));
+    }
+
+    private static void resumeNow(ParkedCarts.Entry e) {
+        PosCart cart = PosState.cart();
         ParkedCartDto c = PosState.parked().resume(e.clientId());
         if (c == null) {
             return;

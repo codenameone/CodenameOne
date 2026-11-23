@@ -19,7 +19,9 @@
 package com.codenameone.examples.bazaar.pos;
 
 import com.codename1.appkit.Net;
-import com.codename1.ui.Dialog;
+import com.codename1.ui.Container;
+import com.codename1.ui.Label;
+import com.codename1.ui.Sheet;
 import com.codename1.ui.Label;
 import com.codename1.ui.TextField;
 import com.codename1.ui.layouts.BoxLayout;
@@ -43,51 +45,81 @@ final class ManagerApproval {
     /// Asks for a manager's approval of `kind` over `amountCents`.
     static void ask(final String kind, final long amountCents, final String reason,
             final Approved done) {
-        final Dialog d = new Dialog(Lang.tr("Manager approval"), BoxLayout.y());
-        d.setName("pos-approval");
-        d.add(PosUi.label(why(kind), "PosMuted"));
+        final Sheet d = PosSheet.open(Lang.tr("Manager approval"), "pos-approval");
+        final Container c = d.getContentPane();
+        c.add(PosUi.label(why(kind), "PosSheetText"));
         if (amountCents > 0) {
-            d.add(PosUi.data(PosState.money(amountCents), "PosTitle"));
+            c.add(PosUi.data(PosState.money(amountCents), "PosSheetAmount"));
         }
         final TextField who = new TextField("", Lang.tr("Manager e-mail"), 20, TextField.EMAILADDR);
         who.setUIID("PosField");
         who.setName("pos-approval-user");
-        final TextField pin = new TextField("", Lang.tr("PIN"), 6,
-                TextField.NUMERIC | TextField.PASSWORD);
-        pin.setUIID("PosField");
-        pin.setName("pos-approval-pin");
+        c.add(who);
+        // The PIN is typed on the register's own keypad: large keys, and the
+        // digits are never shown, only a dot for each.
+        final StringBuilder pin = new StringBuilder();
+        final Label dots = new Label(dotsFor(0), "PosPinDots");
+        dots.setName("pos-approval-pin");
         final Label message = new Label("", "PosError");
         message.setName("pos-approval-message");
-        d.add(who).add(pin).add(message);
-        d.add(PosUi.key(Lang.tr("Approve"), "pos-approval-ok", "PosPay", e -> {
-            String p = pin.getText().trim();
-            if (p.length() < 4) {
-                message.setText(Lang.tr("A PIN has 4 to 6 digits"));
-                d.revalidateLater();
-                return;
+        c.add(PosUi.label(Lang.tr("PIN"), "PosSheetLabel"));
+        c.add(dots);
+        c.add(PosUi.pad("pos-approval-key", "", k -> {
+            if (k == '\b') {
+                if (pin.length() > 0) {
+                    pin.setLength(pin.length() - 1);
+                }
+            } else if (k >= '0' && k <= '9' && pin.length() < 6) {
+                pin.append(k);
             }
-            message.setText(Lang.tr("Checking..."));
-            pin.setText("");
-            Api.posTools().approve(PosState.storeId(), PosState.registerId(),
-                    new ApprovalRequestDto(who.getText().trim(), p, kind, amountCents,
-                            reason == null ? "" : reason), Net.to(a -> {
-                                d.dispose();
-                                if (a != null && a.id() != null) {
-                                    done.approved(a.id());
-                                }
-                            }, (status, text) -> {
-                                message.setText(status <= 0
-                                        ? Lang.tr("An approval needs the network")
-                                        : status == 401 || status == 403
-                                        ? Lang.tr("That manager or PIN is not right")
-                                        : status == 423
-                                        ? Lang.tr("Too many wrong PINs. Try again in 15 minutes.")
-                                        : Lang.tr(text));
-                                d.revalidateLater();
-                            }));
+            dots.setText(dotsFor(pin.length()));
+            c.revalidateLater();
         }));
-        d.add(PosUi.key(Lang.tr("Cancel"), "pos-approval-cancel", "PosChoice", e -> d.dispose()));
+        c.add(message);
+        c.add(PosSheet.actions(
+                PosUi.key(Lang.tr("Cancel"), "pos-approval-cancel", "PosSecondary", e -> d.back()),
+                PosUi.key(Lang.tr("Approve"), "pos-approval-ok", "PosPrimary", e -> {
+                    String p = pin.toString();
+                    if (p.length() < 4) {
+                        message.setText(Lang.tr("A PIN has 4 to 6 digits"));
+                        c.revalidateLater();
+                        return;
+                    }
+                    message.setText(Lang.tr("Checking..."));
+                    pin.setLength(0);
+                    dots.setText(dotsFor(0));
+                    Api.posTools().approve(PosState.storeId(), PosState.registerId(),
+                            new ApprovalRequestDto(who.getText().trim(), p, kind, amountCents,
+                                    reason == null ? "" : reason), Net.to(a -> {
+                                        d.back();
+                                        if (a != null && a.id() != null) {
+                                            done.approved(a.id());
+                                        }
+                                    }, (status, text) -> {
+                                        message.setText(status <= 0
+                                                ? Lang.tr("An approval needs the network")
+                                                : status == 401 || status == 403
+                                                ? Lang.tr("That manager or PIN is not right")
+                                                : status == 423
+                                                ? Lang.tr("Too many wrong PINs. Try again in 15 minutes.")
+                                                : Lang.tr(text));
+                                        c.revalidateLater();
+                                    }));
+                })));
         d.show();
+    }
+
+    /// One dot per typed digit, and six hollow places in all, so the row
+    /// shows how many digits a PIN may have and keeps its height.
+    static String dotsFor(int n) {
+        StringBuilder b = new StringBuilder();
+        for (int iter = 0; iter < 6; iter++) {
+            if (iter > 0) {
+                b.append(' ');
+            }
+            b.append(iter < n ? '*' : '-');
+        }
+        return b.toString();
     }
 
     static String why(String kind) {

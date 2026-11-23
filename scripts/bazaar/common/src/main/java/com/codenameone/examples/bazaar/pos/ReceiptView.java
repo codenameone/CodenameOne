@@ -44,7 +44,7 @@ final class ReceiptView {
     }
 
     static void show(final Receipt r) {
-        final Sheet sheet = new Sheet(null, Lang.tr("Sale complete"));
+        final Sheet sheet = PosSheet.open(Lang.tr("Sale complete"));
         sheet.setName("pos-receipt");
         final Container c = sheet.getContentPane();
         c.setLayout(BoxLayout.y());
@@ -118,7 +118,7 @@ final class ReceiptView {
             Ui.say("The receipt can be sent once the sale is uploaded");
             return;
         }
-        final Sheet ask = new Sheet(null, Lang.tr(sms ? "Text the receipt" : "E-mail the receipt"));
+        final Sheet ask = PosSheet.open(Lang.tr(sms ? "Text the receipt" : "E-mail the receipt"));
         Container c = ask.getContentPane();
         c.setLayout(BoxLayout.y());
         final TextField to = new TextField("", Lang.tr(sms ? "Phone number" : "E-mail address"), 20,

@@ -21,7 +21,6 @@ package com.codenameone.examples.bazaar.pos;
 import com.codename1.appkit.Net;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
-import com.codename1.ui.Dialog;
 import com.codename1.ui.FontImage;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
@@ -111,25 +110,29 @@ final class LayawayPane {
                         min)), PosState.money(total)));
                 return;
             }
-            String kind = pickKind();
-            if (kind == null) {
-                return;
-            }
-            LayawayRequestDto req = new LayawayRequestDto(UUID.randomUUID().toString(),
-                    PosState.shiftId(), cart.customer().id(), cart.uploadLines(),
-                    new PosTenderDto(kind, cents, ""), -1);
-            Api.layaways().create(PosState.storeId(), PosState.registerId(), req, Net.to(l -> {
-                cart.clear();
-                PosState.fireCart();
-                PosState.refreshCatalog(null);
-                show(page, l);
-            }, (s, m) -> Ui.fail(s, s <= 0 ? "Layaways need the network" : m)));
+            pickKind(kind -> {
+                LayawayRequestDto req = new LayawayRequestDto(UUID.randomUUID().toString(),
+                        PosState.shiftId(), cart.customer().id(), cart.uploadLines(),
+                        new PosTenderDto(kind, cents, ""), -1);
+                Api.layaways().create(PosState.storeId(), PosState.registerId(), req, Net.to(l -> {
+                    cart.clear();
+                    PosState.fireCart();
+                    PosState.refreshCatalog(null);
+                    show(page, l);
+                }, (s, m) -> Ui.fail(s, s <= 0 ? "Layaways need the network" : m)));
+            });
         });
     }
 
-    private static String pickKind() {
-        return Dialog.show(Lang.tr("Paid by"), Lang.tr("How is it paid?"), Lang.tr("Cash"),
-                Lang.tr("Card")) ? Tenders.CASH : Tenders.CARD;
+    /// What a tender kind is handed to.
+    private interface Kind {
+        void got(String kind);
+    }
+
+    private static void pickKind(final Kind got) {
+        PosSheet.choose(Lang.tr("Paid by"), Lang.tr("How is it paid?"), Lang.tr("Cash"),
+                Lang.tr("Card"), "pos-layaway-kind",
+                cash -> got.got(cash ? Tenders.CASH : Tenders.CARD));
     }
 
     /// The balance of one layaway, its payments, and what can be done next.
@@ -167,20 +170,20 @@ final class LayawayPane {
             if (amount <= 0) {
                 return;
             }
-            String kind = pickKind();
-            Api.layaways().pay(PosState.storeId(), l.id(), new PosTenderDto(kind, amount, ""),
-                    Net.to(fresh -> show(page, fresh), (s, m) -> Ui.fail(s, s <= 0
-                            ? "Layaways need the network" : m)));
+            pickKind(kind -> Api.layaways().pay(PosState.storeId(), l.id(),
+                    new PosTenderDto(kind, amount, ""), Net.to(fresh -> show(page, fresh),
+                            (s, m) -> Ui.fail(s, s <= 0 ? "Layaways need the network" : m))));
         });
     }
 
     private static void cancel(final Container page, final LayawayDto l) {
         long back = PosRules.cancelRefund(l.totalCents(), l.paidCents(), l.cancelFeeBp());
-        if (!Dialog.show(Lang.tr("Cancel layaway"), Lang.tr("Give back {0} in cash and return "
+        PosSheet.confirm(Lang.tr("Cancel layaway"), Lang.tr("Give back {0} in cash and return "
                 + "the items to stock?", PosState.money(back)), Lang.tr("Cancel layaway"),
-                Lang.tr("Keep"))) {
-            return;
-        }
+                Lang.tr("Keep"), "pos-layaway-confirm", true, () -> cancelNow(page, l));
+    }
+
+    private static void cancelNow(final Container page, final LayawayDto l) {
         Api.layaways().cancel(PosState.storeId(), l.id(), new LayawayCancelDto(PosState.shiftId(),
                 Tenders.CASH, "Cancelled at the counter"), Net.to(fresh -> {
                     PosState.refreshCatalog(null);

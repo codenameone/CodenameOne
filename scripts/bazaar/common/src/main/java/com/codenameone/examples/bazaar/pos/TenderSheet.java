@@ -56,7 +56,7 @@ final class TenderSheet {
     private TenderSheet() {
         totals = PosState.totals();
         tenders = new Tenders(totals.totalCents);
-        sheet = new Sheet(null, Lang.tr("Charge {0}", PosState.money(totals.totalCents)));
+        sheet = PosSheet.open(Lang.tr("Charge {0}", PosState.money(totals.totalCents)));
         sheet.setName("pos-tender-sheet");
         left = PosUi.data("", "PosAmount");
         left.setName("pos-remaining");
@@ -185,7 +185,7 @@ final class TenderSheet {
         if (tenders.remaining() <= 0) {
             return;
         }
-        final Sheet ask = new Sheet(sheet, Lang.tr("Add a tip?"));
+        final Sheet ask = new Sheet(sheet, Lang.tr("Add a tip?"), "PosSheet");
         ask.setName("pos-tip");
         Container c = ask.getContentPane();
         c.setLayout(BoxLayout.y());
@@ -233,7 +233,7 @@ final class TenderSheet {
     /// standalone terminal takes the card instead.
     private void reader(final long amount) {
         final String clientId = UUID.randomUUID().toString();
-        final Sheet wait = new Sheet(sheet, Lang.tr("Card reader"));
+        final Sheet wait = new Sheet(sheet, Lang.tr("Card reader"), "PosSheet");
         wait.setName("pos-reader");
         Container c = wait.getContentPane();
         c.setLayout(BoxLayout.y());
@@ -325,7 +325,7 @@ final class TenderSheet {
 
     /// A simulated standalone terminal: "present the card", a moment, approved.
     private void standalone(final long amount) {
-        final Sheet terminal = new Sheet(sheet, Lang.tr("Card terminal"));
+        final Sheet terminal = new Sheet(sheet, Lang.tr("Card terminal"), "PosSheet");
         terminal.setName("pos-terminal");
         Container c = terminal.getContentPane();
         c.setLayout(BoxLayout.y());
@@ -358,7 +358,7 @@ final class TenderSheet {
     }
 
     private void gift() {
-        final Sheet ask = new Sheet(sheet, Lang.tr("Gift card"));
+        final Sheet ask = new Sheet(sheet, Lang.tr("Gift card"), "PosSheet");
         ask.setName("pos-gift-sheet");
         Container c = ask.getContentPane();
         c.setLayout(BoxLayout.y());
