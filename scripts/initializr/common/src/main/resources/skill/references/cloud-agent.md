@@ -11,6 +11,8 @@ developer to install Xcode or Android Studio to build. The developer approves yo
 browser; there is no API key to paste.
 
 Read this when the developer asks you to ship the app, sign it, set up push, or submit it.
+When the app has a backend, deploy it first (`references/deployment.md`): the release builds
+need its final HTTPS address, and store review runs against it.
 
 ## Connect
 
@@ -199,3 +201,12 @@ POST /api/v2/console/builds/{id}/submit
 `BETA` is TestFlight or the Play internal track; `PRODUCTION` goes to store review. Confirm the
 destination with the developer before a `PRODUCTION` submission. Follow progress with
 `GET /api/v2/console/submissions`.
+
+## After release
+
+- **Review state:** for an Apple `PRODUCTION` submission, `GET /api/v2/console/submissions`
+  reports processing, in review, approved or rejected. After a rejection, read Apple's reason
+  and go back to `store-review.md` ("After a rejection") before you change anything.
+- **Crashes:** with Crash Protection on, every crash from a release build lands as a
+  symbolicated GitHub issue in the repository mapped to the app's package. Reading, ranking,
+  fixing and shipping those is in `crash-triage.md`.

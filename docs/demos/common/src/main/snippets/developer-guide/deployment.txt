@@ -1,0 +1,118 @@
+// Generated from docs/developer-guide source blocks. Edit the guide snippets here, not inline.
+
+// tag::deploy-layout[]
+/opt/myapp/
+  current -> releases/20261123094500
+  releases/
+    20261123094500/            owned by deploy, readable by myapp
+      myapp                    the server binary
+      application.properties   optional; the build compiled a copy in
+      webapp/                  the app's browser build, when the server hosts it
+/etc/myapp/env                 secrets, readable by root only
+/etc/systemd/system/myapp.service
+// end::deploy-layout[]
+
+// tag::deploy-env[]
+# /etc/myapp/env -- chmod 600, owned by root
+DATABASE_URL=postgres://myapp:CHANGE-ME@db.internal:5432/myapp?sslmode=require
+CN1_SERVER_ADDRESS=127.0.0.1
+CN1_SERVER_FORWARDHEADERS=true
+CN1_SERVER_TRUSTEDPROXIES=127.0.0.1
+CN1_SESSION_SECURE=true
+CN1_MANAGEMENT_TOKEN=CHANGE-ME-TOO
+// end::deploy-env[]
+
+// tag::deploy-unit[]
+# /etc/systemd/system/myapp.service
+[Unit]
+Description=myapp backend
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=myapp
+Group=myapp
+WorkingDirectory=/opt/myapp/current
+EnvironmentFile=/etc/myapp/env
+ExecStart=/opt/myapp/current/myapp
+Restart=on-failure
+RestartSec=2
+TimeoutStopSec=20
+LimitNOFILE=65536
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
+// end::deploy-unit[]
+
+// tag::deploy-caddyfile[]
+# /etc/caddy/Caddyfile
+app.example.com {
+    encode zstd gzip
+    reverse_proxy 127.0.0.1:8080 {
+        health_uri /manage/health/readiness
+    }
+}
+// end::deploy-caddyfile[]
+
+// tag::deploy-native-tls[]
+# /etc/myapp/env, when the server terminates TLS itself
+CN1_SERVER_PORT=443
+CN1_SERVER_TLS_CERTIFICATE=/etc/myapp/tls/fullchain.pem
+CN1_SERVER_TLS_KEY=/etc/myapp/tls/privkey.pem
+
+# myapp.service, under [Service]: a port below 1024 without running as root
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+
+# /etc/letsencrypt/renewal-hooks/deploy/myapp -- chmod 755. The server reads the
+# files when it starts, so a renewed certificate needs a restart.
+#!/bin/sh
+install -o myapp -g myapp -m 600 -D \
+    /etc/letsencrypt/live/app.example.com/fullchain.pem /etc/myapp/tls/fullchain.pem
+install -o myapp -g myapp -m 600 -D \
+    /etc/letsencrypt/live/app.example.com/privkey.pem /etc/myapp/tls/privkey.pem
+systemctl restart myapp
+// end::deploy-native-tls[]
+
+// tag::deploy-dockerfile[]
+# Dockerfile -- the binary was built on ubuntu:24.04, so it runs on ubuntu:24.04
+FROM ubuntu:24.04
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends libssl3t64 libnghttp2-14 libcurl4t64 ca-certificates \
+ && rm -rf /var/lib/apt/lists/* \
+ && useradd --system --home /app myapp
+WORKDIR /app
+COPY backend/target/myapp-backend ./myapp
+COPY backend/application.properties ./
+COPY backend/target/webapp ./webapp
+USER myapp
+EXPOSE 8080
+ENTRYPOINT ["/app/myapp"]
+// end::deploy-dockerfile[]
+
+// tag::deploy-github-actions[]
+# .github/workflows/deploy.yml
+name: deploy
+on:
+  push:
+    branches: [main]
+jobs:
+  server:
+    runs-on: ubuntu-24.04          # the server's release, so the libraries match
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '17', cache: maven }
+      - run: sudo apt-get install -y clang libssl-dev libnghttp2-dev libcurl4-openssl-dev
+      - run: ./mvnw -B -pl backend -Dcodename1.platform=backend cn1:backend-webapp
+      - run: ./mvnw -B -pl backend -Dcodename1.platform=backend cn1:backend-package
+      - run: |
+          mkdir -p ~/.ssh && echo "$DEPLOY_KEY" > ~/.ssh/id_ed25519 && chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan app.example.com >> ~/.ssh/known_hosts
+          sh deploy.sh
+        env:
+          DEPLOY_KEY: ${{ secrets.DEPLOY_KEY }}
+// end::deploy-github-actions[]
