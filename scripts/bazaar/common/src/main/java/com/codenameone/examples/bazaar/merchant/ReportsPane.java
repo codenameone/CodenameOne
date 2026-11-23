@@ -243,8 +243,10 @@ final class ReportsPane extends MerchantPane {
     /// net sales as a total, the cost of goods off that, and the gross margin it
     /// ends on.
     static Component profitLossChart(ProfitLossDto p) {
-        String[] labels = {Lang.tr("Gross sales"), Lang.tr("Discounts"), Lang.tr("Refunds"),
-            Lang.tr("Net sales"), Lang.tr("Cost of goods"), Lang.tr("Gross margin")};
+        // Short names under the bars: six full names do not fit a phone's width,
+        // and the axis then drops every other one. The grid below has them whole.
+        String[] labels = {Lang.tr("Gross"), Lang.tr("Disc."), Lang.tr("Refunds"),
+            Lang.tr("Net"), Lang.tr("Cost"), Lang.tr("Margin")};
         double[] steps = {p.grossSalesCents(), -p.discountsCents(), -p.refundsCents(), 0,
             -p.cogsCents(), 0};
         boolean[] totals = {false, false, false, true, false, true};

@@ -131,6 +131,11 @@ final class MUi {
         grid.setRowHeightMM(8f);
         grid.setSelectionMode(DataGrid.SelectionMode.MULTIPLE_ROWS);
         grid.setEmptyText(Lang.tr("Nothing here yet"));
+        // Columns share whatever width is left over, so a narrow grid fills
+        // the page instead of ending in an empty band on the right.
+        for (int iter = 0; iter < grid.getColumnCount(); iter++) {
+            grid.getColumn(iter).setFlex(1);
+        }
         return grid;
     }
 

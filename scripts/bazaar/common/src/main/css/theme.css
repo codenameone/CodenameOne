@@ -2719,7 +2719,7 @@ MeCardTitle { color: var(--text); background-color: transparent; font-family: "n
 MeDeltaUp { color: var(--success); background-color: transparent; font-family: "native:MainBold"; font-size: 2.1mm; padding: 0.6mm 0 0 0; margin: 0; }
 MeDeltaDown { color: var(--danger); background-color: transparent; font-family: "native:MainBold"; font-size: 2.1mm; padding: 0.6mm 0 0 0; margin: 0; }
 MeDeltaFlat { color: var(--text-muted); background-color: transparent; font-size: 2.1mm; padding: 0.6mm 0 0 0; margin: 0; }
-MeChartBox { background-color: var(--surface); padding: 0; margin: 0; }
+MeChartBox { background-color: var(--surface); padding: 3mm 3mm 2mm 3mm; margin: 2mm 3mm 2mm 3mm; border-radius: 3mm; }
 MeChart { color: var(--brand); background-color: var(--surface); padding: 0; margin: 0; }
 MeChartGrid { color: var(--line); }
 MeChartText { color: var(--text-muted); font-size: 1.9mm; }
