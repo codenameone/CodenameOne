@@ -82,6 +82,16 @@ public class Store {
     @Column(nullable = false, type = "TEXT")
     private String policies = "";
 
+    /// Search synonym groups, one group a line, words split by commas: a
+    /// search for any word of a group also finds the others.
+    @Column(nullable = false, type = "VARCHAR(2000)")
+    private String searchSynonyms = "";
+
+    /// The pre-launch password; empty leaves the storefront open. Kept as
+    /// typed, like a door code: it guards a launch date, not an account.
+    @Column(nullable = false, type = "VARCHAR(100)")
+    private String storefrontPassword = "";
+
     @Column(nullable = false)
     private Instant createdAt = Instant.EPOCH;
 
@@ -249,5 +259,21 @@ public class Store {
 
     public void setUpdatedAt(Instant updatedAt) {
         this.updatedAt = updatedAt;
+    }
+
+    public String getSearchSynonyms() {
+        return searchSynonyms;
+    }
+
+    public void setSearchSynonyms(String searchSynonyms) {
+        this.searchSynonyms = searchSynonyms == null ? "" : searchSynonyms;
+    }
+
+    public String getStorefrontPassword() {
+        return storefrontPassword;
+    }
+
+    public void setStorefrontPassword(String storefrontPassword) {
+        this.storefrontPassword = storefrontPassword == null ? "" : storefrontPassword;
     }
 }

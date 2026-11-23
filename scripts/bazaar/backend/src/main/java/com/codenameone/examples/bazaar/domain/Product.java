@@ -55,6 +55,11 @@ public class Product {
     @Column(nullable = false, type = "VARCHAR(16)")
     private String status = "";
 
+    /// Added to the product's relevance score in storefront search, so a
+    /// merchant can lift (or, negative, sink) it among equal matches.
+    @Column(nullable = false)
+    private int searchBoost;
+
     @Column(nullable = false, type = "VARCHAR(200)")
     private String seoTitle = "";
 
@@ -228,5 +233,13 @@ public class Product {
 
     public void setCategoryId(int categoryId) {
         this.categoryId = categoryId;
+    }
+
+    public int getSearchBoost() {
+        return searchBoost;
+    }
+
+    public void setSearchBoost(int searchBoost) {
+        this.searchBoost = searchBoost;
     }
 }

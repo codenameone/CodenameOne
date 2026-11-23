@@ -72,6 +72,8 @@ public final class PageMeta {
     public String cartUrl = "";
     /// The search action, or empty on platform pages.
     public String searchUrl = "";
+    /// Where the search box asks for predictive suggestions ([StoreSite]).
+    public String suggestUrl = "";
     /// The search words to show again in the box.
     public String query = "";
     /// The schema.org JSON-LD for this page, or empty.

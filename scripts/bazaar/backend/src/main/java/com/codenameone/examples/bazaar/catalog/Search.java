@@ -84,12 +84,16 @@ final class Search {
     boolean matches(Product product, List<String> tags, long minPrice, long maxPrice,
             Map<String, List<String>> membership, String skip) {
         for (int iter = 0; iter < words.length; iter++) {
-            String word = words[iter];
-            boolean hit = contains(product.getTitle(), word) || contains(product.getVendor(), word)
-                    || contains(product.getProductType(), word)
-                    || contains(translatedTitle(product), word);
-            for (int t = 0; t < tags.size() && !hit; t++) {
-                hit = contains(tags.get(t), word);
+            String[] alts = alternatives(words[iter]);
+            boolean hit = false;
+            for (int a = 0; a < alts.length && !hit; a++) {
+                String word = alts[a];
+                hit = contains(product.getTitle(), word) || contains(product.getVendor(), word)
+                        || contains(product.getProductType(), word)
+                        || contains(translatedTitle(product), word);
+                for (int t = 0; t < tags.size() && !hit; t++) {
+                    hit = contains(tags.get(t), word);
+                }
             }
             if (!hit) {
                 return false;
@@ -135,7 +139,8 @@ final class Search {
 
     /// How well a product matches the words: a word in the title counts most.
     int score(Product product) {
-        int score = 0;
+        // The merchant's boost counts only when there is something to rank.
+        int score = words.length == 0 ? 0 : product.getSearchBoost();
         String shown = translatedTitle(product);
         for (int iter = 0; iter < words.length; iter++) {
             if (startsWith(product.getTitle(), words[iter]) || startsWith(shown, words[iter])) {
@@ -216,6 +221,53 @@ final class Search {
     /// The product's title in the shopper's language, or null.
     String translatedTitle(Product product) {
         return titles == null ? null : titles.get(product.getId());
+    }
+
+    /// The merchant's synonym groups ([#synonymGroups]); empty for none.
+    List<String[]> synonyms = new ArrayList<String[]>();
+
+    /// `word` and every word that shares a synonym group with it.
+    String[] alternatives(String word) {
+        for (int g = 0; g < synonyms.size(); g++) {
+            String[] group = synonyms.get(g);
+            for (int w = 0; w < group.length; w++) {
+                if (group[w].equalsIgnoreCase(word)) {
+                    String[] out = new String[group.length + 1];
+                    out[0] = word;
+                    System.arraycopy(group, 0, out, 1, group.length);
+                    return out;
+                }
+            }
+        }
+        return new String[] {word};
+    }
+
+    /// Parses a store's synonym text: one group a line, words split by
+    /// commas, blanks dropped, groups of one word ignored.
+    public static List<String[]> synonymGroups(String text) {
+        List<String[]> out = new ArrayList<String[]>();
+        if (text == null) {
+            return out;
+        }
+        List<String> group = new ArrayList<String>();
+        int start = 0;
+        for (int iter = 0; iter <= text.length(); iter++) {
+            char c = iter == text.length() ? '\n' : text.charAt(iter);
+            if (c == ',' || c == '\n') {
+                String w = text.substring(start, iter).trim();
+                if (w.length() > 0) {
+                    group.add(w);
+                }
+                start = iter + 1;
+                if (c == '\n') {
+                    if (group.size() > 1) {
+                        out.add(group.toArray(new String[group.size()]));
+                    }
+                    group.clear();
+                }
+            }
+        }
+        return out;
     }
 
     static boolean contains(String hay, String needle) {

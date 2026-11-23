@@ -865,6 +865,7 @@ public class StorefrontPages {
         page.home = storeUrl(store.getHandle());
         page.cartUrl = "/s/" + store.getHandle() + "/cart";
         page.searchUrl = "/s/" + store.getHandle() + "/search";
+        page.suggestUrl = "/s/" + store.getHandle() + "/suggest";
         page.chatStore = store.getHandle();
         // "Open the app" from a store's page opens that store in the app
         // (DeepLink in the app reads it); a product page adds the product.

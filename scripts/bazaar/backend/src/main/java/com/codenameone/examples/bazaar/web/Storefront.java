@@ -59,6 +59,10 @@ public class Storefront {
         this.attribution = attribution;
     }
 
+    /// The pre-launch password gate ([StoreSite#locked]).
+    @com.codename1.backend.annotations.Autowired
+    private StoreSite site;
+
     @GetMapping("/")
     public String index(Model model, HttpServer.Request request) {
         pages.index(model, request);
@@ -69,6 +73,9 @@ public class Storefront {
     public String home(@PathVariable("handle") String handle, Model model,
             HttpServer.Request request) throws IOException {
         attribution.capture(request, handle);
+        if (site.locked(handle, request)) {
+            return "redirect:" + StorefrontPages.storeUrl(handle) + "/password";
+        }
         pages.home(handle, model, request);
         return "home";
     }
@@ -80,6 +87,9 @@ public class Storefront {
             @RequestParam(value = "page", required = false) String page,
             Model model, HttpServer.Request request) throws IOException {
         attribution.capture(request, handle);
+        if (site.locked(handle, request)) {
+            return "redirect:" + StorefrontPages.storeUrl(handle) + "/password";
+        }
         pages.collection(handle, collection, sort, number(page), model, request);
         return "listing";
     }
@@ -91,6 +101,9 @@ public class Storefront {
             @RequestParam(value = "page", required = false) String page,
             Model model, HttpServer.Request request) throws IOException {
         attribution.capture(request, handle);
+        if (site.locked(handle, request)) {
+            return "redirect:" + StorefrontPages.storeUrl(handle) + "/password";
+        }
         pages.search(handle, q, sort, number(page), model, request);
         return "listing";
     }
@@ -104,6 +117,9 @@ public class Storefront {
             @RequestParam(value = "variant", required = false) String variant,
             Model model, HttpServer.Request request) throws IOException {
         attribution.capture(request, handle);
+        if (site.locked(handle, request)) {
+            return "redirect:" + StorefrontPages.storeUrl(handle) + "/password";
+        }
         pages.product(handle, product, variant, model, request);
         automations.viewedByHandle(handle, product, CheckoutPages.signedIn());
         views.viewedByHandle(handle, product, request, CheckoutPages.signedIn());

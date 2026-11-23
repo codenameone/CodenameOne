@@ -338,11 +338,11 @@ on a row.
 | URL redirects manager | &#10003; | core | app/plugin | core | no | 301 redirects for paths no route matches. 
 | Storefront search | &#10003; | core | core | core | core | 
 | Search filters / facets | &#10003; | core | core | core | core | 
-| Predictive search / autocomplete | &#8211; | core | app/plugin | core | no | 
+| Predictive search / autocomplete | &#10003; | core | app/plugin | core | no | Prefix suggestions from titles, tags and collections in the web search box; the app search field is not wired yet.
 | Product recommendations (related) | &#9681; | core | core | core | core | Related products from the same collection.
-| Synonyms / boosts (search tuning) | &#8211; | core | app/plugin | core | no | 
+| Synonyms / boosts (search tuning) | &#10003; | core | app/plugin | core | no | Merchant synonym groups and per-product boosts, edited on the web admin online store page.
 | Custom domain | &#8211; | core | core | core | core | 
-| Password page / pre-launch | &#8211; | core | app/plugin | core | core | 
+| Password page / pre-launch | &#10003; | core | app/plugin | core | core | Staff pass; a locked store leaves the sitemap and is disallowed in robots.txt.
 | Files library | &#10003; | core | core | core | core | 
 | Metafields / metaobjects | &#10003; | core | app/plugin | core | no | 
 | Content translation | &#10003; | core | app/plugin | core | no | Pages, policies, posts, menu labels, metafield names and metaobject entries, per market language with fallback. 
@@ -351,7 +351,7 @@ on a row.
 | TikTok / Pinterest | &#8211; | core | app/plugin | core | no | 
 | Amazon/eBay/Walmart marketplace connect | &#10003; | app/plugin | app/plugin | core | no | Live sync behind a connector interface (eBay-style connector, simulated by default): stock and price push, order pull with signed notifications, tracking push back; plus CSV import. 
 | Supplier and retailer dropship network | &#8211; | core | app/plugin | app/plugin | no | 
-| Buy button / embeddable | &#8211; | core | app/plugin | core | core | 
+| Buy button / embeddable | &#10003; | core | app/plugin | core | core | A frameable product card linking to the product page; the admin shows the iframe snippet.
 | Marketplace (multi-merchant browse) | &#9681; | core | app/plugin | app/plugin | no | The platform hosts many stores and the app lists them.
 |===
 

@@ -74,6 +74,7 @@ public class StorefrontFiles {
     /// The API, the sign-in pages and the per-visitor pages stay out of
     /// indexes; everything else is welcome, and the sitemap says what there is.
     @GetMapping("/robots.txt")
+    @Transactional(readOnly = true)
     public HttpServer.Response robots(HttpServer.Request request) throws IOException {
         String body = "User-agent: *\n"
                 + "Disallow: /api/\n"
@@ -83,11 +84,28 @@ public class StorefrontFiles {
                 + "Disallow: /track/\n"
                 + "Disallow: /s/*/cart\n"
                 + "Disallow: /s/*/search\n"
+                + "Disallow: /s/*/suggest\n"
+                + "Disallow: /s/*/password\n"
+                + "Disallow: /s/*/embed/\n"
+                + locked()
                 + "Allow: /\n"
                 + "\n"
                 + "Sitemap: " + urls.absolute(request, "/sitemap.xml") + "\n";
         return Conditional.answer(request, "text/plain; charset=utf-8", body.getBytes("UTF-8"),
                 "public, max-age=3600", 0);
+    }
+
+    /// A `Disallow` line for each store behind its pre-launch password.
+    private String locked() throws IOException {
+        StringBuilder b = new StringBuilder();
+        List<Store> active = stores.findByStatusOrderByNameAsc(Stores.ACTIVE);
+        for (int iter = 0; iter < active.size(); iter++) {
+            if (active.get(iter).getStorefrontPassword().length() > 0) {
+                b.append("Disallow: ").append(StorefrontPages.storeUrl(active.get(iter)
+                        .getHandle())).append('\n');
+            }
+        }
+        return b.toString();
     }
 
     /// Every active store, its published collections and its active
@@ -104,6 +122,10 @@ public class StorefrontFiles {
         List<Store> active = stores.findByStatusOrderByNameAsc(Stores.ACTIVE);
         for (int s = 0; s < active.size(); s++) {
             Store store = active.get(s);
+            if (store.getStorefrontPassword().length() > 0) {
+                // A store behind its pre-launch password is not announced.
+                continue;
+            }
             // Only what the online store shows now: a product outside its
             // window is left out, and a flip counts as a change.
             List<Product> ps = schedules.visible(store.getId(),

@@ -112,6 +112,20 @@ public class WebSecurity {
         return http.build();
     }
 
+    /// The buy button (StoreSite.embed): framed by other sites, so none of
+    /// the default headers (X-Frame-Options above all) and no session; the
+    /// route writes its own policy.
+    @Bean
+    @Order(0)
+    public SecurityFilterChain embedChain(HttpSecurity http) throws IOException {
+        http.securityMatcher("/s/*/embed/**")
+            .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            .headers(h -> h.defaultsDisabled())
+            .csrf(c -> c.disable())
+            .authorizeHttpRequests(auth -> auth.anyRequest().permitAll());
+        return http.build();
+    }
+
     @Bean
     @Order(3)
     public SecurityFilterChain webAppChain(HttpSecurity http, TotpService totp,

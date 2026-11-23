@@ -482,6 +482,14 @@ image::img/bazaar-merchant-automations-tablet.png["Automations in the app",scale
 
 === A storefront search engines can read
 
+`web/StoreSite` adds the storefront's search and launch surfaces: `/s/<handle>/suggest`
+(prefix matches from `Catalog.suggest`, filled into the search box's `datalist`
+by `/suggest.js`), the pre-launch page behind `Store.storefrontPassword` (a locked
+store leaves the sitemap and gets a robots.txt `Disallow`), and
+`/s/<handle>/embed/<product>`, the one page that sets its own policy with
+`frame-ancestors *`. Synonym groups (`Store.searchSynonyms`) widen each search
+word in `Search.matches`, and `Product.searchBoost` is added to the relevance score.
+
 The app is a Codename One application, and a crawler that doesn't run
 JavaScript sees nothing of it in a browser. The backend therefore also serves
 the storefront as server-rendered HTML, from templates in

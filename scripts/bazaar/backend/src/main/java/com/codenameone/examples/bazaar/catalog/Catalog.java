@@ -336,7 +336,72 @@ public class Catalog {
             snapshot.titles = productText.titles(store.getId(), locale);
             search.titles = snapshot.titles;
         }
+        search.synonyms = Search.synonymGroups(store.getSearchSynonyms());
         return page(snapshot, search);
+    }
+
+    /// Predictive search: up to `limit` suggestions for what a shopper has
+    /// typed so far, each `{kind, title, handle}` with kind `product` or
+    /// `collection`. A product matches when a word of its title or one of
+    /// its tags starts with `prefix`; a published collection when a word of
+    /// its title does. Products come first, the merchant's boost ahead.
+    @Transactional(readOnly = true)
+    public List<String[]> suggest(String handle, String prefix, int limit) throws IOException {
+        List<String[]> out = new ArrayList<String[]>();
+        String typed = prefix == null ? "" : prefix.trim();
+        if (typed.length() == 0) {
+            return out;
+        }
+        Store store = storeService.activeStore(handle);
+        Snapshot snapshot = new Snapshot(store.getId(), ACTIVE, true).forViewer(store.getId());
+        List<Product> hits = new ArrayList<Product>();
+        for (int iter = 0; iter < snapshot.list.size(); iter++) {
+            Product p = snapshot.list.get(iter);
+            boolean hit = wordStarts(p.getTitle(), typed);
+            List<String> tags = tags(p.getTags());
+            for (int t = 0; t < tags.size() && !hit; t++) {
+                hit = wordStarts(tags.get(t), typed);
+            }
+            if (hit) {
+                int at = hits.size();
+                while (at > 0 && hits.get(at - 1).getSearchBoost() < p.getSearchBoost()) {
+                    at--;
+                }
+                hits.add(at, p);
+            }
+        }
+        for (int iter = 0; iter < hits.size() && out.size() < limit; iter++) {
+            out.add(new String[] {"product", hits.get(iter).getTitle(), hits.get(iter).getHandle()});
+        }
+        for (int iter = 0; iter < snapshot.allCollections.size() && out.size() < limit; iter++) {
+            Collection c = snapshot.allCollections.get(iter);
+            if (c.isPublished() && wordStarts(c.getTitle(), typed)) {
+                out.add(new String[] {"collection", c.getTitle(), c.getHandle()});
+            }
+        }
+        return out;
+    }
+
+    /// The lowest and highest variant price of `product`, in cents.
+    @Transactional(readOnly = true)
+    public long[] priceRange(Product product) throws IOException {
+        List<Variant> mine = Search.byProduct(variants.findByStoreId(product.getStoreId()))
+                .get(product.getId());
+        return Search.priceRange(mine == null ? new ArrayList<Variant>() : mine);
+    }
+
+    /// Whether some word of `text` starts with `prefix`, ignoring case.
+    static boolean wordStarts(String text, String prefix) {
+        if (text == null) {
+            return false;
+        }
+        for (int iter = 0; iter + prefix.length() <= text.length(); iter++) {
+            boolean start = iter == 0 || !Character.isLetterOrDigit(text.charAt(iter - 1));
+            if (start && text.regionMatches(true, iter, prefix, 0, prefix.length())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /// A page of an active store's active products for the server-rendered

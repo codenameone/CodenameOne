@@ -198,6 +198,21 @@ public class OnlineStorePages {
         pub.text = "Replaces the theme shoppers see.";
         v.forms.add(pub);
         if (store != null) {
+            FormView sf = new FormView("search", "Search and launch", b + "/search", "Save");
+            sf.add("synonyms", "Synonym groups", "textarea", store.getSearchSynonyms())
+                    .hint("One group a line, words split by commas: sofa, couch, settee");
+            sf.add("boosts", "Search boosts", "textarea", site.boostText(storeId))
+                    .hint("product-handle=N, one a line, -100 to 100; higher ranks first");
+            sf.add("password", "Storefront password", "text", store.getStorefrontPassword())
+                    .hint("Empty opens the store; staff always get in");
+            v.forms.add(sf);
+            ActionCard embed = card("Buy button", "Paste this on another site to sell a "
+                    + "product there; replace the handle with the product's.");
+            embed.url = "/s/" + store.getHandle() + "/embed/PRODUCT-HANDLE";
+            embed.extraUrl = embed.url;
+            embed.extraLabel = com.codenameone.examples.bazaar.web.StoreSite.embedCode("",
+                    store.getHandle(), "PRODUCT-HANDLE");
+            v.cards.add(embed);
             String token = themes.previewToken(Caller.name(), storeId);
             ActionCard k = card("Preview the draft", "The link works for an hour and is "
                     + "never cached.");
@@ -217,6 +232,16 @@ public class OnlineStorePages {
                 new ThemeDto(Themes.DRAFT, p(request, "accent"), p(request, "palette"),
                     p(request, "font"), p(request, "radius"), p(request, "logoPhotoId"),
                     Lists.split(p(request, "sections")))));
+    }
+
+    @com.codename1.backend.annotations.Autowired
+    private com.codenameone.examples.bazaar.web.StoreSite site;
+
+    @PostMapping("/admin/{storeId}/online-store/search")
+    public String saveSearch(@PathVariable("storeId") String storeId,
+            HttpServer.Request request) throws Exception {
+        return change(request, base(storeId), "Search settings saved", () -> site.saveSettings(
+                storeId, p(request, "synonyms"), p(request, "password"), p(request, "boosts")));
     }
 
     @PostMapping("/admin/{storeId}/online-store/theme/publish")
