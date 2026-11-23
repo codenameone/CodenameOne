@@ -101,6 +101,12 @@ public final class AndroidSystemLlmImpl extends SystemLlmImpl {
 
     private final Map<Integer, Job> generations = new HashMap<Integer, Job>();
     private final String[] reasons = new String[FEATURE_COUNT];
+    // Status per feature, reused for a short while: SystemLlmClient asks again
+    // before every request, and each question is an IPC round trip to AICore
+    // that can take seconds on a slow device.
+    private final int[] cachedStatus = new int[FEATURE_COUNT];
+    private final long[] cachedAt = new long[FEATURE_COUNT];
+    private static final long STATUS_TTL_MS = 30000;
     private int nextHandle = 1;
     private String lastError;
     private GenerativeModelFutures model;
@@ -148,18 +154,29 @@ public final class AndroidSystemLlmImpl extends SystemLlmImpl {
         if (feature < 0 || feature >= FEATURE_COUNT) {
             return STATUS_UNSUPPORTED;
         }
+        long now = System.currentTimeMillis();
+        if (cachedAt[feature] != 0 && now - cachedAt[feature] < STATUS_TTL_MS
+                && cachedStatus[feature] != STATUS_DOWNLOADING) {
+            return cachedStatus[feature];
+        }
         try {
             ListenableFuture<Integer> f = statusFuture(feature, 0);
             // Bounded: AICore is a separate service, and a device where it
             // is missing or wedged must answer "unsupported", not hang the
             // client's worker forever.
-            int s = f.get(10, java.util.concurrent.TimeUnit.SECONDS).intValue();
+            int s = f.get(5, java.util.concurrent.TimeUnit.SECONDS).intValue();
             reasons[feature] = reasonFor(s);
-            return toStatus(s);
+            return remember(feature, toStatus(s));
         } catch (Throwable t) {
             reasons[feature] = describe(t instanceof ExecutionException ? t.getCause() : t);
-            return STATUS_UNSUPPORTED;
+            return remember(feature, STATUS_UNSUPPORTED);
         }
+    }
+
+    private int remember(int feature, int status) {
+        cachedStatus[feature] = status;
+        cachedAt[feature] = System.currentTimeMillis();
+        return status;
     }
 
     @Override
@@ -187,7 +204,12 @@ public final class AndroidSystemLlmImpl extends SystemLlmImpl {
             synchronized (this) {
                 f = downloadFuture(feature, cb);
             }
+            // Unbounded on purpose: a model download legitimately takes
+            // minutes, and the caller asked for exactly this wait.
             f.get();
+            synchronized (this) {
+                java.util.Arrays.fill(cachedAt, 0L);
+            }
             return failure[0] == null || setError(failure[0]);
         } catch (ExecutionException ex) {
             return setError(describe(ex.getCause()));

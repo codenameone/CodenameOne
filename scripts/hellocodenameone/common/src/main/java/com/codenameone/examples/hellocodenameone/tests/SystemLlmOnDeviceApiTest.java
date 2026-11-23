@@ -47,8 +47,9 @@ import com.codename1.util.AsyncResource;
  * with Apple Intelligence, a Pixel -- one short request runs as well.</p>
  */
 public class SystemLlmOnDeviceApiTest extends BaseTest {
-    private static final long STATUS_BUDGET_MS = 10000;
-    private static final long REQUEST_BUDGET_MS = 15000;
+    private static final long STATUS_BUDGET_MS = 8000;
+    private static final long REFUSAL_BUDGET_MS = 10000;
+    private static final long REQUEST_BUDGET_MS = 10000;
 
     @Override
     public boolean shouldTakeScreenshot() {
@@ -93,8 +94,15 @@ public class SystemLlmOnDeviceApiTest extends BaseTest {
                 throw new IllegalStateException("Unexpected Android provider " + provider);
             }
 
+            // Two features, not all six: each status is an IPC round trip to
+            // the OS model service, bounded at 5s on Android, and the runner
+            // gives a test 30s. CHAT proves the prompt path, REWRITE is the
+            // feature the request below uses -- on Android they are separate
+            // models with separate availability.
             SystemLlmStatus chat = null;
-            for (SystemLlmFeature f : SystemLlmFeature.values()) {
+            SystemLlmStatus rewrite = null;
+            for (SystemLlmFeature f : new SystemLlmFeature[] {SystemLlmFeature.CHAT,
+                    SystemLlmFeature.REWRITE}) {
                 AsyncResource<SystemLlmStatus> r = SystemLlmClient.checkStatus(f);
                 SystemLlmStatus s = await(r, STATUS_BUDGET_MS, "status of " + f);
                 if (s == null) {
@@ -104,6 +112,8 @@ public class SystemLlmOnDeviceApiTest extends BaseTest {
                         + " reason=" + SystemLlmClient.getStatusReason(f));
                 if (f == SystemLlmFeature.CHAT) {
                     chat = s;
+                } else {
+                    rewrite = s;
                 }
             }
             if (!expectBackend && chat != SystemLlmStatus.UNSUPPORTED) {
@@ -111,7 +121,7 @@ public class SystemLlmOnDeviceApiTest extends BaseTest {
             }
 
             AsyncResource<String> req = llm.rewrite("Ths sentense has erors.", RewriteStyle.SHORTEN);
-            if (chat != null && chat.isAvailable()) {
+            if (rewrite != null && rewrite.isAvailable()) {
                 // A real model: the request must settle, either way, in the
                 // budget. A first request can load the model, so a slow
                 // answer is logged rather than failed.
@@ -128,7 +138,7 @@ public class SystemLlmOnDeviceApiTest extends BaseTest {
                 return;
             }
             // No model: the request is refused promptly, never left hanging.
-            if (!waitFor(req, STATUS_BUDGET_MS)) {
+            if (!waitFor(req, REFUSAL_BUDGET_MS)) {
                 throw new IllegalStateException("A request without a model did not settle");
             }
             try {

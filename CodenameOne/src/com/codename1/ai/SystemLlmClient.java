@@ -74,6 +74,7 @@ import java.util.List;
 /// The builders add the platform bridge only to applications that call
 /// [LlmClient#system()]; an application that checks the status here without
 /// ever calling it has no bridge and is told [SystemLlmStatus#UNSUPPORTED].
+/// A request's seed has no effect on Apple platforms, whose model takes none.
 /// Tools, [ResponseFormat#JSON_OBJECT] and embeddings are not supported
 /// and fail the request with [LlmException.ErrorType#INVALID_REQUEST].
 ///
@@ -140,7 +141,9 @@ public final class SystemLlmClient extends LlmClient {
                 });
             }
         });
-        t.kill();
+        // killWhenIdle, not kill: kill() drops a task the new thread has not
+        // picked up yet, which here is always, and the status never arrived.
+        t.killWhenIdle();
         return result;
     }
 
@@ -177,8 +180,10 @@ public final class SystemLlmClient extends LlmClient {
     }
 
     /// Asks the OS to download the model behind a feature, for a status of
-    /// [SystemLlmStatus#DOWNLOADABLE]. Completes when the model is ready.
-    /// Apple platforms download on their own and complete at once.
+    /// [SystemLlmStatus#DOWNLOADABLE]. On Android it completes when the
+    /// model is ready. Apple platforms download on their own: there it
+    /// completes at once, with `true` while the OS is still fetching the model
+    /// too, so check [#getStatus(SystemLlmFeature)] before relying on it.
     ///
     /// @param feature the capability
     /// @return completes with `true`, or fails with an [LlmException]
@@ -226,14 +231,30 @@ public final class SystemLlmClient extends LlmClient {
         final String[] roles = new String[messages.size()];
         final String[] contents = new String[messages.size()];
         byte[] image = null;
+        int lastUser = -1;
+        for (int i = 0; i < roles.length; i++) {
+            roles[i] = roleName(messages.get(i).getRole());
+            if ("user".equals(roles[i])) {
+                lastUser = i;
+            }
+        }
         for (int i = 0; i < roles.length; i++) {
             ChatMessage m = messages.get(i);
-            roles[i] = roleName(m.getRole());
-            contents[i] = m.getText();
+            // Never null: an image-only message has no text, and the ports
+            // hand the text to APIs that refuse null.
+            String text = m.getText();
+            contents[i] = text == null ? "" : text;
             List<MessagePart> parts = m.getParts();
             for (int p = 0; p < parts.size(); p++) {
                 MessagePart part = parts.get(p);
                 if (part instanceof ImagePart) {
+                    // The OS models take the image with the newest user turn
+                    // only; anywhere else it would be moved silently.
+                    if (i != lastUser) {
+                        fail(result, listener, invalid(
+                                "The system model accepts an image only in the last user message"));
+                        return result;
+                    }
                     image = ((ImagePart) part).getData();
                 }
             }
@@ -313,7 +334,9 @@ public final class SystemLlmClient extends LlmClient {
     /// Stops the worker thread. Requests already queued still run first.
     public void close() {
         if (worker != null) {
-            worker.kill();
+            // kill() would drop queued requests and leave their results
+            // unsettled forever; the documented contract is that they run.
+            worker.killWhenIdle();
             worker = null;
         }
     }
