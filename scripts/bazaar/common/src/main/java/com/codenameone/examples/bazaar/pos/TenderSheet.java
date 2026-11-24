@@ -440,6 +440,7 @@ final class TenderSheet {
                 tenders.list(), PosState.staffUsername(), cart.tipCents(), cart.approvalId());
         Receipt receipt = Receipt.of(sale, cart, totals, tenders.change());
         PosState.recordSale(sale);
+        receipt.milestone = PosState.recordGoal(totals.totalCents);
         cart.clear();
         PosState.fireCart();
         sheet.back();

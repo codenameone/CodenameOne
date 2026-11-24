@@ -130,6 +130,13 @@ public final class Api {
     private Api() {
     }
 
+    /// Points every client at `url` (null: back at the session's server),
+    /// without signing anyone out: the design-review tour uses it to show a
+    /// register whose server has gone.
+    public static void useOfflineHostForTests(String url) {
+        connect(url == null ? Session.serverUrl() : url);
+    }
+
     static void connect(String baseUrl) {
         account = RestClients.create(AccountApi.class, baseUrl);
         admin = RestClients.create(AdminApi.class, baseUrl);

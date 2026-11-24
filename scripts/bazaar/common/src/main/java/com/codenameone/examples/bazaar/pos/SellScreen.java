@@ -151,7 +151,7 @@ final class SellScreen {
         chips.setScrollVisible(false);
         chips.setUIID("PosChips");
         Container north = new Container(BoxLayout.y());
-        north.add(top).add(chips);
+        north.add(top).add(goalRow()).add(chips);
         products.add(BorderLayout.NORTH, north);
         grid.setScrollableY(true);
         grid.setScrollVisible(false);
@@ -172,6 +172,7 @@ final class SellScreen {
         fillGrid();
         fillCart();
         PosUi.live(root, () -> {
+            fillGoal(false);
             fillChips();
             fillGrid();
             fillCart();
@@ -189,6 +190,34 @@ final class SellScreen {
     }
 
     private Container cartSheetContent;
+    private final PosMotion.GoalBar goalBar = new PosMotion.GoalBar();
+    private final Label goalText = new Label("", "PosGoalText");
+
+    /// The shift's sales against its target: a slim bar under the search,
+    /// so the cashier sees the day moving without it taking a row of tiles.
+    private Container goalRow() {
+        Container row = new Container(new BorderLayout());
+        row.setUIID("PosGoalRow");
+        row.setName("pos-goal");
+        Label flag = new Label("", "PosGoalIcon");
+        FontImage.setMaterialIcon(flag, FontImage.MATERIAL_FLAG, 2.8f);
+        row.add(BorderLayout.WEST, flag);
+        row.add(BorderLayout.CENTER, goalBar);
+        goalText.setName("pos-goal-text");
+        row.add(BorderLayout.EAST, goalText);
+        fillGoal(false);
+        return row;
+    }
+
+    private void fillGoal(boolean celebrate) {
+        ShiftGoal g = PosState.goal();
+        goalText.setText(Lang.tr("{0} of {1}", PosState.money(g.sold()), PosState.money(g.target())));
+        goalBar.fill(g.permille(), celebrate);
+    }
+    /// The total the cart last showed, for counting to the next one; -1
+    /// before the first fill, which shows its total without counting.
+    private long shownTotal = -1;
+    private static final String MARK = "\u0001";
 
     // ---------------------------------------------------------------- grid
 
@@ -525,8 +554,9 @@ final class SellScreen {
         lead.addActionListener(e -> {
             if (variants.size() == 1) {
                 add(variants.get(0), 1);
+                flyIn(tile);
             } else {
-                pickVariant(variants);
+                pickVariant(variants, tile);
             }
         });
         tile.add(lead);
@@ -536,38 +566,23 @@ final class SellScreen {
         return tile;
     }
 
-    private void pickVariant(List<PosItemDto> variants) {
-        final Sheet sheet = PosSheet.open(variants.get(0).title());
-        sheet.setName("pos-variants");
-        Container content = sheet.getContentPane();
-        content.setLayout(new GridLayout((variants.size() + 1) / 2, 2));
-        for (int iter = 0; iter < variants.size(); iter++) {
-            final PosItemDto v = variants.get(iter);
-            // Two lines: the option on top, the price and stock under it, so
-            // "M / Charcoal" is never cut off to make room for the price.
-            Container card = new Container(BoxLayout.y());
-            card.setUIID("PosChoice");
-            Label name = PosUi.data(v.variantTitle(), "PosChoiceTitle");
-            name.setAutoSizeMode(true);
-            card.add(name);
-            String meta = PosState.money(v.priceCents());
-            if (v.trackInventory()) {
-                meta += Ui.DOT + Lang.tr("{0} left", v.available());
-            }
-            card.add(PosUi.data(meta, "PosChoiceMeta"));
-            Button b = new Button();
-            b.setName("pos-variant-" + iter);
-            b.addActionListener(e -> {
-                sheet.back();
-                add(v, 1);
-            });
-            card.add(b);
-            b.setHidden(true);
-            card.setLeadComponent(b);
-            com.codenameone.examples.bazaar.ui.Ui.accessible(card, b);
-            content.add(card);
+    private void pickVariant(List<PosItemDto> variants, final Component tile) {
+        VariantPicker.show(variants, (v, quantity, photo) -> {
+            add(v, quantity);
+            flyIn(tile);
+        });
+    }
+
+    /// The tile's photo flies into the cart: the cart panel beside the grid,
+    /// or the Charge bar on a phone.
+    private void flyIn(Component tile) {
+        if (tile == null || !(tile instanceof Container)) {
+            return;
         }
-        sheet.show();
+        Component art = ((Container) tile).getComponentAt(0);
+        com.codename1.ui.Image image = art instanceof Label ? ((Label) art).getIcon() : null;
+        Component target = PosUi.wide() ? cartBox : pay;
+        PosMotion.fly(root.getComponentForm(), image, art, target, null);
     }
 
     private void add(PosItemDto item, int quantity) {
@@ -726,6 +741,12 @@ final class SellScreen {
                     : t.taxCents, "PosTotalRow");
         }
         total("Total", t.totalCents, "PosGrand");
+        Label grand = (Label) ((Container) totalsBox.getComponentAt(totalsBox.getComponentCount() - 1))
+                .getComponentAt(1);
+        boolean moved = shownTotal >= 0 && shownTotal != t.totalCents;
+        if (moved) {
+            PosMotion.count(grand, shownTotal, t.totalCents, "", "");
+        }
         // An empty sale reads as a quiet hint, not a dead grey slab; a full
         // one says what it will charge and for how many items.
         if (cart.isEmpty()) {
@@ -733,10 +754,20 @@ final class SellScreen {
             pay.setUIID("PosPayIdle");
         } else {
             int count = cart.units();
-            pay.setText(Lang.tr("Charge {0}", PosState.money(t.totalCents)) + Ui.DOT
-                    + (count == 1 ? Lang.tr("1 item") : Lang.tr("{0} items", count)));
+            String items = Ui.DOT + (count == 1 ? Lang.tr("1 item") : Lang.tr("{0} items", count));
+            String full = Lang.tr("Charge {0}", MARK);
+            int at = full.indexOf(MARK);
+            String before = at < 0 ? full + " " : full.substring(0, at);
+            String after = (at < 0 ? "" : full.substring(at + MARK.length())) + items;
             pay.setUIID("PosPay");
+            if (moved && !PosUi.wide()) {
+                // The bar counts up to the new total as the item lands in it.
+                PosMotion.count(pay, shownTotal, t.totalCents, before, after);
+            } else {
+                pay.setText(before + PosState.money(t.totalCents) + after);
+            }
         }
+        shownTotal = t.totalCents;
         pay.setEnabled(!cart.isEmpty());
         root.revalidateLater();
         if (cartSheetContent != null) {

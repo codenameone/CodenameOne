@@ -490,6 +490,25 @@ public class DemoTourTest extends E2e {
         }
     }
 
+    /// The register with the server gone: every photo held in memory is
+    /// dropped and the server address points nowhere, so the grid can only
+    /// show the photos the device cached on disk. Put back afterwards.
+    private void visualOfflinePhotos(String mode) {
+        final String[] was = new String[1];
+        onEdt(() -> {
+            was[0] = com.codenameone.examples.bazaar.net.Session.serverUrl();
+            com.codenameone.examples.bazaar.ui.ProductArt.forgetPhotos();
+            com.codenameone.examples.bazaar.ui.ProductArt.clear();
+            com.codenameone.examples.bazaar.net.Api.useOfflineHostForTests("http://127.0.0.1:9");
+        });
+        // Redraws the grid: every tile asks for its photo again.
+        onEdt(() -> com.codenameone.examples.bazaar.pos.PosState.fireCart());
+        pause(2500);
+        visualShot("reg-offline-photos" + mode);
+        onEdt(() -> com.codenameone.examples.bazaar.net.Api.useOfflineHostForTests(null));
+        pause(600);
+    }
+
     /// Puts the look back to the one `bazaar.visual.dark` asks for.
     private void visualTheme() {
         final boolean dark = Boolean.getBoolean("bazaar.visual.dark");
@@ -535,17 +554,36 @@ public class DemoTourTest extends E2e {
                         1500, 1800, 2000, 2000, 0)));
         tap("pos-sell");
         pause(2500);
+        visualShot("reg-sell-empty" + mode);
+        boolean pickerShot = false;
         for (int i = 0; i < 4; i++) {
             // Through the tile's accessibility action, as a screen reader or
             // an agent opens it: what the tour holds is that this works.
             activateNth("pos-tile-", i);
-            pause(1800);
-            if (activateNth("pos-variant-", 0)) {
-                pause(1800);
+            pause(1500);
+            if (findByName("pos-variant-add") != null) {
+                if (!pickerShot) {
+                    pickerShot = true;
+                    visualShot("reg-variants" + mode);
+                    // One tap on another value of the first option: the
+                    // price, stock and Add button follow in place.
+                    if (tap("pos-opt-0-1")) {
+                        pause(700);
+                        visualShot("reg-variants-2" + mode);
+                    }
+                }
+                tap("pos-variant-add");
+                // The photo is mid-flight into the cart for a moment.
+                pause(220);
+                if (i == 0 || pickerShot && i < 2) {
+                    visualShot("reg-fly-" + i + mode);
+                }
+                pause(1300);
             }
         }
         pause(1200);
         visualShot("reg-sell" + mode);
+        visualOfflinePhotos(mode);
         if (findByName("pos-discount") == null && tap("pos-pay")) {
             pause(1500);
         }
@@ -627,18 +665,46 @@ public class DemoTourTest extends E2e {
                 }
                 pause(800);
                 visualShot("reg-receipt" + mode);
+                scrollDown(1);
+                visualShot("reg-receipt-2" + mode);
                 pause(6000);
                 dumpOutbox("receipt+6s");
                 tap("pos-new-sale");
                 pause(1500);
             }
         }
+        // A parked sale: ring one item up, park it, and see it on the list.
+        activateNth("pos-tile-", 2);
+        pause(1500);
+        if (findByName("pos-variant-add") != null) {
+            tap("pos-variant-add");
+            pause(1500);
+        }
+        reopen("pos-park", "pos-pay");
+        if (tap("pos-park")) {
+            pause(1500);
+            visualShot("reg-park" + mode);
+            if (!tap("pos-park-ok")) {
+                tapFirst("pos-park-");
+            }
+            pause(1500);
+            dismiss();
+            pause(800);
+        }
+        go(com.codenameone.examples.bazaar.pos.PosSections.PARKED);
+        pause(2200);
+        visualShot("reg-parked" + mode);
+        go(com.codenameone.examples.bazaar.pos.PosSections.RETURNS);
+        pause(2200);
+        visualShot("reg-returns" + mode);
+        tap("pos-sell");
+        pause(1800);
         // A layaway needs a sale with a customer: ring two items up, find
         // the customer, then lay it away on a deposit from the layaways page.
         for (int i = 0; i < 2; i++) {
             activateNth("pos-tile-", i);
             pause(1500);
-            if (activateNth("pos-variant-", 0)) {
+            if (tap("pos-variant-add")) {
                 pause(1500);
             }
         }
@@ -1503,14 +1569,71 @@ private void screens() throws Exception {
         waitFor(900);
     }
 
-    /// A finger swipe up the middle of the screen, `times` over.
+    /// A finger swipe up the middle of the screen, `times` over, that goes
+    /// exactly as far as there is content left and no further: a page that
+    /// does not scroll is left alone, the last swipe stops on the content's
+    /// end, and the finger rests before it lifts so nothing flings past the
+    /// end and bounces back in the capture.
     protected void scrollDown(int times) {
         for (int i = 0; i < times; i++) {
+            final int[] left = new int[3];
+            onEdt(() -> {
+                Form f = Display.getInstance().getCurrent();
+                int x = f.getWidth() / 2;
+                int y = f.getHeight() / 2;
+                Component c = f.getComponentAt(x, y);
+                while (c != null && !c.isScrollableY()) {
+                    c = c.getParent();
+                }
+                if (c == null) {
+                    left[0] = 0;
+                    return;
+                }
+                int view = c.getHeight() - c.getStyle().getVerticalPadding();
+                left[0] = Math.max(0, c.getScrollDimension().getHeight() - view - c.getScrollY());
+                left[1] = c.getAbsoluteY() + c.getHeight() * 4 / 5;
+                left[2] = c.getHeight();
+            });
+            int distance = Math.min(left[0], left[2] * 3 / 5);
+            if (distance <= 0) {
+                return;
+            }
             Form f = Display.getInstance().getCurrent();
             int x = f.getWidth() / 2;
-            drag(x, f.getHeight() * 3 / 4, x, f.getHeight() / 3, 18);
-            waitFor(900);
+            dragAndHold(x, left[1], x, left[1] - distance, 18);
+            waitFor(700);
         }
+    }
+
+    /// A drag that rests on its last point before lifting: no velocity, so
+    /// the content stops where the finger did.
+    private void dragAndHold(final int x0, final int y0, final int x1, final int y1, int steps) {
+        final TouchOverlay overlay = JavaSEPort.instance.getTouchOverlay();
+        onEdt(() -> {
+            overlay.pressed(x0, y0);
+            Display.getInstance().getCurrent().pointerPressed(x0, y0);
+        });
+        waitFor(120);
+        for (int i = 1; i <= steps; i++) {
+            final int x = x0 + (x1 - x0) * i / steps;
+            final int y = y0 + (y1 - y0) * i / steps;
+            onEdt(() -> {
+                overlay.dragged(x, y);
+                Display.getInstance().getCurrent().pointerDragged(x, y);
+            });
+            waitFor(33);
+        }
+        for (int i = 0; i < 6; i++) {
+            onEdt(() -> {
+                overlay.dragged(x1, y1);
+                Display.getInstance().getCurrent().pointerDragged(x1, y1);
+            });
+            waitFor(60);
+        }
+        com.codename1.ui.CN.callSerially(() -> {
+            overlay.released(x1, y1);
+            Display.getInstance().getCurrent().pointerReleased(x1, y1);
+        });
     }
 
     /// A press, a drag in `steps` moves and a release, a frame a step.

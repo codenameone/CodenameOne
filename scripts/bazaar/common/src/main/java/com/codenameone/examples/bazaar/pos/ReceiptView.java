@@ -46,12 +46,45 @@ final class ReceiptView {
     private ReceiptView() {
     }
 
+    private static String milestoneText(int percent) {
+        if (percent >= 100) {
+            return Lang.tr("Goal reached. Great shift!");
+        }
+        if (percent >= 75) {
+            return Lang.tr("Three quarters of today's goal");
+        }
+        if (percent >= 50) {
+            return Lang.tr("Halfway to today's goal");
+        }
+        return Lang.tr("A quarter of today's goal");
+    }
+
     static void show(final Receipt r) {
         final Sheet sheet = PosSheet.open(Lang.tr("Sale complete"));
         sheet.setName("pos-receipt");
         final Container c = sheet.getContentPane();
         c.setLayout(BoxLayout.y());
         c.setScrollableY(true);
+        // The moment the sale lands: a check draws itself in, and a crossed
+        // milestone of the shift's goal gets its own line and bar.
+        c.add(new PosMotion.Check());
+        if (r.milestone > 0) {
+            ShiftGoal g = PosState.goal();
+            Container m = new Container(BoxLayout.y());
+            m.setUIID("PosMilestone");
+            m.setName("pos-milestone");
+            Label star = new Label(milestoneText(r.milestone), "PosMilestoneText");
+            FontImage.setMaterialIcon(star, r.milestone >= 100 ? FontImage.MATERIAL_EMOJI_EVENTS
+                    : FontImage.MATERIAL_AUTO_AWESOME, 3.6f);
+            m.add(star);
+            m.add(PosUi.data(Lang.tr("{0} of {1} today", PosState.money(g.sold()),
+                    PosState.money(g.target())), "PosMilestoneMeta"));
+            final PosMotion.GoalBar bar = new PosMotion.GoalBar();
+            m.add(bar);
+            c.add(m);
+            final int fill = g.permille();
+            com.codename1.ui.CN.callSerially(() -> bar.fill(fill, true));
+        }
         for (int iter = 0; iter < r.totals.size(); iter++) {
             String[] p = r.totals.get(iter);
             boolean big = "Change".equals(p[0]) || "Total".equals(p[0]);

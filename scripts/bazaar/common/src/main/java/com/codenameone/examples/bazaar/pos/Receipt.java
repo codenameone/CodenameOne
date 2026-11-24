@@ -41,6 +41,8 @@ final class Receipt {
     final List<String[]> totals = new ArrayList<String[]>();
     /// Whether the sale took cash, which opens the drawer.
     boolean cash;
+    /// The shift goal milestone this sale crossed (25, 50, 75, 100), or 0.
+    int milestone;
 
     private Receipt(String clientId, String store, String register, long when) {
         this.clientId = clientId;

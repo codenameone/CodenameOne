@@ -3184,3 +3184,68 @@ SvCheckoutReview {
     SvCheckoutReview { background-color: var(--surface-alt-dark); border: 1px solid var(--line-dark); }
 }
 /* ---- end APP ROUND 9 ---- */
+/* REGISTER ROUND A: the variant picker (photo, option chips, Add with the
+   price), the shift goal bar, the sale-complete check and its milestone. */
+PosVpBody { background-color: transparent; padding: 2mm 0 0 0; margin: 0; }
+PosVpHero { background-color: transparent; padding: 0 0 3mm 0; margin: 0 0 1mm 0; border-bottom: 1px solid var(--line); }
+PosVpPhoto { background-color: var(--surface-alt); padding: 0; margin: 0 3.2mm 0 0; }
+PosVpFacts { background-color: transparent; padding: 1mm 0 0 0; margin: 0; }
+PosVpPrice { color: var(--text); background-color: transparent; font-family: "native:MainBold"; font-size: 6mm; padding: 0; margin: 0; }
+PosVpVariant { color: var(--text-muted); background-color: transparent; font-size: 3.2mm; padding: 0.8mm 0 0 0; margin: 0; }
+PosVpStock { color: var(--success); background-color: var(--success-tint); font-family: "native:MainBold"; font-size: 2.6mm; border-radius: 3mm; padding: 0.8mm 2.2mm 0.8mm 2.2mm; margin: 1.8mm 0 0 0; }
+PosVpStockLow { cn1-derive: PosVpStock; color: var(--warning); background-color: var(--warning-tint); }
+PosVpStockOut { cn1-derive: PosVpStock; color: var(--danger); background-color: var(--danger-tint); }
+PosVpGroupRow { background-color: transparent; padding: 3mm 0 1.4mm 0; margin: 0; }
+PosVpGroup { color: var(--text); background-color: transparent; font-family: "native:MainBold"; font-size: 3.2mm; padding: 0 2mm 0 0; margin: 0; }
+PosVpGroupValue { color: var(--text-muted); background-color: transparent; font-size: 3.2mm; padding: 0; margin: 0; }
+PosVpChips { background-color: transparent; padding: 0; margin: 0; }
+PosVpChip { color: var(--text); background-color: var(--surface); font-family: "native:MainBold"; font-size: 3.4mm; text-align: center; border: 1px solid var(--line-strong); border-radius: var(--radius); padding: 3mm 4.2mm 3mm 4.2mm; margin: 0 1.6mm 1.6mm 0; }
+PosVpChip.pressed { background-color: var(--surface-press); }
+PosVpChipOn { cn1-derive: PosVpChip; color: var(--brand); background-color: var(--brand-tint); border: 2px solid var(--brand); }
+PosVpChipOn.pressed { background-color: var(--brand-tint); }
+PosVpChipOnOut { cn1-derive: PosVpChip; color: var(--text-muted); background-color: var(--surface-alt); border: 2px solid var(--text-muted); }
+PosVpChipOut { cn1-derive: PosVpChip; color: var(--text-muted); background-color: var(--surface-alt); border: 1px solid var(--line); }
+PosVpChipNone { cn1-derive: PosVpChip; color: var(--line-strong); background-color: transparent; border: 1px solid var(--line); }
+PosVpQtyRow { background-color: transparent; padding: 3mm 0 1mm 0; margin: 2mm 0 0 0; border-top: 1px solid var(--line); }
+PosVpFoot { background-color: transparent; padding: 2.4mm 0 0 0; margin: 0; }
+PosVpAddAnyway { cn1-derive: PosPay; color: var(--warning); background-color: var(--warning-tint); }
+PosGoalRow { background-color: transparent; padding: 0.4mm 3mm 1.2mm 3mm; margin: 0; }
+PosGoalIcon { color: var(--brand); background-color: transparent; padding: 0 1.6mm 0 0; margin: 0; }
+PosGoalText { color: var(--text-muted); background-color: transparent; font-size: 2.5mm; padding: 0 0 0 2mm; margin: 0; }
+PosGoalTrack { color: var(--line); background-color: transparent; padding: 0; margin: 0; }
+PosGoalFill { color: var(--brand); background-color: transparent; }
+PosGoalDone { color: var(--success); background-color: transparent; }
+PosCheck { color: var(--success); background-color: var(--surface); padding: 2mm 0 1mm 0; margin: 0; }
+PosMilestone { background-color: var(--brand-tint); border-radius: var(--radius); padding: 2.6mm 3mm 3mm 3mm; margin: 1mm 0 3mm 0; }
+PosMilestoneText { color: var(--brand); background-color: transparent; font-family: "native:MainBold"; font-size: 3.4mm; padding: 0; margin: 0; }
+PosMilestoneMeta { color: var(--text-muted); background-color: transparent; font-size: 2.8mm; padding: 0.8mm 0 1.6mm 0; margin: 0; }
+@media (prefers-color-scheme: dark) {
+    PosVpHero { border-bottom: 1px solid var(--line-dark); }
+    PosVpPhoto { background-color: var(--surface-alt-dark); }
+    PosVpPrice { color: var(--text-dark); }
+    PosVpVariant { color: var(--text-muted-dark); }
+    PosVpStock { color: var(--success-dark); background-color: var(--success-tint-dark); }
+    PosVpStockLow { color: var(--warning-dark); background-color: var(--warning-tint-dark); }
+    PosVpStockOut { color: var(--danger-dark); background-color: var(--danger-tint-dark); }
+    PosVpGroup { color: var(--text-dark); }
+    PosVpGroupValue { color: var(--text-muted-dark); }
+    PosVpChip { color: var(--text-dark); background-color: var(--surface-dark); border: 1px solid var(--line-strong-dark); }
+    PosVpChip.pressed { background-color: var(--surface-press-dark); }
+    PosVpChipOn { color: var(--brand-dark); background-color: var(--brand-tint-dark); border: 2px solid var(--brand-dark); }
+    PosVpChipOn.pressed { background-color: var(--brand-tint-dark); }
+    PosVpChipOnOut { color: var(--text-muted-dark); background-color: var(--surface-alt-dark); border: 2px solid var(--text-muted-dark); }
+    PosVpChipOut { color: var(--text-muted-dark); background-color: var(--surface-alt-dark); border: 1px solid var(--line-dark); }
+    PosVpChipNone { color: var(--line-strong-dark); border: 1px solid var(--line-dark); }
+    PosVpQtyRow { border-top: 1px solid var(--line-dark); }
+    PosVpAddAnyway { color: var(--warning-dark); background-color: var(--warning-tint-dark); }
+    PosGoalIcon { color: var(--brand-dark); }
+    PosGoalText { color: var(--text-muted-dark); }
+    PosGoalTrack { color: var(--line-dark); }
+    PosGoalFill { color: var(--brand-dark); }
+    PosGoalDone { color: var(--success-dark); }
+    PosCheck { color: var(--success-dark); background-color: var(--surface-dark); }
+    PosMilestone { background-color: var(--brand-tint-dark); }
+    PosMilestoneText { color: var(--brand-dark); }
+    PosMilestoneMeta { color: var(--text-muted-dark); }
+}
+/* ---- end REGISTER ROUND A ---- */

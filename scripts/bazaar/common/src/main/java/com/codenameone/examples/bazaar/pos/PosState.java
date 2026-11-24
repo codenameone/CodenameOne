@@ -562,6 +562,31 @@ public final class PosState {
         return bp;
     }
 
+    // ---------------------------------------------------------------- goal
+
+    private static ShiftGoal goal;
+
+    /// The open shift's sales against its target, counted on this register.
+    static ShiftGoal goal() {
+        if (goal == null) {
+            Object o = read(key("goal"));
+            goal = ShiftGoal.load(o instanceof String ? (String) o : null);
+        }
+        ShiftDto s = shift();
+        if (s != null) {
+            goal.begin(s.id(), s.cashSalesCents() + s.cardSalesCents() + s.otherSalesCents());
+        }
+        return goal;
+    }
+
+    /// Counts a finished sale toward the goal; answers the milestone it
+    /// crossed (25, 50, 75 or 100), or 0.
+    static int recordGoal(long cents) {
+        int crossed = goal().record(cents);
+        write(key("goal"), goal.save());
+        return crossed;
+    }
+
     // ---------------------------------------------------------------- storage
 
     private static String key(String name) {

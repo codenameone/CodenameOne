@@ -176,6 +176,17 @@ public final class ProductArt {
             }
             return;
         }
+        // On the device already (an offline register, a restart): no
+        // network at all.
+        byte[] kept = PhotoCache.shared().get(photoId);
+        if (kept != null) {
+            EncodedImage decoded = EncodedImage.create(kept);
+            if (decoded != null && decoded.getWidth() > 0) {
+                keep(photoId, decoded);
+                label.setIcon(sized(decoded, key, width, height));
+                return;
+            }
+        }
         waiting = new ArrayList<Label>();
         waiting.add(label);
         WAITING.put(photoId, waiting);
@@ -187,11 +198,8 @@ public final class ProductArt {
             try {
                 byte[] bytes = Base64.decode(photo.data().getBytes("UTF-8"));
                 EncodedImage decoded = EncodedImage.create(bytes);
-                SOURCES.put(photoId, decoded);
-                SOURCE_ORDER.add(photoId);
-                while (SOURCE_ORDER.size() > MOST) {
-                    SOURCES.remove(SOURCE_ORDER.remove(0));
-                }
+                keep(photoId, decoded);
+                PhotoCache.shared().put(photoId, bytes);
                 for (int iter = 0; told != null && iter < told.size(); iter++) {
                     Label l = told.get(iter);
                     Object size = l.getClientProperty("photoSize");
@@ -204,6 +212,23 @@ public final class ProductArt {
                 // Not an image after all: the drawn art stays.
             }
         }, (status, message) -> WAITING.remove(photoId)));
+    }
+
+    private static void keep(String photoId, EncodedImage decoded) {
+        SOURCES.put(photoId, decoded);
+        SOURCE_ORDER.add(photoId);
+        while (SOURCE_ORDER.size() > MOST) {
+            SOURCES.remove(SOURCE_ORDER.remove(0));
+        }
+    }
+
+    /// Forgets every photo held in memory, so the next ones come from the
+    /// device's cache: what a register that restarted offline sees.
+    public static void forgetPhotos() {
+        PHOTOS.clear();
+        PHOTO_ORDER.clear();
+        SOURCES.clear();
+        SOURCE_ORDER.clear();
     }
 
     private static Image sized(EncodedImage source, String key, int width, int height) {

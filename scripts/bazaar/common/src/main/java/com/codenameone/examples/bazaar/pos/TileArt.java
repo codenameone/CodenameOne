@@ -30,8 +30,20 @@ import com.codenameone.examples.bazaar.ui.ProductArt;
 final class TileArt extends Label {
     private final GeneralPath path = new GeneralPath();
 
+    /// Rounds the bottom corners too: a picture standing on its own (the
+    /// variant picker's), not the top of a card.
+    private boolean round;
+
     private TileArt() {
         super("", "PosTileArt");
+    }
+
+    /// The art of `id` rounded on all four corners, `side` pixels square.
+    static Label rounded(String id, String title, String photoId, int side) {
+        TileArt art = (TileArt) create(id, title, photoId, side, side);
+        art.round = true;
+        art.setUIID("PosVpPhoto");
+        return art;
     }
 
     /// The art of `id` (its photo once it arrives), `width` by `height` pixels.
@@ -58,12 +70,19 @@ final class TileArt extends Label {
         // sits inside.
         float r = Math.max(0, CN.convertToPixels(2.4f) - 1);
         path.reset();
-        path.moveTo(x, y + h);
+        path.moveTo(x, round ? y + h - r : y + h);
         path.lineTo(x, y + r);
         path.quadTo(x, y, x + r, y);
         path.lineTo(x + w - r, y);
         path.quadTo(x + w, y, x + w, y + r);
-        path.lineTo(x + w, y + h);
+        if (round) {
+            path.lineTo(x + w, y + h - r);
+            path.quadTo(x + w, y + h, x + w - r, y + h);
+            path.lineTo(x + r, y + h);
+            path.quadTo(x, y + h, x, y + h - r);
+        } else {
+            path.lineTo(x + w, y + h);
+        }
         path.closePath();
         int cx = g.getClipX();
         int cy = g.getClipY();

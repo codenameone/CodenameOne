@@ -15,7 +15,13 @@ if [ "${2:-}" != "--inside" ]; then
   NAME="bazaar-visual-$$"
   podman build -q -t localhost/bazaar-visual-sim "$HERE/visual" >/dev/null
   trap 'podman rm -f "$NAME" >/dev/null 2>&1 || true' EXIT
-  podman run --name "$NAME" --rm -e "BAZAAR_VISUAL_OUT=${BAZAAR_VISUAL_OUT:-visual}" -e "BAZAAR_VISUAL_TOUR=${BAZAAR_VISUAL_TOUR:-visual}" -e "BAZAAR_VISUAL_MODES=${BAZAAR_VISUAL_MODES:-false true}" -e "BAZAAR_VISUAL_SKIN=${BAZAAR_VISUAL_SKIN:-}" -v "$REPO:/ro-repo:ro" -v "$HERE:/app" localhost/bazaar-visual-sim \
+  # The Codename One Maven plugin wants the build client even for a
+  # simulator run; lend the host's, read-only.
+  CLIENT=()
+  if [ -f "$HOME/.codenameone/CodeNameOneBuildClient.jar" ]; then
+    CLIENT=(-v "$HOME/.codenameone/CodeNameOneBuildClient.jar:/root/.codenameone/CodeNameOneBuildClient.jar:ro")
+  fi
+  podman run --name "$NAME" --rm -e "BAZAAR_VISUAL_OUT=${BAZAAR_VISUAL_OUT:-visual}" -e "BAZAAR_VISUAL_TOUR=${BAZAAR_VISUAL_TOUR:-visual}" -e "BAZAAR_VISUAL_MODES=${BAZAAR_VISUAL_MODES:-false true}" -e "BAZAAR_VISUAL_SKIN=${BAZAAR_VISUAL_SKIN:-}" -v "$REPO:/ro-repo:ro" "${CLIENT[@]}" -v "$HERE:/app" localhost/bazaar-visual-sim \
     bash -c 'cp -a /ro-repo /repo && (Xvfb :99 -screen 0 1600x1200x24 -nolisten tcp &) && sleep 2 && DISPLAY=:99 bash /app/visual/capture.sh /repo --inside'
   exit 0
 fi
