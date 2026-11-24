@@ -783,6 +783,10 @@ final class OdpWriter {
         if (pic != null) {
             x.raw("<draw:image").attr("xlink:href", picture(pic))
                     .raw(" xlink:type=\"simple\" xlink:show=\"embed\" xlink:actuate=\"onLoad\"/>");
+            // the alt text; ODF puts svg:desc after the frame's content
+            if (pic.description != null && pic.description.length() > 0) {
+                x.raw("<svg:desc>").text(pic.description, false).raw("</svg:desc>");
+            }
         }
         x.raw("</draw:frame>");
     }

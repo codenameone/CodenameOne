@@ -1229,6 +1229,7 @@ final class OdpReader {
         String image = null;
         String object = null;
         Table table = null;
+        String desc = null;
         while (true) {
             int e = x.next();
             if (e == XmlScanner.EOF || e == XmlScanner.END) {
@@ -1252,6 +1253,9 @@ final class OdpReader {
                     object = "";
                 }
                 x.skipElement();
+            } else if ("desc".equals(c)) {
+                // svg:desc is the frame's alt text
+                desc = x.elementText().trim();
             } else if ("table".equals(c)) {
                 table = table(x);
             } else {
@@ -1274,7 +1278,7 @@ final class OdpReader {
             return new TableElement(id, name, table, b[0], b[1], b[2], b[3], b[4]);
         }
         if (image != null) {
-            Picture pic = picture(image, name);
+            Picture pic = picture(image, desc);
             if (pic == null) {
                 return null;
             }

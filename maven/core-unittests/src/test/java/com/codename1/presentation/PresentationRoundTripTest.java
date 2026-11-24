@@ -55,6 +55,14 @@ class PresentationRoundTripTest extends UITestBase {
                 SlideElement m = match(b, e);
                 assertNotNull(m, where + " lost " + e.getClass().getSimpleName() + " "
                         + e.plainText());
+                if (e instanceof DiagramElement && m instanceof GroupElement) {
+                    // a diagram is written as the shapes it draws; their group hugs them,
+                    // inside the diagram's box
+                    assertTrue(m.x >= e.x - 0.5f && m.y >= e.y - 0.5f
+                            && m.x + m.width <= e.x + e.width + 0.5f
+                            && m.y + m.height <= e.y + e.height + 0.5f, where + " diagram box");
+                    continue;
+                }
                 assertEquals(e.x, m.x, 0.5f, where + " x of " + e.id);
                 assertEquals(e.y, m.y, 0.5f, where + " y of " + e.id);
                 assertEquals(e.width, m.width, 0.5f, where + " width of " + e.id);
@@ -91,7 +99,8 @@ class PresentationRoundTripTest extends UITestBase {
         // a diagram may come back as the group of shapes it draws
         if (e instanceof DiagramElement) {
             for (SlideElement c : s.elements) {
-                if (c instanceof GroupElement && Math.abs(c.x - e.x) < 0.5f) {
+                if (c instanceof GroupElement && c.x >= e.x - 0.5f && c.y >= e.y - 0.5f
+                        && c.x < e.x + e.width && c.y < e.y + e.height) {
                     return c;
                 }
             }
@@ -102,6 +111,11 @@ class PresentationRoundTripTest extends UITestBase {
     @Test
     void pptx() throws IOException {
         assertSurvives(Decks.everything(), Presentation.Format.PPTX);
+    }
+
+    @Test
+    void odp() throws IOException {
+        assertSurvives(Decks.everything(), Presentation.Format.ODP);
     }
 
     @Test

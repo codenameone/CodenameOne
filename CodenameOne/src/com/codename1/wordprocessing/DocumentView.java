@@ -778,7 +778,7 @@ public class DocumentView extends ScrollSurface implements TextInputClient,
     /// The painter of the current layout's measurer, made again when the measurer changes.
     private LayoutPainter painter() {
         Measurer m = getLayout().getMeasurer();
-        if (painter == null || painter.getMeasurer() != m) {
+        if (painter == null || painter.getMeasurer() != m) { //NOPMD CompareObjectsWithEquals - a different measurer instance, not an equal one
             painter = new LayoutPainter(m);
         }
         return painter;
