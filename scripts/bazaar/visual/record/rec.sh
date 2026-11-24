@@ -6,7 +6,7 @@
 set -uo pipefail
 HERE="$(cd "$(dirname "$0")/../.." && pwd)"
 REPO="$1"
-RUNS="${RUNS:-shop:phone:GooglePixel pos:tablet:iPadAir2 merchant:desktop:- admin:desktop:- pos:desktop:-}"
+RUNS="${RUNS:-shop:phone:GooglePixel pos:tablet:iPadAir2 merchant:desktop:- admin:desktop:- pos:desktop:- merchant:tablet:iPadAir2 pos:phone:GooglePixel}"
 WORK="$HERE/target/record"
 if [ "${2:-}" != "--inside" ]; then
   NAME="bazaar-rec-media-$$"

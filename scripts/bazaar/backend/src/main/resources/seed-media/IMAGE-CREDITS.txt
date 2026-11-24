@@ -71,6 +71,13 @@ candle-in-ceramic-cup.jpg
 canyon-shorts.jpg
   original AI-generated product image made for this sample, released with it
 
+cast-iron-skillet.jpg
+  photo: Cast-Iron-Pan
+  author: Evan-Amos
+  license: Public domain
+  source: https://commons.wikimedia.org/wiki/File:Cast-Iron-Pan.jpg
+  file: https://upload.wikimedia.org/wikipedia/commons/1/14/Cast-Iron-Pan.jpg
+
 cereal-bowl-2.jpg
   photo: Elegant handcrafted ceramic bowl design
   author: artinstitutechicago
@@ -182,6 +189,13 @@ insulated-water-bottle.jpg
   license: CC0 1.0
   source: https://commons.wikimedia.org/w/index.php?curid=19133709
   file: https://upload.wikimedia.org/wikipedia/commons/4/45/Metal_Water_Bottles.jpeg
+
+linen-tea-towel.jpg
+  photo: Viskestykke
+  author: Nillerdk
+  license: Public domain
+  source: https://commons.wikimedia.org/wiki/File:Viskestykke.jpg
+  file: https://upload.wikimedia.org/wikipedia/commons/6/61/Viskestykke.jpg
 
 merino-base-layer-crew.jpg
   original AI-generated product image made for this sample, released with it
@@ -430,3 +444,4 @@ wool-beanie.jpg
   license: CC0 1.0
   source: https://www.rawpixel.com/image/6042659/photo-image-public-domain-free
   file: https://images.rawpixel.com/editor_1024/czNmcy1wcml2YXRlL3Jhd3BpeGVsX2ltYWdlcy93ZWJzaXRlX2NvbnRlbnQvbHIvZmw4NDg5NDkwNTAzLWltYWdlLWt5YmVoc3VhLmpwZw.jpg
+

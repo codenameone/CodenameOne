@@ -1255,10 +1255,10 @@ private void screens() throws Exception {
         scrollDown(1);
         pause(1600);
 
-        go(Sections.PAYMENTS);
-        caption("Payments: payouts and fees across the platform", 3000);
-        pause(3400);
-        shotAs("admin-" + Sections.PAYMENTS);
+        // Payments is left out: the demo seed pays no payouts, so the screen is
+        // an empty state held for seven seconds. The tour closes on the
+        // overview, which has the platform's numbers on it.
+        go(Sections.OVERVIEW);
         caption("Bazaar: the marketplace's own back office, in the same app", 3000);
         pause(3200);
     }

@@ -8,9 +8,10 @@
 // a fixed rate, so each frame is kept with the time the browser painted it
 // (its metadata timestamp, never its arrival), an ffconcat holds every frame
 // for exactly that long, and ffmpeg resamples the result to a constant 60 fps
-// by repeating frames. Scrolling is an eased requestAnimationFrame tween in
-// the page, clamped to the document's ends, so it repaints every vsync and
-// never overshoots. Writes OUT/bazaar-web-FLOW[-dark].mp4 and its poster, and
+// by repeating frames. Scrolling is stepped one screenshot per video frame,
+// clamped to the document's ends, so it is smooth at the full 60 fps and
+// never overshoots; see scroll() for why a scroll is stepped instead.
+// Writes OUT/bazaar-web-FLOW[-dark].mp4 and its poster, and
 // OUT/scrolls-FLOW[-dark].json, the scroll windows in video seconds, for
 // measuring smoothness with mpdecimate.
 import { execFileSync } from 'node:child_process';
@@ -79,11 +80,17 @@ const cdp = await context.newCDPSession(page);
 const list = [];
 let n = 0;
 const writes = [];
+// stepping: a scroll is being captured frame by frame. shift: seconds added
+// to every later screencast timestamp, so the video timeline continues from
+// the end of the stepped scroll however long its screenshots took to take.
+let stepping = false, shift = 0;
 cdp.on('Page.screencastFrame', f => {
   // Ack first, so the browser sends the next paint without waiting on the disk.
   cdp.send('Page.screencastFrameAck', { sessionId: f.sessionId }).catch(() => { /* closed */ });
+  // While a scroll is being stepped its frames come from captureScreenshot.
+  if (stepping) return;
   const file = path.join(frames, String(n++).padStart(6, '0') + '.jpg');
-  list.push([file, f.metadata.timestamp]);
+  list.push([file, f.metadata.timestamp + shift]);
   writes.push(fs.promises.writeFile(file, Buffer.from(f.data, 'base64')));
 });
 // Scroll windows, in screencast (wall clock) seconds.
@@ -128,27 +135,41 @@ async function type(sel, text) {
   await page.locator(sel).first().pressSequentially(text, { delay: 45 });
   await wait(300);
 }
-// Scrolls by `px` over `ms` with an ease-in-out tween run in the page, one
-// step per animation frame, clamped to the document's ends.
+// Scrolls by `px` over `ms` of VIDEO time, deterministically: the page is
+// set to each 60 fps step of an ease-in-out curve (clamped to the document's
+// ends, so it never overscrolls) and one screenshot is taken per step, stamped
+// exactly 1/60 s after the previous one. A screencast only delivers the paints
+// the browser gets round to, about 21 distinct frames a second during a long
+// scroll; this delivers every frame, at natural timing, whatever the capture
+// costs in wall time.
 async function scroll(px, ms = 1400) {
-  const t0 = Date.now() / 1000;
-  await page.evaluate(([dy, dur]) => new Promise(done => {
+  const geo = await page.evaluate(dy => {
     const root = document.scrollingElement || document.documentElement;
     root.style.scrollBehavior = 'auto';
+    document.documentElement.style.overscrollBehavior = 'none';
     const from = root.scrollTop;
     const max = Math.max(0, root.scrollHeight - window.innerHeight);
-    const to = Math.min(max, Math.max(0, from + dy));
-    if (to === from) { done(); return; }
-    const start = performance.now();
-    const step = now => {
-      const t = Math.min(1, (now - start) / dur);
-      const e = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
-      root.scrollTop = from + (to - from) * e;
-      if (t < 1) requestAnimationFrame(step); else done();
-    };
-    requestAnimationFrame(step);
-  }), [px, ms]);
-  scrolls.push([t0, Date.now() / 1000]);
+    return [from, Math.min(max, Math.max(0, from + dy))];
+  }, px);
+  const [from, to] = geo;
+  if (to === from) { await wait(700); return; }
+  stepping = true;
+  const last = list.length ? list[list.length - 1][1] : Date.now() / 1000;
+  const t0 = Math.max(last + 1 / 60, Date.now() / 1000 + shift);
+  const steps = Math.max(2, Math.round(ms / 1000 * 60));
+  let t = t0;
+  for (let i = 1; i <= steps; i++) {
+    const u = i / steps, e = u < 0.5 ? 4 * u * u * u : 1 - Math.pow(-2 * u + 2, 3) / 2;
+    await page.evaluate(y => { (document.scrollingElement || document.documentElement).scrollTop = y; }, Math.round(from + (to - from) * e));
+    const shotData = await cdp.send('Page.captureScreenshot', { format: 'jpeg', quality: 92 });
+    const file = path.join(frames, String(n++).padStart(6, '0') + '.jpg');
+    t = t0 + (i - 1) / 60;
+    list.push([file, t]);
+    writes.push(fs.promises.writeFile(file, Buffer.from(shotData.data, 'base64')));
+  }
+  scrolls.push([t0, t + 1 / 60]);
+  shift = t + 1 / 60 - Date.now() / 1000;
+  stepping = false;
   await wait(700);
 }
 async function go(url) { await page.goto(origin + url, { waitUntil: 'load' }); await wait(600); }

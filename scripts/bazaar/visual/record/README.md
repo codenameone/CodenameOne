@@ -11,8 +11,10 @@ visual/record/rec.sh <maven-repo>        # e.g. ../../.m2-repo
 ```
 
 `DemoTourTest` drives each tour and the simulator's recorder captures it.
-`RUNS` picks the tours (`tour:device:skin`, default all five:
-`shop:phone:GooglePixel pos:tablet:iPadAir2 merchant:desktop:- admin:desktop:- pos:desktop:-`);
+`RUNS` picks the tours (`tour:device:skin`, default all seven:
+`shop:phone:GooglePixel pos:tablet:iPadAir2 merchant:desktop:- admin:desktop:- pos:desktop:-
+merchant:tablet:iPadAir2 pos:phone:GooglePixel`; the merchant tablet run makes the
+guide's `*-tablet` back-office shots);
 skins are copied from `SKINS` (default `~/.codenameone`). Videos land in
 `target/record/out/video`, the guide screenshots in `target/record/out/shots`.
 
@@ -53,9 +55,35 @@ ORIGIN=http://localhost:18097 OUT=target/record/web SCHEME=light FLOW=storefront
 
 records the server-rendered pages (`FLOW` is `storefront` or `account`,
 `SCHEME` `light` or `dark`) against a running backend; Playwright must be
-resolvable from the working directory. It keeps every screencast frame with the
-timestamp the browser painted it at, writes an ffconcat that holds each frame
-for its real duration, and encodes that at a constant 60 fps, so motion keeps
-its timing. Scrolling is an eased `requestAnimationFrame` tween clamped to the
-page's ends, never a jump. The back office in a browser is the app at `/app/`,
-recorded with the app's own walkthroughs.
+resolvable (`NODE_PATH=<checkout>/scripts/node_modules`) and `OUT` must be an
+absolute path. Start the backend on a port of its own (`backend/server.sh run
+--jvm --prebuilt --port 18097` with `CN1_PROFILE=test`), never 8095.
+
+Two capture modes share one timeline:
+
+- **Between scrolls** a CDP screencast keeps every frame with the timestamp the
+  browser painted it at, and an ffconcat holds each frame for its real
+  duration. Clicks, typing and captions keep their natural timing.
+- **A scroll is stepped**, never animated: the page is set to each 60 fps
+  position of an ease-in-out curve (clamped to the document's ends, with
+  `overscroll-behavior: none`, so it never bounces) and one
+  `Page.captureScreenshot` is taken per step, stamped exactly 1/60 s after the
+  previous one. Later screencast frames are shifted so the timeline continues
+  from the end of the scroll, however long the screenshots took. A screencast
+  delivers only the paints the browser gets round to -- about 21 distinct
+  frames a second during a long scroll -- so a scroll recorded that way
+  stutters.
+
+The result is encoded at a constant 60 fps. `scrolls-FLOW[-dark].json` lists
+the scroll windows in video seconds. Measure them with a sensitive
+`mpdecimate`; the default thresholds drop the 1-3 px steps at either end of an
+eased scroll as "duplicates" and report about 21 fps for a scroll in which
+every frame differs:
+
+```bash
+ffmpeg -i bazaar-web-storefront.mp4 -vf mpdecimate=hi=64:lo=32:frac=0.1 -fps_mode vfr -f framemd5 -
+```
+
+(about 53 distinct fps in the scroll windows, and none on a still screen). The
+back office in a browser is the app at `/app/`, recorded with the app's own
+walkthroughs.
