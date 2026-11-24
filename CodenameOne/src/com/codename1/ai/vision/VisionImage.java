@@ -63,6 +63,9 @@ public final class VisionImage {
     private final int rotationDegrees;
     private final long timestampNanos;
     private final FrameFormat format;
+    /// Whether this is one frame of a live camera stream, which a
+    /// {@link BarcodeScanner} may wait to see confirmed by the next one.
+    private boolean cameraFrame;
 
     private VisionImage(byte[] encodedBytes, byte[] pixels, int width, int height,
                         int rotationDegrees, long timestampNanos, FrameFormat format) {
@@ -87,9 +90,16 @@ public final class VisionImage {
                                           int rotationDegrees,
                                           long timestampNanos,
                                           FrameFormat format) {
-        return new VisionImage(raw ? null : data, raw ? data : null,
+        VisionImage out = new VisionImage(raw ? null : data, raw ? data : null,
                 width, height, rotationDegrees, timestampNanos,
                 raw ? format : FrameFormat.JPEG, false);
+        out.cameraFrame = true;
+        return out;
+    }
+
+    /// @return whether this image is a frame of a live camera stream
+    boolean isCameraFrame() {
+        return cameraFrame;
     }
 
     /// Creates an encoded JPEG or PNG input whose stored pixels are already
@@ -178,9 +188,11 @@ public final class VisionImage {
         if (!useRaw) {
             format = FrameFormat.JPEG;
         }
-        return new VisionImage(encoded, pixels,
+        VisionImage out = new VisionImage(encoded, pixels,
                 frame.getWidth(), frame.getHeight(), frame.getRotationDegrees(),
                 frame.getTimestampNanos(), format);
+        out.cameraFrame = true;
+        return out;
     }
 
     /// Reads a JPEG or PNG file from {@link FileSystemStorage} and wraps it

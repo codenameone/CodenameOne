@@ -66,7 +66,7 @@ abstract class AbstractVisionAnalyzer<T> implements VisionAnalyzer<T> {
         }
         AsyncResource<T> backend = impl.analyze(feature,
                 options.getBackend().getId(), image, options);
-        return new AnalysisResource<T>(backend, this);
+        return new AnalysisResource<T>(backend, this, image);
     }
 
     /// The options this analyzer was built with (its own snapshot).
@@ -80,8 +80,9 @@ abstract class AbstractVisionAnalyzer<T> implements VisionAnalyzer<T> {
     /// through a compiler-generated cast, which ParparVM does not check.
     ///
     /// @param value what the backend answered
+    /// @param image the image it answered for
     /// @return what the caller receives, of the same type
-    Object filter(Object value) {
+    Object filter(Object value, VisionImage image) {
         return value;
     }
 
@@ -105,9 +106,12 @@ abstract class AbstractVisionAnalyzer<T> implements VisionAnalyzer<T> {
     private static final class AnalysisResource<T>
             extends AsyncResource<T> {
         private final AbstractVisionAnalyzer<T> analyzer;
+        private final VisionImage image;
 
-        AnalysisResource(AsyncResource<T> backend, AbstractVisionAnalyzer<T> analyzer) {
+        AnalysisResource(AsyncResource<T> backend, AbstractVisionAnalyzer<T> analyzer,
+                         VisionImage image) {
             this.analyzer = analyzer;
+            this.image = image;
             backend.ready(new SuccessCallback<T>() {
                 @Override
                 public void onSucess(T value) {
@@ -129,7 +133,7 @@ abstract class AbstractVisionAnalyzer<T> implements VisionAnalyzer<T> {
         @SuppressWarnings("unchecked")
         private synchronized void publish(T value) {
             if (!isCancelled()) {
-                complete((T) analyzer.filter(value));
+                complete((T) analyzer.filter(value, image));
             }
         }
 

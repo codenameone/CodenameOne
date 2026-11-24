@@ -71,8 +71,10 @@ import java.util.Arrays;
 /// A PDF417 is reported only once two frames have read it identically, since
 /// one printed with little error correction (level 0, as on many payment
 /// slips) misreads into plausible wrong payloads; see
-/// {@link VisionOptions#strictBarcodes(boolean)} to change that. A single still
-/// image therefore reports no PDF417 unless strict mode is turned off.
+/// {@link VisionOptions#strictBarcodes(boolean)} to change that. This default
+/// applies to camera frames ({@link VisionImage#fromCameraFrame}, and every
+/// frame a {@link VisionCameraView} or {@link VisionPipeline} analyzes); a still
+/// image is reported as decoded.
 public final class BarcodeScanner extends AbstractVisionAnalyzer<Barcode[]> {
     /// In strict mode, the codes of the last frame that had any, waiting for a
     /// later frame to confirm them.
@@ -92,32 +94,53 @@ public final class BarcodeScanner extends AbstractVisionAnalyzer<Barcode[]> {
     }
 
     @Override
-    synchronized Object filter(Object value) {
+    synchronized Object filter(Object value, VisionImage image) {
         if (!(value instanceof Barcode[])) {
             return value;
         }
         Barcode[] codes = (Barcode[]) value;
-        if (codes.length == 0) {
-            // A frame with no code keeps the pending read: the code may simply
-            // have been out of focus for a frame.
+        VisionOptions o = options();
+        // The PDF417 default is for a camera stream, where the next frame is
+        // a moment away. A still image is one read: it is reported as decoded
+        // and leaves the pending read alone. An explicit strictBarcodes(true)
+        // holds stills too, as documented there.
+        boolean stream = image != null && image.isCameraFrame();
+        if (!stream && !o.isStrictBarcodes()) {
             return codes;
         }
-        VisionOptions o = options();
         int kept = 0;
+        int strictCount = 0;
         boolean[] keep = new boolean[codes.length];
         for (int i = 0; i < codes.length; i++) {
             Barcode c = codes[i];
             if (c == null) {
                 continue;
             }
-            keep[i] = !o.isStrictBarcode(c.getFormat())
-                    || (c.getValue() != null && pending != null
-                            && confirmedBy(pending, c));
+            if (!o.isStrictBarcode(c.getFormat())) {
+                keep[i] = true;
+            } else {
+                strictCount++;
+                keep[i] = c.getValue() != null && pending != null
+                        && confirmedBy(pending, c);
+            }
             if (keep[i]) {
                 kept++;
             }
         }
-        pending = codes;
+        // Only codes that need confirming are remembered, and only a frame
+        // that has one replaces them: a QR code decoding alone in between
+        // must not push out the PDF417 waiting for its second read. A frame
+        // with no such code keeps the pending read for the same reason.
+        if (strictCount > 0) {
+            Barcode[] next = new Barcode[strictCount];
+            int n = 0;
+            for (int i = 0; i < codes.length; i++) {
+                if (codes[i] != null && o.isStrictBarcode(codes[i].getFormat())) {
+                    next[n++] = codes[i];
+                }
+            }
+            pending = next;
+        }
         if (kept == codes.length) {
             return codes;
         }

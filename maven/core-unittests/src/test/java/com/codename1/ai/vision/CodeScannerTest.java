@@ -256,6 +256,32 @@ class CodeScannerTest extends UITestBase {
         scanner.close();
     }
 
+    @Test
+    void aStillImageReportsAPdf417AtOnceByDefault() {
+        BarcodeScanner scanner = new BarcodeScanner();
+        vision.result = new Barcode[] {pdf("slip", new byte[] {1})};
+        assertEquals(1, processNow(scanner, VisionImage.encoded(new byte[] {1})).length,
+                "a gallery photo is one read; there is no second frame to wait for");
+        scanner.close();
+    }
+
+    @Test
+    void aQrCodeDecodingAloneDoesNotPushOutThePendingPdf417() {
+        BarcodeScanner scanner = new BarcodeScanner();
+        VisionImage frame = VisionImage.detachedCameraData(new byte[] {1}, false,
+                0, 0, 0, 1L, null);
+        Barcode qr = new Barcode("qr", BarcodeFormat.QR_CODE, null, VisionRect.EMPTY, null);
+
+        vision.result = new Barcode[] {pdf("slip", new byte[] {5})};
+        assertEquals(0, processNow(scanner, frame).length);
+        vision.result = new Barcode[] {qr};
+        assertEquals(1, processNow(scanner, frame).length, "a QR code is reported at once");
+        vision.result = new Barcode[] {qr, pdf("slip", new byte[] {5})};
+        Barcode[] both = processNow(scanner, frame);
+        assertEquals(2, both.length, "the PDF417 is confirmed across the QR-only frame");
+        scanner.close();
+    }
+
     private Barcode[] processNow(BarcodeScanner scanner, VisionImage frame) {
         final Barcode[][] out = new Barcode[1][];
         scanner.process(frame).ready(new SuccessCallback<Barcode[]>() {

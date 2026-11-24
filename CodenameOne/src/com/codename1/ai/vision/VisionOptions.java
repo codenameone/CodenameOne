@@ -111,8 +111,9 @@ public final class VisionOptions {
     }
 
     /// Makes a {@link BarcodeScanner} report a code only once two frames have
-    /// read it identically. By default this applies to PDF417 codes alone,
-    /// and every other code of every frame is reported as soon as it decodes;
+    /// read it identically. By default this applies to PDF417 codes in camera
+    /// frames alone, and every other code, and any code in a still image, is
+    /// reported as soon as it decodes;
     /// {@code true} extends it to every symbology, {@code false} turns it off
     /// for PDF417 as well.
     ///
@@ -130,8 +131,8 @@ public final class VisionOptions {
     /// pipeline ({@link VisionCameraView}, {@link CodeScanner}) does once per
     /// frame. A frame with no code keeps the pending read, and every code in a
     /// frame is checked against every code of the pending frame, so codes in
-    /// view whose order changes between frames still confirm. A single still
-    /// image processed once therefore reports nothing in strict mode.
+    /// view whose order changes between frames still confirm. With this set to
+    /// {@code true} a single still image processed once reports nothing.
     ///
     /// @param value whether a code must be read identically twice
     /// @return this options object

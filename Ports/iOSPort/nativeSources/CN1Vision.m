@@ -273,6 +273,13 @@ static NSString *cn1BarcodePayloadText(NSData *bytes, NSString *charset) {
  * therefore the payload's bytes, and are recovered here so they can be
  * decoded properly. Nil when the text holds a character above U+00FF, which
  * means Vision decoded it itself (an ECI) and its text is kept as it is.
+ *
+ * Known limit: Vision gives no signal that it honoured an ECI, so a code that
+ * declares one and decodes to characters all at or below U+00FF is taken for
+ * raw bytes too. That is harmless without a named charset (Latin-1 bytes that
+ * are not UTF-8 read back as the same text) and, with one, changes only the
+ * few Latin-1 letters the named charset maps elsewhere. HUB-3 slips and the
+ * other codes measured carry no ECI.
  */
 static NSData *cn1VisionLatin1Bytes(NSString *text) {
     if (text == nil) return nil;
@@ -490,7 +497,10 @@ static NSString *cn1MLKitVisionPerform(NSData *data, CGImageRef rawImage,
                     && (mlkValue == nil || barcodeCharset.length > 0)) {
                 // As on Android: ML Kit answers nil for a payload that is not
                 // valid in the charset it assumes, and its own guess can be the
-                // wrong charset, so a PDF417 is decoded from its bytes.
+                // wrong charset, so a PDF417 is decoded from its bytes. Without
+                // a named charset a non-nil value is kept, the same rule as
+                // AndroidBarcodeScanningAdapter.text: ML Kit's rawValue was not
+                // measured to garble, unlike Apple Vision's payloadStringValue.
                 mlkValue = cn1BarcodePayloadText(barcode.rawData, barcodeCharset);
             }
             item[@"value"] = mlkValue ?: [NSNull null];
