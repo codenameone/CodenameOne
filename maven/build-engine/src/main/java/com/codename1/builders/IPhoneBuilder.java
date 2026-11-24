@@ -7906,7 +7906,15 @@ public class IPhoneBuilder extends Executor {
                             + "    end\n"
                             + "    swift_paths.each do |swift_path|\n"
                             + "      rel_path = Pathname.new(swift_path).relative_path_from(Pathname.new(project_root)).to_s\n"
-                            + "      ref = xcproj.files.find{|f| f.path == rel_path} || xcproj.main_group.new_file(rel_path)\n"
+                            // A Swift file already in <Main>-src when the translator ran (the
+                            // system language model bridge is injected then) has a reference
+                            // whose path is the bare file name inside the -src group, so it never
+                            // equals rel_path. Matching on path alone made a second reference and
+                            // compiled the file twice ("Skipping duplicate build file in Compile
+                            // Sources"), which the native warning census fails. Match the file
+                            // the reference resolves to as well.
+                            + "      abs_path = File.expand_path(swift_path)\n"
+                            + "      ref = xcproj.files.find{|f| f.path == rel_path || ((f.real_path.to_s == abs_path) rescue false)} || xcproj.main_group.new_file(rel_path)\n"
                             + "      unless main_target.source_build_phase.files_references.include?(ref)\n"
                             + "        main_target.source_build_phase.add_file_reference(ref, true)\n"
                             + "      end\n"
